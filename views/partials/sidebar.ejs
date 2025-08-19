@@ -1,0 +1,194 @@
+<!-- start sidebar menu -->
+<% if (typeof activePage === 'undefined') { activePage = 'dashboard'; } %>
+<div class="sidebar-container">
+	<div class="sidemenu-container navbar-collapse collapse fixed-menu">
+		<div id="remove-scroll">
+			<ul class="sidemenu page-header-fixed p-t-20" data-keep-expanded="false" data-auto-scroll="true"
+				data-slide-speed="200">
+				<li class="sidebar-toggler-wrapper hide">
+					<div class="sidebar-toggler">
+						<span></span>
+					</div>
+				</li>
+				<li class="sidebar-user-panel">
+					<div class="user-panel">
+						<div class="row">
+							<div class="sidebar-userpic">
+								<img src="/img/dp.png" class="img-responsive" alt=""> </div>
+						</div>
+						<div class="profile-usertitle">
+							<div class="sidebar-userpic-name"> <%= user ? user.FULLNAME : 'Guest' %> </div>
+							<div class="profile-usertitle-job"> 
+								<% if (user && user.PERMISSIONS) { %>
+									<% if (user.PERMISSIONS == 1) { %>
+										Admin
+									<% } else { %>
+										User
+									<% } %>
+								<% } else { %>
+									Guest
+								<% } %>
+							</div>
+						</div>
+						<div class="sidebar-userpic-btn">
+							<a class="tooltips" href="#" data-placement="top"
+								data-original-title="Profile">
+								<i class="material-icons">person_outline</i>
+							</a>
+							<a class="tooltips" href="#" data-placement="top"
+								data-original-title="Mail">
+								<i class="material-icons">mail_outline</i>
+							</a>
+							<a class="tooltips" href="#" data-placement="top"
+								data-original-title="Chat">
+								<i class="material-icons">chat</i>
+							</a>
+							<a class="tooltips" href="#" data-placement="top"
+								data-original-title="Logout">
+								<i class="material-icons">input</i>
+							</a>
+						</div>
+					</div>
+				</li>
+				<li class="menu-heading" >
+					<span>Front Desk</span>
+				</li>
+				<li class="nav-item <%= !activePage || activePage === 'dashboard' ? 'active' : '' %>">
+					<a href="/" class="nav-link ">
+						<span class="title">Dashboard </span>
+						<i class="material-icons">dashboard</i>
+						<span class="selected"></span>
+					</a>
+				</li>
+
+				<li class="nav-item <%= activePage  === 'calendar' ? 'active' : '' %>">
+					<a href="/calendar" class="nav-link ">
+						<span class="title">Calendar </span>
+						<i class="material-icons">event_note</i>
+						<span class="selected"></span>
+					</a>
+				</li>
+
+				<li class="nav-item <%= activePage  === 'booking' ? 'active' : '' %>">
+					<a href="/booking" class="nav-link ">
+						<span class="title">Booking </span>
+						<i class="material-icons">business_center</i>
+						<span class="selected"></span>
+					</a>
+				</li>
+
+				<li class="nav-item <%= activePage === 'booking_channel' ? 'active' : '' %>">
+					<a href="/booking_channel" class="nav-link ">
+						<span class="title">Booking Channel </span>
+						<i class="material-icons">link</i>
+						<span class="selected"></span>
+					</a>
+				</li>
+
+				<li class="nav-item <%= activePage === 'room' ? 'active' : '' %>">
+					<a href="/room" class="nav-link ">
+						<span class="title">Rooms </span>
+						<i class="material-icons">hotel</i>
+						<span class="selected"></span>
+					</a>
+				</li>
+				
+				<li class="nav-item <%= activePage === 'guest' ? 'active' : '' %>">
+					<a href="/guest" class="nav-link ">
+						<span class="title">Guest Profile </span>
+						<i class="material-icons">person</i>
+						<span class="selected"></span>
+					</a>
+				</li>
+
+				<li class="menu-heading" style="margin-top: 15px;">
+					<span>Management</span>
+				</li>
+				
+				<li class="nav-item <%= activePage === 'expenses' ? 'active' : '' %>">
+					<a href="/expenses" class="nav-link ">
+						<span class="title">Expenses </span>
+						<i class="material-icons">account_balance_wallet</i>
+						<span class="selected"></span>
+					</a>
+				</li>
+				
+				<li class="nav-item <%= activePage === 'services' ? 'active' : '' %>">
+					<a href="/services" class="nav-link ">
+						<span class="title">Services </span>
+						<i class="material-icons">room_service</i>
+						<span class="selected"></span>
+					</a>
+				</li>
+				
+				<li class="nav-item <%= activePage === 'employee' ? 'active' : '' %>">
+					<a href="/employee" class="nav-link ">
+						<span class="title">Employee </span>
+						<i class="material-icons">people</i>
+						<span class="selected"></span>
+					</a>
+				</li>
+				
+				<li class="nav-item <%= activePage === 'vehicle' ? 'active' : '' %>">
+					<a href="/vehicle" class="nav-link ">
+						<span class="title">Vehicle </span>
+						<i class="material-icons">directions_car</i>
+						<span class="selected"></span>
+					</a>
+				</li>
+				
+				<li class="nav-item <%= activePage === 'user_info' ? 'active' : '' %>">
+					<a href="/user_info" class="nav-link ">
+						<span class="title">User Info </span>
+						<i class="material-icons">person_add</i>
+						<span class="selected"></span>
+					</a>
+				</li>
+				
+				
+				
+
+				<!-- Settings Section -->
+				<li class="nav-item <%= activePage === 'integration' ? 'open' : '' %>">
+					<a class="nav-link nav-toggle nav-main-link-submenu" data-toggle="submenu" aria-haspopup="true"
+						aria-expanded="<%= activePage === 'integration' ? 'true' : 'false' %>" href="#">
+						<i class="material-icons">settings</i>
+						<span class="title">Settings</span>
+						<span class="arrow <%= activePage === 'integration' ? 'open' : '' %>"></span>
+					</a>
+					<ul class="sub-menu <%= activePage === 'integration' ? 'show' : '' %>">
+						<li class="nav-item">
+							<a class="nav-link <%= activePage === 'integration' ? 'active' : '' %>" href="/integration">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Integration</span>
+							</a>
+						</li>
+					</ul>
+				</li>
+				
+					<!-- Application Section -->
+					<li class="menu-heading" style="margin-top: 15px;">
+						<span>Application</span>
+					</li>
+				
+
+					<li class="nav-item">
+						<a href="http://45.32.103.210:5002/" class="nav-link " target="_blank">
+							<span class="title">Room Control </span>
+							<i class="material-icons">hotel</i>
+							<span class="selected"></span>
+						</a>
+					</li>
+
+					<li class="nav-item">
+						<a href="http://45.32.103.210:5002/hk" class="nav-link " target="_blank">
+							<span class="title">HK Control </span>
+							<i class="material-icons">local_laundry_service</i>
+							<span class="selected"></span>
+						</a>
+					</li>
+			</ul>
+		</div>
+	</div>
+</div>
+<!-- end sidebar menu -->

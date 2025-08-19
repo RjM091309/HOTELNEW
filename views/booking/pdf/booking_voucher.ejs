@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Booking Voucher</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 13px; }
+    .voucher-box { border: 2px solid #000; padding: 20px; }
+    .header {
+      text-align: center;
+      font-weight: bold;
+      font-size: 20px;
+      margin-bottom: 5px;
+    }
+    .subheader {
+      text-align: center;
+      font-size: 11px;
+      margin-bottom: 20px;
+    }
+    .voucher-title {
+      text-align: center;
+      font-weight: bold;
+      font-size: 18px;
+      /* text-decoration: underline; */
+      margin-bottom: 15px;
+    }
+    .info-table {
+      width: 100%;
+      border: 1px solid #000;
+      border-collapse: collapse;
+      margin-bottom: 15px;
+    }
+    .info-table td {
+      border: 1px solid #000;
+      padding: 6px 8px;
+      vertical-align: top;
+    }
+    .info-table .label {
+      font-weight: bold;
+      width: 35%;
+    }
+    .remarks-box {
+      padding: 8px;
+      min-height: 50px;
+      /* white-space: pre-line; */
+    }
+    .total {
+      text-align: right;
+      font-weight: bold;
+      font-size: 16px;
+      border-top: 2px solid #000;
+      padding-top: 8px;
+    }
+    .prepared {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    .policy {
+      font-size: 11px;
+      margin-top: 20px;
+    }
+    .policy-title {
+      font-weight: bold;
+      margin-top: 10px;
+    }
+    .policy ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+    .red-box {
+      margin-top: 15px;
+      background: red;
+      color: white;
+      font-weight: bold;
+      text-align: center;
+      padding: 8px;
+    }
+
+    .voucher-box img {
+      height: 150px;
+    }
+
+  </style>
+</head>
+<body>
+  <div class="voucher-box">
+ <!-- Wrapper with relative positioning -->
+    <div style="position: relative; text-align: center; margin-bottom: 5px;">
+        <!-- Logo centered -->
+        <img src="<%= imageUrl %>" alt="MSTAY Logo" >
+    
+        <!-- Voucher number absolutely positioned top-right -->
+        <div style="position: absolute; top: 0; right: 0; font-weight: bold; font-size: 13px;">
+        VOUCHER NO: <%= voucherNo || 'N/A' %>
+        </div>
+    </div>
+    
+    <div class="subheader">
+      Clark Terrace Building, Lot 2 Block 1, The Villages Prince Balagtas Avenue, Clark Freeport Zone, Pampanga, 2023<br>
+      📞 (GLOBE) 0945 146 7000 | (SMART) 0969 049 7000
+    </div>
+
+    <div class="voucher-title">VOUCHER</div>
+
+    <table class="info-table">
+      <tr>
+        <td class="label">SOURCE / GUEST NAME:</td>
+        <td><%= fullname %></td>
+      </tr>
+      <tr>
+        <td class="label">RESERVATION DATE:</td>
+        <td><%= new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) %></td>
+      </tr>
+      <tr>
+        <td class="label">ARRIVAL DATE:</td>
+        <td><%= dateFrom %></td>
+      </tr>
+      <tr>
+        <td class="label">DEPARTURE DATE:</td>
+        <td><%= dateTo %></td>
+      </tr>
+      <tr>
+        <td class="label">NO. PAX:</td>
+        <td>-</td>
+      </tr>
+      <tr>
+        <td class="label">LENGTH OF STAY:</td>
+        <td>
+          <% 
+            const from = new Date(dateFrom);
+            const to = new Date(dateTo);
+            const diffDays = Math.ceil((to - from) / (1000 * 60 * 60 * 24));
+          %>
+          <%= diffDays %> NIGHT<%= diffDays > 1 ? 'S' : '' %>
+        </td>
+      </tr>
+      <tr>
+        <td class="label">ROOM TYPE:</td>
+        <td><%= roomNumber %> - (<%= roomType %>)</td>
+      </tr>
+      <tr>
+        <td class="label">REMARKS:</td>
+        <td class="remarks-box">
+          <% 
+            const lines = [];
+      
+            if (remarks && remarks.trim()) lines.push(remarks.trim());
+            lines.push('Room Accomodation');
+      
+            const paxTotal = (parseInt(breakfastAdult || 0) || 0) + (parseInt(breakfastKid || 0) || 0);
+            if (paxTotal > 0) lines.push(`${paxTotal} Pax Breakfast Included`);
+      
+            if (pickup && parseFloat(pickup) > 0) lines.push('With Pick-Up');
+            if (dropoff && parseFloat(dropoff) > 0) lines.push('With Drop-off');
+
+          %>
+          <%- lines.join('<br>') %>
+        </td>
+      </tr>
+      
+      
+      
+    </table>
+
+    <%
+    const cleanTotal = parseFloat((total || '0').toString().replace(/,/g, ''));
+    %>
+    <table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-weight: bold; font-size: 14px;">
+        <tr style="background: #d9d9d9; border-top: 2px solid #000; border-bottom: 2px solid #000;">
+          <td style="padding: 10px; text-align: center;">
+            TOTAL BALANCE: PHP <%= cleanTotal.toLocaleString() %>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 8px; text-align: center;">
+            PREPARED BY: <%= encodedBy %>
+          </td>
+        </tr>
+      </table>
+
+    <div class="policy">
+      <div class="policy-title">Cancellation Refund Policy</div>
+      <ul>
+        <li>1 night penalty for cancellation 20 days before check-in</li>
+        <li>2 nights penalty for cancellation 10 days before check-in</li>
+        <li>Full penalty for cancellation 5 days before check-in</li>
+      </ul>
+
+      <div class="policy-title">Reservation Policy</div>
+      <ul>
+        <li>Reservation fee is non-refundable</li>
+        <li>Reservation fee is deducted from accommodation balance</li>
+        <li>Rescheduling must be done 1 week before arrival</li>
+      </ul>
+
+      <div class="policy-title">Security Deposit</div>
+      <ul>
+        <li>Prepare PHP 2,000 CASH deposit per room upon check-in</li>
+        <li>It is refundable upon checkout</li>
+      </ul>
+    </div>
+
+    <div class="red-box">
+      CHECK-IN TIME: 3:00 PM<br>
+      CHECK-OUT TIME: 12:00 NN
+    </div>
+  </div>
+</body>
+</html>

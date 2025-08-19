@@ -1,0 +1,142 @@
+<!-- ======================================== -->
+<!-- ROOM TYPE MANAGEMENT -->
+<!-- ======================================== -->
+
+<!-- Room Types Management Modal -->
+<div class="modal fade" id="roomTypesManagementModal" tabindex="-1" role="dialog" aria-labelledby="roomTypesManagementModalLabel" aria-hidden="true" data-keyboard="false" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="roomTypesManagementModalLabel">Room Types Management</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6>Manage Room Types</h6>
+                    <button class="btn btn-primary btn-sm" id="addRoomTypeBtn" title="Add New Room Type">
+                        <i class="fa fa-plus"></i> Add New Room Type
+                    </button>
+                </div>
+                <div class="table-scrollable">
+                    <table id="roomTypeTable" class="table table-hover table-bordered full-width">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Description</th>
+                                <th>Base Price</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Room Type Modal -->
+<div class="modal fade" id="addRoomTypeModal" tabindex="-1" role="dialog" aria-labelledby="addRoomTypeModalLabel" aria-hidden="true" data-keyboard="false" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="addRoomTypeModalLabel">Add New Room Type</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addRoomTypeForm">
+                <div class="modal-body">
+                    <!-- Room Type Name -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="addRoomTypeName" name="NAME" required>
+                                <label class="mdl-textfield__label">Room Type Name *</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Description -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <textarea class="mdl-textfield__input" type="text" rows="3" id="addRoomTypeDescription" name="DESCRIPTION"></textarea>
+                                <label class="mdl-textfield__label">Description</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Base Price -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="number" step="0.01" id="addRoomTypePrice" name="BASE_PRICE" required>
+                                <label class="mdl-textfield__label">Base Price *</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-10">Add Room Type</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Room Type Modal -->
+<div class="modal fade" id="editRoomTypeModal" tabindex="-1" role="dialog" aria-labelledby="editRoomTypeModalLabel" aria-hidden="true" data-keyboard="false" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="editRoomTypeModalLabel">Edit Room Type</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editRoomTypeForm">
+                <div class="modal-body">
+                    <input type="hidden" id="editRoomTypeId" name="IDNo">
+                    
+                    <!-- Room Type Name -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editRoomTypeName" name="NAME" required>
+                                <label class="mdl-textfield__label">Room Type Name</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Description -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <textarea class="mdl-textfield__input" type="text" rows="3" id="editRoomTypeDescription" name="DESCRIPTION"></textarea>
+                                <label class="mdl-textfield__label">Description</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Base Price -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="number" step="0.01" id="editRoomTypePrice" name="BASE_PRICE" required>
+                                <label class="mdl-textfield__label">Base Price</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-10">Update Room Type</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div> 

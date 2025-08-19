@@ -1,0 +1,46 @@
+<div class="modal fade" id="modal-cancel-booking" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title">Cancel Booking</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="cancelBookingId">
+          <div class="form-check mt-3">
+            <input class="form-check-input" type="checkbox" id="manualOverrideToggle">
+            <label class="form-check-label" for="manualOverrideToggle">Enter refund amount manually.</label>
+          </div>
+          
+          <div id="manualFields" style="display: none;">
+            <div class="mb-2">
+              <label>Refundable Amount (₱)</label>
+              <input type="number" id="manualRefund" class="form-control" step="0.01">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label for="cancelReason" class="form-label">Reason</label>
+            <textarea class="form-control" id="cancelReason" rows="3" placeholder="Optional..."></textarea>
+          </div>
+          <div class="alert alert-warning">
+            This action cannot be undone. Cancellation penalties apply based on policy.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button class="btn btn-danger" id="confirmCancelBtn">Confirm Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+<!-- Include external JavaScript files -->
+<script>
+	document.addEventListener('DOMContentLoaded', function() {
+		
+		// Load add_booking.js immediately - this is critical for booking functionality
+		var cancelBookingScript = document.createElement('script');
+		cancelBookingScript.src = '/js/booking/cancel_booking.js';
+		document.body.appendChild(cancelBookingScript);
+	});
+</script>

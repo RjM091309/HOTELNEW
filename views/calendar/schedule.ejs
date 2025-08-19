@@ -1,0 +1,1527 @@
+<!-- Team Schedule Table -->
+<div class="card basic-data-table">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">Team Schedule</h5>
+        <div class="card-toolbar d-flex gap-3">
+          <button type="button" class="btn btn-primary-10 radius-8 px-20 py-11 d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modal-schedule-types">
+            <iconify-icon icon="mingcute:eye-line" class="text-xl"></iconify-icon> View Schedule Type
+          </button>
+          
+          <button type="button" class="btn btn-secondary radius-8 px-20 py-11 d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modal-new-schedule">
+            <iconify-icon icon="mingcute:add-line" class="text-xl"></iconify-icon> New Schedule
+          </button>
+        </div>
+    </div>
+    <div class="card-body">
+        <!-- Filter Controls -->
+        <div class="row mb-6">
+            <div class="col-md-8">
+                <label for="department">Department</label>
+                <div class="field2">
+                    <select class="js-select2" id="department" name="department">
+                        <option value="" disabled selected>Select Department</option>
+                    </select>
+                    <div class="wizard-form-error"></div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <label for="month">Month</label>
+                <div class="field2">
+                    <select class="js-select2" id="month" name="month">
+                        <option value="01">January</option>
+                        <option value="02">February</option>
+                        <option value="03">March</option>
+                        <option value="04">April</option>
+                        <option value="05">May</option>
+                        <option value="06">June</option>
+                        <option value="07">July</option>
+                        <option value="08">August</option>
+                        <option value="09">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                    </select>
+                    <div class="wizard-form-error"></div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <label for="year">Year</label>
+                <div class="field2">
+                    <select class="js-select2" id="year" name="year">
+                    </select>
+                    <div class="wizard-form-error"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Schedule Display -->
+        <div class="mt-24" id="scheduleContainer" style="display: none;">
+        </div>
+    </div>
+</div>
+
+<script>
+    (() => {
+// Team Schedule Management
+
+let dropdownOptions = null;
+let currentDepartment = '';
+let currentMonth = '';
+let currentYear = '';
+
+// Color generation function for schedule types
+function generateColorFromId(id) {
+    // Predefined colors for better visual distinction
+    const colors = [
+        '#7bb9f7', // Blue
+        '#28a745', // Green  
+        '#ffc107', // Yellow
+        '#e4606d', // Red
+        '#6f42c1', // Purple
+        '#fd9a47', // Orange
+        '#20c997', // Teal
+        '#e83e8c', // Pink
+        '#868e96', // Gray
+        '#17a2b8', // Cyan
+        '#6610f2', // Indigo
+        '#e3f2fd', // Light Blue
+        '#e8f5e8', // Light Green
+        '#fff8e1', // Light Yellow
+        '#ffebee', // Light Red
+        '#f3e5f5', // Light Purple
+        '#fff3e0', // Light Orange
+        '#e0f2f1', // Light Teal
+        '#fce4ec', // Light Pink
+        '#f5f5f5', // Light Gray
+        '#e0f7fa', // Light Cyan
+        '#e1f5fe', // Very Light Blue
+        '#f8f9fa', // Very Light Gray
+        '#fff9c4'  // Very Light Yellow
+    ];
+    
+    // Use modulo to cycle through colors
+    const colorIndex = parseInt(id) % colors.length;
+    return colors[colorIndex];
+}
+
+// Get color for schedule type (supports custom colors)
+function getScheduleTypeColor(scheduleTypeInfo) {
+    if (!scheduleTypeInfo) return '#e2e3e5'; // Default gray
+    
+    // If schedule type has custom color, use it
+    if (scheduleTypeInfo.custom_color) {
+        return scheduleTypeInfo.custom_color;
+    }
+    
+    // Otherwise use auto-generated color
+    return generateColorFromId(scheduleTypeInfo.id);
+}
+
+// Generate legend for schedule types
+function generateScheduleTypeLegend() {
+    if (!dropdownOptions || !dropdownOptions.scheduleTypes) {
+        return '';
+    }
+    
+    let legendHTML = '';
+    dropdownOptions.scheduleTypes.forEach(scheduleType => {
+        const color = getScheduleTypeColor(scheduleType);
+        legendHTML += `
+            <div class="d-flex align-items-center gap-2">
+                <div style="width: 20px; height: 20px; background-color: ${color};"></div>
+                <span>${scheduleType.description}</span>
+            </div>
+        `;
+    });
+    
+    return legendHTML;
+}
+
+// Alert functions
+function showSuccessAlert(message) {
+  $('.team-schedule-success-alert').remove();
+  var alertHtml = `
+    <div class="alert alert-success bg-success-100 text-success-600 border-success-600 border-start-width-4-px border-top-0 border-end-0 border-bottom-0 px-24 py-13 mb-0 fw-semibold text-lg radius-4 d-flex align-items-center justify-content-between team-schedule-success-alert" role="alert" style="position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+      <div class="d-flex align-items-center gap-2">
+        <iconify-icon icon="akar-icons:double-check" class="icon text-xl"></iconify-icon>
+        ${message}
+      </div>
+      <button class="remove-button text-success-600 text-xxl line-height-1" onclick="$('.team-schedule-success-alert').remove();">
+        <iconify-icon icon="iconamoon:sign-times-light" class="icon"></iconify-icon>
+      </button>
+    </div>
+  `;
+  $('body').append(alertHtml);
+  setTimeout(function () {
+    $('.team-schedule-success-alert').fadeOut(300, function () { $(this).remove(); });
+  }, 5000);
+}
+
+function showDangerAlert(message) {
+  $('.team-schedule-danger-alert').remove();
+  var alertHtml = `
+    <div class="alert alert-danger bg-danger-100 text-danger-600 border-danger-600 border-start-width-4-px border-top-0 border-end-0 border-bottom-0 px-24 py-13 mb-0 fw-semibold text-lg radius-4 d-flex align-items-center justify-content-between team-schedule-danger-alert" role="alert" style="position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+      <div class="d-flex align-items-center gap-2">
+        <iconify-icon icon="mdi:error-outline" class="icon text-xl"></iconify-icon>
+        ${message}
+      </div>
+      <button class="remove-button text-danger-600 text-xxl line-height-1" onclick="$('.team-schedule-danger-alert').remove();">
+        <iconify-icon icon="iconamoon:sign-times-light" class="icon"></iconify-icon>
+      </button>
+    </div>
+  `;
+  $('body').append(alertHtml);
+  setTimeout(function () {
+    $('.team-schedule-danger-alert').fadeOut(300, function () { $(this).remove(); });
+  }, 5000);
+}
+
+// Wait for jQuery to be available
+function waitForJQuery(callback) {
+    if (typeof jQuery !== 'undefined') {
+        callback();
+    } else {
+        setTimeout(function() {
+            waitForJQuery(callback);
+        }, 100);
+    }
+}
+
+waitForJQuery(function() {
+    $(document).ready(function() {
+        // Initialize everything
+        initializePage();
+    });
+});
+
+function initializePage() {
+    loadDropdownOptions();
+    initializeMonthDropdown();
+    setupEventListeners();
+    setDefaultFilters();
+    populateYearDropdown();
+}
+
+// Load dropdown options
+function loadDropdownOptions(callback) {
+    $.get('/team-schedule/api/dropdown-options', function(data) {
+        dropdownOptions = data;
+        populateDropdowns(data);
+        if (typeof callback === 'function') callback();
+    }).fail(function(xhr, status, error) {
+        console.error('Error loading dropdown options:', error);
+        console.error('Response:', xhr.responseText);
+        showDangerAlert('Failed to load dropdown options. Please try again.');
+    });
+}
+
+// Populate dropdowns
+function populateDropdowns(data) {
+    // Department dropdown
+    const $deptSelect = $('#department');
+    $deptSelect.empty().append('<option value="" disabled selected>Select Department</option>');
+    if (data.departments && data.departments.length > 0) {
+        data.departments.forEach(dept => {
+            $deptSelect.append(`<option value="${dept.department_id}">${dept.description}</option>`);
+        });
+    } else {
+        console.warn('No departments found in dropdown options');
+    }
+    $deptSelect.select2({ 
+        placeholder: 'Select Department',
+        width: '100%'
+    });
+
+    // Employee dropdowns
+    const employeeSelects = ['#add_employee'];
+    employeeSelects.forEach(selectId => {
+        const $empSelect = $(selectId);
+        $empSelect.empty().append('<option value="" disabled selected>Select Employee</option>');
+        if (data.employees && data.employees.length > 0) {
+            data.employees.forEach(emp => {
+                const fullName = [emp.first_name, emp.last_name].filter(Boolean).join(' ');
+                $empSelect.append(`<option value="${emp.profile_id}">${fullName}</option>`);
+            });
+        } else {
+            console.warn('No employees found in dropdown options');
+        }
+        $empSelect.select2({ 
+            placeholder: 'Select Employee',
+            width: '100%', 
+            dropdownParent: $(selectId).closest('.modal').length ? $(selectId).closest('.modal') : $('body')
+        });
+    });
+
+    // Schedule type dropdowns
+    const scheduleTypeSelects = ['#add_schedule_type', '#edit_schedule_type'];
+    scheduleTypeSelects.forEach(selectId => {
+        const $scheduleSelect = $(selectId);
+        $scheduleSelect.empty().append('<option value="" disabled selected>Select Schedule Type</option>');
+        if (data.scheduleTypes && data.scheduleTypes.length > 0) {
+            data.scheduleTypes.forEach(schedule => {
+                $scheduleSelect.append(`<option value="${schedule.id}">${schedule.description}</option>`);
+            });
+        } else {
+            console.warn('No schedule types found in dropdown options');
+        }
+        $scheduleSelect.select2({ 
+            placeholder: 'Select Schedule Type',
+            width: '100%', 
+            dropdownParent: $(selectId).closest('.modal').length ? $(selectId).closest('.modal') : $('body')
+        });
+    });
+}
+
+function populateYearDropdown() {
+    const yearSelect = $('#year');
+    yearSelect.empty();
+    yearSelect.append('<option value="" disabled selected>Select Year</option>');
+    
+    const currentYear = new Date().getFullYear();
+    for (let year = currentYear; year >= currentYear - 5; year--) {
+        yearSelect.append(`<option value="${year}">${year}</option>`);
+    }
+    
+    // Set current year as default
+    yearSelect.val(currentYear);
+    yearSelect.select2({ 
+        placeholder: 'Select Year',
+        width: '100%'
+    });
+}
+
+function initializeMonthDropdown() {
+    const monthSelect = $('#month');
+    monthSelect.select2({ 
+        placeholder: 'Select Month',
+        width: '100%'
+    });
+}
+
+function setupEventListeners() {
+    // Filter change events
+    $('#department').on('change', function() {
+        currentDepartment = $(this).val();
+        filterEmployeesByDepartment();
+        if (currentDepartment && currentMonth && currentYear) {
+            loadTeamSchedule();
+        }
+    });
+
+    $('#month').on('change', function() {
+        currentMonth = $(this).val();
+        if (currentDepartment && currentMonth && currentYear) {
+            loadTeamSchedule();
+        }
+    });
+
+    $('#year').on('change', function() {
+        currentYear = $(this).val();
+        if (currentDepartment && currentMonth && currentYear) {
+            loadTeamSchedule();
+        }
+    });
+
+    // Modal events
+    $('#modal-new-schedule').on('show.bs.modal', function() {
+        resetAddScheduleForm();
+    });
+
+    $('#modal-edit-schedule').on('show.bs.modal', function() {
+        // loadScheduleForEdit() is called from editSchedule function
+    });
+
+    $('#modal-schedule-types').on('show.bs.modal', function() {
+        loadScheduleTypes();
+    });
+
+    // Form submissions
+    $('#addScheduleForm').on('submit', function(e) {
+        e.preventDefault();
+        createSchedule();
+    });
+
+    $('#editScheduleForm').on('submit', function(e) {
+        e.preventDefault();
+        updateSchedule();
+    });
+
+    // Schedule Type form submission
+    $('#scheduleTypeForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        const editId = $('#scheduleTypeForm').data('edit-id');
+        
+        if (editId) {
+            // Update existing schedule type
+            updateScheduleType(editId);
+        } else {
+            // Create new schedule type
+            createScheduleType();
+        }
+    });
+
+    // Delete confirmation
+    $('#confirmDeleteSchedule').on('click', function() {
+        confirmDeleteSchedule();
+    });
+
+    // Initialize Flatpickr for date inputs
+    if (typeof flatpickr !== 'undefined') {
+        $('.flatpickr-date').flatpickr({
+            dateFormat: "Y-m-d",
+            allowInput: true,
+            clickOpens: true,
+            disableMobile: false
+        });
+        
+        // Initialize date range picker
+        $('.flatpickr-date-range').flatpickr({
+            mode: "range",
+            dateFormat: "Y-m-d",
+            allowInput: true,
+            clickOpens: true,
+            disableMobile: false,
+            onChange: function(selectedDates, dateStr, instance) {
+                // Trigger validation when date range is selected
+                $(instance.input).trigger('blur');
+            }
+        });
+    }
+
+    // Ensure time inputs work properly - use native time inputs instead of Flatpickr
+    $('#modal-new-type').on('shown.bs.modal', function() {
+        // Remove any existing Flatpickr instances
+        if ($('#schedule_time_in').data('flatpickr')) {
+            $('#schedule_time_in').data('flatpickr').destroy();
+        }
+        if ($('#schedule_time_out').data('flatpickr')) {
+            $('#schedule_time_out').data('flatpickr').destroy();
+        }
+        
+        // Initialize select2 for schedule color dropdown
+        $('#schedule_color').select2({
+            placeholder: 'Select Color',
+            width: '100%',
+            dropdownParent: $('#modal-new-type')
+        });
+        
+        // Add event listeners for time input changes
+        $('#schedule_time_in').off('change input').on('change input', function() {
+            // Time input change handler
+        });
+        
+        $('#schedule_time_out').off('change input').on('change input', function() {
+            // Time input change handler
+        });
+        
+        // Handle DAY OFF checkbox
+        $('#schedule_is_dayoff').off('change').on('change', function() {
+            const isDayOff = $(this).is(':checked');
+            const timeInField = $('#schedule_time_in');
+            const timeOutField = $('#schedule_time_out');
+            const descriptionField = $('#schedule_description');
+            
+            if (isDayOff) {
+                // Auto-fill for DAY OFF
+                timeInField.val('00:00').prop('disabled', true);
+                timeOutField.val('00:00').prop('disabled', true);
+                
+                // Auto-fill description if empty
+                if (!descriptionField.val().trim()) {
+                    descriptionField.val('DAY OFF');
+                }
+                
+                // Show visual indication
+                timeInField.closest('.form-group').addClass('bg-light');
+                timeOutField.closest('.form-group').addClass('bg-light');
+            } else {
+                // Re-enable time fields
+                timeInField.prop('disabled', false).val('');
+                timeOutField.prop('disabled', false).val('');
+                
+                // Remove visual indication
+                timeInField.closest('.form-group').removeClass('bg-light');
+                timeOutField.closest('.form-group').removeClass('bg-light');
+            }
+        });
+    });
+
+    // Schedule Type Management Event Listeners
+    $(document).on('click', '#addNewScheduleTypeBtn', function() {
+        openNewScheduleTypeModal();
+    });
+
+    $(document).on('click', '.edit-schedule-type-btn', function() {
+        const scheduleId = $(this).data('schedule-id');
+        editScheduleType(scheduleId);
+    });
+
+    $(document).on('click', '.delete-schedule-type-btn', function() {
+        const scheduleId = $(this).data('schedule-id');
+        deleteScheduleType(scheduleId);
+    });
+
+    $(document).on('click', '.reactivate-schedule-type-btn', function() {
+        const scheduleId = $(this).data('schedule-id');
+        reactivateScheduleType(scheduleId);
+    });
+
+
+}
+
+function filterEmployeesByDepartment() {
+    const departmentId = currentDepartment;
+    const employeeSelects = ['#add_employee'];
+    
+    if (!departmentId) {
+        // If no department selected, hide all employees
+        employeeSelects.forEach(selectId => {
+            const select = $(selectId);
+            select.find('option').not(':first').hide();
+        });
+        return;
+    }
+    
+    // Filter employees by department
+    employeeSelects.forEach(selectId => {
+        const select = $(selectId);
+        
+        // Show only employees from the selected department
+        select.find('option').each(function() {
+            const option = $(this);
+            const employeeId = option.val();
+            
+            if (!employeeId) {
+                // Keep the "Select Employee" option visible
+                option.show();
+                return;
+            }
+            
+            // Check if this employee belongs to the selected department
+            // We need to get employee data from the dropdown options
+            const employeeData = dropdownOptions?.employees?.find(emp => emp.profile_id == employeeId);
+            
+            if (employeeData && employeeData.department == departmentId) {
+                option.show();
+            } else {
+                option.hide();
+            }
+        });
+    });
+}
+
+function setDefaultFilters() {
+    // Set current month as default
+    const currentDate = new Date();
+    const defaultMonth = (currentDate.getMonth() + 1).toString().padStart(2, '0'); // Get current month (01-12)
+    const defaultYear = currentDate.getFullYear();
+    
+    // Set month dropdown to current month
+    $('#month').val(defaultMonth).trigger('change');
+    currentMonth = defaultMonth;
+    
+    // Set year dropdown to current year
+    $('#year').val(defaultYear).trigger('change');
+    currentYear = defaultYear;
+    
+    // Check if we have all required filters and trigger load
+    if (currentDepartment && currentMonth && currentYear) {
+        filterEmployeesByDepartment(); // Filter employees when page loads
+        loadTeamSchedule();
+    }
+}
+
+function loadTeamSchedule() {
+    if (!currentDepartment || !currentMonth || !currentYear) {
+        showDangerAlert('Please select department, month, and year');
+        return;
+    }
+
+    showLoading();
+
+    $.ajax({
+        url: '/team-schedule/api/team-schedule',
+        method: 'GET',
+        data: {
+            department: currentDepartment,
+            month: currentMonth,
+            year: currentYear
+        },
+        success: function(response) {
+            hideLoading();
+            if (response.success) {
+                renderTeamSchedule(response.data);
+                $('#scheduleContainer').show();
+            } else {
+                showDangerAlert(response.message || 'Failed to load team schedule');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Error loading team schedule:', error);
+            hideLoading();
+            showDangerAlert('Error loading team schedule');
+        }
+    });
+}
+
+function renderTeamSchedule(data) {
+    const { employees, days, schedules } = data;
+    
+    if (!employees || employees.length === 0) {
+        $('#scheduleContainer').html('<div class="alert alert-info">No employees found in this department</div>');
+        return;
+    }
+    
+    // Create the complete table HTML
+    let tableHTML = `
+        <div class="row">
+            <div class="col-12">
+                <div class="table-responsive" style="max-width: 100%; overflow-x: auto;">
+                    <table class="table table-bordered" id="teamScheduleTable" style="border-collapse: collapse; border: 2px solid #dee2e6; font-size: 12px;">
+                        <thead>
+                            <tr>
+                                <th style="border: 2px solid #dee2e6; background-color: #f8f9fa; color: #6c757d; font-weight: bold; padding: 8px;">Employee</th>`;
+    
+    // Add header days
+    days.forEach(day => {
+        // Extract day number from date (YYYY-MM-DD format)
+        const dayNumber = day.date.split('-')[2];
+        
+        // Set background color based on day
+        let backgroundColor = '#f8f9fa'; // Default color
+        if (day.dayName === 'Sat') {
+            backgroundColor = '#e1e5ea'; // Light blue for Saturday
+        } else if (day.dayName === 'Sun') {
+            backgroundColor = '#e1e5ea'; // Light red for Sunday
+        }
+        
+        tableHTML += `<th class="text-center" style="border: 2px solid #dee2e6; background-color: ${backgroundColor}; font-weight: bold; padding: 4px; min-width: 40px; max-width: 45px;">
+            <div style="font-size: 10px; color: #6c757d; line-height: 1;">${day.dayName}</div>
+            <small style="font-size: 12px; color: #6c757d; font-weight: bold; line-height: 1;">${dayNumber}</small>
+        </th>`;
+    });
+    
+    tableHTML += `
+                            </tr>
+                        </thead>
+                        <tbody>`;
+    
+    // Add employee rows
+    employees.forEach((employee, index) => {
+        tableHTML += `<tr>
+            <td style="border: 2px solid #dee2e6; background-color: #f8f9fa; padding: 8px; min-width: 120px; max-width: 140px;">
+                <strong style="font-size: 12px; color: #6c757d;">${employee.first_name} ${employee.last_name}</strong>
+            </td>`;
+
+        // Add schedule cells for each day
+        days.forEach(day => {
+            const schedule = schedules.find(s => {
+                const match = s.employee_id === employee.id && s.date === day.date;
+                return match;
+            });
+
+            let cellClass = 'table-light';
+            let scheduleText = '';
+            let scheduleType = '';
+            let cellStyle = '';
+
+            if (schedule) {
+                scheduleType = schedule.schedule_type;
+                
+                // Dynamic color coding based on schedule type
+                if (schedule.is_changed) {
+                    cellStyle = 'background-color: #fff3cd;'; // Warning color for changed schedules
+                } else {
+                    // Get schedule type info from dropdown options
+                    const scheduleTypeInfo = dropdownOptions?.scheduleTypes?.find(sched => sched.id == scheduleType);
+                    
+                                    if (scheduleTypeInfo) {
+                    // Use custom color or auto-generated color
+                    const colorHash = getScheduleTypeColor(scheduleTypeInfo);
+                    cellStyle = `background-color: ${colorHash};`;
+                } else {
+                    // Fallback colors for unknown schedule types
+                    if (scheduleType === '0' || scheduleType === 0) {
+                        cellStyle = 'background-color: #f8d7da;'; // Danger color for day off
+                    } else if (scheduleType === '1' || scheduleType === 1) {
+                        cellStyle = 'background-color: #4b9ff4;'; // Custom blue for duty
+                    } else if (scheduleType === '2' || scheduleType === 2) {
+                        cellStyle = 'background-color: #d1ecf1;'; // Info color
+                    } else if (scheduleType === '3' || scheduleType === 3) {
+                        cellStyle = 'background-color: #fff3cd;'; // Warning color
+                    } else {
+                        // Default color for new schedule types
+                        cellStyle = 'background-color: #e2e3e5;'; // Light gray
+                    }
+                }
+                }
+            }
+
+            tableHTML += `<td class="text-center" 
+                data-employee="${employee.id}" 
+                data-date="${day.date}" 
+                data-schedule="${scheduleType}"
+                style="cursor: pointer; border: 2px solid #dee2e6; padding: 4px; min-width: 40px; max-width: 45px; height: 40px; vertical-align: middle; position: relative; ${cellStyle}">
+            </td>`;
+        });
+
+        tableHTML += `</tr>`;
+    });
+    
+    tableHTML += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer mt-24">
+    <div class="d-flex align-items-center justify-content-end gap-8 w-100">
+     
+               
+                <div class="d-flex gap-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <div style="width: 20px; height: 20px; background-color: #fff; border: 1px solid #ddd;"></div>
+                        <span>Unassigned</span>
+                    </div>
+                 
+                    ${generateScheduleTypeLegend()}
+                </div>
+            </div>
+    
+  </div>
+        `;
+
+    $('#scheduleContainer').html(tableHTML);
+    
+    // Re-attach click events
+    $('#teamScheduleTable td[data-employee]').on('click', function() {
+        const employeeId = $(this).data('employee');
+        const date = $(this).data('date');
+        const scheduleType = $(this).data('schedule');
+        
+        // Check if it's a right-click or has specific class for edit/delete
+        if ($(this).hasClass('schedule-cell-edit')) {
+            editSchedule(employeeId, date, scheduleType);
+        } else if ($(this).hasClass('schedule-cell-delete')) {
+            deleteSchedule(employeeId, date, scheduleType);
+        } else {
+            // Default behavior - show details or edit
+            editSchedule(employeeId, date, scheduleType);
+        }
+    });
+
+    // Add specific edit/delete button handlers
+    $('#teamScheduleTable .edit-schedule-btn').on('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const employeeId = $(this).data('employee');
+        const date = $(this).data('date');
+        const scheduleType = $(this).data('schedule');
+        editSchedule(employeeId, date, scheduleType);
+    });
+
+
+
+    // Add right-click context menu
+    $('#teamScheduleTable td[data-employee]').on('contextmenu', function(e) {
+        e.preventDefault();
+        const employeeId = $(this).data('employee');
+        const date = $(this).data('date');
+        const scheduleType = $(this).data('schedule');
+        
+        // Show context menu
+        showContextMenu(e, employeeId, date, scheduleType);
+    });
+
+    $('#scheduleContainer').show();
+}
+
+function resetAddScheduleForm() {
+    $('#addScheduleForm')[0].reset();
+    $('#add_employee').val('').trigger('change');
+    $('#add_schedule_type').val('').trigger('change');
+    $('#add_date_range').val('');
+    $('#add_exclude_weekends').prop('checked', false);
+}
+
+function createSchedule() {
+    const formData = {
+        employee_id: $('#add_employee').val(),
+        schedule_type: $('#add_schedule_type').val(),
+        date_range: $('#add_date_range').val(),
+        exclude_weekends: $('#add_exclude_weekends').is(':checked')
+    };
+
+    if (!formData.employee_id || !formData.schedule_type || !formData.date_range) {
+        showDangerAlert('Please fill in all required fields');
+        return;
+    }
+
+    // Parse date range
+    const dateRange = formData.date_range.split(' to ');
+    if (dateRange.length !== 2) {
+        showDangerAlert('Please select a valid date range');
+        return;
+    }
+
+    const startDate = new Date(dateRange[0]);
+    const endDate = new Date(dateRange[1]);
+    
+    if (startDate > endDate) {
+        showDangerAlert('Start date cannot be after end date');
+        return;
+    }
+
+    // Generate dates array
+    const dates = [];
+    const currentDate = new Date(startDate);
+    
+    while (currentDate <= endDate) {
+        const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 6 = Saturday
+        
+        // Skip weekends if exclude_weekends is checked
+        if (formData.exclude_weekends && (dayOfWeek === 0 || dayOfWeek === 6)) {
+            currentDate.setDate(currentDate.getDate() + 1);
+            continue;
+        }
+        
+        dates.push(new Date(currentDate).toISOString().split('T')[0]);
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    if (dates.length === 0) {
+        showDangerAlert('No valid dates found in the selected range');
+        return;
+    }
+
+    $.ajax({
+        url: '/team-schedule/api/schedule',
+        method: 'POST',
+        data: {
+            employee_id: formData.employee_id,
+            schedule_type: formData.schedule_type,
+            dates: dates
+        },
+        success: function(response) {
+            if (response.success) {
+                showSuccessAlert(`Schedules created successfully for ${dates.length} date(s)!`);
+                $('#modal-new-schedule').modal('hide');
+                resetAddScheduleForm();
+                
+                // Add a small delay before reloading to ensure database update is complete
+                setTimeout(() => {
+                    loadTeamSchedule(); // Reload the schedule data
+                }, 500);
+            } else {
+                showDangerAlert(response.message || 'Failed to create schedules');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Error creating schedule:', error);
+            showDangerAlert('Error creating schedules. Please try again.');
+        }
+    });
+}
+
+function editSchedule(employeeId, date, currentSchedule) {
+    // Load schedule data for editing
+    loadScheduleForEdit(employeeId, date, currentSchedule);
+    
+    // Show edit modal
+    $('#modal-edit-schedule').modal('show');
+}
+
+function loadScheduleForEdit(employeeId, date, currentSchedule) {
+    // Get employee name from dropdown options
+    const employeeData = dropdownOptions?.employees?.find(emp => emp.profile_id == employeeId);
+    const employeeName = employeeData ? [employeeData.first_name, employeeData.last_name].filter(Boolean).join(' ') : 'Unknown Employee';
+    
+    // Populate edit form
+    $('#edit_employee_name').val(employeeName);
+    $('#edit_employee').val(employeeId);
+    $('#edit_schedule_type').val(currentSchedule).trigger('change');
+    $('#edit_date').val(date);
+    
+    // Store current data for update
+    $('#editScheduleForm').data('edit-data', {
+        employeeId: employeeId,
+        date: date,
+        currentSchedule: currentSchedule
+    });
+}
+
+function updateSchedule() {
+    const formData = {
+        employee_id: $('#edit_employee').val(),
+        schedule_type: $('#edit_schedule_type').val(),
+        date: $('#edit_date').val()
+    };
+
+    if (!formData.employee_id || !formData.schedule_type || !formData.date) {
+        showDangerAlert('Please fill in all required fields');
+        return;
+    }
+    
+    $.ajax({
+        url: '/team-schedule/api/schedule/update',
+        method: 'PUT',
+        data: formData,
+        success: function(response) {
+            if (response.success) {
+                showSuccessAlert('Schedule updated successfully!');
+                $('#modal-edit-schedule').modal('hide');
+                
+                // Add a small delay before reloading to ensure database update is complete
+                setTimeout(() => {
+                    loadTeamSchedule(); // Reload the schedule data
+                }, 500);
+            } else {
+                showDangerAlert(response.message || 'Failed to update schedule');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Error updating schedule:', error);
+            showDangerAlert('Error updating schedule. Please try again.');
+        }
+    });
+}
+
+function deleteSchedule(employeeId, date, scheduleType) {
+    // Get employee name for confirmation
+    const employeeData = dropdownOptions?.employees?.find(emp => emp.profile_id == employeeId);
+    const employeeName = employeeData ? [employeeData.first_name, employeeData.last_name].filter(Boolean).join(' ') : 'Unknown Employee';
+    
+    // Get schedule description
+    const scheduleData = dropdownOptions?.scheduleTypes?.find(sched => sched.id == scheduleType);
+    const scheduleDesc = scheduleData ? scheduleData.description : 'Unknown Schedule';
+    
+    // Populate delete confirmation modal
+    $('#scheduleInfoToDelete').text(`${employeeName} - ${scheduleDesc} on ${date}`);
+    
+    // Store delete data
+    $('#modal-delete-schedule').data('delete-data', {
+        employeeId: employeeId,
+        date: date,
+        scheduleType: scheduleType
+    });
+    
+    // Show delete modal
+    $('#modal-delete-schedule').modal('show');
+}
+
+function confirmDeleteSchedule() {
+    const deleteData = $('#modal-delete-schedule').data('delete-data');
+    if (!deleteData) {
+        showDangerAlert('No schedule selected for deletion');
+        return;
+    }
+    
+    // Combine employee_id and date for the API call
+    const deleteId = `${deleteData.employeeId},${deleteData.date}`;
+    
+    $.ajax({
+        url: `/team-schedule/api/schedule/${deleteId}`,
+        method: 'DELETE',
+        success: function(response) {
+            if (response.success) {
+                showSuccessAlert('Schedule deleted successfully!');
+                $('#modal-delete-schedule').modal('hide');
+                
+                // Add a small delay before reloading to ensure database update is complete
+                setTimeout(() => {
+                    loadTeamSchedule(); // Reload the schedule data
+                }, 500);
+            } else {
+                showDangerAlert(response.message || 'Failed to delete schedule');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Error deleting schedule:', error);
+            showDangerAlert('Error deleting schedule. Please try again.');
+        }
+    });
+}
+
+function showLoading() {
+    $('#scheduleContainer').html('<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>');
+    $('#scheduleContainer').show();
+}
+
+function hideLoading() {
+    // Loading is hidden when content is rendered
+    // The loading spinner is replaced by the table content in renderTeamSchedule
+}
+
+function showContextMenu(e, employeeId, date, scheduleType) {
+    // Remove existing context menu
+    $('.schedule-context-menu').remove();
+    
+    // Create context menu
+    const menu = $(`
+        <div class="schedule-context-menu" style="
+            position: fixed; 
+            background: white; 
+            border: 1px solid #ccc; 
+            border-radius: 4px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            z-index: 1000; 
+            padding: 5px 0;
+            min-width: 120px;">
+            <div class="context-menu-item" style="padding: 8px 15px; cursor: pointer; hover: background-color: #f5f5f5;" data-action="edit">
+                <i class="fas fa-edit" style="margin-right: 8px;"></i> Edit Schedule
+            </div>
+            <div class="context-menu-item" style="padding: 8px 15px; cursor: pointer; hover: background-color: #f5f5f5; color: #dc3545;" data-action="delete">
+                <i class="fas fa-trash" style="margin-right: 8px;"></i> Delete Schedule
+            </div>
+        </div>
+    `);
+    
+    // Position menu at mouse position
+    menu.css({
+        left: e.pageX + 'px',
+        top: e.pageY + 'px'
+    });
+    
+    // Add to body
+    $('body').append(menu);
+    
+    // Handle menu item clicks
+    menu.find('.context-menu-item').on('click', function() {
+        const action = $(this).data('action');
+        
+        if (action === 'edit') {
+            editSchedule(employeeId, date, scheduleType);
+        } else if (action === 'delete') {
+            deleteSchedule(employeeId, date, scheduleType);
+        }
+        
+        menu.remove();
+    });
+    
+    // Remove menu when clicking outside
+    $(document).one('click', function() {
+        menu.remove();
+    });
+}
+
+// Schedule Type File Maintenance Functions
+
+
+function openNewScheduleTypeModal() {
+    resetScheduleTypeForm();
+    // Show the new modal on top of the current one
+    $('#modal-new-type').modal('show');
+}
+
+function resetScheduleTypeForm() {
+    $('#scheduleTypeForm')[0].reset();
+    $('#schedule_overnight').prop('checked', false);
+    $('#schedule_is_dayoff').prop('checked', false);
+    
+    // Reset select2 dropdowns
+    $('#schedule_color').val('').trigger('change');
+    
+    // Re-enable time fields
+    $('#schedule_time_in').prop('disabled', false).val('');
+    $('#schedule_time_out').prop('disabled', false).val('');
+    
+    // Remove visual indication
+    $('#schedule_time_in').closest('.form-group').removeClass('bg-light');
+    $('#schedule_time_out').closest('.form-group').removeClass('bg-light');
+}
+
+function loadScheduleTypes() {
+    // Initialize DataTable if not already done
+    if ($.fn.DataTable.isDataTable('#scheduleTypesTable')) {
+        $('#scheduleTypesTable').DataTable().destroy();
+    }
+
+    // First load the data, then initialize DataTable
+    $.ajax({
+        url: '/team-schedule/api/schedule-types-management',
+        method: 'GET',
+        success: function(response) {
+            if (response.success) {
+                // Initialize DataTable after data is loaded
+                const dataTable = $("#scheduleTypesTable").DataTable({
+                    columnDefs: [
+                        { targets: [1, 2, 3, 4, 5 ,6], className: "text-center" },
+                        { targets: [6], orderable: false, searchable: false }
+                    ],
+                    pageLength: 10,
+                    lengthMenu: [
+                        [10, 15, 20, 25],
+                        [10, 15, 20, 25],
+                    ],
+                    autoWidth: false,
+                    responsive: true,
+                    order: [[0, 'asc']], // Sort by description by default
+                    deferRender: true, // Optimize for large datasets
+                    processing: true // Show processing indicator
+                });
+                
+                updateScheduleTypesTableFromData(response.data);
+            } else {
+                showDangerAlert('Failed to load schedule types');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Error loading schedule types:', error);
+            showDangerAlert('Error loading schedule types');
+        }
+    });
+}
+
+// Helper function to format time values
+function formatTimeForDisplay(timeValue) {
+    if (!timeValue) return '-';
+    
+    // If it's already in HH:MM format, return as is
+    if (typeof timeValue === 'string' && timeValue.match(/^\d{2}:\d{2}$/)) {
+        return timeValue;
+    }
+    
+    // Format time to 12-hour format (same as approve_ob.js)
+    return formatTimeTo12Hour(timeValue);
+}
+
+// Format time to 12-hour format (from approve_ob.js)
+function formatTimeTo12Hour(timeStr) {
+    if (!timeStr) return '';
+    let date;
+    if (/^\d{2}:\d{2}/.test(timeStr)) {
+      date = new Date(`1970-01-01T${timeStr}Z`); // Add Z to force UTC
+      var hour = date.getUTCHours();
+      var minute = date.getUTCMinutes();
+    } else {
+      date = new Date(timeStr);
+      var hour = date.getUTCHours();
+      var minute = date.getUTCMinutes();
+    }
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    let displayHour = hour % 12;
+    if (displayHour === 0) displayHour = 12;
+    minute = minute.toString().padStart(2, '0');
+    const formatted = `${displayHour.toString().padStart(2, '0')}:${minute}${ampm}`;
+  
+    return formatted;
+}
+
+function updateScheduleTypesTableFromData(scheduleTypes) {
+    // Check if DataTable is initialized
+    if (!$.fn.DataTable.isDataTable('#scheduleTypesTable')) {
+        console.error('DataTable not initialized for scheduleTypesTable');
+        return;
+    }
+    
+    const dataTable = $('#scheduleTypesTable').DataTable();
+    dataTable.clear();
+
+    if (scheduleTypes && scheduleTypes.length > 0) {
+        const allRows = [];
+        
+        scheduleTypes.forEach(schedule => {
+            // Format time values for display
+            const timeIn = formatTimeForDisplay(schedule.time_in);
+            const timeOut = formatTimeForDisplay(schedule.time_out);
+            
+            const breakTime = schedule.break_time_start && schedule.break_time_end 
+                ? `${formatTimeForDisplay(schedule.break_time_start)} - ${formatTimeForDisplay(schedule.break_time_end)}`
+                : 'No break';
+                
+            const overnight = schedule.overnight == 1 ? 'Yes' : 'No';
+            const status = schedule.status == 1 ? '<span class="bg-success-focus text-success-main px-16 py-4 rounded-pill fw-medium text-xs">Active</span>' : '<span class="bg-danger-focus text-danger-main px-16 py-4 rounded-pill fw-medium text-xs">Inactive</span>';
+            
+            const actions = `
+                ${schedule.status == 1 ? 
+                    `<button type="button" class="w-32-px h-32-px bg-info-focus text-info-main d-inline-flex align-items-center justify-content-center js-bs-tooltip-enabled edit-schedule-type-btn" data-schedule-id="${schedule.id}" data-bs-toggle="tooltip" data-bs-placement="top" aria-label="Edit" data-bs-original-title="Edit">
+                        <iconify-icon icon="mingcute:edit-line" class="text-md"></iconify-icon>
+                    </button>` : ''
+                }
+                ${schedule.status == 0 ? 
+                    `<button type="button" class="w-32-px h-32-px bg-success-focus text-success-main d-inline-flex align-items-center justify-content-center js-bs-tooltip-enabled reactivate-schedule-type-btn" data-schedule-id="${schedule.id}" data-bs-toggle="tooltip" data-bs-placement="top" aria-label="Reactivate" data-bs-original-title="Reactivate">
+                        <iconify-icon icon="mdi:refresh" class="text-md"></iconify-icon>
+                    </button>` : 
+                    `<button type="button" class="w-32-px h-32-px bg-danger-focus text-danger-main d-inline-flex align-items-center justify-content-center js-bs-tooltip-enabled delete-schedule-type-btn" data-schedule-id="${schedule.id}" data-bs-toggle="tooltip" data-bs-placement="top" aria-label="Delete" data-bs-original-title="Delete">
+                        <iconify-icon icon="fluent:delete-24-regular" class="text-md"></iconify-icon>
+                    </button>`
+                }
+            `;
+            
+            allRows.push([
+                schedule.description,
+                timeIn,
+                timeOut,
+                breakTime,
+                overnight,
+                status,
+                actions
+            ]);
+        });
+        
+        // Batch add all rows at once
+        dataTable.rows.add(allRows).draw();
+    } else {
+        dataTable.row.add(['No data available', '', '', '', '', '', '']).draw();
+    }
+}
+
+
+
+function createScheduleType() {
+    // Get form values and trim whitespace
+    const description = $('#schedule_description').val().trim();
+    const timeIn = $('#schedule_time_in').val().trim();
+    const timeOut = $('#schedule_time_out').val().trim();
+    const customColor = $('#schedule_color').val().trim();
+    
+    const formData = {
+        description: description,
+        time_in: timeIn,
+        time_out: timeOut,
+        overnight: $('#schedule_overnight').is(':checked') ? 1 : 0,
+        status: 1 // Always set to active for new schedule types
+    };
+
+    // Handle custom color - now required
+    if (customColor) {
+        formData.custom_color = customColor;
+    }
+
+    // Only add optional fields if they have values
+    const breakTimeStart = $('#schedule_break_start').val().trim();
+    if (breakTimeStart) {
+        formData.break_time_start = breakTimeStart;
+    }
+
+    const breakTimeEnd = $('#schedule_break_end').val().trim();
+    if (breakTimeEnd) {
+        formData.break_time_end = breakTimeEnd;
+    }
+
+    // Validate required fields
+    if (!formData.description) {
+        showDangerAlert('Please fill in Description');
+        return;
+    }
+    
+    if (!formData.time_in) {
+        showDangerAlert('Please fill in Time In');
+        return;
+    }
+    
+    if (!formData.time_out) {
+        showDangerAlert('Please fill in Time Out');
+        return;
+    }
+
+    if (!customColor) {
+        showDangerAlert('Please select a Schedule Color');
+        return;
+    }
+
+    $.ajax({
+        url: '/team-schedule/api/schedule-types',
+        method: 'POST',
+        data: formData,
+        success: function(response) {
+            if (response.success) {
+                showSuccessAlert('Schedule type created successfully!');
+                $('#modal-new-type').modal('hide');
+                resetScheduleTypeForm();
+                loadScheduleTypes(); // This will refresh the DataTable
+                loadDropdownOptions(function() {
+                    // Reload main schedule table and legend if filters are set
+                    if (currentDepartment && currentMonth && currentYear) {
+                        loadTeamSchedule();
+                    }
+                });
+            } else {
+                showDangerAlert(response.message || 'Failed to create schedule type');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Error creating schedule type:', error);
+            showDangerAlert('Error creating schedule type');
+        }
+    });
+}
+
+
+
+function editScheduleType(scheduleId) {
+    $.ajax({
+        url: `/team-schedule/api/schedule-types/${scheduleId}`,
+        method: 'GET',
+        success: function(response) {
+            if (response.success) {
+                populateScheduleTypeForm(response.data);
+                $('#modal-new-type').modal('show');
+            } else {
+                showDangerAlert('Failed to load schedule type');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Error loading schedule type:', error);
+            showDangerAlert('Error loading schedule type');
+        }
+    });
+}
+
+function populateScheduleTypeForm(schedule) {
+    $('#schedule_description').val(schedule.description);
+    
+    // Helper function to safely format time values
+    function formatTimeForInput(timeValue) {
+        if (!timeValue || timeValue === null || timeValue === undefined) {
+            return '';
+        }
+        
+        // Convert to string and handle different formats
+        const timeStr = String(timeValue);
+        
+        // If it's already in HH:MM format, return it
+        if (/^\d{2}:\d{2}$/.test(timeStr)) {
+            return timeStr;
+        }
+        
+        // If it's in HH:MM:SS format, extract HH:MM
+        if (/^\d{2}:\d{2}:\d{2}/.test(timeStr)) {
+            return timeStr.substring(0, 5);
+        }
+        
+        // Handle datetime format like "1970-01-01T08:00:00.000Z"
+        if (timeStr.includes('T') && timeStr.includes('1970-')) {
+            try {
+                const date = new Date(timeStr);
+                const hours = date.getUTCHours().toString().padStart(2, '0');
+                const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+                return `${hours}:${minutes}`;
+            } catch (e) {
+                return '';
+            }
+        }
+        
+        // If it's just numbers, assume it's HHMM format
+        if (/^\d{4}$/.test(timeStr)) {
+            return timeStr.substring(0, 2) + ':' + timeStr.substring(2, 4);
+        }
+        
+        return '';
+    }
+    
+    // Format time values for HTML time inputs (HH:MM format)
+    const timeIn = formatTimeForInput(schedule.time_in);
+    const timeOut = formatTimeForInput(schedule.time_out);
+    const breakStart = formatTimeForInput(schedule.break_time_start);
+    const breakEnd = formatTimeForInput(schedule.break_time_end);
+    
+    $('#schedule_time_in').val(timeIn);
+    $('#schedule_time_out').val(timeOut);
+    $('#schedule_break_start').val(breakStart);
+    $('#schedule_break_end').val(breakEnd);
+    $('#schedule_overnight').prop('checked', schedule.overnight == 1);
+    
+    // Set color dropdown if custom_color exists
+    if (schedule.custom_color) {
+        $('#schedule_color').val(schedule.custom_color);
+    } else {
+        $('#schedule_color').val('');
+    }
+    
+    // Handle DAY OFF checkbox
+    const isDayOff = (timeIn === '00:00' && timeOut === '00:00') || 
+                     (schedule.description && schedule.description.toLowerCase().includes('day off'));
+    $('#schedule_is_dayoff').prop('checked', isDayOff);
+    
+    if (isDayOff) {
+        $('#schedule_time_in').prop('disabled', true);
+        $('#schedule_time_out').prop('disabled', true);
+        $('#schedule_time_in').closest('.form-group').addClass('bg-light');
+        $('#schedule_time_out').closest('.form-group').addClass('bg-light');
+    }
+    
+    // Store the schedule ID for update
+    $('#scheduleTypeForm').data('edit-id', schedule.id);
+}
+
+function updateScheduleType(scheduleId) {
+    // Get form values and trim whitespace
+    const description = $('#schedule_description').val().trim();
+    const timeIn = $('#schedule_time_in').val().trim();
+    const timeOut = $('#schedule_time_out').val().trim();
+    const customColor = $('#schedule_color').val().trim();
+    
+    const formData = {
+        description: description,
+        time_in: timeIn,
+        time_out: timeOut,
+        overnight: $('#schedule_overnight').is(':checked') ? 1 : 0,
+        status: 1 // Always set to active when updating
+    };
+
+    // Handle custom color - now required
+    if (customColor) {
+        formData.custom_color = customColor;
+    }
+
+    // Only add optional fields if they have values
+    const breakTimeStart = $('#schedule_break_start').val().trim();
+    if (breakTimeStart) {
+        formData.break_time_start = breakTimeStart;
+    }
+
+    const breakTimeEnd = $('#schedule_break_end').val().trim();
+    if (breakTimeEnd) {
+        formData.break_time_end = breakTimeEnd;
+    }
+
+    // Validate required fields
+    if (!formData.description) {
+        showDangerAlert('Please fill in Description');
+        return;
+    }
+    
+    if (!formData.time_in) {
+        showDangerAlert('Please fill in Time In');
+        return;
+    }
+    
+    if (!formData.time_out) {
+        showDangerAlert('Please fill in Time Out');
+        return;
+    }
+
+    if (!customColor) {
+        showDangerAlert('Please select a Schedule Color');
+        return;
+    }
+
+    $.ajax({
+        url: `/team-schedule/api/schedule-types/${scheduleId}`,
+        method: 'PUT',
+        data: formData,
+        success: function(response) {
+            if (response.success) {
+                showSuccessAlert('Schedule type updated successfully!');
+                $('#modal-new-type').modal('hide');
+                resetScheduleTypeForm();
+                $('#scheduleTypeForm').removeData('edit-id');
+                loadScheduleTypes(); // This will refresh the DataTable
+                loadDropdownOptions(function() {
+                    // Reload main schedule table and legend if filters are set
+                    if (currentDepartment && currentMonth && currentYear) {
+                        loadTeamSchedule();
+                    }
+                });
+            } else {
+                showDangerAlert(response.message || 'Failed to update schedule type');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Error updating schedule type:', error);
+            showDangerAlert('Error updating schedule type');
+        }
+    });
+}
+
+
+
+function deleteScheduleType(scheduleId) {
+    if (!scheduleId || scheduleId === 'undefined' || scheduleId === 'null') {
+        showDangerAlert('Invalid schedule ID. Please try again.');
+        return;
+    }
+    
+    Swal.fire({
+        title: 'Are you sure?',
+        text: "You won't be able to revert this!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, delete it!',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.ajax({
+                url: `/team-schedule/api/schedule-types/${scheduleId}`,
+                method: 'DELETE',
+                success: function(response) {
+                    if (response.success) {
+                        showSuccessAlert('Schedule type deleted successfully!');
+                        loadScheduleTypes(); // This will refresh the DataTable
+                        loadDropdownOptions(function() {
+                            // Reload main schedule table and legend if filters are set
+                            if (currentDepartment && currentMonth && currentYear) {
+                                loadTeamSchedule();
+                            }
+                        });
+                    } else {
+                        showDangerAlert(response.message || 'Failed to delete schedule type');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error deleting schedule type:', error);
+                    
+                    // Handle specific error cases
+                    if (xhr.status === 409) {
+                        Swal.fire(
+                            'Cannot Delete',
+                            'Cannot delete this schedule type because it is currently assigned to employees. Please reassign or deactivate the employees first.',
+                            'error'
+                        );
+                    } else {
+                        showDangerAlert('Error deleting schedule type. Please try again.');
+                    }
+                }
+            });
+        }
+    });
+}
+
+function reactivateScheduleType(scheduleId) {
+    Swal.fire({
+        title: 'Reactivate Schedule Type?',
+        text: "This will make the schedule type active again.",
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#28a745',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, reactivate it!',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.ajax({
+                url: `/team-schedule/api/schedule-types/${scheduleId}/reactivate`,
+                method: 'PUT',
+                success: function(response) {
+                    if (response.success) {
+                        showSuccessAlert('Schedule type reactivated successfully!');
+                        loadScheduleTypes(); // This will refresh the DataTable
+                        loadDropdownOptions(function() {
+                            // Reload main schedule table and legend if filters are set
+                            if (currentDepartment && currentMonth && currentYear) {
+                                loadTeamSchedule();
+                            }
+                        });
+                    } else {
+                        showDangerAlert(response.message || 'Failed to reactivate schedule type');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error reactivating schedule type:', error);
+                    showDangerAlert('Error reactivating schedule type');
+                }
+            });
+        }
+    });
+}
+
+function openScheduleTypesList() {
+    loadScheduleTypes();
+    $('#modal-schedule-types').modal('show');
+}
+})();
+</script>

@@ -1,0 +1,1056 @@
+<!-- start header -->
+<div class="page-header navbar  navbar-fixed-top">
+	<div class="page-header-inner ">
+		<!-- logo start -->
+		<div class="page-logo">
+			<a href="/">
+				<img alt="" src="/img/logo.png">
+				<span class="logo-default">3CORE</span> </a>
+		</div>
+		<!-- logo end -->
+		<ul class="nav navbar-nav navbar-left in">
+			<li><a href="#" class="menu-toggler sidebar-toggler" id="sidebarToggleBtn"><i class="icon-menu"></i></a></li>
+		</ul>
+		
+		<!-- Date Picker for Available Rooms -->
+		<div class="col-lg-6 col-md-4 col-sm-4 col-4">
+			<div class="nav navbar-nav navbar-left" style="margin-top: 13px !important;">
+				<input type="text" id="datePicker" placeholder="Available Rooms" />
+			</div>
+		</div>
+		
+		<!-- start mobile menu -->
+		<a href="javascript:;" class="menu-toggler responsive-toggler" data-bs-toggle="collapse"
+			data-bs-target=".navbar-collapse">
+			<span></span>
+		</a>
+		<!-- end mobile menu -->
+		<!-- start header menu -->
+		<div class="top-menu">
+			<ul class="nav navbar-nav pull-right">
+				<!-- start notification dropdown -->
+				<li class="dropdown dropdown-extended dropdown-notification" id="header_notification_bar">
+					<a href="javascript:;" class="dropdown-toggle" data-bs-toggle="dropdown" data-hover="dropdown"
+						data-close-others="true">
+						<i class="fa fa-bell-o"></i>
+						<span class="badge headerBadgeColor1"> 6 </span>
+					</a>
+					<ul class="dropdown-menu animated swing">
+						<li class="external">
+							<h3><span class="bold">Notifications</span></h3>
+							<span class="notification-label purple-bgcolor">New 6</span>
+						</li>
+						<li>
+							<ul class="dropdown-menu-list small-slimscroll-style" data-handle-color="#637283">
+								<li>
+									<a href="javascript:;">
+										<span class="time">just now</span>
+										<span class="details">
+											<span class="notification-icon circle deepPink-bgcolor"><i
+													class="fa fa-check"></i></span> Congratulations!. </span>
+									</a>
+								</li>
+								<li>
+									<a href="javascript:;">
+										<span class="time">3 mins</span>
+										<span class="details">
+											<span class="notification-icon circle purple-bgcolor"><i
+													class="fa fa-user o"></i></span>
+											<b>John Micle </b>is now following you. </span>
+									</a>
+								</li>
+								<li>
+									<a href="javascript:;">
+										<span class="time">7 mins</span>
+										<span class="details">
+											<span class="notification-icon circle blue-bgcolor"><i
+													class="fa fa-comments-o"></i></span>
+											<b>Sneha Jogi </b>sent you a message. </span>
+									</a>
+								</li>
+								<li>
+									<a href="javascript:;">
+										<span class="time">12 mins</span>
+										<span class="details">
+											<span class="notification-icon circle pink"><i
+													class="fa fa-heart"></i></span>
+											<b>Ravi Patel </b>like your photo. </span>
+									</a>
+								</li>
+								<li>
+									<a href="javascript:;">
+										<span class="time">15 mins</span>
+										<span class="details">
+											<span class="notification-icon circle yellow"><i
+													class="fa fa-warning"></i></span> Warning! </span>
+									</a>
+								</li>
+								<li>
+									<a href="javascript:;">
+										<span class="time">10 hrs</span>
+										<span class="details">
+											<span class="notification-icon circle red"><i
+													class="fa fa-times"></i></span> Application error. </span>
+									</a>
+								</li>
+							</ul>
+							<div class="dropdown-menu-footer">
+								<a href="javascript:void(0)"> All notifications </a>
+							</div>
+						</li>
+					</ul>
+				</li>
+				<!-- end notification dropdown -->
+				
+				<!-- Cleaning Notifications -->
+				<li class="dropdown dropdown-extended dropdown-notification" id="header_notification_bar_broom">
+					<a href="javascript:;" class="dropdown-toggle" data-bs-toggle="dropdown">
+						<i class="fas fa-broom"></i>
+						<span id="notification-count-broom" class="badge notification-badge" style="display: none;">0</span>
+					</a>
+					<ul class="dropdown-menu">
+						<li class="external">
+							<h3 class="notification-header">Cleaning Notifications</h3>
+						</li>
+						<li>
+							<ul id="notification-list-broom" class="dropdown-menu-list">
+								<!-- Notifications will be dynamically added here -->
+							</ul>
+						</li>
+						<li class="dropdown-menu-footer">
+							<a href="#" class="view-all-notifications" data-bs-toggle="modal" data-bs-target="#allNotificationsModal">
+								View All Notifications
+							</a>
+						</li>
+					</ul>
+				</li>
+				
+				<!-- Modal for View All Notifications (centered) -->
+				<div class="modal fade" id="allNotificationsModal" tabindex="-1" aria-labelledby="allNotificationsModalLabel" aria-hidden="true" data-bs-backdrop="false">
+					<div class="modal-dialog modal-lg modal-dialog-centered">
+						<div class="modal-content">
+							<div class="modal-header">
+								<h5 class="modal-title" id="allNotificationsModalLabel">Cleaning Notifications</h5>
+								<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+							</div>
+							<div class="modal-body">
+								<ul class="list-group">
+									<!-- Notifications will be dynamically added here -->
+								</ul>
+							</div>
+							<div class="modal-footer">
+								<button type="button" class="btn btn-primary" id="viewAllNotificationsButton">
+									View All Notifications
+								</button>
+								<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+							</div>
+						</div>
+					</div>
+				</div>
+				
+				<!-- start message dropdown -->
+				<li class="dropdown dropdown-extended dropdown-inbox" id="header_inbox_bar">
+					<a href="javascript:;" class="dropdown-toggle" data-bs-toggle="dropdown" data-hover="dropdown"
+						data-close-others="true">
+						<i class="fa fa-envelope-o"></i>
+						<span class="badge headerBadgeColor2"> 2 </span>
+					</a>
+					<ul class="dropdown-menu animated slideInDown">
+						<li class="external">
+							<h3><span class="bold">Messages</span></h3>
+							<span class="notification-label cyan-bgcolor">New 2</span>
+						</li>
+						<li>
+							<ul class="dropdown-menu-list small-slimscroll-style" data-handle-color="#637283">
+								<li>
+									<a href="#">
+										<span class="photo">
+											<img src="/img/user/user2.jpg" class="img-circle" alt="">
+										</span>
+										<span class="subject">
+											<span class="from"> Sarah Smith </span>
+											<span class="time">Just Now </span>
+										</span>
+										<span class="message"> Jatin I found you on LinkedIn... </span>
+									</a>
+								</li>
+								<li>
+									<a href="#">
+										<span class="photo">
+											<img src="/img/user/user3.jpg" class="img-circle" alt="">
+										</span>
+										<span class="subject">
+											<span class="from"> John Deo </span>
+											<span class="time">16 mins </span>
+										</span>
+										<span class="message"> Fwd: Important Notice Regarding Your Domain
+											Name... </span>
+									</a>
+								</li>
+								<li>
+									<a href="#">
+										<span class="photo">
+											<img src="/img/user/user1.jpg" class="img-circle" alt="">
+										</span>
+										<span class="subject">
+											<span class="from"> Rajesh </span>
+											<span class="time">2 hrs </span>
+										</span>
+										<span class="message"> pls take a print of attachments. </span>
+									</a>
+								</li>
+								<li>
+									<a href="#">
+										<span class="photo">
+											<img src="/img/user/user8.jpg" class="img-circle" alt="">
+										</span>
+										<span class="subject">
+											<span class="from"> Lina Smith </span>
+											<span class="time">40 mins </span>
+										</span>
+										<span class="message"> Apply for Ortho Surgeon </span>
+									</a>
+								</li>
+								<li>
+									<a href="#">
+										<span class="photo">
+											<img src="/img/user/user5.jpg" class="img-circle" alt="">
+										</span>
+										<span class="subject">
+											<span class="from"> Jacob Ryan </span>
+											<span class="time">46 mins </span>
+										</span>
+										<span class="message"> Request for leave application. </span>
+									</a>
+								</li>
+							</ul>
+							<div class="dropdown-menu-footer">
+								<a href="#"> All Messages </a>
+							</div>
+						</li>
+					</ul>
+				</li>
+				<!-- end message dropdown -->
+				<!-- start manage user dropdown -->
+				<li class="dropdown dropdown-user">
+					<a href="javascript:;" class="dropdown-toggle" data-bs-toggle="dropdown" data-hover="dropdown"
+						data-close-others="true">
+						<img alt="" class="img-circle " src="/img/dp.png" />
+						<span class="username username-hide-on-mobile"> <%= user ? user.FULLNAME : 'Guest' %> </span>
+						<i class="fa fa-angle-down"></i>
+					</a>
+					<ul class="dropdown-menu dropdown-menu-default animated jello">
+						<li>
+							<a href="user_profile.html">
+								<i class="icon-user"></i> Profile </a>
+						</li>
+						<li>
+							<a href="#">
+								<i class="icon-settings"></i> Settings
+							</a>
+						</li>
+						<li>
+							<a href="#">
+								<i class="icon-directions"></i> Help
+							</a>
+						</li>
+						<li class="divider"> </li>
+						<li>
+							<a href="lock_screen.html">
+								<i class="icon-lock"></i> Lock
+							</a>
+						</li>
+						<li>
+							<a href="javascript:;" onclick="logout()">
+								<i class="icon-logout"></i> Log Out </a>
+						</li>
+					</ul>
+				</li>
+				<!-- end manage user dropdown -->
+				<li class="dropdown dropdown-quick-sidebar-toggler">
+					<a id="headerSettingButton" class="mdl-button mdl-js-button mdl-button--icon pull-right"
+						data-upgraded=",MaterialButton">
+						<i class="material-icons">settings</i>
+					</a>
+				</li>
+			</ul>
+		</div>
+	</div>
+</div>
+<!-- end header -->
+
+<%- include('../booking/modal/add_booking') %>
+
+<!-- Styles for the new components -->
+<style>
+
+/* Scrollable Container */
+.scrollable-containers {
+max-height: 400px; /* Limit the height for scrolling */
+overflow-y: scroll; /* Enable vertical scrolling */
+background-color: #e2f0fa; /* Light background */
+padding: 15px;
+border-radius: 8px;
+box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+margin-top: 10px;
+
+/* Hide scrollbar */
+scrollbar-width: none; 
+-ms-overflow-style: none; 
+}
+
+.scrollable-containers::-webkit-scrollbar {
+display: none; 
+}
+
+/* Floor Header */
+.floor-header {
+font-size: 1.2rem; /* Slightly larger font */
+font-weight: bold;
+color: #34495e; /* Darker text for contrast */
+margin-bottom: 10px;
+text-align: left;
+}
+
+/* Room Row */
+.room-row {
+display: flex; /* Flexbox for better alignment */
+flex-wrap: wrap; /* Allow wrapping to the next line */
+gap: 10px; /* Space between items */
+margin-bottom: 15px; /* Space below the row */
+}
+
+
+
+
+/* Room Item Hover Effect */
+.room-item:hover {
+transform: translateY(-2px); /* Slight lift effect */
+
+}
+
+.room-item {
+position: relative; /* Allow positioning for the pseudo-element */
+background-color: #ffffff; /* White background */
+width: 70px; /* Set the width */
+height: 60px; /* Set the height */
+border-radius: 5px; /* Rounded corners */
+padding: 10px; /* Padding for content */
+text-align: center; /* Center text alignment */
+color: #000; /* Text color */
+box-sizing: border-box; /* Include padding and border in width/height */
+
+}
+
+/* Folded Corner Effect */
+.room-item::after {
+content: "";
+position: absolute;
+bottom: 0; /* Align with the bottom edge */
+right: 0; /* Align with the right edge */
+width: 0;
+height: 0;
+border-left: 10px solid transparent; /* Transparent left side of the fold */
+border-top: 10px solid #e2f0fa; /* Light gray for the folded corner */
+transform: rotate(85deg); /* Rotate to create a proper folded corner effect */
+box-shadow: -2px 2px 3px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+}
+
+
+
+
+
+
+/* Room Link */
+.room-link {
+font-size: 1.5rem; /* Adjust font size for readability */
+font-weight: bold;
+color: #34495e; /* Black text color */
+text-decoration: none;
+display: inline-block;
+}
+
+
+
+/* Room Link Hover */
+.room-link:hover {
+color: #34495e; /* Darker blue on hover */
+
+
+}
+
+/* Custom Scrollbar */
+.scrollable-containers::-webkit-scrollbar {
+width: 8px; /* Scrollbar width */
+}
+.scrollable-containers::-webkit-scrollbar-thumb {
+background-color: #ccc; /* Gray scrollbar */
+border-radius: 4px;
+}
+.scrollable-containers::-webkit-scrollbar-thumb:hover {
+background-color: #aaa; /* Darker gray on hover */
+}
+
+/* Search Bar Styling */
+.search-bar {
+display: flex;
+justify-content: right;
+margin-bottom: 15px;
+}
+
+.search-bar input {
+padding: 12px;
+width: 30%;
+border: 1px solid #ddd;
+border-radius: 5px;
+outline: none; /* Remove browser-specific outline */
+transition: border-color 0.2s ease; /* Add smooth transition */
+}
+
+.search-bar input:focus {
+border: 1px solid #000; /* Use a subtle color for the border */
+}
+
+.filter-options label {
+margin-right: 8px;
+white-space: nowrap;
+font-weight: 500;
+}
+
+#roomSearchInput {
+padding: 6px 10px;
+height: 34px;
+}
+
+	/* Notification Styles */
+	.blinking-message {
+		color: green;
+		font-size: 11px;
+		font-weight: bold;
+		animation: blinker 1s linear infinite;
+	}
+	@keyframes blinker { 50% { opacity: 0; } }
+	.visible { display: inline !important; }
+	.hidden { display: none !important; }
+	.notification-item div, .list-group-item div { font-size: 12px; line-height: 1.2; }
+	.date-completed-request-label { color: green; }
+	#notification-list-broom { padding: 10px; }
+	#allNotificationsModal .modal-body { max-height: 400px; overflow-y: auto; }
+	.list-group-item { font-size: 14px; line-height: 1.4; }
+	
+
+</style>
+
+<script>
+
+flatpickr("#datePicker", {
+    altInput: true, // Enables a separate input field for display
+    showMonths: 2, // Display two months side by side
+    altFormat: "M d, Y", // Format shown to the user (e.g., "Jan 6, 2025")
+    dateFormat: "Y-m-d", // Format sent to the backend (e.g., "2025-01-06")
+    mode: "range", // Allow range selection
+    minDate: "today", // Disable past dates
+    onClose: function (selectedDates, dateStr, instance) {
+        if (selectedDates.length === 2) {
+            // Get the start and end dates
+            const startDate = selectedDates[0];
+            const endDate = selectedDates[1];
+
+            // Calculate the number of nights
+            const diffInTime = endDate.getTime() - startDate.getTime();
+            const nights = diffInTime / (1000 * 3600 * 24); // Convert time difference to days
+
+            // Format the display string
+            const formattedStartDate = flatpickr.formatDate(startDate, "M d, Y");
+            const formattedEndDate = flatpickr.formatDate(endDate, "M d, Y");
+            const formattedDateRange = `${formattedStartDate} to ${formattedEndDate} (${nights} night/s)`;
+
+            // Update the Flatpickr input value
+            instance.input.value = formattedDateRange;
+
+            // Set the value in the Add Booking modal date range field
+            const dateRangeField = document.querySelector("#daterange");
+            if (dateRangeField) {
+                dateRangeField.value = formattedDateRange;
+            }
+
+            // Set the value in the #diffindays field
+            const diffInDaysField = document.querySelector("#diffindays");
+            if (diffInDaysField) {
+                diffInDaysField.value = nights; // Set the calculated nights
+            }
+
+            // Fetch available rooms using backend-compatible format
+            fetchAvailableRooms(dateStr);
+        } else {
+            console.error("Please select both start and end dates.");
+        }
+    },
+});
+
+	
+		function fetchAvailableRooms(dateRange) {
+
+			console.log("Date Range passed to fetchAvailableRooms:", dateRange);
+
+// Remove any extra text like `(1 night/s)`
+const cleanDateRange = dateRange.split(' (')[0]; // Keep only the date range before `(`
+
+// Split the cleaned date range into start and end dates
+if (!cleanDateRange || !cleanDateRange.includes(" to ")) {
+	// console.error("Invalid date range format:", cleanDateRange);
+	return;
+}
+
+			// Split the date range into start and end dates
+			const [startDate, endDate] = dateRange.split(" to ");
+	
+			// Perform an AJAX call to your server
+			fetch('/booking/available-rooms', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ startDate, endDate }),
+			})
+				.then(response => response.json())
+				.then(data => {
+					if (data.success) {
+						// Format startDate and endDate with worded month
+						const formattedStartDate = flatpickr.formatDate(new Date(startDate), "F d, Y"); // e.g., "January 10, 2025"
+						const formattedEndDate = flatpickr.formatDate(new Date(endDate), "F d, Y"); // e.g., "January 11, 2025"
+						// Show the available rooms in a SweetAlert
+						Swal.fire({
+    title: '', // Leave title empty since we're using a custom header
+    html: `
+        <header class="panel-heading panel-heading-blue mb-3"><strong>
+            Available Rooms<br> (${formattedStartDate} to ${formattedEndDate})</strong>
+        </header>
+        
+       <div style="display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 10px;">
+        <div class="filter-options" style="flex-wrap: wrap; display: flex; gap: 10px;">
+            <label><input type="radio" name="roomFilter" value="all" checked onchange="filterRooms()"> All</label>
+            <label><input type="radio" name="roomFilter" value="1BC" onchange="filterRooms()"> 1BC</label>
+            <label><input type="radio" name="roomFilter" value="1BM" onchange="filterRooms()"> 1BM</label>
+            <label><input type="radio" name="roomFilter" value="2BC" onchange="filterRooms()"> 2BC</label>
+            <label><input type="radio" name="roomFilter" value="2BM" onchange="filterRooms()"> 2BM</label>
+        </div>
+         <!-- Room count display -->
+        <div style="white-space: nowrap; font-weight: bold;">
+          Available: <span id="availableRoomCount">0</span>
+        </div>
+        <div class="search-bar" style="flex-shrink: 0;">
+            <input type="text" id="roomSearchInput" placeholder="Search Room" onkeyup="filterRooms()" style="width: 130px; padding: 6px 10px;" />
+        </div>
+      </div>
+        <div id="roomListContainer">
+            ${generateRoomListHTML(data.rooms)}
+        </div>
+    `,
+    showConfirmButton: false,
+    customClass: {
+        popup: 'swal-custom-popup', // Add custom styling for the modal
+    },
+    width: '650px', // Set the width of the modal
+    didOpen: () => {
+        // Ensure the input is not auto-focused on modal open
+        const input = document.getElementById('roomSearchInput');
+        input.blur();
+        document.getElementById('roomSearchInput').blur();
+        filterRooms(); // Initialize count and visibility
+    },
+    willClose: () => {
+        // Clear the input field when the modal closes
+        const datePicker = document.getElementById('datePicker');
+        if (datePicker) {
+            datePicker.value = ''; // Clear the input field
+        }
+    }
+});
+
+
+					}
+				})
+				.catch(error => {
+					console.error('Error:', error);
+					Swal.fire({
+						title: 'Error',
+						text: 'An unexpected error occurred.',
+						icon: 'error',
+						confirmButtonText: 'Close',
+					});
+				});
+		}
+        
+    function filterRooms() {
+    const input = document.getElementById('roomSearchInput').value.toLowerCase();
+    const selectedCategory = document.querySelector('input[name="roomFilter"]:checked').value;
+    const rooms = document.querySelectorAll('.room-item');
+    let visibleCount = 0;
+
+    rooms.forEach(room => {
+        const roomNumber = room.querySelector('.room-link').textContent.toLowerCase();
+        const category = room.getAttribute('data-category');
+
+        const matchesSearch = roomNumber.includes(input);
+        const matchesCategory = selectedCategory === 'all' || category === selectedCategory;
+
+        const shouldShow = matchesSearch && matchesCategory;
+        room.style.display = shouldShow ? 'flex' : 'none';
+
+        if (shouldShow) visibleCount++;
+    });
+
+    // Set the count
+    document.getElementById('availableRoomCount').textContent = visibleCount;
+}
+
+
+
+
+		function generateRoomListHTML(rooms) {
+    if (rooms.length === 0) {
+        return '<p>No available rooms for the selected date range.</p>';
+    }
+
+    // Group rooms by floor
+    const roomsByFloor = rooms.reduce((floors, room) => {
+        if (!floors[room.ROOM_FLOOR]) {
+            floors[room.ROOM_FLOOR] = [];
+        }
+        floors[room.ROOM_FLOOR].push(room);
+        return floors;
+    }, {});
+
+    let html = '<div class="scrollable-containers">';
+
+   // Iterate through floors and create rows
+// Iterate through floors and create rows
+Object.keys(roomsByFloor).sort((a, b) => a - b).forEach(floor => {
+    
+    
+    const rooms = roomsByFloor[floor];
+    html += '<div class="room-row">';
+    rooms.forEach(room => {
+        let roomStyle = ""; // Define styles for each room dynamically
+
+        // Assign styles based on the floor number
+        if (floor == 3) {
+        roomStyle = "color: #4CAF50; border-top: 2px solid #4CAF50;";
+    } else if (floor == 4) {
+        roomStyle = "color: #1e1bd6; border-top: 2px solid #1e1bd6;";
+    } else if (floor == 5) {
+        roomStyle = "color: #df1818; border-top: 2px solid #df1818;";
+    } else if (floor == 6) {
+        roomStyle = "color: #8A2BE2; border-top: 2px solid #8A2BE2;";
+    }
+
+    // If the room has checkoutToday == true, override with red
+ if (room.checkoutToday) {
+  roomStyle = 'background-color: #CC9999';
+    }
+        // Add room item with specific styles
+        html += `<div class="room-item" 
+    style="${roomStyle}"
+    data-bed="${room.ROOM_BED}" 
+    data-view="${room.ROOM_VIEW}" 
+    data-category="${room.ROOM_BED}${room.ROOM_VIEW == 1 ? 'BC' : 'BM'}">
+    
+    <a href="#" class="room-link" 
+       data-room-id="${room.IDNo}" 
+       data-room-number="${room.ROOM_NUMBER}" 
+       data-floor="${room.ROOM_FLOOR}">
+       ${room.ROOM_NUMBER}
+    </a>
+</div>`;
+
+    });
+    html += '</div><br>'; // Add spacing between floors
+});
+
+html += '</div>';
+return html;
+
+
+}
+
+
+function getSeasonalPrice(seasonalPrices, bedCount, bookingType) {
+  return seasonalPrices.find(p =>
+    parseInt(p.bedCount) === parseInt(bedCount) &&
+    p.bookingType === bookingType
+  );
+}
+
+document.addEventListener('click', function (event) {
+  if (event.target.classList.contains('room-link')) {
+    event.preventDefault();
+    initializeAddBookingHandler();
+
+    const roomId = event.target.getAttribute('data-room-id');
+    const roomNumber = event.target.getAttribute('data-room-number');
+    const floor = event.target.getAttribute('data-floor');
+    const dateRange = document.querySelector('#datePicker').value || '';
+    const [startDate, endDate] = dateRange.split(' to ');
+    const startDateObj = new Date(startDate);
+    const endDateObj = new Date(endDate);
+    const nights = (endDateObj - startDateObj) / (1000 * 3600 * 24);
+
+    fetch('/booking/get-room-details', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomId })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (!data.success) return console.error(data.message);
+
+      const roomDetails = data.roomDetails;
+      const seasonalPrices = roomDetails.SEASONAL_PRICES || [];
+
+      // DOM fields
+      const floorField = document.querySelector('#addFloor');
+      const roomField = document.querySelector('#addroom');
+      const dateRangeField = document.querySelector('#daterange');
+      const roomTypeField = document.querySelector('#room_type');
+       const roomTypeFieldHidden = document.querySelector('#room_type_hidden');
+      const roomPriceField = document.querySelector('#price');
+      const maxOccupantsField = document.querySelector('#maxOccupants');
+      const bedCountField = document.querySelector('#bedCount');
+      const amenitiesField = document.querySelector('#amenities');
+      const basePriceField = document.querySelector('#baseprice');
+      const diffInDaysField = document.querySelector('#diffindays');
+
+      if (floorField) floorField.value = floor;
+      if (roomField) roomField.innerHTML = `<option value="${roomId}" selected>${roomNumber}</option>`;
+      if (dateRangeField) dateRangeField.value = `${startDate} to ${endDate}`;
+      if (roomTypeField) {
+        roomTypeField.value = roomDetails.ROOM_VIEW === 1 ? 'Condo View' :
+                              roomDetails.ROOM_VIEW === 2 ? 'Mountain View' : '';
+      }
+      if (roomPriceField) roomPriceField.value = roomDetails.ROOM_PRICE;
+      if (maxOccupantsField) maxOccupantsField.value = roomDetails.ROOM_MAX;
+      if (bedCountField) bedCountField.value = roomDetails.ROOM_BED;
+      if (roomTypeFieldHidden) roomTypeFieldHidden.value = roomDetails.ROOM_TYPE;
+      if (amenitiesField) amenitiesField.value = roomDetails.AMENITIES;
+      if (diffInDaysField) diffInDaysField.value = nights;
+      
+
+      function getSeasonIdForDate(checkInDate, seasonalPrices) {
+  const checkIn = new Date(checkInDate);
+  const mmdd = (checkIn.getMonth() + 1).toString().padStart(2, '0') + checkIn.getDate().toString().padStart(2, '0');
+
+  const seen = new Set();
+
+  for (const p of seasonalPrices) {
+    if (!p.startDate || !p.endDate || seen.has(p.seasonId)) continue;
+    seen.add(p.seasonId);
+
+    const start = new Date(p.startDate);
+    const end = new Date(p.endDate);
+
+    const startMMDD = (start.getMonth() + 1).toString().padStart(2, '0') + start.getDate().toString().padStart(2, '0');
+    const endMMDD = (end.getMonth() + 1).toString().padStart(2, '0') + end.getDate().toString().padStart(2, '0');
+
+    if (startMMDD <= endMMDD) {
+      if (mmdd >= startMMDD && mmdd <= endMMDD) return p.seasonId;
+    } else {
+      if (mmdd >= startMMDD || mmdd <= endMMDD) return p.seasonId;
+    }
+  }
+
+  return null;
+}
+
+
+
+
+      // 🧠 Function to calculate seasonal price and update DOM
+      function updateSeasonalPrice() {
+  const selectedBedCount = bedCountField.value;
+  const selectedBookingType = document.querySelector('#bookingRoute').value;
+  const currentSeasonId = getSeasonIdForDate(startDate, seasonalPrices); // from "const [startDate, endDate] = ..."
+
+
+  const match = seasonalPrices.find(p =>
+    parseInt(p.bedCount) === parseInt(selectedBedCount) &&
+    p.bookingType === selectedBookingType &&
+    parseInt(p.seasonId) === parseInt(currentSeasonId)
+  );
+
+  const nights = parseFloat(diffInDaysField.value || 0);
+  let pricePerNight = 0;
+
+  if (match) {
+    pricePerNight = parseFloat(match.price);
+  } else {
+    console.warn('No match for seasonal price — fallback to default ROOM_PRICE');
+    pricePerNight = parseFloat(roomDetails.ROOM_PRICE);
+  }
+
+  // roomPriceField.value = (pricePerNight * nights).toFixed(2);
+  roomPriceField.value = pricePerNight.toFixed(2);
+  basePriceField.value = pricePerNight.toFixed(2);
+}
+
+function computeTotal() {
+  const roomRate = $('#manualPriceToggle').prop('checked')
+    ? parseFloat($('#price').val()) || 0
+    : parseFloat($('#baseprice').val()) || 0;
+
+  const nights = parseInt($('#diffindays').val()) || 1;
+
+  const adultQty = parseInt($('#breakfastAdultQty').val()) || 0;
+  const adultPrice = parseFloat($('#breakfastAdultPrice').val()) || 0;
+  const kidQty = parseInt($('#breakfastKidQty').val()) || 0;
+  const kidPrice = parseFloat($('#breakfastKidPrice').val()) || 0;
+
+  const pickupChecked = $('#includePickup').prop('checked');
+  const dropoffChecked = $('#includeDropoff').prop('checked');
+
+  const pickupPrice = pickupChecked ? parseFloat($('#pickupPrice').val()) || 0 : 0;
+  const dropoffPrice = dropoffChecked ? parseFloat($('#dropoffPrice').val()) || 0 : 0;
+
+  const total =
+    (roomRate * nights) +
+    (adultQty * adultPrice) +
+    (kidQty * kidPrice) +
+    pickupPrice +
+    dropoffPrice;
+
+    $('#computedTotal').html('<b>' + total.toLocaleString(undefined, { minimumFractionDigits: 2 }) + '</b>');
+
+}
+      // 🔁 Initial trigger
+      updateSeasonalPrice();
+
+      // 🔁 Bind update when booking type changes
+      document.querySelector('#bookingRoute').addEventListener('change', updateSeasonalPrice);
+      $(document).on('input change', '#bookingRoute, #price, #baseprice, #diffindays, #breakfastAdultQty, #breakfastAdultPrice, #breakfastKidQty, #breakfastKidPrice, #pickupPrice, #dropoffPrice, #pickupLocation, #dropoffLocation, #includePickup, #includeDropoff', function () {
+    computeTotal();
+});
+
+      // ✅ Show modal
+      const addBookingModalElement = document.getElementById('modal-addbooking');
+      if (addBookingModalElement) {
+        Swal.close();
+        document.body.classList.add('custom-booking-layout'); // 👈 add this
+        addBookingModalElement.classList.add('from-datepicker'); // Add class for datePicker styling
+        const addBookingModal = new bootstrap.Modal(addBookingModalElement);
+        addBookingModal.show();
+        computeTotal()
+
+        document.getElementById('daterange').disabled = true;
+        document.getElementById('addFloor').disabled = true;
+        document.getElementById('addroom').disabled = true;
+        document.getElementById('groupBookingCheckbox').parentElement.style.display = 'none';
+      } else {
+        console.error('Modal element not found in the DOM');
+      }
+    })
+    .catch(error => console.error('Error fetching room details:', error));
+  }
+});
+
+
+
+// Function to initialize the Add Booking form handler
+function initializeAddBookingHandler() {
+    $('#addbooking').off('submit').on('submit', function (e) {
+        e.preventDefault();
+       
+        // Reverting to manual data collection as it was more reliable.
+        const formData = {
+            room_id: $('#addroom').val(),
+            fullname: $('#txtFullNameAdd').val(),
+            number: $('#txtNumber').val(),
+            address: $('#txtAddress').val() || '',
+            daterange: $('#daterange').val(),
+            maxOccupants: $('#maxOccupants').val(),
+            paymentStatus: $('#paymentStatus').val(),
+            price: $('#baseprice').val(),
+            diffindays: $('#diffindays').val(),
+            guestType: $('#guestType').val(),
+            guestLevel: $('#guestLevel').val(),
+            guestID: $('#guestID').val(),
+            bookingRoute: $('#bookingRoute').val(),
+            checkInStatus: $('#checkInStatus').val(),
+            bookingRemarks: $('#bookingRemarks').val(),
+            agencyID: $('#agencySelect').val(),
+            voucherNo: $('#voucherNo').val(),
+            
+           // ✅ Include services and transport
+           breakfastAdultQty: $('#breakfastAdultQty').val(),
+            breakfastAdultPrice: $('#breakfastAdultPrice').val(),
+            breakfastAdultId: $('#breakfastAdultId').val(),
+            breakfastKidQty: $('#breakfastKidQty').val(),
+            breakfastKidPrice: $('#breakfastKidPrice').val(),
+            breakfastKidId: $('#breakfastKidId').val(),
+            pickupServiceId: $('#pickupServiceId').val(),
+            pickupPrice: $('#pickupPrice').val(),
+            dropoffServiceId: $('#dropoffServiceId').val(),
+            dropoffPrice: $('#dropoffPrice').val(),
+           
+        };
+
+        console.log('Form data being sent (manual):', formData);
+
+        // Perform AJAX request to save booking
+        $.ajax({
+            url: '/booking/add_booking',
+            type: 'POST',
+            data: formData,
+            success: function (response) {
+                $('#modal-addbooking').modal('hide');
+                if (response.success) {
+                    const qrCodeImg = `<img src="https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(response.confirmationNumber)}&size=150x150" alt="QR Code" />`;
+                   
+                    Swal.fire({
+                        title: 'Booking Successful!',
+                        html: `${qrCodeImg}<br>Please Screenshot your QR CODE`,
+                        icon: 'success',
+                        confirmButtonText: 'OK',
+                        didOpen: () => {
+                        const form = $('<form>', {
+                            method: 'POST',
+                            action: '/booking/generate-voucher?download=1',
+                            // target: '_blank'
+                        });
+
+        const voucherData = {
+          voucherNo: formData.voucherNo, // ✅ Gamitin dito
+            fullname: formData.fullname,
+            dateFrom: formData.daterange.split(' to ')[0],
+            dateTo: formData.daterange.split(' to ')[1].split('(')[0].trim(),
+            bedCount: formData.bedCount || '',
+            roomNumber: $('#addroom option:selected').text(),
+            roomType: $('#room_type_hidden').val(),
+            roomView: $('#room_type').val(),
+            roomRate: formData.price,
+            breakfastAdult: formData.breakfastAdultQty,
+            breakfastAdultPrice: formData.breakfastAdultPrice,
+            breakfastKid: formData.breakfastKidQty,
+            breakfastKidPrice: formData.breakfastKidPrice,
+            pickup: formData.pickupPrice || 0,
+            dropoff: formData.dropoffPrice || 0,
+            remarks: formData.bookingRemarks,
+            total: $('#computedTotal').text(),
+            checkInStatus: formData.checkInStatus
+        };
+
+        for (let key in voucherData) {
+            form.append($('<input>', {
+                type: 'hidden',
+                name: key,
+                value: voucherData[key]
+            }));
+        }
+
+        $('body').append(form);
+        form.submit();
+        form.remove();
+
+        setTimeout(() => {
+      Swal.close();
+      window.location.reload();
+    }, 10000);
+    }
+                    }).then(() => {
+                        window.location.reload();
+                    });
+                } else {
+                    Swal.fire({
+                        title: 'Booking Failed!',
+                        text: response.message || 'An error occurred. Please try again.',
+                        icon: 'error',
+                        confirmButtonText: 'OK',
+                    });
+                }
+            },
+            error: function (err) {
+                console.error('Error:', err);
+                Swal.fire({
+                    title: 'Error!',
+                    text: err.responseJSON?.message || 'An error occurred. Please try again later.',
+                    icon: 'error',
+                    confirmButtonText: 'OK',
+                });
+            },
+        });
+    });
+}
+
+// Initialize the handler when the document is ready.
+// This is called here and also can be called from other pages like the dashboard.
+$(document).ready(function() {
+    initializeAddBookingHandler();
+});
+
+// Auto-trigger sidebar toggle for calendar page - DISABLED to prevent hash issues
+// function autoTriggerSidebarForCalendar() {
+//     // Check if current page is calendar
+//     const currentPath = window.location.pathname;
+//     const isCalendarPage = currentPath.includes('/calendar') || currentPath.includes('calendar');
+//     
+//     if (isCalendarPage) {
+//         // Wait for page to load completely
+//         setTimeout(() => {
+//             const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+//             if (sidebarToggleBtn) {
+//                 // Add active class for visual feedback
+//                 sidebarToggleBtn.classList.add('active');
+//                 
+//                 // Trigger the sidebar toggle click
+//                 sidebarToggleBtn.click();
+//                 
+//                 console.log('🎯 Auto-triggered sidebar toggle for calendar page');
+//             }
+//         }, 500); // Small delay to ensure DOM is ready
+//     }
+// }
+
+// Initialize auto-trigger when page loads - DISABLED
+// document.addEventListener('DOMContentLoaded', function() {
+//     autoTriggerSidebarForCalendar();
+// });
+
+//logout
+function logout() {
+    // Show loading state
+    const logoutBtn = event.target.closest('a');
+    const originalText = logoutBtn.innerHTML;
+    logoutBtn.innerHTML = '<i class="zmdi zmdi-spinner zmdi-hc-spin"></i> Logging out...';
+    logoutBtn.style.pointerEvents = 'none';
+    
+    // Make AJAX request to logout
+    $.ajax({
+        url: '/logout',
+        method: 'POST',
+        contentType: 'application/json',
+        success: function(response) {
+            if (response.success) {
+                // Redirect directly to login page
+                window.location.href = response.redirectUrl || '/login';
+            } else {
+                // Show error message only
+                alert(response.message || 'Logout failed');
+                // Restore button state
+                logoutBtn.innerHTML = originalText;
+                logoutBtn.style.pointerEvents = 'auto';
+            }
+        },
+        error: function(xhr) {
+            let errorMessage = 'An error occurred during logout';
+            
+            if (xhr.responseJSON && xhr.responseJSON.message) {
+                errorMessage = xhr.responseJSON.message;
+            }
+            
+            alert(errorMessage);
+            // Restore button state
+            logoutBtn.innerHTML = originalText;
+            logoutBtn.style.pointerEvents = 'auto';
+        }
+    });
+}
+</script> 

@@ -1,0 +1,187 @@
+<!-- ======================================== -->
+<!-- USER INFO MANAGEMENT PAGE -->
+<!-- ======================================== -->
+
+<!-- Main Content Area -->
+<div class="row">
+    <div class="col-xl-12 col-md-12 col-12">
+        <div class="dashboard-card">
+            <div class="dashboard-card-header">
+                <header>User Information Management</header>
+                
+            </div>
+            <div class="dashboard-card-body">
+                <!-- Action Buttons -->
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-primary btn-sm" id="addUserBtn" title="Add New User">
+                            <i class="fa fa-plus"></i> Add New User
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Main Users Table -->
+                <div class="table-scrollable">
+                    <table id="usersTable" class="table table-hover table-bordered full-width">
+                        <thead>
+                            <tr>
+                                <th>Full Name</th>
+                                <th>Username</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================== -->
+<!-- USER INFO MODALS -->
+<!-- ======================================== -->
+
+<!-- Add User Modal -->
+<div class="modal fade" id="addUserModal" tabindex="-1" role="dialog" aria-labelledby="addUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addUserModalLabel">Add New User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addUserForm">
+                    <div class="mb-3">
+                        <label for="fullname" class="form-label">Full Name *</label>
+                        <input type="text" class="form-control" id="fullname" name="fullname" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username *</label>
+                        <input type="text" class="form-control" id="username" name="username" required>
+                        <div id="usernameCheck" class="form-text"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="role" class="form-label">Role *</label>
+                        <select class="form-select" id="role" name="role" required>
+                            <option value="">Select Role</option>
+                            <option value="1">Admin</option>
+                            <option value="2">Frontdesk</option>
+                            <option value="3">Manager</option>
+                            <option value="4">Housekeeping</option>
+                            <option value="5">GuestRoom</option>
+                            <option value="6">GuestApp</option>
+                            <option value="7">DriverApp</option>
+                            <option value="8">SalesRoom</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password *</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Confirm Password *</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary" form="addUserForm">Save User</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1" role="dialog" aria-labelledby="editUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editUserModalLabel">Edit User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editUserForm">
+                    <input type="hidden" id="editUserId" name="userId">
+                    <div class="mb-3">
+                        <label for="editFullname" class="form-label">Full Name *</label>
+                        <input type="text" class="form-control" id="editFullname" name="fullname" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editUsername" class="form-label">Username *</label>
+                        <input type="text" class="form-control" id="editUsername" name="username" required>
+                        <div id="editUsernameCheck" class="form-text"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editRole" class="form-label">Role *</label>
+                        <select class="form-select" id="editRole" name="role" required>
+                            <option value="">Select Role</option>
+                            <option value="1">Admin</option>
+                            <option value="2">Frontdesk</option>
+                            <option value="3">Manager</option>
+                            <option value="4">Housekeeping</option>
+                            <option value="5">GuestRoom</option>
+                            <option value="6">GuestApp</option>
+                            <option value="7">DriverApp</option>
+                            <option value="8">SalesRoom</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editPassword" class="form-label">New Password (leave blank to keep current)</label>
+                        <input type="password" class="form-control" id="editPassword" name="password">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editConfirmPassword" class="form-label">Confirm New Password</label>
+                        <input type="password" class="form-control" id="editConfirmPassword" name="confirm_password">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary" form="editUserForm">Update User</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================== -->
+<!-- SCRIPT LOADING -->
+<!-- ======================================== -->
+
+<style>
+/* Fix modal z-index stacking for nested modals */
+.modal-backdrop {
+    z-index: 9997 !important;
+}
+
+.modal-backdrop + .modal-backdrop {
+    z-index: 9998 !important;
+}
+
+/* Ensure add/edit modals appear on top */
+#addUserModal,
+#editUserModal {
+    z-index: 9999 !important;
+}
+
+/* Force modal backdrop to be behind all modals */
+.modal-backdrop.show {
+    z-index: 9997 !important;
+}
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Load scripts with proper timing
+        setTimeout(function() {
+            var usersScript = document.createElement('script');
+            usersScript.src = '/js/user_info/users_data.js';
+            document.body.appendChild(usersScript);
+        }, 300);
+    });
+</script> 

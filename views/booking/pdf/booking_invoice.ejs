@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Invoice</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .header img {
+      height: 150px;
+    }
+
+    .invoice-title {
+      font-size: 28px;
+      font-weight: bold;
+      margin: 15px 0;
+    }
+
+    .sub-header {
+      text-align: center;
+      font-size: 14px;
+    }
+
+    .info-table, .remarks-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      font-size: 14px;
+    }
+
+    .info-table th, .info-table td {
+      border: 1px solid #f3c200;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .totals {
+  margin-top: 20px;
+  font-size: 14px;
+  margin-left: auto;          /* push to right side */
+  width: fit-content;         /* only occupy needed space */
+  text-align: left;           /* left-align the content inside */
+}
+
+.totals .label {
+  font-weight: bold;
+  margin: 0;
+}
+
+.totals .sub {
+  font-weight: normal;
+  margin: 0 0 2px 20px;
+  font-size: 12px;
+}
+
+    .totals p {
+  margin: 2px 0;
+}
+
+    .remarks-title {
+      font-weight: bold;
+      font-size: 14px;
+      background: #e3e8ed;
+      padding: 10px;
+      margin-top: 30px;
+    }
+
+    .bank-details {
+      margin-top: 30px;
+      font-size: 13px;
+    }
+
+    .issued-by {
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    .red {
+      color: red;
+      font-weight: bold;
+    }
+
+    .text-center {
+      text-align: center;
+    }
+
+    .text-right {
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <img src="<%= imageUrl %>" alt="logo" class="logo-default" />
+
+    <div class="invoice-title">INVOICE</div>
+    <div class="sub-header">
+      <div>Clark Terrace Building, Lot 2 Block 1, The Villages Prince Balagtas Avenue,</div>
+      <div>Clark Freeport Zone, Pampanga, 2023</div>
+      <div>(GLOBE) 0945 146 7000 (SMART) 0969 049 7000</div>
+    </div>
+  </div>
+
+  <div style="display: flex; justify-content: space-between; margin-top: 10px;">
+    <div><b>Date:</b> <%= DATE_ISSUED %></div>
+    <div><b>Invoice #:</b> <%= INVOICE_NO %></div>
+  </div>
+
+  <div style="margin-top: 10px;">
+    <b>Billed to:</b> <%= DISPLAY_NAME %>
+  </div>
+
+  <table class="info-table">
+    <thead>
+      <tr>
+        <th>DATE</th>
+        <th>GUEST NAME</th>
+        <th>DESCRIPTION</th>
+        <th>NO OF ROOMS</th>
+        <th>NO. OF NIGHTS</th>
+        <th>TOTAL</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><%= CHECKIN_DATE %> TO <%= CHECKOUT_DATE %></td>
+        <td><%= CUSTOMER_NAME %></td>
+        <td>ROOM ACCOMMODATION</td>
+        <td><%= ROOM_COUNT %> ROOMS (<%= ROOM_TYPE %>)</td>
+        <td><%= TOTAL_NIGHTS %> NIGHTS</td>
+        <td>PHP <%= parseFloat(GRAND_TOTAL).toLocaleString() %></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <p class="label"><b>CHARGE SUMMARY:</b></p>
+    <% if (EXTENDED_DAYS > 0) { %>
+      <p class="sub">ROOM & EXTENSION: PHP <%= parseFloat(ROOM_TOTAL).toLocaleString() %></p>
+    <% } else { %>
+      <p class="sub">ROOM: PHP <%= parseFloat(ROOM_TOTAL).toLocaleString() %></p>
+    <% } %>
+    <% if (SERVICES_TOTAL > 0) { %>
+    <p class="sub">SERVICES: PHP <%= parseFloat(SERVICES_TOTAL).toLocaleString() %></p>
+    <% } %>
+    <p class="label"><b>TOTAL CHARGES:</b> PHP <%= parseFloat(GRAND_TOTAL).toLocaleString() %></p>
+  </div>
+  
+  
+  
+  
+
+  <div class="remarks-title">REMARKS</div>
+  <table class="remarks-table">
+  
+    <div class="totals">
+      
+      <!-- <hr style="margin: 5px 0;"> -->
+      <p class="label"><b>TAX:</b> PHP 0</p>
+      <p class="label"><b>PAYMENT:</b> PHP <%= parseFloat(TOTAL_PAID).toLocaleString() %></p>
+      <p class="sub">ROOM PAID: PHP <%= parseFloat(ROOM_PAID).toLocaleString() %></p>
+      <% if (EXTENDED_DAYS > 0) { %>
+        <p class="sub">EXTENSION PAID: PHP <%= parseFloat(EXTENDED_PAID).toLocaleString() %></p>
+      <% } %>
+      <% if (SERVICES_TOTAL > 0) { %>
+      <p class="sub">SERVICES PAID: PHP <%= parseFloat(SERVICES_PAID).toLocaleString() %></p>
+      <% } %>
+      <p class="label"><b class="red">TOTAL DUE:</b><span class="red"> PHP <%= parseFloat(TOTAL_UNPAID).toLocaleString() %></span></p>
+    </div>
+  </table>
+  
+
+  <div style="display: flex; justify-content: space-between; margin-top: 30px; font-size: 13px;">
+    <div style="line-height: 1.5;">
+      <b>M STAY HOTEL BANK ACCOUNT</b><br>
+      BANK DETAILS: BDO<br>
+      BANK NAME: M STAY HOTEL CORP.<br>
+      ACCOUNT NUMBER: 005738009996
+    </div>
+    <div style="text-align: right; font-weight: bold; align-self: flex-start;">
+      ISSUED BY: <%= ISSUED_BY %>
+    </div>
+  </div>
+  
+
+</body>
+</html>

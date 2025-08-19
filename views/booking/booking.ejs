@@ -1,0 +1,72 @@
+<!-- start page content -->
+<div class="row">
+    <div class="col-xl-12 col-md-12 col-12">
+        <div class="dashboard-card">
+            <div class="dashboard-card-header">
+                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                    <div class="tab-bar">
+                        <a class="tab-item is-active" href="/booking">Single</a>
+                        <a class="tab-item" href="/booking/group">Group</a>
+                    </div>
+                    
+                    <div style="flex: 1; display: flex; justify-content: center; margin: 0 20px;">
+                        <div class="filter-btn-group">
+                            <button type="button" class="filter-btn active" data-filter="today">Today</button>
+                            <button type="button" class="filter-btn" data-filter="last3days">Last 3 Days</button>
+                            <button type="button" class="filter-btn" data-filter="thisWeek">This Week</button>
+                            <button type="button" class="filter-btn" data-filter="thisMonth">This Month</button>
+                        </div>
+                    </div>
+                    
+                    <div style="flex: 0 0 auto;">
+                        <button type="button" class="btn btn-success" data-bs-toggle="modal"
+                        data-bs-target="#modal-addbooking"><i class="fa fa-plus"></i> Add
+                            Booking
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="dashboard-card-body">
+                <div class="table-scrollable">
+                    <table id="booking_tbl" class="table table-hover table-bordered full-width">
+                        <thead>
+                        <tr>
+                            <th style="display:none"></th>
+                            <th>#</th>
+                            <th>GUEST ID</th>
+                            <th>ROOM NUMBER</th>
+                            <th>CONFIRMATION NUMBER</th>
+                            <th>CHECK IN</th>
+                            <th>CHECK OUT</th>
+                            <th>TOTAL PAYMENT</th>
+                            <th>PAYMENT STATUS </th>
+                            <th>BOOKING STATUS</th>
+                            <th>BOOKING CHANNEL</th>
+                            <th>ACTION</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+            
+<%- include('../booking/modal/billing') %>
+
+        <%- include('../booking/modal/status') %>
+     
+            <%- include('../booking/modal/cancel_booking') %>
+                
+                    
+
+
+
+
+<script src="/js/booking/booking_data.js"></script>
+
+
+<script src="/js/booking/booking_submit.js"></script> 

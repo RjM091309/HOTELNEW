@@ -1,0 +1,40 @@
+<!-- meta tags and other links -->
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+  <%- include('../partials/head') %>
+  <body class="page-header-fixed sidemenu-closed-hidelogo page-content-white page-md header-dark dark-sidebar-color logo-dark">
+    <div class="page-wrapper">
+      <%- include('../partials/navbar') %>
+      
+      <!-- start page container -->
+      <div class="page-container">
+        <%- include('../partials/sidebar') %>
+
+        <!-- start page content -->
+        <div class="page-content-wrapper">
+          <div class="page-content">
+            <% if (typeof hideBreadcrumb === 'undefined' || !hideBreadcrumb) { %>
+              <%- include('../partials/breadcrumb'), {title: typeof title !== 'undefined' ? title : '', subTitle: typeof subTitle !== 'undefined' ? subTitle : ''} %> 
+            <% } %>
+
+            <%- body %>
+          </div>
+        </div>
+        <!-- end page content -->
+      </div>
+      <!-- end page container -->
+      
+      <%- include('../partials/footer') %>
+      
+      <!-- start chat sidebar -->
+      <%- include('../partials/chat-sidebar') %>
+      <!-- end chat sidebar -->
+    </div>
+    <%- include('../partials/scripts') %> 
+
+   <!-- Add the script block here -->
+   <% if (typeof script !== 'undefined') { %>
+    <%- script %>
+  <% } %>
+  </body>
+</html>

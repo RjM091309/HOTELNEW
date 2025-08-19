@@ -1,0 +1,144 @@
+<!-- Reusable Booking Card Template -->
+<div class="card <%= cardClass %>" data-floor="<%= booking.ROOM_FLOOR %>" data-checkin="<%= booking.CHECK_IN_DATE %>" data-checkout="<%= booking.CHECK_OUT_DATE %>" data-idno="<%= booking.ROOM_ID %>" data-room-number="<%= booking.ROOM_NUMBER %>" data-booking-id="<%= booking.BookingID %>" data-late-checkout="<%= booking.LATE_CHECKOUT %>" data-booking-status="<%= booking.BookingStatus %>" data-customer-type="<%= booking.CUSTOMER_TYPE || '' %>" data-customer-level="<%= booking.CUSTOMER_LEVEL || '' %>">
+    
+    <!-- Header with Toggle -->
+    <div class="card-head" style="text-align: center; display: flex; align-items: center; justify-content: space-between;">
+        <% if (typeof showToggle !== 'undefined' && showToggle) { %>
+            <!-- Toggle Button -->
+            <label class="custom-switch <%= toggleType === 'checkout' ? 'input-out' : 'input-in' %>">
+                <input 
+                    type="checkbox" 
+                    class="custom-toggle-<%= toggleType === 'checkout' ? 'checkout' : 'checkin' %>" 
+                    data-idno="<%= booking.BookingID %>"
+                    data-late-checkout="<%= booking.LATE_CHECKOUT %>"
+                    <%= booking.BookingStatus === (toggleType === 'checkout' ? 'check-Out' : 'check-In') ? 'checked disabled' : '' %>
+                >
+                <span class="custom-slider"></span>
+            </label>
+        <% } %>
+        
+        <!-- Room Number -->
+        <header onclick="openRoomMenuModal('<%= booking.BookingID %>')" style="cursor: pointer; flex-grow: 1; text-align: center; font-weight: bold;">
+            <%= booking.ROOM_NUMBER %>
+        </header>
+        
+        <!-- Group Icon (Conditional) -->
+        <% if (booking.IS_GROUP == 1) { %>
+            <i class="material-icons" style="font-size: 20px; color: #555;">group</i>
+        <% } %>
+    </div>
+
+    <!-- Card Body -->
+    <div class="card-body">
+        <p><%= booking.RoomType %></p>
+        <div class="d-flex align-items-center justify-content-between">
+            <p class="mb-2" style="font-weight: normal;"><%= booking.CustomerName %></p>
+            <% if (typeof booking.TRANSFER !== 'undefined' && booking.TRANSFER === 1) { %>
+                <span class="badge badge-success tr-button">T/R</span>
+            <% } %>
+        </div>
+        <div class="d-flex align-items-center justify-content-between">
+            <p class="mb-0"><%= Number(booking.TotalCost).toLocaleString('en-US') %></p>
+            <% if (typeof showBadges !== 'undefined' && showBadges) { %>
+                <% if (booking.LATE_CHECKOUT === 1) { %>
+                    <span class="badge badge-success">LCO</span>
+                <% } %>
+                <% if (typeof booking.CHECK_IN_STATUS !== 'undefined' && booking.CHECK_IN_STATUS === 0) { %>
+                    <span class="badge badge-success">LCI</span>
+                <% } %>
+                <% if (typeof booking.EXTENDED !== 'undefined' && booking.EXTENDED === 1) { %>
+                    <span class="badge badge-warning">EXT</span>
+                <% } %>
+            <% } %>
+        </div>
+
+        <% if (typeof showDeviceStatus !== 'undefined' && showDeviceStatus) { %>
+            <!-- Device Status -->
+            <div class="device-status-container">
+                <!-- Cleaning Icon with DND Condition -->
+                <% if (booking.dndStatus === 'on') { %>
+                    <!-- DND ON kaya OFF ang Cleaning icon -->
+                    <i class="fas fa-broom off"></i>
+                <% } else if (booking.makeUpStatus === 'on') { %>
+                    <!-- Cleaning ON -->
+                    <i class="fas fa-broom on"></i>
+                    <p class="blink-green">MAKE UP ROOM REQUEST</p>
+                <% } else { %>
+                    <!-- Cleaning OFF -->
+                    <i class="fas fa-broom off"></i>
+                <% } %>
+                
+                <!-- Card Holder (IN/OUT) -->
+                <% if (booking.cholderStatus === 'on') { %>
+                    <span class="badge badge-success">IN</span>
+                <% } else { %>
+                    <span class="badge badge-danger">OUT</span>
+                <% } %>
+            </div>
+        <% } %>
+
+        <!-- Thin Line -->
+        <hr class="section-divider">
+        
+        <!-- Dates -->
+        <div class="dates">
+            <span>In: <%= checkInDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }) %></span>
+            <span>Out: <%= checkOutDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }) %></span>
+        </div>
+
+        <% if (typeof showProgressBars !== 'undefined' && showProgressBars) { %>
+            <!-- Progress Bars -->
+            <div class="progress-bars-wrapper">
+                <div class="progress-bars">
+                    <% for (let i = 0; i < visibleStayed; i++) { %>
+                        <div class="bar orange">
+                            <% if (i === 4 && totalDays >= 5) { %>
+                                <span style="color: white; font-size: 12px; display: block; text-align: center;">5</span>
+                            <% } %>
+                        </div>
+                    <% } %>
+                    <% for (let i = 0; i < visibleRemaining; i++) { %>
+                        <div class="bar green"></div>
+                    <% } %>
+                </div>
+                <% if (extraDays > 0) { %>
+                    <span class="extra-days">+<%= extraDays %></span>
+                <% } %>
+            </div>
+        <% } %>
+
+        <!-- Memo Section -->
+        <div class="memo <%= memoClass %>" 
+             data-booking-id="<%= booking.BookingID %>"
+             data-room-number="<%= booking.ROOM_NUMBER %>"
+             data-customer-name="<%= booking.CustomerName %>"
+             data-remarks="<%= booking.REMARKS || '' %>"
+             onclick="openRemarksModalFromData(this)" 
+             style="cursor: pointer;">
+            <p>
+                <% if (booking.REMARKS && booking.REMARKS.trim() !== '') { %>
+                    Remarks
+                <% } else { %>
+                    No Remarks
+                <% } %>
+            </p>
+        </div>
+        
+
+
+        <% if (typeof showLateCheckoutButtons !== 'undefined' && showLateCheckoutButtons) { %>
+            <!-- Late Check-Out Buttons -->
+            <div class="late-checkout-buttons" style="margin-top: 10px;">
+                <% if (booking.LATE_CHECKOUT === 1) { %>
+                    <button class="btn btn-secondary btn-oval" disabled>Late Check-Out (Applied)</button>
+                <% } else { %>
+                    <% if (totalDays < 3) { %>
+                        <button class="btn btn-warning btn-oval" onclick="openLateCheckoutModal('<%= booking.ROOM_ID %>', '<%= booking.CHECK_OUT_DATE %>', '<%= booking.BookingID %>')">Late Check-Out</button>
+                    <% } else { %>
+                        <button class="btn btn-secondary btn-oval" onclick="openLateCheckoutModal('<%= booking.ROOM_ID %>', '<%= booking.CHECK_OUT_DATE %>', '<%= booking.BookingID %>')">Free Late Check-Out</button>
+                    <% } %>
+                <% } %>
+            </div>
+        <% } %>
+    </div>
+</div> 

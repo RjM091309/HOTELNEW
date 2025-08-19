@@ -1,0 +1,176 @@
+<!-- ======================================== -->
+<!-- SEASON MANAGEMENT -->
+<!-- ======================================== -->
+
+<!-- Seasons Management Modal -->
+<div class="modal fade" id="seasonsManagementModal" tabindex="-1" role="dialog" aria-labelledby="seasonsManagementModalLabel" aria-hidden="true" data-keyboard="false" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="seasonsManagementModalLabel">Seasons Management</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6>Manage Seasons</h6>
+                    <button class="btn btn-primary btn-sm" id="addSeasonBtn" title="Add New Season">
+                        <i class="fa fa-plus"></i> Add New Season
+                    </button>
+                </div>
+                <div class="table-scrollable">
+                    <table id="seasonTable" class="table table-hover table-bordered full-width">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Start Date</th>
+                                <th>End Date</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Season Modal -->
+<div class="modal fade" id="addSeasonModal" tabindex="-1" role="dialog" aria-labelledby="addSeasonModalLabel" aria-hidden="true" data-keyboard="false" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="addSeasonModalLabel">Add New Season</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addSeasonForm">
+                <div class="modal-body">
+                    <!-- Season Name -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="addSeasonName" name="NAME" required>
+                                <label class="mdl-textfield__label">Season Name *</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Start Date -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="date" id="addSeasonStartDate" name="START_DATE" required>
+                                <label class="mdl-textfield__label">Start Date *</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- End Date -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="date" id="addSeasonEndDate" name="END_DATE" required>
+                                <label class="mdl-textfield__label">End Date *</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Status Selection -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="addSeasonActive" name="ACTIVE" value="" readonly tabIndex="-1" required>
+                                <label for="addSeasonActive" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="addSeasonActive" class="mdl-textfield__label">Status *</label>
+                                <ul data-mdl-for="addSeasonActive" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                    <li class="mdl-menu__item" data-val="1">Active</li>
+                                    <li class="mdl-menu__item" data-val="0">Inactive</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-10">Add Season</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Season Modal -->
+<div class="modal fade" id="editSeasonModal" tabindex="-1" role="dialog" aria-labelledby="editSeasonModalLabel" aria-hidden="true" data-keyboard="false" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="editSeasonModalLabel">Edit Season</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editSeasonForm">
+                <div class="modal-body">
+                    <input type="hidden" id="editSeasonId" name="IDNo">
+                    
+                    <!-- Season Name -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editSeasonName" name="NAME" required>
+                                <label class="mdl-textfield__label">Season Name</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Start Date -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="date" id="editSeasonStartDate" name="START_DATE" required>
+                                <label class="mdl-textfield__label">Start Date</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- End Date -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="date" id="editSeasonEndDate" name="END_DATE" required>
+                                <label class="mdl-textfield__label">End Date</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Status Selection -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editSeasonActive" name="ACTIVE" value="" readonly tabIndex="-1" required>
+                                <label for="editSeasonActive" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="editSeasonActive" class="mdl-textfield__label">Status</label>
+                                <ul data-mdl-for="editSeasonActive" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                    <li class="mdl-menu__item" data-val="1">Active</li>
+                                    <li class="mdl-menu__item" data-val="0">Inactive</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-10">Update Season</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div> 

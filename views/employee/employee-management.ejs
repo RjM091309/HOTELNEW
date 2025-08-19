@@ -1,0 +1,260 @@
+<!-- ======================================== -->
+<!-- EMPLOYEE MANAGEMENT PAGE -->
+<!-- ======================================== -->
+
+<!-- Main Content Area -->
+<div class="row">
+    <div class="col-xl-12 col-md-12 col-12">
+        <div class="dashboard-card">
+            <div class="dashboard-card-header">
+                <header>Employee Management</header>
+               
+            </div>
+            <div class="dashboard-card-body">
+                <!-- Action Buttons -->
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-primary btn-sm" id="addEmployeeBtn" title="Add New Employee">
+                            <i class="fa fa-plus"></i> Add New Employee
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Main Employee Table -->
+                <div class="table-scrollable">
+                    <table id="employeeTable" class="table table-hover table-bordered full-width">
+                        <thead>
+                            <tr>
+                                <th>Photo</th>
+                                <th>Full Name</th>
+                                <th>Department</th>
+                                <th>Contact No</th>
+                                <th>Address</th>
+                                <th>Date Started</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================== -->
+<!-- EMPLOYEE MODALS -->
+<!-- ======================================== -->
+
+<!-- Add Employee Modal -->
+<div class="modal fade" id="addEmployeeModal" tabindex="-1" role="dialog" aria-labelledby="addEmployeeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addEmployeeModalLabel">Add New Employee</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="addEmployeeForm" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <!-- Basic Information -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="addFullName">Full Name *</label>
+                                <input type="text" class="form-control" id="addFullName" name="fullName" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="addDepartment">Department *</label>
+                                <select class="form-control" id="addDepartment" name="department" required>
+                                    <option value="" selected disabled>Select Department</option>
+                                    <option value="Manager">Manager</option>
+                                    <option value="Supervisor">Supervisor</option>
+                                    <option value="Admin">Admin</option>
+                                    <option value="Front Desk">Front Desk</option>
+                                    <option value="Driver">Driver</option>
+                                    <option value="Housekeeping">Housekeeping</option>
+                                    <option value="Maintenance">Maintenance</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Contact Information -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="addContactNo">Contact Number *</label>
+                                <input type="text" class="form-control" id="addContactNo" name="contactNo" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="addDateStarted">Date Started *</label>
+                                <input type="date" class="form-control" id="addDateStarted" name="dateStarted" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Address -->
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="addAddress">Address *</label>
+                                <input type="text" class="form-control" id="addAddress" name="address" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Photo Upload -->
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="addPhoto">Photo</label>
+                                <input type="file" class="form-control" id="addPhoto" name="photo" accept="image/*">
+                                <small class="form-text text-muted">Only JPG, JPEG, PNG files allowed. Max size: 5MB</small>
+                                <div class="mt-2">
+                                    <img id="addPhotoPreview" src="#" alt="Photo Preview" style="display:none; max-width: 200px; max-height: 200px; object-fit: cover;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Employee</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Employee Modal -->
+<div class="modal fade" id="editEmployeeModal" tabindex="-1" role="dialog" aria-labelledby="editEmployeeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editEmployeeModalLabel">Edit Employee</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="editEmployeeForm" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <input type="hidden" id="editEmployeeId" name="employeeId">
+                    
+                    <!-- Basic Information -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="editFullName">Full Name *</label>
+                                <input type="text" class="form-control" id="editFullName" name="fullName" required>
+                            </div>
+                        </div>
+                                    <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="editDepartment">Department *</label>
+                                                <select class="form-control" id="editDepartment" name="department" required>
+                                                <option value="" selected disabled>Select Department</option>
+                                                <option value="Manager">Manager</option>
+                                                <option value="Supervisor">Supervisor</option>
+                                                <option value="Admin">Admin</option>
+                                                <option value="Front Desk">Front Desk</option>
+                                                <option value="Driver">Driver</option>
+                                                <option value="Housekeeping">Housekeeping</option>
+                                                <option value="Maintenance">Maintenance</option>
+                                                </select>
+                                            </div>
+                                            </div>
+                    </div>
+                    
+                    <!-- Contact Information -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="editContactNo">Contact Number *</label>
+                                <input type="text" class="form-control" id="editContactNo" name="contactNo" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="editDateStarted">Date Started *</label>
+                                <input type="date" class="form-control" id="editDateStarted" name="dateStarted" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Address -->
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="editAddress">Address *</label>
+                                <input type="text" class="form-control" id="editAddress" name="address" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Photo Upload -->
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="editPhoto">Photo</label>
+                                <input type="file" class="form-control" id="editPhoto" name="photo" accept="image/*">
+                                <small class="form-text text-muted">Only JPG, JPEG, PNG files allowed. Max size: 5MB</small>
+                                <div class="mt-2">
+                                    <img id="editPhotoPreview" src="#" alt="Photo Preview" style="display:none; max-width: 200px; max-height: 200px; object-fit: cover;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Employee</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================== -->
+<!-- SCRIPT LOADING -->
+<!-- ======================================== -->
+
+<style>
+/* Fix modal z-index stacking for nested modals */
+.modal-backdrop {
+    z-index: 9997 !important;
+}
+
+.modal-backdrop + .modal-backdrop {
+    z-index: 9998 !important;
+}
+
+/* Ensure add/edit modals appear on top */
+#addEmployeeModal,
+#editEmployeeModal {
+    z-index: 9999 !important;
+}
+
+/* Force modal backdrop to be behind all modals */
+.modal-backdrop.show {
+    z-index: 9997 !important;
+}
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Load scripts with proper timing
+        setTimeout(function() {
+            var employeeScript = document.createElement('script');
+            employeeScript.src = '/js/employee/employee_data.js';
+            document.body.appendChild(employeeScript);
+        }, 300);
+    });
+</script> 

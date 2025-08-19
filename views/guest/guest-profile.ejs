@@ -1,0 +1,389 @@
+<!-- start page content -->
+<div class="row">
+    <div class="col-xl-12 col-md-12 col-12">
+        <div class="dashboard-card">
+            <div class="dashboard-card-header">
+                <header>Guest List</header>
+                <div class="tools">
+                    <button type="button" class="btn btn-primary-10 btn-sm" id="manageGuestTypesBtn">
+                        <i class="fa fa-cog"></i> Manage Guest Types
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" id="manageGuestLevelsBtn">
+                        <i class="fa fa-cog"></i> Manage Guest Levels
+                    </button>
+                </div>
+            </div>
+            <div class="dashboard-card-body">
+               
+                <div class="table-scrollable">
+                    <table class="table table-hover table-bordered full-width"
+                    id="guestTable">
+                        <thead>
+                            <tr>
+                                        <th >Guest Name</th>
+                                        <th >Phone</th>
+                                        <th >Type</th>
+                                        <th >Level</th>
+                                        <th >Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Guest Modal -->
+<div class="modal fade" id="editGuestModal" tabindex="-1" role="dialog" aria-labelledby="editGuestModalLabel" aria-hidden="true" data-keyboard="false" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="editGuestModalLabel">Edit Guest</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editGuestForm">
+                <div class="modal-body">
+                    <input type="hidden" id="editGuestId" name="IDNo">
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editGuestName" name="NAME" required>
+                                <label class="mdl-textfield__label">Guest Name</label>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editGuestPhone" name="CONTACTNo" required>
+                                <label class="mdl-textfield__label">Phone Number</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editGuestType" name="TYPE" value="" readonly tabIndex="-1" required>
+                                <label for="editGuestType" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="editGuestType" class="mdl-textfield__label">Customer Type</label>
+                                <ul data-mdl-for="editGuestType" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                    <li class="mdl-menu__item" data-val="1">Golf</li>
+                                    <li class="mdl-menu__item" data-val="2">Group</li>
+                                    <li class="mdl-menu__item" data-val="3">Casino</li>
+                                    <li class="mdl-menu__item" data-val="4">Learning</li>
+                                    <li class="mdl-menu__item" data-val="5">Relaxing</li>
+                                    <li class="mdl-menu__item" data-val="6">Entertainment</li>
+                                    <li class="mdl-menu__item" data-val="7">Investment</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editGuestLevel" name="LEVEL" value="" readonly tabIndex="-1" required>
+                                <label for="editGuestLevel" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="editGuestLevel" class="mdl-textfield__label">Customer Level</label>
+                                <ul data-mdl-for="editGuestLevel" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                    <li class="mdl-menu__item" data-val="1">VIP</li>
+                                    <li class="mdl-menu__item" data-val="2">Regular</li>
+                                    <li class="mdl-menu__item" data-val="3">New Guest</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-10">Update Guest</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+                    <div class="modal fade" id="viewGuestModal" tabindex="-1" role="dialog"
+						aria-labelledby="viewGuestModalLabel" aria-hidden="true" data-keyboard="false" data-bs-backdrop="static">
+						<div class="modal-dialog modal-xl" role="document">
+							<div class="modal-content">
+								<div class="modal-header">
+									<h4 class="modal-title" id="viewGuestModalLabel">Guest Booking History</h4>
+									<button type="button" class="btn-close" data-bs-dismiss="modal"
+										aria-label="Close"></button>
+								</div>
+								<div class="modal-body">
+									
+                                            <div class="row">
+
+                                                <div class="col-lg-3 p-t-20">
+                                                    <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                                        <input class="mdl-textfield__input" type="text" id="modalCustomerName" readonly>
+                                                        <label class="mdl-textfield__label">Guest Name</label>
+                                                    </div>
+                                                </div>
+
+                                                <div class="col-lg-3 p-t-20">
+                                                    <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                                        <input class="mdl-textfield__input" type="text" id="modalCustomerPhone" readonly>
+                                                        <label class="mdl-textfield__label">Phone Number</label>
+                                                    </div>
+                                                </div>
+
+                                                <div class="col-lg-3 p-t-20">
+                                                    <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                                        <input class="mdl-textfield__input" type="text" id="modalCustomerType" readonly>
+                                                        <label class="mdl-textfield__label">Customer Type</label>
+                                                    </div>
+                                                </div>
+
+                                                <div class="col-lg-3 p-t-20">
+                                                    <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                                        <input class="mdl-textfield__input" type="text" id="modalCustomerLevel" readonly>
+                                                        <label class="mdl-textfield__label">Customer Level</label>
+                                                    </div>
+                                                </div>
+
+
+                                                
+                                            </div>
+                                      
+                                    <div class="table-scrollable">
+                                        <table id="bookingTable" class="table table-hover table-bordered full-width">
+                                            <thead>
+                                                <tr>
+                                                    <th>Room Number</th>
+                                                    <th>Confirmation #</th>
+                                                    <th>Check In</th>
+                                                    <th>Check Out</th>
+                                                    <th>Total Cost</th>
+                                                    <th>Booking Channel</th>
+                                                    <th>Payment Status</th>
+                                                    <th>Booking Status</th>
+                                                    <th>Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <!-- Data will be loaded dynamically via DataTable -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+								</div>
+								<div class="modal-footer">
+									<button type="button" class="btn btn-secondary"
+										data-bs-dismiss="modal">Close</button>
+									
+								</div>
+							</div>
+						</div>
+					</div>
+<!-- Booking Details Billing Modal -->
+<div class="modal fade" id="modal-booking-details" tabindex="-1" role="dialog" aria-labelledby="bookingDetailsModalTitle" aria-hidden="true" data-keyboard="false" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-xl" role="document">
+        <div class="modal-content" id="printableBookingArea">
+            <div class="modal-header">
+                <h4 class="modal-title">Booking Details #<span id="bookingDetailsId">N/A</span></h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="white-box">
+                            <input type="hidden" id="hiddenBookingId" name="hiddenBookingId">
+                            <h3><b>Booking Receipt</b> <span class="pull-right">#<span id="confNumber"></span></h3>
+                            <hr>                       
+                            <div class="row">
+                                <div class="col-md-12 d-flex align-items-center justify-content-between">
+                                    <!-- Left Section: Hotel Info -->
+                                    <div class="pull-left">
+                                        <address>
+                                            <img src="/img/logo.png" alt="logo" class="logo-default" />
+                                            <span class="logo-default">SKY HOTEL</span>
+                                            <p class="text-muted m-l-5">
+                                                Aditya Hotel, <br> Opp. Town Hall, <br>
+                                                Sardar Patel Road, <br> Ahmedabad - 380015
+                                            </p>
+                                        </address>
+                                    </div>
+                                
+                                    <!-- Center Section: Payment Status Image -->
+                                    <div id="paymentStatusContainer" style="text-align: center; margin-top: -50px;">
+                                        <img id="paymentStatusImage" src="/img/paid.png" alt="Payment Status" style="width: 200px;">
+                                    </div>
+                                
+                                    <!-- Right Section: Customer Info -->
+                                    <div class="pull-right text-right">
+                                        <address>
+                                            <p class="addr-font-h3">To,</p>
+                                            <p class="font-bold addr-font-h4" id="customerName"><!--Guest Name--> </p>
+                                            <p class="text-muted m-l-30" id="customerAddress">
+                                                <!--CUSTOMER ADDRESS-->
+                                            </p>
+                                            <p class="m-t-30">
+                                                <b>Booking Date :</b> <i class="fa fa-calendar"></i><span id="bookingDate">N/A</span>
+                                            </p>
+                                        </address>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-12">
+                                    <div class="table-responsive m-t-40">
+                                        <table class="table table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th class="text-center">#</th>
+                                                    <th class="text-center">Date</th>
+                                                    <th class="text-center">Description</th>
+                                                    <th class="text-center">Base Price</th>
+                                                    <th class="text-center">No Of Days / QTY</th>
+                                                    <th class="text-right">Sub Total</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="bookingDetailsTableBody">
+                                               
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="col-md-12">
+                                    <div class="pull-right m-t-30 text-right">
+                                        <p class="text-success"><b>Paid:</b> <span id="totalPaid"></span></p>
+                                        <p class="text-danger"><b>Balance:</b> <span id="balanceAmount"></span></p>
+                                        <h3><b>Total:</b> <span id="totalPayment"></span></h3>
+                                    </div>
+                                    <hr>
+                                    <div class="text-right">
+                                        <button onclick="printBookingDiv('printableBookingArea')" class="btn btn-default btn-outline" type="button">
+                                            <span><i class="fa fa-print"></i> Print</span>
+                                        </button>
+                                        <button id="generateBookingInvoiceBtn" class="btn btn-primary" type="button">
+                                            <i class="fa fa-file-pdf-o"></i> Invoice
+                                        </button>
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- Include Guest Type and Guest Level Management Modals -->
+<%- include('guest-type-management') %>
+<%- include('guest-level-management') %>
+
+
+
+<style>
+    #guestTypesManagementModal {
+        z-index: 1050;
+    }
+    #guestLevelsManagementModal {
+        z-index: 1050;
+    }
+    #addGuestTypeModal {
+        z-index: 1060;
+    }
+    #editGuestTypeModal {
+        z-index: 1060;
+    }
+    #addGuestLevelModal {
+        z-index: 1060;
+    }
+    #editGuestLevelModal {
+        z-index: 1060;
+    }
+    
+    /* Fix dropdown overflow issues in modals */
+    .modal {
+        overflow: visible !important;
+    }
+    
+    .modal-body {
+        overflow: visible !important;
+    }
+    
+    /* Ensure MDL dropdowns appear above modal content */
+    .mdl-menu {
+        z-index: 9999 !important;
+    }
+    
+    .mdl-menu__container {
+        z-index: 9999 !important;
+    }
+    
+    /* Fix dropdown positioning */
+    .mdl-menu--bottom-left,
+    .mdl-menu--bottom-right {
+        z-index: 9999 !important;
+    }
+    
+    /* Ensure dropdowns are not clipped by modal boundaries */
+    .modal .mdl-textfield {
+        overflow: visible !important;
+    }
+    
+    .modal .getmdl-select {
+        overflow: visible !important;
+    }
+    
+    /* Force dropdowns to render above modal backdrop */
+    .modal-backdrop + .mdl-menu,
+    .modal-backdrop + .mdl-menu__container {
+        z-index: 9999 !important;
+    }
+    
+    /* Additional fix for modal overflow */
+    .modal-dialog {
+        overflow: visible !important;
+    }
+    
+    .modal-content {
+        overflow: visible !important;
+    }
+</style>
+
+<script>
+	document.addEventListener('DOMContentLoaded', function() {
+		
+		// Wait for all scripts to be loaded first
+		setTimeout(function() {
+			// Load guest_data.js
+			var guestScript = document.createElement('script');
+			guestScript.src = '/js/guest/guest_data.js';
+			document.body.appendChild(guestScript);
+
+			// Load view_guest.js after guest_data.js
+			setTimeout(function() {
+				var viewGuestScript = document.createElement('script');
+				viewGuestScript.src = '/js/guest/view_guest.js';
+				document.body.appendChild(viewGuestScript);
+			}, 100);
+
+			// Load guest type maintenance.js
+			setTimeout(function() {
+				var guestTypeScript = document.createElement('script');
+				guestTypeScript.src = '/js/guest/guest-type-maintenance.js';
+				document.body.appendChild(guestTypeScript);
+			}, 200);
+
+			// Load guest level maintenance.js
+			setTimeout(function() {
+				var guestLevelScript = document.createElement('script');
+				guestLevelScript.src = '/js/guest/guest-level-maintenance.js';
+				document.body.appendChild(guestLevelScript);
+			}, 300);
+		}, 300);
+
+	});
+</script> 
+

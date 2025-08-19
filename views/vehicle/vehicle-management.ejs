@@ -1,0 +1,275 @@
+<!-- ======================================== -->
+<!-- VEHICLE MANAGEMENT PAGE -->
+<!-- ======================================== -->
+
+<!-- Main Content Area -->
+<div class="row">
+    <div class="col-xl-12 col-md-12 col-12">
+        <div class="dashboard-card">
+            <div class="dashboard-card-header">
+                <header>Vehicle Management</header>
+                
+            </div>
+            <div class="dashboard-card-body">
+                <!-- Action Buttons -->
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-primary btn-sm" id="addVehicleBtn" title="Add New Vehicle">
+                            <i class="fa fa-plus"></i> Add New Vehicle
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Main Vehicles Table -->
+                <div class="table-scrollable">
+                    <table id="vehiclesTable" class="table table-hover table-bordered full-width">
+                        <thead>
+                            <tr>
+                                <th>Photo</th>
+                                <th>Model Name</th>
+                                <th>Vehicle Type</th>
+                                <th>Color</th>
+                                <th>Plate Number</th>
+                                <th>Fuel Type</th>
+                                <th>Remarks</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================== -->
+<!-- VEHICLE MODALS -->
+<!-- ======================================== -->
+
+<!-- Add Vehicle Modal -->
+<div class="modal fade" id="addVehicleModal" tabindex="-1" role="dialog" aria-labelledby="addVehicleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addVehicleModalLabel">Add New Vehicle</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addVehicleForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="modelName">Model Name *</label>
+                                <input type="text" class="form-control" id="modelName" name="modelName" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="plateNumber">Plate Number *</label>
+                                <input type="text" class="form-control" id="plateNumber" name="plateNumber" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="vehicleType">Vehicle Type *</label>
+                                <select class="form-control" id="vehicleType" name="vehicleType" required>
+                                    <option value="" selected disabled>Select Vehicle Type</option>
+                                    <option value="Sedan">Sedan</option>
+                                    <option value="SUV">SUV</option>
+                                    <option value="Truck">Truck</option>
+                                    <option value="Van">Van</option>
+                                    <option value="Motorcycle">Motorcycle</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="fuelType">Fuel Type *</label>
+                                <select class="form-control" id="fuelType" name="fuelType" required>
+                                    <option value="" selected disabled>Select Fuel Type</option>
+                                    <option value="Gasoline">Gasoline</option>
+                                    <option value="Diesel">Diesel</option>
+                                    <option value="Electric">Electric</option>
+                                    <option value="Hybrid">Hybrid</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="color">Color *</label>
+                                <input type="text" class="form-control" id="color" name="color" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="vehiclePhoto">Vehicle Photo</label>
+                                <input type="file" class="form-control" id="vehiclePhoto" name="vehiclePhoto" accept="image/*">
+                                <img id="photoPreview" src="#" alt="Photo preview" style="display:none; max-width: 200px; margin-top: 10px;">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="remarks">Remarks</label>
+                                <textarea class="form-control" id="remarks" name="remarks" rows="3"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary" form="addVehicleForm">Save Vehicle</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Vehicle Modal -->
+<div class="modal fade" id="editVehicleModal" tabindex="-1" role="dialog" aria-labelledby="editVehicleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editVehicleModalLabel">Edit Vehicle</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editVehicleForm">
+                    <input type="hidden" id="editVehicleId" name="vehicleId">
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="editModelName">Model Name *</label>
+                                <input type="text" class="form-control" id="editModelName" name="modelName" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="editPlateNumber">Plate Number *</label>
+                                <input type="text" class="form-control" id="editPlateNumber" name="plateNumber" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="editVehicleType">Vehicle Type *</label>
+                                <select class="form-control" id="editVehicleType" name="vehicleType" required>
+                                    <option value="Sedan">Sedan</option>
+                                    <option value="SUV">SUV</option>
+                                    <option value="Truck">Truck</option>
+                                    <option value="Van">Van</option>
+                                    <option value="Motorcycle">Motorcycle</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="editFuelType">Fuel Type *</label>
+                                <select class="form-control" id="editFuelType" name="fuelType" required>
+                                    <option value="Gasoline">Gasoline</option>
+                                    <option value="Diesel">Diesel</option>
+                                    <option value="Electric">Electric</option>
+                                    <option value="Hybrid">Hybrid</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="editColor">Color *</label>
+                                <input type="text" class="form-control" id="editColor" name="color" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="editVehiclePhoto">Vehicle Photo</label>
+                                <input type="file" class="form-control" id="editVehiclePhoto" name="vehiclePhoto" accept="image/*">
+                                <img id="editPhotoPreview" src="#" alt="Photo preview" style="display:none; max-width: 200px; margin-top: 10px;">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="editRemarks">Remarks</label>
+                                <textarea class="form-control" id="editRemarks" name="remarks" rows="3"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary" form="editVehicleForm">Update Vehicle</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================== -->
+<!-- SCRIPT LOADING -->
+<!-- ======================================== -->
+
+<style>
+/* Fix modal z-index stacking for nested modals */
+.modal-backdrop {
+    z-index: 9997 !important;
+}
+
+.modal-backdrop + .modal-backdrop {
+    z-index: 9998 !important;
+}
+
+/* Ensure add/edit modals appear on top */
+#addVehicleModal,
+#editVehicleModal {
+    z-index: 9999 !important;
+}
+
+/* Force modal backdrop to be behind all modals */
+.modal-backdrop.show {
+    z-index: 9997 !important;
+}
+
+/* Vehicle photo styling */
+.vehicle-photo {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.vehicle-photo:hover {
+    transform: scale(1.1);
+    transition: transform 0.2s;
+}
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Load scripts with proper timing
+        setTimeout(function() {
+            var vehiclesScript = document.createElement('script');
+            vehiclesScript.src = '/js/vehicle/vehicles_data.js';
+            document.body.appendChild(vehiclesScript);
+        }, 300);
+    });
+</script> 

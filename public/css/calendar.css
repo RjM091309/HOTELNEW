@@ -1,0 +1,804 @@
+/* ========================================
+   CALENDAR STYLES - DARK THEME
+   ======================================== */
+
+/* Main Container */
+#calendar {
+    max-width: 100%;
+    margin: auto;
+    font-size: 11px !important;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(145deg, #2a3135, #1f2528);
+    min-height: 100vh;
+    /* Performance optimizations */
+    will-change: scroll-position;
+    transform: translateZ(0);
+  }
+  
+  /* Siguraduhin na pangalan lang ang lalabas */
+  .fc-event-time {
+    display: none !important;
+  }
+  
+  /* Ensure event box displays properly */
+  .fc-event {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    width: 100% !important; /* Full width to eliminate gaps */
+    height: 18px !important; /* Keep original height */
+    padding: 0px !important; /* Remove extra padding */
+    margin-top: 0px !important; /* Remove vertical margins */
+    margin-bottom: 0px !important; /* Remove vertical margins */
+    margin-left: 0px !important; /* Remove horizontal margins */
+    margin-right: 0px !important; /* Remove horizontal margins */
+    font-size: 10px !important; /* Keep original font size */
+    border: none !important;
+    border-radius: 0 !important; /* Remove rounded corners for parallelogram */
+    font-weight: 600 !important; /* Slightly bolder text */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    /* Enhanced shadow for better depth */
+    transform: skew(-25deg) scale(1.02) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.2) !important;
+    /* Parallelogram shape */
+    transform: skew(-35deg) !important;
+    transform-origin: center !important;
+    /* Smooth transitions for hover effects */
+    transition: all 0.3s ease !important;
+    /* Better text contrast */
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+    /* Subtle border for definition */
+    border-left: 2px solid rgba(255, 255, 255, 0.1) !important;
+    border-right: 2px solid rgba(0, 0, 0, 0.1) !important;
+    z-index: 10 !important;
+  }
+  
+  /* Counter the skew for the text inside */
+  .fc-event > * {
+    transform: skew(25deg) !important;
+    transform-origin: center !important;
+    /* Ensure text stays crisp */
+    backface-visibility: hidden !important;
+    -webkit-font-smoothing: antialiased !important;
+  }
+  
+  
+  
+  /* Active/focus state */
+  .fc-event:focus {
+    outline: 2px solid rgba(111, 156, 64, 0.5) !important;
+    outline-offset: 1px !important;
+  }
+  
+  .fc-datagrid-cell-cushion {
+    display: flex !important;
+    align-items: center !important;
+    height: 100%;
+    box-sizing: border-box;
+    padding: 1px !important;
+  }
+  
+  /* BOLD the Floor Names */
+  .fc-resource-bold {
+    font-weight: bold;
+    color: #ccc;
+  }
+  
+  /* ========================================
+     TOP NAVIGATION BAR
+     ======================================== */
+  .fc-header-toolbar {
+    background: linear-gradient(135deg, #2a3135, #1f2528);
+    padding: 15px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    margin-bottom: 1.5em;
+  }
+  
+  /* Calendar title (e.g., June 2025) */
+  .fc-toolbar-title {
+    font-size: 1.75em;
+    font-weight: 600;
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+  
+  /* Button base styling */
+  .fc-button {
+    background: rgba(255,255,255,0.1) !important;
+    border: 1px solid rgba(255,255,255,0.2) !important;
+    border-radius: 4px !important;
+    padding: 8px 12px !important;
+    margin: 0 2px !important;
+    font-size: 0.85rem !important;
+    font-weight: 500 !important;
+    color: #ffffff !important;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    text-transform: capitalize;
+  }
+  
+  /* Hover effect */
+  .fc-button:hover {
+    background: rgba(255,255,255,0.2) !important;
+    border-color: rgba(255,255,255,0.3) !important;
+    transform: translateY(-1px);
+  }
+  
+  /* Active/selected state */
+  .fc-button-primary:not(:disabled).fc-button-active,
+  .fc-button-primary:not(:disabled):active {
+    background: linear-gradient(45deg, #6f9c40, #5a7a33) !important;
+    color: #ffffff !important;
+    border-color: #6f9c40 !important;
+    box-shadow: 0 2px 8px rgba(111, 156, 64, 0.3) !important;
+  }
+  
+  .fc-button-primary:disabled {
+    background: rgba(255,255,255,0.05) !important;
+    border-color: rgba(255,255,255,0.1) !important;
+    color: rgba(255,255,255,0.5) !important;
+  }
+  
+  .fc-button-primary:focus {
+    box-shadow: 0 0 0 0.2rem rgba(111, 156, 64, 0.5) !important;
+  }
+  
+  /* Button group spacing */
+  .fc-button-group {
+    display: flex;
+    gap: 4px;
+  }
+  
+  /* ========================================
+     MAIN CALENDAR LAYOUT
+     ======================================== */
+  .fc {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(145deg, #2a3135, #1f2528);
+  }
+  
+  /* ========================================
+     RESOURCE AREA (ROOMS LIST)
+     ======================================== */
+  .fc-resource-area-header {
+    background: rgba(255,255,255,0.05) !important;
+    color: #ffffff !important;
+    font-weight: bold;
+    border: none !important;
+    border-right: 1px solid rgba(255,255,255,0.1) !important;
+    border-bottom: none !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+  }
+  
+  .fc-resource-area-header::after {
+    display: none;
+  }
+  
+  /* ========================================
+     GRID STYLING
+     ======================================== */
+  .fc-theme-standard .fc-scrollgrid, 
+  .fc-theme-standard th, 
+  .fc-theme-standard td {
+    border: 1px solid rgba(255,255,255,0.1) !important;
+  }
+  
+  .fc-theme-standard .fc-list-day-cushion, 
+  .fc-theme-standard .fc-list-table th {
+    background-color: rgba(255,255,255,0.05) !important;
+    color: #ffffff !important;
+  }
+  
+  /* ========================================
+     TIMELINE SLOTS
+     ======================================== */
+  .fc-timeline-slot-cushion {
+    color: #ffffff !important;
+    background: rgba(255,255,255,0.02) !important;
+  }
+  
+  .fc-timeline-slot {
+    background: rgba(255,255,255,0.02) !important;
+    border-right: 1px solid rgba(255,255,255,0.1) !important;
+  }
+  
+  /* ========================================
+     DAY HIGHLIGHTS
+     ======================================== */
+  
+  /* Saturday - Soft Blue Background */
+  .saturday-border {
+    background: rgba(255,255,255,0.08) !important; /* Dark green tone */
+  }
+  
+  /* Sunday - Soft Red Background */
+  .sunday-border {
+    background: rgba(255,255,255,0.08) !important; /* Dark red tone */
+  }
+  
+  
+  /* Highlight the current day */
+  .current-day {
+    background-color: rgba(111, 156, 64, 0.3) !important; /* Dark green highlight */
+   
+  }
+  
+  /* ========================================
+     EVENT STYLING
+     ======================================== */
+  
+  /* Occupied - Green */
+  .fc-event[style*="background-color: green"] {
+    background-color: #43a047 !important; /* Material success green */
+    color: #fff !important;
+  }
+  
+  /* Late Check-In - Deep Orange */
+  .fc-event[style*="background-color: orange"] {
+    background-color: #fb8c00 !important; /* Material deep orange */
+    color: #fff !important;
+  }
+  
+  /* Regular Check-In - Info Blue */
+  .fc-event[style*="background-color: ''"] {
+    background-color: #42a5f5 !important; /* Lighter blue (informational) */
+    color: #fff !important;
+  }
+  
+  /* Check-Out - Neutral Gray */
+  .fc-event[style*="background-color: rgb(179, 179, 179)"] {
+    background-color: #6c757d !important; /* Blue-gray for neutral tone */
+    color: #fff !important;
+  }
+  
+  /* Cancelled - Alert Yellow */
+  .fc-event[style*="background-color: yellow"] {
+    background-color: #fd3535 !important;
+    color: #fff !important;
+  }
+  
+  .fc-v-event {
+    border: none;
+  }
+  
+
+  
+  /* ========================================
+     HIGHLIGHT SELECTED CELL
+     ======================================== */
+  .fc-highlight {
+    background: rgba(111, 156, 64, 0.3) !important; /* Dark green highlight */
+    opacity: 0.7 !important;
+  }
+  
+  /* ========================================
+     HOVER EFFECTS FOR BOOKING
+     ======================================== */
+  
+
+  
+  /* Hover effect for empty booking slots */ .fc-timeline-slot:not(:has(.fc-event)):hover { background: linear-gradient(45deg, rgba(111, 156, 64, .2), rgba(111, 156, 64, .15)) !important; position: relative !important; } /* Hover effect for the calendar body */ .fc-timeline-body .fc-timeline-slot:hover { cursor: crosshair !important; } /* Enhanced cursor styles */ .fc-timeline-slot:not(:has(.fc-event)) { cursor: pointer !important; } .fc-timeline-slot:has(.fc-event) { cursor: default !important; }
+
+  
+  /* ========================================
+     LOADING SPINNER
+     ======================================== */
+  #calendar {
+    position: relative;
+  }
+  
+  #calendar-loading {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(42, 49, 53, 0.9) !important; /* Dark background with higher opacity */
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    backdrop-filter: blur(5px);
+  }
+  
+  .loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px;
+    background: linear-gradient(145deg, #2a3135, #1f2528);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  #calendar-loading .spinner {
+    border: 4px solid rgba(255,255,255,0.1);
+    border-top: 4px solid #6f9c40;
+    border-radius: 50%;
+    width: 60px; 
+    height: 60px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(111, 156, 64, 0.3);
+  }
+  
+  .loading-text {
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 500;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    letter-spacing: 0.5px;
+  }
+  
+  @keyframes spin { 
+    100% { transform: rotate(360deg); } 
+  }
+  
+  /* ========================================
+     MONTH SEPARATOR
+     ======================================== */
+  /* .fc .fc-timeline-slot.month-separator-end {
+    border-right: 2px solid #6f9c40 !important;
+  } */
+  
+  /* ========================================
+     SCROLLBAR STYLING
+     ======================================== */
+  
+  /* make room for our injected bar */
+  #calendar .fc-scrollgrid {
+    margin-top: 12px;
+  }
+  
+  /* style our injected bar */
+  #calendar #top-scroller {
+    height: 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: linear-gradient(145deg, #2a3135, #1f2528);
+    /* Firefox */
+    scrollbar-color: #6f9c40 rgba(255,255,255,0.1);
+    scrollbar-width: thin;
+    /* GPU rendering for smooth horizontal scrolling */
+    transform: translateZ(0);
+    will-change: scroll-position;
+  }
+  
+  /* WebKit browsers */
+  #calendar #top-scroller::-webkit-scrollbar {
+    height: 12px;
+  }
+  
+  #calendar #top-scroller::-webkit-scrollbar-thumb {
+    background-color: #6f9c40;
+    border-radius: 6px;
+  }
+  
+  #calendar #top-scroller::-webkit-scrollbar-track {
+    background-color: rgba(255,255,255,0.1);
+  }
+  
+  #calendar #top-scroller > div {
+    height: 1px; /* just enough to render the inner width */
+  }
+  
+  /* Hide scrollbars for calendar */
+  #calendar .fc-scroller::-webkit-scrollbar {
+    display: none;
+  }
+  
+  #calendar .fc-scroller {
+    -ms-overflow-style: none;  /* Internet Explorer 10+ */
+    scrollbar-width: none;  /* Firefox */
+    /* GPU rendering for smooth scrolling */
+    transform: translateZ(0);
+    will-change: scroll-position;
+  }
+  
+  /* Hide bottom scrollbar */
+  #calendar .fc-scrollgrid-shrink-frame::-webkit-scrollbar {
+    display: none;
+  }
+  
+  #calendar .fc-scrollgrid-shrink-frame {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    /* GPU rendering for smooth scrolling */
+    transform: translateZ(0);
+    will-change: scroll-position;
+  }
+  
+  /* ========================================
+     FULLSCREEN MODE
+     ======================================== */
+  #calendar:-webkit-full-screen,
+  #calendar:-moz-full-screen,
+  #calendar:-ms-fullscreen,
+  #calendar:fullscreen {
+    filter: none !important;
+    -webkit-filter: none !important;
+    background: linear-gradient(145deg, #2a3135, #1f2528) !important;
+    color: #ffffff !important;
+  }
+  
+  /* ========================================
+     LICENSE MESSAGE
+     ======================================== */
+  div.fc-license-message {
+    display: none !important;
+  }
+
+/* ========================================
+     CALENDAR LEGEND OVERLAY
+     ======================================== */
+.calendar-legend-overlay {
+  position: fixed;
+  bottom: 20px; /* Changed from top: 20px to bottom: 20px */
+  right: 20px;
+  background: linear-gradient(145deg, #2a3135, #1f2528);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  z-index: 1000;
+  min-width: 300px; /* Increased from 280px to 300px for better text fit */
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  transition: all 0.3s ease;
+}
+
+/* Removed hover effect that caused floating */
+/* .calendar-legend-overlay:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+} */
+
+.calendar-legend-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 15px; /* Add gap between title and button */
+}
+
+.calendar-legend-title {
+  color: #ffffff;
+  font-size: 16px; /* Reduced from 18px to 16px */
+  font-weight: 600;
+  margin: 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  flex: 1; /* Allow title to take available space */
+  white-space: nowrap; /* Prevent text wrapping */
+  overflow: hidden; /* Hide overflow */
+  text-overflow: ellipsis; /* Show ellipsis if text is too long */
+}
+
+.calendar-legend-toggle {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: #ffffff;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 500;
+  flex-shrink: 0; /* Prevent button from shrinking */
+  min-width: 32px; /* Ensure minimum button width */
+}
+
+/* Removed hover effect that caused movement */
+/* .calendar-legend-toggle:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  transform: translateY(-1px);
+} */
+
+.calendar-legend-toggle:active {
+  transform: translateY(0);
+}
+
+.calendar-legend-content {
+  display: block;
+}
+
+.calendar-legend-content.collapsed {
+  display: none;
+}
+
+.calendar-legend-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border-left: 4px solid transparent;
+  transition: all 0.3s ease;
+}
+
+/* Removed hover effect that caused movement */
+/* .calendar-legend-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateX(5px);
+} */
+
+.calendar-legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  margin-right: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.calendar-legend-text {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  flex: 1;
+}
+
+.calendar-legend-count {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 20px;
+  text-align: center;
+}
+
+/* Legend color definitions */
+.legend-color-occupied {
+  background-color: #43a047 !important;
+}
+
+.legend-color-late-checkin {
+  background-color: #fb8c00 !important;
+}
+
+.legend-color-regular-checkin {
+  background-color: #42a5f5 !important;
+}
+
+.legend-color-checkout {
+  background-color: #6c757d !important;
+}
+
+.legend-color-cancelled {
+  background-color: #fd3535 !important;
+}
+
+/* Legend minimize/maximize animation */
+.calendar-legend-overlay.minimized {
+  min-width: auto;
+  width: 48px; /* compact size */
+  height: 48px; /* compact size */
+  padding: 0; /* no inner padding */
+  border-radius: 12px;
+  transform: none; /* no slide-out */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.calendar-legend-overlay.minimized .calendar-legend-content { display: none; }
+
+.calendar-legend-overlay.minimized .calendar-legend-header {
+  border-bottom: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.calendar-legend-overlay.minimized .calendar-legend-title { display: none; }
+
+/* Compact toggle button when minimized */
+.calendar-legend-overlay.minimized .calendar-legend-toggle {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.2);
+}
+
+/* Removed hover effect that caused movement */
+/* .calendar-legend-overlay.minimized:hover {
+  transform: translateX(calc(100% - 80px));
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+} */
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .calendar-legend-overlay {
+    bottom: 10px; /* Changed from top: 10px to bottom: 10px */
+    right: 10px;
+    left: 10px;
+    min-width: auto;
+    width: auto;
+  }
+  
+  .calendar-legend-overlay.minimized {
+    width: auto;
+    left: auto;
+  }
+}
+
+/* Legend show/hide animation */
+.calendar-legend-overlay {
+  animation: legend-slide-in 0.3s ease-out;
+}
+
+@keyframes legend-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.calendar-legend-overlay.hidden {
+  animation: legend-slide-out 0.3s ease-in forwards;
+}
+
+@keyframes legend-slide-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+}
+
+/* ========================================
+     EVENT UPDATE ANIMATION
+     ======================================== */
+.event-updated {
+  animation: event-update-pulse 0.3s ease-in-out;
+  transform: scale(1.05);
+  z-index: 1000;
+}
+
+@keyframes event-update-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+  .fc-slot-label-combined {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    /* give a little extra vertical room */
+    padding: 4px 0;
+    min-height: 2.4rem;
+    line-height: 1;
+  }
+  
+  .fc-slot-label-combined .dow {
+    font-size: 0.7rem;
+    font-weight: 400;   /* make weekday regular weight */
+    text-transform: uppercase;
+    color: #bbb;        /* optional: tone down the weekday color */
+  }
+  
+  .fc-slot-label-combined .day {
+    font-size: 1rem;
+    font-weight: 700;   /* bold the date number */
+    color: #fff;        /* or whatever your header text color is */
+  }
+  
+
+/* === CONTROLS (adjust mo lang ito) === */
+:root{
+  --day-name-font-size: 0.7rem;
+  --day-name-weight: 400;
+  --day-name-color: #bbb;
+  --day-name-transform: uppercase;
+  --day-name-offset-y: 12px; /* negative = pataas, positive = pababa */
+
+  --day-number-font-size: 1rem;
+  --day-number-weight: 700;
+  --day-number-color: #fff;
+  --day-number-offset-y: 8px;  /* negative = pataas, positive = pababa */
+}
+
+/* HIDE the minor header row (AM/PM) – optional */
+#calendar .fc-timeline-header .fc-timeline-header-row:nth-child(2){
+  display:none;
+}
+
+/* Make major header cells stack nicely */
+#calendar .fc-timeline-header .fc-timeline-header-row:first-child
+  .fc-timeline-slot-cushion{
+  display:flex !important;
+  flex-direction:column !important;
+  align-items:center !important;
+  justify-content:center !important;
+  line-height:1.1 !important;
+  padding:4px 0 !important;
+  min-height:2.4rem !important;
+}
+
+/* ✅ Styles for stacked labels (now with controls) */
+#calendar .fc-timeline-slot-cushion .dow{
+  display:block;                 /* para hiwalay sa number kahit may <br> */
+  line-height:1;
+  font-size:var(--day-name-font-size) !important;
+  font-weight:var(--day-name-weight) !important;
+  text-transform:var(--day-name-transform) !important;
+  color:var(--day-name-color) !important;
+  transform:translateY(var(--day-name-offset-y));
+}
+
+#calendar .fc-timeline-slot-cushion .day{
+  display:block;
+  line-height:1;
+  font-size:var(--day-number-font-size) !important;
+  font-weight:var(--day-number-weight) !important;
+  color:var(--day-number-color) !important;
+  transform:translateY(var(--day-number-offset-y));
+}
+
+/* (Optional) itago ang AM/PM (minor row) - duplicate ok lang pero ito na lang dapat */
+#calendar .fc-timeline-header .fc-timeline-header-row:nth-child(2){
+  display:none;
+}
+
+
+
+
+
+/* bawasan padding ng th/slot para magmukhang siksik at naka-center */
+#calendar .fc-timeline-header th,
+#calendar .fc-timeline-header .fc-timeline-slot{
+  padding:0 !important;
+}
+
+#calendar .fc-timeline-header .fc-timeline-slot-cushion{
+  padding:4px 0 !important;
+  line-height:1.1;
+  text-align:center;
+  white-space:normal; /* allow line breaks */
+}
+
+/* dagdag height para sa header row */
+#calendar .fc-timeline-header .fc-timeline-header-row{
+  height:46px !important; /* adjust mo kung kinakailangan */
+}
+
+/* ayusin din ang cushion sa loob */
+#calendar .fc-timeline-header .fc-timeline-slot-cushion{
+  height:100% !important;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+}

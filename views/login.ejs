@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta content="width=device-width, initial-scale=1" name="viewport" />
+	<meta name="description" content="Hotel PMS" />
+	<meta name="author" content="3CORE Leaderstech" />
+	<title>3CORE - Hotel Management System</title>
+	<!-- icons -->
+	<link href="/plugins/font-awesome/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+	<link rel="stylesheet" href="/plugins/iconic/css/material-design-iconic-font.min.css">
+	<!-- bootstrap -->
+	<link href="/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet" type="text/css" />
+	<!-- style -->
+	<link rel="stylesheet" href="/css/pages/extra_pages.css">
+	<!-- favicon -->
+	<link rel="shortcut icon" href="/img/favicon.ico" />
+
+</head>
+
+<body>
+	<div class="limiter">
+		<div class="container-login100 page-background">
+			<div class="wrap-login100">
+				<form class="login100-form validate-form" id="loginForm">
+					<div class="login-header">
+						<!-- <div class="logo-container">
+							<i class="zmdi zmdi-cocktail"></i>
+						</div> -->
+						<h1 class="login-title">3CORE</h1>
+						<p class="login-subtitle">Hotel Management System</p>
+					</div>
+					
+					<div class="form-container">
+						<div class="wrap-input100 validate-input" data-validate="Enter username">
+							<input class="input100" type="text" name="username" placeholder="Username" required>
+							<span class="focus-input100" data-placeholder="&#xf207;"></span>
+						</div>
+						<div class="wrap-input100 validate-input" data-validate="Enter password">
+							<input class="input100" type="password" name="password" placeholder="Password" required>
+							<span class="focus-input100" data-placeholder="&#xf191;"></span>
+						</div>
+						<div class="contact100-form-checkbox">
+							<input class="input-checkbox100" id="ckb1" type="checkbox" name="remember-me">
+							<label class="label-checkbox100" for="ckb1">
+								Remember me
+							</label>
+						</div>
+						<div class="container-login100-form-btn">
+							<button class="login100-form-btn" type="submit">
+								<i class="zmdi zmdi-sign-in"></i>
+								Login
+							</button>
+						</div>
+					</div>
+					
+					<div class="login-footer">
+						<a class="txt1" href="#">
+							Forgot Password?
+						</a>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+	<!-- start js include path -->
+	<script src="/plugins/jquery/jquery.min.js"></script>
+	<!-- bootstrap -->
+	<script src="/plugins/bootstrap/js/bootstrap.min.js"></script>
+
+	<script src="/js/pages/extra_pages/login.js"></script>
+	<!-- Login Script -->
+	<script>
+		$(document).ready(function() {
+			// Handle login form submission
+			$('.login100-form').on('submit', function(e) {
+				e.preventDefault();
+				
+				const username = $('input[name="username"]').val();
+				const password = $('input[name="password"]').val();
+				const rememberMe = $('input[name="remember-me"]').is(':checked');
+				
+				// Show loading state
+				const submitBtn = $('.login100-form-btn');
+				const originalText = submitBtn.html();
+				submitBtn.html('<i class="zmdi zmdi-spinner zmdi-hc-spin"></i> Logging in...');
+				submitBtn.prop('disabled', true);
+				
+				// Make AJAX request
+				$.ajax({
+					url: '/login',
+					method: 'POST',
+					contentType: 'application/json',
+					data: JSON.stringify({
+						username: username,
+						password: password,
+						rememberMe: rememberMe
+					}),
+					success: function(response) {
+						if (response.success) {
+							// Redirect directly to dashboard
+							window.location.href = response.redirectUrl || '/dashboard';
+						} else {
+							// Show message only for wrong password
+							if (response.message && response.message.includes('Invalid username or password')) {
+								alert('Wrong password. Please try again.');
+							} else {
+								alert(response.message || 'Login failed');
+							}
+							// Restore button state
+							submitBtn.html(originalText);
+							submitBtn.prop('disabled', false);
+						}
+					},
+					error: function(xhr) {
+						let errorMessage = 'An error occurred during login';
+						
+						if (xhr.responseJSON && xhr.responseJSON.message) {
+							errorMessage = xhr.responseJSON.message;
+						}
+						
+						// Show message only for wrong password
+						if (errorMessage.includes('Invalid username or password')) {
+							alert('Wrong password. Please try again.');
+						} else {
+							alert(errorMessage);
+						}
+						// Restore button state
+						submitBtn.html(originalText);
+						submitBtn.prop('disabled', false);
+					}
+				});
+			});
+			
+			// Handle Enter key press
+			$('.input100').on('keypress', function(e) {
+				if (e.which === 13) { // Enter key
+					$('.login100-form').submit();
+				}
+			});
+		});
+	</script>
+	<!-- end js include path -->
+</body>
+
+</html>

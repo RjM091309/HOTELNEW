@@ -1,0 +1,173 @@
+<!-- ======================================== -->
+<!-- GUEST LEVEL MANAGEMENT -->
+<!-- ======================================== -->
+
+<!-- Guest Levels Management Modal -->
+<div class="modal fade" id="guestLevelsManagementModal" tabindex="-1" role="dialog" aria-labelledby="guestLevelsManagementModalLabel" aria-hidden="true" data-keyboard="false" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="guestLevelsManagementModalLabel">Guest Levels Management</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6>Manage Guest Levels</h6>
+                    <button class="btn btn-primary-10 btn-sm" id="addGuestLevelBtn" title="Add New Guest Level">
+                        <i class="fa fa-plus"></i> Add New Guest Level
+                    </button>
+                </div>
+                <div class="table-scrollable">
+                    <table id="guestLevelTable" class="table table-hover table-bordered full-width">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Guest Level Modal -->
+<div class="modal fade" id="addGuestLevelModal" tabindex="-1" role="dialog" aria-labelledby="addGuestLevelModalLabel" aria-hidden="true" data-keyboard="false" data-bs-backdrop="static">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="addGuestLevelModalLabel">Add New Guest Level</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addGuestLevelForm">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="addGuestLevelName" name="TYPE" required>
+                                <label class="mdl-textfield__label">Guest Level Name</label>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="addGuestLevelActive" name="ACTIVE" value="" readonly tabIndex="-1" required>
+                                <label for="addGuestLevelActive" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="addGuestLevelActive" class="mdl-textfield__label">Status</label>
+                                <ul data-mdl-for="addGuestLevelActive" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                    <li class="mdl-menu__item" data-val="1">Active</li>
+                                    <li class="mdl-menu__item" data-val="0">Inactive</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-10">Add Guest Level</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Guest Level Modal -->
+<div class="modal fade" id="editGuestLevelModal" tabindex="-1" role="dialog" aria-labelledby="editGuestLevelModalLabel" aria-hidden="true" data-keyboard="false" data-bs-backdrop="static">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="editGuestLevelModalLabel">Edit Guest Level</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editGuestLevelForm">
+                <div class="modal-body">
+                    <input type="hidden" id="editGuestLevelId" name="id">
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editGuestLevelName" name="TYPE" required>
+                                <label class="mdl-textfield__label">Guest Level Name</label>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editGuestLevelActive" name="ACTIVE" value="" readonly tabIndex="-1" required>
+                                <label for="editGuestLevelActive" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="editGuestLevelActive" class="mdl-textfield__label">Status</label>
+                                <ul data-mdl-for="editGuestLevelActive" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                    <li class="mdl-menu__item" data-val="1">Active</li>
+                                    <li class="mdl-menu__item" data-val="0">Inactive</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-10">Update Guest Level</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Fix dropdown overflow issues in modals */
+    .modal {
+        overflow: visible !important;
+    }
+    
+    .modal-body {
+        overflow: visible !important;
+    }
+    
+    /* Ensure MDL dropdowns appear above modal content */
+    .mdl-menu {
+        z-index: 9999 !important;
+    }
+    
+    .mdl-menu__container {
+        z-index: 9999 !important;
+    }
+    
+    /* Fix dropdown positioning */
+    .mdl-menu--bottom-left,
+    .mdl-menu--bottom-right {
+        z-index: 9999 !important;
+    }
+    
+    /* Ensure dropdowns are not clipped by modal boundaries */
+    .modal .mdl-textfield {
+        overflow: visible !important;
+    }
+    
+    .modal .getmdl-select {
+        overflow: visible !important;
+    }
+    
+    /* Force dropdowns to render above modal backdrop */
+    .modal-backdrop + .mdl-menu,
+    .modal-backdrop + .mdl-menu__container {
+        z-index: 9999 !important;
+    }
+    
+    /* Additional fix for modal overflow */
+    .modal-dialog {
+        overflow: visible !important;
+    }
+    
+    .modal-content {
+        overflow: visible !important;
+    }
+</style>

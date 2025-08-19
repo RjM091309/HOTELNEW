@@ -1,0 +1,57 @@
+<!-- start page content -->
+<div class="row">
+    <div class="col-xl-12 col-md-12 col-12">
+        <div class="dashboard-card">
+            <div class="dashboard-card-header">
+                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                    <div class="tab-bar">
+                        <a class="tab-item is-active" href="/expenses">All Expenses</a>
+                    </div>        
+                    
+                    <div style="flex: 0 0 auto;">
+                        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#new-expense-modal">
+                            <i class="fa fa-plus"></i> Add Expense
+                        </button>
+                        <button id="exportToExcel" class="btn btn-primary" style="margin-left: 10px;">
+                            <i class="fa fa-download"></i> Export to Excel
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="dashboard-card-body">
+                <div class="table-scrollable">
+                    <table id="expenses_tbl" class="table table-hover table-bordered full-width">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Expense Items</th>
+                                <th>Description</th>
+                                <th>Amount</th>
+                                <th>Encoded By</th>
+                                <th>Encoded Date</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data will be loaded via JavaScript -->
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="3" class="text-right font-weight-bold"><strong>Grand Total:</strong></td>
+                                <td ></td>
+                                <td colspan="3"></td>
+                                
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('modal/new_expenses') %>
+<%- include('modal/edit_expenses') %>
+
+<!-- Include external JavaScript file -->
+<script src="/js/expenses/expenses.js"></script> 

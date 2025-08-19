@@ -1,0 +1,633 @@
+<!-- Date Time item CSS -->
+<link rel="stylesheet" href="/plugins/flatpicker/flatpickr.min.css">
+
+<div class="modal fade" id="modal-addbooking" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">Add Booking</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addbooking" method="POST" action="/booking/add_booking">
+
+                    <!-- A clean, single set of hidden inputs with matching id and name -->
+                    <input type="hidden" id="baseprice" name="baseprice">
+                    <input type="hidden" id="diffindays" name="diffindays">
+                    <input type="hidden" id="guestID" name="guestID">
+                    <input type="hidden" id="selectedBlock" name="selectedBlock">
+                    <input type="hidden" id="selectedRoomPrice" name="selectedRoomPrice">
+                    <input type="hidden" id="room_type_hidden" name="room_type_hidden">
+                    <input type="hidden" id="voucherNo" name="voucherNo">
+
+                    <div class="row">
+
+                         <!-- BEGIN GROUP BOOKING SECTION (Optional) -->
+                    <div class="row p-t-20">
+
+                        <div class="col-lg-6">
+                            <div class="form-group">
+                                <label class="form-label">Select Date From To</label>
+                                <input class="form-control flatpickr-input" type="text" id="daterange" name="daterange" required>
+                            </div>
+                        </div>
+                        <div id="divroom_type" class="col-lg-3">
+                            <div class="form-group">
+                                <label class="form-label">Room View</label>
+                                <input class="form-control" type="text" id="room_type" name="room_type" readonly>
+                            </div>
+                        </div>
+                        <div id="divbedCount" class="col-lg-3">
+                            <div class="form-group">
+                                <label class="form-label">Bed Count</label>
+                                <input class="form-control" type="text" id="bedCount" name="bedCount" readonly>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row p-t-20">
+                        <div class="col-lg-6">
+                            <label style="font-weight: bold;">
+                                <input type="checkbox" id="groupBookingCheckbox" name="groupBookingCheckbox" style="margin-right: 5px;">
+                                Group Booking
+                            </label>
+                        </div>
+                    </div>
+                    <!-- Group Booking Fields -->
+                    <div id="groupBookingFields" style="display: none;">
+                        <div class="row p-t-20">
+                            <div class="col-lg-6">
+                                <div class="form-group">
+                                    <label class="form-label">Group Name</label>
+                                    <input type="text" id="groupName" name="groupName" class="form-control">
+                                </div>
+                            </div>
+                            <div class="col-lg-6">
+                                <div class="form-group">
+                                    <label class="form-label">Group Contact Number</label>
+                                    <input type="text" id="groupContact" name="groupContact" class="form-control">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row p-t-20">
+                            <div class="col-lg-6">
+                                <div class="form-group">
+                                    <label class="form-label">Number of Rooms Needed</label>
+                                    <input type="number" id="numberOfRooms" name="numberOfRooms" class="form-control">
+                                </div>
+                            </div>
+                            <div class="col-lg-6">
+                                <div class="form-group">
+                                    <label class="form-label">Select Floor (Optional)</label>
+                                    <select class="form-select" id="groupFloorSelect" name="groupFloorSelect">
+                                        <option value="" disabled selected>Select Floor (Optional)</option>
+                                        <!-- Options populated via AJAX -->
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Row for Booking Resources and Select Agency side by side -->
+                        <div class="row p-t-20">
+                            <div id="bookingRouteGroupPlaceholder" class="col-lg-6"></div>
+                            <div id="agencySelectGroupPlaceholder" class="col-lg-6"></div>
+                        </div>
+                        <div class="row p-t-20">
+                            <div class="col-lg-12">
+                                <button type="button" class="btn btn-primary" id="btnSearchConsecutive">
+                                    Search Rooms
+                                </button>
+                            </div>
+                        </div>
+                        <div class="row p-t-20" id="consecutiveResultsContainer" style="display: none;">
+                            <div class="col-lg-12">
+                                <div id="availableRoomsBlock">
+                                    <h5>Available Rooms:</h5>
+                                    <div id="consecutiveRoomsList"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- END GROUP BOOKING SECTION -->
+
+                        <div id="divaddFloor" class="col-lg-4">
+                            <div class="form-group">
+                                <label class="form-label">Select Floor</label>
+                                <select class="form-select" id="addFloor">
+                                    <option value="" disabled selected>Select Floor</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div id="divaddroom" class="col-lg-4">
+                            <div class="form-group">
+                                <label class="form-label">Select Room</label>
+                                <select class="form-select" id="addroom" name="room_id">
+                                    <option value="" disabled selected>Select Room</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Booking Resources select, wrapped for dynamic move -->
+                        <div id="bookingRouteSinglePlaceholder" class="col-lg-4">
+                          <div id="bookingRouteWrapper">
+                              <div class="form-group">
+                                  <label class="form-label">Booking Resources</label>
+                                  <select class="form-select" id="bookingRoute" name="bookingRoute">
+                                      <option value="" disabled selected>Booking Resources</option>
+                                      <option value="walk-in" selected>Walk-in</option>
+                                      <option value="agency">Agency</option>
+                                      <option value="booking-channel">Booking Channel</option>
+                                  </select>
+                              </div>
+                          </div>
+                        </div>
+                      
+                        
+                      
+                          
+
+                        <div id="divmaxOccupants" class="col-lg-4" style="display: none;">
+                            <div class="form-group">
+                                <label class="form-label">Max Occupants</label>
+                                <input class="form-control" type="text" id="maxOccupants" name="maxOccupants" readonly>
+                            </div>
+                        </div>
+                    
+                     
+                    
+                        <div id="divamenities" class="col-lg-4" style="display: none;">
+                            <div class="form-group">
+                                <label class="form-label">Amenities</label>
+                                <input class="form-control" type="text" id="amenities" name="amenities" readonly>
+                            </div>
+                        </div>
+
+                     
+
+                        <div id="agencySelectWrapper" class="col-lg-4" style="display: none;">
+                            <div class="form-group">
+                                <label class="form-label">Select Agency</label>
+                                <select class="form-select" id="agencySelect" name="agencyID">
+                                  <option value="" disabled selected>Select Agency</option>
+                                </select>
+                            </div>
+                        </div>
+                          
+                        <div id="divprice" class="col-lg-4">
+                            <div class="form-group">
+                              <label class="form-label">Room Rate</label>
+                              <input class="form-control" type="text" id="price" name="price" readonly>
+                              <div style="margin-top: 0px;">
+                                <input type="checkbox" id="manualPriceToggle"> <label for="manualPriceToggle" style="font-size: 12px;">Enter Price Manually</label>
+                              </div>
+                            </div>
+                        </div>
+
+                          <!-- GUEST INFORMATION -->
+                            <div id="divtxtFullNameAdd" class="col-lg-4" style="position: relative;">
+                                <div class="form-group">
+                                    <label class="form-label">Guest</label>
+                                    <input 
+                                        class="form-control" 
+                                        type="text" 
+                                        id="txtFullNameAdd" 
+                                        name="fullname" 
+                                        required 
+                                        autocomplete="off" 
+                                        onkeyup="searchCustomer(this.value)"
+                                        onblur="hideSearchResults()" 
+                                    >
+                                </div>
+                                <div  id="searchResults">
+                                </div>
+                            </div>
+
+                            <div id="divtxtNumber" class="col-lg-4">
+                                <div class="form-group">
+                                    <label class="form-label">Contact Number</label>
+                                    <input class="form-control" type="text" id="txtNumber" name="number" autocomplete="off">
+                                </div>
+                            </div>
+                            
+
+                            <div class="row p-t-10">
+                                <div class="col-lg-4">
+                                    <label><input type="checkbox" id="includeBreakfast"> Breakfast</label>
+                                    <div id="breakfastInputs" style="display: none; margin-top: 5px;">
+                                  
+                                      <!-- Breakfast - Adult -->
+                                      <div class="mb-2 d-flex gap-2 align-items-center">
+                                        <input type="number" class="form-control" id="breakfastAdultQty" name="breakfastAdultQty" placeholder="Adult" style="max-width: 80px;">
+                                        <input type="number" class="form-control" id="breakfastAdultPrice" name="breakfastAdultPrice" placeholder="Price per Qty" readonly>
+                                         <!-- For display only -->
+                                          <input type="text" class="form-control d-none" id="breakfastAdultTotal" placeholder="Total" readonly>
+                                        <input type="hidden" id="breakfastAdultId" name="breakfastAdultId">
+                                      </div>
+                                  
+                                      <!-- Breakfast - Kids -->
+                                      <div class="d-flex gap-2 align-items-center">
+                                        <input type="number" class="form-control" id="breakfastKidQty" name="breakfastKidQty" placeholder="Kids" style="max-width: 80px;">
+                                        <input type="number" class="form-control" id="breakfastKidPrice" name="breakfastKidPrice" placeholder="Price per Qty" readonly>
+                                        <input type="text" class="form-control d-none" id="breakfastKidTotal" placeholder="Total" readonly>
+                                        <input type="hidden" id="breakfastKidId" name="breakfastKidId">
+                                      </div>
+                                  
+                                    </div>
+                                  </div>
+                                  
+                                <div class="col-lg-4">
+                                    <div class="form-check mb-1">
+                                      <input class="form-check-input" type="checkbox" id="includePickup">
+                                      <label class="form-check-label" for="includePickup">Pick-up</label>
+                                    </div>
+                                    <div id="pickupWrapper" class="mt-1" style="display: none;">
+                                      <input type="number" class="form-control" id="pickupPrice" name="pickupPrice" placeholder="Pick-up Price" readonly>
+                                      <input type="hidden" id="pickupServiceId" name="pickupServiceId">
+                                    </div>
+                                  </div>
+                                 
+                                  <div class="col-lg-4">
+                                    <div class="form-check mb-1">
+                                      <input class="form-check-input" type="checkbox" id="includeDropoff">
+                                      <label class="form-check-label" for="includeDropoff">Drop-off</label>
+                                    </div>
+                                    <div id="dropoffWrapper" class="mt-1" style="display: none;">
+                                      <input type="number" class="form-control" id="dropoffPrice" name="dropoffPrice" placeholder="Drop-off Price" readonly>
+                                      <input type="hidden" id="dropoffServiceId" name="dropoffServiceId">
+                                    </div>
+                                  </div>
+                                  
+                                  
+                            </div>
+<hr class="my-4">
+                            <div id="divpaymentStatus" class="col-lg-3">
+                                <div class="form-group">
+                                    <label class="form-label">Payment Status</label>
+                                    <select class="form-select" id="paymentStatus" name="paymentStatus" required>
+                                        <option disabled selected>Payment Status</option>
+                                        <option value="paid" selected>Paid</option>
+                                        <option value="unpaid">Unpaid</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div id="divtxtCheckInStatus" class="col-lg-3">
+                                <div class="form-group">
+                                  <label class="form-label">Check-In Status</label>
+                                  <select class="form-select" name="checkInStatus" id="checkInStatus" required>
+                                    <option value="" disabled selected>Check-In Status</option>
+                                    <option value="1">Regular Check In</option>
+                                    <option value="0" selected>Late Check In</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                          
+                            
+
+                            <!-- <div class="col-lg-8 p-t-20">
+                                <div class="form-group">
+                                    <label class="form-label">Address</label>
+                                    <input class="form-control" type="text" id="txtAddress" name="address" autocomplete="off">
+                                </div>
+                            </div> -->
+                            <div id="divtxtGuestType" class="col-lg-3">
+                                <div class="form-group">
+                                    <label class="form-label">Guest Type</label>
+                                    <select class="form-select" id="guestType" name="guestType" data-placeholder="Guest Type" required>
+                                        <option value="" disabled selected>Guest Type</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div id="divtxtGuestLevel" class="col-lg-3">
+                                <div class="form-group">
+                                    <label class="form-label">Guest Level</label>
+                                    <select class="form-select" id="guestLevel" name="guestLevel" required>
+                                        <option value="" disabled selected>Guest Level</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="col-lg-12">
+                                <div class="form-group">
+                                  <label class="form-label">Additional Remarks (optional)</label>
+                                  <textarea class="form-control" id="bookingRemarks" name="bookingRemarks" rows="3"></textarea>
+                                </div>
+                              </div>
+
+                              <h3>Total: <span id="computedTotal">0.00</span></h3>
+
+                        
+                    </div>
+                    
+                    <!-- Move submit button inside the form -->
+                    <div class="modal-footer ">
+                        <!-- Add both voucher buttons, only one visible at a time -->
+                        <button type="button" class="btn btn-primary" id="btnGenerateVoucherPreview">
+                        Voucher
+                          </button>
+                          <button type="button" class="btn btn-primary" id="btnGenerateGroupVoucherPreview" style="display:none;">
+                          Group Voucher
+                          </button>
+                          <button type="submit" class="btn btn-primary">Save changes</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal fade" id="pendingBookingsModal" tabindex="-1" role="dialog" aria-labelledby="pendingBookingsLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content" style="background-color: #6c757d; color: #fff;">
+            <div class="modal-header">
+                <h4 class="modal-title" id="pendingBookingsLabel">Booking Details</h4>
+                <button type="button" data-bs-dismiss="modal" aria-label="Close" style="background-color: transparent; border: none; opacity: 1 !important;">
+                    <span style="color: #ffffff; font-size: 1.5rem; font-weight: bold;">&times;</span>
+                </button>
+                
+            </div>
+            <div class="modal-body">
+              
+                <table class="table ">
+                    <thead style="color: #fff;">
+                        <tr>
+                            <th>Guest Name</th>
+                            <th>Check-in</th>
+                            <th>Check-out </th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pendingBookingsTableBody" style="color: #fff;">
+                        <!-- Pending bookings will be appended here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add jQuery CDN -->
+
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="/plugins/flatpicker/flatpickr.min.js"></script>
+<script>
+	document.addEventListener('DOMContentLoaded', function() {
+		
+		// Load add_booking.js immediately - this is critical for booking functionality
+		var bookingScript = document.createElement('script');
+		bookingScript.src = '/js/booking/add_booking.js';
+		document.body.appendChild(bookingScript);
+	});
+</script>
+
+<style>
+    #modal-addbooking .modal-dialog {
+   
+   max-height: 99vh;      /* mas mataas na value para mas mahaba ang modal */
+   margin: 1vh auto;
+}
+
+#modal-addbooking .modal-content {
+   max-height: 90vh;      /* mas mataas na value */
+   overflow: visible;
+}
+
+#modal-addbooking .modal-body {
+   max-height: 90vh;
+   overflow-y: auto !important;
+   padding-bottom: 0;
+}
+
+
+#modal-addbooking .form-label {
+   font-size: 12px;
+}
+
+#modal-addbooking .btn-close {
+   filter: invert(1) !important;
+}
+#modal-addbooking .btn-close:hover {
+   filter: invert(0.8) !important; /* Slightly lighter on hover */
+}
+   /* Modal Background */
+#modal-addbooking .modal-content {
+   background-color: #2a3135;
+   color: #e0e0e0; /* Light text */
+   border-radius: 6px;
+   box-shadow: 0 0 10px rgba(59,59,59, 0.2); /* Slight neon glow */
+   border: 5px solid #0c2a42;
+   margin: 0 1px 1px 1px; /* 3px margin on left, right, and bottom */
+}
+
+/* Modal Header */
+#modal-addbooking .modal-header {
+   background-color: #0c2a42;
+   color: #ffffff;
+   border-bottom: 1px solid #0c2a42;
+}
+
+/* Modal Title */
+#modal-addbooking .modal-title {
+   color: #ffffff;
+}
+
+/* Close button (X) */
+#modal-addbooking .btn-close {
+   filter: brightness(200%);
+}
+
+/* Input fields & select boxes */
+#modal-addbooking input[type="text"],
+#modal-addbooking input[type="number"],
+#modal-addbooking input[type="email"],
+#modal-addbooking select,
+#modal-addbooking textarea {
+   background-color: #41474c ;
+   color: #ffffff;
+   border: 1px solid #41474c ;
+}
+
+/* Manual input fields that need user attention (ONLY when opened via datePicker) */
+#modal-addbooking.from-datepicker input[type="text"]:not([readonly]):not([value]),
+#modal-addbooking.from-datepicker input[type="text"]:not([readonly])[value=""],
+#modal-addbooking.from-datepicker input[type="number"]:not([readonly]):not([value]),
+#modal-addbooking.from-datepicker input[type="number"]:not([readonly])[value=""],
+#modal-addbooking.from-datepicker textarea:not([readonly]):not([value]),
+#modal-addbooking.from-datepicker textarea:not([readonly])[value=""] {
+   background-color: #41474c !important; /* Original gray background */
+   color: #6f9c40 !important; /* Bright green text */
+   border: 1px solid #6f9c40 !important; /* Bright green border */
+   font-weight: 500;
+}
+
+/* Auto-filled fields remain normal (no highlighting) */
+#modal-addbooking.from-datepicker input[readonly],
+#modal-addbooking.from-datepicker select[disabled],
+#modal-addbooking.from-datepicker select:has(option[selected]) {
+   background-color: #41474c !important; /* Normal gray background */
+   color: #ffffff !important; /* Normal white text */
+   border: 1px solid #41474c !important; /* Normal border */
+   font-weight: normal;
+}
+
+#modal-addbooking input::placeholder,
+#modal-addbooking textarea::placeholder {
+   color: #bbbbbb;
+}
+
+#modal-addbooking select option {
+   background-color: #41474c;
+   color: #ffffff;
+}
+
+/* Labels */
+#modal-addbooking label,
+#modal-addbooking .mdl-textfield__label {
+   color: #cfcfcf;
+}
+
+/* Form section titles (like Total:) */
+#modal-addbooking h3,
+#modal-addbooking h5 {
+   color: #ffffff;
+}
+
+/* Buttons */
+#modal-addbooking .btn-primary,
+#modal-addbooking .btn-success {
+   background-color: #6f9c40 !important;
+   border-color: #6f9c40 !important;
+}
+
+#modal-addbooking .btn-primary:hover,
+#modal-addbooking .btn-success:hover {
+   background-color: #5b8435 !important; /* darker shade for hover */
+   border-color: #5b8435 !important;
+}
+
+
+
+
+/* Checkbox label tweak */
+#modal-addbooking input[type="checkbox"] + label,
+#modal-addbooking .form-check-label {
+   color: #dcdcdc;
+}
+
+.group-room-breakdown {
+   background: #202629;
+   border-radius: 8px;
+   padding: 16px 20px 12px 20px;
+   margin: 18px 0 10px 0;
+   color: #fff;
+   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+   font-size: 1.04em;
+}
+.group-room-breakdown b,
+.group-room-breakdown strong {
+   font-size: 1.12em;
+   letter-spacing: 0.5px;
+   display: block;
+   margin-bottom: 7px;
+}
+.group-room-breakdown ul {
+   margin: 0 0 0 0;
+   padding-left: 20px;
+}
+.group-room-breakdown li {
+   font-size: 1em;
+   margin-bottom: 3px;
+   letter-spacing: 0.2px;
+   line-height: 1.5;
+}
+
+    
+    /* .mdl-textfield--floating-label .mdl-textfield__input:focus + .mdl-textfield__label,
+ .mdl-textfield--floating-label .mdl-textfield__input:not(:focus):valid + .mdl-textfield__label {
+     top: -10px;
+     font-size: 12px;
+     color: #3f51b5; 
+ }
+ .mdl-textfield--floating-label .mdl-textfield__label {
+     top: 5px; 
+     transition: top 0.2s ease-in-out, font-size 0.2s ease-in-out;
+ }
+ .mdl-textfield {
+     margin-bottom: 1rem; 
+ } */
+
+ #searchResults {
+    display: none;
+    position: absolute;
+    background: white;
+    border: 1px solid #ccc;
+    z-index: 10;
+    top: 70px;  /* Adjust this value to control the distance between the input field and results */
+    left: 50%;   /* Position the results from the center */
+    transform: translateX(-50%);  /* Center the results horizontally */
+    width: 93%;  /* Make it match the width of the input */
+    max-height: 150px; /* Optional: add scroll if too many results */
+    overflow-y: auto;
+}
+
+#searchResults div {
+    padding: 2px 8px;  /* Reduced padding for tighter spacing */
+    margin: 0;  /* Ensure no margin is applied between items */
+    line-height: .8;  /* Reduce line height to bring items closer */
+    cursor: pointer;
+    font-size: 14px;  /* Optional: adjust font size if necessary */
+}
+
+#searchResults div:hover {
+    background-color: #f0f0f0;  /* Optional: add hover effect for better UX */
+}
+
+.swal2-container {
+    z-index: 20000 !important; /* Force Swal to be above Bootstrap modal and backdrop */
+}
+.modal-backdrop {
+    z-index: 1040 !important; /* Ensure the backdrop stays behind Swal */
+}
+
+/* ROOM IN GROUP BOOKING SEARCH */
+
+.room-list-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.room-option {
+    background: #f8f9fa;
+    border: 1px solid #ccc;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    flex: 1 1 30%;
+    min-width: 180px;
+    transition: background 0.2s ease-in-out;
+}
+
+.room-option:hover {
+    background: #e9ecef;
+}
+
+.room-numbers {
+    font-weight: bold;
+}
+
+.selected-room-block {
+    border: 1px solid #007bff;
+    color: #000102;
+    padding: 10px;
+    border-radius: 5px;
+    text-align: center;
+    font-weight: bold;
+    background: transparent;
+}
+
+
+</style>

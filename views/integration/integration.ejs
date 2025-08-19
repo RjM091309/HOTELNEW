@@ -1,0 +1,51 @@
+
+<!-- ======================================== -->
+<!-- INTEGRATION MANAGEMENT PAGE -->
+<!-- ======================================== -->
+
+<!-- Main Content Area -->
+<div class="row">
+    <div class="col-xl-12 col-md-12 col-12">
+        <div class="dashboard-card">
+            <div class="dashboard-card-header">
+                <header>Integration Management</header>
+            </div>
+            <div class="dashboard-card-body">
+                
+                <!-- Integration Table -->
+                <div class="table-scrollable">
+                    <table id="integrationTable" class="table table-hover table-bordered full-width">
+                        <thead>
+                            <tr>
+                                <th>Room Number</th>
+                                <th>Clean Up Device ID</th>
+                                <th>DND Device ID</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================== -->
+<!-- SCRIPT LOADING -->
+<!-- ======================================== -->
+
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Load integration script with proper timing
+        setTimeout(function() {
+            var integrationScript = document.createElement('script');
+            integrationScript.src = '/js/integration/integration-data.js';
+            document.body.appendChild(integrationScript);
+        }, 300);
+    });
+</script>

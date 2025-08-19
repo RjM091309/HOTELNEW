@@ -1,0 +1,520 @@
+<!-- ======================================== -->
+<!-- ROOM MANAGEMENT PAGE -->
+<!-- ======================================== -->
+
+<!-- Main Content Area -->
+<div class="row">
+    <div class="col-xl-12 col-md-12 col-12">
+        <div class="dashboard-card">
+            <div class="dashboard-card-header">
+                <header>Room Management</header>
+                <!-- Action Buttons -->
+                <div class="tools">
+                    <button class="btn btn-secondary btn-sm" id="manageRoomTypesBtn" title="Manage Room Types">
+                        <i class="fa fa-tags"></i> Room Types
+                    </button>
+                    <button class="btn btn-secondary btn-sm" id="manageAmenitiesBtn" title="Manage Amenities">
+                        <i class="fa fa-wifi"></i> Amenities
+                    </button>
+                    <button class="btn btn-secondary btn-sm" id="manageSeasonsBtn" title="Manage Seasons">
+                        <i class="fa fa-calendar"></i> Seasons
+                    </button>
+                    <button class="btn btn-success btn-sm" id="addRoomBtn" title="Add New Room">
+                        <i class="fa fa-plus"></i> New Room
+                    </button>
+                </div>
+            </div>
+            <div class="dashboard-card-body">
+               
+                
+                <!-- Main Room Table -->
+                <div class="table-scrollable">
+                    <table id="roomTable" class="table table-hover table-bordered full-width">
+                        <thead>
+                            <tr>
+                                <th>Image</th>
+                                <th>Room Number</th>
+                                <th>Room Type</th>
+                                <th>Max Occupants</th>
+                                <th>Bed Count</th>
+                                <th>Room Size</th>
+                                <th>Room View</th>
+                                <th>Amenities</th>
+                                <th>Price</th>
+                                <th>Status</th>
+                                <th>Description</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================== -->
+<!-- ROOM MODALS -->
+<!-- ======================================== -->
+
+<!-- Add Room Modal -->
+<div class="modal fade" id="addRoomModal" tabindex="-1" role="dialog" aria-labelledby="addRoomModalLabel" aria-hidden="true" data-keyboard="false" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="addRoomModalLabel">Add New Room</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addRoomForm">
+                <div class="modal-body">
+                    <!-- Basic Information -->
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="addRoomType" name="ROOM_TYPE_ID" value="" readonly tabIndex="-1" required>
+                                <label for="addRoomType" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="addRoomType" class="mdl-textfield__label">Room Type</label>
+                                <ul data-mdl-for="addRoomType" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                    <!-- Loaded dynamically -->
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="addRoomNumber" name="ROOM_NUMBER" required>
+                                <label class="mdl-textfield__label">Room Number</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Status Information -->
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="addRoomStatus" name="ROOM_STATUS" value="" readonly tabIndex="-1" required>
+                                <label for="addRoomStatus" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="addRoomStatus" class="mdl-textfield__label">Room Status</label>
+                                <ul data-mdl-for="addRoomStatus" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                    <li class="mdl-menu__item" data-val="1">Available</li>
+                                    <li class="mdl-menu__item" data-val="2">Occupied</li>
+                                    <li class="mdl-menu__item" data-val="3">Maintenance</li>
+                                    <li class="mdl-menu__item" data-val="4">Cleaning</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="number" step="0.01" id="addRoomPrice" name="ROOM_PRICE" required>
+                                <label class="mdl-textfield__label">Room Price</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Capacity and Bed Information -->
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="number" id="addRoomMax" name="ROOM_MAX" required>
+                                <label class="mdl-textfield__label">Max Occupants</label>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="addRoomBed" name="ROOM_BED" value="" readonly tabIndex="-1" required>
+                                <label for="addRoomBed" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="addRoomBed" class="mdl-textfield__label">Bed Count</label>
+                                <ul data-mdl-for="addRoomBed" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                    <li class="mdl-menu__item" data-val="1">1 Bed</li>
+                                    <li class="mdl-menu__item" data-val="2">2 Beds</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Size and View Information -->
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="number" id="addRoomSize" name="ROOM_SIZE" required>
+                                <label class="mdl-textfield__label">Room Size</label>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="addRoomView" name="ROOM_VIEW" value="" readonly tabIndex="-1" required>
+                                <label for="addRoomView" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="addRoomView" class="mdl-textfield__label">Room View</label>
+                                <ul data-mdl-for="addRoomView" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                    <li class="mdl-menu__item" data-val="1">Condo View</li>
+                                    <li class="mdl-menu__item" data-val="2">Mountain View</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Description -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <textarea class="mdl-textfield__input" type="text" rows="3" id="addRoomDescription" name="ROOM_DESCRIPTION"></textarea>
+                                <label class="mdl-textfield__label">Description</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Room Image Upload -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="file" id="addRoomImage" name="ROOM_IMAGE" accept="image/*">
+                                <label class="mdl-textfield__label">Room Image</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Amenities Selection -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <label>Amenities</label>
+                            <div id="addAmenitiesContainer" class="d-flex flex-wrap gap-2">
+                                <!-- Loaded dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Seasonal Pricing Section -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <div class="form-group" id="addSeasonalPricingSection" style="display: none;">
+                                <label><strong>Seasonal Pricing (based on Booking Type & Bed Count)</strong></label>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-sm">
+                                        <thead class="thead-light">
+                                            <tr>
+                                                <th>Season</th>
+                                                <th>Booking Type</th>
+                                                <th>Bed Count</th>
+                                                <th>Price</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="addPricingTableBody">
+                                            <!-- Generated dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <!-- No Bed Count Message -->
+                            <div class="form-group" id="addNoBedCountMessage" style="display: block;">
+                                <div class="alert alert-info">
+                                    <i class="fa fa-info-circle"></i> Please select a bed count to configure seasonal pricing.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-10">Add Room</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Room Modal -->
+<div class="modal fade" id="editRoomModal" tabindex="-1" role="dialog" aria-labelledby="editRoomModalLabel" aria-hidden="true" data-keyboard="false" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="editRoomModalLabel">Edit Room</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editRoomForm">
+                <div class="modal-body">
+                    <input type="hidden" id="editRoomId" name="IDNo">
+                    
+                    <!-- Basic Information -->
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editRoomType" name="ROOM_TYPE_ID" value="" readonly tabIndex="-1" required>
+                                <label for="editRoomType" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="editRoomType" class="mdl-textfield__label">Room Type</label>
+                                <ul data-mdl-for="editRoomType" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                    <!-- Loaded dynamically -->
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editRoomNumber" name="ROOM_NUMBER" required>
+                                <label class="mdl-textfield__label">Room Number</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Status Information -->
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editRoomStatus" name="ROOM_STATUS" value="" readonly tabIndex="-1" required>
+                                <label for="editRoomStatus" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="editRoomStatus" class="mdl-textfield__label">Room Status</label>
+                                <ul data-mdl-for="editRoomStatus" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                    <li class="mdl-menu__item" data-val="1">Available</li>
+                                    <li class="mdl-menu__item" data-val="2">Occupied</li>
+                                    <li class="mdl-menu__item" data-val="3">Maintenance</li>
+                                    <li class="mdl-menu__item" data-val="4">Cleaning</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="number" step="0.01" id="editRoomPrice" name="ROOM_PRICE" required>
+                                <label class="mdl-textfield__label">Room Price</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Capacity and Bed Information -->
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="number" id="editRoomMax" name="ROOM_MAX" required>
+                                <label class="mdl-textfield__label">Max Occupants</label>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editRoomBed" name="ROOM_BED" value="" readonly tabIndex="-1" required>
+                                <label for="editRoomBed" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="editRoomBed" class="mdl-textfield__label">Bed Count</label>
+                                <ul data-mdl-for="editRoomBed" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                    <li class="mdl-menu__item" data-val="1">1 Bed</li>
+                                    <li class="mdl-menu__item" data-val="2">2 Beds</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Size and View Information -->
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="number" id="editRoomSize" name="ROOM_SIZE" required>
+                                <label class="mdl-textfield__label">Room Size</label>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editRoomView" name="ROOM_VIEW" value="" readonly tabIndex="-1" required>
+                                <label for="editRoomView" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="editRoomView" class="mdl-textfield__label">Room View</label>
+                                <ul data-mdl-for="editRoomView" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                    <li class="mdl-menu__item" data-val="1">Condo View</li>
+                                    <li class="mdl-menu__item" data-val="2">Mountain View</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Description -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <textarea class="mdl-textfield__input" type="text" rows="3" id="editRoomDescription" name="ROOM_DESCRIPTION"></textarea>
+                                <label class="mdl-textfield__label">Description</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Room Image Upload -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="file" id="editRoomImage" name="ROOM_IMAGE" accept="image/*">
+                                <label class="mdl-textfield__label">Room Image</label>
+                                <small class="form-text text-muted">Leave empty to keep current image</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Amenities Selection -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <label>Amenities</label>
+                            <div id="editAmenitiesContainer" class="d-flex flex-wrap gap-2">
+                                <!-- Loaded dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Seasonal Pricing Section -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <div class="form-group" id="editSeasonalPricingSection" style="display: none;">
+                                <label><strong>Seasonal Pricing (based on Booking Type & Bed Count)</strong></label>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-sm">
+                                        <thead class="thead-light">
+                                            <tr>
+                                                <th>Season</th>
+                                                <th>Booking Type</th>
+                                                <th>Bed Count</th>
+                                                <th>Price</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="editPricingTableBody">
+                                            <!-- Generated dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <!-- No Bed Count Message -->
+                            <div class="form-group" id="editNoBedCountMessage" style="display: block;">
+                                <div class="alert alert-info">
+                                    <i class="fa fa-info-circle"></i> Please select a bed count to configure seasonal pricing.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-10">Update Room</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================== -->
+<!-- INCLUDE SEPARATED MODALS -->
+<!-- ======================================== -->
+
+<%- include('room-type-management') %>
+<%- include('amenity-management') %>
+<%- include('season-management') %>
+
+<!-- ======================================== -->
+<!-- SCRIPT LOADING -->
+<!-- ======================================== -->
+
+<style>
+    /* Fix modal z-index stacking for nested modals */
+    .modal-backdrop {
+        z-index: 9997 !important;
+    }
+    
+    .modal-backdrop + .modal-backdrop {
+        z-index: 9998 !important;
+    }
+    
+    /* Ensure add/edit modals appear on top */
+    #addRoomTypeModal,
+    #editRoomTypeModal,
+    #addAmenityModal,
+    #editAmenityModal,
+    #addSeasonModal,
+    #editSeasonModal,
+    #addRoomModal,
+    #editRoomModal {
+        z-index: 9999 !important;
+    }
+    
+    /* Ensure management modals are below add/edit modals */
+    #roomTypesManagementModal,
+    #amenitiesManagementModal,
+    #seasonsManagementModal {
+        z-index: 9998 !important;
+    }
+    
+    /* Force modal backdrop to be behind all modals */
+    .modal-backdrop.show {
+        z-index: 9997 !important;
+    }
+    
+
+    
+    /* Ensure MDL dropdowns appear above modal content */
+    .mdl-menu {
+        z-index: 9999 !important;
+    }
+    
+    .mdl-menu__container {
+        z-index: 9999 !important;
+    }
+    
+    /* Fix dropdown positioning */
+    .mdl-menu--bottom-left,
+    .mdl-menu--bottom-right {
+        z-index: 9999 !important;
+    }
+    
+    /* Ensure dropdowns are not clipped by modal boundaries */
+    .modal .mdl-textfield {
+        overflow: visible !important;
+    }
+    
+    .modal .getmdl-select {
+        overflow: visible !important;
+    }
+    
+    /* Force dropdowns to render above modal backdrop */
+    .modal-backdrop + .mdl-menu,
+    .modal-backdrop + .mdl-menu__container {
+        z-index: 9999 !important;
+    }
+    
+
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Load scripts with proper timing
+        setTimeout(function() {
+            var roomScript = document.createElement('script');
+            roomScript.src = '/js/room/room_data.js';
+            document.body.appendChild(roomScript);
+
+            setTimeout(function() {
+                var roomTypeScript = document.createElement('script');
+                roomTypeScript.src = '/js/room/room-type-maintenance.js';
+                document.body.appendChild(roomTypeScript);
+            }, 100);
+
+            setTimeout(function() {
+                var amenityScript = document.createElement('script');
+                amenityScript.src = '/js/room/amenity-maintenance.js';
+                document.body.appendChild(amenityScript);
+            }, 200);
+
+            setTimeout(function() {
+                var seasonScript = document.createElement('script');
+                seasonScript.src = '/js/room/season-maintenance.js';
+                document.body.appendChild(seasonScript);
+            }, 300);
+        }, 300);
+    });
+</script> 

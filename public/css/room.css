@@ -1,0 +1,417 @@
+
+/* Base legend‐button style */
+.legend-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: none;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  font: inherit;
+  color: #555;
+  border-radius: 4px;
+  transition: background-color 0.2s, color 0.2s, transform 0.2s ease, box-shadow 0.2s ease;
+  /* default hover background */
+  --hover-bg: rgba(0, 0, 0, 0.05);
+}
+
+.legend-button:hover,
+.legend-button:focus {
+  background-color: var(--hover-bg);
+  color: var(--hover-color);
+  outline: none;
+  transform: translateY(-2px);         /* float up */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15); /* subtle shadow */
+}
+
+/* Modifiers: only override the hover-bg variable */
+.legend-button--show-all    { --hover-bg: rgba(0,   0,   0,   0.5); --hover-color: #fff; }
+.legend-button--maintenance { --hover-bg: rgba(255, 152, 0,   0.2); --hover-color: #FF9800; }
+.legend-button--cleaning    { --hover-bg: rgba(244,  67,  54,  0.2); --hover-color: #F44336; }
+.legend-button--occupied    { --hover-bg: rgba(53,   152, 220, 0.2); --hover-color: #3598dc; }
+.legend-button--available   { --hover-bg: rgba(76,   175, 80,  0.2); --hover-color: #4CAF50; }
+
+/* Dot */
+.legend-button .legend-color {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+/* Dot colors */
+.legend-button--show-all    .legend-color { background: #000;    opacity: 0.5; }
+.legend-button--maintenance .legend-color { background: #FF9800; opacity: 1;   }
+.legend-button--cleaning    .legend-color { background: #F44336; }
+.legend-button--occupied    .legend-color { background: #3598dc; }
+.legend-button--available   .legend-color { background: #4CAF50; }
+
+/* Container for the entire layout */
+.single-floor {
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  justify-content: center;
+  min-height: 300px;
+}
+
+/* Row classes for each custom row */
+.row1, .row2, .row3, .row4 {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-start;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.row1 {
+  margin-left: 10px;
+}
+
+.row2 {
+  justify-content: flex-end;
+  margin-right: 97px;
+  margin-top: -115px;
+}
+
+.row3 {
+  margin-left: 183px;
+  margin-top: 17px;
+}
+
+.row4 {
+  justify-content: flex-end;
+  margin-right: 10px;
+  margin-top: -115px;
+}
+
+/* Room styling - Updated to match dashboard theme */
+.room {
+  width: 80px;
+  height: 100px;
+  background: linear-gradient(145deg, #2a3135, #1f2528);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3), 
+              0 4px 16px rgba(0,0,0,0.2),
+              inset 0 1px 0 rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 12px;
+  cursor: pointer;
+  overflow: hidden;
+  padding-top: 8px;
+}
+
+.room::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+ 
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.room:hover {
+  transform: scale(1.05);
+  z-index: 10;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.35), 
+              0 6px 20px rgba(0,0,0,0.25),
+              inset 0 1px 0 rgba(255,255,255,0.15);
+}
+
+.room:hover::before {
+  opacity: 1;
+}
+
+.room.dimmed {
+  opacity: 0.3;
+  filter: grayscale(80%);
+}
+
+.room.empty-room {
+  background: linear-gradient(145deg, #f8f9fa, #e9ecef) !important;
+  border: 1px solid #dee2e6 !important;
+  color: #6c757d !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+
+.room.empty-room .room-number {
+  color: #6c757d !important;
+}
+
+.room .bed-icons {
+  display: flex;
+  gap: 0.2rem;
+  margin-bottom: 0.2rem;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.room .bed-icons i {
+  color: #fff;
+  font-size: 12px;
+  opacity: 0.9;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+}
+
+.room .room-number {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #fff;
+  text-align: center;
+  margin-bottom: 0.1rem;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  letter-spacing: 0.5px;
+}
+
+.room .room-status {
+  font-size: 0.7rem;
+  color: #fff;
+  position: absolute;
+  bottom: 8px;
+  background: rgba(255,255,255,0.15);
+  backdrop-filter: blur(10px);
+  padding: 4px 8px;
+  border-radius: 6px;
+  text-align: center;
+  font-weight: 500;
+  min-width: 60px;
+  border: 1px solid rgba(255,255,255,0.2);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+/* Status-specific room styling */
+.room.status-available {
+  background: linear-gradient(145deg, #2a3135, #1f2528);
+}
+
+.room.status-occupied {
+  background: linear-gradient(145deg, #1a2332, #0f1419);
+  border-color: rgba(53, 152, 220, 0.3);
+}
+
+.room.status-cleaning {
+  background: linear-gradient(145deg, #2a1f1f, #1f1515);
+  border-color: rgba(244, 67, 54, 0.3);
+}
+
+.room.status-maintenance {
+  background: linear-gradient(145deg, #2a1f1f, #1f1515);
+  border-color: rgba(255, 152, 0, 0.3);
+}
+
+/* Tab styling */
+.tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 0.2rem;
+  flex-wrap: wrap;
+}
+
+.tab-item {
+  position: relative;
+  padding: 0.75rem 1.5rem;
+  cursor: pointer;
+  color: #555;
+  font-weight: 500;
+  transition: color 0.3s ease;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.tab-item:hover {
+  color: #6f9c40;
+  background-color: rgba(111, 156, 64, 0.1);
+}
+
+.tab-item.is-active {
+  color: #6f9c40;
+  font-weight: 600;
+  background-color: rgba(111, 156, 64, 0.1);
+}
+
+.tab-item.is-active::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background-color: #6f9c40;
+  border-radius: 2px;
+}
+
+.tab-panel {
+  display: none;
+}
+
+.tab-panel.is-active {
+  display: block;
+}
+
+/* Legend styling */
+.legend {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  white-space: nowrap;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Dashboard card footer */
+.dashboard-card-footer {
+  border-top: 0;
+  background: linear-gradient(145deg, #2a3135, #1f2528);
+  padding: 15px 25px;
+}
+
+/* New CSS for Tab Dot Alarm Indicator */
+.tab-item.dot-alarm-tab {
+  position: relative;
+}
+
+.tab-item.dot-alarm-tab::after {
+  content: "!";
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: red;
+  color: white;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  animation: alarmBlink 1s infinite;
+}
+
+/* New CSS for Room Shadow Alarm */
+.room.shadow-alarm {
+  box-shadow: 0 0 10px 3px red;
+  animation: alarmBlink 1s infinite;
+}
+
+/* Blink animation */
+@keyframes alarmBlink {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+
+/* Responsive Adjustments */
+@media (max-width: 1200px) {
+  .row2 {
+    margin-top: -100px;
+    margin-right: 70px;
+  }
+  .row3 {
+    margin-left: 150px;
+    margin-top: 15px;
+  }
+  .row4 {
+    margin-top: -100px;
+    margin-right: 8px;
+  }
+  .room {
+    width: 75px;
+    height: 95px;
+  }
+}
+
+@media (max-width: 991px) {
+  .row2 {
+    margin-top: -80px;
+    margin-right: 50px;
+  }
+  .row3 {
+    margin-left: 100px;
+    margin-top: 10px;
+  }
+  .row4 {
+    margin-top: -80px;
+    margin-right: 5px;
+  }
+  .room {
+    width: 70px;
+    height: 90px;
+  }
+  .legend {
+    justify-content: center;
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .row1, .row2, .row3, .row4 {
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 10px;
+    justify-content: center;
+  }
+  .room {
+    width: 65px;
+    height: 85px;
+  }
+  .tab-bar {
+    justify-content: center;
+  }
+  .legend {
+    justify-content: center;
+    gap: 0.3rem;
+  }
+  .legend-button {
+    font-size: 0.8rem;
+    padding: 0.2rem 0.4rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .row1, .row2, .row3, .row4 {
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 0;
+    justify-content: flex-start;
+    gap: 0.3rem;
+  }
+  .room {
+    width: 60px;
+    height: 80px;
+  }
+  .room .room-number {
+    font-size: 0.8rem;
+  }
+  .room .room-status {
+    font-size: 0.6rem;
+    min-width: 50px;
+  }
+  .tab-item {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+  }
+  .legend {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .legend-button {
+    font-size: 0.75rem;
+    padding: 0.15rem 0.3rem;
+  }
+}

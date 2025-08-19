@@ -1,0 +1,1028 @@
+<!-- start widget -->
+<%
+// Helper function to get floor color class
+function getFloorColorClass(floorNumber) {
+	const colorMap = {
+		1: 'card-topline-yellow',
+		2: 'card-topline-gray', 
+		3: 'card-topline-green',
+		4: 'card-topline-blue',
+		5: 'card-topline-red',
+		6: 'card-topline-violet',
+		7: 'card-topline-orange',
+		8: 'card-topline-pink',
+		9: 'card-topline-green2',
+		10: 'card-topline-sky'
+	};
+	return colorMap[floorNumber] || '';
+}
+
+// Helper function to calculate common card variables - moved to global scope
+function calculateCardVariables(booking) {
+	// Validate dates first
+	if (!booking.CHECK_IN_DATE || !booking.CHECK_OUT_DATE) {
+		console.warn('Invalid booking dates:', booking);
+		return null;
+	}
+	
+	const checkInDate = new Date(booking.CHECK_IN_DATE);
+	const checkOutDate = new Date(booking.CHECK_OUT_DATE);
+	
+	// Check if dates are valid
+	if (isNaN(checkInDate.getTime()) || isNaN(checkOutDate.getTime())) {
+		console.warn('Invalid date format:', booking);
+		return null;
+	}
+	
+	checkInDate.setHours(0, 0, 0, 0); // Remove time
+	checkOutDate.setHours(0, 0, 0, 0); // Remove time
+	
+	const today = new Date();
+	const totalDays = Math.max(1, Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24))); // Total days of booking
+	
+	// Fix: Ensure check-in day shows only one bar for occupied rooms
+	const isTodayCheckInDate = checkInDate.toDateString() === today.toDateString();
+	const daysStayed = isTodayCheckInDate ? 1 : Math.min(Math.ceil((today - checkInDate) / (1000 * 60 * 60 * 24)), totalDays); // Days already stayed
+	
+	const daysRemaining = totalDays - daysStayed; // Remaining days
+	const maxBars = booking.IS_GROUP == 1 ? 10 : 8; // Maximum bars visible (10 for group bookings, 8 for others)
+	const visibleBars = Math.min(totalDays, maxBars); // Total bars visible
+	const visibleStayed = Math.min(daysStayed, visibleBars); // Stayed bars to display
+	const visibleRemaining = visibleBars - visibleStayed; // Remaining bars to display
+	const extraDays = Math.max(0, daysRemaining - visibleRemaining); // Calculate extra days
+
+	// Determine the card class based on the ROOM_FLOOR
+	const cardClass = getFloorColorClass(booking.ROOM_FLOOR);
+	
+	// Determine the memo background color based on ROOM_FLOOR
+	const memoClass = booking.ROOM_FLOOR === 3 ? 'memo-1' : 
+					booking.ROOM_FLOOR === 4 ? 'memo-2' : 
+					booking.ROOM_FLOOR === 5 ? 'memo-3' : 
+					booking.ROOM_FLOOR === 6 ? 'memo-4' : 'memo-default';
+
+	return {
+		checkInDate,
+		checkOutDate,
+		totalDays,
+		daysStayed,
+		daysRemaining,
+		visibleBars,
+		visibleStayed,
+		visibleRemaining,
+		extraDays,
+		cardClass,
+		memoClass
+	};
+}
+%>
+<div class="state-overview">
+	<div class="row mb-4">
+		<div class="col-xl-3 col-md-6 col-8">
+			<div class="dashboard-card naranja ">
+				<div class="dashboard-card-header bg-blue">
+					<div class="dashboard-card-header-title ">Booking Overview</div>
+					<span class="info-box-icon push-bottom"><i class="material-icons">style</i></span>
+				</div>
+				<div class="dashboard-card-body">
+					<a class="dashboard-btn-row">
+						<span class="dashboard-btn-row-item">Today's Check-in</span>
+						<span class="dashboard-btn-row-metric">
+							<%= totalBookingsToday || 0 %>
+						</span>
+					</a>
+					<a class="dashboard-btn-row">
+						<span class="dashboard-btn-row-item">Checked-in</span>
+						<span class="dashboard-btn-row-metric">
+							<%= TODAY_CHECKEDIN %>
+						</span>
+					</a>
+					<a class="dashboard-btn-row">
+						<span class="dashboard-btn-row-item">Late Check-out/Check-in</span>
+						<span class="dashboard-btn-row-metric">
+							<%= LATE_IN_OUT %>
+						</span>
+					</a>
+
+
+				</div>
+
+			</div>
+		</div>
+
+
+		<div class="col-xl-3 col-md-6 col-8">
+			<div class="dashboard-card naranja">
+				<div class="dashboard-card-header">
+					<div class="dashboard-card-header-title">Check-out Overview</div>
+					<span class="info-box-icon push-bottom"><i class="material-icons">card_travel</i></span>
+				</div>
+				<div class="dashboard-card-body">
+					<a class="dashboard-btn-row">
+						<span class="dashboard-btn-row-item">Today's Check-out</span>
+						<span class="dashboard-btn-row-metric">
+							<%= TODAY_CHECKEDOUT || 0 %>
+						</span>
+					</a>
+					<a class="dashboard-btn-row">
+						<span class="dashboard-btn-row-item">Late Check-out</span>
+						<span class="dashboard-btn-row-metric">
+							<%= LATE_CHECKOUT || 0 %>
+						</span>
+					</a>
+					<a class="dashboard-btn-row">
+						<span class="dashboard-btn-row-item">Extended</span>
+						<span class="dashboard-btn-row-metric">
+							<%= EXTENDED || 0 %>
+						</span>
+					</a>
+				</div>
+			</div>
+		</div>
+
+		<div class="col-xl-3 col-md-6 col-8">
+			<div class="dashboard-card naranja">
+				<div class="dashboard-card-header">
+					<div class="dashboard-card-header-title">Rooms Overview</div>
+					<span class="info-box-icon push-bottom"><i class="material-icons">local_hotel</i></span>
+				</div>
+				<div class="dashboard-card-body">
+					<a class="dashboard-btn-row1">
+						<span class="dashboard-btn-row-item1">Rooms</span>
+						<span class="dashboard-btn-row-metric1">
+							<%= totalRooms %>
+						</span>
+						<span class="dashboard-btn-row-item2">Available</span>
+						<span class="dashboard-btn-row-metric2">
+							<%= Number(availableRooms) + Number(OccupiedNotMove)  %>
+						</span>
+					</a>
+					<a class="dashboard-btn-row1">
+						<span class="dashboard-btn-row-item1">Occupied</span>
+						<span class="dashboard-btn-row-metric1">
+							<%= Number(occupiedRooms) - Number(OccupiedNotMove) %>
+						</span>
+						<span class="dashboard-btn-row-item2">Cleaning</span>
+						<span class="dashboard-btn-row-metric2">
+							<%= cleaningRooms %>
+						</span>
+					</a>
+					<a class="dashboard-btn-row1">
+						<span class="dashboard-btn-row-item1">Under Maintenance</span>
+						<span class="dashboard-btn-row-metric2">
+							<%= underMaintenanceRooms %>
+						</span>
+					</a>
+
+				</div>
+
+			</div>
+		</div>
+
+		<div class="col-xl-3 col-md-6 col-8">
+			<div class="dashboard-card naranja">
+				<div class="dashboard-card-header">
+					<div class="dashboard-card-header-title">Monthly Booking Overview</div>
+					<span class="info-box-icon push-bottom"><i class="material-icons">date_range</i></span>
+				</div>
+				<div class="dashboard-card-body">
+					<a class="dashboard-btn-row">
+						<span class="dashboard-btn-row-item">Monthly Booking</span>
+						<span class="dashboard-btn-row-metric">
+							<%= totalBookingsMonthly %>
+						</span>
+					</a>
+					<a class="dashboard-btn-row">
+						<span class="dashboard-btn-row-item">Completed</span>
+						<span class="dashboard-btn-row-metric">
+							<%= completedBookingsMonthly || 0 %>
+						</span>
+					</a>
+					<a class="dashboard-btn-row">
+						<span class="dashboard-btn-row-item">Pending</span>
+						<span class="dashboard-btn-row-metric">
+							<%= pendingBookingsMonthly || 0 %>
+						</span>
+					</a>
+				</div>
+			</div>
+		</div>
+	</div>
+
+
+
+<div class="dashboard-btn-row-item mb-4">
+	<div class="col-xl-12 col-md-12 col-12 " >
+		<div class="dashboard-card" >
+			<div class="dashboard-card-header" style="padding: 20px 25px; min-height: 80px; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(145deg, #2a3135, #1f2528) !important;">
+				<div class="dashboard-card-header-title">Real-Time Booking Monitor</div>
+				<div class="filter-btn-group" >
+				
+					<!-- Filter Group Buttons -->
+					<div class="btn-group">
+						<button type="button" class="filter-btn" id="moveToOccupiedBtn">Move to Occupied</button>
+						<button type="button" class="filter-btn" id="sort-button">Sort</button>
+						<button type="button" class="filter-btn" id="filter-newest">Newest Booking</button>
+						<button type="button" class="filter-btn" id="filter-all">All Floors</button>
+					</div>
+			
+					<!-- Floor Filter Dropdown - Separate from button group -->
+					<div class="dropdown-container" style="position: relative; display: inline-block;">
+						<button type="button" class="filter-btn dropdown-toggle">
+							Select Floor <span class="caret"></span>
+						</button>
+						<ul class="dropdown-menu" role="menu">
+							<% floors.forEach(floor => { %>
+								<li><a href="#" class="floor-option" data-floor="<%= floor.floor %>">
+									<% if (floor.floor === 1) { %>1st Floor<% } %>
+									<% if (floor.floor === 2) { %>2nd Floor<% } %>
+									<% if (floor.floor === 3) { %>3rd Floor<% } %>
+									<% if (floor.floor === 4) { %>4th Floor<% } %>
+									<% if (floor.floor === 5) { %>5th Floor<% } %>
+									<% if (floor.floor === 6) { %>6th Floor<% } %>
+									<% if (floor.floor === 7) { %>7th Floor<% } %>
+									<% if (floor.floor === 8) { %>8th Floor<% } %>
+									<% if (floor.floor === 9) { %>9th Floor<% } %>
+									<% if (floor.floor === 10) { %>10th Floor<% } %>
+								</a></li>
+							<% }); %>
+						</ul>
+					</div>
+			
+				
+					</div>
+			
+			</div>
+			
+			<div class="dashboard-card-body">
+				<!-- Tab Panel -->
+				 <div>
+					<div class="mdl-tabs mdl-js-tabs">
+						<div class="mdl-tabs__tab-bar tab-left-side mb-4" id="tabBar">
+							<% 
+							let defaultTabs = [
+								{ name: "Today Check-in", target: "checked-in-content" },
+								{ name: "Today Check-out", target: "checkout-content" },
+								{ name: "Occupied Room", target: "occupied-content" },
+								{ name: "Late Check-out", target: "late-checkout-content" },
+								{ name: "LCO/LCI", target: "late-in-out-content" },								
+								{ name: "Transferred Room", target: "transferred-content" },
+								{ name: "Group Booking", target: "group-booking-content" },
+								{ name: "Cleaning Room", target: "cleaning-content" },
+								{ name: "Extended", target: "extended-content" },
+								{ name: "Available Room", target: "available-content" },
+							];
+					
+							let userTabOrder = tabOrder && tabOrder.length ? tabOrder : defaultTabs.map(tab => tab.target);
+							let firstActiveTab = userTabOrder[0]; // Set first tab as active
+					
+							userTabOrder.forEach((tabTarget, index) => {
+								let tabData = defaultTabs.find(tab => tab.target === tabTarget);
+								if (tabData) { %>
+									<div class="mdl-tabs__tab tabs_three <%= index === 0 ? 'is-active' : '' %>" data-target="<%= tabData.target %>">
+										<%= tabData.name %>
+									</div>
+								<% }
+							}); %>
+						</div>
+					
+						<!-- TAB CONTENTS -->
+						
+					</div>
+					
+					
+						<!-- ======================================== -->
+						<!-- TAB CONTENT SECTIONS -->
+						<!-- ======================================== -->
+						
+						<!-- ======================================== -->
+						<!-- TAB 1: TODAY CHECK-IN -->
+						<!-- ======================================== -->
+					<div id="checked-in-content" class="tab-content active-tab">
+						<div class="scrollable-container">
+							<% if (!todayCheckInDetails || todayCheckInDetails.length === 0) { %>
+								<div class="no-data-message">
+									<i class="fas fa-calendar-check" style="font-size: 3rem; color: #6c757d; margin-bottom: 1rem;"></i>
+									<h4 style="color: #6c757d; margin-bottom: 0.5rem;">No Check-ins Today</h4>
+									<p style="color: #6c757d; font-size: 0.9rem;">No guests are scheduled to check in today.</p>
+								</div>
+							<% } else { %>
+								<!-- Render Today Check-In Cards -->
+								<% todayCheckInDetails.forEach(checkedIn => { 
+									const variables = calculateCardVariables(checkedIn);
+									if (variables) { // Only render if variables are valid
+								%>
+									<%- include('../partials/booking-card', {
+										booking: checkedIn,
+										...variables,
+										showToggle: true,
+										toggleType: 'checkin',
+										showBadges: true,
+										showProgressBars: true
+									}) %>
+								<% } %>
+							<% }) %>
+							<% } %>
+						</div>
+					</div>
+					
+						<!-- ======================================== -->
+						<!-- TAB 2: LCO/LCI (LATE CHECK-IN/OUT) -->
+						<!-- ======================================== -->
+					 <div id="late-in-out-content" class="tab-content">
+						<div class="scrollable-container">
+							<% if (!lateInOutDetails || lateInOutDetails.length === 0) { %>
+								<div class="no-data-message">
+									<i class="fas fa-clock" style="font-size: 3rem; color: #6c757d; margin-bottom: 1rem;"></i>
+									<h4 style="color: #6c757d; margin-bottom: 0.5rem;">No Late Check-ins/Check-outs</h4>
+									<p style="color: #6c757d; font-size: 0.9rem;">All guests are on time with their check-ins and check-outs.</p>
+								</div>
+							<% } else { %>
+								<!-- Special dual-card structure for LCO/LCI -->
+							<% lateInOutDetails.forEach(lateInOut => { 
+								const checkInDate = new Date(lateInOut.NextCheckInDate);
+								const checkOutDate = new Date(lateInOut.CurrentCheckoutDate);
+								
+								// Determine the card class based on the ROOM_FLOOR
+								const cardClass = getFloorColorClass(lateInOut.ROOM_FLOOR);
+							%>
+									<!-- LCO/LCI Card Container -->
+								<div class="card <%= cardClass %>" data-floor="<%= lateInOut.ROOM_FLOOR %>" data-checkin="<%= lateInOut.CHECK_IN_DATE %>">
+										<!-- Room Header -->
+									<div class="card-head" style="text-align: center;">
+										<header><%= lateInOut.ROOM_NUMBER %></header>
+									</div>
+					
+										<!-- Current Guest Section (LCO) -->
+									<div class="card-body">
+											<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+											<p style="margin: 0;"><%= lateInOut.CurrentGuest %></p>
+											<p class="dates" style="margin: 0;">Out: <%= checkOutDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }) %></p>
+										</div>
+										<div style="display: flex; justify-content: flex-end; gap: 5px; margin-top: 10px; margin-bottom: 10px;">
+											<% if (lateInOut.CurrentBookingStatus === 'pending') { %>
+												<span class="badge badge-success">Pending</span>
+											<% } else if (lateInOut.CurrentBookingStatus === 'check-In') { %>
+												<span class="badge badge-success">Checked-In</span>
+											<% } else if (lateInOut.CurrentBookingStatus === 'check-Out') { %>
+												<span class="badge badge-success">Check-Out</span>
+											<% } %>
+
+											<% if (lateInOut.CurrentLateCheckout === 1) { %>
+												<span class="badge badge-success" style="margin-left: auto;">LCO</span>
+											<% } %>
+										</div>
+
+											<!-- Separator Line -->
+										<hr class="section-divider">
+									</div>
+										
+										<!-- Next Guest Section (LCI) -->
+									<div class="card-body">
+										<div style="display: flex; justify-content: space-between; align-items: center;">
+											<p style="margin: 0;"><%= lateInOut.NextGuest %></p>
+											<p class="dates" style="margin: 0;">In: <%= checkInDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }) %></p>
+										</div>
+										<div style="display: flex; justify-content: flex-end; gap: 5px; margin-top: 10px;">
+											<% if (lateInOut.NextBookingStatus === 'pending') { %>
+												<span class="badge badge-primary">Pending</span>
+											<% } else if (lateInOut.NextBookingStatus === 'check-In') { %>
+												<span class="badge badge-primary">Check-In</span>
+											<% } else if (lateInOut.NextBookingStatus === 'check-Out') { %>
+												<span class="badge badge-primary">Check-Out</span>
+											<% } %>
+
+											<% if (lateInOut.NextCheckInStatus === 0) { %>
+												<span class="badge badge-primary" style="margin-left: auto;">LCI</span>
+											<% } %>
+										</div>
+									</div>
+								</div>
+							<% }) %>
+							<% } %>
+						</div>
+					</div>
+						
+						<!-- ======================================== -->
+						<!-- TAB 3: TODAY CHECK-OUT -->
+						<!-- ======================================== -->
+					 <div id="checkout-content" class="tab-content">
+						<div class="scrollable-container">
+							<% if (!todayCheckedOutDetails || todayCheckedOutDetails.length === 0) { %>
+								<div class="no-data-message">
+									<i class="fas fa-sign-out-alt" style="font-size: 3rem; color: #6c757d; margin-bottom: 1rem;"></i>
+									<h4 style="color: #6c757d; margin-bottom: 0.5rem;">No Check-outs Today</h4>
+									<p style="color: #6c757d; font-size: 0.9rem;">No guests are scheduled to check out today.</p>
+								</div>
+							<% } else { %>
+								<!-- Render Today Check-Out Cards -->
+							<% todayCheckedOutDetails.forEach(checkedOut => { 
+									const variables = calculateCardVariables(checkedOut);
+									if (variables) { // Only render if variables are valid
+								%>
+									<%- include('../partials/booking-card', {
+										booking: checkedOut,
+										...variables,
+										showToggle: true,
+										toggleType: 'checkout',
+										showBadges: true,
+										showProgressBars: true
+									}) %>
+								<% } %>
+							<% }) %>
+							<% } %>
+						</div>
+					</div>
+
+						<!-- ======================================== -->
+						<!-- TAB 4: GROUP BOOKING -->
+						<!-- ======================================== -->
+					 <div id="group-booking-content" class="tab-content">
+						<div class="scrollable-container">
+							<% if (!groupBookingDetails || groupBookingDetails.length === 0) { %>
+								<div class="no-data-message">
+									<i class="fas fa-users" style="font-size: 3rem; color: #6c757d; margin-bottom: 1rem;"></i>
+									<h4 style="color: #6c757d; margin-bottom: 0.5rem;">No Group Bookings</h4>
+									<p style="color: #6c757d; font-size: 0.9rem;">No group bookings are currently active.</p>
+								</div>
+							<% } else { %>
+							<% 
+								// Group booking color management
+							const colorClasses = ['card-topline-green', 'card-topline-blue', 'card-topline-red', 'card-topline-violet', 'card-topline-orange', 'card-topline-pink','card-topline-yellow', 'card-topline-gray', 'card-topline-green2', 'card-topline-sky'];
+							const groupColors = {};
+							let colorIndex = 0;
+
+								// Render Group Booking Cards
+							groupBookingDetails.forEach(groupBooking => { 
+								if (!groupColors[groupBooking.GROUP_BOOKING_ID]) {
+									groupColors[groupBooking.GROUP_BOOKING_ID] = colorClasses[colorIndex % colorClasses.length];
+									colorIndex++;
+								}
+									// Override the cardClass for group bookings
+									groupBooking.cardClass = groupColors[groupBooking.GROUP_BOOKING_ID];
+									const variables = calculateCardVariables(groupBooking);
+									if (variables) { // Only render if variables are valid
+								%>
+									<%- include('../partials/booking-card', {
+										booking: groupBooking,
+										...variables,
+										showToggle: false,
+										showBadges: false,
+										showProgressBars: true
+									}) %>
+								<% } %>
+							<% }) %>
+							<% } %>
+						</div>
+					</div>
+					
+
+						<!-- ======================================== -->
+						<!-- TAB 5: EXTENDED BOOKINGS -->
+						<!-- ======================================== -->
+					 <div id="extended-content" class="tab-content">
+						<div class="scrollable-container">
+							<% if (!extendedDetails || extendedDetails.length === 0) { %>
+								<div class="no-data-message">
+									<i class="fas fa-calendar-plus" style="font-size: 3rem; color: #6c757d; margin-bottom: 1rem;"></i>
+									<h4 style="color: #6c757d; margin-bottom: 0.5rem;">No Extended Bookings</h4>
+									<p style="color: #6c757d; font-size: 0.9rem;">No bookings have been extended beyond their original checkout date.</p>
+								</div>
+							<% } else { %>
+								<!-- Render Extended Booking Cards -->
+							<% extendedDetails.forEach(extended => { 
+									const variables = calculateCardVariables(extended);
+									if (variables) { // Only render if variables are valid
+								%>
+									<%- include('../partials/booking-card', {
+										booking: extended,
+										...variables,
+										showToggle: false,
+										showBadges: false,
+										showProgressBars: true
+									}) %>
+								<% } %>
+							<% }) %>
+							<% } %>
+						</div>
+					</div>
+
+						<!-- ======================================== -->
+						<!-- TAB 6: LATE CHECK-OUT -->
+						<!-- ======================================== -->
+					 <div id="late-checkout-content" class="tab-content">
+						<div class="scrollable-container">
+							<% if (!lateCheckOutDetails || lateCheckOutDetails.length === 0) { %>
+								<div class="no-data-message">
+									<i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: #6c757d; margin-bottom: 1rem;"></i>
+									<h4 style="color: #6c757d; margin-bottom: 0.5rem;">No Late Check-outs</h4>
+									<p style="color: #6c757d; font-size: 0.9rem;">All guests are checking out on time.</p>
+								</div>
+							<% } else { %>
+								<!-- Render Late Check-Out Cards -->
+							<% lateCheckOutDetails.forEach(lateCheckOut => { 
+									const variables = calculateCardVariables(lateCheckOut);
+									if (variables) { // Only render if variables are valid
+								%>
+									<%- include('../partials/booking-card', {
+										booking: lateCheckOut,
+										...variables,
+										showToggle: false,
+										showBadges: true,
+										showProgressBars: true
+									}) %>
+								<% } %>
+							<% }) %>
+							<% } %>
+						</div>
+					</div>
+						
+						<!-- ======================================== -->
+						<!-- TAB 7: AVAILABLE ROOMS -->
+						<!-- ======================================== -->
+					 <div id="available-content" class="tab-content">
+						<div class="scrollable-container">
+							<% if (!availableRoomDetails || availableRoomDetails.length === 0) { %>
+								<div class="no-data-message">
+									<i class="fas fa-door-open" style="font-size: 3rem; color: #6c757d; margin-bottom: 1rem;"></i>
+									<h4 style="color: #6c757d; margin-bottom: 0.5rem;">No Available Rooms</h4>
+									<p style="color: #6c757d; font-size: 0.9rem;">All rooms are currently occupied, under maintenance, or being cleaned.</p>
+								</div>
+							<% } else { %>
+								<!-- Render Available Room Cards -->
+						  <% availableRoomDetails.forEach(room => { 
+								// Available rooms don't have booking data, so we'll create a simple card structure
+								const cardClass = getFloorColorClass(room.ROOM_FLOOR);
+								%>
+									<!-- Available Room Card -->
+									<div class="card <%= cardClass %>" data-floor="<%= room.ROOM_FLOOR %>">
+										<div class="card-head" style="text-align: center; margin-bottom: -5px;">
+											<header style="font-weight: bold;"><%= room.ROOM_NUMBER %></header>
+										</div>
+										<div class="card-body">
+											<div style="flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+												<div>
+													<p style="margin: 5px 0; font-weight: 600; font-size: 12px;"><%= room.ROOM_TYPE %></p>
+													<p style="margin: 5px 0; font-size: 11px;">Max: <%= room.ROOM_MAX %></p>
+													<p style="margin: 5px 0; font-size: 11px;">Bed: <%= room.ROOM_BED %></p>
+													<p style="margin: 5px 0; font-size: 11px;"><%= Number(room.FINAL_PRICE).toLocaleString('en-US') %></p>
+												</div>
+												<!-- Add spacing to match booking card structure -->
+												<div style="flex: 1;"></div>
+											</div>
+										</div>
+									</div>
+						  <% }); %>
+							<% } %>
+						</div>
+					  </div>
+					  
+						<!-- ======================================== -->
+						<!-- TAB 8: TRANSFERRED ROOMS -->
+						<!-- ======================================== -->
+					 <div id="transferred-content" class="tab-content">
+						<div class="scrollable-container">
+							<% if (!transferredRoomDetails || transferredRoomDetails.length === 0) { %>
+								<div class="no-data-message">
+									<i class="fas fa-exchange-alt" style="font-size: 3rem; color: #6c757d; margin-bottom: 1rem;"></i>
+									<h4 style="color: #6c757d; margin-bottom: 0.5rem;">No Transferred Rooms</h4>
+									<p style="color: #6c757d; font-size: 0.9rem;">No guests have been transferred to different rooms.</p>
+								</div>
+							<% } else { %>
+								<!-- Render Transferred Room Cards -->
+							<% transferredRoomDetails.forEach(transferred => { 
+									const variables = calculateCardVariables(transferred);
+									if (variables) { // Only render if variables are valid
+								%>
+									<%- include('../partials/booking-card', {
+										booking: transferred,
+										...variables,
+										showToggle: false,
+										showBadges: false,
+										showProgressBars: true
+									}) %>
+								<% } %>
+							<% }) %>
+							<% } %>
+						</div>
+					</div>
+					
+						<!-- ======================================== -->
+						<!-- TAB 9: OCCUPIED ROOMS -->
+						<!-- ======================================== -->
+						<div id="occupied-content" class="tab-content">
+							<div class="scrollable-container" id="occupied-content-wrapper1">
+								<% if (!occupiedRoomDetails || occupiedRoomDetails.length === 0) { %>
+									<div class="no-data-message">
+										<i class="fas fa-bed" style="font-size: 3rem; color: #6c757d; margin-bottom: 1rem;"></i>
+										<h4 style="color: #6c757d; margin-bottom: 0.5rem;">No Occupied Rooms</h4>
+										<p style="color: #6c757d; font-size: 0.9rem;">No rooms are currently occupied by guests.</p>
+									</div>
+								<% } else { %>
+								<!-- Render Occupied Room Cards -->
+								<% occupiedRoomDetails.forEach(occupiedRoom => { 
+									const variables = calculateCardVariables(occupiedRoom);
+									if (variables) { // Only render if variables are valid
+								%>
+									<%- include('../partials/booking-card', {
+										booking: occupiedRoom,
+										...variables,
+										showToggle: false,
+										showBadges: true,
+										showDeviceStatus: true,
+										showProgressBars: true
+									}) %>
+								<% } %>
+								<% }) %>
+								<% } %>
+								</div>
+										</div>
+						
+						<!-- ======================================== -->
+						<!-- TAB 10: CLEANING ROOMS -->
+						<!-- ======================================== -->
+						<div id="cleaning-content" class="tab-content">
+							<div class="scrollable-container">
+								<% if (!cleaningRoomDetails || cleaningRoomDetails.length === 0) { %>
+									<div class="no-data-message">
+										<i class="fas fa-broom" style="font-size: 3rem; color: #6c757d; margin-bottom: 1rem;"></i>
+										<h4 style="color: #6c757d; margin-bottom: 0.5rem;">No Rooms Being Cleaned</h4>
+										<p style="color: #6c757d; font-size: 0.9rem;">No rooms are currently under cleaning.</p>
+									</div>
+								<% } else { %>
+								<!-- Render Cleaning Room Cards -->
+								<% cleaningRoomDetails.forEach(cleaningRoom => { 
+									// Determine the card class based on the ROOM_FLOOR
+									const cardClass = getFloorColorClass(cleaningRoom.ROOM_FLOOR);
+								%>
+									<div class="card <%= cardClass %>" data-floor="<%= cleaningRoom.ROOM_FLOOR %>">
+										<div class="card-head" style="text-align: center; display: flex; align-items: center; justify-content: space-between;">
+											<!-- Cleaning Toggle Button -->
+											<div class="cleaning-container" data-room-id="<%= cleaningRoom.ROOM_ID %>">
+												<i class="fas fa-broom on"></i>
+											</div>
+											<!-- Room Number -->
+											<header style="flex-grow: 1; text-align: center; font-weight: bold;"><%= cleaningRoom.ROOM_NUMBER %></header>
+										</div>
+										<div class="card-body">
+											<div style="flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+												<div>
+													<p style="margin: 5px 0; font-weight: 600; font-size: 12px;"><%= cleaningRoom.ROOM_TYPE %></p>
+													<p style="margin: 5px 0; font-size: 11px;">Max: <%= cleaningRoom.ROOM_MAX %></p>
+													<p style="margin: 5px 0; font-size: 11px;">Bed: <%= cleaningRoom.ROOM_BED %></p>
+													<p style="margin: 5px 0; font-size: 11px;"><%= Number(cleaningRoom.FINAL_PRICE).toLocaleString('en-US') %></p>
+												</div>
+												<!-- Add spacing to match booking card structure -->
+												<div style="flex: 1;"></div>
+											</div>
+										</div>
+									</div>
+								<% }); %>
+								<% } %>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+						<!-- ======================================== -->
+						<!-- Real-Time Room Status -->
+						<!-- ======================================== -->
+
+<div class="dashboard-btn-row-item">
+	<div class="col-xl-12 col-md-12 col-12">
+		<div class="dashboard-card">
+			<div class="dashboard-card-header" style="padding: 20px 25px; min-height: 80px; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(145deg, #2a3135, #1f2528) !important;">
+				<div class="dashboard-card-header-title">Real-Time Room Status</div>
+				<div class="tab-bar">
+					<div class="tab-item is-active" data-target="3rd-floor-content">3rd Floor</div>
+					<div class="tab-item" data-target="4th-floor-content">4th Floor</div>
+					<div class="tab-item" data-target="5th-floor-content">5th Floor</div>
+					<div class="tab-item" data-target="6th-floor-content">6th Floor</div>
+				</div>
+			</div>
+			<div class="dashboard-card-body">
+				<div class="tab-panel is-active" id="3rd-floor-content">
+					<div id="floor-layout-3" class="single-floor"></div>
+				</div>
+				<div class="tab-panel" id="4th-floor-content">
+					<div id="floor-layout-4" class="single-floor"></div>
+				</div>
+				<div class="tab-panel" id="5th-floor-content">
+					<div id="floor-layout-5" class="single-floor"></div>
+				</div>
+				<div class="tab-panel" id="6th-floor-content">
+					<div id="floor-layout-6" class="single-floor"></div>
+				</div>
+			</div>
+			<div class="dashboard-card-footer" >
+				<div class="legend" style="display: flex; gap: 1rem; align-items: center; margin-left: auto; white-space: nowrap; flex-wrap: wrap;">
+					<!-- SHOW ALL -->
+					<button type="button" class="legend-button legend-button--show-all legend-item" data-filter="SHOW ALL">
+						<span class="legend-color"></span>
+						SHOW ALL
+					</button>
+					
+					<button type="button" class="legend-button legend-button--maintenance legend-item" data-filter="MAINTENANCE">
+						<span class="legend-color"></span>
+						MAINTENANCE
+					</button>
+
+					<button type="button" class="legend-button legend-button--cleaning legend-item" data-filter="CLEANING">
+						<span class="legend-color"></span>
+						CLEANING
+					</button>
+
+					<button type="button" class="legend-button legend-button--occupied legend-item" data-filter="OCCUPIED">
+						<span class="legend-color"></span>
+						OCCUPIED
+					</button>
+
+					<button type="button" class="legend-button legend-button--available legend-item" data-filter="AVAILABLE">
+						<span class="legend-color"></span>
+						AVAILABLE
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+
+<script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+<script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+
+<!-- Socket.IO for Dashboard -->
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/dashboard/socket-config.js"></script>
+
+<script>
+	document.addEventListener('DOMContentLoaded', function() {
+		
+		// Load room_data.js immediately - this is critical for room display
+		var roomScript = document.createElement('script');
+		roomScript.src = '/js/dashboard/room_data.js';
+		document.body.appendChild(roomScript);
+		
+		// Load main_data.js
+		var mainScript = document.createElement('script');
+		mainScript.src = '/js/dashboard/main_data.js';
+		document.body.appendChild(mainScript);
+		
+		// Load other scripts
+		var script2 = document.createElement('script');
+		script2.src = '/js/dashboard/room-menu_data.js';
+		document.body.appendChild(script2);
+		// var script3 = document.createElement('script');
+		// script3.src = '/js/dashboard/late-checkout_data.js';
+		// document.body.appendChild(script3);
+		var script4 = document.createElement('script');
+		script4.src = '/js/dashboard/extend_data.js';
+		document.body.appendChild(script4);
+		var script5 = document.createElement('script');
+		script5.src = '/js/dashboard/billing_data.js';
+		document.body.appendChild(script5);
+		var script7 = document.createElement('script');
+		script7.src = '/js/dashboard/booking_data.js';
+		document.body.appendChild(script7);
+	});
+</script>
+
+<!-- Extend Stay Modal -->
+<div class="modal fade" id="extendStayModal" tabindex="-1" aria-labelledby="extendStayModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="extendStayModalLabel">Extend Stay</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="extendStayForm">
+                    <!-- Number of Days/Nights -->
+                    <div class="mb-3">
+                        <label for="extensionDays" class="form-label">Number of Days/Nights</label>
+                        <input type="number" class="form-control" id="extensionDays" min="1" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="extensionCost" class="form-label">Cost Per Day</label>
+                        <input type="number" class="form-control" id="extensionCost" min="0" required>
+                    </div>
+
+                    <!-- Available Rooms Grid -->
+                    <div class="mb-3" id="roomSelectionWrapper" style="display: none;">
+                        <label class="form-label">Select an Available Room</label>
+                        <div id="availableRoomsGrid" class="room-grid">
+                            <!-- Dynamic room buttons will be appended here -->
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="submit" class="btn btn-primary" id="confirmExtendButton">Confirm Extension</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Remarks Modal -->
+<div class="modal fade" id="remarksModal" tabindex="-1" aria-labelledby="remarksModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(145deg, #2a3135, #1f2528); border-bottom: 1px solid #495057;">
+                <h5 class="modal-title" id="remarksModalLabel" style="color: #fff;">
+                    <i class="fas fa-comment-alt me-2"></i>
+                    Room <span id="remarksRoomNumber" class="text-info" style="font-weight: 600;"></span> - Remarks
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="background: #2a3135; color: #fff; padding: 25px;">
+                <!-- Full Remarks Display -->
+                <div class="full-remarks-section">
+                 
+                    <div class="remarks-content-box" style="background: #495057; padding: 20px; border-radius: 10px; border: 1px solid #6c757d;">
+                        <div id="fullRemarksText" style="color: #fff; font-size: 15px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word;">
+                            <!-- Full remarks text will be displayed here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="background: #2a3135; border-top: 1px solid #495057; padding: 20px;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="padding: 10px 25px; font-weight: 600;">
+                    <i class="fas fa-times me-2"></i>Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Remarks Modal JavaScript Functions -->
+<script>
+// Global variables for remarks modal
+let currentRemarksData = {
+    bookingId: null,
+    roomNumber: null,
+    guestName: null,
+    currentRemarks: null
+};
+
+// Open remarks modal
+function openRemarksModal(bookingId, roomNumber, guestName, currentRemarks) {
+    // Store current data
+    currentRemarksData = {
+        bookingId: bookingId,
+        roomNumber: roomNumber,
+        guestName: guestName,
+        currentRemarks: currentRemarks
+    };
+    
+    // Update modal title with room number
+    document.getElementById('remarksRoomNumber').textContent = roomNumber;
+    
+    // Display full remarks text
+    const fullRemarksText = document.getElementById('fullRemarksText');
+    if (currentRemarks && currentRemarks.trim() !== '') {
+        fullRemarksText.textContent = currentRemarks;
+        fullRemarksText.style.color = '#fff';
+    } else {
+        fullRemarksText.textContent = 'No remarks available for this room.';
+        fullRemarksText.style.color = '#adb5bd';
+        fullRemarksText.style.fontStyle = 'italic';
+    }
+    
+    // Show modal
+    const remarksModal = new bootstrap.Modal(document.getElementById('remarksModal'));
+    remarksModal.show();
+}
+
+// New function to open remarks modal from data attributes
+function openRemarksModalFromData(element) {
+    const bookingId = element.getAttribute('data-booking-id');
+    const roomNumber = element.getAttribute('data-room-number');
+    const customerName = element.getAttribute('data-customer-name');
+    const currentRemarks = element.getAttribute('data-remarks');
+    
+    // Call the existing function
+    openRemarksModal(bookingId, roomNumber, customerName, currentRemarks);
+}
+</script>
+					
+					
+					
+<style>
+/* Remarks Button Styling */
+.remarks-btn {
+  width: 100%;
+  background: linear-gradient(145deg, #495057, #343a40);
+  border: 1px solid #6c757d;
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: left;
+  min-height: 40px;
+}
+
+.remarks-btn:hover {
+  background: linear-gradient(145deg, #6c757d, #495057);
+  border-color: #28a745;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.remarks-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.remarks-btn i {
+  font-size: 14px;
+  color: #28a745;
+  flex-shrink: 0;
+}
+
+.remarks-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+/* Remarks Modal Styling */
+.remarks-content-box {
+  background: #495057 !important;
+  border: 1px solid #6c757d !important;
+  border-radius: 10px !important;
+  padding: 20px !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.remarks-content-box:hover {
+  border-color: #28a745 !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 0 0 2px rgba(40, 167, 69, 0.1);
+}
+
+/* Modal Animation */
+.modal.fade .modal-dialog {
+  transition: transform 0.3s ease-out;
+  transform: translate(0, -50px);
+}
+
+.modal.show .modal-dialog {
+  transform: none;
+}
+
+/* Button Hover Effects */
+.btn-secondary:hover {
+  background: linear-gradient(145deg, #6c757d, #495057) !important;
+  border-color: #28a745 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Text Enhancements */
+#fullRemarksText {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .modal-dialog {
+    margin: 10px;
+  }
+  
+  .remarks-content-box {
+    padding: 15px !important;
+  }
+}
+
+/* Simple Memo Section Styling */
+.memo {
+  background: #495057;
+  border: 1px solid #6c757d;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-top: 10px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.memo p {
+  margin: 0;
+  color: #fff;
+  font-size: 12px;
+}
+</style>
+					
+					
+					

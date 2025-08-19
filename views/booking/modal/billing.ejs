@@ -1,0 +1,1410 @@
+<div class="modal fade" id="modal-billing" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false" style="z-index: 1070 !important;">
+    <div class="modal-dialog modal-dialog-centered modal-xl" role="document">
+        <!-- Added id="printableArea" here so that printDiv() can find the element -->
+        <div class="modal-content" id="printableArea">
+            <div class="modal-header">
+                <h4 class="modal-title">Billing Receipt #<span id="billingReceiptId">N/A</span></h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="white-box billing-receipt-container">
+                            <input type="hidden" id="hiddenBookingId" name="hiddenBookingId">
+                            
+                            <!-- Enhanced Header Section -->
+                            <div class="billing-header">
+                                <h2 class="billing-title">
+                                    <i class="fa fa-file-text-o"></i>
+                                    Billing Receipt
+                                    <span class="receipt-number">#<span id="confNumber"></span></span>
+                                </h2>
+                                <div class="billing-divider"></div>
+                            </div>
+                            
+                            <div class="row billing-content">
+                                <!-- Left Section: Hotel Info -->
+                                <div class="col-md-6">
+                                    <div class="hotel-info-section">
+                                        <div class="hotel-logo-container">
+                                            <img src="/img/logo.png" alt="logo" class="hotel-logo" />
+                                            <h3 class="hotel-name">SKY HOTEL</h3>
+                                        </div>
+                                        <div class="hotel-address">
+                                            <p><i class="fa fa-map-marker"></i> Aditya Hotel</p>
+                                            <p><i class="fa fa-building"></i> Opp. Town Hall</p>
+                                            <p><i class="fa fa-road"></i> Sardar Patel Road</p>
+                                            <p><i class="fa fa-location-arrow"></i> Ahmedabad - 380015</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            
+                                <!-- Right Section: Customer Info -->
+                                <div class="col-md-6">
+                                    <div class="customer-info-section">
+                                        <div class="customer-header">
+                                            <h4><i class="fa fa-user"></i> Bill To:</h4>
+                                        </div>
+                                        <div class="customer-details">
+                                            <p class="customer-name" id="customerName"><!--CUSTOMER NAME--></p>
+                                            <div class="customer-address" id="customerAddress">
+                                                <!--CUSTOMER ADDRESS-->
+                                            </div>
+                                        </div>
+                                        <div class="invoice-date">
+                                            <p><i class="fa fa-calendar"></i> <strong>Invoice Date:</strong></p>
+                                            <span class="date-value" id="invoiceDate">N/A</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Enhanced Table Section -->
+                            <div class="billing-table-section">
+                                <div class="table-responsive">
+                                    <table class="table table-hover billing-table">
+                                        <thead>
+                                            <tr>
+                                                <th class="text-center">#</th>
+                                                <th class="text-center">Date</th>
+                                                <th class="text-center">Descriptions</th>
+                                                <th class="text-center">Base Price</th>
+                                                <th class="text-center">No Of Days / QTY</th>
+                                                <th class="text-right">Sub Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                           
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <!-- Enhanced Summary Section -->
+                            <div class="billing-summary-section">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="payment-notes">
+                                            <div class="note-item">
+                                                <i class="fa fa-info-circle"></i>
+                                                <span>Payment processed successfully</span>
+                                            </div>
+                                            <div class="note-item">
+                                                <i class="fa fa-check-circle"></i>
+                                                <span>Receipt generated on <span id="generatedDate"></span></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="payment-summary">
+                                            <!-- Paid Image Overlay -->
+                                            <div class="paid-image-overlay" id="paidImageOverlay" style="display: none;">
+                                                <img id="paidImage" src="/img/paid.png" alt="Paid" class="paid-overlay-image" />
+                                            </div>
+                                            
+                                            <div class="summary-row">
+                                                <span class="summary-label">Paid Amount:</span>
+                                                <span class="summary-value paid-amount" id="totalPaid">₹0.00</span>
+                                            </div>
+                                            <div class="summary-row">
+                                                <span class="summary-label">Balance:</span>
+                                                <span class="summary-value balance-amount" id="balanceAmount">₹0.00</span>
+                                            </div>
+                                            <div class="summary-row total-row">
+                                                <span class="summary-label">Total Amount:</span>
+                                                <span class="summary-value total-amount" id="totalPayment">₹0.00</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Enhanced Action Buttons -->
+                            <div class="billing-actions">
+                                <div class="action-buttons">
+                                    <button type="button" id="proceedToPaymentButton" class="btn btn-payment" data-bs-toggle="modal" data-bs-target="#modal-payment">
+                                        <i class="fa fa-credit-card"></i> Proceed to Payment
+                                    </button>
+                                    <button onclick="printDiv('printableArea')" class="btn btn-print" type="button">
+                                        <i class="fa fa-print"></i> Print Receipt
+                                    </button>
+                                    <button id="generateInvoiceBtn" class="btn btn-invoice" type="button">
+                                        <i class="fa fa-file-pdf-o"></i> Generate Invoice
+                                    </button>
+                                    <button type="button" class="btn btn-close-modal" data-bs-dismiss="modal">
+                                        <i class="fa fa-times"></i> Close
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('payment') %>
+
+<!-- Include external JavaScript files -->
+<script>
+	document.addEventListener('DOMContentLoaded', function() {
+		
+		// Load add_booking.js immediately - this is critical for booking functionality
+		var bookingBillingScript = document.createElement('script');
+		bookingBillingScript.src = '/js/booking/billing.js';
+		document.body.appendChild(bookingBillingScript);
+		
+		// Set current date for generated date
+		document.getElementById('generatedDate').textContent = new Date().toLocaleDateString('en-US', {
+			year: 'numeric',
+			month: 'long',
+			day: 'numeric'
+		});
+		
+		// Initialize payment status
+		updatePaymentStatus();
+		
+		// Also check payment status after a short delay to ensure elements are loaded
+		setTimeout(updatePaymentStatus, 500);
+	});
+	
+	// Function to update payment status and show/hide paid image
+	function updatePaymentStatus() {
+		const totalPaidElement = document.getElementById('totalPaid');
+		const totalPaymentElement = document.getElementById('totalPayment');
+		const balanceAmountElement = document.getElementById('balanceAmount');
+		const paidImageOverlay = document.getElementById('paidImageOverlay');
+		
+		// Check if elements exist
+		if (!totalPaidElement || !totalPaymentElement || !balanceAmountElement || !paidImageOverlay) {
+			console.log('Some elements not found:', {
+				totalPaid: !!totalPaidElement,
+				totalPayment: !!totalPaymentElement,
+				balanceAmount: !!balanceAmountElement,
+				paidImageOverlay: !!paidImageOverlay
+			});
+			return;
+		}
+		
+		const totalPaid = parseFloat(totalPaidElement.textContent.replace('₹', '').replace(',', '')) || 0;
+		const totalPayment = parseFloat(totalPaymentElement.textContent.replace('₹', '').replace(',', '')) || 0;
+		const balanceAmount = parseFloat(balanceAmountElement.textContent.replace('₹', '').replace(',', '')) || 0;
+		
+		console.log('Payment Status Update:', {
+			totalPaid,
+			totalPayment,
+			balanceAmount,
+			textContent: {
+				totalPaid: totalPaidElement.textContent,
+				totalPayment: totalPaymentElement.textContent,
+				balanceAmount: balanceAmountElement.textContent
+			}
+		});
+		
+		// Check if payment is truly complete
+		const isPaymentComplete = (balanceAmount <= 0 && totalPaid > 0 && totalPayment > 0);
+		
+		console.log('Is Payment Complete:', isPaymentComplete);
+		
+		if (isPaymentComplete) {
+			// Show paid image only when payment is complete
+			paidImageOverlay.style.display = 'block';
+			paidImageOverlay.classList.add('show-paid-status');
+			console.log('Paid image should be visible now');
+		} else {
+			// Hide paid image for unpaid or partial payments
+			paidImageOverlay.style.display = 'none';
+			paidImageOverlay.classList.remove('show-paid-status');
+			console.log('Paid image hidden');
+		}
+	}
+	
+	// Function to be called when payment data is updated
+	function refreshPaymentStatus() {
+		updatePaymentStatus();
+	}
+	
+	// Function to manually check payment status (for debugging)
+	function checkPaymentStatus() {
+		console.log('=== MANUAL PAYMENT STATUS CHECK ===');
+		updatePaymentStatus();
+	}
+	
+	// Function to force show paid image (for testing)
+	function forceShowPaidImage() {
+		const paidImageOverlay = document.getElementById('paidImageOverlay');
+		if (paidImageOverlay) {
+			paidImageOverlay.style.display = 'block';
+			paidImageOverlay.classList.add('show-paid-status');
+			console.log('Forced paid image to show');
+		} else {
+			console.log('Paid image overlay element not found');
+		}
+	}
+	
+	// Enhanced print function for better layout
+	function printDiv(divId) {
+		// Store current modal state
+		const modal = document.getElementById('modal-billing');
+		const originalZIndex = modal.style.zIndex;
+		const originalPosition = modal.style.position;
+		
+		// Temporarily modify modal for printing
+		modal.style.zIndex = '9999';
+		modal.style.position = 'relative';
+		
+		// Get the printable content
+		const printContents = document.getElementById(divId).innerHTML;
+		const originalContents = document.body.innerHTML;
+		
+		// Create a new window for printing
+		const printWindow = window.open('', '_blank', 'width=800,height=600');
+		printWindow.document.write(`
+			<!DOCTYPE html>
+			<html>
+			<head>
+				<title>Billing Receipt</title>
+				<style>
+					body {
+						font-family: Arial, sans-serif;
+						margin: 0;
+						padding: 20px;
+						background: white;
+						color: black;
+					}
+					.billing-receipt-container {
+						background: white !important;
+						color: black !important;
+						border: 2px solid black !important;
+						padding: 30px !important;
+						margin: 0 !important;
+						box-shadow: none !important;
+					}
+					.billing-header {
+						text-align: center;
+						border-bottom: 3px solid black;
+						margin-bottom: 30px;
+						padding-bottom: 20px;
+					}
+					.billing-title {
+						font-size: 28px;
+						font-weight: bold;
+						margin: 0 0 20px 0;
+					}
+					.billing-divider {
+						height: 3px;
+						background: black;
+						margin: 25px auto;
+						width: 100%;
+					}
+					.hotel-info-section,
+					.customer-info-section {
+						border: 2px solid black;
+						padding: 25px;
+						margin-bottom: 25px;
+						background: white;
+					}
+					.hotel-logo {
+						width: 80px;
+						height: 80px;
+						border: 3px solid black;
+					}
+					.hotel-name {
+						font-size: 24px;
+						font-weight: bold;
+						text-align: center;
+						margin: 15px 0;
+					}
+					.hotel-address p {
+						font-size: 14px;
+						margin: 8px 0;
+					}
+					.customer-name {
+						font-size: 16px;
+						font-weight: bold;
+						background: #f0f0f0;
+						border-left: 4px solid black;
+						padding: 10px;
+						margin-bottom: 15px;
+					}
+					.invoice-date {
+						background: #f8f8f8;
+						border: 2px solid black;
+						padding: 15px;
+					}
+					.billing-table {
+						width: 100%;
+						border: 3px solid black;
+						border-collapse: collapse;
+						margin: 30px 0;
+					}
+					.billing-table th {
+						background: #f0f0f0;
+						border: 2px solid black;
+						padding: 15px 10px;
+						font-size: 14px;
+						font-weight: bold;
+						text-align: center;
+					}
+					.billing-table td {
+						border: 1px solid black;
+						padding: 12px 10px;
+						font-size: 14px;
+						text-align: center;
+					}
+					.billing-summary-section {
+						border: 3px solid black;
+						padding: 30px;
+						margin: 30px 0;
+						background: white;
+					}
+					.payment-notes {
+						border: 2px solid black;
+						background: #f8f8f8;
+						padding: 20px;
+					}
+					.payment-summary {
+						border: 2px solid black;
+						background: #f8f8f8;
+						padding: 25px;
+						position: relative;
+					}
+					.paid-image-overlay {
+						position: absolute;
+						top: 20px;
+						right: 20px;
+						z-index: 100;
+					}
+					.paid-overlay-image {
+						width: 120px;
+						height: auto;
+					}
+					.summary-row {
+						display: flex;
+						justify-content: space-between;
+						align-items: center;
+						margin-bottom: 15px;
+						padding: 10px 0;
+						border-bottom: 1px solid black;
+						font-size: 16px;
+						font-weight: bold;
+					}
+					.total-row {
+						border-top: 3px solid black;
+						padding-top: 25px;
+						margin-top: 25px;
+					}
+					.col-md-6 {
+						width: 100%;
+						margin-bottom: 20px;
+					}
+					@media print {
+						@page {
+							size: A4 portrait;
+							margin: 1cm;
+						}
+						body {
+							font-size: 12pt;
+						}
+					}
+				</style>
+			</head>
+			<body>
+				${printContents}
+			</body>
+			</html>
+		`);
+		
+		printWindow.document.close();
+		
+		// Wait for content to load then print
+		printWindow.onload = function() {
+			printWindow.focus();
+			printWindow.print();
+			printWindow.close();
+		};
+		
+		// Restore original modal state
+		modal.style.zIndex = originalZIndex;
+		modal.style.position = originalPosition;
+	}
+</script>
+
+<style>
+/* Billing Receipt Light Theme Styles */
+.billing-receipt-container {
+    background: linear-gradient(145deg, #ffffff, #f8f9fa);
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.1),
+        0 4px 16px rgba(0, 0, 0, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    color: #333333;
+}
+
+/* Enhanced Header */
+.billing-header {
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+.billing-title {
+    color: #2c3e50;
+    font-size: 1.6rem;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+}
+
+.billing-title i {
+    color: #3498db;
+    font-size: 2rem;
+}
+
+.receipt-number {
+    color: #3498db;
+    font-weight: 700;
+    margin-left: 15px;
+}
+
+.billing-divider {
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #3498db, transparent);
+    margin: 20px auto;
+    width: 80%;
+    border-radius: 2px;
+}
+
+/* Content Sections */
+.billing-content {
+    margin-bottom: 15px;
+}
+
+.hotel-info-section,
+.customer-info-section {
+    background: linear-gradient(145deg, #ffffff, #f8f9fa);
+    border-radius: 8px;
+    padding: 12px;
+    height: 100%;
+    box-shadow: 
+        0 4px 20px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.hotel-logo-container {
+    text-align: center;
+    margin-bottom: 12px;
+}
+
+.hotel-logo {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    border: 2px solid #3498db;
+}
+
+.hotel-name {
+    color: #3498db;
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 10px 0 0 0;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.hotel-address p {
+    margin: 4px 0;
+    color: #6c757d;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.hotel-address i {
+    color: #3498db;
+    width: 16px;
+    text-align: center;
+}
+
+/* Paid Status Section */
+.paid-status-container {
+    text-align: center;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.paid-image-wrapper {
+    margin-bottom: 20px;
+}
+
+.paid-image {
+    width: 180px;
+    height: auto;
+}
+
+.status-badge {
+    background: linear-gradient(145deg, #27ae60, #2ecc71);
+    color: white;
+    padding: 8px 20px;
+    border-radius: 25px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
+}
+
+/* Customer Info Section */
+.customer-header h4 {
+    color: #3498db;
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.customer-header i {
+    font-size: 1.2rem;
+}
+
+.customer-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #2c3e50;
+    margin-bottom: 10px;
+    padding: 6px;
+    background: rgba(52, 152, 219, 0.1);
+    border-radius: 6px;
+    border-left: 4px solid #3498db;
+}
+
+.customer-address {
+    color: #6c757d;
+    margin-bottom: 12px;
+    line-height: 1.4;
+}
+
+.invoice-date {
+    background: rgba(52, 152, 219, 0.05);
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(52, 152, 219, 0.1);
+}
+
+.invoice-date p {
+    margin: 0 0 8px 0;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.date-value {
+    color: #2c3e50;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+/* Table Section */
+.billing-table-section {
+    margin: 20px 0;
+}
+
+.billing-table {
+    background: #ffffff !important;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e9ecef;
+}
+
+.billing-table.table {
+    background: #ffffff !important;
+    color: #333333 !important;
+}
+
+.billing-table thead th {
+    background: #f8f9fa !important;
+    color: #2c3e50 !important;
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: none !important;
+    border-bottom: 2px solid #dee2e6 !important;
+    padding: 12px 10px;
+    text-align: center;
+}
+
+.billing-table tbody td {
+    background: #ffffff !important;
+    color: #333333 !important;
+    border: none !important;
+    border-bottom: 1px solid #f1f3f4 !important;
+    padding: 10px 8px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.billing-table tbody tr:hover td {
+    background: #f8f9fa !important;
+    color: #333333 !important;
+    transform: translateY(-1px);
+    transition: all 0.3s ease;
+}
+
+/* Additional overrides to ensure light theme */
+.billing-table.table-hover tbody tr:hover td {
+    background: #f8f9fa !important;
+    color: #333333 !important;
+}
+
+.billing-table .table {
+    background: #ffffff !important;
+    color: #333333 !important;
+}
+
+.billing-table .table thead th {
+    background: #f8f9fa !important;
+    color: #2c3e50 !important;
+}
+
+.billing-table .table tbody td {
+    background: #ffffff !important;
+    color: #333333 !important;
+}
+
+/* Summary Section */
+.billing-summary-section {
+    background: linear-gradient(145deg, #ffffff, #f8f9fa);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+    box-shadow: 
+        0 4px 20px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.payment-notes {
+    padding: 15px;
+}
+
+.note-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 15px;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.note-item i {
+    color: #3498db;
+    width: 16px;
+}
+
+.payment-summary {
+    background: rgba(52, 152, 219, 0.05);
+    border-radius: 8px;
+    padding: 18px;
+    border: 1px solid rgba(52, 152, 219, 0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Paid Image Overlay */
+.paid-image-overlay {
+    position: absolute;
+    top: 50px;
+    right: 160px;
+    z-index: 10;
+    pointer-events: none;
+    opacity: 0;
+    transform: scale(0.8) rotate(15deg);
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.paid-image-overlay.show-paid-status {
+    opacity: 1;
+    transform: scale(1) rotate(15deg);
+}
+
+.paid-overlay-image {
+    width: 160px;
+    height: auto;
+    opacity: 0.9;
+    filter: drop-shadow(0 4px 15px rgba(0, 0, 0, 0.2));
+    transform: rotate(15deg);
+}
+
+/* Animation for paid status */
+@keyframes paidStampAppear {
+    0% {
+        opacity: 0;
+        transform: scale(0.5) rotate(15deg);
+    }
+    50% {
+        transform: scale(1.1) rotate(15deg);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) rotate(15deg);
+    }
+}
+
+.paid-image-overlay.show-paid-status {
+    animation: paidStampAppear 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 8px 0;
+    position: relative;
+    z-index: 5;
+}
+
+.summary-row:last-child {
+    margin-bottom: 0;
+}
+
+.summary-label {
+    color: #6c757d;
+    font-weight: 500;
+    font-size: 1rem;
+}
+
+.summary-value {
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.paid-amount {
+    color: #27ae60;
+}
+
+.balance-amount {
+    color: #e74c3c;
+}
+
+.total-row {
+    border-top: 2px solid rgba(52, 152, 219, 0.3);
+    padding-top: 20px;
+    margin-top: 20px;
+}
+
+.total-row .summary-label {
+    color: #2c3e50;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.total-amount {
+    color: #3498db;
+    font-size: 1.2rem;
+}
+
+/* Action Buttons */
+.billing-actions {
+    margin-top: 25px;
+    text-align: center;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s ease;
+}
+
+.btn:hover::before {
+    left: 100%;
+}
+
+.btn-payment {
+    background: linear-gradient(145deg, #e74c3c, #c0392b);
+    color: white;
+}
+
+.btn-payment:hover {
+    background: linear-gradient(145deg, #f39c12, #e74c3c);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(231, 76, 60, 0.4);
+}
+
+.btn-print {
+    background: linear-gradient(145deg, #27ae60, #2ecc71);
+    color: white;
+}
+
+.btn-print:hover {
+    background: linear-gradient(145deg, #2ecc71, #27ae60);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(39, 174, 96, 0.4);
+}
+
+.btn-invoice {
+    background: linear-gradient(145deg, #3498db, #2980b9);
+    color: white;
+}
+
+.btn-invoice:hover {
+    background: linear-gradient(145deg, #5dade2, #3498db);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(52, 152, 219, 0.4);
+}
+
+.btn-close-modal {
+    background: linear-gradient(145deg, #95a5a6, #7f8c8d);
+    color: white;
+}
+
+.btn-close-modal:hover {
+    background: linear-gradient(145deg, #bdc3c7, #95a5a6);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(149, 165, 166, 0.4);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .billing-receipt-container {
+        padding: 20px;
+    }
+    
+    .billing-title {
+        font-size: 1.8rem;
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .receipt-number {
+        margin-left: 0;
+        margin-top: 10px;
+    }
+    
+    .billing-content .col-md-6 {
+        margin-bottom: 20px;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .btn {
+        width: 100%;
+        max-width: 300px;
+    }
+    
+    /* Adjust paid image overlay position for mobile */
+.paid-image-overlay {
+    top: 30px;
+    right: 20px;
+}
+
+.paid-overlay-image {
+    width: 100px;
+}
+}
+
+@media (max-width: 480px) {
+    .billing-receipt-container {
+        padding: 15px;
+    }
+    
+    .billing-title {
+        font-size: 1.5rem;
+    }
+    
+    .hotel-logo {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .hotel-name {
+        font-size: 1.2rem;
+    }
+    
+    .paid-image {
+        width: 140px;
+    }
+    
+    /* Further adjust paid image overlay for small screens */
+.paid-image-overlay {
+    top: 20px;
+    right: 10px;
+}
+
+.paid-overlay-image {
+    width: 80px;
+}
+}
+
+/* Print Styles - Light Theme for Printing */
+@media print {
+    /* Reset all colors and backgrounds for print */
+    * {
+        background: transparent !important;
+        color: #000000 !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+        border-radius: 0 !important;
+    }
+    
+    /* Hide modal backdrop and unnecessary elements */
+    .modal-backdrop,
+    .modal-header,
+    .billing-actions,
+    .btn-close {
+        display: none !important;
+    }
+    
+    /* Main container print styling */
+    .billing-receipt-container {
+        background: #ffffff !important;
+        color: #000000 !important;
+        border: 2px solid #000000 !important;
+        border-radius: 0 !important;
+        padding: 30px !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        page-break-inside: avoid !important;
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+    
+    /* Header styling for print */
+    .billing-header {
+        border-bottom: 3px solid #000000 !important;
+        margin-bottom: 30px !important;
+        padding-bottom: 20px !important;
+        text-align: center !important;
+    }
+    
+    .billing-title {
+        color: #000000 !important;
+        font-size: 28px !important;
+        font-weight: bold !important;
+        margin: 0 0 20px 0 !important;
+        text-align: center !important;
+    }
+    
+    .billing-title i {
+        color: #000000 !important;
+        font-size: 32px !important;
+        margin-right: 15px !important;
+    }
+    
+    .receipt-number {
+        color: #000000 !important;
+        font-weight: bold !important;
+        font-size: 24px !important;
+        margin-left: 20px !important;
+    }
+    
+    .billing-divider {
+        background: #000000 !important;
+        height: 3px !important;
+        margin: 25px auto !important;
+        width: 100% !important;
+    }
+    
+    /* Content sections for print */
+    .billing-content {
+        margin-bottom: 30px !important;
+        page-break-inside: avoid !important;
+    }
+    
+    .hotel-info-section,
+    .customer-info-section {
+        background: #ffffff !important;
+        color: #000000 !important;
+        border: 2px solid #000000 !important;
+        border-radius: 0 !important;
+        padding: 25px !important;
+        margin-bottom: 25px !important;
+        box-shadow: none !important;
+        height: auto !important;
+        min-height: 200px !important;
+    }
+    
+    .hotel-logo-container {
+        text-align: center !important;
+        margin-bottom: 20px !important;
+    }
+    
+    .hotel-logo {
+        width: 80px !important;
+        height: 80px !important;
+        border: 3px solid #000000 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
+    
+    .hotel-name {
+        color: #000000 !important;
+        font-weight: bold !important;
+        text-shadow: none !important;
+        font-size: 24px !important;
+        margin: 15px 0 !important;
+        text-align: center !important;
+    }
+    
+    .hotel-address p {
+        color: #333333 !important;
+        font-size: 14px !important;
+        margin: 8px 0 !important;
+        text-align: left !important;
+    }
+    
+    .hotel-address i {
+        color: #000000 !important;
+        width: 20px !important;
+        margin-right: 10px !important;
+    }
+    
+    .customer-header h4 {
+        color: #000000 !important;
+        font-weight: bold !important;
+        font-size: 18px !important;
+        margin-bottom: 15px !important;
+        text-align: left !important;
+    }
+    
+    .customer-header i {
+        font-size: 20px !important;
+        margin-right: 10px !important;
+    }
+    
+    .customer-name {
+        color: #000000 !important;
+        background: #f0f0f0 !important;
+        border-left: 4px solid #000000 !important;
+        font-size: 16px !important;
+        font-weight: bold !important;
+        padding: 10px !important;
+        margin-bottom: 15px !important;
+    }
+    
+    .customer-address {
+        color: #333333 !important;
+        font-size: 14px !important;
+        line-height: 1.6 !important;
+        margin-bottom: 20px !important;
+    }
+    
+    .invoice-date {
+        background: #f8f8f8 !important;
+        border: 2px solid #000000 !important;
+        padding: 15px !important;
+        border-radius: 0 !important;
+    }
+    
+    .invoice-date p {
+        color: #333333 !important;
+        font-size: 14px !important;
+        margin: 0 0 10px 0 !important;
+        font-weight: bold !important;
+    }
+    
+    .date-value {
+        color: #000000 !important;
+        font-weight: bold !important;
+        font-size: 16px !important;
+    }
+    
+    /* Table styling for print */
+    .billing-table-section {
+        margin: 30px 0 !important;
+        page-break-inside: avoid !important;
+    }
+    
+    .billing-table {
+        background: #ffffff !important;
+        color: #000000 !important;
+        border: 3px solid #000000 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        width: 100% !important;
+        margin: 0 !important;
+    }
+    
+    .billing-table thead th {
+        background: #f0f0f0 !important;
+        color: #000000 !important;
+        font-weight: bold !important;
+        border: 2px solid #000000 !important;
+        padding: 15px 10px !important;
+        font-size: 14px !important;
+        text-align: center !important;
+        text-transform: uppercase !important;
+    }
+    
+    .billing-table tbody td {
+        background: #ffffff !important;
+        color: #000000 !important;
+        border: 1px solid #000000 !important;
+        padding: 12px 10px !important;
+        font-size: 14px !important;
+        text-align: center !important;
+        vertical-align: middle !important;
+    }
+    
+    .billing-table tbody tr:hover td {
+        background: #f8f8f8 !important;
+        transform: none !important;
+    }
+    
+    /* Summary section for print */
+    .billing-summary-section {
+        background: #ffffff !important;
+        color: #000000 !important;
+        border: 3px solid #000000 !important;
+        border-radius: 0 !important;
+        padding: 30px !important;
+        margin: 30px 0 !important;
+        box-shadow: none !important;
+        page-break-inside: avoid !important;
+    }
+    
+    .payment-notes {
+        padding: 20px !important;
+        border: 2px solid #000000 !important;
+        background: #f8f8f8 !important;
+    }
+    
+    .note-item {
+        color: #333333 !important;
+        font-size: 14px !important;
+        margin-bottom: 15px !important;
+        font-weight: bold !important;
+    }
+    
+    .note-item i {
+        color: #000000 !important;
+        width: 20px !important;
+        margin-right: 15px !important;
+    }
+    
+    .payment-summary {
+        background: #f8f8f8 !important;
+        border: 2px solid #000000 !important;
+        padding: 25px !important;
+        position: relative !important;
+    }
+    
+    /* Paid image overlay for print */
+    .paid-image-overlay {
+        display: block !important;
+        opacity: 1 !important;
+        transform: scale(1) rotate(15deg) !important;
+        filter: none !important;
+        position: absolute !important;
+        top: 20px !important;
+        right: 20px !important;
+        z-index: 100 !important;
+    }
+    
+    .paid-overlay-image {
+        filter: none !important;
+        opacity: 1 !important;
+        width: 120px !important;
+        height: auto !important;
+    }
+    
+    .summary-row {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        margin-bottom: 15px !important;
+        padding: 10px 0 !important;
+        border-bottom: 1px solid #000000 !important;
+        font-size: 16px !important;
+        font-weight: bold !important;
+    }
+    
+    .summary-row:last-child {
+        margin-bottom: 0 !important;
+        border-bottom: none !important;
+    }
+    
+    .summary-label {
+        color: #000000 !important;
+        font-weight: bold !important;
+        font-size: 16px !important;
+    }
+    
+    .summary-value {
+        color: #000000 !important;
+        font-weight: bold !important;
+        font-size: 16px !important;
+    }
+    
+    .paid-amount {
+        color: #006600 !important;
+        font-weight: bold !important;
+    }
+    
+    .balance-amount {
+        color: #cc0000 !important;
+        font-weight: bold !important;
+    }
+    
+    .total-row {
+        border-top: 3px solid #000000 !important;
+        padding-top: 25px !important;
+        margin-top: 25px !important;
+    }
+    
+    .total-row .summary-label {
+        color: #000000 !important;
+        font-weight: bold !important;
+        font-size: 20px !important;
+    }
+    
+    .total-amount {
+        color: #006600 !important;
+        font-weight: bold !important;
+        font-size: 20px !important;
+    }
+    
+    /* Hide action buttons in print */
+    .billing-actions {
+        display: none !important;
+    }
+    
+    /* Page break controls */
+    .billing-receipt-container {
+        page-break-inside: avoid !important;
+    }
+    
+    .billing-table {
+        page-break-inside: avoid !important;
+    }
+    
+    .billing-summary-section {
+        page-break-inside: avoid !important;
+    }
+    
+    /* Font sizes for print */
+    body {
+        font-size: 12pt !important;
+        line-height: 1.5 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    .billing-title {
+        font-size: 20pt !important;
+        line-height: 1.2 !important;
+    }
+    
+    .hotel-name {
+        font-size: 16pt !important;
+    }
+    
+    .customer-name {
+        font-size: 14pt !important;
+    }
+    
+    .summary-value {
+        font-size: 12pt !important;
+    }
+    
+    .total-amount {
+        font-size: 16pt !important;
+    }
+    
+    /* Ensure good contrast for print */
+    .text-muted {
+        color: #333333 !important;
+    }
+    
+    .text-success {
+        color: #006600 !important;
+    }
+    
+    .text-danger {
+        color: #cc0000 !important;
+    }
+    
+    /* Force page orientation and margins */
+    @page {
+        size: A4 portrait !important;
+        margin: 1cm !important;
+    }
+    
+    /* Remove any floating elements */
+    .col-md-6 {
+        float: none !important;
+        width: 100% !important;
+        margin-bottom: 20px !important;
+    }
+    
+    /* Ensure proper spacing between sections */
+    .row {
+        margin: 0 !important;
+        display: block !important;
+    }
+    
+    .col-md-12 {
+        width: 100% !important;
+        padding: 0 !important;
+    }
+    
+    /* Fix table layout for print */
+    .table-responsive {
+        overflow: visible !important;
+    }
+    
+    /* Ensure all text is visible */
+    .modal-body {
+        padding: 0 !important;
+        overflow: visible !important;
+    }
+    
+    .modal-content {
+        border: none !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+    }
+}
+</style>

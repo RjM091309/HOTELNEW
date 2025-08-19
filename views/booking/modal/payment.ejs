@@ -1,0 +1,50 @@
+<div class="modal fade" id="modal-payment" tabindex="-1" role="dialog" aria-labelledby="paymentModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="paymentModalLabel">Payment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="paymentForm">
+                    <div class="mb-3">
+                        <label for="paymentAmount" class="form-label">Amount to Pay</label>
+                        <input type="text" class="form-control" id="paymentAmount" readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="paymentMethod" class="form-label">Payment Method</label>
+                        <select class="form-select" name="paymentMethod" id="paymentMethod" required>
+                            <option value="" selected disabled>Select Payment Method</option>
+                            <option value="cash">Cash</option>
+                            <option value="credit_card">Credit Card</option>
+                            <!-- <option value="paypal">PayPal</option> -->
+                            
+                        </select>
+                    </div>
+                    <div id="paymentDetails">
+                        <!-- Dynamic payment details will appear here -->
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="confirmPaymentButton" class="btn btn-success">Confirm Payment</button>
+            </div>
+        </div>
+       
+    </div>
+</div>
+
+
+
+<!-- Include external JavaScript files -->
+<script>
+	document.addEventListener('DOMContentLoaded', function() {
+		
+		// Load add_booking.js immediately - this is critical for booking functionality
+		var bookingPaymentScript = document.createElement('script');
+		bookingPaymentScript.src = '/js/booking/payment.js';
+		document.body.appendChild(bookingPaymentScript);
+	});
+</script>
