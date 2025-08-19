@@ -1,3 +1,6 @@
+// Load environment variables FIRST, before any other imports
+require('dotenv').config();
+
 const express = require('express');
 const expressLayouts = require('express-ejs-layouts');
 const bodyParser = require('body-parser');
@@ -12,7 +15,6 @@ const cors = require('cors');
 const http = require('http');
 const socketIo = require('socket.io');
 const setupSocketEvents = require('./socket-events');
-require('dotenv').config();
 
 console.log('🔍 Loaded ENV values:', {
   DATABASE_HOST: process.env.DATABASE_HOST,
@@ -28,7 +30,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
     cors: {
-        origin: ['http://45.32.103.210:6000', 'http://45.32.103.210:4173', 'http://45.32.103.210:5002'],
+        origin: ['http://localhost:6000', 'http://localhost:4173', 'http://localhost:5002'],
         methods: ['GET', 'POST']
     }
 });
@@ -36,7 +38,7 @@ const PORT = process.env.PORT || 5001;
 
 // CORS middleware for API access from frontend
 app.use(cors({
-    origin: ['http://45.32.103.210:6000', 'http://45.32.103.210:4173', 'http://45.32.103.210:5002'],
+    origin: ['http://localhost:6000', 'http://localhost:4173', 'http://localhost:5002'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']

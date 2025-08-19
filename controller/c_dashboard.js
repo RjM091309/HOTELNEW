@@ -602,6 +602,41 @@ class DashboardController {
       });
     }
   }
+
+  // Get occupied rooms for guest app
+  static async getOccupiedRooms(req, res) {
+    try {
+      const roomDetails = await DashboardModel.getRoomDetails();
+      const occupiedRooms = roomDetails.occupied || [];
+      
+      // Format the data for the guest app
+      const formattedRooms = occupiedRooms.map(room => ({
+        ROOM_NUMBER: room.ROOM_NUMBER,
+        NAME: room.CustomerName,
+        CUSTOMER_NAME: room.CustomerName,
+        CHECK_IN_DATE: room.CHECK_IN_DATE,
+        CHECK_OUT_DATE: room.CHECK_OUT_DATE,
+        TOTAL_DAYS: room.TotalDays,
+        BOOKING_STATUS: room.BookingStatus,
+        ROOM_TYPE: room.RoomType,
+        ROOM_FLOOR: room.ROOM_FLOOR,
+        GUEST_COUNT: room.GuestCount,
+        CONFIRMATION_NUMBER: room.CONFIRMATION_NUMBER,
+        BOOKING_CHANNEL: room.BOOKING_CHANNEL
+      }));
+      
+      res.json({
+        success: true,
+        data: formattedRooms
+      });
+    } catch (error) {
+      console.error('Error fetching occupied rooms:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error'
+      });
+    }
+  }
 }
 
 module.exports = DashboardController;

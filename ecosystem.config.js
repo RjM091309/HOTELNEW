@@ -9,7 +9,7 @@ module.exports = {
     env: {
       NODE_ENV: 'development',
       PORT: 5001,
-      DATABASE_HOST: '127.0.0.1',
+      DATABASE_HOST: '45.32.103.210',
       DATABASE_USER: '3core',
       DATABASE_PASS: '2024.3core21',
       DATABASE_NAME: 'hotel',
@@ -18,7 +18,7 @@ module.exports = {
     env_production: {
       NODE_ENV: 'production',
       PORT: 5001,
-      DATABASE_HOST: '127.0.0.1',
+      DATABASE_HOST: '45.32.103.210',
       DATABASE_USER: '3core',
       DATABASE_PASS: '2024.3core21',
       DATABASE_NAME: 'hotel',

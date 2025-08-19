@@ -101,6 +101,20 @@ router.post('/api/seasons/create', RoomController.createSeason);
 // Update season
 router.post('/api/seasons/update', RoomController.updateSeason);
 
+// ========================================
+// API ROUTES - ROOM CONTROL
+// ========================================
 
+// Get room control status by room number
+router.get('/api/room-control/:roomNumber', RoomController.getRoomControlStatus);
+
+// Update room control settings
+router.post('/api/room-control/update', RoomController.updateRoomControlSettings);
+
+// Get room control history
+router.get('/api/room-control/:roomNumber/history', RoomController.getRoomControlHistory);
+
+// Emergency room control
+router.post('/api/room-control/emergency', RoomController.emergencyRoomControl);
 
 module.exports = router; 

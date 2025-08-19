@@ -3,7 +3,6 @@
 // ========================================
 
 const RoomModel = require('../models/roomModel');
-const { queryDatabasePromise } = require('../config/database');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -636,8 +635,7 @@ class RoomController {
   // Get seasons for seasonal pricing
   static async getSeasons(req, res) {
     try {
-      const query = 'SELECT IDNo, NAME FROM season WHERE ACTIVE = 1 ORDER BY IDNo ASC';
-      const seasons = await queryDatabasePromise(query);
+      const seasons = await RoomModel.getSeasons();
       res.json(seasons);
     } catch (error) {
       console.error('Error fetching seasons:', error);
@@ -656,21 +654,7 @@ class RoomController {
   // Get all seasons
   static async getAllSeasons(req, res) {
     try {
-      const query = `
-        SELECT 
-          IDNo,
-          NAME,
-          START_DATE,
-          END_DATE,
-          ACTIVE
-        FROM 
-          season 
-        WHERE 
-          ACTIVE IN (0, 1)
-        ORDER BY 
-          START_DATE DESC`;
-      
-      const seasons = await queryDatabasePromise(query);
+      const seasons = await RoomModel.getAllSeasons();
       res.json({
         success: true,
         data: seasons
@@ -689,31 +673,19 @@ class RoomController {
   static async getSeasonById(req, res) {
     try {
       const { id } = req.params;
-      const query = `
-        SELECT 
-          IDNo,
-          NAME,
-          DATE_FORMAT(START_DATE, '%Y-%m-%d') as START_DATE,
-          DATE_FORMAT(END_DATE, '%Y-%m-%d') as END_DATE,
-          ACTIVE
-        FROM 
-          season 
-        WHERE 
-          IDNo = ? AND ACTIVE IN (0, 1)`;
+      const season = await RoomModel.getSeasonById(id);
       
-      const seasons = await queryDatabasePromise(query, [id]);
-      
-      if (seasons.length === 0) {
-        return res.status(404).json({
+      if (season) {
+        res.json({
+          success: true,
+          data: season
+        });
+      } else {
+        res.status(404).json({
           success: false,
           message: 'Season not found'
         });
       }
-      
-      res.json({
-        success: true,
-        data: seasons[0]
-      });
     } catch (error) {
       console.error('Error fetching season:', error);
       res.status(500).json({
@@ -737,23 +709,12 @@ class RoomController {
         });
       }
 
-      const query = `
-        INSERT INTO season 
-        (NAME, START_DATE, END_DATE, ACTIVE, ENCODED_BY, ENCODED_DT) 
-        VALUES (?, ?, ?, ?, ?, NOW())`;
-
-      const result = await queryDatabasePromise(query, [
-        NAME, 
-        START_DATE, 
-        END_DATE, 
-        ACTIVE,
-        encodedBy
-      ]);
+      const result = await RoomModel.createSeason(NAME, START_DATE, END_DATE, ACTIVE, encodedBy);
 
       res.json({
         success: true,
         message: 'Season created successfully',
-        data: { id: result.insertId }
+        data: { id: result }
       });
     } catch (error) {
       console.error('Error creating season:', error);
@@ -778,38 +739,19 @@ class RoomController {
         });
       }
 
-      const query = `
-        UPDATE season 
-        SET 
-          NAME = ?,
-          START_DATE = ?,
-          END_DATE = ?,
-          ACTIVE = ?,
-          ENCODED_BY = ?,
-          ENCODED_DT = NOW()
-        WHERE 
-          IDNo = ?`;
+      const result = await RoomModel.updateSeason(IDNo, NAME, START_DATE, END_DATE, ACTIVE, encodedBy);
 
-      const result = await queryDatabasePromise(query, [
-        NAME, 
-        START_DATE, 
-        END_DATE, 
-        ACTIVE, 
-        encodedBy,
-        IDNo
-      ]);
-
-      if (result.affectedRows === 0) {
-        return res.status(404).json({
+      if (result) {
+        res.json({
+          success: true,
+          message: 'Season updated successfully'
+        });
+      } else {
+        res.status(404).json({
           success: false,
           message: 'Season not found'
         });
       }
-
-      res.json({
-        success: true,
-        message: 'Season updated successfully'
-      });
     } catch (error) {
       console.error('Error updating season:', error);
       res.status(500).json({
@@ -820,6 +762,173 @@ class RoomController {
     }
   }
 
+  // ========================================
+  // ROOM CONTROL FUNCTIONALITY
+  // ========================================
+
+  // Get room control status by room number
+  static async getRoomControlStatus(req, res) {
+    try {
+      const { roomNumber } = req.params;
+      
+      if (!roomNumber) {
+        return res.status(400).json({
+          success: false,
+          message: 'Room number is required'
+        });
+      }
+
+      const room = await RoomModel.getRoomByNumber(roomNumber);
+      
+      if (!room) {
+        return res.status(404).json({
+          success: false,
+          message: 'Room not found'
+        });
+      }
+
+      // Get current booking for this room
+      const currentBooking = await RoomModel.getCurrentBookingByRoom(roomNumber);
+      
+      const roomControlData = {
+        roomId: room.IDNo,
+        roomNumber: room.ROOM_NUMBER,
+        roomType: room.ROOM_TYPE_NAME,
+        roomStatus: room.ROOM_STATUS,
+        maintenanceStatus: room.ROOM_MAINTENANCE_STATUS,
+        currentGuest: currentBooking ? currentBooking.CUSTOMER_NAME : null,
+        checkInDate: currentBooking ? currentBooking.CHECK_IN_DATE : null,
+        checkOutDate: currentBooking ? currentBooking.CHECK_OUT_DATE : null,
+        isOccupied: room.ROOM_STATUS === 'Occupied',
+        isMaintenance: room.ROOM_MAINTENANCE_STATUS === 'Under Maintenance',
+        timestamp: new Date().toISOString()
+      };
+
+      res.json({
+        success: true,
+        data: roomControlData
+      });
+    } catch (error) {
+      console.error('Error fetching room control status:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching room control status',
+        error: error.message
+      });
+    }
+  }
+
+  // Update room control settings (Do Not Disturb, Cleaning, etc.)
+  static async updateRoomControlSettings(req, res) {
+    try {
+      const { roomNumber, settings } = req.body;
+      
+      if (!roomNumber || !settings) {
+        return res.status(400).json({
+          success: false,
+          message: 'Room number and settings are required'
+        });
+      }
+
+      const { doNotDisturb, cleaning, mood, curtain, sound, ac, light } = settings;
+      
+      // Update room control settings in database
+      const result = await RoomModel.updateRoomControlSettings(roomNumber, {
+        doNotDisturb: doNotDisturb || false,
+        cleaning: cleaning || false,
+        mood: mood || null,
+        curtain: curtain || null,
+        sound: sound || null,
+        ac: ac || null,
+        light: light || null,
+        lastUpdated: new Date().toISOString()
+      });
+
+      if (result) {
+        res.json({
+          success: true,
+          message: 'Room control settings updated successfully',
+          data: result
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: 'Failed to update room control settings'
+        });
+      }
+    } catch (error) {
+      console.error('Error updating room control settings:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error updating room control settings',
+        error: error.message
+      });
+    }
+  }
+
+  // Get room control history
+  static async getRoomControlHistory(req, res) {
+    try {
+      const { roomNumber, limit = 50 } = req.query;
+      
+      if (!roomNumber) {
+        return res.status(400).json({
+          success: false,
+          message: 'Room number is required'
+        });
+      }
+
+      const history = await RoomModel.getRoomControlHistory(roomNumber, parseInt(limit));
+      
+      res.json({
+        success: true,
+        data: history
+      });
+    } catch (error) {
+      console.error('Error fetching room control history:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching room control history',
+        error: error.message
+      });
+    }
+  }
+
+  // Emergency room control (override all settings)
+  static async emergencyRoomControl(req, res) {
+    try {
+      const { roomNumber, action, reason } = req.body;
+      
+      if (!roomNumber || !action) {
+        return res.status(400).json({
+          success: false,
+          message: 'Room number and action are required'
+        });
+      }
+
+      const result = await RoomModel.emergencyRoomControl(roomNumber, action, reason);
+      
+      if (result) {
+        res.json({
+          success: true,
+          message: `Emergency ${action} activated for room ${roomNumber}`,
+          data: result
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: 'Failed to activate emergency control'
+        });
+      }
+    } catch (error) {
+      console.error('Error activating emergency room control:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error activating emergency room control',
+        error: error.message
+      });
+    }
+  }
 
 }
 
