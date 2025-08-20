@@ -10,19 +10,23 @@
             <div class="row">
               <!-- Category Dropdown -->
               <div class="col-lg-6 p-t-20">
-                <div class="mdl-textfield mdl-js-textfield txt-full-width">
-                  <select class="mdl-textfield__input" id="expenseCategory" name="category" required>
-                    <option value="" disabled selected>Select Category</option>
-                    <option value="Major Expenses">Major Expenses</option>
-                    <option value="Regular Expenses">Regular Expenses</option>
-                    <option value="Marketing Expenses">Marketing Expenses</option>
-                  </select>
+                <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                  <input class="mdl-textfield__input" type="text" id="expenseCategory" name="category" value="" readonly tabIndex="-1" required>
+                  <label for="expenseCategory" class="pull-right margin-0">
+                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                  </label>
+                  <label for="expenseCategory" class="mdl-textfield__label">Category</label>
+                  <ul data-mdl-for="expenseCategory" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                    <li class="mdl-menu__item" data-val="Major Expenses">Major Expenses</li>
+                    <li class="mdl-menu__item" data-val="Regular Expenses">Regular Expenses</li>
+                    <li class="mdl-menu__item" data-val="Marketing Expenses">Marketing Expenses</li>
+                  </ul>
                 </div>
               </div>
   
               <!-- Receipt Number -->
               <div class="col-lg-6 p-t-20">
-                <div class="mdl-textfield mdl-js-textfield txt-full-width">
+                <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
                   <input class="mdl-textfield__input" type="text" id="expenseReceipt" name="receipt">
                   <label class="mdl-textfield__label">Expense Items</label>
                 </div>
@@ -30,7 +34,7 @@
   
               <!-- Description -->
               <div class="col-lg-12 p-t-20">
-                <div class="mdl-textfield mdl-js-textfield txt-full-width">
+                <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
                   <textarea class="mdl-textfield__input" id="expenseDescription" name="description" rows="3" required></textarea>
                   <label class="mdl-textfield__label">Description</label>
                 </div>
@@ -38,7 +42,7 @@
   
               <!-- Amount -->
               <div class="col-lg-6 p-t-20">
-                <div class="mdl-textfield mdl-js-textfield txt-full-width">
+                <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
                   <input class="mdl-textfield__input" type="number" id="expenseAmount" name="amount" step="0.01" required>
                   <label class="mdl-textfield__label">Amount</label>
                 </div>

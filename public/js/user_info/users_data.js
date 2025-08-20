@@ -35,6 +35,37 @@ function setupModalHandlers() {
     $(document).on('click', '#addUserBtn', function() {
         $('#addUserModal').modal('show');
     });
+
+    // Initialize MDL components when modals are shown
+    $('#addUserModal').on('shown.bs.modal', function() {
+        setTimeout(() => {
+            if (window.componentHandler) {
+                window.componentHandler.upgradeElements(document.querySelectorAll('.mdl-textfield'));
+            }
+            if (window.originalComponentHandler) {
+                window.originalComponentHandler.upgradeElements(document.querySelectorAll('.mdl-textfield'));
+            }
+        }, 200);
+    });
+
+    // Reset add modal when hidden
+    $('#addUserModal').on('hidden.bs.modal', function() {
+        resetAddUserForm();
+    });
+
+    $('#editUserModal').on('shown.bs.modal', function() {
+        setTimeout(() => {
+            if (window.componentHandler) {
+                window.componentHandler.upgradeElements(document.querySelectorAll('.mdl-textfield'));
+            }
+            if (window.originalComponentHandler) {
+                window.originalComponentHandler.upgradeElements(document.querySelectorAll('.mdl-textfield'));
+            }
+        }, 200);
+    });
+
+    // Setup MDL dropdown handlers
+    setupUserDropdownChangeHandlers();
 }
 
 // ========================================
@@ -147,11 +178,11 @@ function reloadData() {
 
 function createUser() {
     // Validate required fields
-    const fullname = $('#fullname').val();
-    const username = $('#username').val();
-    const role = $('#role').val();
-    const password = $('#password').val();
-    const confirm_password = $('#confirm_password').val();
+    const fullname = $('#addFullName').val();
+    const username = $('#addUsername').val();
+    const role = $('#addRole').attr('data-value') || $('#addRole').val();
+    const password = $('#addPassword').val();
+    const confirm_password = $('#addConfirmPassword').val();
     
     if (!fullname || !username || !role || !password || !confirm_password) {
         Swal.fire({
@@ -204,6 +235,8 @@ function createUser() {
         dataType: 'json',
         success: function(response) {
             if (response.success) {
+                // Reset form before closing modal
+                resetAddUserForm();
                 $('#addUserModal').modal('hide');
                 
                 setTimeout(() => {
@@ -243,9 +276,9 @@ function createUser() {
 function updateUser() {
     // Validate required fields
     const userId = $('#editUserId').val();
-    const fullname = $('#editFullname').val();
+    const fullname = $('#editFullName').val();
     const username = $('#editUsername').val();
-    const role = $('#editRole').val();
+    const role = $('#editRole').attr('data-value') || $('#editRole').val();
     const password = $('#editPassword').val();
     const confirm_password = $('#editConfirmPassword').val();
     
@@ -421,12 +454,23 @@ function deleteUser(userId) {
 
 function populateEditForm(user) {
     $('#editUserId').val(user.IDno);
-    $('#editFullname').val(user.FULLNAME);
+    $('#editFullName').val(user.FULLNAME);
     $('#editUsername').val(user.USERNAME);
     $('#editRole').val(user.PERMISSIONS);
+    $('#editRole').attr('data-value', user.PERMISSIONS);
     $('#editPassword').val('');
     $('#editConfirmPassword').val('');
     $('#editUsernameCheck').html('');
+    
+    // Force MDL labels to float for prefilled inputs
+    const textfields = document.querySelectorAll('#editUserModal .mdl-textfield');
+    textfields.forEach(function(tf) {
+        const input = tf.querySelector('.mdl-textfield__input');
+        if (input && input.value) {
+            tf.classList.add('is-dirty');
+            tf.classList.remove('is-focused');
+        }
+    });
 }
 
 // ========================================
@@ -462,11 +506,62 @@ function checkUsernameAvailability(username, elementId) {
 
 // Initialize username check listeners
 $(document).ready(function() {
-    $('#username').on('input', function() {
+    $('#addUsername').on('input', function() {
         checkUsernameAvailability($(this).val(), 'usernameCheck');
     });
 
     $('#editUsername').on('input', function() {
         checkUsernameAvailability($(this).val(), 'editUsernameCheck');
     });
-}); 
+});
+
+// ========================================
+// FORM RESET UTILITIES
+// ========================================
+
+function resetAddUserForm() {
+    // Clear values
+    $('#addFullName').val('');
+    $('#addUsername').val('');
+    $('#addRole').val('').attr('data-value', '');
+    $('#addPassword').val('');
+    $('#addConfirmPassword').val('');
+    $('#usernameCheck').html('');
+
+    // Reset MDL textfields state
+    const textfields = document.querySelectorAll('#addUserModal .mdl-textfield');
+    textfields.forEach(function(tf) {
+        tf.classList.remove('is-dirty');
+        tf.classList.remove('is-focused');
+    });
+
+    // Reset the native form
+    if (document.getElementById('addUserForm')) {
+        document.getElementById('addUserForm').reset();
+    }
+}
+
+// ========================================
+// MDL DROPDOWN HANDLERS FOR USER
+// ========================================
+
+function setupUserDropdownChangeHandlers() {
+    // Handle MDL dropdown changes for Role (add & edit)
+    const selector = '[data-mdl-for="addRole"] .mdl-menu__item, [data-mdl-for="editRole"] .mdl-menu__item';
+    $(document)
+        .off('click.mdlRole', selector)
+        .on('click.mdlRole', selector, function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const $li = $(this);
+            const $ul = $li.closest('ul');
+            const value = $li.data('val');
+            const input = $('#' + $ul.attr('data-mdl-for'));
+            input.val($li.text().trim());
+            if (typeof value !== 'undefined') {
+                input.attr('data-value', value);
+            }
+            const tf = input.closest('.mdl-textfield');
+            if (tf && tf.length) tf.addClass('is-dirty');
+        });
+} 

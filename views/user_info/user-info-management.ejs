@@ -8,17 +8,13 @@
         <div class="dashboard-card">
             <div class="dashboard-card-header">
                 <header>User Information Management</header>
-                
+                <div class="tools">
+                    <button class="btn btn-primary-10" id="addUserBtn" title="Add New User">
+                        <i class="fa fa-plus"></i> Add New User
+                    </button>
+                </div>
             </div>
             <div class="dashboard-card-body">
-                <!-- Action Buttons -->
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div class="btn-group" role="group">
-                        <button class="btn btn-primary btn-sm" id="addUserBtn" title="Add New User">
-                            <i class="fa fa-plus"></i> Add New User
-                        </button>
-                    </div>
-                </div>
                 
                 <!-- Main Users Table -->
                 <div class="table-scrollable">
@@ -48,107 +44,172 @@
 
 <!-- Add User Modal -->
 <div class="modal fade" id="addUserModal" tabindex="-1" role="dialog" aria-labelledby="addUserModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="addUserModalLabel">Add New User</h5>
+                <h4 class="modal-title" id="addUserModalLabel">Add New User</h4>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <form id="addUserForm">
-                    <div class="mb-3">
-                        <label for="fullname" class="form-label">Full Name *</label>
-                        <input type="text" class="form-control" id="fullname" name="fullname" required>
+            <form id="addUserForm">
+                <div class="modal-body">
+                    <!-- Basic Information -->
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="addFullName" name="fullName" required>
+                                <label class="mdl-textfield__label">Full Name</label>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="addUsername" name="username" required>
+                                <label class="mdl-textfield__label">Username</label>
+                            </div>
+                            <div id="usernameCheck" class="form-text" style="margin-top: 5px; font-size: 12px;"></div>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="username" class="form-label">Username *</label>
-                        <input type="text" class="form-control" id="username" name="username" required>
-                        <div id="usernameCheck" class="form-text"></div>
+                    
+                    <!-- Role and Password -->
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="addRole" name="role" value="" readonly tabIndex="-1" required>
+                                <label for="addRole" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="addRole" class="mdl-textfield__label">Role</label>
+                                <ul data-mdl-for="addRole" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                    <li class="mdl-menu__item" data-val="1">Admin</li>
+                                    <li class="mdl-menu__item" data-val="2">Frontdesk</li>
+                                    <li class="mdl-menu__item" data-val="3">Manager</li>
+                                    <li class="mdl-menu__item" data-val="4">Housekeeping</li>
+                                    <li class="mdl-menu__item" data-val="5">GuestRoom</li>
+                                    <li class="mdl-menu__item" data-val="6">GuestApp</li>
+                                    <li class="mdl-menu__item" data-val="7">DriverApp</li>
+                                    <li class="mdl-menu__item" data-val="8">SalesRoom</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="password" id="addPassword" name="password" required>
+                                <label class="mdl-textfield__label">Password</label>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="role" class="form-label">Role *</label>
-                        <select class="form-select" id="role" name="role" required>
-                            <option value="">Select Role</option>
-                            <option value="1">Admin</option>
-                            <option value="2">Frontdesk</option>
-                            <option value="3">Manager</option>
-                            <option value="4">Housekeeping</option>
-                            <option value="5">GuestRoom</option>
-                            <option value="6">GuestApp</option>
-                            <option value="7">DriverApp</option>
-                            <option value="8">SalesRoom</option>
-                        </select>
+                    
+                    <!-- Confirm Password -->
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="password" id="addConfirmPassword" name="confirmPassword" required>
+                                <label class="mdl-textfield__label">Confirm Password</label>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="password" class="form-label">Password *</label>
-                        <input type="password" class="form-control" id="password" name="password" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="confirm_password" class="form-label">Confirm Password *</label>
-                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-primary" form="addUserForm">Save User</button>
-            </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save User</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
 
 <!-- Edit User Modal -->
 <div class="modal fade" id="editUserModal" tabindex="-1" role="dialog" aria-labelledby="editUserModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="editUserModalLabel">Edit User</h5>
+                <h4 class="modal-title" id="editUserModalLabel">Edit User</h4>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <form id="editUserForm">
+            <form id="editUserForm">
+                <div class="modal-body">
                     <input type="hidden" id="editUserId" name="userId">
-                    <div class="mb-3">
-                        <label for="editFullname" class="form-label">Full Name *</label>
-                        <input type="text" class="form-control" id="editFullname" name="fullname" required>
+                    
+                    <!-- Basic Information -->
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editFullName" name="fullName" required>
+                                <label class="mdl-textfield__label">Full Name</label>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editUsername" name="username" required>
+                                <label class="mdl-textfield__label">Username</label>
+                            </div>
+                            <div id="editUsernameCheck" class="form-text" style="margin-top: 5px; font-size: 12px;"></div>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="editUsername" class="form-label">Username *</label>
-                        <input type="text" class="form-control" id="editUsername" name="username" required>
-                        <div id="editUsernameCheck" class="form-text"></div>
+                    
+                    <!-- Role and Password -->
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editRole" name="role" value="" readonly tabIndex="-1" required>
+                                <label for="editRole" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="editRole" class="mdl-textfield__label">Role</label>
+                                <ul data-mdl-for="editRole" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                    <li class="mdl-menu__item" data-val="1">Admin</li>
+                                    <li class="mdl-menu__item" data-val="2">Frontdesk</li>
+                                    <li class="mdl-menu__item" data-val="3">Manager</li>
+                                    <li class="mdl-menu__item" data-val="4">Housekeeping</li>
+                                    <li class="mdl-menu__item" data-val="5">GuestRoom</li>
+                                    <li class="mdl-menu__item" data-val="6">GuestApp</li>
+                                    <li class="mdl-menu__item" data-val="7">DriverApp</li>
+                                    <li class="mdl-menu__item" data-val="8">SalesRoom</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="password" id="editPassword" name="password">
+                                <label class="mdl-textfield__label">New Password (leave blank to keep current)</label>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="editRole" class="form-label">Role *</label>
-                        <select class="form-select" id="editRole" name="role" required>
-                            <option value="">Select Role</option>
-                            <option value="1">Admin</option>
-                            <option value="2">Frontdesk</option>
-                            <option value="3">Manager</option>
-                            <option value="4">Housekeeping</option>
-                            <option value="5">GuestRoom</option>
-                            <option value="6">GuestApp</option>
-                            <option value="7">DriverApp</option>
-                            <option value="8">SalesRoom</option>
-                        </select>
+                    
+                    <!-- Confirm Password -->
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="password" id="editConfirmPassword" name="confirmPassword">
+                                <label class="mdl-textfield__label">Confirm New Password</label>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="editPassword" class="form-label">New Password (leave blank to keep current)</label>
-                        <input type="password" class="form-control" id="editPassword" name="password">
-                    </div>
-                    <div class="mb-3">
-                        <label for="editConfirmPassword" class="form-label">Confirm New Password</label>
-                        <input type="password" class="form-control" id="editConfirmPassword" name="confirm_password">
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-primary" form="editUserForm">Update User</button>
-            </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update User</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
 
+<style>
+    /* Ensure MDL dropdown menus can overflow outside Bootstrap modals */
+    #addUserModal .modal-dialog,
+    #addUserModal .modal-content,
+    #addUserModal .modal-body,
+    #editUserModal .modal-dialog,
+    #editUserModal .modal-content,
+    #editUserModal .modal-body {
+        overflow: visible !important;
+    }
+
+    /* Keep the MDL menu above the modal content/backdrop */
+    .mdl-menu__container.is-visible {
+        z-index: 2000 !important; /* Bootstrap modal backdrop ~1050, modal ~1055 */
+    }
+</style>
 <!-- ======================================== -->
 <!-- SCRIPT LOADING -->
 <!-- ======================================== -->

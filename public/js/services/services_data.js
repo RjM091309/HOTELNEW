@@ -35,6 +35,69 @@ function setupModalHandlers() {
     $(document).on('click', '#addServiceBtn', function() {
         $('#addServiceModal').modal('show');
     });
+
+    // Initialize MDL components when add modal is shown
+    $('#addServiceModal').on('shown.bs.modal', function() {
+        setTimeout(() => {
+            if (window.componentHandler) {
+                window.componentHandler.upgradeElements(document.querySelectorAll('.mdl-textfield'));
+            }
+            // Also try to initialize with original handler if available
+            if (window.originalComponentHandler) {
+                window.originalComponentHandler.upgradeElements(document.querySelectorAll('.mdl-textfield'));
+            }
+            
+            // Ensure floating labels are dirty when inputs already have values
+            const addTextfields = document.querySelectorAll('#addServiceModal .mdl-textfield');
+            addTextfields.forEach(function(textfield) {
+                const input = textfield.querySelector('.mdl-textfield__input');
+                if (input && input.value) {
+                    textfield.classList.add('is-dirty');
+                    textfield.classList.remove('is-focused');
+                }
+            });
+            
+            // Add event listeners for MDL dropdown changes
+            setupDropdownChangeHandlers();
+        }, 300);
+    });
+
+    // Initialize MDL components when edit modal is shown
+    $('#editServiceModal').on('shown.bs.modal', function() {
+        setTimeout(() => {
+            if (window.componentHandler) {
+                window.componentHandler.upgradeElements(document.querySelectorAll('.mdl-textfield'));
+            }
+            // Also try to initialize with original handler if available
+            if (window.originalComponentHandler) {
+                window.originalComponentHandler.upgradeElements(document.querySelectorAll('.mdl-textfield'));
+            }
+            
+            // Force floating labels for all textfields with values
+            const textfields = document.querySelectorAll('#editServiceModal .mdl-textfield');
+            textfields.forEach(function(textfield) {
+                const input = textfield.querySelector('.mdl-textfield__input');
+                if (input && input.value) {
+                    textfield.classList.add('is-dirty');
+                    // Remove is-focused to prevent green underline by default
+                    textfield.classList.remove('is-focused');
+                }
+            });
+            
+            // Also ensure the MDL selects are marked dirty if they have data-value
+            const selectInputs = ['#editServiceCategory', '#editServiceAvailability'];
+            selectInputs.forEach(sel => {
+                const el = document.querySelector(sel);
+                if (el && (el.getAttribute('data-value') || el.value)) {
+                    const tf = el.closest('.mdl-textfield');
+                    if (tf) tf.classList.add('is-dirty');
+                }
+            });
+            
+            // Add event listeners for MDL dropdown changes
+            setupDropdownChangeHandlers();
+        }, 300);
+    });
 }
 
 // ========================================
@@ -49,7 +112,7 @@ function initializeDataTable() {
     dataTable = $("#servicesTable").DataTable({
         columnDefs: [
             { targets: [5], className: "text-center" },
-            { targets: [5], orderable: false, searchable: false }
+            { targets: [5], width: '15%', orderable: false, searchable: false }
         ],
         pageLength: 10,
         lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
@@ -86,7 +149,7 @@ function reloadData() {
                         });
                         
                         const actions = `
-                            <button type="button" class="btn btn-tbl-edit btn-xs" onclick="editService('${service.IDNo}')" title="Edit Service">
+                            <button type="button" class="btn btn-tbl-edit btn-xs" onclick="openEditModal('${service.IDNo}')" title="Edit Service">
                                 <i class="fa fa-pencil"></i>
                             </button>
                             <button type="button" class="btn btn-tbl-delete btn-xs" onclick="deleteService('${service.IDNo}')" title="Delete Service">
@@ -145,12 +208,12 @@ function reloadData() {
 // ========================================
 
 function createService() {
-    // Validate required fields
-    const serviceCategory = $('#addServiceCategory').val();
+    // Get values from MDL dropdowns
+    const serviceCategory = $('#addServiceCategory').attr('data-value') || $('#addServiceCategory').val();
     const serviceName = $('#addServiceName').val();
     const serviceDescription = $('#addServiceDescription').val();
     const serviceCost = $('#addServiceCost').val();
-    const serviceAvailability = $('#addServiceAvailability').val();
+    const serviceAvailability = $('#addServiceAvailability').attr('data-value') || $('#addServiceAvailability').val();
     
     if (!serviceCategory || !serviceName || !serviceDescription || !serviceCost || !serviceAvailability) {
         Swal.fire({
@@ -230,13 +293,13 @@ function createService() {
 }
 
 function updateService() {
-    // Validate required fields
+    // Get values from MDL dropdowns
     const serviceId = $('#editServiceId').val();
-    const serviceCategory = $('#editServiceCategory').val();
+    const serviceCategory = $('#editServiceCategory').attr('data-value') || $('#editServiceCategory').val();
     const serviceName = $('#editServiceName').val();
     const serviceDescription = $('#editServiceDescription').val();
     const serviceCost = $('#editServiceCost').val();
-    const serviceAvailability = $('#editServiceAvailability').val();
+    const serviceAvailability = $('#editServiceAvailability').attr('data-value') || $('#editServiceAvailability').val();
     
     if (!serviceId || !serviceCategory || !serviceName || !serviceDescription || !serviceCost || !serviceAvailability) {
         Swal.fire({
@@ -316,7 +379,7 @@ function updateService() {
     });
 }
 
-function editService(serviceId) {
+function openEditModal(serviceId) {
     $.ajax({
         url: `/services/api/services/${serviceId}`,
         method: 'GET',
@@ -405,6 +468,23 @@ function populateEditForm(service) {
     $('#editServiceDescription').val(service.SERVICE_DESCRIPTION);
     $('#editServiceCost').val(service.SERVICE_COST);
     $('#editServiceAvailability').val(service.SERVICE_AVAILABILITY);
+    
+    // Store the actual values for form submission
+    $('#editServiceCategory').attr('data-value', service.SERVICE_CATEGORY);
+    $('#editServiceAvailability').attr('data-value', service.SERVICE_AVAILABILITY);
+
+    // Force floating labels to float when values are set
+    ['#editServiceCategory', '#editServiceName', '#editServiceDescription', '#editServiceCost', '#editServiceAvailability']
+        .forEach(function(selector) {
+            const input = document.querySelector(selector);
+            if (input && (input.value || input.getAttribute('data-value'))) {
+                const tf = input.closest('.mdl-textfield');
+                if (tf) {
+                    tf.classList.add('is-dirty');
+                    tf.classList.remove('is-focused');
+                }
+            }
+        });
 }
 
 // ========================================
@@ -420,5 +500,37 @@ function formatCost(cost) {
     return '₱' + numCost.toLocaleString('en-US', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
+    });
+}
+
+// ========================================
+// MDL DROPDOWN HANDLERS
+// ========================================
+
+function setupDropdownChangeHandlers() {
+    // Handle MDL dropdown changes for Category
+    $('[data-mdl-for="addServiceCategory"], [data-mdl-for="editServiceCategory"]').on('click', '.mdl-menu__item', function() {
+        const value = $(this).data('val');
+        const targetInput = $('#' + $(this).closest('ul').attr('data-mdl-for'));
+        targetInput.val($(this).text());
+        targetInput.attr('data-value', value);
+        
+        // Trigger MDL update
+        if (targetInput.closest('.mdl-textfield').length) {
+            targetInput.closest('.mdl-textfield').addClass('is-dirty');
+        }
+    });
+
+    // Handle MDL dropdown changes for Availability
+    $('[data-mdl-for="addServiceAvailability"], [data-mdl-for="editServiceAvailability"]').on('click', '.mdl-menu__item', function() {
+        const value = $(this).data('val');
+        const targetInput = $('#' + $(this).closest('ul').attr('data-mdl-for'));
+        targetInput.val($(this).text());
+        targetInput.attr('data-value', value);
+        
+        // Trigger MDL update
+        if (targetInput.closest('.mdl-textfield').length) {
+            targetInput.closest('.mdl-textfield').addClass('is-dirty');
+        }
     });
 } 

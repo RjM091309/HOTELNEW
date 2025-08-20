@@ -101,6 +101,48 @@ function initializeEventListeners() {
         document.getElementById('edit-expense-form')?.reset();
         currentExpenseId = null;
     });
+    
+    // Initialize MDL components when modals are shown
+    $('#new-expense-modal').on('shown.bs.modal', function() {
+        setTimeout(() => {
+            if (window.componentHandler) {
+                window.componentHandler.upgradeElements(document.querySelectorAll('.mdl-textfield'));
+            }
+            // Also try to initialize with original handler if available
+            if (window.originalComponentHandler) {
+                window.originalComponentHandler.upgradeElements(document.querySelectorAll('.mdl-textfield'));
+            }
+            
+            // Add event listeners for MDL dropdown changes
+            setupDropdownChangeHandlers();
+        }, 300);
+    });
+
+    $('#edit-expense-modal').on('shown.bs.modal', function() {
+        setTimeout(() => {
+            if (window.componentHandler) {
+                window.componentHandler.upgradeElements(document.querySelectorAll('.mdl-textfield'));
+            }
+            // Also try to initialize with original handler if available
+            if (window.originalComponentHandler) {
+                window.originalComponentHandler.upgradeElements(document.querySelectorAll('.mdl-textfield'));
+            }
+            
+            // Force floating labels for all textfields with values
+            const textfields = document.querySelectorAll('#edit-expense-modal .mdl-textfield');
+            textfields.forEach(function(textfield) {
+                const input = textfield.querySelector('.mdl-textfield__input');
+                if (input && input.value) {
+                    textfield.classList.add('is-dirty');
+                    // Remove is-focused to prevent green underline by default
+                    textfield.classList.remove('is-focused');
+                }
+            });
+            
+            // Add event listeners for MDL dropdown changes
+            setupDropdownChangeHandlers();
+        }, 300);
+    });
 }
 
 // ========================================
@@ -171,6 +213,10 @@ function populateEditForm(expense) {
     document.getElementById('edit-expense-receipt').value = expense.ReceiptNo || '';
     document.getElementById('edit-expense-description').value = expense.Description;
     document.getElementById('edit-expense-amount').value = expense.Amount;
+    
+    // Store the actual values for form submission
+    $('#edit-expense-category').attr('data-value', expense.Category);
+    
     currentExpenseId = expense.IDNo;
 }
 
@@ -178,7 +224,7 @@ function handleNewExpenseSubmit(event) {
     event.preventDefault();
     const formData = new FormData(event.target);
     const expenseData = {
-        category: formData.get('category'),
+        category: $('#expenseCategory').attr('data-value') || $('#expenseCategory').val(),
         receipt: formData.get('receipt'),
         description: formData.get('description'),
         amount: formData.get('amount')
@@ -193,7 +239,7 @@ function handleEditExpenseSubmit(event) {
     event.preventDefault();
     const formData = new FormData(event.target);
     const expenseData = {
-        category: formData.get('category'),
+        category: $('#edit-expense-category').attr('data-value') || $('#edit-expense-category').val(),
         receipt: formData.get('receipt'),
         description: formData.get('description'),
         amount: formData.get('amount')
@@ -404,6 +450,38 @@ function initializeDataTable() {
     } catch (error) {
         console.error('DataTable initialization error:', error);
     }
+}
+
+// ========================================
+// MDL DROPDOWN HANDLERS
+// ========================================
+
+function setupDropdownChangeHandlers() {
+    // Handle MDL dropdown changes for Category in Add Modal
+    $('[data-mdl-for="expenseCategory"]').on('click', '.mdl-menu__item', function() {
+        const value = $(this).data('val');
+        const targetInput = $('#' + $(this).closest('ul').attr('data-mdl-for'));
+        targetInput.val($(this).text());
+        targetInput.attr('data-value', value);
+        
+        // Trigger MDL update
+        if (targetInput.closest('.mdl-textfield').length) {
+            targetInput.closest('.mdl-textfield').addClass('is-dirty');
+        }
+    });
+
+    // Handle MDL dropdown changes for Category in Edit Modal
+    $('[data-mdl-for="edit-expense-category"]').on('click', '.mdl-menu__item', function() {
+        const value = $(this).data('val');
+        const targetInput = $('#' + $(this).closest('ul').attr('data-mdl-for'));
+        targetInput.val($(this).text());
+        targetInput.attr('data-value', value);
+        
+        // Trigger MDL update
+        if (targetInput.closest('.mdl-textfield').length) {
+            targetInput.closest('.mdl-textfield').addClass('is-dirty');
+        }
+    });
 }
 
 // ========================================
