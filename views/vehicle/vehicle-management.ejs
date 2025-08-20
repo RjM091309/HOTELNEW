@@ -8,17 +8,13 @@
         <div class="dashboard-card">
             <div class="dashboard-card-header">
                 <header>Vehicle Management</header>
-                
+                <div class="tools">
+                    <button type="button" class="btn btn-primary-10 btn-sm" id="addVehicleBtn">
+                        <i class="fa fa-plus"></i> Add New Vehicle
+                    </button>
+                </div>
             </div>
             <div class="dashboard-card-body">
-                <!-- Action Buttons -->
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div class="btn-group" role="group">
-                        <button class="btn btn-primary btn-sm" id="addVehicleBtn" title="Add New Vehicle">
-                            <i class="fa fa-plus"></i> Add New Vehicle
-                        </button>
-                    </div>
-                </div>
                 
                 <!-- Main Vehicles Table -->
                 <div class="table-scrollable">
@@ -50,175 +46,268 @@
 <!-- ======================================== -->
 
 <!-- Add Vehicle Modal -->
-<div class="modal fade" id="addVehicleModal" tabindex="-1" role="dialog" aria-labelledby="addVehicleModalLabel" aria-hidden="true">
+<div class="modal fade" id="addVehicleModal" tabindex="-1" role="dialog" aria-labelledby="addVehicleModalLabel" aria-hidden="true" data-keyboard="false" data-bs-backdrop="static">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="addVehicleModalLabel">Add New Vehicle</h5>
+                <h4 class="modal-title" id="addVehicleModalLabel">Add New Vehicle</h4>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <form id="addVehicleForm">
+            <form id="addVehicleForm">
+                <div class="modal-body">
                     <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="modelName">Model Name *</label>
-                                <input type="text" class="form-control" id="modelName" name="modelName" required>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="modelName" name="modelName" required>
+                                <label class="mdl-textfield__label">Model Name</label>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="plateNumber">Plate Number *</label>
-                                <input type="text" class="form-control" id="plateNumber" name="plateNumber" required>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="plateNumber" name="plateNumber" required>
+                                <label class="mdl-textfield__label">Plate Number</label>
                             </div>
                         </div>
                     </div>
                     
                     <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="vehicleType">Vehicle Type *</label>
-                                <select class="form-control" id="vehicleType" name="vehicleType" required>
-                                    <option value="" selected disabled>Select Vehicle Type</option>
-                                    <option value="Sedan">Sedan</option>
-                                    <option value="SUV">SUV</option>
-                                    <option value="Truck">Truck</option>
-                                    <option value="Van">Van</option>
-                                    <option value="Motorcycle">Motorcycle</option>
-                                </select>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="vehicleType" name="vehicleType" value="" readonly tabIndex="-1" required>
+                                <label for="vehicleType" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="vehicleType" class="mdl-textfield__label">Vehicle Type</label>
+                                <ul data-mdl-for="vehicleType" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                    <li class="mdl-menu__item" data-val="Sedan">Sedan</li>
+                                    <li class="mdl-menu__item" data-val="SUV">SUV</li>
+                                    <li class="mdl-menu__item" data-val="Truck">Truck</li>
+                                    <li class="mdl-menu__item" data-val="Van">Van</li>
+                                    <li class="mdl-menu__item" data-val="Motorcycle">Motorcycle</li>
+                                </ul>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="fuelType">Fuel Type *</label>
-                                <select class="form-control" id="fuelType" name="fuelType" required>
-                                    <option value="" selected disabled>Select Fuel Type</option>
-                                    <option value="Gasoline">Gasoline</option>
-                                    <option value="Diesel">Diesel</option>
-                                    <option value="Electric">Electric</option>
-                                    <option value="Hybrid">Hybrid</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="color">Color *</label>
-                                <input type="text" class="form-control" id="color" name="color" required>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="vehiclePhoto">Vehicle Photo</label>
-                                <input type="file" class="form-control" id="vehiclePhoto" name="vehiclePhoto" accept="image/*">
-                                <img id="photoPreview" src="#" alt="Photo preview" style="display:none; max-width: 200px; margin-top: 10px;">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="fuelType" name="fuelType" value="" readonly tabIndex="-1" required>
+                                <label for="fuelType" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="fuelType" class="mdl-textfield__label">Fuel Type</label>
+                                <ul data-mdl-for="fuelType" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                    <li class="mdl-menu__item" data-val="Gasoline">Gasoline</li>
+                                    <li class="mdl-menu__item" data-val="Diesel">Diesel</li>
+                                    <li class="mdl-menu__item" data-val="Electric">Electric</li>
+                                    <li class="mdl-menu__item" data-val="Hybrid">Hybrid</li>
+                                </ul>
                             </div>
                         </div>
                     </div>
                     
                     <div class="row">
-                        <div class="col-md-12">
-                            <div class="form-group">
-                                <label for="remarks">Remarks</label>
-                                <textarea class="form-control" id="remarks" name="remarks" rows="3"></textarea>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="color" name="color" required>
+                                <label class="mdl-textfield__label">Color</label>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="vehicle-photo-upload-container">
+                                <label class="upload-label">Vehicle Photo</label>
+                                <div class="file-upload-wrapper">
+                                    <div class="file-upload-area" id="fileUploadArea">
+                                        <div class="upload-icon">
+                                            <i class="material-icons">cloud_upload</i>
+                                        </div>
+                                        <div class="upload-text">
+                                            <span class="primary-text">Click to upload</span>
+                                            <span class="secondary-text">or drag and drop</span>
+                                            <span class="file-types">PNG, JPG, JPEG up to 5MB</span>
+                                        </div>
+                                        <input class="file-input" type="file" id="vehiclePhoto" name="vehiclePhoto" accept="image/*" data-max-size="5">
+                                    </div>
+                                    <div class="file-info" id="fileInfo" style="display: none;">
+                                        <div class="file-details">
+                                            <div class="file-icon">
+                                                <i class="material-icons">image</i>
+                                            </div>
+                                            <div class="file-text">
+                                                <span class="file-name" id="fileName"></span>
+                                                <span class="file-size" id="fileSize"></span>
+                                            </div>
+                                            <button type="button" class="remove-file-btn" id="removeFileBtn">
+                                                <i class="material-icons">close</i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="photo-preview-container" id="photoPreviewContainer" style="display: none;">
+                                    <div class="preview-header">
+                                        <span>Photo Preview</span>
+                                        <button type="button" class="preview-actions">
+                                            <i class="material-icons" onclick="previewFullImage(document.getElementById('photoPreview').src)">fullscreen</i>
+                                        </button>
+                                    </div>
+                                    <div class="preview-image-wrapper">
+                                        <img id="photoPreview" src="#" alt="Photo preview" class="preview-image">
+                                    </div>
+                                </div>
+                                <div class="upload-error" id="uploadError" style="display: none;">
+                                    <i class="material-icons error-icon">error</i>
+                                    <span class="error-text" id="errorText"></span>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-primary" form="addVehicleForm">Save Vehicle</button>
-            </div>
+                    
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <textarea class="mdl-textfield__input" type="text" id="remarks" name="remarks" rows="3"></textarea>
+                                <label class="mdl-textfield__label">Remarks</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-10">Save Vehicle</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
 
 <!-- Edit Vehicle Modal -->
-<div class="modal fade" id="editVehicleModal" tabindex="-1" role="dialog" aria-labelledby="editVehicleModalLabel" aria-hidden="true">
+<div class="modal fade" id="editVehicleModal" tabindex="-1" role="dialog" aria-labelledby="editVehicleModalLabel" aria-hidden="true" data-keyboard="false" data-bs-backdrop="static">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="editVehicleModalLabel">Edit Vehicle</h5>
+                <h4 class="modal-title" id="editVehicleModalLabel">Edit Vehicle</h4>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <form id="editVehicleForm">
+            <form id="editVehicleForm">
+                <div class="modal-body">
                     <input type="hidden" id="editVehicleId" name="vehicleId">
-                    
                     <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="editModelName">Model Name *</label>
-                                <input type="text" class="form-control" id="editModelName" name="modelName" required>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editModelName" name="modelName" required>
+                                <label class="mdl-textfield__label">Model Name</label>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="editPlateNumber">Plate Number *</label>
-                                <input type="text" class="form-control" id="editPlateNumber" name="plateNumber" required>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editPlateNumber" name="plateNumber" required>
+                                <label class="mdl-textfield__label">Plate Number</label>
                             </div>
                         </div>
                     </div>
                     
                     <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="editVehicleType">Vehicle Type *</label>
-                                <select class="form-control" id="editVehicleType" name="vehicleType" required>
-                                    <option value="Sedan">Sedan</option>
-                                    <option value="SUV">SUV</option>
-                                    <option value="Truck">Truck</option>
-                                    <option value="Van">Van</option>
-                                    <option value="Motorcycle">Motorcycle</option>
-                                </select>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editVehicleType" name="vehicleType" value="" readonly tabIndex="-1" required>
+                                <label for="editVehicleType" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="editVehicleType" class="mdl-textfield__label">Vehicle Type</label>
+                                <ul data-mdl-for="editVehicleType" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                    <li class="mdl-menu__item" data-val="Sedan">Sedan</li>
+                                    <li class="mdl-menu__item" data-val="SUV">SUV</li>
+                                    <li class="mdl-menu__item" data-val="Truck">Truck</li>
+                                    <li class="mdl-menu__item" data-val="Van">Van</li>
+                                    <li class="mdl-menu__item" data-val="Motorcycle">Motorcycle</li>
+                                </ul>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="editFuelType">Fuel Type *</label>
-                                <select class="form-control" id="editFuelType" name="fuelType" required>
-                                    <option value="Gasoline">Gasoline</option>
-                                    <option value="Diesel">Diesel</option>
-                                    <option value="Electric">Electric</option>
-                                    <option value="Hybrid">Hybrid</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="editColor">Color *</label>
-                                <input type="text" class="form-control" id="editColor" name="color" required>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="form-group">
-                                <label for="editVehiclePhoto">Vehicle Photo</label>
-                                <input type="file" class="form-control" id="editVehiclePhoto" name="vehiclePhoto" accept="image/*">
-                                <img id="editPhotoPreview" src="#" alt="Photo preview" style="display:none; max-width: 200px; margin-top: 10px;">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editFuelType" name="fuelType" value="" readonly tabIndex="-1" required>
+                                <label for="editFuelType" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="editFuelType" class="mdl-textfield__label">Fuel Type</label>
+                                <ul data-mdl-for="editFuelType" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                    <li class="mdl-menu__item" data-val="Gasoline">Gasoline</li>
+                                    <li class="mdl-menu__item" data-val="Diesel">Diesel</li>
+                                    <li class="mdl-menu__item" data-val="Electric">Electric</li>
+                                    <li class="mdl-menu__item" data-val="Hybrid">Hybrid</li>
+                                </ul>
                             </div>
                         </div>
                     </div>
                     
                     <div class="row">
-                        <div class="col-md-12">
-                            <div class="form-group">
-                                <label for="editRemarks">Remarks</label>
-                                <textarea class="form-control" id="editRemarks" name="remarks" rows="3"></textarea>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editColor" name="color" required>
+                                <label class="mdl-textfield__label">Color</label>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="vehicle-photo-upload-container">
+                                <label class="upload-label">Vehicle Photo</label>
+                                <div class="file-upload-wrapper">
+                                    <div class="file-upload-area" id="editFileUploadArea">
+                                        <div class="upload-icon">
+                                            <i class="material-icons">cloud_upload</i>
+                                        </div>
+                                        <div class="upload-text">
+                                            <span class="primary-text">Click to upload</span>
+                                            <span class="secondary-text">or drag and drop</span>
+                                            <span class="file-types">PNG, JPG, JPEG up to 5MB</span>
+                                        </div>
+                                        <input class="file-input" type="file" id="editVehiclePhoto" name="vehiclePhoto" accept="image/*" data-max-size="5">
+                                    </div>
+                                    <div class="file-info" id="editFileInfo" style="display: none;">
+                                        <div class="file-details">
+                                            <div class="file-icon">
+                                                <i class="material-icons">image</i>
+                                            </div>
+                                            <div class="file-text">
+                                                <span class="file-name" id="editFileName"></span>
+                                                <span class="file-size" id="editFileSize"></span>
+                                            </div>
+                                            <button type="button" class="remove-file-btn" id="editRemoveFileBtn">
+                                                <i class="material-icons">close</i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="photo-preview-container" id="editPhotoPreviewContainer" style="display: none;">
+                                    <div class="preview-header">
+                                        <span>Photo Preview</span>
+                                        <button type="button" class="preview-actions">
+                                            <i class="material-icons" onclick="previewFullImage(document.getElementById('editPhotoPreview').src)">fullscreen</i>
+                                        </button>
+                                    </div>
+                                    <div class="preview-image-wrapper">
+                                        <img id="editPhotoPreview" src="#" alt="Photo preview" class="preview-image">
+                                    </div>
+                                </div>
+                                <div class="upload-error" id="editUploadError" style="display: none;">
+                                    <i class="material-icons error-icon">error</i>
+                                    <span class="error-text" id="editErrorText"></span>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-primary" form="editVehicleForm">Update Vehicle</button>
-            </div>
+                    
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <textarea class="mdl-textfield__input" type="text" id="editRemarks" name="remarks" rows="3"></textarea>
+                                <label class="mdl-textfield__label">Remarks</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-10">Update Vehicle</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -260,6 +349,359 @@
 .vehicle-photo:hover {
     transform: scale(1.1);
     transition: transform 0.2s;
+}
+
+/* ======================================== */
+/* ENHANCED FILE UPLOAD STYLING */
+/* ======================================== */
+
+.vehicle-photo-upload-container {
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+.upload-label {
+    display: block;
+    font-size: 12px !important;
+    font-weight: 500;
+    color: #aaaaaa !important;
+    margin-bottom: 12px;
+    font-family: 'Poppins', sans-serif;
+}
+
+.file-upload-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.file-upload-area {
+    position: relative;
+    border: 2px dashed #555;
+    border-radius: 8px;
+    padding: 20px 15px;
+    text-align: center;
+    background: #2a3135;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.file-upload-area:hover {
+    border-color: #2196F3;
+    background: #2a3135;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+}
+
+.file-upload-area.dragover {
+    border-color: #2196F3;
+    background: #1e3a5f;
+    transform: scale(1.02);
+}
+
+.file-upload-area.has-file {
+    border-color: #4CAF50;
+    background: #1a2e1a;
+}
+
+.upload-icon {
+    margin-bottom: 10px;
+}
+
+.upload-icon i {
+    font-size: 36px;
+    color: #2196F3;
+    transition: all 0.3s ease;
+}
+
+.file-upload-area:hover .upload-icon i {
+    color: #1976D2;
+    transform: scale(1.1);
+}
+
+.upload-text {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.primary-text {
+    font-size: 16px;
+    font-weight: 600;
+    color: #ffffff;
+    font-family: 'Poppins', sans-serif;
+}
+
+.secondary-text {
+    font-size: 13px;
+    color: #cccccc;
+    font-family: 'Poppins', sans-serif;
+}
+
+.file-types {
+    font-size: 11px;
+    color: #999;
+    font-family: 'Poppins', sans-serif;
+    margin-top: 3px;
+}
+
+.file-input {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.file-info {
+    margin-top: 12px;
+    padding: 12px;
+    background: #1a2e1a;
+    border: 1px solid #2d5a2d;
+    border-radius: 6px;
+    display: none;
+}
+
+.file-details {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.file-icon {
+    color: #4CAF50;
+}
+
+.file-icon i {
+    font-size: 24px;
+}
+
+.file-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.file-name {
+    font-weight: 600;
+    color: #4CAF50;
+    font-size: 13px;
+    font-family: 'Poppins', sans-serif;
+}
+
+.file-size {
+    font-size: 11px;
+    color: #cccccc;
+    font-family: 'Poppins', sans-serif;
+}
+
+.remove-file-btn {
+    background: #ff5722;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 16px;
+}
+
+.remove-file-btn:hover {
+    background: #d84315;
+    transform: scale(1.1);
+}
+
+.photo-preview-container {
+    margin-top: 15px;
+    border: 1px solid #555;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #2a2a2a;
+}
+
+.preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: #3a3a3a;
+    border-bottom: 1px solid #555;
+}
+
+.preview-header span {
+    font-weight: 600;
+    color: #ffffff;
+    font-size: 13px;
+    font-family: 'Poppins', sans-serif;
+}
+
+.preview-actions {
+    background: none;
+    border: none;
+    color: #2196F3;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.preview-actions:hover {
+    background: #e3f2fd;
+    color: #1976D2;
+}
+
+.preview-image-wrapper {
+    padding: 12px;
+    text-align: center;
+}
+
+.preview-image {
+    max-width: 100%;
+    max-height: 180px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+}
+
+.preview-image:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.upload-error {
+    margin-top: 15px;
+    padding: 12px 15px;
+    background: #ffebee;
+    border: 1px solid #ffcdd2;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    display: none;
+}
+
+.error-icon {
+    color: #f44336;
+    font-size: 20px;
+}
+
+.error-text {
+    color: #c62828;
+    font-size: 14px;
+    font-family: 'Poppins', sans-serif;
+}
+
+/* Drag and drop animations */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.file-upload-area.dragover {
+    animation: pulse 0.6s ease-in-out;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .file-upload-area {
+        padding: 20px 15px;
+    }
+    
+    .upload-icon i {
+        font-size: 36px;
+    }
+    
+    .primary-text {
+        font-size: 16px;
+    }
+    
+    .secondary-text {
+        font-size: 13px;
+    }
+    
+    .file-types {
+        font-size: 11px;
+    }
+}
+
+/* Loading state */
+.file-upload-area.loading {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.file-upload-area.loading .upload-icon i {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Modal-specific styling */
+.modal .vehicle-photo-upload-container {
+    margin-bottom: 15px;
+}
+
+.modal .file-upload-area {
+    padding: 25px 15px;
+}
+
+.modal .upload-icon i {
+    font-size: 40px;
+}
+
+.modal .primary-text {
+    font-size: 16px;
+}
+
+.modal .secondary-text {
+    font-size: 13px;
+}
+
+.modal .file-types {
+    font-size: 11px;
+}
+
+/* Ensure proper spacing in modal rows */
+.modal .row .col-lg-6 {
+    margin-bottom: 10px;
+}
+
+/* File upload area focus states */
+.file-upload-area:focus-within {
+    border-color: #1976D2;
+    box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+}
+
+/* Smooth transitions for all interactive elements */
+.file-upload-area *,
+.file-info *,
+.preview-actions,
+.remove-file-btn {
+    transition: all 0.3s ease;
+}
+
+/* Hover effects for preview image */
+.preview-image-wrapper:hover .preview-image {
+    transform: scale(1.08);
+}
+
+/* Enhanced button hover effects */
+.preview-actions:hover,
+.remove-file-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 </style>
 
