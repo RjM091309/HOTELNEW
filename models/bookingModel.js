@@ -1050,7 +1050,7 @@ class BookingModel {
     try {
       // Get regular services
       const serviceQuery = `
-        SELECT bs.SERVICE_ID, s.SERVICE_NAME, bs.QTY, bs.TOTAL_COST, bs.STATUS
+        SELECT bs.SERVICE_ID, s.SERVICE_NAME, bs.QTY, bs.TOTAL_COST, bs.STATUS, bs.ENCODED_DT
         FROM booking_service bs
         JOIN services s ON bs.SERVICE_ID = s.IDNo
         WHERE bs.BOOKING_ID = ? AND bs.ACTIVE = 1
@@ -1059,7 +1059,7 @@ class BookingModel {
 
       // Get extensions
       const extensionQuery = `
-        SELECT IDNo AS SERVICE_ID, EXTEND_DATE, QTY, COST, PAYMENT_STATUS
+        SELECT IDNo AS SERVICE_ID, EXTEND_DATE AS ENCODED_DT, QTY, COST, PAYMENT_STATUS
         FROM booking_extension
         WHERE BOOKING_ID = ?
       `;
@@ -1071,12 +1071,13 @@ class BookingModel {
         SERVICE_NAME: 'Extended Stay',
         QTY: ext.QTY,
         TOTAL_COST: ext.COST * ext.QTY,
-        STATUS: ext.PAYMENT_STATUS
+        STATUS: ext.PAYMENT_STATUS,
+        ENCODED_DT: ext.ENCODED_DT
       }));
 
       // Get transport services
       const transportQuery = `
-        SELECT pd.IDNo, pd.PICKDROP_ID, pd.TYPE, pd.RATE, pd.STATUS, r.NAME AS LOCATION_NAME
+        SELECT pd.IDNo, pd.PICKDROP_ID, pd.TYPE, pd.RATE, pd.STATUS, r.NAME AS LOCATION_NAME, pd.ENCODED_DT
         FROM booking_pick_drop pd
         JOIN pick_drop_rates r ON pd.PICKDROP_ID = r.IDNo
         WHERE pd.BOOKING_ID = ? AND pd.ACTIVE = 1
@@ -1089,7 +1090,8 @@ class BookingModel {
         SERVICE_NAME: `${row.TYPE === 'pick-up' ? 'Pick-up' : 'Drop-off'} - ${row.LOCATION_NAME}`,
         QTY: 1,
         TOTAL_COST: parseFloat(row.RATE),
-        STATUS: row.STATUS
+        STATUS: row.STATUS,
+        ENCODED_DT: row.ENCODED_DT
       }));
 
       // Combine all services

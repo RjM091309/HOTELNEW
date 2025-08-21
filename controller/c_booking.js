@@ -485,7 +485,10 @@ class BookingController {
 
       const allServices = await BookingModel.getBookingServices(bookingId);
 
-      res.json(allServices);
+      res.json({
+        success: true,
+        data: allServices
+      });
 
     } catch (error) {
       console.error('Error fetching booking services + extensions + transport:', error);

@@ -28,5 +28,6 @@ router.post('/room-control/emergency', RoomController.emergencyRoomControl);
 // Booking endpoints (no authentication required - for guest use)
 router.get('/booking/booking_data', BookingController.getBookingData);
 router.post('/booking/get-room-details', BookingController.getRoomDetails);
+router.get('/booking/get-booking-services/:bookingId', BookingController.getBookingServices);
 
 module.exports = router;

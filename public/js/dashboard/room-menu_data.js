@@ -517,8 +517,8 @@ setTimeout(() => {
     loadBookingDetails(bookingId);
     loadGuestDetails(bookingId);
     loadTransferHistory(bookingId, bookingId);
-    
-    // Ensure grand total is calculated after all data is loaded
+        
+        // Ensure grand total is calculated after all data is loaded
     setTimeout(() => {
         calculateTotalCost(bookingId);
         calculateBalance(bookingId, bookingId);
@@ -874,8 +874,9 @@ if (!bookingIdValue) {
 
 fetch(`/booking/get-booking-services/${bookingIdValue}`)
     .then(response => response.json())
-    .then(services => {
-
+    .then(response => {
+        // Handle new response format: { success: true, data: [...] }
+        const services = response.data || response;
         
         // Add fetched services to addedServicesMap using the same bookingId
         if (!addedServicesMap[bookingId]) {
@@ -1129,7 +1130,7 @@ if (selectedService) {
     if (!addedServicesMap[bookingId]) {
         addedServicesMap[bookingId] = [];
     }
-    
+
     let roomServices = addedServicesMap[bookingId];
     const existingUnpaid = roomServices.find(s => s.SERVICE_ID === service.SERVICE_ID && s.STATUS !== 'paid');
     const serviceCost = parseFloat(service.SERVICE_COST);
@@ -1154,7 +1155,7 @@ if (selectedService) {
     // Save the updated services to the backend and then update balance
     saveServices(bookingId, bookingId).then((result) => {
         // Update balance after successful save
-        calculateBalance(bookingId, bookingId);
+    calculateBalance(bookingId, bookingId);
     }).catch((error) => {
         console.error('❌ Error saving services:', error);
         // Still update balance even if save fails, to show current state
@@ -1175,75 +1176,75 @@ if (selectedService) {
 // Save services to backend
 function saveServices(bookingId, currentBookingId) {
 return new Promise((resolve, reject) => {
-    let roomServices = addedServicesMap[bookingId];
+let roomServices = addedServicesMap[bookingId];
 
-    if (!roomServices || roomServices.length === 0) {
-        toastWarning('Info', 'No services added to save!');
+if (!roomServices || roomServices.length === 0) {
+    toastWarning('Info', 'No services added to save!');
         resolve();
+    return;
+}
+
+// Group services by SERVICE_ID and STATUS to avoid duplication
+const serviceMap = new Map();
+const ignoredServiceIds = [-999, -101, -102];
+
+roomServices.forEach(service => {
+    if (service.STATUS === 'paid') return;
+    if (ignoredServiceIds.includes(parseInt(service.SERVICE_ID))) return;
+
+    // Validate service cost and quantity
+    const serviceCost = parseFloat(service.SERVICE_COST) || 0;
+    const quantity = parseInt(service.QUANTITY) || 0;
+    
+    // Skip invalid services
+    if (isNaN(serviceCost) || isNaN(quantity) || serviceCost < 0 || quantity < 0) {
+        console.warn('Invalid service data:', service);
         return;
     }
 
-    // Group services by SERVICE_ID and STATUS to avoid duplication
-    const serviceMap = new Map();
-    const ignoredServiceIds = [-999, -101, -102];
+    const key = `${service.SERVICE_ID}-${service.STATUS}`;
+    const totalCost = serviceCost * quantity;
 
-    roomServices.forEach(service => {
-        if (service.STATUS === 'paid') return;
-        if (ignoredServiceIds.includes(parseInt(service.SERVICE_ID))) return;
-
-        // Validate service cost and quantity
-        const serviceCost = parseFloat(service.SERVICE_COST) || 0;
-        const quantity = parseInt(service.QUANTITY) || 0;
-        
-        // Skip invalid services
-        if (isNaN(serviceCost) || isNaN(quantity) || serviceCost < 0 || quantity < 0) {
-            console.warn('Invalid service data:', service);
-            return;
-        }
-
-        const key = `${service.SERVICE_ID}-${service.STATUS}`;
-        const totalCost = serviceCost * quantity;
-
-        if (!serviceMap.has(key)) {
-            serviceMap.set(key, {
-                SERVICE_ID: service.SERVICE_ID,
-                QUANTITY: quantity,
-                TOTAL_COST: totalCost
-            });
-        } else {
-            const existing = serviceMap.get(key);
-            existing.QUANTITY += quantity;
+    if (!serviceMap.has(key)) {
+        serviceMap.set(key, {
+            SERVICE_ID: service.SERVICE_ID,
+            QUANTITY: quantity,
+            TOTAL_COST: totalCost
+        });
+    } else {
+        const existing = serviceMap.get(key);
+        existing.QUANTITY += quantity;
             // Recalculate TOTAL_COST based on the combined quantity and service cost
             existing.TOTAL_COST = existing.QUANTITY * serviceCost;
-            serviceMap.set(key, existing);
-        }
-    });
-
-    const servicesData = Array.from(serviceMap.values());
-
-    if (servicesData.length === 0) {
-        toastInfo('Info', 'No new unpaid services to save.');
-        resolve();
-        return;
+        serviceMap.set(key, existing);
     }
-    fetch('/booking/save-booking-services', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            bookingId: bookingId,
-            services: servicesData
-        })
+});
+
+const servicesData = Array.from(serviceMap.values());
+
+if (servicesData.length === 0) {
+    toastInfo('Info', 'No new unpaid services to save.');
+        resolve();
+    return;
+}
+fetch('/booking/save-booking-services', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+        bookingId: bookingId,
+        services: servicesData
     })
-    .then(response => response.json())
-    .then(data => {
-        // Services saved successfully
+})
+.then(response => response.json())
+.then(data => {
+    // Services saved successfully
         resolve(data);
-    })
-    .catch(error => {
+})
+.catch(error => {
         console.error('❌ Error saving services:', error);
-        toastError('Error', 'Failed to save services. Please try again.');
+    toastError('Error', 'Failed to save services. Please try again.');
         reject(error);
     });
 });
@@ -1375,33 +1376,33 @@ function calculateTotalCost(bookingId) {
 
 // Calculate balance
 function calculateBalance(bookingId, currentBookingId) {
-    fetch(`/booking/unpaid_balance/${bookingId}`)
-        .then(response => response.json())
-        .then(data => {
-            let totalUnpaid = data.total_unpaid_balance || 0;
+fetch(`/booking/unpaid_balance/${bookingId}`)
+    .then(response => response.json())
+    .then(data => {
+        let totalUnpaid = data.total_unpaid_balance || 0;
 
-            // Format Balance with Comma Separator
-            let formattedBalance = totalUnpaid.toLocaleString('en-US', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            });
+        // Format Balance with Comma Separator
+        let formattedBalance = totalUnpaid.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
 
-            // Display Balance in UI
-            let balanceElement = document.getElementById(`Balance-${bookingId}`);
+        // Display Balance in UI
+        let balanceElement = document.getElementById(`Balance-${bookingId}`);
             
-            if (balanceElement) {
-                if (totalUnpaid > 0) {
-                    balanceElement.innerHTML = `<span class="text-danger"><strong>₱${formattedBalance}</strong></span>`;
-                } else {
-                    balanceElement.innerHTML = `<span class="text-success"><strong>₱0.00</strong></span>`;
-                }
+        if (balanceElement) {
+            if (totalUnpaid > 0) {
+                balanceElement.innerHTML = `<span class="text-danger"><strong>₱${formattedBalance}</strong></span>`;
+            } else {
+                balanceElement.innerHTML = `<span class="text-success"><strong>₱0.00</strong></span>`;
+            }
             } else {
                 console.error(`❌ Balance element not found: Balance-${bookingId}`);
-            }
-        })
-        .catch(error => {
+        }
+    })
+    .catch(error => {
             console.error('❌ Error fetching balance:', error);
-        });
+    });
 }
 
 // Function to show billing
@@ -3102,8 +3103,9 @@ function loadCheckoutData(bookingId) {
 function loadServicesCost(bookingId) {
     fetch(`/booking/get-booking-services/${bookingId}`)
         .then(response => response.json())
-        .then(services => {
-    
+        .then(response => {
+            // Handle new response format: { success: true, data: [...] }
+            const services = response.data || response;
             
             let totalServicesCost = 0;
             if (Array.isArray(services) && services.length > 0) {
@@ -3305,7 +3307,9 @@ function loadBillingServices(bookingId) {
     
     fetch(`/booking/get-booking-services/${bookingId}`)
         .then(response => response.json())
-        .then(services => {
+        .then(response => {
+            // Handle new response format: { success: true, data: [...] }
+            const services = response.data || response;
             console.log('Billing services loaded:', services);
             
             // Find the billing table tbody in the modal
@@ -3455,7 +3459,9 @@ function viewFullBookingDetails(bookingId) {
 function loadExistingServicesForModal(bookingId) {
     fetch(`/booking/get-booking-services/${bookingId}`)
         .then(response => response.json())
-        .then(services => {
+        .then(response => {
+            // Handle new response format: { success: true, data: [...] }
+            const services = response.data || response;
             // Clear the existing services map for this booking
             addedServicesMap[bookingId] = [];
             
