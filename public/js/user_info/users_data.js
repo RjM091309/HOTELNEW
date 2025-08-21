@@ -4,6 +4,22 @@
 
 var dataTable;
 
+// Role ID to display name mapping for consistent UI rendering
+const ROLE_ID_TO_NAME = {
+    '1': 'Admin',
+    '2': 'Frontdesk',
+    '3': 'Manager',
+    '4': 'Housekeeping',
+    '5': 'GuestRoom',
+    '6': 'GuestApp',
+    '7': 'DriverApp',
+    '8': 'SalesRoom'
+};
+
+function getRoleNameById(roleId) {
+    return ROLE_ID_TO_NAME[String(roleId)] || 'Unknown';
+}
+
 // ========================================
 // INITIALIZATION
 // ========================================
@@ -45,6 +61,22 @@ function setupModalHandlers() {
             if (window.originalComponentHandler) {
                 window.originalComponentHandler.upgradeElements(document.querySelectorAll('.mdl-textfield'));
             }
+            // Enforce clearing values and disabling autofill artifacts
+            resetAddUserForm();
+            const addForm = document.getElementById('addUserForm');
+            if (addForm) {
+                addForm.setAttribute('autocomplete', 'off');
+            }
+            $('#addUsername').attr({
+                'autocomplete': 'off',
+                'autocapitalize': 'none',
+                'spellcheck': 'false',
+                'name': 'new-username'
+            });
+            $('#addPassword, #addConfirmPassword').attr({
+                'autocomplete': 'new-password',
+                'name': function(idx, old){ return old === 'password' ? 'new-password' : 'confirm-new-password'; }
+            });
         }, 200);
     });
 
@@ -60,6 +92,12 @@ function setupModalHandlers() {
             }
             if (window.originalComponentHandler) {
                 window.originalComponentHandler.upgradeElements(document.querySelectorAll('.mdl-textfield'));
+            }
+            // Ensure Role text shows name, not id, when opening
+            const currentVal = $('#editRole').attr('data-value');
+            if (currentVal) {
+                $('#editRole').val(getRoleNameById(currentVal));
+                $('#editRole').closest('.mdl-textfield').addClass('is-dirty');
             }
         }, 200);
     });
@@ -456,7 +494,8 @@ function populateEditForm(user) {
     $('#editUserId').val(user.IDno);
     $('#editFullName').val(user.FULLNAME);
     $('#editUsername').val(user.USERNAME);
-    $('#editRole').val(user.PERMISSIONS);
+    const roleName = getRoleNameById(user.PERMISSIONS);
+    $('#editRole').val(roleName);
     $('#editRole').attr('data-value', user.PERMISSIONS);
     $('#editPassword').val('');
     $('#editConfirmPassword').val('');

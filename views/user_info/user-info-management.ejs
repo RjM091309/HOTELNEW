@@ -50,19 +50,19 @@
                 <h4 class="modal-title" id="addUserModalLabel">Add New User</h4>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="addUserForm">
+            <form id="addUserForm" autocomplete="off">
                 <div class="modal-body">
                     <!-- Basic Information -->
                     <div class="row">
                         <div class="col-lg-6 p-t-20">
                             <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
-                                <input class="mdl-textfield__input" type="text" id="addFullName" name="fullName" required>
+                                <input class="mdl-textfield__input" type="text" id="addFullName" name="fullName" autocomplete="off" required>
                                 <label class="mdl-textfield__label">Full Name</label>
                             </div>
                         </div>
                         <div class="col-lg-6 p-t-20">
                             <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
-                                <input class="mdl-textfield__input" type="text" id="addUsername" name="username" required>
+                                <input class="mdl-textfield__input" type="text" id="addUsername" name="new-username" autocomplete="off" autocapitalize="none" spellcheck="false" required>
                                 <label class="mdl-textfield__label">Username</label>
                             </div>
                             <div id="usernameCheck" class="form-text" style="margin-top: 5px; font-size: 12px;"></div>
@@ -73,7 +73,7 @@
                     <div class="row">
                         <div class="col-lg-6 p-t-20">
                             <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
-                                <input class="mdl-textfield__input" type="text" id="addRole" name="role" value="" readonly tabIndex="-1" required>
+                                <input class="mdl-textfield__input" type="text" id="addRole" name="role" value="" autocomplete="off" readonly tabIndex="-1" required>
                                 <label for="addRole" class="pull-right margin-0">
                                     <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
                                 </label>
@@ -92,7 +92,7 @@
                         </div>
                         <div class="col-lg-6 p-t-20">
                             <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
-                                <input class="mdl-textfield__input" type="password" id="addPassword" name="password" required>
+                                <input class="mdl-textfield__input" type="password" id="addPassword" name="new-password" autocomplete="new-password" required>
                                 <label class="mdl-textfield__label">Password</label>
                             </div>
                         </div>
@@ -102,7 +102,7 @@
                     <div class="row">
                         <div class="col-lg-6 p-t-20">
                             <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
-                                <input class="mdl-textfield__input" type="password" id="addConfirmPassword" name="confirmPassword" required>
+                                <input class="mdl-textfield__input" type="password" id="addConfirmPassword" name="confirm-new-password" autocomplete="new-password" required>
                                 <label class="mdl-textfield__label">Confirm Password</label>
                             </div>
                         </div>
