@@ -270,21 +270,38 @@ class CalendarController {
         });
       }
 
+      console.log('🔄 Calendar transfer request:', { bookingId, oldRoomNumber, newRoomId, transferDate });
+
       // Process room transfer using the same logic as dashboard
       const result = await CalendarModel.transferRoom(bookingId, oldRoomNumber, newRoomId, transferDate);
       
       if (result.success) {
-        
-        
-        res.json({ message: result.message });
+        console.log('✅ Calendar transfer successful:', result);
+        res.json({ 
+          success: true,
+          message: result.message 
+        });
       } else {
+        console.log('❌ Calendar transfer failed:', result);
         res.status(400).json({ error: result.error });
       }
     } catch (error) {
-      console.error('Error transferring room:', error);
+      console.error('❌ Error transferring room:', error);
+      
+      // Provide more specific error messages based on error type
+      let errorMessage = 'Server error occurred during room transfer.';
+      if (error.code === 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD') {
+        errorMessage = 'Database field type mismatch. Please contact support.';
+      } else if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+        errorMessage = 'Referenced room or booking not found.';
+      } else if (error.code === 'ER_DUP_ENTRY') {
+        errorMessage = 'Duplicate entry detected.';
+      }
+      
       res.status(500).json({
         success: false,
-        message: 'Server error'
+        message: errorMessage,
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
       });
     }
   }

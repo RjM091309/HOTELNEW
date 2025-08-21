@@ -205,7 +205,7 @@ class CalendarModel {
           queryDatabasePromise(`
             UPDATE booking 
             SET ROOM_ID = ?, CHECK_IN_DATE = ?, CHECK_OUT_DATE = ?, 
-                TRANSFER = 1, TRANSFER_FROM = ?, EDITED_BY = 'System', EDITED_DT = NOW()
+                TRANSFER = 1, TRANSFER_FROM = ?, EDITED_DT = NOW()
             WHERE IDNo = ? AND ACTIVE = 1
           `, [newRoomId, checkIn, checkOut, currentRoomId, id]),
           
@@ -264,7 +264,7 @@ class CalendarModel {
             await queryDatabasePromise(`
               INSERT INTO booking_extension (
                 BOOKING_ID, EXTEND_DATE, QTY, COST, PAYMENT_STATUS, ENCODED_BY
-              ) VALUES (?, ?, ?, 0, 'unpaid', 'System')
+              ) VALUES (?, ?, ?, 0, 'unpaid', 1)
             `, [id, extensionDate, daysAdded]);
           }
         }
@@ -562,30 +562,37 @@ class CalendarModel {
   // Transfer room (copied from dashboard logic)
   static async transferRoom(bookingId, oldRoomNumber, newRoomId, transferDate) {
     try {
+      console.log('🔄 Calendar transfer started:', { bookingId, oldRoomNumber, newRoomId, transferDate });
+      
       // Get the old room ID from room number
       const oldRoomResult = await queryDatabasePromise(`
         SELECT IDNo FROM room WHERE ROOM_NUMBER = ?
       `, [oldRoomNumber]);
 
       if (oldRoomResult.length === 0) {
+        console.log('❌ Old room not found:', oldRoomNumber);
         return { success: false, error: 'Old room not found' };
       }
 
       const oldRoomId = oldRoomResult[0].IDNo;
-      const userId = "System"; // Default user for calendar transfers
+      console.log('✅ Old room ID found:', oldRoomId);
 
       // Start transaction
       await queryDatabasePromise('START TRANSACTION');
+      console.log('🔄 Transaction started');
 
       // Step 1: Update booking with new room
+      console.log('🔄 Updating booking with new room:', { newRoomId, oldRoomId, bookingId });
       await queryDatabasePromise(`
         UPDATE booking 
         SET ROOM_ID = ?, TRANSFER = 1, TRANSFER_FROM = ?, 
-            EDITED_BY = ?, EDITED_DT = NOW() 
+            EDITED_DT = NOW() 
         WHERE IDNo = ?
-      `, [newRoomId, oldRoomId, userId, bookingId]);
+      `, [newRoomId, oldRoomId, bookingId]);
+      console.log('✅ Booking updated successfully');
 
       // Step 2: Update room statuses (old room to cleaning, new room to occupied)
+      console.log('🔄 Updating room statuses:', { oldRoomId, newRoomId });
       await queryDatabasePromise(`
         UPDATE room 
         SET ROOM_STATUS = CASE 
@@ -594,6 +601,7 @@ class CalendarModel {
         END 
         WHERE IDNo IN (?, ?)
       `, [oldRoomId, newRoomId, oldRoomId, newRoomId]);
+      console.log('✅ Room statuses updated successfully');
 
       // Step 3: Log the transfer
       console.log('📝 Calendar transfer logging:', {
@@ -613,6 +621,7 @@ class CalendarModel {
 
       // Commit transaction
       await queryDatabasePromise('COMMIT');
+      console.log('✅ Transaction committed successfully');
 
       return { 
         success: true, 
@@ -620,6 +629,7 @@ class CalendarModel {
       };
     } catch (error) {
       // Rollback on error
+      console.error('❌ Calendar transfer error, rolling back transaction:', error);
       await queryDatabasePromise('ROLLBACK');
       throw error;
     }
@@ -846,7 +856,7 @@ class CalendarModel {
         bookingId,
         daysToExtend,
         parsedCost,
-        "System" // Default user for calendar extensions
+        1 // Default system user ID for calendar extensions
       ]);
 
       return { success: true };
@@ -1073,7 +1083,7 @@ class CalendarModel {
 
       const status = lateCheckoutFee > 0 ? 'unpaid' : 'paid';
 
-      await queryDatabasePromise(insertBookingServiceQuery, [bookingId, lateCheckoutFee, status, "System"]);
+      await queryDatabasePromise(insertBookingServiceQuery, [bookingId, lateCheckoutFee, status, 1]);
 
       return { 
         success: true,

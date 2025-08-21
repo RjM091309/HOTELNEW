@@ -187,9 +187,10 @@
 			return;
 		}
 		
-		const totalPaid = parseFloat(totalPaidElement.textContent.replace('₹', '').replace(',', '')) || 0;
-		const totalPayment = parseFloat(totalPaymentElement.textContent.replace('₹', '').replace(',', '')) || 0;
-		const balanceAmount = parseFloat(balanceAmountElement.textContent.replace('₹', '').replace(',', '')) || 0;
+		// Parse amounts, handling both ₹ and ₱ currency symbols
+		const totalPaid = parseFloat(totalPaidElement.textContent.replace(/[₹₱,]/g, '')) || 0;
+		const totalPayment = parseFloat(totalPaymentElement.textContent.replace(/[₹₱,]/g, '')) || 0;
+		const balanceAmount = parseFloat(balanceAmountElement.textContent.replace(/[₹₱,]/g, '')) || 0;
 		
 		console.log('Payment Status Update:', {
 			totalPaid,
@@ -202,8 +203,8 @@
 			}
 		});
 		
-		// Check if payment is truly complete
-		const isPaymentComplete = (balanceAmount <= 0 && totalPaid > 0 && totalPayment > 0);
+		// Check if payment is truly complete - improved logic
+		const isPaymentComplete = (balanceAmount <= 0 && totalPaid > 0 && totalPayment > 0 && totalPaid >= totalPayment);
 		
 		console.log('Is Payment Complete:', isPaymentComplete);
 		

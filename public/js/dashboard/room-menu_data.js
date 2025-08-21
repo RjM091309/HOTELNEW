@@ -4,6 +4,38 @@
 let selectedCard = null; // Store the currently selected card
 let addedServicesMap = {}; // Store added services for each room
 
+// Make functions globally accessible for onclick events
+window.addService = function(bookingId) {
+    if (typeof addServiceLocal === 'function') {
+        return addServiceLocal(bookingId);
+    } else {
+        console.error('❌ addServiceLocal function not found!');
+        return false;
+    }
+};
+
+// Also make other functions globally accessible
+window.calculateBalance = calculateBalance;
+window.calculateTotalCost = calculateTotalCost;
+window.updateAddedServicesList = updateAddedServicesList;
+window.saveServices = saveServices;
+window.removeService = removeService;
+window.loadServices = loadServices;
+window.loadExistingServicesForModal = loadExistingServicesForModal;
+window.loadBookingDetails = loadBookingDetails;
+window.loadGuestDetails = loadGuestDetails;
+window.loadTransferHistory = loadTransferHistory;
+window.showBilling = showBilling;
+window.openExtendModal = openExtendModal;
+window.triggerTransferFromMenu = triggerTransferFromMenu;
+window.openRoomMenuModal = openRoomMenuModal;
+window.createDynamicRoomModal = createDynamicRoomModal;
+
+// Add a function to refresh services when payment status changes
+window.refreshServicesList = function(bookingId) {
+    loadExistingServicesForModal(bookingId);
+};
+
 // Toast helpers using PMSCore when available, with safe fallbacks
 function notifyToast(type, heading, message, options = {}) {
     try {
@@ -273,7 +305,7 @@ function createDynamicRoomModal(bookingId, event, options) {
                                     <option value="">Select a service</option>
                                 </select>
                                 <input type="number" id="service-quantity-${bookingId}" class="form-control form-control-sm me-2" min="1" value="1" style="width: 60px;">
-                                <button type="button" class="btn btn-sm btn-success" onclick="addService('${bookingId}')">
+                                <button type="button" class="btn btn-sm btn-success" onclick="window.addService('${bookingId}')">
                                     <i class="fas fa-plus me-1"></i>Add
                                 </button>
                             </div>
@@ -334,7 +366,6 @@ document.body.insertAdjacentHTML('beforeend', modalHTML);
 const modal = document.getElementById(`dynamicRoomModal_${bookingId}`);
 if (!modal) {
     console.error(`Modal element not found: dynamicRoomModal_${bookingId}`);
-    console.error('Available modals:', document.querySelectorAll('.modal').length);
     return;
 }
 
@@ -482,16 +513,15 @@ bootstrapModal.show();
 // Load services and booking details after modal is shown
 setTimeout(() => {
     loadServices(bookingId);
+    loadExistingServicesForModal(bookingId);
     loadBookingDetails(bookingId);
     loadGuestDetails(bookingId);
     loadTransferHistory(bookingId, bookingId);
     
-    // Debug: Check if services are loaded
+    // Ensure grand total is calculated after all data is loaded
     setTimeout(() => {
-
-        
-        // Ensure grand total is calculated after all data is loaded
         calculateTotalCost(bookingId);
+        calculateBalance(bookingId, bookingId);
     }, 500);
 }, 100);
 
@@ -982,11 +1012,15 @@ function loadTransferHistory(bookingId, currentBookingId) {
 // Update the added services list
 function updateAddedServicesList(bookingId) {
 const serviceList = document.getElementById(`added-services-list-${bookingId}`);
-if (!serviceList) return;
+if (!serviceList) {
+    console.log('Service list element not found for booking:', bookingId);
+    return;
+}
 
 serviceList.innerHTML = '';
 
 let roomServices = addedServicesMap[bookingId] || [];
+
 if (roomServices.length === 0) {
     serviceList.style.display = 'none';
 } else {
@@ -1067,12 +1101,22 @@ calculateTotalCost(bookingId);
 const bookingIdInput = document.getElementById(`bookingID-${bookingId}`);
 if (bookingIdInput) {
     const bookingIdValue = bookingIdInput.value;
-    if (bookingIdValue) calculateBalance(bookingId, bookingIdValue);
+    if (bookingIdValue) {
+        calculateBalance(bookingId, bookingIdValue);
+    } else {
+        calculateBalance(bookingId, bookingId);
+    }
+} else {
+    calculateBalance(bookingId, bookingId);
 }
 }
 
-// Function to add extra services
-function addService(bookingId) {
+// Function to add extra services (local version)
+function addServiceLocal(bookingId) {
+    if (!bookingId) {
+        console.error('❌ No bookingId provided to addServiceLocal');
+        return;
+    }
 const serviceSelect = document.getElementById(`extra-service-select-${bookingId}`);
 const selectedService = serviceSelect.value;
 const quantityInput = document.getElementById(`service-quantity-${bookingId}`);
@@ -1082,10 +1126,14 @@ if (selectedService) {
     const service = JSON.parse(selectedService);
     const quantity = parseInt(quantityInput.value, 10);
 
+    if (!addedServicesMap[bookingId]) {
+        addedServicesMap[bookingId] = [];
+    }
+    
     let roomServices = addedServicesMap[bookingId];
     const existingUnpaid = roomServices.find(s => s.SERVICE_ID === service.SERVICE_ID && s.STATUS !== 'paid');
-
     const serviceCost = parseFloat(service.SERVICE_COST);
+    
     if (existingUnpaid) {
         existingUnpaid.QUANTITY += quantity;
         existingUnpaid.SERVICE_COST = serviceCost;
@@ -1099,13 +1147,19 @@ if (selectedService) {
         });
     }
 
-    // Save the updated services to the backend
-    saveServices(bookingId, bookingId);
-
-    // Refresh the list and recalc totals
+    // Refresh the list and recalc totals immediately for UI responsiveness
     updateAddedServicesList(bookingId);
     calculateTotalCost(bookingId);
-    calculateBalance(bookingId, bookingId);
+
+    // Save the updated services to the backend and then update balance
+    saveServices(bookingId, bookingId).then((result) => {
+        // Update balance after successful save
+        calculateBalance(bookingId, bookingId);
+    }).catch((error) => {
+        console.error('❌ Error saving services:', error);
+        // Still update balance even if save fails, to show current state
+        calculateBalance(bookingId, bookingId);
+    });
 
     // Reset the dropdown and quantity
     serviceSelect.value = '';
@@ -1120,72 +1174,78 @@ if (selectedService) {
 
 // Save services to backend
 function saveServices(bookingId, currentBookingId) {
-let roomServices = addedServicesMap[bookingId];
+return new Promise((resolve, reject) => {
+    let roomServices = addedServicesMap[bookingId];
 
-if (!roomServices || roomServices.length === 0) {
-    toastWarning('Info', 'No services added to save!');
-    return;
-}
-
-// Group services by SERVICE_ID and STATUS to avoid duplication
-const serviceMap = new Map();
-const ignoredServiceIds = [-999, -101, -102];
-
-roomServices.forEach(service => {
-    if (service.STATUS === 'paid') return;
-    if (ignoredServiceIds.includes(parseInt(service.SERVICE_ID))) return;
-
-    // Validate service cost and quantity
-    const serviceCost = parseFloat(service.SERVICE_COST) || 0;
-    const quantity = parseInt(service.QUANTITY) || 0;
-    
-    // Skip invalid services
-    if (isNaN(serviceCost) || isNaN(quantity) || serviceCost < 0 || quantity < 0) {
-        console.warn('Invalid service data:', service);
+    if (!roomServices || roomServices.length === 0) {
+        toastWarning('Info', 'No services added to save!');
+        resolve();
         return;
     }
 
-    const key = `${service.SERVICE_ID}-${service.STATUS}`;
-    const totalCost = serviceCost * quantity;
+    // Group services by SERVICE_ID and STATUS to avoid duplication
+    const serviceMap = new Map();
+    const ignoredServiceIds = [-999, -101, -102];
 
-    if (!serviceMap.has(key)) {
-        serviceMap.set(key, {
-            SERVICE_ID: service.SERVICE_ID,
-            QUANTITY: quantity,
-            TOTAL_COST: totalCost
-        });
-    } else {
-        const existing = serviceMap.get(key);
-        existing.QUANTITY += quantity;
-        existing.TOTAL_COST += totalCost;
-        serviceMap.set(key, existing);
+    roomServices.forEach(service => {
+        if (service.STATUS === 'paid') return;
+        if (ignoredServiceIds.includes(parseInt(service.SERVICE_ID))) return;
+
+        // Validate service cost and quantity
+        const serviceCost = parseFloat(service.SERVICE_COST) || 0;
+        const quantity = parseInt(service.QUANTITY) || 0;
+        
+        // Skip invalid services
+        if (isNaN(serviceCost) || isNaN(quantity) || serviceCost < 0 || quantity < 0) {
+            console.warn('Invalid service data:', service);
+            return;
+        }
+
+        const key = `${service.SERVICE_ID}-${service.STATUS}`;
+        const totalCost = serviceCost * quantity;
+
+        if (!serviceMap.has(key)) {
+            serviceMap.set(key, {
+                SERVICE_ID: service.SERVICE_ID,
+                QUANTITY: quantity,
+                TOTAL_COST: totalCost
+            });
+        } else {
+            const existing = serviceMap.get(key);
+            existing.QUANTITY += quantity;
+            // Recalculate TOTAL_COST based on the combined quantity and service cost
+            existing.TOTAL_COST = existing.QUANTITY * serviceCost;
+            serviceMap.set(key, existing);
+        }
+    });
+
+    const servicesData = Array.from(serviceMap.values());
+
+    if (servicesData.length === 0) {
+        toastInfo('Info', 'No new unpaid services to save.');
+        resolve();
+        return;
     }
-});
-
-const servicesData = Array.from(serviceMap.values());
-
-if (servicesData.length === 0) {
-    toastInfo('Info', 'No new unpaid services to save.');
-    return;
-}
-
-fetch('/booking/save-booking-services', {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-        bookingId: bookingId,
-        services: servicesData
+    fetch('/booking/save-booking-services', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            bookingId: bookingId,
+            services: servicesData
+        })
     })
-})
-.then(response => response.json())
-.then(data => {
-    // Services saved successfully
-})
-.catch(error => {
-    console.error('Error saving services:', error);
-    toastError('Error', 'Failed to save services. Please try again.');
+    .then(response => response.json())
+    .then(data => {
+        // Services saved successfully
+        resolve(data);
+    })
+    .catch(error => {
+        console.error('❌ Error saving services:', error);
+        toastError('Error', 'Failed to save services. Please try again.');
+        reject(error);
+    });
 });
 }
 
@@ -1315,32 +1375,33 @@ function calculateTotalCost(bookingId) {
 
 // Calculate balance
 function calculateBalance(bookingId, currentBookingId) {
-fetch(`/booking/unpaid_balance/${bookingId}`)
-    .then(response => response.json())
-    .then(data => {
-        let totalUnpaid = data.total_unpaid_balance || 0;
+    fetch(`/booking/unpaid_balance/${bookingId}`)
+        .then(response => response.json())
+        .then(data => {
+            let totalUnpaid = data.total_unpaid_balance || 0;
 
+            // Format Balance with Comma Separator
+            let formattedBalance = totalUnpaid.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
 
-
-        // Format Balance with Comma Separator
-        let formattedBalance = totalUnpaid.toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        });
-
-        // Display Balance in UI
-        let balanceElement = document.getElementById(`Balance-${bookingId}`);
-        if (balanceElement) {
-            if (totalUnpaid > 0) {
-                balanceElement.innerHTML = `<span class="text-danger"><strong>₱${formattedBalance}</strong></span>`;
+            // Display Balance in UI
+            let balanceElement = document.getElementById(`Balance-${bookingId}`);
+            
+            if (balanceElement) {
+                if (totalUnpaid > 0) {
+                    balanceElement.innerHTML = `<span class="text-danger"><strong>₱${formattedBalance}</strong></span>`;
+                } else {
+                    balanceElement.innerHTML = `<span class="text-success"><strong>₱0.00</strong></span>`;
+                }
             } else {
-                balanceElement.innerHTML = `<span class="text-success"><strong>₱0.00</strong></span>`;
+                console.error(`❌ Balance element not found: Balance-${bookingId}`);
             }
-        }
-    })
-    .catch(error => {
-        console.error('Error fetching balance:', error);
-    });
+        })
+        .catch(error => {
+            console.error('❌ Error fetching balance:', error);
+        });
 }
 
 // Function to show billing
@@ -3357,12 +3418,12 @@ function updateBillingPaymentStatus(bookingId) {
             const proceedButton = document.getElementById('proceedToPaymentButton');
             if (proceedButton) {
                 if (totalUnpaid <= 0 && totalPaid > 0) {
-                    proceedButton.prop('disabled', true);
+                    proceedButton.disabled = true;
                     proceedButton.textContent = 'Payment Completed';
                     proceedButton.classList.remove('btn-payment');
                     proceedButton.classList.add('btn-success');
                 } else {
-                    proceedButton.prop('disabled', false);
+                    proceedButton.disabled = false;
                     proceedButton.textContent = 'Proceed to Payment';
                     proceedButton.classList.remove('btn-success');
                     proceedButton.classList.add('btn-payment');
@@ -3389,3 +3450,56 @@ function updateBillingPaymentStatus(bookingId) {
 function viewFullBookingDetails(bookingId) {
     window.open(`/booking?highlight=${bookingId}`, '_blank');
 } 
+
+// Function to load existing services from database for the dynamic modal
+function loadExistingServicesForModal(bookingId) {
+    fetch(`/booking/get-booking-services/${bookingId}`)
+        .then(response => response.json())
+        .then(services => {
+            // Clear the existing services map for this booking
+            addedServicesMap[bookingId] = [];
+            
+            // Add existing services to the map
+            if (Array.isArray(services) && services.length > 0) {
+                services.forEach(service => {
+                    // Calculate unit cost from total cost and quantity
+                    const totalCost = parseFloat(service.TOTAL_COST) || 0;
+                    const quantity = parseInt(service.QTY) || 1;
+                    const unitCost = quantity > 0 ? totalCost / quantity : 0;
+                    
+                    // Check if we can combine with existing service (same service, same status, same unit cost)
+                    const existingService = addedServicesMap[bookingId].find(s => 
+                        s.SERVICE_ID === service.SERVICE_ID && 
+                        s.STATUS === service.STATUS &&
+                        s.SERVICE_COST === unitCost
+                    );
+                    
+                    if (existingService) {
+                        // Combine quantities for identical services
+                        existingService.QUANTITY += quantity;
+                    } else {
+                        // Add as new service entry
+                        addedServicesMap[bookingId].push({
+                            SERVICE_ID: service.SERVICE_ID,
+                            SERVICE_NAME: service.SERVICE_NAME || 'Unknown Service',
+                            SERVICE_COST: unitCost,
+                            QUANTITY: quantity,
+                            STATUS: service.STATUS || 'unpaid'
+                        });
+                    }
+                });
+            }
+            
+            // Update the services list display
+            updateAddedServicesList(bookingId);
+            
+            // Recalculate totals
+            calculateTotalCost(bookingId);
+            calculateBalance(bookingId, bookingId);
+        })
+        .catch(error => {
+            console.error('Error loading existing services for modal:', error);
+        });
+}
+
+// Function to load services

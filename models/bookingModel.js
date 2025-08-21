@@ -135,15 +135,24 @@ class BookingModel {
     try {
       const query = `
         SELECT 
-          bs.*,
-          s.SERVICE_NAME,
-          s.SERVICE_COST
-        FROM booking_services bs
+          bs.IDNo,
+          bs.BOOKING_ID,
+          bs.SERVICE_ID,
+          bs.QTY,
+          bs.TOTAL_COST,
+          bs.STATUS,
+          bs.ENCODED_DT,
+          bs.ACTIVE,
+          COALESCE(s.SERVICE_NAME, 'Unknown Service') as SERVICE_NAME,
+          COALESCE(s.SERVICE_COST, bs.TOTAL_COST) as SERVICE_COST
+        FROM booking_service bs
           LEFT JOIN services s ON bs.SERVICE_ID = s.IDNo
         WHERE bs.BOOKING_ID = ? AND bs.ACTIVE = 1
+        ORDER BY bs.ENCODED_DT DESC
       `;
       
       const results = await queryDatabasePromise(query, [bookingId]);
+      console.log('Booking services query results:', results);
       return results;
     } catch (error) {
       console.error('Error in getBookingServices:', error);
