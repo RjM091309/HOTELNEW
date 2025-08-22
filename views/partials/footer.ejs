@@ -7,4 +7,296 @@
         <i class="icon-arrow-up"></i>
     </div>
 </div>
+
+
+
+<!-- Socket.io Script -->
+<script src="/socket.io/socket.io.js"></script>
+<script>
+// Custom Toast System (copied from pmsCore.js)
+function showToast(type, heading, message, options = {}) {
+    const defaultOptions = {
+        position: 'top-right', // Use top-right as base, then reposition
+        hideAfter: 5000,
+        stack: 6
+    };
+    
+    const toastOptions = { ...defaultOptions, ...options };
+    
+    // Set background color based on type
+    let loaderBg = '#ff6849'; // Default
+    let icon = 'info';
+    
+    switch (type) {
+        case 'success':
+            loaderBg = '#0c2a42';
+            icon = 'success';
+            break;
+        case 'error':
+            loaderBg = '#dc3545';
+            icon = 'error';
+            break;
+        case 'warning':
+            loaderBg = '#ffc107';
+            icon = 'warning';
+            break;
+        case 'info':
+            loaderBg = '#17a2b8';
+            icon = 'info';
+            break;
+    }
+    
+    $.toast({
+        heading: heading,
+        text: message,
+        position: toastOptions.position,
+        loaderBg: loaderBg,
+        icon: icon,
+        hideAfter: toastOptions.hideAfter,
+        stack: toastOptions.stack
+    });
+    
+    // If position is bottom-right, manually reposition the toast
+    if (options.position === 'bottom-right') {
+        setTimeout(() => {
+            repositionToastToBottomRight();
+        }, 50);
+    }
+}
+
+// Function to reposition toast to bottom-right
+function repositionToastToBottomRight() {
+    const toastWrap = document.querySelector('.jq-toast-wrap');
+    if (toastWrap) {
+        // Remove any existing bottom-right positioning
+        toastWrap.style.removeProperty('top');
+        toastWrap.style.removeProperty('left');
+        toastWrap.style.removeProperty('right');
+        
+        // Set bottom-right positioning
+        toastWrap.style.position = 'fixed';
+        toastWrap.style.bottom = '20px';
+        toastWrap.style.right = '20px';
+        toastWrap.style.top = 'auto';
+        toastWrap.style.left = 'auto';
+        toastWrap.style.transform = 'none';
+        toastWrap.style.zIndex = '9999';
+    }
+}
+
+function showSuccess(heading, message, options = {}) {
+    showToast('success', heading, message, options);
+}
+
+function showError(heading, message, options = {}) {
+    showToast('error', heading, message, options);
+}
+
+function showWarning(heading, message, options = {}) {
+    showToast('warning', heading, message, options);
+}
+
+function showInfo(heading, message, options = {}) {
+    showToast('info', heading, message, options);
+}
+
+// Socket.io connection for checkout requests
+let socket;
+
+// Initialize socket connection
+function initSocket() {
+    try {
+        socket = io();
+        
+        // Join front desk room
+        socket.emit('join-frontdesk-room');
+        
+        // Handle checkout requests
+        socket.on('checkout-request', (data) => {
+            console.log('📨 New checkout request received:', data);
+            showCheckoutNotification(data);
+        });
+        
+        // Connection events
+        socket.on('connect', () => {
+            console.log('🔌 Front desk connected to socket server');
+        });
+        
+        socket.on('disconnect', () => {
+            console.log('🔌 Front desk disconnected from socket server');
+            showWarning('Disconnected', 'Front desk disconnected from checkout system', { hideAfter: 5000 });
+        });
+        
+    } catch (error) {
+        console.error('Socket connection error:', error);
+    }
+}
+
+// Show checkout notification using custom toast
+function showCheckoutNotification(data) {
+    const toastMessage = `Room ${data.roomId} - ${data.guestName || 'Guest'} has requested checkout.`;
+    
+    // Show the main toast
+    showInfo(
+        'Checkout Request', 
+        toastMessage,
+        { 
+            hideAfter: 300000, // 5 minutes
+            position: 'bottom-right',
+            stack: false // Prevent stacking
+        }
+    );
+    
+    // Ensure toast is positioned at bottom-right
+    setTimeout(() => {
+        repositionToastToBottomRight();
+    }, 150);
+    
+    // Add action buttons after toast is positioned
+    setTimeout(() => {
+        addActionButtonsToToast(data.roomId);
+    }, 100);
+}
+
+// Add action buttons to the toast
+function addActionButtonsToToast(roomId) {
+    const toastWrap = document.querySelector('.jq-toast-wrap');
+    if (toastWrap) {
+        const lastToast = toastWrap.lastElementChild;
+        if (lastToast) {
+            // Create button container
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'toast-action-buttons';
+            buttonContainer.style.cssText = `
+                display: flex;
+                gap: 8px;
+                margin-top: 8px;
+                justify-content: center;
+                align-items: center;
+                width: 100%;
+            `;
+            
+            // Send to Bellman button
+            const bellmanBtn = document.createElement('button');
+            bellmanBtn.innerHTML = '🔔 Bellman';
+            bellmanBtn.className = 'toast-btn bellman-btn';
+            bellmanBtn.style.cssText = `
+                background: rgba(255, 255, 255, 0.1);
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                color: white;
+                padding: 6px 10px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 11px;
+                font-weight: 500;
+                transition: all 0.2s ease;
+                flex: 1;
+                max-width: 110px;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            `;
+            
+            // Check out button
+            const checkoutBtn = document.createElement('button');
+            checkoutBtn.innerHTML = '✅ Check out';
+            checkoutBtn.className = 'toast-btn checkout-btn';
+            checkoutBtn.style.cssText = `
+                background: rgba(255, 255, 255, 0.1);
+                backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                color: white;
+                padding: 6px 10px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 11px;
+                font-weight: 500;
+                transition: all 0.2s ease;
+                flex: 1;
+                max-width: 90px;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            `;
+            
+            // Simple hover effects
+            bellmanBtn.onmouseenter = () => {
+                bellmanBtn.style.background = 'rgba(255, 255, 255, 0.2)';
+                bellmanBtn.style.border = '1px solid rgba(255, 255, 255, 0.3)';
+            };
+            
+            bellmanBtn.onmouseleave = () => {
+                bellmanBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+                bellmanBtn.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+            };
+            
+            checkoutBtn.onmouseenter = () => {
+                checkoutBtn.style.background = 'rgba(255, 255, 255, 0.2)';
+                checkoutBtn.style.border = '1px solid rgba(255, 255, 255, 0.3)';
+            };
+            
+            checkoutBtn.onmouseleave = () => {
+                checkoutBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+                checkoutBtn.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+            };
+            
+            // Add click handlers
+            bellmanBtn.onclick = () => {
+                // Emit bellman request event
+                if (socket && socket.connected) {
+                    socket.emit('bellman-request', {
+                        roomId: roomId,
+                        type: 'checkout-assistance',
+                        message: `Room ${roomId} needs bellman assistance for checkout`,
+                        timestamp: new Date().toISOString(),
+                        priority: 'high'
+                    });
+                    
+                    // Show success message
+                    showSuccess('Bellman Notified', 'Bellman has been notified of the checkout request', { hideAfter: 3000 });
+                    
+                    // Close the toast
+                    const toastElement = lastToast.closest('.jq-toast');
+                    if (toastElement) {
+                        toastElement.remove();
+                    }
+                }
+            };
+            
+            checkoutBtn.onclick = () => {
+                // Emit checkout confirmation event
+                if (socket && socket.connected) {
+                    socket.emit('checkout-confirmed', {
+                        roomId: roomId,
+                        status: 'approved',
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    // Show success message
+                    showSuccess('Checkout Approved', 'Guest checkout has been approved', { hideAfter: 3000 });
+                    
+                    // Close the toast
+                    const toastElement = lastToast.closest('.jq-toast');
+                    if (toastElement) {
+                        toastElement.remove();
+                    }
+                }
+            };
+            
+            // Add buttons to container
+            buttonContainer.appendChild(bellmanBtn);
+            buttonContainer.appendChild(checkoutBtn);
+            
+            // Add container to toast
+            lastToast.appendChild(buttonContainer);
+        }
+    }
+}
+
+
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    initSocket();
+});
+</script>
+
+
 <!-- end footer -->

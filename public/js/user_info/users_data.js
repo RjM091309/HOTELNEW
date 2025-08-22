@@ -22,6 +22,15 @@ function getRoleNameById(roleId) {
 }
 
 // ========================================
+// STATUS LABEL FUNCTIONS
+// ========================================
+
+// Get label class based on user status (matching payment status design)
+function getUserStatusLabel(isActive) {
+    return isActive === 1 ? 'label-success' : 'label-danger';
+}
+
+// ========================================
 // INITIALIZATION
 // ========================================
 
@@ -191,10 +200,10 @@ function reloadData() {
                         };
                         const roleDisplay = roles[user.PERMISSIONS] || 'Unknown';
                         
-                        // Create status badge
-                        const status = user.ACTIVE === 1
-                            ? '<span class="badge badge-success">Active</span>'
-                            : '<span class="badge badge-danger">Inactive</span>';
+                        // Create status label (matching payment status design)
+                        const status = `<span class="label label-sm ${getUserStatusLabel(user.ACTIVE)}">
+                            ${user.ACTIVE === 1 ? 'Active' : 'Inactive'}
+                        </span>`;
                         
                         dataTable.row.add([
                             user.FULLNAME || '',
