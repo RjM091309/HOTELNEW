@@ -5,6 +5,21 @@
 var dataTable;
 
 // ========================================
+// STATUS BADGE FUNCTIONS
+// ========================================
+
+// Get label class based on room status (matching payment status design)
+function getRoomStatusLabel(status) {
+    const statusMap = {
+        '1': 'label-success',    // Available
+        '2': 'label-danger',     // Occupied
+        '3': 'label-info',       // Maintenance
+        '4': 'label-warning'     // Cleaning
+    };
+    return statusMap[status] || 'label-default';
+}
+
+// ========================================
 // INITIALIZATION
 // ========================================
 
@@ -347,15 +362,15 @@ function reloadData() {
                               })
                             : 'P0.00';
                         
-                        const statusConfig = {
-                            '1': { class: 'badge badge-success', text: 'AVAILABLE' },
-                            '2': { class: 'badge badge-danger', text: 'OCCUPIED' },
-                            '3': { class: 'badge badge-info', text: 'MAINTENANCE' },
-                            '4': { class: 'badge badge-warning', text: 'CLEANING' }
-                          
+                        const statusText = {
+                            '1': 'AVAILABLE',
+                            '2': 'OCCUPIED',
+                            '3': 'MAINTENANCE',
+                            '4': 'CLEANING'
                         };
-                        const status = statusConfig[room.ROOM_STATUS] || { class: 'badge badge-secondary', text: 'UNKNOWN' };
-                        const statusBadge = `<span class="${status.class}">${status.text}</span>`;
+                        const statusBadge = `<span class="label label-sm ${getRoomStatusLabel(room.ROOM_STATUS)}">
+                            ${statusText[room.ROOM_STATUS] || 'UNKNOWN'}
+                        </span>`;
                         
                         const actions = `
                             <button type="button" class="btn btn-tbl-edit btn-xs" onclick="editRoom('${room.IDNo}')" title="Edit Room">

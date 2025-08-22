@@ -5,6 +5,19 @@
 var dataTable;
 
 // ========================================
+// STATUS LABEL FUNCTIONS
+// ========================================
+
+// Get label class based on service availability (matching payment status design)
+function getServiceAvailabilityLabel(availability) {
+    const availabilityMap = {
+        'Available': 'label-success',     // Available
+        'Unavailable': 'label-warning'    // Unavailable
+    };
+    return availabilityMap[availability] || 'label-default';
+}
+
+// ========================================
 // INITIALIZATION
 // ========================================
 
@@ -157,13 +170,13 @@ function reloadData() {
                             </button>
                         `;
                         
-                        // Create availability badge
+                        // Create availability label (matching payment status design)
                         const availability = service.SERVICE_AVAILABILITY || '';
                         let availabilityBadge;
-                        if (availability === 'Available') {
-                            availabilityBadge = '<span class="badge badge-success">Available</span>';
-                        } else if (availability === 'Unavailable') {
-                            availabilityBadge = '<span class="badge badge-warning">Unavailable</span>';
+                        if (availability === 'Available' || availability === 'Unavailable') {
+                            availabilityBadge = `<span class="label label-sm ${getServiceAvailabilityLabel(availability)}">
+                                ${availability}
+                            </span>`;
                         } else {
                             availabilityBadge = availability;
                         }
