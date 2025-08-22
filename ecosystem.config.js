@@ -11,7 +11,7 @@ module.exports = {
       PORT: 5001,
       DATABASE_HOST: 'localhost',
       DATABASE_USER: 'root',
-      DATABASE_PASS: '2022.3core21',
+      DATABASE_PASS: '2024.3core21',
       DATABASE_NAME: 'hotel',
       DATABASE_PORT: 3306
     },
@@ -20,7 +20,7 @@ module.exports = {
       PORT: 5001,
       DATABASE_HOST: 'localhost',
       DATABASE_USER: 'root',
-      DATABASE_PASS: '2022.3core21',
+      DATABASE_PASS: '2024.3core21',
       DATABASE_NAME: 'hotel',
       DATABASE_PORT: 3306
     },

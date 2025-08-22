@@ -7,6 +7,88 @@ function setupSocketEvents(io) {
         console.log(`🔌 New client connected: ${socket.id}`);
         
         // ========================================
+        // ROOM CONTROL APP EVENTS
+        // ========================================
+        
+        // Join room-specific channel
+        socket.on('join-room', (data) => {
+            const roomId = data.roomId;
+            socket.join(`room-${roomId}`);
+            console.log(`👤 Client ${socket.id} joined room-${roomId}`);
+        });
+        
+        // Handle checkout requests from room control app
+        socket.on('request-checkout', (data) => {
+            const { roomId, guestName, timestamp } = data;
+            console.log(`🏨 Checkout request received for Room ${roomId} from ${guestName}`);
+            
+            // Acknowledge receipt to the guest
+            socket.emit('checkout-acknowledged', {
+                roomId: roomId,
+                message: 'Check-out request received',
+                timestamp: new Date().toISOString()
+            });
+            
+            // Broadcast checkout request to front desk staff
+            socket.to('frontdesk-room').emit('checkout-request', {
+                roomId: roomId,
+                guestName: guestName,
+                timestamp: timestamp,
+                requestId: Date.now().toString()
+            });
+            
+            // Also broadcast to dashboard for real-time updates
+            socket.to('dashboard-room').emit('checkout-request', {
+                roomId: roomId,
+                guestName: guestName,
+                timestamp: timestamp,
+                requestId: Date.now().toString()
+            });
+            
+            console.log(`📡 Checkout request broadcasted for Room ${roomId}`);
+        });
+        
+        // Handle checkout confirmation from front desk
+        socket.on('checkout-confirmed', (data) => {
+            const { roomId, success, message, timestamp } = data;
+            console.log(`✅ Checkout confirmed for Room ${roomId}: ${success ? 'Success' : 'Failed'}`);
+            
+            // Broadcast checkout result to the specific room
+            io.to(`room-${roomId}`).emit('checkout-processed', {
+                success: success,
+                message: message,
+                roomId: roomId,
+                timestamp: timestamp
+            });
+            
+            // Update dashboard
+            socket.to('dashboard-room').emit('checkout-updated', {
+                roomId: roomId,
+                success: success,
+                message: message,
+                timestamp: timestamp
+            });
+            
+            console.log(`📡 Checkout result broadcasted for Room ${roomId}`);
+        });
+        
+        // ========================================
+        // FRONT DESK EVENTS
+        // ========================================
+        
+        // Join front desk room
+        socket.on('join-frontdesk-room', () => {
+            socket.join('frontdesk-room');
+            console.log(`👤 Client ${socket.id} joined frontdesk-room`);
+        });
+        
+        // Join bellman room
+        socket.on('join-bellman-room', () => {
+            socket.join('bellman-room');
+            console.log(`👤 Client ${socket.id} joined bellman-room`);
+        });
+        
+        // ========================================
         // GUEST LEVEL MAINTENANCE EVENTS
         // ========================================
         
@@ -20,6 +102,27 @@ function setupSocketEvents(io) {
         socket.on('guest-level-updated', (data) => {
             socket.to('guest-level-maintenance').emit('guest-level-refresh', data);
             console.log(`📡 Guest level update broadcasted: ${JSON.stringify(data)}`);
+        });
+        
+        // ========================================
+        // BELLMAN EVENTS
+        // ========================================
+        
+        // Handle bellman requests from front desk
+        socket.on('bellman-request', (data) => {
+            const { roomId, type, message, timestamp, priority } = data;
+            console.log(`🔔 Bellman request received for Room ${roomId}: ${type}`);
+            
+            // Broadcast to bellman room
+            socket.to('bellman-room').emit('bellman-request', {
+                roomId: roomId,
+                type: type,
+                message: message,
+                timestamp: timestamp,
+                priority: priority
+            });
+            
+            console.log(`📡 Bellman request broadcasted for Room ${roomId}`);
         });
         
         // Handle guest level creation
