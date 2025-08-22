@@ -131,6 +131,21 @@
           <%- lines.join('<br>') %>
         </td>
       </tr>
+      
+      <% if (reservationFee && parseFloat(reservationFee) > 0) { %>
+      <tr>
+        <td class="label">RESERVATION FEE:</td>
+        <td>PHP <%= parseFloat(reservationFee).toLocaleString() %></td>
+      </tr>
+      <% } %>
+      
+      <% if (discount && parseFloat(discount) > 0) { %>
+      <tr>
+        <td class="label">DISCOUNT:</td>
+        <td>PHP <%= parseFloat(discount).toLocaleString() %></td>
+      </tr>
+      <% } %>
+      
     </table>
     <table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-weight: bold; font-size: 14px;">
         <tr style="background: #d9d9d9; border-top: 2px solid #000; border-bottom: 2px solid #000;">

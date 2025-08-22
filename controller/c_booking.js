@@ -274,12 +274,18 @@ class BookingController {
         breakfastKidPrice,
         breakfastKidId,
 
-        // ✅ Additional for Transport
-        pickupServiceId,     // should be transport ID
-        pickupPrice,
-        dropoffServiceId,    // should be transport ID
-        dropoffPrice
-      } = req.body;
+              // ✅ Additional for Transport
+      pickupServiceId,     // should be transport ID
+      pickupPrice,
+      dropoffServiceId,    // should be transport ID
+      dropoffPrice,
+      
+      // ✅ Additional for Direct Reservations
+      bedCount,
+      directReservationFlag,
+      reservationFee,
+      discount
+    } = req.body;
 
       const encodedBy = req.user.userId; // Use JWT user ID instead of session
       const date = new Date();
@@ -291,12 +297,16 @@ class BookingController {
 
       // console.log('Received booking data:', req.body);
 
+      // Check if this is a direct reservation
+      const isDirectReservation = directReservationFlag === 'true';
+      
       // Determine the final booking route
       let finalBookingRoute = bookingRoute;
-      if (bookingRoute === 'direct-booking') {
+      if (bookingRoute === 'direct-booking' || bookingRoute === 'direct-reservation') {
         finalBookingRoute = 'walk-in';
       }
       // console.log('Final Booking Route:', finalBookingRoute);
+      // console.log('Is Direct Reservation:', isDirectReservation);
 
       // Parse the date range
       const dateRangeParts = daterange.split(' to ');
@@ -348,7 +358,12 @@ class BookingController {
         pickupServiceId,
         pickupPrice,
         dropoffServiceId,
-        dropoffPrice
+        dropoffPrice,
+        // ✅ Additional for Direct Reservations
+        bedCount,
+        isDirectReservation,
+        reservationFee,
+        discount
       });
 
 
@@ -1394,6 +1409,130 @@ class BookingController {
       console.error('Error fetching pick and drop services:', error);
       res.status(500).json({ error: 'Server error' });
     }
+  }
+
+  // Get available rooms by bed count for direct reservations
+  static async getAvailableRoomsByBedCount(req, res) {
+    try {
+      const { startDate, endDate, bedCount } = req.body;
+      
+      if (!startDate || !endDate || !bedCount) {
+        return res.status(400).json({
+          success: false,
+          message: 'Missing required parameters: startDate, endDate, bedCount'
+        });
+      }
+
+      const availableRooms = await BookingModel.getAvailableRoomsByBedCount(startDate, endDate, bedCount);
+      
+      res.json({
+        success: true,
+        rooms: availableRooms
+      });
+    } catch (error) {
+      console.error('Error fetching available rooms by bed count:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error while fetching available rooms'
+      });
+    }
+  }
+
+  // Assign room to direct reservation
+  static async assignRoomToDirectReservation(req, res) {
+    try {
+      const { bookingId, roomId, roomNumber, roomType, bedCount, price, floor } = req.body;
+      
+      if (!bookingId || !roomId || !roomNumber) {
+        return res.status(400).json({
+          success: false,
+          message: 'Missing required parameters: bookingId, roomId, roomNumber'
+        });
+      }
+
+      const result = await BookingModel.assignRoomToDirectReservation({
+        bookingId,
+        roomId,
+        roomNumber,
+        roomType,
+        bedCount,
+        price,
+        floor
+      });
+
+      if (result.success) {
+        res.json({
+          success: true,
+          message: `Room ${roomNumber} assigned successfully to direct reservation`
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: result.message || 'Failed to assign room'
+        });
+      }
+    } catch (error) {
+      console.error('Error assigning room to direct reservation:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error while assigning room'
+      });
+    }
+  }
+
+  // Get direct reservation details (Hotel_Old compatibility)
+  static async getDirectReservationDetails(req, res) {
+    try {
+      const { bookingId } = req.body;
+
+      if (!bookingId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Missing required parameter: bookingId'
+        });
+      }
+
+      const bookingDetails = await BookingModel.getDirectReservationDetails(bookingId);
+
+      if (!bookingDetails) {
+        return res.status(404).json({
+          success: false,
+          message: 'Direct reservation not found'
+        });
+      }
+
+      res.json({ success: true, bookingDetails });
+    } catch (error) {
+      console.error('Error fetching direct reservation details:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error while fetching booking details'
+      });
+    }
+  }
+
+  // Hotel_Old compatibility: POST body version of get booking services
+  static async getBookingServicesPost(req, res) {
+    try {
+      const { bookingId } = req.body;
+      if (!bookingId) {
+        return res.status(400).json({ error: 'Booking ID is required.' });
+      }
+      const allServices = await BookingModel.getBookingServices(bookingId);
+      res.json(allServices);
+    } catch (error) {
+      console.error('Error fetching booking services (POST):', error);
+      res.status(500).json({ error: 'Internal server error.' });
+    }
+  }
+
+  // Alias to support underscore URL used by Hotel_Old scripts
+  static async assignRoomToDirectReservationAlias(req, res) {
+    // Map roomPrice -> price if provided
+    if (req.body && req.body.roomPrice && !req.body.price) {
+      req.body.price = req.body.roomPrice;
+    }
+    return BookingController.assignRoomToDirectReservation(req, res);
   }
 }
 

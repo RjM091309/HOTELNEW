@@ -314,7 +314,36 @@
                                 </div>
                               </div>
 
+                              <!-- Reservation Fee and Discount Section -->
+                              <hr class="my-4">
+                              <div class="row p-t-20">
+                                <div class="col-lg-6">
+                                  <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="includeReservationFee">
+                                    <label class="form-check-label" for="includeReservationFee">Reservation Fee</label>
+                                  </div>
+                                  <div id="reservationFeeWrapper" class="mt-2" style="display: none;">
+                                    <input type="number" class="form-control" id="reservationFeeAmount" name="reservationFeeAmount" placeholder="Enter Reservation Fee Amount" step="1" min="0">
+                                    <small class="text-muted" style="font-size: 11px; color: #bbbbbb !important;">(Downpayment - not included in total)</small>
+                                    <small class="text-warning" style="font-size: 11px; color: #ffc107 !important; display: none;" id="reservationFeeRequired">*Required for Direct Reservations</small>
+                                  </div>
+                                </div>
+                                
+                                <div class="col-lg-6">
+                                  <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="includeDiscount">
+                                    <label class="form-check-label" for="includeDiscount">Discount</label>
+                                  </div>
+                                  <div id="discountWrapper" class="mt-2" style="display: none;">
+                                    <input type="number" class="form-control" id="discountAmount" name="discountAmount" placeholder="Enter Discount Amount" step="1" min="0">
+                                  </div>
+                                </div>
+                              </div>
+
                               <h3>Total: <span id="computedTotal">0.00</span></h3>
+                              <div id="creditDisplay" style="display: none; margin-top: 10px;">
+                                <span style="color: #28a745; font-weight: bold;">Credit: <span id="creditAmount">0.00</span></span>
+                              </div>
 
                         
                     </div>

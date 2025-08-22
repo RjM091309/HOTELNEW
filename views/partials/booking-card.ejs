@@ -17,9 +17,19 @@
             </label>
         <% } %>
         
-        <!-- Room Number -->
-        <header onclick="openRoomMenuModal('<%= booking.BookingID %>')" style="cursor: pointer; flex-grow: 1; text-align: center; font-weight: bold;">
-            <%= booking.ROOM_NUMBER %>
+        <!-- Room Number or UNFIX for Direct Reservations -->
+        <header style="flex-grow: 1; text-align: center;">
+            <% if (booking.IS_DIRECT_RESERVATION == 1) { %>
+                <span class="unfix-header" 
+                      style="cursor: pointer;" 
+                      onclick="showAvailableRoomsForDirectReservation('<%= booking.BookingID %>', '<%= booking.CHECK_IN_DATE %>', '<%= booking.CHECK_OUT_DATE %>', '<%= booking.CustomerName %>', '<%= booking.BED_COUNT %>')">
+                    UNFIX
+                </span>
+            <% } else { %>
+                <span onclick="openRoomMenuModal('<%= booking.BookingID %>')" style="cursor: pointer; font-weight: bold;">
+                    <%= booking.ROOM_NUMBER %>
+                </span>
+            <% } %>
         </header>
         
         <!-- Group Icon (Conditional) -->
@@ -30,6 +40,12 @@
 
     <!-- Card Body -->
     <div class="card-body">
+        <% if (booking.IS_DIRECT_RESERVATION == 1) { %>
+            <p style="color: #ff6b6b; font-weight: bold;">
+                <i class="material-icons" style="font-size: 14px; vertical-align: middle;">warning</i>
+                No Room Assigned
+            </p>
+        <% } %>
         <p><%= booking.RoomType %></p>
         <div class="d-flex align-items-center justify-content-between">
             <p class="mb-2" style="font-weight: normal;"><%= booking.CustomerName %></p>
@@ -38,7 +54,15 @@
             <% } %>
         </div>
         <div class="d-flex align-items-center justify-content-between">
-            <p class="mb-0"><%= Number(booking.TotalCost).toLocaleString('en-US') %></p>
+            <% if (booking.IS_DIRECT_RESERVATION == 1) { %>
+                <!-- Show Bed Count for Direct Reservations -->
+                <p style="margin: 0;">
+                    <%= booking.BED_COUNT %> Bed<%= (booking.BED_COUNT && booking.BED_COUNT > 1) ? 's' : '' %>
+                </p>
+            <% } else { %>
+                <!-- Show Total Cost for Regular Bookings -->
+                <p style="margin: 0;"><%= Number(booking.TotalCost).toLocaleString('en-US') %></p>
+            <% } %>
             <% if (typeof showBadges !== 'undefined' && showBadges) { %>
                 <% if (booking.LATE_CHECKOUT === 1) { %>
                     <span class="badge badge-success">LCO</span>

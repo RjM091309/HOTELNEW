@@ -158,7 +158,19 @@
         </td>
       </tr>
       
+      <% if (reservationFee && parseFloat(reservationFee) > 0) { %>
+      <tr>
+        <td class="label">RESERVATION FEE:</td>
+        <td>PHP <%= parseFloat(reservationFee).toLocaleString() %></td>
+      </tr>
+      <% } %>
       
+      <% if (discount && parseFloat(discount) > 0) { %>
+      <tr>
+        <td class="label">DISCOUNT:</td>
+        <td>PHP <%= parseFloat(discount).toLocaleString() %></td>
+      </tr>
+      <% } %>
       
     </table>
 

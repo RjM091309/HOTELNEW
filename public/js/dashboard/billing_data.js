@@ -41,8 +41,38 @@ function showBilling(bookingID) {
 
 			// Populate totals
 			const subTotal = parseFloat(data.subTotal);
-			const discount = parseFloat(data.discount);
+			const discount = parseFloat(data.discountAmount) || 0;
 			const total = subTotal - discount;
+
+			// Handle Reservation Fee Display
+			if (data.reservationFee && parseFloat(data.reservationFee) > 0) {
+				const reservationFeeRow = document.getElementById('reservationFeeRow');
+				const reservationFeeElement = document.getElementById('billingReservationFeeAmount');
+				if (reservationFeeRow && reservationFeeElement) {
+					reservationFeeRow.style.display = 'block';
+					reservationFeeElement.textContent = `₱${parseFloat(data.reservationFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+				}
+			} else {
+				const reservationFeeRow = document.getElementById('reservationFeeRow');
+				if (reservationFeeRow) {
+					reservationFeeRow.style.display = 'none';
+				}
+			}
+
+			// Handle Discount Display
+			if (data.discountAmount && parseFloat(data.discountAmount) > 0) {
+				const discountRow = document.getElementById('discountRow');
+				const discountElement = document.getElementById('billingDiscountAmount');
+				if (discountRow && discountElement) {
+					discountRow.style.display = 'block';
+					discountElement.textContent = `₱${parseFloat(data.discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+				}
+			} else {
+				const discountRow = document.getElementById('discountRow');
+				if (discountRow) {
+					discountRow.style.display = 'none';
+				}
+			}
 
 			let totalPaid = 0;
 			let totalUnpaid = 0;

@@ -45,6 +45,14 @@ router.get('/search-customer', BookingController.searchCustomer);
 router.post('/available-rooms', BookingController.getAvailableRooms);
 router.post('/get-room-details', BookingController.getRoomDetails);
 
+// Direct reservation management
+router.post('/available-rooms-bed-count', BookingController.getAvailableRoomsByBedCount);
+router.post('/assign-room-to-direct-reservation', BookingController.assignRoomToDirectReservation);
+// Compatibility routes (Hotel_Old)
+router.post('/get-direct-reservation-details', BookingController.getDirectReservationDetails);
+router.post('/get-booking-services', BookingController.getBookingServicesPost);
+router.post('/assign_room_to_direct_reservation', BookingController.assignRoomToDirectReservationAlias);
+
 // Payment management
 router.post('/update-room-payment-status', BookingController.updateRoomPaymentStatus);
 router.post('/update-extend-payment-status', BookingController.updateExtendPaymentStatus);

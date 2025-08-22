@@ -304,7 +304,12 @@ function createDynamicRoomModal(bookingId, event, options) {
                                 <select id="extra-service-select-${bookingId}" class="form-select form-select-sm me-2" style="max-width: 180px;">
                                     <option value="">Select a service</option>
                                 </select>
-                                <input type="number" id="service-quantity-${bookingId}" class="form-control form-control-sm me-2" min="1" value="1" style="width: 60px;">
+                                <input type="number" id="service-quantity-${bookingId}" class="form-control form-select-sm me-2" min="1" value="1" style="width: 60px;">
+                                <input type="number" id="service-cost-${bookingId}" class="form-control form-select-sm me-2" min="0" step="1" placeholder="Cost" style="width: 80px; display: none;">
+                                <div class="form-check me-2">
+                                    <input class="form-check-input" type="checkbox" id="custom-cost-checkbox-${bookingId}" onchange="window.toggleCustomCost('${bookingId}')">
+                                    <label class="form-check-label" for="custom-cost-checkbox-${bookingId}">Manual Cost</label>
+                                </div>
                                 <button type="button" class="btn btn-sm btn-success" onclick="window.addService('${bookingId}')">
                                     <i class="fas fa-plus me-1"></i>Add
                                 </button>
@@ -328,6 +333,32 @@ function createDynamicRoomModal(bookingId, event, options) {
                                         <label class="text-muted small mb-0">Balance</label>
                                         <div class="summary-value" id="Balance-${bookingId}">₱0.00</div>
                                     </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Reservation Fee Row (Conditional) -->
+                            <div class="row" id="reservation-fee-row-${bookingId}" style="display: none;">
+                                <div class="col-md-6">
+                                    <div class="summary-item">
+                                        <label class="text-muted small mb-0" style="color: #28a745;">Reservation Fee (Paid)</label>
+                                        <div class="summary-value" id="reservation-fee-${bookingId}" style="color: #28a745;">₱0.00</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <!-- Empty column for alignment -->
+                                </div>
+                            </div>
+                            
+                            <!-- Discount Row (Conditional) -->
+                            <div class="row" id="discount-row-${bookingId}" style="display: none;">
+                                <div class="col-md-6">
+                                    <div class="summary-item">
+                                        <label class="text-muted small mb-0" style="color: #28a745;">Discount Applied</label>
+                                        <div class="summary-value" id="discount-amount-${bookingId}" style="color: #dc3545;">₱0.00</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <!-- Empty column for alignment -->
                                 </div>
                             </div>
                         </div>
@@ -473,11 +504,52 @@ modalStyle.textContent = `
         margin-top: 1px;
     }
     
+    /* Reservation Fee and Discount Row Styling */
+    #dynamicRoomModal_${bookingId} #reservation-fee-row-${bookingId},
+    #dynamicRoomModal_${bookingId} #discount-row-${bookingId} {
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid #e9ecef;
+    }
+    
+    #dynamicRoomModal_${bookingId} #reservation-fee-row-${bookingId} .summary-item label,
+    #dynamicRoomModal_${bookingId} #discount-row-${bookingId} .summary-item label {
+        font-weight: 600;
+        font-size: 0.8rem;
+    }
+    
+    #dynamicRoomModal_${bookingId} #reservation-fee-row-${bookingId} .summary-value,
+    #dynamicRoomModal_${bookingId} #discount-row-${bookingId} .summary-value {
+        font-weight: 700;
+        font-size: 0.9rem;
+    }
+    
     #dynamicRoomModal_${bookingId} .form-control,
     #dynamicRoomModal_${bookingId} .form-select {
         border: 1px solid #ced4da;
         border-radius: 6px;
         transition: all 0.2s ease;
+    }
+    
+    /* Custom Cost Input Styling */
+    #dynamicRoomModal_${bookingId} #service-cost-${bookingId} {
+        transition: all 0.3s ease;
+    }
+    
+    #dynamicRoomModal_${bookingId} #service-cost-${bookingId}:focus {
+        border-color: #28a745;
+        box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+    }
+    
+    #dynamicRoomModal_${bookingId} .form-check-input:checked {
+        background-color: #28a745;
+        border-color: #28a745;
+    }
+    
+    #dynamicRoomModal_${bookingId} .form-check-label {
+        font-size: 0.8rem;
+        color: #6c757d;
+        font-weight: 500;
     }
     
     #dynamicRoomModal_${bookingId} .form-control:focus,
@@ -517,6 +589,16 @@ setTimeout(() => {
     loadBookingDetails(bookingId);
     loadGuestDetails(bookingId);
     loadTransferHistory(bookingId, bookingId);
+    
+    // Initialize custom cost input state
+    const customCostInput = document.getElementById(`service-cost-${bookingId}`);
+    const customCostCheckbox = document.getElementById(`custom-cost-checkbox-${bookingId}`);
+    if (customCostInput && customCostCheckbox) {
+        customCostInput.style.display = 'none';
+        customCostInput.disabled = true;
+        customCostCheckbox.checked = false;
+        // console.log(`✅ Custom cost input initialized for booking ${bookingId}`);
+    }
         
         // Ensure grand total is calculated after all data is loaded
     setTimeout(() => {
@@ -1112,6 +1194,29 @@ if (bookingIdInput) {
 }
 }
 
+// Function to toggle custom cost input for services
+function toggleCustomCost(bookingId) {
+    const customCostCheckbox = document.getElementById(`custom-cost-checkbox-${bookingId}`);
+    const serviceCostInput = document.getElementById(`service-cost-${bookingId}`);
+    
+    if (!customCostCheckbox || !serviceCostInput) {
+        console.error(`❌ Custom cost elements not found for booking ${bookingId}`);
+        return;
+    }
+    
+    if (customCostCheckbox.checked) {
+        serviceCostInput.style.display = 'block';
+        serviceCostInput.disabled = false;
+        serviceCostInput.focus();
+        console.log(`✅ Manual cost enabled for booking ${bookingId}`);
+    } else {
+        serviceCostInput.style.display = 'none';
+        serviceCostInput.disabled = true;
+        serviceCostInput.value = '';
+        console.log(`✅ Manual cost disabled for booking ${bookingId}`);
+}
+}
+
 // Function to add extra services (local version)
 function addServiceLocal(bookingId) {
     if (!bookingId) {
@@ -1121,6 +1226,8 @@ function addServiceLocal(bookingId) {
 const serviceSelect = document.getElementById(`extra-service-select-${bookingId}`);
 const selectedService = serviceSelect.value;
 const quantityInput = document.getElementById(`service-quantity-${bookingId}`);
+const customCostInput = document.getElementById(`service-cost-${bookingId}`);
+const customCostCheckbox = document.getElementById(`custom-cost-checkbox-${bookingId}`);
 const bookingIdInput = document.getElementById(`bookingID-${bookingId}`);
 
 if (selectedService) {
@@ -1133,7 +1240,22 @@ if (selectedService) {
 
     let roomServices = addedServicesMap[bookingId];
     const existingUnpaid = roomServices.find(s => s.SERVICE_ID === service.SERVICE_ID && s.STATUS !== 'paid');
-    const serviceCost = parseFloat(service.SERVICE_COST);
+    
+    // Determine the service cost based on checkboxes
+    let serviceCost;
+    if (customCostCheckbox && customCostCheckbox.checked && customCostInput) {
+        const customCost = parseFloat(customCostInput.value);
+        if (isNaN(customCost) || customCost < 0) {
+            toastWarning('Validation', 'Please enter a valid custom cost!');
+            return;
+        }
+        serviceCost = customCost;
+        console.log('✅ Using custom cost:', serviceCost);
+    } else {
+        // Use default service cost from database
+        serviceCost = parseFloat(service.SERVICE_COST);
+        console.log('✅ Using default cost:', serviceCost);
+    }
     
     if (existingUnpaid) {
         existingUnpaid.QUANTITY += quantity;
@@ -1165,6 +1287,10 @@ if (selectedService) {
     // Reset the dropdown and quantity
     serviceSelect.value = '';
     quantityInput.value = '1';
+    customCostInput.value = '';
+    customCostCheckbox.checked = false;
+    customCostInput.style.display = 'none';
+    customCostInput.disabled = true;
 
     // Show success message
     toastSuccess('Success', 'Service added successfully!');
@@ -1209,18 +1335,25 @@ roomServices.forEach(service => {
         serviceMap.set(key, {
             SERVICE_ID: service.SERVICE_ID,
             QUANTITY: quantity,
-            TOTAL_COST: totalCost
+            TOTAL_COST: totalCost,
+            CUSTOM_COST: serviceCost // Send the actual service cost (custom or default)
         });
     } else {
         const existing = serviceMap.get(key);
         existing.QUANTITY += quantity;
             // Recalculate TOTAL_COST based on the combined quantity and service cost
             existing.TOTAL_COST = existing.QUANTITY * serviceCost;
+        // Keep the custom cost if it exists
+        if (serviceCost !== existing.CUSTOM_COST) {
+            existing.CUSTOM_COST = serviceCost;
+        }
         serviceMap.set(key, existing);
     }
 });
 
 const servicesData = Array.from(serviceMap.values());
+
+console.log('🚀 Sending services to backend:', servicesData);
 
 if (servicesData.length === 0) {
     toastInfo('Info', 'No new unpaid services to save.');
@@ -1380,6 +1513,48 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
     .then(response => response.json())
     .then(data => {
         let totalUnpaid = data.total_unpaid_balance || 0;
+        let reservationFee = data.reservation_fee || 0;
+        let discountAmount = data.discount_amount || 0;
+
+      
+
+        // Handle Reservation Fee Display
+        if (reservationFee > 0) {
+            const reservationFeeRow = document.getElementById(`reservation-fee-row-${bookingId}`);
+            const reservationFeeElement = document.getElementById(`reservation-fee-${bookingId}`);
+            if (reservationFeeRow && reservationFeeElement) {
+                reservationFeeRow.style.display = 'block';
+                reservationFeeElement.innerHTML = `<span class="text-danger"><strong>-₱${parseFloat(reservationFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>`;
+                // console.log(`✅ Reservation Fee row displayed: -₱${parseFloat(reservationFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
+            } else {
+                console.error(`❌ Reservation Fee elements not found for booking ${bookingId}`);
+            }
+        } else {
+            const reservationFeeRow = document.getElementById(`reservation-fee-row-${bookingId}`);
+            if (reservationFeeRow) {
+                reservationFeeRow.style.display = 'none';
+                // console.log(`✅ Reservation Fee row hidden (no fee)`);
+            }
+        }
+
+        // Handle Discount Display
+        if (discountAmount > 0) {
+            const discountRow = document.getElementById(`discount-row-${bookingId}`);
+            const discountAmountElement = document.getElementById(`discount-amount-${bookingId}`);
+            if (discountRow && discountAmountElement) {
+                discountRow.style.display = 'block';
+                discountAmountElement.innerHTML = `<span class="text-danger"><strong>-₱${parseFloat(discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>`;
+                // console.log(`✅ Discount row displayed: -₱${parseFloat(discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
+            } else {
+                console.error(`❌ Discount elements not found for booking ${bookingId}`);
+            }
+        } else {
+            const discountRow = document.getElementById(`discount-row-${bookingId}`);
+            if (discountRow) {
+                discountRow.style.display = 'none';
+                // console.log(`✅ Discount row hidden (no discount)`);
+            }
+        }
 
         // Format Balance with Comma Separator
         let formattedBalance = totalUnpaid.toLocaleString('en-US', {
@@ -1830,6 +2005,7 @@ window.processExtension = processExtension;
 window.calculateExtensionCost = calculateExtensionCost;
 window.openRoomMenuModal = openRoomMenuModal;
 window.openCheckoutBacktrackModal = openCheckoutBacktrackModal;
+window.toggleCustomCost = toggleCustomCost;
 
 // Initialize transfer modal immediately
 function initializeTransferModal() {

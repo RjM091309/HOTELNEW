@@ -469,7 +469,12 @@ class BookingModel {
       pickupServiceId,
       pickupPrice,
       dropoffServiceId,
-      dropoffPrice
+      dropoffPrice,
+      // ✅ Additional for Direct Reservations
+      bedCount,
+      isDirectReservation,
+      reservationFee,
+      discount
     } = bookingData;
 
     try {
@@ -513,13 +518,14 @@ class BookingModel {
         // Create booking
         const bookingQuery = `
           INSERT INTO booking 
-          (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, REMARKS, CONFIRMATION_NUMBER, NOTIFICATION_READ, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, AGENCY_ID) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)
+          (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, REMARKS, CONFIRMATION_NUMBER, NOTIFICATION_READ, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, AGENCY_ID, IS_DIRECT_RESERVATION, BED_COUNT) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)
         `;
+        const directReservationFlag = isDirectReservation ? 1 : 0;
         const bookingValues = [
           customerId, room_id, checkInDate, checkOutDate, 'pending', finalBookingRoute,
           maxOccupants, bookingRemarks, confirmationNumber, encodedBy, date, 1, checkInStatus, 
-          finalBookingRoute === 'agency' ? agencyID : null 
+          finalBookingRoute === 'agency' ? agencyID : null, directReservationFlag, bedCount || null
         ];
 
         const bookingResult = await new Promise((resolve, reject) => {
@@ -534,11 +540,12 @@ class BookingModel {
         // Create billing
         const billingQuery = `
           INSERT INTO billing 
-          (BOOKING_ID, ROOM_CHARGE, AMENITIES_CHARGE, SERVICES_CHARGE, LATE_CHECKOUT_CHARGE, QTY, PAYMENT_STATUS, PAYMENT_METHOD, REMARKS, ENCODED_BY, ENCODED_DT, ACTIVE) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (BOOKING_ID, ROOM_CHARGE, AMENITIES_CHARGE, SERVICES_CHARGE, LATE_CHECKOUT_CHARGE, QTY, PAYMENT_STATUS, PAYMENT_METHOD, REMARKS, ENCODED_BY, ENCODED_DT, ACTIVE, RESERVATION_FEE, DISCOUNT_AMOUNT) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const billingValues = [
-          bookingId, numericRoomPrice, 0.00, 0.00, 0.00, diffindays, paymentStatus, 'cash', '', encodedBy, date, 1
+          bookingId, numericRoomPrice, 0.00, 0.00, 0.00, diffindays, paymentStatus, 'cash', '', encodedBy, date, 1,
+          parseFloat(reservationFee) || 0.00, parseFloat(discount) || 0.00
         ];
 
         await new Promise((resolve, reject) => {
@@ -549,6 +556,56 @@ class BookingModel {
         });
 
         // console.log('Billing inserted successfully');
+        
+        // Insert payment records for reservation fee and discount if they exist
+        const additionalPayments = [];
+        
+        // Add reservation fee payment record
+        if (parseFloat(reservationFee) > 0) {
+          additionalPayments.push([
+            bookingId,
+            null, // No specific service ID for reservation fee
+            parseFloat(reservationFee),
+            'cash',
+            'reservation_fee', // New payment type
+            date,
+            encodedBy
+          ]);
+        }
+        
+        // Add discount payment record (negative amount)
+        if (parseFloat(discount) > 0) {
+          additionalPayments.push([
+            bookingId,
+            null, // No specific service ID for discount
+            -parseFloat(discount), // Negative amount for discount
+            'cash',
+            'discount', // New payment type
+            date,
+            encodedBy
+          ]);
+        }
+        
+        // Insert additional payments if any
+        if (additionalPayments.length > 0) {
+          const additionalPayQuery = `
+            INSERT INTO payments 
+            (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
+            VALUES ?
+          `;
+          
+          await new Promise((resolve, reject) => {
+            connection.query(additionalPayQuery, [additionalPayments], (err) => {
+              if (err) {
+                console.error('❌ Failed to insert reservation fee/discount payments:', err);
+                reject(err);
+              } else {
+                console.log('✅ Reservation fee and discount payments inserted successfully');
+                resolve();
+              }
+            });
+          });
+        }
 
         // Insert breakfast services if provided
         const services = [];
@@ -855,6 +912,14 @@ class BookingModel {
 
           if (hasUnpaid) {
             // Update if existing record is unpaid
+            // Use custom cost if provided, otherwise use existing service cost
+            let costToUse;
+            if (service.CUSTOM_COST !== undefined && service.CUSTOM_COST !== null) {
+              costToUse = parseFloat(service.CUSTOM_COST);
+            } else {
+              costToUse = serviceCost;
+            }
+            
             const updateQuery = `
               UPDATE booking_service 
               SET QTY = ?, 
@@ -868,7 +933,7 @@ class BookingModel {
             await new Promise((resolve, reject) => {
               connection.query(
                 updateQuery,
-                [service.QUANTITY, service.QUANTITY, serviceCost, userId, bookingId, service.SERVICE_ID],
+                [service.QUANTITY, service.QUANTITY, costToUse, userId, bookingId, service.SERVICE_ID],
                 (err) => {
                   if (err) reject(err);
                   else resolve();
@@ -876,18 +941,25 @@ class BookingModel {
               );
             });
 
-            totalCost += service.QUANTITY * serviceCost;
+            totalCost += service.QUANTITY * costToUse;
           } else {
             // Insert new row if no unpaid or already paid
-            const fetchCostQuery = `SELECT SERVICE_COST FROM services WHERE IDNo = ?`;
-            const costResult = await new Promise((resolve, reject) => {
-              connection.query(fetchCostQuery, [service.SERVICE_ID], (err, results) => {
-                if (err) reject(err);
-                else resolve(results);
+            // Use custom cost if provided, otherwise fetch from services table
+            let cost;
+            if (service.CUSTOM_COST !== undefined && service.CUSTOM_COST !== null) {
+              // Use the custom cost provided by the frontend
+              cost = parseFloat(service.CUSTOM_COST);
+            } else {
+              // Fetch cost from services table
+              const fetchCostQuery = `SELECT SERVICE_COST FROM services WHERE IDNo = ?`;
+              const costResult = await new Promise((resolve, reject) => {
+                connection.query(fetchCostQuery, [service.SERVICE_ID], (err, results) => {
+                  if (err) reject(err);
+                  else resolve(results);
+                });
               });
-            });
-
-            const cost = costResult[0]?.SERVICE_COST || 0;
+              cost = costResult[0]?.SERVICE_COST || 0;
+            }
 
             const insertQuery = `
               INSERT INTO booking_service 
@@ -992,6 +1064,20 @@ class BookingModel {
               WHERE pd.BOOKING_ID = ? AND pd.STATUS = 'unpaid' AND pd.ACTIVE = 1
           ), 0) AS transport_unpaid,
 
+          -- Reservation Fee (always applied to reduce balance)
+          COALESCE((
+              SELECT b.RESERVATION_FEE
+              FROM billing b
+              WHERE b.BOOKING_ID = ?
+          ), 0) AS reservation_fee,
+
+          -- Discount Amount (always applied to reduce balance)
+          COALESCE((
+              SELECT b.DISCOUNT_AMOUNT
+              FROM billing b
+              WHERE b.BOOKING_ID = ?
+          ), 0) AS discount_amount,
+
           -- Total Outstanding Balance
           (
               COALESCE((
@@ -1021,12 +1107,25 @@ class BookingModel {
                   FROM booking_pick_drop pd
                   WHERE pd.BOOKING_ID = ? AND pd.STATUS = 'unpaid' AND pd.ACTIVE = 1
               ), 0)
+              -
+              COALESCE((
+                  SELECT b.RESERVATION_FEE
+                  FROM billing b
+                  WHERE b.BOOKING_ID = ?
+              ), 0)
+              -
+              COALESCE((
+                  SELECT b.DISCOUNT_AMOUNT
+                  FROM billing b
+                  WHERE b.BOOKING_ID = ?
+              ), 0)
           ) AS total_unpaid_balance
       `;
       
-      // Ensure param count matches query (8 parameters)
+      // Ensure param count matches query (12 parameters)
       const results = await queryDatabasePromise(query, [
         bookingId, bookingId, bookingId, bookingId, 
+        bookingId, bookingId, bookingId, bookingId,
         bookingId, bookingId, bookingId, bookingId
       ]);
 
@@ -1035,6 +1134,8 @@ class BookingModel {
         extension_charge_unpaid: 0,
         service_unpaid: 0,
         transport_unpaid: 0,
+        reservation_fee: 0,
+        discount_amount: 0,
         total_unpaid_balance: 0
       };
 
@@ -1100,6 +1201,44 @@ class BookingModel {
       return allServices;
     } catch (error) {
       console.error('Error in getBookingServices:', error);
+      throw error;
+    }
+  }
+
+  // Get direct reservation details (Hotel_Old compatibility)
+  static async getDirectReservationDetails(bookingId) {
+    try {
+      const query = `
+        SELECT 
+          b.IDNo as bookingId,
+          c.NAME as fullname,
+          c.CONTACTNo as number,
+          c.ADDRESS as address,
+          CONCAT(DATE_FORMAT(b.CHECK_IN_DATE, '%M %d, %Y'), ' to ', DATE_FORMAT(b.CHECK_OUT_DATE, '%M %d, %Y')) as daterange,
+          DATEDIFF(b.CHECK_OUT_DATE, b.CHECK_IN_DATE) as diffindays,
+          b.BOOKING_CHANNEL as bookingRoute,
+          b.GUESTS_COUNT as maxOccupants,
+          b.REMARKS as bookingRemarks,
+          b.AGENCY_ID as agencyID,
+          b.CONFIRMATION_NUMBER as voucherNo,
+          b.CHECK_IN_STATUS as checkInStatus,
+          bill.PAYMENT_STATUS as paymentStatus,
+          bill.RESERVATION_FEE as reservationFee,
+          bill.DISCOUNT_AMOUNT as discountAmount,
+          gl.TYPE as guestLevel,
+          gt.TYPE as guestType
+        FROM booking b
+        LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+        LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
+        LEFT JOIN guest_level gl ON gl.IDNo = c.LEVEL
+        LEFT JOIN guest_type gt ON gt.IDNo = c.TYPE
+        WHERE b.IDNo = ? AND b.IS_DIRECT_RESERVATION = 1
+      `;
+
+      const results = await queryDatabasePromise(query, [bookingId]);
+      return results.length ? results[0] : null;
+    } catch (error) {
+      console.error('Error in getDirectReservationDetails:', error);
       throw error;
     }
   }
@@ -1328,6 +1467,8 @@ class BookingModel {
           bi.QTY,
           bi.ORIGINAL_QTY,
           bi.PAYMENT_STATUS,
+          bi.RESERVATION_FEE,
+          bi.DISCOUNT_AMOUNT,
           rt.NAME AS ROOM_TYPE
         FROM booking b
         JOIN billing bi ON b.IDNo = bi.BOOKING_ID
@@ -1442,7 +1583,9 @@ class BookingModel {
         invoiceDate: new Date(b.CHECK_IN_DATE).toLocaleDateString(),
         paymentStatus: b.PAYMENT_STATUS,
         items: allItems,
-        subTotal: subTotal
+        subTotal: subTotal,
+        reservationFee: parseFloat(b.RESERVATION_FEE) || 0,
+        discountAmount: parseFloat(b.DISCOUNT_AMOUNT) || 0
       };
 
       return receiptData;
@@ -2226,7 +2369,7 @@ class BookingModel {
           // Insert into `booking`
           const bookingQuery = `
             INSERT INTO booking (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, REMARKS, CONFIRMATION_NUMBER, NOTIFICATION_READ, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, GROUP_BOOKING_ID)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)
           `;
           const bookingValues = [
             guestID, roomId, checkInDate, checkOutDate, 'pending', bookingRoute, 1, '',
@@ -3358,6 +3501,119 @@ class BookingModel {
       return results;
     } catch (error) {
       console.error('Error in getPickDrop:', error);
+      throw error;
+    }
+  }
+
+  // Get available rooms by bed count for direct reservations
+  static async getAvailableRoomsByBedCount(startDate, endDate, bedCount) {
+    try {
+      // Format dates to YYYY-MM-DD
+      const formatDate = (date) => {
+        const d = new Date(date);
+        const month = String(d.getMonth() + 1).padStart(2, '0'); // Months are 0-based
+        const day = String(d.getDate()).padStart(2, '0');
+        const year = d.getFullYear();
+        return `${year}-${month}-${day}`;
+      };
+
+      const startDateFormatted = formatDate(startDate);
+      const endDateFormatted = formatDate(endDate);
+      
+      const query = `
+        SELECT r.IDNo, r.ROOM_NUMBER, r.ROOM_FLOOR, r.ROOM_BED, r.ROOM_VIEW,  (
+            SELECT 1 
+            FROM booking b2 
+            WHERE b2.ROOM_ID = r.IDNo 
+              AND DATE(b2.CHECK_OUT_DATE) = ? 
+            LIMIT 1
+          ) AS checkoutToday
+        FROM room r
+        LEFT JOIN booking b ON r.IDNo = b.ROOM_ID
+            AND DATE(b.CHECK_IN_DATE) < ?
+            AND DATE(b.CHECK_OUT_DATE) > ?
+        WHERE r.ROOM_STATUS NOT IN (3, 4)
+          AND (b.ROOM_ID IS NULL OR DATE(b.CHECK_OUT_DATE) = ?)
+          ${bedCount ? 'AND r.ROOM_BED = ?' : ''}
+        ORDER BY r.ROOM_NUMBER ASC;
+      `;
+
+      const queryParams = [startDateFormatted, endDateFormatted, startDateFormatted, startDateFormatted];
+      if (bedCount) {
+        queryParams.push(bedCount);
+      }
+      
+      const results = await queryDatabasePromise(query, queryParams);
+      return results;
+    } catch (error) {
+      console.error('Error in getAvailableRoomsByBedCount:', error);
+      throw error;
+    }
+  }
+
+  // Assign room to direct reservation
+  static async assignRoomToDirectReservation(params) {
+    const { bookingId, roomId, roomNumber, roomType, bedCount, price, floor } = params;
+    
+    try {
+      // Start transaction
+      await queryDatabasePromise('START TRANSACTION');
+
+      // Update the booking to assign the room
+      const updateBookingQuery = `
+        UPDATE booking 
+        SET ROOM_ID = ?, 
+            IS_DIRECT_RESERVATION = 0,
+            EDITED_BY = 'System',
+            EDITED_DT = NOW()
+        WHERE IDNo = ? AND ACTIVE = 1
+      `;
+      
+      const bookingResult = await queryDatabasePromise(updateBookingQuery, [roomId, bookingId]);
+      
+      if (bookingResult.affectedRows === 0) {
+        await queryDatabasePromise('ROLLBACK');
+        return {
+          success: false,
+          message: 'Booking not found or already inactive'
+        };
+      }
+
+      // Update room status to occupied
+      const updateRoomQuery = `
+        UPDATE room 
+        SET ROOM_STATUS = 2 
+        WHERE IDNo = ? AND ACTIVE = 1
+      `;
+      
+      await queryDatabasePromise(updateRoomQuery, [roomId]);
+
+      // Update billing to include room charge
+      const updateBillingQuery = `
+        UPDATE billing 
+        SET ROOM_CHARGE = ? 
+        WHERE BOOKING_ID = ? AND ACTIVE = 1
+      `;
+      
+      await queryDatabasePromise(updateBillingQuery, [price, bookingId]);
+
+      // Commit transaction
+      await queryDatabasePromise('COMMIT');
+
+      return {
+        success: true,
+        message: `Room ${roomNumber} assigned successfully to direct reservation`
+      };
+
+    } catch (error) {
+      // Rollback transaction on error
+      try {
+        await queryDatabasePromise('ROLLBACK');
+      } catch (rollbackError) {
+        console.error('Error during rollback:', rollbackError);
+      }
+      
+      console.error('Error in assignRoomToDirectReservation:', error);
       throw error;
     }
   }

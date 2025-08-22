@@ -98,6 +98,8 @@ class DashboardModel {
           b.REMARKS AS BookingRemarks,
           b.CONFIRMATION_NUMBER,
           b.BOOKING_CHANNEL,
+          b.IS_DIRECT_RESERVATION,
+          b.BED_COUNT,
           b.REMARKS,
           b.CHECK_IN_STATUS,
           b.LATE_CHECKOUT,

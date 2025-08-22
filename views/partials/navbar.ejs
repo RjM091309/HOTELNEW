@@ -438,6 +438,27 @@ height: 34px;
 	#allNotificationsModal .modal-body { max-height: 400px; overflow-y: auto; }
 	.list-group-item { font-size: 14px; line-height: 1.4; }
 	
+	/* Date Options Modal Styling */
+	.swal2-popup .btn {
+		border-radius: 8px;
+		font-weight: 600;
+		transition: all 0.3s ease;
+	}
+
+	.swal2-popup .btn:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+	}
+
+	.swal2-popup .btn-primary {
+		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		border: none;
+	}
+
+	.swal2-popup .btn-success {
+		background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+		border: none;
+	}
 
 </style>
 
@@ -545,6 +566,25 @@ if (!cleanDateRange || !cleanDateRange.includes(" to ")) {
       </div>
         <div id="roomListContainer">
             ${generateRoomListHTML(data.rooms)}
+        </div>
+        
+        <!-- RESERVE Button -->
+        <div style="text-align: center; margin-top: 20px;">
+            <button onclick="openDirectReservationModal('${formattedStartDate} to ${formattedEndDate}', ${Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24))})" 
+                    style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); 
+                           border: none; 
+                           color: white; 
+                           padding: 10px 20px; 
+                           border-radius: 10px; 
+                           font-weight: bold; 
+                           font-size: 14px; 
+                           cursor: pointer; 
+                           display: inline-flex; 
+                           align-items: center; 
+                           gap: 10px; 
+                           box-shadow: 0 4px 15px rgba(17, 153, 142, 0.4);">
+                📅 Unassigned Room
+            </button>
         </div>
     `,
     showConfirmButton: false,
@@ -859,21 +899,24 @@ function initializeAddBookingHandler() {
     $('#addbooking').off('submit').on('submit', function (e) {
         e.preventDefault();
        
+        // Check if this is a direct reservation
+        const isDirectReservation = $('#directReservationFlag').val() === 'true';
+       
         // Reverting to manual data collection as it was more reliable.
         const formData = {
-            room_id: $('#addroom').val(),
+            room_id: isDirectReservation ? 0 : $('#addroom').val(), // 0 for direct reservations (backend can handle this)
             fullname: $('#txtFullNameAdd').val(),
             number: $('#txtNumber').val(),
             address: $('#txtAddress').val() || '',
             daterange: $('#daterange').val(),
-            maxOccupants: $('#maxOccupants').val(),
+            maxOccupants: isDirectReservation ? 1 : $('#maxOccupants').val(), // Default to 1 for direct reservations
             paymentStatus: $('#paymentStatus').val(),
-            price: $('#baseprice').val(),
+            price: isDirectReservation ? '0.00' : $('#baseprice').val(), // Default to 0.00 for direct reservations
             diffindays: $('#diffindays').val(),
             guestType: $('#guestType').val(),
             guestLevel: $('#guestLevel').val(),
             guestID: $('#guestID').val(),
-            bookingRoute: $('#bookingRoute').val(),
+            bookingRoute: isDirectReservation ? 'direct-reservation' : $('#bookingRoute').val(),
             checkInStatus: $('#checkInStatus').val(),
             bookingRemarks: $('#bookingRemarks').val(),
             agencyID: $('#agencySelect').val(),
@@ -890,10 +933,49 @@ function initializeAddBookingHandler() {
             pickupPrice: $('#pickupPrice').val(),
             dropoffServiceId: $('#dropoffServiceId').val(),
             dropoffPrice: $('#dropoffPrice').val(),
-           
+            
+            // Add bed count for direct reservations only
+            bedCount: isDirectReservation ? (window.selectedBedCount || 1) : null,
+            
+            // ✅ Include reservation fee and discount
+            reservationFee: $('#includeReservationFee').prop('checked') ? $('#reservationFeeAmount').val() : '0.00',
+            discount: $('#includeDiscount').prop('checked') ? $('#discountAmount').val() : '0.00',
+            
+            // Add direct reservation flag
+            directReservationFlag: isDirectReservation ? 'true' : 'false'
         };
 
         console.log('Form data being sent (manual):', formData);
+        if (isDirectReservation) {
+            console.log('🚨 DIRECT RESERVATION DETECTED - No room assigned');
+        }
+        
+        // Validate required fields for direct reservations
+        if (isDirectReservation) {
+            if (!formData.fullname || !formData.number || !formData.daterange) {
+                Swal.fire({
+                    title: 'Missing Required Fields',
+                    text: 'Please fill in Guest Name, Contact Number, and Date Range for Direct Reservation.',
+                    icon: 'warning',
+                    confirmButtonText: 'OK'
+                });
+                return;
+            }
+            
+            // Validate reservation fee for direct reservations
+            const reservationFeeChecked = $('#includeReservationFee').prop('checked');
+            const reservationFeeAmount = parseFloat($('#reservationFeeAmount').val()) || 0;
+            
+            if (!reservationFeeChecked || reservationFeeAmount <= 0) {
+                Swal.fire({
+                    title: 'Reservation Fee Required',
+                    text: 'Direct reservations require a reservation fee. Please check the Reservation Fee checkbox and enter an amount.',
+                    icon: 'warning',
+                    confirmButtonText: 'OK'
+                });
+                return;
+            }
+        }
 
         // Perform AJAX request to save booking
         $.ajax({
@@ -922,10 +1004,10 @@ function initializeAddBookingHandler() {
             fullname: formData.fullname,
             dateFrom: formData.daterange.split(' to ')[0],
             dateTo: formData.daterange.split(' to ')[1].split('(')[0].trim(),
-            bedCount: formData.bedCount || '',
-            roomNumber: $('#addroom option:selected').text(),
-            roomType: $('#room_type_hidden').val(),
-            roomView: $('#room_type').val(),
+            bedCount: formData.bedCount || formData.bedCountDirect || window.selectedBedCount || 1,
+            roomNumber: isDirectReservation ? 'No Room Assigned' : $('#addroom option:selected').text(),
+            roomType: isDirectReservation ? 'Direct Reservation' : $('#room_type_hidden').val(),
+            roomView: isDirectReservation ? 'N/A' : $('#room_type').val(),
             roomRate: formData.price,
             breakfastAdult: formData.breakfastAdultQty,
             breakfastAdultPrice: formData.breakfastAdultPrice,
@@ -933,6 +1015,8 @@ function initializeAddBookingHandler() {
             breakfastKidPrice: formData.breakfastKidPrice,
             pickup: formData.pickupPrice || 0,
             dropoff: formData.dropoffPrice || 0,
+            reservationFee: formData.reservationFee || 0,
+            discount: formData.discount || 0,
             remarks: formData.bookingRemarks,
             total: $('#computedTotal').text(),
             checkInStatus: formData.checkInStatus
@@ -986,6 +1070,322 @@ $(document).ready(function() {
     initializeAddBookingHandler();
 });
 
+// Function to open direct reservation modal without room selection
+function openDirectReservationModal(formattedDateRange, nights) {
+    // Close the current SweetAlert modal first
+    Swal.close();
+    
+    // Wait a bit for smooth transition, then open the direct reservation modal
+    setTimeout(() => {
+        // Set the date range in the Add Booking modal
+        const dateRangeField = document.querySelector("#daterange");
+        if (dateRangeField) {
+            dateRangeField.value = formattedDateRange;
+        }
+
+        // Set the nights in the diffindays field
+        const diffInDaysField = document.querySelector("#diffindays");
+        if (diffInDaysField) {
+            diffInDaysField.value = nights;
+        }
+
+        // Show the Add Booking modal directly
+        const addBookingModalElement = document.getElementById('modal-addbooking');
+        if (addBookingModalElement) {
+           
+            document.body.classList.add('custom-booking-layout');
+            const addBookingModal = new bootstrap.Modal(addBookingModalElement);
+            addBookingModal.show();
+            
+            // Wait a bit for modal to fully open, then ensure content is visible
+            setTimeout(() => {
+                const modalBody = addBookingModalElement.querySelector('.modal-body');
+                if (modalBody) {
+                    modalBody.style.display = 'block';
+                    modalBody.style.visibility = 'visible';
+                    modalBody.style.opacity = '1';
+                }
+            }, 100);
+            
+            // Disable date fields since they're pre-filled
+            document.getElementById('daterange').disabled = true;
+            document.getElementById('diffindays').disabled = true;
+            
+            // Hide only specific room selection fields, not entire rows
+            const fieldsToHide = [
+                '#addFloor', '#addroom', '#room_type', '#room_type_hidden', 
+                '#bedCount', '#bookingRoute', '#price', '#divprice'
+            ];
+            
+            fieldsToHide.forEach(selector => {
+                const field = document.querySelector(selector);
+                if (field) {
+                    field.style.display = 'none';
+                }
+            });
+            
+            // Hide specific div containers but keep their parent rows
+            const divsToHide = ['#divaddFloor', '#divaddroom', '#divroom_type', '#divbedCount', '#bookingRouteSinglePlaceholder', '#divprice'];
+            divsToHide.forEach(selector => {
+                const div = document.querySelector(selector);
+                if (div) {
+                    div.style.display = 'none';
+                }
+            });
+            
+            // Hide breakfast-related fields completely (including labels and containers)
+            const breakfastFieldsToHide = [
+                '#includeBreakfast', '#breakfastInputs'
+            ];
+            
+            breakfastFieldsToHide.forEach(selector => {
+                const field = document.querySelector(selector);
+                if (field) {
+                    field.style.display = 'none';
+                }
+            });
+            
+            // Hide breakfast label and container more aggressively
+            const breakfastLabels = document.querySelectorAll('label, span, div');
+            breakfastLabels.forEach(element => {
+                const text = element.textContent || '';
+                if (text.toLowerCase().includes('breakfast') && 
+                    !text.toLowerCase().includes('pick') && 
+                    !text.toLowerCase().includes('drop')) {
+                    element.style.display = 'none';
+                }
+            });
+            
+            // Also hide any parent containers that might contain breakfast
+            const breakfastContainers = document.querySelectorAll('.form-group, .form-check, .checkbox-group');
+            breakfastContainers.forEach(container => {
+                const hasBreakfast = container.querySelector('#includeBreakfast, #breakfastInputs');
+                if (hasBreakfast) {
+                    container.style.display = 'none';
+                }
+            });
+            
+            // Ensure the modal body is visible
+            const modalBody = addBookingModalElement.querySelector('.modal-body');
+            if (modalBody) {
+                modalBody.style.display = 'block';
+                modalBody.style.visibility = 'visible';
+                modalBody.style.opacity = '1';
+                modalBody.style.height = 'auto';
+                modalBody.style.overflow = 'visible';
+            }
+            
+            // Also ensure the form is visible
+            const form = addBookingModalElement.querySelector('#addbooking');
+            if (form) {
+                form.style.display = 'block';
+                form.style.visibility = 'visible';
+            }
+            
+            // Show message that this is a direct reservation
+            const modalTitle = addBookingModalElement.querySelector('.modal-title');
+            if (modalTitle) {
+                modalTitle.innerHTML = 'Reservation - No Room Assigned';
+            }
+            
+            // Add a hidden field to identify this as a direct reservation
+            let directReservationFlag = addBookingModalElement.querySelector('#directReservationFlag');
+            if (!directReservationFlag) {
+                directReservationFlag = document.createElement('input');
+                directReservationFlag.type = 'hidden';
+                directReservationFlag.id = 'directReservationFlag';
+                directReservationFlag.name = 'directReservationFlag';
+                directReservationFlag.value = 'true';
+                addBookingModalElement.querySelector('#addbooking').appendChild(directReservationFlag);
+            } else {
+                directReservationFlag.value = 'true';
+            }
+            
+            // Also add a visual indicator in the form
+            let directReservationLabel = addBookingModalElement.querySelector('#directReservationLabel');
+            if (!directReservationLabel) {
+                directReservationLabel = document.createElement('div');
+                directReservationLabel.style.marginBottom = '20px';
+                
+                // Insert at the top of the form
+                const form = addBookingModalElement.querySelector('#addbooking');
+                form.insertBefore(directReservationLabel, form.firstChild);
+            }
+            
+            // Set default payment status to "unpaid" for direct reservations
+            const paymentStatusField = addBookingModalElement.querySelector('#paymentStatus');
+            if (paymentStatusField) {
+                paymentStatusField.value = 'unpaid';
+            }
+
+            // Handle reservation fee requirement for direct reservations
+            const reservationFeeCheckbox = addBookingModalElement.querySelector('#includeReservationFee');
+            const reservationFeeWrapper = addBookingModalElement.querySelector('#reservationFeeWrapper');
+            const reservationFeeRequired = addBookingModalElement.querySelector('#reservationFeeRequired');
+            const reservationFeeAmount = addBookingModalElement.querySelector('#reservationFeeAmount');
+            
+            if (reservationFeeCheckbox && reservationFeeWrapper && reservationFeeRequired && reservationFeeAmount) {
+                // For direct reservations, reservation fee is required
+                reservationFeeCheckbox.checked = true;
+                reservationFeeWrapper.style.display = 'block';
+                reservationFeeRequired.style.display = 'block';
+              
+                
+                // Disable the checkbox to prevent unchecking
+                reservationFeeCheckbox.disabled = true;
+            }
+
+             // Hide Group Booking checkbox for direct reservations
+            const groupBookingCheckbox = addBookingModalElement.querySelector('#groupBookingCheckbox');
+            if (groupBookingCheckbox) {
+                groupBookingCheckbox.parentElement.style.display = 'none';
+            }
+            
+            // Add Bed Count field in the same row as Date fields
+            const contactNumberField = addBookingModalElement.querySelector('#txtNumber');
+            if (contactNumberField) {
+                // Look for the row that contains Date fields (Select Date From/To)
+                // We want Bed Count to be in the same row as the date selection
+                let targetRow = null;
+                
+                // Find the date fields to locate their row
+                const dateFromField = addBookingModalElement.querySelector('#daterange');
+                if (dateFromField) {
+                    let dateColumn = dateFromField.parentNode.parentNode; // Go up to col-lg-6 or col-lg-4
+                    let dateRow = dateColumn.parentNode; // Go up to the row
+                    
+                    // Check if this row contains date-related fields
+                    if (dateRow && (dateRow.querySelector('#daterange') || dateRow.querySelector('#diffindays'))) {
+                        targetRow = dateRow;
+                    }
+                }
+                
+                if (targetRow && targetRow.classList.contains('row')) {
+                    // First, update Guest and Contact Number columns to col-lg-6
+                    const guestColumn = addBookingModalElement.querySelector('#divtxtFullNameAdd');
+                    const contactColumn = addBookingModalElement.querySelector('#divtxtNumber');
+                    
+                    if (guestColumn) {
+                        guestColumn.className = 'col-lg-6';
+                    }
+                    if (contactColumn) {
+                        contactColumn.className = 'col-lg-6';
+                    }
+                    
+                     // Create bed count column (col-lg-6 for proper alignment)
+                    const bedCountColumn = document.createElement('div');
+                    bedCountColumn.className = 'col-lg-6';
+                    bedCountColumn.id = 'divBedCount';
+                    
+                    // Create bed count container
+                    const bedCountContainer = document.createElement('div');
+                    bedCountContainer.className = 'form-group';
+                    
+                    // Create bed count label
+                    const bedCountLabel = document.createElement('label');
+                    bedCountLabel.htmlFor = 'bedCountDirect';
+                    bedCountLabel.textContent = 'Bed Count:';
+                   
+                   
+                    // Create bed count select
+                    const bedCountSelect = document.createElement('select');
+                    bedCountSelect.id = 'bedCountDirect';
+                    bedCountSelect.name = 'bedCountDirect';
+                    bedCountSelect.className = 'form-control';
+                    bedCountSelect.required = true;
+                   
+                    
+                    // Add bed count options
+                    const bedOptions = [
+                        { value: '', text: 'Select Options', selected: true, disabled: true },
+                        { value: '1', text: '1 Bed' },
+                        { value: '2', text: '2 Beds' }
+                
+                    ];
+                    
+                    bedOptions.forEach(option => {
+                        const optionElement = document.createElement('option');
+                        optionElement.value = option.value;
+                        optionElement.textContent = option.text;
+                        if (option.selected) optionElement.selected = true;
+                        if (option.disabled) optionElement.disabled = true;
+                        bedCountSelect.appendChild(optionElement);
+                    });
+                    
+                    // Don't set default value - let the "Select" option be selected by default
+                    // bedCountSelect.value = '1';
+                    
+                    // Append label and select to container
+                    bedCountContainer.appendChild(bedCountLabel);
+                    bedCountContainer.appendChild(bedCountSelect);
+                    
+                    // Add bed count container to the column
+                    bedCountColumn.appendChild(bedCountContainer);
+                    
+                    // Add the new column to the same row
+                    targetRow.appendChild(bedCountColumn);
+                    
+                    // Add event listener to capture Bed Count value when form is submitted
+                    const bedCountSelectElement = document.getElementById('bedCountDirect');
+                    if (bedCountSelectElement) {
+                        bedCountSelectElement.addEventListener('change', function() {
+                            // Store the selected bed count value for later use
+                            window.selectedBedCount = this.value;
+                        });
+                    }
+                } else {
+                    // Fallback: create simple form group if row structure not found
+                    const bedCountContainer = document.createElement('div');
+                    bedCountContainer.className = 'form-group';
+                    bedCountContainer.style.marginTop = '15px';
+                    
+                    const bedCountLabel = document.createElement('label');
+                    bedCountLabel.htmlFor = 'bedCountDirect';
+                    bedCountLabel.textContent = 'Bed Count:';
+                    bedCountLabel.style.fontWeight = 'bold';
+                    bedCountLabel.style.color = '#333';
+                    
+                    const bedCountSelect = document.createElement('select');
+                    bedCountSelect.id = 'bedCountDirect';
+                    bedCountSelect.name = 'bedCountDirect';
+                    bedCountSelect.className = 'form-control';
+                    bedCountSelect.style.width = '100%';
+                    
+                    const bedOptions = [
+                        { value: '1', text: '1 Bed' },
+                        { value: '2', text: '2 Beds' }
+                    ];
+                    
+                    bedOptions.forEach(option => {
+                        const optionElement = document.createElement('option');
+                        optionElement.value = option.value;
+                        optionElement.textContent = option.text;
+                        bedCountSelect.appendChild(optionElement);
+                    });
+                    
+                    bedCountSelect.value = '1';
+                    bedCountContainer.appendChild(bedCountLabel);
+                    bedCountContainer.appendChild(bedCountSelect);
+                    
+                    // Insert after contact number
+                    contactNumberField.parentNode.insertBefore(bedCountContainer, contactNumberField.nextSibling);
+                    
+                    // Add event listener to capture Bed Count value for fallback case
+                    const bedCountSelectFallback = document.getElementById('bedCountDirect');
+                    if (bedCountSelectFallback) {
+                        bedCountSelectFallback.addEventListener('change', function() {
+                            // Store the selected bed count value for later use
+                            window.selectedBedCount = this.value;
+                        });
+                    }
+                }
+            }
+        } else {
+            console.error('Modal element not found in the DOM');
+        }
+    }, 100); // Close the setTimeout
+}
+
 // Auto-trigger sidebar toggle for calendar page - DISABLED to prevent hash issues
 // function autoTriggerSidebarForCalendar() {
 //     // Check if current page is calendar
@@ -1013,6 +1413,22 @@ $(document).ready(function() {
 // document.addEventListener('DOMContentLoaded', function() {
 //     autoTriggerSidebarForCalendar();
 // });
+
+// Function to calculate time ago for notifications
+function timeAgo(date) {
+    if (!date) return "N/A";
+    const now = new Date();
+    const pastDate = new Date(date);
+    if (isNaN(pastDate.getTime())) return "Invalid date";
+    const seconds = Math.floor((now - pastDate) / 1000);
+    if (seconds < 60) return `${seconds} second${seconds !== 1 ? 's' : ''} ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+    const days = Math.floor(hours / 24);
+    return `${days} day${days !== 1 ? 's' : ''} ago`;
+}
 
 //logout
 function logout() {

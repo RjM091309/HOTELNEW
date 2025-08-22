@@ -786,6 +786,9 @@ function calculateCardVariables(booking) {
 		var script7 = document.createElement('script');
 		script7.src = '/js/dashboard/booking_data.js';
 		document.body.appendChild(script7);
+    var script8 = document.createElement('script');
+		script8.src = '/js/dashboard/unassigned_room.js';
+		document.body.appendChild(script8);
 	});
 </script>
 
@@ -907,6 +910,9 @@ function openRemarksModalFromData(element) {
     // Call the existing function
     openRemarksModal(bookingId, roomNumber, customerName, currentRemarks);
 }
+
+ 
+
 </script>
 					
 					
@@ -1022,7 +1028,147 @@ function openRemarksModalFromData(element) {
   color: #fff;
   font-size: 12px;
 }
+
+/* Direct Reservation UNFIX Styling */
+.unfix-header {
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: #ff6b6b !important;
+  font-weight: bold !important;
+  font-size: 16px !important;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+  background: linear-gradient(45deg, #ff6b6b, #ff8e8e);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.unfix-header:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.available-rooms-modal .swal2-popup {
+  max-width: 600px !important;
+}
+
+.room-option {
+  transition: all 0.2s ease;
+}
+
+.room-option:hover {
+  background-color: #f8f9fa;
+  border-color: #007bff !important;
+  transform: translateY(-2px);
+}
+
+/* Fix Swal being hidden behind modals */
+.swal2-container {
+  z-index: 99999 !important;
+}
+.modal-backdrop {
+  z-index: 1040 !important;
+}
+.modal {
+  z-index: 1050 !important;
+}
+
+/* Room Grid Styling for Direct Reservation Modal */
+.room-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px;
+  background-color: #eaf4fc;
+  border-radius: 12px;
+}
+
+.room-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 80px;
+  height: 80px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background-color: #fff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  margin: 5px;
+  position: relative;
+}
+
+.room-container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  background-color: inherit;
+}
+
+.room-button {
+  font-size: 16px;
+  font-weight: bold;
+  color: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+}
+
+.room-button:hover {
+  background-color: #f0f8ff;
+  border-radius: 8px;
+}
+
+/* Floor color classes matching Hotel_Old */
+.room-container.card-topline-green::before {
+  background-color: #28a745;
+}
+
+.room-container.card-topline-blue::before {
+  background-color: #007bff;
+}
+
+.room-container.card-topline-red::before {
+  background-color: #dc3545;
+}
+
+.room-container.card-topline-violet::before {
+  background-color: #6f42c1;
+}
+
+.room-container.card-topline-gray::before {
+  background-color: #6c757d;
+}
+
+/* Search Input */
+#searchRoomInput {
+  margin-bottom: 10px;
+  padding: 6px; /* Smaller padding */
+  font-size: 14px; /* Smaller font size */
+  border: 1px solid #ccc; /* Subtle border */
+  border-radius: 4px; /* Rounded corners */
+  width: 25%; /* Full width of the modal */
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1); /* Subtle inner shadow */
+}
+
+#searchRoomInput:focus {
+  outline: none; /* Remove default outline */
+  border-color: #007bff; /* Blue border on focus */
+  box-shadow: 0 0 4px rgba(0, 123, 255, 0.5); /* Glow effect */
+}
 </style>
+
+<!-- Include Billing Modal -->
+<%- include('../booking/modal/billing') %>
 					
 					
 					

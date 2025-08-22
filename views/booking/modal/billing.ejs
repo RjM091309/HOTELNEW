@@ -102,14 +102,26 @@
                                                 <img id="paidImage" src="/img/paid.png" alt="Paid" class="paid-overlay-image" />
                                             </div>
                                             
+                                           
                                             <div class="summary-row">
                                                 <span class="summary-label">Paid Amount:</span>
                                                 <span class="summary-value paid-amount" id="totalPaid">₹0.00</span>
+                                            </div>
+                                             <!-- Reservation Fee (Conditional) -->
+                                             <div class="summary-row" id="reservationFeeRow">
+                                                <span class="summary-label">Reservation Fee:</span>
+                                                <span class="summary-value reservation-fee-amount" id="billingReservationFeeAmount" style="color: #28a745;"></span>
+                                            </div>
+                                            <!-- Discount (Conditional) -->
+                                            <div class="summary-row" id="discountRow">
+                                                <span class="summary-label">Discount Applied:</span>
+                                                <span class="summary-value discount-amount" id="billingDiscountAmount" style="color: #28a745;"></span>
                                             </div>
                                             <div class="summary-row">
                                                 <span class="summary-label">Balance:</span>
                                                 <span class="summary-value balance-amount" id="balanceAmount">₹0.00</span>
                                             </div>
+                                            
                                             <div class="summary-row total-row">
                                                 <span class="summary-label">Total Amount:</span>
                                                 <span class="summary-value total-amount" id="totalPayment">₹0.00</span>
