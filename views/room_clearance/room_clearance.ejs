@@ -1,0 +1,308 @@
+<!-- start page content -->
+<div class="row">
+	<div class="col-xl-12 col-md-12 col-12">
+		<div class="dashboard-card">
+			<div class="dashboard-card-header">
+				<div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+					<div class="tab-bar">
+						<a class="tab-item is-active" href="/room_clearance">Room Clearance</a>
+					</div>
+					<div style="flex: 0 0 auto;">
+						<button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#new-clearance-modal">
+							<i class="fa fa-plus"></i> New Clearance
+						</button>
+						<button id="exportClearance" class="btn btn-primary" style="margin-left: 10px;">
+							<i class="fa fa-download"></i> Export to Excel
+						</button>
+					</div>
+				</div>
+			</div>
+			<div class="dashboard-card-body">
+				<div class="table-scrollable">
+					<table id="room_clearance_tbl" class="table table-hover table-bordered full-width">
+						<thead>
+							<tr>
+								<th>Room</th>
+								<th>Guest</th>
+								<th>Checkout</th>
+								<th>Assigned To</th>
+								<th>Status</th>
+								<th>Encoded Date</th>
+								<th>Action</th>
+							</tr>
+						</thead>
+						<tbody></tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- ======================================== -->
+<!-- ROOM CLEARANCE MODALS -->
+<!-- ======================================== -->
+
+<!-- Add New Clearance Modal -->
+<div class="modal fade" id="new-clearance-modal" tabindex="-1" role="dialog" aria-labelledby="newClearanceModalLabel" aria-hidden="true">
+	<div class="modal-dialog modal-lg" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h4 class="modal-title" id="newClearanceModalLabel">New Room Clearance</h4>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<form id="new-clearance-form">
+				<div class="modal-body">
+					<div class="row">
+						<!-- Checkout Booking Dropdown -->
+						<div class="col-lg-6 p-t-20">
+							<div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+								<select class="mdl-textfield__input" id="nc-booking" name="booking_id" required>
+									<option value="">Select Checkout Booking</option>
+								</select>
+								<label class="mdl-textfield__label">Checkout Booking</label>
+							</div>
+						</div>
+
+						<!-- Assign To Dropdown -->
+						<div class="col-lg-6 p-t-20">
+							<div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+								<select class="mdl-textfield__input" id="nc-assigned-to" name="assigned_to">
+									<option value="">Unassigned</option>
+								</select>
+								<label class="mdl-textfield__label">Assign To</label>
+							</div>
+						</div>
+
+						<!-- Notes -->
+						<div class="col-lg-12 p-t-20">
+							<div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+								<textarea class="mdl-textfield__input" name="notes" rows="3"></textarea>
+								<label class="mdl-textfield__label">Notes</label>
+							</div>
+						</div>
+
+						<!-- Status -->
+						<div class="col-lg-6 p-t-20">
+							<div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+								<select class="mdl-textfield__input" name="status" id="nc-status" required>
+									<option value="assigned">Assigned</option>
+									<option value="clear">Clear</option>
+									<option value="issue">Issue</option>
+								</select>
+								<label class="mdl-textfield__label">Status</label>
+							</div>
+						</div>
+
+						<!-- Conditional Fields for Issue Status -->
+						<div id="issue-fields" style="display: none;">
+							<div class="row">
+								<!-- Checklist -->
+								<div class="col-lg-12 p-t-20">
+									<div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+										<textarea class="mdl-textfield__input" name="checklist" rows="3" placeholder="Enter checklist items (e.g., Damaged items, Missing amenities, etc.)"></textarea>
+										<label class="mdl-textfield__label">Checklist</label>
+									</div>
+								</div>
+
+								<!-- Upload Photos -->
+								<div class="col-lg-6 p-t-20">
+									<div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+										<input type="file" class="mdl-textfield__input" name="photos" multiple accept="image/*" />
+										<label class="mdl-textfield__label">Upload Photos</label>
+									</div>
+								</div>
+
+								<!-- Proposed Charges -->
+								<div class="col-lg-6 p-t-20">
+									<div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+										<textarea class="mdl-textfield__input" name="proposed_charges" rows="3" placeholder="Enter proposed charges (e.g., Damaged towel: $50, Broken lamp: $30)"></textarea>
+										<label class="mdl-textfield__label">Proposed Charges</label>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+					<button type="submit" class="btn btn-primary">Save</button>
+				</div>
+			</form>
+		</div>
+	</div>
+</div>
+
+<!-- Edit Clearance Modal -->
+<div class="modal fade" id="edit-clearance-modal" tabindex="-1" role="dialog" aria-labelledby="editClearanceModalLabel" aria-hidden="true">
+	<div class="modal-dialog modal-lg" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h4 class="modal-title" id="editClearanceModalLabel">Edit Room Clearance</h4>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<form id="edit-clearance-form">
+				<div class="modal-body">
+					<input type="hidden" id="ec-id" name="id" />
+					<div class="row">
+						<!-- Checkout Booking Dropdown -->
+						<div class="col-lg-6 p-t-20">
+							<div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+								<select class="mdl-textfield__input" id="ec-booking" name="booking_id" required>
+									<option value="">Select Checkout Booking</option>
+								</select>
+								<label class="mdl-textfield__label">Checkout Booking</label>
+							</div>
+						</div>
+
+						<!-- Assign To Dropdown -->
+						<div class="col-lg-6 p-t-20">
+							<div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+								<select class="mdl-textfield__input" id="ec-assigned-to" name="assigned_to">
+									<option value="">Unassigned</option>
+								</select>
+								<label class="mdl-textfield__label">Assign To</label>
+							</div>
+						</div>
+
+						<!-- Notes -->
+						<div class="col-lg-12 p-t-20">
+							<div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+								<textarea class="mdl-textfield__input" id="ec-notes" name="notes" rows="3"></textarea>
+								<label class="mdl-textfield__label">Notes</label>
+							</div>
+						</div>
+
+						<!-- Status -->
+						<div class="col-lg-6 p-t-20">
+							<div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+								<select class="mdl-textfield__input" id="ec-status" name="status" required>
+									<option value="assigned">Assigned</option>
+									<option value="clear">Clear</option>
+									<option value="issue">Issue</option>
+								</select>
+								<label class="mdl-textfield__label">Status</label>
+							</div>
+						</div>
+
+						<!-- Conditional Fields for Issue Status -->
+						<div id="edit-issue-fields" style="display: none;">
+							<div class="row">
+								<!-- Checklist -->
+								<div class="col-lg-12 p-t-20">
+									<div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+										<textarea class="mdl-textfield__input" id="ec-checklist" name="checklist" rows="3" placeholder="Enter checklist items (e.g., Damaged items, Missing amenities, etc.)"></textarea>
+										<label class="mdl-textfield__label">Checklist</label>
+									</div>
+								</div>
+
+								<!-- Upload Photos -->
+								<div class="col-lg-6 p-t-20">
+									<div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+										<input type="file" class="mdl-textfield__input" id="ec-photos" name="photos" multiple accept="image/*" />
+										<label class="mdl-textfield__label">Upload Photos</label>
+									</div>
+								</div>
+
+								<!-- Proposed Charges -->
+								<div class="col-lg-6 p-t-20">
+									<div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+										<textarea class="mdl-textfield__input" id="ec-proposed-charges" name="proposed_charges" rows="3" placeholder="Enter proposed charges (e.g., Damaged towel: $50, Broken lamp: $30)"></textarea>
+										<label class="mdl-textfield__label">Proposed Charges</label>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+					<button type="submit" class="btn btn-primary">Update</button>
+				</div>
+			</form>
+		</div>
+	</div>
+</div>
+
+<!-- ======================================== -->
+<!-- SCRIPT LOADING -->
+<!-- ======================================== -->
+
+<style>
+/* Fix modal z-index stacking for nested modals */
+.modal-backdrop {
+    z-index: 9997 !important;
+}
+
+.modal-backdrop + .modal-backdrop {
+    z-index: 9998 !important;
+}
+
+/* Ensure add/edit modals appear on top */
+#new-clearance-modal,
+#edit-clearance-modal {
+    z-index: 9999 !important;
+}
+
+/* Force modal backdrop to be behind all modals */
+.modal-backdrop.show {
+    z-index: 9997 !important;
+}
+
+/* Photo button styling */
+.btn-tbl-view {
+    background-color: #17a2b8;
+    border-color: #17a2b8;
+    color: white;
+    margin-right: 5px;
+}
+
+.btn-tbl-view:hover {
+    background-color: #138496;
+    border-color: #138496;
+    color: white;
+}
+
+/* Photo preview styling */
+.photo-preview {
+    max-width: 100px;
+    max-height: 100px;
+    object-fit: cover;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.photo-preview:hover {
+    transform: scale(1.05);
+}
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Load scripts with proper timing
+        setTimeout(function() {
+            var clearanceScript = document.createElement('script');
+            clearanceScript.src = '/js/room_clearance/room_clearance.js';
+            document.body.appendChild(clearanceScript);
+        }, 300);
+    });
+</script>
+
+<style>
+/* Allow MDL dropdown menus to overflow outside Bootstrap modals for Room Clearance */
+#new-clearance-modal .modal-dialog,
+#new-clearance-modal .modal-content,
+#new-clearance-modal .modal-body,
+#edit-clearance-modal .modal-dialog,
+#edit-clearance-modal .modal-content,
+#edit-clearance-modal .modal-body {
+    overflow: visible !important;
+}
+
+.mdl-menu__container.is-visible {
+    z-index: 2000 !important;
+}
+</style>
+
+
