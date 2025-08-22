@@ -15,6 +15,7 @@ class UserModel {
         FULLNAME, 
         USERNAME, 
         PERMISSIONS,
+        ROOM_ID,
         ENCODED_BY,
         ENCODED_DT,
         ACTIVE
@@ -32,6 +33,7 @@ class UserModel {
         FULLNAME, 
         USERNAME, 
         PERMISSIONS,
+        ROOM_ID,
         ENCODED_BY,
         ENCODED_DT,
         ACTIVE
@@ -43,22 +45,23 @@ class UserModel {
 
   // Create new user
   static async createUser(userData) {
-    const { fullname, username, password, role, encodedBy } = userData;
+    const { fullname, username, password, role, roomId, encodedBy } = userData;
     const dateNow = new Date();
 
     // Hash the password using bcrypt
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const query = `
-      INSERT INTO user_info (FULLNAME, USERNAME, PASSWORD, PERMISSIONS, ENCODED_BY, ENCODED_DT, ACTIVE)
-      VALUES (?, ?, ?, ?, ?, ?, 1)
+      INSERT INTO user_info (FULLNAME, USERNAME, PASSWORD, PERMISSIONS, ROOM_ID, ENCODED_BY, ENCODED_DT, ACTIVE)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1)
     `;
 
     const values = [
       fullname, 
       username, 
       hashedPassword, 
-      role, 
+      role,
+      (String(role) === '9' ? (roomId || null) : null), 
       encodedBy, 
       dateNow
     ];
@@ -69,7 +72,7 @@ class UserModel {
 
   // Update user
   static async updateUser(userData) {
-    const { userId, fullname, username, password, role, editedBy } = userData;
+    const { userId, fullname, username, password, role, roomId, editedBy } = userData;
     const dateNow = new Date();
 
     let query;
@@ -80,17 +83,17 @@ class UserModel {
       const hashedPassword = await bcrypt.hash(password, 10);
       query = `
         UPDATE user_info
-        SET FULLNAME = ?, USERNAME = ?, PASSWORD = ?, PERMISSIONS = ?
+        SET FULLNAME = ?, USERNAME = ?, PASSWORD = ?, PERMISSIONS = ?, ROOM_ID = ?
         WHERE IDno = ?
       `;
-      values = [fullname, username, hashedPassword, role, userId];
+      values = [fullname, username, hashedPassword, role, (String(role) === '9' ? (roomId || null) : null), userId];
     } else {
       query = `
         UPDATE user_info
-        SET FULLNAME = ?, USERNAME = ?, PERMISSIONS = ?
+        SET FULLNAME = ?, USERNAME = ?, PERMISSIONS = ?, ROOM_ID = ?
         WHERE IDno = ?
       `;
-      values = [fullname, username, role, userId];
+      values = [fullname, username, role, (String(role) === '9' ? (roomId || null) : null), userId];
     }
 
     return await queryDatabasePromise(query, values);

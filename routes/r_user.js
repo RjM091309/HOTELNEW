@@ -36,4 +36,7 @@ router.delete('/api/users/:id', UserController.deleteUser);
 // Check username availability
 router.post('/api/users/check-username', UserController.checkUsernameAvailability);
 
+// Get current user info
+router.get('/api/current-user', UserController.getCurrentUser);
+
 module.exports = router;

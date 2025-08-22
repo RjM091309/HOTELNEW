@@ -90,7 +90,7 @@ class UserController {
   // Create new user
   static async createUser(req, res) {
     try {
-      const { fullname, username, password, confirm_password, role } = req.body;
+      const { fullname, username, password, confirm_password, role, roomId } = req.body;
       
       if (!fullname || !username || !password || !confirm_password || !role) {
         return res.status(400).json({
@@ -121,6 +121,7 @@ class UserController {
         username,
         password,
         role,
+        roomId,
         encodedBy: req.user ? req.user.userId : req.session.userId
       };
 
@@ -151,7 +152,7 @@ class UserController {
   // Update user
   static async updateUser(req, res) {
     try {
-      const { userId, fullname, username, password, confirm_password, role } = req.body;
+      const { userId, fullname, username, password, confirm_password, role, roomId } = req.body;
       
       if (!userId || !fullname || !username || !role) {
         return res.status(400).json({
@@ -186,6 +187,7 @@ class UserController {
         username,
         password,
         role,
+        roomId,
         editedBy: req.user ? req.user.userId : req.session.userId
       };
 
@@ -263,6 +265,41 @@ class UserController {
       res.status(500).json({
         success: false,
         message: 'Error checking username availability',
+        error: error.message
+      });
+    }
+  }
+
+  // Get current user info
+  static async getCurrentUser(req, res) {
+    try {
+      const userId = req.user ? req.user.userId : req.session.userId;
+      
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: 'User not authenticated'
+        });
+      }
+
+      const user = await UserModel.getUserById(userId);
+      
+      if (user) {
+        res.json({
+          success: true,
+          data: user
+        });
+      } else {
+        res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching current user:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching current user',
         error: error.message
       });
     }

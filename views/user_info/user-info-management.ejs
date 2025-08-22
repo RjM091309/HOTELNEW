@@ -12,6 +12,9 @@
                     <button class="btn btn-primary-10" id="addUserBtn" title="Add New User">
                         <i class="fa fa-plus"></i> Add New User
                     </button>
+                                         <button class="btn btn-warning" id="viewRoomUsersBtn" title="View Room-Assigned Users" style="margin-left: 10px;">
+                         <i class="fa fa-bed"></i> Room Users
+                     </button>
                 </div>
             </div>
             <div class="dashboard-card-body">
@@ -78,15 +81,29 @@
                                     <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
                                 </label>
                                 <label for="addRole" class="mdl-textfield__label">Role</label>
-                                <ul data-mdl-for="addRole" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
-                                    <li class="mdl-menu__item" data-val="1">Admin</li>
-                                    <li class="mdl-menu__item" data-val="2">Frontdesk</li>
-                                    <li class="mdl-menu__item" data-val="3">Manager</li>
-                                    <li class="mdl-menu__item" data-val="4">Housekeeping</li>
-                                    <li class="mdl-menu__item" data-val="5">GuestRoom</li>
-                                    <li class="mdl-menu__item" data-val="6">GuestApp</li>
-                                    <li class="mdl-menu__item" data-val="7">DriverApp</li>
-                                    <li class="mdl-menu__item" data-val="8">SalesRoom</li>
+                                                                 <ul data-mdl-for="addRole" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                     <li class="mdl-menu__item" data-val="1">Admin</li>
+                                     <li class="mdl-menu__item" data-val="2">Frontdesk</li>
+                                     <li class="mdl-menu__item" data-val="3">Manager</li>
+                                     <li class="mdl-menu__item" data-val="4">Housekeeping</li>
+                                     <li class="mdl-menu__item" data-val="5">GuestRoom</li>
+                                     <li class="mdl-menu__item" data-val="6">GuestApp</li>
+                                     <li class="mdl-menu__item" data-val="7">DriverApp</li>
+                                     <li class="mdl-menu__item" data-val="8">SalesRoom</li>
+                                     <li class="mdl-menu__item" data-val="9">Guest Room Controller</li>
+                                 </ul>
+                            </div>
+                        </div>
+                                                 <!-- Guest Room Controller: Room selector (shown only when role is Guest Room Controller) -->
+                         <div class="col-lg-6 p-t-20" id="addRoomContainer" style="display:none;">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="addRoom" name="room" value="" autocomplete="off" readonly tabIndex="-1">
+                                <label for="addRoom" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="addRoom" class="mdl-textfield__label">Room</label>
+                                <ul data-mdl-for="addRoom" class="mdl-menu mdl-menu--bottom-left mdl-js-menu" id="addRoomList">
+                                    <!-- populated dynamically -->
                                 </ul>
                             </div>
                         </div>
@@ -155,15 +172,29 @@
                                     <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
                                 </label>
                                 <label for="editRole" class="mdl-textfield__label">Role</label>
-                                <ul data-mdl-for="editRole" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
-                                    <li class="mdl-menu__item" data-val="1">Admin</li>
-                                    <li class="mdl-menu__item" data-val="2">Frontdesk</li>
-                                    <li class="mdl-menu__item" data-val="3">Manager</li>
-                                    <li class="mdl-menu__item" data-val="4">Housekeeping</li>
-                                    <li class="mdl-menu__item" data-val="5">GuestRoom</li>
-                                    <li class="mdl-menu__item" data-val="6">GuestApp</li>
-                                    <li class="mdl-menu__item" data-val="7">DriverApp</li>
-                                    <li class="mdl-menu__item" data-val="8">SalesRoom</li>
+                                                                 <ul data-mdl-for="editRole" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                     <li class="mdl-menu__item" data-val="1">Admin</li>
+                                     <li class="mdl-menu__item" data-val="2">Frontdesk</li>
+                                     <li class="mdl-menu__item" data-val="3">Manager</li>
+                                     <li class="mdl-menu__item" data-val="4">Housekeeping</li>
+                                     <li class="mdl-menu__item" data-val="5">GuestRoom</li>
+                                     <li class="mdl-menu__item" data-val="6">GuestApp</li>
+                                     <li class="mdl-menu__item" data-val="7">DriverApp</li>
+                                     <li class="mdl-menu__item" data-val="8">SalesRoom</li>
+                                     <li class="mdl-menu__item" data-val="9">Guest Room Controller</li>
+                                 </ul>
+                            </div>
+                        </div>
+                                                 <!-- Guest Room Controller: Room selector (shown only when role is Guest Room Controller) -->
+                         <div class="col-lg-6 p-t-20" id="editRoomContainer" style="display:none;">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editRoom" name="room" value="" readonly tabIndex="-1">
+                                <label for="editRoom" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="editRoom" class="mdl-textfield__label">Room</label>
+                                <ul data-mdl-for="editRoom" class="mdl-menu mdl-menu--bottom-left mdl-js-menu" id="editRoomList">
+                                    <!-- populated dynamically -->
                                 </ul>
                             </div>
                         </div>
@@ -194,6 +225,40 @@
     </div>
 </div>
 
+<!-- Room Users Modal -->
+<div class="modal fade" id="roomUsersModal" tabindex="-1" role="dialog" aria-labelledby="roomUsersModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                                 <h4 class="modal-title" id="roomUsersModalLabel">Room-Assigned Users</h4>
+                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-scrollable">
+                    <table id="roomUsersTable" class="table table-hover table-bordered full-width">
+                        <thead>
+                            <tr>
+                                <th>Full Name</th>
+                                <th>Username</th>
+                                <th>Role</th>
+                                <th>Room Number</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
     /* Ensure MDL dropdown menus can overflow outside Bootstrap modals */
     #addUserModal .modal-dialog,
@@ -214,27 +279,7 @@
 <!-- SCRIPT LOADING -->
 <!-- ======================================== -->
 
-<style>
-/* Fix modal z-index stacking for nested modals */
-.modal-backdrop {
-    z-index: 9997 !important;
-}
 
-.modal-backdrop + .modal-backdrop {
-    z-index: 9998 !important;
-}
-
-/* Ensure add/edit modals appear on top */
-#addUserModal,
-#editUserModal {
-    z-index: 9999 !important;
-}
-
-/* Force modal backdrop to be behind all modals */
-.modal-backdrop.show {
-    z-index: 9997 !important;
-}
-</style>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
