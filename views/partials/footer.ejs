@@ -120,7 +120,6 @@ function initSocket() {
         // Connection events
         socket.on('connect', () => {
             console.log('🔌 Front desk connected to socket server');
-            showSuccess('Connected', 'Front desk connected to checkout system', { hideAfter: 3000 });
         });
         
         socket.on('disconnect', () => {
