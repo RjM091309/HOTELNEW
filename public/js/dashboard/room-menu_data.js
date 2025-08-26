@@ -1536,6 +1536,19 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
                 // console.log(`✅ Reservation Fee row hidden (no fee)`);
             }
         }
+        
+        // Also update billing modal elements if they exist
+        const billingReservationFeeRow = document.getElementById('reservationFeeRow');
+        const billingReservationFeeElement = document.getElementById('billingReservationFeeAmount');
+        if (billingReservationFeeRow && billingReservationFeeElement) {
+            if (reservationFee > 0) {
+                billingReservationFeeRow.style.display = 'block';
+                billingReservationFeeElement.textContent = `₱${parseFloat(reservationFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                console.log(`✅ Reservation Fee displayed in billing modal: ${reservationFee}`);
+            } else {
+                billingReservationFeeRow.style.display = 'none';
+            }
+        }
 
         // Handle Discount Display
         if (discountAmount > 0) {
@@ -1553,6 +1566,19 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
             if (discountRow) {
                 discountRow.style.display = 'none';
                 // console.log(`✅ Discount row hidden (no discount)`);
+            }
+        }
+        
+        // Also update billing modal elements if they exist
+        const billingDiscountRow = document.getElementById('discountRow');
+        const billingDiscountElement = document.getElementById('billingDiscountAmount');
+        if (billingDiscountRow && billingDiscountElement) {
+            if (discountAmount > 0) {
+                billingDiscountRow.style.display = 'block';
+                billingDiscountElement.textContent = `₱${parseFloat(discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                console.log(`✅ Discount displayed in billing modal: ${discountAmount}`);
+            } else {
+                billingDiscountRow.style.display = 'none';
             }
         }
 
@@ -3401,7 +3427,7 @@ function loadBillingData(bookingId) {
                 });
             }
             
-            // Calculate and update totals
+            // Calculate and update totals with Reservation Fee and Discount
             if (data.items && Array.isArray(data.items)) {
                 let totalPaid = 0;
                 let totalUnpaid = 0;
@@ -3415,6 +3441,15 @@ function loadBillingData(bookingId) {
                     }
                 });
                 
+                // Calculate total amount including reservation fee and discount
+                const subTotal = data.items.reduce((sum, item) => sum + item.subTotal, 0);
+                const reservationFee = parseFloat(data.reservationFee) || 0;
+                const discountAmount = parseFloat(data.discountAmount) || 0;
+                const totalAmount = subTotal - reservationFee - discountAmount;
+                
+                // Calculate final balance including reservation fee and discount
+                const finalBalance = totalAmount - totalPaid;
+                
                 // Update total paid
                 const totalPaidElement = document.getElementById('totalPaid');
                 if (totalPaidElement) {
@@ -3424,18 +3459,18 @@ function loadBillingData(bookingId) {
                 // Update balance
                 const balanceElement = document.getElementById('balanceAmount');
                 if (balanceElement) {
-                    balanceElement.textContent = `₱${totalUnpaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                    balanceElement.textContent = `₱${finalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
                 }
                 
                 // Update total payment
                 const totalPaymentElement = document.getElementById('totalPayment');
                 if (totalPaymentElement) {
-                    const totalAmount = totalPaid + totalUnpaid;
                     totalPaymentElement.textContent = `₱${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
                 }
                 
-                // Show/hide paid image overlay based on payment status
-                const allPaid = data.items.every(item => item.status === 'paid');
+                // Show/hide paid image overlay based on payment status (including reservation fee consideration)
+                const allItemsPaid = data.items.every(item => item.status === 'paid');
+                const allPaid = allItemsPaid && (finalBalance <= 0);
                 const paidImageOverlay = document.getElementById('paidImageOverlay');
                 if (paidImageOverlay) {
                     if (allPaid && totalPaid > 0) {
@@ -3468,6 +3503,44 @@ function loadBillingData(bookingId) {
             
             // Log all available fields for debugging
             console.log('Available data fields:', Object.keys(data));
+            
+            // Handle Reservation Fee Display
+            if (data.reservationFee && parseFloat(data.reservationFee) > 0) {
+                const reservationFeeRow = document.getElementById('reservationFeeRow');
+                const reservationFeeElement = document.getElementById('billingReservationFee');
+                if (reservationFeeRow && reservationFeeElement) {
+                    reservationFeeRow.style.display = 'block';
+                    reservationFeeElement.textContent = `₱${parseFloat(data.reservationFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                    // Align the amount to the right like Paid and Balance
+                    reservationFeeElement.style.textAlign = 'right';
+                    console.log('✅ Reservation Fee displayed:', data.reservationFee);
+                }
+            } else {
+                const reservationFeeRow = document.getElementById('reservationFeeRow');
+                if (reservationFeeRow) {
+                    reservationFeeRow.style.display = 'none';
+                    console.log('✅ Reservation Fee hidden (no fee)');
+                }
+            }
+            
+            // Handle Discount Display
+            if (data.discountAmount && parseFloat(data.discountAmount) > 0) {
+                const discountRow = document.getElementById('discountRow');
+                const discountElement = document.getElementById('billingDiscountAmount');
+                if (discountRow && discountElement) {
+                    discountRow.style.display = 'block';
+                    discountElement.textContent = `₱${parseFloat(data.discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                    // Align the amount to the right like Paid and Balance
+                    discountElement.style.textAlign = 'right';
+                    console.log('✅ Discount displayed:', data.discountAmount);
+                }
+            } else {
+                const discountRow = document.getElementById('discountRow');
+                if (discountRow) {
+                    discountRow.style.display = 'none';
+                    console.log('✅ Discount hidden (no discount)');
+                }
+            }
         })
         .catch(error => {
             console.error('Error loading billing data:', error);

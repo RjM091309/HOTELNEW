@@ -39,10 +39,13 @@ function showBilling(bookingID) {
 				tbody.insertAdjacentHTML('beforeend', row);
 			});
 
-			// Populate totals
+			// Populate totals with Reservation Fee and Discount
 			const subTotal = parseFloat(data.subTotal);
-			const discount = parseFloat(data.discountAmount) || 0;
-			const total = subTotal - discount;
+			const reservationFee = parseFloat(data.reservationFee) || 0;
+			const discountAmount = parseFloat(data.discountAmount) || 0;
+			
+			// Calculate total amount including reservation fee and discount
+			const totalAmount = subTotal - reservationFee - discountAmount;
 
 			// Handle Reservation Fee Display
 			if (data.reservationFee && parseFloat(data.reservationFee) > 0) {
@@ -51,11 +54,17 @@ function showBilling(bookingID) {
 				if (reservationFeeRow && reservationFeeElement) {
 					reservationFeeRow.style.display = 'block';
 					reservationFeeElement.textContent = `₱${parseFloat(data.reservationFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+					// Align the amount to the right like Paid and Balance
+					reservationFeeElement.style.textAlign = 'right';
+					console.log('✅ Reservation Fee displayed in billing:', data.reservationFee);
+				} else {
+					console.error('❌ Reservation Fee elements not found in billing modal');
 				}
 			} else {
 				const reservationFeeRow = document.getElementById('reservationFeeRow');
 				if (reservationFeeRow) {
 					reservationFeeRow.style.display = 'none';
+					console.log('✅ Reservation Fee hidden in billing (no fee)');
 				}
 			}
 
@@ -65,15 +74,22 @@ function showBilling(bookingID) {
 				const discountElement = document.getElementById('billingDiscountAmount');
 				if (discountRow && discountElement) {
 					discountRow.style.display = 'block';
-					discountElement.textContent = `₱${parseFloat(data.discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+					                        					discountElement.textContent = `₱${parseFloat(data.discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+					// Align the amount to the right like Paid and Balance
+					discountElement.style.textAlign = 'right';
+					console.log('✅ Discount displayed in billing:', data.discountAmount);
+				} else {
+					console.error('❌ Discount elements not found in billing modal');
 				}
 			} else {
 				const discountRow = document.getElementById('discountRow');
 				if (discountRow) {
 					discountRow.style.display = 'none';
+					console.log('✅ Discount hidden in billing (no discount)');
 				}
 			}
 
+			// Calculate paid and unpaid amounts from items
 			let totalPaid = 0;
 			let totalUnpaid = 0;
 
@@ -84,6 +100,23 @@ function showBilling(bookingID) {
 				} else {
 					totalUnpaid += amount;
 				}
+			});
+			
+			// Add reservation fee to total amount (it's part of the total cost)
+			// Note: Reservation fee is not part of individual item payments, it's a separate charge
+			const totalWithReservationFee = totalAmount;
+			
+			// Calculate final balance including reservation fee and discount
+			const finalBalance = totalWithReservationFee - totalPaid;
+			
+			// Log calculations for debugging
+			console.log('💰 Billing Calculations:', {
+				subTotal: subTotal,
+				reservationFee: reservationFee,
+				discountAmount: discountAmount,
+				totalAmount: totalAmount,
+				totalPaid: totalPaid,
+				finalBalance: finalBalance
 			});
 
 			// Populate modal fields dynamically
@@ -97,18 +130,20 @@ function showBilling(bookingID) {
 				maximumFractionDigits: 2
 			});
 
-			document.getElementById('balanceAmount').textContent = totalUnpaid.toLocaleString(undefined, {
+			document.getElementById('balanceAmount').textContent = finalBalance.toLocaleString(undefined, {
 				minimumFractionDigits: 2,
 				maximumFractionDigits: 2
 			});
 
-			document.getElementById('totalPayment').textContent = (totalPaid + totalUnpaid).toLocaleString(undefined, {
+			document.getElementById('totalPayment').textContent = totalWithReservationFee.toLocaleString(undefined, {
 				minimumFractionDigits: 2,
 				maximumFractionDigits: 2
 			});
 
-			// Determine if ALL items are paid
-			const allPaid = data.items.every(item => item.status === 'paid');
+			// Determine if ALL items are paid (including reservation fee consideration)
+			const allItemsPaid = data.items.every(item => item.status === 'paid');
+			// Consider reservation fee as part of the total payment requirement
+			const allPaid = allItemsPaid && (finalBalance <= 0);
 
 			if (allPaid) {
 				$('#paidImageContainer').show();

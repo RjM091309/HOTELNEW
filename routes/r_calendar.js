@@ -5,6 +5,9 @@ const CalendarController = require('../controller/c_calendar');
 // Calendar routes
 router.get('/', CalendarController.getCalendar);
 
+// Unassigned Rooms route
+router.get('/unassigned-rooms', CalendarController.getUnassignedRooms);
+
 // API endpoints for AJAX
 router.get('/api/bookings', CalendarController.getBookingsForCalendar);
 router.get('/api/bookings/details', CalendarController.getDetailedBookings);
@@ -13,6 +16,10 @@ router.get('/api/available-rooms', CalendarController.getAvailableRooms);
 router.post('/api/reopen-reservation', CalendarController.reopenReservation);
 router.post('/api/remove-reservation', CalendarController.removeReservation);
 router.post('/api/check-in-reservation', CalendarController.checkInReservation);
+
+// Unassigned Rooms API endpoints
+router.get('/api/unassigned-rooms', CalendarController.getUnassignedRoomsForCalendar);
+router.get('/api/unassigned-rooms/details', CalendarController.getDetailedUnassignedRooms);
 
 // Transfer routes for room transfer functionality
 router.get('/transfer-available-rooms', CalendarController.getTransferAvailableRooms);

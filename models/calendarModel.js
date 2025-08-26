@@ -1310,6 +1310,123 @@ class CalendarModel {
       throw error;
     }
   }
+
+  // Get Unassigned Rooms for FullCalendar
+  static async getUnassignedRoomsForCalendar(start, end) {
+    try {
+      console.log('🔍 Model: getUnassignedRoomsForCalendar called with:', { start, end });
+      
+      const query = `
+        SELECT 
+          b.CHECK_IN_DATE AS checkInDate,
+          b.CHECK_OUT_DATE AS checkOutDate,
+          COALESCE(r.ROOM_NUMBER, 'Unassigned') AS roomNumber,
+          c.NAME AS customerName
+        FROM booking b
+        LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+        LEFT JOIN room r ON b.ROOM_ID = r.IDNo AND r.ACTIVE = 1
+        WHERE b.ACTIVE = 1
+          AND b.IS_DIRECT_RESERVATION = 1
+          AND (b.CHECK_IN_DATE <= ? AND b.CHECK_OUT_DATE >= ?)
+      `;
+
+      console.log('🔍 Executing query with parameters:', [end, start]);
+      const results = await queryDatabasePromise(query, [end, start]);
+      console.log('🔍 Query results:', results);
+
+      // Create a map of dates with counts and unassigned info
+      const dateCounts = {};
+      const dateUnassigned = {};
+      
+      results.forEach((booking) => {
+        const checkInDate = new Date(booking.checkInDate);
+        const isUnassigned = booking.roomNumber === 'Unassigned';
+
+        // Only show event on check-in date for monitoring purposes
+        const formattedDate = checkInDate.toISOString().split('T')[0];
+        dateCounts[formattedDate] = (dateCounts[formattedDate] || 0) + 1;
+        
+        // Track if any reservation on this date is unassigned
+        if (isUnassigned) {
+          dateUnassigned[formattedDate] = true;
+        }
+      });
+
+      console.log('🔍 Processed dateCounts:', dateCounts);
+      console.log('🔍 Processed dateUnassigned:', dateUnassigned);
+
+      // Convert dateCounts into event format
+      const events = Object.keys(dateCounts).map((date) => ({
+        id: date,
+        start: date,
+        title: `${dateCounts[date]} Unassigned Rooms`,
+        allDay: true,
+        extendedProps: {
+          count: dateCounts[date],
+          type: 'direct',
+          hasUnassigned: dateUnassigned[date] || false
+        }
+      }));
+
+      console.log('🔍 Final events:', events);
+      return events;
+    } catch (error) {
+      console.error('❌ Model error:', error);
+      throw error;
+    }
+  }
+
+  // Get detailed Unassigned Rooms for a specific date
+  static async getDetailedUnassignedRooms(date) {
+    try {
+      const query = `
+        SELECT
+          b.IDNo AS id,
+          b.IDNo AS bookingId,
+          b.ROOM_ID AS room_id,
+          COALESCE(r.ROOM_NUMBER, 'Unassigned') AS room_number,
+          IFNULL(c.NAME, 'Guest') AS customer_name,
+          b.CHECK_IN_DATE AS checkin_date,
+          b.CHECK_OUT_DATE AS checkout_date,
+          b.CONFIRMATION_NUMBER AS confirmation_number,
+          b.GUESTS_COUNT AS guests_count,
+          DATE_FORMAT(b.ENCODED_DT, '%Y-%m-%d %H:%i:%s') AS booking_time,
+          b.BOOKING_STATUS AS booking_status,
+          COALESCE(billing.PAYMENT_STATUS, 'Unknown') AS payment_status,
+          b.BED_COUNT AS bedCount
+        FROM booking b
+        LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+        LEFT JOIN room r ON b.ROOM_ID = r.IDNo AND r.ACTIVE = 1
+        LEFT JOIN billing ON b.IDNo = billing.BOOKING_ID AND billing.ACTIVE = 1
+        WHERE b.ACTIVE = 1
+          AND b.IS_DIRECT_RESERVATION = 1
+          AND DATE(b.CHECK_IN_DATE) = ?
+        ORDER BY b.ENCODED_DT DESC
+      `;
+
+      const results = await queryDatabasePromise(query, [date]);
+
+      const bookings = results.map((result) => ({
+        id: result.id,
+        bookingId: result.bookingId,
+        roomId: result.room_id,
+        roomNumber: result.room_number,
+        customerName: result.customer_name,
+        checkInDate: result.checkin_date,
+        checkOutDate: result.checkout_date,
+        confirmationNumber: result.confirmation_number,
+        guestsCount: result.guests_count,
+        bookingTime: result.booking_time,
+        bookingStatus: result.booking_status,
+        paymentStatus: result.payment_status,
+        bedCount: result.bedCount,
+      }));
+
+      return { success: true, bookings };
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 module.exports = CalendarModel; 

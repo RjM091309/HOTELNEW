@@ -3214,100 +3214,107 @@ class BookingModel {
       // Complex invoice query with all calculations
       const query = `
         SELECT 
-          b.IDNo AS BookingID,
-          b.CUSTOMER_ID,
-          b.AGENCY_ID,
-          c.NAME AS CUSTOMER_NAME,
-          c.IS_GROUP,
-          b.AGENCY_ID,
-          a.NAME AS AGENCY_NAME,
-          b.ROOM_ID,
-          r.ROOM_NUMBER,
-          rt.NAME AS ROOM_TYPE,
-          b.CHECK_IN_DATE,
-          b.CHECK_OUT_DATE,
-          bill.ROOM_CHARGE AS ROOM_RATE,
+        b.IDNo AS BookingID,
+        b.CUSTOMER_ID,
+        b.AGENCY_ID,
+        c.NAME AS CUSTOMER_NAME,
+        c.IS_GROUP,
+        b.AGENCY_ID,
+        a.NAME AS AGENCY_NAME,
+        b.ROOM_ID,
+        r.ROOM_NUMBER,
+        rt.NAME AS ROOM_TYPE,
+        b.CHECK_IN_DATE,
+        b.CHECK_OUT_DATE,
+        bill.ROOM_CHARGE AS ROOM_RATE,
 
-          COALESCE(bill.QTY) AS ORIGINAL_DAYS,
-          COALESCE((SELECT SUM(QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo), 0) AS EXTENDED_DAYS,
-          COALESCE(bill.QTY + EXTENDED_DAYS) AS TOTAL_NIGHTS,
+        COALESCE(bill.QTY) AS ORIGINAL_DAYS,
+        COALESCE((SELECT SUM(QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo), 0) AS EXTENDED_DAYS,
+        COALESCE(bill.QTY + EXTENDED_DAYS) AS TOTAL_NIGHTS,
 
-          (COALESCE(bill.QTY) * bill.ROOM_CHARGE) AS ROOM_COST,
-          (COALESCE(bill.QTY) * bill.ROOM_CHARGE) +
-          COALESCE((SELECT SUM(COST * QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo), 0) AS ROOM_TOTAL,
+        (COALESCE(bill.QTY) * bill.ROOM_CHARGE) AS ROOM_COST,
+        (COALESCE(bill.QTY) * bill.ROOM_CHARGE) +
+        COALESCE((SELECT SUM(COST * QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo), 0) AS ROOM_TOTAL,
 
-          (
-            SELECT COALESCE(SUM(bs.TOTAL_COST), 0)
-            FROM booking_service bs
-            WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1
-          ) AS SERVICES_TOTAL,
+        (
+          SELECT COALESCE(SUM(bs.TOTAL_COST), 0)
+          FROM booking_service bs
+          WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1
+        ) AS SERVICES_TOTAL,
 
+        COALESCE(bill.RESERVATION_FEE, 0) AS RESERVATION_FEE,
+        COALESCE(bill.DISCOUNT_AMOUNT, 0) AS DISCOUNT,
+
+        (SELECT COALESCE(SUM(bs.TOTAL_COST), 0)
+         FROM booking_service bs
+         WHERE bs.BOOKING_ID = b.IDNo AND bs.STATUS = 'paid' AND bs.ACTIVE = 1) AS SERVICES_PAID,
+
+        (SELECT COALESCE(SUM(bs.TOTAL_COST), 0)
+         FROM booking_service bs
+         WHERE bs.BOOKING_ID = b.IDNo AND bs.STATUS = 'unpaid' AND bs.ACTIVE = 1) AS SERVICES_UNPAID,
+
+        COALESCE((SELECT SUM(COST * QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo), 0) AS EXTENDED_TOTAL,
+
+        COALESCE((SELECT SUM(p2.AMOUNT_PAID) FROM payments p2 WHERE p2.BOOKING_EXTENSION_ID IN (
+          SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo)), 0) AS EXTENDED_PAID,
+
+        COALESCE((SELECT SUM(COST * QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo), 0) -
+        COALESCE((SELECT SUM(p2.AMOUNT_PAID) FROM payments p2 WHERE p2.BOOKING_EXTENSION_ID IN (
+          SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo)), 0) AS EXTENDED_UNPAID,
+
+        (COALESCE((SELECT SUM(p.AMOUNT_PAID) 
+                   FROM payments p 
+                   WHERE p.BILLING_ID = bill.IDNo), 0) +
+         COALESCE((SELECT SUM(p2.AMOUNT_PAID) 
+                   FROM payments p2 
+                   WHERE p2.BOOKING_EXTENSION_ID IN (
+                     SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo)), 0)) AS ROOM_PAID,
+
+        ((COALESCE((SELECT SUM(p.AMOUNT_PAID) 
+                    FROM payments p 
+                    WHERE p.BILLING_ID = bill.IDNo), 0) +
+          COALESCE((SELECT SUM(p2.AMOUNT_PAID) 
+                    FROM payments p2 
+                    WHERE p2.BOOKING_EXTENSION_ID IN (
+                      SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo)), 0)) +
+         (SELECT COALESCE(SUM(bs.TOTAL_COST), 0)
+          FROM booking_service bs
+          WHERE bs.BOOKING_ID = b.IDNo AND bs.STATUS = 'paid' AND bs.ACTIVE = 1)) AS TOTAL_PAID,
+
+        ((COALESCE(bill.ORIGINAL_QTY, bill.QTY) * bill.ROOM_CHARGE) +
+         COALESCE((SELECT SUM(COST * QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo), 0) +
+         (SELECT COALESCE(SUM(bs.TOTAL_COST), 0)
+          FROM booking_service bs
+          WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1) -
+         COALESCE(bill.RESERVATION_FEE, 0) -
+         COALESCE(bill.DISCOUNT_AMOUNT, 0)) AS GRAND_TOTAL,
+
+        (((COALESCE(bill.ORIGINAL_QTY, bill.QTY) * bill.ROOM_CHARGE) +
+          COALESCE((SELECT SUM(COST * QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo), 0) +
           (SELECT COALESCE(SUM(bs.TOTAL_COST), 0)
            FROM booking_service bs
-           WHERE bs.BOOKING_ID = b.IDNo AND bs.STATUS = 'paid' AND bs.ACTIVE = 1) AS SERVICES_PAID,
-
-          (SELECT COALESCE(SUM(bs.TOTAL_COST), 0)
-           FROM booking_service bs
-           WHERE bs.BOOKING_ID = b.IDNo AND bs.STATUS = 'unpaid' AND bs.ACTIVE = 1) AS SERVICES_UNPAID,
-
-          COALESCE((SELECT SUM(COST * QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo), 0) AS EXTENDED_TOTAL,
-
-          COALESCE((SELECT SUM(p2.AMOUNT_PAID) FROM payments p2 WHERE p2.BOOKING_EXTENSION_ID IN (
-            SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo)), 0) AS EXTENDED_PAID,
-
-          COALESCE((SELECT SUM(COST * QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo), 0) -
-          COALESCE((SELECT SUM(p2.AMOUNT_PAID) FROM payments p2 WHERE p2.BOOKING_EXTENSION_ID IN (
-            SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo)), 0) AS EXTENDED_UNPAID,
-
-          (COALESCE((SELECT SUM(p.AMOUNT_PAID) 
+           WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1) -
+          COALESCE(bill.RESERVATION_FEE, 0) -
+          COALESCE(bill.DISCOUNT_AMOUNT, 0)) -
+         ((COALESCE((SELECT SUM(p.AMOUNT_PAID) 
                      FROM payments p 
                      WHERE p.BILLING_ID = bill.IDNo), 0) +
            COALESCE((SELECT SUM(p2.AMOUNT_PAID) 
                      FROM payments p2 
                      WHERE p2.BOOKING_EXTENSION_ID IN (
-                       SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo)), 0)) AS ROOM_PAID,
+                       SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo)), 0)) +
+          (SELECT COALESCE(SUM(bs.TOTAL_COST), 0)
+           FROM booking_service bs
+           WHERE bs.BOOKING_ID = b.IDNo AND bs.STATUS = 'paid' AND bs.ACTIVE = 1))) AS TOTAL_UNPAID
 
-          ((COALESCE((SELECT SUM(p.AMOUNT_PAID) 
-                      FROM payments p 
-                      WHERE p.BILLING_ID = bill.IDNo), 0) +
-            COALESCE((SELECT SUM(p2.AMOUNT_PAID) 
-                      FROM payments p2 
-                      WHERE p2.BOOKING_EXTENSION_ID IN (
-                        SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo)), 0)) +
-           (SELECT COALESCE(SUM(bs.TOTAL_COST), 0)
-            FROM booking_service bs
-            WHERE bs.BOOKING_ID = b.IDNo AND bs.STATUS = 'paid' AND bs.ACTIVE = 1)) AS TOTAL_PAID,
-
-          ((COALESCE(bill.ORIGINAL_QTY, bill.QTY) * bill.ROOM_CHARGE) +
-           COALESCE((SELECT SUM(COST * QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo), 0) +
-           (SELECT COALESCE(SUM(bs.TOTAL_COST), 0)
-            FROM booking_service bs
-            WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1)) AS GRAND_TOTAL,
-
-          (((COALESCE(bill.ORIGINAL_QTY, bill.QTY) * bill.ROOM_CHARGE) +
-            COALESCE((SELECT SUM(COST * QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo), 0) +
-            (SELECT COALESCE(SUM(bs.TOTAL_COST), 0)
-             FROM booking_service bs
-             WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1)) -
-           ((COALESCE((SELECT SUM(p.AMOUNT_PAID) 
-                       FROM payments p 
-                       WHERE p.BILLING_ID = bill.IDNo), 0) +
-             COALESCE((SELECT SUM(p2.AMOUNT_PAID) 
-                       FROM payments p2 
-                       WHERE p2.BOOKING_EXTENSION_ID IN (
-                         SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo)), 0)) +
-            (SELECT COALESCE(SUM(bs.TOTAL_COST), 0)
-             FROM booking_service bs
-             WHERE bs.BOOKING_ID = b.IDNo AND bs.STATUS = 'paid' AND bs.ACTIVE = 1))) AS TOTAL_UNPAID
-
-        FROM booking b
-        LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
-        LEFT JOIN agency a ON b.AGENCY_ID = a.IDNo
-        LEFT JOIN room r ON b.ROOM_ID = r.IDNo
-        LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
-        LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID
-        WHERE b.IDNo = ? AND b.ACTIVE = 1
-        GROUP BY b.IDNo
+      FROM booking b
+      LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+      LEFT JOIN agency a ON b.AGENCY_ID = a.IDNo
+      LEFT JOIN room r ON b.ROOM_ID = r.IDNo
+      LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
+      LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID
+      WHERE b.IDNo = ? AND b.ACTIVE = 1
+      GROUP BY b.IDNo;
       `;
 
       const rows = await queryDatabasePromise(query, [bookingId]);

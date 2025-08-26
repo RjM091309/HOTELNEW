@@ -657,6 +657,133 @@ class CalendarController {
       });
     }
   }
+
+  // Get Unassigned Rooms page
+  static async getUnassignedRooms(req, res) {
+    try {
+      // Get user from JWT token
+      const user = req.user || null;
+      const userId = user?.userId || null;
+      const tabOrder = user?.TAB_ORDER || null;
+
+      const currentDate = new Date();
+      const queryMonth = parseInt(req.query.month, 10) || currentDate.getMonth();
+      const queryYear = parseInt(req.query.year, 10) || currentDate.getFullYear();
+
+      // Get all calendar data in parallel
+      const [
+        allRooms,
+        floors,
+        calendarStats
+      ] = await Promise.all([
+        CalendarModel.getAllRooms(),
+        CalendarModel.getFloors(),
+        CalendarModel.getCalendarStats()
+      ]);
+
+      // Process room data to include status and CSS classes
+      const processedRooms = allRooms.map((room) => {
+        let status = 'Unknown';
+        let statusClass = 'label-secondary';
+        const roomStatus = Number(room.ROOM_STATUS);
+
+        switch (roomStatus) {
+          case 1:
+            status = 'Available';
+            statusClass = 'label-success';
+            break;
+          case 2:
+            status = 'Occupied';
+            statusClass = 'label-danger';
+            break;
+          case 3:
+            status = 'Under Maintenance';
+            statusClass = 'label-secondary';
+            break;
+          case 4:
+            status = 'Cleaning';
+            statusClass = 'label-info';
+            break;
+          default:
+            status = 'Unknown';
+            statusClass = 'label-warning';
+        }
+
+        return {
+          ROOM_NUMBER: room.ROOM_NUMBER,
+          ROOM_TYPE_NAME: room.ROOM_TYPE || 'N/A',
+          ROOM_BED: room.ROOM_BED || 'N/A',
+          status,
+          statusClass,
+        };
+      });
+
+      res.render('calendar/unassigned_rooms', {
+        title: 'Unassigned Rooms',
+        subTitle: 'Unassigned Rooms',
+        hideBreadcrumb: true,
+        activePage: 'unassigned-rooms',
+        user,
+        userId,
+        tabOrder,
+        rooms: processedRooms,
+        currentMonth: queryMonth,
+        currentYear: queryYear,
+        script: `<script>document.body.setAttribute('data-user-id', '${userId}');</script>`
+      });
+    } catch (error) {
+      console.error('Error fetching unassigned rooms data:', error);
+      res.status(500).render('error', { message: 'Server error' });
+    }
+  }
+
+  // Get Unassigned Rooms for FullCalendar
+  static async getUnassignedRoomsForCalendar(req, res) {
+    try {
+      const { start, end } = req.query;
+
+      if (!start || !end) {
+        return res.status(400).json({ success: false, message: 'Missing start or end date.' });
+      }
+
+      const events = await CalendarModel.getUnassignedRoomsForCalendar(start, end);
+      res.json(events);
+    } catch (error) {
+      console.error('Error fetching unassigned rooms for calendar:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error'
+      });
+    }
+  }
+
+  // Get detailed Unassigned Rooms for a specific date
+  static async getDetailedUnassignedRooms(req, res) {
+    try {
+      const { date } = req.query;
+
+      if (!date) {
+        console.log('Missing date parameter');
+        return res.status(400).json({ success: false, message: 'Missing date parameter.' });
+      }
+
+      console.log(`Fetching unassigned rooms for date: ${date}`);
+
+      const result = await CalendarModel.getDetailedUnassignedRooms(date);
+      
+      if (result.success) {
+        res.json({ success: true, bookings: result.bookings });
+      } else {
+        res.status(400).json({ success: false, message: result.message });
+      }
+    } catch (error) {
+      console.error('Error fetching detailed unassigned rooms:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error'
+      });
+    }
+  }
 }
 
 module.exports = CalendarController;

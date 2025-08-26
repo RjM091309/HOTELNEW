@@ -110,12 +110,12 @@
                                              <!-- Reservation Fee (Conditional) -->
                                              <div class="summary-row" id="reservationFeeRow">
                                                 <span class="summary-label">Reservation Fee:</span>
-                                                <span class="summary-value reservation-fee-amount" id="billingReservationFeeAmount" style="color: #28a745;"></span>
+                                                <span class="summary-value reservation-fee-amount" id="billingReservationFeeAmount"></span>
                                             </div>
                                             <!-- Discount (Conditional) -->
                                             <div class="summary-row" id="discountRow">
                                                 <span class="summary-label">Discount Applied:</span>
-                                                <span class="summary-value discount-amount" id="billingDiscountAmount" style="color: #28a745;"></span>
+                                                <span class="summary-value discount-amount" id="billingDiscountAmount"></span>
                                             </div>
                                             <div class="summary-row">
                                                 <span class="summary-label">Balance:</span>
@@ -805,7 +805,7 @@
     font-size: 1rem;
 }
 
-.paid-amount {
+.paid-amount, .reservation-fee-amount, .discount-amount {
     color: #27ae60;
 }
 

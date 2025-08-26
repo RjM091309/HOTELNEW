@@ -106,7 +106,7 @@
     <div class="sub-header">
       <div>Clark Terrace Building, Lot 2 Block 1, The Villages Prince Balagtas Avenue,</div>
       <div>Clark Freeport Zone, Pampanga, 2023</div>
-      <div>(GLOBE) 0945 146 7000 (SMART) 0969 049 7000</div>
+      <div>(GLOBE) 0945 146 7000 (SMART) 0969 049 7000</div>
     </div>
   </div>
 
@@ -152,6 +152,15 @@
     <% if (SERVICES_TOTAL > 0) { %>
     <p class="sub">SERVICES: PHP <%= parseFloat(SERVICES_TOTAL).toLocaleString() %></p>
     <% } %>
+    
+    <% if (typeof RESERVATION_FEE !== 'undefined' && RESERVATION_FEE && parseFloat(RESERVATION_FEE) > 0) { %>
+    <p class="sub"  style="color: #28a745;">RESERVATION FEE: -PHP <%= parseFloat(RESERVATION_FEE).toLocaleString() %></p>
+    <% } %>
+    
+    <% if (typeof DISCOUNT !== 'undefined' && DISCOUNT && parseFloat(DISCOUNT) > 0) { %>
+    <p class="sub" style="color: #28a745;">DISCOUNT: -PHP <%= parseFloat(DISCOUNT).toLocaleString() %></p>
+    <% } %>
+    
     <p class="label"><b>TOTAL CHARGES:</b> PHP <%= parseFloat(GRAND_TOTAL).toLocaleString() %></p>
   </div>
   
@@ -174,6 +183,15 @@
       <% if (SERVICES_TOTAL > 0) { %>
       <p class="sub">SERVICES PAID: PHP <%= parseFloat(SERVICES_PAID).toLocaleString() %></p>
       <% } %>
+      
+      <% if (typeof RESERVATION_FEE !== 'undefined' && RESERVATION_FEE && parseFloat(RESERVATION_FEE) > 0) { %>
+      <p class="sub" style="color: #28a745;">RESERVATION FEE PAID: -PHP <%= parseFloat(RESERVATION_FEE).toLocaleString() %></p>
+      <% } %>
+      
+      <% if (typeof DISCOUNT !== 'undefined' && DISCOUNT && parseFloat(DISCOUNT) > 0) { %>
+      <p class="sub" style="color: #28a745;">DISCOUNT APPLIED: -PHP <%= parseFloat(DISCOUNT).toLocaleString() %></p>
+      <% } %>
+      
       <p class="label"><b class="red">TOTAL DUE:</b><span class="red"> PHP <%= parseFloat(TOTAL_UNPAID).toLocaleString() %></span></p>
     </div>
   </table>

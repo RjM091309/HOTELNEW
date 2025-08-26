@@ -1,0 +1,188 @@
+<!-- FullCalendar CSS -->
+<link href="/plugins/fullcalendar/packages/core/main.min.css" rel="stylesheet" />
+<link href="/plugins/fullcalendar/packages/daygrid/main.min.css" rel="stylesheet" />
+<link href="/plugins/fullcalendar/packages/timegrid/main.min.css" rel="stylesheet" />
+<link href="/css/pages/fullcalendar.css" rel="stylesheet" />
+
+<!-- Custom CSS for table alignment and height -->
+<style>
+  .available-rooms-table th,
+  .available-rooms-table td {
+    text-align: center !important;
+  }
+  
+  .available-rooms-table .label {
+    text-align: center !important;
+    display: inline-block !important;
+  }
+  
+  /* Make the Available Rooms card match calendar height */
+  .col-lg-4 .card {
+    height: 100%;
+  }
+  
+  .col-lg-4 .card-body {
+    height: calc(100% - 60px); /* Subtract card-head height */
+    overflow: hidden;
+  }
+  
+  .table-wrap.slimscroll-style {
+    height: calc(100% - 200px); /* Adjust based on summary and help message height */
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  
+  /* Ensure calendar and rooms section are same height */
+  .row {
+    align-items: stretch;
+  }
+  
+  .col-lg-8 .card,
+  .col-lg-4 .card {
+    height: 100%;
+  }
+</style>
+
+      <div class="row">
+        <!-- Calendar Section -->
+        <div class="col-lg-8 col-md-8 col-sm-8 col-8">
+          <div class="card">
+            <div class="card-head">
+              <header>Unassigned Rooms Calendar</header>
+            </div>
+            <div class="card-body">
+              <!-- <div class="alert alert-warning mb-3" style="font-size: 13px;">
+                <i class="fa fa-exclamation-triangle"></i>
+                <strong>Note:</strong> This calendar shows unassigned room reservations that need room assignments. 
+                Yellow events indicate unassigned room reservations.
+              </div> -->
+              
+            
+
+              <!-- Calendar Container -->
+              <div id="calendar" class="has-toolbar"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Available Rooms Section -->
+        <div class="col-lg-4 col-md-12 col-sm-12 col-12">
+          <div class="card">
+            <div class="card-head">
+              <header>Available Rooms</header>
+              <div class="tools">
+                                  <div class="d-flex align-items-center gap-2">
+                    <input type="text" id="roomSearch" class="form-control form-control-sm" placeholder="Search" style="width: 100px; font-size: 11px;">
+                    <select id="floorFilter" class="form-control custom-select form-control-sm" style="width: 100px; font-size: 11px;">
+                      <option value="all">All Floors</option>
+                      <option value="3">3rd Floor</option>
+                      <option value="4">4th Floor</option>
+                      <option value="5">5th Floor</option>
+                      <option value="6">6th Floor</option>
+                    </select>
+                  </div>
+              </div>
+            </div>
+            <div class="card-body">
+              <!-- Summary Info -->
+              <div class="row mb-3">
+                <div class="col-6">
+                  <div class="text-center">
+                    <h4 class="text-success"><%= rooms.filter(room => room.status === 'Available').length %></h4>
+                    <small class="text-muted">Available Rooms</small>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="text-center">
+                    <h4 class="text-info"><%= rooms.filter(room => room.status === 'Occupied').length %></h4>
+                    <small class="text-muted">Occupied Rooms</small>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Help Message -->
+              <!-- <div class="alert alert-info mb-3" style="font-size: 12px;">
+                <i class="fa fa-info-circle"></i>
+                <strong>Tip:</strong> Click on calendar dates to assign available rooms to unassigned room reservations.
+              </div> -->
+              
+              <div class="table-wrap slimscroll-style">
+                <table class="table display product-overview available-rooms-table" style="max-width: 100%; border-collapse: collapse">
+                  <thead style="background-color: #28a745; color: #fff;">
+                    <tr>
+                      <th style="text-align: center;">Room Number</th>
+                      <th style="text-align: center;">Type</th>
+                      <th style="text-align: center;">Bed</th>
+                      <th style="text-align: center;">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% rooms.filter(room => room.status === 'Available').forEach((room) => { %>
+                      <tr data-floor="<%= Math.floor(room.ROOM_NUMBER / 100) %>" style="background-color: transparent !important;">
+                        <td style="text-align: center;"><%= room.ROOM_NUMBER %></td>
+                        <td style="text-align: center;"><%= room.ROOM_TYPE_NAME %></td>
+                        <td style="text-align: center;"><%= room.ROOM_BED || 'N/A' %></td>
+                        <td style="text-align: center;">
+                          <span class="label <%= room.statusClass %>"><%= room.status %></span>
+                        </td>
+                      </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </div>
+           
+            </div>
+          </div>
+        </div>
+          <!-- Side Panel -->
+          <div class="side-panel">
+            <div class="overlay"></div>
+            <div class="content">
+              <!-- Content for side panel -->
+            </div>
+          </div>
+      </div>
+
+      <!-- Floor Filter and Room Search JavaScript -->
+      <script>
+        // Floor Filter Event Listener
+        document.getElementById('floorFilter').addEventListener('change', function (event) {
+          event.preventDefault();
+          console.log('Floor filter changed to:', this.value);
+          filterRooms();
+        });
+
+        // Room Search Event Listener
+        document.getElementById('roomSearch').addEventListener('input', function (event) {
+          event.preventDefault();
+          console.log('Room search:', this.value);
+          filterRooms();
+        });
+
+        // Combined filter function
+        function filterRooms() {
+          const selectedFloor = document.getElementById('floorFilter').value;
+          const searchTerm = document.getElementById('roomSearch').value.toLowerCase();
+          
+          const rows = document.querySelectorAll('.available-rooms-table tbody tr');
+          rows.forEach(row => {
+            const roomFloor = row.getAttribute('data-floor');
+            const roomNumber = row.querySelector('td:first-child').textContent.toLowerCase();
+            
+            const floorMatch = selectedFloor === 'all' || roomFloor === selectedFloor;
+            const searchMatch = searchTerm === '' || roomNumber.includes(searchTerm);
+            
+            row.style.display = (floorMatch && searchMatch) ? '' : 'none';
+          });
+        }
+      </script>
+
+
+<!-- JavaScript Libraries -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="/plugins/fullcalendar/packages/core/main.min.js"></script>
+<script src="/plugins/fullcalendar/packages/interaction/main.min.js"></script>
+<script src="/plugins/fullcalendar/packages/daygrid/main.min.js"></script>
+<script src="/plugins/fullcalendar/packages/timegrid/main.min.js"></script>
+<script src="/js/calendar/unassigned_rooms.js"></script>
+<script src="/socket.io/socket.io.js"></script>
