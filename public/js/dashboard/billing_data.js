@@ -110,23 +110,22 @@ function showBilling(bookingID) {
 				}
 			});
 			
+			// Determine if room charge (first item) is paid
+			const roomItem = Array.isArray(data.items) && data.items.length > 0 ? data.items[0] : null;
+			const isRoomPaid = roomItem && roomItem.status === 'paid';
+			
+			// Adjust totalPaid to apply reservation fee and discount ONLY against the paid room amount
+			let adjustedPaidAmount = totalPaid;
+			if (isRoomPaid) {
+				adjustedPaidAmount = Math.max(0, totalPaid - (reservationFee + discountAmount));
+			}
+			
 			// Add reservation fee to total amount (it's part of the total cost)
 			// Note: Reservation fee is not part of individual item payments, it's a separate charge
 			const totalWithReservationFee = totalAmount;
 			
-			// FIXED: Calculate actual paid amount considering reservation fee and discount
-			// If all items are paid, the actual paid amount should be the net amount (after reservation fee and discount)
-			let actualPaidAmount = totalPaid;
-			
-			// If all items are paid, adjust for reservation fee and discount
-			const allItemsPaid = data.items.every(item => item.status === 'paid');
-			if (allItemsPaid) {
-				// When all items are paid, the actual paid amount is the net amount due
-				actualPaidAmount = totalAmount; // This is already calculated as subTotal - reservationFee - discountAmount
-			}
-			
 			// Calculate final balance including reservation fee and discount
-			const finalBalance = totalWithReservationFee - actualPaidAmount;
+			const finalBalance = totalWithReservationFee - adjustedPaidAmount;
 			
 			// Log calculations for debugging
 			console.log('💰 Billing Calculations:', {
@@ -134,10 +133,10 @@ function showBilling(bookingID) {
 				reservationFee: reservationFee,
 				discountAmount: discountAmount,
 				totalAmount: totalAmount,
-				totalPaid: totalPaid,
-				actualPaidAmount: actualPaidAmount,
+				totalPaidRaw: totalPaid,
+				adjustedPaidAmount: adjustedPaidAmount,
 				finalBalance: finalBalance,
-				allItemsPaid: allItemsPaid
+				isRoomPaid: isRoomPaid
 			});
 
 			// Populate modal fields dynamically
@@ -146,7 +145,7 @@ function showBilling(bookingID) {
 			// document.getElementById('customerAddress').textContent = data.address || 'N/A';
 			document.getElementById('invoiceDate').textContent = data.invoiceDate || 'N/A';
 			document.getElementById('confNumber').textContent = data.confNumber || 'N/A';
-			document.getElementById('totalPaid').textContent = actualPaidAmount.toLocaleString(undefined, {
+			document.getElementById('totalPaid').textContent = adjustedPaidAmount.toLocaleString(undefined, {
 				minimumFractionDigits: 2,
 				maximumFractionDigits: 2
 			});
@@ -163,7 +162,7 @@ function showBilling(bookingID) {
 
 			// Determine if ALL items are paid (including reservation fee consideration)
 			// Consider reservation fee as part of the total payment requirement
-			const allPaid = allItemsPaid && (finalBalance <= 0);
+			const allPaid = data.items.every(item => item.status === 'paid') && (finalBalance <= 0);
 
 			if (allPaid) {
 				// Show paid image overlay in billing modal

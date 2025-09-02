@@ -453,9 +453,19 @@ function showBilling(bookingID) {
                 }
             });
 
+            // Determine if room charge (first item) is paid
+            const roomItem = Array.isArray(data.items) && data.items.length > 0 ? data.items[0] : null;
+            const isRoomPaid = roomItem && roomItem.status === 'paid';
+
+            // Adjust totalPaid to apply reservation fee and discount ONLY against the paid room amount
+            let adjustedPaidAmount = totalPaid;
+            if (isRoomPaid) {
+                adjustedPaidAmount = Math.max(0, totalPaid - (reservationFee + discountAmount));
+            }
+
             // Calculate final balance including reservation fee and discount
-            const totalWithReservationFee = totalAmount;
-            const finalBalance = totalWithReservationFee - totalPaid;
+            const totalWithReservationFee = totalAmount; // subTotal - reservationFee - discountAmount
+            const finalBalance = totalWithReservationFee - adjustedPaidAmount;
             
             // Log calculations for debugging
             console.log('💰 Billing Calculations:', {
@@ -463,8 +473,10 @@ function showBilling(bookingID) {
                 reservationFee: reservationFee,
                 discountAmount: discountAmount,
                 totalAmount: totalAmount,
-                totalPaid: totalPaid,
-                finalBalance: finalBalance
+                totalPaidRaw: totalPaid,
+                adjustedPaidAmount: adjustedPaidAmount,
+                finalBalance: finalBalance,
+                isRoomPaid: isRoomPaid
             });
 
             // Populate modal fields dynamically
@@ -473,7 +485,7 @@ function showBilling(bookingID) {
             // document.getElementById('customerAddress').textContent = data.address || 'N/A';
             document.getElementById('invoiceDate').textContent = data.invoiceDate || 'N/A';
             document.getElementById('confNumber').textContent = data.confNumber || 'N/A';
-            document.getElementById('totalPaid').textContent = totalPaid.toLocaleString(undefined, {
+            document.getElementById('totalPaid').textContent = adjustedPaidAmount.toLocaleString(undefined, {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             });

@@ -1118,18 +1118,6 @@ class BookingModel {
                   FROM booking_pick_drop pd
                   WHERE pd.BOOKING_ID = ? AND pd.STATUS = 'unpaid' AND pd.ACTIVE = 1
               ), 0)
-              -
-              COALESCE((
-                  SELECT b.RESERVATION_FEE
-                  FROM billing b
-                  WHERE b.BOOKING_ID = ?
-              ), 0)
-              -
-              COALESCE((
-                  SELECT b.DISCOUNT_AMOUNT
-                  FROM billing b
-                  WHERE b.BOOKING_ID = ?
-              ), 0)
           ) AS total_unpaid_balance
       `;
       
