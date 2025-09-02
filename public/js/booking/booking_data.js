@@ -397,9 +397,13 @@ function showBilling(bookingID) {
                 const reservationFeeElement = document.getElementById('billingReservationFeeAmount');
                 if (reservationFeeRow && reservationFeeElement) {
                     reservationFeeRow.style.display = 'block';
-                    reservationFeeElement.textContent = `₱${parseFloat(data.reservationFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                    reservationFeeElement.textContent = parseFloat(data.reservationFee).toLocaleString('en-US', { minimumFractionDigits: 2 });
                     // Align the amount to the right like Paid and Balance
                     reservationFeeElement.style.textAlign = 'right';
+                    reservationFeeElement.style.display = 'inline-block';
+                    reservationFeeElement.style.width = 'auto';
+                    reservationFeeElement.style.float = 'right';
+                    reservationFeeElement.style.marginLeft = 'auto';
                     console.log('✅ Reservation Fee displayed in billing:', data.reservationFee);
                 } else {
                     console.error('❌ Reservation Fee elements not found in billing modal');
@@ -418,9 +422,13 @@ function showBilling(bookingID) {
                 const discountElement = document.getElementById('billingDiscountAmount');
                 if (discountRow && discountElement) {
                     discountRow.style.display = 'block';
-                    discountElement.textContent = `₱${parseFloat(data.discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                    discountElement.textContent = parseFloat(data.discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 });
                     // Align the amount to the right like Paid and Balance
                     discountElement.style.textAlign = 'right';
+                    discountElement.style.display = 'inline-block';
+                    discountElement.style.width = 'auto';
+                    discountElement.style.float = 'right';
+                    discountElement.style.marginLeft = 'auto';
                     console.log('✅ Discount displayed in billing:', data.discountAmount);
                 } else {
                     console.error('❌ Discount elements not found in billing modal');

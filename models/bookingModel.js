@@ -890,14 +890,29 @@ class BookingModel {
 
         // Process each service
         for (const service of services) {
-          // Check if service already exists for this booking
+          // Determine the cost to use for this service
+          let costToUse;
+          if (service.CUSTOM_COST !== undefined && service.CUSTOM_COST !== null) {
+            costToUse = parseFloat(service.CUSTOM_COST);
+          } else {
+            // Fetch cost from services table
+            const fetchCostQuery = `SELECT SERVICE_COST FROM services WHERE IDNo = ?`;
+            const costResult = await new Promise((resolve, reject) => {
+              connection.query(fetchCostQuery, [service.SERVICE_ID], (err, results) => {
+                if (err) reject(err);
+                else resolve(results);
+              });
+            });
+            costToUse = costResult[0]?.SERVICE_COST || 0;
+          }
+
+          // Check if service already exists for this booking with the same cost
           const checkQuery = `
-            SELECT bs.IDNo, bs.QTY, bs.STATUS, s.SERVICE_COST 
+            SELECT bs.IDNo, bs.QTY, bs.STATUS, bs.TOTAL_COST, s.SERVICE_COST 
             FROM booking_service bs
             INNER JOIN services s ON bs.SERVICE_ID = s.IDNo
-            WHERE bs.BOOKING_ID = ? AND bs.SERVICE_ID = ?
+            WHERE bs.BOOKING_ID = ? AND bs.SERVICE_ID = ? AND bs.STATUS != 'paid'
             ORDER BY bs.IDNo DESC
-            LIMIT 1
           `;
 
           const checkResults = await new Promise((resolve, reject) => {
@@ -907,18 +922,31 @@ class BookingModel {
             });
           });
 
-          const hasUnpaid = checkResults.length > 0 && checkResults[0].STATUS !== 'paid';
-          const serviceCost = checkResults.length > 0 ? parseFloat(checkResults[0].SERVICE_COST) : 0;
-
-          if (hasUnpaid) {
-            // Update if existing record is unpaid
-            // Use custom cost if provided, otherwise use existing service cost
-            let costToUse;
-            if (service.CUSTOM_COST !== undefined && service.CUSTOM_COST !== null) {
-              costToUse = parseFloat(service.CUSTOM_COST);
-            } else {
-              costToUse = serviceCost;
+          // Check if there's an existing unpaid service with the EXACT same cost
+          let hasUnpaid = false;
+          let existingCost = 0;
+          let existingId = null;
+          
+          for (const result of checkResults) {
+            // Calculate the cost per unit of this existing service
+            const existingTotalCost = parseFloat(result.TOTAL_COST);
+            const existingQty = parseFloat(result.QTY);
+            const thisExistingCost = existingQty > 0 ? existingTotalCost / existingQty : 0;
+            
+            // Compare costs with tolerance for floating point differences
+            const costMatches = Math.abs(thisExistingCost - costToUse) < 0.01;
+            
+            if (costMatches) {
+              hasUnpaid = true;
+              existingCost = thisExistingCost;
+              existingId = result.IDNo;
+              break; // Found an exact match, use this one
             }
+          }
+          
+          // If no exact cost match found, we'll insert a new record
+          if (hasUnpaid && existingId) {
+            // Update if existing record is unpaid AND has the same cost
             
             const updateQuery = `
               UPDATE booking_service 
@@ -927,13 +955,13 @@ class BookingModel {
                   EDITED_BY = ?, 
                   EDITED_DT = NOW(),
                   ACTIVE = 1
-              WHERE BOOKING_ID = ? AND SERVICE_ID = ? AND STATUS != 'paid'
+              WHERE IDNo = ?
             `;
 
             await new Promise((resolve, reject) => {
               connection.query(
                 updateQuery,
-                [service.QUANTITY, service.QUANTITY, costToUse, userId, bookingId, service.SERVICE_ID],
+                [service.QUANTITY, service.QUANTITY, costToUse, userId, existingId],
                 (err) => {
                   if (err) reject(err);
                   else resolve();
@@ -943,24 +971,7 @@ class BookingModel {
 
             totalCost += service.QUANTITY * costToUse;
           } else {
-            // Insert new row if no unpaid or already paid
-            // Use custom cost if provided, otherwise fetch from services table
-            let cost;
-            if (service.CUSTOM_COST !== undefined && service.CUSTOM_COST !== null) {
-              // Use the custom cost provided by the frontend
-              cost = parseFloat(service.CUSTOM_COST);
-            } else {
-              // Fetch cost from services table
-              const fetchCostQuery = `SELECT SERVICE_COST FROM services WHERE IDNo = ?`;
-              const costResult = await new Promise((resolve, reject) => {
-                connection.query(fetchCostQuery, [service.SERVICE_ID], (err, results) => {
-                  if (err) reject(err);
-                  else resolve(results);
-                });
-              });
-              cost = costResult[0]?.SERVICE_COST || 0;
-            }
-
+            // Insert new row if no unpaid service exists OR if costs don't match
             const insertQuery = `
               INSERT INTO booking_service 
                 (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT)
@@ -970,7 +981,7 @@ class BookingModel {
             await new Promise((resolve, reject) => {
               connection.query(
                 insertQuery,
-                [bookingId, service.SERVICE_ID, service.QUANTITY, service.QUANTITY * cost, userId, date],
+                [bookingId, service.SERVICE_ID, service.QUANTITY, service.QUANTITY * costToUse, userId, date],
                 (err) => {
                   if (err) reject(err);
                   else resolve();
@@ -978,7 +989,7 @@ class BookingModel {
               );
             });
 
-            totalCost += service.QUANTITY * cost;
+            totalCost += service.QUANTITY * costToUse;
           }
         }
 

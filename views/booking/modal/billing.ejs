@@ -167,18 +167,64 @@
 		bookingBillingScript.src = '/js/booking/billing.js';
 		document.body.appendChild(bookingBillingScript);
 		
-		// Set current date for generated date
-		document.getElementById('generatedDate').textContent = new Date().toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: 'long',
-			day: 'numeric'
-		});
-		
-		// Initialize payment status
-		updatePaymentStatus();
-		
-		// Also check payment status after a short delay to ensure elements are loaded
-		setTimeout(updatePaymentStatus, 500);
+			// Set current date for generated date
+	document.getElementById('generatedDate').textContent = new Date().toLocaleDateString('en-US', {
+		year: 'numeric',
+		month: 'long',
+		day: 'numeric'
+	});
+	
+	// Initialize payment status
+	updatePaymentStatus();
+	
+	// Also check payment status after a short delay to ensure elements are loaded
+	setTimeout(updatePaymentStatus, 500);
+	
+	// Ensure proceed to payment button is properly initialized
+	setTimeout(function() {
+		const proceedButton = document.getElementById('proceedToPaymentButton');
+		if (proceedButton) {
+			console.log('Proceed to Payment button found:', proceedButton);
+			
+			// Remove any existing event listeners
+			proceedButton.replaceWith(proceedButton.cloneNode(true));
+			
+			// Get the new button reference
+			const newProceedButton = document.getElementById('proceedToPaymentButton');
+			
+			// Add event listener
+			newProceedButton.addEventListener('click', function(e) {
+				e.preventDefault();
+				e.stopPropagation();
+				console.log('Proceed to Payment button clicked');
+				
+				// Get the Balance (not total) from the Billing Modal
+				const totalPayment = document.getElementById('balanceAmount').textContent.trim();
+				console.log('Balance for payment:', totalPayment);
+
+				const paymentAmountField = document.getElementById('paymentAmount');
+				if (totalPayment) {
+					paymentAmountField.value = totalPayment;
+				} else {
+					paymentAmountField.value = "N/A";
+				}
+
+				// Close billing modal first
+				const billingModal = bootstrap.Modal.getInstance(document.getElementById('modal-billing'));
+				if (billingModal) {
+					billingModal.hide();
+				}
+
+				// Show payment modal
+				const paymentModal = new bootstrap.Modal(document.getElementById('modal-payment'));
+				paymentModal.show();
+			});
+			
+			console.log('Event listener attached to Proceed to Payment button');
+		} else {
+			console.error('Proceed to Payment button not found');
+		}
+	}, 1000);
 	});
 	
 	// Function to update payment status and show/hide paid image
@@ -875,12 +921,33 @@
 .btn-payment {
     background: linear-gradient(145deg, #e74c3c, #c0392b);
     color: white;
+    position: relative;
+    z-index: 10;
+    cursor: pointer;
+    pointer-events: auto;
 }
 
 .btn-payment:hover {
     background: linear-gradient(145deg, #f39c12, #e74c3c);
     transform: translateY(-3px);
     box-shadow: 0 8px 25px rgba(231, 76, 60, 0.4);
+}
+
+.btn-payment:active {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+}
+
+/* Ensure all action buttons are clickable */
+.action-buttons {
+    position: relative;
+    z-index: 10;
+}
+
+.action-buttons .btn {
+    position: relative;
+    z-index: 10;
+    pointer-events: auto;
 }
 
 .btn-print {
@@ -989,6 +1056,39 @@
 .paid-overlay-image {
     width: 80px;
 }
+}
+
+/* Modal Z-Index Fixes */
+#modal-billing {
+    z-index: 1070 !important;
+}
+
+#modal-billing .modal-backdrop {
+    z-index: 1065 !important;
+}
+
+#modal-payment {
+    z-index: 1080 !important;
+}
+
+#modal-payment .modal-backdrop {
+    z-index: 1075 !important;
+}
+
+/* Ensure buttons are always clickable */
+.modal-content {
+    position: relative;
+    z-index: 1;
+}
+
+.modal-body {
+    position: relative;
+    z-index: 1;
+}
+
+.billing-actions {
+    position: relative;
+    z-index: 10;
 }
 
 /* Print Styles - Light Theme for Printing */

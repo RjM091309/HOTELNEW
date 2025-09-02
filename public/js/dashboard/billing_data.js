@@ -53,9 +53,13 @@ function showBilling(bookingID) {
 				const reservationFeeElement = document.getElementById('billingReservationFeeAmount');
 				if (reservationFeeRow && reservationFeeElement) {
 					reservationFeeRow.style.display = 'block';
-					reservationFeeElement.textContent = `₱${parseFloat(data.reservationFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+					reservationFeeElement.textContent = parseFloat(data.reservationFee).toLocaleString('en-US', { minimumFractionDigits: 2 });
 					// Align the amount to the right like Paid and Balance
 					reservationFeeElement.style.textAlign = 'right';
+					reservationFeeElement.style.display = 'inline-block';
+					reservationFeeElement.style.width = 'auto';
+					reservationFeeElement.style.float = 'right';
+					reservationFeeElement.style.marginLeft = 'auto';
 					console.log('✅ Reservation Fee displayed in billing:', data.reservationFee);
 				} else {
 					console.error('❌ Reservation Fee elements not found in billing modal');
@@ -74,9 +78,13 @@ function showBilling(bookingID) {
 				const discountElement = document.getElementById('billingDiscountAmount');
 				if (discountRow && discountElement) {
 					discountRow.style.display = 'block';
-					                        					discountElement.textContent = `₱${parseFloat(data.discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+					discountElement.textContent = parseFloat(data.discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 });
 					// Align the amount to the right like Paid and Balance
 					discountElement.style.textAlign = 'right';
+					discountElement.style.display = 'inline-block';
+					discountElement.style.width = 'auto';
+					discountElement.style.float = 'right';
+					discountElement.style.marginLeft = 'auto';
 					console.log('✅ Discount displayed in billing:', data.discountAmount);
 				} else {
 					console.error('❌ Discount elements not found in billing modal');
@@ -106,8 +114,19 @@ function showBilling(bookingID) {
 			// Note: Reservation fee is not part of individual item payments, it's a separate charge
 			const totalWithReservationFee = totalAmount;
 			
+			// FIXED: Calculate actual paid amount considering reservation fee and discount
+			// If all items are paid, the actual paid amount should be the net amount (after reservation fee and discount)
+			let actualPaidAmount = totalPaid;
+			
+			// If all items are paid, adjust for reservation fee and discount
+			const allItemsPaid = data.items.every(item => item.status === 'paid');
+			if (allItemsPaid) {
+				// When all items are paid, the actual paid amount is the net amount due
+				actualPaidAmount = totalAmount; // This is already calculated as subTotal - reservationFee - discountAmount
+			}
+			
 			// Calculate final balance including reservation fee and discount
-			const finalBalance = totalWithReservationFee - totalPaid;
+			const finalBalance = totalWithReservationFee - actualPaidAmount;
 			
 			// Log calculations for debugging
 			console.log('💰 Billing Calculations:', {
@@ -116,7 +135,9 @@ function showBilling(bookingID) {
 				discountAmount: discountAmount,
 				totalAmount: totalAmount,
 				totalPaid: totalPaid,
-				finalBalance: finalBalance
+				actualPaidAmount: actualPaidAmount,
+				finalBalance: finalBalance,
+				allItemsPaid: allItemsPaid
 			});
 
 			// Populate modal fields dynamically
@@ -125,7 +146,7 @@ function showBilling(bookingID) {
 			// document.getElementById('customerAddress').textContent = data.address || 'N/A';
 			document.getElementById('invoiceDate').textContent = data.invoiceDate || 'N/A';
 			document.getElementById('confNumber').textContent = data.confNumber || 'N/A';
-			document.getElementById('totalPaid').textContent = totalPaid.toLocaleString(undefined, {
+			document.getElementById('totalPaid').textContent = actualPaidAmount.toLocaleString(undefined, {
 				minimumFractionDigits: 2,
 				maximumFractionDigits: 2
 			});
@@ -141,16 +162,35 @@ function showBilling(bookingID) {
 			});
 
 			// Determine if ALL items are paid (including reservation fee consideration)
-			const allItemsPaid = data.items.every(item => item.status === 'paid');
 			// Consider reservation fee as part of the total payment requirement
 			const allPaid = allItemsPaid && (finalBalance <= 0);
 
 			if (allPaid) {
-				$('#paidImageContainer').show();
+				// Show paid image overlay in billing modal
+				const paidImageOverlay = document.getElementById('paidImageOverlay');
+				if (paidImageOverlay) {
+					paidImageOverlay.style.display = 'block';
+					paidImageOverlay.classList.add('show-paid-status');
+				}
+				
+				// Update button text and disable it
 				$('#proceedToPaymentButton').prop('disabled', true).text('Payment Completed');
+				
+				// Also update the button class to show it's completed
+				$('#proceedToPaymentButton').removeClass('btn-payment').addClass('btn-success');
 			} else {
-				$('#paidImageContainer').hide();
+				// Hide paid image overlay in billing modal
+				const paidImageOverlay = document.getElementById('paidImageOverlay');
+				if (paidImageOverlay) {
+					paidImageOverlay.style.display = 'none';
+					paidImageOverlay.classList.remove('show-paid-status');
+				}
+				
+				// Update button text and enable it
 				$('#proceedToPaymentButton').prop('disabled', false).text('Proceed to Payment');
+				
+				// Reset button class
+				$('#proceedToPaymentButton').removeClass('btn-success').addClass('btn-payment');
 			}
 
 			// Show the modal

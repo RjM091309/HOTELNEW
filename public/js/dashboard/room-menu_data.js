@@ -1239,7 +1239,6 @@ if (selectedService) {
     }
 
     let roomServices = addedServicesMap[bookingId];
-    const existingUnpaid = roomServices.find(s => s.SERVICE_ID === service.SERVICE_ID && s.STATUS !== 'paid');
     
     // Determine the service cost based on checkboxes
     let serviceCost;
@@ -1257,10 +1256,40 @@ if (selectedService) {
         console.log('✅ Using default cost:', serviceCost);
     }
     
+    // Check for existing unpaid service with the SAME SERVICE_ID AND SAME COST
+    const existingUnpaid = roomServices.find(s => {
+        const sameId = s.SERVICE_ID === service.SERVICE_ID;
+        const sameStatus = s.STATUS !== 'paid';
+        const sameCost = Math.abs(parseFloat(s.SERVICE_COST) - serviceCost) < 0.01;
+        
+        console.log('🔍 Comparing service:', {
+            existingId: s.SERVICE_ID,
+            newId: service.SERVICE_ID,
+            existingCost: s.SERVICE_COST,
+            newCost: serviceCost,
+            sameId: sameId,
+            sameStatus: sameStatus,
+            sameCost: sameCost,
+            willMatch: sameId && sameStatus && sameCost
+        });
+        
+        return sameId && sameStatus && sameCost;
+    });
+    
+    console.log('🔍 Checking for existing service:', {
+        serviceId: service.SERVICE_ID,
+        serviceName: service.SERVICE_NAME,
+        newCost: serviceCost,
+        existingServices: roomServices.map(s => ({ id: s.SERVICE_ID, cost: s.SERVICE_COST, status: s.STATUS })),
+        foundExisting: !!existingUnpaid
+    });
+    
     if (existingUnpaid) {
+        // Only combine if the costs are the same
         existingUnpaid.QUANTITY += quantity;
-        existingUnpaid.SERVICE_COST = serviceCost;
+        console.log('✅ Updated existing service with same cost. New quantity:', existingUnpaid.QUANTITY);
     } else {
+        // Create a new service record if cost is different or service doesn't exist
         roomServices.push({
             SERVICE_ID: service.SERVICE_ID,
             SERVICE_NAME: service.SERVICE_NAME,
@@ -1268,6 +1297,7 @@ if (selectedService) {
             QUANTITY: quantity,
             STATUS: "unpaid"
         });
+        console.log('✅ Added new service record with cost:', serviceCost);
     }
 
     // Refresh the list and recalc totals immediately for UI responsiveness
@@ -1276,8 +1306,9 @@ if (selectedService) {
 
     // Save the updated services to the backend and then update balance
     saveServices(bookingId, bookingId).then((result) => {
+        console.log('✅ Services saved successfully:', result);
         // Update balance after successful save
-    calculateBalance(bookingId, bookingId);
+        calculateBalance(bookingId, bookingId);
     }).catch((error) => {
         console.error('❌ Error saving services:', error);
         // Still update balance even if save fails, to show current state
@@ -1328,8 +1359,18 @@ roomServices.forEach(service => {
         return;
     }
 
-    const key = `${service.SERVICE_ID}-${service.STATUS}`;
+    // Create a unique key that includes SERVICE_ID, STATUS, and COST to keep different cost services separate
+    const key = `${service.SERVICE_ID}-${service.STATUS}-${serviceCost}`;
     const totalCost = serviceCost * quantity;
+
+    console.log('💾 Processing service for backend:', {
+        serviceId: service.SERVICE_ID,
+        serviceName: service.SERVICE_NAME,
+        cost: serviceCost,
+        quantity: quantity,
+        totalCost: totalCost,
+        key: key
+    });
 
     if (!serviceMap.has(key)) {
         serviceMap.set(key, {
@@ -1338,16 +1379,14 @@ roomServices.forEach(service => {
             TOTAL_COST: totalCost,
             CUSTOM_COST: serviceCost // Send the actual service cost (custom or default)
         });
+        console.log('📝 Created new service entry with key:', key);
     } else {
         const existing = serviceMap.get(key);
         existing.QUANTITY += quantity;
-            // Recalculate TOTAL_COST based on the combined quantity and service cost
-            existing.TOTAL_COST = existing.QUANTITY * serviceCost;
-        // Keep the custom cost if it exists
-        if (serviceCost !== existing.CUSTOM_COST) {
-            existing.CUSTOM_COST = serviceCost;
-        }
+        // Recalculate TOTAL_COST based on the combined quantity and service cost
+        existing.TOTAL_COST = existing.QUANTITY * serviceCost;
         serviceMap.set(key, existing);
+        console.log('📝 Updated existing service entry with key:', key, 'New quantity:', existing.QUANTITY);
     }
 });
 

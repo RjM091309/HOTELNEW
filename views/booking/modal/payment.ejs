@@ -1,4 +1,4 @@
-<div class="modal fade" id="modal-payment" tabindex="-1" role="dialog" aria-labelledby="paymentModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+<div class="modal fade" id="modal-payment" tabindex="-1" role="dialog" aria-labelledby="paymentModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false" style="z-index: 1080 !important;">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">
             <div class="modal-header">
@@ -35,6 +35,139 @@
        
     </div>
 </div>
+
+<style>
+/* Ensure payment modal appears above billing modal */
+#modal-payment {
+    z-index: 1080 !important;
+}
+
+#modal-payment .modal-backdrop {
+    z-index: 1075 !important;
+}
+
+/* Ensure payment modal content is properly positioned */
+#modal-payment .modal-dialog {
+    z-index: 1085 !important;
+}
+
+/* Fix any potential overlay issues */
+.modal-backdrop + .modal-backdrop {
+    z-index: 1074 !important;
+}
+
+/* Payment Modal Input Styling - Default Black Text */
+#modal-payment .form-control {
+    background: #ffffff !important;
+    border: 1px solid #ced4da !important;
+    color: #000000 !important;
+    font-weight: 500 !important;
+}
+
+#modal-payment .form-control:focus {
+    background: #ffffff !important;
+    border-color: #3498db !important;
+    color: #000000 !important;
+    box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25) !important;
+}
+
+#modal-payment .form-control:read-only {
+    background: #f8f9fa !important;
+    color: #000000 !important;
+    border-color: #ced4da !important;
+}
+
+#modal-payment .form-select {
+    background: #ffffff !important;
+    border: 1px solid #ced4da !important;
+    color: #000000 !important;
+    font-weight: 500 !important;
+}
+
+#modal-payment .form-select:focus {
+    background: #ffffff !important;
+    border-color: #3498db !important;
+    color: #000000 !important;
+    box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25) !important;
+}
+
+#modal-payment .form-select option {
+    background: #ffffff !important;
+    color: #000000 !important;
+}
+
+#modal-payment .form-select option:hover {
+    background: #f8f9fa !important;
+    color: #000000 !important;
+}
+
+#modal-payment .form-select option:checked {
+    background: #3498db !important;
+    color: #ffffff !important;
+}
+
+/* Force select text to be black */
+#modal-payment select.form-select {
+    color: #000000 !important;
+}
+
+#modal-payment select.form-select option {
+    color: #000000 !important;
+}
+
+/* Additional specificity for select elements */
+#modal-payment .form-select,
+#modal-payment select,
+#modal-payment select option {
+    color: #000000 !important;
+}
+
+/* Label styling */
+#modal-payment .form-label {
+    color: #ffffff !important;
+    font-weight: 500 !important;
+    margin-bottom: 8px !important;
+}
+
+/* Placeholder styling */
+#modal-payment .form-control::placeholder {
+    color: #6c757d !important;
+}
+
+#modal-payment .form-select:invalid {
+    color: #6c757d !important;
+}
+
+/* Force select dropdown text to be black with higher specificity */
+#modal-payment select.form-select,
+#modal-payment .form-select,
+#modal-payment select {
+    color: #000000 !important;
+    background-color: #ffffff !important;
+}
+
+#modal-payment select.form-select option,
+#modal-payment .form-select option,
+#modal-payment select option {
+    color: #000000 !important;
+    background-color: #ffffff !important;
+}
+
+/* Override any Bootstrap default colors */
+#modal-payment .form-select:not([size]):not([multiple]) {
+    color: #000000 !important;
+}
+
+/* Hover effects */
+#modal-payment .form-control:hover,
+#modal-payment .form-select:hover {
+    background: #ffffff !important;
+    border-color: #adb5bd !important;
+    color: #000000 !important;
+}
+
+
+</style>
 
 
 
