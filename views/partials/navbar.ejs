@@ -25,6 +25,26 @@
 			<span></span>
 		</a>
 		<!-- end mobile menu -->
+
+        <style>
+            /* DO NOT remove the placeholder cells; just hide their numbers */
+            .flatpickr-day.prevMonthDay,
+            .flatpickr-day.nextMonthDay {
+              display: inline-block !important;  /* re-enable if something set display:none */
+              visibility: hidden;                /* keep space so the grid stays aligned */
+              pointer-events: none;              /* not clickable */
+            }
+          
+            /* If you actually want to show them faintly instead of hiding: */
+            /* 
+            .flatpickr-day.prevMonthDay,
+            .flatpickr-day.nextMonthDay {
+              visibility: visible;
+              opacity: .35;
+              pointer-events: none;
+            }
+            */
+          </style>
 		<!-- start header menu -->
 		<div class="top-menu">
 			<ul class="nav navbar-nav pull-right">
@@ -471,6 +491,7 @@ flatpickr("#datePicker", {
     dateFormat: "Y-m-d", // Format sent to the backend (e.g., "2025-01-06")
     mode: "range", // Allow range selection
     minDate: "today", // Disable past dates
+    locale: { firstDayOfWeek: 1 }, // start week on Monday
     onClose: function (selectedDates, dateStr, instance) {
         if (selectedDates.length === 2) {
             // Get the start and end dates

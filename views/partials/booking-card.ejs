@@ -3,7 +3,7 @@
     
     <!-- Header with Toggle -->
     <div class="card-head" style="text-align: center; display: flex; align-items: center; justify-content: space-between;">
-        <% if (typeof showToggle !== 'undefined' && showToggle) { %>
+        <% if (typeof showToggle !== 'undefined' && showToggle && booking.IS_DIRECT_RESERVATION != 1) { %>
             <!-- Toggle Button -->
             <label class="custom-switch <%= toggleType === 'checkout' ? 'input-out' : 'input-in' %>">
                 <input 
