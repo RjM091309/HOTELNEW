@@ -4295,6 +4295,127 @@ form.search-form-opened .btn.submit {
   padding: 0;
   background: linear-gradient(135deg, #2a3135, #1f2528);
 }
+
+/* Light sidebar themes get light background */
+body.white-sidebar-color .page-content,
+body.custom-sidebar-color .page-content {
+    background: #eef1f5;
+}
+
+/* Dark and colored sidebar themes keep dark background */
+body.dark-sidebar-color .page-content,
+body.blue-sidebar-color .page-content,
+body.indigo-sidebar-color .page-content,
+body.cyan-sidebar-color .page-content,
+body.green-sidebar-color .page-content,
+body.red-sidebar-color .page-content {
+    background: linear-gradient(135deg, #2a3135, #1f2528);
+}
+
+/* Footer dynamic background - matches exact sidebar colors */
+body.white-sidebar-color .page-footer {
+    background-color: #ffffff;
+}
+
+body.dark-sidebar-color .page-footer {
+    background-color: #1f2528;
+}
+
+body.blue-sidebar-color .page-footer {
+    background-color: #1880c9;
+}
+
+body.indigo-sidebar-color .page-footer {
+    background-color: #6673FC;
+}
+
+body.cyan-sidebar-color .page-footer {
+    background-color: #4ABAD2;
+}
+
+body.green-sidebar-color .page-footer {
+    background-color: #6f9c40;
+}
+
+body.red-sidebar-color .page-footer {
+    background-color: #E44F56;
+}
+
+body.custom-sidebar-color .page-footer {
+    background-color: #ffffff;
+}
+
+/* Footer fixed dynamic background - matches exact sidebar colors */
+body.white-sidebar-color .page-footer-fixed .page-footer {
+    background-color: #ffffff;
+}
+
+body.dark-sidebar-color .page-footer-fixed .page-footer {
+    background-color: #1f2528;
+}
+
+body.blue-sidebar-color .page-footer-fixed .page-footer {
+    background-color: #1880c9;
+}
+
+body.indigo-sidebar-color .page-footer-fixed .page-footer {
+    background-color: #6673FC;
+}
+
+body.cyan-sidebar-color .page-footer-fixed .page-footer {
+    background-color: #4ABAD2;
+}
+
+body.green-sidebar-color .page-footer-fixed .page-footer {
+    background-color: #6f9c40;
+}
+
+body.red-sidebar-color .page-footer-fixed .page-footer {
+    background-color: #E44F56;
+}
+
+body.custom-sidebar-color .page-footer-fixed .page-footer {
+    background-color: #ffffff;
+}
+
+/* Card footer styling - dynamic based on sidebar theme */
+/* Light sidebar themes get light background */
+body.white-sidebar-color .card-footer,
+body.custom-sidebar-color .card-footer {
+    background-color: #eef1f5 !important;
+    border-top: 1px solid #dee2e6;
+}
+
+/* Dark and colored sidebar themes get matching sidebar colors */
+body.dark-sidebar-color .card-footer {
+    background-color: #1f2528 !important;
+    border-top: 1px solid #2a3135;
+}
+
+body.blue-sidebar-color .card-footer {
+    background-color: #1880c9 !important;
+    border-top: 1px solid #1565c0;
+}
+
+body.indigo-sidebar-color .card-footer {
+    background-color: #6673FC !important;
+    border-top: 1px solid #5a67d8;
+}
+
+body.cyan-sidebar-color .card-footer {
+    background-color: #4ABAD2 !important;
+    border-top: 1px solid #42a5b5;
+}
+
+body.green-sidebar-color .card-footer {
+    background-color: #6f9c40 !important;
+    border-top: 1px solid #5a7c2a;
+}
+
+body.red-sidebar-color .card-footer {
+    background-color: #E44F56 !important;
+    border-top: 1px solid #d32f2f;
+}
 .page-full-width .page-content {
   margin-left: 0 !important;
 }
@@ -5922,27 +6043,7 @@ h4.media-heading {
   /* box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.33); */
   box-shadow: 0px 5px 25px 0px rgba(0, 0, 0, 0.2);
 }
-.card-topline-yellow {
-  border-top: 3px solid #f39c12;
-}
-.card-topline-aqua {
-  border-top: 3px solid #00c0ef;
-}
-.card-topline-lightblue {
-  border-top: 3px solid #3c8dbc;
-}
-.card-topline-green {
-  border-top: 3px solid #00a65a;
-}
-.card-topline-red {
-  border-top: 3px solid #dd4b39;
-}
-.card-topline-purple {
-  border-top: 3px solid #ad5bff;
-}
-.card-topline-gray {
-  border-top: 3px solid #ddd;
-}
+/* Card toplines are now handled by theme-color.css for proper theme support */
 .card:before,
 .card:after {
   content: " ";

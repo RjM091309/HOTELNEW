@@ -273,10 +273,49 @@
   justify-content: flex-end;
 }
 
-/* Dashboard card footer */
-.dashboard-card-footer {
+/* Dashboard card footer - dynamic based on sidebar theme */
+/* Light sidebar themes get light background */
+body.white-sidebar-color .dashboard-card-footer,
+body.custom-sidebar-color .dashboard-card-footer {
   border-top: 0;
-  background: linear-gradient(145deg, #2a3135, #1f2528);
+  background: #eef1f5;
+  padding: 15px 25px;
+}
+
+/* Dark and colored sidebar themes get matching sidebar colors */
+body.dark-sidebar-color .dashboard-card-footer {
+  border-top: 0;
+  background: #1f2528;
+  padding: 15px 25px;
+}
+
+body.blue-sidebar-color .dashboard-card-footer {
+  border-top: 0;
+  background: #1880c9;
+  padding: 15px 25px;
+}
+
+body.indigo-sidebar-color .dashboard-card-footer {
+  border-top: 0;
+  background: #6673FC;
+  padding: 15px 25px;
+}
+
+body.cyan-sidebar-color .dashboard-card-footer {
+  border-top: 0;
+  background: #4ABAD2;
+  padding: 15px 25px;
+}
+
+body.green-sidebar-color .dashboard-card-footer {
+  border-top: 0;
+  background: #6f9c40;
+  padding: 15px 25px;
+}
+
+body.red-sidebar-color .dashboard-card-footer {
+  border-top: 0;
+  background: #E44F56;
   padding: 15px 25px;
 }
 

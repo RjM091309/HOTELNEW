@@ -5,8 +5,24 @@
  	(header-white white-sidebar-color logo-indigo) with (custom-sidebar-color logo-custom header-custom) classes in template <body> tag 
  	and set bellow variable color as per desire. Thats It !!!!!!
  */
- 
- :root {
+
+/* =====================
+   Smooth Theme Transitions
+   ===================== */
+* {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Exclude specific elements from transitions */
+.fc *,
+.fc * *,
+.modal *,
+.modal * *,
+.animate-none * {
+    transition: none !important;
+}
+
+:root {
   --sidebar-color: #ffffff;
   --sidebar-font-color: #4680ff;
   --logo-color: #222c3c;
@@ -151,6 +167,383 @@
 	background: var(--logo-color);
 }
 
+/* =====================
+   CSS Variables Themes
+   Activate via <html data-theme="...">
+   ===================== */
+[data-theme="white"] {
+    --sidebar-color: #ffffff;
+    --sidebar-font-color: #4680ff;
+    --logo-color: #ffffff;
+    --header-color: #ffffff;
+}
+[data-theme="dark"] {
+    --sidebar-color: #1f2528;
+    --sidebar-font-color: #ffffff;
+    --logo-color: #1f2528;
+    --header-color: #1f2528;
+}
+[data-theme="blue"] {
+    --sidebar-color: #1880c9;
+    --sidebar-font-color: #ffffff;
+    --logo-color: #1880c9;
+    --header-color: #1880c9;
+}
+[data-theme="indigo"] {
+    --sidebar-color: #6673FC;
+    --sidebar-font-color: #ffffff;
+    --logo-color: #6673FC;
+    --header-color: #6673FC;
+}
+[data-theme="cyan"] {
+    --sidebar-color: #4ABAD2;
+    --sidebar-font-color: #ffffff;
+    --logo-color: #4ABAD2;
+    --header-color: #4ABAD2;
+}
+[data-theme="green"] {
+    --sidebar-color: #6f9c40;
+    --sidebar-font-color: #ffffff;
+    --logo-color: #6f9c40;
+    --header-color: #6f9c40;
+}
+[data-theme="red"] {
+    --sidebar-color: #E44F56;
+    --sidebar-font-color: #ffffff;
+    --logo-color: #E44F56;
+    --header-color: #E44F56;
+}
+
+/* Bridge existing selectors to variables so old and new systems both work */
+.custom-sidebar-color .sidemenu-container,
+.white-sidebar-color .sidemenu-container,
+.dark-sidebar-color .sidemenu-container,
+.blue-sidebar-color .sidemenu-container,
+.indigo-sidebar-color .sidemenu-container,
+.cyan-sidebar-color .sidemenu-container,
+.green-sidebar-color .sidemenu-container,
+.red-sidebar-color .sidemenu-container {
+    background-color: var(--sidebar-color);
+}
+.custom-sidebar-color .sidemenu-container .sidemenu>li>a,
+.white-sidebar-color .sidemenu-container .sidemenu>li>a,
+.dark-sidebar-color .sidemenu-container .sidemenu>li>a,
+.blue-sidebar-color .sidemenu-container .sidemenu>li>a,
+.indigo-sidebar-color .sidemenu-container .sidemenu>li>a,
+.cyan-sidebar-color .sidemenu-container .sidemenu>li>a,
+.green-sidebar-color .sidemenu-container .sidemenu>li>a,
+.red-sidebar-color .sidemenu-container .sidemenu>li>a {
+    background-color: var(--sidebar-color);
+}
+.header-custom .page-header.navbar,
+.header-white .page-header.navbar,
+.header-dark .page-header.navbar,
+.header-blue .page-header.navbar,
+.header-indigo .page-header.navbar,
+.header-cyan .page-header.navbar,
+.header-red .page-header.navbar,
+.header-green .page-header.navbar {
+    background-color: var(--header-color);
+}
+
+/* =====================
+   Light theme readability fixes
+   Ensures dark text on light backgrounds when using light/white theme
+   ===================== */
+[data-theme="white"] .page-content,
+[data-theme="white"] .page-content * {
+    color: #1f2937;
+}
+[data-theme="white"] .dashboard-card {
+    background: linear-gradient(145deg, #ffffff, #f8fafc) !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04) !important;
+}
+[data-theme="white"] .dashboard-card-header {
+    background: linear-gradient(135deg, #e5e7eb, #f3f4f6) !important;
+}
+[data-theme="white"] .dashboard-card-header-title {
+    color: #111827 !important;
+}
+[data-theme="white"] .dashboard-card-body {
+    background: rgba(0,0,0,0.02) !important;
+    color: #1f2937 !important;
+}
+[data-theme="white"] .dashboard-btn-row,
+[data-theme="white"] .dashboard-btn-row1 {
+    color: #1f2937 !important;
+    border-bottom: 1px solid rgba(0,0,0,0.1) !important;
+}
+[data-theme="white"] .dashboard-btn-row:hover,
+[data-theme="white"] .dashboard-btn-row1:hover {
+    background: rgba(0,0,0,0.04) !important;
+}
+
+/* Generic cards used across booking/rooms - force dark text on light theme */
+[data-theme="white"] .card {
+    background: #ffffff !important;
+    border-color: #e5e7eb !important;
+    border-top: 1px solid #e5e7eb !important; /* Only set default top border */
+}
+[data-theme="white"] .card-head { 
+    background: #f9fafb !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+[data-theme="white"] .card-head header { 
+    color: #111827 !important;
+}
+[data-theme="white"] .card-body { 
+    color: #1f2937 !important;
+}
+[data-theme="white"] .card-body p,
+[data-theme="white"] .dates,
+[data-theme="white"] .dates span { 
+    color: #334155 !important;
+}
+
+/* Ensure card toplines are visible in light theme - with higher specificity */
+[data-theme="white"] .card.card-topline-yellow {
+    border-top: 5px solid #FFC107 !important;
+}
+[data-theme="white"] .card.card-topline-gray {
+    border-top: 5px solid #9E9E9E !important;
+}
+[data-theme="white"] .card.card-topline-green {
+    border-top: 5px solid #4CAF50 !important;
+}
+[data-theme="white"] .card.card-topline-blue {
+    border-top: 5px solid #2196F3 !important;
+}
+[data-theme="white"] .card.card-topline-red {
+    border-top: 5px solid #F44336 !important;
+}
+[data-theme="white"] .card.card-topline-purple {
+    border-top: 5px solid #9C27B0 !important;
+}
+[data-theme="white"] .card.card-topline-violet {
+    border-top: 5px solid #8A2BE2 !important;
+}
+[data-theme="white"] .card.card-topline-orange {
+    border-top: 5px solid #FF9800 !important;
+}
+[data-theme="white"] .card.card-topline-sky {
+    border-top: 5px solid #10b8eb !important;
+}
+[data-theme="white"] .card.card-topline-pink {
+    border-top: 5px solid #db7bbb !important;
+}
+[data-theme="white"] .card.card-topline-green2 {
+    border-top: 5px solid #0c2409 !important;
+}
+
+/* =====================
+   Light theme: tables & modals
+   ===================== */
+[data-theme="white"] table,
+[data-theme="white"] .table,
+[data-theme="white"] .table-bordered,
+[data-theme="white"] .table-striped,
+[data-theme="white"] .table-hover {
+    color: #111827;
+    background: #ffffff;
+}
+[data-theme="white"] .table th,
+[data-theme="white"] .table td {
+    border-color: #e5e7eb !important;
+}
+[data-theme="white"] .table thead th {
+    background: #f3f4f6 !important;
+    color: #111827 !important;
+    border-color: #e5e7eb !important;
+}
+[data-theme="white"] .table-striped tbody tr:nth-of-type(odd) {
+    background: #f9fafb;
+}
+[data-theme="white"] .table-hover tbody tr:hover {
+    background: #eef2f7;
+}
+
+/* Light theme: Real-Time Booking Monitor tabs */
+[data-theme="white"] .tab-item {
+    color: #111827 !important;
+    background-color: rgba(0,0,0,0.05);
+}
+[data-theme="white"] .tab-item:hover,
+[data-theme="white"] .tab-item.is-active {
+    color: #166534 !important;
+    background-color: rgba(22,101,52,0.12);
+}
+[data-theme="white"] .tab-item.is-active::after {
+    background-color: #166534 !important;
+}
+
+/* Material-style tabs in light theme */
+[data-theme="white"] .mdl-tabs__tab,
+[data-theme="white"] .mdl-tabs .mdl-tabs__tab {
+    color: #111827 !important;
+}
+[data-theme="white"] .mdl-tabs__tab:hover,
+[data-theme="white"] .mdl-tabs .mdl-tabs__tab:hover,
+[data-theme="white"] .mdl-tabs__tab.is-active,
+[data-theme="white"] .mdl-tabs .mdl-tabs__tab.is-active {
+    color: #166534 !important;
+}
+[data-theme="white"] .mdl-tabs.is-upgraded .mdl-tabs__tab.is-active:after,
+[data-theme="white"] .mdl-tabs .mdl-tabs.is-upgraded .mdl-tabs__tab.is-active:after {
+    background-color: #166534 !important;
+}
+
+/* Light theme table styling */
+[data-theme="white"] .table {
+    background: #ffffff;
+    color: #111827;
+}
+[data-theme="white"] .table tbody tr {
+    background: #ffffff;
+    color: #111827;
+}
+[data-theme="white"] .table tbody tr td {
+    background: #ffffff !important;
+    color: #111827 !important;
+    border-color: #e5e7eb !important;
+}
+[data-theme="white"] .table thead th {
+    background: #f3f4f6 !important;
+    color: #111827 !important;
+    border-color: #e5e7eb !important;
+}
+
+/* Light theme form controls styling */
+[data-theme="white"] .form-control,
+[data-theme="white"] .form-control:focus,
+[data-theme="white"] .custom-select,
+[data-theme="white"] .custom-select:focus {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border-color: #d1d5db !important;
+}
+
+[data-theme="white"] .form-control::placeholder,
+[data-theme="white"] .custom-select option {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] .dataTables_length select,
+[data-theme="white"] .dataTables_filter input {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border-color: #d1d5db !important;
+}
+
+[data-theme="white"] .dataTables_length label,
+[data-theme="white"] .dataTables_filter label {
+    color: #111827 !important;
+}
+
+[data-theme="white"] .dataTables_info {
+    color: #111827 !important;
+}
+
+[data-theme="white"] .dataTables_info .dataTables_info {
+    color: #111827 !important;
+}
+
+/* Modals */
+[data-theme="white"] .modal-content {
+    background: #ffffff;
+    color: #111827;
+    border: 1px solid #e5e7eb;
+}
+[data-theme="white"] .modal-header,
+[data-theme="white"] .modal-footer {
+    background: #f9fafb;
+    border-color: #e5e7eb;
+}
+[data-theme="white"] .modal-title { color: #111827; }
+[data-theme="white"] .close, [data-theme="white"] .modal-header .close { color: #111827; opacity: 0.6; }
+[data-theme="white"] .close:hover, [data-theme="white"] .modal-header .close:hover { opacity: 1; }
+
+/* =====================
+   Light theme: Calendar (FullCalendar-like)
+   ===================== */
+[data-theme="white"] .fc,
+[data-theme="white"] .fc a { color: #111827; }
+[data-theme="white"] .fc .fc-toolbar-title { color: #111827; }
+[data-theme="white"] .fc .fc-toolbar { background: #ffffff; border-bottom: 1px solid #e5e7eb; }
+[data-theme="white"] .fc .fc-button-primary { background: #f3f4f6; border-color: #e5e7eb; color: #111827; }
+[data-theme="white"] .fc .fc-button-primary:hover { background: #e5e7eb; border-color: #d1d5db; color: #111827; }
+[data-theme="white"] .fc .fc-button-primary:disabled { background: #f3f4f6; border-color: #e5e7eb; color: #9ca3af; }
+
+[data-theme="white"] .fc .fc-scrollgrid,
+[data-theme="white"] .fc .fc-scrollgrid-section > * { background: #ffffff; }
+[data-theme="white"] .fc .fc-scrollgrid,
+[data-theme="white"] .fc .fc-col-header-cell,
+[data-theme="white"] .fc .fc-daygrid-day,
+[data-theme="white"] .fc .fc-timegrid-slot,
+[data-theme="white"] .fc .fc-timegrid-axis { border-color: #e5e7eb; }
+[data-theme="white"] .fc .fc-col-header-cell { background: #f9fafb; color: #111827; }
+[data-theme="white"] .fc .fc-daygrid-day-number { color: #111827; }
+[data-theme="white"] .fc .fc-daygrid-day.fc-day-today,
+[data-theme="white"] .fc .fc-timegrid-col.fc-day-today { background: #fffbea; }
+
+[data-theme="white"] .fc .fc-event { background: #e6f2ff; border-color: #bfdbfe; color: #1e293b; }
+[data-theme="white"] .fc .fc-event .fc-event-title { color: #1e293b; }
+
+/* Light theme: strengthen grid lines and labels */
+[data-theme="white"] .fc-theme-standard td,
+[data-theme="white"] .fc-theme-standard th,
+[data-theme="white"] .fc .fc-scrollgrid,
+[data-theme="white"] .fc .fc-col-header-cell,
+[data-theme="white"] .fc .fc-daygrid-day,
+[data-theme="white"] .fc .fc-timegrid-slot,
+[data-theme="white"] .fc .fc-timegrid-axis {
+    border-color: #d1d5db !important;
+}
+[data-theme="white"] .fc .fc-col-header-cell-cushion,
+[data-theme="white"] .fc .fc-timegrid-slot-label-cushion,
+[data-theme="white"] .fc .fc-axis { color: #111827 !important; }
+[data-theme="white"] .fc .fc-timegrid-slot { background: #ffffff; }
+[data-theme="white"] .fc .fc-timegrid-slot:nth-child(2n) { background: #fbfdff; }
+[data-theme="white"] .fc .fc-daygrid-day.fc-day-today,
+[data-theme="white"] .fc .fc-timegrid-col.fc-day-today { background: #fffbea; }
+
+/* Light theme: match dark-theme visibility via stronger guides */
+[data-theme="white"] .fc .fc-col-header-cell-cushion { font-weight: 600; color: #0f172a !important; }
+[data-theme="white"] .fc .fc-timegrid-axis-cushion { color: #0f172a !important; font-weight: 600; }
+[data-theme="white"] .fc-theme-standard .fc-timegrid-slot { border-top: 1px solid #cbd5e1 !important; background: #ffffff !important; }
+[data-theme="white"] .fc-theme-standard .fc-timegrid-axis { border-right: 1px solid #cbd5e1 !important; }
+[data-theme="white"] .fc-theme-standard .fc-timegrid-col { border-left: 1px solid #d1d5db !important; }
+[data-theme="white"] .fc-theme-standard .fc-timegrid-cols .fc-timegrid-col:nth-child(even) { background: #f5f7fb !important; }
+[data-theme="white"] .fc-theme-standard td,
+[data-theme="white"] .fc-theme-standard th,
+[data-theme="white"] .fc-theme-standard .fc-scrollgrid { border-color: #cbd5e1 !important; }
+
+/* Day grid vertical banding for readability */
+[data-theme="white"] .fc .fc-daygrid-body table tr > td { background: #ffffff !important; }
+[data-theme="white"] .fc .fc-daygrid-body table tr > td:nth-child(even) { background: #f7fafc !important; }
+[data-theme="white"] .fc .fc-daygrid-day-frame { border-left: 1px solid #e2e8f0 !important; }
+
+/* Light theme: fine-tune subtle/muted texts and icons */
+[data-theme="white"] .info-box-icon {
+    background: rgba(0,0,0,0.06) !important;
+    border: 1px solid rgba(0,0,0,0.1) !important;
+}
+[data-theme="white"] .info-box-icon i { color: #111827 !important; }
+[data-theme="white"] .dates { color: #475569 !important; }
+[data-theme="white"] .dates span { background: #eef2f7 !important; border-color: #e5e7eb !important; color: #374151 !important; }
+[data-theme="white"] .memo { background: #f9fafb !important; border-color: #e5e7eb !important; }
+[data-theme="white"] .dashboard-card-header-metric { color: #111827 !important; }
+[data-theme="white"] .dashboard-btn-row-metric,
+[data-theme="white"] .dashboard-btn-row-metric1,
+[data-theme="white"] .dashboard-btn-row-metric2 { color: #166534 !important; }
+
+/* Dark/colored themes: ensure light text for items that were hardcoded dark */
+[data-theme]:not([data-theme="white"]) .card-body ul li,
+[data-theme]:not([data-theme="white"]) .dates,
+[data-theme]:not([data-theme="white"]) .dates span,
+[data-theme]:not([data-theme="white"]) .memo p { color: rgba(255,255,255,0.85) !important; }
+[data-theme]:not([data-theme="white"]) .dates span { background: rgba(255,255,255,0.12) !important; border-color: rgba(255,255,255,0.2) !important; }
+[data-theme]:not([data-theme="white"]) .badge { color: #ffffff !important; background: rgba(255,255,255,0.12) !important; border-color: rgba(255,255,255,0.25) !important; }
+
 
 /* White sidebar color */
 .white-sidebar-color .sidemenu-container {
@@ -162,20 +555,16 @@
 .white-sidebar-color .sidemenu-closed.sidemenu-container-fixed .sidemenu-container:hover .sidemenu>li.active>a {
     background-color: #F4F6F9;
     border-top-color: transparent;
-    color: #4680ff;
+    color: #1f2937;
 }
-/* .white-sidebar-color .sidemenu-container .sidemenu>li>a{
-	color: #555;
-	border-bottom:none;
-	background-color: #ffffff;
-} */
+
 .white-sidebar-color .sidemenu-container .sidemenu>li.open>a, 
 .white-sidebar-color .sidemenu-container .sidemenu>li:hover>a, 
 .white-sidebar-color .sidemenu-closed.sidemenu-container-fixed .sidemenu-container:hover .sidemenu>li.open>a, 
 .white-sidebar-color .sidemenu-closed.sidemenu-container-fixed .sidemenu-container:hover .sidemenu>li:hover>a{
 	background-color: #F4F6F9;
     border-top-color: transparent;
-    color: #4680ff;
+    color: #000000;
 }
 .white-sidebar-color .user-panel,
 .white-sidebar-color .txtOnline,
@@ -195,7 +584,7 @@
 .white-sidebar-color .sidemenu-closed.sidemenu-container-fixed .sidemenu-container:hover .sidemenu>li:hover>a>.arrow.open:before, 
 .white-sidebar-color .sidemenu-closed.sidemenu-container-fixed .sidemenu-container:hover .sidemenu>li:hover>a>.arrow:before, 
 .white-sidebar-color .sidemenu-closed.sidemenu-container-fixed .sidemenu-container:hover .sidemenu>li:hover>a>i{
-	color: #4680ff;
+	color: #000000;
 }
 .white-sidebar-color .sidemenu-container .sidemenu .sub-menu, 
 .white-sidebar-color .sidemenu-closed.sidemenu-container-fixed .sidemenu-container:hover .sidemenu .sub-menu{
@@ -211,16 +600,13 @@
 .white-sidebar-color .sidemenu-closed.sidemenu-container-fixed .sidemenu-container:hover .sidemenu .sub-menu>li.active>a, 
 .white-sidebar-color .sidemenu-closed.sidemenu-container-fixed .sidemenu-container:hover .sidemenu .sub-menu>li.open>a, 
 .white-sidebar-color .sidemenu-closed.sidemenu-container-fixed .sidemenu-container:hover .sidemenu .sub-menu>li:hover>a{
-	color: #4680ff;
+	color: #000000;
 }
 .white-sidebar-color .page-container{
 	background-color : #ffffff;
 }
-.selector-title{
-	margin-top: 0px !important; 
-}
 .white-sidebar-color .sidemenu-hover-submenu li:hover a>.arrow{
-	    border-right: 8px solid #4680ff;
+	    border-right: 8px solid #000000;
 }
 .white-sidebar-color .sidemenu-hover-submenu li:hover>.sub-menu{
 	background-color: #F5F5F5;
@@ -230,7 +616,7 @@
 .white-sidebar-color .sidemenu-container .sidemenu li.active>a>.arrow:before, 
 .white-sidebar-color .sidemenu-closed.sidemenu-container-fixed .sidemenu-container:hover .sidemenu li.active>a>.arrow.open:before, 
 .white-sidebar-color .sidemenu-closed.sidemenu-container-fixed .sidemenu-container:hover .sidemenu li.active>a>.arrow:before{
-	color: #4680ff;
+	color: #1f2937;
 }
 .white-sidebar-color .menu-heading {
     color: #52545b;
@@ -1470,3 +1856,1850 @@
 .header-green .navbar-custom {
     background: #6f9c40;
 }
+
+/* Light theme: enforce white footer background for Bootstrap/DataTables */
+[data-theme="white"] .dataTables_wrapper .table > tfoot > tr > th,
+[data-theme="white"] .dataTables_wrapper .table > tfoot > tr > td,
+[data-theme="white"] .table.table-bordered > tfoot > tr > th,
+[data-theme="white"] .table.table-bordered > tfoot > tr > td,
+[data-theme="white"] .table.table-hover > tfoot > tr > th,
+[data-theme="white"] .table.table-hover > tfoot > tr > td,
+[data-theme="white"] .table > tfoot > tr > th,
+[data-theme="white"] .table > tfoot > tr > td {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+/* =====================
+   Light theme: Buttons with + icons
+   Make buttons with plus icons use light colors in light theme
+   ===================== */
+[data-theme="white"] .btn i.fa-plus,
+[data-theme="white"] .btn i.fas.fa-plus,
+[data-theme="white"] .btn i.far.fa-plus,
+[data-theme="white"] .btn i.fa-plus-circle,
+[data-theme="white"] .btn i.fas.fa-plus-circle,
+[data-theme="white"] .btn i.far.fa-plus-circle,
+[data-theme="white"] .btn i.fa-plus-square,
+[data-theme="white"] .btn i.fas.fa-plus-square,
+[data-theme="white"] .btn i.far.fa-plus-square,
+[data-theme="white"] .btn i.fa-plus-square-o,
+[data-theme="white"] .btn i.fas.fa-plus-square-o,
+[data-theme="white"] .btn i.far.fa-plus-square-o,
+[data-theme="white"] .btn span.fa-plus,
+[data-theme="white"] .btn span.fas.fa-plus,
+[data-theme="white"] .btn span.far.fa-plus,
+[data-theme="white"] .btn span.fa-plus-circle,
+[data-theme="white"] .btn span.fas.fa-plus-circle,
+[data-theme="white"] .btn span.far.fa-plus-circle,
+[data-theme="white"] .btn span.fa-plus-square,
+[data-theme="white"] .btn span.fas.fa-plus-square,
+[data-theme="white"] .btn span.far.fa-plus-square,
+[data-theme="white"] .btn span.fa-plus-square-o,
+[data-theme="white"] .btn span.fas.fa-plus-square-o,
+[data-theme="white"] .btn span.far.fa-plus-square-o {
+    color: #ffffff !important;
+}
+
+/* Light theme: Buttons with + icons - hover state */
+[data-theme="white"] .btn:hover i.fa-plus,
+[data-theme="white"] .btn:hover i.fas.fa-plus,
+[data-theme="white"] .btn:hover i.far.fa-plus,
+[data-theme="white"] .btn:hover i.fa-plus-circle,
+[data-theme="white"] .btn:hover i.fas.fa-plus-circle,
+[data-theme="white"] .btn:hover i.far.fa-plus-circle,
+[data-theme="white"] .btn:hover i.fa-plus-square,
+[data-theme="white"] .btn:hover i.fas.fa-plus-square,
+[data-theme="white"] .btn:hover i.far.fa-plus-square,
+[data-theme="white"] .btn:hover i.fa-plus-square-o,
+[data-theme="white"] .btn:hover i.fas.fa-plus-square-o,
+[data-theme="white"] .btn:hover i.far.fa-plus-square-o,
+[data-theme="white"] .btn:hover span.fa-plus,
+[data-theme="white"] .btn:hover span.fas.fa-plus,
+[data-theme="white"] .btn:hover span.far.fa-plus,
+[data-theme="white"] .btn:hover span.fa-plus-circle,
+[data-theme="white"] .btn:hover span.fas.fa-plus-circle,
+[data-theme="white"] .btn:hover span.far.fa-plus-circle,
+[data-theme="white"] .btn:hover span.fa-plus-square,
+[data-theme="white"] .btn:hover span.fas.fa-plus-square,
+[data-theme="white"] .btn:hover span.far.fa-plus-square,
+[data-theme="white"] .btn:hover span.fa-plus-square-o,
+[data-theme="white"] .btn:hover span.fas.fa-plus-square-o,
+[data-theme="white"] .btn:hover span.far.fa-plus-square-o {
+    color: #ffffff !important;
+}
+
+/* =====================
+   Light theme: Room Management Icons and Fonts
+   Make room management icons and fonts use light colors in light theme
+   ===================== */
+
+/* Room Management Header Icons */
+[data-theme="white"] .dashboard-card-header .tools .btn i.fa-tags,
+[data-theme="white"] .dashboard-card-header .tools .btn i.fa-wifi,
+[data-theme="white"] .dashboard-card-header .tools .btn i.fa-calendar,
+[data-theme="white"] .dashboard-card-header .tools .btn i.fa-plus,
+[data-theme="white"] .dashboard-card-header .tools .btn i.fas.fa-tags,
+[data-theme="white"] .dashboard-card-header .tools .btn i.fas.fa-wifi,
+[data-theme="white"] .dashboard-card-header .tools .btn i.fas.fa-calendar,
+[data-theme="white"] .dashboard-card-header .tools .btn i.fas.fa-plus,
+[data-theme="white"] .dashboard-card-header .tools .btn i.far.fa-tags,
+[data-theme="white"] .dashboard-card-header .tools .btn i.far.fa-wifi,
+[data-theme="white"] .dashboard-card-header .tools .btn i.far.fa-calendar,
+[data-theme="white"] .dashboard-card-header .tools .btn i.far.fa-plus {
+    color: #ffffff !important;
+}
+
+/* Room Management Table Icons */
+[data-theme="white"] #roomTable i.fa-edit,
+[data-theme="white"] #roomTable i.fa-trash,
+[data-theme="white"] #roomTable i.fa-eye,
+[data-theme="white"] #roomTable i.fa-image,
+[data-theme="white"] #roomTable i.fa-bed,
+[data-theme="white"] #roomTable i.fa-users,
+[data-theme="white"] #roomTable i.fa-tag,
+[data-theme="white"] #roomTable i.fa-calendar,
+[data-theme="white"] #roomTable i.fas.fa-edit,
+[data-theme="white"] #roomTable i.fas.fa-trash,
+[data-theme="white"] #roomTable i.fas.fa-eye,
+[data-theme="white"] #roomTable i.fas.fa-image,
+[data-theme="white"] #roomTable i.fas.fa-bed,
+[data-theme="white"] #roomTable i.fas.fa-users,
+[data-theme="white"] #roomTable i.fas.fa-tag,
+[data-theme="white"] #roomTable i.fas.fa-calendar,
+[data-theme="white"] #roomTable i.far.fa-edit,
+[data-theme="white"] #roomTable i.far.fa-trash,
+[data-theme="white"] #roomTable i.far.fa-eye,
+[data-theme="white"] #roomTable i.far.fa-image,
+[data-theme="white"] #roomTable i.far.fa-bed,
+[data-theme="white"] #roomTable i.far.fa-users,
+[data-theme="white"] #roomTable i.far.fa-tag,
+[data-theme="white"] #roomTable i.far.fa-calendar {
+    color: #ffffff !important;
+}
+
+/* Room Management Modal Icons */
+[data-theme="white"] .modal i.material-icons,
+[data-theme="white"] .modal i.fa-info-circle,
+[data-theme="white"] .modal i.fa-exclamation-triangle,
+[data-theme="white"] .modal i.fa-check-circle,
+[data-theme="white"] .modal i.fa-times-circle,
+[data-theme="white"] .modal i.fas.fa-info-circle,
+[data-theme="white"] .modal i.fas.fa-exclamation-triangle,
+[data-theme="white"] .modal i.fas.fa-check-circle,
+[data-theme="white"] .modal i.fas.fa-times-circle,
+[data-theme="white"] .modal i.far.fa-info-circle,
+[data-theme="white"] .modal i.far.fa-exclamation-triangle,
+[data-theme="white"] .modal i.far.fa-check-circle,
+[data-theme="white"] .modal i.far.fa-times-circle {
+    color: #ffffff !important;
+}
+
+/* Room Management Button Text */
+[data-theme="white"] .dashboard-card-header .tools .btn {
+    color: #ffffff !important;
+}
+
+/* Room Management Table Text */
+[data-theme="white"] #roomTable th,
+[data-theme="white"] #roomTable td {
+    color: #111827 !important;
+}
+
+/* Room Management Modal Text */
+[data-theme="white"] .modal .modal-title,
+[data-theme="white"] .modal .mdl-textfield__label,
+[data-theme="white"] .modal label,
+[data-theme="white"] .modal .form-text {
+    color: #111827 !important;
+}
+
+/* Room Management Alert Icons */
+[data-theme="white"] .alert i.fa-info-circle,
+[data-theme="white"] .alert i.fa-exclamation-triangle,
+[data-theme="white"] .alert i.fa-check-circle,
+[data-theme="white"] .alert i.fa-times-circle,
+[data-theme="white"] .alert i.fas.fa-info-circle,
+[data-theme="white"] .alert i.fas.fa-exclamation-triangle,
+[data-theme="white"] .alert i.fas.fa-check-circle,
+[data-theme="white"] .alert i.fas.fa-times-circle,
+[data-theme="white"] .alert i.far.fa-info-circle,
+[data-theme="white"] .alert i.far.fa-exclamation-triangle,
+[data-theme="white"] .alert i.far.fa-check-circle,
+[data-theme="white"] .alert i.far.fa-times-circle {
+    color: #ffffff !important;
+}
+
+/* Room Management Action Buttons */
+[data-theme="white"] .btn-group .btn i,
+[data-theme="white"] .btn-group .btn span,
+[data-theme="white"] .action-buttons .btn i,
+[data-theme="white"] .action-buttons .btn span {
+    color: #ffffff !important;
+}
+
+/* Room Management Dropdown Icons */
+[data-theme="white"] .mdl-icon-toggle__label.material-icons {
+    color: #111827 !important;
+}
+
+/* Room Management Form Icons */
+[data-theme="white"] .form-group i,
+[data-theme="white"] .form-group span,
+[data-theme="white"] .input-group i,
+[data-theme="white"] .input-group span {
+    color: #111827 !important;
+}
+
+/* Room Management Status Icons */
+[data-theme="white"] .status-indicator i,
+[data-theme="white"] .status-indicator span,
+[data-theme="white"] .room-status i,
+[data-theme="white"] .room-status span {
+    color: #ffffff !important;
+}
+
+/* =====================
+   Light theme: Guest List Gear/Settings Icons
+   Make gear/settings icons in guest list buttons use light colors in light theme
+   ===================== */
+
+/* Guest List Header Gear Icons */
+[data-theme="white"] .dashboard-card-header .tools .btn i.fa-cog,
+[data-theme="white"] .dashboard-card-header .tools .btn i.fas.fa-cog,
+[data-theme="white"] .dashboard-card-header .tools .btn i.far.fa-cog,
+[data-theme="white"] .dashboard-card-header .tools .btn i.fa-gear,
+[data-theme="white"] .dashboard-card-header .tools .btn i.fas.fa-gear,
+[data-theme="white"] .dashboard-card-header .tools .btn i.far.fa-gear {
+    color: #ffffff !important;
+}
+
+/* Guest List Table Gear Icons */
+[data-theme="white"] #guestTable i.fa-cog,
+[data-theme="white"] #guestTable i.fas.fa-cog,
+[data-theme="white"] #guestTable i.far.fa-cog,
+[data-theme="white"] #guestTable i.fa-gear,
+[data-theme="white"] #guestTable i.fas.fa-gear,
+[data-theme="white"] #guestTable i.far.fa-gear {
+    color: #ffffff !important;
+}
+
+/* Guest List Button Text */
+[data-theme="white"] .dashboard-card-header .tools .btn {
+    color: #ffffff !important;
+}
+
+/* Guest List Table Action Icons */
+[data-theme="white"] #guestTable i.fa-eye,
+[data-theme="white"] #guestTable i.fa-pencil,
+[data-theme="white"] #guestTable i.fa-edit,
+[data-theme="white"] #guestTable i.fa-trash,
+[data-theme="white"] #guestTable i.fas.fa-eye,
+[data-theme="white"] #guestTable i.fas.fa-pencil,
+[data-theme="white"] #guestTable i.fas.fa-edit,
+[data-theme="white"] #guestTable i.fas.fa-trash,
+[data-theme="white"] #guestTable i.far.fa-eye,
+[data-theme="white"] #guestTable i.far.fa-pencil,
+[data-theme="white"] #guestTable i.far.fa-edit,
+[data-theme="white"] #guestTable i.far.fa-trash {
+    color: #ffffff !important;
+}
+
+/* Guest List Modal Icons */
+[data-theme="white"] .modal i.fa-cog,
+[data-theme="white"] .modal i.fas.fa-cog,
+[data-theme="white"] .modal i.far.fa-cog,
+[data-theme="white"] .modal i.fa-gear,
+[data-theme="white"] .modal i.fas.fa-gear,
+[data-theme="white"] .modal i.far.fa-gear {
+    color: #ffffff !important;
+}
+
+/* Guest List Table Text */
+[data-theme="white"] #guestTable th,
+[data-theme="white"] #guestTable td {
+    color: #111827 !important;
+}
+
+/* Guest List Modal Text */
+[data-theme="white"] .modal .modal-title,
+[data-theme="white"] .modal .mdl-textfield__label,
+[data-theme="white"] .modal label,
+[data-theme="white"] .modal .form-text {
+    color: #111827 !important;
+}
+
+/* =====================
+   Light theme: Room Management Edit Icons
+   Make edit room icons (pencil icons) use light colors in light theme
+   ===================== */
+
+/* Room Management Edit Icons - Specific targeting */
+[data-theme="white"] #roomTable .btn-tbl-edit i.fa-pencil,
+[data-theme="white"] #roomTable .btn-tbl-edit i.fas.fa-pencil,
+[data-theme="white"] #roomTable .btn-tbl-edit i.far.fa-pencil,
+[data-theme="white"] #roomTable .btn-tbl-edit i.fa-edit,
+[data-theme="white"] #roomTable .btn-tbl-edit i.fas.fa-edit,
+[data-theme="white"] #roomTable .btn-tbl-edit i.far.fa-edit,
+[data-theme="white"] #roomTable .btn-tbl-edit i.fa-pencil-alt,
+[data-theme="white"] #roomTable .btn-tbl-edit i.fas.fa-pencil-alt,
+[data-theme="white"] #roomTable .btn-tbl-edit i.far.fa-pencil-alt {
+    color: #ffffff !important;
+}
+
+/* Room Management Edit Button Background */
+[data-theme="white"] #roomTable .btn-tbl-edit {
+    background-color: #6c757d !important;
+    border-color: #6c757d !important;
+}
+
+/* Room Management Edit Button Hover */
+[data-theme="white"] #roomTable .btn-tbl-edit:hover {
+    background-color: #5a6268 !important;
+    border-color: #545b62 !important;
+}
+
+/* Room Management Edit Button Hover Icon */
+[data-theme="white"] #roomTable .btn-tbl-edit:hover i.fa-pencil,
+[data-theme="white"] #roomTable .btn-tbl-edit:hover i.fas.fa-pencil,
+[data-theme="white"] #roomTable .btn-tbl-edit:hover i.far.fa-pencil,
+[data-theme="white"] #roomTable .btn-tbl-edit:hover i.fa-edit,
+[data-theme="white"] #roomTable .btn-tbl-edit:hover i.fas.fa-edit,
+[data-theme="white"] #roomTable .btn-tbl-edit:hover i.far.fa-edit,
+[data-theme="white"] #roomTable .btn-tbl-edit:hover i.fa-pencil-alt,
+[data-theme="white"] #roomTable .btn-tbl-edit:hover i.fas.fa-pencil-alt,
+[data-theme="white"] #roomTable .btn-tbl-edit:hover i.far.fa-pencil-alt {
+    color: #ffffff !important;
+}
+
+/* Room Management Action Buttons Container */
+[data-theme="white"] #roomTable .btn-group .btn-tbl-edit,
+[data-theme="white"] #roomTable .action-buttons .btn-tbl-edit {
+    background-color: #6c757d !important;
+    border-color: #6c757d !important;
+}
+
+/* Room Management Action Buttons Container Hover */
+[data-theme="white"] #roomTable .btn-group .btn-tbl-edit:hover,
+[data-theme="white"] #roomTable .action-buttons .btn-tbl-edit:hover {
+    background-color: #5a6268 !important;
+    border-color: #545b62 !important;
+}
+
+/* =====================
+   Light theme: Expenses Export Icons
+   Make export icons (download icons) in expenses use light colors in light theme
+   ===================== */
+
+/* Expenses Export Icons */
+[data-theme="white"] #exportToExcel i.fa-download,
+[data-theme="white"] #exportToExcel i.fas.fa-download,
+[data-theme="white"] #exportToExcel i.far.fa-download,
+[data-theme="white"] #exportToExcel i.fa-file-excel,
+[data-theme="white"] #exportToExcel i.fas.fa-file-excel,
+[data-theme="white"] #exportToExcel i.far.fa-file-excel,
+[data-theme="white"] #exportToExcel i.fa-file-export,
+[data-theme="white"] #exportToExcel i.fas.fa-file-export,
+[data-theme="white"] #exportToExcel i.far.fa-file-export {
+    color: #ffffff !important;
+}
+
+/* Expenses Export Button Text */
+[data-theme="white"] #exportToExcel {
+    color: #ffffff !important;
+}
+
+/* Expenses Export Button Hover */
+[data-theme="white"] #exportToExcel:hover i.fa-download,
+[data-theme="white"] #exportToExcel:hover i.fas.fa-download,
+[data-theme="white"] #exportToExcel:hover i.far.fa-download,
+[data-theme="white"] #exportToExcel:hover i.fa-file-excel,
+[data-theme="white"] #exportToExcel:hover i.fas.fa-file-excel,
+[data-theme="white"] #exportToExcel:hover i.far.fa-file-excel,
+[data-theme="white"] #exportToExcel:hover i.fa-file-export,
+[data-theme="white"] #exportToExcel:hover i.fas.fa-file-export,
+[data-theme="white"] #exportToExcel:hover i.far.fa-file-export {
+    color: #ffffff !important;
+}
+
+/* Expenses Add Button Icons */
+[data-theme="white"] .btn-success i.fa-plus,
+[data-theme="white"] .btn-success i.fas.fa-plus,
+[data-theme="white"] .btn-success i.far.fa-plus {
+    color: #ffffff !important;
+}
+
+/* Expenses Add Button Text */
+[data-theme="white"] .btn-success {
+    color: #ffffff !important;
+}
+
+/* Expenses Add Button Hover */
+[data-theme="white"] .btn-success:hover i.fa-plus,
+[data-theme="white"] .btn-success:hover i.fas.fa-plus,
+[data-theme="white"] .btn-success:hover i.far.fa-plus {
+    color: #ffffff !important;
+}
+
+/* Expenses Table Action Icons */
+[data-theme="white"] #expenses_tbl i.fa-pencil,
+[data-theme="white"] #expenses_tbl i.fa-trash-o,
+[data-theme="white"] #expenses_tbl i.fa-trash,
+[data-theme="white"] #expenses_tbl i.fas.fa-pencil,
+[data-theme="white"] #expenses_tbl i.fas.fa-trash-o,
+[data-theme="white"] #expenses_tbl i.fas.fa-trash,
+[data-theme="white"] #expenses_tbl i.far.fa-pencil,
+[data-theme="white"] #expenses_tbl i.far.fa-trash-o,
+[data-theme="white"] #expenses_tbl i.far.fa-trash {
+    color: #ffffff !important;
+}
+
+/* Expenses Table Text */
+[data-theme="white"] #expenses_tbl th,
+[data-theme="white"] #expenses_tbl td {
+    color: #111827 !important;
+}
+
+/* Expenses Modal Icons */
+[data-theme="white"] .modal i.fa-plus,
+[data-theme="white"] .modal i.fa-edit,
+[data-theme="white"] .modal i.fa-trash,
+[data-theme="white"] .modal i.fas.fa-plus,
+[data-theme="white"] .modal i.fas.fa-edit,
+[data-theme="white"] .modal i.fas.fa-trash,
+[data-theme="white"] .modal i.far.fa-plus,
+[data-theme="white"] .modal i.far.fa-edit,
+[data-theme="white"] .modal i.far.fa-trash {
+    color: #ffffff !important;
+}
+
+/* Expenses Modal Text */
+[data-theme="white"] .modal .modal-title,
+[data-theme="white"] .modal .mdl-textfield__label,
+[data-theme="white"] .modal label,
+[data-theme="white"] .modal .form-text {
+    color: #111827 !important;
+}
+
+/* =====================
+   Light theme: Integration Management Action Buttons
+   Make integration management action buttons use light colors in light theme
+   ===================== */
+
+/* Integration Management Action Icons */
+[data-theme="white"] #integrationTable i.fa-edit,
+[data-theme="white"] #integrationTable i.fa-trash,
+[data-theme="white"] #integrationTable i.fa-eye,
+[data-theme="white"] #integrationTable i.fa-cog,
+[data-theme="white"] #integrationTable i.fa-gear,
+[data-theme="white"] #integrationTable i.fa-pencil,
+[data-theme="white"] #integrationTable i.fas.fa-edit,
+[data-theme="white"] #integrationTable i.fas.fa-trash,
+[data-theme="white"] #integrationTable i.fas.fa-eye,
+[data-theme="white"] #integrationTable i.fas.fa-cog,
+[data-theme="white"] #integrationTable i.fas.fa-gear,
+[data-theme="white"] #integrationTable i.fas.fa-pencil,
+[data-theme="white"] #integrationTable i.far.fa-edit,
+[data-theme="white"] #integrationTable i.far.fa-trash,
+[data-theme="white"] #integrationTable i.far.fa-eye,
+[data-theme="white"] #integrationTable i.far.fa-cog,
+[data-theme="white"] #integrationTable i.far.fa-gear,
+[data-theme="white"] #integrationTable i.far.fa-pencil {
+    color: #ffffff !important;
+}
+
+/* Integration Management Button Text */
+[data-theme="white"] #integrationTable .btn-tbl-edit,
+[data-theme="white"] #integrationTable .btn-tbl-delete,
+[data-theme="white"] #integrationTable .btn-tbl-view {
+    color: #ffffff !important;
+}
+
+/* Integration Management Table Text */
+[data-theme="white"] #integrationTable th,
+[data-theme="white"] #integrationTable td {
+    color: #111827 !important;
+}
+
+/* Integration Management Modal Icons */
+[data-theme="white"] .modal i.fa-cog,
+[data-theme="white"] .modal i.fa-gear,
+[data-theme="white"] .modal i.fa-edit,
+[data-theme="white"] .modal i.fa-trash,
+[data-theme="white"] .modal i.fas.fa-cog,
+[data-theme="white"] .modal i.fas.fa-gear,
+[data-theme="white"] .modal i.fas.fa-edit,
+[data-theme="white"] .modal i.fas.fa-trash,
+[data-theme="white"] .modal i.far.fa-cog,
+[data-theme="white"] .modal i.far.fa-gear,
+[data-theme="white"] .modal i.far.fa-edit,
+[data-theme="white"] .modal i.far.fa-trash {
+    color: #ffffff !important;
+}
+
+/* Integration Management Modal Text */
+[data-theme="white"] .modal .modal-title,
+[data-theme="white"] .modal .mdl-textfield__label,
+[data-theme="white"] .modal label,
+[data-theme="white"] .modal .form-text {
+    color: #111827 !important;
+}
+
+/* =====================
+   Light theme: Channel Manager Hotel Info Cards
+   Make channel manager hotel info cards use light colors in light theme
+   ===================== */
+
+/* Channel Manager Hotel Info Card Background */
+[data-theme="white"] .hotel-info-card,
+[data-theme="white"] .channel-manager-card {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Info Section Background */
+[data-theme="white"] .info-section {
+    background: #eef1f5 !important;
+}
+
+/* Info Section Icons - Override All */
+[data-theme="white"] .hotel-info-card i,
+[data-theme="white"] .channel-manager-card i,
+[data-theme="white"] .hotel-info-card .icon,
+[data-theme="white"] .channel-manager-card .icon,
+[data-theme="white"] .info-section .hotel-info-card i,
+[data-theme="white"] .info-section .channel-manager-card i,
+[data-theme="white"] .info-section .hotel-info-card .icon,
+[data-theme="white"] .info-section .channel-manager-card .icon,
+[data-theme="white"] .hotel-info-card .info-section i,
+[data-theme="white"] .channel-manager-card .info-section i,
+[data-theme="white"] .hotel-info-card .info-section .icon,
+[data-theme="white"] .channel-manager-card .info-section .icon,
+[data-theme="white"] .info-section i,
+[data-theme="white"] .info-section .icon {
+    color: #eef1f5 !important;
+}
+
+/* Sidebar User Pic Icons - Make Darker for Visibility */
+[data-theme="white"] .sidebar-userpic i,
+[data-theme="white"] .sidebar-userpic-btn i,
+[data-theme="white"] .sidebar-user-panel i,
+[data-theme="white"] .user-panel i {
+    color: #374151 !important;
+    transition: all 0.3s ease !important;
+}
+
+/* Sidebar User Pic Icons - Hover Effect with Shadow */
+[data-theme="white"] .sidebar-userpic i:hover,
+[data-theme="white"] .sidebar-userpic-btn i:hover,
+[data-theme="white"] .sidebar-user-panel i:hover,
+[data-theme="white"] .user-panel i:hover {
+    color: #1f2937 !important;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Channel Manager Hotel Info Card Text */
+[data-theme="white"] .hotel-info-card h3,
+[data-theme="white"] .hotel-info-card h4,
+[data-theme="white"] .hotel-info-card p,
+[data-theme="white"] .hotel-info-card span,
+[data-theme="white"] .hotel-info-card .card-title,
+[data-theme="white"] .hotel-info-card .card-text,
+[data-theme="white"] .channel-manager-card h3,
+[data-theme="white"] .channel-manager-card h4,
+[data-theme="white"] .channel-manager-card p,
+[data-theme="white"] .channel-manager-card span,
+[data-theme="white"] .channel-manager-card .card-title,
+[data-theme="white"] .channel-manager-card .card-text {
+    color: #111827 !important;
+}
+
+/* Channel Manager Hotel Info Card Icons */
+[data-theme="white"] .hotel-info-card i,
+[data-theme="white"] .hotel-info-card .icon,
+[data-theme="white"] .channel-manager-card i,
+[data-theme="white"] .channel-manager-card .icon {
+    color: #111827 !important;
+}
+
+/* Channel Manager Hotel Info Card Icon Background */
+[data-theme="white"] .hotel-info-card .icon-bg,
+[data-theme="white"] .channel-manager-card .icon-bg {
+    background: #f3f4f6 !important;
+    border: 1px solid #e5e7eb !important;
+}
+
+/* Channel Manager Hotel Info Card Buttons */
+[data-theme="white"] .hotel-info-card .btn,
+[data-theme="white"] .channel-manager-card .btn {
+    color: #ffffff !important;
+}
+
+/* Channel Manager Hotel Info Card Button Icons */
+[data-theme="white"] .hotel-info-card .btn i,
+[data-theme="white"] .channel-manager-card .btn i {
+    color: #ffffff !important;
+}
+
+/* Channel Manager Hotel Info Card Button Text */
+[data-theme="white"] .hotel-info-card .btn span,
+[data-theme="white"] .channel-manager-card .btn span {
+    color: #ffffff !important;
+}
+
+/* Channel Manager Hotel Info Card Description Text */
+[data-theme="white"] .hotel-info-card .description,
+[data-theme="white"] .hotel-info-card .desc,
+[data-theme="white"] .channel-manager-card .description,
+[data-theme="white"] .channel-manager-card .desc {
+    color: #6b7280 !important;
+}
+
+/* Channel Manager Hotel Info Card Hotel ID */
+[data-theme="white"] .hotel-info-card .hotel-id,
+[data-theme="white"] .channel-manager-card .hotel-id {
+    color: #111827 !important;
+    font-weight: 600 !important;
+}
+
+/* =====================
+   Light theme: Room Clearance Icons
+   Make room clearance icons use light colors in light theme
+   ===================== */
+
+/* Room Clearance Export Icons */
+[data-theme="white"] #exportClearance i.fa-download,
+[data-theme="white"] #exportClearance i.fas.fa-download,
+[data-theme="white"] #exportClearance i.far.fa-download,
+[data-theme="white"] #exportClearance i.fa-file-excel,
+[data-theme="white"] #exportClearance i.fas.fa-file-excel,
+[data-theme="white"] #exportClearance i.far.fa-file-excel,
+[data-theme="white"] #exportClearance i.fa-file-export,
+[data-theme="white"] #exportClearance i.fas.fa-file-export,
+[data-theme="white"] #exportClearance i.far.fa-file-export {
+    color: #ffffff !important;
+}
+
+/* Room Clearance Export Button Text */
+[data-theme="white"] #exportClearance {
+    color: #ffffff !important;
+}
+
+/* Room Clearance Export Button Hover */
+[data-theme="white"] #exportClearance:hover i.fa-download,
+[data-theme="white"] #exportClearance:hover i.fas.fa-download,
+[data-theme="white"] #exportClearance:hover i.far.fa-download,
+[data-theme="white"] #exportClearance:hover i.fa-file-excel,
+[data-theme="white"] #exportClearance:hover i.fas.fa-file-excel,
+[data-theme="white"] #exportClearance:hover i.far.fa-file-excel,
+[data-theme="white"] #exportClearance:hover i.fa-file-export,
+[data-theme="white"] #exportClearance:hover i.fas.fa-file-export,
+[data-theme="white"] #exportClearance:hover i.far.fa-file-export {
+    color: #ffffff !important;
+}
+
+/* Room Clearance Add Button Icons */
+[data-theme="white"] .btn-success i.fa-plus,
+[data-theme="white"] .btn-success i.fas.fa-plus,
+[data-theme="white"] .btn-success i.far.fa-plus {
+    color: #ffffff !important;
+}
+
+/* Room Clearance Add Button Text */
+[data-theme="white"] .btn-success {
+    color: #ffffff !important;
+}
+
+/* Room Clearance Add Button Hover */
+[data-theme="white"] .btn-success:hover i.fa-plus,
+[data-theme="white"] .btn-success:hover i.fas.fa-plus,
+[data-theme="white"] .btn-success:hover i.far.fa-plus {
+    color: #ffffff !important;
+}
+
+/* Room Clearance Table Action Icons */
+[data-theme="white"] #room_clearance_tbl i.fa-pencil,
+[data-theme="white"] #room_clearance_tbl i.fa-trash-o,
+[data-theme="white"] #room_clearance_tbl i.fa-trash,
+[data-theme="white"] #room_clearance_tbl i.fa-image,
+[data-theme="white"] #room_clearance_tbl i.fa-eye,
+[data-theme="white"] #room_clearance_tbl i.fas.fa-pencil,
+[data-theme="white"] #room_clearance_tbl i.fas.fa-trash-o,
+[data-theme="white"] #room_clearance_tbl i.fas.fa-trash,
+[data-theme="white"] #room_clearance_tbl i.fas.fa-image,
+[data-theme="white"] #room_clearance_tbl i.fas.fa-eye,
+[data-theme="white"] #room_clearance_tbl i.far.fa-pencil,
+[data-theme="white"] #room_clearance_tbl i.far.fa-trash-o,
+[data-theme="white"] #room_clearance_tbl i.far.fa-trash,
+[data-theme="white"] #room_clearance_tbl i.far.fa-image,
+[data-theme="white"] #room_clearance_tbl i.far.fa-eye {
+    color: #ffffff !important;
+}
+
+/* Room Clearance Table Text */
+[data-theme="white"] #room_clearance_tbl th,
+[data-theme="white"] #room_clearance_tbl td {
+    color: #111827 !important;
+}
+
+/* Room Clearance Modal Icons */
+[data-theme="white"] .modal i.fa-plus,
+[data-theme="white"] .modal i.fa-edit,
+[data-theme="white"] .modal i.fa-trash,
+[data-theme="white"] .modal i.fa-image,
+[data-theme="white"] .modal i.fa-eye,
+[data-theme="white"] .modal i.fas.fa-plus,
+[data-theme="white"] .modal i.fas.fa-edit,
+[data-theme="white"] .modal i.fas.fa-trash,
+[data-theme="white"] .modal i.fas.fa-image,
+[data-theme="white"] .modal i.fas.fa-eye,
+[data-theme="white"] .modal i.far.fa-plus,
+[data-theme="white"] .modal i.far.fa-edit,
+[data-theme="white"] .modal i.far.fa-trash,
+[data-theme="white"] .modal i.far.fa-image,
+[data-theme="white"] .modal i.far.fa-eye {
+    color: #ffffff !important;
+}
+
+/* Room Clearance Modal Text */
+[data-theme="white"] .modal .modal-title,
+[data-theme="white"] .modal .mdl-textfield__label,
+[data-theme="white"] .modal label,
+[data-theme="white"] .modal .form-text {
+    color: #111827 !important;
+}
+
+/* Room Clearance Badge Icons */
+[data-theme="white"] .badge i,
+[data-theme="white"] .badge span {
+    color: #ffffff !important;
+}
+
+/* Room Clearance Cleaning Icons */
+[data-theme="white"] .cleaning-container i,
+[data-theme="white"] .cleaning-container span {
+    color: #ffffff !important;
+}
+
+/* Room Clearance Action Buttons */
+[data-theme="white"] .btn-tbl-view i,
+[data-theme="white"] .btn-tbl-edit i,
+[data-theme="white"] .btn-tbl-delete i,
+[data-theme="white"] .btn-tbl-view span,
+[data-theme="white"] .btn-tbl-edit span,
+[data-theme="white"] .btn-tbl-delete span {
+    color: #ffffff !important;
+}
+
+/***************** Logo Theme **********************/
+.logo-white .page-header.navbar .page-logo{
+	background: #ffffff;
+}
+.logo-white .page-logo a{
+	color: #000;
+	
+}
+.logo-dark .page-header.navbar .page-logo{
+	background: #1f2528;
+}
+.logo-blue .page-header.navbar .page-logo{
+	background: #1880c9;
+}
+.logo-indigo .page-header.navbar .page-logo{
+	background: #6673FC;
+}
+.logo-cyan .page-header.navbar .page-logo{
+	background: #4ABAD2;
+}
+.logo-red .page-header.navbar .page-logo{
+	background: #E44F56
+}
+.logo-green .page-header.navbar .page-logo{
+	background: #6f9c40;
+}
+
+
+
+/*************** Header Theme ******************/
+/* Header White */
+.header-white .page-header.navbar{
+	background-color: #ffffff;
+}
+.header-white form.search-form-opened {
+    float: left;
+    width: 100%;
+    max-width: 200px;
+    background-color: transparent;
+    color: #fff;
+    border-radius: 30px;
+    margin: 12px 0 0 10px;
+    border: 1px solid #bdbdbd;
+}
+.header-white .page-header.navbar .top-menu .navbar-nav>li.dropdown-language>.dropdown-toggle>.langname, 
+.header-white .page-header.navbar .top-menu .navbar-nav>li.dropdown-user>.dropdown-toggle>.username, 
+.header-white .page-header.navbar .top-menu .navbar-nav>li.dropdown-user>.dropdown-toggle>i{
+	color: #000;
+}
+.header-white .page-header.navbar .top-menu .navbar-nav>li.dropdown .dropdown-toggle>i{
+	color: #000;
+}
+.header-white .language-switch a{
+	color: #000;
+}
+.header-white .menu-toggler i.icon-menu{
+	color: #000000;
+	font-size: 18px;
+}
+
+.header-white .page-header.navbar .hor-menu .navbar-nav>li.mega-menu-dropdown>.dropdown-menu .mega-menu-content .mega-menu-submenu li>h3,
+.header-white .page-header.navbar .hor-menu .navbar-nav>li>a {
+    color: #555;
+}
+.header-white .page-header.navbar .hor-menu .navbar-nav>li>a>i {
+    color: #555;
+}
+.header-white .page-header.navbar .hor-menu .navbar-nav>li.open>a,
+.header-white .page-header.navbar .hor-menu .navbar-nav>li:hover>a,
+.header-white .page-header.navbar .hor-menu .navbar-nav>li>a:hover {
+    color: #555;
+    background: none !important;
+}
+.header-white .page-header.navbar .hor-menu .navbar-nav>li.open>a>i,
+.header-white .page-header.navbar .hor-menu .navbar-nav>li:hover>a>i,
+.header-white .page-header.navbar .hor-menu .navbar-nav>li>a:hover>i {
+    color: #555;
+}
+.header-white .page-header.navbar .hor-menu .navbar-nav>li.active>a,
+.header-white .page-header.navbar .hor-menu .navbar-nav>li.current>a {
+    color: #4680ff;
+    background-color: transparent;
+}
+.header-white .page-header.navbar .hor-menu .navbar-nav>li.active>a>i,
+.header-white .page-header.navbar .hor-menu .navbar-nav>li.current>a>i {
+    color: #4680ff;
+}
+.header-white .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li>a, 
+.header-white .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li>a>i{
+	color: #444;
+}
+.header-white .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu {
+    box-shadow: 5px 5px rgba(63, 79, 98, .2);
+    background: #F5F5F5;
+}
+/* .header-white .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li>a,
+.header-white .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li>a>i {
+    color: #444 !important;
+} */
+.header-white .page-header.navbar .hor-menu .navbar-nav>li.mega-menu-dropdown>.dropdown-menu .mega-menu-content .mega-menu-submenu li>a:hover{
+	text-decoration: none;
+    color: #46a2ff;
+}
+.header-white .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li:hover>a {
+    color: #000000;
+}
+.header-white .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.active>a,
+.header-white .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.active>a:hover,
+.header-white .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.current>a,
+.header-white .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.current>a:hover {
+    color: #46a2ff;
+    background: transparent;
+}
+.header-white #headerSettingButton {
+    color: #555 ;
+}
+/* Header Dark */
+.header-dark .page-header.navbar{
+	background: #1f2528;
+}
+.header-dark form.search-form-opened .btn.submit {
+    color: #fff;
+}
+.header-dark .search-form-opened input[type="text"]{
+	color:#fff;
+}
+.header-dark form.search-form-opened {
+    background-color: rgba(255, 255, 255, 0.3);
+    border: 0;
+}
+.header-dark .page-header .search-form-opened .input-group .form-control::-moz-placeholder {
+    color: #efefef;
+    opacity: 1;
+}
+.header-dark .page-header .search-form-opened .input-group .form-control:-ms-input-placeholder {
+    color: #efefef;
+    opacity: 1;
+}
+.header-dark .page-header .search-form-opened .input-group .form-control::-webkit-input-placeholder {
+    color: #efefef;
+    opacity: 1;
+}
+.header-dark .page-header.navbar .top-menu .navbar-nav>li.dropdown-language>.dropdown-toggle>.langname, 
+.header-dark .page-header.navbar .top-menu .navbar-nav>li.dropdown-user>.dropdown-toggle>.username, 
+.header-dark .page-header.navbar .top-menu .navbar-nav>li.dropdown-user>.dropdown-toggle>i{
+	color: #fff;
+}
+.header-dark .page-header.navbar .top-menu .navbar-nav>li.dropdown .dropdown-toggle>i{
+	color: #fff;
+}
+.header-dark .language-switch a{
+	color: #fff;
+}
+.header-dark .menu-toggler i.icon-menu{
+	color: #ffffff;
+	font-size: 18px;
+}
+.header-dark .page-header.navbar .hor-menu .navbar-nav>li.active>a, 
+.header-dark .page-header.navbar .hor-menu .navbar-nav>li.current>a{
+	background-color: transparent;
+}
+.header-dark .dropdown-menu>li>a:focus, .dropdown-menu>li>a:hover{
+	background-color: transparent;
+}
+.header-dark .dropdown-menu>li.active:hover>a, 
+.header-dark .dropdown-menu>li.active>a, 
+.header-dark .dropdown-menu>li:hover>a{
+	background-color: transparent;
+}
+
+.header-dark .language-switch a.dropdown-toggle{
+	color:#fff;
+}
+.header-dark .navbar-custom {
+    background: #1f2528;
+}
+
+/* header blue */
+.header-blue .page-header.navbar{
+	background-color: #1880c9;
+}
+.header-blue form.search-form-opened .btn.submit {
+    color: #fff;
+}
+.header-blue .search-form-opened input[type="text"]{
+	color:#fff;
+}
+.header-blue form.search-form-opened {
+    background-color: rgba(255, 255, 255, 0.3);
+    border: 0;
+}
+.header-blue .page-header .search-form-opened .input-group .form-control::-moz-placeholder {
+    color: #efefef;
+    opacity: 1;
+}
+.header-blue .page-header .search-form-opened .input-group .form-control:-ms-input-placeholder {
+    color: #efefef;
+    opacity: 1;
+}
+.header-blue .page-header .search-form-opened .input-group .form-control::-webkit-input-placeholder {
+    color: #efefef;
+    opacity: 1;
+}
+.header-blue .page-header.navbar .top-menu .navbar-nav>li.dropdown-language>.dropdown-toggle>.langname, 
+.header-blue .page-header.navbar .top-menu .navbar-nav>li.dropdown-user>.dropdown-toggle>.username, 
+.header-blue .page-header.navbar .top-menu .navbar-nav>li.dropdown-user>.dropdown-toggle>i{
+	color: #fff;
+}
+.header-blue .page-header.navbar .top-menu .navbar-nav>li.dropdown .dropdown-toggle>i{
+	color: #fff;
+}
+.header-blue .language-switch a{
+	color: #fff;
+}
+.header-blue .menu-toggler i.icon-menu{
+	color: #ffffff;
+	font-size: 18px;
+}
+
+.header-blue .page-header.navbar .hor-menu .navbar-nav>li.mega-menu-dropdown>.dropdown-menu .mega-menu-content .mega-menu-submenu li>h3,
+.header-blue .page-header.navbar .hor-menu .navbar-nav>li>a {
+    color: rgba(255, 255, 255, 0.8);
+}
+.header-blue .page-header.navbar .hor-menu .navbar-nav>li>a>i {
+    color: rgba(255, 255, 255, 0.8);
+}
+.header-blue .page-header.navbar .hor-menu .navbar-nav>li.open>a,
+.header-blue .page-header.navbar .hor-menu .navbar-nav>li:hover>a,
+.header-blue .page-header.navbar .hor-menu .navbar-nav>li>a:hover {
+    color: #fff;
+    background: none !important;
+}
+.header-blue .page-header.navbar .hor-menu .navbar-nav>li.open>a>i,
+.header-blue .page-header.navbar .hor-menu .navbar-nav>li:hover>a>i,
+.header-blue .page-header.navbar .hor-menu .navbar-nav>li>a:hover>i {
+    color: #fff;
+}
+.header-blue .page-header.navbar .hor-menu .navbar-nav>li.active>a,
+.header-blue .page-header.navbar .hor-menu .navbar-nav>li.current>a {
+    color: #fff;
+    background: none !important; 
+}
+.header-blue .page-header.navbar .hor-menu .navbar-nav>li.active>a>i,
+.header-blue .page-header.navbar .hor-menu .navbar-nav>li.current>a>i {
+    color: #fff;
+}
+.header-blue .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu {
+    box-shadow: 5px 5px rgba(63, 79, 98, .2);
+    background: #186fad;
+}
+.header-blue .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li>a,
+.header-blue .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li>a>i {
+    color: rgba(255, 255, 255, 0.8);
+}
+.header-blue .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li:hover>a {
+    color: #fff;
+   /*  background: #47596e; */
+}
+.header-blue .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.active>a,
+.header-blue .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.active>a:hover,
+.header-blue .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.current>a,
+.header-blue .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.current>a:hover {
+    color: #fff;
+    background: transparent;
+}
+.header-blue .dropdown-menu>li.active:hover>a, 
+.header-blue .dropdown-menu>li.active>a, 
+.header-blue .dropdown-menu>li:hover>a{
+	background-color: transparent;
+}
+.header-blue .language-switch a.dropdown-toggle{
+	color:#fff;
+}
+.header-blue .navbar-custom {
+    background: #1370b1;
+}
+
+/* Header Indigo */
+.header-indigo .page-header.navbar{
+	background-color: #6673FC;
+}
+.header-indigo form.search-form-opened .btn.submit {
+    color: #fff;
+}
+.header-indigo .search-form-opened input[type="text"]{
+	color:#fff;
+}
+.header-indigo form.search-form-opened {
+    background-color: rgba(255, 255, 255, 0.3);
+    border: 0;
+}
+.header-indigo .page-header .search-form-opened .input-group .form-control::-moz-placeholder {
+    color: #efefef;
+    opacity: 1;
+}
+.header-indigo .page-header .search-form-opened .input-group .form-control:-ms-input-placeholder {
+    color: #efefef;
+    opacity: 1;
+}
+.header-indigo .page-header .search-form-opened .input-group .form-control::-webkit-input-placeholder {
+    color: #efefef;
+    opacity: 1;
+}
+.header-indigo .page-header.navbar .top-menu .navbar-nav>li.dropdown-language>.dropdown-toggle>.langname, 
+.header-indigo .page-header.navbar .top-menu .navbar-nav>li.dropdown-user>.dropdown-toggle>.username, 
+.header-indigo .page-header.navbar .top-menu .navbar-nav>li.dropdown-user>.dropdown-toggle>i{
+	color: #fff;
+}
+.header-indigo .page-header.navbar .top-menu .navbar-nav>li.dropdown .dropdown-toggle>i{
+	color: #fff;
+}
+.header-indigo .language-switch a{
+	color: #fff;
+}
+.header-indigo .menu-toggler i.icon-menu{
+	color: #ffffff;
+	font-size: 18px;
+}
+
+.header-indigo .page-header.navbar .hor-menu .navbar-nav>li.mega-menu-dropdown>.dropdown-menu .mega-menu-content .mega-menu-submenu li>h3,
+.header-indigo .page-header.navbar .hor-menu .navbar-nav>li>a {
+    color: rgba(255, 255, 255, 0.8);
+}
+.header-indigo .page-header.navbar .hor-menu .navbar-nav>li>a>i {
+    color: rgba(255, 255, 255, 0.8);
+}
+.header-indigo .page-header.navbar .hor-menu .navbar-nav>li.open>a,
+.header-indigo .page-header.navbar .hor-menu .navbar-nav>li:hover>a,
+.header-indigo .page-header.navbar .hor-menu .navbar-nav>li>a:hover {
+    color: #fff;
+    background: none !important;
+}
+.header-indigo .page-header.navbar .hor-menu .navbar-nav>li.open>a>i,
+.header-indigo .page-header.navbar .hor-menu .navbar-nav>li:hover>a>i,
+.header-indigo .page-header.navbar .hor-menu .navbar-nav>li>a:hover>i {
+    color: #fff;
+}
+.header-indigo .page-header.navbar .hor-menu .navbar-nav>li.active>a,
+.header-indigo .page-header.navbar .hor-menu .navbar-nav>li.current>a {
+    color: #fff;
+    background: none !important; 
+}
+.header-indigo .page-header.navbar .hor-menu .navbar-nav>li.active>a>i,
+.header-indigo .page-header.navbar .hor-menu .navbar-nav>li.current>a>i {
+    color: #fff;
+}
+.header-indigo .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu {
+    box-shadow: 5px 5px rgba(63, 79, 98, .2);
+    background: #545ed6;
+}
+.header-indigo .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li>a,
+.header-indigo .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li>a>i {
+    color: rgba(255, 255, 255, 0.8);
+}
+.header-indigo .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li:hover>a {
+    color: #fff;
+   /*  background: #47596e; */
+}
+.header-indigo .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.active>a,
+.header-indigo .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.active>a:hover,
+.header-indigo .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.current>a,
+.header-indigo .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.current>a:hover {
+    color: #fff;
+    background: transparent;
+}
+.header-indigo .dropdown-menu>li.active:hover>a, 
+.header-indigo .dropdown-menu>li.active>a, 
+.header-indigo .dropdown-menu>li:hover>a{
+	background-color: transparent;
+}
+.header-indigo .language-switch a.dropdown-toggle{
+	color:#fff;
+}
+.header-indigo .navbar-custom {
+    background: #5360e6;
+}
+
+/* Header Cyan */
+.header-cyan .page-header.navbar{
+	background-color: #4ABAD2;
+}
+.header-cyan form.search-form-opened .btn.submit {
+    color: #fff;
+}
+.header-cyan .search-form-opened input[type="text"]{
+	color:#fff;
+}
+.header-cyan form.search-form-opened {
+    background-color: rgba(255, 255, 255, 0.3);
+    border: 0;
+}
+.header-cyan .page-header .search-form-opened .input-group .form-control::-moz-placeholder {
+    color: #efefef;
+    opacity: 1;
+}
+.header-cyan .page-header .search-form-opened .input-group .form-control:-ms-input-placeholder {
+    color: #efefef;
+    opacity: 1;
+}
+.header-cyan .page-header .search-form-opened .input-group .form-control::-webkit-input-placeholder {
+    color: #efefef;
+    opacity: 1;
+}
+.header-cyan .page-header.navbar .top-menu .navbar-nav>li.dropdown-language>.dropdown-toggle>.langname, 
+.header-cyan .page-header.navbar .top-menu .navbar-nav>li.dropdown-user>.dropdown-toggle>.username, 
+.header-cyan .page-header.navbar .top-menu .navbar-nav>li.dropdown-user>.dropdown-toggle>i{
+	color: #fff;
+}
+.header-cyan .page-header.navbar .top-menu .navbar-nav>li.dropdown .dropdown-toggle>i{
+	color: #fff;
+}
+.header-cyan .language-switch a{
+	color: #fff;
+}
+.header-cyan .menu-toggler i.icon-menu{
+	color: #ffffff;
+	font-size: 18px;
+}
+.header-cyan .page-header.navbar .hor-menu .navbar-nav>li.mega-menu-dropdown>.dropdown-menu .mega-menu-content .mega-menu-submenu li>h3,
+.header-cyan .page-header.navbar .hor-menu .navbar-nav>li>a {
+    color: rgba(255, 255, 255, 0.8);
+}
+.header-cyan .page-header.navbar .hor-menu .navbar-nav>li>a>i {
+    color: rgba(255, 255, 255, 0.8);
+}
+.header-cyan .page-header.navbar .hor-menu .navbar-nav>li.open>a,
+.header-cyan .page-header.navbar .hor-menu .navbar-nav>li:hover>a,
+.header-cyan .page-header.navbar .hor-menu .navbar-nav>li>a:hover {
+    color: #fff;
+    background: none !important;
+}
+.header-cyan .page-header.navbar .hor-menu .navbar-nav>li.open>a>i,
+.header-cyan .page-header.navbar .hor-menu .navbar-nav>li:hover>a>i,
+.header-cyan .page-header.navbar .hor-menu .navbar-nav>li>a:hover>i {
+    color: #fff;
+}
+.header-cyan .page-header.navbar .hor-menu .navbar-nav>li.active>a,
+.header-cyan .page-header.navbar .hor-menu .navbar-nav>li.current>a {
+    color: #fff;
+    background: none !important; 
+}
+.header-cyan .page-header.navbar .hor-menu .navbar-nav>li.active>a>i,
+.header-cyan .page-header.navbar .hor-menu .navbar-nav>li.current>a>i {
+    color: #fff;
+}
+.header-cyan .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu {
+    box-shadow: 5px 5px rgba(63, 79, 98, .2);
+    background: #34A3BC;
+}
+.header-cyan .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li>a,
+.header-cyan .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li>a>i {
+    color: rgba(255, 255, 255, 0.8);
+}
+.header-cyan .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li:hover>a {
+    color: #fff;
+   /*  background: #47596e; */
+}
+.header-cyan .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.active>a,
+.header-cyan .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.active>a:hover,
+.header-cyan .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.current>a,
+.header-cyan .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.current>a:hover {
+    color: #fff;
+    background: transparent;
+}
+.header-cyan .dropdown-menu>li.active:hover>a, 
+.header-cyan .dropdown-menu>li.active>a, 
+.header-cyan .dropdown-menu>li:hover>a{
+	background-color: transparent;
+}
+.header-cyan .language-switch a.dropdown-toggle{
+	color:#fff;
+}
+.header-cyan .navbar-custom {
+    background: #44a8bd;
+}
+
+/* Header Red */
+.header-red .page-header.navbar{
+	background-color: #E44F56
+}
+.header-red form.search-form-opened .btn.submit {
+    color: #fff;
+}
+.header-red .search-form-opened input[type="text"]{
+	color:#fff;
+}
+.header-red form.search-form-opened {
+    background-color: rgba(255, 255, 255, 0.3);
+    border: 0;
+}
+.header-red .page-header .search-form-opened .input-group .form-control::-moz-placeholder {
+    color: #efefef;
+    opacity: 1;
+}
+.header-red .page-header .search-form-opened .input-group .form-control:-ms-input-placeholder {
+    color: #efefef;
+    opacity: 1;
+}
+.header-red .page-header .search-form-opened .input-group .form-control::-webkit-input-placeholder {
+    color: #efefef;
+    opacity: 1;
+}
+.header-red .page-header.navbar .top-menu .navbar-nav>li.dropdown-language>.dropdown-toggle>.langname, 
+.header-red .page-header.navbar .top-menu .navbar-nav>li.dropdown-user>.dropdown-toggle>.username, 
+.header-red .page-header.navbar .top-menu .navbar-nav>li.dropdown-user>.dropdown-toggle>i{
+	color: #fff;
+}
+.header-red .page-header.navbar .top-menu .navbar-nav>li.dropdown .dropdown-toggle>i{
+	color: #fff;
+}
+.header-red .language-switch a{
+	color: #fff;
+}
+.header-red .menu-toggler i.icon-menu{
+	color: #ffffff;
+	font-size: 18px;
+}
+.header-red .page-header.navbar .hor-menu .navbar-nav>li.mega-menu-dropdown>.dropdown-menu .mega-menu-content .mega-menu-submenu li>h3,
+.header-red .page-header.navbar .hor-menu .navbar-nav>li>a {
+    color: rgba(255, 255, 255, 0.8);
+}
+.header-red .page-header.navbar .hor-menu .navbar-nav>li>a>i {
+    color: rgba(255, 255, 255, 0.8);
+}
+.header-red .page-header.navbar .hor-menu .navbar-nav>li.open>a,
+.header-red .page-header.navbar .hor-menu .navbar-nav>li:hover>a,
+.header-red .page-header.navbar .hor-menu .navbar-nav>li>a:hover {
+    color: #fff;
+    background: none !important;
+}
+.header-red .page-header.navbar .hor-menu .navbar-nav>li.open>a>i,
+.header-red .page-header.navbar .hor-menu .navbar-nav>li:hover>a>i,
+.header-red .page-header.navbar .hor-menu .navbar-nav>li>a:hover>i {
+    color: #fff;
+}
+.header-red .page-header.navbar .hor-menu .navbar-nav>li.active>a,
+.header-red .page-header.navbar .hor-menu .navbar-nav>li.current>a {
+    color: #fff;
+    background: none !important; 
+}
+.header-red .page-header.navbar .hor-menu .navbar-nav>li.active>a>i,
+.header-red .page-header.navbar .hor-menu .navbar-nav>li.current>a>i {
+    color: #fff;
+}
+.header-red .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu {
+    box-shadow: 5px 5px rgba(63, 79, 98, .2);
+    background: #b54b50;
+}
+.header-red .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li>a,
+.header-red .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li>a>i {
+    color: rgba(255, 255, 255, 0.8);
+}
+.header-red .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li:hover>a {
+    color: #fff;
+   /*  background: #47596e; */
+}
+.header-red .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.active>a,
+.header-red .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.active>a:hover,
+.header-red .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.current>a,
+.header-red .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.current>a:hover {
+    color: #fff;
+    background: transparent;
+}
+.header-red .dropdown-menu>li.active:hover>a, 
+.header-red .dropdown-menu>li.active>a, 
+.header-red .dropdown-menu>li:hover>a{
+	background-color: transparent;
+}
+.header-red .language-switch a.dropdown-toggle{
+	color:#fff;
+}
+.header-red .navbar-custom {
+    background: #ce444b;
+}
+
+/* Header Green */
+.header-green .page-header.navbar{
+	background-color: #6f9c40;
+}
+.header-green form.search-form-opened .btn.submit {
+    color: #fff;
+}
+.header-green .search-form-opened input[type="text"]{
+	color:#fff;
+}
+.header-green form.search-form-opened {
+    background-color: rgba(255, 255, 255, 0.3);
+    border: 0;
+}
+.header-green .page-header .search-form-opened .input-group .form-control::-moz-placeholder {
+    color: #efefef;
+    opacity: 1;
+}
+.header-green .page-header .search-form-opened .input-group .form-control:-ms-input-placeholder {
+    color: #efefef;
+    opacity: 1;
+}
+.header-green .page-header .search-form-opened .input-group .form-control::-webkit-input-placeholder {
+    color: #efefef;
+    opacity: 1;
+}
+.header-green .page-header.navbar .top-menu .navbar-nav>li.dropdown-language>.dropdown-toggle>.langname, 
+.header-green .page-header.navbar .top-menu .navbar-nav>li.dropdown-user>.dropdown-toggle>.username, 
+.header-green .page-header.navbar .top-menu .navbar-nav>li.dropdown-user>.dropdown-toggle>i{
+	color: #fff;
+}
+.header-green .page-header.navbar .top-menu .navbar-nav>li.dropdown .dropdown-toggle>i{
+	color: #fff;
+}
+.header-green .language-switch a{
+	color: #fff;
+}
+.header-green .menu-toggler i.icon-menu{
+	color: #ffffff;
+	font-size: 18px;
+}
+.header-green .page-header.navbar .hor-menu .navbar-nav>li.mega-menu-dropdown>.dropdown-menu .mega-menu-content .mega-menu-submenu li>h3,
+.header-green .page-header.navbar .hor-menu .navbar-nav>li>a {
+    color: rgba(255, 255, 255, 0.8);
+}
+.header-green .page-header.navbar .hor-menu .navbar-nav>li>a>i {
+    color: rgba(255, 255, 255, 0.8);
+}
+.header-green .page-header.navbar .hor-menu .navbar-nav>li.open>a,
+.header-green .page-header.navbar .hor-menu .navbar-nav>li:hover>a,
+.header-green .page-header.navbar .hor-menu .navbar-nav>li>a:hover {
+    color: #fff;
+    background: none !important;
+}
+.header-green .page-header.navbar .hor-menu .navbar-nav>li.open>a>i,
+.header-green .page-header.navbar .hor-menu .navbar-nav>li:hover>a>i,
+.header-green .page-header.navbar .hor-menu .navbar-nav>li>a:hover>i {
+    color: #fff;
+}
+.header-green .page-header.navbar .hor-menu .navbar-nav>li.active>a,
+.header-green .page-header.navbar .hor-menu .navbar-nav>li.current>a {
+    color: #fff;
+    background: none !important; 
+}
+.header-green .page-header.navbar .hor-menu .navbar-nav>li.active>a>i,
+.header-green .page-header.navbar .hor-menu .navbar-nav>li.current>a>i {
+    color: #fff;
+}
+.header-green .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu {
+    box-shadow: 5px 5px rgba(63, 79, 98, .2);
+    background: #6f9c40;
+}
+.header-green .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li>a,
+.header-green .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li>a>i {
+    color: rgba(255, 255, 255, 0.8);
+}
+.header-green .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li:hover>a {
+    color: #fff;
+   /*  background: #47596e; */
+}
+.header-green .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.active>a,
+.header-green .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.active>a:hover,
+.header-green .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.current>a,
+.header-green .page-header.navbar .hor-menu .navbar-nav>li .dropdown-menu li.current>a:hover {
+    color: #fff;
+    background: transparent;
+}
+.header-green .dropdown-menu>li.active:hover>a, 
+.header-green .dropdown-menu>li.active>a, 
+.header-green .dropdown-menu>li:hover>a{
+	background-color: transparent;
+}
+.header-green .language-switch a.dropdown-toggle{
+	color:#fff;
+}
+.header-green .navbar-custom {
+    background: #6f9c40;
+}
+
+/* Light theme: enforce white footer background for Bootstrap/DataTables */
+[data-theme="white"] .dataTables_wrapper .table > tfoot > tr > th,
+[data-theme="white"] .dataTables_wrapper .table > tfoot > tr > td,
+[data-theme="white"] .table.table-bordered > tfoot > tr > th,
+[data-theme="white"] .table.table-bordered > tfoot > tr > td,
+[data-theme="white"] .table.table-hover > tfoot > tr > th,
+[data-theme="white"] .table.table-hover > tfoot > tr > td,
+[data-theme="white"] .table > tfoot > tr > th,
+[data-theme="white"] .table > tfoot > tr > td {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+/* =====================
+   Light theme: Buttons with + icons
+   Make buttons with plus icons use light colors in light theme
+   ===================== */
+[data-theme="white"] .btn i.fa-plus,
+[data-theme="white"] .btn i.fas.fa-plus,
+[data-theme="white"] .btn i.far.fa-plus,
+[data-theme="white"] .btn i.fa-plus-circle,
+[data-theme="white"] .btn i.fas.fa-plus-circle,
+[data-theme="white"] .btn i.far.fa-plus-circle,
+[data-theme="white"] .btn i.fa-plus-square,
+[data-theme="white"] .btn i.fas.fa-plus-square,
+[data-theme="white"] .btn i.far.fa-plus-square,
+[data-theme="white"] .btn i.fa-plus-square-o,
+[data-theme="white"] .btn i.fas.fa-plus-square-o,
+[data-theme="white"] .btn i.far.fa-plus-square-o,
+[data-theme="white"] .btn span.fa-plus,
+[data-theme="white"] .btn span.fas.fa-plus,
+[data-theme="white"] .btn span.far.fa-plus,
+[data-theme="white"] .btn span.fa-plus-circle,
+[data-theme="white"] .btn span.fas.fa-plus-circle,
+[data-theme="white"] .btn span.far.fa-plus-circle,
+[data-theme="white"] .btn span.fa-plus-square,
+[data-theme="white"] .btn span.fas.fa-plus-square,
+[data-theme="white"] .btn span.far.fa-plus-square,
+[data-theme="white"] .btn span.fa-plus-square-o,
+[data-theme="white"] .btn span.fas.fa-plus-square-o,
+[data-theme="white"] .btn span.far.fa-plus-square-o {
+    color: #ffffff !important;
+}
+
+/* Light theme: Buttons with + icons - hover state */
+[data-theme="white"] .btn:hover i.fa-plus,
+[data-theme="white"] .btn:hover i.fas.fa-plus,
+[data-theme="white"] .btn:hover i.far.fa-plus,
+[data-theme="white"] .btn:hover i.fa-plus-circle,
+[data-theme="white"] .btn:hover i.fas.fa-plus-circle,
+[data-theme="white"] .btn:hover i.far.fa-plus-circle,
+[data-theme="white"] .btn:hover i.fa-plus-square,
+[data-theme="white"] .btn:hover i.fas.fa-plus-square,
+[data-theme="white"] .btn:hover i.far.fa-plus-square,
+[data-theme="white"] .btn:hover i.fa-plus-square-o,
+[data-theme="white"] .btn:hover i.fas.fa-plus-square-o,
+[data-theme="white"] .btn:hover i.far.fa-plus-square-o,
+[data-theme="white"] .btn:hover span.fa-plus,
+[data-theme="white"] .btn:hover span.fas.fa-plus,
+[data-theme="white"] .btn:hover span.far.fa-plus,
+[data-theme="white"] .btn:hover span.fa-plus-circle,
+[data-theme="white"] .btn:hover span.fas.fa-plus-circle,
+[data-theme="white"] .btn:hover span.far.fa-plus-circle,
+[data-theme="white"] .btn:hover span.fa-plus-square,
+[data-theme="white"] .btn:hover span.fas.fa-plus-square,
+[data-theme="white"] .btn:hover span.far.fa-plus-square,
+[data-theme="white"] .btn:hover span.fa-plus-square-o,
+[data-theme="white"] .btn:hover span.fas.fa-plus-square-o,
+[data-theme="white"] .btn:hover span.far.fa-plus-square-o {
+    color: #ffffff !important;
+}
+
+/* =====================
+   Light theme: Room Management Icons and Fonts
+   Make room management icons and fonts use light colors in light theme
+   ===================== */
+
+/* Room Management Header Icons */
+[data-theme="white"] .dashboard-card-header .tools .btn i.fa-tags,
+[data-theme="white"] .dashboard-card-header .tools .btn i.fa-wifi,
+[data-theme="white"] .dashboard-card-header .tools .btn i.fa-calendar,
+[data-theme="white"] .dashboard-card-header .tools .btn i.fa-plus,
+[data-theme="white"] .dashboard-card-header .tools .btn i.fas.fa-tags,
+[data-theme="white"] .dashboard-card-header .tools .btn i.fas.fa-wifi,
+[data-theme="white"] .dashboard-card-header .tools .btn i.fas.fa-calendar,
+[data-theme="white"] .dashboard-card-header .tools .btn i.fas.fa-plus,
+[data-theme="white"] .dashboard-card-header .tools .btn i.far.fa-tags,
+[data-theme="white"] .dashboard-card-header .tools .btn i.far.fa-wifi,
+[data-theme="white"] .dashboard-card-header .tools .btn i.far.fa-calendar,
+[data-theme="white"] .dashboard-card-header .tools .btn i.far.fa-plus {
+    color: #ffffff !important;
+}
+
+/* Room Management Table Icons */
+[data-theme="white"] #roomTable i.fa-edit,
+[data-theme="white"] #roomTable i.fa-trash,
+[data-theme="white"] #roomTable i.fa-eye,
+[data-theme="white"] #roomTable i.fa-image,
+[data-theme="white"] #roomTable i.fa-bed,
+[data-theme="white"] #roomTable i.fa-users,
+[data-theme="white"] #roomTable i.fa-tag,
+[data-theme="white"] #roomTable i.fa-calendar,
+[data-theme="white"] #roomTable i.fas.fa-edit,
+[data-theme="white"] #roomTable i.fas.fa-trash,
+[data-theme="white"] #roomTable i.fas.fa-eye,
+[data-theme="white"] #roomTable i.fas.fa-image,
+[data-theme="white"] #roomTable i.fas.fa-bed,
+[data-theme="white"] #roomTable i.fas.fa-users,
+[data-theme="white"] #roomTable i.fas.fa-tag,
+[data-theme="white"] #roomTable i.fas.fa-calendar,
+[data-theme="white"] #roomTable i.far.fa-edit,
+[data-theme="white"] #roomTable i.far.fa-trash,
+[data-theme="white"] #roomTable i.far.fa-eye,
+[data-theme="white"] #roomTable i.far.fa-image,
+[data-theme="white"] #roomTable i.far.fa-bed,
+[data-theme="white"] #roomTable i.far.fa-users,
+[data-theme="white"] #roomTable i.far.fa-tag,
+[data-theme="white"] #roomTable i.far.fa-calendar {
+    color: #ffffff !important;
+}
+
+/* Room Management Modal Icons */
+[data-theme="white"] .modal i.material-icons,
+[data-theme="white"] .modal i.fa-info-circle,
+[data-theme="white"] .modal i.fa-exclamation-triangle,
+[data-theme="white"] .modal i.fa-check-circle,
+[data-theme="white"] .modal i.fa-times-circle,
+[data-theme="white"] .modal i.fas.fa-info-circle,
+[data-theme="white"] .modal i.fas.fa-exclamation-triangle,
+[data-theme="white"] .modal i.fas.fa-check-circle,
+[data-theme="white"] .modal i.fas.fa-times-circle,
+[data-theme="white"] .modal i.far.fa-info-circle,
+[data-theme="white"] .modal i.far.fa-exclamation-triangle,
+[data-theme="white"] .modal i.far.fa-check-circle,
+[data-theme="white"] .modal i.far.fa-times-circle {
+    color: #ffffff !important;
+}
+
+/* Room Management Button Text */
+[data-theme="white"] .dashboard-card-header .tools .btn {
+    color: #ffffff !important;
+}
+
+/* Room Management Table Text */
+[data-theme="white"] #roomTable th,
+[data-theme="white"] #roomTable td {
+    color: #111827 !important;
+}
+
+/* Room Management Modal Text */
+[data-theme="white"] .modal .modal-title,
+[data-theme="white"] .modal .mdl-textfield__label,
+[data-theme="white"] .modal label,
+[data-theme="white"] .modal .form-text {
+    color: #111827 !important;
+}
+
+/* Room Management Alert Icons */
+[data-theme="white"] .alert i.fa-info-circle,
+[data-theme="white"] .alert i.fa-exclamation-triangle,
+[data-theme="white"] .alert i.fa-check-circle,
+[data-theme="white"] .alert i.fa-times-circle,
+[data-theme="white"] .alert i.fas.fa-info-circle,
+[data-theme="white"] .alert i.fas.fa-exclamation-triangle,
+[data-theme="white"] .alert i.fas.fa-check-circle,
+[data-theme="white"] .alert i.fas.fa-times-circle,
+[data-theme="white"] .alert i.far.fa-info-circle,
+[data-theme="white"] .alert i.far.fa-exclamation-triangle,
+[data-theme="white"] .alert i.far.fa-check-circle,
+[data-theme="white"] .alert i.far.fa-times-circle {
+    color: #ffffff !important;
+}
+
+/* Room Management Action Buttons */
+[data-theme="white"] .btn-group .btn i,
+[data-theme="white"] .btn-group .btn span,
+[data-theme="white"] .action-buttons .btn i,
+[data-theme="white"] .action-buttons .btn span {
+    color: #ffffff !important;
+}
+
+/* Room Management Dropdown Icons */
+[data-theme="white"] .mdl-icon-toggle__label.material-icons {
+    color: #111827 !important;
+}
+
+/* Room Management Form Icons */
+[data-theme="white"] .form-group i,
+[data-theme="white"] .form-group span,
+[data-theme="white"] .input-group i,
+[data-theme="white"] .input-group span {
+    color: #111827 !important;
+}
+
+/* Room Management Status Icons */
+[data-theme="white"] .status-indicator i,
+[data-theme="white"] .status-indicator span,
+[data-theme="white"] .room-status i,
+[data-theme="white"] .room-status span {
+    color: #ffffff !important;
+}
+
+/* =====================
+   Light theme: Guest List Gear/Settings Icons
+   Make gear/settings icons in guest list buttons use light colors in light theme
+   ===================== */
+
+/* Guest List Header Gear Icons */
+[data-theme="white"] .dashboard-card-header .tools .btn i.fa-cog,
+[data-theme="white"] .dashboard-card-header .tools .btn i.fas.fa-cog,
+[data-theme="white"] .dashboard-card-header .tools .btn i.far.fa-cog,
+[data-theme="white"] .dashboard-card-header .tools .btn i.fa-gear,
+[data-theme="white"] .dashboard-card-header .tools .btn i.fas.fa-gear,
+[data-theme="white"] .dashboard-card-header .tools .btn i.far.fa-gear {
+    color: #ffffff !important;
+}
+
+/* Guest List Table Gear Icons */
+[data-theme="white"] #guestTable i.fa-cog,
+[data-theme="white"] #guestTable i.fas.fa-cog,
+[data-theme="white"] #guestTable i.far.fa-cog,
+[data-theme="white"] #guestTable i.fa-gear,
+[data-theme="white"] #guestTable i.fas.fa-gear,
+[data-theme="white"] #guestTable i.far.fa-gear {
+    color: #ffffff !important;
+}
+
+/* Guest List Button Text */
+[data-theme="white"] .dashboard-card-header .tools .btn {
+    color: #ffffff !important;
+}
+
+/* Guest List Table Action Icons */
+[data-theme="white"] #guestTable i.fa-eye,
+[data-theme="white"] #guestTable i.fa-pencil,
+[data-theme="white"] #guestTable i.fa-edit,
+[data-theme="white"] #guestTable i.fa-trash,
+[data-theme="white"] #guestTable i.fas.fa-eye,
+[data-theme="white"] #guestTable i.fas.fa-pencil,
+[data-theme="white"] #guestTable i.fas.fa-edit,
+[data-theme="white"] #guestTable i.fas.fa-trash,
+[data-theme="white"] #guestTable i.far.fa-eye,
+[data-theme="white"] #guestTable i.far.fa-pencil,
+[data-theme="white"] #guestTable i.far.fa-edit,
+[data-theme="white"] #guestTable i.far.fa-trash {
+    color: #ffffff !important;
+}
+
+/* Guest List Modal Icons */
+[data-theme="white"] .modal i.fa-cog,
+[data-theme="white"] .modal i.fas.fa-cog,
+[data-theme="white"] .modal i.far.fa-cog,
+[data-theme="white"] .modal i.fa-gear,
+[data-theme="white"] .modal i.fas.fa-gear,
+[data-theme="white"] .modal i.far.fa-gear {
+    color: #ffffff !important;
+}
+
+/* Guest List Table Text */
+[data-theme="white"] #guestTable th,
+[data-theme="white"] #guestTable td {
+    color: #111827 !important;
+}
+
+/* Guest List Modal Text */
+[data-theme="white"] .modal .modal-title,
+[data-theme="white"] .modal .mdl-textfield__label,
+[data-theme="white"] .modal label,
+[data-theme="white"] .modal .form-text {
+    color: #111827 !important;
+}
+
+/* =====================
+   Light theme: Room Management Edit Icons
+   Make edit room icons (pencil icons) use light colors in light theme
+   ===================== */
+
+/* Room Management Edit Icons - Specific targeting */
+[data-theme="white"] #roomTable .btn-tbl-edit i.fa-pencil,
+[data-theme="white"] #roomTable .btn-tbl-edit i.fas.fa-pencil,
+[data-theme="white"] #roomTable .btn-tbl-edit i.far.fa-pencil,
+[data-theme="white"] #roomTable .btn-tbl-edit i.fa-edit,
+[data-theme="white"] #roomTable .btn-tbl-edit i.fas.fa-edit,
+[data-theme="white"] #roomTable .btn-tbl-edit i.far.fa-edit,
+[data-theme="white"] #roomTable .btn-tbl-edit i.fa-pencil-alt,
+[data-theme="white"] #roomTable .btn-tbl-edit i.fas.fa-pencil-alt,
+[data-theme="white"] #roomTable .btn-tbl-edit i.far.fa-pencil-alt {
+    color: #ffffff !important;
+}
+
+/* Room Management Edit Button Background */
+[data-theme="white"] #roomTable .btn-tbl-edit {
+    background-color: #6c757d !important;
+    border-color: #6c757d !important;
+}
+
+/* Room Management Edit Button Hover */
+[data-theme="white"] #roomTable .btn-tbl-edit:hover {
+    background-color: #5a6268 !important;
+    border-color: #545b62 !important;
+}
+
+/* Room Management Edit Button Hover Icon */
+[data-theme="white"] #roomTable .btn-tbl-edit:hover i.fa-pencil,
+[data-theme="white"] #roomTable .btn-tbl-edit:hover i.fas.fa-pencil,
+[data-theme="white"] #roomTable .btn-tbl-edit:hover i.far.fa-pencil,
+[data-theme="white"] #roomTable .btn-tbl-edit:hover i.fa-edit,
+[data-theme="white"] #roomTable .btn-tbl-edit:hover i.fas.fa-edit,
+[data-theme="white"] #roomTable .btn-tbl-edit:hover i.far.fa-edit,
+[data-theme="white"] #roomTable .btn-tbl-edit:hover i.fa-pencil-alt,
+[data-theme="white"] #roomTable .btn-tbl-edit:hover i.fas.fa-pencil-alt,
+[data-theme="white"] #roomTable .btn-tbl-edit:hover i.far.fa-pencil-alt {
+    color: #ffffff !important;
+}
+
+/* Room Management Action Buttons Container */
+[data-theme="white"] #roomTable .btn-group .btn-tbl-edit,
+[data-theme="white"] #roomTable .action-buttons .btn-tbl-edit {
+    background-color: #6c757d !important;
+    border-color: #6c757d !important;
+}
+
+/* Room Management Action Buttons Container Hover */
+[data-theme="white"] #roomTable .btn-group .btn-tbl-edit:hover,
+[data-theme="white"] #roomTable .action-buttons .btn-tbl-edit:hover {
+    background-color: #5a6268 !important;
+    border-color: #545b62 !important;
+}
+
+/* =====================
+   Light theme: Expenses Export Icons
+   Make export icons (download icons) in expenses use light colors in light theme
+   ===================== */
+
+/* Expenses Export Icons */
+[data-theme="white"] #exportToExcel i.fa-download,
+[data-theme="white"] #exportToExcel i.fas.fa-download,
+[data-theme="white"] #exportToExcel i.far.fa-download,
+[data-theme="white"] #exportToExcel i.fa-file-excel,
+[data-theme="white"] #exportToExcel i.fas.fa-file-excel,
+[data-theme="white"] #exportToExcel i.far.fa-file-excel,
+[data-theme="white"] #exportToExcel i.fa-file-export,
+[data-theme="white"] #exportToExcel i.fas.fa-file-export,
+[data-theme="white"] #exportToExcel i.far.fa-file-export {
+    color: #ffffff !important;
+}
+
+/* Expenses Export Button Text */
+[data-theme="white"] #exportToExcel {
+    color: #ffffff !important;
+}
+
+/* Expenses Export Button Hover */
+[data-theme="white"] #exportToExcel:hover i.fa-download,
+[data-theme="white"] #exportToExcel:hover i.fas.fa-download,
+[data-theme="white"] #exportToExcel:hover i.far.fa-download,
+[data-theme="white"] #exportToExcel:hover i.fa-file-excel,
+[data-theme="white"] #exportToExcel:hover i.fas.fa-file-excel,
+[data-theme="white"] #exportToExcel:hover i.far.fa-file-excel,
+[data-theme="white"] #exportToExcel:hover i.fa-file-export,
+[data-theme="white"] #exportToExcel:hover i.fas.fa-file-export,
+[data-theme="white"] #exportToExcel:hover i.far.fa-file-export {
+    color: #ffffff !important;
+}
+
+/* Expenses Add Button Icons */
+[data-theme="white"] .btn-success i.fa-plus,
+[data-theme="white"] .btn-success i.fas.fa-plus,
+[data-theme="white"] .btn-success i.far.fa-plus {
+    color: #ffffff !important;
+}
+
+/* Expenses Add Button Text */
+[data-theme="white"] .btn-success {
+    color: #ffffff !important;
+}
+
+/* Expenses Add Button Hover */
+[data-theme="white"] .btn-success:hover i.fa-plus,
+[data-theme="white"] .btn-success:hover i.fas.fa-plus,
+[data-theme="white"] .btn-success:hover i.far.fa-plus {
+    color: #ffffff !important;
+}
+
+/* Expenses Table Action Icons */
+[data-theme="white"] #expenses_tbl i.fa-pencil,
+[data-theme="white"] #expenses_tbl i.fa-trash-o,
+[data-theme="white"] #expenses_tbl i.fa-trash,
+[data-theme="white"] #expenses_tbl i.fas.fa-pencil,
+[data-theme="white"] #expenses_tbl i.fas.fa-trash-o,
+[data-theme="white"] #expenses_tbl i.fas.fa-trash,
+[data-theme="white"] #expenses_tbl i.far.fa-pencil,
+[data-theme="white"] #expenses_tbl i.far.fa-trash-o,
+[data-theme="white"] #expenses_tbl i.far.fa-trash {
+    color: #ffffff !important;
+}
+
+/* Expenses Table Text */
+[data-theme="white"] #expenses_tbl th,
+[data-theme="white"] #expenses_tbl td {
+    color: #111827 !important;
+}
+
+/* Expenses Modal Icons */
+[data-theme="white"] .modal i.fa-plus,
+[data-theme="white"] .modal i.fa-edit,
+[data-theme="white"] .modal i.fa-trash,
+[data-theme="white"] .modal i.fas.fa-plus,
+[data-theme="white"] .modal i.fas.fa-edit,
+[data-theme="white"] .modal i.fas.fa-trash,
+[data-theme="white"] .modal i.far.fa-plus,
+[data-theme="white"] .modal i.far.fa-edit,
+[data-theme="white"] .modal i.far.fa-trash {
+    color: #ffffff !important;
+}
+
+/* Expenses Modal Text */
+[data-theme="white"] .modal .modal-title,
+[data-theme="white"] .modal .mdl-textfield__label,
+[data-theme="white"] .modal label,
+[data-theme="white"] .modal .form-text {
+    color: #111827 !important;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+

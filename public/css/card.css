@@ -544,21 +544,7 @@ display: flex;
 flex-direction: column;
 }
 
-.card-topline {
-border-top: 5px solid; /* Generic topline */
-}
-
-.card-topline.green {
-border-color: #28a745;
-}
-
-.card-topline.blue {
-border-color: #007bff;
-}
-
-.card-topline.red {
-border-color: #dc3545;
-}
+/* Card toplines are now handled by theme-color.css for proper theme support */
 
 .card-head {
 padding: 0px 0; /* Reduce padding for the header */
@@ -713,6 +699,14 @@ transition: 0.4s;
 border-radius: 20px; /* Adjusted for a more compact rounded look */
 }
 
+/* Light theme visibility for custom slider */
+body.white-sidebar-color .custom-slider,
+[data-theme="white"] .custom-slider {
+background-color: #e5e7eb !important;
+border: 1px solid #d1d5db !important;
+box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
 /* Inner Circle */
 .custom-slider:before {
 position: absolute;
@@ -729,6 +723,14 @@ border-radius: 50%;
 /* Checked Styles for IN */
 .custom-switch.input-in input:checked + .custom-slider {
 background-color: #4caf50; /* Green for IN */
+}
+
+/* Light theme checked state for IN */
+body.white-sidebar-color .custom-switch.input-in input:checked + .custom-slider,
+[data-theme="white"] .custom-switch.input-in input:checked + .custom-slider {
+background-color: #10b981 !important;
+border: 1px solid #059669 !important;
+box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2) !important;
 }
 
 .custom-switch.input-in input:checked + .custom-slider:before {
@@ -752,6 +754,14 @@ transition: 0.4s;
 background-color: red; /* Red for OUT */
 }
 
+/* Light theme checked state for OUT */
+body.white-sidebar-color .custom-switch.input-out input:checked + .custom-slider,
+[data-theme="white"] .custom-switch.input-out input:checked + .custom-slider {
+background-color: #ef4444 !important;
+border: 1px solid #dc2626 !important;
+box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+}
+
 .custom-switch.input-out input:checked + .custom-slider:after {
 content: 'OUT'; /* Show IN */
 position: absolute;
@@ -771,6 +781,14 @@ transform: translateX(15px); /* Adjusted translation for smaller width */
 /* Cleaning Toggle Styles */
 .custom-switch.input-cleaning input:checked + .custom-slider {
 background-color: #4caf50; /* Green for CHECK */
+}
+
+/* Light theme checked state for Cleaning */
+body.white-sidebar-color .custom-switch.input-cleaning input:checked + .custom-slider,
+[data-theme="white"] .custom-switch.input-cleaning input:checked + .custom-slider {
+background-color: #10b981 !important;
+border: 1px solid #059669 !important;
+box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2) !important;
 }
 
 .custom-switch.input-cleaning input:checked + .custom-slider:before {
@@ -836,44 +854,7 @@ animation: blinkAnimation 1s infinite;
 100% { opacity: 1; }
 }
 
-    /* Uniform card design across sections */
-    .card.card-topline-yellow {
-    border-top: 5px solid #e6e207; /* Yellow border for consistency */
-    }
-    .card.card-topline-green {
-    border-top: 5px solid #4CAF50; /* Green border for consistency */
-    }
-
-    .card.card-topline-red {
-    border-top: 5px solid #df1818; /* Red border for consistency */
-    }
-
-    .card.card-topline-blue {
-    border-top: 5px solid #1e1bd6; /* blue border for consistency */
-    }
-
-    .card.card-topline-gray {
-    border-top: 5px solid #69686b; /* blue border for consistency */ 
-    }
-
-    .card.card-topline-violet {
-    border-top: 5px solid #8A2BE2; /* blue border for consistency */
-    }
-    .card.card-topline-orange {
-    border-top: 5px solid #d3733b; /* blue border for consistency */
-    }
-
-    .card.card-topline-sky {
-    border-top: 5px solid #10b8eb; /* blue border for consistency */
-    }
-
-    .card.card-topline-pink {
-    border-top: 5px solid #db7bbb; /* blue border for consistency */
-    }
-
-    .card.card-topline-green2 {
-    border-top: 5px solid #0c2409; /* blue border for consistency */
-    }
+    /* Card toplines are now handled by theme-color.css for proper theme support */
 
     /* Status indicator classes */
     .status-indicator {
@@ -1234,6 +1215,32 @@ border-radius: 8px;
         cursor: pointer;
     }
 
+    /* Smooth theme color transitions for tabs and dashboard rows */
+    .tab-item,
+    .mdl-tabs__tab,
+    .mdl-tabs .mdl-tabs__tab,
+    .dashboard-btn-row,
+    .dashboard-btn-row1,
+    .dashboard-btn-row-item,
+    .dashboard-btn-row-item1,
+    .dashboard-btn-row-item2 {
+        transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease;
+    }
+
+    /* Respect users who prefer reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+        .tab-item,
+        .mdl-tabs__tab,
+        .mdl-tabs .mdl-tabs__tab,
+        .dashboard-btn-row,
+        .dashboard-btn-row1,
+        .dashboard-btn-row-item,
+        .dashboard-btn-row-item1,
+        .dashboard-btn-row-item2 {
+            transition: none;
+        }
+    }
+
     .mdl-tabs__tab.is-active {
         color: #6f9c40 !important;
     }
@@ -1390,13 +1397,28 @@ border-radius: 8px;
         border: 1px solid rgba(255, 255, 255, 0.3);
     }
 
+    /* Light theme visibility for custom slider */
+    body.white-sidebar-color .custom-slider,
+    [data-theme="white"] .custom-slider {
+        background: #e5e7eb !important;
+        border: 1px solid #d1d5db !important;
+        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    body.white-sidebar-color .custom-slider:before,
+    [data-theme="white"] .custom-slider:before {
+        background: #ffffff !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+        border: 1px solid #d1d5db !important;
+    }
+
     .custom-slider:before {
         position: absolute;
         content: "";
-        height: 10px;
-        width: 10px;
-        left: 2px;
-        bottom: 2px;
+        height: 12px;
+        width: 12px;
+        left: 1.5px;
+        bottom: 1.5px;
         background: white;
         transition: 0.3s;
         border-radius: 50%;
@@ -1408,7 +1430,22 @@ border-radius: 8px;
     }
 
     input:checked + .custom-slider:before {
-        transform: translateX(16px);
+        transform: translateX(15px);
+    }
+
+    /* Light theme checked state for custom slider */
+    body.white-sidebar-color input:checked + .custom-slider,
+    [data-theme="white"] input:checked + .custom-slider {
+        background: linear-gradient(45deg, #10b981, #059669) !important;
+        border: 1px solid #059669 !important;
+        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+    }
+
+    body.white-sidebar-color input:checked + .custom-slider:before,
+    [data-theme="white"] input:checked + .custom-slider:before {
+        background: #ffffff !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+        border: 1px solid #d1d5db !important;
     }
 
     /* Enhanced Badges */
@@ -1547,17 +1584,7 @@ border-radius: 8px;
     .memo-4::before { background: #9C27B0; }
     .memo-default::before { background: rgba(255, 255, 255, 0.5); }
 
-    /* Card Topline Colors */
-    .card-topline-yellow::before { --topline-color: #FFC107; --topline-color-secondary: #FFB300; }
-    .card-topline-gray::before { --topline-color: #9E9E9E; --topline-color-secondary: #757575; }
-    .card-topline-green::before { --topline-color: #4CAF50; --topline-color-secondary: #45a049; }
-    .card-topline-blue::before { --topline-color: #2196F3; --topline-color-secondary: #1976D2; }
-    .card-topline-red::before { --topline-color: #F44336; --topline-color-secondary: #D32F2F; }
-    .card-topline-violet::before { --topline-color: #9C27B0; --topline-color-secondary: #7B1FA2; }
-    .card-topline-orange::before { --topline-color: #FF9800; --topline-color-secondary: #F57C00; }
-    .card-topline-pink::before { --topline-color: #E91E63; --topline-color-secondary: #C2185B; }
-    .card-topline-green2::before { --topline-color: #8BC34A; --topline-color-secondary: #689F38; }
-    .card-topline-sky::before { --topline-color: #03A9F4; --topline-color-secondary: #0288D1; }
+    /* Card toplines are now handled by theme-color.css for proper theme support */
 
     /* Material Icons in Cards */
     .card .material-icons {
@@ -1732,40 +1759,7 @@ body.white-sidebar-color .dashboard-card {
               inset 0 1px 0 rgba(0,0,0,0.05);
 }
 
-body.white-sidebar-color .dashboard-card-header {
-  background: linear-gradient(135deg, #6f9c40, #5a7a33);
-}
 
-body.white-sidebar-color .dashboard-card-body {
-  background: rgba(0,0,0,0.02);
-}
-
-body.white-sidebar-color .dashboard-btn-row {
-  color: #333333 !important;
-  border-bottom: 1px solid rgba(0,0,0,0.1);
-}
-
-body.white-sidebar-color .dashboard-btn-row:hover {
-  background: rgba(0,0,0,0.05);
-}
-
-body.white-sidebar-color .dashboard-btn-row-metric {
-  color: #6f9c40 !important;
-}
-
-body.white-sidebar-color .dashboard-btn-row1 {
-  color: #333333 !important;
-  border-bottom: 1px solid rgba(0,0,0,0.1);
-}
-
-body.white-sidebar-color .dashboard-btn-row1:hover {
-  background: rgba(0,0,0,0.05);
-}
-
-body.white-sidebar-color .dashboard-btn-row-metric1,
-body.white-sidebar-color .dashboard-btn-row-metric2 {
-  color: #6f9c40 !important;
-}
 
 /* Dark Theme */
 body.dark-sidebar-color .dashboard-card {
@@ -1782,6 +1776,8 @@ body.dark-sidebar-color .dashboard-card-header {
 body.dark-sidebar-color .dashboard-card-body {
   background: rgba(255,255,255,0.02);
 }
+
+/* Reverted legend/footer color bindings */
 
 body.dark-sidebar-color .dashboard-btn-row {
   color: #ffffff !important;
@@ -1869,28 +1865,18 @@ body.indigo-sidebar-color .dashboard-card-body {
   background: rgba(255,255,255,0.05);
 }
 
-body.indigo-sidebar-color .dashboard-btn-row {
-  color: #ffffff !important;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-
-body.indigo-sidebar-color .dashboard-btn-row:hover {
-  background: rgba(255,255,255,0.1);
-}
-
-body.indigo-sidebar-color .dashboard-btn-row-metric {
-  color: #5c6bc0 !important;
-}
-
+body.indigo-sidebar-color .dashboard-btn-row,
 body.indigo-sidebar-color .dashboard-btn-row1 {
   color: #ffffff !important;
   border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
+body.indigo-sidebar-color .dashboard-btn-row:hover,
 body.indigo-sidebar-color .dashboard-btn-row1:hover {
   background: rgba(255,255,255,0.1);
 }
 
+body.indigo-sidebar-color .dashboard-btn-row-metric,
 body.indigo-sidebar-color .dashboard-btn-row-metric1,
 body.indigo-sidebar-color .dashboard-btn-row-metric2 {
   color: #5c6bc0 !important;
@@ -1912,28 +1898,18 @@ body.cyan-sidebar-color .dashboard-card-body {
   background: rgba(255,255,255,0.05);
 }
 
-body.cyan-sidebar-color .dashboard-btn-row {
-  color: #ffffff !important;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-
-body.cyan-sidebar-color .dashboard-btn-row:hover {
-  background: rgba(255,255,255,0.1);
-}
-
-body.cyan-sidebar-color .dashboard-btn-row-metric {
-  color: #00bcd4 !important;
-}
-
+body.cyan-sidebar-color .dashboard-btn-row,
 body.cyan-sidebar-color .dashboard-btn-row1 {
   color: #ffffff !important;
   border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
+body.cyan-sidebar-color .dashboard-btn-row:hover,
 body.cyan-sidebar-color .dashboard-btn-row1:hover {
   background: rgba(255,255,255,0.1);
 }
 
+body.cyan-sidebar-color .dashboard-btn-row-metric,
 body.cyan-sidebar-color .dashboard-btn-row-metric1,
 body.cyan-sidebar-color .dashboard-btn-row-metric2 {
   color: #00bcd4 !important;
@@ -1955,28 +1931,18 @@ body.green-sidebar-color .dashboard-card-body {
   background: rgba(255,255,255,0.05);
 }
 
-body.green-sidebar-color .dashboard-btn-row {
-  color: #ffffff !important;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-
-body.green-sidebar-color .dashboard-btn-row:hover {
-  background: rgba(255,255,255,0.1);
-}
-
-body.green-sidebar-color .dashboard-btn-row-metric {
-  color: #6f9c40 !important;
-}
-
+body.green-sidebar-color .dashboard-btn-row,
 body.green-sidebar-color .dashboard-btn-row1 {
   color: #ffffff !important;
   border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
+body.green-sidebar-color .dashboard-btn-row:hover,
 body.green-sidebar-color .dashboard-btn-row1:hover {
   background: rgba(255,255,255,0.1);
 }
 
+body.green-sidebar-color .dashboard-btn-row-metric,
 body.green-sidebar-color .dashboard-btn-row-metric1,
 body.green-sidebar-color .dashboard-btn-row-metric2 {
   color: #6f9c40 !important;
@@ -1998,52 +1964,371 @@ body.red-sidebar-color .dashboard-card-body {
   background: rgba(255,255,255,0.05);
 }
 
-body.red-sidebar-color .dashboard-btn-row {
-  color: #ffffff !important;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-
-body.red-sidebar-color .dashboard-btn-row:hover {
-  background: rgba(255,255,255,0.1);
-}
-
-body.red-sidebar-color .dashboard-btn-row-metric {
-  color: #f44336 !important;
-}
-
+body.red-sidebar-color .dashboard-btn-row,
 body.red-sidebar-color .dashboard-btn-row1 {
   color: #ffffff !important;
   border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
+body.red-sidebar-color .dashboard-btn-row:hover,
 body.red-sidebar-color .dashboard-btn-row1:hover {
   background: rgba(255,255,255,0.1);
 }
 
+body.red-sidebar-color .dashboard-btn-row-metric,
 body.red-sidebar-color .dashboard-btn-row-metric1,
 body.red-sidebar-color .dashboard-btn-row-metric2 {
   color: #f44336 !important;
 }
 
 /* Dashboard Card Header Theme Integration */
-/* White Theme */
-body.logo-white .dashboard-card-header {
-  background: linear-gradient(135deg, #ffffff, #f8f9fa);
-  color: #333333;
+/* Sidebar Color Controls Text Color */
+
+
+
+/* Dark Sidebar Theme (Dark) */
+body.dark-sidebar-color .dashboard-card-header {
+  background: linear-gradient(135deg, #2a3135, #1f2528);
+  color: #ffffff;
 }
 
-body.logo-white .dashboard-card-header-title {
-  color: #333333;
+body.dark-sidebar-color .dashboard-card-header-title {
+  color: #ffffff;
 }
 
-body.logo-white .info-box-icon {
-  background: rgba(0,0,0,0.1);
-  border: 1px solid rgba(0,0,0,0.2);
+body.dark-sidebar-color .info-box-icon {
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.3);
 }
 
-body.logo-white .info-box-icon i {
-  color: #333333;
+body.dark-sidebar-color .info-box-icon i {
+  color: #ffffff;
 }
+
+/* Dashboard Tabs - Sidebar Color Controls Text Color */
+
+
+
+/* Dark Sidebar Theme (Dark) */
+body.dark-sidebar-color .tab-item {
+  color: #ffffff !important;
+  background-color: rgba(255,255,255,0.1);
+}
+
+body.dark-sidebar-color .tab-item:hover {
+  color: #6f9c40 !important;
+  background-color: rgba(111, 156, 64, 0.2);
+}
+
+body.dark-sidebar-color .tab-item.is-active {
+  color: #6f9c40 !important;
+  background-color: rgba(111, 156, 64, 0.25);
+}
+
+body.dark-sidebar-color .tab-item.is-active::after {
+  background-color: #6f9c40 !important;
+}
+
+/* Material Design Tabs - Dark Sidebar Theme (match dashboard-btn-row text) */
+body.dark-sidebar-color .mdl-tabs__tab,
+body.dark-sidebar-color .mdl-tabs .mdl-tabs__tab {
+  color: #ffffff !important;
+}
+
+body.dark-sidebar-color .mdl-tabs__tab:hover,
+body.dark-sidebar-color .mdl-tabs .mdl-tabs__tab:hover {
+  color: #6f9c40 !important;
+}
+
+body.dark-sidebar-color .mdl-tabs__tab.is-active,
+body.dark-sidebar-color .mdl-tabs .mdl-tabs__tab.is-active {
+  color: #6f9c40 !important;
+}
+
+body.dark-sidebar-color .mdl-tabs.is-upgraded .mdl-tabs__tab.is-active:after,
+body.dark-sidebar-color .mdl-tabs .mdl-tabs.is-upgraded .mdl-tabs__tab.is-active:after {
+  background-color: #6f9c40 !important;
+}
+
+/* Dashboard Card Body Text - Sidebar Color Controls */
+body.white-sidebar-color .dashboard-btn-row-item,
+body.white-sidebar-color .dashboard-btn-row-item1,
+body.white-sidebar-color .dashboard-btn-row-item2 {
+  color: #333333 !important;
+}
+
+body.white-sidebar-color .dashboard-btn-row-metric,
+body.white-sidebar-color .dashboard-btn-row-metric1,
+body.white-sidebar-color .dashboard-btn-row-metric2 {
+  color: #166534 !important;
+  font-weight: 600;
+}
+
+/* Light sidebar: make room status cards readable */
+body.white-sidebar-color .card {
+  background: #ffffff !important;
+  border-color: #e5e7eb !important;
+}
+body.white-sidebar-color .card-head {
+  background: #f9fafb !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+body.white-sidebar-color .card-head header {
+  color: #111827 !important;
+}
+body.white-sidebar-color .card-body {
+  color: #1f2937 !important;
+}
+body.white-sidebar-color .card-body p,
+body.white-sidebar-color .dates,
+body.white-sidebar-color .dates span {
+  color: #334155 !important;
+}
+body.white-sidebar-color .info-box-icon,
+body.white-sidebar-color .badge,
+body.white-sidebar-color .memo {
+  background: #f3f4f6 !important;
+  border-color: #e5e7eb !important;
+  color: #1f2937 !important;
+}
+
+/* Match Real-Time Booking Monitor visibility rules in Room Status when light theme */
+body.white-sidebar-color .room-container {
+  background-color: #ffffff !important;
+  border-color: #e5e7eb !important;
+}
+body.white-sidebar-color .room-container::before {
+  background-color: #e5e7eb !important;
+}
+body.white-sidebar-color .room-button {
+  color: #1f2937 !important;
+}
+body.white-sidebar-color .card .material-icons {
+  color: #374151 !important;
+}
+body.white-sidebar-color .device-status-container .fas.fa-broom.off {
+  color: #6b7280 !important;
+  opacity: 0.6 !important;
+}
+
+/* Ensure room numbers and status text are visible on light theme */
+body.white-sidebar-color .room-button {
+  color: #111827 !important; /* room number */
+  font-weight: 700 !important;
+}
+body.white-sidebar-color .status-indicator {
+  background: #e5e7eb !important; /* neutral pill for statuses rendered without color */
+  border: 1px solid #cbd5e1 !important;
+  color: #111827 !important; /* status label text */
+}
+body.white-sidebar-color .status-in,
+body.white-sidebar-color .status-out {
+  color: #ffffff !important; /* keep contrast on strong green/red */
+}
+
+/* Also support data-theme="white" (variable-based light theme) */
+[data-theme="white"] .room-container { background-color: #ffffff !important; border-color: #e5e7eb !important; }
+[data-theme="white"] .room-container::before { background-color: #e5e7eb !important; }
+[data-theme="white"] .room-button { color: #111827 !important; font-weight: 700 !important; }
+[data-theme="white"] .status-indicator { background: #e5e7eb !important; border: 1px solid #cbd5e1 !important; color: #111827 !important; }
+[data-theme="white"] .status-in, [data-theme="white"] .status-out { color: #ffffff !important; }
+
+/* Stronger overrides: Real-Time Room Status tiles inside dashboard card (light sidebar) */
+body.white-sidebar-color .dashboard-card .room-container { 
+  background-color: #ffffff !important; 
+  border: 1px solid #e5e7eb !important; 
+  box-shadow: 0 2px 5px rgba(0,0,0,0.08) !important;
+}
+body.white-sidebar-color .dashboard-card .room-container::before { 
+  background-color: #e5e7eb !important; 
+}
+body.white-sidebar-color .dashboard-card .room-container .room-button { 
+  color: #111827 !important; 
+  font-weight: 700 !important; 
+  text-shadow: none !important;
+}
+/* Bed/amenity icons inside the old room-container markup */
+body.white-sidebar-color .dashboard-card .room-container i,
+body.white-sidebar-color .dashboard-card .room-container .material-icons,
+body.white-sidebar-color .dashboard-card .room-container span.material-icons,
+body.white-sidebar-color .dashboard-card .room-container svg {
+  color: #0f172a !important;
+  fill: #0f172a !important;
+  opacity: 1 !important;
+}
+body.white-sidebar-color .dashboard-card .status-indicator { 
+  background: #e5e7eb !important; 
+  border: 1px solid #cbd5e1 !important; 
+  color: #111827 !important; 
+}
+
+/* Real-Time Room Status tiles using `.room` structure – light theme readability */
+body.white-sidebar-color .dashboard-card .room {
+  background: #ffffff !important;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.08) !important;
+  color: #111827 !important; /* ensure children inheriting color are dark */
+}
+body.white-sidebar-color .dashboard-card .room i,
+body.white-sidebar-color .dashboard-card .room .room-number,
+body.white-sidebar-color .dashboard-card .room .room-status {
+  color: #111827 !important;
+  text-shadow: none !important;
+}
+body.white-sidebar-color .dashboard-card .room .room-status {
+  background: #e5e7eb !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+/* Make bed icons fully visible on light theme */
+body.white-sidebar-color .dashboard-card .room i {
+  color: #0f172a !important;
+  opacity: 1 !important;
+}
+/* Cover other icon renderers (span.material-icons, svg icons, grouped bed icon container) */
+body.white-sidebar-color .dashboard-card .room .bed-icons,
+body.white-sidebar-color .dashboard-card .room .material-icons,
+body.white-sidebar-color .dashboard-card .room span.material-icons,
+body.white-sidebar-color .dashboard-card .room svg {
+  color: #0f172a !important;
+  fill: #0f172a !important;
+  opacity: 1 !important;
+}
+
+/* Ionicons (shadow DOM) – set host color so inner svg inherits */
+body.white-sidebar-color .dashboard-card ion-icon {
+  color: #0f172a !important;
+  opacity: 1 !important;
+}
+[data-theme="white"] .dashboard-card ion-icon {
+  color: #0f172a !important;
+}
+/* Thicken Ionicons outline for better visibility on light theme */
+body.white-sidebar-color .dashboard-card .room ion-icon,
+body.white-sidebar-color .dashboard-card .room-container ion-icon {
+  --ionicon-stroke-width: 40px; /* default ~32px; increase a bit */
+}
+
+body.dark-sidebar-color .dashboard-btn-row-item,
+body.dark-sidebar-color .dashboard-btn-row-item1,
+body.dark-sidebar-color .dashboard-btn-row-item2 {
+  color: #ffffff !important;
+}
+
+body.dark-sidebar-color .dashboard-btn-row-metric,
+body.dark-sidebar-color .dashboard-btn-row-metric1,
+body.dark-sidebar-color .dashboard-btn-row-metric2 {
+  color: #6f9c40 !important;
+  font-weight: 600;
+}
+
+/* =====================
+   All Dark Theme (Light Text)
+   ===================== */
+
+/* All Dark Theme - Light Text for Visibility */
+body.dark-sidebar-color.logo-dark.header-dark .tab-item {
+  color: #ffffff !important;
+  background-color: rgba(255,255,255,0.1);
+}
+
+body.dark-sidebar-color.logo-dark.header-dark .tab-item:hover {
+  color: #6f9c40 !important;
+  background-color: rgba(111, 156, 64, 0.2);
+}
+
+body.dark-sidebar-color.logo-dark.header-dark .tab-item.is-active {
+  color: #6f9c40 !important;
+  background-color: rgba(111, 156, 64, 0.25);
+}
+
+body.dark-sidebar-color.logo-dark.header-dark .tab-item.is-active::after {
+  background-color: #6f9c40 !important;
+}
+
+/* Material Design Tabs - All Dark Theme */
+body.dark-sidebar-color.logo-dark.header-dark .mdl-tabs__tab,
+body.dark-sidebar-color.logo-dark.header-dark .mdl-tabs .mdl-tabs__tab {
+  color: #ffffff !important;
+}
+
+body.dark-sidebar-color.logo-dark.header-dark .mdl-tabs__tab:hover,
+body.dark-sidebar-color.logo-dark.header-dark .mdl-tabs .mdl-tabs__tab:hover {
+  color: #6f9c40 !important;
+}
+
+body.dark-sidebar-color.logo-dark.header-dark .mdl-tabs__tab.is-active,
+body.dark-sidebar-color.logo-dark.header-dark .mdl-tabs .mdl-tabs__tab.is-active {
+  color: #6f9c40 !important;
+}
+
+body.dark-sidebar-color.logo-dark.header-dark .mdl-tabs.is-upgraded .mdl-tabs__tab.is-active:after,
+body.dark-sidebar-color.logo-dark.header-dark .mdl-tabs .mdl-tabs.is-upgraded .mdl-tabs__tab.is-active:after {
+  background-color: #6f9c40 !important;
+}
+
+/* Dashboard Card Body Text - All Dark Theme */
+body.dark-sidebar-color.logo-dark.header-dark .dashboard-btn-row-item,
+body.dark-sidebar-color.logo-dark.header-dark .dashboard-btn-row-item1,
+body.dark-sidebar-color.logo-dark.header-dark .dashboard-btn-row-item2 {
+  color: #ffffff !important;
+}
+
+body.dark-sidebar-color.logo-dark.header-dark .dashboard-btn-row-metric,
+body.dark-sidebar-color.logo-dark.header-dark .dashboard-btn-row-metric1,
+body.dark-sidebar-color.logo-dark.header-dark .dashboard-btn-row-metric2 {
+  color: #6f9c40 !important;
+  font-weight: 600;
+}
+
+/* =====================
+   Mixed Theme Combinations
+   ===================== */
+
+/* Light Sidebar + Dark Header Brand + Light Header Color */
+body.white-sidebar-color.logo-dark.header-white .tab-item {
+  color: #333333 !important;
+  background-color: rgba(0,0,0,0.05);
+}
+
+body.white-sidebar-color.logo-dark.header-white .tab-item:hover {
+  color: #166534 !important;
+  background-color: rgba(22, 101, 52, 0.1);
+}
+
+body.white-sidebar-color.logo-dark.header-white .tab-item.is-active {
+  color: #166534 !important;
+  background-color: rgba(22, 101, 52, 0.15);
+}
+
+body.white-sidebar-color.logo-dark.header-white .tab-item.is-active::after {
+  background-color: #166534 !important;
+}
+
+/* Light Sidebar + Dark Header Brand + Any Header Color */
+body.white-sidebar-color.logo-dark .tab-item {
+  color: #333333 !important;
+  background-color: rgba(0,0,0,0.05);
+}
+
+body.white-sidebar-color.logo-dark .tab-item:hover {
+  color: #166534 !important;
+  background-color: rgba(22, 101, 52, 0.1);
+}
+
+body.white-sidebar-color.logo-dark .tab-item.is-active {
+  color: #166534 !important;
+  background-color: rgba(22, 101, 52, 0.15);
+}
+
+body.white-sidebar-color.logo-dark .tab-item.is-active::after {
+  background-color: #166534 !important;
+}
+
+/* Header-brand text color rules removed; sidebar controls text colors */
+
+/* Header-brand text color rules removed for logo-blue */
+
+/* Header-brand text color rules removed for logo-indigo */
 
 /* Dark Theme */
 body.logo-dark .dashboard-card-header {
@@ -2063,6 +2348,8 @@ body.logo-dark .info-box-icon {
 body.logo-dark .info-box-icon i {
   color: #ffffff;
 }
+
+/* Removed duplicate Dark Theme tab styles. See earlier 'Header Brand Color Controls' section. */
 
 /* Blue Theme */
 body.logo-blue .dashboard-card-header {
@@ -2101,6 +2388,34 @@ body.logo-indigo .info-box-icon {
 body.logo-indigo .info-box-icon i {
   color: #ffffff;
 }
+
+/* =====================
+   Cyan Header Brand - Dark Text
+   ===================== */
+
+/* Cyan Header Brand (Any Sidebar) - White Text */
+body.logo-cyan .tab-item {
+  color: #ffffff !important;
+  background-color: rgba(255,255,255,0.1);
+}
+
+body.logo-cyan .tab-item:hover {
+  color: #166534 !important;
+  background-color: rgba(22, 101, 52, 0.1);
+}
+
+body.logo-cyan .tab-item.is-active {
+  color: #166534 !important;
+  background-color: rgba(22, 101, 52, 0.15);
+}
+
+body.logo-cyan .tab-item.is-active::after {
+  background-color: #166534 !important;
+}
+
+/* Removed cyan header-brand MDL tabs and dashboard text overrides */
+
+/* Removed duplicate Cyan MDL tab hover/active styles; defined above. */
 
 /* Cyan Theme */
 body.logo-cyan .dashboard-card-header {
@@ -2159,6 +2474,153 @@ body.logo-red .info-box-icon i {
   color: #ffffff;
 }
 
+/* =====================
+   Sidebar Theme Integration for Tabs
+   ===================== */
 
+/* Dark Sidebar Theme */
+body.dark-sidebar-color .tab-item {
+  color: #ffffff !important;
+  background-color: rgba(255,255,255,0.1);
+}
 
+body.dark-sidebar-color .tab-item:hover {
+  color: #6f9c40 !important;
+  background-color: rgba(111, 156, 64, 0.2);
+}
+
+body.dark-sidebar-color .tab-item.is-active {
+  color: #6f9c40 !important;
+  background-color: rgba(111, 156, 64, 0.25);
+}
+
+body.dark-sidebar-color .tab-item.is-active::after {
+  background-color: #6f9c40 !important;
+}
+
+/* Dark Sidebar + Any Logo Theme */
+body.dark-sidebar-color.logo-white .tab-item,
+body.dark-sidebar-color.logo-dark .tab-item,
+body.dark-sidebar-color.logo-blue .tab-item {
+  color: #ffffff !important;
+  background-color: rgba(255,255,255,0.1);
+}
+
+body.dark-sidebar-color.logo-white .tab-item:hover,
+body.dark-sidebar-color.logo-dark .tab-item:hover,
+body.dark-sidebar-color.logo-blue .tab-item:hover {
+  color: #6f9c40 !important;
+  background-color: rgba(111, 156, 64, 0.2);
+}
+
+body.dark-sidebar-color.logo-white .tab-item.is-active,
+body.dark-sidebar-color.logo-dark .tab-item.is-active,
+body.dark-sidebar-color.logo-blue .tab-item.is-active {
+  color: #6f9c40 !important;
+  background-color: rgba(111, 156, 64, 0.25);
+}
+
+body.dark-sidebar-color.logo-white .tab-item.is-active::after,
+body.dark-sidebar-color.logo-dark .tab-item.is-active::after,
+body.dark-sidebar-color.logo-blue .tab-item.is-active::after {
+  background-color: #6f9c40 !important;
+}
+
+/* White Sidebar Theme */
+body.white-sidebar-color .tab-item {
+  color: #333333 !important;
+  background-color: rgba(0,0,0,0.05);
+}
+
+/* Dashboard Card Body Text - White Sidebar Theme */
+body.white-sidebar-color .dashboard-btn-row-item,
+body.white-sidebar-color .dashboard-btn-row-item1,
+body.white-sidebar-color .dashboard-btn-row-item2 {
+  color: #333333 !important;
+}
+
+body.white-sidebar-color .dashboard-btn-row-metric,
+body.white-sidebar-color .dashboard-btn-row-metric1,
+body.white-sidebar-color .dashboard-btn-row-metric2 {
+  color: #1f2937 !important;
+  font-weight: 600;
+}
+
+body.white-sidebar-color .tab-item:hover {
+  color: #166534 !important;
+  background-color: rgba(22, 101, 52, 0.1);
+}
+
+body.white-sidebar-color .tab-item.is-active {
+  color: #166534 !important;
+  background-color: rgba(22, 101, 52, 0.15);
+}
+
+body.white-sidebar-color .tab-item.is-active::after {
+  background-color: #166534 !important;
+}
+
+/* Blue Sidebar Theme */
+body.blue-sidebar-color .tab-item {
+  color: #333333 !important;
+  background-color: rgba(0,0,0,0.05);
+}
+
+body.blue-sidebar-color .tab-item:hover {
+  color: #166534 !important;
+  background-color: rgba(22, 101, 52, 0.1);
+}
+
+body.blue-sidebar-color .tab-item.is-active {
+  color: #166534 !important;
+  background-color: rgba(22, 101, 52, 0.15);
+}
+
+body.blue-sidebar-color .tab-item.is-active::after {
+  background-color: #166534 !important;
+}
+
+/* =====================
+   Mixed Theme Combinations
+   ===================== */
+
+/* Light Sidebar + Dark Header Brand + Dark Header Color */
+body.white-sidebar-color.logo-dark.header-dark .tab-item {
+  color: #333333 !important;
+  background-color: rgba(0,0,0,0.05);
+}
+
+body.white-sidebar-color.logo-dark.header-dark .tab-item:hover {
+  color: #166534 !important;
+  background-color: rgba(22, 101, 52, 0.1);
+}
+
+body.white-sidebar-color.logo-dark.header-dark .tab-item.is-active {
+  color: #166534 !important;
+  background-color: rgba(22, 101, 52, 0.15);
+}
+
+body.white-sidebar-color.logo-dark.header-dark .tab-item.is-active::after {
+  background-color: #166534 !important;
+}
+
+/* Light Sidebar + Any Logo Theme + Dark Header Color */
+body.white-sidebar-color.header-dark .tab-item {
+  color: #333333 !important;
+  background-color: rgba(0,0,0,0.05);
+}
+
+body.white-sidebar-color.header-dark .tab-item:hover {
+  color: #166534 !important;
+  background-color: rgba(22, 101, 52, 0.1);
+}
+
+body.white-sidebar-color.header-dark .tab-item.is-active {
+  color: #166534 !important;
+  background-color: rgba(22, 101, 52, 0.15);
+}
+
+body.white-sidebar-color.header-dark .tab-item.is-active::after {
+  background-color: #166534 !important;
+}
 
