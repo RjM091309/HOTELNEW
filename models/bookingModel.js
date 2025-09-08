@@ -2026,31 +2026,100 @@ class BookingModel {
       const startDateFormatted = formatDate(startDate);
       const endDateFormatted = formatDate(endDate);
 
-      const query = `
-        SELECT r.IDNo, r.ROOM_NUMBER, r.ROOM_FLOOR, r.ROOM_BED, r.ROOM_VIEW, (
+      // Query for available rooms
+      const roomsQuery = `
+        SELECT r.IDNo, r.ROOM_NUMBER, r.ROOM_FLOOR, r.ROOM_BED, r.ROOM_VIEW, 
+               (
             SELECT 1 
             FROM booking b2 
             WHERE b2.ROOM_ID = r.IDNo 
               AND DATE(b2.CHECK_OUT_DATE) = ? 
             LIMIT 1
-          ) AS checkoutToday
+          ) AS checkoutToday,
+          (
+            SELECT CASE 
+              WHEN b3.LATE_CHECKOUT = 1 THEN 'L/O'
+              WHEN b3.LATE_CHECKOUT = 0 OR b3.LATE_CHECKOUT IS NULL THEN 'R/O'
+              ELSE NULL
+            END
+            FROM booking b3 
+            WHERE b3.ROOM_ID = r.IDNo 
+              AND DATE(b3.CHECK_OUT_DATE) = ? 
+            LIMIT 1
+          ) AS checkoutType,
+          (
+            SELECT CASE 
+              WHEN b4.CHECK_IN_STATUS = 0 THEN 'L/I'
+              WHEN b4.CHECK_IN_STATUS = 1 THEN 'R/I'
+              ELSE NULL
+            END
+            FROM booking b4 
+            WHERE b4.ROOM_ID = r.IDNo 
+              AND DATE(b4.CHECK_IN_DATE) = ? 
+            LIMIT 1
+          ) AS checkinType
         FROM room r
         LEFT JOIN booking b ON r.IDNo = b.ROOM_ID
             AND DATE(b.CHECK_IN_DATE) < ?
             AND DATE(b.CHECK_OUT_DATE) > ?
         WHERE r.ROOM_STATUS NOT IN (3, 4)
           AND (b.ROOM_ID IS NULL OR DATE(b.CHECK_OUT_DATE) = ?)
-        ORDER BY r.ROOM_NUMBER ASC
+        ORDER BY r.ROOM_NUMBER ASC;
       `;
 
-      const results = await queryDatabasePromise(query, [
+      // Query for unassigned bookings (IS_DIRECT_RESERVATION = 1)
+      const unassignedBookingsQuery = `
+        SELECT 
+          b.IDNo as bookingId,
+          b.CUSTOMER_ID,
+          b.CHECK_IN_DATE,
+          b.CHECK_OUT_DATE,
+          b.BOOKING_STATUS,
+          b.BOOKING_CHANNEL,
+          b.GUESTS_COUNT,
+          b.REMARKS,
+          b.CONFIRMATION_NUMBER,
+          b.CHECK_IN_STATUS,
+          b.IS_DIRECT_RESERVATION,
+          b.BED_COUNT,
+          c.NAME as customerName,
+          c.CONTACTNo as customerContact,
+          c.TYPE as guestType,
+          c.LEVEL as guestLevel,
+          bill.ROOM_CHARGE as price,
+          bill.QTY as diffindays,
+          bill.PAYMENT_STATUS,
+          DATEDIFF(b.CHECK_OUT_DATE, b.CHECK_IN_DATE) AS TOTAL_DAYS
+        FROM booking b
+        LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+        LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
+        WHERE b.ACTIVE = 1 
+          AND b.IS_DIRECT_RESERVATION = 1
+          AND b.ROOM_ID = 0
+          AND DATE(b.CHECK_IN_DATE) < ?
+          AND DATE(b.CHECK_OUT_DATE) > ?
+        ORDER BY b.CHECK_IN_DATE ASC;
+      `;
+
+      // Execute both queries
+      const roomsResults = await queryDatabasePromise(roomsQuery, [
         startDateFormatted, 
+        startDateFormatted, 
+        endDateFormatted, 
         endDateFormatted, 
         startDateFormatted, 
         startDateFormatted
       ]);
 
-      return results;
+      const unassignedBookingsResults = await queryDatabasePromise(unassignedBookingsQuery, [
+        endDateFormatted, 
+        startDateFormatted
+      ]);
+
+      return {
+        rooms: roomsResults,
+        unassignedBookings: unassignedBookingsResults
+      };
 
     } catch (error) {
       console.error('Error in getAvailableRooms:', error);

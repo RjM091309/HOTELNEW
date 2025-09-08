@@ -807,14 +807,15 @@ class BookingController {
         });
       }
 
-      const availableRooms = await BookingModel.getAvailableRooms({
+      const result = await BookingModel.getAvailableRooms({
         startDate,
         endDate
       });
 
       res.json({ 
         success: true, 
-        rooms: availableRooms 
+        rooms: result.rooms,
+        unassignedBookings: result.unassignedBookings
       });
 
     } catch (error) {
