@@ -319,7 +319,7 @@
 [data-theme="dark"] .card.card-topline-blue { border-top: 5px solid #42A5F5 !important; }
 [data-theme="dark"] .card.card-topline-red { border-top: 5px solid #EF5350 !important; }
 [data-theme="dark"] .card.card-topline-purple { border-top: 5px solid #AB47BC !important; }
-[data-theme="dark"] .card.card-topline-violet { border-top: 5px solid #9C7C38 !important; }
+[data-theme="dark"] .card.card-topline-violet { border-top: 5px solid #8A2BE2 !important; }
 [data-theme="dark"] .card.card-topline-orange { border-top: 5px solid #FFB74D !important; }
 [data-theme="dark"] .card.card-topline-sky { border-top: 5px solid #4FC3F7 !important; }
 [data-theme="dark"] .card.card-topline-pink { border-top: 5px solid #F06292 !important; }
@@ -2714,7 +2714,7 @@
 /* Room Clearance Cleaning Icons */
 [data-theme="white"] .cleaning-container i,
 [data-theme="white"] .cleaning-container span {
-    color: #ffffff !important;
+    color: #4CAF50 !important;
 }
 
 /* Room Clearance Action Buttons */
