@@ -1392,7 +1392,7 @@ class DashboardModel {
       const insertExtensionQuery = `
         INSERT INTO booking_extension (
           BOOKING_ID, EXTEND_DATE, QTY, COST, PAYMENT_STATUS, ENCODED_BY
-        ) VALUES (?, ?, ?, 0, 'unpaid', 'System')
+        ) VALUES (?, ?, ?, 0, 'unpaid', 1)
       `;
       
       await queryDatabasePromise(insertExtensionQuery, [

@@ -240,15 +240,16 @@
     color: #fff !important;
   }
   
-  /* Late Check-In - Deep Orange */
-  .fc-event[style*="background-color: orange"] {
-    background-color: #fb8c00 !important; /* Material deep orange */
-    color: #fff !important;
+  /* Late Check-In - Lemon */
+  .fc-event[style*="background-color: #fff700"] {
+    background-color: #fff700 !important;
+    color: #000 !important;
   }
   
-  /* Regular Check-In - Info Blue */
-  .fc-event[style*="background-color: ''"] {
-    background-color: #42a5f5 !important; /* Lighter blue (informational) */
+  /* Regular Check-In - Red */
+  .fc-event[style*="background-color: red"],
+  .fc-event[style*="background-color: #e53935"] {
+    background-color: #e53935 !important;
     color: #fff !important;
   }
   
@@ -258,9 +259,10 @@
     color: #fff !important;
   }
   
-  /* Cancelled - Alert Yellow */
-  .fc-event[style*="background-color: yellow"] {
-    background-color: #fd3535 !important;
+  /* Cancelled - Black */
+  .fc-event[style*="background-color: #000000"],
+  .fc-event[style*="background-color: black"] {
+    background-color: #000000 !important;
     color: #fff !important;
   }
   
@@ -565,11 +567,11 @@
 }
 
 .legend-color-late-checkin {
-  background-color: #fb8c00 !important;
+  background-color: #fff700 !important;
 }
 
 .legend-color-regular-checkin {
-  background-color: #42a5f5 !important;
+  background-color: #e53935 !important;
 }
 
 .legend-color-checkout {
@@ -577,7 +579,7 @@
 }
 
 .legend-color-cancelled {
-  background-color: #fd3535 !important;
+  background-color: #000000 !important;
 }
 
 /* Legend minimize/maximize animation */

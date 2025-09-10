@@ -30,18 +30,47 @@ function processBookingsData(bookingsData) {
       
 
       
+      // Be tolerant of varying backend keys for statuses
+      const bookingStatus = booking.BOOKING_STATUS
+        ?? booking.booking_status
+        ?? booking.status
+        ?? 'pending';
+
+      const checkInStatus = (booking.CHECK_IN_STATUS
+        ?? booking.check_in_status
+        ?? booking.checkInStatus
+        ?? booking.checkin_status
+        ?? booking.CHECKIN_STATUS
+        ?? booking.CHECK_IN) ?? undefined;
+
+      const checkOutStatus = (booking.CHECK_OUT_STATUS
+        ?? booking.check_out_status
+        ?? booking.checkOutStatus
+        ?? booking.checkout_status
+        ?? booking.CHECKOUT_STATUS
+        ?? booking.CHECK_OUT
+        ?? booking.CHECKOUT
+        // Map DB's LATE_CHECKOUT (1=late, 0=regular) to our checkout status
+        ?? booking.LATE_CHECKOUT) ?? undefined;
+
       return {
         id: String(booking.BookingID),
         resourceIds: [String(booking.ROOM_ID)],
         title: booking.CUSTOMER_NAME || 'No Name',
         start: checkInDate,
         end: checkOutDate,
-        backgroundColor: getBookingColor(booking),
+        backgroundColor: getBookingColor({
+          ...booking,
+          BOOKING_STATUS: bookingStatus,
+          CHECK_IN_STATUS: checkInStatus
+        }),
         extendedProps: {
           totalCost: booking.TOTAL_COST,
           paymentStatus: booking.PAYMENT_STATUS,
           totalDays: booking.TOTAL_DAYS,
-          bookingStatus: booking.BOOKING_STATUS,
+          bookingStatus: bookingStatus,
+          checkInStatus: checkInStatus,    // 1 = regular (red), 0 = late (lemon)
+          checkOutStatus: checkOutStatus   // 0 = regular (red), 1 = late (lemon)
         }
       };
     });
@@ -70,11 +99,11 @@ function getBookingColor(booking) {
     case 'pending': 
       // Distinguish between pending and late check-in based on CHECK_IN_STATUS
       if (booking.CHECK_IN_STATUS === 0) {
-        return 'orange'; // Late check-in (pending but past check-in time)
+        return '#fff700'; // Late check-in = lemon
       } else {
-        return '#42a5f5'; // Regular pending (blue)
+        return '#e53935'; // Regular check-in = red
       }
-    case 'cancelled': return 'yellow';
+    case 'cancelled': return '#000000';
     default: return 'pink';
   }
 }
@@ -113,7 +142,7 @@ function handleEventClick(info) {
     case 'pending':
       // Check if this is a late check-in (orange) or regular pending (blue)
       const eventColor = event.backgroundColor;
-      if (eventColor === 'orange' || eventColor === '#fb8c00') {
+      if (eventColor === '#fff700') {
         showLateCheckInModal(event);
       } else {
         showPendingModal(event);
@@ -133,11 +162,11 @@ function handleEventClick(info) {
         // Check if we can determine status from event color or other properties
         const eventColor = event.backgroundColor;
         
-        if (eventColor === 'orange' || eventColor === '#fb8c00') {
+        if (eventColor === '#fff700') {
           showLateCheckInModal(event);
-        } else if (eventColor === 'blue' || eventColor === '#42a5f5') {
+        } else if (eventColor === 'red' || eventColor === '#e53935') {
           showPendingModal(event);
-        } else if (eventColor === 'yellow' || eventColor === '#fdd835') {
+        } else if (eventColor === '#000000') {
           showCancelledModal(event);
         } else {
           // Fallback to event info modal
@@ -145,6 +174,82 @@ function handleEventClick(info) {
         }
       }
       break;
+  }
+}
+
+// Creates a left/right split color based on check-in/out statuses
+function applyCompositeStatusStyles(event, el) {
+  try {
+    const bookingStatus = event.extendedProps?.bookingStatus;
+
+    // Colors
+    const red = '#e53935';      // regular
+    const lemon = '#fff700';    // late
+    const green = '#43a047';    // occupied
+
+    let checkInStatusRaw = event.extendedProps?.checkInStatus;   // expected: 1 regular, 0 late
+    let checkOutStatusRaw = event.extendedProps?.checkOutStatus; // expected: 0 regular, 1 late
+
+    if (checkInStatusRaw === undefined && checkOutStatusRaw === undefined) {
+      el.removeAttribute('data-composite');
+      el.style.background = '';
+      return;
+    }
+
+    // Normalizers to handle differing encodings from backend/UI
+    const inferFromColor = () => (event.backgroundColor === '#fff700' ? 'late' : 'regular');
+    const normalizeCheckIn = (v) => {
+      if (v === undefined || v === null || v === '') return inferFromColor();
+      if (v === 1 || v === '1' || String(v).toLowerCase() === 'regular') return 'regular';
+      if (v === 0 || v === '0' || String(v).toLowerCase().includes('late')) return 'late';
+      return inferFromColor();
+    };
+    const normalizeCheckOut = (v) => {
+      if (v === undefined || v === null || v === '') return inferFromColor();
+      // Some systems store CO: 1 = late, 0 = regular. Others invert.
+      const s = String(v).toLowerCase();
+      if (v === 1 || v === '1' || s.includes('late')) return 'late';
+      if (v === 0 || v === '0' || s.includes('regular')) return 'regular';
+      return inferFromColor();
+    };
+
+    const ciNorm = normalizeCheckIn(checkInStatusRaw);
+    let coNorm = normalizeCheckOut(checkOutStatusRaw);
+    if (checkOutStatusRaw === undefined || checkOutStatusRaw === null || checkOutStatusRaw === '') {
+      // If checkout status is absent, default to Regular (red) to avoid all-lemon bars
+      // This aligns with typical default checkout behavior unless explicitly marked late
+      coNorm = 'regular';
+    }
+
+    // Decide behavior by booking status
+    if (bookingStatus === 'pending') {
+      // Determine each side for pending
+      const leftColor = ciNorm === 'regular' ? red : lemon;    // left half = check-in
+      const rightColor = coNorm === 'late' ? lemon : red;      // right half = check-out
+      el.setAttribute('data-composite', 'true');
+      el.style.background = `linear-gradient(90deg, ${leftColor} 0%, ${leftColor} 50%, ${rightColor} 50%, ${rightColor} 100%)`;
+      el.style.color = '#fff';
+      return;
+    }
+
+    if (bookingStatus === 'check-In') {
+      // Occupied: keep left green, right reflects checkout status
+      const leftColor = green;
+      const rightColor = coNorm === 'late' ? lemon : red;
+      el.setAttribute('data-composite', 'true');
+      el.style.background = `linear-gradient(90deg, ${leftColor} 0%, ${leftColor} 50%, ${rightColor} 50%, ${rightColor} 100%)`;
+      el.style.color = '#fff';
+      return;
+    }
+
+    // Default: no composite, keep original color
+    el.removeAttribute('data-composite');
+    el.style.background = '';
+    if (event.backgroundColor) {
+      el.style.backgroundColor = event.backgroundColor;
+    }
+  } catch (e) {
+    // ignore
   }
 }
 
@@ -177,6 +282,39 @@ function handleEventDidMount(info) {
   }
 
   window.eventElements[info.event.id] = info.el;
+
+  // Apply composite check-in/check-out status colors (left = check-in, right = check-out)
+  try {
+    applyCompositeStatusStyles(info.event, info.el);
+  } catch (e) {
+    // ignore style errors
+  }
+
+  // Improve title readability with a top-aligned parallelogram chip overlay
+  try {
+    // Hide/remove FullCalendar's default title to avoid duplicates
+    const defaultTitle = info.el.querySelector('.fc-event-title, .fc-event-title-container');
+    if (defaultTitle) {
+      defaultTitle.textContent = '';
+      defaultTitle.style.display = 'none';
+    }
+
+    const existing = info.el.querySelector('.event-title-chip');
+    if (!existing) {
+      const chip = document.createElement('div');
+      chip.className = 'event-title-chip';
+      const span = document.createElement('span');
+      span.textContent = info.event.title || '';
+      chip.appendChild(span);
+      info.el.appendChild(chip);
+    } else {
+      const span = existing.querySelector('span') || document.createElement('span');
+      span.textContent = info.event.title || '';
+      if (!existing.contains(span)) existing.appendChild(span);
+    }
+  } catch (e) {
+    // silent
+  }
 }
 
 function handleDatesSet(info) {
@@ -441,11 +579,11 @@ function proceedWithResize(info, newEnd, roomResource, bookingId) {
   const updateData = {
     id: bookingId,
     room: roomResource.title, // Room number
-    checkIn: info.event.start.toISOString(), // Full ISO string with time (2:00 PM)
-    checkOut: newEnd.toISOString(),  // Full ISO string with time (11:00 AM)
+    checkIn: formatMySQLDateTime(info.event.start), // 2:00 PM
+    checkOut: formatMySQLDateTime(newEnd),  // 11:00 AM
     isExtended: true, // Flag to indicate this is an extension
-    originalCheckOut: originalEnd.toISOString(), // Original checkout date for tracking
-    extensionDate: new Date().toISOString() // When the extension was made
+    originalCheckOut: formatMySQLDateTime(originalEnd), // Original checkout date for tracking
+    extensionDate: formatMySQLDateTime(new Date()) // When the extension was made
   };
   
   console.log('🚀 Calendar resize sending data:', updateData);
@@ -794,12 +932,12 @@ function showEventInfoModal(event) {
   const guestName = event.title || 'Unknown Guest';
 
   // FullCalendar uses exclusive end → subtract one day
-  const ci = new Date(event.start);
-  const co = new Date(event.end);
-  co.setDate(co.getDate() - 1);
+  const ciDate = new Date(event.start);
+  const coDate = new Date(event.end);
+  coDate.setDate(coDate.getDate() - 1);
 
-  const checkIn = ci.toLocaleDateString();
-  const checkOut = co.toLocaleDateString();
+  const checkIn = ciDate.toLocaleDateString();
+  const checkOut = coDate.toLocaleDateString();
 
   // Determine event status and title based on event properties
   let statusTitle = '';
@@ -888,16 +1026,24 @@ function showLateCheckInModal(event) {
   const checkIn = ci.toLocaleDateString();
   const checkOut = co.toLocaleDateString();
 
+  // Build composite status badges (CI/CO)
+  const ciStatus = event.extendedProps?.checkInStatus; // 1 regular, 0 late
+  const coStatus = event.extendedProps?.checkOutStatus; // 0 regular, 1 late
+  const ciText = (ciStatus === 1 ? 'REGULAR CHECK-IN' : 'LATE CHECK-IN');
+  const ciColor = (ciStatus === 1 ? '#e53935' : '#fff700');
+  const coText = (coStatus === 1 ? 'LATE CHECK-OUT' : 'REGULAR CHECK-OUT');
+  const coColor = (coStatus === 1 ? '#fff700' : '#e53935');
+
   Swal.fire({
-    title: `Room ${roomNumber} - Late Check-In`,
+    title: `Room ${roomNumber} - Pending Reservation`,
     html: `
       <div class="text-left" style="padding: 20px 0;">
         <div style="margin-bottom: 20px;">
           <div style="display: flex; align-items: center; margin-bottom: 15px;">
-            <div style="width: 8px; height: 8px; background-color: #fb8c00; border-radius: 50%; margin-right: 12px;"></div>
+            <div style="width: 8px; height: 8px; background-color: ${ciStatus === 0 ? '#fff700' : '#e53935'}; border-radius: 50%; margin-right: 12px;"></div>
             <span style="font-weight: 600; color: #ffffff; font-size: 16px;">Reservation Details</span>
           </div>
-          <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border-left: 3px solid #fb8c00;">
+          <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border-left: 3px solid #fff700;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
               <div style="flex: 1; margin-right: 15px;">
                 <span style="color: #cccccc; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Guest Name</span>
@@ -905,7 +1051,10 @@ function showLateCheckInModal(event) {
               </div>
               <div style="flex: 1;">
                 <span style="color: #cccccc; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Status</span>
-                <div style="color: #fb8c00; font-weight: 700; font-size: 16px; margin-top: 4px; text-transform: uppercase;">Late Check-In</div>
+                <div style="margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: center; text-align: center;">
+                  <span style="background: transparent; border:2px solid ${ciColor}; color:${ciColor}; font-weight:800; font-size:12px; padding:2px 6px; border-radius:6px;">${ciText}</span>
+                  <span style="background: transparent; border:2px solid ${coColor}; color:${coColor}; font-weight:800; font-size:12px; padding:2px 6px; border-radius:6px;">${coText}</span>
+                </div>
               </div>
             </div>
             <div style="display: flex; justify-content: space-between;">
@@ -920,18 +1069,14 @@ function showLateCheckInModal(event) {
             </div>
           </div>
         </div>
-        <div style="text-align: center; padding: 15px; background: rgba(251, 140, 0, 0.1); border-radius: 8px; border: 1px solid rgba(251, 140, 0, 0.3);">
-          <span style="color: #fb8c00; font-size: 14px; font-weight: 500;">
-            ⚠️ This guest has not checked in yet and is past the scheduled check-in time.
-          </span>
-        </div>
+        ${ciStatus === 0 ? `<div style="text-align: center; padding: 15px; background: rgba(255, 244, 79, 0.15); border-radius: 8px; border: 1px solid rgba(255, 244, 79, 0.35);"><span style=\"color: #fff700; font-size: 14px; font-weight: 600;\">⚠️ This guest has not checked in yet and is past the scheduled check-in time.</span></div>` : ''}
       </div>
     `,
     icon: 'warning',
     confirmButtonText: 'Check-In Now',
     cancelButtonText: 'Cancel',
     showCancelButton: true,
-    confirmButtonColor: '#fb8c00', // Orange like late check-in events
+    confirmButtonColor: '#b8a600', // Darker lemon for contrast
     cancelButtonColor: '#6c757d',
     background: '#2a3135',
     color: '#ffffff',
@@ -967,23 +1112,31 @@ function showPendingModal(event) {
   const bookingId = event.id;
 
   // FullCalendar uses exclusive end → subtract one day
-  const ci = new Date(event.start);
-  const co = new Date(event.end);
-  co.setDate(co.getDate() - 1);
+  const ciDate2 = new Date(event.start);
+  const coDate2 = new Date(event.end);
+  coDate2.setDate(coDate2.getDate() - 1);
 
-  const checkIn = ci.toLocaleDateString();
-  const checkOut = co.toLocaleDateString();
+  const checkIn = ciDate2.toLocaleDateString();
+  const checkOut = coDate2.toLocaleDateString();
+
+  // Build composite status badges (CI/CO)
+  const ciStatus2 = event.extendedProps?.checkInStatus; // 1 regular, 0 late
+  const coStatus2 = event.extendedProps?.checkOutStatus; // 0 regular, 1 late
+  const ciText = (ciStatus2 === 1 ? 'REGULAR CHECK-IN' : 'LATE CHECK-IN');
+  const ciColor = (ciStatus2 === 1 ? '#e53935' : '#fff700');
+  const coText = (coStatus2 === 1 ? 'LATE CHECK-OUT' : 'REGULAR CHECK-OUT');
+  const coColor = (coStatus2 === 1 ? '#fff700' : '#e53935');
 
   Swal.fire({
-    title: `Room ${roomNumber} - Regular Check-In`,
+    title: `Room ${roomNumber} - Pending Reservation`,
     html: `
       <div class="text-left" style="padding: 20px 0;">
         <div style="margin-bottom: 20px;">
           <div style="display: flex; align-items: center; margin-bottom: 15px;">
-            <div style="width: 8px; height: 8px; background-color: #42a5f5; border-radius: 50%; margin-right: 12px;"></div>
+            <div style="width: 8px; height: 8px; background-color: ${ciStatus2 === 0 ? '#fff700' : '#e53935'}; border-radius: 50%; margin-right: 12px;"></div>
             <span style="font-weight: 600; color: #ffffff; font-size: 16px;">Reservation Details</span>
           </div>
-          <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border-left: 3px solid #42a5f5;">
+          <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border-left: 3px solid #e53935;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
               <div style="flex: 1; margin-right: 15px;">
                 <span style="color: #cccccc; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Guest Name</span>
@@ -991,7 +1144,10 @@ function showPendingModal(event) {
               </div>
               <div style="flex: 1;">
                 <span style="color: #cccccc; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Status</span>
-                <div style="color: #42a5f5; font-weight: 700; font-size: 16px; margin-top: 4px; text-transform: uppercase;">Regular Check-In</div>
+                <div style="margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: center; text-align: center;">
+                  <span style="background: transparent; border:2px solid ${ciColor}; color:${ciColor}; font-weight:800; font-size:12px; padding:2px 6px; border-radius:6px;">${ciText}</span>
+                  <span style="background: transparent; border:2px solid ${coColor}; color:${coColor}; font-weight:800; font-size:12px; padding:2px 6px; border-radius:6px;">${coText}</span>
+                </div>
               </div>
             </div>
             <div style="display: flex; justify-content: space-between;">
@@ -1006,8 +1162,8 @@ function showPendingModal(event) {
             </div>
           </div>
         </div>
-        <div style="text-align: center; padding: 15px; background: rgba(66, 165, 245, 0.1); border-radius: 8px; border: 1px solid rgba(66, 165, 245, 0.3);">
-          <span style="color: #42a5f5; font-size: 14px; font-weight: 500;">
+        <div style="text-align: center; padding: 15px; background: rgba(229, 57, 53, 0.1); border-radius: 8px; border: 1px solid rgba(229, 57, 53, 0.35);">
+          <span style="color: #e53935; font-size: 14px; font-weight: 500;">
             📋 This reservation is Regular Check-In confirmation and requires staff approval.
           </span>
         </div>
@@ -1017,7 +1173,7 @@ function showPendingModal(event) {
     confirmButtonText: 'Check-In Now',
     cancelButtonText: 'Cancel',
     showCancelButton: true,
-    confirmButtonColor: '#42a5f5', // Blue like pending events
+    confirmButtonColor: '#e53935', // Red for regular check-in
     cancelButtonColor: '#6c757d',
     background: '#2a3135',
     color: '#ffffff',
@@ -1309,7 +1465,7 @@ function reopenCancelledReservation(bookingId, event, newStatus = 'pending') {
       };
       
       // Set background color based on check-in status
-      const statusColor = newStatus === 'late_check_in' ? '#fb8c00' : '#42a5f5'; // Orange for late check-in, Blue for regular check-in
+      const statusColor = newStatus === 'late_check_in' ? '#fff700' : '#e53935'; // Lemon for late, Red for regular
       event.backgroundColor = statusColor;
       
       // Update the event status in the calendar INSTANTLY (like drag & drop)
@@ -1427,6 +1583,11 @@ function updateEventStatusInstantly(event, newStatus) {
       // CRITICAL: Also update the event element's data attributes
       eventElement.setAttribute('data-status', newStatus);
       eventElement.setAttribute('data-booking-status', newStatus);
+
+      // Re-apply composite styles if check-in/check-out extendedProps are present
+      try {
+        applyCompositeStatusStyles(event, eventElement);
+      } catch (e) {}
     }
     
     // Force calendar to re-render to show the changes
@@ -1574,10 +1735,10 @@ function showCancelledModal(event) {
       <div class="text-left" style="padding: 20px 0;">
         <div style="margin-bottom: 20px;">
           <div style="display: flex; align-items: center; margin-bottom: 15px;">
-            <div style="width: 8px; height: 8px; background-color: #fd3535; border-radius: 50%; margin-right: 12px;"></div>
+            <div style="width: 8px; height: 8px; background-color: #000000; border-radius: 50%; margin-right: 12px;"></div>
             <span style="font-weight: 600; color: #ffffff; font-size: 16px;">Cancelled Reservation</span>
           </div>
-          <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border-left: 3px solid #fd3535;">
+          <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border-left: 3px solid #000000;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
               <div style="flex: 1; margin-right: 15px;">
                 <span style="color: #cccccc; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Guest Name</span>
@@ -1585,7 +1746,7 @@ function showCancelledModal(event) {
               </div>
               <div style="flex: 1;">
                 <span style="color: #cccccc; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Status</span>
-                <div style="color: #fd3535; font-weight: 700; font-size: 16px; margin-top: 4px; text-transform: uppercase;">Cancelled</div>
+                <div style="color: #ffffff; font-weight: 700; font-size: 16px; margin-top: 4px; text-transform: uppercase;">Cancelled</div>
               </div>
             </div>
             <div style="display: flex; justify-content: space-between;">
@@ -1600,8 +1761,8 @@ function showCancelledModal(event) {
             </div>
           </div>
         </div>
-        <div style="text-align: center; padding: 15px; background: rgba(253, 53, 53, 0.1); border-radius: 8px; border: 1px solid rgba(253, 53, 53, 0.3);">
-          <span style="color: #fd3535; font-size: 14px; font-weight: 500;">
+        <div style="text-align: center; padding: 15px; background: rgba(0, 0, 0, 0.15); border-radius: 8px; border: 1px solid rgba(0, 0, 0, 0.35);">
+          <span style="color: #ffffff; font-size: 14px; font-weight: 500;">
             ❌ This reservation has been cancelled.
           </span>
         </div>
@@ -1614,7 +1775,7 @@ function showCancelledModal(event) {
     showDenyButton: true,
     reverseButtons: true, 
     showCancelButton: true,
-    confirmButtonColor: '#fd3535',
+    confirmButtonColor: '#000000',
     cancelButtonColor: '#dc3545',
     denyButtonColor: '#6c757d',
     background: '#2a3135',
@@ -1632,8 +1793,8 @@ function showCancelledModal(event) {
           confirmButtonText: 'Regular Check-in',
           denyButtonText: 'Late Check-in',
           cancelButtonText: 'Cancel',
-          confirmButtonColor: '#42a5f5', // Blue for pending
-          denyButtonColor: '#fb8c00', // Orange for late check-in
+          confirmButtonColor: '#e53935', // Red for regular
+          denyButtonColor: '#b8a600', // Dark lemon for late
           cancelButtonColor: '#6c757d',
           background: '#2a3135',
           color: '#ffffff'
@@ -1647,7 +1808,7 @@ function showCancelledModal(event) {
               showCancelButton: true,
               confirmButtonText: 'Yes, Reopen as Regular Check-in',
               cancelButtonText: 'Cancel',
-              confirmButtonColor: '#42a5f5',
+              confirmButtonColor: '#e53935',
               cancelButtonColor: '#6c757d'
             }).then((reopenResult) => {
               if (reopenResult.isConfirmed) {
@@ -1674,7 +1835,7 @@ function showCancelledModal(event) {
               showCancelButton: true,
               confirmButtonText: 'Yes, Reopen as Late Check-in',
               cancelButtonText: 'Cancel',
-              confirmButtonColor: '#fb8c00',
+              confirmButtonColor: '#b8a600',
               cancelButtonColor: '#6c757d'
             }).then((reopenResult) => {
               if (reopenResult.isConfirmed) {
@@ -1856,6 +2017,19 @@ function getCalendar(event = null) {
 // Date utility function (needed for overlap detection)
 function getDateString(date) {
   return new Date(date).toISOString().split('T')[0];
+}
+
+// Format Date to MySQL DATETIME (YYYY-MM-DD HH:MM:SS) using local time
+function formatMySQLDateTime(date) {
+  const d = new Date(date);
+  const pad = (n) => String(n).padStart(2, '0');
+  const Y = d.getFullYear();
+  const M = pad(d.getMonth() + 1);
+  const D = pad(d.getDate());
+  const h = pad(d.getHours());
+  const m = pad(d.getMinutes());
+  const s = pad(d.getSeconds());
+  return `${Y}-${M}-${D} ${h}:${m}:${s}`;
 }
 
 // Overlap detection function (needed for event handling)
@@ -2245,8 +2419,8 @@ function proceedWithUpdate(info, newStart, newEnd, targetRoom, bookingId) {
     const updateData = {
       id: bookingId,
       room: targetRoom.title, // Room number
-      checkIn: newStart.toISOString(), // Full ISO string with time (2:00 PM)
-      checkOut: newEnd.toISOString()  // Full ISO string with time (11:00 AM)
+      checkIn: formatMySQLDateTime(newStart), // 2:00 PM
+      checkOut: formatMySQLDateTime(newEnd)  // 11:00 AM
     };
     
     // Make AJAX call to update booking in database
@@ -2397,6 +2571,45 @@ function injectDragStyles() {
       display: block !important; /* Show only right resize handle */
       cursor: ew-resize !important;
     }
+
+    /* Composite half color background via gradient retained on hover */
+    .fc-event[data-composite="true"] {
+      background-size: 100% 100% !important;
+      background-repeat: no-repeat !important;
+    }
+
+    /* Title chip for better contrast (parallelogram) */
+    .fc-event .event-title-chip {
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      top: 0;
+      transform: translateY(0) skewX(12deg);
+      height: 16px;
+      background: linear-gradient(90deg, rgba(0,0,0,0.45), rgba(0,0,0,0.35));
+      color: #fff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-shadow: 0 1px 1px rgba(0,0,0,.5);
+      line-height: 16px;
+      text-align: center;
+      pointer-events: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+    }
+
+    .fc-event .event-title-chip > span {
+      display: inline-block;
+      width: 100%;
+      transform: skewX(-12deg);
+    }
+
+    /* Also hide default title container if any slips through */
+    .fc-event .fc-event-title, .fc-event .fc-event-title-container { display: none !important; }
   `;
   
   document.head.appendChild(style);
@@ -2409,6 +2622,7 @@ function injectDragStyles() {
 // Make functions globally available
 window.processBookingsData = processBookingsData;
 window.getBookingColor = getBookingColor;
+window.applyCompositeStatusStyles = applyCompositeStatusStyles;
 window.handleEventClick = handleEventClick;
 window.handleEventDidMount = handleEventDidMount;
 window.handleDatesSet = handleDatesSet;

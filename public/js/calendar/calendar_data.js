@@ -781,12 +781,12 @@ function createLegendOverlay() {
       </div>
       <div class="calendar-legend-item">
         <div class="calendar-legend-color legend-color-late-checkin"></div>
-        <span class="calendar-legend-text">Late Check-in</span>
+        <span class="calendar-legend-text">Pending – Late (CI/CO)</span>
         <span class="calendar-legend-count" id="legend-count-late-checkin">0</span>
       </div>
       <div class="calendar-legend-item">
         <div class="calendar-legend-color legend-color-regular-checkin"></div>
-        <span class="calendar-legend-text">Regular Check-in</span>
+        <span class="calendar-legend-text">Pending – Regular (CI/CO)</span>
         <span class="calendar-legend-count" id="legend-count-regular-checkin">0</span>
       </div>
       <div class="calendar-legend-item">
@@ -823,18 +823,30 @@ function updateLegendCounts() {
   events.forEach(event => {
     const status = event.extendedProps?.bookingStatus || '';
     const backgroundColor = event.backgroundColor || '';
-    
-    // Determine status based on background color and extended properties
+    const ci = event.extendedProps?.checkInStatus;   // 1=regular,0=late
+    const co = event.extendedProps?.checkOutStatus;  // 0=regular,1=late
+
+    // Occupied
     if (status === 'check-In' || backgroundColor === 'green' || backgroundColor === '#43a047') {
       counts.occupied++;
-    } else if (status === 'pending' && (backgroundColor === 'orange' || backgroundColor === '#fb8c00')) {
-      counts.lateCheckin++;
-    } else if (status === 'pending' && (backgroundColor === 'blue' || backgroundColor === '#42a5f5')) {
-      counts.regularCheckin++;
-    } else if (status === 'check-Out' || backgroundColor === '#B3B3B3' || backgroundColor === '#6c757d') {
+      return;
+    }
+    // Checked out
+    if (status === 'check-Out' || backgroundColor === '#B3B3B3' || backgroundColor === '#6c757d') {
       counts.checkout++;
-    } else if (status === 'cancelled' || backgroundColor === 'yellow' || backgroundColor === '#fd3535') {
+      return;
+    }
+    // Cancelled
+    if (status === 'cancelled' || backgroundColor === '#000000') {
       counts.cancelled++;
+      return;
+    }
+
+    // Pending: determine late vs regular based on composite statuses
+    if (status === 'pending') {
+      // If either CI is late (0) or CO is late (1), count as late; otherwise regular
+      const isLate = (ci === 0) || (co === 1) || (ci === undefined && co === undefined && backgroundColor === '#fff700');
+      if (isLate) counts.lateCheckin++; else counts.regularCheckin++;
     }
   });
   
