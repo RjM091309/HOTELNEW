@@ -319,7 +319,7 @@
 [data-theme="dark"] .card.card-topline-blue { border-top: 5px solid #42A5F5 !important; }
 [data-theme="dark"] .card.card-topline-red { border-top: 5px solid #EF5350 !important; }
 [data-theme="dark"] .card.card-topline-purple { border-top: 5px solid #AB47BC !important; }
-[data-theme="dark"] .card.card-topline-violet { border-top: 5px solid #9C7C38 !important; }
+[data-theme="dark"] .card.card-topline-violet { border-top: 5px solid #8A2BE2 !important; }
 [data-theme="dark"] .card.card-topline-orange { border-top: 5px solid #FFB74D !important; }
 [data-theme="dark"] .card.card-topline-sky { border-top: 5px solid #4FC3F7 !important; }
 [data-theme="dark"] .card.card-topline-pink { border-top: 5px solid #F06292 !important; }
@@ -597,6 +597,75 @@
 [data-theme="white"] .close, [data-theme="white"] .modal-header .close { color: #111827; opacity: 0.6; }
 [data-theme="white"] .close:hover, [data-theme="white"] .modal-header .close:hover { opacity: 1; }
 
+/* Add Booking Modal Light Theme */
+[data-theme="white"] #modal-addbooking .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #modal-addbooking .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #modal-addbooking .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #modal-addbooking .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #modal-addbooking .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #modal-addbooking input[type="text"],
+[data-theme="white"] #modal-addbooking input[type="number"],
+[data-theme="white"] #modal-addbooking input[type="email"],
+[data-theme="white"] #modal-addbooking select,
+[data-theme="white"] #modal-addbooking textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #d1d5db !important;
+}
+
+[data-theme="white"] #modal-addbooking input::placeholder,
+[data-theme="white"] #modal-addbooking textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #modal-addbooking select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #modal-addbooking label,
+[data-theme="white"] #modal-addbooking .mdl-textfield__label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #modal-addbooking h3,
+[data-theme="white"] #modal-addbooking h5 {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #modal-addbooking input[type="checkbox"] + label,
+[data-theme="white"] #modal-addbooking .form-check-label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #modal-addbooking .group-room-breakdown {
+    background: #f9fafb !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+}
+
 /* =====================
    Light theme: Calendar (FullCalendar-like)
    ===================== */
@@ -656,6 +725,91 @@
 [data-theme="white"] .fc .fc-daygrid-body table tr > td { background: #ffffff !important; }
 [data-theme="white"] .fc .fc-daygrid-body table tr > td:nth-child(even) { background: #f7fafc !important; }
 [data-theme="white"] .fc .fc-daygrid-day-frame { border-left: 1px solid #e2e8f0 !important; }
+
+/* Light theme: Pagination buttons - white background with black numbers */
+[data-theme="white"] .pagination .page-link,
+[data-theme="white"] .pagination .page-item .page-link,
+[data-theme="white"] .pagination li a,
+[data-theme="white"] .pagination li span {
+    background-color: #ffffff !important;
+    border-color: #e5e7eb !important;
+    color: #000000 !important;
+}
+
+[data-theme="white"] .pagination .page-link:hover,
+[data-theme="white"] .pagination .page-item .page-link:hover,
+[data-theme="white"] .pagination li a:hover,
+[data-theme="white"] .pagination li span:hover {
+    background-color: #f8f9fa !important;
+    border-color: #d1d5db !important;
+    color: #000000 !important;
+}
+
+[data-theme="white"] .pagination .page-item.active .page-link,
+[data-theme="white"] .pagination .page-item.active span,
+[data-theme="white"] .pagination li.active a,
+[data-theme="white"] .pagination li.active span {
+    background-color: #eef1f5 !important;
+    border-color: #eef1f5 !important;
+    color: #000000 !important;
+}
+
+[data-theme="white"] .pagination .page-item.disabled .page-link,
+[data-theme="white"] .pagination .page-item.disabled span,
+[data-theme="white"] .pagination li.disabled a,
+[data-theme="white"] .pagination li.disabled span {
+    background-color: #ffffff !important;
+    border-color: #e5e7eb !important;
+    color: #9ca3af !important;
+}
+
+/* Light theme: DataTables pagination - white background with black numbers */
+[data-theme="white"] .dataTables_wrapper .dataTables_paginate ul.pagination .page-item .page-link {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+}
+
+[data-theme="white"] .dataTables_wrapper .dataTables_paginate ul.pagination .page-item .page-link:hover {
+    background: #f8f9fa !important;
+    border-color: #d1d5db !important;
+    color: #000000 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+}
+
+[data-theme="white"] .dataTables_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link {
+    background: #eef1f5 !important;
+    border-color: #eef1f5 !important;
+    color: #000000 !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+[data-theme="white"] .dataTables_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link:hover {
+    background: #e2e8f0 !important;
+    border-color: #e2e8f0 !important;
+    color: #000000 !important;
+    transform: translateY(-1px) !important;
+}
+
+[data-theme="white"] .dataTables_wrapper .dataTables_paginate ul.pagination .page-item.disabled .page-link {
+    background: #ffffff !important;
+    border-color: #e5e7eb !important;
+    color: #9ca3af !important;
+    opacity: 0.6 !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+}
+
+[data-theme="white"] .dataTables_wrapper .dataTables_paginate ul.pagination .page-item.disabled .page-link:hover {
+    background: #ffffff !important;
+    border-color: #e5e7eb !important;
+    color: #9ca3af !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
 
 /* Light theme: fine-tune subtle/muted texts and icons */
 [data-theme="white"] .info-box-icon {
@@ -2714,7 +2868,7 @@
 /* Room Clearance Cleaning Icons */
 [data-theme="white"] .cleaning-container i,
 [data-theme="white"] .cleaning-container span {
-    color: #ffffff !important;
+    color: #4CAF50 !important;
 }
 
 /* Room Clearance Action Buttons */
