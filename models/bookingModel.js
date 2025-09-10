@@ -455,6 +455,7 @@ class BookingModel {
       encodedBy,
       date,
       checkInStatus,
+      checkOutStatus,
       bookingRemarks,
       agencyID,
       guestID,
@@ -474,7 +475,8 @@ class BookingModel {
       bedCount,
       isDirectReservation,
       reservationFee,
-      discount
+      discount,
+      lateCheckoutFee
     } = bookingData;
 
     try {
@@ -518,13 +520,13 @@ class BookingModel {
         // Create booking
         const bookingQuery = `
           INSERT INTO booking 
-          (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, REMARKS, CONFIRMATION_NUMBER, NOTIFICATION_READ, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, AGENCY_ID, IS_DIRECT_RESERVATION, BED_COUNT) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)
+          (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, REMARKS, CONFIRMATION_NUMBER, NOTIFICATION_READ, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, LATE_CHECKOUT, AGENCY_ID, IS_DIRECT_RESERVATION, BED_COUNT) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const directReservationFlag = isDirectReservation ? 1 : 0;
         const bookingValues = [
           customerId, room_id, checkInDate, checkOutDate, 'pending', finalBookingRoute,
-          maxOccupants, bookingRemarks, confirmationNumber, encodedBy, date, 1, checkInStatus, 
+          maxOccupants, bookingRemarks, confirmationNumber, encodedBy, date, 1, checkInStatus, checkOutStatus,
           finalBookingRoute === 'agency' ? agencyID : null, directReservationFlag, bedCount || null
         ];
 
@@ -749,6 +751,24 @@ class BookingModel {
               });
             });
           }
+        }
+
+        // Process late check-out fee if applicable
+        if (checkOutStatus == 1 && parseFloat(lateCheckoutFee) > 0) {
+          const lateCheckoutQuery = `
+            INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT) 
+            VALUES (?, 72, 1, ?, ?, ?, NOW())
+          `;
+          
+          const status = paymentStatus === 'paid' ? 'paid' : 'unpaid';
+          await new Promise((resolve, reject) => {
+            connection.query(lateCheckoutQuery, [bookingId, lateCheckoutFee, status, encodedBy], (err, results) => {
+              if (err) reject(err);
+              else resolve(results);
+            });
+          });
+          
+          console.log(`🔄 Late Check-Out Fee Applied: ₱${lateCheckoutFee} (Status: ${status})`);
         }
 
         // If paymentStatus is 'paid', insert into payments table

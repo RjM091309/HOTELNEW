@@ -172,6 +172,19 @@
       </tr>
       <% } %>
       
+      <% if (checkOutStatus == 1) { %>
+      <tr>
+        <td class="label">CHECK-OUT STATUS:</td>
+        <td>Late Check-Out</td>
+      </tr>
+          <% if (lateCheckoutFee && parseFloat(lateCheckoutFee) > 0) { %>
+      <tr>
+        <td class="label">LATE CHECK-OUT FEE:</td>
+        <td>PHP <%= parseFloat(lateCheckoutFee).toLocaleString() %></td>
+      </tr>
+          <% } %>
+      <% } %>
+      
     </table>
 
     <%
