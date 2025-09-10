@@ -19,6 +19,7 @@
                     <input type="hidden" id="selectedRoomPrice" name="selectedRoomPrice">
                     <input type="hidden" id="room_type_hidden" name="room_type_hidden">
                     <input type="hidden" id="voucherNo" name="voucherNo">
+                    <input type="text" id="lateCheckoutFee" name="lateCheckoutFee" value="0">
 
                     <div class="row">
 
@@ -276,6 +277,17 @@
                                     <option value="" disabled selected>Check-In Status</option>
                                     <option value="1">Regular Check In</option>
                                     <option value="0" selected>Late Check In</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              <div id="divtxtCheckOutStatus" class="col-lg-3">
+                                <div class="form-group">
+                                  <label class="form-label">Check-Out Status</label>
+                                  <select class="form-select" name="checkOutStatus" id="checkOutStatus" required>
+                                    <option value="" disabled selected>Check-Out Status</option>
+                                    <option value="0">Regular Check Out</option>
+                                    <option value="1" selected>Late Check Out</option>
                                   </select>
                                 </div>
                               </div>

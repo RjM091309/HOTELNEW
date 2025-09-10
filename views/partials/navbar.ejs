@@ -614,6 +614,8 @@ if (!cleanDateRange || !cleanDateRange.includes(" to ")) {
 		function showRoomSelectionModal(data, startDate, endDate) {
 			// Store unassigned bookings data globally for filterRooms function
 			window.currentUnassignedBookings = data.unassignedBookings || [];
+			// Store original bed conflicts data globally for dynamic filtering
+			window.originalBedConflicts = [];
 			
 			// Check for bed count conflicts
 			const availableRooms = data.rooms || [];
@@ -632,6 +634,17 @@ if (!cleanDateRange || !cleanDateRange.includes(" to ")) {
 				const bedCount = room.ROOM_BED;
 				bedsAvailable[bedCount] = (bedsAvailable[bedCount] || 0) + 1;
 			});
+
+			// Compute which bed types are fully reserved for unassigned bookings and expose globally
+			const fullyReservedMap = {};
+			Object.keys(bedsNeeded).forEach(bedCount => {
+				const needed = bedsNeeded[bedCount];
+				const available = bedsAvailable[bedCount] || 0;
+				if (needed > 0 && available > 0 && needed >= available) {
+					fullyReservedMap[bedCount] = true;
+				}
+			});
+			window.fullyReservedBedTypes = fullyReservedMap; // { '1': true, '2': false, ... }
 			
 			// Check for conflicts
 			const bedConflicts = [];
@@ -648,6 +661,9 @@ if (!cleanDateRange || !cleanDateRange.includes(" to ")) {
 				}
 			});
 			
+			// Store original bed conflicts for dynamic filtering
+			window.originalBedConflicts = [...bedConflicts];
+			
 			// Format startDate and endDate with worded month
 			const formattedStartDate = flatpickr.formatDate(new Date(startDate), "F d, Y"); // e.g., "January 10, 2025"
 			const formattedEndDate = flatpickr.formatDate(new Date(endDate), "F d, Y"); // e.g., "January 11, 2025"
@@ -660,20 +676,18 @@ if (!cleanDateRange || !cleanDateRange.includes(" to ")) {
         </header>
         
         ${bedConflicts.length > 0 ? `
-        <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; padding: 12px; margin-bottom: 15px;">
+        <div id="unassignedWarning" style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; padding: 12px; margin-bottom: 15px;">
             <div style="display: flex; align-items: center; margin-bottom: 8px;">
                 <span style="font-size: 18px; margin-right: 8px;">⚠️</span>
                 <strong style="color: #856404;">Unassigned Rooms Warning</strong>
             </div>
-            <div style="color: #856404; font-size: 13px;">
+            <div id="warningContent" style="color: #856404; font-size: 13px;">
                 ${bedConflicts.map(conflict => 
                     `<div style="margin-bottom: 4px;">
-                        • <strong>${conflict.bedCount} bedrooms:</strong> ${conflict.reserved} out of ${conflict.available} are reserved for unassigned bookings
+                        • <strong>${conflict.bedCount} bed:</strong> ${conflict.reserved} out of ${conflict.available} are reserved for unassigned bookings
                     </div>`
                 ).join('')}
-                <div style="margin-top: 8px; font-style: italic;">
-                    These rooms should be assigned to unassigned bookings first.
-                </div>
+               
             </div>
         </div>
         ` : ''}
@@ -719,6 +733,32 @@ if (!cleanDateRange || !cleanDateRange.includes(" to ")) {
             Unassigned: <span id="unassignedBookingCount">0</span>
         </div>
       </div>
+      
+        <!-- Room Color Legend -->
+        <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 8px; margin-bottom: 15px;">
+           <div style="display: flex; align-items: center; justify-content: center; gap: 20px; font-size: 12px; flex-wrap: wrap;">
+               <div style="display: flex; align-items: center; gap: 4px;">
+                   <div style="width: 16px; height: 12px; background-color: #90EE90; border: 1px solid #28a745; border-radius: 2px;"></div>
+                   <span>Regular Check-out</span>
+               </div>
+               <div style="display: flex; align-items: center; gap: 4px;">
+                   <div style="width: 16px; height: 12px; background-color: #FFA500; border: 1px solid #ff8c00; border-radius: 2px;"></div>
+                   <span>Late Check-out</span>
+               </div>
+               <div style="display: flex; align-items: center; gap: 4px;">
+                   <div style="width: 16px; height: 12px; background-color: #7FBCE9; border: 1px solid #007bff; border-radius: 2px;"></div>
+                   <span>Regular Check-in</span>
+               </div>
+               <div style="display: flex; align-items: center; gap: 4px;">
+                   <div style="width: 16px; height: 12px; background-color: #FF7F7F; border: 1px solid #dc3545; border-radius: 2px;"></div>
+                   <span>Late Check-in</span>
+               </div>
+               <div style="display: flex; align-items: center; gap: 4px;">
+                   <div style="width: 16px; height: 12px; background-color: #f5f5f5; border: 2px dashed #ccc; border-radius: 2px;"></div>
+                   <span>Reserved for Unassigned</span>
+               </div>
+           </div>
+        </div>
         <div id="roomListContainer">
             ${generateRoomListHTML(data.rooms)}
         </div>
@@ -833,6 +873,12 @@ function openDirectReservationModal(formattedDateRange, nights) {
             diffInDaysField.value = nights;
         }
 
+        // Get selected check-in and check-out filters from the Available Rooms modal
+        const selectedCheckinFilter = document.querySelector('input[name="checkinFilter"]:checked')?.value;
+        const selectedCheckoutFilter = document.querySelector('input[name="checkoutFilter"]:checked')?.value;
+        
+        console.log('Selected filters:', { selectedCheckinFilter, selectedCheckoutFilter });
+
         // Show the Add Booking modal directly
         const addBookingModalElement = document.getElementById('modal-addbooking');
         if (addBookingModalElement) {
@@ -859,6 +905,28 @@ function openDirectReservationModal(formattedDateRange, nights) {
             // Disable date fields since they're pre-filled
             document.getElementById('daterange').disabled = true;
             document.getElementById('diffindays').disabled = true;
+            
+            // Set check-in status based on selected filter
+            const checkInStatusField = document.getElementById('checkInStatus');
+            if (checkInStatusField) {
+                if (selectedCheckinFilter === 'R/I') {
+                    checkInStatusField.value = '1'; // Regular Check In
+                } else if (selectedCheckinFilter === 'L/I') {
+                    checkInStatusField.value = '0'; // Late Check In
+                }
+                console.log('Set checkInStatus to:', checkInStatusField.value);
+            }
+            
+            // Set check-out status based on selected filter
+            const checkOutStatusField = document.getElementById('checkOutStatus');
+            if (checkOutStatusField) {
+                if (selectedCheckoutFilter === 'R/O') {
+                    checkOutStatusField.value = '0'; // Regular Check Out
+                } else if (selectedCheckoutFilter === 'L/O') {
+                    checkOutStatusField.value = '1'; // Late Check Out
+                }
+                console.log('Set checkOutStatus to:', checkOutStatusField.value);
+            }
             
             // Hide only specific room selection fields, not entire rows
             const fieldsToHide = [
@@ -970,6 +1038,23 @@ function openDirectReservationModal(formattedDateRange, nights) {
                 paymentStatusField.value = 'unpaid';
             }
 
+            // Ensure backend-required fields have safe defaults for direct reservations
+            try {
+                // Mark booking route explicitly
+                const bookingRouteField = addBookingModalElement.querySelector('#bookingRoute');
+                if (bookingRouteField) bookingRouteField.value = 'direct-reservation';
+
+                // Price-related defaults
+                const basePriceField = addBookingModalElement.querySelector('#baseprice');
+                const priceField = addBookingModalElement.querySelector('#price');
+                if (basePriceField) basePriceField.value = '0.00';
+                if (priceField) priceField.value = '0.00';
+
+                // Room id to 0 for direct reservation
+                const roomSelect = addBookingModalElement.querySelector('#addroom');
+                if (roomSelect) roomSelect.value = '';
+            } catch (e) { /* no-op */ }
+
              // Hide Group Booking checkbox for direct reservations
             const groupBookingCheckbox = addBookingModalElement.querySelector('#groupBookingCheckbox');
             if (groupBookingCheckbox) {
@@ -1046,6 +1131,20 @@ function openDirectReservationModal(formattedDateRange, nights) {
                         if (option.disabled) optionElement.disabled = true;
                         bedCountSelect.appendChild(optionElement);
                     });
+
+                    // Disable fully reserved bed options (e.g., 1 Bed) using global map from the modal
+                    try {
+                        const map = window.fullyReservedBedTypes || {};
+                        // Keys in map are numeric-like strings: '1', '2', ...
+                        if (map['1']) {
+                            const opt1 = Array.from(bedCountSelect.options).find(o => o.value === '1');
+                            if (opt1) { opt1.disabled = true; }
+                        }
+                        if (map['2']) {
+                            const opt2 = Array.from(bedCountSelect.options).find(o => o.value === '2');
+                            if (opt2) { opt2.disabled = true; }
+                        }
+                    } catch (e) { /* no-op */ }
                     
                     // Don't set default value - let the "Select" option be selected by default
                     // bedCountSelect.value = '1';
@@ -1097,6 +1196,19 @@ function openDirectReservationModal(formattedDateRange, nights) {
                         optionElement.textContent = option.text;
                         bedCountSelect.appendChild(optionElement);
                     });
+
+                    // Disable fully reserved bed options based on global map
+                    try {
+                        const map = window.fullyReservedBedTypes || {};
+                        if (map['1']) {
+                            const opt1 = Array.from(bedCountSelect.options).find(o => o.value === '1');
+                            if (opt1) { opt1.disabled = true; }
+                        }
+                        if (map['2']) {
+                            const opt2 = Array.from(bedCountSelect.options).find(o => o.value === '2');
+                            if (opt2) { opt2.disabled = true; }
+                        }
+                    } catch (e) { /* no-op */ }
                     
                     bedCountSelect.value = '1';
                     bedCountContainer.appendChild(bedCountLabel);
@@ -1115,10 +1227,53 @@ function openDirectReservationModal(formattedDateRange, nights) {
                     }
                 }
             }
+
+            // Re-bind AJAX submit handler to guarantee interception for this flow
+            try {
+                initializeAddBookingHandler();
+            } catch (e) { /* no-op */ }
         } else {
             console.error('Modal element not found in the DOM');
         }
     }, 100); // Close the setTimeout
+}
+
+// Function to update warning message based on bed filter
+function updateWarningMessage(selectedBedFilter) {
+    const warningElement = document.getElementById('unassignedWarning');
+    const warningContentElement = document.getElementById('warningContent');
+    
+    if (!warningElement || !warningContentElement || !window.originalBedConflicts) {
+        return;
+    }
+    
+    let filteredConflicts = [];
+    
+    if (selectedBedFilter === 'all') {
+        // Show all conflicts
+        filteredConflicts = window.originalBedConflicts;
+    } else {
+        // Filter conflicts by bed type
+        const bedType = selectedBedFilter === '1B' ? '1' : '2';
+        filteredConflicts = window.originalBedConflicts.filter(conflict => 
+            conflict.bedCount == bedType
+        );
+    }
+    
+    if (filteredConflicts.length > 0) {
+        // Update warning content
+        warningContentElement.innerHTML = filteredConflicts.map(conflict => 
+            `<div style="margin-bottom: 4px;">
+                • <strong>${conflict.bedCount} bed:</strong> ${conflict.reserved} out of ${conflict.available} are reserved for unassigned bookings
+            </div>`
+        ).join('');
+        
+        // Show warning if it was hidden
+        warningElement.style.display = 'block';
+    } else {
+        // Hide warning if no conflicts for this bed type
+        warningElement.style.display = 'none';
+    }
 }
         
     function filterRooms() {
@@ -1136,6 +1291,7 @@ function openDirectReservationModal(formattedDateRange, nights) {
         const category = room.getAttribute('data-category');
         const checkoutType = room.getAttribute('data-checkout-type');
         const checkinType = room.getAttribute('data-checkin-type');
+        const isDisabled = room.getAttribute('data-disabled') === 'true';
 
         const matchesSearch = roomNumber.includes(input);
         
@@ -1201,7 +1357,8 @@ function openDirectReservationModal(formattedDateRange, nights) {
         room.style.display = shouldShow ? 'flex' : 'none';
 
         // Count all rooms that match bed filter and search (regardless of other filters)
-        const shouldCount = matchesSearch && matchesBedFilter;
+        // Don't count disabled rooms in the available count
+        const shouldCount = matchesSearch && matchesBedFilter && !isDisabled;
         if (shouldCount) visibleCount++;
     });
 
@@ -1281,29 +1438,43 @@ function openDirectReservationModal(formattedDateRange, nights) {
     // Set the counts
     document.getElementById('availableRoomCount').textContent = visibleCount;
     
-    // Set unassigned booking count
-    const unassignedCount = window.currentUnassignedBookings ? window.currentUnassignedBookings.length : 0;
-    document.getElementById('unassignedBookingCount').textContent = unassignedCount;
+    // Filter unassigned bookings by bed type and set count
+    let filteredUnassignedCount = 0;
+    if (window.currentUnassignedBookings) {
+        if (selectedBedFilter === 'all') {
+            filteredUnassignedCount = window.currentUnassignedBookings.length;
+        } else {
+            // Filter unassigned bookings by bed type
+            const bedType = selectedBedFilter === '1B' ? '1' : '2';
+            filteredUnassignedCount = window.currentUnassignedBookings.filter(booking => 
+                booking.BED_COUNT == bedType
+            ).length;
+        }
+    }
+    document.getElementById('unassignedBookingCount').textContent = filteredUnassignedCount;
+    
+    // Update warning message based on current filter
+    updateWarningMessage(selectedBedFilter);
     
     // Show "No available rooms" message if no rooms match the filters
     const scrollableContainers = document.querySelector('.scrollable-containers');
     const noRoomsMessage = scrollableContainers.querySelector('.no-rooms-message');
     
-    if (visibleCount === 0) {
-        if (!noRoomsMessage) {
-            const message = document.createElement('div');
-            message.className = 'no-rooms-message';
-            message.style.cssText = 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #666; font-style: italic; z-index: 10;';
-            scrollableContainers.style.position = 'relative';
-            scrollableContainers.style.minHeight = '200px';
-            message.textContent = 'No available rooms match your selected filters.';
-            scrollableContainers.appendChild(message);
-        }
-    } else {
-        if (noRoomsMessage) {
-            noRoomsMessage.remove();
-        }
-    }
+    // if (visibleCount === 0) {
+    //     if (!noRoomsMessage) {
+    //         const message = document.createElement('div');
+    //         message.className = 'no-rooms-message';
+    //         message.style.cssText = 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #666; font-style: italic; z-index: 10;';
+    //         scrollableContainers.style.position = 'relative';
+    //         scrollableContainers.style.minHeight = '200px';
+    //         message.textContent = 'No available rooms match your selected filters.';
+    //         scrollableContainers.appendChild(message);
+    //     }
+    // } else {
+    //     if (noRoomsMessage) {
+    //         noRoomsMessage.remove();
+    //     }
+    // }
 }
 
 
@@ -1313,6 +1484,30 @@ function openDirectReservationModal(formattedDateRange, nights) {
     if (rooms.length === 0) {
         return '<p>No available rooms for the selected date range.</p>';
     }
+
+    // Check for bed conflicts to determine which rooms should be disabled
+    const unassignedBookings = window.currentUnassignedBookings || [];
+    const bedsNeeded = {};
+    unassignedBookings.forEach(booking => {
+        const bedCount = booking.BED_COUNT || 1;
+        bedsNeeded[bedCount] = (bedsNeeded[bedCount] || 0) + 1;
+    });
+    
+    const bedsAvailable = {};
+    rooms.forEach(room => {
+        const bedCount = room.ROOM_BED;
+        bedsAvailable[bedCount] = (bedsAvailable[bedCount] || 0) + 1;
+    });
+    
+    // Determine which bed types are fully reserved
+    const fullyReservedBedTypes = {};
+    Object.keys(bedsNeeded).forEach(bedCount => {
+        const needed = bedsNeeded[bedCount];
+        const available = bedsAvailable[bedCount] || 0;
+        if (needed > 0 && available > 0 && needed >= available) {
+            fullyReservedBedTypes[bedCount] = true;
+        }
+    });
 
     // Group rooms by floor
     const roomsByFloor = rooms.reduce((floors, room) => {
@@ -1334,32 +1529,55 @@ Object.keys(roomsByFloor).sort((a, b) => a - b).forEach(floor => {
     html += '<div class="room-row">';
     rooms.forEach(room => {
         let roomStyle = ""; // Define styles for each room dynamically
+        let isDisabled = false;
+
+        // Check if this room type is fully reserved for unassigned bookings
+        if (fullyReservedBedTypes[room.ROOM_BED]) {
+            isDisabled = true;
+            roomStyle += "opacity: 0.5; cursor: not-allowed; background-color: #f5f5f5 !important; border: 2px dashed #ccc !important;";
+        }
 
         // Assign styles based on the floor number
         if (floor == 3) {
-        roomStyle = "color: #4CAF50; border-top: 2px solid #4CAF50;";
+        roomStyle += "color: #4CAF50; border-top: 2px solid #4CAF50;";
     } else if (floor == 4) {
-        roomStyle = "color: #1e1bd6; border-top: 2px solid #1e1bd6;";
+        roomStyle += "color: #1e1bd6; border-top: 2px solid #1e1bd6;";
     } else if (floor == 5) {
-        roomStyle = "color: #df1818; border-top: 2px solid #df1818;";
+        roomStyle += "color: #df1818; border-top: 2px solid #df1818;";
     } else if (floor == 6) {
-        roomStyle = "color: #8A2BE2; border-top: 2px solid #8A2BE2;";
+        roomStyle += "color: #8A2BE2; border-top: 2px solid #8A2BE2;";
     }
 
-    // If the room has checkoutToday == true, check the checkout type
-    if (room.checkoutToday) {
-        if (room.checkoutType === 'L/O') {
-            roomStyle = 'background-color: #FFA500'; // Orange for late check-out
-        } else if (room.checkoutType === 'R/O') {
-            roomStyle = 'background-color: #90EE90'; // Green for regular check-out
+    // Build background colors for mixed statuses (only if not disabled)
+    if (!isDisabled) {
+        let backgroundColors = [];
+        
+        // If the room has checkoutToday == true, check the checkout type
+        if (room.checkoutToday) {
+            if (room.checkoutType === 'L/O') {
+                backgroundColors.push('#FFA500'); // Orange for late check-out
+            } else if (room.checkoutType === 'R/O') {
+                backgroundColors.push('#90EE90'); // Green for regular check-out
+            }
         }
-    }
-    
-    // Additional styling for check-in types (for check-out filters)
-    if (room.checkinType === 'R/I') {
-        roomStyle = 'background-color: #7FBCE9;'; // Blue border for regular check-in
-    } else if (room.checkinType === 'L/I') {
-        roomStyle = 'background-color: #FF7F7F;'; // Red border for late check-in
+        
+        // Additional styling for check-in types (for check-out filters)
+        if (room.checkinType === 'R/I') {
+            backgroundColors.push('#7FBCE9'); // Blue for regular check-in
+        } else if (room.checkinType === 'L/I') {
+            backgroundColors.push('#FF7F7F'); // Red for late check-in
+        }
+        
+        // Apply mixed background colors if any exist
+        if (backgroundColors.length > 0) {
+            if (backgroundColors.length === 1) {
+                roomStyle += `background-color: ${backgroundColors[0]};`;
+            } else {
+                // Create gradient for multiple colors
+                const gradient = `linear-gradient(50deg, ${backgroundColors.join(', ')})`;
+                roomStyle += `background: ${gradient};`;
+            }
+        }
     }
         // Add room item with specific styles
         html += `<div class="room-item" 
@@ -1368,13 +1586,18 @@ Object.keys(roomsByFloor).sort((a, b) => a - b).forEach(floor => {
     data-view="${room.ROOM_VIEW}" 
     data-category="${room.ROOM_BED}B"
     data-checkout-type="${room.checkoutType || ''}"
-    data-checkin-type="${room.checkinType || ''}">
+    data-checkin-type="${room.checkinType || ''}"
+    data-disabled="${isDisabled}">
     
-    <a href="#" class="room-link" 
+    <a href="#" class="room-link ${isDisabled ? 'disabled-room' : ''}" 
        data-room-id="${room.IDNo}" 
        data-room-number="${room.ROOM_NUMBER}" 
-       data-floor="${room.ROOM_FLOOR}">
+       data-floor="${room.ROOM_FLOOR}"
+       data-bed="${room.ROOM_BED}"
+       data-disabled="${isDisabled}"
+       ${isDisabled ? 'onclick="return false;"' : ''}>
        ${room.ROOM_NUMBER}
+       ${isDisabled ? '<br><small style="font-size: 8px; color: #999;">Reserved</small>' : ''}
     </a>
 </div>`;
 
@@ -1442,6 +1665,27 @@ function getSeasonalPrice(seasonalPrices, bedCount, bookingType) {
 document.addEventListener('click', function (event) {
   if (event.target.classList.contains('room-link')) {
     event.preventDefault();
+    
+    // Check if the room is disabled due to bed conflicts
+    const isDisabled = event.target.getAttribute('data-disabled') === 'true';
+    if (isDisabled) {
+      // Show a warning message instead of proceeding
+      Swal.fire({
+        title: 'Room Not Available',
+        html: `
+          <div style="text-align: left;">
+            <p><strong>Room ${event.target.getAttribute('data-room-number')} cannot be selected.</strong></p>
+            <p>All ${event.target.getAttribute('data-bed')}-bedroom rooms are currently reserved for unassigned bookings.</p>
+            <p style="color: #dc3545; font-weight: bold;">Please assign rooms to unassigned bookings first before making new reservations.</p>
+          </div>
+        `,
+        icon: 'warning',
+        confirmButtonText: 'Understood',
+        confirmButtonColor: '#dc3545'
+      });
+      return;
+    }
+    
     initializeAddBookingHandler();
 
     const roomId = event.target.getAttribute('data-room-id');
@@ -1492,6 +1736,36 @@ document.addEventListener('click', function (event) {
       if (amenitiesField) amenitiesField.value = roomDetails.AMENITIES;
       if (diffInDaysField) diffInDaysField.value = nights;
       
+      // Set check-in and check-out status based on selected filters
+      const selectedCheckinFilter = document.querySelector('input[name="checkinFilter"]:checked')?.value;
+      const selectedCheckoutFilter = document.querySelector('input[name="checkoutFilter"]:checked')?.value;
+      
+      // Set check-in status
+      const checkInStatusField = document.getElementById('checkInStatus');
+      if (checkInStatusField) {
+          if (selectedCheckinFilter === 'R/I') {
+              checkInStatusField.value = '1'; // Regular Check In
+          } else if (selectedCheckinFilter === 'L/I') {
+              checkInStatusField.value = '0'; // Late Check In
+          }
+          console.log('Set checkInStatus to:', checkInStatusField.value);
+      }
+      
+      // Set check-out status
+      const checkOutStatusField = document.getElementById('checkOutStatus');
+      if (checkOutStatusField) {
+          if (selectedCheckoutFilter === 'R/O') {
+              checkOutStatusField.value = '0'; // Regular Check Out
+          } else if (selectedCheckoutFilter === 'L/O') {
+              checkOutStatusField.value = '1'; // Late Check Out
+          }
+          console.log('Set checkOutStatus to:', checkOutStatusField.value);
+          
+          // Trigger late checkout fee calculation
+          if (typeof calculateLateCheckoutFee === 'function') {
+              calculateLateCheckoutFee();
+          }
+      }
 
       function getSeasonIdForDate(checkInDate, seasonalPrices) {
   const checkIn = new Date(checkInDate);
@@ -1679,6 +1953,7 @@ function initializeAddBookingHandler() {
             guestID: $('#guestID').val(),
             bookingRoute: isDirectReservation ? 'direct-reservation' : $('#bookingRoute').val(),
             checkInStatus: $('#checkInStatus').val(),
+            checkOutStatus: $('#checkOutStatus').val(),
             bookingRemarks: $('#bookingRemarks').val(),
             agencyID: $('#agencySelect').val(),
             voucherNo: $('#voucherNo').val(),
@@ -1698,6 +1973,7 @@ function initializeAddBookingHandler() {
             // ✅ Include reservation fee and discount
             reservationFee: $('#includeReservationFee').prop('checked') ? $('#reservationFeeAmount').val() : '0.00',
             discount: $('#includeDiscount').prop('checked') ? $('#discountAmount').val() : '0.00',
+            lateCheckoutFee: $('#lateCheckoutFee').val() || '0.00',
             
             // Add bed count for direct reservations only
             bedCount: isDirectReservation ? (window.selectedBedCount || 1) : null,
@@ -1767,6 +2043,8 @@ function initializeAddBookingHandler() {
             remarks: formData.bookingRemarks,
             total: $('#computedTotal').text(),
             checkInStatus: formData.checkInStatus,
+            checkOutStatus: formData.checkOutStatus,
+            lateCheckoutFee: formData.lateCheckoutFee,
             directReservationFlag: ($('#directReservationFlag').val() === 'true') ? 'true' : 'false'
         };
 
@@ -1817,6 +2095,7 @@ function initializeAddBookingHandler() {
 $(document).ready(function() {
     initializeAddBookingHandler();
 });
+
 
 // Auto-trigger sidebar toggle for calendar page - DISABLED to prevent hash issues
 // function autoTriggerSidebarForCalendar() {

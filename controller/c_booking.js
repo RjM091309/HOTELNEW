@@ -264,6 +264,7 @@ class BookingController {
         guestID,
         bookingRoute,
         checkInStatus,
+        checkOutStatus,
         bookingRemarks,
         agencyID,
         // ✅ Additional for Services (breakfast)
@@ -284,7 +285,8 @@ class BookingController {
       bedCount,
       directReservationFlag,
       reservationFee,
-      discount
+      discount,
+      lateCheckoutFee
     } = req.body;
 
       const encodedBy = req.user.userId; // Use JWT user ID instead of session
@@ -316,7 +318,17 @@ class BookingController {
       // Convert dates to MySQL format
       const moment = require('moment');
       const checkInDate = moment(startDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD') + ' 14:00:00';
-      const checkOutDate = moment(endDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD') + ' 11:00:00';
+      
+      // Set checkout time based on checkOutStatus
+      let checkOutTime;
+      if (checkOutStatus == 1) {
+        // Late Check Out: Set to 11:00 PM
+        checkOutTime = ' 23:00:00';
+      } else {
+        // Regular Check Out: Set to 11:00 AM
+        checkOutTime = ' 11:00:00';
+      }
+      const checkOutDate = moment(endDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD') + checkOutTime;
 
       // console.log('Check-in date:', checkInDate, 'Check-out date:', checkOutDate);
 
@@ -344,6 +356,7 @@ class BookingController {
         encodedBy,
         date,
         checkInStatus,
+        checkOutStatus,
         bookingRemarks,
         agencyID,
         guestID,
@@ -363,7 +376,8 @@ class BookingController {
         bedCount,
         isDirectReservation,
         reservationFee,
-        discount
+        discount,
+        lateCheckoutFee
       });
 
 
