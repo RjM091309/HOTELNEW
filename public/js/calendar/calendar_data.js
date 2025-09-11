@@ -20,6 +20,9 @@ let calendarEl; // Add this global variable
 let currentRangeStart;
 let currentWeekStart;
 window.eventElements = {};
+// Fine-tune centering biases (positive moves right/down, negative moves left/up)
+const H_CENTER_BIAS_PX = 100;
+const V_CENTER_BIAS_PX = 88;
 
 // Date utility functions
 function getLastDayOfMonth(year, monthIndex) {
@@ -88,6 +91,65 @@ function setupScrollbar() {
   return { bodyScroller, top };
 }
 
+function getVerticalScrollerForRow(rowEl) {
+  if (!rowEl) return null;
+  const scroller = rowEl.closest('.fc-scroller');
+  if (scroller) return scroller;
+  // Fallback to timeline body scroller
+  return document.querySelector('#calendar .fc-timeline-body .fc-scroller')
+      || document.querySelector('#calendar .fc-scroller');
+}
+
+function findTimeRowByResourceId(resourceId) {
+  let timeRow = document.querySelector(`.fc-timeline-body tr[data-resource-id="${resourceId}"]`);
+  if (!timeRow) {
+    const resRow = document.querySelector(`.fc-resource-area tr[data-resource-id="${resourceId}"]`);
+    if (resRow && resRow.parentElement) {
+      const idx = Array.prototype.indexOf.call(resRow.parentElement.children, resRow);
+      timeRow = document.querySelectorAll('.fc-timeline-body tbody tr')[idx];
+    }
+  }
+  return timeRow || null;
+}
+
+function centerResourceRow(resourceId) {
+  const timeRow = findTimeRowByResourceId(resourceId);
+  if (!timeRow) return;
+
+  const vScroller = getVerticalScrollerForRow(timeRow);
+  if (!vScroller) return;
+
+  // Compute offsetTop relative to scroller for robust positioning
+  let offsetTop = 0;
+  let el = timeRow;
+  while (el && el !== vScroller) {
+    offsetTop += el.offsetTop;
+    el = el.offsetParent;
+  }
+
+  const targetTop = offsetTop - (vScroller.clientHeight / 2) + (timeRow.offsetHeight / 2) + V_CENTER_BIAS_PX;
+  const maxTop = Math.max(0, vScroller.scrollHeight - vScroller.clientHeight);
+  vScroller.scrollTop = Math.min(Math.max(0, targetTop), maxTop);
+}
+
+function centerElementVerticallyInScroller(el) {
+  if (!el) return;
+  const vScroller = el.closest('.fc-scroller')
+    || document.querySelector('#calendar .fc-timeline-body .fc-scroller')
+    || document.querySelector('#calendar .fc-scroller');
+  if (!vScroller) return;
+
+  let offsetTop = 0;
+  let node = el;
+  while (node && node !== vScroller) {
+    offsetTop += node.offsetTop || 0;
+    node = node.offsetParent;
+  }
+  const targetTop = offsetTop - (vScroller.clientHeight / 2) + (el.offsetHeight / 2) + V_CENTER_BIAS_PX;
+  const maxTop = Math.max(0, vScroller.scrollHeight - vScroller.clientHeight);
+  vScroller.scrollTop = Math.min(Math.max(0, targetTop), maxTop);
+}
+
 function scrollToToday(bodyScroller, top) {
   const view = calendar.view;
   const startMs = view.activeStart.getTime();
@@ -116,6 +178,24 @@ function scrollToDate(targetDate, bodyScroller, top) {
   targetDate.setHours(0, 0, 0, 0);
   const diffDays = (targetDate.getTime() - startMs) / msPerDay;
   bodyScroller.scrollLeft = diffDays * dayWidth;
+  top.scrollLeft = bodyScroller.scrollLeft;
+}
+
+function scrollToDateCentered(targetDate, bodyScroller, top) {
+  const view = calendar.view;
+  const startMs = view.activeStart.getTime();
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const totalDays = (view.activeEnd.getTime() - startMs) / msPerDay;
+  const dayWidth = bodyScroller.scrollWidth / totalDays;
+
+  targetDate.setHours(0, 0, 0, 0);
+  const diffDays = (targetDate.getTime() - startMs) / msPerDay;
+
+  const desiredLeft = diffDays * dayWidth - (bodyScroller.clientWidth / 2) + H_CENTER_BIAS_PX;
+  const maxLeft = Math.max(0, bodyScroller.scrollWidth - bodyScroller.clientWidth);
+  const clampedLeft = Math.min(Math.max(0, desiredLeft), maxLeft);
+
+  bodyScroller.scrollLeft = clampedLeft;
   top.scrollLeft = bodyScroller.scrollLeft;
 }
 
@@ -549,6 +629,133 @@ function hideLoading() {
 // DATA LOADING
 // =============================================================================
 
+// Highlight incoming selection from navbar → calendar (via URL/localStorage)
+function applyIncomingHighlight() {
+  if (!calendar) return;
+
+  // 1) Read from URL params
+  const params = new URLSearchParams(window.location.search);
+  let roomId = params.get('hlRoomId');
+  let startStr = params.get('hlStart');
+  let endStr = params.get('hlEnd');
+  let colorParam = params.get('hlColor'); // optional custom color, e.g. #000000 or rgba()
+
+  // 2) Fallback to localStorage
+  if (!roomId || !startStr || !endStr) {
+    try {
+      const cached = localStorage.getItem('calendarHighlight');
+      if (cached) {
+        const obj = JSON.parse(cached);
+        roomId = roomId || obj.roomId;
+        startStr = startStr || obj.start;
+        endStr = endStr || obj.end;
+        if (!colorParam && obj.color) colorParam = obj.color;
+      }
+    } catch (e) { /* no-op */ }
+  }
+
+  if (!roomId || !startStr || !endStr) return; // nothing to do
+
+  // Parse dates; accept "MMM d, yyyy" or "yyyy-mm-dd"
+  const startDate = new Date(startStr);
+  const endDate = new Date(endStr);
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return;
+
+  // Align with booking logic: Check-in 2:00 PM, Check-out 11:00 AM
+  const startAt = new Date(startDate);
+  startAt.setHours(14, 0, 0, 0); // PM cell
+  const endAt = new Date(endDate);
+  endAt.setHours(11, 0, 0, 0);   // AM cell
+
+  // Ensure resource exists
+  const resource = (typeof calendar.getResourceById === 'function')
+    ? calendar.getResourceById(String(roomId))
+    : (calendar.getResources() || []).find(r => String(r.id) === String(roomId));
+  if (!resource) return;
+
+  // Jump calendar to start date
+  try { calendar.gotoDate(startDate); } catch (e) {}
+
+  // Resolve highlight color (priority: URL param > persisted > default)
+  let highlightColor = colorParam || null;
+  if (!highlightColor) {
+    try {
+      const persisted = localStorage.getItem('calendarHighlightColor');
+      if (persisted) highlightColor = persisted;
+    } catch (e) { /* no-op */ }
+  }
+  if (!highlightColor) highlightColor = 'rgba(255, 255, 255, 1)';
+
+  // Ensure custom highlight CSS is injected/updated
+  try { ensureHighlightStyles(highlightColor); } catch (e) { /* no-op */ }
+
+  // Add background highlight event
+  try {
+    calendar.addEvent({
+      id: 'temp-highlight-' + Date.now(),
+      start: startAt,
+      end: endAt,
+      resourceIds: [String(roomId)],
+      display: 'background',
+      backgroundColor: highlightColor, // backup for older themes
+      classNames: ['calendar-temp-highlight']
+    });
+  } catch (e) { /* no-op */ }
+
+  // Scroll horizontally to the center of the highlighted range
+  try {
+    const midMs = (startDate.getTime() + endDate.getTime()) / 2;
+    const midDate = new Date(midMs);
+    // defer until after DOM paints to ensure accurate widths
+    setTimeout(() => {
+      const sb = setupScrollbar();
+      if (sb) {
+        scrollToDateCentered(midDate, sb.bodyScroller, sb.top);
+        updateHeaderOnScroll(sb.bodyScroller, sb.top);
+      }
+      // also center vertically using the actual highlight background element if present,
+      // fallback to centering the resource row
+      setTimeout(() => {
+        const sel = `.fc-bg-event.calendar-temp-highlight`;
+        const bgEl = document.querySelector(sel);
+        if (bgEl) {
+          centerElementVerticallyInScroller(bgEl);
+        } else {
+          centerResourceRow(String(roomId));
+        }
+      }, 60);
+    }, 20);
+  } catch (e) { /* no-op */ }
+
+  // Clear one-time highlight
+  try { localStorage.removeItem('calendarHighlight'); } catch (e) { /* no-op */ }
+}
+
+// Inject or update CSS to force background for bg-events with our class
+function ensureHighlightStyles(color) {
+  let style = document.getElementById('calendar-highlight-styles');
+  const content = `
+    /* Highlight color for background events we add */
+    .fc .fc-bg-event.calendar-temp-highlight {
+      background: ${color} !important;
+      opacity: 1 !important;
+    }
+    /* Some themes wrap the bg element one level deeper */
+    .calendar-temp-highlight .fc-bg-event {
+      background: ${color} !important;
+      opacity: 1 !important;
+    }
+  `;
+  if (style) {
+    style.textContent = content;
+    return;
+  }
+  style = document.createElement('style');
+  style.id = 'calendar-highlight-styles';
+  style.textContent = content;
+  document.head.appendChild(style);
+}
+
 function loadCalendarData() {
   // Loading removed for faster performance
   
@@ -596,6 +803,13 @@ function loadCalendarData() {
           
           // Setup hover effects immediately
           setupHoverEffects();
+
+          // Apply any pending highlight passed from navbar/datePicker (URL or localStorage)
+          try {
+            applyIncomingHighlight();
+          } catch (e) {
+            // silent
+          }
         })
         .catch(handleDataError);
     })

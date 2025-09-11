@@ -9,8 +9,8 @@ module.exports = {
     env: {
       NODE_ENV: 'development',
       PORT: 5001,
-      DATABASE_HOST: '127.0.0.1',
-      DATABASE_USER: '3core',
+        DATABASE_HOST: 'localhost',
+        DATABASE_USER: 'root',
       DATABASE_PASS: '2024.3core21',
       DATABASE_NAME: 'hotel',
       DATABASE_PORT: 3306
@@ -18,8 +18,8 @@ module.exports = {
     env_production: {
       NODE_ENV: 'production',
       PORT: 5001,
-      DATABASE_HOST: '127.0.0.1',
-      DATABASE_USER: '3core',
+      DATABASE_HOST: 'localhost',
+      DATABASE_USER: 'root',
       DATABASE_PASS: '2024.3core21',
       DATABASE_NAME: 'hotel',
       DATABASE_PORT: 3306
@@ -41,7 +41,7 @@ module.exports = {
   deploy: {
     production: {
       user: 'root',
-      host: '127.0.0.1',
+      host: 'localhost',
       ref: 'origin/main',
       repo: 'git@github.com:yourusername/hotelNEW.git',
       path: '/root/hotelNEW',

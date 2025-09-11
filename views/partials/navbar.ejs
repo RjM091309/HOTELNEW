@@ -1697,6 +1697,22 @@ document.addEventListener('click', function (event) {
     const endDateObj = new Date(endDate);
     const nights = (endDateObj - startDateObj) / (1000 * 3600 * 24);
 
+    // Redirect to calendar with highlight for the selected room and dates
+    try {
+      const startISO = flatpickr.formatDate(startDateObj, 'Y-m-d');
+      const endISO = flatpickr.formatDate(endDateObj, 'Y-m-d');
+
+      // Store in localStorage as fallback
+      localStorage.setItem('calendarHighlight', JSON.stringify({
+        roomId: String(roomId),
+        start: startISO,
+        end: endISO
+      }));
+
+      // Open calendar in a new tab with params so highlight applies immediately
+      window.open(`/calendar?hlRoomId=${encodeURIComponent(String(roomId))}&hlStart=${startISO}&hlEnd=${endISO}`, '_blank');
+    } catch (e) { /* continue to fallback flow below if any error */ }
+
     fetch('/booking/get-room-details', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
