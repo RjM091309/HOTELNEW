@@ -691,7 +691,7 @@ function applyIncomingHighlight() {
 
   // Add background highlight event
   try {
-    calendar.addEvent({
+    const evt = calendar.addEvent({
       id: 'temp-highlight-' + Date.now(),
       start: startAt,
       end: endAt,
@@ -700,6 +700,16 @@ function applyIncomingHighlight() {
       backgroundColor: highlightColor, // backup for older themes
       classNames: ['calendar-temp-highlight']
     });
+    // After render, toggle pulse class to force animation
+    setTimeout(() => {
+      const nodes = calendarEl.querySelectorAll('.fc-bg-event.calendar-temp-highlight');
+      nodes.forEach(node => {
+        node.classList.remove('calendar-temp-highlight-pulse');
+        // Force reflow to restart CSS animation
+        void node.offsetWidth;
+        node.classList.add('calendar-temp-highlight-pulse');
+      });
+    }, 30);
   } catch (e) { /* no-op */ }
 
   // Scroll horizontally to the center of the highlighted range
@@ -720,6 +730,36 @@ function applyIncomingHighlight() {
         const bgEl = document.querySelector(sel);
         if (bgEl) {
           centerElementVerticallyInScroller(bgEl);
+          // Create a temporary overlay pulse on top of the exact screen bounds
+          try {
+            const r = bgEl.getBoundingClientRect();
+            const overlay = document.createElement('div');
+            overlay.className = 'calendar-highlight-overlay-pulse';
+            // match booking bar skew from calendar.css (.fc-event has skew -35deg)
+            // compute extra width to compensate so tips are not cropped
+            const skewDeg = 35; // keep in sync with CSS
+            const skewRad = skewDeg * Math.PI / 180;
+            const extra = Math.tan(skewRad) * (r.height / 2);
+            const pad = 6; // border/blur breathing room
+            const left = r.left - extra - pad;
+            const width = r.width + extra * 2 + pad * 2;
+            const top = r.top - pad;
+            const height = r.height + pad * 2;
+            overlay.style.left = Math.max(0, left) + 'px';
+            overlay.style.top = Math.max(0, top) + 'px';
+            overlay.style.width = Math.max(0, width) + 'px';
+            overlay.style.height = Math.max(0, height) + 'px';
+            overlay.style.transform = 'skew(-35deg)';
+            // inner white fill to mimic event highlight interior
+            const fill = document.createElement('div');
+            fill.style.position = 'absolute';
+            fill.style.inset = '3px';
+            fill.style.background = 'rgba(255,255,255,0.08)';
+            fill.style.pointerEvents = 'none';
+            overlay.appendChild(fill);
+            document.body.appendChild(overlay);
+            setTimeout(() => overlay.remove(), 6200);
+          } catch (e) { /* no-op */ }
         } else {
           centerResourceRow(String(roomId));
         }
@@ -739,11 +779,63 @@ function ensureHighlightStyles(color) {
     .fc .fc-bg-event.calendar-temp-highlight {
       background: ${color} !important;
       opacity: 1 !important;
+      border-radius: 6px;
+      box-shadow: 0 0 0 2px rgba(255, 255, 0, 0.6) inset, 0 0 10px rgba(255, 255, 0, 0.5);
+      position: relative;
+      z-index: 1;
     }
     /* Some themes wrap the bg element one level deeper */
     .calendar-temp-highlight .fc-bg-event {
       background: ${color} !important;
       opacity: 1 !important;
+      border-radius: 6px;
+      box-shadow: 0 0 0 2px rgba(255, 255, 0, 0.6) inset, 0 0 10px rgba(255, 255, 0, 0.5);
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Dedicated pulse class so we can retrigger via JS */
+    .calendar-temp-highlight-pulse {
+      animation: calendarHighlightPulse 1500ms ease-out 6;
+    }
+
+    /* Visible pulse ring even on white background */
+    .calendar-temp-highlight-pulse::after {
+      content: "";
+      position: absolute;
+      left: -3px; right: -3px; top: -3px; bottom: -3px;
+      border-radius: 0;
+      pointer-events: none;
+      border: 3px solid rgba(0, 184, 255, 0.95);
+      box-shadow: 0 0 12px rgba(0, 184, 255, 0.7);
+      animation: calendarHighlightPulseRing 1500ms ease-out 6;
+      /* Keep rectangular to avoid cropping; overlay handles parallelogram */
+    }
+
+    /* Full overlay pulse for cases where bg elements are visually masked */
+    .calendar-highlight-overlay-pulse {
+      position: fixed;
+      pointer-events: none;
+      z-index: 2147483000;
+      border-radius: 0;
+      border: 3px solid rgba(0, 184, 255, 0.95);
+      box-shadow: 0 0 8px rgba(0, 184, 255, 0.6);
+      animation: calendarHighlightPulseRing 1500ms ease-out 6;
+      mix-blend-mode: normal;
+      transform-origin: center;
+      will-change: transform;
+    }
+
+    @keyframes calendarHighlightPulse {
+      0%   { box-shadow: 0 0 0 2px rgba(255, 255, 0, 0.8) inset, 0 0 0 rgba(255, 255, 0, 0.0); }
+      50%  { box-shadow: 0 0 0 6px rgba(255, 255, 0, 0.0) inset, 0 0 18px rgba(255, 255, 0, 0.9); }
+      100% { box-shadow: 0 0 0 2px rgba(255, 255, 0, 0.0) inset, 0 0 0 rgba(255, 255, 0, 0.0); }
+    }
+
+    @keyframes calendarHighlightPulseRing {
+      0%   { transform: scale(0.98); opacity: 0.0; }
+      30%  { transform: scale(1); opacity: 1; }
+      100% { transform: scale(1.02); opacity: 0; }
     }
   `;
   if (style) {
