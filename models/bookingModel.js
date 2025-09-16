@@ -2082,7 +2082,7 @@ class BookingModel {
         LEFT JOIN booking b ON r.IDNo = b.ROOM_ID
             AND DATE(b.CHECK_IN_DATE) < ?
             AND DATE(b.CHECK_OUT_DATE) > ?
-        WHERE r.ROOM_STATUS NOT IN (3, 4)
+        WHERE r.ROOM_STATUS !=3
           AND (b.ROOM_ID IS NULL OR DATE(b.CHECK_OUT_DATE) = ?)
         ORDER BY r.ROOM_NUMBER ASC;
       `;
@@ -3627,7 +3627,7 @@ class BookingModel {
         LEFT JOIN booking b ON r.IDNo = b.ROOM_ID
             AND DATE(b.CHECK_IN_DATE) < ?
             AND DATE(b.CHECK_OUT_DATE) > ?
-        WHERE r.ROOM_STATUS NOT IN (3, 4)
+        WHERE r.ROOM_STATUS !=3
           AND (b.ROOM_ID IS NULL OR DATE(b.CHECK_OUT_DATE) = ?)
           ${bedCount ? 'AND r.ROOM_BED = ?' : ''}
         ORDER BY r.ROOM_NUMBER ASC;

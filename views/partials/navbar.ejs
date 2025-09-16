@@ -480,6 +480,57 @@ height: 34px;
 		border: none;
 	}
 
+    /* Filter Toggle Buttons - Radio Button Style */
+.filter-toggle {
+    padding: 6px 12px;
+    border: none;
+    background-color: transparent;
+    color: #666;
+    border-radius: 0;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    min-width: 40px;
+    position: relative;
+    margin-right: 8px;
+}
+
+.filter-toggle:hover {
+    color: #333;
+}
+
+.filter-toggle.active {
+    color: #007bff;
+    font-weight: 600;
+}
+
+.filter-toggle.active::before {
+    content: '';
+    position: absolute;
+    left: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 12px;
+    height: 12px;
+    border: 2px solid #007bff;
+    border-radius: 50%;
+    background-color: #007bff;
+}
+
+.filter-toggle:not(.active)::before {
+    content: '';
+    position: absolute;
+    left: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 12px;
+    height: 12px;
+    border: 2px solid #ccc;
+    border-radius: 50%;
+    background-color: transparent;
+}
+
 </style>
 
 <script>
@@ -616,6 +667,8 @@ if (!cleanDateRange || !cleanDateRange.includes(" to ")) {
 			window.currentUnassignedBookings = data.unassignedBookings || [];
 			// Store original bed conflicts data globally for dynamic filtering
 			window.originalBedConflicts = [];
+			// Store rooms data globally for initialization
+			window.currentRoomsData = data;
 			
 			// Check for bed count conflicts
 			const availableRooms = data.rooms || [];
@@ -715,15 +768,23 @@ if (!cleanDateRange || !cleanDateRange.includes(" to ")) {
             <!-- Check-in Filter -->
             <div style="display: flex; gap: 10px; align-items: center;">
                 <span style="font-weight: bold; margin-right: 5px;">Check-in:</span>
-                <label><input type="radio" name="checkinFilter" value="R/I" onchange="filterRooms()"> R/I</label>
-                <label><input type="radio" name="checkinFilter" value="L/I" onchange="filterRooms()"> L/I</label>
+                <button type="button" class="filter-toggle" data-filter="checkin" data-value="R/I" onclick="toggleFilter(this)">
+                    R/I
+                </button>
+                <button type="button" class="filter-toggle" data-filter="checkin" data-value="L/I" onclick="toggleFilter(this)">
+                    L/I
+                </button>
             </div>
             
             <!-- Check-out Filter -->
             <div style="display: flex; gap: 10px; align-items: center;">
                 <span style="font-weight: bold; margin-right: 5px;">Check-out:</span>
-                <label><input type="radio" name="checkoutFilter" value="R/O" onchange="filterRooms()"> R/O</label>
-                <label><input type="radio" name="checkoutFilter" value="L/O" onchange="filterRooms()"> L/O</label>
+                <button type="button" class="filter-toggle" data-filter="checkout" data-value="R/O" onclick="toggleFilter(this)">
+                    R/O
+                </button>
+                <button type="button" class="filter-toggle" data-filter="checkout" data-value="L/O" onclick="toggleFilter(this)">
+                    L/O
+                </button>
             </div>
         </div>
         
@@ -736,22 +797,14 @@ if (!cleanDateRange || !cleanDateRange.includes(" to ")) {
       
         <!-- Room Color Legend -->
         <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 8px; margin-bottom: 15px;">
-           <div style="display: flex; align-items: center; justify-content: center; gap: 20px; font-size: 12px; flex-wrap: wrap;">
+           <div style="display: flex; align-items: center; justify-content: left; gap: 20px; font-size: 12px; flex-wrap: wrap;">
                <div style="display: flex; align-items: center; gap: 4px;">
-                   <div style="width: 16px; height: 12px; background-color: #90EE90; border: 1px solid #28a745; border-radius: 2px;"></div>
-                   <span>Regular Check-out</span>
+                   <div style="width: 16px; height: 12px; background-color: #FF7F7F; border: 1px solid #ff4d7a; border-radius: 2px;"></div>
+                   <span>Regular</span>
                </div>
                <div style="display: flex; align-items: center; gap: 4px;">
-                   <div style="width: 16px; height: 12px; background-color: #FFA500; border: 1px solid #ff8c00; border-radius: 2px;"></div>
-                   <span>Late Check-out</span>
-               </div>
-               <div style="display: flex; align-items: center; gap: 4px;">
-                   <div style="width: 16px; height: 12px; background-color: #7FBCE9; border: 1px solid #007bff; border-radius: 2px;"></div>
-                   <span>Regular Check-in</span>
-               </div>
-               <div style="display: flex; align-items: center; gap: 4px;">
-                   <div style="width: 16px; height: 12px; background-color: #FF7F7F; border: 1px solid #dc3545; border-radius: 2px;"></div>
-                   <span>Late Check-in</span>
+                   <div style="width: 16px; height: 12px; background-color: #FFF700; border: 1px solid #ffd700; border-radius: 2px;"></div>
+                   <span>Late</span>
                </div>
                <div style="display: flex; align-items: center; gap: 4px;">
                    <div style="width: 16px; height: 12px; background-color: #f5f5f5; border: 2px dashed #ccc; border-radius: 2px;"></div>
@@ -759,8 +812,50 @@ if (!cleanDateRange || !cleanDateRange.includes(" to ")) {
                </div>
            </div>
         </div>
-        <div id="roomListContainer">
-            ${generateRoomListHTML(data.rooms)}
+              <!-- BOTH FILTERS SECTION -->
+         <div id="bothFiltersSection" style="display: none; margin-bottom: 20px;">
+             <div style="border-radius: 8px; padding: 5px; background: linear-gradient(135deg, #4CAF50 0%, #66BB6A 100%); border: 2px solid #4CAF50;">
+                 <div style="font-weight: bold; color: white; margin-bottom: 5px; text-align: center; font-size: 16px; display: flex; align-items: center; justify-content: center; gap: 5px;">
+                     ⚡ Rooms Matching Both Filters
+                 </div>
+                 <div id="bothFiltersContainer" class="scrollable-containers" style="background-color: rgba(255, 255, 255, 0.95);">
+                     <!-- Rooms matching both filters will appear here -->
+               </div>
+           </div>
+        </div>
+        <!-- Left and Right Sections for Check-in/Check-out Results -->
+        <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+            <!-- LEFT SECTION - Check-in Results -->
+            <div style="flex: 1; border-radius: 8px; padding: 15px; background-color: #f9f9f9;">
+                <div style="font-weight: bold; color: #333; margin-bottom: 15px; text-align: center; font-size: 16px;">
+                    Previous Booking Check-out
+                </div>
+                <div id="checkinResultsContainer" class="scrollable-containers">
+                    <!-- Check-in filtered rooms will appear here -->
+                </div>
+            </div>
+            
+            <!-- RIGHT SECTION - Check-out Results -->
+            <div style="flex: 1; border-radius: 8px; padding: 15px; background-color: #f9f9f9;">
+                <div style="font-weight: bold; color: #333; margin-bottom: 15px; text-align: center; font-size: 16px;">
+                   Incoming Booking Check-in
+                </div>
+                <div id="checkoutResultsContainer" class="scrollable-containers">
+                    <!-- Check-out filtered rooms will appear here -->
+                </div>
+            </div>
+        </div>
+        
+  
+        
+        <!-- Other Available Rooms Section -->
+        <div style="margin-top: 20px;">
+            <div style="font-weight: bold; color: #333; margin-bottom: 15px; text-align: center; font-size: 16px;">
+                Other Available Rooms
+            </div>
+            <div id="otherRoomsContainer" class="scrollable-containers">
+                <!-- Other available rooms will appear here -->
+            </div>
         </div>
         
         <!-- Unassigned Bookings Section -->
@@ -815,6 +910,13 @@ if (!cleanDateRange || !cleanDateRange.includes(" to ")) {
         const input = document.getElementById('roomSearchInput');
         input.blur();
         document.getElementById('roomSearchInput').blur();
+        
+        // Initialize all rooms in the Other Available Rooms section first
+        const otherRoomsContainer = document.getElementById('otherRoomsContainer');
+        if (otherRoomsContainer && window.currentRoomsData) {
+            otherRoomsContainer.innerHTML = generateRoomListHTML(window.currentRoomsData.rooms);
+        }
+        
         filterRooms(); // Initialize count and visibility
     },
     willClose: () => {
@@ -1276,167 +1378,308 @@ function updateWarningMessage(selectedBedFilter) {
     }
 }
         
+    // Toggle filter function
+    function toggleFilter(button) {
+        const filter = button.getAttribute('data-filter');
+        const value = button.getAttribute('data-value');
+        
+        // Toggle the button's active state
+        button.classList.toggle('active');
+        
+        // If this button is now active, deactivate others in the same group
+        if (button.classList.contains('active')) {
+            const sameGroupButtons = document.querySelectorAll(`[data-filter="${filter}"]`);
+            sameGroupButtons.forEach(btn => {
+                if (btn !== button) {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+        
+        // Apply filters
+        filterRooms();
+}
+        
     function filterRooms() {
     const input = document.getElementById('roomSearchInput').value.toLowerCase();
     const selectedBedFilter = document.querySelector('input[name="bedFilter"]:checked').value;
-    const checkedCheckinEl = document.querySelector('input[name="checkinFilter"]:checked');
-    const checkedCheckoutEl = document.querySelector('input[name="checkoutFilter"]:checked');
-    const selectedCheckinFilter = checkedCheckinEl ? checkedCheckinEl.value : '';
-    const selectedCheckoutFilter = checkedCheckoutEl ? checkedCheckoutEl.value : '';
-    const rooms = document.querySelectorAll('.room-item');
-    let visibleCount = 0;
-
-    rooms.forEach(room => {
-        const roomNumber = room.querySelector('.room-link').textContent.toLowerCase();
-        const category = room.getAttribute('data-category');
-        const checkoutType = room.getAttribute('data-checkout-type');
-        const checkinType = room.getAttribute('data-checkin-type');
-        const isDisabled = room.getAttribute('data-disabled') === 'true';
-
-        const matchesSearch = roomNumber.includes(input);
         
-        // Check bed filter
-        let matchesBedFilter = false;
-        if (selectedBedFilter === 'all') {
-            matchesBedFilter = true;
-        } else {
-            matchesBedFilter = category === selectedBedFilter;
+        // Get active toggle buttons
+        const activeCheckinButton = document.querySelector('.filter-toggle[data-filter="checkin"].active');
+        const activeCheckoutButton = document.querySelector('.filter-toggle[data-filter="checkout"].active');
+        
+        const selectedCheckinFilter = activeCheckinButton ? activeCheckinButton.getAttribute('data-value') : '';
+        const selectedCheckoutFilter = activeCheckoutButton ? activeCheckoutButton.getAttribute('data-value') : '';
+        
+    
+
+        // Get all room items from the original data, not from DOM
+        const allRooms = window.currentRoomsData ? window.currentRoomsData.rooms : [];
+        
+        // Filter rooms based on bed count first
+        let filteredRooms = allRooms;
+        if (selectedBedFilter !== 'all') {
+            const bedCount = selectedBedFilter === '1B' ? '1' : '2';
+            filteredRooms = allRooms.filter(room => room.ROOM_BED == bedCount);
         }
         
-        // Check check-in filter
-        let matchesCheckinFilter = true; // Default to true to show all rooms
-        let priority = 0; // Priority for sorting (higher = shown first)
+        // Filter by search input
+        if (input) {
+            filteredRooms = filteredRooms.filter(room => 
+                room.ROOM_NUMBER.toLowerCase().includes(input)
+            );
+        }
         
+       
+
+        // Clear all containers
+        const checkinContainer = document.getElementById('checkinResultsContainer');
+        const checkoutContainer = document.getElementById('checkoutResultsContainer');
+        const bothFiltersContainer = document.getElementById('bothFiltersContainer');
+        const bothFiltersSection = document.getElementById('bothFiltersSection');
+        const otherContainer = document.getElementById('otherRoomsContainer');
+        
+        checkinContainer.innerHTML = '';
+        checkoutContainer.innerHTML = '';
+        bothFiltersContainer.innerHTML = '';
+        otherContainer.innerHTML = '';
+
+        // Arrays to hold rooms for different sections
+        const checkinRooms = [];
+        const checkoutRooms = [];
+        const bothFiltersRooms = [];
+        const otherRooms = [];
+
+        // Categorize filtered rooms
+        filteredRooms.forEach(room => {
+            const checkoutType = room.checkoutType || '';
+            const checkinType = room.checkinType || '';
+            const isDisabled = window.fullyReservedBedTypes && window.fullyReservedBedTypes[room.ROOM_BED];
+        
+        // Check-in filter logic - LEFT section
+            let belongsToCheckin = false;
+            let checkinPriority = 0; // For sorting within check-in section
         if (selectedCheckinFilter === 'R/I') {
-            // R/I: Show Regular Check-out rooms (R/O) + rooms with no check-out
-            matchesCheckinFilter = checkoutType === 'R/O' || checkoutType === null || checkoutType === '';
+                // R/I: Regular Check-out only (Red)
             if (checkoutType === 'R/O') {
-                priority = 4; // Highest priority for R/I rooms
-            } else if (checkoutType === null || checkoutType === '') {
-                priority = 3; // High priority for rooms with no check-out
+                belongsToCheckin = true;
+                    checkinPriority = 1; // Red priority
             }
         } else if (selectedCheckinFilter === 'L/I') {
-            // L/I: Show all Check-out rooms (both R/O and L/O) + rooms with no check-out
-            matchesCheckinFilter = checkoutType === 'R/O' || checkoutType === 'L/O' || checkoutType === null || checkoutType === '';
+                // L/I: Both Late and Regular Check-out, but Late (Yellow) has priority
             if (checkoutType === 'L/O') {
-                priority = 4; // Highest priority for L/I rooms
+                belongsToCheckin = true;
+                    checkinPriority = 2; // Yellow priority (higher = first)
             } else if (checkoutType === 'R/O') {
-                priority = 3; // High priority for R/O rooms
-            } else if (checkoutType === null || checkoutType === '') {
-                priority = 2; // Medium priority for rooms with no check-out
+                belongsToCheckin = true;
+                    checkinPriority = 1; // Red priority (lower = second)
             }
         }
         
-        // Check check-out filter
-        let matchesCheckoutFilter = true; // Default to true to show all rooms
-        
+        // Check-out filter logic - RIGHT section
+            let belongsToCheckout = false;
+            let checkoutPriority = 0; // For sorting within check-out section
         if (selectedCheckoutFilter === 'R/O') {
-            // R/O: Show all check-in rooms + other available rooms
-            matchesCheckoutFilter = checkinType === 'R/I' || checkinType === 'L/I' || checkinType === null || checkinType === '';
+                // R/O: Both Regular and Late Check-in, but Regular (Red) has priority
             if (checkinType === 'R/I') {
-                priority = 5; // Highest priority for Regular check-in (R/O)
+                belongsToCheckout = true;
+                    checkoutPriority = 2; // Red priority (higher = first)
             } else if (checkinType === 'L/I') {
-                priority = 4; // High priority for Late check-in (R/O)
-            } else if (checkinType === null || checkinType === '') {
-                priority = Math.max(priority, 2); // Medium priority for other available rooms
+                belongsToCheckout = true;
+                    checkoutPriority = 1; // Yellow priority (lower = second)
             }
         } else if (selectedCheckoutFilter === 'L/O') {
-            // L/O: Show Late check-in rooms + other available rooms
-            matchesCheckoutFilter = checkinType === 'L/I' || checkinType === null || checkinType === '';
+                // L/O: Late Check-in only (Yellow)
             if (checkinType === 'L/I') {
-                priority = 5; // Highest priority for Late check-in (L/O)
-            } else if (checkinType === null || checkinType === '') {
-                priority = Math.max(priority, 2); // Medium priority for other available rooms
-            }
-        }
-        
-        // Store priority for sorting
-        room.setAttribute('data-priority', priority);
-
-        const shouldShow = matchesSearch && matchesBedFilter && matchesCheckinFilter && matchesCheckoutFilter;
-        room.style.display = shouldShow ? 'flex' : 'none';
-
-        // Count all rooms that match bed filter and search (regardless of other filters)
-        // Don't count disabled rooms in the available count
-        const shouldCount = matchesSearch && matchesBedFilter && !isDisabled;
-        if (shouldCount) visibleCount++;
-    });
-
-    // Sort rooms by priority and create separate sections at the top
-    const containerElement = document.querySelector('.scrollable-containers');
-    const allRoomItems = Array.from(document.querySelectorAll('.room-item'));
-    const priorityGroups = {};
-    
-    // Group all rooms by priority
-    allRoomItems.forEach(item => {
-        const priority = parseInt(item.getAttribute('data-priority') || '0');
-        if (!priorityGroups[priority]) {
-            priorityGroups[priority] = [];
-        }
-        priorityGroups[priority].push(item);
-    });
-    
-    // Clear the scrollable containers
-    containerElement.innerHTML = '';
-    
-    // Add rooms by priority (highest priority first)
-    const priorities = Object.keys(priorityGroups).sort((a, b) => b - a);
-    priorities.forEach(priority => {
-        if (priorityGroups[priority].length > 0) {
-            // Create a new section for this priority level
-            const prioritySection = document.createElement('div');
-            prioritySection.className = 'priority-section';
-            prioritySection.style.marginBottom = '20px';
-            
-            // Add priority label
-            const priorityLabel = document.createElement('div');
-            priorityLabel.style.cssText = 'font-weight: bold; color: #333; margin-bottom: 10px; font-size: 14px; text-align: center; background-color: #f0f0f0; padding: 8px; border-radius: 5px;';
-            
-            if (priority === 5) {
-                if (selectedCheckoutFilter === 'R/O') {
-                    priorityLabel.textContent = 'R/O Priority Rooms';
-                } else if (selectedCheckoutFilter === 'L/O') {
-                    priorityLabel.textContent = 'L/O Priority Rooms';
-                } else {
-                    priorityLabel.textContent = 'Highest Priority Rooms';
+                belongsToCheckout = true;
+                    checkoutPriority = 1; // Yellow priority
                 }
-            } else if (priority === 4) {
-                if (selectedCheckinFilter === 'R/I') {
-                    priorityLabel.textContent = 'R/I Priority Rooms';
-                } else if (selectedCheckinFilter === 'L/I') {
-                    priorityLabel.textContent = 'L/I Priority Rooms';
-                } else if (selectedCheckoutFilter === 'R/O') {
-                    priorityLabel.textContent = 'R/O Secondary Rooms';
-                } else {
-                    priorityLabel.textContent = 'High Priority Rooms';
-                }
-            } else if (priority === 3) {
-                priorityLabel.textContent = 'Secondary Priority Rooms';
-            } else if (priority === 2) {
-                priorityLabel.textContent = 'Available Rooms';
-            } else if (priority === 1) {
-                priorityLabel.textContent = 'Other Rooms';
-            } else if (priority === 0) {
-                priorityLabel.textContent = 'Standard Rooms';
             }
-            prioritySection.appendChild(priorityLabel);
+
+            // Check if room matches BOTH filters
+            const matchesBothFilters = belongsToCheckin && belongsToCheckout && selectedCheckinFilter && selectedCheckoutFilter;
             
-            // Create room row for this priority
-            const priorityRow = document.createElement('div');
-            priorityRow.className = 'room-row';
+            // Add room to appropriate section with priority
+            if (matchesBothFilters) {
+                // Room matches both filters - add to special section
+                room.bothFiltersPriority = Math.max(checkinPriority, checkoutPriority); // Use higher priority
+                bothFiltersRooms.push(room);
+            } else if (belongsToCheckin && selectedCheckinFilter) {
+                room.checkinPriority = checkinPriority; // Store priority for sorting
+                checkinRooms.push(room);
+            } else if (belongsToCheckout && selectedCheckoutFilter) {
+                room.checkoutPriority = checkoutPriority; // Store priority for sorting
+                checkoutRooms.push(room);
+            } else {
+                // Add to other rooms if it doesn't match check-in/check-out filters
+                // or if no check-in/check-out filters are selected
+                otherRooms.push(room);
+            }
+        });
+
+        // Generate HTML for each section
+        const generateRoomHTML = (rooms, sectionType = 'other') => {
+            if (rooms.length === 0) return '';
             
-            // Add rooms to this priority row
-            priorityGroups[priority].forEach(item => {
-                priorityRow.appendChild(item);
+            // Sort rooms by priority first (if it's check-in, check-out, or both filters section)
+            let sortedRooms = rooms;
+            if (sectionType === 'checkin') {
+                sortedRooms = rooms.sort((a, b) => {
+                    const priorityA = a.checkinPriority || 0;
+                    const priorityB = b.checkinPriority || 0;
+                    return priorityB - priorityA; // Higher priority first (Yellow before Red)
+                });
+            } else if (sectionType === 'checkout') {
+                sortedRooms = rooms.sort((a, b) => {
+                    const priorityA = a.checkoutPriority || 0;
+                    const priorityB = b.checkoutPriority || 0;
+                    return priorityB - priorityA; // Higher priority first (Red before Yellow)
+                });
+            } else if (sectionType === 'bothFilters') {
+                sortedRooms = rooms.sort((a, b) => {
+                    const priorityA = a.bothFiltersPriority || 0;
+                    const priorityB = b.bothFiltersPriority || 0;
+            return priorityB - priorityA; // Higher priority first
+        });
+            }
+            
+            // Group rooms by floor
+            const roomsByFloor = sortedRooms.reduce((floors, room) => {
+                if (!floors[room.ROOM_FLOOR]) {
+                    floors[room.ROOM_FLOOR] = [];
+                }
+                floors[room.ROOM_FLOOR].push(room);
+                return floors;
+            }, {});
+
+            let html = '';
+            Object.keys(roomsByFloor).sort((a, b) => a - b).forEach(floor => {
+                const floorRooms = roomsByFloor[floor];
+                html += '<div class="room-row">';
+                floorRooms.forEach(room => {
+                    let roomStyle = "";
+                    let isDisabled = false;
+
+                    // Check if this room type is fully reserved for unassigned bookings
+                    if (window.fullyReservedBedTypes && window.fullyReservedBedTypes[room.ROOM_BED]) {
+                        isDisabled = true;
+                        roomStyle += "opacity: 0.5; cursor: not-allowed; background-color: #f5f5f5 !important; border: 2px dashed #ccc !important;";
+                    }
+
+                    // Assign styles based on the floor number
+                    if (floor == 3) {
+                        roomStyle += "color: #4CAF50; border-top: 2px solid #4CAF50;";
+                    } else if (floor == 4) {
+                        roomStyle += "color: #1e1bd6; border-top: 2px solid #1e1bd6;";
+                    } else if (floor == 5) {
+                        roomStyle += "color: #df1818; border-top: 2px solid #df1818;";
+                    } else if (floor == 6) {
+                        roomStyle += "color: #8A2BE2; border-top: 2px solid #8A2BE2;";
+                    }
+
+                    // Build background colors for mixed statuses (only if not disabled)
+                    if (!isDisabled) {
+                        let checkoutColor = '';
+                        let checkinColor = '';
+                        
+                        // If the room has checkoutToday == true, check the checkout type
+                        if (room.checkoutToday) {
+                            if (room.checkoutType === 'L/O') {
+                                checkoutColor = '#FFF700'; // Bold Pastel Yellow for late check-out
+                            } else if (room.checkoutType === 'R/O') {
+                                checkoutColor = '#FF7F7F'; // Bold Pastel Pink for regular check-out
+                            }
+                        }
+                        
+                        // Additional styling for check-in types (for check-out filters)
+                        if (room.checkinType === 'R/I') {
+                            checkinColor = '#FF7F7F'; // Bold Pastel Pink for regular check-in
+                        } else if (room.checkinType === 'L/I') {
+                            checkinColor = '#FFF700'; // Bold Pastel Yellow for late check-in
+                        }
+                        
+                        // Apply background colors - gradient if both colors exist, solid if single
+                        if (checkoutColor && checkinColor) {
+                            // Both colors exist - create gradient (checkout left, checkin right)
+                            const gradient = `linear-gradient(90deg, ${checkoutColor}, ${checkinColor})`;
+                            roomStyle += `background: ${gradient};`;
+                        } else if (checkoutColor) {
+                            // Only checkout color
+                            roomStyle += `background-color: ${checkoutColor};`;
+                        } else if (checkinColor) {
+                            // Only checkin color
+                            roomStyle += `background-color: ${checkinColor};`;
+                        }
+                    }
+
+                    // Add special styling for "both filters" section
+                    let bothFiltersStyle = "";
+                    let bothFiltersIndicator = "";
+                    if (sectionType === 'bothFilters') {
+                        bothFiltersStyle += "border: 3px solid #4CAF50 !important; box-shadow: 0 0 10px rgba(76, 175, 80, 0.5) !important;";
+                        bothFiltersIndicator = '<br><small style="font-size: 8px; color: #4CAF50; font-weight: bold;">⚡ BOTH</small>';
+                    }
+
+                    // Add room item with specific styles
+                    html += `<div class="room-item" 
+                        style="${roomStyle}${bothFiltersStyle}"
+                        data-bed="${room.ROOM_BED}" 
+                        data-view="${room.ROOM_VIEW}" 
+                        data-category="${room.ROOM_BED}B"
+                        data-checkout-type="${room.checkoutType || ''}"
+                        data-checkin-type="${room.checkinType || ''}"
+                        data-disabled="${isDisabled}">
+                        
+                        <a href="#" class="room-link ${isDisabled ? 'disabled-room' : ''}" 
+                           data-room-id="${room.IDNo}" 
+                           data-room-number="${room.ROOM_NUMBER}" 
+                           data-floor="${room.ROOM_FLOOR}"
+                           data-bed="${room.ROOM_BED}"
+                           data-disabled="${isDisabled}"
+                           ${isDisabled ? 'onclick="return false;"' : ''}>
+                           ${room.ROOM_NUMBER}
+                           ${isDisabled ? '<br><small style="font-size: 8px; color: #999;">Reserved</small>' : ''}
+                           ${bothFiltersIndicator}
+                        </a>
+                    </div>`;
+                });
+                html += '</div><br>';
             });
-            
-            prioritySection.appendChild(priorityRow);
-            containerElement.appendChild(prioritySection);
+            return html;
+        };
+
+        // Populate Check-in section (with priority sorting)
+        if (checkinRooms.length > 0) {
+            checkinContainer.innerHTML = generateRoomHTML(checkinRooms, 'checkin'); // checkin section
+    } else {
+        checkinContainer.innerHTML = '<div style="text-align: center; color: #666; font-style: italic; padding: 20px;">No rooms match Check-in filter</div>';
+    }
+
+        // Populate Check-out section (with priority sorting)
+    if (checkoutRooms.length > 0) {
+            checkoutContainer.innerHTML = generateRoomHTML(checkoutRooms, 'checkout'); // checkout section
+    } else {
+        checkoutContainer.innerHTML = '<div style="text-align: center; color: #666; font-style: italic; padding: 20px;">No rooms match Check-out filter</div>';
+    }
+
+        // Populate Both Filters section (with priority sorting)
+        if (bothFiltersRooms.length > 0) {
+            bothFiltersContainer.innerHTML = generateRoomHTML(bothFiltersRooms, 'bothFilters'); // both filters section
+            bothFiltersSection.style.display = 'block'; // Show the section
+        } else {
+            bothFiltersSection.style.display = 'none'; // Hide the section
         }
-    });
+
+    // Populate Other Available Rooms section
+    if (otherRooms.length > 0) {
+            otherContainer.innerHTML = generateRoomHTML(otherRooms, 'other'); // other section
+    } else {
+        otherContainer.innerHTML = '<div style="text-align: center; color: #666; font-style: italic; padding: 20px;">No other available rooms</div>';
+    }
 
     // Set the counts
-    document.getElementById('availableRoomCount').textContent = visibleCount;
+        const availableCount = filteredRooms.filter(room => !window.fullyReservedBedTypes || !window.fullyReservedBedTypes[room.ROOM_BED]).length;
+        document.getElementById('availableRoomCount').textContent = availableCount;
     
     // Filter unassigned bookings by bed type and set count
     let filteredUnassignedCount = 0;
@@ -1455,26 +1698,14 @@ function updateWarningMessage(selectedBedFilter) {
     
     // Update warning message based on current filter
     updateWarningMessage(selectedBedFilter);
-    
-    // Show "No available rooms" message if no rooms match the filters
-    const scrollableContainers = document.querySelector('.scrollable-containers');
-    const noRoomsMessage = scrollableContainers.querySelector('.no-rooms-message');
-    
-    // if (visibleCount === 0) {
-    //     if (!noRoomsMessage) {
-    //         const message = document.createElement('div');
-    //         message.className = 'no-rooms-message';
-    //         message.style.cssText = 'position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #666; font-style: italic; z-index: 10;';
-    //         scrollableContainers.style.position = 'relative';
-    //         scrollableContainers.style.minHeight = '200px';
-    //         message.textContent = 'No available rooms match your selected filters.';
-    //         scrollableContainers.appendChild(message);
-    //     }
-    // } else {
-    //     if (noRoomsMessage) {
-    //         noRoomsMessage.remove();
-    //     }
-    // }
+
+        console.log('📈 FILTER RESULTS:');
+        console.log('  - Check-in rooms:', checkinRooms.length);
+        console.log('  - Check-out rooms:', checkoutRooms.length);
+        console.log('  - Both filters rooms:', bothFiltersRooms.length);
+        console.log('  - Other rooms:', otherRooms.length);
+        console.log('  - Total available:', availableCount);
+        console.log('  - Unassigned:', filteredUnassignedCount);
 }
 
 
@@ -1518,13 +1749,10 @@ function updateWarningMessage(selectedBedFilter) {
         return floors;
     }, {});
 
-    let html = '<div class="scrollable-containers">';
+    let html = '';
 
    // Iterate through floors and create rows
-// Iterate through floors and create rows
 Object.keys(roomsByFloor).sort((a, b) => a - b).forEach(floor => {
-    
-    
     const rooms = roomsByFloor[floor];
     html += '<div class="room-row">';
     rooms.forEach(room => {
@@ -1550,33 +1778,36 @@ Object.keys(roomsByFloor).sort((a, b) => a - b).forEach(floor => {
 
     // Build background colors for mixed statuses (only if not disabled)
     if (!isDisabled) {
-        let backgroundColors = [];
+                        let checkoutColor = '';
+                        let checkinColor = '';
         
         // If the room has checkoutToday == true, check the checkout type
         if (room.checkoutToday) {
             if (room.checkoutType === 'L/O') {
-                backgroundColors.push('#FFA500'); // Orange for late check-out
+                                checkoutColor = '#FFF700'; // Bold Pastel Yellow for late check-out
             } else if (room.checkoutType === 'R/O') {
-                backgroundColors.push('#90EE90'); // Green for regular check-out
+                                checkoutColor = '#FF7F7F'; // Bold Pastel Pink for regular check-out
             }
         }
         
         // Additional styling for check-in types (for check-out filters)
         if (room.checkinType === 'R/I') {
-            backgroundColors.push('#7FBCE9'); // Blue for regular check-in
+                            checkinColor = '#FF7F7F'; // Bold Pastel Pink for regular check-in
         } else if (room.checkinType === 'L/I') {
-            backgroundColors.push('#FF7F7F'); // Red for late check-in
-        }
-        
-        // Apply mixed background colors if any exist
-        if (backgroundColors.length > 0) {
-            if (backgroundColors.length === 1) {
-                roomStyle += `background-color: ${backgroundColors[0]};`;
-            } else {
-                // Create gradient for multiple colors
-                const gradient = `linear-gradient(50deg, ${backgroundColors.join(', ')})`;
+                            checkinColor = '#FFF700'; // Bold Pastel Yellow for late check-in
+                        }
+                        
+                        // Apply background colors - gradient if both colors exist, solid if single
+                        if (checkoutColor && checkinColor) {
+                            // Both colors exist - create gradient (checkout left, checkin right)
+                            const gradient = `linear-gradient(90deg, ${checkoutColor}, ${checkinColor})`;
                 roomStyle += `background: ${gradient};`;
-            }
+                        } else if (checkoutColor) {
+                            // Only checkout color
+                            roomStyle += `background-color: ${checkoutColor};`;
+                        } else if (checkinColor) {
+                            // Only checkin color
+                            roomStyle += `background-color: ${checkinColor};`;
         }
     }
         // Add room item with specific styles
@@ -1605,10 +1836,7 @@ Object.keys(roomsByFloor).sort((a, b) => a - b).forEach(floor => {
     html += '</div><br>'; // Add spacing between floors
 });
 
-html += '</div>';
 return html;
-
-
 }
 
 		function generateUnassignedBookingsHTML(unassignedBookings) {
@@ -1697,6 +1925,7 @@ document.addEventListener('click', function (event) {
     const endDateObj = new Date(endDate);
     const nights = (endDateObj - startDateObj) / (1000 * 3600 * 24);
 
+    
     // Redirect to calendar with highlight for the selected room and dates
     try {
       const startISO = flatpickr.formatDate(startDateObj, 'Y-m-d');
@@ -1752,36 +1981,6 @@ document.addEventListener('click', function (event) {
       if (amenitiesField) amenitiesField.value = roomDetails.AMENITIES;
       if (diffInDaysField) diffInDaysField.value = nights;
       
-      // Set check-in and check-out status based on selected filters
-      const selectedCheckinFilter = document.querySelector('input[name="checkinFilter"]:checked')?.value;
-      const selectedCheckoutFilter = document.querySelector('input[name="checkoutFilter"]:checked')?.value;
-      
-      // Set check-in status
-      const checkInStatusField = document.getElementById('checkInStatus');
-      if (checkInStatusField) {
-          if (selectedCheckinFilter === 'R/I') {
-              checkInStatusField.value = '1'; // Regular Check In
-          } else if (selectedCheckinFilter === 'L/I') {
-              checkInStatusField.value = '0'; // Late Check In
-          }
-          console.log('Set checkInStatus to:', checkInStatusField.value);
-      }
-      
-      // Set check-out status
-      const checkOutStatusField = document.getElementById('checkOutStatus');
-      if (checkOutStatusField) {
-          if (selectedCheckoutFilter === 'R/O') {
-              checkOutStatusField.value = '0'; // Regular Check Out
-          } else if (selectedCheckoutFilter === 'L/O') {
-              checkOutStatusField.value = '1'; // Late Check Out
-          }
-          console.log('Set checkOutStatus to:', checkOutStatusField.value);
-          
-          // Trigger late checkout fee calculation
-          if (typeof calculateLateCheckoutFee === 'function') {
-              calculateLateCheckoutFee();
-          }
-      }
 
       function getSeasonIdForDate(checkInDate, seasonalPrices) {
   const checkIn = new Date(checkInDate);
@@ -1905,7 +2104,91 @@ function computeTotal() {
     computeTotal();
 });
 
-      // Room details fetched successfully - SweetAlert modal remains open for room selection
+      /*
+      // ✅ Show modal for room selection — DISABLED per request
+      const addBookingModalElement = document.getElementById('modal-addbooking');
+      if (addBookingModalElement) {
+        Swal.close();
+        document.body.classList.add('custom-booking-layout');
+        const addBookingModal = new bootstrap.Modal(addBookingModalElement);
+        addBookingModal.show();
+        computeTotal()
+
+        // Disable date fields since they're pre-filled
+        document.getElementById('daterange').disabled = true;
+        document.getElementById('diffindays').disabled = true;
+        
+        // Set check-in and check-out status based on selected filters
+        const activeCheckinButton = document.querySelector('.filter-toggle[data-filter="checkin"].active');
+        const activeCheckoutButton = document.querySelector('.filter-toggle[data-filter="checkout"].active');
+        const selectedCheckinFilter = activeCheckinButton ? activeCheckinButton.getAttribute('data-value') : '';
+        const selectedCheckoutFilter = activeCheckoutButton ? activeCheckoutButton.getAttribute('data-value') : '';
+        
+        // Set check-in status based on selected filter
+        const checkInStatusField = document.getElementById('checkInStatus');
+        if (checkInStatusField && selectedCheckinFilter) {
+            if (selectedCheckinFilter === 'R/I') {
+                checkInStatusField.value = '1';
+            } else if (selectedCheckinFilter === 'L/I') {
+                checkInStatusField.value = '0';
+            }
+            console.log('Set checkInStatus to:', checkInStatusField.value);
+        }
+        
+        // Set check-out status based on selected filter
+        const checkOutStatusField = document.getElementById('checkOutStatus');
+        if (checkOutStatusField && selectedCheckoutFilter) {
+            if (selectedCheckoutFilter === 'R/O') {
+                checkOutStatusField.value = '0';
+            } else if (selectedCheckoutFilter === 'L/O') {
+                checkOutStatusField.value = '1';
+            }
+            console.log('Set checkOutStatus to:', checkOutStatusField.value);
+        }
+        
+        try {
+            const roomList = (window.currentRoomsData && Array.isArray(window.currentRoomsData.rooms)) ? window.currentRoomsData.rooms : [];
+            const selectedRoom = roomList.find(r => String(r.IDNo) === String(roomId));
+            if (selectedRoom && selectedRoom.checkinType === 'R/I' && checkOutStatusField) {
+                checkOutStatusField.value = '0';
+                const lateOutOption = checkOutStatusField.querySelector('option[value="1"]');
+                if (lateOutOption) {
+                    lateOutOption.disabled = true;
+                    lateOutOption.title = 'Disabled: Incoming Regular Check-in on end date';
+                }
+                try { toastr.info('Late Out disabled: There is a Regular Check-in on the end date.'); } catch(e) {}
+                console.log('Checkout constrained to Regular Out due to incoming Regular Check-in on end date');
+            }
+            if (selectedRoom && selectedRoom.checkoutType === 'L/O' && checkInStatusField) {
+                checkInStatusField.value = '0';
+                const regularInOption = checkInStatusField.querySelector('option[value="1"]');
+                if (regularInOption) {
+                    regularInOption.disabled = true;
+                    regularInOption.title = 'Disabled: Previous booking has Late Check-out on start date';
+                }
+                try { toastr.info('Regular In disabled: Previous booking has Late Check-out on the start date.'); } catch(e) {}
+                console.log('Checkin constrained to Late In due to previous Late Check-out on start date');
+            }
+        } catch (e) {}
+
+        const roomSelectionFields = document.querySelectorAll('#addFloor, #addroom, #room_type, #room_type_hidden');
+        roomSelectionFields.forEach(field => {
+            if (field) field.style.display = 'block';
+        });
+
+        const groupBookingCheckbox = addBookingModalElement.querySelector('#groupBookingCheckbox');
+        if (groupBookingCheckbox) {
+            groupBookingCheckbox.parentElement.style.display = 'none';
+        }
+        
+        const modalTitle = addBookingModalElement.querySelector('.modal-title');
+        if (modalTitle) {
+            modalTitle.innerHTML = 'Room Selection - ' + roomNumber;
+        }
+      } else {
+        console.error('Modal element not found in the DOM');
+      }
+      */
     })
     .catch(error => console.error('Error fetching room details:', error));
   }
@@ -2046,13 +2329,11 @@ function initializeAddBookingHandler() {
 
         setTimeout(() => {
       Swal.close();
-      // Redirect to clean calendar URL without highlight parameters
       window.location.href = '/calendar';
     }, 10000);
     }
                     }).then(() => {
-                        // Redirect to clean calendar URL without highlight parameters
-                        window.location.href = '/calendar';
+                      window.location.href = '/calendar';
                     });
                 } else {
                     Swal.fire({
@@ -2081,6 +2362,7 @@ function initializeAddBookingHandler() {
 $(document).ready(function() {
     initializeAddBookingHandler();
 });
+
 
 
 // Auto-trigger sidebar toggle for calendar page - DISABLED to prevent hash issues
