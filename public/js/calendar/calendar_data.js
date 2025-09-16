@@ -985,9 +985,37 @@ const findHeader = setInterval(() => {
 
     select: function(info) {
       const modal = $('#modal-addbooking');
-      modal.data('calendar-room-id', info.resource.id);
-      modal.data('calendar-start', info.start);
-      modal.data('calendar-end', info.end);
+      
+      // Check if this selection is from a highlighted area (URL params)
+      const params = new URLSearchParams(window.location.search);
+      const hlRoomId = params.get('hlRoomId');
+      const hlStart = params.get('hlStart');
+      const hlEnd = params.get('hlEnd');
+      
+      // If this is a highlight selection, use the original highlight dates
+      if (hlRoomId && hlStart && hlEnd && String(info.resource.id) === String(hlRoomId)) {
+        console.log('Using highlight dates from URL params:', { hlStart, hlEnd });
+        
+        // Parse the original highlight dates
+        const originalStartDate = new Date(hlStart);
+        const originalEndDate = new Date(hlEnd);
+        
+        // Set check-in time to 2 PM (14:00) - PM cell
+        originalStartDate.setHours(14, 0, 0, 0);
+        
+        // Set check-out time to 11 AM (11:00) - AM cell  
+        originalEndDate.setHours(11, 0, 0, 0);
+        
+        modal.data('calendar-room-id', info.resource.id);
+        modal.data('calendar-start', originalStartDate);
+        modal.data('calendar-end', originalEndDate);
+      } else {
+        // Use the calendar selection dates for normal selections
+        modal.data('calendar-room-id', info.resource.id);
+        modal.data('calendar-start', info.start);
+        modal.data('calendar-end', info.end);
+      }
+      
       modal.modal('show');
       calendar.unselect();
     },

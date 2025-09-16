@@ -1905,39 +1905,7 @@ function computeTotal() {
     computeTotal();
 });
 
-      // ✅ Show modal for room selection
-      const addBookingModalElement = document.getElementById('modal-addbooking');
-      if (addBookingModalElement) {
-        Swal.close();
-        document.body.classList.add('custom-booking-layout');
-        const addBookingModal = new bootstrap.Modal(addBookingModalElement);
-        addBookingModal.show();
-        computeTotal()
-
-        // Disable date fields since they're pre-filled
-        document.getElementById('daterange').disabled = true;
-        document.getElementById('diffindays').disabled = true;
-        
-        // Show room selection fields since this is room selection
-        const roomSelectionFields = document.querySelectorAll('#addFloor, #addroom, #room_type, #room_type_hidden');
-        roomSelectionFields.forEach(field => {
-            if (field) field.style.display = 'block';
-        });
-
-         // Show Group Booking checkbox for room selection
-        const groupBookingCheckbox = addBookingModalElement.querySelector('#groupBookingCheckbox');
-        if (groupBookingCheckbox) {
-            groupBookingCheckbox.parentElement.style.display = 'none';
-        }
-        
-        // Show message that this is room selection
-        const modalTitle = addBookingModalElement.querySelector('.modal-title');
-        if (modalTitle) {
-            modalTitle.innerHTML = 'Room Selection - ' + roomNumber;
-        }
-      } else {
-        console.error('Modal element not found in the DOM');
-      }
+      // Room details fetched successfully - SweetAlert modal remains open for room selection
     })
     .catch(error => console.error('Error fetching room details:', error));
   }
@@ -2078,11 +2046,13 @@ function initializeAddBookingHandler() {
 
         setTimeout(() => {
       Swal.close();
-      window.location.reload();
+      // Redirect to clean calendar URL without highlight parameters
+      window.location.href = '/calendar';
     }, 10000);
     }
                     }).then(() => {
-                        window.location.reload();
+                        // Redirect to clean calendar URL without highlight parameters
+                        window.location.href = '/calendar';
                     });
                 } else {
                     Swal.fire({
