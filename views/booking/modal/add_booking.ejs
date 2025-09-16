@@ -476,10 +476,23 @@
 						});
 					} catch(e) { /* no-op */ }
 
-					// Optionally clear after use to avoid stale values
+
+					// Persist any user changes to the selects so refresh keeps them
 					try {
-						localStorage.removeItem('bookingCheckinPref');
-						localStorage.removeItem('bookingCheckoutPref');
+						const inFieldP = document.getElementById('checkInStatus');
+						const outFieldP = document.getElementById('checkOutStatus');
+						if (inFieldP) {
+							inFieldP.addEventListener('change', function(){
+								const code = this.value === '1' ? 'R/I' : 'L/I';
+								localStorage.setItem('bookingCheckinPref', code);
+							});
+						}
+						if (outFieldP) {
+							outFieldP.addEventListener('change', function(){
+								const code = this.value === '0' ? 'R/O' : 'L/O';
+								localStorage.setItem('bookingCheckoutPref', code);
+							});
+						}
 					} catch (e) { /* no-op */ }
 				});
 			}

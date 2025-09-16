@@ -828,7 +828,8 @@ function ensureHighlightStyles(color) {
     .calendar-highlight-overlay-pulse {
       position: fixed;
       pointer-events: none;
-      z-index: 2147483000;
+      /* Keep below Bootstrap modal backdrop (1040) so it doesn't show over modals */
+      z-index: 1000;
       border-radius: 0;
       border: 3px solid rgba(0, 184, 255, 0.95);
       box-shadow: 0 0 8px rgba(0, 184, 255, 0.6);
