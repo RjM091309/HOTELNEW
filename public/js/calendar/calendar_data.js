@@ -461,6 +461,18 @@ const customButtons = {
   customFullscreen: {
     text: 'Full Screen',
     click: toggleFullScreen
+  },
+
+  searchBox: {
+    text: 'Search',
+    click: function() {
+      toggleSearchBox();
+    }
+  },
+
+  filterBox: {
+    text: 'Filter',
+    click: function() {}
   }
 };
 
@@ -974,7 +986,7 @@ const findHeader = setInterval(() => {
     resourceAreaHeaderContent: 'Rooms',
     resourceAreaWidth: "70px",
     height: '850px',
-    eventOverlap: false,
+    eventOverlap: true,
     editable: true,
     selectable: true,
     // Resize options - compatible with older FullCalendar versions
@@ -1032,7 +1044,7 @@ const findHeader = setInterval(() => {
 
     resourceOrder: '',
     headerToolbar: {
-      left:  'dayPrev customToday dayNext',
+      left:  'searchBox dayPrev customToday dayNext',
       center:'title',
       right: 'customFullscreen week customMonth customPrev customNext'
     },
@@ -1073,7 +1085,478 @@ const findHeader = setInterval(() => {
   // Initialize calendar legend
   initializeCalendarLegend();
 
+  // Initialize search and filter functionality
+  initializeSearchAndFilter();
+
 });
+
+// =============================================================================
+// SEARCH AND FILTER FUNCTIONALITY
+// =============================================================================
+
+// Global variables for search and filter
+let searchBoxVisible = false;
+let filterBoxVisible = false;
+let currentFilters = {
+  guestName: '',
+  floor: 'all',
+  roomType: 'all',
+  status: 'all',
+  dateRange: null
+};
+
+// Initialize search and filter functionality
+function initializeSearchAndFilter() {
+  createSearchBox();
+  createFilterBox();
+  setupSearchAndFilterEvents();
+}
+
+// Create search box overlay
+function createSearchBox() {
+  const searchOverlay = document.createElement('div');
+  searchOverlay.id = 'calendar-search-overlay';
+  searchOverlay.className = 'calendar-search-overlay hidden';
+  
+  searchOverlay.innerHTML = `
+    <div class="search-box-container">
+      <div class="search-header">
+        <h4><i class="fa fa-search"></i> Search Bookings</h4>
+        <button class="close-search" onclick="toggleSearchBox()">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+      <div class="search-content">
+        <div class="search-field">
+          <label for="guest-search">Guest Name:</label>
+          <input type="text" id="guest-search" placeholder="Enter guest name..." />
+        </div>
+        <div class="search-field">
+          <label>Booking Status:</label>
+          <div class="status-radio-group">
+            <label class="radio-option">
+              <input type="radio" name="search-status" value="all" checked>
+              <span class="radio-label">All Statuses</span>
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="search-status" value="check-In">
+              <span class="radio-label">Occupied (Checked In)</span>
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="search-status" value="pending-late">
+              <span class="radio-label">Pending - Late (CI/CO)</span>
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="search-status" value="pending-regular">
+              <span class="radio-label">Pending - Regular (CI/CO)</span>
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="search-status" value="check-Out">
+              <span class="radio-label">Checked Out</span>
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="search-status" value="cancelled">
+              <span class="radio-label">Cancelled</span>
+            </label>
+          </div>
+        </div>
+        <!-- Auto-search enabled; buttons removed -->
+        <div class="search-results" id="search-results"></div>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(searchOverlay);
+}
+
+// Create filter box overlay
+function createFilterBox() {}
+
+// Setup event listeners for search and filter
+function setupSearchAndFilterEvents() {
+  // Guest search input
+  const guestSearch = document.getElementById('guest-search');
+  if (guestSearch) {
+    guestSearch.addEventListener('input', debounce(performSearch, 300));
+    guestSearch.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        performSearch();
+      }
+    });
+  }
+  
+  // Search status radio buttons
+  const searchStatusRadios = document.querySelectorAll('input[name="search-status"]');
+  searchStatusRadios.forEach(radio => {
+    radio.addEventListener('change', performSearch);
+  });
+  
+  // Filter change events
+  const floorFilter = document.getElementById('floor-filter');
+  const statusFilter = document.getElementById('status-filter');
+  const dateRangeFilter = document.getElementById('date-range-filter');
+  
+  if (floorFilter) {
+    floorFilter.addEventListener('change', applyFilters);
+  }
+  
+  if (statusFilter) {
+    statusFilter.addEventListener('change', applyFilters);
+  }
+  
+  if (dateRangeFilter) {
+    // Initialize date range picker
+    flatpickr(dateRangeFilter, {
+      mode: "range",
+      altInput: true,
+      altFormat: "M d, Y",
+      dateFormat: "Y-m-d",
+      onChange: function(selectedDates, dateStr, instance) {
+        if (selectedDates.length === 2) {
+          currentFilters.dateRange = {
+            start: selectedDates[0],
+            end: selectedDates[1]
+          };
+          applyFilters();
+        }
+      }
+    });
+  }
+}
+
+// Toggle search box visibility
+function toggleSearchBox() {
+  const searchOverlay = document.getElementById('calendar-search-overlay');
+  if (searchOverlay) {
+    searchBoxVisible = !searchBoxVisible;
+    if (searchBoxVisible) {
+      searchOverlay.classList.remove('hidden');
+      document.getElementById('guest-search').focus();
+    } else {
+      searchOverlay.classList.add('hidden');
+    }
+  }
+}
+
+// Toggle filter box visibility
+function toggleFilterBox() {}
+
+// Perform guest name search with status filter
+function performSearch() {
+  const guestName = document.getElementById('guest-search').value.trim();
+  const statusFilter = document.querySelector('input[name="search-status"]:checked').value;
+  const resultsContainer = document.getElementById('search-results');
+  
+  if (!guestName && statusFilter === 'all') {
+    resultsContainer.innerHTML = '';
+    return;
+  }
+  
+  // Get all events from calendar
+  const allEvents = calendar.getEvents();
+  const matchingEvents = allEvents.filter(event => {
+    let matchesGuest = true;
+    let matchesStatus = true;
+    
+    // Check guest name filter
+    if (guestName) {
+      const eventTitle = event.title.toLowerCase();
+      matchesGuest = eventTitle.includes(guestName.toLowerCase());
+    }
+    
+    // Check status filter
+    if (statusFilter !== 'all') {
+      const eventStatus = event.extendedProps?.bookingStatus || '';
+      const checkInStatus = event.extendedProps?.checkInStatus;
+      
+      if (statusFilter === 'pending-late') {
+        // Late pending: booking status is 'pending' AND checkInStatus is 0
+        matchesStatus = eventStatus === 'pending' && checkInStatus === 0;
+      } else if (statusFilter === 'pending-regular') {
+        // Regular pending: booking status is 'pending' AND checkInStatus is 1
+        matchesStatus = eventStatus === 'pending' && checkInStatus === 1;
+      } else {
+        // Other statuses match directly
+        matchesStatus = eventStatus === statusFilter;
+      }
+    }
+    
+    return matchesGuest && matchesStatus;
+  });
+  
+  // Display search results
+  if (matchingEvents.length === 0) {
+    let noResultsMessage = 'No bookings found';
+    if (guestName && statusFilter !== 'all') {
+      noResultsMessage = `No bookings found for "${guestName}" with status "${statusFilter}"`;
+    } else if (guestName) {
+      noResultsMessage = `No bookings found for "${guestName}"`;
+    } else if (statusFilter !== 'all') {
+      noResultsMessage = `No bookings found with status "${statusFilter}"`;
+    }
+    resultsContainer.innerHTML = '<div class="no-results">' + noResultsMessage + '</div>';
+  } else {
+    let resultsHTML = '<div class="search-results-header">Found ' + matchingEvents.length + ' booking(s):</div>';
+    
+    matchingEvents.forEach(event => {
+      const resources = event.getResources();
+      const roomNumber = resources.length ? resources[0].title : 'N/A';
+      const startDate = event.start.toLocaleDateString();
+      const endDate = event.end.toLocaleDateString();
+      const eventStatus = event.extendedProps?.bookingStatus || 'Unknown';
+      const checkInStatus = event.extendedProps?.checkInStatus;
+      
+      // Determine display status and color
+      let displayStatus = eventStatus;
+      let statusColor = '#b0b0b0';
+      
+      if (eventStatus === 'pending') {
+        if (checkInStatus === 0) {
+          displayStatus = 'Pending - Late (CI/CO)';
+          statusColor = '#fff700'; // Yellow for late
+        } else {
+          displayStatus = 'Pending - Regular (CI/CO)';
+          statusColor = '#e53935'; // Red for regular
+        }
+      } else if (eventStatus === 'check-In') {
+        displayStatus = 'Occupied (Checked In)';
+        statusColor = '#43a047'; // Green
+      } else if (eventStatus === 'check-Out') {
+        displayStatus = 'Checked Out';
+        statusColor = '#6c757d'; // Gray
+      } else if (eventStatus === 'cancelled') {
+        displayStatus = 'Cancelled';
+        statusColor = '#000000'; // Black
+      }
+      
+      resultsHTML += `
+        <div class="search-result-item" onclick="highlightBooking('${event.id}')">
+          <div class="guest-name">${event.title}</div>
+          <div class="booking-details">
+            Room ${roomNumber} • ${startDate} - ${endDate}
+          </div>
+          <div class="booking-status" style="color: ${statusColor}; font-weight: 600; font-size: 12px; margin-top: 3px;">
+            Status: ${displayStatus}
+          </div>
+          <div class="click-hint">Click to focus on calendar</div>
+        </div>
+      `;
+    });
+    
+    resultsContainer.innerHTML = resultsHTML;
+  }
+}
+
+// Clear search
+function clearSearch() {
+  document.getElementById('guest-search').value = '';
+  document.querySelector('input[name="search-status"][value="all"]').checked = true;
+  document.getElementById('search-results').innerHTML = '';
+  currentFilters.guestName = '';
+  applyFilters();
+}
+
+// Apply filters
+function applyFilters() {
+  // Update current filters
+  currentFilters.guestName = document.getElementById('guest-search').value.trim();
+  currentFilters.floor = document.getElementById('floor-filter').value;
+  currentFilters.status = document.getElementById('status-filter').value;
+  
+  // Get all events
+  const allEvents = calendar.getEvents();
+  
+  // Apply filters
+  allEvents.forEach(event => {
+    let shouldShow = true;
+    
+    // Guest name filter
+    if (currentFilters.guestName) {
+      const eventTitle = event.title.toLowerCase();
+      shouldShow = shouldShow && eventTitle.includes(currentFilters.guestName.toLowerCase());
+    }
+    
+    // Floor filter
+    if (currentFilters.floor !== 'all') {
+      const resources = event.getResources();
+      if (resources.length) {
+        const roomNumber = resources[0].title;
+        const floorNumber = roomNumber.charAt(0);
+        shouldShow = shouldShow && floorNumber === currentFilters.floor;
+      }
+    }
+    
+    // Status filter
+    if (currentFilters.status !== 'all') {
+      const eventStatus = event.extendedProps?.bookingStatus || '';
+      shouldShow = shouldShow && eventStatus === currentFilters.status;
+    }
+    
+    // Date range filter
+    if (currentFilters.dateRange) {
+      const eventStart = new Date(event.start);
+      const eventEnd = new Date(event.end);
+      const filterStart = currentFilters.dateRange.start;
+      const filterEnd = currentFilters.dateRange.end;
+      
+      shouldShow = shouldShow && (
+        (eventStart >= filterStart && eventStart <= filterEnd) ||
+        (eventEnd >= filterStart && eventEnd <= filterEnd) ||
+        (eventStart <= filterStart && eventEnd >= filterEnd)
+      );
+    }
+    
+    // Show/hide event based on filter result
+    if (shouldShow) {
+      event.setProp('display', 'block');
+    } else {
+      event.setProp('display', 'none');
+    }
+  });
+  
+  // Update active filters display
+  updateActiveFiltersDisplay();
+  
+  // Update legend counts
+  if (typeof updateLegendCounts === 'function') {
+    updateLegendCounts();
+  }
+}
+
+// Clear all filters
+function clearFilters() {
+  // Reset filter inputs
+  document.getElementById('guest-search').value = '';
+  document.getElementById('floor-filter').value = 'all';
+  document.getElementById('status-filter').value = 'all';
+  document.getElementById('date-range-filter').value = '';
+  
+  // Reset current filters
+  currentFilters = {
+    guestName: '',
+    floor: 'all',
+    roomType: 'all',
+    status: 'all',
+    dateRange: null
+  };
+  
+  // Show all events
+  const allEvents = calendar.getEvents();
+  allEvents.forEach(event => {
+    event.setProp('display', 'block');
+  });
+  
+  // Clear search results
+  document.getElementById('search-results').innerHTML = '';
+  
+  // Update active filters display
+  updateActiveFiltersDisplay();
+  
+  // Update legend counts
+  if (typeof updateLegendCounts === 'function') {
+    updateLegendCounts();
+  }
+}
+
+// Update active filters display
+function updateActiveFiltersDisplay() {
+  const activeFiltersContainer = document.getElementById('active-filters');
+  const activeFilters = [];
+  
+  if (currentFilters.guestName) {
+    activeFilters.push(`Guest: "${currentFilters.guestName}"`);
+  }
+  
+  if (currentFilters.floor !== 'all') {
+    activeFilters.push(`Floor: ${currentFilters.floor}`);
+  }
+  
+  if (currentFilters.status !== 'all') {
+    activeFilters.push(`Status: ${currentFilters.status}`);
+  }
+  
+  if (currentFilters.dateRange) {
+    const startStr = currentFilters.dateRange.start.toLocaleDateString();
+    const endStr = currentFilters.dateRange.end.toLocaleDateString();
+    activeFilters.push(`Date: ${startStr} - ${endStr}`);
+  }
+  
+  if (activeFilters.length > 0) {
+    activeFiltersContainer.innerHTML = `
+      <div class="active-filters-header">Active Filters:</div>
+      <div class="active-filters-list">
+        ${activeFilters.map(filter => `<span class="active-filter-tag">${filter}</span>`).join('')}
+      </div>
+    `;
+  } else {
+    activeFiltersContainer.innerHTML = '';
+  }
+}
+
+// Highlight specific booking and focus on calendar
+function highlightBooking(eventId) {
+  const event = calendar.getEventById(eventId);
+  if (event) {
+    // Get the event's start date to navigate calendar to that date
+    const eventStartDate = new Date(event.start);
+    
+    // Navigate calendar to the event's date
+    calendar.gotoDate(eventStartDate);
+    
+    // Wait for calendar to render, then scroll to the event
+    setTimeout(() => {
+      const eventElement = window.eventElements[eventId];
+      if (eventElement) {
+        // Scroll the calendar to center the event
+        eventElement.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center',
+          inline: 'center'
+        });
+        
+        // Add highlight effect (keep long enough to match CSS ~20s)
+        eventElement.classList.add('search-highlight');
+        setTimeout(() => {
+          eventElement.classList.remove('search-highlight');
+        }, 10000);
+      }
+      
+      // Also scroll the calendar container to focus on the event
+      const calendarContainer = document.getElementById('calendar');
+      if (calendarContainer) {
+        calendarContainer.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }
+    }, 100);
+    
+    // Close search box
+    toggleSearchBox();
+  }
+}
+
+// Debounce function for search input
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+// Make functions globally available
+window.toggleSearchBox = toggleSearchBox;
+window.toggleFilterBox = toggleFilterBox;
+window.performSearch = performSearch;
+window.clearSearch = clearSearch;
+window.applyFilters = applyFilters;
+window.clearFilters = clearFilters;
+window.highlightBooking = highlightBooking;
 
 // =============================================================================
 // CALENDAR LEGEND FUNCTIONALITY

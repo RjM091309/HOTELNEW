@@ -981,6 +981,16 @@ function openDirectReservationModal(formattedDateRange, nights) {
         
         console.log('Selected filters:', { selectedCheckinFilter, selectedCheckoutFilter });
 
+        // Persist current filter choices for use in Add Booking modal (any flow)
+        try {
+            const activeCheckinButton = document.querySelector('.filter-toggle[data-filter="checkin"].active');
+            const activeCheckoutButton = document.querySelector('.filter-toggle[data-filter="checkout"].active');
+            const selectedCheckinFilter = activeCheckinButton ? activeCheckinButton.getAttribute('data-value') : (localStorage.getItem('bookingCheckinPref') || '');
+            const selectedCheckoutFilter = activeCheckoutButton ? activeCheckoutButton.getAttribute('data-value') : (localStorage.getItem('bookingCheckoutPref') || '');
+            localStorage.setItem('bookingCheckinPref', selectedCheckinFilter || '');
+            localStorage.setItem('bookingCheckoutPref', selectedCheckoutFilter || '');
+        } catch (e) { /* no-op */ }
+
         // Show the Add Booking modal directly
         const addBookingModalElement = document.getElementById('modal-addbooking');
         if (addBookingModalElement) {
@@ -1008,27 +1018,23 @@ function openDirectReservationModal(formattedDateRange, nights) {
             document.getElementById('daterange').disabled = true;
             document.getElementById('diffindays').disabled = true;
             
-            // Set check-in status based on selected filter
-            const checkInStatusField = document.getElementById('checkInStatus');
-            if (checkInStatusField) {
-                if (selectedCheckinFilter === 'R/I') {
-                    checkInStatusField.value = '1'; // Regular Check In
-                } else if (selectedCheckinFilter === 'L/I') {
-                    checkInStatusField.value = '0'; // Late Check In
+            // Set check-in/check-out status based on active toggle buttons
+            try {
+                const selectedCheckinFilter = localStorage.getItem('bookingCheckinPref') || '';
+                const selectedCheckoutFilter = localStorage.getItem('bookingCheckoutPref') || '';
+
+                const checkInStatusField = document.getElementById('checkInStatus');
+                if (checkInStatusField && selectedCheckinFilter) {
+                    checkInStatusField.value = (selectedCheckinFilter === 'R/I') ? '1' : '0';
+                    checkInStatusField.dispatchEvent(new Event('change'));
                 }
-                console.log('Set checkInStatus to:', checkInStatusField.value);
-            }
-            
-            // Set check-out status based on selected filter
-            const checkOutStatusField = document.getElementById('checkOutStatus');
-            if (checkOutStatusField) {
-                if (selectedCheckoutFilter === 'R/O') {
-                    checkOutStatusField.value = '0'; // Regular Check Out
-                } else if (selectedCheckoutFilter === 'L/O') {
-                    checkOutStatusField.value = '1'; // Late Check Out
+
+                const checkOutStatusField = document.getElementById('checkOutStatus');
+                if (checkOutStatusField && selectedCheckoutFilter) {
+                    checkOutStatusField.value = (selectedCheckoutFilter === 'R/O') ? '0' : '1';
+                    checkOutStatusField.dispatchEvent(new Event('change'));
                 }
-                console.log('Set checkOutStatus to:', checkOutStatusField.value);
-            }
+            } catch (e) { /* no-op */ }
             
             // Hide only specific room selection fields, not entire rows
             const fieldsToHide = [
@@ -1925,7 +1931,16 @@ document.addEventListener('click', function (event) {
     const endDateObj = new Date(endDate);
     const nights = (endDateObj - startDateObj) / (1000 * 3600 * 24);
 
-    
+    // Persist current filter choices before any redirect/open
+    try {
+      const activeCheckinButton = document.querySelector('.filter-toggle[data-filter="checkin"].active');
+      const activeCheckoutButton = document.querySelector('.filter-toggle[data-filter="checkout"].active');
+      const selectedCheckinFilter = activeCheckinButton ? activeCheckinButton.getAttribute('data-value') : '';
+      const selectedCheckoutFilter = activeCheckoutButton ? activeCheckoutButton.getAttribute('data-value') : '';
+      localStorage.setItem('bookingCheckinPref', selectedCheckinFilter || '');
+      localStorage.setItem('bookingCheckoutPref', selectedCheckoutFilter || '');
+    } catch (e) { /* no-op */ }
+
     // Redirect to calendar with highlight for the selected room and dates
     try {
       const startISO = flatpickr.formatDate(startDateObj, 'Y-m-d');

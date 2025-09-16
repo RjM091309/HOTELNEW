@@ -421,6 +421,69 @@
 		var bookingScript = document.createElement('script');
 		bookingScript.src = '/js/booking/add_booking.js';
 		document.body.appendChild(bookingScript);
+
+		// When the Add Booking modal is shown, apply saved check-in/out preferences
+		try {
+			const modal = document.getElementById('modal-addbooking');
+			if (modal) {
+				modal.addEventListener('shown.bs.modal', function () {
+					try {
+						const prefIn = localStorage.getItem('bookingCheckinPref');
+						const prefOut = localStorage.getItem('bookingCheckoutPref');
+						const inField = document.getElementById('checkInStatus');
+						const outField = document.getElementById('checkOutStatus');
+						if (inField && (prefIn === 'R/I' || prefIn === 'L/I')) {
+							inField.value = (prefIn === 'R/I') ? '1' : '0';
+							inField.dispatchEvent(new Event('change'));
+							// Disable non-selected options (keep control enabled)
+							try { Array.from(inField.options).forEach(function(opt){ opt.disabled = (opt.value !== inField.value); }); } catch(e) {}
+						}
+						if (outField && (prefOut === 'R/O' || prefOut === 'L/O')) {
+							outField.value = (prefOut === 'R/O') ? '0' : '1';
+							outField.dispatchEvent(new Event('change'));
+							// Disable non-selected options (keep control enabled)
+							try { Array.from(outField.options).forEach(function(opt){ opt.disabled = (opt.value !== outField.value); }); } catch(e) {}
+						}
+					} catch (e) { /* no-op */ }
+
+					// Re-assert after a tick in case other scripts adjust defaults
+					setTimeout(() => {
+						try {
+							const prefIn2 = localStorage.getItem('bookingCheckinPref');
+							const prefOut2 = localStorage.getItem('bookingCheckoutPref');
+							const inField2 = document.getElementById('checkInStatus');
+							const outField2 = document.getElementById('checkOutStatus');
+							if (inField2 && (prefIn2 === 'R/I' || prefIn2 === 'L/I')) {
+								inField2.value = (prefIn2 === 'R/I') ? '1' : '0';
+								try { Array.from(inField2.options).forEach(function(opt){ opt.disabled = (opt.value !== inField2.value); }); } catch(e) {}
+							}
+							if (outField2 && (prefOut2 === 'R/O' || prefOut2 === 'L/O')) {
+								outField2.value = (prefOut2 === 'R/O') ? '0' : '1';
+								try { Array.from(outField2.options).forEach(function(opt){ opt.disabled = (opt.value !== outField2.value); }); } catch(e) {}
+							}
+						} catch (e) { /* no-op */ }
+					}, 50);
+
+					// On modal hide, restore options to normal so future opens are clean
+					try {
+						modal.addEventListener('hidden.bs.modal', function(){
+							try {
+								const inFieldR = document.getElementById('checkInStatus');
+								const outFieldR = document.getElementById('checkOutStatus');
+								if (inFieldR) { Array.from(inFieldR.options).forEach(function(opt){ opt.disabled = false; }); }
+								if (outFieldR) { Array.from(outFieldR.options).forEach(function(opt){ opt.disabled = false; }); }
+							} catch(e) {}
+						});
+					} catch(e) { /* no-op */ }
+
+					// Optionally clear after use to avoid stale values
+					try {
+						localStorage.removeItem('bookingCheckinPref');
+						localStorage.removeItem('bookingCheckoutPref');
+					} catch (e) { /* no-op */ }
+				});
+			}
+		} catch (e) { /* no-op */ }
 	});
 </script>
 
