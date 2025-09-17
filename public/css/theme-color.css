@@ -13,7 +13,7 @@
 [data-theme="white"] .fc-theme-standard .fc-scrollgrid,
 [data-theme="white"] .fc-theme-standard th,
 [data-theme="white"] .fc-theme-standard td {
-    border: 1px solid rgba(0, 0, 0, 0.10) !important;
+    border: 1px solid rgba(0, 0, 0, 0.2) !important;
 }
 
 /* =====================
@@ -729,6 +729,17 @@
 /* Target specific button text content */
 [data-theme="white"] #addRoomModal button:first-child,
 [data-theme="white"] #addRoomModal .modal-footer button:first-child {
+    color: #ffffff !important;
+}
+
+/* White theme: mimic dark theme hover (slightly darker, keep white text) */
+[data-theme="white"] #addRoomModal .btn-primary-10:hover {
+    filter: brightness(0.92) !important;
+    color: #ffffff !important;
+}
+[data-theme="white"] #addRoomModal .btn-secondary:hover {
+    background-color: #4b5563 !important; /* dark gray to match dark theme feel */
+    border-color: #4b5563 !important;
     color: #ffffff !important;
 }
 
@@ -1488,28 +1499,7 @@
     background-color: #eef1f5 !important;
 }
 
-[data-theme="white"] .modal .btn:hover {
-    background-color: #eef1f5 !important;
-    border-color: #eef1f5 !important;
-}
-
-[data-theme="white"] .modal .btn-secondary:hover {
-    background-color: #eef1f5 !important;
-    border-color: #eef1f5 !important;
-    color: #111827 !important;
-}
-
-[data-theme="white"] .modal .btn-primary:hover {
-    background-color: #eef1f5 !important;
-    border-color: #eef1f5 !important;
-    color: #111827 !important;
-}
-
-[data-theme="white"] .modal .btn-primary-10:hover {
-    background-color: #eef1f5 !important;
-    border-color: #eef1f5 !important;
-    color: #111827 !important;
-}
+/* Removed global modal button hover overrides to preserve button-specific hover colors */
 
 /* Specific modal hover overrides */
 [data-theme="white"] #guestLevelsManagementModal .table tbody tr:hover,
@@ -2941,6 +2931,79 @@
     border: 1px solid #e5e7eb !important;
 }
 
+/* Add Booking: ensure voucher and save buttons keep white text on hover */
+[data-theme="white"] #modal-addbooking .btn.btn-primary:hover,
+[data-theme="white"] #modal-addbooking .btn.btn-success:hover,
+[data-theme="white"] #modal-addbooking .btn[data-role="voucher"]:hover,
+[data-theme="white"] #modal-addbooking .btn[data-role="save"]:hover {
+    color: #ffffff !important;
+}
+/* =====================
+   Light theme: Unassigned Rooms Side Panel
+   ===================== */
+[data-theme="white"] .side-panel .overlay {
+    background: rgba(0,0,0,0.3) !important;
+}
+
+[data-theme="white"] .side-panel .content {
+    background: #ffffff !important;
+    color: #111827 !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08) !important;
+    border: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] .side-panel .content h3 {
+    background: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] .panel-booking-item {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08) !important;
+}
+
+/* Some lists render with card-box + panel-booking-item combo; force light bg */
+[data-theme="white"] .card-box.panel-booking-item,
+[data-theme="white"] .panel-booking-item.card-box {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] .panel-booking-item .booking-item-details {
+    color: #1f2937 !important;
+}
+
+[data-theme="white"] .panel-booking-item .room-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] .panel-booking-item .room-title span {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] .panel-booking-item .details-bar {
+    background: #f3f4f6 !important;
+    color: #111827 !important;
+    border-left: 4px solid #28a745 !important;
+}
+
+[data-theme="white"] .side-panel .content::-webkit-scrollbar-thumb {
+    background: #c7cdd4 !important;
+}
+
+[data-theme="white"] .side-panel .content::-webkit-scrollbar-track {
+    background: #eef2f7 !important;
+}
+
+/* Light theme: ensure "Assign Room" button bed icon is white */
+[data-theme="white"] .assign-room-btn i,
+[data-theme="white"] .assign-room-btn .fa,
+[data-theme="white"] .assign-room-btn .material-icons {
+    color: #ffffff !important;
+}
+
 /* =====================
    Light theme: Calendar (FullCalendar-like)
    ===================== */
@@ -2960,12 +3023,18 @@
 [data-theme="white"] .fc .fc-timegrid-slot,
 [data-theme="white"] .fc .fc-timegrid-axis { border-color: #e5e7eb; }
 [data-theme="white"] .fc .fc-col-header-cell { background: #f9fafb; color: #111827; }
-[data-theme="white"] .fc .fc-daygrid-day-number { color: #111827; }
+[data-theme="white"] .fc .fc-daygrid-day-number { color: #000000 !important; }
+
+/* Additional light theme overrides for date numbers */
+[data-theme="white"] .fc-unthemed td.fc-day-top .fc-day-number,
+[data-theme="white"] .fc-day-number {
+  color: #000000 !important;
+}
 [data-theme="white"] .fc .fc-daygrid-day.fc-day-today,
 [data-theme="white"] .fc .fc-timegrid-col.fc-day-today { background: #fffbea; }
 
-[data-theme="white"] .fc .fc-event { background: #e6f2ff; border-color: #bfdbfe; color: #1e293b; }
-[data-theme="white"] .fc .fc-event .fc-event-title { color: #1e293b; }
+[data-theme="white"] .fc .fc-event { background: #e6f2ff; border-color: #bfdbfe; color: #1e293b; box-shadow: none !important; text-shadow: none !important; }
+[data-theme="white"] .fc .fc-event .fc-event-title { color: #1e293b; text-shadow: none !important; }
 
 /* Light theme: strengthen grid lines and labels */
 [data-theme="white"] .fc-theme-standard td,
@@ -2975,30 +3044,30 @@
 [data-theme="white"] .fc .fc-daygrid-day,
 [data-theme="white"] .fc .fc-timegrid-slot,
 [data-theme="white"] .fc .fc-timegrid-axis {
-    border-color: #d1d5db !important;
+    border-color: rgba(0,0,0,0.2) !important;
 }
 [data-theme="white"] .fc .fc-col-header-cell-cushion,
 [data-theme="white"] .fc .fc-timegrid-slot-label-cushion,
 [data-theme="white"] .fc .fc-axis { color: #111827 !important; }
 [data-theme="white"] .fc .fc-timegrid-slot { background: #ffffff; }
-[data-theme="white"] .fc .fc-timegrid-slot:nth-child(2n) { background: #fbfdff; }
+[data-theme="white"] .fc .fc-timegrid-slot:nth-child(2n) { background: rgba(0,0,0,0.05); }
 [data-theme="white"] .fc .fc-daygrid-day.fc-day-today,
 [data-theme="white"] .fc .fc-timegrid-col.fc-day-today { background: #fffbea; }
 
 /* Light theme: match dark-theme visibility via stronger guides */
 [data-theme="white"] .fc .fc-col-header-cell-cushion { font-weight: 600; color: #0f172a !important; }
 [data-theme="white"] .fc .fc-timegrid-axis-cushion { color: #0f172a !important; font-weight: 600; }
-[data-theme="white"] .fc-theme-standard .fc-timegrid-slot { border-top: 1px solid #cbd5e1 !important; background: #ffffff !important; }
-[data-theme="white"] .fc-theme-standard .fc-timegrid-axis { border-right: 1px solid #cbd5e1 !important; }
-[data-theme="white"] .fc-theme-standard .fc-timegrid-col { border-left: 1px solid #d1d5db !important; }
-[data-theme="white"] .fc-theme-standard .fc-timegrid-cols .fc-timegrid-col:nth-child(even) { background: #f5f7fb !important; }
+[data-theme="white"] .fc-theme-standard .fc-timegrid-slot { border-top: 1px solid rgba(0,0,0,0.2) !important; background: #ffffff !important; }
+[data-theme="white"] .fc-theme-standard .fc-timegrid-axis { border-right: 1px solid rgba(0,0,0,0.2) !important; }
+[data-theme="white"] .fc-theme-standard .fc-timegrid-col { border-left: 1px solid rgba(0,0,0,0.2) !important; }
+[data-theme="white"] .fc-theme-standard .fc-timegrid-cols .fc-timegrid-col:nth-child(even) { background: rgba(0,0,0,0.05) !important; }
 [data-theme="white"] .fc-theme-standard td,
 [data-theme="white"] .fc-theme-standard th,
-[data-theme="white"] .fc-theme-standard .fc-scrollgrid { border-color: #cbd5e1 !important; }
+[data-theme="white"] .fc-theme-standard .fc-scrollgrid { border-color: rgba(0,0,0,0.2) !important; }
 
 /* Day grid vertical banding for readability */
 [data-theme="white"] .fc .fc-daygrid-body table tr > td { background: #ffffff !important; }
-[data-theme="white"] .fc .fc-daygrid-body table tr > td:nth-child(even) { background: #f7fafc !important; }
+[data-theme="white"] .fc .fc-daygrid-body table tr > td:nth-child(even) { background: rgba(0,0,0,0.05) !important; }
 [data-theme="white"] .fc .fc-daygrid-day-frame { border-left: 1px solid #e2e8f0 !important; }
 
 /* Light theme: Pagination buttons - white background with black numbers */

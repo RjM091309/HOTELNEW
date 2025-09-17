@@ -1203,16 +1203,40 @@
 [data-theme="white"] .fc-theme-standard .fc-scrollgrid,
 [data-theme="white"] .fc-theme-standard th,
 [data-theme="white"] .fc-theme-standard td {
-  border: 1px solid rgba(0,0,0,0.1) !important;
+  border: 1px solid rgba(0,0,0,0.2) !important;
 }
 
 [data-theme="white"] .fc-timeline-body {
   background: #ffffff !important;
 }
 
+/* Ensure table layout collapses borders for clear separators */
+[data-theme="white"] .fc-timeline-body table {
+  border-collapse: collapse !important;
+}
+
 [data-theme="white"] .fc-timeline-slot {
   background: rgba(0,0,0,0.02) !important;
-  border-right: 1px solid rgba(0,0,0,0.1) !important;
+  border-right: 1px solid rgba(0,0,0,0.2) !important;
+  border-top: 1px solid rgba(0,0,0,0.2) !important;
+}
+
+/* Force visible horizontal hairline inside each lane (even if events overlap borders) */
+[data-theme="white"] td.fc-timeline-lane {
+  position: relative !important;
+}
+
+/* Draw a 1px separator above events to guarantee visibility */
+[data-theme="white"] td.fc-timeline-lane::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: rgba(0,0,0,0.2);
+  pointer-events: none;
+  z-index: 20; /* higher than .fc-event (z-index:10) */
 }
 
 [data-theme="white"] .fc-timeline-slot-cushion {
@@ -1220,10 +1244,18 @@
   background: rgba(0,0,0,0.02) !important;
 }
 
+/* Ensure date numbers and day names are black in light theme */
+[data-theme="white"] .fc-timeline-slot-cushion .day,
+[data-theme="white"] .fc-slot-label-combined .day,
+[data-theme="white"] .fc-timeline-slot-cushion .dow,
+[data-theme="white"] .fc-slot-label-combined .dow {
+  color: #000000 !important;
+}
+
 [data-theme="white"] .fc-resource-area-header {
   background: rgba(0,0,0,0.05) !important;
   color: #000000 !important;
-  border-right: 1px solid rgba(0,0,0,0.1) !important;
+  border-right: 1px solid rgba(0,0,0,0.2) !important;
 }
 
 [data-theme="white"] .fc-resource-bold {
@@ -1239,7 +1271,8 @@
 
 [data-theme="white"] .fc-timeline-header .fc-timeline-slot {
   background: rgba(0,0,0,0.02) !important;
-  border-right: 1px solid rgba(0,0,0,0.1) !important;
+  border-right: 1px solid rgba(0,0,0,0.2) !important;
+  border-top: 1px solid rgba(0,0,0,0.2) !important;
 }
 
 [data-theme="white"] .fc-timeline-header .fc-timeline-slot-cushion {
@@ -1248,11 +1281,17 @@
 }
 
 [data-theme="white"] .fc-slot-label-combined .dow {
-  color: #666666 !important;
+  color: #000000 !important;
 }
 
 [data-theme="white"] .fc-slot-label-combined .day {
   color: #000000 !important;
+}
+
+/* Override CSS variable for light theme */
+[data-theme="white"] {
+  --day-number-color: #000000 !important;
+  --day-name-color: #000000 !important;
 }
 
 /* ========================================
@@ -1270,6 +1309,31 @@
 [data-theme="white"] .fc-theme-standard .fc-list-table th {
   background-color: #f8f9fa !important;
   color: #000000 !important;
+}
+
+/* Light theme: weekend shading similar to dark theme */
+[data-theme="white"] .saturday-border {
+  background: rgba(0,0,0,0.16) !important; /* darker gray for Saturday */
+}
+
+[data-theme="white"] .sunday-border {
+  background: rgba(0,0,0,0.16) !important; /* darker gray for Sunday */
+}
+
+/* Light theme: also shade weekend header cells */
+[data-theme="white"] .fc-timeline-header .saturday-border,
+[data-theme="white"] .fc-timeline-header .sunday-border {
+  background: rgba(0,0,0,0.16) !important;
+}
+
+/* Light theme: current day shading in header as well */
+[data-theme="white"] .fc-timeline-header .current-day {
+  background-color: rgba(111, 156, 64, 0.30) !important;
+}
+
+/* Light theme: darker highlight for current day */
+[data-theme="white"] .current-day {
+  background-color: rgba(111, 156, 64, 0.30) !important; /* match dark theme green */
 }
 
 /* ========================================
@@ -1294,6 +1358,7 @@
 [data-theme="white"] #calendar #top-scroller::-webkit-scrollbar-track {
   background-color: rgba(0,0,0,0.15) !important;
 }
+
 
 
   .fc-slot-label-combined {

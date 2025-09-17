@@ -2982,28 +2982,7 @@ body.white-sidebar-color .modal .table-hover tbody tr:hover td {
   background-color: #eef1f5 !important;
 }
 
-body.white-sidebar-color .modal .btn:hover {
-  background-color: #eef1f5 !important;
-  border-color: #eef1f5 !important;
-}
-
-body.white-sidebar-color .modal .btn-secondary:hover {
-  background-color: #eef1f5 !important;
-  border-color: #eef1f5 !important;
-  color: #111827 !important;
-}
-
-body.white-sidebar-color .modal .btn-primary:hover {
-  background-color: #eef1f5 !important;
-  border-color: #eef1f5 !important;
-  color: #111827 !important;
-}
-
-body.white-sidebar-color .modal .btn-primary-10:hover {
-  background-color: #eef1f5 !important;
-  border-color: #eef1f5 !important;
-  color: #111827 !important;
-}
+/* Removed global modal button hover overrides to preserve button-specific hover colors */
 
 /* Specific modal hover overrides */
 body.white-sidebar-color #guestLevelsManagementModal .table tbody tr:hover,
