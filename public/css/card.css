@@ -2092,6 +2092,2338 @@ body.white-sidebar-color .memo {
   color: #1f2937 !important;
 }
 
+/* FullCalendar Event Names - White text in LIGHT THEME (white-sidebar-color) STRONG OVERRIDE */
+body.white-sidebar-color .fc .fc-event,
+body.white-sidebar-color .fc .fc-event *,
+body.white-sidebar-color .fc .fc-event .fc-event-title,
+body.white-sidebar-color .fc .fc-event .fc-event-main,
+body.white-sidebar-color .fc .fc-event .fc-event-main-frame,
+body.white-sidebar-color .fc .fc-event .fc-event-main-frame .fc-event-title-container,
+body.white-sidebar-color .fc .fc-event .fc-event-main-frame .fc-event-title-container .fc-event-title,
+body.white-sidebar-color .fc .fc-timeline-event,
+body.white-sidebar-color .fc .fc-timeline-event *,
+body.white-sidebar-color .fc .fc-timeline-event .fc-event-title,
+body.white-sidebar-color .fc .fc-timeline-event .fc-event-main,
+body.white-sidebar-color .fc .fc-timeline-event .fc-event-main-frame,
+body.white-sidebar-color .fc .fc-timeline-event .fc-event-main-frame .fc-event-title-container,
+body.white-sidebar-color .fc .fc-timeline-event .fc-event-main-frame .fc-event-title-container .fc-event-title {
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+
+/* Add Booking Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #modal-addbooking .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Modal Body - White Background */
+body.white-sidebar-color #modal-addbooking .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+/* Add Room Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #addRoomModal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.white-sidebar-color #addRoomModal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #addRoomModal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addRoomModal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addRoomModal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #addRoomModal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #addRoomModal input[type="text"],
+body.white-sidebar-color #addRoomModal input[type="number"],
+body.white-sidebar-color #addRoomModal input[type="email"],
+body.white-sidebar-color #addRoomModal select,
+body.white-sidebar-color #addRoomModal textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: none !important;
+  border-bottom: 1px solid #d1d5db !important;
+  border-radius: 0 !important;
+}
+
+body.white-sidebar-color #addRoomModal input::placeholder,
+body.white-sidebar-color #addRoomModal textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #addRoomModal select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addRoomModal label,
+body.white-sidebar-color #addRoomModal .mdl-textfield__label {
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #addRoomModal h3,
+body.white-sidebar-color #addRoomModal h5 {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addRoomModal input[type="checkbox"] + label,
+body.white-sidebar-color #addRoomModal .form-check-label {
+  color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility */
+body.white-sidebar-color #addRoomModal .mdl-icon-toggle__label,
+body.white-sidebar-color #addRoomModal .material-icons,
+body.white-sidebar-color #addRoomModal .keyboard_arrow_down {
+  color: #374151 !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #addRoomModal select {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.7em top 50% !important;
+  background-size: 0.65em auto !important;
+}
+
+/* Cancel Button - White Text */
+body.white-sidebar-color #addRoomModal .btn-secondary,
+body.white-sidebar-color #addRoomModal .btn-cancel,
+body.white-sidebar-color #addRoomModal .modal-footer .btn-secondary,
+body.white-sidebar-color #addRoomModal .modal-footer button,
+body.white-sidebar-color #addRoomModal button[type="button"],
+body.white-sidebar-color #addRoomModal .btn {
+  color: #ffffff !important;
+}
+
+/* Target specific button text content */
+body.white-sidebar-color #addRoomModal button:first-child,
+body.white-sidebar-color #addRoomModal .modal-footer button:first-child {
+  color: #ffffff !important;
+}
+
+/* Room Types Management Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #roomTypesManagementModal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.white-sidebar-color #roomTypesManagementModal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #roomTypesManagementModal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #roomTypesManagementModal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #roomTypesManagementModal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #roomTypesManagementModal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #roomTypesManagementModal .btn-secondary {
+  color: #ffffff !important;
+}
+
+/* Amenities Management Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #amenitiesManagementModal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.white-sidebar-color #amenitiesManagementModal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #amenitiesManagementModal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #amenitiesManagementModal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #amenitiesManagementModal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #amenitiesManagementModal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #amenitiesManagementModal .btn-secondary {
+  color: #ffffff !important;
+}
+
+/* Seasons Management Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #seasonsManagementModal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.white-sidebar-color #seasonsManagementModal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #seasonsManagementModal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #seasonsManagementModal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #seasonsManagementModal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #seasonsManagementModal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #seasonsManagementModal .btn-secondary {
+  color: #ffffff !important;
+}
+
+/* Edit Room Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #editRoomModal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.white-sidebar-color #editRoomModal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #editRoomModal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editRoomModal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editRoomModal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #editRoomModal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #editRoomModal input[type="text"],
+body.white-sidebar-color #editRoomModal input[type="number"],
+body.white-sidebar-color #editRoomModal input[type="email"],
+body.white-sidebar-color #editRoomModal select,
+body.white-sidebar-color #editRoomModal textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: none !important;
+  border-bottom: 1px solid #d1d5db !important;
+  border-radius: 0 !important;
+}
+
+body.white-sidebar-color #editRoomModal input::placeholder,
+body.white-sidebar-color #editRoomModal textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #editRoomModal select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editRoomModal label,
+body.white-sidebar-color #editRoomModal .mdl-textfield__label {
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #editRoomModal h3,
+body.white-sidebar-color #editRoomModal h5 {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editRoomModal input[type="checkbox"] + label,
+body.white-sidebar-color #editRoomModal .form-check-label {
+  color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility for Edit Room */
+body.white-sidebar-color #editRoomModal .mdl-icon-toggle__label,
+body.white-sidebar-color #editRoomModal .material-icons,
+body.white-sidebar-color #editRoomModal .keyboard_arrow_down {
+  color: #374151 !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #editRoomModal select {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.7em top 50% !important;
+  background-size: 0.65em auto !important;
+}
+
+/* Add New Room Type Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #addRoomTypeModal input[type="text"],
+body.white-sidebar-color #addRoomTypeModal input[type="number"],
+body.white-sidebar-color #addRoomTypeModal input[type="email"],
+body.white-sidebar-color #addRoomTypeModal select,
+body.white-sidebar-color #addRoomTypeModal textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: none !important;
+  border-bottom: 1px solid #d1d5db !important;
+  border-radius: 0 !important;
+}
+
+body.white-sidebar-color #addRoomTypeModal input::placeholder,
+body.white-sidebar-color #addRoomTypeModal textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #addRoomTypeModal select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addRoomTypeModal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addRoomTypeModal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #addRoomTypeModal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addRoomTypeModal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addRoomTypeModal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #addRoomTypeModal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #addRoomTypeModal input[type="checkbox"] + label,
+body.white-sidebar-color #addRoomTypeModal .form-check-label {
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #addRoomTypeModal .btn-secondary {
+  color: #ffffff !important;
+}
+
+body.white-sidebar-color #addRoomTypeModal select {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.7em top 50% !important;
+  background-size: 0.65em auto !important;
+  padding-right: 2em !important;
+}
+
+/* Add New Amenity Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #addAmenityModal input[type="text"],
+body.white-sidebar-color #addAmenityModal input[type="number"],
+body.white-sidebar-color #addAmenityModal input[type="email"],
+body.white-sidebar-color #addAmenityModal select,
+body.white-sidebar-color #addAmenityModal textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: none !important;
+  border-bottom: 1px solid #d1d5db !important;
+  border-radius: 0 !important;
+}
+
+body.white-sidebar-color #addAmenityModal input::placeholder,
+body.white-sidebar-color #addAmenityModal textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #addAmenityModal select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addAmenityModal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addAmenityModal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #addAmenityModal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addAmenityModal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addAmenityModal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #addAmenityModal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #addAmenityModal input[type="checkbox"] + label,
+body.white-sidebar-color #addAmenityModal .form-check-label {
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #addAmenityModal .btn-secondary {
+  color: #ffffff !important;
+}
+
+body.white-sidebar-color #addAmenityModal select {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.7em top 50% !important;
+  background-size: 0.65em auto !important;
+  padding-right: 2em !important;
+}
+
+/* Add New Season Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #addSeasonModal input[type="text"],
+body.white-sidebar-color #addSeasonModal input[type="number"],
+body.white-sidebar-color #addSeasonModal input[type="email"],
+body.white-sidebar-color #addSeasonModal input[type="date"],
+body.white-sidebar-color #addSeasonModal select,
+body.white-sidebar-color #addSeasonModal textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: none !important;
+  border-bottom: 1px solid #d1d5db !important;
+  border-radius: 0 !important;
+}
+
+body.white-sidebar-color #addSeasonModal input::placeholder,
+body.white-sidebar-color #addSeasonModal textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #addSeasonModal select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addSeasonModal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addSeasonModal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #addSeasonModal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addSeasonModal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addSeasonModal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #addSeasonModal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #addSeasonModal input[type="checkbox"] + label,
+body.white-sidebar-color #addSeasonModal .form-check-label {
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #addSeasonModal .btn-secondary {
+  color: #ffffff !important;
+}
+
+body.white-sidebar-color #addSeasonModal select {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.7em top 50% !important;
+  background-size: 0.65em auto !important;
+  padding-right: 2em !important;
+}
+
+/* Cancel Button - White Text for Edit Room */
+body.white-sidebar-color #editRoomModal .btn-secondary,
+body.white-sidebar-color #editRoomModal .btn-cancel,
+body.white-sidebar-color #editRoomModal .modal-footer .btn-secondary,
+body.white-sidebar-color #editRoomModal .modal-footer button,
+body.white-sidebar-color #editRoomModal button[type="button"],
+body.white-sidebar-color #editRoomModal .btn {
+  color: #ffffff !important;
+}
+
+body.white-sidebar-color #editRoomModal button:first-child,
+body.white-sidebar-color #editRoomModal .modal-footer button:first-child {
+  color: #ffffff !important;
+}
+
+/* Guest Types Management Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #guestTypesManagementModal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.white-sidebar-color #guestTypesManagementModal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #guestTypesManagementModal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #guestTypesManagementModal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #guestTypesManagementModal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #guestTypesManagementModal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #guestTypesManagementModal .btn-secondary {
+  color: #ffffff !important;
+}
+
+/* Add Guest Type Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #addGuestTypeModal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.white-sidebar-color #addGuestTypeModal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #addGuestTypeModal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addGuestTypeModal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addGuestTypeModal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #addGuestTypeModal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #addGuestTypeModal input[type="text"],
+body.white-sidebar-color #addGuestTypeModal input[type="number"],
+body.white-sidebar-color #addGuestTypeModal input[type="email"],
+body.white-sidebar-color #addGuestTypeModal select,
+body.white-sidebar-color #addGuestTypeModal textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: none !important;
+  border-bottom: 1px solid #d1d5db !important;
+  border-radius: 0 !important;
+}
+
+body.white-sidebar-color #addGuestTypeModal input::placeholder,
+body.white-sidebar-color #addGuestTypeModal textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #addGuestTypeModal select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addGuestTypeModal label,
+body.white-sidebar-color #addGuestTypeModal .mdl-textfield__label {
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #addGuestTypeModal .btn-secondary {
+  color: #ffffff !important;
+}
+
+/* Edit Guest Type Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #editGuestTypeModal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.white-sidebar-color #editGuestTypeModal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #editGuestTypeModal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editGuestTypeModal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editGuestTypeModal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #editGuestTypeModal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #editGuestTypeModal input[type="text"],
+body.white-sidebar-color #editGuestTypeModal input[type="number"],
+body.white-sidebar-color #editGuestTypeModal input[type="email"],
+body.white-sidebar-color #editGuestTypeModal select,
+body.white-sidebar-color #editGuestTypeModal textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #d1d5db !important;
+}
+
+body.white-sidebar-color #editGuestTypeModal input::placeholder,
+body.white-sidebar-color #editGuestTypeModal textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #editGuestTypeModal select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editGuestTypeModal label,
+body.white-sidebar-color #editGuestTypeModal .mdl-textfield__label {
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #editGuestTypeModal .btn-secondary {
+  color: #ffffff !important;
+}
+
+/* Guest Levels Management Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #guestLevelsManagementModal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.white-sidebar-color #guestLevelsManagementModal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #guestLevelsManagementModal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #guestLevelsManagementModal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #guestLevelsManagementModal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #guestLevelsManagementModal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #guestLevelsManagementModal .btn-secondary {
+  color: #ffffff !important;
+}
+
+/* Add Guest Level Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #addGuestLevelModal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.white-sidebar-color #addGuestLevelModal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #addGuestLevelModal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addGuestLevelModal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addGuestLevelModal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #addGuestLevelModal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #addGuestLevelModal input[type="text"],
+body.white-sidebar-color #addGuestLevelModal input[type="number"],
+body.white-sidebar-color #addGuestLevelModal input[type="email"],
+body.white-sidebar-color #addGuestLevelModal select,
+body.white-sidebar-color #addGuestLevelModal textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: none !important;
+  border-bottom: 1px solid #d1d5db !important;
+  border-radius: 0 !important;
+}
+
+body.white-sidebar-color #addGuestLevelModal input::placeholder,
+body.white-sidebar-color #addGuestLevelModal textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #addGuestLevelModal select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addGuestLevelModal label,
+body.white-sidebar-color #addGuestLevelModal .mdl-textfield__label {
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #addGuestLevelModal .btn-secondary {
+  color: #ffffff !important;
+}
+
+/* Edit Guest Level Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #editGuestLevelModal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.white-sidebar-color #editGuestLevelModal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #editGuestLevelModal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editGuestLevelModal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editGuestLevelModal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #editGuestLevelModal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #editGuestLevelModal input[type="text"],
+body.white-sidebar-color #editGuestLevelModal input[type="number"],
+body.white-sidebar-color #editGuestLevelModal input[type="email"],
+body.white-sidebar-color #editGuestLevelModal select,
+body.white-sidebar-color #editGuestLevelModal textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #d1d5db !important;
+}
+
+body.white-sidebar-color #editGuestLevelModal input::placeholder,
+body.white-sidebar-color #editGuestLevelModal textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #editGuestLevelModal select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editGuestLevelModal label,
+body.white-sidebar-color #editGuestLevelModal .mdl-textfield__label {
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #editGuestLevelModal .btn-secondary {
+  color: #ffffff !important;
+}
+
+/* Hover Colors for Light Theme Modals (white-sidebar-color) - STRONG OVERRIDE */
+body.white-sidebar-color .modal .table tbody tr:hover,
+body.white-sidebar-color .modal .table-hover tbody tr:hover,
+body.white-sidebar-color .modal .table tbody tr:hover td,
+body.white-sidebar-color .modal .table-hover tbody tr:hover td {
+  background-color: #eef1f5 !important;
+}
+
+body.white-sidebar-color .modal .btn:hover {
+  background-color: #eef1f5 !important;
+  border-color: #eef1f5 !important;
+}
+
+body.white-sidebar-color .modal .btn-secondary:hover {
+  background-color: #eef1f5 !important;
+  border-color: #eef1f5 !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color .modal .btn-primary:hover {
+  background-color: #eef1f5 !important;
+  border-color: #eef1f5 !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color .modal .btn-primary-10:hover {
+  background-color: #eef1f5 !important;
+  border-color: #eef1f5 !important;
+  color: #111827 !important;
+}
+
+/* Specific modal hover overrides */
+body.white-sidebar-color #guestLevelsManagementModal .table tbody tr:hover,
+body.white-sidebar-color #guestLevelsManagementModal .table tbody tr:hover td,
+body.white-sidebar-color #guestTypesManagementModal .table tbody tr:hover,
+body.white-sidebar-color #guestTypesManagementModal .table tbody tr:hover td,
+body.white-sidebar-color #roomTypesManagementModal .table tbody tr:hover,
+body.white-sidebar-color #roomTypesManagementModal .table tbody tr:hover td,
+body.white-sidebar-color #amenitiesManagementModal .table tbody tr:hover,
+body.white-sidebar-color #amenitiesManagementModal .table tbody tr:hover td,
+body.white-sidebar-color #seasonsManagementModal .table tbody tr:hover,
+body.white-sidebar-color #seasonsManagementModal .table tbody tr:hover td {
+  background-color: #eef1f5 !important;
+}
+
+/* Edit Guest Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #editGuestModal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.white-sidebar-color #editGuestModal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #editGuestModal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editGuestModal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editGuestModal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #editGuestModal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #editGuestModal input[type="text"],
+body.white-sidebar-color #editGuestModal input[type="number"],
+body.white-sidebar-color #editGuestModal input[type="email"],
+body.white-sidebar-color #editGuestModal select,
+body.white-sidebar-color #editGuestModal textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #d1d5db !important;
+}
+
+body.white-sidebar-color #editGuestModal input::placeholder,
+body.white-sidebar-color #editGuestModal textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #editGuestModal select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editGuestModal label,
+body.white-sidebar-color #editGuestModal .mdl-textfield__label {
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #editGuestModal h3,
+body.white-sidebar-color #editGuestModal h5 {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editGuestModal input[type="checkbox"] + label,
+body.white-sidebar-color #editGuestModal .form-check-label {
+  color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility for Edit Guest */
+body.white-sidebar-color #editGuestModal .mdl-icon-toggle__label,
+body.white-sidebar-color #editGuestModal .material-icons,
+body.white-sidebar-color #editGuestModal .keyboard_arrow_down {
+  color: #374151 !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #editGuestModal select {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.7em top 50% !important;
+  background-size: 0.65em auto !important;
+}
+
+/* Cancel Button - White Text for Edit Guest */
+body.white-sidebar-color #editGuestModal .btn-secondary,
+body.white-sidebar-color #editGuestModal .btn-cancel,
+body.white-sidebar-color #editGuestModal .modal-footer .btn-secondary,
+body.white-sidebar-color #editGuestModal .modal-footer button,
+body.white-sidebar-color #editGuestModal button[type="button"],
+body.white-sidebar-color #editGuestModal .btn {
+  color: #ffffff !important;
+}
+
+body.white-sidebar-color #editGuestModal button:first-child,
+body.white-sidebar-color #editGuestModal .modal-footer button:first-child {
+  color: #ffffff !important;
+}
+
+/* Add New Expense Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #new-expense-modal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.white-sidebar-color #new-expense-modal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #new-expense-modal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #new-expense-modal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #new-expense-modal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #new-expense-modal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #new-expense-modal input[type="text"],
+body.white-sidebar-color #new-expense-modal input[type="number"],
+body.white-sidebar-color #new-expense-modal input[type="email"],
+body.white-sidebar-color #new-expense-modal select,
+body.white-sidebar-color #new-expense-modal textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: none !important;
+  border-bottom: 1px solid #d1d5db !important;
+  border-radius: 0 !important;
+}
+
+body.white-sidebar-color #new-expense-modal input::placeholder,
+body.white-sidebar-color #new-expense-modal textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #new-expense-modal select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #new-expense-modal label,
+body.white-sidebar-color #new-expense-modal .mdl-textfield__label {
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #new-expense-modal h3,
+body.white-sidebar-color #new-expense-modal h5 {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #new-expense-modal input[type="checkbox"] + label,
+body.white-sidebar-color #new-expense-modal .form-check-label {
+  color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility for Add New Expense */
+body.white-sidebar-color #new-expense-modal .mdl-icon-toggle__label,
+body.white-sidebar-color #new-expense-modal .material-icons,
+body.white-sidebar-color #new-expense-modal .keyboard_arrow_down {
+  color: #374151 !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #new-expense-modal select {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.7em top 50% !important;
+  background-size: 0.65em auto !important;
+}
+
+/* Cancel Button - White Text for Add New Expense */
+body.white-sidebar-color #new-expense-modal .btn-secondary,
+body.white-sidebar-color #new-expense-modal .btn-cancel,
+body.white-sidebar-color #new-expense-modal .modal-footer .btn-secondary,
+body.white-sidebar-color #new-expense-modal .modal-footer button,
+body.white-sidebar-color #new-expense-modal button[type="button"],
+body.white-sidebar-color #new-expense-modal .btn {
+  color: #ffffff !important;
+}
+
+body.white-sidebar-color #new-expense-modal button:first-child,
+body.white-sidebar-color #new-expense-modal .modal-footer button:first-child {
+  color: #ffffff !important;
+}
+
+/* Edit Expense Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #edit-expense-modal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.white-sidebar-color #edit-expense-modal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #edit-expense-modal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #edit-expense-modal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #edit-expense-modal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #edit-expense-modal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #edit-expense-modal input[type="text"],
+body.white-sidebar-color #edit-expense-modal input[type="number"],
+body.white-sidebar-color #edit-expense-modal input[type="email"],
+body.white-sidebar-color #edit-expense-modal select,
+body.white-sidebar-color #edit-expense-modal textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: none !important;
+  border-bottom: 1px solid #d1d5db !important;
+  border-radius: 0 !important;
+}
+
+body.white-sidebar-color #edit-expense-modal input::placeholder,
+body.white-sidebar-color #edit-expense-modal textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #edit-expense-modal select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #edit-expense-modal label,
+body.white-sidebar-color #edit-expense-modal .mdl-textfield__label {
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #edit-expense-modal h3,
+body.white-sidebar-color #edit-expense-modal h5 {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #edit-expense-modal input[type="checkbox"] + label,
+body.white-sidebar-color #edit-expense-modal .form-check-label {
+  color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility for Edit Expense */
+body.white-sidebar-color #edit-expense-modal .mdl-icon-toggle__label,
+body.white-sidebar-color #edit-expense-modal .material-icons,
+body.white-sidebar-color #edit-expense-modal .keyboard_arrow_down {
+  color: #374151 !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #edit-expense-modal select {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.7em top 50% !important;
+  background-size: 0.65em auto !important;
+}
+
+/* Cancel Button - White Text for Edit Expense */
+body.white-sidebar-color #edit-expense-modal .btn-secondary,
+body.white-sidebar-color #edit-expense-modal .btn-cancel,
+body.white-sidebar-color #edit-expense-modal .modal-footer .btn-secondary,
+body.white-sidebar-color #edit-expense-modal .modal-footer button,
+body.white-sidebar-color #edit-expense-modal button[type="button"],
+body.white-sidebar-color #edit-expense-modal .btn {
+  color: #ffffff !important;
+}
+
+body.white-sidebar-color #edit-expense-modal button:first-child,
+body.white-sidebar-color #edit-expense-modal .modal-footer button:first-child {
+  color: #ffffff !important;
+}
+
+/* New Room Clearance Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #new-clearance-modal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.white-sidebar-color #new-clearance-modal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #new-clearance-modal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #new-clearance-modal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #new-clearance-modal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #new-clearance-modal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #new-clearance-modal input[type="text"],
+body.white-sidebar-color #new-clearance-modal input[type="number"],
+body.white-sidebar-color #new-clearance-modal input[type="email"],
+body.white-sidebar-color #new-clearance-modal select,
+body.white-sidebar-color #new-clearance-modal textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: none !important;
+  border-bottom: 1px solid #d1d5db !important;
+  border-radius: 0 !important;
+}
+
+body.white-sidebar-color #new-clearance-modal input::placeholder,
+body.white-sidebar-color #new-clearance-modal textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #new-clearance-modal select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #new-clearance-modal label,
+body.white-sidebar-color #new-clearance-modal .mdl-textfield__label {
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #new-clearance-modal h3,
+body.white-sidebar-color #new-clearance-modal h5 {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #new-clearance-modal input[type="checkbox"] + label,
+body.white-sidebar-color #new-clearance-modal .form-check-label {
+  color: #374151 !important;
+}
+
+/* Hide ALL Material Design icons in New Room Clearance */
+body.white-sidebar-color #new-clearance-modal .mdl-icon-toggle__label,
+body.white-sidebar-color #new-clearance-modal .material-icons,
+body.white-sidebar-color #new-clearance-modal .keyboard_arrow_down,
+body.white-sidebar-color #new-clearance-modal i.material-icons,
+body.white-sidebar-color #new-clearance-modal i.mdl-icon-toggle__label.material-icons,
+body.white-sidebar-color #new-clearance-modal .mdl-textfield__input::after,
+body.white-sidebar-color #new-clearance-modal .mdl-textfield::after,
+body.white-sidebar-color #new-clearance-modal .mdl-textfield__input::before,
+body.white-sidebar-color #new-clearance-modal .mdl-textfield::before,
+body.white-sidebar-color #new-clearance-modal i,
+body.white-sidebar-color #new-clearance-modal .icon,
+body.white-sidebar-color #new-clearance-modal .fa,
+body.white-sidebar-color #new-clearance-modal .fas,
+body.white-sidebar-color #new-clearance-modal .far,
+body.white-sidebar-color #new-clearance-modal .glyphicon {
+  display: none !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  height: 0 !important;
+  font-size: 0 !important;
+  content: none !important;
+}
+
+
+/* Hide specific dropdown arrows in new-clearance-modal */
+body.white-sidebar-color #new-clearance-modal .mdl-textfield__input::before,
+body.white-sidebar-color #new-clearance-modal .mdl-textfield__input::after,
+body.white-sidebar-color #new-clearance-modal .mdl-textfield::before,
+body.white-sidebar-color #new-clearance-modal .mdl-textfield::after {
+  display: none !important;
+}
+
+/* Cancel Button - White Text for New Room Clearance */
+body.white-sidebar-color #new-clearance-modal .btn-secondary,
+body.white-sidebar-color #new-clearance-modal .btn-cancel,
+body.white-sidebar-color #new-clearance-modal .modal-footer .btn-secondary,
+body.white-sidebar-color #new-clearance-modal .modal-footer button,
+body.white-sidebar-color #new-clearance-modal button[type="button"],
+body.white-sidebar-color #new-clearance-modal .btn {
+  color: #ffffff !important;
+}
+
+body.white-sidebar-color #new-clearance-modal button:first-child,
+body.white-sidebar-color #new-clearance-modal .modal-footer button:first-child {
+  color: #ffffff !important;
+}
+
+/* Add New Service Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #addServiceModal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.white-sidebar-color #addServiceModal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #addServiceModal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addServiceModal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addServiceModal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #addServiceModal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #addServiceModal input[type="text"],
+body.white-sidebar-color #addServiceModal input[type="number"],
+body.white-sidebar-color #addServiceModal input[type="email"],
+body.white-sidebar-color #addServiceModal select,
+body.white-sidebar-color #addServiceModal textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: none !important;
+  border-bottom: 1px solid #d1d5db !important;
+  border-radius: 0 !important;
+}
+
+body.white-sidebar-color #addServiceModal input::placeholder,
+body.white-sidebar-color #addServiceModal textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #addServiceModal select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addServiceModal label,
+body.white-sidebar-color #addServiceModal .mdl-textfield__label {
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #addServiceModal h3,
+body.white-sidebar-color #addServiceModal h5 {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addServiceModal input[type="checkbox"] + label,
+body.white-sidebar-color #addServiceModal .form-check-label {
+  color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility for Add New Service */
+body.white-sidebar-color #addServiceModal .mdl-icon-toggle__label,
+body.white-sidebar-color #addServiceModal .material-icons,
+body.white-sidebar-color #addServiceModal .keyboard_arrow_down {
+  color: #374151 !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #addServiceModal select {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.7em top 50% !important;
+  background-size: 0.65em auto !important;
+}
+
+/* Cancel Button - White Text for Add New Service */
+body.white-sidebar-color #addServiceModal .btn-secondary,
+body.white-sidebar-color #addServiceModal .btn-cancel,
+body.white-sidebar-color #addServiceModal .modal-footer .btn-secondary,
+body.white-sidebar-color #addServiceModal .modal-footer button,
+body.white-sidebar-color #addServiceModal button[type="button"],
+body.white-sidebar-color #addServiceModal .btn {
+  color: #ffffff !important;
+}
+
+body.white-sidebar-color #addServiceModal button:first-child,
+body.white-sidebar-color #addServiceModal .modal-footer button:first-child {
+  color: #ffffff !important;
+}
+
+/* Edit Service Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #editServiceModal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.white-sidebar-color #editServiceModal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #editServiceModal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editServiceModal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editServiceModal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #editServiceModal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #editServiceModal input[type="text"],
+body.white-sidebar-color #editServiceModal input[type="number"],
+body.white-sidebar-color #editServiceModal input[type="email"],
+body.white-sidebar-color #editServiceModal select,
+body.white-sidebar-color #editServiceModal textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: none !important;
+  border-bottom: 1px solid #d1d5db !important;
+  border-radius: 0 !important;
+}
+
+body.white-sidebar-color #editServiceModal input::placeholder,
+body.white-sidebar-color #editServiceModal textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #editServiceModal select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editServiceModal label,
+body.white-sidebar-color #editServiceModal .mdl-textfield__label {
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #editServiceModal h3,
+body.white-sidebar-color #editServiceModal h5 {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editServiceModal input[type="checkbox"] + label,
+body.white-sidebar-color #editServiceModal .form-check-label {
+  color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility for Edit Service */
+body.white-sidebar-color #editServiceModal .mdl-icon-toggle__label,
+body.white-sidebar-color #editServiceModal .material-icons,
+body.white-sidebar-color #editServiceModal .keyboard_arrow_down {
+  color: #374151 !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #editServiceModal select {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.7em top 50% !important;
+  background-size: 0.65em auto !important;
+}
+
+/* Cancel Button - White Text for Edit Service */
+body.white-sidebar-color #editServiceModal .btn-secondary,
+body.white-sidebar-color #editServiceModal .btn-cancel,
+body.white-sidebar-color #editServiceModal .modal-footer .btn-secondary,
+body.white-sidebar-color #editServiceModal .modal-footer button,
+body.white-sidebar-color #editServiceModal button[type="button"],
+body.white-sidebar-color #editServiceModal .btn {
+  color: #ffffff !important;
+}
+
+body.white-sidebar-color #editServiceModal button:first-child,
+body.white-sidebar-color #editServiceModal .modal-footer button:first-child {
+  color: #ffffff !important;
+}
+
+/* Add New Employee Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #addEmployeeModal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.white-sidebar-color #addEmployeeModal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #addEmployeeModal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addEmployeeModal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addEmployeeModal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #addEmployeeModal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #addEmployeeModal input[type="text"],
+body.white-sidebar-color #addEmployeeModal input[type="number"],
+body.white-sidebar-color #addEmployeeModal input[type="email"],
+body.white-sidebar-color #addEmployeeModal select,
+body.white-sidebar-color #addEmployeeModal textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: none !important;
+  border-bottom: 1px solid #d1d5db !important;
+  border-radius: 0 !important;
+}
+
+body.white-sidebar-color #addEmployeeModal input::placeholder,
+body.white-sidebar-color #addEmployeeModal textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #addEmployeeModal select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addEmployeeModal label,
+body.white-sidebar-color #addEmployeeModal .mdl-textfield__label {
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #addEmployeeModal h3,
+body.white-sidebar-color #addEmployeeModal h5 {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addEmployeeModal input[type="checkbox"] + label,
+body.white-sidebar-color #addEmployeeModal .form-check-label {
+  color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility for Add New Employee */
+body.white-sidebar-color #addEmployeeModal .mdl-icon-toggle__label,
+body.white-sidebar-color #addEmployeeModal .material-icons,
+body.white-sidebar-color #addEmployeeModal .keyboard_arrow_down {
+  color: #374151 !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #addEmployeeModal select {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.7em top 50% !important;
+  background-size: 0.65em auto !important;
+}
+
+/* Cancel Button - White Text for Add New Employee */
+body.white-sidebar-color #addEmployeeModal .btn-secondary,
+body.white-sidebar-color #addEmployeeModal .btn-cancel,
+body.white-sidebar-color #addEmployeeModal .modal-footer .btn-secondary,
+body.white-sidebar-color #addEmployeeModal .modal-footer button,
+body.white-sidebar-color #addEmployeeModal button[type="button"],
+body.white-sidebar-color #addEmployeeModal .btn {
+  color: #ffffff !important;
+}
+
+body.white-sidebar-color #addEmployeeModal button:first-child,
+body.white-sidebar-color #addEmployeeModal .modal-footer button:first-child {
+  color: #ffffff !important;
+}
+
+/* File Upload Area - Light Gray Background for Light Theme (white-sidebar-color) */
+body.white-sidebar-color #addEmployeeModal .file-upload-area,
+body.white-sidebar-color #addEmployeeModal .upload-area,
+body.white-sidebar-color #addEmployeeModal .file-input-area,
+body.white-sidebar-color #addEmployeeModal .dropzone,
+body.white-sidebar-color #addEmployeeModal .upload-container,
+body.white-sidebar-color #addEmployeeModal .photo-upload-area {
+  background-color: #eef1f5 !important;
+  border: 2px dashed #d1d5db !important;
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #addEmployeeModal .file-upload-area:hover,
+body.white-sidebar-color #addEmployeeModal .upload-area:hover,
+body.white-sidebar-color #addEmployeeModal .file-input-area:hover,
+body.white-sidebar-color #addEmployeeModal .dropzone:hover,
+body.white-sidebar-color #addEmployeeModal .upload-container:hover,
+body.white-sidebar-color #addEmployeeModal .photo-upload-area:hover {
+  background-color: #e5e7eb !important;
+  border-color: #9ca3af !important;
+}
+
+body.white-sidebar-color #addEmployeeModal .file-upload-area .upload-icon,
+body.white-sidebar-color #addEmployeeModal .upload-area .upload-icon,
+body.white-sidebar-color #addEmployeeModal .file-input-area .upload-icon,
+body.white-sidebar-color #addEmployeeModal .dropzone .upload-icon,
+body.white-sidebar-color #addEmployeeModal .upload-container .upload-icon,
+body.white-sidebar-color #addEmployeeModal .photo-upload-area .upload-icon {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #addEmployeeModal .file-upload-area .upload-text,
+body.white-sidebar-color #addEmployeeModal .upload-area .upload-text,
+body.white-sidebar-color #addEmployeeModal .file-input-area .upload-text,
+body.white-sidebar-color #addEmployeeModal .dropzone .upload-text,
+body.white-sidebar-color #addEmployeeModal .upload-container .upload-text,
+body.white-sidebar-color #addEmployeeModal .photo-upload-area .upload-text {
+  color: #6b7280 !important;
+}
+
+/* Edit Employee Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #editEmployeeModal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.white-sidebar-color #editEmployeeModal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #editEmployeeModal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editEmployeeModal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editEmployeeModal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #editEmployeeModal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #editEmployeeModal input[type="text"],
+body.white-sidebar-color #editEmployeeModal input[type="number"],
+body.white-sidebar-color #editEmployeeModal input[type="email"],
+body.white-sidebar-color #editEmployeeModal select,
+body.white-sidebar-color #editEmployeeModal textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: none !important;
+  border-bottom: 1px solid #d1d5db !important;
+  border-radius: 0 !important;
+}
+
+body.white-sidebar-color #editEmployeeModal input::placeholder,
+body.white-sidebar-color #editEmployeeModal textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #editEmployeeModal select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editEmployeeModal label,
+body.white-sidebar-color #editEmployeeModal .mdl-textfield__label {
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #editEmployeeModal h3,
+body.white-sidebar-color #editEmployeeModal h5 {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editEmployeeModal input[type="checkbox"] + label,
+body.white-sidebar-color #editEmployeeModal .form-check-label {
+  color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility for Edit Employee */
+body.white-sidebar-color #editEmployeeModal .mdl-icon-toggle__label,
+body.white-sidebar-color #editEmployeeModal .material-icons,
+body.white-sidebar-color #editEmployeeModal .keyboard_arrow_down {
+  color: #374151 !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #editEmployeeModal select {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.7em top 50% !important;
+  background-size: 0.65em auto !important;
+}
+
+/* Cancel Button - White Text for Edit Employee */
+body.white-sidebar-color #editEmployeeModal .btn-secondary,
+body.white-sidebar-color #editEmployeeModal .btn-cancel,
+body.white-sidebar-color #editEmployeeModal .modal-footer .btn-secondary,
+body.white-sidebar-color #editEmployeeModal .modal-footer button,
+body.white-sidebar-color #editEmployeeModal button[type="button"],
+body.white-sidebar-color #editEmployeeModal .btn {
+  color: #ffffff !important;
+}
+
+body.white-sidebar-color #editEmployeeModal button:first-child,
+body.white-sidebar-color #editEmployeeModal .modal-footer button:first-child {
+  color: #ffffff !important;
+}
+
+/* File Upload Area for Edit Employee - Light Gray Background (white-sidebar-color) */
+body.white-sidebar-color #editEmployeeModal .file-upload-area,
+body.white-sidebar-color #editEmployeeModal .upload-area,
+body.white-sidebar-color #editEmployeeModal .file-input-area,
+body.white-sidebar-color #editEmployeeModal .dropzone,
+body.white-sidebar-color #editEmployeeModal .upload-container,
+body.white-sidebar-color #editEmployeeModal .photo-upload-area {
+  background-color: #eef1f5 !important;
+  border: 2px dashed #d1d5db !important;
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #editEmployeeModal .file-upload-area:hover,
+body.white-sidebar-color #editEmployeeModal .upload-area:hover,
+body.white-sidebar-color #editEmployeeModal .file-input-area:hover,
+body.white-sidebar-color #editEmployeeModal .dropzone:hover,
+body.white-sidebar-color #editEmployeeModal .upload-container:hover,
+body.white-sidebar-color #editEmployeeModal .photo-upload-area:hover {
+  background-color: #e5e7eb !important;
+  border-color: #9ca3af !important;
+}
+
+body.white-sidebar-color #editEmployeeModal .file-upload-area .upload-icon,
+body.white-sidebar-color #editEmployeeModal .upload-area .upload-icon,
+body.white-sidebar-color #editEmployeeModal .file-input-area .upload-icon,
+body.white-sidebar-color #editEmployeeModal .dropzone .upload-icon,
+body.white-sidebar-color #editEmployeeModal .upload-container .upload-icon,
+body.white-sidebar-color #editEmployeeModal .photo-upload-area .upload-icon {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #editEmployeeModal .file-upload-area .upload-text,
+body.white-sidebar-color #editEmployeeModal .upload-area .upload-text,
+body.white-sidebar-color #editEmployeeModal .file-input-area .upload-text,
+body.white-sidebar-color #editEmployeeModal .dropzone .upload-text,
+body.white-sidebar-color #editEmployeeModal .upload-container .upload-text,
+body.white-sidebar-color #editEmployeeModal .photo-upload-area .upload-text {
+  color: #6b7280 !important;
+}
+
+/* Add New Vehicle Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #addVehicleModal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.white-sidebar-color #addVehicleModal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #addVehicleModal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addVehicleModal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addVehicleModal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #addVehicleModal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #addVehicleModal input[type="text"],
+body.white-sidebar-color #addVehicleModal input[type="number"],
+body.white-sidebar-color #addVehicleModal input[type="email"],
+body.white-sidebar-color #addVehicleModal select,
+body.white-sidebar-color #addVehicleModal textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: none !important;
+  border-bottom: 1px solid #d1d5db !important;
+  border-radius: 0 !important;
+}
+
+body.white-sidebar-color #addVehicleModal input::placeholder,
+body.white-sidebar-color #addVehicleModal textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #addVehicleModal select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addVehicleModal label,
+body.white-sidebar-color #addVehicleModal .mdl-textfield__label {
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #addVehicleModal h3,
+body.white-sidebar-color #addVehicleModal h5 {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addVehicleModal input[type="checkbox"] + label,
+body.white-sidebar-color #addVehicleModal .form-check-label {
+  color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility for Add New Vehicle */
+body.white-sidebar-color #addVehicleModal .mdl-icon-toggle__label,
+body.white-sidebar-color #addVehicleModal .material-icons,
+body.white-sidebar-color #addVehicleModal .keyboard_arrow_down {
+  color: #374151 !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #addVehicleModal select {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.7em top 50% !important;
+  background-size: 0.65em auto !important;
+}
+
+/* Cancel Button - White Text for Add New Vehicle */
+body.white-sidebar-color #addVehicleModal .btn-secondary,
+body.white-sidebar-color #addVehicleModal .btn-cancel,
+body.white-sidebar-color #addVehicleModal .modal-footer .btn-secondary,
+body.white-sidebar-color #addVehicleModal .modal-footer button,
+body.white-sidebar-color #addVehicleModal button[type="button"],
+body.white-sidebar-color #addVehicleModal .btn {
+  color: #ffffff !important;
+}
+
+body.white-sidebar-color #addVehicleModal button:first-child,
+body.white-sidebar-color #addVehicleModal .modal-footer button:first-child {
+  color: #ffffff !important;
+}
+
+/* File Upload Area for Add New Vehicle - Light Gray Background (white-sidebar-color) */
+body.white-sidebar-color #addVehicleModal .file-upload-area,
+body.white-sidebar-color #addVehicleModal .upload-area,
+body.white-sidebar-color #addVehicleModal .file-input-area,
+body.white-sidebar-color #addVehicleModal .dropzone,
+body.white-sidebar-color #addVehicleModal .upload-container,
+body.white-sidebar-color #addVehicleModal .vehicle-photo-upload-container,
+body.white-sidebar-color #addVehicleModal .file-upload-wrapper {
+  background-color: #eef1f5 !important;
+  border: 2px dashed #d1d5db !important;
+  color: #374151 !important;
+}
+
+/* Remove ALL outer borders from vehicle photo container (white-sidebar-color) */
+body.white-sidebar-color #addVehicleModal .vehicle-photo-upload-container,
+body.white-sidebar-color #addVehicleModal .file-upload-wrapper,
+body.white-sidebar-color #addVehicleModal .upload-container {
+  border: none !important;
+  background-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Keep only the inner file-upload-area border (white-sidebar-color) */
+body.white-sidebar-color #addVehicleModal .file-upload-area {
+  background-color: #eef1f5 !important;
+  border: 2px dashed #d1d5db !important;
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #addVehicleModal .file-upload-area:hover,
+body.white-sidebar-color #addVehicleModal .upload-area:hover,
+body.white-sidebar-color #addVehicleModal .file-input-area:hover,
+body.white-sidebar-color #addVehicleModal .dropzone:hover,
+body.white-sidebar-color #addVehicleModal .upload-container:hover,
+body.white-sidebar-color #addVehicleModal .vehicle-photo-upload-container:hover,
+body.white-sidebar-color #addVehicleModal .file-upload-wrapper:hover {
+  background-color: #e5e7eb !important;
+  border-color: #9ca3af !important;
+}
+
+body.white-sidebar-color #addVehicleModal .file-upload-area .upload-icon,
+body.white-sidebar-color #addVehicleModal .upload-area .upload-icon,
+body.white-sidebar-color #addVehicleModal .file-input-area .upload-icon,
+body.white-sidebar-color #addVehicleModal .dropzone .upload-icon,
+body.white-sidebar-color #addVehicleModal .upload-container .upload-icon,
+body.white-sidebar-color #addVehicleModal .vehicle-photo-upload-container .upload-icon,
+body.white-sidebar-color #addVehicleModal .file-upload-wrapper .upload-icon {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #addVehicleModal .file-upload-area .upload-text,
+body.white-sidebar-color #addVehicleModal .upload-area .upload-text,
+body.white-sidebar-color #addVehicleModal .file-input-area .upload-text,
+body.white-sidebar-color #addVehicleModal .dropzone .upload-text,
+body.white-sidebar-color #addVehicleModal .upload-container .upload-text,
+body.white-sidebar-color #addVehicleModal .vehicle-photo-upload-container .upload-text,
+body.white-sidebar-color #addVehicleModal .file-upload-wrapper .upload-text {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #addVehicleModal .upload-label {
+  color: #374151 !important;
+}
+
+/* Edit Vehicle Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #editVehicleModal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.white-sidebar-color #editVehicleModal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #editVehicleModal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editVehicleModal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editVehicleModal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #editVehicleModal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #editVehicleModal input[type="text"],
+body.white-sidebar-color #editVehicleModal input[type="number"],
+body.white-sidebar-color #editVehicleModal input[type="email"],
+body.white-sidebar-color #editVehicleModal select,
+body.white-sidebar-color #editVehicleModal textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: none !important;
+  border-bottom: 1px solid #d1d5db !important;
+  border-radius: 0 !important;
+}
+
+body.white-sidebar-color #editVehicleModal input::placeholder,
+body.white-sidebar-color #editVehicleModal textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #editVehicleModal select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editVehicleModal label,
+body.white-sidebar-color #editVehicleModal .mdl-textfield__label {
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #editVehicleModal h3,
+body.white-sidebar-color #editVehicleModal h5 {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #editVehicleModal input[type="checkbox"] + label,
+body.white-sidebar-color #editVehicleModal .form-check-label {
+  color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility for Edit Vehicle */
+body.white-sidebar-color #editVehicleModal .mdl-icon-toggle__label,
+body.white-sidebar-color #editVehicleModal .material-icons,
+body.white-sidebar-color #editVehicleModal .keyboard_arrow_down {
+  color: #374151 !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #editVehicleModal select {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.7em top 50% !important;
+  background-size: 0.65em auto !important;
+}
+
+/* Cancel Button - White Text for Edit Vehicle */
+body.white-sidebar-color #editVehicleModal .btn-secondary,
+body.white-sidebar-color #editVehicleModal .btn-cancel,
+body.white-sidebar-color #editVehicleModal .modal-footer .btn-secondary,
+body.white-sidebar-color #editVehicleModal .modal-footer button,
+body.white-sidebar-color #editVehicleModal button[type="button"],
+body.white-sidebar-color #editVehicleModal .btn {
+  color: #ffffff !important;
+}
+
+body.white-sidebar-color #editVehicleModal button:first-child,
+body.white-sidebar-color #editVehicleModal .modal-footer button:first-child {
+  color: #ffffff !important;
+}
+
+/* File Upload Area for Edit Vehicle - Light Gray Background (white-sidebar-color) */
+body.white-sidebar-color #editVehicleModal .file-upload-area,
+body.white-sidebar-color #editVehicleModal .upload-area,
+body.white-sidebar-color #editVehicleModal .file-input-area,
+body.white-sidebar-color #editVehicleModal .dropzone,
+body.white-sidebar-color #editVehicleModal .upload-container,
+body.white-sidebar-color #editVehicleModal .vehicle-photo-upload-container,
+body.white-sidebar-color #editVehicleModal .file-upload-wrapper {
+  background-color: #eef1f5 !important;
+  border: 2px dashed #d1d5db !important;
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #editVehicleModal .file-upload-area:hover,
+body.white-sidebar-color #editVehicleModal .upload-area:hover,
+body.white-sidebar-color #editVehicleModal .file-input-area:hover,
+body.white-sidebar-color #editVehicleModal .dropzone:hover,
+body.white-sidebar-color #editVehicleModal .upload-container:hover,
+body.white-sidebar-color #editVehicleModal .vehicle-photo-upload-container:hover,
+body.white-sidebar-color #editVehicleModal .file-upload-wrapper:hover {
+  background-color: #e5e7eb !important;
+  border-color: #9ca3af !important;
+}
+
+body.white-sidebar-color #editVehicleModal .file-upload-area .upload-icon,
+body.white-sidebar-color #editVehicleModal .upload-area .upload-icon,
+body.white-sidebar-color #editVehicleModal .file-input-area .upload-icon,
+body.white-sidebar-color #editVehicleModal .dropzone .upload-icon,
+body.white-sidebar-color #editVehicleModal .upload-container .upload-icon,
+body.white-sidebar-color #editVehicleModal .vehicle-photo-upload-container .upload-icon,
+body.white-sidebar-color #editVehicleModal .file-upload-wrapper .upload-icon {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #editVehicleModal .file-upload-area .upload-text,
+body.white-sidebar-color #editVehicleModal .upload-area .upload-text,
+body.white-sidebar-color #editVehicleModal .file-input-area .upload-text,
+body.white-sidebar-color #editVehicleModal .dropzone .upload-text,
+body.white-sidebar-color #editVehicleModal .upload-container .upload-text,
+body.white-sidebar-color #editVehicleModal .vehicle-photo-upload-container .upload-text,
+body.white-sidebar-color #editVehicleModal .file-upload-wrapper .upload-text {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #editVehicleModal .upload-label {
+  color: #374151 !important;
+}
+
+/* Remove ALL outer borders from edit vehicle photo container (white-sidebar-color) */
+body.white-sidebar-color #editVehicleModal .vehicle-photo-upload-container,
+body.white-sidebar-color #editVehicleModal .file-upload-wrapper,
+body.white-sidebar-color #editVehicleModal .upload-container {
+  border: none !important;
+  background-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Keep only the inner file-upload-area border for edit vehicle (white-sidebar-color) */
+body.white-sidebar-color #editVehicleModal .file-upload-area {
+  background-color: #eef1f5 !important;
+  border: 2px dashed #d1d5db !important;
+  color: #374151 !important;
+}
+
+/* Add New User Modal Light Theme (white-sidebar-color) */
+body.white-sidebar-color #addUserModal .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.white-sidebar-color #addUserModal .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #addUserModal .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addUserModal .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addUserModal .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #addUserModal .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #addUserModal input[type="text"],
+body.white-sidebar-color #addUserModal input[type="password"],
+body.white-sidebar-color #addUserModal input[type="number"],
+body.white-sidebar-color #addUserModal input[type="email"],
+body.white-sidebar-color #addUserModal select,
+body.white-sidebar-color #addUserModal textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: none !important;
+  border-bottom: 1px solid #d1d5db !important;
+  border-radius: 0 !important;
+}
+
+body.white-sidebar-color #addUserModal input::placeholder,
+body.white-sidebar-color #addUserModal textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #addUserModal select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addUserModal label,
+body.white-sidebar-color #addUserModal .mdl-textfield__label {
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #addUserModal h3,
+body.white-sidebar-color #addUserModal h5 {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #addUserModal input[type="checkbox"] + label,
+body.white-sidebar-color #addUserModal .form-check-label {
+  color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility for Add New User */
+body.white-sidebar-color #addUserModal .mdl-icon-toggle__label,
+body.white-sidebar-color #addUserModal .material-icons,
+body.white-sidebar-color #addUserModal .keyboard_arrow_down {
+  color: #374151 !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #addUserModal select {
+  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.7em top 50% !important;
+  background-size: 0.65em auto !important;
+}
+
+/* Cancel Button - White Text for Add New User */
+body.white-sidebar-color #addUserModal .btn-secondary,
+body.white-sidebar-color #addUserModal .btn-cancel,
+body.white-sidebar-color #addUserModal .modal-footer .btn-secondary,
+body.white-sidebar-color #addUserModal .modal-footer button,
+body.white-sidebar-color #addUserModal button[type="button"],
+body.white-sidebar-color #addUserModal .btn {
+  color: #ffffff !important;
+}
+
+body.white-sidebar-color #addUserModal button:first-child,
+body.white-sidebar-color #addUserModal .modal-footer button:first-child {
+  color: #ffffff !important;
+}
+
+/* Form Text Helper for Add New User */
+body.white-sidebar-color #addUserModal .form-text,
+body.white-sidebar-color #addUserModal #usernameCheck {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #modal-addbooking .modal-header {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+/* Override modal header inline styles */
+body.white-sidebar-color #modal-addbooking .modal-header[style*="background-color: #0c2a42"] {
+  background-color: #f9fafb !important;
+  color: #111827 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+body.white-sidebar-color #modal-addbooking .modal-title {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #modal-addbooking .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+
+body.white-sidebar-color #modal-addbooking .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.white-sidebar-color #modal-addbooking input[type="text"],
+body.white-sidebar-color #modal-addbooking input[type="number"],
+body.white-sidebar-color #modal-addbooking input[type="email"],
+body.white-sidebar-color #modal-addbooking select,
+body.white-sidebar-color #modal-addbooking textarea,
+body.white-sidebar-color #modal-addbooking input[style*="background-color: #41474c"],
+body.white-sidebar-color #modal-addbooking select[style*="background-color: #41474c"],
+body.white-sidebar-color #modal-addbooking textarea[style*="background-color: #41474c"] {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #d1d5db !important;
+}
+
+body.white-sidebar-color #modal-addbooking input::placeholder,
+body.white-sidebar-color #modal-addbooking textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+body.white-sidebar-color #modal-addbooking select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #modal-addbooking label,
+body.white-sidebar-color #modal-addbooking .mdl-textfield__label {
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #modal-addbooking h3,
+body.white-sidebar-color #modal-addbooking h5 {
+  color: #111827 !important;
+}
+
+body.white-sidebar-color #modal-addbooking input[type="checkbox"] + label,
+body.white-sidebar-color #modal-addbooking .form-check-label {
+  color: #374151 !important;
+}
+
+body.white-sidebar-color #modal-addbooking .group-room-breakdown {
+  background: #f9fafb !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+
 /* Match Real-Time Booking Monitor visibility rules in Room Status when light theme */
 body.white-sidebar-color .room-container {
   background-color: #ffffff !important;

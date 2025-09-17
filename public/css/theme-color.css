@@ -7,6 +7,16 @@
  */
 
 /* =====================
+   Light theme: FullCalendar borders override
+   Fix white borders on white bg → use subtle dark borders
+   ===================== */
+[data-theme="white"] .fc-theme-standard .fc-scrollgrid,
+[data-theme="white"] .fc-theme-standard th,
+[data-theme="white"] .fc-theme-standard td {
+    border: 1px solid rgba(0, 0, 0, 0.10) !important;
+}
+
+/* =====================
    Smooth Theme Transitions
    ===================== */
 * {
@@ -516,6 +526,16 @@
 [data-theme="white"] .mdl-tabs .mdl-tabs__tab {
     color: #111827 !important;
 }
+
+/* Light theme: Booking table checkout button text color */
+[data-theme="white"] .btn-checkout {
+    color: #111827 !important; /* ensure visible on white background */
+}
+[data-theme="white"] .btn-checkout:hover,
+[data-theme="white"] .btn-checkout:focus {
+    color: #0f172a !important;
+    text-decoration: underline;
+}
 [data-theme="white"] .mdl-tabs__tab:hover,
 [data-theme="white"] .mdl-tabs .mdl-tabs__tab:hover,
 [data-theme="white"] .mdl-tabs__tab.is-active,
@@ -605,7 +625,2259 @@
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
 }
 
+/* Modal Body - White Background */
+[data-theme="white"] #modal-addbooking .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+/* Add Room Modal Light Theme */
+[data-theme="white"] #addRoomModal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #addRoomModal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #addRoomModal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addRoomModal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addRoomModal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #addRoomModal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #addRoomModal input[type="text"],
+[data-theme="white"] #addRoomModal input[type="number"],
+[data-theme="white"] #addRoomModal input[type="email"],
+[data-theme="white"] #addRoomModal select,
+[data-theme="white"] #addRoomModal textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: none !important;
+    border-bottom: 1px solid #d1d5db !important;
+    border-radius: 0 !important;
+}
+
+[data-theme="white"] #addRoomModal input::placeholder,
+[data-theme="white"] #addRoomModal textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #addRoomModal select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addRoomModal label,
+[data-theme="white"] #addRoomModal .mdl-textfield__label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #addRoomModal h3,
+[data-theme="white"] #addRoomModal h5 {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addRoomModal input[type="checkbox"] + label,
+[data-theme="white"] #addRoomModal .form-check-label {
+    color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility */
+[data-theme="white"] #addRoomModal .mdl-icon-toggle__label,
+[data-theme="white"] #addRoomModal .material-icons,
+[data-theme="white"] #addRoomModal .keyboard_arrow_down {
+    color: #374151 !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #addRoomModal select {
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.7em top 50% !important;
+    background-size: 0.65em auto !important;
+}
+
+/* Cancel Button - White Text */
+[data-theme="white"] #addRoomModal .btn-secondary,
+[data-theme="white"] #addRoomModal .btn-cancel,
+[data-theme="white"] #addRoomModal .modal-footer .btn-secondary,
+[data-theme="white"] #addRoomModal .modal-footer button,
+[data-theme="white"] #addRoomModal button[type="button"],
+[data-theme="white"] #addRoomModal .btn {
+    color: #ffffff !important;
+}
+
+/* Target specific button text content */
+[data-theme="white"] #addRoomModal button:first-child,
+[data-theme="white"] #addRoomModal .modal-footer button:first-child {
+    color: #ffffff !important;
+}
+
+/* Room Types Management Modal Light Theme */
+[data-theme="white"] #roomTypesManagementModal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #roomTypesManagementModal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #roomTypesManagementModal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #roomTypesManagementModal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #roomTypesManagementModal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #roomTypesManagementModal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #roomTypesManagementModal .btn-secondary {
+    color: #ffffff !important;
+}
+
+/* Amenities Management Modal Light Theme */
+[data-theme="white"] #amenitiesManagementModal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #amenitiesManagementModal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #amenitiesManagementModal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #amenitiesManagementModal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #amenitiesManagementModal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #amenitiesManagementModal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #amenitiesManagementModal .btn-secondary {
+    color: #ffffff !important;
+}
+
+/* Seasons Management Modal Light Theme */
+[data-theme="white"] #seasonsManagementModal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #seasonsManagementModal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #seasonsManagementModal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #seasonsManagementModal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #seasonsManagementModal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #seasonsManagementModal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #seasonsManagementModal .btn-secondary {
+    color: #ffffff !important;
+}
+
+/* Edit Room Modal Light Theme */
+[data-theme="white"] #editRoomModal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #editRoomModal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #editRoomModal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editRoomModal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editRoomModal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #editRoomModal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #editRoomModal input[type="text"],
+[data-theme="white"] #editRoomModal input[type="number"],
+[data-theme="white"] #editRoomModal input[type="email"],
+[data-theme="white"] #editRoomModal select,
+[data-theme="white"] #editRoomModal textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: none !important;
+    border-bottom: 1px solid #d1d5db !important;
+    border-radius: 0 !important;
+}
+
+[data-theme="white"] #editRoomModal input::placeholder,
+[data-theme="white"] #editRoomModal textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #editRoomModal select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editRoomModal label,
+[data-theme="white"] #editRoomModal .mdl-textfield__label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #editRoomModal h3,
+[data-theme="white"] #editRoomModal h5 {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editRoomModal input[type="checkbox"] + label,
+[data-theme="white"] #editRoomModal .form-check-label {
+    color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility for Edit Room */
+[data-theme="white"] #editRoomModal .mdl-icon-toggle__label,
+[data-theme="white"] #editRoomModal .material-icons,
+[data-theme="white"] #editRoomModal .keyboard_arrow_down {
+    color: #374151 !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #editRoomModal select {
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.7em top 50% !important;
+    background-size: 0.65em auto !important;
+}
+
+/* Add New Room Type Modal Light Theme */
+[data-theme="white"] #addRoomTypeModal input[type="text"],
+[data-theme="white"] #addRoomTypeModal input[type="number"],
+[data-theme="white"] #addRoomTypeModal input[type="email"],
+[data-theme="white"] #addRoomTypeModal select,
+[data-theme="white"] #addRoomTypeModal textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: none !important;
+    border-bottom: 1px solid #d1d5db !important;
+    border-radius: 0 !important;
+}
+
+[data-theme="white"] #addRoomTypeModal input::placeholder,
+[data-theme="white"] #addRoomTypeModal textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #addRoomTypeModal select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addRoomTypeModal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addRoomTypeModal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #addRoomTypeModal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addRoomTypeModal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addRoomTypeModal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #addRoomTypeModal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #addRoomTypeModal input[type="checkbox"] + label,
+[data-theme="white"] #addRoomTypeModal .form-check-label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #addRoomTypeModal .btn-secondary {
+    color: #ffffff !important;
+}
+
+[data-theme="white"] #addRoomTypeModal select {
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.7em top 50% !important;
+    background-size: 0.65em auto !important;
+    padding-right: 2em !important;
+}
+
+/* Add New Amenity Modal Light Theme */
+[data-theme="white"] #addAmenityModal input[type="text"],
+[data-theme="white"] #addAmenityModal input[type="number"],
+[data-theme="white"] #addAmenityModal input[type="email"],
+[data-theme="white"] #addAmenityModal select,
+[data-theme="white"] #addAmenityModal textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: none !important;
+    border-bottom: 1px solid #d1d5db !important;
+    border-radius: 0 !important;
+}
+
+[data-theme="white"] #addAmenityModal input::placeholder,
+[data-theme="white"] #addAmenityModal textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #addAmenityModal select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addAmenityModal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addAmenityModal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #addAmenityModal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addAmenityModal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addAmenityModal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #addAmenityModal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #addAmenityModal input[type="checkbox"] + label,
+[data-theme="white"] #addAmenityModal .form-check-label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #addAmenityModal .btn-secondary {
+    color: #ffffff !important;
+}
+
+[data-theme="white"] #addAmenityModal select {
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.7em top 50% !important;
+    background-size: 0.65em auto !important;
+    padding-right: 2em !important;
+}
+
+/* Add New Season Modal Light Theme */
+[data-theme="white"] #addSeasonModal input[type="text"],
+[data-theme="white"] #addSeasonModal input[type="number"],
+[data-theme="white"] #addSeasonModal input[type="email"],
+[data-theme="white"] #addSeasonModal input[type="date"],
+[data-theme="white"] #addSeasonModal select,
+[data-theme="white"] #addSeasonModal textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: none !important;
+    border-bottom: 1px solid #d1d5db !important;
+    border-radius: 0 !important;
+}
+
+[data-theme="white"] #addSeasonModal input::placeholder,
+[data-theme="white"] #addSeasonModal textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #addSeasonModal select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addSeasonModal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addSeasonModal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #addSeasonModal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addSeasonModal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addSeasonModal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #addSeasonModal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #addSeasonModal input[type="checkbox"] + label,
+[data-theme="white"] #addSeasonModal .form-check-label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #addSeasonModal .btn-secondary {
+    color: #ffffff !important;
+}
+
+[data-theme="white"] #addSeasonModal select {
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.7em top 50% !important;
+    background-size: 0.65em auto !important;
+    padding-right: 2em !important;
+}
+
+/* Cancel Button - White Text for Edit Room */
+[data-theme="white"] #editRoomModal .btn-secondary,
+[data-theme="white"] #editRoomModal .btn-cancel,
+[data-theme="white"] #editRoomModal .modal-footer .btn-secondary,
+[data-theme="white"] #editRoomModal .modal-footer button,
+[data-theme="white"] #editRoomModal button[type="button"],
+[data-theme="white"] #editRoomModal .btn {
+    color: #ffffff !important;
+}
+
+[data-theme="white"] #editRoomModal button:first-child,
+[data-theme="white"] #editRoomModal .modal-footer button:first-child {
+    color: #ffffff !important;
+}
+
+/* Guest Types Management Modal Light Theme */
+[data-theme="white"] #guestTypesManagementModal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #guestTypesManagementModal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #guestTypesManagementModal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #guestTypesManagementModal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #guestTypesManagementModal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #guestTypesManagementModal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #guestTypesManagementModal .btn-secondary {
+    color: #ffffff !important;
+}
+
+/* Add Guest Type Modal Light Theme */
+[data-theme="white"] #addGuestTypeModal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #addGuestTypeModal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #addGuestTypeModal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addGuestTypeModal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addGuestTypeModal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #addGuestTypeModal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #addGuestTypeModal input[type="text"],
+[data-theme="white"] #addGuestTypeModal input[type="number"],
+[data-theme="white"] #addGuestTypeModal input[type="email"],
+[data-theme="white"] #addGuestTypeModal select,
+[data-theme="white"] #addGuestTypeModal textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: none !important;
+    border-bottom: 1px solid #d1d5db !important;
+    border-radius: 0 !important;
+}
+
+[data-theme="white"] #addGuestTypeModal input::placeholder,
+[data-theme="white"] #addGuestTypeModal textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #addGuestTypeModal select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addGuestTypeModal label,
+[data-theme="white"] #addGuestTypeModal .mdl-textfield__label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #addGuestTypeModal .btn-secondary {
+    color: #ffffff !important;
+}
+
+/* Edit Guest Type Modal Light Theme */
+[data-theme="white"] #editGuestTypeModal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #editGuestTypeModal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #editGuestTypeModal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editGuestTypeModal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editGuestTypeModal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #editGuestTypeModal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #editGuestTypeModal input[type="text"],
+[data-theme="white"] #editGuestTypeModal input[type="number"],
+[data-theme="white"] #editGuestTypeModal input[type="email"],
+[data-theme="white"] #editGuestTypeModal select,
+[data-theme="white"] #editGuestTypeModal textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #d1d5db !important;
+}
+
+[data-theme="white"] #editGuestTypeModal input::placeholder,
+[data-theme="white"] #editGuestTypeModal textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #editGuestTypeModal select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editGuestTypeModal label,
+[data-theme="white"] #editGuestTypeModal .mdl-textfield__label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #editGuestTypeModal .btn-secondary {
+    color: #ffffff !important;
+}
+
+/* Guest Levels Management Modal Light Theme */
+[data-theme="white"] #guestLevelsManagementModal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #guestLevelsManagementModal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #guestLevelsManagementModal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #guestLevelsManagementModal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #guestLevelsManagementModal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #guestLevelsManagementModal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #guestLevelsManagementModal .btn-secondary {
+    color: #ffffff !important;
+}
+
+/* Add Guest Level Modal Light Theme */
+[data-theme="white"] #addGuestLevelModal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #addGuestLevelModal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #addGuestLevelModal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addGuestLevelModal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addGuestLevelModal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #addGuestLevelModal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #addGuestLevelModal input[type="text"],
+[data-theme="white"] #addGuestLevelModal input[type="number"],
+[data-theme="white"] #addGuestLevelModal input[type="email"],
+[data-theme="white"] #addGuestLevelModal select,
+[data-theme="white"] #addGuestLevelModal textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: none !important;
+    border-bottom: 1px solid #d1d5db !important;
+    border-radius: 0 !important;
+}
+
+[data-theme="white"] #addGuestLevelModal input::placeholder,
+[data-theme="white"] #addGuestLevelModal textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #addGuestLevelModal select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addGuestLevelModal label,
+[data-theme="white"] #addGuestLevelModal .mdl-textfield__label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #addGuestLevelModal .btn-secondary {
+    color: #ffffff !important;
+}
+
+/* Edit Guest Level Modal Light Theme */
+[data-theme="white"] #editGuestLevelModal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #editGuestLevelModal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #editGuestLevelModal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editGuestLevelModal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editGuestLevelModal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #editGuestLevelModal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #editGuestLevelModal input[type="text"],
+[data-theme="white"] #editGuestLevelModal input[type="number"],
+[data-theme="white"] #editGuestLevelModal input[type="email"],
+[data-theme="white"] #editGuestLevelModal select,
+[data-theme="white"] #editGuestLevelModal textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #d1d5db !important;
+}
+
+[data-theme="white"] #editGuestLevelModal input::placeholder,
+[data-theme="white"] #editGuestLevelModal textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #editGuestLevelModal select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editGuestLevelModal label,
+[data-theme="white"] #editGuestLevelModal .mdl-textfield__label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #editGuestLevelModal .btn-secondary {
+    color: #ffffff !important;
+}
+
+/* Hover Colors for Light Theme Modals - STRONG OVERRIDE */
+[data-theme="white"] .modal .table tbody tr:hover,
+[data-theme="white"] .modal .table-hover tbody tr:hover,
+[data-theme="white"] .modal .table tbody tr:hover td,
+[data-theme="white"] .modal .table-hover tbody tr:hover td {
+    background-color: #eef1f5 !important;
+}
+
+[data-theme="white"] .modal .btn:hover {
+    background-color: #eef1f5 !important;
+    border-color: #eef1f5 !important;
+}
+
+[data-theme="white"] .modal .btn-secondary:hover {
+    background-color: #eef1f5 !important;
+    border-color: #eef1f5 !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] .modal .btn-primary:hover {
+    background-color: #eef1f5 !important;
+    border-color: #eef1f5 !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] .modal .btn-primary-10:hover {
+    background-color: #eef1f5 !important;
+    border-color: #eef1f5 !important;
+    color: #111827 !important;
+}
+
+/* Specific modal hover overrides */
+[data-theme="white"] #guestLevelsManagementModal .table tbody tr:hover,
+[data-theme="white"] #guestLevelsManagementModal .table tbody tr:hover td,
+[data-theme="white"] #guestTypesManagementModal .table tbody tr:hover,
+[data-theme="white"] #guestTypesManagementModal .table tbody tr:hover td,
+[data-theme="white"] #roomTypesManagementModal .table tbody tr:hover,
+[data-theme="white"] #roomTypesManagementModal .table tbody tr:hover td,
+[data-theme="white"] #amenitiesManagementModal .table tbody tr:hover,
+[data-theme="white"] #amenitiesManagementModal .table tbody tr:hover td,
+[data-theme="white"] #seasonsManagementModal .table tbody tr:hover,
+[data-theme="white"] #seasonsManagementModal .table tbody tr:hover td {
+    background-color: #eef1f5 !important;
+}
+
+/* Edit Guest Modal Light Theme */
+[data-theme="white"] #editGuestModal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #editGuestModal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #editGuestModal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editGuestModal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editGuestModal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #editGuestModal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #editGuestModal input[type="text"],
+[data-theme="white"] #editGuestModal input[type="number"],
+[data-theme="white"] #editGuestModal input[type="email"],
+[data-theme="white"] #editGuestModal select,
+[data-theme="white"] #editGuestModal textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #d1d5db !important;
+}
+
+[data-theme="white"] #editGuestModal input::placeholder,
+[data-theme="white"] #editGuestModal textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #editGuestModal select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editGuestModal label,
+[data-theme="white"] #editGuestModal .mdl-textfield__label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #editGuestModal h3,
+[data-theme="white"] #editGuestModal h5 {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editGuestModal input[type="checkbox"] + label,
+[data-theme="white"] #editGuestModal .form-check-label {
+    color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility for Edit Guest */
+[data-theme="white"] #editGuestModal .mdl-icon-toggle__label,
+[data-theme="white"] #editGuestModal .material-icons,
+[data-theme="white"] #editGuestModal .keyboard_arrow_down {
+    color: #374151 !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #editGuestModal select {
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.7em top 50% !important;
+    background-size: 0.65em auto !important;
+}
+
+/* Cancel Button - White Text for Edit Guest */
+[data-theme="white"] #editGuestModal .btn-secondary,
+[data-theme="white"] #editGuestModal .btn-cancel,
+[data-theme="white"] #editGuestModal .modal-footer .btn-secondary,
+[data-theme="white"] #editGuestModal .modal-footer button,
+[data-theme="white"] #editGuestModal button[type="button"],
+[data-theme="white"] #editGuestModal .btn {
+    color: #ffffff !important;
+}
+
+[data-theme="white"] #editGuestModal button:first-child,
+[data-theme="white"] #editGuestModal .modal-footer button:first-child {
+    color: #ffffff !important;
+}
+
+/* Add New Expense Modal Light Theme */
+[data-theme="white"] #new-expense-modal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #new-expense-modal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #new-expense-modal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #new-expense-modal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #new-expense-modal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #new-expense-modal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #new-expense-modal input[type="text"],
+[data-theme="white"] #new-expense-modal input[type="number"],
+[data-theme="white"] #new-expense-modal input[type="email"],
+[data-theme="white"] #new-expense-modal select,
+[data-theme="white"] #new-expense-modal textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: none !important;
+    border-bottom: 1px solid #d1d5db !important;
+    border-radius: 0 !important;
+}
+
+[data-theme="white"] #new-expense-modal input::placeholder,
+[data-theme="white"] #new-expense-modal textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #new-expense-modal select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #new-expense-modal label,
+[data-theme="white"] #new-expense-modal .mdl-textfield__label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #new-expense-modal h3,
+[data-theme="white"] #new-expense-modal h5 {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #new-expense-modal input[type="checkbox"] + label,
+[data-theme="white"] #new-expense-modal .form-check-label {
+    color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility for Add New Expense */
+[data-theme="white"] #new-expense-modal .mdl-icon-toggle__label,
+[data-theme="white"] #new-expense-modal .material-icons,
+[data-theme="white"] #new-expense-modal .keyboard_arrow_down {
+    color: #374151 !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #new-expense-modal select {
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.7em top 50% !important;
+    background-size: 0.65em auto !important;
+}
+
+/* Cancel Button - White Text for Add New Expense */
+[data-theme="white"] #new-expense-modal .btn-secondary,
+[data-theme="white"] #new-expense-modal .btn-cancel,
+[data-theme="white"] #new-expense-modal .modal-footer .btn-secondary,
+[data-theme="white"] #new-expense-modal .modal-footer button,
+[data-theme="white"] #new-expense-modal button[type="button"],
+[data-theme="white"] #new-expense-modal .btn {
+    color: #ffffff !important;
+}
+
+[data-theme="white"] #new-expense-modal button:first-child,
+[data-theme="white"] #new-expense-modal .modal-footer button:first-child {
+    color: #ffffff !important;
+}
+
+/* Edit Expense Modal Light Theme */
+[data-theme="white"] #edit-expense-modal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #edit-expense-modal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #edit-expense-modal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #edit-expense-modal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #edit-expense-modal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #edit-expense-modal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #edit-expense-modal input[type="text"],
+[data-theme="white"] #edit-expense-modal input[type="number"],
+[data-theme="white"] #edit-expense-modal input[type="email"],
+[data-theme="white"] #edit-expense-modal select,
+[data-theme="white"] #edit-expense-modal textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: none !important;
+    border-bottom: 1px solid #d1d5db !important;
+    border-radius: 0 !important;
+}
+
+[data-theme="white"] #edit-expense-modal input::placeholder,
+[data-theme="white"] #edit-expense-modal textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #edit-expense-modal select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #edit-expense-modal label,
+[data-theme="white"] #edit-expense-modal .mdl-textfield__label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #edit-expense-modal h3,
+[data-theme="white"] #edit-expense-modal h5 {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #edit-expense-modal input[type="checkbox"] + label,
+[data-theme="white"] #edit-expense-modal .form-check-label {
+    color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility for Edit Expense */
+[data-theme="white"] #edit-expense-modal .mdl-icon-toggle__label,
+[data-theme="white"] #edit-expense-modal .material-icons,
+[data-theme="white"] #edit-expense-modal .keyboard_arrow_down {
+    color: #374151 !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #edit-expense-modal select {
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.7em top 50% !important;
+    background-size: 0.65em auto !important;
+}
+
+/* Cancel Button - White Text for Edit Expense */
+[data-theme="white"] #edit-expense-modal .btn-secondary,
+[data-theme="white"] #edit-expense-modal .btn-cancel,
+[data-theme="white"] #edit-expense-modal .modal-footer .btn-secondary,
+[data-theme="white"] #edit-expense-modal .modal-footer button,
+[data-theme="white"] #edit-expense-modal button[type="button"],
+[data-theme="white"] #edit-expense-modal .btn {
+    color: #ffffff !important;
+}
+
+[data-theme="white"] #edit-expense-modal button:first-child,
+[data-theme="white"] #edit-expense-modal .modal-footer button:first-child {
+    color: #ffffff !important;
+}
+
+/* New Room Clearance Modal Light Theme */
+[data-theme="white"] #new-clearance-modal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #new-clearance-modal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #new-clearance-modal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #new-clearance-modal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #new-clearance-modal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #new-clearance-modal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #new-clearance-modal input[type="text"],
+[data-theme="white"] #new-clearance-modal input[type="number"],
+[data-theme="white"] #new-clearance-modal input[type="email"],
+[data-theme="white"] #new-clearance-modal select,
+[data-theme="white"] #new-clearance-modal textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: none !important;
+    border-bottom: 1px solid #d1d5db !important;
+    border-radius: 0 !important;
+}
+
+[data-theme="white"] #new-clearance-modal input::placeholder,
+[data-theme="white"] #new-clearance-modal textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #new-clearance-modal select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #new-clearance-modal label,
+[data-theme="white"] #new-clearance-modal .mdl-textfield__label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #new-clearance-modal h3,
+[data-theme="white"] #new-clearance-modal h5 {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #new-clearance-modal input[type="checkbox"] + label,
+[data-theme="white"] #new-clearance-modal .form-check-label {
+    color: #374151 !important;
+}
+
+/* Hide ALL Material Design icons in New Room Clearance */
+[data-theme="white"] #new-clearance-modal .mdl-icon-toggle__label,
+[data-theme="white"] #new-clearance-modal .material-icons,
+[data-theme="white"] #new-clearance-modal .keyboard_arrow_down,
+[data-theme="white"] #new-clearance-modal i.material-icons,
+[data-theme="white"] #new-clearance-modal i.mdl-icon-toggle__label.material-icons,
+[data-theme="white"] #new-clearance-modal .mdl-textfield__input::after,
+[data-theme="white"] #new-clearance-modal .mdl-textfield::after,
+[data-theme="white"] #new-clearance-modal .mdl-textfield__input::before,
+[data-theme="white"] #new-clearance-modal .mdl-textfield::before,
+[data-theme="white"] #new-clearance-modal i,
+[data-theme="white"] #new-clearance-modal .icon,
+[data-theme="white"] #new-clearance-modal .fa,
+[data-theme="white"] #new-clearance-modal .fas,
+[data-theme="white"] #new-clearance-modal .far,
+[data-theme="white"] #new-clearance-modal .glyphicon {
+    display: none !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    height: 0 !important;
+    font-size: 0 !important;
+    content: none !important;
+}
+
+/* Hide specific dropdown arrows in new-clearance-modal */
+[data-theme="white"] #new-clearance-modal .mdl-textfield__input::before,
+[data-theme="white"] #new-clearance-modal .mdl-textfield__input::after,
+[data-theme="white"] #new-clearance-modal .mdl-textfield::before,
+[data-theme="white"] #new-clearance-modal .mdl-textfield::after {
+    display: none !important;
+}
+
+[data-theme="white"] #new-clearance-modal .mdl-textfield__input,
+[data-theme="white"] #new-clearance-modal .mdl-textfield {
+    position: relative !important;
+}
+
+[data-theme="white"] #new-clearance-modal .mdl-textfield__input::before,
+[data-theme="white"] #new-clearance-modal .mdl-textfield__input::after,
+[data-theme="white"] #new-clearance-modal .mdl-textfield::before,
+[data-theme="white"] #new-clearance-modal .mdl-textfield::after {
+    display: none !important;
+    content: none !important;
+}
+
+/* Cancel Button - White Text for New Room Clearance */
+[data-theme="white"] #new-clearance-modal .btn-secondary,
+[data-theme="white"] #new-clearance-modal .btn-cancel,
+[data-theme="white"] #new-clearance-modal .modal-footer .btn-secondary,
+[data-theme="white"] #new-clearance-modal .modal-footer button,
+[data-theme="white"] #new-clearance-modal button[type="button"],
+[data-theme="white"] #new-clearance-modal .btn {
+    color: #ffffff !important;
+}
+
+[data-theme="white"] #new-clearance-modal button:first-child,
+[data-theme="white"] #new-clearance-modal .modal-footer button:first-child {
+    color: #ffffff !important;
+}
+
+/* Add New Service Modal Light Theme */
+[data-theme="white"] #addServiceModal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #addServiceModal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #addServiceModal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addServiceModal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addServiceModal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #addServiceModal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #addServiceModal input[type="text"],
+[data-theme="white"] #addServiceModal input[type="number"],
+[data-theme="white"] #addServiceModal input[type="email"],
+[data-theme="white"] #addServiceModal select,
+[data-theme="white"] #addServiceModal textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: none !important;
+    border-bottom: 1px solid #d1d5db !important;
+    border-radius: 0 !important;
+}
+
+[data-theme="white"] #addServiceModal input::placeholder,
+[data-theme="white"] #addServiceModal textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #addServiceModal select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addServiceModal label,
+[data-theme="white"] #addServiceModal .mdl-textfield__label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #addServiceModal h3,
+[data-theme="white"] #addServiceModal h5 {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addServiceModal input[type="checkbox"] + label,
+[data-theme="white"] #addServiceModal .form-check-label {
+    color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility for Add New Service */
+[data-theme="white"] #addServiceModal .mdl-icon-toggle__label,
+[data-theme="white"] #addServiceModal .material-icons,
+[data-theme="white"] #addServiceModal .keyboard_arrow_down {
+    color: #374151 !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #addServiceModal select {
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.7em top 50% !important;
+    background-size: 0.65em auto !important;
+}
+
+/* Cancel Button - White Text for Add New Service */
+[data-theme="white"] #addServiceModal .btn-secondary,
+[data-theme="white"] #addServiceModal .btn-cancel,
+[data-theme="white"] #addServiceModal .modal-footer .btn-secondary,
+[data-theme="white"] #addServiceModal .modal-footer button,
+[data-theme="white"] #addServiceModal button[type="button"],
+[data-theme="white"] #addServiceModal .btn {
+    color: #ffffff !important;
+}
+
+[data-theme="white"] #addServiceModal button:first-child,
+[data-theme="white"] #addServiceModal .modal-footer button:first-child {
+    color: #ffffff !important;
+}
+
+/* Edit Service Modal Light Theme */
+[data-theme="white"] #editServiceModal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #editServiceModal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #editServiceModal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editServiceModal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editServiceModal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #editServiceModal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #editServiceModal input[type="text"],
+[data-theme="white"] #editServiceModal input[type="number"],
+[data-theme="white"] #editServiceModal input[type="email"],
+[data-theme="white"] #editServiceModal select,
+[data-theme="white"] #editServiceModal textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: none !important;
+    border-bottom: 1px solid #d1d5db !important;
+    border-radius: 0 !important;
+}
+
+[data-theme="white"] #editServiceModal input::placeholder,
+[data-theme="white"] #editServiceModal textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #editServiceModal select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editServiceModal label,
+[data-theme="white"] #editServiceModal .mdl-textfield__label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #editServiceModal h3,
+[data-theme="white"] #editServiceModal h5 {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editServiceModal input[type="checkbox"] + label,
+[data-theme="white"] #editServiceModal .form-check-label {
+    color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility for Edit Service */
+[data-theme="white"] #editServiceModal .mdl-icon-toggle__label,
+[data-theme="white"] #editServiceModal .material-icons,
+[data-theme="white"] #editServiceModal .keyboard_arrow_down {
+    color: #374151 !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #editServiceModal select {
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.7em top 50% !important;
+    background-size: 0.65em auto !important;
+}
+
+/* Cancel Button - White Text for Edit Service */
+[data-theme="white"] #editServiceModal .btn-secondary,
+[data-theme="white"] #editServiceModal .btn-cancel,
+[data-theme="white"] #editServiceModal .modal-footer .btn-secondary,
+[data-theme="white"] #editServiceModal .modal-footer button,
+[data-theme="white"] #editServiceModal button[type="button"],
+[data-theme="white"] #editServiceModal .btn {
+    color: #ffffff !important;
+}
+
+[data-theme="white"] #editServiceModal button:first-child,
+[data-theme="white"] #editServiceModal .modal-footer button:first-child {
+    color: #ffffff !important;
+}
+
+/* Add New Employee Modal Light Theme */
+[data-theme="white"] #addEmployeeModal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #addEmployeeModal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #addEmployeeModal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addEmployeeModal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addEmployeeModal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #addEmployeeModal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #addEmployeeModal input[type="text"],
+[data-theme="white"] #addEmployeeModal input[type="number"],
+[data-theme="white"] #addEmployeeModal input[type="email"],
+[data-theme="white"] #addEmployeeModal select,
+[data-theme="white"] #addEmployeeModal textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: none !important;
+    border-bottom: 1px solid #d1d5db !important;
+    border-radius: 0 !important;
+}
+
+[data-theme="white"] #addEmployeeModal input::placeholder,
+[data-theme="white"] #addEmployeeModal textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #addEmployeeModal select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addEmployeeModal label,
+[data-theme="white"] #addEmployeeModal .mdl-textfield__label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #addEmployeeModal h3,
+[data-theme="white"] #addEmployeeModal h5 {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addEmployeeModal input[type="checkbox"] + label,
+[data-theme="white"] #addEmployeeModal .form-check-label {
+    color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility for Add New Employee */
+[data-theme="white"] #addEmployeeModal .mdl-icon-toggle__label,
+[data-theme="white"] #addEmployeeModal .material-icons,
+[data-theme="white"] #addEmployeeModal .keyboard_arrow_down {
+    color: #374151 !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #addEmployeeModal select {
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.7em top 50% !important;
+    background-size: 0.65em auto !important;
+}
+
+/* Cancel Button - White Text for Add New Employee */
+[data-theme="white"] #addEmployeeModal .btn-secondary,
+[data-theme="white"] #addEmployeeModal .btn-cancel,
+[data-theme="white"] #addEmployeeModal .modal-footer .btn-secondary,
+[data-theme="white"] #addEmployeeModal .modal-footer button,
+[data-theme="white"] #addEmployeeModal button[type="button"],
+[data-theme="white"] #addEmployeeModal .btn {
+    color: #ffffff !important;
+}
+
+[data-theme="white"] #addEmployeeModal button:first-child,
+[data-theme="white"] #addEmployeeModal .modal-footer button:first-child {
+    color: #ffffff !important;
+}
+
+/* File Upload Area - Light Gray Background for Light Theme */
+[data-theme="white"] #addEmployeeModal .file-upload-area,
+[data-theme="white"] #addEmployeeModal .upload-area,
+[data-theme="white"] #addEmployeeModal .file-input-area,
+[data-theme="white"] #addEmployeeModal .dropzone,
+[data-theme="white"] #addEmployeeModal .upload-container,
+[data-theme="white"] #addEmployeeModal .photo-upload-area {
+    background-color: #eef1f5 !important;
+    border: 2px dashed #d1d5db !important;
+    color: #374151 !important;
+}
+
+[data-theme="white"] #addEmployeeModal .file-upload-area:hover,
+[data-theme="white"] #addEmployeeModal .upload-area:hover,
+[data-theme="white"] #addEmployeeModal .file-input-area:hover,
+[data-theme="white"] #addEmployeeModal .dropzone:hover,
+[data-theme="white"] #addEmployeeModal .upload-container:hover,
+[data-theme="white"] #addEmployeeModal .photo-upload-area:hover {
+    background-color: #e5e7eb !important;
+    border-color: #9ca3af !important;
+}
+
+[data-theme="white"] #addEmployeeModal .file-upload-area .upload-icon,
+[data-theme="white"] #addEmployeeModal .upload-area .upload-icon,
+[data-theme="white"] #addEmployeeModal .file-input-area .upload-icon,
+[data-theme="white"] #addEmployeeModal .dropzone .upload-icon,
+[data-theme="white"] #addEmployeeModal .upload-container .upload-icon,
+[data-theme="white"] #addEmployeeModal .photo-upload-area .upload-icon {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #addEmployeeModal .file-upload-area .upload-text,
+[data-theme="white"] #addEmployeeModal .upload-area .upload-text,
+[data-theme="white"] #addEmployeeModal .file-input-area .upload-text,
+[data-theme="white"] #addEmployeeModal .dropzone .upload-text,
+[data-theme="white"] #addEmployeeModal .upload-container .upload-text,
+[data-theme="white"] #addEmployeeModal .photo-upload-area .upload-text {
+    color: #6b7280 !important;
+}
+
+/* Edit Employee Modal Light Theme */
+[data-theme="white"] #editEmployeeModal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #editEmployeeModal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #editEmployeeModal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editEmployeeModal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editEmployeeModal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #editEmployeeModal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #editEmployeeModal input[type="text"],
+[data-theme="white"] #editEmployeeModal input[type="number"],
+[data-theme="white"] #editEmployeeModal input[type="email"],
+[data-theme="white"] #editEmployeeModal select,
+[data-theme="white"] #editEmployeeModal textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: none !important;
+    border-bottom: 1px solid #d1d5db !important;
+    border-radius: 0 !important;
+}
+
+[data-theme="white"] #editEmployeeModal input::placeholder,
+[data-theme="white"] #editEmployeeModal textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #editEmployeeModal select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editEmployeeModal label,
+[data-theme="white"] #editEmployeeModal .mdl-textfield__label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #editEmployeeModal h3,
+[data-theme="white"] #editEmployeeModal h5 {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editEmployeeModal input[type="checkbox"] + label,
+[data-theme="white"] #editEmployeeModal .form-check-label {
+    color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility for Edit Employee */
+[data-theme="white"] #editEmployeeModal .mdl-icon-toggle__label,
+[data-theme="white"] #editEmployeeModal .material-icons,
+[data-theme="white"] #editEmployeeModal .keyboard_arrow_down {
+    color: #374151 !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #editEmployeeModal select {
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.7em top 50% !important;
+    background-size: 0.65em auto !important;
+}
+
+/* Cancel Button - White Text for Edit Employee */
+[data-theme="white"] #editEmployeeModal .btn-secondary,
+[data-theme="white"] #editEmployeeModal .btn-cancel,
+[data-theme="white"] #editEmployeeModal .modal-footer .btn-secondary,
+[data-theme="white"] #editEmployeeModal .modal-footer button,
+[data-theme="white"] #editEmployeeModal button[type="button"],
+[data-theme="white"] #editEmployeeModal .btn {
+    color: #ffffff !important;
+}
+
+[data-theme="white"] #editEmployeeModal button:first-child,
+[data-theme="white"] #editEmployeeModal .modal-footer button:first-child {
+    color: #ffffff !important;
+}
+
+/* File Upload Area for Edit Employee - Light Gray Background */
+[data-theme="white"] #editEmployeeModal .file-upload-area,
+[data-theme="white"] #editEmployeeModal .upload-area,
+[data-theme="white"] #editEmployeeModal .file-input-area,
+[data-theme="white"] #editEmployeeModal .dropzone,
+[data-theme="white"] #editEmployeeModal .upload-container,
+[data-theme="white"] #editEmployeeModal .photo-upload-area {
+    background-color: #eef1f5 !important;
+    border: 2px dashed #d1d5db !important;
+    color: #374151 !important;
+}
+
+[data-theme="white"] #editEmployeeModal .file-upload-area:hover,
+[data-theme="white"] #editEmployeeModal .upload-area:hover,
+[data-theme="white"] #editEmployeeModal .file-input-area:hover,
+[data-theme="white"] #editEmployeeModal .dropzone:hover,
+[data-theme="white"] #editEmployeeModal .upload-container:hover,
+[data-theme="white"] #editEmployeeModal .photo-upload-area:hover {
+    background-color: #e5e7eb !important;
+    border-color: #9ca3af !important;
+}
+
+[data-theme="white"] #editEmployeeModal .file-upload-area .upload-icon,
+[data-theme="white"] #editEmployeeModal .upload-area .upload-icon,
+[data-theme="white"] #editEmployeeModal .file-input-area .upload-icon,
+[data-theme="white"] #editEmployeeModal .dropzone .upload-icon,
+[data-theme="white"] #editEmployeeModal .upload-container .upload-icon,
+[data-theme="white"] #editEmployeeModal .photo-upload-area .upload-icon {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #editEmployeeModal .file-upload-area .upload-text,
+[data-theme="white"] #editEmployeeModal .upload-area .upload-text,
+[data-theme="white"] #editEmployeeModal .file-input-area .upload-text,
+[data-theme="white"] #editEmployeeModal .dropzone .upload-text,
+[data-theme="white"] #editEmployeeModal .upload-container .upload-text,
+[data-theme="white"] #editEmployeeModal .photo-upload-area .upload-text {
+    color: #6b7280 !important;
+}
+
+/* Add New Vehicle Modal Light Theme */
+[data-theme="white"] #addVehicleModal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #addVehicleModal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #addVehicleModal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addVehicleModal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addVehicleModal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #addVehicleModal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #addVehicleModal input[type="text"],
+[data-theme="white"] #addVehicleModal input[type="number"],
+[data-theme="white"] #addVehicleModal input[type="email"],
+[data-theme="white"] #addVehicleModal select,
+[data-theme="white"] #addVehicleModal textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: none !important;
+    border-bottom: 1px solid #d1d5db !important;
+    border-radius: 0 !important;
+}
+
+[data-theme="white"] #addVehicleModal input::placeholder,
+[data-theme="white"] #addVehicleModal textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #addVehicleModal select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addVehicleModal label,
+[data-theme="white"] #addVehicleModal .mdl-textfield__label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #addVehicleModal h3,
+[data-theme="white"] #addVehicleModal h5 {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addVehicleModal input[type="checkbox"] + label,
+[data-theme="white"] #addVehicleModal .form-check-label {
+    color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility for Add New Vehicle */
+[data-theme="white"] #addVehicleModal .mdl-icon-toggle__label,
+[data-theme="white"] #addVehicleModal .material-icons,
+[data-theme="white"] #addVehicleModal .keyboard_arrow_down {
+    color: #374151 !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #addVehicleModal select {
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.7em top 50% !important;
+    background-size: 0.65em auto !important;
+}
+
+/* Cancel Button - White Text for Add New Vehicle */
+[data-theme="white"] #addVehicleModal .btn-secondary,
+[data-theme="white"] #addVehicleModal .btn-cancel,
+[data-theme="white"] #addVehicleModal .modal-footer .btn-secondary,
+[data-theme="white"] #addVehicleModal .modal-footer button,
+[data-theme="white"] #addVehicleModal button[type="button"],
+[data-theme="white"] #addVehicleModal .btn {
+    color: #ffffff !important;
+}
+
+[data-theme="white"] #addVehicleModal button:first-child,
+[data-theme="white"] #addVehicleModal .modal-footer button:first-child {
+    color: #ffffff !important;
+}
+
+/* File Upload Area for Add New Vehicle - Light Gray Background */
+[data-theme="white"] #addVehicleModal .file-upload-area,
+[data-theme="white"] #addVehicleModal .upload-area,
+[data-theme="white"] #addVehicleModal .file-input-area,
+[data-theme="white"] #addVehicleModal .dropzone,
+[data-theme="white"] #addVehicleModal .upload-container,
+[data-theme="white"] #addVehicleModal .vehicle-photo-upload-container,
+[data-theme="white"] #addVehicleModal .file-upload-wrapper {
+    background-color: #eef1f5 !important;
+    border: 2px dashed #d1d5db !important;
+    color: #374151 !important;
+}
+
+/* Remove ALL outer borders from vehicle photo container */
+[data-theme="white"] #addVehicleModal .vehicle-photo-upload-container,
+[data-theme="white"] #addVehicleModal .file-upload-wrapper,
+[data-theme="white"] #addVehicleModal .upload-container {
+    border: none !important;
+    background-color: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* Keep only the inner file-upload-area border */
+[data-theme="white"] #addVehicleModal .file-upload-area {
+    background-color: #eef1f5 !important;
+    border: 2px dashed #d1d5db !important;
+    color: #374151 !important;
+}
+
+[data-theme="white"] #addVehicleModal .file-upload-area:hover,
+[data-theme="white"] #addVehicleModal .upload-area:hover,
+[data-theme="white"] #addVehicleModal .file-input-area:hover,
+[data-theme="white"] #addVehicleModal .dropzone:hover,
+[data-theme="white"] #addVehicleModal .upload-container:hover,
+[data-theme="white"] #addVehicleModal .vehicle-photo-upload-container:hover,
+[data-theme="white"] #addVehicleModal .file-upload-wrapper:hover {
+    background-color: #e5e7eb !important;
+    border-color: #9ca3af !important;
+}
+
+[data-theme="white"] #addVehicleModal .file-upload-area .upload-icon,
+[data-theme="white"] #addVehicleModal .upload-area .upload-icon,
+[data-theme="white"] #addVehicleModal .file-input-area .upload-icon,
+[data-theme="white"] #addVehicleModal .dropzone .upload-icon,
+[data-theme="white"] #addVehicleModal .upload-container .upload-icon,
+[data-theme="white"] #addVehicleModal .vehicle-photo-upload-container .upload-icon,
+[data-theme="white"] #addVehicleModal .file-upload-wrapper .upload-icon {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #addVehicleModal .file-upload-area .upload-text,
+[data-theme="white"] #addVehicleModal .upload-area .upload-text,
+[data-theme="white"] #addVehicleModal .file-input-area .upload-text,
+[data-theme="white"] #addVehicleModal .dropzone .upload-text,
+[data-theme="white"] #addVehicleModal .upload-container .upload-text,
+[data-theme="white"] #addVehicleModal .vehicle-photo-upload-container .upload-text,
+[data-theme="white"] #addVehicleModal .file-upload-wrapper .upload-text {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #addVehicleModal .upload-label {
+    color: #374151 !important;
+}
+
+/* Edit Vehicle Modal Light Theme */
+[data-theme="white"] #editVehicleModal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #editVehicleModal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #editVehicleModal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editVehicleModal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editVehicleModal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #editVehicleModal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #editVehicleModal input[type="text"],
+[data-theme="white"] #editVehicleModal input[type="number"],
+[data-theme="white"] #editVehicleModal input[type="email"],
+[data-theme="white"] #editVehicleModal select,
+[data-theme="white"] #editVehicleModal textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: none !important;
+    border-bottom: 1px solid #d1d5db !important;
+    border-radius: 0 !important;
+}
+
+[data-theme="white"] #editVehicleModal input::placeholder,
+[data-theme="white"] #editVehicleModal textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #editVehicleModal select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editVehicleModal label,
+[data-theme="white"] #editVehicleModal .mdl-textfield__label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #editVehicleModal h3,
+[data-theme="white"] #editVehicleModal h5 {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #editVehicleModal input[type="checkbox"] + label,
+[data-theme="white"] #editVehicleModal .form-check-label {
+    color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility for Edit Vehicle */
+[data-theme="white"] #editVehicleModal .mdl-icon-toggle__label,
+[data-theme="white"] #editVehicleModal .material-icons,
+[data-theme="white"] #editVehicleModal .keyboard_arrow_down {
+    color: #374151 !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #editVehicleModal select {
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.7em top 50% !important;
+    background-size: 0.65em auto !important;
+}
+
+/* Cancel Button - White Text for Edit Vehicle */
+[data-theme="white"] #editVehicleModal .btn-secondary,
+[data-theme="white"] #editVehicleModal .btn-cancel,
+[data-theme="white"] #editVehicleModal .modal-footer .btn-secondary,
+[data-theme="white"] #editVehicleModal .modal-footer button,
+[data-theme="white"] #editVehicleModal button[type="button"],
+[data-theme="white"] #editVehicleModal .btn {
+    color: #ffffff !important;
+}
+
+[data-theme="white"] #editVehicleModal button:first-child,
+[data-theme="white"] #editVehicleModal .modal-footer button:first-child {
+    color: #ffffff !important;
+}
+
+/* File Upload Area for Edit Vehicle - Light Gray Background */
+[data-theme="white"] #editVehicleModal .file-upload-area,
+[data-theme="white"] #editVehicleModal .upload-area,
+[data-theme="white"] #editVehicleModal .file-input-area,
+[data-theme="white"] #editVehicleModal .dropzone,
+[data-theme="white"] #editVehicleModal .upload-container,
+[data-theme="white"] #editVehicleModal .vehicle-photo-upload-container,
+[data-theme="white"] #editVehicleModal .file-upload-wrapper {
+    background-color: #eef1f5 !important;
+    border: 2px dashed #d1d5db !important;
+    color: #374151 !important;
+}
+
+[data-theme="white"] #editVehicleModal .file-upload-area:hover,
+[data-theme="white"] #editVehicleModal .upload-area:hover,
+[data-theme="white"] #editVehicleModal .file-input-area:hover,
+[data-theme="white"] #editVehicleModal .dropzone:hover,
+[data-theme="white"] #editVehicleModal .upload-container:hover,
+[data-theme="white"] #editVehicleModal .vehicle-photo-upload-container:hover,
+[data-theme="white"] #editVehicleModal .file-upload-wrapper:hover {
+    background-color: #e5e7eb !important;
+    border-color: #9ca3af !important;
+}
+
+[data-theme="white"] #editVehicleModal .file-upload-area .upload-icon,
+[data-theme="white"] #editVehicleModal .upload-area .upload-icon,
+[data-theme="white"] #editVehicleModal .file-input-area .upload-icon,
+[data-theme="white"] #editVehicleModal .dropzone .upload-icon,
+[data-theme="white"] #editVehicleModal .upload-container .upload-icon,
+[data-theme="white"] #editVehicleModal .vehicle-photo-upload-container .upload-icon,
+[data-theme="white"] #editVehicleModal .file-upload-wrapper .upload-icon {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #editVehicleModal .file-upload-area .upload-text,
+[data-theme="white"] #editVehicleModal .upload-area .upload-text,
+[data-theme="white"] #editVehicleModal .file-input-area .upload-text,
+[data-theme="white"] #editVehicleModal .dropzone .upload-text,
+[data-theme="white"] #editVehicleModal .upload-container .upload-text,
+[data-theme="white"] #editVehicleModal .vehicle-photo-upload-container .upload-text,
+[data-theme="white"] #editVehicleModal .file-upload-wrapper .upload-text {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #editVehicleModal .upload-label {
+    color: #374151 !important;
+}
+
+/* Remove ALL outer borders from edit vehicle photo container */
+[data-theme="white"] #editVehicleModal .vehicle-photo-upload-container,
+[data-theme="white"] #editVehicleModal .file-upload-wrapper,
+[data-theme="white"] #editVehicleModal .upload-container {
+    border: none !important;
+    background-color: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* Keep only the inner file-upload-area border for edit vehicle */
+[data-theme="white"] #editVehicleModal .file-upload-area {
+    background-color: #eef1f5 !important;
+    border: 2px dashed #d1d5db !important;
+    color: #374151 !important;
+}
+
+/* Add New User Modal Light Theme */
+[data-theme="white"] #addUserModal .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #addUserModal .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #addUserModal .modal-title {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addUserModal .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addUserModal .btn-close {
+    filter: none !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="white"] #addUserModal .btn-close:hover {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #addUserModal input[type="text"],
+[data-theme="white"] #addUserModal input[type="password"],
+[data-theme="white"] #addUserModal input[type="number"],
+[data-theme="white"] #addUserModal input[type="email"],
+[data-theme="white"] #addUserModal select,
+[data-theme="white"] #addUserModal textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: none !important;
+    border-bottom: 1px solid #d1d5db !important;
+    border-radius: 0 !important;
+}
+
+[data-theme="white"] #addUserModal input::placeholder,
+[data-theme="white"] #addUserModal textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #addUserModal select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addUserModal label,
+[data-theme="white"] #addUserModal .mdl-textfield__label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #addUserModal h3,
+[data-theme="white"] #addUserModal h5 {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #addUserModal input[type="checkbox"] + label,
+[data-theme="white"] #addUserModal .form-check-label {
+    color: #374151 !important;
+}
+
+/* Dropdown Arrow Visibility for Add New User */
+[data-theme="white"] #addUserModal .mdl-icon-toggle__label,
+[data-theme="white"] #addUserModal .material-icons,
+[data-theme="white"] #addUserModal .keyboard_arrow_down {
+    color: #374151 !important;
+    opacity: 1 !important;
+}
+
+[data-theme="white"] #addUserModal select {
+    background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Cpath fill='%23374151' d='M2 0L0 2h4zm0 5L0 3h4z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.7em top 50% !important;
+    background-size: 0.65em auto !important;
+}
+
+/* Cancel Button - White Text for Add New User */
+[data-theme="white"] #addUserModal .btn-secondary,
+[data-theme="white"] #addUserModal .btn-cancel,
+[data-theme="white"] #addUserModal .modal-footer .btn-secondary,
+[data-theme="white"] #addUserModal .modal-footer button,
+[data-theme="white"] #addUserModal button[type="button"],
+[data-theme="white"] #addUserModal .btn {
+    color: #ffffff !important;
+}
+
+[data-theme="white"] #addUserModal button:first-child,
+[data-theme="white"] #addUserModal .modal-footer button:first-child {
+    color: #ffffff !important;
+}
+
+/* Form Text Helper for Add New User */
+[data-theme="white"] #addUserModal .form-text,
+[data-theme="white"] #addUserModal #usernameCheck {
+    color: #6b7280 !important;
+}
+
 [data-theme="white"] #modal-addbooking .modal-header {
+    background-color: #f9fafb !important;
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+}
+
+/* Override modal header inline styles */
+[data-theme="white"] #modal-addbooking .modal-header[style*="background-color: #0c2a42"] {
     background-color: #f9fafb !important;
     color: #111827 !important;
     border-bottom: 1px solid #e5e7eb !important;
@@ -629,7 +2901,10 @@
 [data-theme="white"] #modal-addbooking input[type="number"],
 [data-theme="white"] #modal-addbooking input[type="email"],
 [data-theme="white"] #modal-addbooking select,
-[data-theme="white"] #modal-addbooking textarea {
+[data-theme="white"] #modal-addbooking textarea,
+[data-theme="white"] #modal-addbooking input[style*="background-color: #41474c"],
+[data-theme="white"] #modal-addbooking select[style*="background-color: #41474c"],
+[data-theme="white"] #modal-addbooking textarea[style*="background-color: #41474c"] {
     background-color: #ffffff !important;
     color: #111827 !important;
     border: 1px solid #d1d5db !important;
@@ -3978,6 +6253,27 @@
 [data-theme="white"] .modal .form-text {
     color: #111827 !important;
 }
+
+/* FullCalendar Event Names - Dark text in LIGHT THEME (STRONG OVERRIDE) */
+[data-theme="white"] .fc .fc-event,
+[data-theme="white"] .fc .fc-event *,
+[data-theme="white"] .fc .fc-event .fc-event-title,
+[data-theme="white"] .fc .fc-event .fc-event-main,
+[data-theme="white"] .fc .fc-event .fc-event-main-frame,
+[data-theme="white"] .fc .fc-event .fc-event-main-frame .fc-event-title-container,
+[data-theme="white"] .fc .fc-event .fc-event-main-frame .fc-event-title-container .fc-event-title,
+[data-theme="white"] .fc .fc-timeline-event,
+[data-theme="white"] .fc .fc-timeline-event *,
+[data-theme="white"] .fc .fc-timeline-event .fc-event-title,
+[data-theme="white"] .fc .fc-timeline-event .fc-event-main,
+[data-theme="white"] .fc .fc-timeline-event .fc-event-main-frame,
+[data-theme="white"] .fc .fc-timeline-event .fc-event-main-frame .fc-event-title-container,
+[data-theme="white"] .fc .fc-timeline-event .fc-event-main-frame .fc-event-title-container .fc-event-title {
+    color: #1f2937 !important;
+    font-weight: 600 !important;
+}
+
+
 
 
 
