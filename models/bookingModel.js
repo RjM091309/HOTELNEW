@@ -3617,20 +3617,22 @@ class BookingModel {
       
       const query = `
         SELECT r.IDNo, r.ROOM_NUMBER, r.ROOM_FLOOR, r.ROOM_BED, r.ROOM_VIEW,  (
-            SELECT 1 
-            FROM booking b2 
-            WHERE b2.ROOM_ID = r.IDNo 
-              AND DATE(b2.CHECK_OUT_DATE) = ? 
-            LIMIT 1
-          ) AS checkoutToday
-        FROM room r
-        LEFT JOIN booking b ON r.IDNo = b.ROOM_ID
-            AND DATE(b.CHECK_IN_DATE) < ?
-            AND DATE(b.CHECK_OUT_DATE) > ?
-        WHERE r.ROOM_STATUS !=3
-          AND (b.ROOM_ID IS NULL OR DATE(b.CHECK_OUT_DATE) = ?)
-          ${bedCount ? 'AND r.ROOM_BED = ?' : ''}
-        ORDER BY r.ROOM_NUMBER ASC;
+        SELECT 1 
+        FROM booking b2 
+        WHERE b2.ROOM_ID = r.IDNo 
+          AND DATE(b2.CHECK_OUT_DATE) = ? 
+          AND (b2.IS_CANCELLED IS NULL OR b2.IS_CANCELLED != 1)
+        LIMIT 1
+      ) AS checkoutToday
+    FROM room r
+    LEFT JOIN booking b ON r.IDNo = b.ROOM_ID
+        AND DATE(b.CHECK_IN_DATE) < ?
+        AND DATE(b.CHECK_OUT_DATE) > ?
+        AND (b.IS_CANCELLED IS NULL OR b.IS_CANCELLED != 1)
+    WHERE r.ROOM_STATUS != 3
+      AND (b.ROOM_ID IS NULL OR DATE(b.CHECK_OUT_DATE) = ?)
+      ${bedCount ? 'AND r.ROOM_BED = ?' : ''}
+    ORDER BY r.ROOM_NUMBER ASC;
       `;
 
       const queryParams = [startDateFormatted, endDateFormatted, startDateFormatted, startDateFormatted];

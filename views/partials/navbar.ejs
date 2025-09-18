@@ -1456,7 +1456,7 @@ function updateWarningMessage(selectedBedFilter) {
         const bothFiltersRooms = [];
         const otherRooms = [];
 
-        // Categorize filtered rooms
+            // Categorize filtered rooms
         filteredRooms.forEach(room => {
             const checkoutType = room.checkoutType || '';
             const checkinType = room.checkinType || '';
@@ -1466,19 +1466,19 @@ function updateWarningMessage(selectedBedFilter) {
             let belongsToCheckin = false;
             let checkinPriority = 0; // For sorting within check-in section
         if (selectedCheckinFilter === 'R/I') {
-                // R/I: Regular Check-out only (Red)
+                // R/I: Only compatible with R/O checkout
             if (checkoutType === 'R/O') {
                 belongsToCheckin = true;
                     checkinPriority = 1; // Red priority
             }
         } else if (selectedCheckinFilter === 'L/I') {
-                // L/I: Both Late and Regular Check-out, but Late (Yellow) has priority
-            if (checkoutType === 'L/O') {
+                // L/I: Compatible with BOTH R/O and L/O checkout
+            if (checkoutType === 'R/O') {
+                belongsToCheckin = true;
+                    checkinPriority = 1; // Red priority
+            } else if (checkoutType === 'L/O') {
                 belongsToCheckin = true;
                     checkinPriority = 2; // Yellow priority (higher = first)
-            } else if (checkoutType === 'R/O') {
-                belongsToCheckin = true;
-                    checkinPriority = 1; // Red priority (lower = second)
             }
         }
         
@@ -1486,16 +1486,16 @@ function updateWarningMessage(selectedBedFilter) {
             let belongsToCheckout = false;
             let checkoutPriority = 0; // For sorting within check-out section
         if (selectedCheckoutFilter === 'R/O') {
-                // R/O: Both Regular and Late Check-in, but Regular (Red) has priority
+                // R/O: Compatible with BOTH R/I and L/I checkin
             if (checkinType === 'R/I') {
                 belongsToCheckout = true;
                     checkoutPriority = 2; // Red priority (higher = first)
             } else if (checkinType === 'L/I') {
                 belongsToCheckout = true;
-                    checkoutPriority = 1; // Yellow priority (lower = second)
+                    checkoutPriority = 1; // Yellow priority
             }
         } else if (selectedCheckoutFilter === 'L/O') {
-                // L/O: Late Check-in only (Yellow)
+                // L/O: Only compatible with L/I checkin
             if (checkinType === 'L/I') {
                 belongsToCheckout = true;
                     checkoutPriority = 1; // Yellow priority
@@ -1504,6 +1504,28 @@ function updateWarningMessage(selectedBedFilter) {
 
             // Check if room matches BOTH filters
             const matchesBothFilters = belongsToCheckin && belongsToCheckout && selectedCheckinFilter && selectedCheckoutFilter;
+            
+            // Check if room is incompatible with selected filters
+            if (selectedCheckinFilter && selectedCheckoutFilter) {
+                // Both filters selected - check if room is incompatible
+                if ((selectedCheckinFilter === 'R/I' && checkoutType === 'L/O') || 
+                    (selectedCheckoutFilter === 'L/O' && checkinType === 'R/I')) {
+                    // Room is incompatible - don't add to any container
+                    return;
+                }
+            } else if (selectedCheckinFilter) {
+                // Only check-in filter selected - check if room is incompatible
+                if (selectedCheckinFilter === 'R/I' && checkoutType === 'L/O') {
+                    // Room is incompatible - don't add to any container
+                    return;
+                }
+            } else if (selectedCheckoutFilter) {
+                // Only check-out filter selected - check if room is incompatible
+                if (selectedCheckoutFilter === 'L/O' && checkinType === 'R/I') {
+                    // Room is incompatible - don't add to any container
+                    return;
+                }
+            }
             
             // Add room to appropriate section with priority
             if (matchesBothFilters) {
@@ -1522,6 +1544,8 @@ function updateWarningMessage(selectedBedFilter) {
                 otherRooms.push(room);
             }
         });
+
+
 
         // Generate HTML for each section
         const generateRoomHTML = (rooms, sectionType = 'other') => {
@@ -1683,8 +1707,9 @@ function updateWarningMessage(selectedBedFilter) {
         otherContainer.innerHTML = '<div style="text-align: center; color: #666; font-style: italic; padding: 20px;">No other available rooms</div>';
     }
 
-    // Set the counts
-        const availableCount = filteredRooms.filter(room => !window.fullyReservedBedTypes || !window.fullyReservedBedTypes[room.ROOM_BED]).length;
+   // Set the counts - count all rooms that are actually displayed (compatible rooms only)
+   const displayedRooms = [...checkinRooms, ...checkoutRooms, ...bothFiltersRooms, ...otherRooms];
+        const availableCount = displayedRooms.filter(room => !window.fullyReservedBedTypes || !window.fullyReservedBedTypes[room.ROOM_BED]).length;
         document.getElementById('availableRoomCount').textContent = availableCount;
     
     // Filter unassigned bookings by bed type and set count
@@ -1705,13 +1730,6 @@ function updateWarningMessage(selectedBedFilter) {
     // Update warning message based on current filter
     updateWarningMessage(selectedBedFilter);
 
-        console.log('📈 FILTER RESULTS:');
-        console.log('  - Check-in rooms:', checkinRooms.length);
-        console.log('  - Check-out rooms:', checkoutRooms.length);
-        console.log('  - Both filters rooms:', bothFiltersRooms.length);
-        console.log('  - Other rooms:', otherRooms.length);
-        console.log('  - Total available:', availableCount);
-        console.log('  - Unassigned:', filteredUnassignedCount);
 }
 
 
