@@ -27,6 +27,8 @@ router.post('/remove-service', BookingController.removeService);
 
 // Payment processing
 router.post('/process-payment', BookingController.processPayment);
+// Discount management
+router.post('/apply-discount', BookingController.applyDiscount);
 
 // Check-out management
 router.post('/late_checkout', BookingController.lateCheckout);

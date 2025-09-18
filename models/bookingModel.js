@@ -1138,14 +1138,18 @@ class BookingModel {
                   FROM booking_pick_drop pd
                   WHERE pd.BOOKING_ID = ? AND pd.STATUS = 'unpaid' AND pd.ACTIVE = 1
               ), 0)
-          ) AS total_unpaid_balance
+          ) AS total_unpaid_balance,
+          COALESCE((
+            SELECT b.REMARKS FROM billing b WHERE b.BOOKING_ID = ?
+          ), '') AS discount_remarks
       `;
       
       // Ensure param count matches query (12 parameters)
       const results = await queryDatabasePromise(query, [
         bookingId, bookingId, bookingId, bookingId, 
         bookingId, bookingId, bookingId, bookingId,
-        bookingId, bookingId, bookingId, bookingId
+        bookingId, bookingId, bookingId, bookingId,
+        bookingId
       ]);
 
       const balanceData = results.length > 0 ? results[0] : {
@@ -1161,6 +1165,40 @@ class BookingModel {
       return balanceData;
     } catch (error) {
       console.error('Error in getUnpaidBalance:', error);
+      throw error;
+    }
+  }
+
+  // Apply or update manual discount
+  static async applyDiscount(params) {
+    const { bookingId, amount, remarks, editedBy } = params;
+    try {
+      // Update billing discount and optionally remarks
+      const updateBillingSql = `
+        UPDATE billing 
+        SET DISCOUNT_AMOUNT = ?, 
+            EDITED_BY = ?, 
+            EDITED_DT = NOW(),
+            REMARKS = CASE WHEN ? <> '' THEN ? ELSE REMARKS END
+        WHERE BOOKING_ID = ?
+      `;
+      await queryDatabasePromise(updateBillingSql, [amount, editedBy, remarks, remarks, bookingId]);
+
+      // Remove existing discount payments, then insert a new negative one if amount > 0
+      const deleteSql = `DELETE FROM payments WHERE BOOKING_ID = ? AND PAYMENT_TYPE = 'discount'`;
+      await queryDatabasePromise(deleteSql, [bookingId]);
+
+      if (amount > 0) {
+        const insertSql = `
+          INSERT INTO payments (BOOKING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
+          VALUES (?, ?, 'cash', 'discount', NOW(), ?)
+        `;
+        await queryDatabasePromise(insertSql, [bookingId, -amount, editedBy]);
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error in applyDiscount:', error);
       throw error;
     }
   }

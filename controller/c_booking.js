@@ -503,6 +503,25 @@ class BookingController {
     }
   }
 
+  // Apply or update manual discount for an occupied booking
+  static async applyDiscount(req, res) {
+    try {
+      const { bookingId, amount, remarks } = req.body;
+      const editedBy = req.user?.userId || 'system';
+      if (!bookingId) return res.status(400).json({ error: 'Missing bookingId' });
+      const numericAmount = parseFloat(amount);
+      if (isNaN(numericAmount) || numericAmount < 0) {
+        return res.status(400).json({ error: 'Invalid discount amount' });
+      }
+
+      const result = await BookingModel.applyDiscount({ bookingId, amount: numericAmount, remarks: remarks || '', editedBy });
+      res.json({ success: true, result });
+    } catch (error) {
+      console.error('❌ Failed to apply discount:', error);
+      res.status(500).json({ error: 'Failed to apply discount' });
+    }
+  }
+
   // Get booking services
   static async getBookingServices(req, res) {
     try {

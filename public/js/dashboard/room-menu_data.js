@@ -30,6 +30,46 @@ window.openExtendModal = openExtendModal;
 window.triggerTransferFromMenu = triggerTransferFromMenu;
 window.openRoomMenuModal = openRoomMenuModal;
 window.createDynamicRoomModal = createDynamicRoomModal;
+// Discount helpers
+window.toggleDiscountInput = function(bookingId){
+    const input = document.getElementById(`discountAmountManual-${bookingId}`);
+    const remarks = document.getElementById(`discountRemarks-${bookingId}`);
+    const applyBtn = document.getElementById(`applyDiscountBtn-${bookingId}`);
+    if (!input || !applyBtn) return;
+    const willShow = input.style.display === 'none' || input.style.display === '';
+    input.style.display = willShow ? 'block' : 'none';
+    if (remarks) remarks.style.display = willShow ? 'block' : 'none';
+    applyBtn.style.display = willShow ? 'inline-block' : 'none';
+    if (willShow) setTimeout(() => input.focus(), 0);
+};
+
+window.applyManualDiscount = function(bookingId){
+    const amountInput = document.getElementById(`discountAmountManual-${bookingId}`);
+    const remarksInput = document.getElementById(`discountRemarks-${bookingId}`);
+    if (!amountInput) return;
+    const amount = parseFloat(amountInput.value);
+    if (isNaN(amount) || amount < 0){
+        toastWarning('Validation', 'Please enter a valid discount amount.');
+        return;
+    }
+    fetch('/booking/apply-discount', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+        body: new URLSearchParams({ bookingId: bookingId, amount: amount, remarks: (remarksInput ? remarksInput.value : '') }).toString()
+    })
+    .then(res => {
+        if (!res.ok) throw new Error('Failed to apply discount');
+        return res.json();
+    })
+    .then(() => {
+        toastSuccess('Success', 'Discount applied');
+        calculateBalance(bookingId, bookingId);
+    })
+    .catch(err => {
+        console.error('Failed to apply discount', err);
+        toastError('Error', 'Failed to apply discount');
+    });
+};
 
 // Add a function to refresh services when payment status changes
 window.refreshServicesList = function(bookingId) {
@@ -319,6 +359,22 @@ function createDynamicRoomModal(bookingId, event, options) {
                             </div>
                         </div>
                         
+                        <!-- Discount Section (boxed) -->
+                        <div class="discount-section mb-3">
+                            <div class="section-header">Discount</div>
+                            <div class="section-body">
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <button type="button" class="btn btn-sm btn-outline-success" onclick="toggleDiscountInput('${bookingId}')">Discount</button>
+                                    <input type="number" min="0" step="0.01" id="discountAmountManual-${bookingId}" class="form-control form-control-sm" placeholder="Enter amount" style="max-width: 140px; display: none;">
+                                    <input type="text" id="discountRemarks-${bookingId}" class="form-control form-control-sm" placeholder="Remarks (optional)" style="max-width: 260px; display: none;">
+                                    <button type="button" class="btn btn-sm btn-success" id="applyDiscountBtn-${bookingId}" style="display: none;" onclick="applyManualDiscount('${bookingId}')">Apply</button>
+                                </div>
+                                <div class="discount-divider"></div>
+                                <div id="discount-remarks-label-${bookingId}" class="discount-remarks-label" style="display:none;">Discount Remarks</div>
+                                <div id="discount-remarks-display-${bookingId}" class="discount-remarks-box text-muted small mt-1" style="display:none;"></div>
+                            </div>
+                        </div>
+                        
                         <!-- Summary Section -->
                         <div class="summary-section">
                             <div class="row">
@@ -361,6 +417,7 @@ function createDynamicRoomModal(bookingId, event, options) {
                                     <!-- Empty column for alignment -->
                                 </div>
                             </div>
+                            
                         </div>
                     </div>
                 </div>
@@ -568,6 +625,33 @@ modalStyle.textContent = `
         font-size: 0.75rem;
         padding: 4px 8px;
         border-radius: 12px;
+    }
+    /* Override theme file forcing white badges */
+    #dynamicRoomModal_${bookingId} .badge.bg-success{ background-color: var(--bs-success) !important; color:#fff !important; }
+    #dynamicRoomModal_${bookingId} .badge.bg-warning{ background-color: var(--bs-warning) !important; color:#212529 !important; }
+    #dynamicRoomModal_${bookingId} .badge.bg-danger{ background-color: var(--bs-danger) !important; color:#fff !important; }
+    #dynamicRoomModal_${bookingId} .badge.bg-primary{ background-color: var(--bs-primary) !important; color:#fff !important; }
+    #dynamicRoomModal_${bookingId} .badge.bg-secondary{ background-color: var(--bs-secondary) !important; color:#fff !important; }
+    #dynamicRoomModal_${bookingId} .badge.bg-info{ background-color: var(--bs-info) !important; color:#000 !important; }
+    #dynamicRoomModal_${bookingId} .badge.bg-dark{ background-color: var(--bs-dark) !important; color:#fff !important; }
+    /* Boxed section styling (like Extra Services) */
+    #dynamicRoomModal_${bookingId} .discount-section{
+        background:#ffffff; border:1px solid #e9ecef; border-radius:6px; padding:10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    #dynamicRoomModal_${bookingId} .discount-section .section-header{
+        color:#198754; font-weight:600; font-size:0.9rem; border-bottom:2px solid #198754; padding-bottom:4px; margin-bottom:8px;
+    }
+    #dynamicRoomModal_${bookingId} .discount-section .section-body{ padding-top:2px; }
+    /* Divider and remarks box for discount section */
+    #dynamicRoomModal_${bookingId} .discount-divider{ height:1px; background:#e9ecef; margin-top:8px; }
+    #dynamicRoomModal_${bookingId} .discount-remarks-box{ background:#f8f9fa; border:1px solid #e9ecef; border-radius:6px; padding:8px 10px; }
+    #dynamicRoomModal_${bookingId} .discount-remarks-label{ font-size: 0.75rem; color:#6c757d; font-weight:600; margin-top:6px; }
+    /* Discount button exact green */
+    #dynamicRoomModal_${bookingId} .discount-section .btn-outline-success{
+        background-color:#198754 !important; color:#fff !important; border-color:#198754 !important;
+    }
+    #dynamicRoomModal_${bookingId} .discount-section .btn-outline-success:hover{
+        filter: brightness(0.95);
     }
 `;
 
@@ -1554,6 +1638,7 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
         let totalUnpaid = data.total_unpaid_balance || 0;
         let reservationFee = data.reservation_fee || 0;
         let discountAmount = data.discount_amount || 0;
+        let discountRemarks = (data.discount_remarks || '').trim();
 
       
 
@@ -1600,12 +1685,34 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
             } else {
                 console.error(`❌ Discount elements not found for booking ${bookingId}`);
             }
+            // Prefill inputs and show remarks row if provided
+            const amountInput = document.getElementById(`discountAmountManual-${bookingId}`);
+            if (amountInput) amountInput.value = parseFloat(discountAmount).toFixed(2);
+            const remarksInput = document.getElementById(`discountRemarks-${bookingId}`);
+            if (remarksInput) remarksInput.value = discountRemarks;
+            const remarksInline = document.getElementById(`discount-remarks-display-${bookingId}`);
+            const remarksLabel = document.getElementById(`discount-remarks-label-${bookingId}`);
+            if (remarksInline) {
+                if (discountRemarks) {
+                    if (remarksLabel) remarksLabel.style.display = 'block';
+                    remarksInline.style.display = 'block';
+                    remarksInline.textContent = discountRemarks;
+                } else {
+                    if (remarksLabel) remarksLabel.style.display = 'none';
+                    remarksInline.style.display = 'none';
+                    remarksInline.textContent = '';
+                }
+            }
         } else {
             const discountRow = document.getElementById(`discount-row-${bookingId}`);
             if (discountRow) {
                 discountRow.style.display = 'none';
                 // console.log(`✅ Discount row hidden (no discount)`);
             }
+            const remarksInline = document.getElementById(`discount-remarks-display-${bookingId}`);
+            const remarksLabel = document.getElementById(`discount-remarks-label-${bookingId}`);
+            if (remarksInline) { remarksInline.style.display = 'none'; remarksInline.textContent=''; }
+            if (remarksLabel) { remarksLabel.style.display = 'none'; }
         }
         
         // Also update billing modal elements if they exist
