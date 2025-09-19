@@ -8514,6 +8514,64 @@ th > .rt-radio.rt-radio-single {
 .modal .input-icon > i {
   z-index: 10055;
 }
+
+/* FIX: Modal stacking fix for billing modal */
+#modal-billing {
+  z-index: 1070 !important;
+  pointer-events: auto !important;
+}
+
+#modal-billing .modal-content {
+  pointer-events: auto !important;
+  z-index: 1071 !important;
+}
+
+#modal-billing .modal-dialog {
+  pointer-events: auto !important;
+  z-index: 1071 !important;
+}
+
+#modal-billing + .modal-backdrop {
+  z-index: 1065 !important;
+}
+
+/* Ensure checkout modal has proper z-index */
+[id^="checkoutBacktrackModal_"] {
+  z-index: 1060 !important;
+}
+
+[id^="checkoutBacktrackModal_"] + .modal-backdrop {
+  z-index: 1055 !important;
+}
+
+/* Multiple modal backdrop handling */
+.modal-backdrop + .modal-backdrop {
+  z-index: 1065 !important;
+}
+
+/* FIX: Ensure billing modal is clickable */
+#modal-billing.show {
+  pointer-events: auto !important;
+}
+
+#modal-billing.show .modal-content {
+  pointer-events: auto !important;
+}
+
+#modal-billing.show .modal-dialog {
+  pointer-events: auto !important;
+}
+
+/* Remove any blur effects that might interfere */
+#modal-billing {
+  filter: none !important;
+  backdrop-filter: none !important;
+}
+
+#modal-billing .modal-content {
+  filter: none !important;
+  backdrop-filter: none !important;
+}
 .has-success .input-icon > i {
   color: #36c6d3;
 }
