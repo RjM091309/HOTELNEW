@@ -360,7 +360,7 @@ function createDynamicRoomModal(bookingId, event, options) {
                         </div>
                         
                         <!-- Discount Section (boxed) -->
-                        <div class="discount-section mb-3">
+                        <div class="discount-section mb-3" id="discount-section-${bookingId}">
                             <div class="section-header">Discount</div>
                             <div class="section-body">
                                 <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -1745,6 +1745,22 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
             }
             } else {
                 console.error(`❌ Balance element not found: Balance-${bookingId}`);
+        }
+
+        // Hide/Show Discount Section based on payment status
+        const discountSection = document.getElementById(`discount-section-${bookingId}`) || 
+                               document.querySelector(`#dynamicRoomModal_${bookingId} .discount-section`);
+        
+        if (discountSection) {
+            if (totalUnpaid <= 0) {
+                // Hide discount section when fully paid
+                discountSection.style.display = 'none';
+                console.log(`✅ Discount section hidden - booking ${bookingId} is fully paid`);
+            } else {
+                // Show discount section when there's unpaid balance
+                discountSection.style.display = 'block';
+                console.log(`✅ Discount section shown - booking ${bookingId} has unpaid balance`);
+            }
         }
     })
     .catch(error => {
