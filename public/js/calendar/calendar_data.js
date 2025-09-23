@@ -315,12 +315,11 @@ function setupHoverEffects() {
   events.forEach(ev => {
     ev.addEventListener('mouseenter', function () {
       this.style.zIndex = '20';
-      this.style.boxShadow = '0 6px 16px rgba(0,0,0,.4), 0 3px 8px rgba(0,0,0,.3)';
       this.style.transition = 'box-shadow .2s ease';
     });
     ev.addEventListener('mouseleave', function () {
       this.style.zIndex = '';
-      this.style.boxShadow = '0 4px 12px rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.2)';
+      this.style.boxShadow = '';
     });
   });
 }

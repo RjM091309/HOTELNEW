@@ -229,6 +229,8 @@ function applyCompositeStatusStyles(event, el) {
       el.setAttribute('data-composite', 'true');
       el.style.background = `linear-gradient(90deg, ${leftColor} 0%, ${leftColor} 50%, ${rightColor} 50%, ${rightColor} 100%)`;
       el.style.color = '#fff';
+      // Lower z-index so checkout side (right half) visually sits underneath neighbors
+      el.style.zIndex = '5';
       return;
     }
 
@@ -239,6 +241,8 @@ function applyCompositeStatusStyles(event, el) {
       el.setAttribute('data-composite', 'true');
       el.style.background = `linear-gradient(90deg, ${leftColor} 0%, ${leftColor} 50%, ${rightColor} 50%, ${rightColor} 100%)`;
       el.style.color = '#fff';
+      // Lower z-index so checkout side (right half) visually sits underneath neighbors
+      el.style.zIndex = '5';
       return;
     }
 
@@ -248,6 +252,8 @@ function applyCompositeStatusStyles(event, el) {
     if (event.backgroundColor) {
       el.style.backgroundColor = event.backgroundColor;
     }
+    // Restore default stacking when not composite
+    el.style.zIndex = '';
   } catch (e) {
     // ignore
   }
@@ -272,6 +278,8 @@ function handleEventDidMount(info) {
   const overlappingEvents = sameRoomEvents.filter(e => {
     const eStartDate = getDateString(e.start);
     const eEndDate = getDateString(e.end);
+    // Allow overlap when either the current event or the compared event is a checkout
+    if (isCheckoutEvent(info.event) || isCheckoutEvent(e)) return false;
     return (eventStartDate <= eEndDate && eventEndDate >= eStartDate);
   });
 
@@ -289,6 +297,18 @@ function handleEventDidMount(info) {
   } catch (e) {
     // ignore style errors
   }
+
+  // Control visual overlay: allow only if either event is checkout
+  try {
+    const harness = info.el.closest('.fc-timeline-event-harness');
+    if (harness) {
+      if (isCheckoutEvent(info.event)) {
+        harness.classList.add('fc-allow-overlay');
+      } else {
+        harness.classList.remove('fc-allow-overlay');
+      }
+    }
+  } catch (e) {}
 
   // Improve title readability with a top-aligned parallelogram chip overlay
   try {
@@ -798,24 +818,15 @@ function handleEventDrop(info) {
   if (targetRoom && targetRoom.id) {
     const overlappingEvents = checkForOverlaps(newStart, newEnd, targetRoom.id, bookingId);
     if (overlappingEvents.length > 0) {
-      
-      // Show warning about overlaps
+      // Strict rule: only checkout may overlap. Block move.
       Swal.fire({
-        title: '⚠️ Overlapping Events Detected',
-        html: `This booking will overlap with existing events:<br><br>
+        title: 'Overlap Not Allowed',
+        html: `This change would overlap with:<br><br>
                <b>${overlappingEvents.map(e => e.title).join(', ')}</b><br><br>
-               Do you want to continue?`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Yes, Continue',
-        cancelButtonText: 'Cancel'
-      }).then((result) => {
-        if (result.isConfirmed) {
-          proceedWithUpdate(info, newStart, newEnd, targetRoom, bookingId);
-        } else {
-          info.revert();
-        }
-      });
+               Only checkout schedules may overlap other events.`,
+        icon: 'error',
+        confirmButtonText: 'OK'
+      }).then(() => { info.revert(); });
       return;
     }
   } else {
@@ -2019,6 +2030,19 @@ function getDateString(date) {
   return new Date(date).toISOString().split('T')[0];
 }
 
+// Identify checkout events. Treat events whose bookingStatus is 'check-Out'
+// OR whose right half reflects checkout state (composite styles applied) as checkout carriers.
+function isCheckoutEvent(event) {
+  try {
+    const status = event?.extendedProps?.bookingStatus;
+    if (status === 'check-Out') return true;
+    // If composite is applied for check-In/pending, it's not a pure checkout
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
 // Format Date to MySQL DATETIME (YYYY-MM-DD HH:MM:SS) using local time
 function formatMySQLDateTime(date) {
   const d = new Date(date);
@@ -2052,6 +2076,8 @@ function globalOverlapCheck(calendar) {
     const overlappingEvents = sameRoomEvents.filter(e => {
       const eStartDate = getDateString(e.start);
       const eEndDate = getDateString(e.end);
+      // Allow overlap when either side is a checkout event
+      if (isCheckoutEvent(event) || isCheckoutEvent(e)) return false;
       return (eventStartDate <= eEndDate && eventEndDate >= eStartDate);
     });
 
@@ -2081,21 +2107,31 @@ function updateSingleEvent(event, newStart, newEnd, newResource) {
     // Mark event as being updated
     event._isUpdating = true;
     
-    // ULTRA-FAST: Update event dates directly
-    event.start = newStart;
-    event.end = newEnd;
+    // Use FullCalendar APIs to update dates to avoid internal state desync
+    try {
+      if (typeof event.setDates === 'function') {
+        event.setDates(newStart, newEnd, { allDay: false });
+      } else {
+        if (typeof event.setStart === 'function') event.setStart(newStart, { maintainDuration: false });
+        if (typeof event.setEnd === 'function') event.setEnd(newEnd, { allowOpenEnded: false });
+      }
+    } catch (apiErr) {
+      // Fallback for older versions
+      event.start = newStart;
+      event.end = newEnd;
+    }
     
     // Update resource if changed
     if (newResource && event.getResources()[0]?.id !== newResource.id) {
-      // Update resource ID directly
-      event.resourceIds = [newResource.id];
-      
-      // Force calendar to re-render the event in the new room
-      if (event.view && event.view.calendar) {
-        event.view.calendar.render();
-        console.log('✅ Event moved to new room:', newResource.title);
-      } else {
-        console.warn('⚠️ Calendar view not available for re-render');
+      try {
+        if (typeof event.setProp === 'function') {
+          event.setProp('resourceIds', [newResource.id]);
+        } else {
+          // Last resort fallback
+          event.resourceIds = [newResource.id];
+        }
+      } catch (resErr) {
+        event.resourceIds = [newResource.id];
       }
     }
     
@@ -2114,6 +2150,18 @@ function updateSingleEvent(event, newStart, newEnd, newResource) {
       
       console.log('✅ Event data updated instantly');
     }
+
+    // Update overlay class on harness depending on status
+    try {
+      const harness = (eventElement && eventElement.closest) ? eventElement.closest('.fc-timeline-event-harness') : null;
+      if (harness) {
+        if (isCheckoutEvent(event)) {
+          harness.classList.add('fc-allow-overlay');
+        } else {
+          harness.classList.remove('fc-allow-overlay');
+        }
+      }
+    } catch (e) {}
     
     // Update overlap detection for this specific event
     setTimeout(() => {
@@ -2264,13 +2312,16 @@ function checkForOverlaps(newStart, newEnd, roomId, excludeEventId) {
         return; // Skip events with invalid resource IDs
       }
       
-      if (eventRoomId === roomId) {
+    if (eventRoomId === roomId) {
         // Check for date overlap
         const eventStart = new Date(event.start);
         const eventEnd = new Date(event.end);
         
         // Check if dates overlap (exclusive end dates)
-        if (newStart < eventEnd && newEnd > eventStart) {
+      if (newStart < eventEnd && newEnd > eventStart) {
+        // Only allow overlap if the existing event is checkout
+        const existingIsCheckout = isCheckoutEvent(event);
+        if (!existingIsCheckout) {
           overlappingEvents.push({
             id: event.id,
             title: event.title,
@@ -2278,6 +2329,7 @@ function checkForOverlaps(newStart, newEnd, roomId, excludeEventId) {
             end: eventEnd
           });
         }
+      }
       }
     } catch (error) {
       // Continue with other events
