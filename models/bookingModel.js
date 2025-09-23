@@ -542,12 +542,12 @@ class BookingModel {
         // Create billing
         const billingQuery = `
           INSERT INTO billing 
-          (BOOKING_ID, ROOM_CHARGE, AMENITIES_CHARGE, SERVICES_CHARGE, LATE_CHECKOUT_CHARGE, QTY, PAYMENT_STATUS, PAYMENT_METHOD, REMARKS, ENCODED_BY, ENCODED_DT, ACTIVE, RESERVATION_FEE, DISCOUNT_AMOUNT) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (BOOKING_ID, ROOM_CHARGE, AMENITIES_CHARGE, SERVICES_CHARGE, LATE_CHECKOUT_CHARGE, QTY, PAYMENT_STATUS, PAYMENT_METHOD, REMARKS, ENCODED_BY, ENCODED_DT, ACTIVE, RESERVATION_FEE, DISCOUNT_AMOUNT, DISCOUNT_APPLIED) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const billingValues = [
           bookingId, numericRoomPrice, 0.00, 0.00, 0.00, diffindays, paymentStatus, 'cash', '', encodedBy, date, 1,
-          parseFloat(reservationFee) || 0.00, parseFloat(discount) || 0.00
+          parseFloat(reservationFee) || 0.00, parseFloat(discount) || 0.00, paymentStatus === 'paid' ? 1 : 0
         ];
 
         await new Promise((resolve, reject) => {
@@ -1109,6 +1109,13 @@ class BookingModel {
               WHERE b.BOOKING_ID = ?
           ), 0) AS discount_amount,
 
+          -- Discount Applied flag (0 = Discount, 1 = Discount Applied)
+          COALESCE((
+              SELECT b.DISCOUNT_APPLIED
+              FROM billing b
+              WHERE b.BOOKING_ID = ?
+          ), 0) AS discount_applied,
+
           -- Total Outstanding Balance
           (
               COALESCE((
@@ -1144,10 +1151,12 @@ class BookingModel {
           ), '') AS discount_remarks
       `;
       
-      // Ensure param count matches query (12 parameters)
+      // Ensure param count matches query (13 parameters)
       const results = await queryDatabasePromise(query, [
         bookingId, bookingId, bookingId, bookingId, 
         bookingId, bookingId, bookingId, bookingId,
+        bookingId, /* discount_amount */ 
+        bookingId, /* discount_applied */
         bookingId, bookingId, bookingId, bookingId,
         bookingId
       ]);
@@ -1526,6 +1535,7 @@ class BookingModel {
           bi.PAYMENT_STATUS,
           bi.RESERVATION_FEE,
           bi.DISCOUNT_AMOUNT,
+          bi.DISCOUNT_APPLIED,
           rt.NAME AS ROOM_TYPE
         FROM booking b
         JOIN billing bi ON b.IDNo = bi.BOOKING_ID
@@ -1642,7 +1652,8 @@ class BookingModel {
         items: allItems,
         subTotal: subTotal,
         reservationFee: parseFloat(b.RESERVATION_FEE) || 0,
-        discountAmount: parseFloat(b.DISCOUNT_AMOUNT) || 0
+        discountAmount: parseFloat(b.DISCOUNT_AMOUNT) || 0,
+        discountApplied: b.DISCOUNT_APPLIED === 1 ? 1 : 0
       };
 
       return receiptData;

@@ -1639,6 +1639,7 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
         let reservationFee = data.reservation_fee || 0;
         let discountAmount = data.discount_amount || 0;
         let discountRemarks = (data.discount_remarks || '').trim();
+        let discountAppliedFlag = parseInt(data.discount_applied, 10) || 0;
 
       
 
@@ -1680,6 +1681,16 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
             const discountAmountElement = document.getElementById(`discount-amount-${bookingId}`);
             if (discountRow && discountAmountElement) {
                 discountRow.style.display = 'block';
+                // Set label based on discount_applied flag from API (default to Applied when unknown)
+                const label = document.querySelector(`#discount-row-${bookingId} .summary-item label`);
+                if (label) {
+                    const discountAppliedFlag = typeof data.discount_applied !== 'undefined' ? parseInt(data.discount_applied, 10) : 1;
+                    if (discountAppliedFlag === 0) {
+                        label.textContent = 'Discount';
+                    } else {
+                        label.textContent = 'Discount Applied';
+                    }
+                }
                 discountAmountElement.innerHTML = `<span class="text-danger"><strong>-₱${parseFloat(discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>`;
                 // console.log(`✅ Discount row displayed: -₱${parseFloat(discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
             } else {
@@ -1728,8 +1739,21 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
             }
         }
 
+        // Adjust balance: when DISCOUNT_APPLIED = 0, subtract discount from outstanding balance
+        // Base balance is sum of unpaid charges
+        let balanceToShow = totalUnpaid;
+        // Always subtract Reservation Fee (already paid)
+        if (reservationFee > 0) {
+            balanceToShow -= reservationFee;
+        }
+        // If discount is not yet applied (flag=0), subtract it as well
+        if (discountAppliedFlag === 0 && discountAmount > 0) {
+            balanceToShow -= discountAmount;
+        }
+        if (balanceToShow < 0) balanceToShow = 0;
+
         // Format Balance with Comma Separator
-        let formattedBalance = totalUnpaid.toLocaleString('en-US', {
+        let formattedBalance = balanceToShow.toLocaleString('en-US', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
         });
@@ -1738,7 +1762,7 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
         let balanceElement = document.getElementById(`Balance-${bookingId}`);
             
         if (balanceElement) {
-            if (totalUnpaid > 0) {
+            if (balanceToShow > 0) {
                 balanceElement.innerHTML = `<span class="text-danger"><strong>₱${formattedBalance}</strong></span>`;
             } else {
                 balanceElement.innerHTML = `<span class="text-success"><strong>₱0.00</strong></span>`;
@@ -1752,7 +1776,7 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
                                document.querySelector(`#dynamicRoomModal_${bookingId} .discount-section`);
         
         if (discountSection) {
-            if (totalUnpaid <= 0) {
+            if (balanceToShow <= 0) {
                 // Hide discount section when fully paid
                 discountSection.style.display = 'none';
                 console.log(`✅ Discount section hidden - booking ${bookingId} is fully paid`);
@@ -1770,177 +1794,8 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
 
 // Function to show billing
 function showBilling(bookingId) {
-    // Try to use jQuery approach (most reliable)
-    if (typeof $ !== 'undefined' && $.fn.modal) {
-        // Set the booking ID first
-        $('#hiddenBookingId').val(bookingId);
-        
-        // Use jQuery AJAX to load billing data
-        $.ajax({
-            url: `/booking/get-billing/${bookingId}?_=${Date.now()}`,
-            method: 'GET',
-            cache: false,
-            success: function (data) {
-                // Populate table rows
-                const tbody = document.querySelector('#modal-billing table tbody');
-                tbody.innerHTML = '';
-                data.items.forEach((item, index) => {
-                    const isPaid = item.status === 'paid';
-                    const paidTextClass = isPaid ? 'text-success' : '';
-                    const row = `
-                    <tr>
-                    <td class="text-center ${paidTextClass}">${index + 1}</td>
-                    <td class="text-center ${paidTextClass}">${new Date(item.date).toLocaleDateString()}</td>
-                    <td class="text-center ${paidTextClass}">${item.description}</td>
-                    <td class="text-center ${paidTextClass}">${parseFloat(item.basePrice).toFixed(2)}</td>
-                    <td class="text-center ${paidTextClass}">${item.qty || '-'}</td>
-                    <td class="text-right ${paidTextClass}">${parseFloat(item.subTotal).toFixed(2)}</td>
-                    </tr>
-                    `;
-                    tbody.insertAdjacentHTML('beforeend', row);
-                });
-                
-                // Calculate totals
-                const subTotal = parseFloat(data.subTotal);
-                const reservationFee = parseFloat(data.reservationFee) || 0;
-                const discountAmount = parseFloat(data.discountAmount) || 0;
-                const totalAmount = subTotal - reservationFee - discountAmount;
-                
-                let totalPaid = 0;
-                data.items.forEach(item => {
-                    if (item.status === 'paid') {
-                        totalPaid += parseFloat(item.subTotal);
-                    }
-                });
-                
-                // Determine if room charge (first item) is paid
-                const roomItem = Array.isArray(data.items) && data.items.length > 0 ? data.items[0] : null;
-                const isRoomPaid = roomItem && roomItem.status === 'paid';
-                
-                // Adjust totalPaid to apply reservation fee and discount ONLY against the paid room amount
-                let adjustedPaidAmount = totalPaid;
-                if (isRoomPaid) {
-                    adjustedPaidAmount = Math.max(0, totalPaid - (reservationFee + discountAmount));
-                }
-                
-                const finalBalance = totalAmount - adjustedPaidAmount;
-                
-                // Populate modal fields dynamically
-                $('#billingReceiptId').text(data.bookingId || 'N/A');
-                $('#customerName').text(data.customerName || 'N/A');
-                $('#invoiceDate').text(data.invoiceDate || 'N/A');
-                $('#confNumber').text(data.confNumber || 'N/A');
-                
-                // Update totals
-                $('#totalPaid').text(`₱${adjustedPaidAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
-                $('#balanceAmount').text(`₱${finalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
-                $('#totalPayment').text(`₱${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
-                
-                // Handle Reservation Fee Display
-                if (data.reservationFee && parseFloat(data.reservationFee) > 0) {
-                    const reservationFeeRow = document.getElementById('reservationFeeRow');
-                    const reservationFeeElement = document.getElementById('billingReservationFeeAmount');
-                    if (reservationFeeRow && reservationFeeElement) {
-                        reservationFeeRow.style.display = 'block';
-                        reservationFeeElement.textContent = parseFloat(data.reservationFee).toLocaleString('en-US', { minimumFractionDigits: 2 });
-                    }
-                } else {
-                    const reservationFeeRow = document.getElementById('reservationFeeRow');
-                    if (reservationFeeRow) {
-                        reservationFeeRow.style.display = 'none';
-                    }
-                }
-                
-                // Handle Discount Display
-                if (data.discountAmount && parseFloat(data.discountAmount) > 0) {
-                    const discountRow = document.getElementById('discountRow');
-                    const discountElement = document.getElementById('billingDiscountAmount');
-                    if (discountRow && discountElement) {
-                        discountRow.style.display = 'block';
-                        discountElement.textContent = parseFloat(data.discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 });
-                    }
-                } else {
-                    const discountRow = document.getElementById('discountRow');
-                    if (discountRow) {
-                        discountRow.style.display = 'none';
-                    }
-                }
-                
-                // Determine if ALL items are paid (including reservation fee consideration)
-                const allPaid = data.items.every(item => item.status === 'paid') && (finalBalance <= 0);
-
-                if (allPaid) {
-                    // Show paid image overlay in billing modal
-                    const paidImageOverlay = document.getElementById('paidImageOverlay');
-                    if (paidImageOverlay) {
-                        paidImageOverlay.style.display = 'block';
-                        paidImageOverlay.classList.add('show-paid-status');
-                    }
-                    
-                    // Update button text and disable it
-                    $('#proceedToPaymentButton').prop('disabled', true).text('Payment Completed');
-                    $('#proceedToPaymentButton').removeClass('btn-payment').addClass('btn-success');
-                } else {
-                    // Hide paid image overlay in billing modal
-                    const paidImageOverlay = document.getElementById('paidImageOverlay');
-                    if (paidImageOverlay) {
-                        paidImageOverlay.style.display = 'none';
-                        paidImageOverlay.classList.remove('show-paid-status');
-                    }
-                    
-                    // Update button text and enable it
-                    $('#proceedToPaymentButton').prop('disabled', false).text('Proceed to Payment');
-                    $('#proceedToPaymentButton').removeClass('btn-success').addClass('btn-payment');
-                }
-
-                // Show modal
-                $('#modal-billing').modal('show');
-                
-                // Ensure modal is clickable after showing
-                setTimeout(() => {
-                    const modalElement = document.getElementById('modal-billing');
-                    if (modalElement) {
-                        // Force pointer events
-                        modalElement.style.pointerEvents = 'auto';
-                        modalElement.style.zIndex = '1070';
-                        
-                        const modalContent = modalElement.querySelector('.modal-content');
-                        if (modalContent) {
-                            modalContent.style.pointerEvents = 'auto';
-                            modalContent.style.zIndex = '1071';
-                        }
-                        
-                        const modalDialog = modalElement.querySelector('.modal-dialog');
-                        if (modalDialog) {
-                            modalDialog.style.pointerEvents = 'auto';
-                            modalDialog.style.zIndex = '1071';
-                        }
-                        
-                        // Remove any conflicting backdrops
-                        const backdrops = document.querySelectorAll('.modal-backdrop');
-                        if (backdrops.length > 1) {
-                            // Keep only the last backdrop (for billing modal)
-                            for (let i = 0; i < backdrops.length - 1; i++) {
-                                backdrops[i].remove();
-                            }
-                            // Ensure the last backdrop has correct z-index
-                            const lastBackdrop = backdrops[backdrops.length - 1];
-                            if (lastBackdrop) {
-                                lastBackdrop.style.zIndex = '1065';
-                            }
-                        }
-                    }
-                }, 100);
-            },
-            error: function (err) {
-                alert('Failed to fetch billing data. Please try again.');
-            }
-        });
-        return;
-    }
-    
-    // Fallback - open in new window
-    window.open(`/booking/billing/${bookingId}`, '_blank');
+    if (window.showBilling) return window.showBilling(bookingId);
+    console.error('Global showBilling is not available');
 }
 
 // Real working extend modal function
