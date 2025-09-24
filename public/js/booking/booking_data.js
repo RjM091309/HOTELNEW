@@ -9,6 +9,9 @@ $(document).ready(function () {
             url: '/booking/booking_data?filter=all',
             type: 'GET',
             dataSrc: function (json) {
+                // Debug log all raw data
+                console.log('Raw booking data from server:', json.data);
+
                 return json.data.map(item => {
                     const formatDate = (dateString) => {
                         const date = new Date(dateString); // Parse the date string
@@ -19,6 +22,10 @@ $(document).ready(function () {
                             timeZone: 'UTC' // Force UTC to avoid timezone shifts
                         }).format(date);
                     };
+
+                    // Debug log each item
+                    console.log('Processing booking item:', item);
+
                     return {
                         BookingID: item.BookingID,
                         // CustomerName: `<a href="#" data-bs-toggle="modal" data-bs-target="#modal-booking-details" onclick="bookingDetails(${item.BookingID})">${item.NAME}</a>`, // Clickable link
@@ -97,6 +104,8 @@ $(document).ready(function () {
                 title: 'BOOKING STATUS',
                 visible: false, // This hides the column
                 render: function (data, type, row) {
+                    // Debug log for bookingStatus
+                    console.log('Booking ID:', row.BookingID, 'BookingStatus:', row.BookingStatus);
                     // Render the custom status label
                     return data;
                 }
@@ -106,11 +115,19 @@ $(document).ready(function () {
                     const paymentStatus = row.Paymentstatus.toLowerCase();
                     const bookingStatus = row.BookingStatus?.toLowerCase(); // safe check
 
+                    // Debug logging for bookingStatus
+                    console.log('Action column - Booking ID:', row.BookingID, 'PaymentStatus:', paymentStatus, 'BookingStatus:', bookingStatus, 'Raw BookingStatus:', row.BookingStatus);
+
                     const buttonText = paymentStatus === 'paid' ? 'BILLING' : 'BILLING';
                     const buttonClass = paymentStatus === 'paid' ? 'btn-primary' : 'btn-primary';
 
                     let html = `<button class="btn btn-tbl-view btn-xs ${buttonClass}" onclick="showBilling(${row.BookingID})" title="Billing"><i class="fas fa-file-invoice"></i></button>`;
-                    
+
+                    // Add Edit button for pending and check-In bookings (matching Hotel_Old logic)
+                    if (bookingStatus === 'pending' || bookingStatus === 'check-in') {
+                        html += `<button class="btn btn-tbl-edit btn-xs" onclick="editBooking(${row.BookingID})" title="Edit Booking" style="background-color: #FFFACD !important; border-color: #FFFACD !important; color: #8B4513 !important;"><i class="fas fa-edit"></i></button>`;
+                    }
+
                     // Add Remarks button only if there are remarks
                     if ((row.BookingRemarks && row.BookingRemarks.trim() !== '') || (row.RemarksCount && row.RemarksCount > 0)) {
                         html += `<button class="btn btn-tbl-edit btn-xs" onclick="openRemarksModal(${row.BookingID})" title="Remarks"><i class="fas fa-comment-dots"></i></button>`;

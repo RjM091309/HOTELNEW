@@ -3977,6 +3977,366 @@ class BookingModel {
       };
     }
   }
+
+  // ==================== EDIT BOOKING METHODS ====================
+
+  // Get booking details for editing
+  static async getEditBookingDetails(bookingId) {
+    try {
+      const query = `
+        SELECT 
+          b.IDNo as bookingId,
+          b.CUSTOMER_ID,
+          b.ROOM_ID,
+          b.CHECK_IN_DATE,
+          b.CHECK_OUT_DATE,
+          b.BOOKING_STATUS,
+          b.BOOKING_CHANNEL,
+          b.GUESTS_COUNT,
+          b.REMARKS,
+          b.CONFIRMATION_NUMBER,
+          b.CHECK_IN_STATUS,
+          b.LATE_CHECKOUT,
+          b.IS_DIRECT_RESERVATION,
+          b.AGENCY_ID,
+          b.BED_COUNT,
+          
+          c.NAME as fullname,
+          c.CONTACTNo as number,
+          c.TYPE as guestType,
+          c.LEVEL as guestLevel,
+          
+          r.ROOM_NUMBER,
+          r.ROOM_FLOOR,
+          r.ROOM_VIEW,
+          r.ROOM_TYPE_ID,
+          r.ROOM_BED,
+          rt.NAME as ROOM_TYPE,
+          
+          bill.ROOM_CHARGE as price,
+          bill.QTY as diffindays,
+          bill.PAYMENT_STATUS,
+          bill.RESERVATION_FEE,
+          bill.DISCOUNT_AMOUNT,
+          
+          bs_adult.QTY as breakfastAdultQty,
+          bs_adult.TOTAL_COST as breakfastAdultPrice,
+          bs_adult.SERVICE_ID as breakfastAdultId,
+          
+          bs_kid.QTY as breakfastKidQty,
+          bs_kid.TOTAL_COST as breakfastKidPrice,
+          bs_kid.SERVICE_ID as breakfastKidId,
+          
+          bs_pickup.TOTAL_COST as pickupPrice,
+          bs_pickup.SERVICE_ID as pickupServiceId,
+          
+          bs_dropoff.TOTAL_COST as dropoffPrice,
+          bs_dropoff.SERVICE_ID as dropoffServiceId,
+          
+          ag.IDNo as agencyID,
+          ag.NAME as agencyName
+          
+        FROM booking b
+        LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+        LEFT JOIN room r ON b.ROOM_ID = r.IDNo
+        LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
+        LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
+        LEFT JOIN booking_service bs_adult ON bs_adult.BOOKING_ID = b.IDNo AND bs_adult.SERVICE_ID = 74 AND bs_adult.ACTIVE = 1
+        LEFT JOIN booking_service bs_kid ON bs_kid.BOOKING_ID = b.IDNo AND bs_kid.SERVICE_ID = 75 AND bs_kid.ACTIVE = 1
+        LEFT JOIN booking_service bs_pickup ON bs_pickup.BOOKING_ID = b.IDNo AND bs_pickup.SERVICE_ID = 76 AND bs_pickup.ACTIVE = 1
+        LEFT JOIN booking_service bs_dropoff ON bs_dropoff.BOOKING_ID = b.IDNo AND bs_dropoff.SERVICE_ID = 77 AND bs_dropoff.ACTIVE = 1
+        LEFT JOIN agency ag ON b.AGENCY_ID = ag.IDNo
+        WHERE b.IDNo = ? AND b.ACTIVE = 1
+      `;
+
+      const results = await queryDatabasePromise(query, [bookingId]);
+      
+      if (results.length === 0) {
+        return null;
+      }
+
+      const booking = results[0];
+      
+      // Format dates for frontend
+      const moment = require('moment');
+      const checkInDate = moment(booking.CHECK_IN_DATE).format('MMM DD, YYYY');
+      const checkOutDate = moment(booking.CHECK_OUT_DATE).format('MMM DD, YYYY');
+      const daterange = `${checkInDate} to ${checkOutDate} (${booking.diffindays} night/s)`;
+      
+      // Calculate breakfast prices per unit
+      const breakfastAdultPrice = booking.breakfastAdultQty > 0 ? 
+        (booking.breakfastAdultPrice / booking.breakfastAdultQty) : 0;
+      const breakfastKidPrice = booking.breakfastKidQty > 0 ? 
+        (booking.breakfastKidPrice / booking.breakfastKidQty) : 0;
+
+      const formattedBooking = {
+        ...booking,
+        daterange,
+        breakfastAdultPrice: breakfastAdultPrice.toFixed(2),
+        breakfastKidPrice: breakfastKidPrice.toFixed(2)
+      };
+
+      return formattedBooking;
+
+    } catch (error) {
+      console.error('Error fetching booking details for edit:', error);
+      throw error;
+    }
+  }
+
+  // Update existing booking
+  static async updateBooking(params) {
+    return new Promise((resolve, reject) => {
+      const {
+        bookingId, room_id, fullname, number, daterange, maxOccupants,
+        paymentStatus, price, diffindays, guestType, guestLevel,
+        bookingRoute, checkInStatus, checkOutStatus, bookingRemarks, agencyID, bedCount,
+        breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
+        breakfastKidQty, breakfastKidPrice, breakfastKidId,
+        pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
+        reservationFee, discount, editedBy
+      } = params;
+
+      const editDate = new Date();
+
+      // Parse the date range
+      const dateRangeParts = daterange.split(' to ');
+      const startDateStr = dateRangeParts[0].trim();
+      const endDateStr = dateRangeParts[1].split('(')[0].trim();
+
+      // Convert dates to MySQL format
+      const moment = require('moment');
+      const checkInDate = moment(startDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD') + ' 14:00:00';
+
+      // Set checkout time based on checkOutStatus (0 = regular, 1 = late)
+      let checkOutTime;
+      if (checkOutStatus == 1) {
+        // Late Check Out: Set to 11:00 PM
+        checkOutTime = ' 23:00:00';
+      } else {
+        // Regular Check Out: Set to 11:00 AM
+        checkOutTime = ' 11:00:00';
+      }
+      const checkOutDate = moment(endDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD') + checkOutTime;
+
+      // Remove commas from price and convert to decimal
+      let numericRoomPrice = parseFloat(price.replace(/,/g, ''));
+      if (isNaN(numericRoomPrice)) {
+        return reject(new Error('Invalid room price format'));
+      }
+
+      // Start transaction
+      pool.getConnection((err, connection) => {
+        if (err) {
+          console.error('Error getting connection:', err);
+          return reject(new Error('Database connection error'));
+        }
+
+        connection.beginTransaction(async (err) => {
+          if (err) {
+            connection.release();
+            return reject(new Error('Transaction start error'));
+          }
+
+          try {
+            // 1. Update customer information
+            const customerUpdateQuery = `
+              UPDATE customer 
+              SET NAME = ?, CONTACTNo = ?, TYPE = ?, LEVEL = ?, EDITED_BY = ?, EDITED_DT = ?
+              WHERE IDNo = (SELECT CUSTOMER_ID FROM booking WHERE IDNo = ?)
+            `;
+            await connection.promise().query(customerUpdateQuery, [
+              fullname, number, guestType, guestLevel, editedBy, editDate, bookingId
+            ]);
+
+            // 2. Update booking information
+            const bookingUpdateQuery = `
+              UPDATE booking
+              SET ROOM_ID = ?, CHECK_IN_DATE = ?, CHECK_OUT_DATE = ?, BOOKING_CHANNEL = ?,
+                  GUESTS_COUNT = ?, REMARKS = ?, CHECK_IN_STATUS = ?, LATE_CHECKOUT = ?, AGENCY_ID = ?,
+                  BED_COUNT = ?, EDITED_BY = ?, EDITED_DT = ?
+              WHERE IDNo = ?
+            `;
+            await connection.promise().query(bookingUpdateQuery, [
+              room_id, checkInDate, checkOutDate, bookingRoute, maxOccupants,
+              bookingRemarks, checkInStatus, checkOutStatus || 0, (bookingRoute === 'agency' ? agencyID : null),
+              bedCount, editedBy, editDate, bookingId
+            ]);
+
+            // 3. Update billing information
+            const billingUpdateQuery = `
+              UPDATE billing 
+              SET ROOM_CHARGE = ?, QTY = ?, PAYMENT_STATUS = ?, RESERVATION_FEE = ?, 
+                  DISCOUNT_AMOUNT = ?, EDITED_BY = ?, EDITED_DT = ?
+              WHERE BOOKING_ID = ?
+            `;
+            await connection.promise().query(billingUpdateQuery, [
+              numericRoomPrice, diffindays, paymentStatus, 
+              parseFloat(reservationFee) || 0.00, parseFloat(discount) || 0.00,
+              editedBy, editDate, bookingId
+            ]);
+
+            // 4. Delete existing services and re-insert
+            await connection.promise().query('DELETE FROM booking_service WHERE BOOKING_ID = ?', [bookingId]);
+
+            // 5. Insert updated services
+            const services = [];
+            
+            if (parseInt(breakfastAdultQty) > 0 && breakfastAdultId) {
+              const totalAdult = parseFloat(breakfastAdultQty) * parseFloat(breakfastAdultPrice);
+              services.push([
+                bookingId, breakfastAdultId, breakfastAdultQty, totalAdult,
+                paymentStatus === 'paid' ? 'paid' : 'unpaid', editedBy, editDate, 1
+              ]);
+            }
+
+            if (parseInt(breakfastKidQty) > 0 && breakfastKidId) {
+              const totalKid = parseFloat(breakfastKidQty) * parseFloat(breakfastKidPrice);
+              services.push([
+                bookingId, breakfastKidId, breakfastKidQty, totalKid,
+                paymentStatus === 'paid' ? 'paid' : 'unpaid', editedBy, editDate, 1
+              ]);
+            }
+
+            if (pickupServiceId && pickupPrice) {
+              services.push([
+                bookingId, pickupServiceId, 1, pickupPrice,
+                paymentStatus === 'paid' ? 'paid' : 'unpaid', editedBy, editDate, 1
+              ]);
+            }
+
+            if (dropoffServiceId && dropoffPrice) {
+              services.push([
+                bookingId, dropoffServiceId, 1, dropoffPrice,
+                paymentStatus === 'paid' ? 'paid' : 'unpaid', editedBy, editDate, 1
+              ]);
+            }
+
+            if (services.length > 0) {
+              const serviceQuery = `
+                INSERT INTO booking_service 
+                (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE)
+                VALUES ?
+              `;
+              await connection.promise().query(serviceQuery, [services]);
+            }
+
+            // 6. Update payments if status changed to paid
+            if (paymentStatus === 'paid') {
+              // Delete existing payments for this booking
+              await connection.promise().query('DELETE FROM payments WHERE BOOKING_ID = ?', [bookingId]);
+              
+              // Insert new payment records
+              const payments = [];
+              
+              // Room payment
+              const roomAmount = numericRoomPrice * diffindays;
+              payments.push([bookingId, null, roomAmount, 'cash', 'room', editDate, editedBy]);
+              
+              // Service payments
+              services.forEach(service => {
+                payments.push([bookingId, service[1], service[3], 'cash', 'service', editDate, editedBy]);
+              });
+              
+              // Reservation fee payment
+              if (parseFloat(reservationFee) > 0) {
+                payments.push([bookingId, null, parseFloat(reservationFee), 'cash', 'reservation_fee', editDate, editedBy]);
+              }
+              
+              // Discount payment (negative amount)
+              if (parseFloat(discount) > 0) {
+                payments.push([bookingId, null, -parseFloat(discount), 'cash', 'discount', editDate, editedBy]);
+              }
+              
+              if (payments.length > 0) {
+                const paymentQuery = `
+                  INSERT INTO payments 
+                  (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
+                  VALUES ?
+                `;
+                await connection.promise().query(paymentQuery, [payments]);
+              }
+            }
+
+            // Commit transaction
+            await connection.promise().commit();
+            connection.release();
+            
+            console.log('✅ Booking updated successfully');
+            resolve({ 
+              message: 'Booking updated successfully!',
+              bookingId: bookingId
+            });
+
+          } catch (error) {
+            // Rollback on error
+            await connection.promise().rollback();
+            connection.release();
+            console.error('❌ Error updating booking:', error);
+            reject(new Error('Error updating booking: ' + error.message));
+          }
+        });
+      });
+    });
+  }
+
+  // Get available rooms by floor for edit booking
+  static async getAvailableRoomsByFloor(params) {
+    try {
+      const { floor, checkInDate, checkOutDate, excludeBookingId } = params;
+
+      let query = `
+        SELECT
+          r.IDNo as room_id,
+          r.ROOM_NUMBER,
+          r.ROOM_FLOOR,
+          r.ROOM_TYPE_ID,
+          r.ROOM_BED,
+          r.ROOM_MAX,
+          r.ROOM_VIEW,
+          rt.NAME as ROOM_TYPE,
+          r.ROOM_PRICE
+        FROM room r
+        LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
+        WHERE r.ROOM_FLOOR = ?
+        AND r.ACTIVE = 1
+        AND (
+          r.IDNo NOT IN (
+            SELECT DISTINCT b.ROOM_ID
+            FROM booking b
+            WHERE b.ACTIVE = 1
+            AND b.BOOKING_STATUS IN ('pending', 'check-In')
+            AND (
+              (b.CHECK_IN_DATE <= ? AND b.CHECK_OUT_DATE > ?) OR
+              (b.CHECK_IN_DATE < ? AND b.CHECK_OUT_DATE >= ?) OR
+              (b.CHECK_IN_DATE >= ? AND b.CHECK_OUT_DATE <= ?)
+            )
+          )
+          OR r.IDNo IN (
+            SELECT b.ROOM_ID
+            FROM booking b
+            WHERE b.IDNo = ?
+            AND b.ACTIVE = 1
+          )
+        )
+        ORDER BY r.ROOM_NUMBER ASC
+      `;
+
+      const queryParams = [floor, checkInDate, checkInDate, checkOutDate, checkOutDate, checkInDate, checkOutDate, excludeBookingId];
+
+      console.log('Executing query:', query);
+      console.log('With parameters:', queryParams);
+
+      const results = await queryDatabasePromise(query, queryParams);
+
+      console.log('Query results:', results);
+      return results;
+
+    } catch (error) {
+      console.error('Error fetching available rooms by floor:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = BookingModel;

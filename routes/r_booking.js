@@ -98,6 +98,11 @@ router.get('/get-breakfast-prices', BookingController.getBreakfastPrices);
 router.get('/get-pick-drop', BookingController.getPickDrop);
 router.get('/get-services', BookingController.getExtraServiceDropdown);
 
+// Edit booking routes
+router.get('/edit_booking/:id', BookingController.getEditBookingDetails);
+router.post('/edit_booking/:id', BookingController.updateBooking);
+router.post('/get_available_rooms_by_floor', BookingController.getAvailableRoomsByFloor);
+
 // Remarks routes
 router.post('/remarks', BookingController.addRemark);
 router.get('/remarks/booking/:bookingId', BookingController.getRemarksByBooking);

@@ -1,0 +1,1207 @@
+<!-- Date Time item CSS -->
+<link rel="stylesheet" href="/plugins/flatpicker/flatpickr.min.css">
+
+<div class="modal fade" id="modal-editbooking" tabindex="-1" role="dialog" aria-labelledby="editBookingModalLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">Edit Booking</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" onclick="window.location.reload()" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editbooking" method="POST">
+                    <!-- Hidden fields -->
+                    <input type="hidden" id="edit_bookingId" name="bookingId">
+                    <input type="hidden" id="edit_baseprice" name="baseprice">
+                    <input type="hidden" id="edit_diffindays" name="diffindays">
+                    <input type="hidden" id="edit_guestID" name="guestID">
+                    <input type="hidden" id="edit_voucherNo" name="voucherNo">
+                    <input type="hidden" id="edit_room_type_hidden" name="room_type_hidden">
+
+                    <div class="row">
+                        <!-- BEGIN DATE AND ROOM SELECTION SECTION -->
+                        <div class="row p-t-20">
+                            <div class="col-lg-6">
+                                <div class="form-group">
+                                    <label class="form-label">Select Date From To</label>
+                                    <input class="form-control flatpickr-input" type="text" id="edit_daterange" name="daterange" required>
+                                </div>
+                            </div>
+                            <div id="edit_divroom_type" class="col-lg-3">
+                                <div class="form-group">
+                                    <label class="form-label">Room View</label>
+                                    <input class="form-control" type="text" id="edit_room_type" name="room_type" readonly>
+                                </div>
+                            </div>
+                            <div id="edit_divbedCount" class="col-lg-3">
+                                <div class="form-group">
+                                    <label class="form-label">Bed Count</label>
+                                    <input class="form-control" type="text" id="edit_bedCount" name="bedCount" readonly>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ROOM SELECTION FIELDS -->
+                        <div id="edit_divaddFloor" class="col-lg-4">
+                            <div class="form-group">
+                                <label class="form-label">Select Floor</label>
+                                <select class="form-select" id="edit_addFloor">
+                                    <option value="" disabled selected>Select Floor</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div id="edit_divaddroom" class="col-lg-4">
+                            <div class="form-group">
+                                <label class="form-label">Select Room</label>
+                                <select class="form-select" id="edit_addroom" name="room_id">
+                                    <option value="" disabled selected>Select Room</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Booking Resources select -->
+                        <div id="edit_bookingRouteSinglePlaceholder" class="col-lg-4">
+                            <div id="edit_bookingRouteWrapper">
+                                <div class="form-group">
+                                    <label class="form-label">Booking Resources</label>
+                                    <select class="form-select" id="edit_bookingRoute" name="bookingRoute">
+                                        <option value="" disabled selected>Booking Resources</option>
+                                        <option value="walk-in">Walk-in</option>
+                                        <option value="agency">Agency</option>
+                                        <option value="booking-channel">Booking Channel</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ROOM DETAILS -->
+                        <div id="edit_divmaxOccupants" class="col-lg-4" style="display: none;">
+                            <div class="form-group">
+                                <label class="form-label">Max Occupants</label>
+                                <input class="form-control" type="text" id="edit_maxOccupants" name="maxOccupants" readonly>
+                            </div>
+                        </div>
+                    
+                        <div id="edit_divamenities" class="col-lg-4" style="display: none;">
+                            <div class="form-group">
+                                <label class="form-label">Amenities</label>
+                                <input class="form-control" type="text" id="edit_amenities" name="amenities" readonly>
+                            </div>
+                        </div>
+
+                        <!-- AGENCY SELECTION -->
+                        <div id="edit_agencySelectWrapper" class="col-lg-4" style="display: none;">
+                            <div class="form-group">
+                                <label class="form-label">Select Agency</label>
+                                <select class="form-select" id="edit_agencySelect" name="agencyID">
+                                    <option value="" disabled selected>Select Agency</option>
+                                </select>
+                            </div>
+                        </div>
+                          
+                        <div id="edit_divprice" class="col-lg-4">
+                            <div class="form-group">
+                                <label class="form-label">Room Rate</label>
+                                <input class="form-control" type="text" id="edit_price" name="price" readonly>
+                                <div style="margin-top: 0px;">
+                                    <input type="checkbox" id="edit_manualPriceToggle"> <label for="edit_manualPriceToggle" style="font-size: 12px;">Enter Price Manually</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- GUEST INFORMATION -->
+                        <div id="edit_divtxtFullNameAdd" class="col-lg-4" style="position: relative;">
+                            <div class="form-group">
+                                <label class="form-label">Guest</label>
+                                <input 
+                                    class="form-control" 
+                                    type="text" 
+                                    id="edit_txtFullNameAdd" 
+                                    name="fullname" 
+                                    required 
+                                    autocomplete="off" 
+                                    onkeyup="searchEditCustomer(this.value)"
+                                    onblur="hideEditSearchResults()" 
+                                >
+                            </div>
+                            <div id="edit_searchResults"></div>
+                        </div>
+
+                        <div id="edit_divtxtNumber" class="col-lg-4">
+                            <div class="form-group">
+                                <label class="form-label">Contact Number</label>
+                                <input class="form-control" type="text" id="edit_txtNumber" name="number" autocomplete="off">
+                            </div>
+                        </div>
+
+                        <!-- SERVICES SECTION -->
+                        <div class="row p-t-10">
+                            <div class="col-lg-4">
+                                <label><input type="checkbox" id="edit_includeBreakfast"> Breakfast</label>
+                                <div id="edit_breakfastInputs" style="display: none; margin-top: 5px;">
+                                    <!-- Breakfast - Adult -->
+                                    <div class="mb-2 d-flex gap-2 align-items-center">
+                                        <input type="number" class="form-control" id="edit_breakfastAdultQty" name="breakfastAdultQty" placeholder="Adult" style="max-width: 80px;">
+                                        <input type="number" class="form-control" id="edit_breakfastAdultPrice" name="breakfastAdultPrice" placeholder="Price per Qty" readonly>
+                                        <input type="hidden" id="edit_breakfastAdultId" name="breakfastAdultId">
+                                    </div>
+                                
+                                    <!-- Breakfast - Kids -->
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <input type="number" class="form-control" id="edit_breakfastKidQty" name="breakfastKidQty" placeholder="Kids" style="max-width: 80px;">
+                                        <input type="number" class="form-control" id="edit_breakfastKidPrice" name="breakfastKidPrice" placeholder="Price per Qty" readonly>
+                                        <input type="hidden" id="edit_breakfastKidId" name="breakfastKidId">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-lg-4">
+                                <div class="form-check mb-1">
+                                    <input class="form-check-input" type="checkbox" id="edit_includePickup">
+                                    <label class="form-check-label" for="edit_includePickup">Pick-up</label>
+                                </div>
+                                <div id="edit_pickupWrapper" class="mt-1" style="display: none;">
+                                    <input type="number" class="form-control" id="edit_pickupPrice" name="pickupPrice" placeholder="Pick-up Price" readonly>
+                                    <input type="hidden" id="edit_pickupServiceId" name="pickupServiceId">
+                                </div>
+                            </div>
+                             
+                            <div class="col-lg-4">
+                                <div class="form-check mb-1">
+                                    <input class="form-check-input" type="checkbox" id="edit_includeDropoff">
+                                    <label class="form-check-label" for="edit_includeDropoff">Drop-off</label>
+                                </div>
+                                <div id="edit_dropoffWrapper" class="mt-1" style="display: none;">
+                                    <input type="number" class="form-control" id="edit_dropoffPrice" name="dropoffPrice" placeholder="Drop-off Price" readonly>
+                                    <input type="hidden" id="edit_dropoffServiceId" name="dropoffServiceId">
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+                        
+                        <!-- PAYMENT AND STATUS SECTION -->
+                        <div id="edit_divpaymentStatus" class="col-lg-3">
+                            <div class="form-group">
+                                <label class="form-label">Payment Status</label>
+                                <select class="form-select" id="edit_paymentStatus" name="paymentStatus" required>
+                                    <option disabled selected>Payment Status</option>
+                                    <option value="paid">Paid</option>
+                                    <option value="unpaid">Unpaid</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div id="edit_divtxtCheckInStatus" class="col-lg-3">
+                            <div class="form-group">
+                                <label class="form-label">Check-In Status</label>
+                                <select class="form-select" name="checkInStatus" id="edit_checkInStatus" required>
+                                    <option value="" disabled selected>Check-In Status</option>
+                                    <option value="1">Regular Check In</option>
+                                    <option value="0">Late Check In</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="edit_divtxtCheckOutStatus" class="col-lg-3">
+                            <div class="form-group">
+                                <label class="form-label">Check-Out Status</label>
+                                <select class="form-select" name="checkOutStatus" id="edit_checkOutStatus" required>
+                                    <option value="" disabled selected>Check-Out Status</option>
+                                    <option value="0">Regular Check Out</option>
+                                    <option value="1">Late Check Out</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="edit_divtxtGuestType" class="col-lg-3">
+                            <div class="form-group">
+                                <label class="form-label">Guest Type</label>
+                                <select class="form-select" id="edit_guestType" name="guestType" data-placeholder="Guest Type" required>
+                                    <option value="" disabled selected>Guest Type</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="edit_divtxtGuestLevel" class="col-lg-3">
+                            <div class="form-group">
+                                <label class="form-label">Guest Level</label>
+                                <select class="form-select" id="edit_guestLevel" name="guestLevel" required>
+                                    <option value="" disabled selected>Guest Level</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-12">
+                            <div class="form-group">
+                                <label class="form-label">Additional Remarks (optional)</label>
+                                <textarea class="form-control" id="edit_bookingRemarks" name="bookingRemarks" rows="3"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Reservation Fee and Discount Section -->
+                        <hr class="my-4">
+                        <div class="row p-t-20">
+                            <div class="col-lg-6">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="edit_includeReservationFee">
+                                    <label class="form-check-label" for="edit_includeReservationFee">Reservation Fee</label>
+                                </div>
+                                <div id="edit_reservationFeeWrapper" class="mt-2" style="display: none;">
+                                    <input type="number" class="form-control" id="edit_reservationFeeAmount" name="reservationFeeAmount" placeholder="Enter Reservation Fee Amount" step="1" min="0">
+                                    <small class="text-muted" style="font-size: 11px; color: #bbbbbb !important;">(Downpayment - not included in total)</small>
+                                </div>
+                            </div>
+                            
+                            <div class="col-lg-6">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="edit_includeDiscount">
+                                    <label class="form-check-label" for="edit_includeDiscount">Discount</label>
+                                </div>
+                                <div id="edit_discountWrapper" class="mt-2" style="display: none;">
+                                    <input type="number" class="form-control" id="edit_discountAmount" name="discountAmount" placeholder="Enter Discount Amount" step="1" min="0">
+                                </div>
+                            </div>
+                        </div>
+
+                        <h3>Total: <span id="edit_computedTotal">0.00</span></h3>
+                        <div id="edit_creditDisplay" style="display: none; margin-top: 10px;">
+                            <span style="color: #28a745; font-weight: bold;">Credit: <span id="edit_creditAmount">0.00</span></span>
+                        </div>
+                    </div>
+                    
+                    <!-- Submit button -->
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-primary">Update Booking</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="window.location.reload()">Close</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Dark Theme Styling for Edit Booking Modal (matching Add Booking) */
+#modal-editbooking .modal-dialog {
+    max-height: 99vh;
+    margin: 1vh auto;
+}
+
+#modal-editbooking .modal-content {
+    max-height: 90vh;
+    overflow: visible;
+    background-color: #2a3135;
+    color: #e0e0e0;
+    border-radius: 6px;
+    box-shadow: 0 0 10px rgba(59,59,59, 0.2);
+    border: 5px solid #0c2a42;
+}
+
+#modal-editbooking .modal-header {
+    background-color: #0c2a42;
+    color: #ffffff;
+    border-bottom: 1px solid #0c2a42;
+}
+
+#modal-editbooking .modal-title {
+    color: #ffffff;
+}
+
+#modal-editbooking .btn-close {
+    filter: brightness(200%);
+}
+
+#modal-editbooking input[type="text"],
+#modal-editbooking input[type="number"],
+#modal-editbooking input[type="email"],
+#modal-editbooking select,
+#modal-editbooking textarea {
+    background-color: #41474c;
+    color: #ffffff;
+    border: 1px solid #41474c;
+}
+
+#modal-editbooking input::placeholder,
+#modal-editbooking textarea::placeholder {
+    color: #bbbbbb;
+}
+
+#modal-editbooking select option {
+    background-color: #41474c;
+    color: #ffffff;
+}
+
+#modal-editbooking label,
+#modal-editbooking .form-label,
+#modal-editbooking .mdl-textfield__label {
+    color: #cfcfcf;
+}
+
+#modal-editbooking h3,
+#modal-editbooking h5 {
+    color: #ffffff;
+}
+
+#modal-editbooking .btn-primary,
+#modal-editbooking .btn-success {
+    background-color: #6f9c40 !important;
+    border-color: #6f9c40 !important;
+}
+
+#modal-editbooking .btn-primary:hover,
+#modal-editbooking .btn-success:hover {
+    background-color: #5b8435 !important;
+    border-color: #5b8435 !important;
+}
+
+#modal-editbooking input[type="checkbox"] + label,
+#modal-editbooking .form-check-label {
+    color: #dcdcdc;
+}
+
+#modal-editbooking #edit_reservationFeeWrapper,
+#modal-editbooking #edit_discountWrapper {
+    margin-top: 10px;
+}
+
+#modal-editbooking #edit_reservationFeeAmount,
+#modal-editbooking #edit_discountAmount {
+    background-color: #41474c;
+    color: #ffffff;
+    border: 1px solid #41474c;
+}
+
+#modal-editbooking #edit_reservationFeeAmount:focus,
+#modal-editbooking #edit_discountAmount:focus {
+    border-color: #6f9c40;
+    box-shadow: 0 0 0 0.2rem rgba(111, 156, 64, 0.25);
+}
+
+/* Search results styling */
+#edit_searchResults {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-top: none;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+    border-radius: 0 0 4px 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#edit_searchResults div {
+    padding: 10px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+    transition: background-color 0.2s;
+}
+
+#edit_searchResults div:hover {
+    background-color: #f0f0f0;
+}
+
+#edit_searchResults div:last-child {
+    border-bottom: none;
+}
+
+#edit_searchResults {
+    display: none;
+    position: absolute;
+    background: white;
+    border: 1px solid #ccc;
+    z-index: 10;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 93%;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+#edit_searchResults div {
+    padding: 2px 8px;
+    margin: 0;
+    line-height: .8;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+#edit_searchResults div:hover {
+    background-color: #f0f0f0;
+}
+
+/* Remove inner scrollbar for Edit Booking modal */
+#modal-editbooking .modal-dialog { 
+    max-height: 99vh; 
+    margin: 1vh auto; 
+}
+
+#modal-editbooking .modal-content { 
+    max-height: 95vh; 
+    overflow: visible; 
+}
+
+#modal-editbooking .modal-body { 
+    max-height: none; 
+    overflow-y: visible; 
+}
+
+#modal-editbooking .modal-body::-webkit-scrollbar { 
+    display: none; 
+}
+
+#modal-editbooking .modal-body { 
+    -ms-overflow-style: none; 
+    scrollbar-width: none; 
+}
+</style>
+
+<!-- Scripts -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="/plugins/flatpicker/flatpickr.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+$(document).ready(function() {
+    // Initialize flatpickr for edit form
+    let editFlatpickrInstance = null;
+    
+    function initializeEditFlatpickr() {
+        if (editFlatpickrInstance) {
+            editFlatpickrInstance.destroy();
+        }
+
+        editFlatpickrInstance = flatpickr("#edit_daterange", {
+            mode: "range",
+            dateFormat: "M d, Y",
+            showMonths: 2, // Display two months side by side
+            minDate: "today",
+            onClose: function(selectedDates, dateStr, instance) {
+                if (selectedDates.length === 2) {
+                    var startDate = selectedDates[0];
+                    var endDate = selectedDates[1];
+                    var diffInTime = endDate.getTime() - startDate.getTime();
+                    var diffInDays = Math.round(diffInTime / (1000 * 3600 * 24));
+
+                    $('#edit_diffindays').val(diffInDays);
+                    var formattedDateRange = dateStr + ' (' + diffInDays + ' night/s)';
+                    instance.input.value = formattedDateRange;
+                    computeEditTotal();
+                    
+                    // Auto-refresh room selection if floor is already selected
+                    const selectedFloor = $('#edit_addFloor').val();
+                    if (selectedFloor) {
+                        $('#edit_addFloor').trigger('change');
+                    }
+                }
+            }
+        });
+    }
+
+    // Initialize flatpickr
+    initializeEditFlatpickr();
+
+    // Populate Guest Type dropdown
+    $.ajax({
+        url: '/booking/get_guest_types',
+        method: 'GET',
+        success: function (data) {
+            const dropdown = $('#edit_guestType');
+            dropdown.empty().append('<option disabled selected>Guest Type</option>');
+            data.forEach(guestType => {
+                dropdown.append(`<option value="${guestType.IDNo}">${guestType.TYPE}</option>`);
+            });
+        },
+        error: function (err) {
+            console.error('Error fetching guest types:', err);
+        }
+    });
+
+    // Populate Guest Level dropdown
+    $.ajax({
+        url: '/booking/get_guest_level',
+        method: 'GET',
+        success: function (data) {
+            const dropdown = $('#edit_guestLevel');
+            dropdown.empty().append('<option disabled selected>Guest Level</option>');
+            data.forEach(guestLevel => {
+                dropdown.append(`<option value="${guestLevel.IDNo}">${guestLevel.TYPE}</option>`);
+            });
+        },
+        error: function (err) {
+            console.error('Error fetching guest levels:', err);
+        }
+    });
+
+    // Populate Floor Dropdown
+    $.ajax({
+        url: '/booking/get_floors_for_dropdown',
+        method: 'GET',
+        success: function (data) {
+            const floorDropdown = $('#edit_addFloor');
+            floorDropdown.empty().append('<option value="" disabled selected>Select Floor</option>');
+            data.forEach(floor => {
+                floorDropdown.append(`<option value="${floor.floor_number}">${floor.floor_number} Floor</option>`);
+            });
+        },
+        error: function (err) {
+            console.error('Error fetching floors:', err);
+        }
+    });
+
+    // Populate Rooms based on selected floor
+    $('#edit_addFloor').change(function () {
+        const selectedFloor = $(this).val();
+        if (selectedFloor) {
+            // Get selected dates for filtering
+            const daterange = $('#edit_daterange').val();
+            if (!daterange) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Select Dates First',
+                    text: 'Please select check-in and check-out dates before selecting a room',
+                    confirmButtonText: 'OK'
+                });
+                return;
+            }
+            
+            // Parse dates from daterange
+            const dateRangeParts = daterange.split(' to ');
+            const startDateStr = dateRangeParts[0].trim();
+            const endDateStr = dateRangeParts[1].split('(')[0].trim();
+            
+            // Convert to YYYY-MM-DD format
+            const checkInDate = moment(startDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD');
+            const checkOutDate = moment(endDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD');
+            
+            // Fetch available rooms for the selected floor and dates
+            $.ajax({
+                url: '/booking/get_available_rooms_by_floor',
+                method: 'POST',
+                data: {
+                    floor: selectedFloor,
+                    checkInDate: checkInDate,
+                    checkOutDate: checkOutDate,
+                    excludeBookingId: $('#edit_bookingId').val() // Exclude current booking
+                },
+                success: function (data) {
+                    const roomDropdown = $('#edit_addroom');
+                    roomDropdown.empty().append('<option value="" disabled selected>Select Room</option>');
+                    
+                    if (data.length === 0) {
+                        roomDropdown.append('<option value="" disabled>No available rooms for selected dates</option>');
+                    } else {
+                        data.forEach(room => {
+                            roomDropdown.append(`<option value="${room.room_id}">${room.ROOM_NUMBER}</option>`);
+                        });
+                    }
+                },
+                error: function (err) {
+                    console.error('Error fetching available rooms for floor:', err);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error!',
+                        text: 'Failed to fetch available rooms. Please try again.',
+                        confirmButtonText: 'OK'
+                    });
+                }
+            });
+        }
+    });
+
+    // Helper to compute seasonal price for selected room
+    function computeEditSeasonalPrice(room) {
+        if (!room) return null;
+        const seasonalPrices = room.SEASONAL_PRICES || [];
+        const daterange = $('#edit_daterange').val() || '';
+        const [startDate] = daterange.split(' to ');
+        const bookingType = $('#edit_bookingRoute').val();
+
+        function getSeasonIdForDate(checkInDate, seasonal) {
+            if (!checkInDate) return null;
+            const checkIn = new Date(checkInDate);
+            const mmdd = (checkIn.getMonth() + 1).toString().padStart(2, '0') + checkIn.getDate().toString().padStart(2, '0');
+            for (const p of (seasonal || [])) {
+                const start = new Date(p.startDate);
+                const end = new Date(p.endDate);
+                const startMMDD = (start.getMonth() + 1).toString().padStart(2, '0') + start.getDate().toString().padStart(2, '0');
+                const endMMDD = (end.getMonth() + 1).toString().padStart(2, '0') + end.getDate().toString().padStart(2, '0');
+                if ((startMMDD <= endMMDD && mmdd >= startMMDD && mmdd <= endMMDD) ||
+                    (startMMDD > endMMDD && (mmdd >= startMMDD || mmdd <= endMMDD))) {
+                    return p.seasonId;
+                }
+            }
+            return null;
+        }
+
+        const seasonId = getSeasonIdForDate(startDate, seasonalPrices);
+        const bedCount = parseInt(room.ROOM_BED);
+        const match = seasonalPrices.find(p => parseInt(p.bedCount) === bedCount && p.bookingType === bookingType && parseInt(p.seasonId) === parseInt(seasonId));
+        let pricePerNight = match ? parseFloat(match.price) : parseFloat(room.FINAL_PRICE || room.ROOM_PRICE);
+        if (!isFinite(pricePerNight)) pricePerNight = 0;
+        return pricePerNight;
+    }
+
+    // When selecting a room, update room details and price
+    $('#edit_addroom').off('change').on('change', function () {
+        const roomId = $(this).val();
+        if (!roomId) return;
+
+        console.log('Room selected:', roomId);
+
+        fetch('/booking/get-room-details', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ roomId })
+        })
+        .then(r => r.json())
+        .then(data => {
+            console.log('Room details response:', data);
+
+            if (!data.success) {
+                console.error('Failed to fetch room details:', data.message);
+                return;
+            }
+            const room = data.roomDetails;
+            // Save details for later recompute on bookingRoute change
+            $('#edit_addroom').data('roomDetails', room);
+
+            // Update view, bed count, max occupants, amenities
+            const roomViewText = room.ROOM_VIEW === 1 ? 'Condo View' : (room.ROOM_VIEW === 2 ? 'Mountain View' : 'N/A');
+            $('#edit_room_type').val(roomViewText);
+            $('#edit_maxOccupants').val(room.ROOM_MAX);
+            $('#edit_bedCount').val(room.ROOM_BED === 1 ? '1' : room.ROOM_BED === 2 ? '2' : 'N/A');
+            $('#edit_amenities').val(room.AMENITIES || '');
+            $('#edit_room_type_hidden').val(room.ROOM_TYPE);
+
+            // Compute seasonal price and set
+            const pricePerNight = computeEditSeasonalPrice(room);
+            $('#edit_baseprice').val((pricePerNight || 0).toFixed(2));
+            $('#edit_price').val((pricePerNight || 0).toFixed(2));
+            computeEditTotal();
+        })
+        .catch(err => console.error('Error fetching room details:', err));
+    });
+
+    // Recompute price when booking route changes (if a room is selected)
+    $('#edit_bookingRoute').on('change', function(){
+        const room = $('#edit_addroom').data('roomDetails');
+        if (room) {
+            const pricePerNight = computeEditSeasonalPrice(room);
+            $('#edit_baseprice').val((pricePerNight || 0).toFixed(2));
+            if (!$('#edit_manualPriceToggle').is(':checked')) {
+                $('#edit_price').val((pricePerNight || 0).toFixed(2));
+            }
+            computeEditTotal();
+        }
+    });
+
+    // Fetch breakfast and transport prices
+    fetch('/booking/get-breakfast-prices')
+        .then(res => res.json())
+        .then(serviceData => {
+            if (!Array.isArray(serviceData)) throw new Error('Invalid response format');
+
+            const adult = serviceData.find(s => s.SERVICE_NAME.includes('Adult'));
+            const kid = serviceData.find(s => s.SERVICE_NAME.includes('Kids'));
+
+            if (adult) {
+                $('#edit_breakfastAdultPrice').val(adult.SERVICE_COST);
+                $('#edit_breakfastAdultId').val(adult.IDNo);
+            }
+            if (kid) {
+                $('#edit_breakfastKidPrice').val(kid.SERVICE_COST);
+                $('#edit_breakfastKidId').val(kid.IDNo);
+            }
+        })
+        .catch(err => console.error('Failed to load breakfast prices:', err));
+
+    // Fetch transport rates
+    fetch('/booking/get-pick-drop')
+        .then(res => res.json())
+        .then(data => {
+            if (!Array.isArray(data)) return console.error("Invalid transport data:", data);
+
+            const pickup = data.find(s => s.SERVICE_NAME.toLowerCase().includes('pick'));
+            const dropoff = data.find(s => s.SERVICE_NAME.toLowerCase().includes('drop'));
+
+            if (pickup) {
+                $('#edit_pickupPrice').val(pickup.SERVICE_COST);
+                $('#edit_pickupServiceId').val(pickup.IDNo);
+            }
+            if (dropoff) {
+                $('#edit_dropoffPrice').val(dropoff.SERVICE_COST);
+                $('#edit_dropoffServiceId').val(dropoff.IDNo);
+            }
+        })
+        .catch(err => console.error('Error fetching transport prices:', err));
+
+    // Service checkbox handlers
+    $('#edit_includeBreakfast').on('change', function () {
+        $('#edit_breakfastInputs').toggle(this.checked);
+        if (!this.checked) {
+            $('#edit_breakfastAdultQty').val('');
+            $('#edit_breakfastAdultPrice').val('');
+            $('#edit_breakfastAdultId').val('');
+            $('#edit_breakfastKidQty').val('');
+            $('#edit_breakfastKidPrice').val('');
+            $('#edit_breakfastKidId').val('');
+        }
+        computeEditTotal();
+    });
+
+    $('#edit_includePickup').on('change', function () {
+        $('#edit_pickupWrapper').toggle(this.checked);
+        if (!this.checked) {
+            $('#edit_pickupPrice').val('');
+            $('#edit_pickupServiceId').val('');
+        }
+        computeEditTotal();
+    });
+
+    $('#edit_includeDropoff').on('change', function () {
+        $('#edit_dropoffWrapper').toggle(this.checked);
+        if (!this.checked) {
+            $('#edit_dropoffPrice').val('');
+            $('#edit_dropoffServiceId').val('');
+        }
+        computeEditTotal();
+    });
+
+    $('#edit_includeReservationFee').on('change', function () {
+        $('#edit_reservationFeeWrapper').toggle(this.checked);
+        if (!this.checked) {
+            $('#edit_reservationFeeAmount').val('');
+        }
+        computeEditTotal();
+    });
+
+    $('#edit_includeDiscount').on('change', function () {
+        $('#edit_discountWrapper').toggle(this.checked);
+        if (!this.checked) {
+            $('#edit_discountAmount').val('');
+        }
+        computeEditTotal();
+    });
+
+    // Booking route change handler
+    $('#edit_bookingRoute').on('change', function () {
+        const isAgency = this.value === 'agency';
+        $('#edit_agencySelectWrapper').toggle(isAgency);
+        
+        if (isAgency) {
+            fetch('/booking/get-agency')
+                .then(res => res.json())
+                .then(data => {
+                    const agencySelect = $('#edit_agencySelect');
+                    agencySelect.empty().append(`<option value="" disabled selected>Select Agency</option>`);
+                    data.forEach(a => {
+                        agencySelect.append(`<option value="${a.IDNo}">${a.NAME}</option>`);
+                    });
+                });
+        } else {
+            $('#edit_agencySelect').val('');
+        }
+    });
+
+    // Payment Status logic: disable reservation fee when paid
+    function checkEditPaymentStatus() {
+        const status = $('#edit_paymentStatus').val();
+        if (status === 'paid') {
+            $('#edit_includeReservationFee').prop('checked', false).prop('disabled', true);
+            $('#edit_reservationFeeWrapper').hide();
+            $('#edit_reservationFeeAmount').val('');
+        } else {
+            $('#edit_includeReservationFee').prop('disabled', false);
+            // do not auto-check; wrapper shown only when user checks
+        }
+        computeEditTotal();
+    }
+
+    $('#edit_paymentStatus').on('change', checkEditPaymentStatus);
+    // initial sync on load
+    checkEditPaymentStatus();
+
+    // Manual price toggle
+    $('#edit_manualPriceToggle').change(function () {
+        if ($(this).is(':checked')) {
+            $('#edit_price').prop('readonly', false);
+        } else {
+            $('#edit_price').prop('readonly', true);
+            // Restore calculated price
+            const basePrice = parseFloat($('#edit_baseprice').val()) || 0;
+            $('#edit_price').val(basePrice.toFixed(2));
+        }
+        computeEditTotal();
+    });
+
+    // Input event listeners for total computation
+    $('#edit_reservationFeeAmount, #edit_discountAmount, #edit_breakfastAdultQty, #edit_breakfastKidQty').on('input', function() {
+        computeEditTotal();
+    });
+
+    // Edit form submission
+    $('#editbooking').off('submit').on('submit', function (e) {
+        e.preventDefault();
+        
+        const bookingId = $('#edit_bookingId').val();
+        
+        // Collect form data
+        const formData = {
+            room_id: $('#edit_addroom').val(),
+            fullname: $('#edit_txtFullNameAdd').val(),
+            number: $('#edit_txtNumber').val(),
+            daterange: $('#edit_daterange').val(),
+            maxOccupants: $('#edit_maxOccupants').val(),
+            paymentStatus: $('#edit_paymentStatus').val(),
+            price: $('#edit_baseprice').val(),
+            diffindays: $('#edit_diffindays').val(),
+            guestType: $('#edit_guestType').val(),
+            guestLevel: $('#edit_guestLevel').val(),
+            bookingRoute: $('#edit_bookingRoute').val(),
+            checkInStatus: $('#edit_checkInStatus').val(),
+            checkOutStatus: $('#edit_checkOutStatus').val(),
+            bookingRemarks: $('#edit_bookingRemarks').val(),
+            agencyID: $('#edit_agencySelect').val(),
+            bedCount: $('#edit_bedCount').val(),
+            
+            // Services
+            breakfastAdultQty: $('#edit_includeBreakfast').prop('checked') ? $('#edit_breakfastAdultQty').val() : '0',
+            breakfastAdultPrice: $('#edit_includeBreakfast').prop('checked') ? $('#edit_breakfastAdultPrice').val() : '0',
+            breakfastAdultId: $('#edit_includeBreakfast').prop('checked') ? $('#edit_breakfastAdultId').val() : '',
+            breakfastKidQty: $('#edit_includeBreakfast').prop('checked') ? $('#edit_breakfastKidQty').val() : '0',
+            breakfastKidPrice: $('#edit_includeBreakfast').prop('checked') ? $('#edit_breakfastKidPrice').val() : '0',
+            breakfastKidId: $('#edit_includeBreakfast').prop('checked') ? $('#edit_breakfastKidId').val() : '',
+            pickupServiceId: $('#edit_includePickup').prop('checked') ? $('#edit_pickupServiceId').val() : '',
+            pickupPrice: $('#edit_includePickup').prop('checked') ? $('#edit_pickupPrice').val() : '0',
+            dropoffServiceId: $('#edit_includeDropoff').prop('checked') ? $('#edit_dropoffServiceId').val() : '',
+            dropoffPrice: $('#edit_includeDropoff').prop('checked') ? $('#edit_dropoffPrice').val() : '0',
+            
+            // Fees
+            reservationFee: $('#edit_includeReservationFee').prop('checked') ? $('#edit_reservationFeeAmount').val() : '0.00',
+            discount: $('#edit_includeDiscount').prop('checked') ? $('#edit_discountAmount').val() : '0.00'
+        };
+        
+        // Submit update
+        $.ajax({
+            url: `/booking/edit_booking/${bookingId}`,
+            type: 'POST',
+            data: formData,
+            success: function (response) {
+                if (response.success) {
+                    $('#modal-editbooking').modal('hide');
+                    Swal.fire({
+                        title: 'Success!',
+                        text: response.message,
+                        icon: 'success',
+                        confirmButtonText: 'OK'
+                    }).then(() => {
+                        window.location.reload();
+                    });
+                } else {
+                    Swal.fire({
+                        title: 'Error!',
+                        text: response.message || 'Failed to update booking',
+                        icon: 'error',
+                        confirmButtonText: 'OK'
+                    });
+                }
+            },
+            error: function (err) {
+                console.error('Error:', err);
+                Swal.fire({
+                    title: 'Error!',
+                    text: 'An error occurred while updating the booking',
+                    icon: 'error',
+                    confirmButtonText: 'OK'
+                });
+            }
+        });
+    });
+});
+
+// Function to compute total for edit form
+function computeEditTotal() {
+    const roomRate = parseFloat($('#edit_baseprice').val()) || 0;
+    const nights = parseInt($('#edit_diffindays').val()) || 1;
+    
+    const adultQty = parseInt($('#edit_breakfastAdultQty').val()) || 0;
+    const adultPrice = parseFloat($('#edit_breakfastAdultPrice').val()) || 0;
+    const kidQty = parseInt($('#edit_breakfastKidQty').val()) || 0;
+    const kidPrice = parseFloat($('#edit_breakfastKidPrice').val()) || 0;
+    
+    const pickupPrice = $('#edit_includePickup').prop('checked') ? parseFloat($('#edit_pickupPrice').val()) || 0 : 0;
+    const dropoffPrice = $('#edit_includeDropoff').prop('checked') ? parseFloat($('#edit_dropoffPrice').val()) || 0 : 0;
+    
+    const reservationFee = $('#edit_includeReservationFee').prop('checked') ? parseFloat($('#edit_reservationFeeAmount').val()) || 0 : 0;
+    const discount = $('#edit_includeDiscount').prop('checked') ? parseFloat($('#edit_discountAmount').val()) || 0 : 0;
+    
+    const subtotal = (roomRate * nights) + (adultQty * adultPrice) + (kidQty * kidPrice) + pickupPrice + dropoffPrice;
+    const finalBalance = subtotal - reservationFee - discount;
+    
+    if (finalBalance < 0) {
+        $('#edit_computedTotal').html('<b>0.00</b>');
+        $('#edit_creditAmount').html(Math.abs(finalBalance).toLocaleString(undefined, { minimumFractionDigits: 2 }));
+        $('#edit_creditDisplay').show();
+    } else {
+        $('#edit_computedTotal').html('<b>' + finalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 }) + '</b>');
+        $('#edit_creditDisplay').hide();
+    }
+}
+
+// Function to populate edit form (called from parent page)
+function populateEditForm(booking) {
+    // Set hidden fields
+    $('#edit_bookingId').val(booking.bookingId);
+    $('#edit_guestID').val(booking.CUSTOMER_ID);
+    
+    // Set form fields
+    $('#edit_daterange').val(booking.daterange);
+    $('#edit_txtFullNameAdd').val(booking.fullname);
+    $('#edit_txtNumber').val(booking.number);
+    $('#edit_maxOccupants').val(booking.GUESTS_COUNT);
+    $('#edit_paymentStatus').val(booking.PAYMENT_STATUS);
+    $('#edit_price').val(booking.price);
+    $('#edit_baseprice').val(booking.price);
+    $('#edit_diffindays').val(booking.diffindays);
+    $('#edit_guestType').val(booking.guestType);
+    $('#edit_guestLevel').val(booking.guestLevel);
+    $('#edit_bookingRoute').val(booking.BOOKING_CHANNEL);
+    $('#edit_checkInStatus').val(booking.CHECK_IN_STATUS);
+    $('#edit_checkOutStatus').val(booking.LATE_CHECKOUT);
+    $('#edit_bookingRemarks').val(booking.REMARKS);
+    $('#edit_agencySelect').val(booking.agencyID);
+    $('#edit_bedCount').val(booking.ROOM_BED === 1 ? '1' : booking.ROOM_BED === 2 ? '2' : 'N/A');
+    $('#edit_room_type').val(booking.ROOM_VIEW === 1 ? 'Condo View' : booking.ROOM_VIEW === 2 ? 'Mountain View' : 'N/A');
+    $('#edit_room_type_hidden').val(booking.ROOM_TYPE);
+    
+    // Set services
+    if (parseInt(booking.breakfastAdultQty) > 0) {
+        $('#edit_includeBreakfast').prop('checked', true);
+        $('#edit_breakfastInputs').show();
+        $('#edit_breakfastAdultQty').val(booking.breakfastAdultQty);
+        $('#edit_breakfastAdultPrice').val(booking.breakfastAdultPrice);
+        $('#edit_breakfastAdultId').val(booking.breakfastAdultId);
+    }
+    
+    if (parseInt(booking.breakfastKidQty) > 0) {
+        $('#edit_breakfastKidQty').val(booking.breakfastKidQty);
+        $('#edit_breakfastKidPrice').val(booking.breakfastKidPrice);
+        $('#edit_breakfastKidId').val(booking.breakfastKidId);
+    }
+    
+    if (parseFloat(booking.pickupPrice) > 0) {
+        $('#edit_includePickup').prop('checked', true);
+        $('#edit_pickupWrapper').show();
+        $('#edit_pickupPrice').val(booking.pickupPrice);
+        $('#edit_pickupServiceId').val(booking.pickupServiceId);
+    }
+    
+    if (parseFloat(booking.dropoffPrice) > 0) {
+        $('#edit_includeDropoff').prop('checked', true);
+        $('#edit_dropoffWrapper').show();
+        $('#edit_dropoffPrice').val(booking.dropoffPrice);
+        $('#edit_dropoffServiceId').val(booking.dropoffServiceId);
+    }
+    
+    // Set reservation fee and discount
+    if (parseFloat(booking.RESERVATION_FEE) > 0) {
+        $('#edit_includeReservationFee').prop('checked', true);
+        $('#edit_reservationFeeWrapper').show();
+        $('#edit_reservationFeeAmount').val(booking.RESERVATION_FEE);
+    }
+    
+    if (parseFloat(booking.DISCOUNT_AMOUNT) > 0) {
+        $('#edit_includeDiscount').prop('checked', true);
+        $('#edit_discountWrapper').show();
+        $('#edit_discountAmount').val(booking.DISCOUNT_AMOUNT);
+    }
+    
+    // Set room selection if not direct reservation
+    if (!booking.IS_DIRECT_RESERVATION && booking.ROOM_ID) {
+        populateEditRoomSelection(booking.ROOM_ID, booking.ROOM_FLOOR);
+    }
+    
+    // Recompute total
+    computeEditTotal();
+}
+
+// Function to populate room selection in edit form
+function populateEditRoomSelection(roomId, floorNumber) {
+    // Set floor
+    $('#edit_addFloor').val(floorNumber);
+    
+    // Get current dates for filtering
+    const daterange = $('#edit_daterange').val();
+    if (!daterange) return;
+    
+    // Parse dates from daterange
+    const dateRangeParts = daterange.split(' to ');
+    const startDateStr = dateRangeParts[0].trim();
+    const endDateStr = dateRangeParts[1].split('(')[0].trim();
+    
+    // Convert to YYYY-MM-DD format
+    const checkInDate = moment(startDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD');
+    const checkOutDate = moment(endDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD');
+    
+    // Fetch available rooms for the selected floor and dates
+    fetch('/booking/get_available_rooms_by_floor', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            floor: floorNumber,
+            checkInDate: checkInDate,
+            checkOutDate: checkOutDate,
+            excludeBookingId: $('#edit_bookingId').val()
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        const roomDropdown = $('#edit_addroom');
+        roomDropdown.empty().append('<option value="" disabled>Select Room</option>');
+
+        console.log('Available rooms response:', data); // Debug log
+
+        if (data.length === 0) {
+            roomDropdown.append('<option value="" disabled>No available rooms for selected dates</option>');
+        } else {
+            let currentRoomFound = false;
+            data.forEach(room => {
+                const selected = room.room_id == roomId ? 'selected' : '';
+                if (room.room_id == roomId) {
+                    currentRoomFound = true;
+                }
+                roomDropdown.append(`<option value="${room.room_id}" ${selected}>${room.ROOM_NUMBER}</option>`);
+            });
+
+            // If current room not found in available rooms, add it manually
+            if (!currentRoomFound && roomId) {
+                console.log('Current room not found in available rooms, adding manually');
+                roomDropdown.append(`<option value="${roomId}" selected>${roomId} (Current)</option>`);
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error fetching available rooms:', error);
+    });
+}
+
+// Function to open edit booking modal (called from parent page)
+function editBooking(bookingId) {
+    console.log('Editing booking ID:', bookingId);
+    
+    // Fetch booking details
+    fetch(`/booking/edit_booking/${bookingId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                populateEditForm(data.booking);
+                $('#modal-editbooking').modal('show');
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error!',
+                    text: data.message || 'Failed to fetch booking details',
+                    confirmButtonText: 'OK'
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error!',
+                text: 'An error occurred while fetching booking details',
+                confirmButtonText: 'OK'
+            });
+        });
+}
+
+// Guest search functionality for edit form
+function searchEditCustomer(query) {
+    if (query.length === 0) {
+        document.getElementById('edit_searchResults').style.display = 'none';
+        return;
+    }
+
+    fetch(`/booking/search-customer?query=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+            const resultsDiv = document.getElementById('edit_searchResults');
+            if (data.length > 0) {
+                resultsDiv.innerHTML = data.map(customer => 
+                 `<div style="color: #000; padding: 10px; cursor: pointer; background-color: #f8f9fa; border: 1px solid #dee2e6; margin: 2px 0; border-radius: 4px;" onclick="selectEditCustomer('${customer.NAME}', '${customer.LEVEL}', '${customer.CUSTOMER_ID}', '${customer.CONTACT_NO}', '${customer.TYPE}')">
+                        ${customer.NAME} (${customer.LEVEL})
+                    </div>`).join('');
+                resultsDiv.style.display = 'block';
+            } else {
+                resultsDiv.style.display = 'none';
+            }
+        })
+        .catch(error => console.error('Error fetching customers:', error));
+}
+
+// Hide search results on blur
+function hideEditSearchResults() {
+    setTimeout(() => {
+        document.getElementById('edit_searchResults').style.display = 'none';
+    }, 200);
+}
+
+// Function to update the edit form inputs based on the selected customer
+function selectEditCustomer(name, level, customerId, contactNo, guestType) {
+    document.getElementById('edit_txtFullNameAdd').value = name;
+    document.getElementById('edit_searchResults').style.display = 'none';
+
+    // Set the Guest Level dropdown value based on the level of the selected customer
+    const guestLevelDropdown = document.getElementById('edit_guestLevel');
+    for (let i = 0; i < guestLevelDropdown.options.length; i++) {
+        if (guestLevelDropdown.options[i].text === level) {
+            guestLevelDropdown.selectedIndex = i;
+            break;
+        }
+    }
+
+    // Update the Guest Type dropdown value based on the type of the selected customer
+    const guestTypeDropdown = document.getElementById('edit_guestType');
+    for (let i = 0; i < guestTypeDropdown.options.length; i++) {
+        if (guestTypeDropdown.options[i].text === guestType) {
+            guestTypeDropdown.selectedIndex = i;
+            break;
+        }
+    }
+
+    // Set the Contact Number field
+    document.getElementById('edit_txtNumber').value = contactNo;
+
+    // Store the Customer ID in the hidden input field
+    document.getElementById('edit_guestID').val(customerId);
+}
+
+// Add event listener to reset dropdowns when guest name changes
+$(document).ready(function() {
+    $('#edit_txtFullNameAdd').on('input', function() {
+        // Clear the Customer ID and Contact Number fields
+        $('#edit_guestID').val('');
+        $('#edit_txtNumber').val('');
+
+        // Reset the selected values in the dropdowns
+        $('#edit_guestType').prop('selectedIndex', 0);
+        $('#edit_guestLevel').prop('selectedIndex', 0);
+    });
+
+    // Prevent hiding if clicked inside search results
+    $('#edit_searchResults').on('mousedown', function(event) {
+        event.preventDefault();
+    });
+});
+</script>

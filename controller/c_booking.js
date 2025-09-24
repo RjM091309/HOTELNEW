@@ -1569,6 +1569,132 @@ class BookingController {
     return BookingController.assignRoomToDirectReservation(req, res);
   }
 
+  // ==================== EDIT BOOKING FUNCTIONS ====================
+
+  // Get booking details for editing
+  static async getEditBookingDetails(req, res) {
+    try {
+      const bookingId = req.params.id;
+
+      const bookingDetails = await BookingModel.getEditBookingDetails(bookingId);
+
+      if (!bookingDetails) {
+        return res.status(404).json({ success: false, message: 'Booking not found' });
+      }
+
+      res.json({ success: true, booking: bookingDetails });
+
+    } catch (error) {
+      console.error('Error fetching booking details for edit:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Error fetching booking details' 
+      });
+    }
+  }
+
+  // Update existing booking
+  static async updateBooking(req, res) {
+    try {
+      const bookingId = req.params.id;
+      console.log('Received edit_booking request for ID:', bookingId);
+
+      const {
+        room_id, fullname, number, daterange, maxOccupants,
+        paymentStatus, price, diffindays, guestType, guestLevel,
+        bookingRoute, checkInStatus, checkOutStatus, bookingRemarks, agencyID, bedCount,
+        breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
+        breakfastKidQty, breakfastKidPrice, breakfastKidId,
+        pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
+        reservationFee, discount
+      } = req.body;
+
+      const editedBy = req.user.userId; // Use JWT user ID
+
+      if (!editedBy) {
+        return res.status(400).json({ success: false, message: 'User is not logged in' });
+      }
+
+      const result = await BookingModel.updateBooking({
+        bookingId,
+        room_id,
+        fullname,
+        number,
+        daterange,
+        maxOccupants,
+        paymentStatus,
+        price,
+        diffindays,
+        guestType,
+        guestLevel,
+        bookingRoute,
+        checkInStatus,
+        checkOutStatus,
+        bookingRemarks,
+        agencyID,
+        bedCount,
+        breakfastAdultQty,
+        breakfastAdultPrice,
+        breakfastAdultId,
+        breakfastKidQty,
+        breakfastKidPrice,
+        breakfastKidId,
+        pickupServiceId,
+        pickupPrice,
+        dropoffServiceId,
+        dropoffPrice,
+        reservationFee,
+        discount,
+        editedBy
+      });
+
+      res.json({ 
+        success: true, 
+        message: result.message,
+        bookingId: bookingId
+      });
+
+    } catch (error) {
+      console.error('❌ Error updating booking:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: error.message || 'Error updating booking' 
+      });
+    }
+  }
+
+  // Get available rooms by floor for edit booking
+  static async getAvailableRoomsByFloor(req, res) {
+    try {
+      const { floor, checkInDate, checkOutDate, excludeBookingId } = req.body;
+
+      console.log('getAvailableRoomsByFloor request:', { floor, checkInDate, checkOutDate, excludeBookingId });
+
+      if (!floor || !checkInDate || !checkOutDate) {
+        return res.status(400).json({
+          error: 'Floor, check-in date, and check-out date are required'
+        });
+      }
+
+      const availableRooms = await BookingModel.getAvailableRoomsByFloor({
+        floor,
+        checkInDate,
+        checkOutDate,
+        excludeBookingId
+      });
+
+      console.log('Available rooms response:', availableRooms);
+
+      res.json(availableRooms);
+
+    } catch (error) {
+      console.error('Error fetching available rooms by floor:', error);
+      res.status(500).json({
+        error: 'Error fetching available rooms'
+      });
+    }
+  }
+
   // ==================== REMARKS FUNCTIONS ====================
 
   // Add a new remark
