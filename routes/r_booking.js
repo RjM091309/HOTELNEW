@@ -98,4 +98,10 @@ router.get('/get-breakfast-prices', BookingController.getBreakfastPrices);
 router.get('/get-pick-drop', BookingController.getPickDrop);
 router.get('/get-services', BookingController.getExtraServiceDropdown);
 
+// Remarks routes
+router.post('/remarks', BookingController.addRemark);
+router.get('/remarks/booking/:bookingId', BookingController.getRemarksByBooking);
+router.put('/remarks/:remarkId', BookingController.updateRemark);
+router.delete('/remarks/:remarkId', BookingController.deleteRemark);
+
 module.exports = router;

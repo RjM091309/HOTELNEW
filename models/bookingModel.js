@@ -58,7 +58,8 @@ class BookingModel {
           COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
             + COALESCE(bill.AMENITIES_CHARGE,  0)
             + COALESCE(bill.SERVICES_CHARGE,   0) AS TOTAL_COST,
-          COALESCE(bill.PAYMENT_STATUS, 'Not Paid') AS PAYMENT_STATUS
+          COALESCE(bill.PAYMENT_STATUS, 'Not Paid') AS PAYMENT_STATUS,
+          (SELECT COUNT(*) FROM remarks rm WHERE rm.BOOKING_ID = b.IDNo AND rm.ACTIVE = 1) AS RemarksCount
         FROM booking b
           LEFT JOIN customer   c   ON b.CUSTOMER_ID = c.IDNo
           LEFT JOIN billing    bill ON b.IDNo       = bill.BOOKING_ID
@@ -771,6 +772,26 @@ class BookingModel {
           console.log(`🔄 Late Check-Out Fee Applied: ₱${lateCheckoutFee} (Status: ${status})`);
         }
 
+        // Add booking remarks to remarks table if bookingRemarks has content
+        if (bookingRemarks && bookingRemarks.trim() !== '') {
+          const remarksQuery = `
+            INSERT INTO remarks (BOOKING_ID, CATEGORY, REMARK_TEXT, ENCODED_BY, EDITDED_BY) 
+            VALUES (?, 'Booking', ?, ?, ?)
+          `;
+          
+          await new Promise((resolve, reject) => {
+            connection.query(remarksQuery, [bookingId, bookingRemarks.trim(), encodedBy, encodedBy], (err, results) => {
+              if (err) {
+                console.error('❌ Failed to insert booking remarks:', err);
+                reject(err);
+              } else {
+                console.log('✅ Booking remarks inserted successfully');
+                resolve(results);
+              }
+            });
+          });
+        }
+
         // If paymentStatus is 'paid', insert into payments table
         if (paymentStatus === 'paid') {
           const getBillingIdQuery = `SELECT IDNo, ROOM_CHARGE, QTY FROM billing WHERE BOOKING_ID = ? LIMIT 1`;
@@ -1203,6 +1224,39 @@ class BookingModel {
           VALUES (?, ?, 'cash', 'discount', NOW(), ?)
         `;
         await queryDatabasePromise(insertSql, [bookingId, -amount, editedBy]);
+      }
+
+      // Add discount remarks to remarks table if remarks has content
+      if (remarks && remarks.trim() !== '') {
+        // Check if a discount remark already exists for this booking
+        const existingRemark = await queryDatabasePromise(
+          `SELECT IDNo, REMARK_TEXT FROM remarks 
+           WHERE BOOKING_ID = ? AND CATEGORY = 'Discount' AND ACTIVE = 1`,
+          [bookingId]
+        );
+        
+        if (existingRemark.length > 0) {
+          // Merge with existing remark - append new text with separator
+          const currentText = existingRemark[0].REMARK_TEXT;
+          const mergedText = `${currentText}\n--\n${remarks.trim()}`;
+          
+          await queryDatabasePromise(
+            `UPDATE remarks SET REMARK_TEXT = ?, EDITDED_BY = ?, EDITDED_DT = CURRENT_TIMESTAMP 
+             WHERE IDNo = ? AND ACTIVE = 1`,
+            [mergedText, editedBy, existingRemark[0].IDNo]
+          );
+          
+          console.log('✅ Discount remarks merged successfully');
+        } else {
+          // Insert new discount remark
+          await queryDatabasePromise(
+            `INSERT INTO remarks (BOOKING_ID, CATEGORY, REMARK_TEXT, ENCODED_BY, EDITDED_BY) 
+             VALUES (?, 'Discount', ?, ?, ?)`,
+            [bookingId, remarks.trim(), editedBy, editedBy]
+          );
+          
+          console.log('✅ Discount remarks inserted successfully');
+        }
       }
 
       return { success: true };
@@ -3761,6 +3815,166 @@ class BookingModel {
       
       console.error('Error in assignRoomToDirectReservation:', error);
       throw error;
+    }
+  }
+
+  // ==================== REMARKS FUNCTIONS ====================
+
+  // Add a new remark
+  static async addRemark({ bookingId, category, remarkText, encodedBy }) {
+    try {
+      // Check if a remark with the same category already exists for this booking
+      const existingRemark = await queryDatabasePromise(
+        `SELECT IDNo, REMARK_TEXT FROM remarks 
+         WHERE BOOKING_ID = ? AND CATEGORY = ? AND ACTIVE = 1`,
+        [bookingId, category]
+      );
+      
+      if (existingRemark.length > 0) {
+        // Merge with existing remark - append new text with separator
+        const currentText = existingRemark[0].REMARK_TEXT;
+        const mergedText = `${currentText}\n--\n${remarkText}`;
+        
+        const result = await queryDatabasePromise(
+          `UPDATE remarks SET REMARK_TEXT = ?, EDITDED_BY = ?, EDITDED_DT = CURRENT_TIMESTAMP 
+           WHERE IDNo = ? AND ACTIVE = 1`,
+          [mergedText, encodedBy, existingRemark[0].IDNo]
+        );
+        
+        return {
+          success: true,
+          remarkId: existingRemark[0].IDNo,
+          message: 'Remark merged successfully'
+        };
+      } else {
+        // Insert the new remark
+        const result = await queryDatabasePromise(
+          `INSERT INTO remarks (BOOKING_ID, CATEGORY, REMARK_TEXT, ENCODED_BY, EDITDED_BY) 
+           VALUES (?, ?, ?, ?, ?)`,
+          [bookingId, category, remarkText, encodedBy, encodedBy]
+        );
+
+        return {
+          success: true,
+          remarkId: result.insertId,
+          message: 'Remark added successfully'
+        };
+      }
+
+    } catch (error) {
+      console.error('Error adding remark:', error);
+      return {
+        success: false,
+        message: 'Failed to add remark'
+      };
+    }
+  }
+
+  // Get remarks by booking ID
+  static async getRemarksByBooking(bookingId) {
+    try {
+      // Get remarks for the booking with user names
+      const remarks = await queryDatabasePromise(
+        `SELECT r.IDNo, r.BOOKING_ID, r.CATEGORY, r.REMARK_TEXT, r.ENCODED_BY, r.ENCODED_DT, r.EDITDED_BY, r.EDITDED_DT, r.ACTIVE,
+                u1.FULLNAME as ENCODED_BY_NAME,
+                u2.FULLNAME as EDITDED_BY_NAME
+         FROM remarks r
+         LEFT JOIN user_info u1 ON r.ENCODED_BY = u1.IDno
+         LEFT JOIN user_info u2 ON r.EDITDED_BY = u2.IDno
+         WHERE r.BOOKING_ID = ? AND r.ACTIVE = 1 
+         ORDER BY r.ENCODED_DT DESC`,
+        [bookingId]
+      );
+
+      return remarks;
+
+    } catch (error) {
+      console.error('Error fetching remarks:', error);
+      return [];
+    }
+  }
+
+  // Update a remark
+  static async updateRemark({ remarkId, remarkText, editedBy }) {
+    try {
+      // Get remark details first to check category and booking ID
+      const remarkDetails = await queryDatabasePromise(
+        `SELECT BOOKING_ID, CATEGORY FROM remarks WHERE IDNo = ? AND ACTIVE = 1`,
+        [remarkId]
+      );
+
+      if (remarkDetails.length === 0) {
+        return {
+          success: false,
+          message: 'Remark not found or already deleted'
+        };
+      }
+
+      const { BOOKING_ID, CATEGORY } = remarkDetails[0];
+
+      // Update the remark
+      const result = await queryDatabasePromise(
+        `UPDATE remarks SET REMARK_TEXT = ?, EDITDED_BY = ?, EDITDED_DT = CURRENT_TIMESTAMP WHERE IDNo = ? AND ACTIVE = 1`,
+        [remarkText, editedBy, remarkId]
+      );
+
+      if (result.affectedRows > 0) {
+        // If this is a "Booking" category remark, also update the booking table's REMARKS field
+        if (CATEGORY === 'Booking') {
+          await queryDatabasePromise(
+            `UPDATE booking SET REMARKS = ? WHERE IDNo = ?`,
+            [remarkText, BOOKING_ID]
+          );
+          console.log('✅ Booking REMARKS field updated to match remarks table');
+        }
+
+        return {
+          success: true,
+          message: 'Remark updated successfully'
+        };
+      } else {
+        return {
+          success: false,
+          message: 'Remark not found or already deleted'
+        };
+      }
+
+    } catch (error) {
+      console.error('Error updating remark:', error);
+      return {
+        success: false,
+        message: 'Failed to update remark'
+      };
+    }
+  }
+
+  // Delete a remark (soft delete by setting ACTIVE = 0)
+  static async deleteRemark(remarkId) {
+    try {
+      // Soft delete the remark
+      const result = await queryDatabasePromise(
+        `UPDATE remarks SET ACTIVE = 0 WHERE IDNo = ?`,
+        [remarkId]
+      );
+
+      if (result.affectedRows > 0) {
+        return {
+          success: true,
+          message: 'Remark deleted successfully'
+        };
+      } else {
+        return {
+          success: false,
+          message: 'Remark not found'
+        };
+      }
+
+    } catch (error) {
+      console.error('Error deleting remark:', error);
+      return {
+        success: false,
+        message: 'Failed to delete remark'
+      };
     }
   }
 }

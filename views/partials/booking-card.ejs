@@ -140,8 +140,8 @@
              onclick="openRemarksModalFromData(this)" 
              style="cursor: pointer;">
             <p>
-                <% if (booking.REMARKS && booking.REMARKS.trim() !== '') { %>
-                    Remarks
+                <% if ((booking.REMARKS && booking.REMARKS.trim() !== '') || (booking.RemarksCount && booking.RemarksCount > 0)) { %>
+                    <span style="color: yellow;">Remarks</span>
                 <% } else { %>
                     No Remarks
                 <% } %>

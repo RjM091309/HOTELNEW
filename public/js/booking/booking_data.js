@@ -33,7 +33,9 @@ $(document).ready(function () {
                         Paymentstatus: item.PAYMENT_STATUS,
                         BookingChannel: item.BOOKING_CHANNEL,
                         Status: getStatusLabel(item.BookingStatus, item.BookingID), // Status label
-                        BookingStatus: item.BookingStatus
+                        BookingStatus: item.BookingStatus,
+                        BookingRemarks: item.BookingRemarks || '',
+                        RemarksCount: item.RemarksCount || 0
                     };
                 });
             },
@@ -108,6 +110,11 @@ $(document).ready(function () {
                     const buttonClass = paymentStatus === 'paid' ? 'btn-primary' : 'btn-primary';
 
                     let html = `<button class="btn btn-tbl-view btn-xs ${buttonClass}" onclick="showBilling(${row.BookingID})" title="Billing"><i class="fas fa-file-invoice"></i></button>`;
+                    
+                    // Add Remarks button only if there are remarks
+                    if ((row.BookingRemarks && row.BookingRemarks.trim() !== '') || (row.RemarksCount && row.RemarksCount > 0)) {
+                        html += `<button class="btn btn-tbl-edit btn-xs" onclick="openRemarksModal(${row.BookingID})" title="Remarks"><i class="fas fa-comment-dots"></i></button>`;
+                    }
 
                     if (bookingStatus === 'pending') {
                         html += `

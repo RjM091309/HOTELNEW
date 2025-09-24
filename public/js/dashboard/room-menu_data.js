@@ -118,19 +118,22 @@ function toastInfo(heading, message, options = {}) { notifyToast('info', heading
 * @param {string|number} bookingId
 * @param {FullCalendar.EventApi} [event]  – the clicked calendar event
 */
-function openRoomMenuModal(bookingId, event) {
+async function openRoomMenuModal(bookingId, event) {
   // Always use the original modal structure, but get data from different sources
   if (event && event.extendedProps) {
     // Calendar context - extract data from event
-    createDynamicRoomModalFromEvent(bookingId, event);
+    await createDynamicRoomModalFromEvent(bookingId, event);
   } else {
     // Dashboard context - use existing logic
-    createDynamicRoomModal(bookingId, event, { isFromCalendar: false });
+    await createDynamicRoomModal(bookingId, event, { isFromCalendar: false });
   }
+  
+  // Update button color to ensure it's current
+  await updateRemarksButtonColor(bookingId);
 }
 
 // Function to create a dynamic room modal from calendar event data using original modal structure
-function createDynamicRoomModalFromEvent(bookingId, event) {
+async function createDynamicRoomModalFromEvent(bookingId, event) {
   
   
   // Extract data from the calendar event
@@ -154,7 +157,7 @@ function createDynamicRoomModalFromEvent(bookingId, event) {
   
   // Instead of creating duplicate HTML, call the original modal function
   // but pass the calendar event data as parameters
-  createDynamicRoomModal(bookingId, event, {
+  await createDynamicRoomModal(bookingId, event, {
     roomNumber,
     roomId,
     guestName,
@@ -165,8 +168,41 @@ function createDynamicRoomModalFromEvent(bookingId, event) {
   });
 }
 
+// Function to check if remarks exist for a booking
+async function checkRemarksExist(bookingId) {
+    try {
+        const response = await fetch(`/booking/remarks/booking/${bookingId}`);
+        const result = await response.json();
+        return result.success && result.remarks && result.remarks.length > 0;
+    } catch (error) {
+        console.error('Error checking remarks:', error);
+        return false;
+    }
+}
+
+// Function to update remarks button color dynamically
+async function updateRemarksButtonColor(bookingId) {
+    const hasRemarks = await checkRemarksExist(bookingId);
+    const newClass = hasRemarks ? 'btn-danger' : 'btn-info';
+    
+    // Update button in room menu modal if it exists
+    const modalButton = document.querySelector(`#dynamicRoomModal_${bookingId} .btn-sm[onclick*="openRemarksModal"]`);
+    if (modalButton) {
+        modalButton.className = modalButton.className.replace(/btn-(danger|info)/, newClass);
+    }
+    
+    // Also update the button in the room card if it exists
+    const roomCard = document.querySelector(`[data-booking-id="${bookingId}"]`);
+    if (roomCard) {
+        const remarksButton = roomCard.querySelector('.btn-sm[onclick*="openRemarksModal"]');
+        if (remarksButton) {
+            remarksButton.className = remarksButton.className.replace(/btn-(danger|info)/, newClass);
+        }
+    }
+}
+
 // Function to create a dynamic room modal
-function createDynamicRoomModal(bookingId, event, options) {
+async function createDynamicRoomModal(bookingId, event, options) {
   let roomNumber, roomId, guestName, checkInDate, checkOutDate, daysDiff, roomType, customerType, customerLevel, totalCost, lateCheckout;
   
   // Check if data is coming from calendar event
@@ -222,6 +258,10 @@ function createDynamicRoomModal(bookingId, event, options) {
     addedServicesMap[bookingId] = [];
   }
 
+  // Check if remarks exist for this booking
+  const hasRemarks = await checkRemarksExist(bookingId);
+  const remarksButtonClass = hasRemarks ? 'btn-danger' : 'btn-info';
+
   // Create modal HTML
   const modalHTML = `
 <div class="modal fade" id="dynamicRoomModal_${bookingId}" tabindex="-1" aria-labelledby="dynamicRoomModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
@@ -255,6 +295,10 @@ function createDynamicRoomModal(bookingId, event, options) {
                             id="btnExtend" 
                             onclick="openExtendModal('${roomId}', '${checkOutDate}', '${bookingId}')">
                         <i class="fas fa-plus-circle"></i> Extend
+                    </button>
+                    
+                    <button class="btn btn-sm ${remarksButtonClass}" onclick="openRemarksModal('${bookingId}')">
+                        <i class="fas fa-sticky-note"></i> Remarks
                     </button>
                 </div>
             </div>
@@ -426,7 +470,7 @@ function createDynamicRoomModal(bookingId, event, options) {
             <!-- Modal Footer -->
             <div class="modal-footer py-2" style="background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%); border-top: 1px solid #495057;">
                 <button type="button" class="btn btn-primary" onclick="showBilling('${bookingId}')">Billing</button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="window.location.reload()">Close</button>
             </div>
         </div>
     </div>
@@ -3942,6 +3986,418 @@ function loadExistingServicesForModal(bookingId) {
 
 // Make showBilling function globally accessible
 window.showBilling = showBilling;
+
+// ==================== REMARKS/NOTES FUNCTIONALITY ====================
+
+// Global variable to store remarks data
+let remarksData = {};
+
+// Function to open remarks modal
+function openRemarksModal(bookingId) {
+    // Create and show the remarks modal
+    createRemarksModal(bookingId);
+}
+
+// Function to create remarks modal
+function createRemarksModal(bookingId) {
+    // Remove existing remarks modal if any
+    const existingModal = document.getElementById(`remarksModal_${bookingId}`);
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    // Create modal HTML
+    const modalHTML = `
+    <div class="modal fade" id="remarksModal_${bookingId}" tabindex="-1" aria-labelledby="remarksModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 700px;">
+            <div class="modal-content" style="background-color: #ffffff; border: 4px solid transparent; border-image: linear-gradient(135deg, #ffffff 0%, #ffffff 100%); border-image-slice: 1;">
+                
+                <!-- Modal Header -->
+                <div class="modal-header py-2" style="background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%); border-bottom: 1px solid #eeeeee;">
+                    <h6 class="modal-title mb-0" style="color: #495057;">
+                        <i class="fas fa-sticky-note me-2"></i><strong>Remarks</strong>
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                
+                <!-- Modal Body -->
+                <div class="modal-body p-3" style="background-color: #ffffff; color: #495057;">
+                    <!-- Add New Remark Form -->
+                    <div class="card shadow-sm mb-4" style="background-color: #ffffff; border: 1px solid #dee2e6;">
+                        <div class="card-header py-2" style="background-color: #f8f9fa; border-bottom: 1px solid #dee2e6;">
+                            <h6 class="mb-0 text-primary">
+                                <i class="fas fa-plus-circle me-1"></i>Add New Remark
+                            </h6>
+                        </div>
+                        <div class="card-body p-3">
+                            <form id="addRemarkForm_${bookingId}">
+                                <div class="row">
+                                    <div class="col-md-12 mb-3">
+                                        <label for="remarkCategory_${bookingId}" class="form-label">Category</label>
+                                        <select class="form-select" id="remarkCategory_${bookingId}" required>
+                                            <option value="">Select Category</option>
+                                            <option value="Booking">Booking</option>
+                                            <option value="Billing">Billing</option>
+                                            <option value="Complain">Complain</option>
+                                            <option value="Request">Request</option>
+                                            <option value="Discount">Discount</option>
+                                            <option value="Service">Service</option>
+                                
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="remarkText_${bookingId}" class="form-label">Remark/Note</label>
+                                    <textarea class="form-control" id="remarkText_${bookingId}" rows="3" placeholder="Enter your remark or note here..." required></textarea>
+                                </div>
+                                <div class="d-flex justify-content-end">
+                                    <button type="button" class="btn btn-secondary me-2" onclick="clearRemarkForm('${bookingId}')">
+                                        <i class="fas fa-eraser me-1"></i>Clear
+                                    </button>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-1"></i>Add Remark
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <!-- Remarks Table -->
+                    <div class="card shadow-sm" style="background-color: #ffffff; border: 1px solid #dee2e6;">
+                        <div class="card-header py-2" style="background-color: #f8f9fa; border-bottom: 1px solid #dee2e6;">
+                            <h6 class="mb-0 text-success">
+                                <i class="fas fa-list me-1"></i>Existing Remarks
+                            </h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0" id="remarksTable_${bookingId}" style="background-color: white;">
+                                    <thead style="background-color: #6c757d; color: white;">
+                                        <tr>
+                                            <th style="width: 45%; color: white;">Remark</th>
+                                            <th style="width: 15%; color: white;">Category</th>
+                                            <th style="width: 15%; color: white;">User</th>
+                                            <th style="width: 15%; color: white;">Date</th>
+                                            <th style="width: 10%; color: white;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="remarksTableBody_${bookingId}" style="background-color: white; color: black;">
+                                        <!-- Remarks will be populated here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div id="noRemarksMessage_${bookingId}" class="text-center py-4 text-muted" style="display: none;">
+                                <i class="fas fa-sticky-note fa-2x mb-2"></i>
+                                <p class="mb-0">No remarks added yet.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Modal Footer -->
+                <div class="modal-footer py-2" style="background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%); border-top: 1px solid #495057;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    `;
+
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    // Show the modal
+    const modal = new bootstrap.Modal(document.getElementById(`remarksModal_${bookingId}`));
+    modal.show();
+
+    // Load existing remarks
+    loadRemarks(bookingId);
+
+    // Set up form submission
+    document.getElementById(`addRemarkForm_${bookingId}`).addEventListener('submit', function(e) {
+        e.preventDefault();
+        addRemark(bookingId);
+    });
+}
+
+// Function to add a new remark
+async function addRemark(bookingId) {
+    const category = document.getElementById(`remarkCategory_${bookingId}`).value;
+    const remarkText = document.getElementById(`remarkText_${bookingId}`).value;
+
+    if (!category || !remarkText) {
+        toastError('Error', 'Please fill in all fields');
+        return;
+    }
+
+    try {
+        // Show loading state
+        const submitBtn = document.querySelector(`#addRemarkForm_${bookingId} button[type="submit"]`);
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Adding...';
+        submitBtn.disabled = true;
+
+        // Send to backend
+        const response = await fetch('/booking/remarks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                bookingId: bookingId,
+                category: category,
+                remarkText: remarkText
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Clear form
+            clearRemarkForm(bookingId);
+            
+            // Reload remarks
+            await loadRemarks(bookingId);
+            
+            // Update button color to reflect new remarks
+            await updateRemarksButtonColor(bookingId);
+            
+            toastSuccess('Success', 'Remark added successfully!');
+        } else {
+            toastError('Error', result.message || 'Failed to add remark');
+        }
+
+    } catch (error) {
+        console.error('Error adding remark:', error);
+        toastError('Error', 'Failed to add remark. Please try again.');
+    } finally {
+        // Restore button state
+        const submitBtn = document.querySelector(`#addRemarkForm_${bookingId} button[type="submit"]`);
+        submitBtn.innerHTML = '<i class="fas fa-save me-1"></i>Add Remark';
+        submitBtn.disabled = false;
+    }
+}
+
+// Function to clear remark form
+function clearRemarkForm(bookingId) {
+    document.getElementById(`remarkCategory_${bookingId}`).value = '';
+    document.getElementById(`remarkText_${bookingId}`).value = '';
+}
+
+// Function to load existing remarks
+async function loadRemarks(bookingId) {
+    try {
+        const response = await fetch(`/booking/remarks/booking/${bookingId}`);
+        const result = await response.json();
+
+        if (result.success) {
+            remarksData[bookingId] = result.remarks;
+            updateRemarksTable(bookingId);
+        } else {
+            console.error('Failed to load remarks:', result.message);
+            remarksData[bookingId] = [];
+            updateRemarksTable(bookingId);
+        }
+    } catch (error) {
+        console.error('Error loading remarks:', error);
+        remarksData[bookingId] = [];
+        updateRemarksTable(bookingId);
+    }
+}
+
+// Function to update remarks table
+function updateRemarksTable(bookingId) {
+    const tbody = document.getElementById(`remarksTableBody_${bookingId}`);
+    const noRemarksMessage = document.getElementById(`noRemarksMessage_${bookingId}`);
+    
+    if (!tbody) return;
+
+    // Clear existing content
+    tbody.innerHTML = '';
+
+    const remarks = remarksData[bookingId] || [];
+
+    if (remarks.length === 0) {
+        noRemarksMessage.style.display = 'block';
+        return;
+    }
+
+    noRemarksMessage.style.display = 'none';
+
+    // Add each remark to table
+    remarks.forEach(remark => {
+        const row = document.createElement('tr');
+        row.style.backgroundColor = 'white';
+        row.style.color = 'black';
+        row.innerHTML = `
+            <td style="background-color: white; color: #6c757d;">
+                <div style="max-width: 300px; word-wrap: break-word;">
+                    ${remark.REMARK_TEXT}
+                </div>
+            </td>
+            <td style="background-color: white; color: #6c757d;">
+                ${remark.CATEGORY}
+            </td>
+            <td style="background-color: white; color: #6c757d;">${remark.EDITDED_BY_NAME || remark.EDITDED_BY || remark.ENCODED_BY_NAME || remark.ENCODED_BY}</td>
+            <td style="background-color: white; color: #6c757d;">
+                <small style="color: #6c757d;">
+                    ${new Date(remark.EDITDED_DT || remark.ENCODED_DT).toLocaleDateString()}<br>
+                    ${new Date(remark.EDITDED_DT || remark.ENCODED_DT).toLocaleTimeString()}
+                </small>
+            </td>
+            <td style="background-color: white; color: black;">
+                <i class="fas fa-edit text-primary me-2" onclick="editRemark('${bookingId}', ${remark.IDNo})" title="Edit Remark" style="cursor: pointer; font-size: 16px;"></i>
+                <i class="fas fa-trash text-danger" onclick="deleteRemark('${bookingId}', ${remark.IDNo})" title="Delete Remark" style="cursor: pointer; font-size: 16px;"></i>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// Function to delete a remark
+async function deleteRemark(bookingId, remarkId) {
+    if (!confirm('Are you sure you want to delete this remark?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/booking/remarks/${remarkId}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Remove from local data
+            if (remarksData[bookingId]) {
+                remarksData[bookingId] = remarksData[bookingId].filter(remark => remark.IDNo !== remarkId);
+            }
+            
+            // Update table
+            updateRemarksTable(bookingId);
+            
+            toastSuccess('Success', 'Remark deleted successfully!');
+        } else {
+            toastError('Error', result.message || 'Failed to delete remark');
+        }
+
+    } catch (error) {
+        console.error('Error deleting remark:', error);
+        toastError('Error', 'Failed to delete remark. Please try again.');
+    }
+}
+
+// Function to edit a remark
+function editRemark(bookingId, remarkId) {
+    // Find the remark in the data
+    const remark = remarksData[bookingId]?.find(r => r.IDNo === remarkId);
+    if (!remark) {
+        toastError('Error', 'Remark not found');
+        return;
+    }
+
+    // Create edit modal
+    const editModalHTML = `
+    <div class="modal fade" id="editRemarkModal_${remarkId}" tabindex="-1" aria-labelledby="editRemarkModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 500px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editRemarkModalLabel">
+                        <i class="fas fa-edit me-2"></i>Edit Remark
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editRemarkForm_${remarkId}">
+                        <div class="mb-3">
+                            <label for="editRemarkText_${remarkId}" class="form-label">Remark/Note</label>
+                            <textarea class="form-control" id="editRemarkText_${remarkId}" rows="4" required>${remark.REMARK_TEXT}</textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="updateRemark('${bookingId}', ${remarkId})">Update Remark</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    `;
+
+    // Remove existing edit modal if any
+    const existingModal = document.getElementById(`editRemarkModal_${remarkId}`);
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', editModalHTML);
+
+    // Show the modal
+    const modal = new bootstrap.Modal(document.getElementById(`editRemarkModal_${remarkId}`));
+    modal.show();
+}
+
+// Function to update a remark
+async function updateRemark(bookingId, remarkId) {
+    const remarkText = document.getElementById(`editRemarkText_${remarkId}`).value;
+
+    if (!remarkText.trim()) {
+        toastError('Error', 'Please enter a remark');
+        return;
+    }
+
+    try {
+        // Show loading state
+        const updateBtn = document.querySelector(`#editRemarkModal_${remarkId} .btn-primary`);
+        const originalText = updateBtn.innerHTML;
+        updateBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Updating...';
+        updateBtn.disabled = true;
+
+        // Send to backend
+        const response = await fetch(`/booking/remarks/${remarkId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                remarkText: remarkText
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Close edit modal
+            const editModal = bootstrap.Modal.getInstance(document.getElementById(`editRemarkModal_${remarkId}`));
+            editModal.hide();
+            
+            // Reload remarks
+            await loadRemarks(bookingId);
+            
+            toastSuccess('Success', 'Remark updated successfully!');
+        } else {
+            toastError('Error', result.message || 'Failed to update remark');
+        }
+
+    } catch (error) {
+        console.error('Error updating remark:', error);
+        toastError('Error', 'Failed to update remark. Please try again.');
+    } finally {
+        // Restore button state
+        const updateBtn = document.querySelector(`#editRemarkModal_${remarkId} .btn-primary`);
+        updateBtn.innerHTML = 'Update Remark';
+        updateBtn.disabled = false;
+    }
+}
+
+// Make functions globally accessible
+window.openRemarksModal = openRemarksModal;
+window.addRemark = addRemark;
+window.clearRemarkForm = clearRemarkForm;
+window.deleteRemark = deleteRemark;
+window.editRemark = editRemark;
+window.updateRemark = updateRemark;
 
 
 // Function to load services

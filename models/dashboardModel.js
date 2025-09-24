@@ -107,7 +107,8 @@ class DashboardModel {
           COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) + COALESCE(bill.AMENITIES_CHARGE, 0) + COALESCE(bill.SERVICES_CHARGE, 0) AS TotalCost,
           COALESCE(bill.PAYMENT_STATUS, 'Not Paid') AS PaymentStatus,
           gt.TYPE AS CUSTOMER_TYPE,
-          gl.TYPE AS CUSTOMER_LEVEL
+          gl.TYPE AS CUSTOMER_LEVEL,
+          COALESCE(rm.remarks_count, 0) AS RemarksCount
         FROM booking b
         LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
         LEFT JOIN guest_type gt ON c.TYPE = gt.IDNo
@@ -115,6 +116,12 @@ class DashboardModel {
         LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID
         LEFT JOIN room r ON b.ROOM_ID = r.IDNo
         LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
+        LEFT JOIN (
+          SELECT BOOKING_ID, COUNT(*) as remarks_count 
+          FROM remarks 
+          WHERE ACTIVE = 1 
+          GROUP BY BOOKING_ID
+        ) rm ON b.IDNo = rm.BOOKING_ID
         WHERE b.ACTIVE = 1  
           AND DATE(b.CHECK_IN_DATE) <= CURDATE()
           AND b.IS_OCCUPIED = 0
@@ -155,7 +162,8 @@ class DashboardModel {
           COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) + COALESCE(bill.AMENITIES_CHARGE, 0) + COALESCE(bill.SERVICES_CHARGE, 0) AS TotalCost,
           COALESCE(bill.PAYMENT_STATUS, 'Not Paid') AS PaymentStatus,
           gt.TYPE AS CUSTOMER_TYPE,
-          gl.TYPE AS CUSTOMER_LEVEL
+          gl.TYPE AS CUSTOMER_LEVEL,
+          COALESCE(rm.remarks_count, 0) AS RemarksCount
         FROM booking b
         LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
         LEFT JOIN guest_type gt ON c.TYPE = gt.IDNo
@@ -163,6 +171,12 @@ class DashboardModel {
         LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID
         LEFT JOIN room r ON b.ROOM_ID = r.IDNo
         LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
+        LEFT JOIN (
+          SELECT BOOKING_ID, COUNT(*) as remarks_count 
+          FROM remarks 
+          WHERE ACTIVE = 1 
+          GROUP BY BOOKING_ID
+        ) rm ON b.IDNo = rm.BOOKING_ID
         WHERE DATE(b.CHECK_IN_DATE) <= CURDATE()
         AND b.ACTIVE = 1 AND c.IS_GROUP = 1
         ORDER BY r.ROOM_NUMBER ASC
@@ -241,7 +255,8 @@ class DashboardModel {
           COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) + COALESCE(bill.AMENITIES_CHARGE, 0) + COALESCE(bill.SERVICES_CHARGE, 0) AS TotalCost,
           COALESCE(bill.PAYMENT_STATUS, 'Not Paid') AS PaymentStatus,
           gt.TYPE AS CUSTOMER_TYPE,
-          gl.TYPE AS CUSTOMER_LEVEL
+          gl.TYPE AS CUSTOMER_LEVEL,
+          COALESCE(rm.remarks_count, 0) AS RemarksCount
         FROM booking b
         LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
         LEFT JOIN guest_type gt ON c.TYPE = gt.IDNo
@@ -249,6 +264,12 @@ class DashboardModel {
         LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID
         LEFT JOIN room r ON b.ROOM_ID = r.IDNo
         LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
+        LEFT JOIN (
+          SELECT BOOKING_ID, COUNT(*) as remarks_count 
+          FROM remarks 
+          WHERE ACTIVE = 1 
+          GROUP BY BOOKING_ID
+        ) rm ON b.IDNo = rm.BOOKING_ID
         WHERE b.ACTIVE = 1 AND DATE(b.CHECK_OUT_DATE) <= CURDATE() AND b.BOOKING_STATUS = 'check-In'
         ORDER BY r.ROOM_NUMBER ASC
       `);
@@ -287,7 +308,8 @@ class DashboardModel {
           COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) + COALESCE(bill.AMENITIES_CHARGE, 0) + COALESCE(bill.SERVICES_CHARGE, 0) AS TotalCost,
           COALESCE(bill.PAYMENT_STATUS, 'Not Paid') AS PaymentStatus,
           gt.TYPE AS CUSTOMER_TYPE,
-          gl.TYPE AS CUSTOMER_LEVEL
+          gl.TYPE AS CUSTOMER_LEVEL,
+          COALESCE(rm.remarks_count, 0) AS RemarksCount
         FROM booking b
         LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
         LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID
@@ -295,6 +317,12 @@ class DashboardModel {
         LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
         LEFT JOIN guest_type gt ON c.TYPE = gt.IDNo
         LEFT JOIN guest_level gl ON c.LEVEL = gl.IDNo
+        LEFT JOIN (
+          SELECT BOOKING_ID, COUNT(*) as remarks_count 
+          FROM remarks 
+          WHERE ACTIVE = 1 
+          GROUP BY BOOKING_ID
+        ) rm ON b.IDNo = rm.BOOKING_ID
         WHERE b.ACTIVE = 1 AND r.ROOM_STATUS = 2 AND b.BOOKING_STATUS = 'check-In' AND b.EXTENDED = 1
         ORDER BY r.ROOM_NUMBER ASC
       `);
@@ -332,7 +360,8 @@ class DashboardModel {
           COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) + COALESCE(bill.AMENITIES_CHARGE, 0) + COALESCE(bill.SERVICES_CHARGE, 0) AS TotalCost,
           COALESCE(bill.PAYMENT_STATUS, 'Not Paid') AS PaymentStatus,
           gt.TYPE AS CUSTOMER_TYPE,
-          gl.TYPE AS CUSTOMER_LEVEL
+          gl.TYPE AS CUSTOMER_LEVEL,
+          COALESCE(rm.remarks_count, 0) AS RemarksCount
         FROM booking b
         LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
         LEFT JOIN guest_type gt ON c.TYPE = gt.IDNo
@@ -340,6 +369,12 @@ class DashboardModel {
         LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID
         LEFT JOIN room r ON b.ROOM_ID = r.IDNo
         LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
+        LEFT JOIN (
+          SELECT BOOKING_ID, COUNT(*) as remarks_count 
+          FROM remarks 
+          WHERE ACTIVE = 1 
+          GROUP BY BOOKING_ID
+        ) rm ON b.IDNo = rm.BOOKING_ID
         WHERE b.ACTIVE = 1 AND (DATE(b.CHECK_OUT_DATE) = CURDATE()) AND b.BOOKING_STATUS = 'check-In' AND b.LATE_CHECKOUT = 1 
         ORDER BY r.ROOM_NUMBER ASC
       `);
@@ -571,7 +606,8 @@ class DashboardModel {
             b.EXTENDED_DAYS,
             b.EXTENDED,
             COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) + COALESCE(bill.AMENITIES_CHARGE, 0) + COALESCE(bill.SERVICES_CHARGE, 0) AS TotalCost,
-            COALESCE(bill.PAYMENT_STATUS, 'Not Paid') AS PaymentStatus
+            COALESCE(bill.PAYMENT_STATUS, 'Not Paid') AS PaymentStatus,
+            COALESCE(rm.remarks_count, 0) AS RemarksCount
           FROM booking b
           LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
           LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID
@@ -579,6 +615,12 @@ class DashboardModel {
           LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
           LEFT JOIN guest_type gt ON c.TYPE = gt.IDNo
           LEFT JOIN guest_level gl ON c.LEVEL = gl.IDNo
+          LEFT JOIN (
+            SELECT BOOKING_ID, COUNT(*) as remarks_count 
+            FROM remarks 
+            WHERE ACTIVE = 1 
+            GROUP BY BOOKING_ID
+          ) rm ON b.IDNo = rm.BOOKING_ID
           WHERE b.ACTIVE = 1 AND r.ROOM_STATUS = 2 AND b.BOOKING_STATUS = 'check-In' AND b.IS_OCCUPIED = 1 
           ORDER BY r.ROOM_NUMBER ASC
         `,
@@ -609,7 +651,8 @@ class DashboardModel {
             COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) + COALESCE(bill.AMENITIES_CHARGE, 0) + COALESCE(bill.SERVICES_CHARGE, 0) AS TotalCost,
             COALESCE(bill.PAYMENT_STATUS, 'Not Paid') AS PaymentStatus,
             gt.TYPE AS CUSTOMER_TYPE,
-            gl.TYPE AS CUSTOMER_LEVEL
+            gl.TYPE AS CUSTOMER_LEVEL,
+            COALESCE(rm.remarks_count, 0) AS RemarksCount
           FROM booking b
           LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
           LEFT JOIN guest_type gt ON c.TYPE = gt.IDNo
@@ -617,6 +660,12 @@ class DashboardModel {
           LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID
           LEFT JOIN room r ON b.ROOM_ID = r.IDNo
           LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
+          LEFT JOIN (
+            SELECT BOOKING_ID, COUNT(*) as remarks_count 
+            FROM remarks 
+            WHERE ACTIVE = 1 
+            GROUP BY BOOKING_ID
+          ) rm ON b.IDNo = rm.BOOKING_ID
           WHERE b.ACTIVE = 1 AND r.ROOM_STATUS = 2 AND b.BOOKING_STATUS = 'check-In' AND b.TRANSFER != 0 
           ORDER BY r.ROOM_NUMBER ASC
         `

@@ -1568,6 +1568,155 @@ class BookingController {
     }
     return BookingController.assignRoomToDirectReservation(req, res);
   }
+
+  // ==================== REMARKS FUNCTIONS ====================
+
+  // Add a new remark
+  static async addRemark(req, res) {
+    try {
+      const { bookingId, category, remarkText } = req.body;
+      const encodedBy = req.user.userId;
+
+      // Validate required fields
+      if (!bookingId || !category || !remarkText) {
+        return res.status(400).json({
+          success: false,
+          message: 'All fields are required: bookingId, category, remarkText'
+        });
+      }
+
+      // Add remark using model
+      const result = await BookingModel.addRemark({
+        bookingId,
+        category,
+        remarkText,
+        encodedBy
+      });
+
+      if (result.success) {
+        res.json({
+          success: true,
+          message: 'Remark added successfully',
+          remarkId: result.remarkId
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          message: result.message || 'Failed to add remark'
+        });
+      }
+    } catch (error) {
+      console.error('Error adding remark:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
+  // Get remarks by booking ID
+  static async getRemarksByBooking(req, res) {
+    try {
+      const { bookingId } = req.params;
+
+      if (!bookingId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Booking ID is required'
+        });
+      }
+
+      // Get remarks using model
+      const remarks = await BookingModel.getRemarksByBooking(bookingId);
+
+      res.json({
+        success: true,
+        remarks: remarks
+      });
+    } catch (error) {
+      console.error('Error fetching remarks:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
+  // Update a remark
+  static async updateRemark(req, res) {
+    try {
+      const { remarkId } = req.params;
+      const { remarkText } = req.body;
+      const editedBy = req.user.userId;
+
+      if (!remarkText) {
+        return res.status(400).json({
+          success: false,
+          message: 'Remark text is required'
+        });
+      }
+
+      // Update remark using model
+      const result = await BookingModel.updateRemark({
+        remarkId,
+        remarkText,
+        editedBy
+      });
+
+      if (result.success) {
+        res.json({
+          success: true,
+          message: 'Remark updated successfully'
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          message: result.message || 'Failed to update remark'
+        });
+      }
+    } catch (error) {
+      console.error('Error updating remark:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
+  // Delete a remark
+  static async deleteRemark(req, res) {
+    try {
+      const { remarkId } = req.params;
+
+      if (!remarkId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Remark ID is required'
+        });
+      }
+
+      // Delete remark using model
+      const result = await BookingModel.deleteRemark(remarkId);
+
+      if (result.success) {
+        res.json({
+          success: true,
+          message: 'Remark deleted successfully'
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          message: result.message || 'Failed to delete remark'
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting remark:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
 }
 
 module.exports = BookingController;
