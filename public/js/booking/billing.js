@@ -101,8 +101,10 @@ window.showBilling = function (bookingID) {
                 const subTotal = parseFloat(data.subTotal);
                 const reservationFee = parseFloat(data.reservationFee) || 0;
                 const discountAmount = parseFloat(data.discountAmount) || 0;
-                const totalAmount = subTotal - reservationFee - discountAmount;
+                const discountApplied = parseInt(data.discountApplied) || 0; // Default to 0 (not applied)
 
+                // Calculate balance using same logic as room-menu_data.js
+                // For billing, we need to calculate unpaid amount from items
                 let totalPaid = 0;
                 let totalUnpaid = 0;
                 data.items.forEach(item => {
@@ -110,10 +112,32 @@ window.showBilling = function (bookingID) {
                     if (item.status === 'paid') totalPaid += amount; else totalUnpaid += amount;
                 });
 
-                // Paid Amount should reflect the sum of PAID items only
-                const adjustedPaidAmount = totalPaid;
-                const totalWithReservationFee = totalAmount;
-                let finalBalance = totalWithReservationFee - adjustedPaidAmount;
+                // Debug logging
+                console.log('Billing Debug:', {
+                    totalUnpaid,
+                    reservationFee,
+                    discountAmount,
+                    discountApplied,
+                    subTotal
+                });
+
+                // Start with total unpaid from items
+                let balanceToShow = totalUnpaid;
+                
+                // Always subtract Reservation Fee (already paid)
+                if (reservationFee > 0) {
+                    balanceToShow -= reservationFee;
+                }
+                
+                // If discount is not yet applied (flag=0), subtract it as well
+                if (discountApplied === 0 && discountAmount > 0) {
+                    balanceToShow -= discountAmount;
+                }
+                
+                // Never show negative balance
+                if (balanceToShow < 0) balanceToShow = 0;
+
+                console.log('Final balance calculation:', balanceToShow);
 
                 const setText = (id, value) => {
                     const el = document.getElementById(id);
@@ -124,9 +148,16 @@ window.showBilling = function (bookingID) {
                 setText('customerName', data.customerName || 'N/A');
                 setText('invoiceDate', data.invoiceDate || 'N/A');
                 setText('confNumber', data.confNumber || 'N/A');
-                setText('totalPaid', adjustedPaidAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-                setText('balanceAmount', finalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-                // Displayed Total Amount should be the sum of item subtotals (subtotal), not net of fees/discounts
+
+                // Display Paid Amount net of discount when discount has already been applied
+                // Example: Room 10,500 with 500 discount => show 10,000 as Paid Amount
+                const displayPaidAmount = (discountApplied === 1)
+                    ? Math.max(0, (totalPaid - (discountAmount || 0)))
+                    : totalPaid;
+
+                setText('totalPaid', displayPaidAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                setText('balanceAmount', balanceToShow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                // GRAND TOTAL should be the subtotal (before discount)
                 setText('totalPayment', subTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
                 // Reservation Fee UI
@@ -173,7 +204,7 @@ window.showBilling = function (bookingID) {
                     }
                 })();
 
-                const allPaid = data.items.every(item => item.status === 'paid') && (finalBalance <= 0);
+                const allPaid = data.items.every(item => item.status === 'paid') && (balanceToShow <= 0);
                 const paidImageOverlay = document.getElementById('paidImageOverlay');
                 const proceedBtn = document.getElementById('proceedToPaymentButton');
                 if (allPaid) {
