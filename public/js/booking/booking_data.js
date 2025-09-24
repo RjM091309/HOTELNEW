@@ -130,6 +130,8 @@ $(document).ready(function () {
 
                     // Add Remarks button only if there are remarks
                     if ((row.BookingRemarks && row.BookingRemarks.trim() !== '') || (row.RemarksCount && row.RemarksCount > 0)) {
+                        html += `<button class="btn btn-tbl-edit btn-xs" onclick="openRemarksModal(${row.BookingID})" title="Remarks" style="background-color: lightgreen !important; border-color: lightgreen !important;"><i class="fas fa-comment-dots"></i></button>`;
+                    } else {
                         html += `<button class="btn btn-tbl-edit btn-xs" onclick="openRemarksModal(${row.BookingID})" title="Remarks"><i class="fas fa-comment-dots"></i></button>`;
                     }
 

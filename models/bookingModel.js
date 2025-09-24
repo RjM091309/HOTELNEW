@@ -3951,6 +3951,19 @@ class BookingModel {
   // Delete a remark (soft delete by setting ACTIVE = 0)
   static async deleteRemark(remarkId) {
     try {
+      // Get remark details first to check category and booking ID
+      const remarkDetails = await queryDatabasePromise(
+        `SELECT BOOKING_ID, CATEGORY FROM remarks WHERE IDNo = ? AND ACTIVE = 1`,
+        [remarkId]
+      );
+
+      if (remarkDetails.length === 0) {
+        return {
+          success: false,
+          message: 'Remark not found'
+        };
+      }
+
       // Soft delete the remark
       const result = await queryDatabasePromise(
         `UPDATE remarks SET ACTIVE = 0 WHERE IDNo = ?`,
@@ -3958,6 +3971,19 @@ class BookingModel {
       );
 
       if (result.affectedRows > 0) {
+        // If the remark category is "BOOKING", also clear the remarks in booking table
+        if (remarkDetails[0].CATEGORY && remarkDetails[0].CATEGORY.toUpperCase() === 'BOOKING') {
+          const bookingId = remarkDetails[0].BOOKING_ID;
+
+          // Update the booking table to set REMARKS to NULL
+          await queryDatabasePromise(
+            `UPDATE booking SET REMARKS = NULL WHERE IDNo = ?`,
+            [bookingId]
+          );
+
+          console.log(`Cleared remarks from booking table for booking ID: ${bookingId}`);
+        }
+
         return {
           success: true,
           message: 'Remark deleted successfully'
@@ -3965,7 +3991,7 @@ class BookingModel {
       } else {
         return {
           success: false,
-          message: 'Remark not found'
+          message: 'Failed to delete remark'
         };
       }
 
