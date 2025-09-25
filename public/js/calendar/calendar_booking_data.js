@@ -1089,10 +1089,9 @@ function showLateCheckInModal(event) {
   const guestName = event.title || 'Unknown Guest';
   const bookingId = event.id;
 
-  // FullCalendar uses exclusive end → subtract one day
+  // Use actual start/end dates (times already set to CI 2PM / CO 11AM)
   const ci = new Date(event.start);
   const co = new Date(event.end);
-  co.setDate(co.getDate() - 1);
 
   const checkIn = ci.toLocaleDateString();
   const checkOut = co.toLocaleDateString();
@@ -1188,10 +1187,9 @@ function showPendingModal(event) {
   const guestName = event.title || 'Unknown Guest';
   const bookingId = event.id;
 
-  // FullCalendar uses exclusive end → subtract one day
+  // Use actual start/end dates (times already set to CI 2PM / CO 11AM)
   const ciDate2 = new Date(event.start);
   const coDate2 = new Date(event.end);
-  coDate2.setDate(coDate2.getDate() - 1);
 
   const checkIn = ciDate2.toLocaleDateString();
   const checkOut = coDate2.toLocaleDateString();
