@@ -502,11 +502,15 @@ class BookingModel {
 
         // If no guestID, create new customer
         if (!customerId) {
+          // Handle empty guestType and guestLevel - set to NULL if empty
+          const processedGuestType = (guestType && guestType.trim() !== '') ? guestType : null;
+          const processedGuestLevel = (guestLevel && guestLevel.trim() !== '') ? guestLevel : null;
+          
           const customerQuery = `
             INSERT INTO customer (NAME, CONTACTNo, TYPE, LEVEL, ADDRESS, ENCODED_BY, ENCODED_DT, ACTIVE) 
             VALUES (?, ?, ?, ?, ?, ?, ?, 1)
           `;
-          const customerValues = [fullname, number, guestType, guestLevel, address, encodedBy, date];
+          const customerValues = [fullname, number, processedGuestType, processedGuestLevel, address, encodedBy, date];
           
           const customerResult = await new Promise((resolve, reject) => {
             connection.query(customerQuery, customerValues, (err, result) => {
@@ -525,10 +529,13 @@ class BookingModel {
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const directReservationFlag = isDirectReservation ? 1 : 0;
+        // Handle empty agencyID - set to NULL if empty
+        const processedAgencyID = (finalBookingRoute === 'agency' && agencyID && agencyID.trim() !== '') ? agencyID : null;
+        
         const bookingValues = [
           customerId, room_id, checkInDate, checkOutDate, 'pending', finalBookingRoute,
           maxOccupants, bookingRemarks, confirmationNumber, encodedBy, date, 1, checkInStatus, checkOutStatus,
-          finalBookingRoute === 'agency' ? agencyID : null, directReservationFlag, bedCount || null
+          processedAgencyID, directReservationFlag, bedCount || null
         ];
 
         const bookingResult = await new Promise((resolve, reject) => {
@@ -2541,11 +2548,15 @@ class BookingModel {
           const totalRoomCharge = roomPrices[index];
 
           // Insert into `customer`
+          // Handle empty guestType and guestLevel - set to NULL if empty
+          const processedGuestType = (guestType && guestType.trim() !== '') ? guestType : null;
+          const processedGuestLevel = (guestLevel && guestLevel.trim() !== '') ? guestLevel : null;
+          
           const customerQuery = `
             INSERT INTO customer (NAME, CONTACTNo, TYPE, LEVEL, ADDRESS, MESSAGE, ENCODED_BY, ENCODED_DT, ACTIVE, IS_GROUP)
             VALUES (?, ?, ?, ?, '', '', ?, ?, 1, 1)
           `;
-          const customerValues = [guestFullName, groupContact, guestType, guestLevel, encodedBy, date];
+          const customerValues = [guestFullName, groupContact, processedGuestType, processedGuestLevel, encodedBy, date];
 
           const custResult = await new Promise((resolve, reject) => {
             connection.query(customerQuery, customerValues, (err, result) => {
@@ -4166,13 +4177,17 @@ class BookingModel {
 
           try {
             // 1. Update customer information
+            // Handle empty guestType and guestLevel - set to NULL if empty
+            const processedGuestType = (guestType && guestType.trim() !== '') ? guestType : null;
+            const processedGuestLevel = (guestLevel && guestLevel.trim() !== '') ? guestLevel : null;
+            
             const customerUpdateQuery = `
               UPDATE customer 
               SET NAME = ?, CONTACTNo = ?, TYPE = ?, LEVEL = ?, EDITED_BY = ?, EDITED_DT = ?
               WHERE IDNo = (SELECT CUSTOMER_ID FROM booking WHERE IDNo = ?)
             `;
             await connection.promise().query(customerUpdateQuery, [
-              fullname, number, guestType, guestLevel, editedBy, editDate, bookingId
+              fullname, number, processedGuestType, processedGuestLevel, editedBy, editDate, bookingId
             ]);
 
             // 2. Update booking information
@@ -4183,10 +4198,14 @@ class BookingModel {
                   BED_COUNT = ?, EDITED_BY = ?, EDITED_DT = ?
               WHERE IDNo = ?
             `;
+            // Handle empty agencyID and bedCount - set to NULL if empty
+            const processedAgencyID = (bookingRoute === 'agency' && agencyID && agencyID.trim() !== '') ? agencyID : null;
+            const processedBedCount = (bedCount && bedCount.trim() !== '') ? bedCount : null;
+            
             await connection.promise().query(bookingUpdateQuery, [
               room_id, checkInDate, checkOutDate, bookingRoute, maxOccupants,
-              bookingRemarks, checkInStatus, checkOutStatus || 0, (bookingRoute === 'agency' ? agencyID : null),
-              bedCount, editedBy, editDate, bookingId
+              bookingRemarks, checkInStatus, checkOutStatus || 0, processedAgencyID,
+              processedBedCount, editedBy, editDate, bookingId
             ]);
 
             // 3. Update billing information

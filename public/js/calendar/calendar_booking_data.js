@@ -1085,10 +1085,13 @@ function showLateCheckInModal(event) {
     `,
     icon: 'warning',
     confirmButtonText: 'Check-In Now',
-    cancelButtonText: 'Cancel',
+    cancelButtonText: 'Edit Details',
+    denyButtonText: 'Cancel',
     showCancelButton: true,
+    showDenyButton: true,
     confirmButtonColor: '#b8a600', // Darker lemon for contrast
-    cancelButtonColor: '#6c757d',
+    cancelButtonColor: '#007bff', // Blue for edit details
+    denyButtonColor: '#6c757d',
     background: '#2a3135',
     color: '#ffffff',
     width: '500px'
@@ -1112,6 +1115,9 @@ function showLateCheckInModal(event) {
           checkInReservation(bookingId, event);
         }
       });
+    } else if (result.dismiss === Swal.DismissReason.cancel) {
+      // Edit Booking button clicked
+      editBookingFromCalendar(bookingId);
     }
   });
 }
@@ -1182,10 +1188,13 @@ function showPendingModal(event) {
     `,
     icon: 'info',
     confirmButtonText: 'Check-In Now',
-    cancelButtonText: 'Cancel',
+    cancelButtonText: 'Edit Details',
+    denyButtonText: 'Cancel',
     showCancelButton: true,
+    showDenyButton: true,
     confirmButtonColor: '#e53935', // Red for regular check-in
-    cancelButtonColor: '#6c757d',
+    cancelButtonColor: '#007bff', // Blue for edit details
+    denyButtonColor: '#6c757d',
     background: '#2a3135',
     color: '#ffffff',
     width: '500px'
@@ -1209,8 +1218,32 @@ function showPendingModal(event) {
           checkInReservation(bookingId, event);
         }
       });
+    } else if (result.dismiss === Swal.DismissReason.cancel) {
+      // Edit Booking button clicked
+      editBookingFromCalendar(bookingId);
     }
   });
+}
+
+// Function to edit booking from calendar (opens the edit booking modal)
+function editBookingFromCalendar(bookingId) {
+  console.log('Editing booking ID from calendar:', bookingId);
+  
+  // Check if the edit booking modal exists
+  if (typeof window.editBooking === 'function') {
+    // Use the existing editBooking function from booking.ejs
+    window.editBooking(bookingId);
+  } else {
+    // Fallback: Show a message that edit booking is not available
+    Swal.fire({
+      title: 'Edit Booking',
+      text: 'Edit booking functionality is not available on this page. Please go to the Booking page to edit this reservation.',
+      icon: 'info',
+      confirmButtonText: 'OK',
+      background: '#2a3135',
+      color: '#ffffff'
+    });
+  }
 }
 
 // Function to check-in a reservation
@@ -2709,4 +2742,5 @@ window.checkInReservation = checkInReservation;
 window.updateEventStatus = updateEventStatus;
 window.updateEventStatusInstantly = updateEventStatusInstantly;
 window.getCalendar = getCalendar;
+window.editBookingFromCalendar = editBookingFromCalendar;
 
