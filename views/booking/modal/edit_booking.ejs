@@ -927,6 +927,147 @@ $(document).ready(function() {
     });
 });
 
+// ================================
+// STATUS ADJACENCY VALIDATION
+// ================================
+(function(){
+    const bookingsCache = {};
+
+    function toISODateOnly(d) {
+        const dd = new Date(d);
+        return new Date(dd.getFullYear(), dd.getMonth(), dd.getDate()).toISOString().split('T')[0];
+    }
+
+    function parseDateRangeToDates() {
+        const dr = $('#edit_daterange').val() || '';
+        if (!dr.includes(' to ')) return { checkIn: null, checkOut: null };
+        const parts = dr.split(' to ');
+        const startStr = parts[0].trim();
+        const endStr = (parts[1] || '').split('(')[0].trim();
+        if (!startStr || !endStr) return { checkIn: null, checkOut: null };
+        const ci = new Date(startStr);
+        const co = new Date(endStr);
+        if (isNaN(ci.getTime()) || isNaN(co.getTime())) return { checkIn: null, checkOut: null };
+        return { checkIn: toISODateOnly(ci), checkOut: toISODateOnly(co) };
+    }
+
+    function normalizeCIStatus(b) {
+        const v = b.CHECK_IN_STATUS ?? b.check_in_status ?? b.checkInStatus ?? b.checkin_status ?? b.CHECKIN_STATUS ?? b.CHECK_IN;
+        if (v === 1 || v === '1' || String(v).toLowerCase() === 'regular') return 1; // regular
+        if (v === 0 || v === '0' || String(v).toLowerCase().includes('late')) return 0; // late
+        return 1; // default to regular
+    }
+
+    function normalizeCOStatus(b) {
+        const v = b.CHECK_OUT_STATUS ?? b.check_out_status ?? b.checkOutStatus ?? b.checkout_status ?? b.CHECKOUT_STATUS ?? b.CHECK_OUT ?? b.CHECKOUT ?? b.LATE_CHECKOUT;
+        const s = String(v).toLowerCase();
+        if (v === 1 || v === '1' || s.includes('late')) return 1; // late
+        if (v === 0 || v === '0' || s.includes('regular')) return 0; // regular
+        return 0; // default to regular
+    }
+
+    async function fetchRoomBookings(roomId) {
+        if (!roomId) return [];
+        if (bookingsCache[roomId]) return bookingsCache[roomId];
+        try {
+            const res = await fetch('/calendar/bookings');
+            const data = await res.json();
+            const arr = Array.isArray(data) ? data : [];
+            const filtered = arr.filter(b => String(b.ROOM_ID) === String(roomId));
+            bookingsCache[roomId] = filtered;
+            return filtered;
+        } catch (e) {
+            return [];
+        }
+    }
+
+    async function validateAdjacencyOnDropdown() {
+        const roomId = $('#edit_addroom').val();
+        const bookingId = $('#edit_bookingId').val();
+        const dates = parseDateRangeToDates();
+        if (!roomId || !dates.checkIn || !dates.checkOut) return { valid: true };
+
+        const ciStatus = $('#edit_checkInStatus').val(); // '1' regular, '0' late
+        const coStatus = $('#edit_checkOutStatus').val(); // '0' regular, '1' late
+
+        const roomBookings = await fetchRoomBookings(roomId);
+
+        // Rule A: If my CO is late (1), the next booking starting on my CO date must NOT be regular CI (1)
+        if (String(coStatus) === '1') {
+            const conflictA = roomBookings.some(b => {
+                if (String(b.BookingID ?? b.bookingId) === String(bookingId)) return false;
+                const startStr = toISODateOnly(new Date(b.CHECK_IN_DATE ?? b.check_in_date ?? b.checkInDate));
+                if (startStr !== dates.checkOut) return false;
+                return normalizeCIStatus(b) === 1; // neighbor is regular CI
+            });
+            if (conflictA) {
+                return { valid: false, reason: 'Late Check-out cannot be adjacent to a Regular Check-in on the same date. Only Late Check-in may follow.' };
+            }
+        }
+
+        // Rule B: If my CI is regular (1), the previous booking ending on my CI date must NOT be late CO (1)
+        if (String(ciStatus) === '1') {
+            const conflictB = roomBookings.some(b => {
+                if (String(b.BookingID ?? b.bookingId) === String(bookingId)) return false;
+                const endStr = toISODateOnly(new Date(b.CHECK_OUT_DATE ?? b.check_out_date ?? b.checkOutDate));
+                if (endStr !== dates.checkIn) return false;
+                return normalizeCOStatus(b) === 1; // neighbor is late CO
+            });
+            if (conflictB) {
+                return { valid: false, reason: 'Regular Check-in cannot directly follow a Late Check-out on the same date. Only Late Check-in may follow.' };
+            }
+        }
+
+        return { valid: true };
+    }
+
+    // Preserve previous values to revert on invalid selection
+    let prevCI = null;
+    let prevCO = null;
+
+    $(document).ready(function(){
+        prevCI = $('#edit_checkInStatus').val();
+        prevCO = $('#edit_checkOutStatus').val();
+
+        $('#edit_checkInStatus').on('focus', function(){ prevCI = $(this).val(); });
+        $('#edit_checkOutStatus').on('focus', function(){ prevCO = $(this).val(); });
+
+        $('#edit_checkInStatus').on('change', async function(){
+            const result = await validateAdjacencyOnDropdown();
+            if (!result.valid) {
+                Swal.fire({
+                    title: 'Not Allowed',
+                    html: result.reason,
+                    icon: 'error',
+                    confirmButtonText: 'OK'
+                });
+                $(this).val(prevCI);
+                return;
+            }
+            prevCI = $(this).val();
+        });
+
+        $('#edit_checkOutStatus').on('change', async function(){
+            const result = await validateAdjacencyOnDropdown();
+            if (!result.valid) {
+                Swal.fire({
+                    title: 'Not Allowed',
+                    html: result.reason,
+                    icon: 'error',
+                    confirmButtonText: 'OK'
+                });
+                $(this).val(prevCO);
+                return;
+            }
+            prevCO = $(this).val();
+        });
+
+        // Reset previous values when room/date changes
+        $('#edit_addroom').on('change', function(){ prevCI = $('#edit_checkInStatus').val(); prevCO = $('#edit_checkOutStatus').val(); });
+        $('#edit_daterange').on('change', function(){ prevCI = $('#edit_checkInStatus').val(); prevCO = $('#edit_checkOutStatus').val(); });
+    });
+})();
+
 // Function to compute total for edit form
 function computeEditTotal() {
     const roomRate = parseFloat($('#edit_baseprice').val()) || 0;

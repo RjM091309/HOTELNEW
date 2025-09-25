@@ -431,6 +431,36 @@ function handleEventResize(info) {
     });
     return;
   }
+
+  // Adjacency rule: if this event carries a late checkout and its new
+  // start-of-day for checkout matches a neighbor with regular check-in,
+  // block the action. We only restrict late checkout -> regular check-in adjacency.
+  try {
+    const isLateCO = isLateCheckout(info.event);
+    const isRegularCI = isRegularCheckIn(info.event);
+    const newCheckoutDateStr = getDateString(newEnd);
+    const newCheckinDateStr = getDateString(info.event.start);
+    if (isLateCO && hasRegularCheckInStartingOn(newCheckoutDateStr, roomResource.id, bookingId)) {
+      Swal.fire({
+        title: 'Not Allowed',
+        html: 'Late check-out cannot be adjacent to a booking with Regular Check-in on the same date. Only Late Check-in is allowed next.',
+        icon: 'error',
+        confirmButtonText: 'OK'
+      }).then(() => { info.revert(); });
+      return;
+    }
+
+    // Also block placing a Regular check-in right after a Late checkout ending same date
+    if (isRegularCI && hasLateCheckoutEndingOn(newCheckinDateStr, roomResource.id, bookingId)) {
+      Swal.fire({
+        title: 'Not Allowed',
+        html: 'Regular Check-in cannot directly follow a Late Check-out on the same date in the same room. Only Late Check-in may follow.',
+        icon: 'error',
+        confirmButtonText: 'OK'
+      }).then(() => { info.revert(); });
+      return;
+    }
+  } catch (e) {}
   
   // Calculate the extension days (difference between new and original end)
   const originalEndDate = originalData.end;
@@ -831,6 +861,36 @@ function handleEventDrop(info) {
     }
   } else {
   }
+
+  // Adjacency rule: prevent placing a late checkout right before a regular check-in
+  try {
+    const isLateCO = isLateCheckout(info.event);
+    const isRegularCI = isRegularCheckIn(info.event);
+    const newCheckoutDateStr = getDateString(newEnd);
+    const newCheckinDateStr = getDateString(newStart);
+
+    // Case 1: Late checkout cannot precede a Regular check-in next booking
+    if (isLateCO && hasRegularCheckInStartingOn(newCheckoutDateStr, targetRoom.id, bookingId)) {
+      Swal.fire({
+        title: 'Not Allowed',
+        html: 'Late check-out cannot directly precede a booking with Regular Check-in on the same date in the same room. Only Late Check-in is allowed next.',
+        icon: 'error',
+        confirmButtonText: 'OK'
+      }).then(() => { info.revert(); });
+      return;
+    }
+
+    // Case 2: Regular check-in cannot be dropped after a Late checkout ending same date
+    if (isRegularCI && hasLateCheckoutEndingOn(newCheckinDateStr, targetRoom.id, bookingId)) {
+      Swal.fire({
+        title: 'Not Allowed',
+        html: 'Regular Check-in cannot directly follow a Late Check-out on the same date in the same room. Only Late Check-in may follow.',
+        icon: 'error',
+        confirmButtonText: 'OK'
+      }).then(() => { info.revert(); });
+      return;
+    }
+  } catch (e) {}
   
   // Determine what changed for the confirmation message
   let changeDescription = '';
@@ -2074,6 +2134,83 @@ function isCheckoutEvent(event) {
   } catch (e) {
     return false;
   }
+}
+
+// Adjacency validation helpers for late checkout vs regular check-in
+function normalizeCheckInStatus(value, inferColorFn) {
+  if (value === undefined || value === null || value === '') return inferColorFn();
+  const s = String(value).toLowerCase();
+  if (value === 1 || value === '1' || s.includes('regular')) return 'regular';
+  if (value === 0 || value === '0' || s.includes('late')) return 'late';
+  return inferColorFn();
+}
+
+function normalizeCheckOutStatus(value, inferColorFn) {
+  if (value === undefined || value === null || value === '') return inferColorFn();
+  const s = String(value).toLowerCase();
+  if (value === 1 || value === '1' || s.includes('late')) return 'late';
+  if (value === 0 || value === '0' || s.includes('regular')) return 'regular';
+  return inferColorFn();
+}
+
+function isLateCheckout(event) {
+  try {
+    const inferFromColor = () => (event.backgroundColor === '#fff700' ? 'late' : 'regular');
+    const coRaw = event?.extendedProps?.checkOutStatus;
+    const coNorm = normalizeCheckOutStatus(coRaw, inferFromColor);
+    return coNorm === 'late';
+  } catch (e) {
+    return false;
+  }
+}
+
+function isRegularCheckIn(event) {
+  try {
+    const inferFromColor = () => (event.backgroundColor === '#fff700' ? 'late' : 'regular');
+    const ciRaw = event?.extendedProps?.checkInStatus;
+    const ciNorm = normalizeCheckInStatus(ciRaw, inferFromColor);
+    return ciNorm === 'regular';
+  } catch (e) {
+    return true;
+  }
+}
+
+function hasRegularCheckInStartingOn(dateStr, roomId, excludeEventId) {
+  const calendar = window.calendar;
+  if (!calendar) return false;
+  const events = calendar.getEvents();
+  for (const e of events) {
+    try {
+      if (e.id === excludeEventId) continue;
+      const res = e.getResources();
+      const rid = res && res[0] ? res[0].id : undefined;
+      if (String(rid) !== String(roomId)) continue;
+      if (getDateString(e.start) !== dateStr) continue;
+      if (isRegularCheckIn(e)) return true;
+    } catch (err) {
+      // skip
+    }
+  }
+  return false;
+}
+
+function hasLateCheckoutEndingOn(dateStr, roomId, excludeEventId) {
+  const calendar = window.calendar;
+  if (!calendar) return false;
+  const events = calendar.getEvents();
+  for (const e of events) {
+    try {
+      if (e.id === excludeEventId) continue;
+      const res = e.getResources();
+      const rid = res && res[0] ? res[0].id : undefined;
+      if (String(rid) !== String(roomId)) continue;
+      if (getDateString(e.end) !== dateStr) continue;
+      if (isLateCheckout(e)) return true;
+    } catch (err) {
+      // skip
+    }
+  }
+  return false;
 }
 
 // Format Date to MySQL DATETIME (YYYY-MM-DD HH:MM:SS) using local time
