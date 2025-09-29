@@ -498,6 +498,29 @@ class BookingModel {
           });
         });
 
+        // Generate final confirmation number based on Hotel_Old format
+        let finalConfirmationNumber = confirmationNumber;
+        
+        if (!isDirectReservation && finalConfirmationNumber.includes('ROOM')) {
+          // For regular bookings, get room number and update confirmation number
+          const roomQuery = 'SELECT ROOM_NUMBER FROM room WHERE IDNo = ?';
+          const roomResult = await new Promise((resolve, reject) => {
+            connection.query(connection.format(roomQuery, [room_id]), (err, result) => {
+              if (err) reject(err);
+              else resolve(result);
+            });
+          });
+          
+          if (roomResult.length === 0) {
+            throw new Error('Room not found');
+          }
+          
+          const roomNumber = roomResult[0].ROOM_NUMBER;
+          // Extract date part and create final confirmation number
+          const datePart = finalConfirmationNumber.substring(0, 8); // YYYYMMDD
+          finalConfirmationNumber = datePart + '0' + roomNumber;
+        }
+
         let customerId = guestID;
 
         // If no guestID, create new customer
@@ -534,7 +557,7 @@ class BookingModel {
         
         const bookingValues = [
           customerId, room_id, checkInDate, checkOutDate, 'pending', finalBookingRoute,
-          maxOccupants, bookingRemarks, confirmationNumber, encodedBy, date, 1, checkInStatus, checkOutStatus,
+          maxOccupants, bookingRemarks, finalConfirmationNumber, encodedBy, date, 1, checkInStatus, checkOutStatus,
           processedAgencyID, directReservationFlag, bedCount || null
         ];
 
@@ -843,7 +866,7 @@ class BookingModel {
         return {
           success: true,
           message: paymentStatus === 'paid' ? 'Booking and payment saved successfully!' : 'Booking added successfully!',
-          confirmationNumber,
+          confirmationNumber: finalConfirmationNumber,
           bookingId
         };
 
@@ -2488,7 +2511,27 @@ class BookingModel {
 
     try {
       const date = new Date();
-      const confirmationNumber = 'CONF-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+      
+      // Generate confirmation number based on Hotel_Old format
+      const moment = require('moment');
+      const checkInDateFormatted = moment(params.checkInDate || daterange.split(' to ')[0].trim(), 'MMM DD, YYYY').format('YYYYMMDD');
+      
+      // For group bookings, we typically use first room number or time
+      const firstRoomId = selectedRooms[0];
+      let confirmationNumber;
+      
+      // Query first room number to create confirmation number
+      const roomQuery = 'SELECT ROOM_NUMBER FROM room WHERE IDNo = ?';
+      const roomResult = await queryDatabasePromise(roomQuery, [firstRoomId]);
+      
+      if (roomResult.length > 0) {
+        const roomNumber = roomResult[0].ROOM_NUMBER;
+        confirmationNumber = checkInDateFormatted + '0' + roomNumber;
+      } else {
+        // Fallback: use current time
+        const currentTime = new Date().toLocaleTimeString('en-US').replace(/:/g, '');
+        confirmationNumber = checkInDateFormatted + 'UR' + currentTime;
+      }
 
       // Split daterange and add default times
       const [checkInDate, checkOutDate] = daterange.split(' to ').map((dateStr, index) => {

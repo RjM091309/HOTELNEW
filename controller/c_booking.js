@@ -291,7 +291,6 @@ class BookingController {
 
       const encodedBy = req.user.userId; // Use JWT user ID instead of session
       const date = new Date();
-      const confirmationNumber = 'CONF-' + Math.random().toString(36).substr(2, 9).toUpperCase();
 
       if (!encodedBy) {
         return res.status(400).json({ success: false, message: 'User is not logged in' });
@@ -299,8 +298,37 @@ class BookingController {
 
       // console.log('Received booking data:', req.body);
 
+      // Parse the date range first
+      const dateRangeParts = daterange.split(' to ');
+      const startDateStr = dateRangeParts[0].trim();
+      const endDateStr = dateRangeParts[1].split('(')[0].trim();
+
       // Check if this is a direct reservation
       const isDirectReservation = directReservationFlag === 'true';
+
+      // Generate confirmation number based on Hotel_Old format
+      const moment = require('moment');
+      const checkInDateFormatted = moment(startDateStr, 'MMM DD, YYYY').format('YYYYMMDD');
+      let confirmationNumber;
+      
+      if (isDirectReservation) {
+        // For direct reservations, use current time instead of room number
+        const currentTime = new Date().toLocaleTimeString('en-US', { 
+          hour12: false, 
+          hour: '2-digit', 
+          minute: '2-digit'
+        }).replace(/:/g, '');
+        confirmationNumber = checkInDateFormatted + 'UR' + currentTime;
+      } else {
+        // For regular bookings, check if room_id exists and create confirmation number
+        if (!room_id) {
+          return res.status(400).json({ success: false, message: 'Room ID is required for regular bookings' });
+        }
+        
+        // Query room number to create confirmation number
+        // This will be enhanced in the model function
+        confirmationNumber = checkInDateFormatted + '0' + 'ROOM'; // Temporary, will be updated in model
+      }
       
       // Determine the final booking route
       let finalBookingRoute = bookingRoute;
@@ -310,13 +338,7 @@ class BookingController {
       // console.log('Final Booking Route:', finalBookingRoute);
       // console.log('Is Direct Reservation:', isDirectReservation);
 
-      // Parse the date range
-      const dateRangeParts = daterange.split(' to ');
-      const startDateStr = dateRangeParts[0].trim();
-      const endDateStr = dateRangeParts[1].split('(')[0].trim();
-
       // Convert dates to MySQL format
-      const moment = require('moment');
       const checkInDate = moment(startDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD') + ' 14:00:00';
       
       // Set checkout time based on checkOutStatus
