@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const CalendarController = require('../controller/c_calendar');
+const CalendarSecurity = require('../middleware/m_calendar_security');
 
 // Calendar routes
 router.get('/', CalendarController.getCalendar);
@@ -8,23 +9,70 @@ router.get('/', CalendarController.getCalendar);
 // Unassigned Rooms route
 router.get('/unassigned-rooms', CalendarController.getUnassignedRooms);
 
-// API endpoints for AJAX
-router.get('/api/bookings', CalendarController.getBookingsForCalendar);
-router.get('/api/bookings/details', CalendarController.getDetailedBookings);
-router.post('/api/update-booking', CalendarController.updateBooking);
-router.get('/api/available-rooms', CalendarController.getAvailableRooms);
-router.post('/api/reopen-reservation', CalendarController.reopenReservation);
-router.post('/api/remove-reservation', CalendarController.removeReservation);
-router.post('/api/check-in-reservation', CalendarController.checkInReservation);
+// API endpoints for AJAX - with security middleware
+router.get('/api/bookings', 
+  CalendarSecurity.rateLimit,
+  CalendarSecurity.setSecurityHeaders,
+  CalendarController.getBookingsForCalendar
+);
+
+router.get('/api/bookings/details', 
+  CalendarSecurity.validateDateRange(), 
+  CalendarSecurity.rateLimit,
+  CalendarController.getDetailedBookings
+);
+
+router.post('/api/update-booking', 
+  CalendarSecurity.validateBookingUpdate(), 
+  CalendarSecurity.csrfProtection,
+  CalendarSecurity.auditLog('BOOKING_UPDATE'),
+  CalendarController.updateBooking
+);
+
+router.get('/api/available-rooms', 
+  CalendarSecurity.rateLimit,
+  CalendarController.getAvailableRooms
+);
+
+router.post('/api/reopen-reservation', 
+  CalendarSecurity.csrfProtection,
+  CalendarSecurity.auditLog('BOOKING_REOPEN'),
+  CalendarController.reopenReservation
+);
+
+router.post('/api/remove-reservation', 
+  CalendarSecurity.csrfProtection,
+  CalendarSecurity.auditLog('BOOKING_REMOVE'),
+  CalendarController.removeReservation
+);
+
+router.post('/api/check-in-reservation', 
+  CalendarSecurity.csrfProtection,
+  CalendarSecurity.auditLog('BOOKING_CHECKIN'),
+  CalendarController.checkInReservation
+);
 
 // Unassigned Rooms API endpoints
 router.get('/api/unassigned-rooms', CalendarController.getUnassignedRoomsForCalendar);
 router.get('/api/unassigned-rooms/details', CalendarController.getDetailedUnassignedRooms);
 
-// Transfer routes for room transfer functionality
-router.get('/transfer-available-rooms', CalendarController.getTransferAvailableRooms);
-router.post('/transfer-room', CalendarController.transferRoom);
-router.get('/transfer-logs/:bookingId', CalendarController.getTransferLogs);
+// Transfer routes for room transfer functionality - with security
+router.get('/transfer-available-rooms', 
+  CalendarSecurity.rateLimit,
+  CalendarController.getTransferAvailableRooms
+);
+
+router.post('/transfer-room', 
+  CalendarSecurity.validateRoomTransfer(), 
+  CalendarSecurity.csrfProtection,
+  CalendarSecurity.auditLog('ROOM_TRANSFER'),
+  CalendarController.transferRoom
+);
+
+router.get('/transfer-logs/:bookingId', 
+  CalendarSecurity.rateLimit,
+  CalendarController.getTransferLogs
+);
 
 // Extend routes for stay extension functionality
 router.get('/extend-check-room', CalendarController.checkExtendRoom);

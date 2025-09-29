@@ -118,17 +118,42 @@ class CalendarController {
     }
   }
 
-  // Update booking
+  // Update booking - ENHANCED with better validation and error handling
   static async updateBooking(req, res) {
     try {
-      const { id, room, checkIn, checkOut, isExtended, originalCheckOut, extensionDate } = req.body;
+      const { 
+        id, 
+        room, 
+        checkIn, 
+        checkOut, 
+        isExtended, 
+        originalCheckOut, 
+        extensionDate,
+        isRoomTransfer = false,
+        oldRoomNumber = null,
+        newRoomId = null 
+      } = req.body;
       
-      // Debug: Log the received data
-      console.log('📥 Calendar API received:', { id, room, checkIn, checkOut, isExtended, originalCheckOut, extensionDate });
-
-      if (!id || !room || !checkIn || !checkOut) {
-        return res.status(400).json({ success: false, message: 'Invalid input data.' });
+      // Enhanced input validation
+      const validation = CalendarController.validateBookingUpdate({ id, room, checkIn, checkOut });
+      if (!validation.isValid) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Validation failed',
+          errors: validation.errors 
+        });
       }
+
+      console.log('📥 Calendar API processing update:', { 
+        bookingId: id, 
+        room, 
+        checkIn, 
+        checkOut, 
+        isExtended,
+        isRoomTransfer,
+        oldRoomNumber,
+        newRoomId
+      });
 
       const result = await CalendarModel.updateBooking(
         id,
@@ -138,28 +163,28 @@ class CalendarController {
         {
           isExtended: Boolean(isExtended),
           originalCheckOut: originalCheckOut || null,
-          extensionDate: extensionDate || null
+          extensionDate: extensionDate || null,
+          isRoomTransfer: Boolean(isRoomTransfer),
+          oldRoomNumber: oldRoomNumber || null,
+          newRoomId: newRoomId || null
         }
       );
       
       if (result && result.success) {
-        // Get the io instance from the app
+        // Emit Socket.IO event for real-time updates
         const io = req.app.get('io');
-        
-        // Emit Socket.IO event for real-time dashboard updates
         if (io) {
           let action = 'booking-updated';
           let message = 'Booking updated successfully';
           
-          // Check if this was an extension
           if (isExtended && originalCheckOut) {
             action = 'booking-extended';
             message = 'Booking extended successfully';
           }
           
           const eventData = {
-            action: action,
-            message: message,
+            action,
+            message,
             data: { 
               bookingId: id, 
               newRoom: room, 
@@ -177,21 +202,91 @@ class CalendarController {
         
         res.json({
           success: true,
-          message: result.isRoomTransfer ? 'Room transfer completed successfully.' : 'Booking and room statuses updated successfully.'
+          message: result.isRoomTransfer 
+            ? 'Room transfer completed successfully.' 
+            : 'Booking updated successfully.',
+          data: {
+            bookingId: id,
+            isRoomTransfer: result.isRoomTransfer,
+            isExtended: Boolean(isExtended)
+          }
         });
       } else {
         res.status(400).json({
           success: false,
-          message: 'Failed to update booking'
+          message: 'Failed to update booking. Please check if the booking exists and you have permission to modify it.',
+          errorCode: 'BOOKING_UPDATE_FAILED'
         });
       }
     } catch (error) {
-      console.error('Error updating booking:', error);
-      res.status(500).json({
+      console.error('❌ Calendar booking update error:', {
+        error: error.message,
+        stack: error.stack,
+        bookingData: { id: req.body.id, room: req.body.room, checkIn: req.body.checkIn, checkOut: req.body.checkOut }
+      });
+
+      // Determine error type and provide appropriate response
+      let errorMessage = 'Internal server error occurred';
+      let statusCode = 500;
+
+      if (error.code === 'ER_DUP_ENTRY') {
+        errorMessage = 'Room conflict detected. Please choose a different room or time slot.';
+        statusCode = 409;
+      } else if (error.code === 'ER_NO_REFERENCED_ROW_2') {
+        errorMessage = 'Invalid booking or room reference.';
+        statusCode = 404;
+      } else if (error.code === 'ECONNREFUSED') {
+        errorMessage = 'Unable to connect to database. Please try again.';
+        statusCode = 503;
+      }
+
+      res.status(statusCode).json({
         success: false,
-        message: 'Server error'
+        message: errorMessage,
+        errorCode: 'BOOKING_UPDATE_SERVER_ERROR',
+        timestamp: new Date().toISOString()
       });
     }
+  }
+
+  // Input validation helper
+  static validateBookingUpdate(data) {
+    const errors = [];
+    const { id, room, checkIn, checkOut } = data;
+
+    // Required fields check
+    if (!id || !room || !checkIn || !checkOut) {
+      errors.push('All fields are required (id, room, checkIn, checkOut)');
+    }
+
+    // Data type validation
+    if (id && !/^\d+$/.test(id)) {
+      errors.push('Booking ID must be a valid number');
+    }
+
+    // Date validation
+    if (checkIn && checkOut) {
+      const checkInDate = new Date(checkIn);
+      const checkOutDate = new Date(checkOut);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (isNaN(checkInDate.getTime()) || isNaN(checkOutDate.getTime())) {
+        errors.push('Invalid date format');
+      } else {
+        if (checkInDate < today) {
+          errors.push('Check-in date cannot be in the past');
+        }
+        if (checkOutDate <= checkInDate) {
+          errors.push('Check-out date must be after check-in date');
+        }
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
   }
 
   // Get available rooms

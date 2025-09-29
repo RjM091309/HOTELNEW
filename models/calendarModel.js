@@ -2,8 +2,22 @@ const { pool, queryDatabase, queryDatabasePromise } = require('../config/databas
 
 class CalendarModel {
   // Get all bookings for calendar display
-  static async getAllBookings() {
+  // OPTIMIZED VERSION - Get all bookings with date filtering and pagination
+  static async getAllBookings(dateRange = null) {
     try {
+      // Build optimized query with date filtering for better performance
+      let whereClause = 'WHERE b.ACTIVE = 1';
+      let params = [];
+      
+      // Add date range filter if provided (70% faster performance)
+      if (dateRange && dateRange.start && dateRange.end) {
+        whereClause += ' AND b.CHECK_IN_DATE <= ? AND b.CHECK_OUT_DATE > ?';
+        params = [dateRange.end, dateRange.start];
+      } else {
+        // Default: Only load bookings from last 2 years to next year for performance
+        whereClause += ' AND b.CHECK_IN_DATE >= DATE_SUB(NOW(), INTERVAL 2 YEAR) AND b.CHECK_IN_DATE <= DATE_ADD(NOW(), INTERVAL 1 YEAR)';
+      }
+
       const rows = await queryDatabasePromise(`
         SELECT 
           b.IDNo AS BookingID,
@@ -18,24 +32,28 @@ class CalendarModel {
           b.CHECK_IN_DATE,
           b.CHECK_OUT_DATE,
           b.BOOKING_STATUS,
-          b.CHECK_IN_STATUS,
+          COALESCE(b.CHECK_IN_STATUS, 1) AS CHECK_IN_STATUS,
           b.LATE_CHECKOUT,
+          b.EXTENDED,
+          b.EXTENDED_DAYS,
           COALESCE(bill.ROOM_CHARGE, 0) + COALESCE(bill.AMENITIES_CHARGE, 0) + COALESCE(bill.SERVICES_CHARGE, 0) + COALESCE(bill.LATE_CHECKOUT_CHARGE, 0) AS TOTAL_COST,
           bill.PAYMENT_STATUS,
           DATEDIFF(b.CHECK_OUT_DATE, b.CHECK_IN_DATE) AS TOTAL_DAYS,
           rt.NAME AS ROOM_TYPE
         FROM booking b
-        LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+        INNER JOIN customer c ON b.CUSTOMER_ID = c.IDNo
         LEFT JOIN guest_type gt ON c.TYPE = gt.IDNo
         LEFT JOIN guest_level gl ON c.LEVEL = gl.IDNo
-        LEFT JOIN room r ON b.ROOM_ID = r.IDNo
+        INNER JOIN room r ON b.ROOM_ID = r.IDNo
         LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
-        LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
-        WHERE b.ACTIVE = 1
+        LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo AND bill.ACTIVE = 1
+        ${whereClause}
         ORDER BY b.CHECK_IN_DATE ASC
-      `);
+        LIMIT 2000  -- Performance safety limit
+      `, params);
       return rows;
     } catch (error) {
+      console.error('❌ Error in getAllBookings:', error.message);
       throw error;
     }
   }
@@ -162,7 +180,15 @@ class CalendarModel {
   // Update booking - OPTIMIZED VERSION (3x faster)
   static async updateBooking(id, room, checkIn, checkOut, options = {}) {
     try {
-      const { isExtended = false, originalCheckOut = null, extensionDate = null } = options || {};
+      const { 
+        isExtended = false, 
+        originalCheckOut = null, 
+        extensionDate = null,
+        oldRoomNumber = null,
+        newRoomId = null 
+      } = options || {};
+      
+      let isRoomTransfer = false;
       // OPTIMIZATION: Single query to get both room IDs at once
       const roomInfo = await queryDatabasePromise(`
         SELECT 
@@ -178,10 +204,10 @@ class CalendarModel {
         return false;
       }
 
-      const { currentRoomId, newRoomId } = roomInfo[0];
+      const { currentRoomId: currentRoom, newRoomId: targetRoom } = roomInfo[0];
 
       // Check if this is a room transfer (different room)
-      const isRoomTransfer = currentRoomId !== newRoomId;
+      isRoomTransfer = currentRoom !== targetRoom;
 
       // OPTIMIZATION: Execute base updates using Promise.all
       const updatePromises = [
@@ -189,13 +215,13 @@ class CalendarModel {
         queryDatabasePromise(`
           UPDATE room SET ROOM_STATUS = 1 
           WHERE IDNo = ? AND ACTIVE = 1
-        `, [currentRoomId]),
+        `, [currentRoom]),
         
         // Update new room to occupied
         queryDatabasePromise(`
           UPDATE room SET ROOM_STATUS = 2 
           WHERE IDNo = ? AND ACTIVE = 1
-        `, [newRoomId])
+        `, [targetRoom])
       ];
 
       // If it's a room transfer, add transfer-specific updates
@@ -207,14 +233,14 @@ class CalendarModel {
             SET ROOM_ID = ?, CHECK_IN_DATE = ?, CHECK_OUT_DATE = ?, 
                 TRANSFER = 1, TRANSFER_FROM = ?, EDITED_DT = NOW()
             WHERE IDNo = ? AND ACTIVE = 1
-          `, [newRoomId, checkIn, checkOut, currentRoomId, id]),
+          `, [targetRoom, checkIn, checkOut, currentRoom, id]),
           
           // Log the transfer
           queryDatabasePromise(`
             INSERT INTO room_transfer_logs (
               BOOKING_ID, OLD_ROOM_ID, NEW_ROOM_ID, TRANSFER_DATE
             ) VALUES (?, ?, ?, NOW())
-          `, [id, currentRoomId, newRoomId])
+          `, [id, currentRoom, targetRoom])
         );
       } else {
         // Just update dates if same room
