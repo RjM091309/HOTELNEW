@@ -5,6 +5,17 @@
 	<meta name="description" content="Responsive Admin Template" />
 	<meta name="author" content="SmartUniversity" />
 	<title><%= typeof title !== 'undefined' ? title : '3CORE PMS' %></title>
+	<!-- Prevent white flash: set immediate dark paint before CSS loads -->
+	<style>
+		html[data-theme="dark"],
+		html[data-theme="dark"] body { background:#0b0e11; color-scheme: dark; }
+		html { background:#0b0e11; }
+		@media (prefers-color-scheme: dark) {
+			html { background:#0b0e11; }
+		}
+	</style>
+	<meta name="theme-color" content="#0b0e11" />
+	<script>(function(){try{var t=localStorage.getItem('ui_data_theme')||'dark';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
 	<!-- icons -->
 	<link href="/plugins/simple-line-icons/simple-line-icons.min.css" rel="stylesheet" type="text/css" />
 	<link href="/plugins/font-awesome/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
