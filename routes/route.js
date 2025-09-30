@@ -16,6 +16,7 @@ const vehicleRoutes = require('./r_vehicle');
 const integrationRoutes = require('./r_integration');
 const roomClearanceRoutes = require('./r_room_clearance');
 const bookingChannelRoutes = require('./r_booking_channel');
+const paymentsRoutes = require('./r_payments');
 const apiRoutes = require('./r_api');
 
 // Auth middleware
@@ -38,6 +39,7 @@ router.use('/vehicle', AuthMiddleware.requireAuth, vehicleRoutes);
 router.use('/room', AuthMiddleware.requireAuth, roomRoutes);
 router.use('/integration', AuthMiddleware.requireAuth, integrationRoutes);
 router.use('/booking_channel', AuthMiddleware.requireAuth, bookingChannelRoutes);
+router.use('/payments', AuthMiddleware.requireAuth, paymentsRoutes);
 router.use('/room_clearance', AuthMiddleware.requireAuth, roomClearanceRoutes);
 
 // Redirect root to dashboard if authenticated, otherwise to login
