@@ -1,0 +1,1787 @@
+<link rel="stylesheet" href="/plugins/flatpicker/flatpickr.min.css">
+
+<div class="modal fade" id="modal-add-group-booking" tabindex="-1" role="dialog" aria-labelledby="modalAddGroupBookingLabel" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title" id="modalAddGroupBookingLabel">Add Group Booking</h4>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="groupBookingForm" autocomplete="off">
+          <input type="hidden" id="groupVoucherNo" name="groupVoucherNo">
+          <input type="hidden" id="groupSelectedRooms" name="groupSelectedRooms">
+          <input type="hidden" id="groupSelectedRoomPrices" name="groupSelectedRoomPrices">
+          <input type="hidden" id="groupSelectedRoomNumbers" name="groupSelectedRoomNumbers">
+          <input type="hidden" id="groupNights" name="groupNights" value="0">
+
+          <div class="row">
+            <div class="col-lg-6">
+              <div class="form-group">
+                <label class="form-label">Select Date From To</label>
+                <input type="text" class="form-control flatpickr-input" id="groupDaterange" name="groupDaterange" required>
+              </div>
+            </div>
+            <div class="col-lg-3">
+              <div class="form-group">
+                <label class="form-label">Number of Rooms Needed</label>
+                <input type="number" class="form-control" id="groupNumberOfRooms" name="groupNumberOfRooms" min="1" required>
+              </div>
+            </div>
+            <div class="col-lg-3">
+              <div class="form-group">
+                <label class="form-label">Select Floor (Optional)</label>
+                <select class="form-select" id="groupFloorSelect" name="groupFloorSelect">
+                  <option value="" selected>Select Floor</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="row p-t-20">
+            <div class="col-lg-6">
+              <div class="form-group">
+                <label class="form-label">Group Name</label>
+                <input type="text" class="form-control" id="groupName" name="groupName" required>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="form-group">
+                <label class="form-label">Group Contact Number</label>
+                <input type="text" class="form-control" id="groupContact" name="groupContact" required>
+              </div>
+            </div>
+          </div>
+
+          <div class="row p-t-20">
+            <div class="col-lg-6">
+              <div class="form-group">
+                <label class="form-label">Booking Resources</label>
+                <select class="form-select" id="groupBookingRoute" name="groupBookingRoute" required>
+                  <option value="" disabled>Select Booking Resource</option>
+                  <option value="walk-in" selected>Walk-in</option>
+                  <option value="agency">Agency</option>
+                  <option value="booking-channel">Booking Channel</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-lg-6" id="groupAgencyWrapper" style="display: none;">
+              <div class="form-group">
+                <label class="form-label">Select Agency</label>
+                <select class="form-select" id="groupAgencySelect" name="groupAgencySelect">
+                  <option value="" disabled selected>Select Agency</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="row p-t-20">
+            <div class="col-lg-4">
+              <div class="form-group">
+                <label class="form-label">Payment Status</label>
+                <select class="form-select" id="groupPaymentStatus" name="groupPaymentStatus" required>
+                  <option value="" disabled selected>Payment Status</option>
+                  <option value="paid">Paid</option>
+                  <option value="unpaid">Unpaid</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="form-group">
+                <label class="form-label">Check-In Status</label>
+                <select class="form-select" id="groupCheckInStatus" name="groupCheckInStatus" required>
+                  <option value="" disabled selected>Check-In Status</option>
+                  <option value="1" selected>Regular Check In</option>
+                  <option value="0" >Late Check In</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="form-group">
+                <label class="form-label">Check-Out Status</label>
+                <select class="form-select" id="groupCheckOutStatus" name="groupCheckOutStatus" required>
+                  <option value="" disabled selected>Check-Out Status</option>
+                  <option value="0" selected>Regular Check Out</option>
+                  <option value="1" >Late Check Out</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="row p-t-20">
+            <div class="col-lg-6">
+              <div class="form-group">
+                <label class="form-label">Guest Type</label>
+                <select class="form-select" id="groupGuestType" name="groupGuestType" required>
+                  <option value="" disabled selected>Guest Type</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="form-group">
+                <label class="form-label">Guest Level</label>
+                <select class="form-select" id="groupGuestLevel" name="groupGuestLevel" required>
+                  <option value="" disabled selected>Guest Level</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="row p-t-20">
+            <div class="col-lg-12">
+              <div class="form-group">
+                <label class="form-label">Remarks</label>
+                <textarea class="form-control" id="groupRemarks" name="groupRemarks" rows="3" placeholder="Enter any additional remarks or notes for this group booking..."></textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="row p-t-20 align-items-start">
+            <div class="col-lg-4">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="groupIncludeBreakfast" name="groupIncludeBreakfast">
+                <label class="form-check-label" for="groupIncludeBreakfast">Add Breakfast</label>
+              </div>
+              <div id="groupBreakfastFields" class="group-breakfast-fields d-none">
+                <div class="group-quantity-wrapper">
+                  <input type="number" class="form-control" id="groupBreakfastAdultQty" name="groupBreakfastAdultQty" placeholder="Adult Qty" style="max-width: 90px;">
+                  <input type="number" class="form-control" id="groupBreakfastAdultPrice" name="groupBreakfastAdultPrice" placeholder="Price" readonly>
+                  <input type="hidden" id="groupBreakfastAdultId" name="groupBreakfastAdultId">
+                </div>
+                <div class="group-quantity-wrapper">
+                  <input type="number" class="form-control" id="groupBreakfastKidQty" name="groupBreakfastKidQty" placeholder="Kid Qty" style="max-width: 90px;">
+                  <input type="number" class="form-control" id="groupBreakfastKidPrice" name="groupBreakfastKidPrice" placeholder="Price" readonly>
+                  <input type="hidden" id="groupBreakfastKidId" name="groupBreakfastKidId">
+                </div>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="groupIncludePickup" name="groupIncludePickup">
+                <label class="form-check-label" for="groupIncludePickup">Add Pick-up</label>
+              </div>
+              <div id="groupPickupWrapper" class="mt-2" style="display: none;">
+                <input type="number" class="form-control" id="groupPickupPrice" name="groupPickupPrice" placeholder="Pick-up Price" readonly>
+                <input type="hidden" id="groupPickupServiceId" name="groupPickupServiceId">
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="groupIncludeDropoff" name="groupIncludeDropoff">
+                <label class="form-check-label" for="groupIncludeDropoff">Add Drop-off</label>
+              </div>
+              <div id="groupDropoffWrapper" class="mt-2" style="display: none;">
+                <input type="number" class="form-control" id="groupDropoffPrice" name="groupDropoffPrice" placeholder="Drop-off Price" readonly>
+                <input type="hidden" id="groupDropoffServiceId" name="groupDropoffServiceId">
+              </div>
+            </div>
+          </div>
+
+          <div class="row p-t-20">
+            <div class="col-lg-4">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="groupIncludeReservationFee">
+                <label class="form-check-label" for="groupIncludeReservationFee">Reservation Fee (Group)</label>
+              </div>
+              <div id="groupReservationFeeWrapper" class="mt-2" style="display: none;">
+                <input type="number" class="form-control" id="groupReservationFee" name="groupReservationFee" min="0" value="0">
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="groupIncludeDiscount">
+                <label class="form-check-label" for="groupIncludeDiscount">Discount (Group)</label>
+              </div>
+              <div id="groupDiscountWrapper" class="mt-2" style="display: none;">
+                <input type="number" class="form-control" id="groupDiscount" name="groupDiscount" min="0" value="0">
+              </div>
+            </div>
+          </div>
+
+          <div class="row p-t-20">
+            <div class="col-lg-12 d-flex align-items-center gap-3 flex-wrap">
+              <div class="form-group mb-0">
+                <label class="form-label mb-1">Bed Requirements</label>
+                <div class="d-flex gap-3 flex-wrap">
+                  <div class="bed-requirement-group">
+                    <span class="badge bg-secondary">1 bed</span>
+                    <input type="number" class="form-control" id="groupBed1Count" name="groupBed1Count" min="0" value="0">
+                  </div>
+                  <div class="bed-requirement-group">
+                    <span class="badge bg-secondary">2 beds</span>
+                    <input type="number" class="form-control" id="groupBed2Count" name="groupBed2Count" min="0" value="0">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="row p-t-20">
+            <div class="col-lg-12 d-flex justify-content-start">
+              <button type="button" class="btn btn-success" id="groupSearchRooms">Search Rooms</button>
+            </div>
+          </div>
+
+          <div class="row p-t-20" id="groupResultsContainer" style="display: none;">
+            <div class="col-lg-12">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Available Rooms</h5>
+                <!-- REMOVED: Manual selection toggle - now default method -->
+              </div>
+              <div id="groupRoomsList" class="room-list-container"></div>
+              <div id="groupManualRoomsContainer" class="room-list-container" style="display: none;"></div>
+              <div class="mt-2 text-warning" id="groupAvailabilityWarning" style="display: none;"></div>
+              <div class="mt-2 text-muted" id="groupManualSelectionInfo" style="display: none;"></div>
+              <div id="groupRoomBreakdown" class="mt-3"></div>
+            </div>
+          </div>
+
+          <hr class="my-4">
+          <div class="row p-t-20">
+            <div class="col-lg-6">
+              <h3>Total: <span id="groupComputedTotal">₱0.00</span></h3>
+              <div id="groupCreditDisplay" style="display: none; margin-top: 10px;">
+                <span style="color: #28a745; font-weight: bold;">Credit: <span id="groupCreditAmount">₱0.00</span></span>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-success" id="btnGroupVoucherPreview">Voucher</button>
+                <button type="submit" class="btn btn-primary">Save Booking</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+#modal-add-group-booking .modal-dialog {
+  max-height: 99vh;
+  margin: 1vh auto;
+}
+
+#modal-add-group-booking .modal-content {
+  background-color: #2a3135;
+  color: #e0e0e0;
+  border-radius: 6px;
+  box-shadow: 0 0 10px rgba(59, 59, 59, 0.2);
+  border: 1px solid #3b3b3b;
+  max-height: 90vh;
+  overflow: visible;
+}
+
+#modal-add-group-booking .modal-body {
+  max-height: 90vh;
+  overflow-y: auto !important;
+  padding-bottom: 0;
+}
+
+#modal-add-group-booking .modal-header {
+  background-color: #0c2a42;
+  color: #ffffff;
+  border-bottom: 1px solid #0c2a42;
+}
+
+#modal-add-group-booking .modal-title {
+  color: #ffffff;
+}
+
+#modal-add-group-booking .btn-close {
+  filter: invert(1) !important;
+}
+
+#modal-add-group-booking .btn-close:hover {
+  filter: invert(0.8) !important;
+}
+
+#modal-add-group-booking .form-label {
+  font-size: 12px;
+  color: #cfcfcf;
+}
+
+#modal-add-group-booking input[type="text"],
+#modal-add-group-booking input[type="number"],
+#modal-add-group-booking input[type="email"],
+#modal-add-group-booking select,
+#modal-add-group-booking textarea {
+  background-color: #41474c;
+  color: #ffffff;
+  border: 1px solid #41474c;
+}
+
+#modal-add-group-booking input::placeholder,
+#modal-add-group-booking textarea::placeholder {
+  color: #bbbbbb;
+}
+
+#modal-add-group-booking select option {
+  background-color: #41474c;
+  color: #ffffff;
+}
+
+#modal-add-group-booking h3,
+#modal-add-group-booking h5,
+#modal-add-group-booking label {
+  color: #ffffff;
+}
+
+#modal-add-group-booking .btn-primary,
+#modal-add-group-booking .btn-success {
+  background-color: #6f9c40 !important;
+  border-color: #6f9c40 !important;
+}
+
+#modal-add-group-booking .btn-primary:hover,
+#modal-add-group-booking .btn-success:hover {
+  background-color: #5b8435 !important;
+  border-color: #5b8435 !important;
+}
+
+#modal-add-group-booking .form-check-label {
+  color: #dcdcdc;
+}
+
+#modal-add-group-booking .room-list-container {
+  background-color: #1f262a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 0;
+  overflow: hidden;
+}
+
+#modal-add-group-booking .group-rooms-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+#modal-add-group-booking #groupManualRoomsContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+#modal-add-group-booking #groupManualRoomsContainer .room-option {
+  flex: 0 1 calc(20% - 10px);
+}
+
+#modal-add-group-booking .manual-rooms-container {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  padding: 16px;
+}
+
+#modal-add-group-booking .manual-rooms-container .room-option {
+  width: 100%;
+  height: 70px;
+  min-width: 0;
+}
+
+#modal-add-group-booking .room-option {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 8px 12px;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  position: relative;
+}
+
+#modal-add-group-booking .room-option-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#modal-add-group-booking .room-option .form-check-input {
+  margin-top: 0;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+#modal-add-group-booking .room-option .form-check-label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0;
+}
+
+#modal-add-group-booking .room-option .bed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: rgba(111, 156, 64, 0.15);
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-left: auto;
+}
+
+#modal-add-group-booking .room-option .bed-badge i {
+  color: #9fe073;
+}
+
+#modal-add-group-booking .room-option:hover {
+  background: rgba(111, 156, 64, 0.15);
+  border-color: rgba(111, 156, 64, 0.4);
+  transform: translateY(-1px);
+}
+
+#modal-add-group-booking .room-option .form-check-input:checked + .form-check-label {
+  color: #9fe073;
+}
+
+#modal-add-group-booking .room-option:has(.form-check-input:checked) {
+  background: rgba(111, 156, 64, 0.2);
+  border-color: #6f9c40;
+  box-shadow: 0 0 0 2px rgba(111, 156, 64, 0.3);
+}
+
+#modal-add-group-booking .group-room-breakdown {
+  background: #202629;
+  border-radius: 6px;
+  padding: 16px;
+  margin-top: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#modal-add-group-booking .group-room-breakdown b {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 1.08em;
+}
+
+#modal-add-group-booking .group-room-breakdown ul {
+  padding-left: 20px;
+  margin: 0;
+}
+
+#modal-add-group-booking .group-room-breakdown li {
+  font-size: 0.95em;
+  margin-bottom: 4px;
+}
+
+#modal-add-group-booking .form-check-input:focus {
+  box-shadow: 0 0 0 0.2rem rgba(111, 156, 64, 0.25);
+  border-color: #6f9c40;
+}
+
+#modal-add-group-booking .form-check-input:checked {
+  background-color: #6f9c40;
+  border-color: #6f9c40;
+}
+
+.swal2-container {
+  z-index: 99999 !important;
+}
+
+.swal2-container.swal2-shown {
+  z-index: 99999 !important;
+}
+
+.swal2-popup {
+  z-index: 100000 !important;
+}
+
+#modal-add-group-booking hr {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.group-breakfast-fields {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.group-breakfast-fields.d-none {
+  display: none !important;
+}
+
+.group-quantity-wrapper {
+  display: flex;
+  gap: 8px;
+}
+
+.group-quantity-wrapper .form-control {
+  flex: 1;
+  min-width: 0;
+}
+
+#modal-add-group-booking .bed-requirement-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#modal-add-group-booking .bed-requirement-group .form-control {
+  width: 90px;
+}
+
+#modal-add-group-booking .bed-requirement-group .badge {
+  font-size: 0.85em;
+}
+
+/* Filter radio group styling */
+#modal-add-group-booking .room-filter-section {
+  background-color: #1f262a;
+  border: none;
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+#modal-add-group-booking .filter-radio-group {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+#modal-add-group-booking .filter-radio-group .form-check {
+  margin: 0;
+}
+
+#modal-add-group-booking .filter-radio-group .form-check-input {
+  margin-top: 5px;
+  margin-right: 6px;
+ 
+}
+
+#modal-add-group-booking .filter-radio-group .form-check-label {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0;
+  cursor: pointer;
+  line-height: 1;
+}
+
+#modal-add-group-booking .filter-radio-group .form-check-input:checked {
+  background-color: #6f9c40;
+  border-color: #6f9c40;
+}
+
+#modal-add-group-booking .filter-radio-group .form-check-input:focus {
+  box-shadow: 0 0 0 0.2rem rgba(111, 156, 64, 0.25);
+  border-color: #6f9c40;
+}
+
+#modal-add-group-booking .room-filter-section label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+#modal-add-group-booking .room-filter-section #groupRoomCount {
+  font-size: 14px;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+/* Responsive grid for smaller screens */
+@media (max-width: 1400px) {
+  #modal-add-group-booking .manual-rooms-container {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+@media (max-width: 1200px) {
+  #modal-add-group-booking .manual-rooms-container {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 992px) {
+  #modal-add-group-booking .manual-rooms-container {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  #modal-add-group-booking .manual-rooms-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+</style>
+
+<script src="/plugins/flatpicker/flatpickr.min.js"></script>
+<script>
+(function() {
+  let groupFlatpickrInstance = null;
+  let groupBlocks = [];
+  let groupNonConsecutiveBlocks = [];
+  let groupAvailableRooms = [];
+  let groupManualMode = false;
+  let groupManualSelectedRooms = [];
+  let groupPickupBasePrice = '';
+  let groupPickupBaseId = '';
+  let groupDropoffBasePrice = '';
+  let groupDropoffBaseId = '';
+  let groupBreakfastAdultBasePrice = '';
+  let groupBreakfastAdultBaseId = '';
+  let groupBreakfastKidBasePrice = '';
+  let groupBreakfastKidBaseId = '';
+  let groupRequiredBed1 = 0;
+  let groupRequiredBed2 = 0;
+  let groupUnassignedConflicts = [];
+
+  function applyGroupBreakfastDefaults() {
+    if (groupBreakfastAdultBasePrice !== '') {
+      $('#groupBreakfastAdultPrice').val(groupBreakfastAdultBasePrice);
+      $('#groupBreakfastAdultId').val(groupBreakfastAdultBaseId);
+    }
+    if (groupBreakfastKidBasePrice !== '') {
+      $('#groupBreakfastKidPrice').val(groupBreakfastKidBasePrice);
+      $('#groupBreakfastKidId').val(groupBreakfastKidBaseId);
+    }
+  }
+
+  function resetGroupForm() {
+    $('#groupBookingForm')[0].reset();
+    $('#groupSelectedRooms').val('');
+    $('#groupSelectedRoomPrices').val('');
+    $('#groupNights').val('0');
+    groupBlocks = [];
+    groupNonConsecutiveBlocks = [];
+    groupAvailableRooms = [];
+    groupManualMode = false;
+    groupManualSelectedRooms = [];
+    groupRequiredBed1 = 0;
+    groupRequiredBed2 = 0;
+    groupUnassignedConflicts = [];
+    setManualSelectionMode(false);
+    $('#groupManualSelectToggle').prop('disabled', false);
+    $('#groupAgencyWrapper').hide();
+    $('#groupRoomsList').empty();
+    $('#groupManualRoomsContainer').hide();
+    $('#groupManualSelectionInfo').hide();
+    $('#groupRoomBreakdown').empty();
+    $('#groupResultsContainer').hide();
+    $('#groupComputedTotal').text('₱0.00');
+    $('#groupCreditDisplay').hide();
+    $('#groupCreditAmount').text('₱0.00');
+    $('#groupBreakfastFields').addClass('d-none');
+    $('#groupIncludeBreakfast, #groupIncludePickup, #groupIncludeDropoff').prop('checked', false);
+    $('#groupBreakfastAdultQty, #groupBreakfastKidQty').val('');
+    $('#groupPickupWrapper, #groupDropoffWrapper').hide();
+    $('#groupPickupPrice, #groupDropoffPrice').val('');
+    $('#groupPickupServiceId, #groupDropoffServiceId').val('');
+    applyGroupBreakfastDefaults();
+  }
+
+  function initializeGroupFlatpickr() {
+    if (groupFlatpickrInstance) {
+      groupFlatpickrInstance.destroy();
+    }
+
+    groupFlatpickrInstance = flatpickr('#groupDaterange', {
+      mode: 'range',
+      dateFormat: 'M d, Y',
+      showMonths: 2,
+      minDate: 'today',
+      onClose: function(selectedDates, dateStr, instance) {
+        if (selectedDates.length === 2) {
+          const startDate = selectedDates[0];
+          const endDate = selectedDates[1];
+          const diffMs = endDate.getTime() - startDate.getTime();
+          const nights = Math.max(1, Math.round(diffMs / (1000 * 3600 * 24)));
+          $('#groupNights').val(nights);
+          instance.input.value = `${dateStr} (${nights} night/s)`;
+          computeGroupTotal();
+        }
+      }
+    });
+  }
+
+  function formatCurrency(value) {
+    return `₱${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  function getSelectedDateRange() {
+    const raw = $('#groupDaterange').val();
+    if (!raw) return null;
+    const parts = raw.split(' to ');
+    if (parts.length < 2) return null;
+    const start = parts[0].trim();
+    const end = parts[1].split('(')[0].trim();
+    return { start, end };
+  }
+
+  function getSeasonIdForDate(checkInDate, seasonalPrices) {
+    if (!seasonalPrices || !seasonalPrices.length) return null;
+    const checkIn = new Date(checkInDate);
+    const mmdd = `${(checkIn.getMonth() + 1).toString().padStart(2, '0')}${checkIn.getDate().toString().padStart(2, '0')}`;
+
+    for (const price of seasonalPrices) {
+      const start = new Date(price.startDate);
+      const end = new Date(price.endDate);
+      const startKey = `${(start.getMonth() + 1).toString().padStart(2, '0')}${start.getDate().toString().padStart(2, '0')}`;
+      const endKey = `${(end.getMonth() + 1).toString().padStart(2, '0')}${end.getDate().toString().padStart(2, '0')}`;
+
+      const isWithinSameYear = startKey <= endKey && mmdd >= startKey && mmdd <= endKey;
+      const crossesYear = startKey > endKey && (mmdd >= startKey || mmdd <= endKey);
+
+      if (isWithinSameYear || crossesYear) {
+        return price.seasonId;
+      }
+    }
+    return null;
+  }
+
+  function displayGroupRooms(blocks, title, groupNameAttr) {
+    const list = $('#groupRoomsList');
+    const section = $(`div[data-group-name="${groupNameAttr}"]`);
+
+    if (!section.length) {
+      const sectionHtml = `
+        <div class="group-rooms-section" data-group-name="${groupNameAttr}">
+          <h6 class="text-info mb-2">${title}</h6>
+          <div class="group-rooms-options"></div>
+        </div>`;
+      list.append(sectionHtml);
+    }
+
+    const targetContainer = list.find(`div[data-group-name="${groupNameAttr}"] .group-rooms-options`);
+    targetContainer.empty();
+
+    if (!blocks || !blocks.length) {
+      targetContainer.append('<p class="text-warning mb-0">No rooms found.</p>');
+      return;
+    }
+
+    blocks.forEach((block, index) => {
+      const blockKey = `${groupNameAttr}-${index}`;
+      const roomNumbers = block.map(room => `${room.ROOM_NUMBER}`).join(', ');
+      const roomIds = block.map(room => room.IDNo).join(',');
+      const option = `
+        <div class="form-check room-option">
+          <div class="room-option-header">
+            <input class="form-check-input" type="radio" name="groupBlock" id="groupBlock${blockKey}" data-block-group="${groupNameAttr}" data-block-index="${index}" value="${roomIds}">
+            <label class="form-check-label" for="groupBlock${blockKey}">
+              ${roomNumbers}
+            </label>
+          </div>
+        </div>`;
+      targetContainer.append(option);
+    });
+  }
+
+  function displayGroupRoomResults({ consecutiveBlocks, nonConsecutiveBlocks, availableRooms, unassignedConflicts }, priority) {
+    // REMOVED: Auto-suggested blocks logic - manual selection only
+    const list = $('#groupRoomsList');
+    list.empty();
+    $('#groupManualRoomsContainer').empty();
+    $('#groupManualSelectionInfo').hide();
+    $('#groupRoomBreakdown').empty();
+    $('#groupAvailabilityWarning').hide();
+    
+    groupUnassignedConflicts = (unassignedConflicts && unassignedConflicts.length) ? unassignedConflicts : [];
+    groupAvailableRooms = availableRooms || [];
+
+    // Show unassigned conflicts warning if any
+    if (groupUnassignedConflicts.length) {
+      const conflictText = groupUnassignedConflicts.map(conf => 
+        `${conf.reserved} ${conf.bed} bed rooms reserved for unassigned bookings`
+      ).join(', ');
+      $('#groupRoomsList').prepend(`
+        <div class="alert alert-warning mb-3">
+          <strong>Unassigned Rooms Notice:</strong> Some rooms may be reserved for unassigned bookings: ${conflictText}
+        </div>
+      `);
+    }
+
+    if (!groupAvailableRooms || !groupAvailableRooms.length) {
+      list.append('<p class="text-danger">No rooms available for the selected dates.</p>');
+      $('#groupResultsContainer').show();
+      $('#groupSelectedRooms').val('');
+      $('#groupSelectedRoomPrices').val('');
+      computeGroupTotal();
+      return;
+    }
+
+    // Show filter and room count
+    $('#groupRoomsList').append(`
+      <div class="room-filter-section mb-3">
+        <div class="d-flex align-items-center w-100" style="display:flex; justify-content: space-between; width:100%;">
+          <div class="d-flex align-items-center">
+            <label class="text-white mb-0 me-3">Filter:</label>
+            <div class="filter-radio-group">
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="groupRoomFilter" id="filterAll" value="all" checked>
+                <label class="form-check-label" for="filterAll">All</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="groupRoomFilter" id="filter1B" value="1B">
+                <label class="form-check-label" for="filter1B">1B</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="groupRoomFilter" id="filter2B" value="2B">
+                <label class="form-check-label" for="filter2B">2B</label>
+              </div>
+            </div>
+          </div>
+          <div class="text-white">
+            <span id="groupRoomCount" style="margin-left: 24px;">&nbsp;&nbsp;&nbsp;&nbsp;Available: 0</span>
+          </div>
+        </div>
+      </div>
+    `);
+    
+    // Render rooms directly in the main list container, not in the hidden manual container
+    if (!groupAvailableRooms || !groupAvailableRooms.length) {
+      $('#groupRoomsList').append('<p class="text-warning">No rooms available for manual selection.</p>');
+    } else {
+      const roomsHtml = groupAvailableRooms.map(room => {
+        const disabled = false; // REMOVED: Disable logic - allow all rooms to be selectable
+        const bedCount = parseInt(room.ROOM_BED, 10);
+        const bedBadge = Number.isFinite(bedCount) && bedCount > 0
+          ? `<span class="bed-badge">${bedCount}<i class="fa fa-bed"></i></span>`
+          : '';
+        return `
+          <div class="form-check room-option${disabled ? ' disabled-room' : ''}">
+            <input class="form-check-input group-manual-checkbox" type="checkbox" data-room-id="${room.IDNo}" ${groupManualSelectedRooms.includes(room.IDNo) ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
+            <label class="form-check-label ms-2">
+              ${room.ROOM_NUMBER}${bedBadge ? ` ${bedBadge}` : ''}
+            </label>
+          </div>`;
+      }).join('');
+      $('#groupRoomsList').append(`<div class="manual-rooms-container">${roomsHtml}</div>`);
+    }
+    
+    $('#groupResultsContainer').show();
+    
+    // Initialize filter and count
+    updateRoomFilterAndCount();
+    
+    // Add filter change handler
+    $('input[name="groupRoomFilter"]').on('change', function() {
+      updateRoomFilterAndCount();
+    });
+    
+    updateManualSelectionInfo();
+  }
+
+  function buildSingleRoomBlocks(rooms) {
+    return rooms.map(room => [room]);
+  }
+
+  function updateRoomFilterAndCount() {
+    const filter = $('input[name="groupRoomFilter"]:checked').val();
+    const roomsContainer = $('.manual-rooms-container');
+    let visibleCount = 0;
+    
+    if (!roomsContainer.length) return;
+    
+    roomsContainer.find('.room-option').each(function() {
+      const $room = $(this);
+      const $checkbox = $room.find('input[data-room-id]');
+      const roomData = $checkbox.data('room-id');
+      const room = groupAvailableRooms.find(r => r.IDNo === roomData);
+      
+      if (!room) {
+        $room.hide();
+        return;
+      }
+      
+      const bedType = parseInt(room.ROOM_BED, 10);
+      const shouldShow = filter === 'all' || 
+        (filter === '1B' && bedType === 1) || 
+        (filter === '2B' && bedType === 2);
+        
+      if (shouldShow) {
+        $room.show();
+        visibleCount++; // Count ALL rooms regardless of disabled state
+      } else {
+        $room.hide();
+      }
+    });
+    
+    // Update count badge
+    const filterText = filter === 'all' ? 'rooms' : filter + ' rooms';
+    $('#groupRoomCount').text(`Available: ${visibleCount}`);
+  }
+
+  function computeGroupTotal() {
+    const nights = parseInt($('#groupNights').val(), 10) || 0;
+      const pricesRaw = $('#groupSelectedRoomPrices').val();
+      const prices = pricesRaw ? pricesRaw.split(',').map(p => parseFloat(p) || 0) : [];
+      const baseSubtotal = prices.reduce((sum, price) => sum + price, 0);
+      const roomSubtotal = baseSubtotal * nights;
+
+    const reservationFee = $('#groupIncludeReservationFee').prop('checked') ? (parseFloat($('#groupReservationFee').val()) || 0) : 0;
+    const discount = $('#groupIncludeDiscount').prop('checked') ? (parseFloat($('#groupDiscount').val()) || 0) : 0;
+
+    const adultQty = $('#groupIncludeBreakfast').is(':checked') ? (parseInt($('#groupBreakfastAdultQty').val(), 10) || 0) : 0;
+    const adultPrice = parseFloat($('#groupBreakfastAdultPrice').val()) || 0;
+    const kidQty = $('#groupIncludeBreakfast').is(':checked') ? (parseInt($('#groupBreakfastKidQty').val(), 10) || 0) : 0;
+    const kidPrice = parseFloat($('#groupBreakfastKidPrice').val()) || 0;
+
+    const pickupPrice = $('#groupIncludePickup').is(':checked') ? parseFloat($('#groupPickupPrice').val()) || 0 : 0;
+    const dropoffPrice = $('#groupIncludeDropoff').is(':checked') ? parseFloat($('#groupDropoffPrice').val()) || 0 : 0;
+
+    const servicesTotal = (adultQty * adultPrice) + (kidQty * kidPrice) + pickupPrice + dropoffPrice;
+    const subtotal = roomSubtotal + servicesTotal;
+    let finalBalance = subtotal - reservationFee - discount;
+
+    if (finalBalance < 0) {
+      $('#groupComputedTotal').text(formatCurrency(0));
+      $('#groupCreditAmount').text(formatCurrency(Math.abs(finalBalance)));
+      $('#groupCreditDisplay').show();
+    } else {
+      $('#groupComputedTotal').text(formatCurrency(finalBalance));
+      $('#groupCreditDisplay').hide();
+    }
+  }
+
+  function populateBreakdown(block, computedPrices) {
+    const container = $('#groupRoomBreakdown');
+    container.empty();
+    if (!block || !block.length) {
+      return;
+    }
+
+    const nights = parseInt($('#groupNights').val(), 10) || 0;
+    let html = '<div class="group-room-breakdown"><b>Selected Room Prices:</b><ul>';
+    block.forEach((room, idx) => {
+      const price = computedPrices[idx] || 0;
+      const total = nights > 0 ? price * nights : price;
+      html += `<li>Room ${room.ROOM_NUMBER}: ${formatCurrency(price)} per night ${nights > 0 ? `(${formatCurrency(total)} total)` : ''}</li>`;
+    });
+    html += '</ul></div>';
+    container.html(html);
+  }
+
+  function attachRoomSelectionHandler() {
+    $('#groupRoomsList').on('change', 'input[name="groupBlock"]', function() {
+      const groupNameAttr = $(this).data('block-group');
+      const blockIndex = parseInt($(this).data('block-index'), 10);
+
+      let sourceBlocks = [];
+      if (groupNameAttr === 'consecutive') {
+        sourceBlocks = groupBlocks;
+      } else if (groupNameAttr === 'non-consecutive') {
+        sourceBlocks = groupNonConsecutiveBlocks;
+      } else if (groupNameAttr === 'available') {
+        sourceBlocks = buildSingleRoomBlocks(groupAvailableRooms);
+      }
+
+      const block = sourceBlocks[blockIndex];
+      if (!block) return;
+
+
+      const dates = getSelectedDateRange();
+      if (!dates) {
+        Swal.fire('Missing Dates', 'Please select a date range first.', 'warning');
+        $(this).prop('checked', false);
+        return;
+      }
+
+      const bookingType = $('#groupBookingRoute').val();
+      const computedPrices = [];
+      block.forEach(room => {
+        const price = typeof room.RESOLVED_PRICE === 'number'
+          ? room.RESOLVED_PRICE
+          : (() => {
+              const seasonalPrices = room.SEASONAL_PRICES || [];
+              const bedCount = parseInt(room.ROOM_BED, 10);
+              const seasonId = getSeasonIdForDate(dates.start, seasonalPrices);
+              const match = seasonalPrices.find(price => parseInt(price.bedCount, 10) === bedCount && price.bookingType === bookingType && parseInt(price.seasonId, 10) === parseInt(seasonId, 10));
+              return match ? parseFloat(match.price) : 0;
+            })();
+        const roomId = room.IDNo;
+        computedPrices.push(price);
+      });
+
+      const selectedIds = block.map(room => room.IDNo);
+      const selectedNumbers = block.map(room => room.ROOM_NUMBER);
+      $('#groupSelectedRooms').val(selectedIds.join(','));
+      $('#groupSelectedRoomPrices').val(computedPrices.join(','));
+      $('#groupSelectedRoomNumbers').val(selectedNumbers.join(','));
+      populateBreakdown(block, computedPrices);
+      updateGroupChargeBreakdown();
+      computeGroupTotal();
+    });
+  }
+
+  function handleSearchRooms() {
+    $('#groupSearchRooms').on('click', function() {
+      const dates = getSelectedDateRange();
+      const neededRooms = $('#groupNumberOfRooms').val();
+      const neededRoomsNum = parseInt(neededRooms, 10);
+      const bed1Needed = parseInt($('#groupBed1Count').val(), 10) || 0;
+      const bed2Needed = parseInt($('#groupBed2Count').val(), 10) || 0;
+      const totalBedNeeded = bed1Needed + bed2Needed;
+      const bookingRoute = $('#groupBookingRoute').val();
+
+      if (!dates) {
+        Swal.fire('Missing Date Range', 'Please select a valid date range.', 'warning');
+        return;
+      }
+      if (!neededRooms) {
+        Swal.fire('Missing Room Count', 'Please enter the number of rooms needed.', 'warning');
+        return;
+      }
+      if (!bookingRoute) {
+        Swal.fire('Missing Booking Resource', 'Please select a booking resource before searching for rooms.', 'warning');
+        return;
+      }
+
+      const checkInStatus = $('#groupCheckInStatus').val();
+      const checkOutStatus = $('#groupCheckOutStatus').val();
+
+      if (!checkInStatus || checkInStatus === '') {
+        Swal.fire('Missing Check-In Status', 'Please select a Check-In Status before searching for rooms.', 'warning');
+        return;
+      }
+
+      if (!checkOutStatus || checkOutStatus === '') {
+        Swal.fire('Missing Check-Out Status', 'Please select a Check-Out Status before searching for rooms.', 'warning');
+        return;
+      }
+
+      if ((bed1Needed > 0 || bed2Needed > 0) && totalBedNeeded !== neededRoomsNum) {
+        Swal.fire('Bed Count Mismatch', 'The sum of bed requirements must equal the total number of rooms needed.', 'warning');
+        return;
+      }
+
+      if (neededRoomsNum > 0 && totalBedNeeded === 0) {
+        Swal.fire('Bed Requirement Missing', 'Please specify how many rooms should have 1 bed or 2 beds before searching.', 'warning');
+        return;
+      }
+
+      groupRequiredBed1 = bed1Needed;
+      groupRequiredBed2 = bed2Needed;
+
+      $.ajax({
+        url: '/booking/find_consecutive_rooms',
+        type: 'POST',
+        data: {
+          startDate: dates.start,
+          endDate: dates.end,
+          neededRooms: neededRooms,
+          floorNumber: $('#groupFloorSelect').val() || '',
+          bed1Needed: bed1Needed,
+          bed2Needed: bed2Needed,
+          bookingRoute: bookingRoute,
+          checkInStatus: $('#groupCheckInStatus').val(),
+          checkOutStatus: $('#groupCheckOutStatus').val()
+        },
+        success: function(response) {
+          if (!response.success) {
+            Swal.fire('No Rooms Found', response.message || 'No available rooms for the selected criteria.', 'info');
+            displayGroupRoomResults({ consecutiveBlocks: [], nonConsecutiveBlocks: [], availableRooms: [] });
+            if (response.data && response.data.availableBedSummary) {
+              showBedSummaryWarning(response.data.availableBedSummary, neededRoomsNum, bed1Needed, bed2Needed, response.data.unassignedConflicts, response.data.availableRooms || []);
+            } else if (response.data && response.data.unassignedConflicts) {
+              showUnassignedConflictWarning(response.data.unassignedConflicts, response.data.availableRooms || []);
+            }
+            return;
+          }
+
+          const data = response.data || {};
+          const availableRooms = data.availableRooms || [];
+          const availableCount = availableRooms.length;
+
+          if (neededRoomsNum > availableCount) {
+            displayGroupRoomResults({ consecutiveBlocks: [], nonConsecutiveBlocks: [], availableRooms: [] });
+            setManualSelectionMode(false);
+            if (data.unassignedConflicts && data.unassignedConflicts.length) {
+              showUnassignedConflictWarning(data.unassignedConflicts, availableRooms);
+            } else {
+              showBedSummaryWarning({
+                bed1: availableRooms.filter(r => parseInt(r.ROOM_BED, 10) === 1).length,
+                bed2: availableRooms.filter(r => parseInt(r.ROOM_BED, 10) === 2).length
+              }, neededRoomsNum, bed1Needed, bed2Needed, [], availableRooms);
+            }
+            return;
+          }
+
+          groupNonConsecutiveBlocks = data.nonConsecutiveBlocks || [];
+          toggleAvailabilityWarning(false);
+          displayGroupRoomResults({
+            consecutiveBlocks: data.consecutiveBlocks || [],
+            nonConsecutiveBlocks: groupNonConsecutiveBlocks,
+            availableRooms,
+            unassignedConflicts: data.unassignedConflicts || []
+          });
+
+          if (groupManualMode) {
+            refreshManualSelectionDisabledState();
+          }
+        },
+        error: function(err) {
+          console.error('Error finding rooms:', err);
+          Swal.fire('Error', 'There was a problem searching for rooms. Please try again.', 'error');
+        }
+      });
+    });
+  }
+
+  function fetchGroupFloors() {
+    $.ajax({
+      url: '/booking/get_floors_for_dropdown',
+      method: 'GET',
+      success: function(data) {
+        const select = $('#groupFloorSelect');
+        select.empty();
+        select.append('<option value="" selected>Select Floor</option>');
+        (data || []).forEach(floor => {
+          select.append(`<option value="${floor.floor_number}">${floor.floor_number} Floor</option>`);
+        });
+      },
+      error: function(err) {
+        console.error('Error fetching floors for group booking:', err);
+      }
+    });
+  }
+
+  function loadGroupGuestTypes() {
+    $.ajax({
+      url: '/booking/get_guest_types',
+      method: 'GET',
+      success: function(data) {
+        const select = $('#groupGuestType');
+        select.empty();
+        select.append('<option value="" disabled selected>Guest Type</option>');
+        (data || []).forEach(type => {
+          const selected = type.IDNo == 1 ? ' selected' : '';
+          select.append(`<option value="${type.IDNo}"${selected}>${type.TYPE}</option>`);
+        });
+      },
+      error: function(err) {
+        console.error('Error fetching guest types:', err);
+      }
+    });
+  }
+
+  function loadGroupGuestLevels() {
+    $.ajax({
+      url: '/booking/get_guest_level',
+      method: 'GET',
+      success: function(data) {
+        const select = $('#groupGuestLevel');
+        select.empty();
+        select.append('<option value="" disabled selected>Guest Level</option>');
+        (data || []).forEach(level => {
+          const selected = level.IDNo == 9 ? ' selected' : '';
+          select.append(`<option value="${level.IDNo}"${selected}>${level.TYPE}</option>`);
+        });
+      },
+      error: function(err) {
+        console.error('Error fetching guest levels:', err);
+      }
+    });
+  }
+
+  function loadGroupAgencies() {
+    $.ajax({
+      url: '/booking/get-agency',
+      method: 'GET',
+      success: function(data) {
+        const select = $('#groupAgencySelect');
+        select.empty();
+        select.append('<option value="" disabled selected>Select Agency</option>');
+        (data || []).forEach(agency => {
+          select.append(`<option value="${agency.IDNo}">${agency.NAME}</option>`);
+        });
+      },
+      error: function(err) {
+        console.error('Error fetching agencies:', err);
+      }
+    });
+  }
+
+  function loadGroupBreakfastPrices() {
+    fetch('/booking/get-breakfast-prices')
+      .then(res => res.json())
+      .then(data => {
+        if (!Array.isArray(data)) return;
+        const adult = data.find(item => item.SERVICE_NAME.toLowerCase().includes('adult'));
+        const kid = data.find(item => item.SERVICE_NAME.toLowerCase().includes('kid'));
+        if (adult) {
+          groupBreakfastAdultBasePrice = adult.SERVICE_COST;
+          groupBreakfastAdultBaseId = adult.IDNo;
+        }
+        if (kid) {
+          groupBreakfastKidBasePrice = kid.SERVICE_COST;
+          groupBreakfastKidBaseId = kid.IDNo;
+        }
+        applyGroupBreakfastDefaults();
+      })
+      .catch(err => console.error('Failed to load breakfast prices:', err));
+  }
+
+  function loadGroupTransportPrices() {
+    groupPickupBasePrice = '';
+    groupPickupBaseId = '';
+    groupDropoffBasePrice = '';
+    groupDropoffBaseId = '';
+
+    fetch('/booking/get-pick-drop')
+      .then(res => res.json())
+      .then(data => {
+        if (!Array.isArray(data)) return;
+        const pickup = data.find(item => item.SERVICE_NAME.toLowerCase().includes('pick'));
+        const dropoff = data.find(item => item.SERVICE_NAME.toLowerCase().includes('drop'));
+        if (pickup) {
+          groupPickupBasePrice = pickup.SERVICE_COST;
+          groupPickupBaseId = pickup.IDNo;
+        }
+        if (dropoff) {
+          groupDropoffBasePrice = dropoff.SERVICE_COST;
+          groupDropoffBaseId = dropoff.IDNo;
+        }
+      })
+      .catch(err => console.error('Failed to load transport prices:', err));
+  }
+
+  function attachToggles() {
+    $('#groupIncludeBreakfast').on('change', function() {
+      if (this.checked) {
+        applyGroupBreakfastDefaults();
+        $('#groupBreakfastFields').removeClass('d-none');
+      } else {
+        $('#groupBreakfastFields').addClass('d-none');
+        $('#groupBreakfastAdultQty, #groupBreakfastKidQty').val('');
+      }
+      computeGroupTotal();
+    });
+
+    $('#groupIncludePickup').on('change', function() {
+      if (this.checked) {
+        $('#groupPickupWrapper').show();
+        if (groupPickupBasePrice !== '') {
+          $('#groupPickupPrice').val(groupPickupBasePrice);
+          $('#groupPickupServiceId').val(groupPickupBaseId);
+        }
+      } else {
+        $('#groupPickupWrapper').hide();
+        $('#groupPickupPrice').val('');
+        $('#groupPickupServiceId').val('');
+      }
+      computeGroupTotal();
+    });
+
+    $('#groupIncludeDropoff').on('change', function() {
+      if (this.checked) {
+        $('#groupDropoffWrapper').show();
+        if (groupDropoffBasePrice !== '') {
+          $('#groupDropoffPrice').val(groupDropoffBasePrice);
+          $('#groupDropoffServiceId').val(groupDropoffBaseId);
+        }
+      } else {
+        $('#groupDropoffWrapper').hide();
+        $('#groupDropoffPrice').val('');
+        $('#groupDropoffServiceId').val('');
+      }
+      computeGroupTotal();
+    });
+
+    $('#groupBreakfastAdultQty, #groupBreakfastKidQty').on('input', computeGroupTotal);
+  }
+
+  function setManualSelectionMode(enabled) {
+    groupManualMode = enabled;
+    $('#groupManualSelectToggle').prop('checked', enabled);
+    $('#groupRoomsList').toggle(!enabled);
+    $('#groupManualRoomsContainer, #groupManualSelectionInfo').toggle(enabled);
+    $('#groupAvailabilityWarning').toggle(!enabled); // Toggle availability warning
+
+    if (!enabled) {
+      groupManualSelectedRooms = [];
+      groupRequiredBed1 = 0;
+      groupRequiredBed2 = 0;
+      groupUnassignedConflicts = [];
+      $('#groupManualRoomsContainer').empty();
+      $('#groupManualSelectionInfo').text('');
+      toggleAvailabilityWarning(false); // Hide availability warning
+      $('#groupSelectedRooms').val('');
+      $('#groupSelectedRoomPrices').val('');
+      $('#groupSelectedRoomNumbers').val('');
+      $('#groupManualSelectToggle').prop('disabled', false);
+      computeGroupTotal();
+      return;
+    }
+
+    // Manual rooms now rendered directly in main container - no need to call renderManualSelectionList
+    updateManualSelectionInfo();
+  }
+
+  function renderManualSelectionList(rooms) {
+    const container = $('#groupManualRoomsContainer');
+    container.empty();
+    if (!rooms || !rooms.length) {
+      container.append('<p class="text-warning">No rooms available for manual selection.</p>');
+      return;
+    }
+
+    const listHtml = rooms.map(room => {
+      const disabled = shouldDisableRoomForManualSelection(room);
+      const bedCount = parseInt(room.ROOM_BED, 10);
+      const bedBadge = Number.isFinite(bedCount) && bedCount > 0
+        ? `<span class="bed-badge">${bedCount}<i class="fa fa-bed"></i></span>`
+        : '';
+      return `
+        <div class="form-check room-option${disabled ? ' disabled-room' : ''}">
+          <input class="form-check-input" type="checkbox" data-room-id="${room.IDNo}" ${groupManualSelectedRooms.includes(room.IDNo) ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
+          <label class="form-check-label ms-2">
+            ${room.ROOM_NUMBER}${bedBadge ? ` ${bedBadge}` : ''}
+          </label>
+        </div>`;
+    }).join('');
+
+    container.append(listHtml);
+
+    container.find('input[type="checkbox"]').each(function() {
+      const roomId = parseInt($(this).data('room-id'), 10);
+      if (groupManualSelectedRooms.includes(roomId)) {
+        $(this).prop('checked', true);
+      }
+    });
+  }
+
+  function formatCurrencyDisplay(value) {
+    return `₱${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  function getManualBedSummary() {
+    const bed1 = groupManualSelectedRooms.reduce((count, roomId) => {
+      const room = groupAvailableRooms.find(r => r.IDNo === roomId);
+      return count + (room && parseInt(room.ROOM_BED, 10) === 1 ? 1 : 0);
+    }, 0);
+    const bed2 = groupManualSelectedRooms.reduce((count, roomId) => {
+      const room = groupAvailableRooms.find(r => r.IDNo === roomId);
+      return count + (room && parseInt(room.ROOM_BED, 10) === 2 ? 1 : 0);
+    }, 0);
+    return { bed1, bed2 };
+  }
+
+  function hasReachedManualSelectionLimit() {
+    const neededRooms = parseInt($('#groupNumberOfRooms').val(), 10) || 0;
+    const selectedCount = groupManualSelectedRooms.length;
+
+    if (groupRequiredBed1 || groupRequiredBed2) {
+      const summary = getManualBedSummary();
+      if (summary.bed1 >= groupRequiredBed1 && summary.bed2 >= groupRequiredBed2 && selectedCount >= neededRooms) {
+        return true;
+      }
+      return selectedCount >= neededRooms;
+    }
+
+    return neededRooms > 0 && selectedCount >= neededRooms;
+  }
+
+  function updateManualSelectionInfo() {
+    const neededRooms = parseInt($('#groupNumberOfRooms').val(), 10) || 0;
+    const selectedCount = groupManualSelectedRooms.length;
+    const remaining = Math.max(neededRooms - selectedCount, 0);
+
+    const bedSummary = getManualBedSummary();
+    const bedInfoParts = [];
+    if (groupRequiredBed1 > 0) {
+      bedInfoParts.push(`${bedSummary.bed1}/${groupRequiredBed1} (1 bed)`);
+    }
+    if (groupRequiredBed2 > 0) {
+      bedInfoParts.push(`${bedSummary.bed2}/${groupRequiredBed2} (2 beds)`);
+    }
+
+    let info = '';
+    if (!neededRooms) {
+      info = `Selected ${selectedCount} room(s).`;
+    } else if (remaining === 0) {
+      info = `Selected ${selectedCount} room(s). Ready to proceed.`;
+    } else {
+      info = `Selected ${selectedCount} room(s). Need ${remaining} more.`;
+    }
+
+    if (bedInfoParts.length) {
+      info += ` | Beds: ${bedInfoParts.join(', ')}`;
+    }
+
+    $('#groupManualSelectionInfo').text(info).show();
+    refreshManualSelectionDisabledState();
+  }
+
+  function toggleAvailabilityWarning(show, message) {
+    const warning = $('#groupAvailabilityWarning');
+    if (show) {
+      warning.text(message || '').show();
+    } else {
+      warning.text('').hide();
+    }
+  }
+
+  function showBedSummaryWarning(summary, neededCount, bed1Needed = 0, bed2Needed = 0, conflicts = [], availableRooms = []) {
+    if (conflicts && conflicts.length) {
+      showUnassignedConflictWarning(conflicts, availableRooms);
+      return;
+    }
+
+    if (!summary) {
+      toggleAvailabilityWarning(false);
+      return;
+    }
+
+    const parts = [];
+    if (typeof summary.bed1 === 'number') {
+      parts.push(`${summary.bed1} room(s) with 1 bed`);
+    }
+    if (typeof summary.bed2 === 'number') {
+      parts.push(`${summary.bed2} room(s) with 2 beds`);
+    }
+
+    const availability = summariseBedAvailability(availableRooms);
+
+    const requirementInfo = (bed1Needed || bed2Needed)
+      ? `Needs ${bed1Needed} of 1-bed and ${bed2Needed} of 2-bed rooms.`
+      : '';
+
+    const message = [
+      `Available rooms (${parts.join(', ')}) do not meet ${neededCount} required rooms.`,
+      requirementInfo,
+      availability ? `Currently available: ${availability}` : ''
+    ].filter(Boolean).join(' ');
+
+    toggleAvailabilityWarning(true, message);
+  }
+
+  function showUnassignedConflictWarning(conflicts, availableRooms = []) {
+    if (!conflicts || !conflicts.length) {
+      toggleAvailabilityWarning(false);
+      return;
+    }
+
+    const availability = summariseBedAvailability(availableRooms);
+
+    const conflictText = conflicts.map(conflict => {
+      return `All ${conflict.bed === 1 ? '1-bed' : '2-bed'} rooms are reserved for unassigned bookings (${conflict.reserved}).`;
+    }).join(' ');
+
+    const message = [conflictText, availability ? `Currently available: ${availability}` : ''].filter(Boolean).join(' ');
+
+    toggleAvailabilityWarning(true, message);
+  }
+
+  function summariseBedAvailability(rooms) {
+    if (!rooms || !rooms.length) return '';
+    const bed1 = rooms.filter(room => parseInt(room.ROOM_BED, 10) === 1).length;
+    const bed2 = rooms.filter(room => parseInt(room.ROOM_BED, 10) === 2).length;
+    const parts = [];
+    if (bed1) parts.push(`${bed1} room(s) with 1 bed`);
+    if (bed2) parts.push(`${bed2} room(s) with 2 beds`);
+    return parts.join(', ');
+  }
+
+  function shouldDisableRoomForManualSelection(room) {
+    if (!room) return true;
+    const bedType = parseInt(room.ROOM_BED, 10);
+    if (!groupUnassignedConflicts || !groupUnassignedConflicts.length) return false;
+    return groupUnassignedConflicts.some(conf => parseInt(conf.bed, 10) === bedType);
+  }
+
+  function refreshManualSelectionDisabledState() {
+    const limitReached = hasReachedManualSelectionLimit();
+    const summary = getManualBedSummary();
+    $('#groupRoomsList .group-manual-checkbox').each(function() {
+      const roomId = parseInt($(this).data('room-id'), 10);
+      const room = groupAvailableRooms.find(r => r.IDNo === roomId);
+      const bedType = room ? parseInt(room.ROOM_BED, 10) : null;
+
+      // REMOVED: shouldDisableRoomForManualSelection check - causing over-disabling
+
+      // Only disable rooms that are NOT needed
+      if (groupRequiredBed2 === 0 && bedType === 2) {
+        // If 0 2-bed rooms needed, disable all 2-bed rooms only  
+        $(this).prop('checked', false).prop('disabled', true);
+        groupManualSelectedRooms = groupManualSelectedRooms.filter(id => id !== roomId);
+        return;
+      }
+
+      if (groupRequiredBed1 || groupRequiredBed2) {
+        if (bedType === 1 && summary.bed1 >= groupRequiredBed1 && !groupManualSelectedRooms.includes(roomId)) {
+          $(this).prop('disabled', true);
+          return;
+        }
+        if (bedType === 2 && summary.bed2 >= groupRequiredBed2 && !groupManualSelectedRooms.includes(roomId)) {
+          $(this).prop('disabled', true);
+          return;
+        }
+      }
+
+      if (limitReached && !groupManualSelectedRooms.includes(roomId)) {
+        $(this).prop('disabled', true);
+      } else {
+        $(this).prop('disabled', false);
+      }
+    });
+  }
+
+  function attachManualSelectionHandlers() {
+    $('#groupManualSelectToggle').on('change', function() {
+      const enabled = $(this).is(':checked');
+      setManualSelectionMode(enabled);
+      if (!enabled) {
+        $('#groupSelectedRooms').val('');
+        $('#groupSelectedRoomPrices').val('');
+        $('#groupRoomBreakdown').empty();
+      }
+
+      const bed1Needed = parseInt($('#groupBed1Count').val(), 10) || 0;
+      const bed2Needed = parseInt($('#groupBed2Count').val(), 10) || 0;
+      groupRequiredBed1 = bed1Needed;
+      groupRequiredBed2 = bed2Needed;
+      if (enabled) {
+        refreshManualSelectionDisabledState();
+        updateManualSelectionInfo();
+      }
+      computeGroupTotal();
+    });
+
+    $('#groupRoomsList').on('change', '.group-manual-checkbox', function() {
+      const roomId = parseInt($(this).data('room-id'), 10);
+      if ($(this).is(':checked')) {
+        if (hasReachedManualSelectionLimit()) {
+          $(this).prop('checked', false);
+          Swal.fire('Limit Reached', 'You have already selected the required number of rooms.', 'info');
+          return;
+        }
+        groupManualSelectedRooms.push(roomId);
+      } else {
+        groupManualSelectedRooms = groupManualSelectedRooms.filter(id => id !== roomId);
+      }
+
+      refreshManualSelectionDisabledState();
+      updateManualSelectionInfo();
+      updateManualSelectedRoomValues();
+      computeGroupTotal();
+    });
+
+  }
+
+  function updateManualSelectedRoomValues() {
+    const selectedRooms = groupAvailableRooms.filter(room => groupManualSelectedRooms.includes(room.IDNo));
+    const dates = getSelectedDateRange();
+    const bookingType = $('#groupBookingRoute').val();
+
+    const computedBasePrices = selectedRooms.map(room => {
+      const basePrice = typeof room.RESOLVED_PRICE === 'number'
+        ? room.RESOLVED_PRICE
+        : (() => {
+            const seasonalPrices = room.SEASONAL_PRICES || [];
+            const bedCount = parseInt(room.ROOM_BED, 10);
+            const seasonId = dates ? getSeasonIdForDate(dates.start, seasonalPrices) : null;
+            const match = seasonalPrices.find(price => parseInt(price.bedCount, 10) === bedCount && price.bookingType === bookingType && parseInt(price.seasonId, 10) === parseInt(seasonId, 10));
+            return match ? parseFloat(match.price) : 0;
+          })();
+      const roomId = room.IDNo;
+      return basePrice;
+    });
+
+    const nights = parseInt($('#groupNights').val(), 10) || 0;
+
+    $('#groupSelectedRooms').val(selectedRooms.map(room => room.IDNo).join(','));
+    $('#groupSelectedRoomPrices').val(computedBasePrices.join(','));
+
+    populateBreakdown(selectedRooms, computedBasePrices);
+    updateGroupChargeBreakdown();
+  }
+
+  function attachBookingRouteHandler() {
+    $('#groupBookingRoute').on('change', function() {
+      if (this.value === 'agency') {
+        $('#groupAgencyWrapper').show();
+        loadGroupAgencies();
+      } else {
+        $('#groupAgencyWrapper').hide();
+        $('#groupAgencySelect').val('');
+      }
+    });
+  }
+
+  function updateGroupChargeBreakdown() {
+    const reservationFee = $('#groupIncludeReservationFee').prop('checked') ? (parseFloat($('#groupReservationFee').val()) || 0) : 0;
+    const discount = $('#groupIncludeDiscount').prop('checked') ? (parseFloat($('#groupDiscount').val()) || 0) : 0;
+    const container = $('#groupRoomBreakdown');
+    if (!container.length) return;
+
+    if (!reservationFee && !discount) {
+      container.find('.group-fee-discount-summary').remove();
+      return;
+    }
+
+    let summary = container.find('.group-fee-discount-summary');
+    if (!summary.length) {
+      summary = $('<div class="group-fee-discount-summary" style="margin-top: 12px;"></div>');
+      container.append(summary);
+    }
+
+    const lines = [];
+    if (reservationFee) {
+      lines.push(`<li>Reservation Fee (Group): ${formatCurrency(reservationFee)}</li>`);
+    }
+    if (discount) {
+      lines.push(`<li>Discount (Group): -${formatCurrency(discount)}</li>`);
+    }
+    summary.html(`<b>Group Adjustments:</b><ul>${lines.join('')}</ul>`);
+  }
+
+
+
+  function getGroupBookingState() {
+    return {
+      reservationFee: $('#groupIncludeReservationFee').prop('checked') ? (parseFloat($('#groupReservationFee').val()) || 0) : 0,
+      discount: $('#groupIncludeDiscount').prop('checked') ? (parseFloat($('#groupDiscount').val()) || 0) : 0
+    };
+  }
+
+  window.getGroupBookingState = getGroupBookingState;
+
+  $(document).ready(function() {
+    initializeGroupFlatpickr();
+    fetchGroupFloors();
+    loadGroupGuestTypes();
+    loadGroupGuestLevels();
+    loadGroupBreakfastPrices();
+    loadGroupTransportPrices();
+    attachToggles();
+    attachRoomSelectionHandler();
+    attachManualSelectionHandlers();
+    attachBookingRouteHandler();
+    handleSearchRooms();
+
+    $('#groupBookingForm').on('input change', computeGroupTotal);
+
+    $('#modal-add-group-booking').on('shown.bs.modal', function() {
+      resetGroupForm();
+      initializeGroupFlatpickr();
+    });
+
+    // Toggle wrappers and recalc
+    $('#groupIncludeReservationFee').on('change', function() {
+      $('#groupReservationFeeWrapper').toggle(this.checked);
+      if (!this.checked) { $('#groupReservationFee').val('0'); }
+      updateGroupChargeBreakdown();
+      computeGroupTotal();
+    });
+    $('#groupIncludeDiscount').on('change', function() {
+      $('#groupDiscountWrapper').toggle(this.checked);
+      if (!this.checked) { $('#groupDiscount').val('0'); }
+      updateGroupChargeBreakdown();
+      computeGroupTotal();
+    });
+
+    $('#groupReservationFee, #groupDiscount').on('input', function() {
+      updateGroupChargeBreakdown();
+      computeGroupTotal();
+    });
+
+    // Clear selected rooms when Check-in/Check-out status changes
+    $('#groupCheckInStatus, #groupCheckOutStatus').on('change', function() {
+      // Uncheck any selected block radios or manual checkboxes
+      $('#groupRoomsList input[name="groupBlock"]').prop('checked', false);
+      $('#groupRoomsList .group-manual-checkbox').prop('checked', false);
+
+      // Reset selected rooms state and hidden inputs
+      groupManualSelectedRooms = [];
+      $('#groupSelectedRooms').val('');
+      $('#groupSelectedRoomPrices').val('');
+      $('#groupSelectedRoomNumbers').val('');
+
+      // Clear breakdown and recompute totals
+      $('#groupRoomBreakdown').empty();
+      updateManualSelectionInfo();
+      computeGroupTotal();
+
+      // Auto-search if rooms were previously searched
+      if ($('#groupResultsContainer').is(':visible')) {
+        $('#groupSearchRooms').click();
+      }
+    });
+    // Generate voucher no. on open and when dates change
+    function generateGroupVoucherNo() {
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      // Group voucher: GV + yyyymmdd + HHMM
+      return `GV${yyyy}${mm}${dd}${hours}${minutes}`;
+    }
+
+    $('#groupVoucherNo').val(generateGroupVoucherNo());
+
+    $('#btnGroupVoucherPreview').on('click', function() {
+      const vno = $('#groupVoucherNo').val() || generateGroupVoucherNo();
+      $('#groupVoucherNo').val(vno);
+
+      const daterange = $('#groupDaterange').val() || '';
+      const dateFrom = daterange.includes(' to ') ? daterange.split(' to ')[0] : '';
+      const dateTo = daterange.includes(' to ') ? daterange.split(' to ')[1].split('(')[0].trim() : '';
+      // Prefer precomputed room numbers from hidden input
+      const selectedRoomNumbers = ($('#groupSelectedRoomNumbers').val()||'').split(',').filter(Boolean);
+      const roomNumbersForVoucher = selectedRoomNumbers.length
+        ? selectedRoomNumbers.join(', ')
+        : ($('#groupSelectedRooms').val()||'').split(',').filter(Boolean).join(', ');
+
+      const totalText = $('#groupComputedTotal').text() || '0';
+      const numericTotal = totalText.replace(/[^0-9.]/g, '') || '0';
+
+      const bookingData = {
+        voucherNo: vno,
+        fullname: $('#groupName').val() || 'Group Booking',
+        contactNumber: $('#groupContact').val() || '',
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        bedCount: '',
+        roomNumber: roomNumbersForVoucher,
+        roomView: '',
+        roomType: 'Group',
+        roomRate: '',
+        breakfastAdult: $('#groupBreakfastAdultQty').val() || 0,
+        breakfastAdultPrice: $('#groupBreakfastAdultPrice').val() || 0,
+        breakfastKid: $('#groupBreakfastKidQty').val() || 0,
+        breakfastKidPrice: $('#groupBreakfastKidPrice').val() || 0,
+        pickup: $('#groupIncludePickup').is(':checked') ? ($('#groupPickupPrice').val() || 0) : 0,
+        dropoff: $('#groupIncludeDropoff').is(':checked') ? ($('#groupDropoffPrice').val() || 0) : 0,
+        remarks: '',
+        total: numericTotal,
+        checkInStatus: $('#groupCheckInStatus').val(),
+        checkOutStatus: $('#groupCheckOutStatus').val(),
+        lateCheckoutFee: 0,
+        reservationFee: $('#groupIncludeReservationFee').is(':checked') ? ($('#groupReservationFee').val() || 0) : 0,
+        discount: $('#groupIncludeDiscount').is(':checked') ? ($('#groupDiscount').val() || 0) : 0,
+        directReservationFlag: false
+      };
+
+      const form = $('<form>', {
+        method: 'POST',
+        action: '/booking/generate-voucher',
+        target: '_blank'
+      });
+      for (let key in bookingData) {
+        form.append($('<input>', { type: 'hidden', name: key, value: bookingData[key] }));
+      }
+      $('body').append(form);
+      form.submit();
+      form.remove();
+    });
+  });
+})();
+</script>
+<script src="/js/booking/group_booking_submit.js"></script>
+

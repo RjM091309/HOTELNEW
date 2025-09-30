@@ -2386,438 +2386,19 @@ class BookingModel {
     }
   }
 
-  // Find consecutive rooms
-  static async findConsecutiveRooms(params) {
-    let { startDate, endDate, neededRooms, floorNumber } = params;
-
-    try {
-      // Convert dates to YYYY-MM-DD using moment.js logic
-      const moment = require('moment');
-      startDate = moment(startDate, 'MMM DD, YYYY').format('YYYY-MM-DD');
-      endDate = moment(endDate, 'MMM DD, YYYY').format('YYYY-MM-DD');
-
-      // Get available rooms for the selected date range
-      let query = `
-        SELECT r.IDNo, r.ROOM_NUMBER, r.ROOM_FLOOR, r.ROOM_BED, r.ROOM_VIEW,
-               COALESCE(r.ROOM_PRICE, rt.BASE_PRICE) AS FINAL_PRICE,
-               r.ROOM_TYPE_ID
-        FROM room r
-        JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
-        WHERE r.ROOM_STATUS != 3
-        AND NOT EXISTS (
-          SELECT 1 FROM booking b
-          WHERE b.ROOM_ID = r.IDNo
-            AND b.ACTIVE = 1
-            AND ((DATE(b.CHECK_IN_DATE) < ? AND DATE(b.CHECK_OUT_DATE) > ?))
-        )
-        ${floorNumber ? "AND r.ROOM_FLOOR = ?" : ""}
-        ORDER BY r.ROOM_NUMBER ASC
-      `;
-
-      let queryParams = [endDate, startDate];
-      if (floorNumber) queryParams.push(floorNumber);
-
-      const rooms = await queryDatabasePromise(query, queryParams);
-
-      // For each room, get its seasonal prices
-      const roomIds = rooms.map(r => r.IDNo);
-      let seasonalPricesMap = {};
-
-      if (roomIds.length > 0) {
-        const seasonalQuery = `
-          SELECT 
-            rsp.ROOM_ID,
-            rsp.SEASON_ID,
-            s.NAME AS SEASON_NAME,
-            s.START_DATE,
-            s.END_DATE,
-            rsp.ROOM_BED AS BED_COUNT,
-            rsp.BOOKING_TYPE,
-            rsp.PRICE AS SEASONAL_PRICE
-          FROM room_season_price rsp
-          LEFT JOIN season s ON s.IDNo = rsp.SEASON_ID
-          WHERE rsp.ROOM_ID IN (?)
-          ORDER BY rsp.ROOM_ID, rsp.SEASON_ID, rsp.BOOKING_TYPE, rsp.ROOM_BED
-        `;
-
-        const seasonalRows = await queryDatabasePromise(seasonalQuery, [roomIds]);
-
-        // Group by room
-        for (const row of seasonalRows) {
-          if (!seasonalPricesMap[row.ROOM_ID]) seasonalPricesMap[row.ROOM_ID] = [];
-          seasonalPricesMap[row.ROOM_ID].push({
-            seasonId: row.SEASON_ID,
-            seasonName: row.SEASON_NAME,
-            bedCount: row.BED_COUNT,
-            bookingType: row.BOOKING_TYPE,
-            price: row.SEASONAL_PRICE,
-            startDate: row.START_DATE,
-            endDate: row.END_DATE
-          });
-        }
-      }
-
-      // Attach SEASONAL_PRICES to each room
-      rooms.forEach(room => {
-        room.SEASONAL_PRICES = seasonalPricesMap[room.IDNo] || [];
-      });
-
-      // Sort available rooms by ROOM_NUMBER (assuming numeric room numbers)
-      rooms.sort((a, b) => parseInt(a.ROOM_NUMBER) - parseInt(b.ROOM_NUMBER));
-
-      // Try to find consecutive blocks
-      let consecutiveBlocks = [];
-      for (let i = 0; i <= rooms.length - neededRooms; i++) {
-        let block = rooms.slice(i, i + parseInt(neededRooms));
-        let consecutive = true;
-        for (let j = 1; j < block.length; j++) {
-          if (parseInt(block[j].ROOM_NUMBER) !== parseInt(block[j - 1].ROOM_NUMBER) + 1) {
-            consecutive = false;
-            break;
-          }
-        }
-        if (consecutive) {
-          consecutiveBlocks.push(block);
-        }
-      }
-
-      if (consecutiveBlocks.length > 0) {
-        return { 
-          success: true, 
-          data: consecutiveBlocks, 
-          priority: 'consecutive' 
-        };
-      } else {
-        // If no consecutive block found, return available rooms (non-consecutive)
-        return { 
-          success: true, 
-          data: rooms, 
-          priority: 'available' 
-        };
-      }
-
-    } catch (error) {
-      console.error('Error in findConsecutiveRooms:', error);
-      throw error;
-    }
-  }
-
-  // Add group booking
-  static async addGroupBooking(params) {
-    const {
-      selectedRooms, selectedRoomPrice, qty, daterange, groupName, groupContact, numberOfRooms, paymentStatus, bookingRoute, guestType, guestLevel, checkInStatus,
-      breakfastAdultQty, breakfastAdultPrice, breakfastAdultId, breakfastKidQty, breakfastKidPrice, breakfastKidId, pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice, encodedBy
-    } = params;
-
-    try {
-      const date = new Date();
-      
-      // Generate confirmation number based on Hotel_Old format
-      const moment = require('moment');
-      const checkInDateFormatted = moment(params.checkInDate || daterange.split(' to ')[0].trim(), 'MMM DD, YYYY').format('YYYYMMDD');
-      
-      // For group bookings, we typically use first room number or time
-      const firstRoomId = selectedRooms[0];
-      let confirmationNumber;
-      
-      // Query first room number to create confirmation number
-      const roomQuery = 'SELECT ROOM_NUMBER FROM room WHERE IDNo = ?';
-      const roomResult = await queryDatabasePromise(roomQuery, [firstRoomId]);
-      
-      if (roomResult.length > 0) {
-        const roomNumber = roomResult[0].ROOM_NUMBER;
-        confirmationNumber = checkInDateFormatted + '0' + roomNumber;
-      } else {
-        // Fallback: use current time
-        const currentTime = new Date().toLocaleTimeString('en-US').replace(/:/g, '');
-        confirmationNumber = checkInDateFormatted + 'UR' + currentTime;
-      }
-
-      // Split daterange and add default times
-      const [checkInDate, checkOutDate] = daterange.split(' to ').map((dateStr, index) => {
-        const cleanDateStr = dateStr.split(' (')[0];
-        const time = index === 0 ? '14:00:00' : '11:00:00';
-        const moment = require('moment');
-        return moment(cleanDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD') + ' ' + time;
-      });
-
-      // console.log('📌 Check-in:', checkInDate, 'Check-out:', checkOutDate);
-
-      // Get connection for transaction
-      const connection = await new Promise((resolve, reject) => {
-        pool.getConnection((err, conn) => {
-          if (err) reject(err);
-          else resolve(conn);
-        });
-      });
-
-      try {
-        // Start transaction
-        await new Promise((resolve, reject) => {
-          connection.beginTransaction(err => {
-            if (err) reject(err);
-            else resolve();
-          });
-        });
-
-        // Insert into `group_booking`
-        const groupBookingQuery = `
-          INSERT INTO group_booking (GROUP_NAME, CONTACT_NO, NUMBER_OF_ROOMS, ENCODED_BY)
-          VALUES (?, ?, ?, ?)
-        `;
-        const groupBookingValues = [groupName, groupContact, numberOfRooms, encodedBy];
-
-        const groupResult = await new Promise((resolve, reject) => {
-          connection.query(groupBookingQuery, groupBookingValues, (err, result) => {
-            if (err) reject(err);
-            else resolve(result);
-          });
-        });
-
-        const groupBookingId = groupResult.insertId;
-        // console.log('✅ Group Booking ID:', groupBookingId);
-
-        // Process each room in the selectedRooms list
-        const roomIds = selectedRooms.split(',');
-        const roomPrices = selectedRoomPrice.split(',').map(price => parseFloat(price));
-
-        let firstBookingId = null;
-        let firstBillingId = null;
-
-        // Process rooms sequentially
-        for (let index = 0; index < roomIds.length; index++) {
-          const roomId = roomIds[index];
-          const guestFullName = `${groupName}-${index + 1}`;
-          const totalRoomCharge = roomPrices[index];
-
-          // Insert into `customer`
-          // Handle empty guestType and guestLevel - set to NULL if empty
-          const processedGuestType = (guestType && guestType.trim() !== '') ? guestType : null;
-          const processedGuestLevel = (guestLevel && guestLevel.trim() !== '') ? guestLevel : null;
-          
-          const customerQuery = `
-            INSERT INTO customer (NAME, CONTACTNo, TYPE, LEVEL, ADDRESS, MESSAGE, ENCODED_BY, ENCODED_DT, ACTIVE, IS_GROUP)
-            VALUES (?, ?, ?, ?, '', '', ?, ?, 1, 1)
-          `;
-          const customerValues = [guestFullName, groupContact, processedGuestType, processedGuestLevel, encodedBy, date];
-
-          const custResult = await new Promise((resolve, reject) => {
-            connection.query(customerQuery, customerValues, (err, result) => {
-              if (err) reject(err);
-              else resolve(result);
-            });
-          });
-
-          const guestID = custResult.insertId;
-          // console.log(`✅ Customer ${guestFullName} ID:`, guestID);
-
-          // Insert into `booking`
-          const bookingQuery = `
-            INSERT INTO booking (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, REMARKS, CONFIRMATION_NUMBER, NOTIFICATION_READ, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, GROUP_BOOKING_ID)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)
-          `;
-          const bookingValues = [
-            guestID, roomId, checkInDate, checkOutDate, 'pending', bookingRoute, 1, '',
-            confirmationNumber, encodedBy, date, 1, checkInStatus, groupBookingId
-          ];
-
-          const bookResult = await new Promise((resolve, reject) => {
-            connection.query(bookingQuery, bookingValues, (err, result) => {
-              if (err) reject(err);
-              else resolve(result);
-            });
-          });
-
-          const bookingId = bookResult.insertId;
-          if (index === 0) firstBookingId = bookingId;
-          // console.log(`✅ Booking ID for ${guestFullName}:`, bookingId);
-
-          // Insert into `billing`
-          const billingQuery = `
-            INSERT INTO billing (BOOKING_ID, ROOM_CHARGE, AMENITIES_CHARGE, SERVICES_CHARGE, LATE_CHECKOUT_CHARGE, QTY, PAYMENT_STATUS, PAYMENT_METHOD, REMARKS, ENCODED_BY, ENCODED_DT, ACTIVE)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `;
-          const billingValues = [
-            bookingId, totalRoomCharge, 0.00, 0.00, 0.00, qty, paymentStatus, 'cash', '', encodedBy, date, 1
-          ];
-
-          const billResult = await new Promise((resolve, reject) => {
-            connection.query(billingQuery, billingValues, (err, result) => {
-              if (err) reject(err);
-              else resolve(result);
-            });
-          });
-
-          if (index === 0) firstBillingId = billResult.insertId || bookingId;
-          // console.log(`✅ Billing added for Booking ID: ${bookingId} with Room Charge: ₱${totalRoomCharge}`);
-
-          // Insert into payments if status is paid (room charge)
-          if (paymentStatus === 'paid') {
-            const amountPaid = totalRoomCharge * qty;
-            const paymentQuery = `
-              INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
-              VALUES (?, ?, ?, ?, 'room', NOW(), ?)
-            `;
-            await new Promise((resolve, reject) => {
-              connection.query(paymentQuery, [bookingId, billResult.insertId || bookingId, amountPaid, 'cash', encodedBy], (err) => {
-                if (err) reject(err);
-                else resolve();
-              });
-            });
-          }
-        }
-
-        // Insert group-level services using firstBookingId
-        if (firstBookingId) {
-          const groupServices = [];
-          
-          // Breakfast Adult
-          if (parseInt(breakfastAdultQty) > 0 && breakfastAdultId) {
-            const totalAdult = parseFloat(breakfastAdultQty) * parseFloat(breakfastAdultPrice);
-            groupServices.push([
-              firstBookingId,
-              breakfastAdultId,
-              breakfastAdultQty,
-              totalAdult,
-              paymentStatus === 'paid' ? 'paid' : 'unpaid',
-              encodedBy,
-              date,
-              1
-            ]);
-          }
-          
-          // Breakfast Kid
-          if (parseInt(breakfastKidQty) > 0 && breakfastKidId) {
-            const totalKid = parseFloat(breakfastKidQty) * parseFloat(breakfastKidPrice);
-            groupServices.push([
-              firstBookingId,
-              breakfastKidId,
-              breakfastKidQty,
-              totalKid,
-              paymentStatus === 'paid' ? 'paid' : 'unpaid',
-              encodedBy,
-              date,
-              1
-            ]);
-          }
-          
-          // Pickup
-          if (pickupServiceId && pickupPrice) {
-            groupServices.push([
-              firstBookingId,
-              pickupServiceId,
-              1,
-              pickupPrice,
-              paymentStatus === 'paid' ? 'paid' : 'unpaid',
-              encodedBy,
-              date,
-              1
-            ]);
-          }
-          
-          // Dropoff
-          if (dropoffServiceId && dropoffPrice) {
-            groupServices.push([
-              firstBookingId,
-              dropoffServiceId,
-              1,
-              dropoffPrice,
-              paymentStatus === 'paid' ? 'paid' : 'unpaid',
-              encodedBy,
-              date,
-              1
-            ]);
-          }
-
-          if (groupServices.length > 0) {
-            const serviceQuery = `
-              INSERT INTO booking_service 
-              (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE)
-              VALUES ?
-            `;
-            await new Promise((resolve, reject) => {
-              connection.query(serviceQuery, [groupServices], (err) => {
-                if (err) reject(err);
-                else resolve();
-              });
-            });
-
-            // Insert payments for services if paid
-            if (paymentStatus === 'paid') {
-              const servicePayments = groupServices.map(s => [
-                firstBookingId,
-                s[1],              // SERVICE_ID
-                parseFloat(s[3]),  // TOTAL_COST
-                'cash',
-                'service',
-                date,
-                encodedBy
-              ]);
-              const payQuery = `
-                INSERT INTO payments 
-                (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
-                VALUES ?
-              `;
-              await new Promise((resolve, reject) => {
-                connection.query(payQuery, [servicePayments], (err) => {
-                  if (err) reject(err);
-                  else resolve();
-                });
-              });
-            }
-          }
-        }
-
-        // Commit transaction
-        await new Promise((resolve, reject) => {
-          connection.commit(err => {
-            if (err) reject(err);
-            else resolve();
-          });
-        });
-
-        connection.release();
-
-        return {
-          success: true,
-          confirmationNumber
-        };
-
-      } catch (error) {
-        // Rollback on error
-        await new Promise((resolve) => {
-          connection.rollback(() => resolve());
-        });
-        connection.release();
-        throw error;
-      }
-
-    } catch (error) {
-      console.error('Error in addGroupBooking:', error);
-      throw error;
-    }
-  }
-
   // Get group booking data
   static async getGroupBookingData(filter) {
     try {
-      // Build a date condition based on the filter
       let dateCondition = '';
-      switch(filter.toLowerCase()) {
-        case 'today':
-          dateCondition = "AND DATE(b.ENCODED_DT) = CURRENT_DATE()";
-          break;
-        case 'last3days':
-          dateCondition = "AND b.ENCODED_DT >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 DAY) AND b.ENCODED_DT <= CURRENT_DATE()";
-          break;
-        case 'thisweek':
-          dateCondition = "AND YEARWEEK(b.ENCODED_DT, 1) = YEARWEEK(CURRENT_DATE(), 1)";
-          break;
-        case 'thismonth':
-          dateCondition = "AND MONTH(b.ENCODED_DT) = MONTH(CURRENT_DATE()) AND YEAR(b.ENCODED_DT) = YEAR(CURRENT_DATE())";
-          break;
-        default:
-          dateCondition = "";
+      
+      if (filter === 'today') {
+        dateCondition = 'AND DATE(b.CHECK_IN_DATE) = CURDATE()';
+      } else if (filter === 'last3days') {
+        dateCondition = 'AND DATE(b.CHECK_IN_DATE) >= DATE_SUB(CURDATE(), INTERVAL 3 DAY)';
+      } else if (filter === 'thisweek') {
+        dateCondition = 'AND YEARWEEK(b.CHECK_IN_DATE) = YEARWEEK(CURDATE())';
+      } else if (filter === 'thismonth') {
+        dateCondition = 'AND YEAR(b.CHECK_IN_DATE) = YEAR(CURDATE()) AND MONTH(b.CHECK_IN_DATE) = MONTH(CURDATE())';
       }
 
       const query = `
@@ -4423,6 +4004,572 @@ class BookingModel {
     } catch (error) {
       console.error('Error fetching available rooms by floor:', error);
       throw error;
+    }
+  }
+
+  // Find consecutive rooms with bed requirements (Hotel_Old logic)
+  static async findConsecutiveRooms(params) {
+    const { startDate, endDate, neededRooms, floorNumber, bed1Needed = 0, bed2Needed = 0, bookingRoute, checkInStatus, checkOutStatus } = params;
+    
+    try {
+      const connection = await pool.promise().getConnection();
+      
+      // Format dates
+      const moment = require('moment');
+      const formattedStartDate = moment(startDate, 'MMM DD, YYYY').format('YYYY-MM-DD');
+      const formattedEndDate = moment(endDate, 'MMM DD, YYYY').format('YYYY-MM-DD');
+
+      const roomsQuery = `
+        SELECT r.IDNo, r.ROOM_NUMBER, r.ROOM_FLOOR, r.ROOM_BED, r.ROOM_VIEW,
+               COALESCE(r.ROOM_PRICE, rt.BASE_PRICE) AS FINAL_PRICE,
+               r.ROOM_TYPE_ID,
+               (
+                 SELECT CASE 
+                   WHEN b2.LATE_CHECKOUT = 1 THEN 'L/O'
+                   WHEN b2.LATE_CHECKOUT = 0 OR b2.LATE_CHECKOUT IS NULL THEN 'R/O'
+                   ELSE NULL
+                 END
+                 FROM booking b2 
+                 WHERE b2.ROOM_ID = r.IDNo 
+                   AND DATE(b2.CHECK_OUT_DATE) = ?
+                   AND (b2.IS_CANCELLED IS NULL OR b2.IS_CANCELLED != 1)
+                   AND b2.ACTIVE = 1
+                 LIMIT 1
+               ) AS checkoutType,
+               (
+                 SELECT CASE 
+                   WHEN b3.CHECK_IN_STATUS = 0 THEN 'L/I'
+                   WHEN b3.CHECK_IN_STATUS = 1 THEN 'R/I'
+                   ELSE NULL
+                 END
+                 FROM booking b3 
+                 WHERE b3.ROOM_ID = r.IDNo 
+                   AND DATE(b3.CHECK_IN_DATE) = ?
+                   AND (b3.IS_CANCELLED IS NULL OR b3.IS_CANCELLED != 1)
+                   AND b3.ACTIVE = 1
+                 LIMIT 1
+               ) AS checkinType
+        FROM room r
+        JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
+        WHERE r.ROOM_STATUS != 3
+          AND NOT EXISTS (
+            SELECT 1 FROM booking b
+            WHERE b.ROOM_ID = r.IDNo
+              AND b.ACTIVE = 1
+              AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
+              AND (DATE(b.CHECK_IN_DATE) < ? AND DATE(b.CHECK_OUT_DATE) > ?)
+          )`;
+
+      const roomParams = [formattedStartDate, formattedEndDate, formattedEndDate, formattedStartDate];
+
+      if (floorNumber) {
+        roomParams.push(floorNumber);
+      }
+
+      const unassignedQuery = `
+        SELECT 
+          b.IDNo AS bookingId,
+          b.CHECK_IN_DATE,
+          b.CHECK_OUT_DATE,
+          b.BED_COUNT,
+          COALESCE(r.ROOM_BED, b.BED_COUNT) AS REQUIRED_BEDS
+        FROM booking b
+        LEFT JOIN room r ON b.ROOM_ID = r.IDNo
+        WHERE b.ACTIVE = 1
+          AND b.IS_DIRECT_RESERVATION = 1
+          AND (b.ROOM_ID = 0 OR b.ROOM_ID IS NULL)
+          AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
+          AND DATE(b.CHECK_IN_DATE) < ?
+          AND DATE(b.CHECK_OUT_DATE) > ?
+      `;
+
+      const [unassignedRows] = await connection.query(unassignedQuery, [formattedEndDate, formattedStartDate]);
+
+      const reservedBeds = unassignedRows.reduce((acc, booking) => {
+        const bedCount = parseInt(booking.REQUIRED_BEDS, 10) || 0;
+        if (bedCount === 1) acc.bed1 += 1;
+        if (bedCount === 2) acc.bed2 += 1;
+        return acc;
+      }, { bed1: 0, bed2: 0 });
+
+      const conflicts = [];
+      if (bed1Needed > 0 && reservedBeds.bed1 >= bed1Needed) {
+        conflicts.push({ bed: 1, reserved: reservedBeds.bed1 });
+      }
+      if (bed2Needed > 0 && reservedBeds.bed2 >= bed2Needed) {
+        conflicts.push({ bed: 2, reserved: reservedBeds.bed2 });
+      }
+
+      const bedNeedsAfterReserve = {
+        bed1: Math.max(bed1Needed - reservedBeds.bed1, 0),
+        bed2: Math.max(bed2Needed - reservedBeds.bed2, 0)
+      };
+
+      let finalRoomsQuery = roomsQuery;
+      if (floorNumber) {
+        finalRoomsQuery += ' AND r.ROOM_FLOOR = ?';
+      }
+      finalRoomsQuery += ' ORDER BY r.ROOM_FLOOR, CAST(r.ROOM_NUMBER AS UNSIGNED)';
+
+      const [rooms] = await connection.query(finalRoomsQuery, roomParams);
+
+      // Count total rooms by bed type
+      const totalRoomsByBed = rooms.reduce((acc, room) => {
+        const bedCount = parseInt(room.ROOM_BED, 10);
+        acc[bedCount] = (acc[bedCount] || 0) + 1;
+        return acc;
+      }, {});
+
+      // Filter out rooms that are reserved for unassigned bookings (like topbar.ejs logic)
+      const availableRooms = rooms.filter(room => {
+        const bedCount = parseInt(room.ROOM_BED, 10);
+        if (bedCount === 1) {
+          const total1Bed = totalRoomsByBed[1] || 0;
+          const available1Bed = Math.max(0, total1Bed - reservedBeds.bed1);
+          return available1Bed > 0; // Show if there are any available 1-bed rooms
+        } else if (bedCount === 2) {
+          const total2Bed = totalRoomsByBed[2] || 0;
+          const available2Bed = Math.max(0, total2Bed - reservedBeds.bed2);
+          return available2Bed > 0; // Show if there are any available 2-bed rooms
+        }
+        return true; // Show other bed types
+      });
+
+      // Apply Check-In Status and Check-Out Status filters like topbar.ejs
+      let filteredRooms = availableRooms;
+      
+      if (checkInStatus !== undefined && checkInStatus !== '' || checkOutStatus !== undefined && checkOutStatus !== '') {
+        filteredRooms = availableRooms.filter(room => {
+          const checkoutType = room.checkoutType;
+          const checkinType = room.checkinType;
+          let belongsToCheckin = true;
+          let belongsToCheckout = true;
+          
+          // Check-In Status Filter Logic - Convert numeric values to matching logic
+          if (checkInStatus === '1') {
+            // Regular Check-In (value 1): Only compatible with R/O checkout OR no checkout conflict
+            belongsToCheckin = (checkoutType === 'R/O' || !checkoutType);
+          } else if (checkInStatus === '0') {
+            // Late Check-In (value 0): Compatible with BOTH R/O and L/O checkout OR no checkout conflict
+            belongsToCheckin = (checkoutType === 'R/O' || checkoutType === 'L/O' || !checkoutType);
+          }
+          
+          // Check-Out Status Filter Logic - Convert numeric values to matching logic
+          if (checkOutStatus === '0') {
+            // Regular Check-Out (value 0): Compatible with BOTH R/I and L/I checkin OR no checkin conflict
+            belongsToCheckout = (checkinType === 'R/I' || checkinType === 'L/I' || !checkinType);
+          } else if (checkOutStatus === '1') {
+            // Late Check-Out (value 1): Only compatible with L/I checkin OR no checkin conflict
+            belongsToCheckout = (checkinType === 'L/I' || !checkinType);
+          }
+          
+          const finalResult = belongsToCheckin && belongsToCheckout;
+          return finalResult;
+        });
+      }
+
+      if (!filteredRooms.length) {
+        return {
+          success: false,
+          message: 'No rooms available for the selected dates.',
+          data: { unassignedConflicts: conflicts }
+        };
+      }
+
+      const roomIds = filteredRooms.map(r => r.IDNo);
+      const seasonalPricesMap = {};
+
+      if (roomIds.length > 0) {
+        const [seasonalRows] = await connection.query(
+          `SELECT 
+            rsp.ROOM_ID,
+            rsp.SEASON_ID,
+            s.NAME AS SEASON_NAME,
+            s.START_DATE,
+            s.END_DATE,
+            rsp.ROOM_BED AS BED_COUNT,
+            rsp.BOOKING_TYPE,
+            rsp.PRICE AS SEASONAL_PRICE
+          FROM room_season_price rsp
+          LEFT JOIN season s ON s.IDNo = rsp.SEASON_ID
+          WHERE rsp.ROOM_ID IN (?)
+          ORDER BY rsp.ROOM_ID, rsp.SEASON_ID, rsp.BOOKING_TYPE, rsp.ROOM_BED`,
+          [roomIds]
+        );
+
+        for (const row of seasonalRows) {
+          if (!seasonalPricesMap[row.ROOM_ID]) seasonalPricesMap[row.ROOM_ID] = [];
+          seasonalPricesMap[row.ROOM_ID].push({
+            seasonId: row.SEASON_ID,
+            seasonName: row.SEASON_NAME,
+            bedCount: row.BED_COUNT,
+            bookingType: row.BOOKING_TYPE,
+            price: row.SEASONAL_PRICE,
+            startDate: row.START_DATE,
+            endDate: row.END_DATE
+          });
+        }
+      }
+
+      filteredRooms.forEach(room => {
+        room.SEASONAL_PRICES = seasonalPricesMap[room.IDNo] || [];
+      });
+
+      const resolveSeasonalPrice = (room, checkInDate) => {
+        const seasonalPrices = room.SEASONAL_PRICES || [];
+        const bedCount = parseInt(room.ROOM_BED, 10);
+        const checkMoment = moment(checkInDate, 'YYYY-MM-DD');
+        if (!checkMoment.isValid()) return 0;
+
+        const matchSeason = seasonalPrices.find(price => {
+          const start = moment(price.startDate);
+          const end = moment(price.endDate);
+          if (!start.isValid() || !end.isValid()) return false;
+          const inRange = start.isSameOrBefore(end)
+            ? checkMoment.isBetween(start, end, 'day', '[]')
+            : checkMoment.isSameOrAfter(start) || checkMoment.isSameOrBefore(end);
+
+          return inRange && parseInt(price.bedCount, 10) === bedCount && price.bookingType === bookingRoute;
+        });
+
+        if (matchSeason) {
+          return parseFloat(matchSeason.price) || 0;
+        }
+
+        const fallbackSeason = seasonalPrices.find(price => {
+          const start = moment(price.startDate);
+          const end = moment(price.endDate);
+          if (!start.isValid() || !end.isValid()) return false;
+          const inRange = start.isSameOrBefore(end)
+            ? checkMoment.isBetween(start, end, 'day', '[]')
+            : checkMoment.isSameOrAfter(start) || checkMoment.isSameOrBefore(end);
+
+          return inRange && parseInt(price.bedCount, 10) === bedCount;
+        });
+
+        return fallbackSeason ? (parseFloat(fallbackSeason.price) || 0) : 0;
+      };
+
+      const attachResolvedPrices = (block) => {
+        return block.map(room => {
+          return {
+            ...room,
+            RESOLVED_PRICE: resolveSeasonalPrice(room, formattedStartDate)
+          };
+        });
+      };
+
+      filteredRooms.sort((a, b) => parseInt(a.ROOM_NUMBER, 10) - parseInt(b.ROOM_NUMBER, 10));
+
+      if (neededRooms > filteredRooms.length) {
+        return {
+          success: false,
+          message: 'Not enough rooms available after accounting for unassigned bookings.',
+          data: {
+            availableRooms: filteredRooms,
+            unassignedConflicts: conflicts
+          }
+        };
+      }
+
+      // CHECK: Validate bed requirements against available rooms
+      const bedValidationPassed = !(bed1Needed + bed2Needed) || 
+        (filteredRooms.filter(r => parseInt(r.ROOM_BED, 10) === 1).length >= bed1Needed) &&
+        (filteredRooms.filter(r => parseInt(r.ROOM_BED, 10) === 2).length >= bed2Needed);
+
+      if (!bedValidationPassed) {
+        return {
+          success: false,
+          message: 'Not enough rooms with required bed types.',
+          data: {
+            availableRooms: filteredRooms.map(room => ({
+              ...room,
+              RESOLVED_PRICE: resolveSeasonalPrice(room, formattedStartDate)
+            })),
+            unassignedConflicts: conflicts
+          }
+        };
+      }
+
+      const payload = {
+        consecutiveBlocks: [], // REMOVED: No auto-suggested consecutive blocks
+        nonConsecutiveBlocks: [], // REMOVED: No auto-suggested non-consecutive blocks
+        availableRooms: filteredRooms.map(room => ({
+          ...room,
+          RESOLVED_PRICE: resolveSeasonalPrice(room, formattedStartDate)
+        })),
+        unassignedConflicts: conflicts
+      };
+
+      connection.release();
+
+      return {
+        success: true,
+        data: payload,
+        priority: 'manual' // Manual selection is now the default
+      };
+
+    } catch (error) {
+      console.error('Error in findConsecutiveRooms:', error);
+      throw error;
+    }
+  }
+
+  // addGroupBooking temporarily removed per request
+  static async addGroupBooking(data) {
+    const {
+      selectedRooms,
+      selectedRoomPrice,
+      qty,
+      daterange,
+      groupName,
+      groupContact,
+      numberOfRooms,
+      paymentStatus,
+      bookingRoute,
+      guestType,
+      guestLevel,
+      checkInStatus,
+      checkOutStatus,
+      remarks,
+      agencyId = null,
+      // Group-level services
+      breakfastAdultQty,
+      breakfastAdultPrice,
+      breakfastAdultId,
+      breakfastKidQty,
+      breakfastKidPrice,
+      breakfastKidId,
+      pickupServiceId,
+      pickupPrice,
+      dropoffServiceId,
+      dropoffPrice,
+      reservationFee = 0,
+      discount = 0,
+      perRoomReservationFees = [],
+      perRoomDiscounts = [],
+      // Meta
+      encodedBy,
+      date,
+      isDirectReservation
+    } = data;
+
+    // Helper: parse daterange "MMM DD, YYYY to MMM DD, YYYY (..optional..)"
+    const moment = require('moment');
+    const [rawCheckIn = '', rawCheckOut = ''] = (daterange || '').split(' to ');
+    const normalizeDate = (raw, isCheckIn) => {
+      if (!raw) return null;
+      const clean = raw.split(' (')[0].trim();
+      const time = isCheckIn ? '14:00:00' : (checkOutStatus == 1 ? '23:00:00' : '11:00:00');
+      const parsed = moment(clean, 'MMM DD, YYYY');
+      if (!parsed.isValid()) return null;
+      return `${parsed.format('YYYY-MM-DD')} ${time}`;
+    };
+    const checkInDate = normalizeDate(rawCheckIn, true);
+    const checkOutDate = normalizeDate(rawCheckOut, false);
+    if (!checkInDate || !checkOutDate) {
+      throw new Error('Invalid date range supplied for group booking');
+    }
+    const checkInDateFormatted = moment(checkInDate, 'YYYY-MM-DD HH:mm:ss').format('YYYYMMDD');
+
+    // Compute confirmation number base
+    const roomIds = (selectedRooms || '').split(',').filter(Boolean);
+    if (!roomIds.length) {
+      throw new Error('No rooms selected');
+    }
+
+    // Get connection for transaction
+    const connection = await new Promise((resolve, reject) => {
+      pool.getConnection((err, conn) => (err ? reject(err) : resolve(conn)));
+    });
+
+    try {
+      // Begin transaction
+      await new Promise((resolve, reject) => connection.beginTransaction(err => (err ? reject(err) : resolve())));
+
+      // Determine confirmation number
+      let confirmationNumber;
+      if (isDirectReservation) {
+        const currentTime = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }).replace(/:/g, '');
+        confirmationNumber = checkInDateFormatted + 'UR' + currentTime;
+      } else {
+        const [roomRows] = await connection.promise().query('SELECT ROOM_NUMBER FROM room WHERE IDNo = ?', [roomIds[0]]);
+        if (!roomRows || roomRows.length === 0) {
+          throw new Error('Room not found');
+        }
+        const roomNumber = roomRows[0].ROOM_NUMBER;
+        confirmationNumber = checkInDateFormatted + '0' + roomNumber;
+      }
+
+      // Insert into group_booking
+      const groupBookingQuery = `
+        INSERT INTO group_booking (GROUP_NAME, CONTACT_NO, NUMBER_OF_ROOMS, ENCODED_BY, GROUP_RESERVATION_FEE, GROUP_DISCOUNT, REMARKS)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `;
+      const [groupResult] = await connection.promise().query(groupBookingQuery, [
+        groupName,
+        groupContact,
+        numberOfRooms,
+        encodedBy,
+        parseFloat(reservationFee) || 0,
+        parseFloat(discount) || 0,
+        remarks || ''
+      ]);
+      const groupBookingId = groupResult.insertId;
+
+      // Prepare per-room arrays
+      const roomBasePrices = (selectedRoomPrice || '').split(',').map(p => parseFloat(p));
+      const nightsCount = parseInt(qty, 10) || 1;
+      const perRoomFeesArray = Array.isArray(perRoomReservationFees) ? perRoomReservationFees : (typeof perRoomReservationFees === 'string' ? perRoomReservationFees.split(',') : []);
+      const perRoomDiscountsArray = Array.isArray(perRoomDiscounts) ? perRoomDiscounts : (typeof perRoomDiscounts === 'string' ? perRoomDiscounts.split(',') : []);
+
+      let firstBookingId = null;
+      let totalGroupRoomCharges = 0;
+
+      // Insert each room booking
+      for (let index = 0; index < roomIds.length; index++) {
+        const roomId = roomIds[index];
+        const guestFullName = `${groupName}-${index + 1}`;
+        const baseRoomPrice = roomBasePrices[index];
+        const totalRoomCharge = baseRoomPrice * nightsCount;
+        const perRoomFee = parseFloat(perRoomFeesArray[index]) || 0;
+        const perRoomDiscount = parseFloat(perRoomDiscountsArray[index]) || 0;
+        const adjustedRoomCharge = Math.max(totalRoomCharge + perRoomFee - perRoomDiscount, 0);
+        totalGroupRoomCharges += adjustedRoomCharge;
+
+        // customer
+        const customerQuery = `
+          INSERT INTO customer (NAME, CONTACTNo, TYPE, LEVEL, ADDRESS, MESSAGE, ENCODED_BY, ENCODED_DT, ACTIVE, IS_GROUP)
+          VALUES (?, ?, ?, ?, '', '', ?, ?, 1, 1)
+        `;
+        const [custResult] = await connection.promise().query(customerQuery, [
+          guestFullName,
+          groupContact,
+          guestType,
+          guestLevel,
+          encodedBy,
+          date
+        ]);
+        const guestID = custResult.insertId;
+
+        // booking
+        const bookingQuery = `
+          INSERT INTO booking (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, LATE_CHECKOUT, REMARKS, CONFIRMATION_NUMBER, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, GROUP_BOOKING_ID, AGENCY_ID, IS_DIRECT_RESERVATION)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+        const bookingValues = [
+          guestID,
+          roomId,
+          checkInDate,
+          checkOutDate,
+          'pending',
+          bookingRoute,
+          1,
+          checkOutStatus,
+          '',
+          confirmationNumber,
+          encodedBy,
+          date,
+          1,
+          checkInStatus,
+          groupBookingId,
+          agencyId || null,
+          0
+        ];
+        const [bookResult] = await connection.promise().query(bookingQuery, bookingValues);
+        const bookingId = bookResult.insertId;
+        if (!firstBookingId) firstBookingId = bookingId;
+
+        // billing
+        const billingQuery = `
+          INSERT INTO billing (BOOKING_ID, ROOM_CHARGE, AMENITIES_CHARGE, SERVICES_CHARGE, LATE_CHECKOUT_CHARGE, QTY, PAYMENT_STATUS, PAYMENT_METHOD, REMARKS, ENCODED_BY, ENCODED_DT, ACTIVE, RESERVATION_FEE, DISCOUNT_AMOUNT)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+        const billingValues = [
+          bookingId,
+          baseRoomPrice,
+          0.00,
+          0.00,
+          0.00,
+          qty,
+          paymentStatus,
+          'cash',
+          '',
+          encodedBy,
+          date,
+          1,
+          perRoomFee || 0,
+          perRoomDiscount || 0
+        ];
+        const [billResult] = await connection.promise().query(billingQuery, billingValues);
+
+        // payments for room if paid
+        if (paymentStatus === 'paid') {
+          const amountPaid = adjustedRoomCharge * qty;
+          const paymentQuery = `
+            INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
+            VALUES (?, ?, ?, ?, 'room', NOW(), ?)
+          `;
+          await connection.promise().query(paymentQuery, [bookingId, billResult.insertId || bookingId, amountPaid, 'cash', encodedBy]);
+        }
+      }
+
+      // Insert group-level services against firstBookingId
+      if (firstBookingId) {
+        const groupServices = [];
+        // Breakfast Adult
+        if (parseInt(breakfastAdultQty) > 0 && breakfastAdultId) {
+          const totalAdult = parseFloat(breakfastAdultQty) * parseFloat(breakfastAdultPrice);
+          groupServices.push([firstBookingId, breakfastAdultId, breakfastAdultQty, totalAdult, paymentStatus === 'paid' ? 'paid' : 'unpaid', encodedBy, date, 1]);
+        }
+        // Breakfast Kid
+        if (parseInt(breakfastKidQty) > 0 && breakfastKidId) {
+          const totalKid = parseFloat(breakfastKidQty) * parseFloat(breakfastKidPrice);
+          groupServices.push([firstBookingId, breakfastKidId, breakfastKidQty, totalKid, paymentStatus === 'paid' ? 'paid' : 'unpaid', encodedBy, date, 1]);
+        }
+        // Pickup
+        if (pickupServiceId && pickupPrice) {
+          groupServices.push([firstBookingId, pickupServiceId, 1, parseFloat(pickupPrice), paymentStatus === 'paid' ? 'paid' : 'unpaid', encodedBy, date, 1]);
+        }
+        // Dropoff
+        if (dropoffServiceId && dropoffPrice) {
+          groupServices.push([firstBookingId, dropoffServiceId, 1, parseFloat(dropoffPrice), paymentStatus === 'paid' ? 'paid' : 'unpaid', encodedBy, date, 1]);
+        }
+        if (groupServices.length > 0) {
+          const serviceQuery = `
+            INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE)
+            VALUES ?
+          `;
+          await connection.promise().query(serviceQuery, [groupServices]);
+          if (paymentStatus === 'paid') {
+            const servicePayments = groupServices.map(s => [firstBookingId, s[1], parseFloat(s[3]), 'cash', 'service', date, encodedBy]);
+            const payQuery = `
+              INSERT INTO payments (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
+              VALUES ?
+            `;
+            await connection.promise().query(payQuery, [servicePayments]);
+          }
+        }
+      }
+
+      // Calculate services total and grand total
+      const breakfastAdultTotal = (parseInt(breakfastAdultQty) > 0 && breakfastAdultPrice) ? parseFloat(breakfastAdultQty) * parseFloat(breakfastAdultPrice) : 0;
+      const breakfastKidTotal = (parseInt(breakfastKidQty) > 0 && breakfastKidPrice) ? parseFloat(breakfastKidQty) * parseFloat(breakfastKidPrice) : 0;
+      const pickupTotal = pickupPrice ? parseFloat(pickupPrice) : 0;
+      const dropoffTotal = dropoffPrice ? parseFloat(dropoffPrice) : 0;
+      const servicesTotal = breakfastAdultTotal + breakfastKidTotal + pickupTotal + dropoffTotal;
+      const subtotal = totalGroupRoomCharges + servicesTotal;
+      const grandTotal = subtotal + (parseFloat(reservationFee) || 0) - (parseFloat(discount) || 0);
+
+      // Commit
+      await new Promise((resolve, reject) => connection.commit(err => (err ? reject(err) : resolve())));
+      connection.release();
+
+      return { success: true, message: 'Group Booking added successfully!', confirmationNumber, grandTotal, reservationFee: parseFloat(reservationFee) || 0, discount: parseFloat(discount) || 0 };
+    } catch (err) {
+      await new Promise(resolve => connection.rollback(() => resolve()));
+      connection.release();
+      throw err;
     }
   }
 }

@@ -69,6 +69,7 @@ router.get('/group_booking_details/:groupId', BookingController.getGroupBookingD
 router.get('/group_billing_details/:groupId', BookingController.getGroupBillingDetails);
 router.get('/check_group_payment_status/:groupId', BookingController.checkGroupPaymentStatus);
 router.post('/group_payment', BookingController.groupPayment);
+router.post('/generate-group-voucher', BookingController.generateGroupVoucher);
 router.get('/bookings', BookingController.getBookings);
 router.get('/rooms', BookingController.getRooms);
 router.post('/cancel', BookingController.cancelBooking);

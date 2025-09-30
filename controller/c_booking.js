@@ -1022,20 +1022,31 @@ class BookingController {
   // Find consecutive rooms
   static async findConsecutiveRooms(req, res) {
     try {
-      let { startDate, endDate, neededRooms, floorNumber } = req.body;
+      let { startDate, endDate, neededRooms, floorNumber, bed1Needed = 0, bed2Needed = 0, bookingRoute, checkInStatus, checkOutStatus } = req.body;
+      const neededRoomsCount = parseInt(neededRooms, 10);
+      const requiredBed1 = parseInt(bed1Needed, 10) || 0;
+      const requiredBed2 = parseInt(bed2Needed, 10) || 0;
+      const totalRequiredBeds = requiredBed1 + requiredBed2;
+      const normalizedBookingRoute = bookingRoute || 'walk-in';
 
-      if (!startDate || !endDate || !neededRooms) {
-        return res.status(400).json({ 
-          success: false, 
-          message: "Missing parameters" 
-        });
+      if (!startDate || !endDate || !neededRoomsCount) {
+        return res.status(400).json({ success: false, message: 'Missing parameters' });
+      }
+
+      if (totalRequiredBeds && totalRequiredBeds !== neededRoomsCount) {
+        return res.status(400).json({ success: false, message: 'Bed requirement total must equal needed rooms.' });
       }
 
       const result = await BookingModel.findConsecutiveRooms({
         startDate,
         endDate,
-        neededRooms,
-        floorNumber
+        neededRooms: neededRoomsCount,
+        floorNumber,
+        bed1Needed: requiredBed1,
+        bed2Needed: requiredBed2,
+        bookingRoute: normalizedBookingRoute,
+        checkInStatus,
+        checkOutStatus
       });
 
       res.json(result);
@@ -1049,25 +1060,47 @@ class BookingController {
     }
   }
 
-  // Add group booking
   static async addGroupBooking(req, res) {
     try {
       const {
-        selectedRooms, selectedRoomPrice, qty, daterange, groupName, groupContact, numberOfRooms, paymentStatus, bookingRoute, guestType, guestLevel, checkInStatus,
-        // Group-level services
-        breakfastAdultQty, breakfastAdultPrice, breakfastAdultId, breakfastKidQty, breakfastKidPrice, breakfastKidId, pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice
+        selectedRooms,
+        selectedRoomPrice,
+        qty,
+        daterange,
+        groupName,
+        groupContact,
+        numberOfRooms,
+        paymentStatus,
+        bookingRoute,
+        guestType,
+        guestLevel,
+        checkInStatus,
+        checkOutStatus,
+        remarks,
+        agencyId,
+        breakfastAdultQty,
+        breakfastAdultPrice,
+        breakfastAdultId,
+        breakfastKidQty,
+        breakfastKidPrice,
+        breakfastKidId,
+        pickupServiceId,
+        pickupPrice,
+        dropoffServiceId,
+        dropoffPrice,
+        reservationFee,
+        discount,
+        perRoomReservationFees,
+        perRoomDiscounts,
+        directReservationFlag
       } = req.body;
 
-      const encodedBy = req.user.userId; // Use JWT user ID instead of session
-
+      const encodedBy = req.user?.userId;
       if (!encodedBy) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'User is not logged in' 
-        });
+        return res.status(400).json({ success: false, message: 'User is not logged in' });
       }
 
-      // console.log('📌 Received group booking data:', req.body);
+      const date = new Date();
 
       const result = await BookingModel.addGroupBooking({
         selectedRooms,
@@ -1082,6 +1115,9 @@ class BookingController {
         guestType,
         guestLevel,
         checkInStatus,
+        checkOutStatus,
+        remarks,
+        agencyId,
         breakfastAdultQty,
         breakfastAdultPrice,
         breakfastAdultId,
@@ -1092,21 +1128,19 @@ class BookingController {
         pickupPrice,
         dropoffServiceId,
         dropoffPrice,
-        encodedBy
+        reservationFee,
+        discount,
+        perRoomReservationFees,
+        perRoomDiscounts,
+        encodedBy,
+        date,
+        isDirectReservation: directReservationFlag === 'true'
       });
 
-      res.json({ 
-        success: true, 
-        message: 'Group Booking added successfully!', 
-        confirmationNumber: result.confirmationNumber 
-      });
-
+      return res.json(result);
     } catch (error) {
       console.error('❌ Error in addGroupBooking:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: error.message || 'Error adding group booking' 
-      });
+      return res.status(500).json({ success: false, message: error.message || 'Error inserting group booking' });
     }
   }
 
@@ -1862,6 +1896,26 @@ class BookingController {
       res.status(500).json({
         success: false,
         message: 'Internal server error'
+      });
+    }
+  }
+
+  // Generate group voucher
+  static async generateGroupVoucher(req, res) {
+    try {
+      const bookingData = req.body;
+      
+      // Render the group voucher PDF
+      res.render('booking/pdf/booking_group_voucher', {
+        booking: bookingData,
+        title: 'Group Booking Voucher'
+      });
+
+    } catch (error) {
+      console.error('Error generating group voucher:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error generating voucher'
       });
     }
   }

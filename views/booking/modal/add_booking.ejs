@@ -19,11 +19,10 @@
                     <input type="hidden" id="selectedRoomPrice" name="selectedRoomPrice">
                     <input type="hidden" id="room_type_hidden" name="room_type_hidden">
                     <input type="hidden" id="voucherNo" name="voucherNo">
-                    <input type="text" id="lateCheckoutFee" name="lateCheckoutFee" value="0">
+                    <input type="hidden" id="lateCheckoutFee" name="lateCheckoutFee" value="0">
 
                     <div class="row">
 
-                         <!-- BEGIN GROUP BOOKING SECTION (Optional) -->
                     <div class="row p-t-20">
 
                         <div class="col-lg-6">
@@ -45,69 +44,6 @@
                             </div>
                         </div>
                     </div>
-                    <div class="row p-t-20">
-                        <div class="col-lg-6">
-                            <label style="font-weight: bold;">
-                                <input type="checkbox" id="groupBookingCheckbox" name="groupBookingCheckbox" style="margin-right: 5px;">
-                                Group Booking
-                            </label>
-                        </div>
-                    </div>
-                    <!-- Group Booking Fields -->
-                    <div id="groupBookingFields" style="display: none;">
-                        <div class="row p-t-20">
-                            <div class="col-lg-6">
-                                <div class="form-group">
-                                    <label class="form-label">Group Name</label>
-                                    <input type="text" id="groupName" name="groupName" class="form-control">
-                                </div>
-                            </div>
-                            <div class="col-lg-6">
-                                <div class="form-group">
-                                    <label class="form-label">Group Contact Number</label>
-                                    <input type="text" id="groupContact" name="groupContact" class="form-control">
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row p-t-20">
-                            <div class="col-lg-6">
-                                <div class="form-group">
-                                    <label class="form-label">Number of Rooms Needed</label>
-                                    <input type="number" id="numberOfRooms" name="numberOfRooms" class="form-control">
-                                </div>
-                            </div>
-                            <div class="col-lg-6">
-                                <div class="form-group">
-                                    <label class="form-label">Select Floor (Optional)</label>
-                                    <select class="form-select" id="groupFloorSelect" name="groupFloorSelect">
-                                        <option value="" disabled selected>Select Floor (Optional)</option>
-                                        <!-- Options populated via AJAX -->
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Row for Booking Resources and Select Agency side by side -->
-                        <div class="row p-t-20">
-                            <div id="bookingRouteGroupPlaceholder" class="col-lg-6"></div>
-                            <div id="agencySelectGroupPlaceholder" class="col-lg-6"></div>
-                        </div>
-                        <div class="row p-t-20">
-                            <div class="col-lg-12">
-                                <button type="button" class="btn btn-primary" id="btnSearchConsecutive">
-                                    Search Rooms
-                                </button>
-                            </div>
-                        </div>
-                        <div class="row p-t-20" id="consecutiveResultsContainer" style="display: none;">
-                            <div class="col-lg-12">
-                                <div id="availableRoomsBlock">
-                                    <h5>Available Rooms:</h5>
-                                    <div id="consecutiveRoomsList"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- END GROUP BOOKING SECTION -->
 
                         <div id="divaddFloor" class="col-lg-4">
                             <div class="form-group">

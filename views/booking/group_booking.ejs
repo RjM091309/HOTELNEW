@@ -21,7 +21,7 @@
                     
                     <div style="flex: 0 0 auto;">
                         <button type="button" class="btn btn-success" data-bs-toggle="modal"
-                        data-bs-target="#modal-addbooking"><i class="fa fa-plus"></i> Add
+                        data-bs-target="#modal-add-group-booking"><i class="fa fa-plus"></i> Add
                             Booking
                         </button>
                     </div>
@@ -183,12 +183,11 @@
     </div>
 </div>
 
+<%- include('../booking/modal/add_group_booking') %>
 <%- include('../booking/modal/billing') %>
-<%- include('../booking/modal/booking_details') %>
 <%- include('../booking/modal/status') %>
 
 <script src="/js/booking/group_booking_data.js"></script>
-<script src="/js/booking/booking_submit.js"></script>
 
 
 <script src="https://cdn.jsdelivr.net/npm/moment@2.29.1/moment.min.js"></script> 

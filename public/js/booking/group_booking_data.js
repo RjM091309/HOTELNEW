@@ -75,30 +75,31 @@ $(document).ready(function () {
                 data: '',
                 title: 'ACTION',
                 orderable: false,
-                 render: function (data, type, row) {
+                render: function (data, type, row) {
                     const buttonId = `billing_btn_${row.GroupID}`;
-                                         // AJAX to check payment status (removed text update since we're using icon-only button)
-                     $.ajax({
-                         url: `/booking/check_group_payment_status/${row.GroupID}`,
-                         method: 'GET',
-                         success: function(res) {
-                             // No text update needed for icon-only button
-                         },
-                         error: function(err) {
-                             console.error("Error checking payment status:", err);
-                         }
-                     });
-                                         return `
-                         <button id="${buttonId}" class="btn btn-tbl-view btn-xs"
-                             onclick="viewGroupBilling(${row.GroupID})" title="Billing">
-                             <i class="fas fa-file-invoice-dollar"></i>
-                         </button>`;
+                    // AJAX to check payment status
+                    $.ajax({
+                        url: `/booking/check_group_payment_status/${row.GroupID}`,
+                        method: 'GET',
+                        success: function(res) {
+                            const btn = $(`#${buttonId}`);
+                            if (res.allPaid) {
+                                btn.text('Billed');
+                            } else {
+                                btn.text('Billing');
+                            }
+                        },
+                        error: function(err) {
+                            console.error("Error checking payment status:", err);
+                        }
+                    });
+                    return `
+                        <button id="${buttonId}" class="btn btn-sm btn-primary"
+                            onclick="viewGroupBilling(${row.GroupID})">
+                            Billing
+                        </button>`;
                 }
             }
-        ],
-        columnDefs: [
-            { targets: [3, 6, 8], className: "text-center" },
-            { targets: [8], width: '10%', orderable: false, searchable: false }
         ],
         language: {
             emptyTable: "No group bookings available."
@@ -128,7 +129,7 @@ $(document).ready(function () {
         // Remove active class from all filter buttons
         $('.filter-btn').removeClass('active');
         // Add active class to clicked button
-        $(this).addClass('active');
+        $(this).addClass('is-active');
         
         // Get the filter value
         let filter = $(this).data('filter');
