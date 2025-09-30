@@ -29,7 +29,7 @@ const paymentsController = {
 
   tableData: async (req, res) => {
     try {
-      const { start = 0, length = 10, search = { value: '' }, order = [{ column: 10, dir: 'desc' }] } = req.query;
+      const { start = 0, length = 10, search = { value: '' }, order = [{ column: 10, dir: 'desc' }], filter = 'today' } = req.query;
       const searchValue = search.value || '';
       const orderColumn = order[0]?.column || 10;
       const orderDir = order[0]?.dir || 'desc';
@@ -46,6 +46,30 @@ const paymentsController = {
         searchCondition = `AND (c.NAME LIKE ? OR r.ROOM_NUMBER LIKE ? OR b.CONFIRMATION_NUMBER LIKE ? OR bill.PAYMENT_STATUS LIKE ?)`;
         const p = `%${searchValue}%`;
         searchParams = [p, p, p, p];
+      }
+
+      // Date filter based on booking.ENCODED_DT
+      const now = new Date();
+      let fromDate = null;
+      if (filter === 'today') {
+        fromDate = new Date();
+      } else if (filter === 'last3days') {
+        fromDate = new Date();
+        fromDate.setDate(now.getDate() - 2);
+      } else if (filter === 'thisWeek') {
+        fromDate = new Date();
+        fromDate.setDate(now.getDate() - now.getDay());
+      } else if (filter === 'thisMonth') {
+        fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      }
+
+      if (fromDate) {
+        const y = fromDate.getFullYear();
+        const m = String(fromDate.getMonth() + 1).padStart(2, '0');
+        const d = String(fromDate.getDate()).padStart(2, '0');
+        const fromStr = `${y}-${m}-${d}`;
+        searchCondition += ` AND DATE(b.ENCODED_DT) >= ?`;
+        searchParams.push(fromStr);
       }
 
       const totalRecords = await paymentsModel.countDatatable(searchCondition, searchParams);

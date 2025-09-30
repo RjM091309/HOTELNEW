@@ -2,13 +2,21 @@
 <div class="dashboard-card">
   <div class="dashboard-card-header">
     <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
-      <div class="tab-bar">
-        <a class="tab-item is-active" href="/payments">Payments</a>
+        <div class="tab-bar">
+          <header style="display:inline-block; white-space: nowrap;">Payment Management</header> 
       </div>
-      <div class="text-muted"><%= new Date().toLocaleString() %></div>
+      <div style="display:flex; align-items:center; justify-content: center; width:100%; margin-bottom: 12px;">
+        <div class="filter-btn-group">
+          <button type="button" class="filter-btn active" data-filter="today">Today</button>
+          <button type="button" class="filter-btn" data-filter="last3days">Last 3 Days</button>
+          <button type="button" class="filter-btn" data-filter="thisWeek">This Week</button>
+          <button type="button" class="filter-btn" data-filter="thisMonth">This Month</button>
+        </div>
+      </div>
     </div>
   </div>
   <div class="dashboard-card-body">
+   
     <!-- Sales Summary Cards -->
     <div class="row" style="margin-bottom:16px">
       <div class="col-md-4">
@@ -84,11 +92,16 @@
 
 <script>
   $(document).ready(function () {
+    let currentFilter = 'today';
     let table = $('#payments_tbl').DataTable({
       rowId: 'BOOKING_ID',
       processing: true,
       serverSide: true,
-      ajax: { url: '/payments/payments_data', type: 'GET' },
+      ajax: { 
+        url: '/payments/payments_data', 
+        type: 'GET',
+        data: function(d){ d.filter = currentFilter; }
+      },
       columns: [
         { data: 'BOOKING_ID', visible: false },
         { data: null, orderable: false, searchable: false, className: 'center' },
@@ -117,6 +130,13 @@
 
     table.on('draw.dt', function(){
       table.column(1, { search: 'applied', order: 'applied' }).nodes().each(function(cell, i){ cell.innerHTML = i + 1; });
+    });
+
+    $('.filter-btn').on('click', function(){
+      $('.filter-btn').removeClass('active');
+      $(this).addClass('active');
+      currentFilter = $(this).data('filter');
+      table.ajax.reload();
     });
   });
 
