@@ -1118,6 +1118,13 @@ function showLateCheckInModal(event) {
   const checkIn = ci.toLocaleDateString();
   const checkOut = co.toLocaleDateString();
 
+  // Check if check-in date is today or in the past
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Reset time to start of day
+  const checkInDateOnly = new Date(ci);
+  checkInDateOnly.setHours(0, 0, 0, 0); // Reset time to start of day
+  const canCheckIn = checkInDateOnly <= today;
+
   // Build composite status badges (CI/CO)
   const ciStatus = event.extendedProps?.checkInStatus; // 1 regular, 0 late
   const coStatus = event.extendedProps?.checkOutStatus; // 0 regular, 1 late
@@ -1126,7 +1133,8 @@ function showLateCheckInModal(event) {
   const coText = (coStatus === 1 ? 'LATE CHECK-OUT' : 'REGULAR CHECK-OUT');
   const coColor = (coStatus === 1 ? '#fff700' : '#e53935');
 
-  Swal.fire({
+  // Prepare modal configuration based on check-in availability
+  const modalConfig = {
     title: `Room ${roomNumber} - Pending Reservation`,
     html: `
       <div class="text-left" style="padding: 20px 0;">
@@ -1161,23 +1169,50 @@ function showLateCheckInModal(event) {
             </div>
           </div>
         </div>
-        ${ciStatus === 0 ? `<div style="text-align: center; padding: 15px; background: rgba(255, 244, 79, 0.15); border-radius: 8px; border: 1px solid rgba(255, 244, 79, 0.35);"><span style=\"color: #fff700; font-size: 14px; font-weight: 600;\">⚠️ This guest has not checked in yet and is past the scheduled check-in time.</span></div>` : ''}
+        ${canCheckIn ? 
+          (ciStatus === 0 ? 
+            `<div style="text-align: center; padding: 15px; background: rgba(255, 244, 79, 0.15); border-radius: 8px; border: 1px solid rgba(255, 244, 79, 0.35);">
+              <span style="color: #fff700; font-size: 14px; font-weight: 600;">
+                ⚠️ This guest has not checked in yet and is past the scheduled check-in time.
+              </span>
+            </div>` : 
+            `<div style="text-align: center; padding: 15px; background: rgba(255, 244, 79, 0.15); border-radius: 8px; border: 1px solid rgba(255, 244, 79, 0.35);">
+              <span style="color: #fff700; font-size: 14px; font-weight: 600;">
+                📋 This reservation is Late Check-In confirmation and requires staff approval.
+              </span>
+            </div>`
+          ) :
+          `<div style="text-align: center; padding: 15px; background: rgba(108, 117, 125, 0.1); border-radius: 8px; border: 1px solid rgba(108, 117, 125, 0.35);">
+            <span style="color: #6c757d; font-size: 14px; font-weight: 500;">
+              📅 Check-in is not available yet. This reservation is for a future date.
+            </span>
+          </div>`
+        }
       </div>
     `,
     icon: 'warning',
-    confirmButtonText: 'Check-In Now',
     cancelButtonText: 'Edit Details',
     denyButtonText: 'Cancel',
     showCancelButton: true,
     showDenyButton: true,
-    confirmButtonColor: '#b8a600', // Darker lemon for contrast
     cancelButtonColor: '#007bff', // Blue for edit details
     denyButtonColor: '#6c757d',
     background: '#2a3135',
     color: '#ffffff',
     width: '500px'
-  }).then((result) => {
-    if (result.isConfirmed) {
+  };
+
+  // Add check-in button only if check-in is available
+  if (canCheckIn) {
+    modalConfig.confirmButtonText = 'Check-In Now';
+    modalConfig.showConfirmButton = true;
+    modalConfig.confirmButtonColor = '#b8a600'; // Darker lemon for contrast
+  } else {
+    modalConfig.showConfirmButton = false;
+  }
+
+  Swal.fire(modalConfig).then((result) => {
+    if (result.isConfirmed && canCheckIn) {
       // Show confirmation dialog
       Swal.fire({
         title: 'Confirm Check-In',
@@ -1216,6 +1251,13 @@ function showPendingModal(event) {
   const checkIn = ciDate2.toLocaleDateString();
   const checkOut = coDate2.toLocaleDateString();
 
+  // Check if check-in date is today or in the past
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Reset time to start of day
+  const checkInDateOnly = new Date(ciDate2);
+  checkInDateOnly.setHours(0, 0, 0, 0); // Reset time to start of day
+  const canCheckIn = checkInDateOnly <= today;
+
   // Build composite status badges (CI/CO)
   const ciStatus2 = event.extendedProps?.checkInStatus; // 1 regular, 0 late
   const coStatus2 = event.extendedProps?.checkOutStatus; // 0 regular, 1 late
@@ -1224,7 +1266,8 @@ function showPendingModal(event) {
   const coText = (coStatus2 === 1 ? 'LATE CHECK-OUT' : 'REGULAR CHECK-OUT');
   const coColor = (coStatus2 === 1 ? '#fff700' : '#e53935');
 
-  Swal.fire({
+  // Prepare modal configuration based on check-in availability
+  const modalConfig = {
     title: `Room ${roomNumber} - Pending Reservation`,
     html: `
       <div class="text-left" style="padding: 20px 0;">
@@ -1259,27 +1302,43 @@ function showPendingModal(event) {
             </div>
           </div>
         </div>
-        <div style="text-align: center; padding: 15px; background: rgba(229, 57, 53, 0.1); border-radius: 8px; border: 1px solid rgba(229, 57, 53, 0.35);">
-          <span style="color: #e53935; font-size: 14px; font-weight: 500;">
-            📋 This reservation is Regular Check-In confirmation and requires staff approval.
-          </span>
-        </div>
+        ${canCheckIn ? 
+          `<div style="text-align: center; padding: 15px; background: rgba(229, 57, 53, 0.1); border-radius: 8px; border: 1px solid rgba(229, 57, 53, 0.35);">
+            <span style="color: #e53935; font-size: 14px; font-weight: 500;">
+              📋 This reservation is Regular Check-In confirmation and requires staff approval.
+            </span>
+          </div>` :
+          `<div style="text-align: center; padding: 15px; background: rgba(108, 117, 125, 0.1); border-radius: 8px; border: 1px solid rgba(108, 117, 125, 0.35);">
+            <span style="color: #6c757d; font-size: 14px; font-weight: 500;">
+              📅 Check-in is not available yet. This reservation is for a future date.
+            </span>
+          </div>`
+        }
       </div>
     `,
     icon: 'info',
-    confirmButtonText: 'Check-In Now',
     cancelButtonText: 'Edit Details',
     denyButtonText: 'Cancel',
     showCancelButton: true,
     showDenyButton: true,
-    confirmButtonColor: '#e53935', // Red for regular check-in
     cancelButtonColor: '#007bff', // Blue for edit details
     denyButtonColor: '#6c757d',
     background: '#2a3135',
     color: '#ffffff',
     width: '500px'
-  }).then((result) => {
-    if (result.isConfirmed) {
+  };
+
+  // Add check-in button only if check-in is available
+  if (canCheckIn) {
+    modalConfig.confirmButtonText = 'Check-In Now';
+    modalConfig.showConfirmButton = true;
+    modalConfig.confirmButtonColor = '#e53935'; // Red for regular check-in
+  } else {
+    modalConfig.showConfirmButton = false;
+  }
+
+  Swal.fire(modalConfig).then((result) => {
+    if (result.isConfirmed && canCheckIn) {
       // Show confirmation dialog
       Swal.fire({
         title: 'Confirm Check-In',
