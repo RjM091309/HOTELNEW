@@ -123,10 +123,63 @@ $(document).ready(function () {
           },
           success: function (response) {
             $('#modal-addbooking').modal('hide');
+            
+            // Auto-download voucher if booking was successful
+            if (response.success && response.bookingId) {
+              // Create a form to trigger voucher download
+              const form = $('<form>', {
+                method: 'POST',
+                action: '/booking/generate-voucher',
+                target: '_blank'
+              });
+              
+              // Add booking data to form
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'bookingId',
+                value: response.bookingId
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'fullname',
+                value: fullname
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'daterange',
+                value: daterange
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'roomPrice',
+                value: roomPrice
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'paymentStatus',
+                value: paymentStatus
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'voucherNo',
+                value: response.confirmationNumber || voucherNo
+              }));
+              
+              // Submit form to trigger download
+              $('body').append(form);
+              form.submit();
+              form.remove();
+            }
+            
             setTimeout(function() {
               Swal.fire({
                 title: 'Booking Successful!',
-                text: 'Your booking has been added successfully.',
+                text: 'Your booking has been added successfully. Voucher is downloading...',
                 icon: 'success',
                 confirmButtonText: 'OK'
               }).then(() => window.location.reload());

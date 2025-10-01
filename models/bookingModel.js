@@ -3041,6 +3041,7 @@ class BookingModel {
       const query = `
         SELECT 
         b.IDNo AS BookingID,
+        b.CONFIRMATION_NUMBER,
         b.CUSTOMER_ID,
         b.AGENCY_ID,
         c.NAME AS CUSTOMER_NAME,
@@ -3209,7 +3210,10 @@ class BookingModel {
 
       await browser.close();
 
-      return { pdfBuffer };
+      return { 
+        pdfBuffer,
+        confirmationNumber: data.CONFIRMATION_NUMBER
+      };
 
     } catch (error) {
       console.error('Error in generateInvoice:', error);
@@ -4570,6 +4574,199 @@ class BookingModel {
       await new Promise(resolve => connection.rollback(() => resolve()));
       connection.release();
       throw err;
+    }
+  }
+
+  // Get enhanced booking data for DataTables (matching Hotel_Old structure)
+  static async getBookingDataEnhanced(params) {
+    try {
+      const {
+        start,
+        length,
+        orderByColumn,
+        orderDirection,
+        dateCondition,
+        channelCondition
+      } = params;
+
+      // ---- COUNT QUERY ----
+      const countQuery = `
+        SELECT COUNT(*) AS total
+        FROM booking b
+          LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+          LEFT JOIN room     r ON b.ROOM_ID      = r.IDNo
+          LEFT JOIN billing  bill ON bill.BOOKING_ID = b.IDNo
+        WHERE b.ACTIVE = 1
+          ${dateCondition}
+          ${channelCondition};
+      `;
+
+      // ---- MAIN DATA QUERY ----
+      const dataQuery = `
+        SELECT 
+          b.IDNo           AS BookingID,
+          b.CUSTOMER_ID,
+          c.NAME,
+          COALESCE(a.NAME, 'N/A') AS AGENCY_NAME,
+          b.ROOM_ID,
+          r.ROOM_NUMBER,
+          IFNULL(r.ROOM_PRICE, rt.BASE_PRICE) AS ROOM_RATE,
+          rt.NAME         AS ROOM_TYPE,
+          b.CHECK_IN_DATE,
+          b.CHECK_OUT_DATE,
+          DATEDIFF(b.CHECK_OUT_DATE, b.CHECK_IN_DATE) AS TOTAL_DAYS,
+          b.BOOKING_STATUS AS BookingStatus,
+          b.GUESTS_COUNT,
+          b.REMARKS       AS BookingRemarks,
+          b.CONFIRMATION_NUMBER,
+          b.BOOKING_CHANNEL,
+          b.IS_DIRECT_RESERVATION,
+          bill.QTY,
+          b.IS_CANCELLED,
+          COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+            + COALESCE(services_total.TOTAL_SERVICES_COST, 0)
+            + COALESCE(extensions_total.TOTAL_EXTENSIONS_COST, 0) AS TOTAL_COST,
+          CASE 
+            WHEN bill.PAYMENT_STATUS = 'paid' 
+              AND COALESCE(services_unpaid_count.TOTAL_UNPAID_SERVICES, 0) = 0
+              AND COALESCE(extensions_unpaid_count.TOTAL_UNPAID_EXTENSIONS, 0) = 0
+            THEN 'paid'
+            ELSE 'unpaid'
+          END AS PAYMENT_STATUS,
+          CASE 
+            WHEN bill.PAYMENT_STATUS = 'paid' THEN 
+              COALESCE(services_total.TOTAL_SERVICES_COST, 0)
+              + COALESCE(extensions_total.TOTAL_EXTENSIONS_COST, 0)
+            ELSE 
+              COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+              + COALESCE(services_total.TOTAL_SERVICES_COST, 0)
+              + COALESCE(extensions_total.TOTAL_EXTENSIONS_COST, 0)
+              - COALESCE(bill.RESERVATION_FEE, 0)
+              - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+          END AS BALANCE
+        FROM booking b
+          LEFT JOIN customer   c   ON b.CUSTOMER_ID = c.IDNo
+          LEFT JOIN agency     a   ON b.AGENCY_ID   = a.IDNo
+          LEFT JOIN billing    bill ON b.IDNo       = bill.BOOKING_ID
+          LEFT JOIN room       r   ON b.ROOM_ID     = r.IDNo
+          LEFT JOIN room_type  rt  ON r.ROOM_TYPE_ID= rt.IDNo
+          LEFT JOIN (
+            SELECT 
+              bs.BOOKING_ID,
+              SUM(bs.TOTAL_COST) AS TOTAL_SERVICES_COST
+            FROM booking_service bs
+            WHERE bs.ACTIVE = 1 AND bs.STATUS = 'unpaid'
+            GROUP BY bs.BOOKING_ID
+          ) services_total ON b.IDNo = services_total.BOOKING_ID
+          LEFT JOIN (
+            SELECT 
+              be.BOOKING_ID,
+              SUM(be.QTY * be.COST) AS TOTAL_EXTENSIONS_COST
+            FROM booking_extension be
+            WHERE be.PAYMENT_STATUS = 'unpaid'
+            GROUP BY be.BOOKING_ID
+          ) extensions_total ON b.IDNo = extensions_total.BOOKING_ID
+          LEFT JOIN (
+            SELECT 
+              bs.BOOKING_ID,
+              COUNT(*) AS TOTAL_UNPAID_SERVICES
+            FROM booking_service bs
+            WHERE bs.ACTIVE = 1 AND bs.STATUS = 'unpaid'
+            GROUP BY bs.BOOKING_ID
+          ) services_unpaid_count ON b.IDNo = services_unpaid_count.BOOKING_ID
+          LEFT JOIN (
+            SELECT 
+              be.BOOKING_ID,
+              COUNT(*) AS TOTAL_UNPAID_EXTENSIONS
+            FROM booking_extension be
+            WHERE be.PAYMENT_STATUS = 'unpaid'
+            GROUP BY be.BOOKING_ID
+          ) extensions_unpaid_count ON b.IDNo = extensions_unpaid_count.BOOKING_ID
+        WHERE b.ACTIVE = 1
+          ${dateCondition}
+          ${channelCondition}
+        ORDER BY ${orderByColumn} ${orderDirection};
+      `;
+
+      // First get the total count
+      const countResults = await queryDatabasePromise(countQuery, []);
+      const totalRecords = countResults[0]?.total || 0;
+
+      // Now fetch the page of data
+      const rows = await queryDatabasePromise(dataQuery, []);
+
+      return {
+        totalRecords,
+        rows
+      };
+
+    } catch (error) {
+      console.error('Error in getBookingDataEnhanced:', error);
+      throw error;
+    }
+  }
+
+  // Get voucher data for modal display
+  static async getVoucherData(bookingId) {
+    try {
+      const query = `
+        SELECT 
+          b.IDNo AS BookingID,
+          b.CONFIRMATION_NUMBER AS confirmationNumber,
+          c.NAME AS fullname,
+          r.ROOM_NUMBER AS roomNumber,
+          rt.NAME AS roomType,
+          b.CHECK_IN_DATE AS dateFrom,
+          b.CHECK_OUT_DATE AS dateTo,
+          b.REMARKS AS remarks,
+          b.CHECK_IN_STATUS AS checkInStatus,
+          b.LATE_CHECKOUT AS checkOutStatus,
+          COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+            + COALESCE(services_total.TOTAL_SERVICES_COST, 0)
+            + COALESCE(extensions_total.TOTAL_EXTENSIONS_COST, 0) AS total,
+          COALESCE(bill.RESERVATION_FEE, 0) AS reservationFee,
+          COALESCE(bill.DISCOUNT_AMOUNT, 0) AS discount,
+          CASE 
+            WHEN bill.PAYMENT_STATUS = 'paid' THEN 
+              COALESCE(services_total.TOTAL_SERVICES_COST, 0)
+              + COALESCE(extensions_total.TOTAL_EXTENSIONS_COST, 0)
+            ELSE 
+              COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+              + COALESCE(services_total.TOTAL_SERVICES_COST, 0)
+              + COALESCE(extensions_total.TOTAL_EXTENSIONS_COST, 0)
+              - COALESCE(bill.RESERVATION_FEE, 0)
+              - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+          END AS totalBalance
+        FROM booking b
+          LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+          LEFT JOIN room r ON b.ROOM_ID = r.IDNo
+          LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
+          LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID
+          LEFT JOIN (
+            SELECT 
+              bs.BOOKING_ID,
+              SUM(bs.TOTAL_COST) AS TOTAL_SERVICES_COST
+            FROM booking_service bs
+            WHERE bs.ACTIVE = 1 AND bs.STATUS = 'unpaid'
+            GROUP BY bs.BOOKING_ID
+          ) services_total ON b.IDNo = services_total.BOOKING_ID
+          LEFT JOIN (
+            SELECT 
+              be.BOOKING_ID,
+              SUM(be.QTY * be.COST) AS TOTAL_EXTENSIONS_COST
+            FROM booking_extension be
+            WHERE be.PAYMENT_STATUS = 'unpaid'
+            GROUP BY be.BOOKING_ID
+          ) extensions_total ON b.IDNo = extensions_total.BOOKING_ID
+        WHERE b.IDNo = ? AND b.ACTIVE = 1
+      `;
+
+      const results = await queryDatabasePromise(query, [bookingId]);
+      return results[0] || null;
+
+    } catch (error) {
+      console.error('Error in getVoucherData:', error);
+      throw error;
     }
   }
 }

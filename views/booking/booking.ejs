@@ -7,6 +7,7 @@
                     <div class="tab-bar">
                         <a class="tab-item is-active" href="/booking">Single</a>
                         <a class="tab-item" href="/booking/group">Group</a>
+                        <a class="tab-item" href="/booking/agency">Agency</a>
                     </div>
                     
                     <div style="flex: 1; display: flex; justify-content: center; margin: 0 20px;">
@@ -33,15 +34,16 @@
                         <tr>
                             <th style="display:none"></th>
                             <th>#</th>
-                            <th>GUEST ID</th>
+                            <th>GUEST NAME</th>
                             <th>ROOM NUMBER</th>
                             <th>CONFIRMATION NUMBER</th>
                             <th>CHECK IN</th>
                             <th>CHECK OUT</th>
                             <th>TOTAL PAYMENT</th>
-                            <th>PAYMENT STATUS </th>
-                            <th>BOOKING STATUS</th>
+                            <th>BALANCE</th>
                             <th>BOOKING CHANNEL</th>
+                            <th>PAYMENT STATUS</th>
+                            <th>BOOKING STATUS</th>
                             <th>ACTION</th>
                         </tr>
                         </thead>
@@ -65,7 +67,85 @@
             
             <%- include('../booking/modal/add_booking') %>
                 
-                    
+                    <!-- Voucher Details Modal -->
+                    <div class="modal fade" id="modal-voucher-details" tabindex="-1" role="dialog" aria-labelledby="modal-voucher-details-label" aria-hidden="true" data-bs-backdrop="static">
+                        <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="modal-voucher-details-label">
+                                        <i class="fa fa-file-text-o"></i> Voucher Details
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered table-striped">
+                                            <tbody>
+                                                <tr>
+                                                    <th class="bg-light" style="width: 40%;">SOURCE / GUEST NAME</th>
+                                                    <td id="voucher-guest-name">-</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="bg-light">RESERVATION DATE</th>
+                                                    <td id="voucher-reservation-date">-</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="bg-light">ARRIVAL DATE</th>
+                                                    <td id="voucher-checkin">-</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="bg-light">DEPARTURE DATE</th>
+                                                    <td id="voucher-checkout">-</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="bg-light">CHECK-IN STATUS</th>
+                                                    <td id="voucher-checkin-status">-</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="bg-light">CHECK-OUT STATUS</th>
+                                                    <td id="voucher-checkout-status">-</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="bg-light">LENGTH OF STAY</th>
+                                                    <td id="voucher-length-stay">-</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="bg-light">ROOM TYPE</th>
+                                                    <td id="voucher-room-type">-</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="bg-light">REMARKS</th>
+                                                    <td id="voucher-remarks">-</td>
+                                                </tr>
+                                                <tr id="reservation-fee-row" style="display: none;">
+                                                    <th class="bg-light">RESERVATION FEE</th>
+                                                    <td id="voucher-reservation-fee">-</td>
+                                                </tr>
+                                                <tr id="discount-amount-row" style="display: none;">
+                                                    <th class="bg-light">DISCOUNT AMOUNT</th>
+                                                    <td id="voucher-discount-amount">-</td>
+                                                </tr>
+                                                <tr id="grand-total-row">
+                                                    <th class="bg-light">GRAND TOTAL</th>
+                                                    <td id="voucher-grand-total">-</td>
+                                                </tr>
+                                                <tr class="table-secondary">
+                                                    <th class="bg-secondary text-white">TOTAL BALANCE</th>
+                                                    <td id="voucher-total-balance" class="fw-bold">-</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                    <button type="button" class="btn btn-info" onclick="downloadVoucherFromModal()">
+                                        <i class="fa fa-download"></i> Download Voucher
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
 
 
@@ -80,3 +160,142 @@
 </script>
 
 <script src="/js/booking/booking_submit.js"></script> 
+
+<style>
+/* Voucher Details Modal Dark Theme - Matching Add Booking Modal */
+#modal-voucher-details .form-label {
+    font-size: 12px;
+}
+
+#modal-voucher-details .btn-close {
+    filter: invert(1) !important;
+}
+
+#modal-voucher-details .btn-close:hover {
+    filter: invert(0.8) !important; /* Slightly lighter on hover */
+}
+
+/* Modal Background */
+#modal-voucher-details .modal-content {
+    background-color: #2a3135;
+    color: #e0e0e0; /* Light text */
+    border-radius: 6px;
+    box-shadow: 0 0 10px rgba(59,59,59, 0.2); /* Slight neon glow */
+    border: 1px solid #3B3B3B;
+}
+
+/* Modal Header */
+#modal-voucher-details .modal-header {
+    background-color: #0c2a42;
+    color: #ffffff;
+    border-bottom: 1px solid #0c2a42;
+}
+
+/* Modal Title */
+#modal-voucher-details .modal-title {
+    color: #ffffff;
+}
+
+/* Close button (X) */
+#modal-voucher-details .btn-close {
+    filter: brightness(200%);
+}
+
+/* Table Styling for Dark Theme */
+#modal-voucher-details .table {
+    background-color: #2a3135;
+    color: #e0e0e0;
+}
+
+#modal-voucher-details .table th {
+    background-color: #41474c !important;
+    color: #e0e0e0 !important;
+    border-color: #3B3B3B !important;
+}
+
+#modal-voucher-details .table td {
+    background-color: #41474c !important;
+    color: #e0e0e0 !important;
+    border-color: #3B3B3B !important;
+}
+
+#modal-voucher-details .table-striped > tbody > tr:nth-of-type(odd) > td {
+    background-color: #41474c !important;
+}
+
+#modal-voucher-details .bg-light {
+    background-color: #41474c !important;
+    color: #ffffff !important;
+}
+
+#modal-voucher-details .bg-secondary {
+    background-color: #0c2a42 !important;
+    color: #ffffff !important;
+}
+
+#modal-voucher-details .table-secondary {
+    background-color: #0c2a42 !important;
+}
+
+#modal-voucher-details .table-secondary th {
+    background-color: #0c2a42 !important;
+    color: #ffffff !important;
+}
+
+#modal-voucher-details .table-secondary td {
+    background-color: #0c2a42 !important;
+    color: #ffffff !important;
+}
+
+/* Ensure TOTAL BALANCE row maintains its color with higher specificity */
+#modal-voucher-details tr.table-secondary th,
+#modal-voucher-details tr.table-secondary td {
+    background-color: #0c2a42 !important;
+    color: #ffffff !important;
+}
+
+/* Override any conflicting styles for the TOTAL BALANCE row */
+#modal-voucher-details tr.table-secondary th.bg-secondary,
+#modal-voucher-details tr.table-secondary td {
+    background-color: #0c2a42 !important;
+    color: #ffffff !important;
+}
+
+/* Remove gray background from TOTAL BALANCE row - make it same as other rows */
+#modal-voucher-details tr.table-secondary th,
+#modal-voucher-details tr.table-secondary td {
+    background-color: #41474c !important;
+    color: #e0e0e0 !important;
+}
+
+/* Modal Footer */
+#modal-voucher-details .modal-footer {
+    background-color: #2a3135;
+    border-top: 1px solid #3B3B3B;
+}
+
+/* Button Styling */
+#modal-voucher-details .btn-secondary {
+    background-color: #41474c;
+    border-color: #3B3B3B;
+    color: #e0e0e0;
+}
+
+#modal-voucher-details .btn-secondary:hover {
+    background-color: #3B3B3B;
+    border-color: #2a3135;
+    color: #ffffff;
+}
+
+#modal-voucher-details .btn-info {
+    background-color: #0c2a42;
+    border-color: #0c2a42;
+    color: #ffffff;
+}
+
+#modal-voucher-details .btn-info:hover {
+    background-color: #0a1f2e;
+    border-color: #0a1f2e;
+    color: #ffffff;
+}
+</style> 

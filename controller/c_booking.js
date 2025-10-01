@@ -54,14 +54,9 @@ class BookingController {
     try {
       const start = parseInt(req.query.start, 10) || 0;   // pagination start
       const length = parseInt(req.query.length, 10) || 10; // pagination length
-      const search = req.query.search?.value || '';        // incoming search term
       const draw = req.query.draw || 1;
 
-      // build your "LIKE" term and also capture exact ID
-      const likeTerm = `%${search}%`;
-      const exactId = search; 
-
-      // sorting setup
+      // sorting setup (unchanged)
       const orderColumnIndex = parseInt(req.query.order?.[0]?.column, 10);
       const orderDirection = req.query.order?.[0]?.dir || 'asc';
       const columns = [
@@ -71,15 +66,17 @@ class BookingController {
         'b.CHECK_IN_DATE',
         'b.CHECK_OUT_DATE',
         'TOTAL_COST',
+        'BALANCE',
         'b.BOOKING_CHANNEL',
-        'PAYMENT_STATUS',
         'b.BOOKING_STATUS'
       ];
       const orderByColumn = columns[orderColumnIndex] || 'b.ENCODED_DT';
 
-      // date-filter logic
+      // date-filter logic (unchanged)
       const filter = req.query.filter || 'all';
       let dateCondition = '';
+      let channelCondition = '';
+      
       switch (filter.toLowerCase()) {
         case 'today':
           dateCondition = `AND DATE(b.ENCODED_DT) = CURRENT_DATE()`;
@@ -99,19 +96,43 @@ class BookingController {
             AND YEAR(b.ENCODED_DT)  = YEAR(CURRENT_DATE())
           `;
           break;
+        case 'agency':
+          channelCondition = `AND b.BOOKING_CHANNEL = 'agency'`;
+          break;
+        case 'agency_today':
+          dateCondition = `AND DATE(b.ENCODED_DT) = CURRENT_DATE()`;
+          channelCondition = `AND b.BOOKING_CHANNEL = 'agency'`;
+          break;
+        case 'agency_last3days':
+          dateCondition = `
+            AND b.ENCODED_DT >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 DAY)
+            AND b.ENCODED_DT <= CURRENT_DATE()
+          `;
+          channelCondition = `AND b.BOOKING_CHANNEL = 'agency'`;
+          break;
+        case 'agency_thisweek':
+          dateCondition = `AND YEARWEEK(b.ENCODED_DT, 1) = YEARWEEK(CURRENT_DATE(), 1)`;
+          channelCondition = `AND b.BOOKING_CHANNEL = 'agency'`;
+          break;
+        case 'agency_thismonth':
+          dateCondition = `
+            AND MONTH(b.ENCODED_DT) = MONTH(CURRENT_DATE())
+            AND YEAR(b.ENCODED_DT)  = YEAR(CURRENT_DATE())
+          `;
+          channelCondition = `AND b.BOOKING_CHANNEL = 'agency'`;
+          break;
         default:
           dateCondition = '';
       }
 
-      // Get booking data from model
-      const result = await BookingModel.getBookingData({
+      // Get booking data from model with enhanced structure
+      const result = await BookingModel.getBookingDataEnhanced({
         start,
         length,
-        likeTerm,
-        exactId,
         orderByColumn,
         orderDirection,
-        dateCondition
+        dateCondition,
+        channelCondition
       });
 
       res.json({
@@ -1402,8 +1423,12 @@ class BookingController {
 
       const invoiceData = await BookingModel.generateInvoice({ bookingId, user });
       
+      // Use confirmation number for filename (same as voucher)
+      const filename = `invoice-${invoiceData.confirmationNumber}.pdf`;
+      
       res.set({
         'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename=${filename}`,
         'Content-Length': invoiceData.pdfBuffer.length
       });
       res.send(invoiceData.pdfBuffer);
@@ -1916,6 +1941,86 @@ class BookingController {
       res.status(500).json({
         success: false,
         message: 'Error generating voucher'
+      });
+    }
+  }
+
+  // Get voucher data for modal display
+  static async getVoucherData(req, res) {
+    try {
+      const { bookingId } = req.params;
+
+      if (!bookingId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Booking ID is required'
+        });
+      }
+
+      const voucherData = await BookingModel.getVoucherData(bookingId);
+
+      if (!voucherData) {
+        return res.status(404).json({
+          success: false,
+          message: 'Booking not found'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: voucherData
+      });
+
+    } catch (error) {
+      console.error('Error fetching voucher data:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching voucher data'
+      });
+    }
+  }
+
+  // Generate voucher PDF
+  static async generateVoucherPDF(req, res) {
+    try {
+      const { bookingId } = req.params;
+      const download = req.query.download === '1';
+
+      if (!bookingId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Booking ID is required'
+        });
+      }
+
+      const voucherData = await BookingModel.getVoucherData(bookingId);
+
+      if (!voucherData) {
+        return res.status(404).json({
+          success: false,
+          message: 'Booking not found'
+        });
+      }
+
+      // Generate PDF using a PDF library (like puppeteer or jsPDF)
+      // For now, we'll return the data structure
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `${download ? 'attachment' : 'inline'}; filename="voucher-${voucherData.confirmationNumber || bookingId}.pdf"`
+      });
+
+      // This would be replaced with actual PDF generation
+      res.json({
+        success: true,
+        message: 'Voucher generated successfully',
+        data: voucherData
+      });
+
+    } catch (error) {
+      console.error('Error generating voucher PDF:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error generating voucher PDF'
       });
     }
   }

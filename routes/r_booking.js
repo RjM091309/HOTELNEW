@@ -110,4 +110,8 @@ router.get('/remarks/booking/:bookingId', BookingController.getRemarksByBooking)
 router.put('/remarks/:remarkId', BookingController.updateRemark);
 router.delete('/remarks/:remarkId', BookingController.deleteRemark);
 
+// Voucher routes
+router.get('/get-voucher-data/:bookingId', BookingController.getVoucherData);
+router.get('/voucher/:bookingId', BookingController.generateVoucherPDF);
+
 module.exports = router;
