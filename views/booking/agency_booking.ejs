@@ -1,0 +1,691 @@
+<!-- start page content -->
+<div class="row">
+    <div class="col-xl-12 col-md-12 col-12">
+        <div class="dashboard-card">
+            <div class="dashboard-card-header">
+                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                    <div class="tab-bar">
+                        <a class="tab-item" href="/booking">Single</a>
+                        <a class="tab-item" href="/booking/group">Group</a>
+                        <a class="tab-item is-active" href="/booking/agency">Agency</a>
+                    </div>
+                    
+                    <div style="flex: 1; display: flex; justify-content: center; margin: 0 20px;">
+                        <div class="filter-btn-group">
+                            <button type="button" class="filter-btn active" data-filter="agency_today">Today</button>
+                            <button type="button" class="filter-btn" data-filter="agency_last3days">Last 3 Days</button>
+                            <button type="button" class="filter-btn" data-filter="agency_thisweek">This Week</button>
+                            <button type="button" class="filter-btn" data-filter="agency_thismonth">This Month</button>
+                        </div>
+                    </div>
+                    
+                    <div style="flex: 0 0 auto;">
+                        <button type="button" class="btn btn-success" data-bs-toggle="modal"
+                        data-bs-target="#modal-addbooking"><i class="fa fa-plus"></i> Add
+                            Booking
+                        </button>
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal"
+                        data-bs-target="#modal-add-group-booking"><i class="fa fa-users"></i> Add
+                           Group Booking
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="dashboard-card-body">
+                <div class="table-scrollable">
+                    <table id="agency_booking_tbl" class="table table-hover table-bordered full-width">
+                        <thead>
+                        <tr>
+                            <th style="display:none"></th>
+                            <th>#</th>
+                            <th>GUEST NAME</th>
+                            <th>AGENCY NAME</th>
+                            <th>ROOM NUMBER</th>
+                            <th>CONFIRMATION NUMBER</th>
+                            <th>CHECK IN</th>
+                            <th>CHECK OUT</th>
+                            <th>TOTAL PAYMENT</th>
+                            <th>BOOKING CHANNEL</th>
+                            <th>PAYMENT STATUS</th>
+                            <th>BOOKING STATUS</th>
+                            <th>ACTION</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+            
+<%- include('./modal/billing') %>
+
+        <%- include('./modal/status') %>
+     
+            <%- include('./modal/cancel_booking') %>
+
+            <%- include('./modal/edit_booking') %>
+            
+            <%- include('./modal/add_booking') %>
+            <%- include('../booking/modal/add_group_booking') %>
+                
+                    <!-- Voucher Details Modal -->
+                    <div class="modal fade" id="modal-voucher-details" tabindex="-1" role="dialog" aria-labelledby="modal-voucher-details-label" aria-hidden="true" data-bs-backdrop="static">
+                        <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="modal-voucher-details-label">
+                                        <i class="fa fa-file-text-o"></i> Voucher Details
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-bordered table-striped">
+                                            <tbody>
+                                                <tr>
+                                                    <th class="bg-light" style="width: 40%;">SOURCE / GUEST NAME</th>
+                                                    <td id="voucher-guest-name">-</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="bg-light">RESERVATION DATE</th>
+                                                    <td id="voucher-reservation-date">-</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="bg-light">ARRIVAL DATE</th>
+                                                    <td id="voucher-checkin">-</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="bg-light">DEPARTURE DATE</th>
+                                                    <td id="voucher-checkout">-</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="bg-light">CHECK-IN STATUS</th>
+                                                    <td id="voucher-checkin-status">-</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="bg-light">CHECK-OUT STATUS</th>
+                                                    <td id="voucher-checkout-status">-</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="bg-light">LENGTH OF STAY</th>
+                                                    <td id="voucher-length-stay">-</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="bg-light">ROOM TYPE</th>
+                                                    <td id="voucher-room-type">-</td>
+                                                </tr>
+                                                <tr>
+                                                    <th class="bg-light">REMARKS</th>
+                                                    <td id="voucher-remarks">-</td>
+                                                </tr>
+                                                <tr id="reservation-fee-row" style="display: none;">
+                                                    <th class="bg-light">RESERVATION FEE</th>
+                                                    <td id="voucher-reservation-fee">-</td>
+                                                </tr>
+                                                <tr id="discount-amount-row" style="display: none;">
+                                                    <th class="bg-light">DISCOUNT AMOUNT</th>
+                                                    <td id="voucher-discount-amount">-</td>
+                                                </tr>
+                                                <tr id="grand-total-row">
+                                                    <th class="bg-dark">GRAND TOTAL</th>
+                                                    <td id="voucher-grand-total">-</td>
+                                                </tr>
+                                                <tr class="bg-dark">
+                                                    <th class="bg-dark text-white">TOTAL BALANCE</th>
+                                                    <td id="voucher-total-balance" class="fw-bold text-white">-</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                    <button type="button" class="btn btn-info" onclick="downloadVoucherFromModal()">
+                                        <i class="fa fa-download"></i> Download Voucher
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
+
+<script src="/js/booking/booking_data.js"></script>
+
+<!-- Include room-menu_data.js for remarks functionality -->
+<script src="/js/dashboard/room-menu_data.js"></script>
+<script>
+    // Expose the openRemarksModal function globally
+    window.openRemarksModal = openRemarksModal;
+</script>
+
+<script src="/js/booking/booking_submit.js"></script> 
+
+<script>
+$(document).ready(function () {
+    let table = $('#agency_booking_tbl').DataTable({
+        rowId: 'BookingID',
+        processing: true,
+        serverSide: true,
+        ajax: {
+            url: '/booking/booking_data?filter=agency',
+            type: 'GET',
+            dataSrc: function (json) {
+                return json.data.map(item => {
+                    const formatDate = (dateString) => {
+                        const date = new Date(dateString);
+                        return new Intl.DateTimeFormat('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                            timeZone: 'UTC'
+                        }).format(date);
+                    };
+                    return {
+                        BookingID: item.BookingID,
+                        CustomerName: item.NAME,
+                        AgencyName: item.AGENCY_NAME || 'N/A',
+                        RoomID: item.ROOM_NUMBER,
+                        CONFIRMATION: item.CONFIRMATION_NUMBER,
+                        Checkin: formatDate(item.CHECK_IN_DATE),
+                        Checkout: `<button class="btn-checkout" data-booking-id="${item.BookingID}" style="background-color: transparent; padding: 0 !important; margin: 0 !important; font-family: Poppins, sans-serif; font-size: 13px; font-weight: 400; line-height: 1.7; color: rgba(0, 0, 0, 0.87); border: none; box-shadow: none; outline: none; cursor: pointer;">
+                                        ${formatDate(item.CHECK_OUT_DATE)}
+                                    </button>`,
+                        Totalcost: item.TOTAL_COST,
+                        Paymentstatus: item.PAYMENT_STATUS,
+                        BookingChannel: item.BOOKING_CHANNEL,
+                        Status: getStatusLabel(item.BookingStatus, item.BookingID),
+                        BookingStatus: item.BookingStatus,
+                        IsDirectReservation: item.IS_DIRECT_RESERVATION
+                    };
+                });
+            },
+        },
+        columns: [  
+        { data: 'BookingID', visible: false },
+        {
+                title: '#',
+                data: null,
+                orderable: false,
+                render: function (data, type, row, meta) {
+                    return meta.settings._iDisplayStart + meta.row + 1;
+                }
+            },
+        {
+             data: 'CustomerName',
+             title: 'GUEST NAME',
+             render: function (data, type, row) {
+                 return `<a href="#" onclick="showVoucherDetails(${row.BookingID})" style="color: #337ab7; text-decoration: none; cursor: pointer;">${data}</a>`;
+             }
+         },
+        { 
+            data: 'AgencyName', 
+            title: 'AGENCY NAME',
+            render: function(data) {
+                return data || 'N/A';
+            }
+        },
+        { 
+            data: 'RoomID', 
+            title: 'ROOM NUMBER',
+            render: function(data) {
+                const value = (data ?? '').toString().trim();
+                if (!value || value === '0') {
+                    return 'Unassigned Room';
+                }
+                return value;
+            }
+        },
+        { data: 'CONFIRMATION', title: 'CONFIRMATION NUMBER' },
+        { data: 'Checkin', title: 'CHECK IN' },
+        {
+            data: 'Checkout',
+            title: 'CHECK OUT',
+            render: function (data, type, row) {
+                return data;
+            }
+        },
+        {
+            data: 'Totalcost',
+            title: 'TOTAL PAYMENT',
+            render: function (data) {
+                return parseFloat(data).toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+            }
+        },
+        { data: 'BookingChannel', title: 'BOOKING CHANNEL' },
+        {
+            data: 'Paymentstatus',
+            title: 'PAYMENT STATUS',
+            className: 'text-center',
+            render: function (data) {
+                const paymentStatus = data.toLowerCase().trim();
+                const labelClass = paymentStatus === 'paid' ? 'label-success' : 'label-danger';
+                return `<div style="text-align: center;"><span class="label label-sm ${labelClass}">${data}</span></div>`;
+            }
+        },
+        {
+            data: 'Status',
+            title: 'BOOKING STATUS',
+            visible: true,
+            className: 'text-center',
+            render: function (data, type, row) {
+                return data;
+            }
+        },
+        {
+            className: 'text-center',
+            render: function (data, type, row) {
+            const paymentStatus = row.Paymentstatus.toLowerCase();
+            const bookingStatus = row.BookingStatus?.toLowerCase();
+
+            const buttonClass = paymentStatus === 'paid' ? 'btn-primary' : 'btn-primary';
+
+            const isDirect = String(row.IsDirectReservation) === '1';
+
+            let html = `<div style="text-align: center;">`;
+            if (isDirect) {
+                html += `
+                <button class="btn btn-sm btn-secondary" disabled title="Disabled for Direct Reservation" style="opacity: .6; cursor: not-allowed; width: 35px; height: 35px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px;">
+                    <i class="fa fa-credit-card"></i>
+                </button>`;
+            } else {
+                html += `
+                <button class="btn btn-sm ${buttonClass}" onclick="showBilling(${row.BookingID})" title="Billing" style="width: 35px; height: 35px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px;">
+                    <i class="fa fa-credit-card"></i>
+                </button>`;
+            }
+
+            html += `
+                <button class="btn btn-sm btn-warning ms-1" onclick="${isDirect ? `editDirect(${row.BookingID})` : `editBooking(${row.BookingID})`}" title="Edit Booking" style="width: 35px; height: 35px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px;">
+                    <i class="fa fa-edit"></i>
+                </button>`;
+
+            html += `
+                <button class="btn btn-sm btn-info ms-1" onclick="downloadVoucher(${row.BookingID})" title="Download Voucher" style="width: 35px; height: 35px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px;">
+                    <i class="fa fa-download"></i>
+                </button>`;
+
+            if (bookingStatus === 'pending') {
+                html += `
+                    <button class="btn btn-sm btn-danger ms-1" onclick="openCancelBookingModal(${row.BookingID})" title="Cancel Booking" style="width: 35px; height: 35px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px;">
+                        <i class="fa fa-times"></i>
+                    </button>`;
+            } else if (bookingStatus === 'cancelled') {
+                html += `
+                    <button class="btn btn-sm btn-danger ms-1" disabled title="Cancelled" style="width: 35px; height: 35px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px;">
+                        <i class="fa fa-ban"></i>
+                    </button>`;
+            }
+
+            html += `</div>`;
+            return html;
+        }
+
+        }
+    ],
+    order: [[9, 'desc']],
+    language: {
+        emptyTable: "No agency bookings available in the table."
+    }
+});
+
+// When a filter button is clicked, update the DataTable's AJAX URL with the right filter
+$('.filter-btn').on('click', function () {
+    $('.filter-btn').removeClass('active');
+    $(this).addClass('active');
+    
+    let filter = $(this).data('filter');
+    
+    table.ajax.url(`/booking/booking_data?filter=${filter}`).load();
+});
+
+// Handle URL highlight parameter
+;(function(){
+    const params = new URLSearchParams(window.location.search);
+    const highlightId = params.get('highlight');
+    if (!highlightId) return;
+
+    table.search(highlightId).draw(false);
+
+    table.on('draw', () => {
+        const row = table.row('#' + highlightId).node();
+        if (row) $(row).addClass('highlight-checkout');
+    });
+})();
+
+});
+
+// Function to generate status label (display only, not clickable)
+function getStatusLabel(status, bookingId) {
+    let labelClass, labelText;
+    status = (status || '').toLowerCase();
+
+    switch (status) {
+        case 'check-in':
+            labelClass = 'label-success';
+            labelText = 'Check In';
+            break;
+        case 'check-out':
+            labelClass = 'label-warning';
+            labelText = 'Check Out';
+            break;
+        case 'pending':
+            labelClass = 'label-info';
+            labelText = 'Pending';
+            break;
+        case 'cancelled':
+            labelClass = 'label-danger';
+            labelText = 'Cancelled';
+            break;
+        default:
+            labelClass = 'label-secondary';
+            labelText = 'Unknown';
+    }
+
+    return `
+        <span class="label label-sm ${labelClass}">
+            ${labelText}
+        </span>
+    `;
+}
+
+// Function to show voucher details modal
+function showVoucherDetails(bookingID) {
+    $.ajax({
+        url: `/booking/get-voucher-data/${bookingID}`,
+        method: 'GET',
+        success: function (response) {
+            if (response.success) {
+                const data = response.data;
+                
+                document.getElementById('voucher-guest-name').textContent = data.fullname || 'N/A';
+                
+                const today = new Date();
+                const reservationDate = today.toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                });
+                document.getElementById('voucher-reservation-date').textContent = reservationDate;
+                
+                document.getElementById('voucher-checkin').textContent = data.dateFrom || 'N/A';
+                document.getElementById('voucher-checkout').textContent = data.dateTo || 'N/A';
+                
+                // Set check-in status
+                const checkInStatus = data.checkInStatus;
+                const checkInStatusText = checkInStatus === 1 ? 'Regular Check-in' : 'Late Check-in';
+                document.getElementById('voucher-checkin-status').textContent = checkInStatusText;
+                
+                // Set check-out status
+                const checkOutStatus = data.checkOutStatus;
+                const checkOutStatusText = checkOutStatus === 1 ? 'Late Check-out' : 'Regular Check-out';
+                document.getElementById('voucher-checkout-status').textContent = checkOutStatusText;
+                
+                if (data.dateFrom && data.dateTo) {
+                    const checkIn = new Date(data.dateFrom);
+                    const checkOut = new Date(data.dateTo);
+                    const diffTime = Math.abs(checkOut - checkIn);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    const nights = diffDays === 1 ? '1 NIGHT' : `${diffDays} NIGHTS`;
+                    document.getElementById('voucher-length-stay').textContent = nights;
+                } else {
+                    document.getElementById('voucher-length-stay').textContent = 'N/A';
+                }
+                
+                let roomTypeText = data.roomType || 'Unassigned Room';
+                if (data.roomNumber && data.roomNumber !== 'Unassigned Room') {
+                    roomTypeText = `${data.roomNumber} - (${data.roomType})`;
+                } else {
+                    roomTypeText = 'Unassigned Room - (Unassigned Room)';
+                }
+                document.getElementById('voucher-room-type').textContent = roomTypeText;
+                
+                document.getElementById('voucher-remarks').textContent = data.remarks || 'Room Accommodation';
+                
+                const reservationFee = data.reservationFee || 0;
+                const reservationFeeRow = document.getElementById('reservation-fee-row');
+                
+                if (parseFloat(reservationFee) > 0) {
+                    document.getElementById('voucher-reservation-fee').textContent = `PHP ${parseFloat(reservationFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                    reservationFeeRow.style.display = 'table-row';
+                } else {
+                    reservationFeeRow.style.display = 'none';
+                }
+                
+                const discountAmount = data.discount || 0;
+                const discountAmountRow = document.getElementById('discount-amount-row');
+                
+                if (parseFloat(discountAmount) > 0) {
+                    document.getElementById('voucher-discount-amount').textContent = `PHP ${parseFloat(discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                    discountAmountRow.style.display = 'table-row';
+                } else {
+                    discountAmountRow.style.display = 'none';
+                }
+                
+                const totalBalance = data.totalBalance || 0;
+                document.getElementById('voucher-total-balance').textContent = `PHP ${parseFloat(totalBalance).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+
+                const grandTotal = (parseFloat(data.total || 0) + parseFloat(reservationFee) + parseFloat(discountAmount));
+                document.getElementById('voucher-grand-total').textContent = `PHP ${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+
+                document.getElementById('modal-voucher-details').setAttribute('data-booking-id', bookingID);
+                
+                $('#modal-voucher-details').modal('show');
+               
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: response.message || 'Failed to fetch voucher details.',
+                    confirmButtonText: 'OK'
+                });
+            }
+        },
+        error: function (xhr, status, error) {
+            console.error('Error fetching voucher details:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'There was an issue fetching the voucher details. Please try again.',
+                confirmButtonText: 'OK'
+            });
+        }
+    });
+}
+
+// Function to download voucher from modal
+function downloadVoucherFromModal() {
+    const modal = document.getElementById('modal-voucher-details');
+    const bookingID = modal.getAttribute('data-booking-id');
+    
+    if (bookingID) {
+        $('#modal-voucher-details').modal('hide');
+        
+        downloadVoucher(bookingID);
+    }
+}
+
+// Function to download voucher
+function downloadVoucher(bookingID) {
+    Swal.fire({
+        title: 'Generating Voucher...',
+        text: 'Please wait while we prepare your voucher.',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = '/booking/voucher/' + bookingID + '?download=1';
+    document.body.appendChild(iframe);
+    
+    setTimeout(() => {
+        document.body.removeChild(iframe);
+        Swal.fire({
+            icon: 'success',
+            title: 'PDF Voucher Downloaded!',
+            text: 'Your voucher has been downloaded as PDF automatically.',
+            confirmButtonText: 'OK'
+        });
+    }, 2000);
+}
+
+// OPEN CANCEL BOOKING MODAL
+function openCancelBookingModal(bookingId) {
+    $('#cancelBookingId').val(bookingId);
+    $('#cancelReason').val('');
+    $('#modal-cancel-booking').modal('show');
+}
+
+</script>
+
+<style>
+/* Voucher Details Modal Dark Theme - Matching Add Booking Modal */
+#modal-voucher-details .form-label {
+    font-size: 12px;
+}
+
+#modal-voucher-details .btn-close {
+    filter: invert(1) !important;
+}
+
+#modal-voucher-details .btn-close:hover {
+    filter: invert(0.8) !important; /* Slightly lighter on hover */
+}
+
+/* Modal Background */
+#modal-voucher-details .modal-content {
+    background-color: #2a3135;
+    color: #e0e0e0; /* Light text */
+    border-radius: 6px;
+    box-shadow: 0 0 10px rgba(59,59,59, 0.2); /* Slight neon glow */
+    border: 1px solid #3B3B3B;
+}
+
+/* Modal Header */
+#modal-voucher-details .modal-header {
+    background-color: #0c2a42;
+    color: #ffffff;
+    border-bottom: 1px solid #0c2a42;
+}
+
+/* Modal Title */
+#modal-voucher-details .modal-title {
+    color: #ffffff;
+}
+
+/* Close button (X) */
+#modal-voucher-details .btn-close {
+    filter: brightness(200%);
+}
+
+/* Table Styling for Dark Theme */
+#modal-voucher-details .table {
+    background-color: #2a3135;
+    color: #e0e0e0;
+}
+
+#modal-voucher-details .table th {
+    background-color: #41474c !important;
+    color: #e0e0e0 !important;
+    border-color: #3B3B3B !important;
+}
+
+#modal-voucher-details .table td {
+    background-color: #41474c !important;
+    color: #e0e0e0 !important;
+    border-color: #3B3B3B !important;
+}
+
+#modal-voucher-details .table-striped > tbody > tr:nth-of-type(odd) > td {
+    background-color: #41474c !important;
+}
+
+#modal-voucher-details .bg-light {
+    background-color: #41474c !important;
+    color: #ffffff !important;
+}
+
+#modal-voucher-details .bg-secondary {
+    background-color: #0c2a42 !important;
+    color: #ffffff !important;
+}
+
+#modal-voucher-details .table-secondary {
+    background-color: #0c2a42 !important;
+}
+
+#modal-voucher-details .table-secondary th {
+    background-color: #0c2a42 !important;
+    color: #ffffff !important;
+}
+
+#modal-voucher-details .table-secondary td {
+    background-color: #0c2a42 !important;
+    color: #ffffff !important;
+}
+
+/* Ensure TOTAL BALANCE row maintains its color with higher specificity */
+#modal-voucher-details tr.table-secondary th,
+#modal-voucher-details tr.table-secondary td {
+    background-color: #0c2a42 !important;
+    color: #ffffff !important;
+}
+
+/* Override any conflicting styles for the TOTAL BALANCE row */
+#modal-voucher-details tr.table-secondary th.bg-secondary,
+#modal-voucher-details tr.table-secondary td {
+    background-color: #0c2a42 !important;
+    color: #ffffff !important;
+}
+
+/* TOTAL BALANCE row styling - force dark blue theme with maximum specificity */
+#modal-voucher-details .modal-content .table-responsive .table tbody tr.table-secondary th,
+#modal-voucher-details .modal-content .table-responsive .table tbody tr.table-secondary td,
+#modal-voucher-details tr.table-secondary th.bg-secondary,
+#modal-voucher-details tr.table-secondary td.fw-bold {
+    background-color: #0c2a42 !important;
+    color: #ffffff !important;
+    background: #0c2a42 !important;
+}
+
+/* Modal Footer */
+#modal-voucher-details .modal-footer {
+    background-color: #2a3135;
+    border-top: 1px solid #3B3B3B;
+}
+
+/* Button Styling */
+#modal-voucher-details .btn-secondary {
+    background-color: #41474c;
+    border-color: #3B3B3B;
+    color: #e0e0e0;
+}
+
+#modal-voucher-details .btn-secondary:hover {
+    background-color: #3B3B3B;
+    border-color: #2a3135;
+    color: #ffffff;
+}
+
+#modal-voucher-details .btn-info {
+    background-color: #0c2a42;
+    border-color: #0c2a42;
+    color: #ffffff;
+}
+
+#modal-voucher-details .btn-info:hover {
+    background-color: #0a1f2e;
+    border-color: #0a1f2e;
+    color: #ffffff;
+}
+</style>

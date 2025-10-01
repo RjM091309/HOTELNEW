@@ -8,6 +8,9 @@ router.get('/', BookingController.renderBookingPage);
 // Route to render the group booking page
 router.get('/group', BookingController.renderGroupBookingPage);
 
+// Route to render the agency booking page
+router.get('/agency', BookingController.renderAgencyBookingPage);
+
 // API Routes for booking data
 router.get('/booking_data', BookingController.getBookingData);
 router.get('/booking_details/:bookingID', BookingController.getBookingDetails);

@@ -2392,13 +2392,13 @@ class BookingModel {
       let dateCondition = '';
       
       if (filter === 'today') {
-        dateCondition = 'AND DATE(b.CHECK_IN_DATE) = CURDATE()';
+        dateCondition = 'AND DATE(b.ENCODED_DT) = CURDATE()';
       } else if (filter === 'last3days') {
-        dateCondition = 'AND DATE(b.CHECK_IN_DATE) >= DATE_SUB(CURDATE(), INTERVAL 3 DAY)';
+        dateCondition = 'AND DATE(b.ENCODED_DT) >= DATE_SUB(CURDATE(), INTERVAL 3 DAY)';
       } else if (filter === 'thisweek') {
-        dateCondition = 'AND YEARWEEK(b.CHECK_IN_DATE) = YEARWEEK(CURDATE())';
+        dateCondition = 'AND YEARWEEK(b.ENCODED_DT) = YEARWEEK(CURDATE())';
       } else if (filter === 'thismonth') {
-        dateCondition = 'AND YEAR(b.CHECK_IN_DATE) = YEAR(CURDATE()) AND MONTH(b.CHECK_IN_DATE) = MONTH(CURDATE())';
+        dateCondition = 'AND YEAR(b.ENCODED_DT) = YEAR(CURDATE()) AND MONTH(b.ENCODED_DT) = MONTH(CURDATE())';
       }
 
       const query = `

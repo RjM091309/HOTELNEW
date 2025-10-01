@@ -19,10 +19,15 @@
                         </div>
                     </div>
                     
-                    <div style="flex: 0 0 auto;">
+                    <div style="flex: 0 0 auto; display: flex; gap: 10px;">
                         <button type="button" class="btn btn-success" data-bs-toggle="modal"
                         data-bs-target="#modal-addbooking"><i class="fa fa-plus"></i> Add
                             Booking
+                        </button>
+                      
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal"
+                        data-bs-target="#modal-add-group-booking"><i class="fa fa-users"></i> Add
+                           Group Booking
                         </button>
                     </div>
                 </div>
@@ -66,6 +71,8 @@
             <%- include('../booking/modal/edit_booking') %>
             
             <%- include('../booking/modal/add_booking') %>
+            
+            <%- include('../booking/modal/add_group_booking') %>
                 
                     <!-- Voucher Details Modal -->
                     <div class="modal fade" id="modal-voucher-details" tabindex="-1" role="dialog" aria-labelledby="modal-voucher-details-label" aria-hidden="true" data-bs-backdrop="static">

@@ -49,6 +49,30 @@ class BookingController {
     }
   }
 
+  // Render the agency booking page
+  static async renderAgencyBookingPage(req, res) {
+    try {
+      // Get user from JWT token (set by middleware)
+      const user = req.user ? {
+        FULLNAME: req.user.FULLNAME,
+        PERMISSIONS: req.user.PERMISSIONS
+      } : null;
+
+      res.render('booking/agency_booking', {
+        title: 'Agency Bookings',
+        subTitle: 'Agency Bookings',
+        activePage: 'booking',
+        user: user
+      });
+    } catch (error) {
+      console.error('Error rendering agency booking page:', error);
+      res.status(500).render('error/500', {
+        title: 'Server Error',
+        subTitle: '500 Error'
+      });
+    }
+  }
+
   // Get booking data for DataTables
   static async getBookingData(req, res) {
     try {
