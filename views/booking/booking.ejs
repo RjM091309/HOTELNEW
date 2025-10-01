@@ -126,12 +126,12 @@
                                                     <td id="voucher-discount-amount">-</td>
                                                 </tr>
                                                 <tr id="grand-total-row">
-                                                    <th class="bg-light">GRAND TOTAL</th>
+                                                    <th class="bg-dark">GRAND TOTAL</th>
                                                     <td id="voucher-grand-total">-</td>
                                                 </tr>
-                                                <tr class="table-secondary">
-                                                    <th class="bg-secondary text-white">TOTAL BALANCE</th>
-                                                    <td id="voucher-total-balance" class="fw-bold">-</td>
+                                                <tr class="bg-dark">
+                                                    <th class="bg-dark text-white">TOTAL BALANCE</th>
+                                                    <td id="voucher-total-balance" class="fw-bold text-white">-</td>
                                                 </tr>
                                             </tbody>
                                         </table>
@@ -261,11 +261,14 @@
     color: #ffffff !important;
 }
 
-/* Remove gray background from TOTAL BALANCE row - make it same as other rows */
-#modal-voucher-details tr.table-secondary th,
-#modal-voucher-details tr.table-secondary td {
-    background-color: #41474c !important;
-    color: #e0e0e0 !important;
+/* TOTAL BALANCE row styling - force dark blue theme with maximum specificity */
+#modal-voucher-details .modal-content .table-responsive .table tbody tr.table-secondary th,
+#modal-voucher-details .modal-content .table-responsive .table tbody tr.table-secondary td,
+#modal-voucher-details tr.table-secondary th.bg-secondary,
+#modal-voucher-details tr.table-secondary td.fw-bold {
+    background-color: #0c2a42 !important;
+    color: #ffffff !important;
+    background: #0c2a42 !important;
 }
 
 /* Modal Footer */
