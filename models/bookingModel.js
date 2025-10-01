@@ -4509,7 +4509,7 @@ class BookingModel {
 
         // payments for room if paid
         if (paymentStatus === 'paid') {
-          const amountPaid = adjustedRoomCharge * qty;
+          const amountPaid = adjustedRoomCharge; // Remove * qty since adjustedRoomCharge already includes nightsCount
           const paymentQuery = `
             INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
             VALUES (?, ?, ?, ?, 'room', NOW(), ?)
