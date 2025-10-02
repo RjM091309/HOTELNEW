@@ -1356,9 +1356,9 @@ class CalendarModel {
           AND (b.CHECK_IN_DATE <= ? AND b.CHECK_OUT_DATE >= ?)
       `;
 
-      console.log('🔍 Executing query with parameters:', [end, start]);
+      // console.log('🔍 Executing query with parameters:', [end, start]);
       const results = await queryDatabasePromise(query, [end, start]);
-      console.log('🔍 Query results:', results);
+      // console.log('🔍 Query results:', results);
 
       // Create a map of dates with counts and unassigned info
       const dateCounts = {};
@@ -1378,9 +1378,7 @@ class CalendarModel {
         }
       });
 
-      console.log('🔍 Processed dateCounts:', dateCounts);
-      console.log('🔍 Processed dateUnassigned:', dateUnassigned);
-
+     
       // Convert dateCounts into event format
       const events = Object.keys(dateCounts).map((date) => ({
         id: date,
@@ -1394,7 +1392,7 @@ class CalendarModel {
         }
       }));
 
-      console.log('🔍 Final events:', events);
+    
       return events;
     } catch (error) {
       console.error('❌ Model error:', error);

@@ -725,7 +725,6 @@ setTimeout(() => {
         customCostInput.style.display = 'none';
         customCostInput.disabled = true;
         customCostCheckbox.checked = false;
-        // console.log(`✅ Custom cost input initialized for booking ${bookingId}`);
     }
         
         // Ensure grand total is calculated after all data is loaded
@@ -1142,7 +1141,6 @@ function loadTransferHistory(bookingId, currentBookingId) {
         .then(response => response.json())
         .then(data => {
          
-            console.log('📊 Transfer logs received:', data);
             
             const transferHistoryContainer = document.getElementById(`transfer-history-${bookingId}`);
             const timelineList = document.getElementById(`timeline-list-${bookingId}`);
@@ -1180,7 +1178,6 @@ function loadTransferHistory(bookingId, currentBookingId) {
                     });
                 });
                 
-                console.log('🏗️ Room progression built:', roomProgression);
                 
                 // Render the timeline with proper room progression
                 roomProgression.forEach((room, index) => {
@@ -1224,7 +1221,6 @@ function loadTransferHistory(bookingId, currentBookingId) {
 function updateAddedServicesList(bookingId) {
 const serviceList = document.getElementById(`added-services-list-${bookingId}`);
 if (!serviceList) {
-    console.log('Service list element not found for booking:', bookingId);
     return;
 }
 
@@ -1336,12 +1332,10 @@ function toggleCustomCost(bookingId) {
         serviceCostInput.style.display = 'block';
         serviceCostInput.disabled = false;
         serviceCostInput.focus();
-        console.log(`✅ Manual cost enabled for booking ${bookingId}`);
     } else {
         serviceCostInput.style.display = 'none';
         serviceCostInput.disabled = true;
         serviceCostInput.value = '';
-        console.log(`✅ Manual cost disabled for booking ${bookingId}`);
 }
 }
 
@@ -1377,11 +1371,9 @@ if (selectedService) {
             return;
         }
         serviceCost = customCost;
-        console.log('✅ Using custom cost:', serviceCost);
     } else {
         // Use default service cost from database
         serviceCost = parseFloat(service.SERVICE_COST);
-        console.log('✅ Using default cost:', serviceCost);
     }
     
     // Check for existing unpaid service with the SAME SERVICE_ID AND SAME COST
@@ -1390,32 +1382,14 @@ if (selectedService) {
         const sameStatus = s.STATUS !== 'paid';
         const sameCost = Math.abs(parseFloat(s.SERVICE_COST) - serviceCost) < 0.01;
         
-        console.log('🔍 Comparing service:', {
-            existingId: s.SERVICE_ID,
-            newId: service.SERVICE_ID,
-            existingCost: s.SERVICE_COST,
-            newCost: serviceCost,
-            sameId: sameId,
-            sameStatus: sameStatus,
-            sameCost: sameCost,
-            willMatch: sameId && sameStatus && sameCost
-        });
         
         return sameId && sameStatus && sameCost;
     });
     
-    console.log('🔍 Checking for existing service:', {
-        serviceId: service.SERVICE_ID,
-        serviceName: service.SERVICE_NAME,
-        newCost: serviceCost,
-        existingServices: roomServices.map(s => ({ id: s.SERVICE_ID, cost: s.SERVICE_COST, status: s.STATUS })),
-        foundExisting: !!existingUnpaid
-    });
     
     if (existingUnpaid) {
         // Only combine if the costs are the same
         existingUnpaid.QUANTITY += quantity;
-        console.log('✅ Updated existing service with same cost. New quantity:', existingUnpaid.QUANTITY);
     } else {
         // Create a new service record if cost is different or service doesn't exist
         roomServices.push({
@@ -1425,7 +1399,6 @@ if (selectedService) {
             QUANTITY: quantity,
             STATUS: "unpaid"
         });
-        console.log('✅ Added new service record with cost:', serviceCost);
     }
 
     // Refresh the list and recalc totals immediately for UI responsiveness
@@ -1434,7 +1407,6 @@ if (selectedService) {
 
     // Save the updated services to the backend and then update balance
     saveServices(bookingId, bookingId).then((result) => {
-        console.log('✅ Services saved successfully:', result);
         // Update balance after successful save
         calculateBalance(bookingId, bookingId);
     }).catch((error) => {
@@ -1491,14 +1463,6 @@ roomServices.forEach(service => {
     const key = `${service.SERVICE_ID}-${service.STATUS}-${serviceCost}`;
     const totalCost = serviceCost * quantity;
 
-    console.log('💾 Processing service for backend:', {
-        serviceId: service.SERVICE_ID,
-        serviceName: service.SERVICE_NAME,
-        cost: serviceCost,
-        quantity: quantity,
-        totalCost: totalCost,
-        key: key
-    });
 
     if (!serviceMap.has(key)) {
         serviceMap.set(key, {
@@ -1507,20 +1471,17 @@ roomServices.forEach(service => {
             TOTAL_COST: totalCost,
             CUSTOM_COST: serviceCost // Send the actual service cost (custom or default)
         });
-        console.log('📝 Created new service entry with key:', key);
     } else {
         const existing = serviceMap.get(key);
         existing.QUANTITY += quantity;
         // Recalculate TOTAL_COST based on the combined quantity and service cost
         existing.TOTAL_COST = existing.QUANTITY * serviceCost;
         serviceMap.set(key, existing);
-        console.log('📝 Updated existing service entry with key:', key, 'New quantity:', existing.QUANTITY);
     }
 });
 
 const servicesData = Array.from(serviceMap.values());
 
-console.log('🚀 Sending services to backend:', servicesData);
 
 if (servicesData.length === 0) {
     toastInfo('Info', 'No new unpaid services to save.');
@@ -1694,7 +1655,6 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
             if (reservationFeeRow && reservationFeeElement) {
                 reservationFeeRow.style.display = 'block';
                 reservationFeeElement.innerHTML = `<span class="text-danger"><strong>-₱${parseFloat(reservationFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>`;
-                // console.log(`✅ Reservation Fee row displayed: -₱${parseFloat(reservationFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
             } else {
                 console.error(`❌ Reservation Fee elements not found for booking ${bookingId}`);
             }
@@ -1702,7 +1662,6 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
             const reservationFeeRow = document.getElementById(`reservation-fee-row-${bookingId}`);
             if (reservationFeeRow) {
                 reservationFeeRow.style.display = 'none';
-                // console.log(`✅ Reservation Fee row hidden (no fee)`);
             }
         }
         
@@ -1713,7 +1672,6 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
             if (reservationFee > 0) {
                 billingReservationFeeRow.style.display = 'block';
                 billingReservationFeeElement.textContent = `₱${parseFloat(reservationFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-                console.log(`✅ Reservation Fee displayed in billing modal: ${reservationFee}`);
             } else {
                 billingReservationFeeRow.style.display = 'none';
             }
@@ -1736,7 +1694,6 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
                     }
                 }
                 discountAmountElement.innerHTML = `<span class="text-danger"><strong>-₱${parseFloat(discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>`;
-                // console.log(`✅ Discount row displayed: -₱${parseFloat(discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
             } else {
                 console.error(`❌ Discount elements not found for booking ${bookingId}`);
             }
@@ -1762,7 +1719,6 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
             const discountRow = document.getElementById(`discount-row-${bookingId}`);
             if (discountRow) {
                 discountRow.style.display = 'none';
-                // console.log(`✅ Discount row hidden (no discount)`);
             }
             const remarksInline = document.getElementById(`discount-remarks-display-${bookingId}`);
             const remarksLabel = document.getElementById(`discount-remarks-label-${bookingId}`);
@@ -1777,7 +1733,6 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
             if (discountAmount > 0) {
                 billingDiscountRow.style.display = 'block';
                 billingDiscountElement.textContent = `₱${parseFloat(discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-                console.log(`✅ Discount displayed in billing modal: ${discountAmount}`);
             } else {
                 billingDiscountRow.style.display = 'none';
             }
@@ -1823,11 +1778,9 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
             if (balanceToShow <= 0) {
                 // Hide discount section when fully paid
                 discountSection.style.display = 'none';
-                console.log(`✅ Discount section hidden - booking ${bookingId} is fully paid`);
             } else {
                 // Show discount section when there's unpaid balance
                 discountSection.style.display = 'block';
-                console.log(`✅ Discount section shown - booking ${bookingId} has unpaid balance`);
             }
         }
     })
@@ -3476,7 +3429,6 @@ function openCheckoutBacktrackModal(bookingId, event) {
         const billingBtn = document.getElementById(`billingBtn_${bookingId}`);
         if (billingBtn) {
             billingBtn.addEventListener('click', function() {
-                console.log('🔍 Billing button clicked for bookingId:', bookingId);
                 showBilling(bookingId);
             });
         }
@@ -3600,22 +3552,18 @@ function updateCheckoutTotal(bookingId) {
 
 // Function to load billing data
 function loadBillingData(bookingId) {
-    console.log('Loading billing data for booking ID:', bookingId);
     
     // Use the same endpoint as the working showBilling function
     fetch(`/booking/get-billing/${bookingId}?_=${Date.now()}`)
         .then(response => response.json())
         .then(data => {
-            console.log('Billing data loaded:', data);
             
             // Update customer name
             const customerNameElement = document.getElementById('customerName');
             if (customerNameElement && data.customerName) {
                 customerNameElement.textContent = data.customerName;
-                console.log('Customer name set to:', data.customerName);
             } else {
                 customerNameElement.textContent = 'Guest';
-                console.log('No customer name found, using default: Guest');
             }
             
             // Update confirmation number
@@ -3703,11 +3651,9 @@ function loadBillingData(bookingId) {
                     if (allPaid && totalPaid > 0) {
                         paidImageOverlay.style.display = 'block';
                         paidImageOverlay.classList.add('show-paid-status');
-                        console.log('Paid image overlay shown');
                     } else {
                         paidImageOverlay.style.display = 'none';
                         paidImageOverlay.classList.remove('show-paid-status');
-                        console.log('Paid image overlay hidden');
                     }
                 }
                 
@@ -3729,7 +3675,6 @@ function loadBillingData(bookingId) {
             }
             
             // Log all available fields for debugging
-            console.log('Available data fields:', Object.keys(data));
             
             // Handle Reservation Fee Display
             if (data.reservationFee && parseFloat(data.reservationFee) > 0) {
@@ -3740,13 +3685,11 @@ function loadBillingData(bookingId) {
                     reservationFeeElement.textContent = `₱${parseFloat(data.reservationFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
                     // Align the amount to the right like Paid and Balance
                     reservationFeeElement.style.textAlign = 'right';
-                    console.log('✅ Reservation Fee displayed:', data.reservationFee);
                 }
             } else {
                 const reservationFeeRow = document.getElementById('reservationFeeRow');
                 if (reservationFeeRow) {
                     reservationFeeRow.style.display = 'none';
-                    console.log('✅ Reservation Fee hidden (no fee)');
                 }
             }
             
@@ -3759,13 +3702,11 @@ function loadBillingData(bookingId) {
                     discountElement.textContent = `₱${parseFloat(data.discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
                     // Align the amount to the right like Paid and Balance
                     discountElement.style.textAlign = 'right';
-                    console.log('✅ Discount displayed:', data.discountAmount);
                 }
             } else {
                 const discountRow = document.getElementById('discountRow');
                 if (discountRow) {
                     discountRow.style.display = 'none';
-                    console.log('✅ Discount hidden (no discount)');
                 }
             }
         })
@@ -3779,14 +3720,12 @@ function loadBillingData(bookingId) {
 
 // Function to load billing services
 function loadBillingServices(bookingId) {
-    console.log('Loading billing services for booking ID:', bookingId);
     
     fetch(`/booking/get-booking-services/${bookingId}`)
         .then(response => response.json())
         .then(response => {
             // Handle new response format: { success: true, data: [...] }
             const services = response.data || response;
-            console.log('Billing services loaded:', services);
             
             // Find the billing table tbody in the modal
             const tableBody = document.querySelector('#modal-billing table tbody');
@@ -3856,12 +3795,10 @@ function loadBillingServices(bookingId) {
 
 // Function to update billing payment status
 function updateBillingPaymentStatus(bookingId) {
-    console.log('Updating billing payment status for booking ID:', bookingId);
     
     fetch(`/booking/unpaid_balance/${bookingId}`)
         .then(response => response.json())
         .then(data => {
-            console.log('Payment status data loaded:', data);
             
             const totalPaid = data.total_paid || 0;
             const totalUnpaid = data.total_unpaid_balance || 0;
@@ -3884,11 +3821,9 @@ function updateBillingPaymentStatus(bookingId) {
                 if (totalUnpaid <= 0 && totalPaid > 0) {
                     paidImageOverlay.style.display = 'block';
                     paidImageOverlay.classList.add('show-paid-status');
-                    console.log('Paid image overlay shown');
                 } else {
                     paidImageOverlay.style.display = 'none';
                     paidImageOverlay.classList.remove('show-paid-status');
-                    console.log('Paid image overlay hidden');
                 }
             } else {
                 console.error('Paid image overlay element not found');

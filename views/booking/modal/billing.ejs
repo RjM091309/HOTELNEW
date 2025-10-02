@@ -184,8 +184,6 @@
 	setTimeout(function() {
 		const proceedButton = document.getElementById('proceedToPaymentButton');
 		if (proceedButton) {
-			console.log('Proceed to Payment button found:', proceedButton);
-			
 			// Remove any existing event listeners
 			proceedButton.replaceWith(proceedButton.cloneNode(true));
 			
@@ -196,11 +194,9 @@
 			newProceedButton.addEventListener('click', function(e) {
 				e.preventDefault();
 				e.stopPropagation();
-				console.log('Proceed to Payment button clicked');
 				
 				// Get the Balance (not total) from the Billing Modal
 				const totalPayment = document.getElementById('balanceAmount').textContent.trim();
-				console.log('Balance for payment:', totalPayment);
 
 				const paymentAmountField = document.getElementById('paymentAmount');
 				if (totalPayment) {
@@ -219,10 +215,6 @@
 				const paymentModal = new bootstrap.Modal(document.getElementById('modal-payment'));
 				paymentModal.show();
 			});
-			
-			console.log('Event listener attached to Proceed to Payment button');
-		} else {
-			console.error('Proceed to Payment button not found');
 		}
 	}, 1000);
 	});
@@ -236,12 +228,6 @@
 		
 		// Check if elements exist
 		if (!totalPaidElement || !totalPaymentElement || !balanceAmountElement || !paidImageOverlay) {
-			console.log('Some elements not found:', {
-				totalPaid: !!totalPaidElement,
-				totalPayment: !!totalPaymentElement,
-				balanceAmount: !!balanceAmountElement,
-				paidImageOverlay: !!paidImageOverlay
-			});
 			return;
 		}
 		
@@ -250,32 +236,17 @@
 		const totalPayment = parseFloat(totalPaymentElement.textContent.replace(/[₹₱,]/g, '')) || 0;
 		const balanceAmount = parseFloat(balanceAmountElement.textContent.replace(/[₹₱,]/g, '')) || 0;
 		
-		console.log('Payment Status Update:', {
-			totalPaid,
-			totalPayment,
-			balanceAmount,
-			textContent: {
-				totalPaid: totalPaidElement.textContent,
-				totalPayment: totalPaymentElement.textContent,
-				balanceAmount: balanceAmountElement.textContent
-			}
-		});
-		
 		// Check if payment is truly complete - improved logic
 		const isPaymentComplete = (balanceAmount <= 0 && totalPaid > 0 && totalPayment > 0 && totalPaid >= totalPayment);
-		
-		console.log('Is Payment Complete:', isPaymentComplete);
 		
 		if (isPaymentComplete) {
 			// Show paid image only when payment is complete
 			paidImageOverlay.style.display = 'block';
 			paidImageOverlay.classList.add('show-paid-status');
-			console.log('Paid image should be visible now');
 		} else {
 			// Hide paid image for unpaid or partial payments
 			paidImageOverlay.style.display = 'none';
 			paidImageOverlay.classList.remove('show-paid-status');
-			console.log('Paid image hidden');
 		}
 	}
 	
@@ -286,7 +257,6 @@
 	
 	// Function to manually check payment status (for debugging)
 	function checkPaymentStatus() {
-		console.log('=== MANUAL PAYMENT STATUS CHECK ===');
 		updatePaymentStatus();
 	}
 	
@@ -296,9 +266,6 @@
 		if (paidImageOverlay) {
 			paidImageOverlay.style.display = 'block';
 			paidImageOverlay.classList.add('show-paid-status');
-			console.log('Forced paid image to show');
-		} else {
-			console.log('Paid image overlay element not found');
 		}
 	}
 	

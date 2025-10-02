@@ -862,8 +862,7 @@ class CalendarController {
         return res.status(400).json({ success: false, message: 'Missing date parameter.' });
       }
 
-      console.log(`Fetching unassigned rooms for date: ${date}`);
-
+    
       const result = await CalendarModel.getDetailedUnassignedRooms(date);
       
       if (result.success) {
