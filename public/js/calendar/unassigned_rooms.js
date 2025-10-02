@@ -20,7 +20,6 @@ $(document).ready(function () {
 
   // Listen for real-time booking updates
   socket.on('bookingUpdated', (data) => {
-    console.log('Real-time Unassigned Room update:', data);
     calendar.refetchEvents(); // Refresh events to reflect real-time changes
   });
 });
@@ -38,23 +37,16 @@ function initCalendar() {
 
     dateClick: function (info) {
       const date = info.dateStr;
-      console.log(`Date clicked: ${date}`);
       const formattedDate = new Date(date).toLocaleDateString('en-US', { 
         month: 'long', 
         day: 'numeric', 
         year: 'numeric' 
       });
 
-      // Debug: Check if side panel exists
-      console.log('Side panel element:', $('.side-panel'));
-      console.log('Side panel classes before:', $('.side-panel').attr('class'));
 
       // Open the side panel and show loading message
       $('.side-panel').toggleClass('opened');
       
-      // Debug: Check if side panel was opened
-      console.log('Side panel classes after:', $('.side-panel').attr('class'));
-      console.log('Side panel opened:', $('.side-panel').hasClass('opened'));
       
       $('.side-panel .content').html(`<p>Loading Unassigned Room details...</p>`);
 
@@ -62,7 +54,6 @@ function initCalendar() {
       fetch(`/calendar/api/unassigned-rooms/details?date=${date}`)
         .then((response) => response.json())
         .then((data) => {
-          console.log('API response:', data);
 
           if (!data.success || data.bookings.length === 0) {
             $('.side-panel .content').html(`
@@ -116,7 +107,6 @@ function fetchUnassignedRoomEvents(fetchInfo, successCallback, failureCallback) 
       return response.json();
     })
     .then((data) => {
-      console.log('Fetched Unassigned Room Events:', data);
 
       const processedEvents = data.map((event) => {
         // Check if any of the reservations for this date are unassigned
@@ -308,7 +298,6 @@ $('.side-panel').on('click', '.assign-room-btn', function () {
   const customerName = container.data('customer-name');
   const bedCount = container.data('bed-count');
 
-  console.log('Assign Room clicked for:', { bookingId, checkInDate, checkOutDate, customerName, bedCount });
 
   // Show available rooms for room assignment
   showAvailableRoomsForDirectReservation(bookingId, checkInDate, checkOutDate, customerName, bedCount);
@@ -316,7 +305,6 @@ $('.side-panel').on('click', '.assign-room-btn', function () {
 
 // Function to show available rooms for direct reservations (copied from dashboard)
 function showAvailableRoomsForDirectReservation(bookingId, checkInDate, checkOutDate, customerName, bedCount) {
-  console.log('Showing available rooms for direct reservation:', { bookingId, checkInDate, checkOutDate, customerName, bedCount });
   
   // Format dates for display
   const startDate = new Date(checkInDate);
@@ -499,7 +487,6 @@ function filterDirectReservationRooms() {
 
 // Function to assign room to direct reservation
 function assignRoomToDirectReservation(bookingId, roomId, roomNumber, roomFloor) {
-  console.log('Assigning room to direct reservation:', { bookingId, roomId, roomNumber, roomFloor });
   
   // Get the original direct reservation details first
   fetch('/booking/get-direct-reservation-details', {

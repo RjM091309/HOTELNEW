@@ -61,6 +61,14 @@
 					</a>
 				</li>
 
+				<li class="nav-item <%= activePage  === 'booking' ? 'active' : '' %>">
+					<a href="/booking" class="nav-link ">
+						<span class="title">Booking </span>
+						<i class="material-icons">business_center</i>
+						<span class="selected"></span>
+					</a>
+				</li>
+
 				<li class="nav-item <%= activePage  === 'calendar' ? 'active' : '' %>">
 					<a href="/calendar" class="nav-link ">
 						<span class="title">Calendar </span>
@@ -77,13 +85,7 @@
 					</a>
 				</li>
 
-				<li class="nav-item <%= activePage  === 'booking' ? 'active' : '' %>">
-					<a href="/booking" class="nav-link ">
-						<span class="title">Booking </span>
-						<i class="material-icons">business_center</i>
-						<span class="selected"></span>
-					</a>
-				</li>
+			
 
 				<li class="nav-item <%= activePage === 'booking_channel' ? 'active' : '' %>">
 					<a href="/booking_channel" class="nav-link ">
