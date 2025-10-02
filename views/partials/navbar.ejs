@@ -1432,7 +1432,7 @@ function updateWarningMessage(selectedBedFilter) {
         // Filter by search input
         if (input) {
             filteredRooms = filteredRooms.filter(room => 
-                room.ROOM_NUMBER.toLowerCase().includes(input)
+                String(room.ROOM_NUMBER || '').toLowerCase().includes(input)
             );
         }
         
