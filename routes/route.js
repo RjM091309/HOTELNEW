@@ -26,6 +26,7 @@ const AuthMiddleware = require('../middleware/m_auth');
 router.use('/', loginRoutes);
 router.use('/api', apiRoutes);
 
+
 // Protected routes (require authentication)
 router.use('/dashboard', AuthMiddleware.requireAuth, dashboardRoutes);
 router.use('/booking', AuthMiddleware.requireAuth, bookingRoutes);

@@ -19,11 +19,22 @@ router.get('/room-monitoring', DashboardController.getRoomMonitoring);
 // Occupied rooms endpoint (no authentication required - for guest app)
 router.get('/dashboard/occupied-rooms', DashboardController.getOccupiedRooms);
 
+// Room control Home Assistant integration (no authentication required - for guest control)
+// IMPORTANT: Place specific routes BEFORE parameterized routes to avoid shadowing
+router.get('/room-control/cleaning-status', RoomController.getCleaningStatus);
+router.get('/room-control/dnd-status', RoomController.getDNDStatus);
+router.post('/room-control/toggle-cleaning', RoomController.toggleCleaning);
+router.post('/room-control/toggle-dnd', RoomController.toggleDND);
+
 // Room control endpoints (no authentication required - for guest use)
 router.get('/room-control/:roomNumber', RoomController.getRoomControlStatus);
 router.post('/room-control/update', RoomController.updateRoomControlSettings);
 router.get('/room-control/:roomNumber/history', RoomController.getRoomControlHistory);
 router.post('/room-control/emergency', RoomController.emergencyRoomControl);
+
+// Housekeeping integration (no authentication required)
+router.get('/housekeeping/cleaning-status', RoomController.getAllRoomsCleaningStatus);
+router.post('/housekeeping/mark-cleaned', RoomController.markRoomCleaned);
 
 // Booking endpoints (no authentication required - for guest use)
 router.get('/booking/booking_data', BookingController.getBookingData);

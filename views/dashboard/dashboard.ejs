@@ -452,7 +452,7 @@ function calculateCardVariables(booking) {
 							let colorIndex = 0;
 
 								// Render Group Booking Cards
-							groupBookingDetails.forEach(groupBooking => { 
+                            groupBookingDetails.forEach(groupBooking => { 
 								if (!groupColors[groupBooking.GROUP_BOOKING_ID]) {
 									groupColors[groupBooking.GROUP_BOOKING_ID] = colorClasses[colorIndex % colorClasses.length];
 									colorIndex++;
@@ -654,15 +654,11 @@ function calculateCardVariables(booking) {
 									// Determine the card class based on the ROOM_FLOOR
 									const cardClass = getFloorColorClass(cleaningRoom.ROOM_FLOOR);
 								%>
-									<div class="card <%= cardClass %>" data-floor="<%= cleaningRoom.ROOM_FLOOR %>">
-										<div class="card-head" style="text-align: center; display: flex; align-items: center; justify-content: space-between;">
-											<!-- Cleaning Toggle Button -->
-											<div class="cleaning-container" data-room-id="<%= cleaningRoom.ROOM_ID %>">
-												<i class="fas fa-broom on"></i>
-											</div>
-											<!-- Room Number -->
-											<header style="flex-grow: 1; text-align: center; font-weight: bold;"><%= cleaningRoom.ROOM_NUMBER %></header>
-										</div>
+                                    <div class="card <%= cardClass %>" data-floor="<%= cleaningRoom.ROOM_FLOOR %>">
+                                        <div class="card-head" style="text-align: center; display: flex; align-items: center; justify-content: space-between;">
+                                            <!-- Room Number -->
+                                            <header style="flex-grow: 1; text-align: center; font-weight: bold;"><%= cleaningRoom.ROOM_NUMBER %></header>
+                                        </div>
 										<div class="card-body">
 											<div style="flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
 												<div>
@@ -789,6 +785,92 @@ function calculateCardVariables(booking) {
     var script8 = document.createElement('script');
 		script8.src = '/js/dashboard/unassigned_room.js';
 		document.body.appendChild(script8);
+
+		// ================= Socket.IO realtime cleaning indicator =================
+		// Safely acquire socket instance created by socket-config.js; fall back to io()
+		var sock = window.socket || (window.io ? window.io() : null);
+		if (sock) {
+			function normalizeRoom(text) { return String(text).trim(); }
+
+			function updateCleaningIconByRoom(roomNumber, isOn) {
+				try {
+					var targetRoom = normalizeRoom(roomNumber);
+					var cards = Array.from(document.querySelectorAll('.card'))
+						.filter(function(card){
+							var header = card.querySelector('.card-head header');
+							return header && normalizeRoom(header.textContent) === targetRoom;
+						});
+					cards.forEach(function(card){
+						var body = card.querySelector('.card-body');
+						if (!body) return;
+						// Ensure container + icon + note exist at the ORIGINAL broom position
+						// The original broom placeholder uses <i class="fa fa-broom"> inside the middle meta row
+						var iconPlaceholder = body.querySelector('i.fa-broom, i.fas.fa-broom');
+						var container = iconPlaceholder ? iconPlaceholder.parentElement : body.querySelector('.rc-cleaning-container');
+						if (!container) {
+							container = document.createElement('div');
+							container.className = 'rc-cleaning-container';
+							// Try to attach at the same parent where the original broom lived
+							var metaRow = body.querySelector('div > div');
+							(metaRow || body).appendChild(container);
+							var icon = document.createElement('i');
+							icon.className = 'fas fa-broom broom-off';
+							container.appendChild(icon);
+							var span = document.createElement('span');
+							span.className = 'cleaning-note';
+							container.appendChild(span);
+						}
+
+						var broomIcon = iconPlaceholder || container.querySelector('i.fa-broom');
+						var note = container.querySelector('.cleaning-note');
+						// Ensure note exists right after the broom icon
+						if (!note && broomIcon) {
+							note = document.createElement('span');
+							note.className = 'cleaning-note';
+							broomIcon.insertAdjacentElement('afterend', note);
+						}
+						if (broomIcon) {
+							broomIcon.classList.remove('broom-on','broom-off');
+							broomIcon.classList.add(isOn ? 'broom-on' : 'broom-off');
+						}
+						if (note) {
+							note.classList.remove('cleaning-note--on');
+							if (isOn) note.classList.add('cleaning-note--on');
+							note.textContent = isOn ? 'Request Cleaning' : '';
+						}
+					});
+				} catch(e){ console.warn('Cleaning icon update failed:', e); }
+			}
+
+			// Initial state: mark broom icons as off if no class yet
+			Array.from(document.querySelectorAll('i.fa-broom')).forEach(function(el){
+				if (!el.classList.contains('broom-on')) el.classList.add('broom-off');
+			});
+
+			// Fetch initial HA cleaning state so indicators persist after refresh (Room 304 default)
+			fetch('/api/room-control/cleaning-status')
+				.then(function(resp){ return resp.ok ? resp.json() : null; })
+				.then(function(data){
+					if (!data || !data.success) return;
+					var isOn = String(data.state).toUpperCase() === 'ON';
+					updateCleaningIconByRoom('304', isOn);
+				})
+				.catch(function(){ /* ignore */ });
+
+			// From housekeeping mark-cleaned
+			sock.on('cleaning-status-update', function(data){
+				if (!data || !data.roomNumber) return;
+				var isOn = String(data.cleaningRelayStatus).toUpperCase() === 'ON';
+				updateCleaningIconByRoom(data.roomNumber, isOn);
+			});
+
+			// From guest room control toggle
+			sock.on('guest-cleaning-toggle', function(data){
+				if (!data || !data.roomNumber) return;
+				var isOn = String(data.newState).toUpperCase() === 'ON';
+				updateCleaningIconByRoom(data.roomNumber, isOn);
+			});
+		}
 	});
 </script>
 
@@ -1164,6 +1246,56 @@ function openRemarksModalFromData(element) {
   outline: none; /* Remove default outline */
   border-color: #007bff; /* Blue border on focus */
   box-shadow: 0 0 4px rgba(0, 123, 255, 0.5); /* Glow effect */
+}
+
+/* ===== Cleaning realtime indicator (Socket.IO) ===== */
+.broom-on {
+  color: #28a745 !important;
+  animation: broom-pulse 1s ease-in-out infinite;
+}
+
+.broom-off {
+  color: #6c757d !important;
+  animation: none;
+  opacity: 0.85;
+}
+
+@keyframes broom-pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.08); opacity: .55; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Blinking note beside broom icon */
+.cleaning-note {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  line-height: 1;
+  background: rgba(108, 117, 125, 0.25);
+  color: #adb5bd;
+}
+
+.cleaning-note--on {
+  background: rgba(40, 167, 69, 0.18);
+  color: #28a745;
+  animation: note-blink 1s ease-in-out infinite;
+}
+
+/* Container used for placing broom + note inside card body (red-box area) */
+.rc-cleaning-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+@keyframes note-blink {
+  0% { opacity: 1; }
+  50% { opacity: .35; }
+  100% { opacity: 1; }
 }
 </style>
 

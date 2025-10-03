@@ -117,4 +117,6 @@ router.get('/api/room-control/:roomNumber/history', RoomController.getRoomContro
 // Emergency room control
 router.post('/api/room-control/emergency', RoomController.emergencyRoomControl);
 
+// Note: Home Assistant integration routes moved to main route.js as public routes
+
 module.exports = router; 

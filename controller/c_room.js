@@ -930,6 +930,299 @@ class RoomController {
     }
   }
 
+  // ========================================
+  // HOME ASSISTANT INTEGRATION METHODS
+  // ========================================
+
+  // Toggle cleaning relay (switch.relay_1)
+  static async toggleCleaning(req, res) {
+    try {
+      const axios = require('axios');
+      
+      const HOME_ASSISTANT_URL = 'http://124.105.224.223:8010';
+      const HA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIxZWNmMDhkNTU5MDA0YzUyYmRiNmU0YTRmY2ZjMzJlNSIsImlhdCI6MTc1OTQ2NzM4OSwiZXhwIjoyMDc0ODI3Mzg5fQ.KbfztQqa68H6XWrkPlmvN5E45sIPHgLHg0bU-NHfwKI';
+      
+      const { action } = req.body;
+      
+      // Get current state of cleaning relay
+      const currentStateResponse = await axios.get(`${HOME_ASSISTANT_URL}/api/states/switch.relay_1`, {
+        headers: { Authorization: `Bearer ${HA_TOKEN}` }
+      });
+      
+      const currentState = currentStateResponse.data.state;
+      
+      // Determine action to take
+      let newState;
+      if (action === 'ON' || action === 'turn_on') {
+        newState = 'on';
+      } else if (action === 'OFF' || action === 'turn_off') {
+        newState = 'off';
+      } else {
+        // Toggle current state
+        newState = currentState === 'on' ? 'off' : 'on';
+      }
+      
+      const service = newState === 'on' ? 'turn_on' : 'turn_off';
+      
+      // Call Home Assistant service
+      const response = await axios.post(`${HOME_ASSISTANT_URL}/api/services/switch/${service}`, {
+        entity_id: 'switch.relay_1'
+      }, {
+        headers: { Authorization: `Bearer ${HA_TOKEN}` }
+      });
+      
+      if (response.status === 200) {
+        // Emit socket event to notify housekeeping clients of guest action
+        const io = req.app.get('io');
+        if (io) {
+          const socketData = {
+            roomNumber: '304', // Default room with guest control - you can extend this to be dynamic
+            action: newState === 'on' ? 'request_cleaning' : 'cancel_cleaning',
+            newState: newState.toUpperCase(),
+            totalRequests: newState === 'on' ? 1 : 0,
+            timestamp: new Date().toISOString(),
+            source: 'guest_control'
+          };
+          
+          io.emit('guest-cleaning-toggle', socketData);
+          console.log(`🚪 Socket.IO: Guest cleaning toggle emitted - Room 304 ${socketData.action}`);
+        }
+
+        res.json({
+          success: true,
+          newState: newState.toUpperCase(),
+          message: `Cleaning relay ${newState.toUpperCase()}`
+        });
+      } else {
+        throw new Error(`Failed to toggle cleaning relay`);
+      }
+    } catch (error) {
+      console.error('Error toggling cleaning:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  // Get cleaning relay status
+  static async getCleaningStatus(req, res) {
+    try {
+      const axios = require('axios');
+      
+      const HOME_ASSISTANT_URL = 'http://124.105.224.223:8010';
+      const HA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIxZWNmMDhkNTU5MDA0YzUyYmRiNmU0YTRmY2ZjMzJlNSIsImlhdCI6MTc1OTQ2NzM4OSwiZXhwIjoyMDc0ODI3Mzg5fQ.KbfztQqa68H6XWrkPlmvN5E45sIPHgLHg0bU-NHfwKI';
+      
+      const response = await axios.get(`${HOME_ASSISTANT_URL}/api/states/switch.relay_1`, {
+        headers: { Authorization: `Bearer ${HA_TOKEN}` }
+      });
+      
+      res.json({
+        success: true,
+        state: response.data.state.toUpperCase()
+      });
+    } catch (error) {
+      console.error('Error getting cleaning status:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  // Toggle DND relay (switch.relay_4)
+  static async toggleDND(req, res) {
+    try {
+      const axios = require('axios');
+      
+      const HOME_ASSISTANT_URL = 'http://124.105.224.223:8010';
+      const HA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIxZWNmMDhkNTU5MDA0YzUyYmRiNmU0YTRmY2ZjMzJlNSIsImlhdCI6MTc1OTQ2NzM4OSwiZXhwIjoyMDc0ODI3Mzg5fQ.KbfztQqa68H6XWrkPlmvN5E45sIPHgLHg0bU-NHfwKI';
+      
+      const { action } = req.body;
+      
+      // Get current state of DND relay
+      const currentStateResponse = await axios.get(`${HOME_ASSISTANT_URL}/api/states/switch.relay_4`, {
+        headers: { Authorization: `Bearer ${HA_TOKEN}` }
+      });
+      
+      const currentState = currentStateResponse.data.state;
+      
+      // Determine action to take
+      let newState;
+      if (action === 'ON' || action === 'turn_on') {
+        newState = 'on';
+      } else if (action === 'OFF' || action === 'turn_off') {
+        newState = 'off';
+      } else {
+        // Toggle current state
+        newState = currentState === 'on' ? 'off' : 'on';
+      }
+      
+      const service = newState === 'on' ? 'turn_on' : 'turn_off';
+      
+      // Call Home Assistant service
+      const response = await axios.post(`${HOME_ASSISTANT_URL}/api/services/switch/${service}`, {
+        entity_id: 'switch.relay_4'
+      }, {
+        headers: { Authorization: `Bearer ${HA_TOKEN}` }
+      });
+      
+      if (response.status === 200) {
+        res.json({
+          success: true,
+          newState: newState.toUpperCase(),
+          message: `DND relay ${newState.toUpperCase()}`
+        });
+      } else {
+        throw new Error(`Failed to toggle DND relay`);
+      }
+    } catch (error) {
+      console.error('Error toggling DND:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  // Get DND relay status
+  static async getDNDStatus(req, res) {
+    try {
+      const axios = require('axios');
+      
+      const HOME_ASSISTANT_URL = 'http://124.105.224.223:8010';
+      const HA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIxZWNmMDhkNTU5MDA0YzUyYmRiNmU0YTRmY2ZjMzJlNSIsImlhdCI6MTc1OTQ2NzM4OSwiZXhwIjoyMDc0ODI3Mzg5fQ.KbfztQqa68H6XWrkPlmvN5E45sIPHgLHg0bU-NHfwKI';
+      
+      const response = await axios.get(`${HOME_ASSISTANT_URL}/api/states/switch.relay_4`, {
+        headers: { Authorization: `Bearer ${HA_TOKEN}` }
+      });
+      
+      res.json({
+        success: true,
+        state: response.data.state.toUpperCase()
+      });
+    } catch (error) {
+      console.error('Error getting DND status:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  // Get all rooms cleaning status for housekeeping
+  static async getAllRoomsCleaningStatus(req, res) {
+    try {
+      const axios = require('axios');
+      
+      const HOME_ASSISTANT_URL = 'http://124.105.224.223:8010';
+      const HA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIxZWNmMDhkNTU5MDA0YzUyYmRiNmU0YTRmY2ZjMzJlNSIsImlhdCI6MTc1OTQ2NzM4OSwiZXhwIjoyMDc0ODI3Mzg5fQ.KbfztQqa68H6XWrkPlmvN5E45sIPHgLHg0bU-NHfwKI';
+      
+      // Check cleaning relay status (switch.relay_1)
+      const cleaningResponse = await axios.get(`${HOME_ASSISTANT_URL}/api/states/switch.relay_1`, {
+        headers: { Authorization: `Bearer ${HA_TOKEN}` }
+      });
+      
+      // Check DND relay status (switch.relay_4)
+      const dndResponse = await axios.get(`${HOME_ASSISTANT_URL}/api/states/switch.relay_4`, {
+        headers: { Authorization: `Bearer ${HA_TOKEN}` }
+      });
+      
+      // Prepare response data
+      const cleaningStatus = cleaningResponse.data.state;
+      const dndStatus = dndResponse.data.state;
+      
+      // Check which rooms need cleaning 
+      const roomsNeedingCleaning = [];
+      
+      // Check if cleaning relay is ON and no DND is active
+      if (cleaningStatus === 'on' && dndStatus === 'off') {
+        // TODO: In future, integrate with device mapping table to get exact room ID
+        // For now, return Room 304 since that's the room with the guest control app
+        // Add room 304 to the list since cleaning relay is ON
+        roomsNeedingCleaning.push({
+          roomNumber: '304', // Room with guest control app
+          needsCleaning: true,
+          cleaningRequestTime: new Date().toISOString(),
+          source: 'Guest Request (switch.relay_1)',
+          relayStatus: cleaningStatus,
+          dndStatus: dndStatus
+        });
+        
+        console.log(`🏠 Cleaning requested detected for Room 304 - Cleaning Relay: ${cleaningStatus}, DND Relay: ${dndStatus}`);
+      } else {
+        console.log(`🏠 No cleaning requests - Cleaning Relay: ${cleaningStatus}, DND Relay: ${dndStatus}`);
+      }
+      
+      res.json({
+        success: true,
+        data: {
+          roomsNeedingCleaning,
+          totalCleaningRequests: roomsNeedingCleaning.length,
+          cleaningRelayStatus: cleaningStatus.toUpperCase(),
+          dndRelayStatus: dndStatus.toUpperCase(),
+          lastUpdated: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      console.error('Error getting all rooms cleaning status:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  // Mark room as cleaned and turn off cleaning relay
+  static async markRoomCleaned(req, res) {
+    try {
+      const axios = require('axios');
+      
+      const HOME_ASSISTANT_URL = 'http://124.105.224.223:8010';
+      const HA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIxZWNmMDhkNTU5MDA0YzUyYmRiNmU0YTRmY2ZjMzJlNSIsImlhdCI6MTc1OTQ2NzM4OSwiZXhwIjoyMDc0ODI3Mzg5fQ.KbfztQqa68H6XWrkPlmvN5E45sIPHgLHg0bU-NHfwKI';
+      
+      const { roomNumber } = req.body;
+      
+      // Turn OFF cleaning relay (switch.relay_1)
+      const response = await axios.post(`${HOME_ASSISTANT_URL}/api/services/switch/turn_off`, {
+        entity_id: 'switch.relay_1'
+      }, {
+        headers: { Authorization: `Bearer ${HA_TOKEN}` }
+      });
+      
+      if (response.status === 200) {
+        // Emit socket event to notify all housekeeping clients
+        const io = req.app.get('io');
+        if (io) {
+          io.emit('cleaning-status-update', {
+            roomNumber,
+            action: 'cleaned',
+            cleaningRelayStatus: 'OFF',
+            totalRequests: 0,
+            timestamp: new Date().toISOString()
+          });
+          console.log(`🔔 Socket.IO: Cleaning status update emitted for Room ${roomNumber}`);
+        }
+
+        res.json({
+          success: true,
+          message: `Room ${roomNumber} marked as cleaned`,
+          roomNumber,
+          cleaningRelayStatus: 'OFF',
+          cleanedAt: new Date().toISOString()
+        });
+      } else {
+        throw new Error(`Failed to turn off cleaning relay for room ${roomNumber}`);
+      }
+    } catch (error) {
+      console.error('Error marking room as cleaned:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
 }
 
 module.exports = RoomController; 
