@@ -10,6 +10,7 @@ $(document).ready(function () {
                         GroupName: item.GROUP_NAME,
                         ContactNo: item.CONTACT_NO,
                         NumberOfRooms: item.NUMBER_OF_ROOMS,
+                        Remarks: item.REMARKS || '',
                         RoomNumbers: item.room_numbers || 'N/A',
                         TotalBookings: item.total_bookings,
                         Channel: item.BOOKING_CHANNEL,
@@ -44,6 +45,7 @@ $(document).ready(function () {
             { data: 'ContactNo', title: 'CONTACT NUMBER' },
             { data: 'NumberOfRooms', title: 'TOTAL ROOMS' },
             { data: 'RoomNumbers', title: 'ROOM NUMBERS' },
+            { data: 'Remarks', title: 'REMARKS' },
             {
                 data: 'TotalPayment',
                 title: 'TOTAL PAYMENT',

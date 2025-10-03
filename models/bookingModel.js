@@ -2407,6 +2407,7 @@ class BookingModel {
           gb.GROUP_NAME,
           gb.CONTACT_NO,
           gb.NUMBER_OF_ROOMS,
+          gb.REMARKS AS REMARKS,
           b.BOOKING_CHANNEL,
           GROUP_CONCAT(r.ROOM_NUMBER ORDER BY r.ROOM_NUMBER SEPARATOR ', ') AS room_numbers,
           COUNT(b.IDNo) AS total_bookings,
