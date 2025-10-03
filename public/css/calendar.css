@@ -472,7 +472,7 @@
     /* Smooth transitions for hover effects */
     transition: all 0.3s ease !important;
     /* Better text contrast */
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+    /* text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important; */
     /* Subtle border for definition */
     border-left: 2px solid rgba(255, 255, 255, 0.1) !important;
     border-right: 2px solid rgba(0, 0, 0, 0.1) !important;
@@ -693,6 +693,39 @@
   .fc-event[style*="background-color: black"] {
     background-color: #000000 !important;
     color: #fff !important;
+  }
+  
+  /* Group Bookings - Blue Text Only */
+  .fc-event.group-booking,
+  .fc-event.group-booking .fc-event-title,
+  .fc-event[style*="color: rgb(0, 191, 255)"] .fc-event-title,
+  .fc-event[style*="color: #00BFFF"] .fc-event-title,
+  .fc-event.fc-event-future.group-booking,
+  .fc-event.fc-event-past.group-booking,
+  .fc-event.fc-event-present.group-booking {
+        color: #2f61ff !important; /* Blue text for group bookings */
+  }
+  
+  /* Force override for existing events - Maximum specificity */
+  .fc .fc-event .fc-event-main.group-booking-text,
+  .fc-event.group-booking .fc-event-title,
+  .fc-event.group-booking .fc-event-main,
+  .fc .fc-daygrid-event .fc-event-title.group-booking-text,
+  .fc .fc-timegrid-event .fc-event-title.group-booking-text,
+  .fc .fc-list-event .fc-event-title.group-booking-text,
+  .fc-bg .fc-event.group-booking,
+  .fc-content .fc-event.group-booking .fc-event-title,
+  .fc-content .fc-event.group-booking .fc-event-main,
+  #calendar .fc-event.group-booking,
+  #calendar .fc-event.group-booking * {
+        color: #2f61ff !important;
+  }
+  
+  /* Specific override for canvas-based events */
+  .fc-event.group-booking.fc-event-future .fc-event-title,
+  .fc-event.group-booking.fc-event-past .fc-event-title,
+  .fc-event.group-booking.fc-event-present .fc-event-title {
+        color: #2f61ff !important;
   }
   
   .fc-v-event {
