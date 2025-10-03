@@ -703,7 +703,7 @@
   .fc-event.fc-event-future.group-booking,
   .fc-event.fc-event-past.group-booking,
   .fc-event.fc-event-present.group-booking {
-        color: #2f61ff !important; /* Blue text for group bookings */
+        color: #2a2a2a !important; /* Blue text for group bookings */
   }
   
   /* Force override for existing events - Maximum specificity */
@@ -718,14 +718,14 @@
   .fc-content .fc-event.group-booking .fc-event-main,
   #calendar .fc-event.group-booking,
   #calendar .fc-event.group-booking * {
-        color: #2f61ff !important;
+        color: #2a2a2a !important;
   }
   
   /* Specific override for canvas-based events */
   .fc-event.group-booking.fc-event-future .fc-event-title,
   .fc-event.group-booking.fc-event-past .fc-event-title,
   .fc-event.group-booking.fc-event-present .fc-event-title {
-        color: #2f61ff !important;
+        color: #2a2a2a !important;
   }
   
   .fc-v-event {

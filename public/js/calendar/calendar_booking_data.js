@@ -242,14 +242,14 @@ function applyCompositeStatusStyles(event, el) {
       const rightColor = coNorm === 'late' ? lemon : red;      // right half = check-out
       el.setAttribute('data-composite', 'true');
       el.style.background = `linear-gradient(90deg, ${leftColor} 0%, ${leftColor} 50%, ${rightColor} 50%, ${rightColor} 100%)`;
-      el.style.color = isGroupBooking ? '#2f61ff !important' : '#fff'; // Blue text for group bookings, white for individual
+      el.style.color = isGroupBooking ? '#2a2a2a !important' : '#fff'; // Blue text for group bookings, white for individual
       el.classList.add(isGroupBooking ? 'group-booking' : ''); // Add CSS class for stronger styling
       
       // Find the text element and apply color directly for group bookings
       if (isGroupBooking) {
         const titleElement = el.querySelector('.fc-event-title');
         if (titleElement) {
-          titleElement.style.color = '#2f61ff !important';
+          titleElement.style.color = '#2a2a2a !important';
           titleElement.classList.add('group-booking-text');
         }
       }
@@ -265,14 +265,14 @@ function applyCompositeStatusStyles(event, el) {
       const rightColor = coNorm === 'late' ? lemon : red;
       el.setAttribute('data-composite', 'true');
       el.style.background = `linear-gradient(90deg, ${leftColor} 0%, ${leftColor} 50%, ${rightColor} 50%, ${rightColor} 100%)`;
-      el.style.color = isGroupBooking ? '#2f61ff !important' : '#fff'; // Blue text for group bookings, white for individual
+      el.style.color = isGroupBooking ? '#2a2a2a !important' : '#fff'; // Blue text for group bookings, white for individual
       el.classList.add(isGroupBooking ? 'group-booking' : ''); // Add CSS class for stronger styling
       
       // Find the text element and apply color directly for group bookings
       if (isGroupBooking) {
         const titleElement = el.querySelector('.fc-event-title');
         if (titleElement) {
-          titleElement.style.color = '#2f61ff !important';
+          titleElement.style.color = '#2a2a2a !important';
           titleElement.classList.add('group-booking-text');
         }
       }
@@ -290,13 +290,13 @@ function applyCompositeStatusStyles(event, el) {
     }
     // Apply blue text color for group bookings
     if (isGroupBooking) {
-      el.style.color = '#2f61ff !important'; // Blue text for group bookings
+      el.style.color = '#2a2a2a !important'; // Blue text for group bookings
       el.classList.add('group-booking'); // Add CSS class for stronger styling
       
       // Find the text element and apply color directly
       const titleElement = el.querySelector('.fc-event-title');
       if (titleElement) {
-        titleElement.style.color = '#2f61ff !important';
+        titleElement.style.color = '#2a2a2a !important';
         titleElement.classList.add('group-booking-text');
       }
       

@@ -4435,6 +4435,7 @@ class BookingModel {
       for (let index = 0; index < roomIds.length; index++) {
         const roomId = roomIds[index];
         const guestFullName = index === 0 ? `${groupName}-Main-1` : `${groupName}-${index + 1}`;
+        const bookingRemarksForThisRow = index === 0 ? (remarks || '') : '';
         const baseRoomPrice = roomBasePrices[index];
         const totalRoomCharge = baseRoomPrice * nightsCount;
         const perRoomFee = parseFloat(perRoomFeesArray[index]) || 0;
@@ -4471,7 +4472,7 @@ class BookingModel {
           bookingRoute,
           1,
           checkOutStatus,
-          '',
+          bookingRemarksForThisRow,
           confirmationNumber,
           encodedBy,
           date,

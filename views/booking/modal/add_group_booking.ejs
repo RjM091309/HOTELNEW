@@ -1760,7 +1760,7 @@
         breakfastKidPrice: $('#groupBreakfastKidPrice').val() || 0,
         pickup: $('#groupIncludePickup').is(':checked') ? ($('#groupPickupPrice').val() || 0) : 0,
         dropoff: $('#groupIncludeDropoff').is(':checked') ? ($('#groupDropoffPrice').val() || 0) : 0,
-        remarks: '',
+        remarks: $('#groupRemarks').val() || '',
         total: numericTotal,
         checkInStatus: $('#groupCheckInStatus').val(),
         checkOutStatus: $('#groupCheckOutStatus').val(),
