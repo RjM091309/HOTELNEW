@@ -4433,7 +4433,7 @@ class BookingModel {
       // Insert each room booking
       for (let index = 0; index < roomIds.length; index++) {
         const roomId = roomIds[index];
-        const guestFullName = `${groupName}-${index + 1}`;
+        const guestFullName = index === 0 ? `${groupName}-Main-1` : `${groupName}-${index + 1}`;
         const baseRoomPrice = roomBasePrices[index];
         const totalRoomCharge = baseRoomPrice * nightsCount;
         const perRoomFee = parseFloat(perRoomFeesArray[index]) || 0;

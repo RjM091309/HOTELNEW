@@ -23,7 +23,6 @@ function processBookingsData(bookingsData) {
   
   // Early return for empty data
   if (!bookingsData || bookingsData.length === 0) {
-    console.log('📭 No booking data to process');
     return [];
   }
 
@@ -64,6 +63,8 @@ function processBookingsData(bookingsData) {
       
       const checkOutStatus = booking.CHECK_OUT_STATUS || booking.LATE_CHECKOUT;
       
+      // // Check if this is a group booking during data processing
+      // const isGroupBooking = booking.GROUP_BOOKING_ID && booking.GROUP_BOOKING_ID !== null;
 
       processedBookings[j] = {
         id: String(booking.BookingID),
@@ -82,7 +83,8 @@ function processBookingsData(bookingsData) {
           totalDays: booking.TOTAL_DAYS,
           bookingStatus: bookingStatus,
           checkInStatus: checkInStatus,    // 1 = regular (red), 0 = late (lemon)
-          checkOutStatus: checkOutStatus   // 0 = regular (red), 1 = late (lemon)
+          checkOutStatus: checkOutStatus,   // 0 = regular (red), 1 = late (lemon)
+          groupBookingId: booking.GROUP_BOOKING_ID || booking.groupBookingId // For blue text styling
         }
       };
     }
@@ -100,15 +102,18 @@ function processBookingsData(bookingsData) {
 }
 
 function getBookingColor(booking) {
+  // Check if this is a group booking first
+  // const isGroupBooking = booking.GROUP_BOOKING_ID && booking.GROUP_BOOKING_ID !== null;
+  
   switch (booking.BOOKING_STATUS) {
-    case 'check-In': return 'green';
+    case 'check-In': return 'green'; // Keep original background color
     case 'check-Out': return '#B3B3B3';
     case 'pending': 
       // Distinguish between pending and late check-in based on CHECK_IN_STATUS
       if (booking.CHECK_IN_STATUS === 0 || booking.CHECK_IN_STATUS === '0') {
-        return '#fff700'; // Late check-in = lemon
+        return '#fff700'; // Late check-in = lemon (keep original)
       } else {
-        return '#e53935'; // Regular check-in = red
+        return '#e53935'; // Regular check-in = red (keep original)
       }
     case 'cancelled': return '#000000';
     default: return 'pink';
@@ -188,11 +193,13 @@ function handleEventClick(info) {
 function applyCompositeStatusStyles(event, el) {
   try {
     const bookingStatus = event.extendedProps?.bookingStatus;
+    const isGroupBooking = event.extendedProps?.groupBookingId && event.extendedProps.groupBookingId !== null && event.extendedProps.groupBookingId !== undefined;
 
-    // Colors
-    const red = '#e53935';      // regular
-    const lemon = '#fff700';    // late
-    const green = '#43a047';    // occupied
+
+    // Colors - Keep original background colors
+    const red = '#e53935';      // regular (keep original red)
+    const lemon = '#fff700';    // late (keep original yellow)
+    const green = '#43a047';    // occupied (keep original green)
 
     let checkInStatusRaw = event.extendedProps?.checkInStatus;   // expected: 1 regular, 0 late
     let checkOutStatusRaw = event.extendedProps?.checkOutStatus; // expected: 0 regular, 1 late
@@ -235,7 +242,18 @@ function applyCompositeStatusStyles(event, el) {
       const rightColor = coNorm === 'late' ? lemon : red;      // right half = check-out
       el.setAttribute('data-composite', 'true');
       el.style.background = `linear-gradient(90deg, ${leftColor} 0%, ${leftColor} 50%, ${rightColor} 50%, ${rightColor} 100%)`;
-      el.style.color = '#fff';
+      el.style.color = isGroupBooking ? '#2f61ff !important' : '#fff'; // Blue text for group bookings, white for individual
+      el.classList.add(isGroupBooking ? 'group-booking' : ''); // Add CSS class for stronger styling
+      
+      // Find the text element and apply color directly for group bookings
+      if (isGroupBooking) {
+        const titleElement = el.querySelector('.fc-event-title');
+        if (titleElement) {
+          titleElement.style.color = '#2f61ff !important';
+          titleElement.classList.add('group-booking-text');
+        }
+      }
+      
       // Lower z-index so checkout side (right half) visually sits underneath neighbors
       el.style.zIndex = '5';
       return;
@@ -247,7 +265,18 @@ function applyCompositeStatusStyles(event, el) {
       const rightColor = coNorm === 'late' ? lemon : red;
       el.setAttribute('data-composite', 'true');
       el.style.background = `linear-gradient(90deg, ${leftColor} 0%, ${leftColor} 50%, ${rightColor} 50%, ${rightColor} 100%)`;
-      el.style.color = '#fff';
+      el.style.color = isGroupBooking ? '#2f61ff !important' : '#fff'; // Blue text for group bookings, white for individual
+      el.classList.add(isGroupBooking ? 'group-booking' : ''); // Add CSS class for stronger styling
+      
+      // Find the text element and apply color directly for group bookings
+      if (isGroupBooking) {
+        const titleElement = el.querySelector('.fc-event-title');
+        if (titleElement) {
+          titleElement.style.color = '#2f61ff !important';
+          titleElement.classList.add('group-booking-text');
+        }
+      }
+      
       // Lower z-index so checkout side (right half) visually sits underneath neighbors
       el.style.zIndex = '5';
       return;
@@ -258,6 +287,19 @@ function applyCompositeStatusStyles(event, el) {
     el.style.background = '';
     if (event.backgroundColor) {
       el.style.backgroundColor = event.backgroundColor;
+    }
+    // Apply blue text color for group bookings
+    if (isGroupBooking) {
+      el.style.color = '#2f61ff !important'; // Blue text for group bookings
+      el.classList.add('group-booking'); // Add CSS class for stronger styling
+      
+      // Find the text element and apply color directly
+      const titleElement = el.querySelector('.fc-event-title');
+      if (titleElement) {
+        titleElement.style.color = '#2f61ff !important';
+        titleElement.classList.add('group-booking-text');
+      }
+      
     }
     // Restore default stacking when not composite
     el.style.zIndex = '';
@@ -364,7 +406,6 @@ function handleDatesSet(info) {
 // =============================================================================
 
 function handleEventResize(info) {
-  console.log('🎯 Resize HANDLER for event:', info.event.title);
   
   // Get the new end date (checkout date)
   const newEnd = info.event.end;
@@ -391,12 +432,6 @@ function handleEventResize(info) {
   
   // Check if this is actually an extension (end date increased)
   const isExtension = newEnd > originalEnd;
-  
-  console.log('🔍 Extension validation:', {
-    newEnd: newEnd.toISOString(),
-    originalEnd: originalEnd.toISOString(),
-    isExtension: isExtension
-  });
   
   // Only allow extensions (increasing checkout date), not reductions
   if (!isExtension) {
@@ -521,7 +556,6 @@ function handleEventResize(info) {
 }
 
 function handleEventResizeStart(info) {
-  console.log('🎯 Resize START for event:', info.event.title);
   
   try {
     // Store original event data in a way that FullCalendar won't interfere with
@@ -541,12 +575,9 @@ function handleEventResizeStart(info) {
     // Also store on the event for backward compatibility
     info.event._originalData = originalData;
     
-    console.log('✅ Original data stored:', originalData);
-    console.log('✅ Data stored in global map for event:', eventId);
-    
     // Verify the data was stored correctly
     if (originalData && originalData.end) {
-      console.log('✅ Original end date verified:', originalData.end.toISOString());
+      // Original data stored successfully
     } else {
       console.error('❌ Original data not stored correctly');
     }
@@ -582,12 +613,6 @@ function handleEventResizeStart(info) {
 }
 
 function handleEventResizeStop(info) {
-  console.log('Event resize stopped:', info.event.title);
-  console.log('🔍 Resize stop data:', {
-    _wasResized: info.event._wasResized,
-    _originalData: info.event._originalData,
-    end: info.event.end
-  });
   
   // RESTORE ORIGINAL STYLING
   info.el.style.borderRight = '';
@@ -607,7 +632,6 @@ function handleEventResizeStop(info) {
   
   // Don't try to detect resize here - FullCalendar hasn't updated the event yet
   // The resize detection will happen in handleEventResize where the event has the new end date
-  console.log('🔄 Resize stop completed, waiting for resize handler');
   
   // Don't restore original data yet - let the resize handler decide
   // The resize handler will either process the resize or restore the data if needed
@@ -643,10 +667,6 @@ function proceedWithResize(info, newEnd, roomResource, bookingId) {
     extensionDate: formatMySQLDateTime(new Date()) // When the extension was made
   };
   
-  console.log('🚀 Calendar resize sending data:', updateData);
-  
-  // Debug: Log the data being sent
-  console.log('🚀 Calendar resize sending data:', updateData);
   
   // Make AJAX call to update booking in database
   fetch('/calendar/api/update-booking', {
@@ -702,10 +722,7 @@ function proceedWithResize(info, newEnd, roomResource, bookingId) {
       // Clean up global map
       if (window.calendarOriginalData) {
         window.calendarOriginalData.delete(bookingId);
-        console.log('✅ Global map cleaned up for booking:', bookingId);
       }
-      
-      console.log('✅ Resize processing completed, all data cleared');
       
       // Emit socket event to update dashboard in real-time
       if (typeof dashboardSocket !== 'undefined' && dashboardSocket) {
@@ -720,8 +737,6 @@ function proceedWithResize(info, newEnd, roomResource, bookingId) {
             timestamp: new Date().toISOString()
           }
         });
-      } else {
-        console.log('⚠️ Socket not available - dashboard refresh will happen on next page load');
       }
       
       // Trigger dashboard refresh if available
@@ -758,7 +773,6 @@ function proceedWithResize(info, newEnd, roomResource, bookingId) {
       // Clean up global map
       if (window.calendarOriginalData) {
         window.calendarOriginalData.delete(bookingId);
-        console.log('✅ Global map cleaned up for failed booking:', bookingId);
       }
       
       if (info.event._originalData) {
@@ -790,7 +804,6 @@ function proceedWithResize(info, newEnd, roomResource, bookingId) {
     // Clean up global map
     if (window.calendarOriginalData) {
       window.calendarOriginalData.delete(info.event.id);
-      console.log('✅ Global map cleaned up for failed event:', info.event.id);
     }
     
     if (info.event._originalData) {
@@ -985,7 +998,6 @@ function handleEventDragStart(info) {
 }
 
 function handleEventDragStop(info) {
-  console.log('Event drag stopped:', info.event.title);
   
   // RESTORE ORIGINAL STYLING
   info.el.style.opacity = '';
@@ -1005,7 +1017,6 @@ function handleEventDragStop(info) {
   
   // If the event wasn't actually dropped (just dragged and released), restore original data
   if (!info.event._wasDropped) {
-    console.log('🔄 Restoring original event data - no drop occurred');
     restoreOriginalEventData(info.event);
     
     // Clean up any duplicates that might have been created during the drag
@@ -1079,7 +1090,6 @@ function showEventInfoModal(event) {
 
 // Function to show booking details modal (calls openRoomMenuModal from room-menu_data.js)
 function showBookingDetailsModal(bookingData, roomId, bookingId) {
-  console.log('showBookingDetailsModal called with:', { bookingData, roomId, bookingId });
   
   // Check if openRoomMenuModal function exists
   if (typeof window.openRoomMenuModal === 'function') {
@@ -1366,7 +1376,6 @@ function showPendingModal(event) {
 
 // Function to edit booking from calendar (opens the edit booking modal)
 function editBookingFromCalendar(bookingId) {
-  console.log('Editing booking ID from calendar:', bookingId);
   
   // Check if the edit booking modal exists
   if (typeof window.editBooking === 'function') {
@@ -2095,7 +2104,6 @@ function showCancelledModal(event) {
 
 // Function to populate the booking modal with selected room and dates
 function populateBookingModal(roomId, start, end) {
-  console.log("1. populateBookingModal called with:", { roomId, start, end });
 
   // Format dates for the daterange input
   const startDate = new Date(start);
@@ -2117,11 +2125,8 @@ function populateBookingModal(roomId, start, end) {
   const selectedResource = resources.find(resource => resource.id === roomId);
   
   if (selectedResource) {
-    console.log("2. Found room details from calendar resources:", selectedResource);
-    
     // Extract floor from parent resource (floor)
     const parentResource = selectedResource.parent;
-    console.log("3. Parent resource:", parentResource);
     
     let floorNumber = '3'; // Default fallback
     
@@ -2140,8 +2145,6 @@ function populateBookingModal(roomId, start, end) {
       }
     }
     
-    console.log("4. Extracted floor number:", floorNumber);
-    
     // Get room number from resource title
     const roomNumber = selectedResource.title;
     
@@ -2158,7 +2161,6 @@ function populateBookingModal(roomId, start, end) {
     roomDropdown.data('is-calendar-action', true);
 
     // Now trigger the change event to populate other fields like price, etc.
-    console.log("5. Triggering change event for the selected room.");
     roomDropdown.trigger('change');
   } else {
     console.error("Room resource not found for ID:", roomId);
@@ -2367,7 +2369,6 @@ function updateSingleEvent(event, newStart, newEnd, newResource) {
   try {
     // Prevent duplicate updates by checking if event is already being updated
     if (event._isUpdating) {
-      console.log('⚠️ Event update already in progress, skipping...');
       return;
     }
     
@@ -2414,8 +2415,6 @@ function updateSingleEvent(event, newStart, newEnd, newResource) {
       setTimeout(() => {
         eventElement.classList.remove('event-updated');
       }, 100);
-      
-      console.log('✅ Event data updated instantly');
     }
 
     // Update overlay class on harness depending on status
@@ -2441,14 +2440,11 @@ function updateSingleEvent(event, newStart, newEnd, newResource) {
     setTimeout(() => {
       event._isUpdating = false;
     }, 100);
-    
-    console.log('✅ Event updated instantly without any calendar re-render');
   } catch (error) {
     console.error('Error updating single event:', error);
     // Clear update flag on error
     if (event) event._isUpdating = false;
     // Fallback to full calendar reload if single update fails
-    console.log('🔄 Falling back to full calendar reload...');
     loadCalendarData();
   }
 }
@@ -2480,7 +2476,6 @@ function clearDragPreviews() {
 function restoreOriginalEventData(event) {
   try {
     if (event._originalData) {
-      console.log('🔄 Restoring original event data for:', event.title);
       
       // Restore original dates and resource
       event.start = event._originalData.start;
@@ -2496,9 +2491,6 @@ function restoreOriginalEventData(event) {
       // Clear the original data only if this is not a resize operation
       if (!event._isResizeOperation) {
         delete event._originalData;
-        console.log('✅ Original data restored and cleared');
-      } else {
-        console.log('✅ Original data restored but preserved for resize processing');
       }
     }
   } catch (error) {
