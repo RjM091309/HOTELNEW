@@ -183,12 +183,12 @@
               <div id="groupBreakfastFields" class="group-breakfast-fields d-none">
                 <div class="group-quantity-wrapper">
                   <input type="number" class="form-control" id="groupBreakfastAdultQty" name="groupBreakfastAdultQty" placeholder="Adult Qty" style="max-width: 90px;">
-                  <input type="number" class="form-control" id="groupBreakfastAdultPrice" name="groupBreakfastAdultPrice" placeholder="Price" readonly>
+                  <input type="number" class="form-control" id="groupBreakfastAdultPrice" name="groupBreakfastAdultPrice" placeholder="Adult Price" min="0" step="0.01">
                   <input type="hidden" id="groupBreakfastAdultId" name="groupBreakfastAdultId">
                 </div>
                 <div class="group-quantity-wrapper">
                   <input type="number" class="form-control" id="groupBreakfastKidQty" name="groupBreakfastKidQty" placeholder="Kid Qty" style="max-width: 90px;">
-                  <input type="number" class="form-control" id="groupBreakfastKidPrice" name="groupBreakfastKidPrice" placeholder="Price" readonly>
+                  <input type="number" class="form-control" id="groupBreakfastKidPrice" name="groupBreakfastKidPrice" placeholder="Kid Price" min="0" step="0.01">
                   <input type="hidden" id="groupBreakfastKidId" name="groupBreakfastKidId">
                 </div>
               </div>
@@ -199,7 +199,7 @@
                 <label class="form-check-label" for="groupIncludePickup">Add Pick-up</label>
               </div>
               <div id="groupPickupWrapper" class="mt-2" style="display: none;">
-                <input type="number" class="form-control" id="groupPickupPrice" name="groupPickupPrice" placeholder="Pick-up Price" readonly>
+                <input type="number" class="form-control" id="groupPickupPrice" name="groupPickupPrice" placeholder="Pick-up Price" min="0" step="0.01">
                 <input type="hidden" id="groupPickupServiceId" name="groupPickupServiceId">
               </div>
             </div>
@@ -209,7 +209,7 @@
                 <label class="form-check-label" for="groupIncludeDropoff">Add Drop-off</label>
               </div>
               <div id="groupDropoffWrapper" class="mt-2" style="display: none;">
-                <input type="number" class="form-control" id="groupDropoffPrice" name="groupDropoffPrice" placeholder="Drop-off Price" readonly>
+                <input type="number" class="form-control" id="groupDropoffPrice" name="groupDropoffPrice" placeholder="Drop-off Price" min="0" step="0.01">
                 <input type="hidden" id="groupDropoffServiceId" name="groupDropoffServiceId">
               </div>
             </div>
@@ -232,6 +232,15 @@
               </div>
               <div id="groupDiscountWrapper" class="mt-2" style="display: none;">
                 <input type="number" class="form-control" id="groupDiscount" name="groupDiscount" min="0" value="0">
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="groupConsolidatedBilling">
+                <label class="form-check-label" for="groupConsolidatedBilling">Consolidated Billing</label>
+              </div>
+              <div class="form-text">
+                <small class="text-muted">All charges (rooms, services, fees) go to main booking only</small>
               </div>
             </div>
           </div>
@@ -523,6 +532,39 @@
   min-width: 0;
 }
 
+.group-quantity-wrapper input[type="number"] {
+  text-align: right;
+}
+
+.group-quantity-wrapper input[type="number"]:focus {
+  border-color: #6f9c40;
+  box-shadow: 0 0 0 0.2rem rgba(111, 156, 64, 0.25);
+}
+
+/* Consolidated billing styling */
+#groupConsolidatedBilling:checked + label {
+  color: #6f9c40;
+  font-weight: 600;
+}
+
+.form-text small {
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.consolidated-indicator {
+  background: rgba(111, 156, 64, 0.1);
+  border: 1px solid rgba(111, 156, 64, 0.3);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.consolidated-indicator i {
+  margin-right: 6px;
+}
+
 #modal-add-group-booking .bed-requirement-group {
   display: inline-flex;
   align-items: center;
@@ -642,12 +684,11 @@
   let groupUnassignedConflicts = [];
 
   function applyGroupBreakfastDefaults() {
-    if (groupBreakfastAdultBasePrice !== '') {
-      $('#groupBreakfastAdultPrice').val(groupBreakfastAdultBasePrice);
+    // Only set service IDs, not prices
+    if (groupBreakfastAdultBaseId !== '') {
       $('#groupBreakfastAdultId').val(groupBreakfastAdultBaseId);
     }
-    if (groupBreakfastKidBasePrice !== '') {
-      $('#groupBreakfastKidPrice').val(groupBreakfastKidBasePrice);
+    if (groupBreakfastKidBaseId !== '') {
       $('#groupBreakfastKidId').val(groupBreakfastKidBaseId);
     }
   }
@@ -673,15 +714,17 @@
     $('#groupManualSelectionInfo').hide();
     $('#groupRoomBreakdown').empty();
     $('#groupResultsContainer').hide();
-    $('#groupComputedTotal').text('₱0.00');
+    $('#groupComputedTotal').html('₱0.00');
     $('#groupCreditDisplay').hide();
     $('#groupCreditAmount').text('₱0.00');
     $('#groupBreakfastFields').addClass('d-none');
-    $('#groupIncludeBreakfast, #groupIncludePickup, #groupIncludeDropoff').prop('checked', false);
+    $('#groupIncludeBreakfast, #groupIncludePickup, #groupIncludeDropoff, #groupConsolidatedBilling').prop('checked', false);
     $('#groupBreakfastAdultQty, #groupBreakfastKidQty').val('');
     $('#groupPickupWrapper, #groupDropoffWrapper').hide();
     $('#groupPickupPrice, #groupDropoffPrice').val('');
     $('#groupPickupServiceId, #groupDropoffServiceId').val('');
+    $('#groupRoomBreakdown').removeClass('d-none');
+    $('.consolidated-indicator').remove();
     applyGroupBreakfastDefaults();
   }
 
@@ -919,10 +962,10 @@
 
   function computeGroupTotal() {
     const nights = parseInt($('#groupNights').val(), 10) || 0;
-      const pricesRaw = $('#groupSelectedRoomPrices').val();
-      const prices = pricesRaw ? pricesRaw.split(',').map(p => parseFloat(p) || 0) : [];
-      const baseSubtotal = prices.reduce((sum, price) => sum + price, 0);
-      const roomSubtotal = baseSubtotal * nights;
+    const pricesRaw = $('#groupSelectedRoomPrices').val();
+    const prices = pricesRaw ? pricesRaw.split(',').map(p => parseFloat(p) || 0) : [];
+    const baseSubtotal = prices.reduce((sum, price) => sum + price, 0);
+    const roomSubtotal = baseSubtotal * nights;
 
     const reservationFee = $('#groupIncludeReservationFee').prop('checked') ? (parseFloat($('#groupReservationFee').val()) || 0) : 0;
     const discount = $('#groupIncludeDiscount').prop('checked') ? (parseFloat($('#groupDiscount').val()) || 0) : 0;
@@ -936,16 +979,34 @@
     const dropoffPrice = $('#groupIncludeDropoff').is(':checked') ? parseFloat($('#groupDropoffPrice').val()) || 0 : 0;
 
     const servicesTotal = (adultQty * adultPrice) + (kidQty * kidPrice) + pickupPrice + dropoffPrice;
-    const subtotal = roomSubtotal + servicesTotal;
-    let finalBalance = subtotal - reservationFee - discount;
 
-    if (finalBalance < 0) {
-      $('#groupComputedTotal').text(formatCurrency(0));
-      $('#groupCreditAmount').text(formatCurrency(Math.abs(finalBalance)));
-      $('#groupCreditDisplay').show();
+    // Check if consolidated billing is enabled
+    const isConsolidated = $('#groupConsolidatedBilling').is(':checked');
+
+    // Always calculate the full total in frontend for user visibility
+    const subtotal = roomSubtotal + servicesTotal;
+    let finalBalance = subtotal + reservationFee - discount;
+
+    if (isConsolidated) {
+      // Show consolidated total with indicator
+      if (finalBalance < 0) {
+        $('#groupComputedTotal').html(`<span class="text-warning">${formatCurrency(0)} <small>(Consolidated)</small></span>`);
+        $('#groupCreditAmount').text(formatCurrency(Math.abs(finalBalance)));
+        $('#groupCreditDisplay').show();
+      } else {
+        $('#groupComputedTotal').html(`<span>${formatCurrency(finalBalance)} <small class="text-info">(Consolidated)</small></span>`);
+        $('#groupCreditDisplay').hide();
+      }
     } else {
-      $('#groupComputedTotal').text(formatCurrency(finalBalance));
-      $('#groupCreditDisplay').hide();
+      // Regular billing calculation
+      if (finalBalance < 0) {
+        $('#groupComputedTotal').text(formatCurrency(0));
+        $('#groupCreditAmount').text(formatCurrency(Math.abs(finalBalance)));
+        $('#groupCreditDisplay').show();
+      } else {
+        $('#groupComputedTotal').text(formatCurrency(finalBalance));
+        $('#groupCreditDisplay').hide();
+      }
     }
   }
 
@@ -1208,6 +1269,7 @@
   }
 
   function loadGroupBreakfastPrices() {
+    // Load breakfast service IDs only, not prices
     fetch('/booking/get-breakfast-prices')
       .then(res => res.json())
       .then(data => {
@@ -1215,22 +1277,17 @@
         const adult = data.find(item => item.SERVICE_NAME.toLowerCase().includes('adult'));
         const kid = data.find(item => item.SERVICE_NAME.toLowerCase().includes('kid'));
         if (adult) {
-          groupBreakfastAdultBasePrice = adult.SERVICE_COST;
           groupBreakfastAdultBaseId = adult.IDNo;
         }
         if (kid) {
-          groupBreakfastKidBasePrice = kid.SERVICE_COST;
           groupBreakfastKidBaseId = kid.IDNo;
         }
-        applyGroupBreakfastDefaults();
       })
-      .catch(err => console.error('Failed to load breakfast prices:', err));
+      .catch(err => console.error('Failed to load breakfast services:', err));
   }
 
   function loadGroupTransportPrices() {
-    groupPickupBasePrice = '';
     groupPickupBaseId = '';
-    groupDropoffBasePrice = '';
     groupDropoffBaseId = '';
 
     fetch('/booking/get-pick-drop')
@@ -1240,15 +1297,13 @@
         const pickup = data.find(item => item.SERVICE_NAME.toLowerCase().includes('pick'));
         const dropoff = data.find(item => item.SERVICE_NAME.toLowerCase().includes('drop'));
         if (pickup) {
-          groupPickupBasePrice = pickup.SERVICE_COST;
           groupPickupBaseId = pickup.IDNo;
         }
         if (dropoff) {
-          groupDropoffBasePrice = dropoff.SERVICE_COST;
           groupDropoffBaseId = dropoff.IDNo;
         }
       })
-      .catch(err => console.error('Failed to load transport prices:', err));
+      .catch(err => console.error('Failed to load transport services:', err));
   }
 
   function attachToggles() {
@@ -1256,6 +1311,9 @@
       if (this.checked) {
         applyGroupBreakfastDefaults();
         $('#groupBreakfastFields').removeClass('d-none');
+        // Set default service IDs only
+        if (groupBreakfastAdultBaseId) $('#groupBreakfastAdultId').val(groupBreakfastAdultBaseId);
+        if (groupBreakfastKidBaseId) $('#groupBreakfastKidId').val(groupBreakfastKidBaseId);
       } else {
         $('#groupBreakfastFields').addClass('d-none');
         $('#groupBreakfastAdultQty, #groupBreakfastKidQty').val('');
@@ -1266,8 +1324,8 @@
     $('#groupIncludePickup').on('change', function() {
       if (this.checked) {
         $('#groupPickupWrapper').show();
-        if (groupPickupBasePrice !== '') {
-          $('#groupPickupPrice').val(groupPickupBasePrice);
+        // Set service ID only, not price
+        if (groupPickupBaseId) {
           $('#groupPickupServiceId').val(groupPickupBaseId);
         }
       } else {
@@ -1281,8 +1339,8 @@
     $('#groupIncludeDropoff').on('change', function() {
       if (this.checked) {
         $('#groupDropoffWrapper').show();
-        if (groupDropoffBasePrice !== '') {
-          $('#groupDropoffPrice').val(groupDropoffBasePrice);
+        // Set service ID only, not price
+        if (groupDropoffBaseId) {
           $('#groupDropoffServiceId').val(groupDropoffBaseId);
         }
       } else {
@@ -1293,7 +1351,15 @@
       computeGroupTotal();
     });
 
-    $('#groupBreakfastAdultQty, #groupBreakfastKidQty').on('input', computeGroupTotal);
+    $('#groupBreakfastAdultQty, #groupBreakfastKidQty, #groupPickupPrice, #groupDropoffPrice').on('input', function() {
+      computeGroupTotal();
+      // Validate that price is not empty if service is checked
+      if ($(this).val() === '' && $(this).closest('.row').find('input[type="checkbox"]:checked').length > 0) {
+        $(this).addClass('is-invalid');
+      } else {
+        $(this).removeClass('is-invalid');
+      }
+    });
   }
 
   function setManualSelectionMode(enabled) {
@@ -1670,6 +1736,8 @@
     $('#modal-add-group-booking').on('shown.bs.modal', function() {
       resetGroupForm();
       initializeGroupFlatpickr();
+      // Ensure consolidated indicator is properly initialized
+      $('#groupConsolidatedBilling').trigger('change');
     });
 
     // Toggle wrappers and recalc
@@ -1689,6 +1757,28 @@
     $('#groupReservationFee, #groupDiscount').on('input', function() {
       updateGroupChargeBreakdown();
       computeGroupTotal();
+    });
+
+    // Handle consolidated billing checkbox
+    $('#groupConsolidatedBilling').on('change', function() {
+      const isConsolidated = $(this).is(':checked');
+      console.log('🔄 Frontend - Consolidated Billing Checkbox Changed:', isConsolidated ? 'CHECKED (Consolidated)' : 'UNCHECKED (Individual)');
+
+      if (isConsolidated) {
+        // Show consolidated billing indicator but keep room breakdown visible
+        $('#groupRoomBreakdown').removeClass('d-none');
+        // Add consolidated indicator to room breakdown
+        const breakdownContainer = $('#groupRoomBreakdown .group-room-breakdown');
+        if (breakdownContainer.length && !breakdownContainer.find('.consolidated-indicator').length) {
+          breakdownContainer.prepend('<div class="consolidated-indicator text-info mb-2"><i class="fa fa-info-circle"></i> Consolidated Billing: All charges will be applied to main booking on save</div>');
+        }
+      } else {
+        // Remove consolidated indicator in normal mode
+        $('.consolidated-indicator').remove();
+      }
+
+      computeGroupTotal();
+      updateGroupChargeBreakdown();
     });
 
     // Clear selected rooms when Check-in/Check-out status changes
@@ -1741,8 +1831,10 @@
         : ($('#groupSelectedRooms').val()||'').split(',').filter(Boolean).join(', ');
 
       const totalText = $('#groupComputedTotal').text() || '0';
-      const numericTotal = totalText.replace(/[^0-9.]/g, '') || '0';
+      // Extract numeric value, handling consolidated format
+      const numericTotal = totalText.replace(/[^0-9.]/g, '').split(' ')[0] || '0';
 
+      const isConsolidated = $('#groupConsolidatedBilling').is(':checked');
       const bookingData = {
         voucherNo: vno,
         fullname: $('#groupName').val() || 'Group Booking',
@@ -1750,9 +1842,9 @@
         dateFrom: dateFrom,
         dateTo: dateTo,
         bedCount: '',
-        roomNumber: roomNumbersForVoucher,
+        roomNumber: isConsolidated ? 'CONSOLIDATED - ' + roomNumbersForVoucher : roomNumbersForVoucher,
         roomView: '',
-        roomType: 'Group',
+        roomType: isConsolidated ? 'Group (Consolidated)' : 'Group',
         roomRate: '',
         breakfastAdult: $('#groupBreakfastAdultQty').val() || 0,
         breakfastAdultPrice: $('#groupBreakfastAdultPrice').val() || 0,

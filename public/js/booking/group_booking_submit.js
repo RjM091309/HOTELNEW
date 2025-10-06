@@ -63,7 +63,11 @@ $(document).ready(function () {
 
     const reservationFee = parseFloat(state.reservationFee) || 0;
     const discount = parseFloat(state.discount) || 0;
-    
+
+    // Get consolidated billing flag
+    const consolidatedBilling = $('#groupConsolidatedBilling').is(':checked');
+    console.log('🔄 Frontend - Consolidated Billing Checkbox:', consolidatedBilling ? 'CHECKED' : 'UNCHECKED');
+
     // Get agency ID if booking route is agency
     const agencyId = bookingRoute === 'agency' ? $('#groupAgencySelect').val() || null : null;
 
@@ -77,46 +81,70 @@ $(document).ready(function () {
       perRoomDiscounts.push(0);
     });
 
+    const ajaxData = {
+      selectedRooms,
+      selectedRoomPrice,
+      qty,
+      daterange,
+      groupName,
+      groupContact,
+      numberOfRooms,
+      paymentStatus,
+      bookingRoute,
+      guestType,
+      guestLevel,
+      checkInStatus,
+      checkOutStatus,
+      remarks,
+      agencyId,
+      breakfastAdultQty,
+      breakfastAdultPrice,
+      breakfastAdultId,
+      breakfastKidQty,
+      breakfastKidPrice,
+      breakfastKidId,
+      pickupServiceId,
+      pickupPrice,
+      dropoffServiceId,
+      dropoffPrice,
+      reservationFee,
+      discount,
+      consolidatedBilling: consolidatedBilling ? 'on' : '',
+      perRoomReservationFees: perRoomFees,
+      perRoomDiscounts
+    };
+
+    console.log('🔄 Frontend - Sending AJAX Data:', {
+      consolidatedBilling: consolidatedBilling,
+      consolidatedBillingType: typeof consolidatedBilling,
+      consolidatedBillingValue: consolidatedBilling
+    });
+
     $.ajax({
       url: '/booking/add_group_booking',
       type: 'POST',
-      data: {
-        selectedRooms,
-        selectedRoomPrice,
-        qty,
-        daterange,
-        groupName,
-        groupContact,
-        numberOfRooms,
-        paymentStatus,
-        bookingRoute,
-        agencyId,
-        guestType,
-        guestLevel,
-        checkInStatus,
-        checkOutStatus,
-        remarks,
-        breakfastAdultQty,
-        breakfastAdultPrice,
-        breakfastAdultId,
-        breakfastKidQty,
-        breakfastKidPrice,
-        breakfastKidId,
-        pickupServiceId,
-        pickupPrice,
-        dropoffServiceId,
-        dropoffPrice,
-        reservationFee,
-        discount,
-        perRoomReservationFees: perRoomFees,
-        perRoomDiscounts
-      },
+      data: ajaxData,
       success: function (response) {
         $('#modal-add-group-booking').modal('hide');
         setTimeout(function () {
+          const isConsolidated = consolidatedBilling;
+
+          // Show the actual calculated amounts from backend response
+          const grandTotal = parseFloat(response.grandTotal) || 0;
+          const reservationFee = parseFloat(response.reservationFee) || 0;
+          const discount = parseFloat(response.discount) || 0;
+
           const details = response && response.grandTotal !== undefined
-            ? `Grand Total: ₱${Number(response.grandTotal || 0).toLocaleString()}\nReservation Fee: ₱${Number(response.reservationFee || 0).toLocaleString()}\nDiscount: ₱${Number(response.discount || 0).toLocaleString()}`
-            : 'The group booking has been added successfully.';
+            ? `Grand Total: ₱${grandTotal.toLocaleString()}\nReservation Fee: ₱${reservationFee.toLocaleString()}\nDiscount: ₱${discount.toLocaleString()}${isConsolidated ? '\n\n✅ Consolidated Billing: All charges applied to main booking' : ''}`
+            : `The group booking has been added successfully.${isConsolidated ? '\n\n✅ Consolidated Billing: All charges applied to main booking' : ''}`;
+
+          console.log('🔄 Success Message - Details:', {
+            grandTotal: grandTotal,
+            reservationFee: reservationFee,
+            discount: discount,
+            isConsolidated: isConsolidated
+          });
+
           Swal.fire({
             title: 'Group Booking Successful!',
             text: details,

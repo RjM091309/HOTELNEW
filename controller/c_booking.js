@@ -1135,10 +1135,18 @@ class BookingController {
         dropoffPrice,
         reservationFee,
         discount,
+        consolidatedBilling: consolidatedBillingValue,
         perRoomReservationFees,
         perRoomDiscounts,
-        directReservationFlag
+        directReservationFlag,
+        lateCheckoutFee = 0
       } = req.body;
+
+      // Convert consolidatedBilling checkbox value to boolean
+      // Checkbox sends "on" when checked, undefined/false when unchecked
+      console.log('🔄 Backend Controller - Received consolidatedBillingValue:', consolidatedBillingValue, 'Type:', typeof consolidatedBillingValue);
+      const consolidatedBilling = consolidatedBillingValue === 'on';
+      console.log('🔄 Backend Controller - Converted consolidatedBilling:', consolidatedBilling);
 
       const encodedBy = req.user?.userId;
       if (!encodedBy) {
@@ -1175,8 +1183,10 @@ class BookingController {
         dropoffPrice,
         reservationFee,
         discount,
+        consolidatedBilling,
         perRoomReservationFees,
         perRoomDiscounts,
+        lateCheckoutFee,
         encodedBy,
         date,
         isDirectReservation: directReservationFlag === 'true'
