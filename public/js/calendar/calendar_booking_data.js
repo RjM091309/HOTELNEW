@@ -242,14 +242,25 @@ function applyCompositeStatusStyles(event, el) {
       const rightColor = coNorm === 'late' ? lemon : red;      // right half = check-out
       el.setAttribute('data-composite', 'true');
       el.style.background = `linear-gradient(90deg, ${leftColor} 0%, ${leftColor} 50%, ${rightColor} 50%, ${rightColor} 100%)`;
-      el.style.color = isGroupBooking ? '#2a2a2a !important' : '#fff'; // Blue text for group bookings, white for individual
-      el.classList.add(isGroupBooking ? 'group-booking' : ''); // Add CSS class for stronger styling
+      el.style.color = isGroupBooking ? '#ffffff !important' : '#fff';
+      if (isGroupBooking) {
+        el.classList.add('group-booking');
+        el.style.border = '2px solid #2196F3';
+        el.style.height = '24px';
+        el.style.minHeight = '24px';
+        el.style.marginTop = '-4px';
+      } else {
+        el.style.border = '';
+        el.style.height = '';
+        el.style.minHeight = '';
+        el.style.marginTop = '';
+      }
       
       // Find the text element and apply color directly for group bookings
       if (isGroupBooking) {
         const titleElement = el.querySelector('.fc-event-title');
         if (titleElement) {
-          titleElement.style.color = '#2a2a2a !important';
+          titleElement.style.color = '#ffffff !important';
           titleElement.classList.add('group-booking-text');
         }
       }
@@ -265,14 +276,25 @@ function applyCompositeStatusStyles(event, el) {
       const rightColor = coNorm === 'late' ? lemon : red;
       el.setAttribute('data-composite', 'true');
       el.style.background = `linear-gradient(90deg, ${leftColor} 0%, ${leftColor} 50%, ${rightColor} 50%, ${rightColor} 100%)`;
-      el.style.color = isGroupBooking ? '#2a2a2a !important' : '#fff'; // Blue text for group bookings, white for individual
-      el.classList.add(isGroupBooking ? 'group-booking' : ''); // Add CSS class for stronger styling
+      el.style.color = isGroupBooking ? '#ffffff !important' : '#fff';
+      if (isGroupBooking) {
+        el.classList.add('group-booking');
+        el.style.border = '2px solid #2196F3';
+        el.style.height = '24px';
+        el.style.minHeight = '24px';
+        el.style.marginTop = '-4px';
+      } else {
+        el.style.border = '';
+        el.style.height = '';
+        el.style.minHeight = '';
+        el.style.marginTop = '';
+      }
       
       // Find the text element and apply color directly for group bookings
       if (isGroupBooking) {
         const titleElement = el.querySelector('.fc-event-title');
         if (titleElement) {
-          titleElement.style.color = '#2a2a2a !important';
+          titleElement.style.color = '#ffffff !important';
           titleElement.classList.add('group-booking-text');
         }
       }
@@ -288,18 +310,29 @@ function applyCompositeStatusStyles(event, el) {
     if (event.backgroundColor) {
       el.style.backgroundColor = event.backgroundColor;
     }
-    // Apply blue text color for group bookings
+    // Apply styles for group bookings
     if (isGroupBooking) {
-      el.style.color = '#2a2a2a !important'; // Blue text for group bookings
-      el.classList.add('group-booking'); // Add CSS class for stronger styling
+      el.style.color = '#ffffff !important';
+      el.classList.add('group-booking');
+      // Border highlight to distinguish group bookings
+      el.style.border = '2px solid #2196F3';
+      el.style.height = '24px';
+      el.style.minHeight = '24px';
+      el.style.marginTop = '-4px';
       
       // Find the text element and apply color directly
       const titleElement = el.querySelector('.fc-event-title');
       if (titleElement) {
-        titleElement.style.color = '#2a2a2a !important';
+        titleElement.style.color = '#ffffff !important';
         titleElement.classList.add('group-booking-text');
       }
       
+    } else {
+      // Ensure non-group events don't keep a border
+      el.style.border = '';
+      el.style.height = '';
+      el.style.minHeight = '';
+      el.style.marginTop = '';
     }
     // Restore default stacking when not composite
     el.style.zIndex = '';
@@ -2950,6 +2983,15 @@ function injectDragStyles() {
   const style = document.createElement('style');
   style.id = 'calendar-drag-styles';
   style.textContent = `
+    /* Group booking highlight border */
+    .fc-event.group-booking {
+      border: 2px solid #2196F3 !important;
+      box-shadow: 0 0 0 1px rgba(33,150,243,0.25) inset;
+      height: 24px !important;
+      min-height: 24px !important;
+      margin-top: -4px !important;
+    }
+
     .event-being-dragged {
       opacity: 0.3 !important;
       z-index: 9999 !important;
