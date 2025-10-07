@@ -135,8 +135,8 @@ $(document).ready(function () {
           const discount = parseFloat(response.discount) || 0;
 
           const details = response && response.grandTotal !== undefined
-            ? `Grand Total: ₱${grandTotal.toLocaleString()}\nReservation Fee: ₱${reservationFee.toLocaleString()}\nDiscount: ₱${discount.toLocaleString()}${isConsolidated ? '\n\n✅ Consolidated Billing: All charges applied to main booking' : ''}`
-            : `The group booking has been added successfully.${isConsolidated ? '\n\n✅ Consolidated Billing: All charges applied to main booking' : ''}`;
+            ? `Grand Total: ₱${grandTotal.toLocaleString()}\nReservation Fee: ₱${reservationFee.toLocaleString()}\nDiscount: ₱${discount.toLocaleString()}${isConsolidated ? '\n\n✅ Bulk Billing: All charges applied to main booking' : ''}`
+            : `The group booking has been added successfully.${isConsolidated ? '\n\n✅ Bulk Billing: All charges applied to main booking' : ''}`;
 
           console.log('🔄 Success Message - Details:', {
             grandTotal: grandTotal,

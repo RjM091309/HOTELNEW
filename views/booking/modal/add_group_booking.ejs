@@ -990,11 +990,11 @@
     if (isConsolidated) {
       // Show consolidated total with indicator
       if (finalBalance < 0) {
-        $('#groupComputedTotal').html(`<span class="text-warning">${formatCurrency(0)} <small>(Consolidated)</small></span>`);
+        $('#groupComputedTotal').html(`<span class="text-warning">${formatCurrency(0)} <small>(Bulk)</small></span>`);
         $('#groupCreditAmount').text(formatCurrency(Math.abs(finalBalance)));
         $('#groupCreditDisplay').show();
       } else {
-        $('#groupComputedTotal').html(`<span>${formatCurrency(finalBalance)} <small class="text-info">(Consolidated)</small></span>`);
+        $('#groupComputedTotal').html(`<span>${formatCurrency(finalBalance)} <small class="text-info">(Bulk)</small></span>`);
         $('#groupCreditDisplay').hide();
       }
     } else {
@@ -1770,7 +1770,7 @@
         // Add consolidated indicator to room breakdown
         const breakdownContainer = $('#groupRoomBreakdown .group-room-breakdown');
         if (breakdownContainer.length && !breakdownContainer.find('.consolidated-indicator').length) {
-          breakdownContainer.prepend('<div class="consolidated-indicator text-info mb-2"><i class="fa fa-info-circle"></i> Consolidated Billing: All charges will be applied to main booking on save</div>');
+          breakdownContainer.prepend('<div class="consolidated-indicator text-info mb-2"><i class="fa fa-info-circle"></i> Bulk Billing: All charges will be applied to main booking on save</div>');
         }
       } else {
         // Remove consolidated indicator in normal mode
@@ -1842,9 +1842,9 @@
         dateFrom: dateFrom,
         dateTo: dateTo,
         bedCount: '',
-        roomNumber: isConsolidated ? 'CONSOLIDATED - ' + roomNumbersForVoucher : roomNumbersForVoucher,
+        roomNumber: isConsolidated ? 'Bulk - ' + roomNumbersForVoucher : roomNumbersForVoucher,
         roomView: '',
-        roomType: isConsolidated ? 'Group (Consolidated)' : 'Group',
+        roomType: isConsolidated ? 'Group (Bulk)' : 'Group',
         roomRate: '',
         breakfastAdult: $('#groupBreakfastAdultQty').val() || 0,
         breakfastAdultPrice: $('#groupBreakfastAdultPrice').val() || 0,
