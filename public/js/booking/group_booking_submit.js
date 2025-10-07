@@ -134,15 +134,27 @@ $(document).ready(function () {
           const reservationFee = parseFloat(response.reservationFee) || 0;
           const discount = parseFloat(response.discount) || 0;
 
-          const details = response && response.grandTotal !== undefined
-            ? `Grand Total: ₱${grandTotal.toLocaleString()}\nReservation Fee: ₱${reservationFee.toLocaleString()}\nDiscount: ₱${discount.toLocaleString()}${isConsolidated ? '\n\n✅ Bulk Billing: All charges applied to main booking' : ''}`
-            : `The group booking has been added successfully.${isConsolidated ? '\n\n✅ Bulk Billing: All charges applied to main booking' : ''}`;
+          // Calculate the breakdown consistently for both billing types
+          // Backend formula: grandTotal = (roomCharges + services) + reservationFee - discount
+          // So: subtotal = grandTotal - reservationFee + discount
+          const subtotal = grandTotal - reservationFee + discount;
 
-          console.log('🔄 Success Message - Details:', {
+          const details = response && response.grandTotal !== undefined
+            ? `Grand Total: ₱${grandTotal.toLocaleString()}\n\n` +
+              `Breakdown:\n` +
+              `• Reservation Fee: ₱${reservationFee.toLocaleString()}\n` +
+              `• Discount: -₱${discount.toLocaleString()}\n\n` +
+              `${isConsolidated ? '✅ Master Billing: All charges applied to main booking' : '✅ Individual Billing: Separate charges per room'}`
+            : `The group booking has been added successfully.\n\n${isConsolidated ? '✅ Master Billing: All charges applied to main booking' : '✅ Individual Billing: Separate charges per room'}`;
+
+          console.log('🔄 Success Message - Debug Values:', {
+            rawResponse: response,
             grandTotal: grandTotal,
             reservationFee: reservationFee,
             discount: discount,
-            isConsolidated: isConsolidated
+            isConsolidated: isConsolidated,
+            calculatedSubtotal: subtotal,
+            verification: `subtotal(${subtotal}) + reservationFee(${reservationFee}) - discount(${discount}) = ${subtotal + reservationFee - discount} (should equal grandTotal: ${grandTotal})`
           });
 
           Swal.fire({

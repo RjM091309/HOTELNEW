@@ -4460,6 +4460,14 @@ class BookingModel {
       const perRoomFeesArray = Array.isArray(perRoomReservationFees) ? perRoomReservationFees : (typeof perRoomReservationFees === 'string' ? perRoomReservationFees.split(',') : []);
       const perRoomDiscountsArray = Array.isArray(perRoomDiscounts) ? perRoomDiscounts : (typeof perRoomDiscounts === 'string' ? perRoomDiscounts.split(',') : []);
 
+      console.log('🔄 Group Booking Debug Info:');
+      console.log(`   selectedRoomPrice: "${selectedRoomPrice}"`);
+      console.log(`   roomBasePrices: [${roomBasePrices.join(', ')}]`);
+      console.log(`   perRoomFeesArray: [${perRoomFeesArray.join(', ')}]`);
+      console.log(`   perRoomDiscountsArray: [${perRoomDiscountsArray.join(', ')}]`);
+      console.log(`   nightsCount: ${nightsCount}`);
+      console.log(`   consolidatedBilling: ${consolidatedBilling}`);
+
       let firstBookingId = null;
       let totalGroupRoomCharges = 0;
 
@@ -4479,18 +4487,31 @@ class BookingModel {
         let adjustedRoomCharge;
         if (consolidatedBilling && index === 0) {
           // Main booking gets all room charges
-          const totalAllRooms = roomBasePrices.reduce((sum, price) => sum + price, 0);
+          // Calculate total for ALL rooms including nights: (room1 + room2 + ...) × nights
+          const totalAllRoomsBase = roomBasePrices.reduce((sum, price) => sum + price, 0);
+          const totalAllRooms = totalAllRoomsBase * nightsCount; // Multiply by number of nights
           const totalAllFees = perRoomFeesArray.reduce((sum, fee) => sum + (parseFloat(fee) || 0), 0);
           const totalAllDiscounts = perRoomDiscountsArray.reduce((sum, discount) => sum + (parseFloat(discount) || 0), 0);
           adjustedRoomCharge = Math.max(totalAllRooms + totalAllFees - totalAllDiscounts, 0);
           totalGroupRoomCharges = adjustedRoomCharge; // Store for later use
+
+          console.log(`🔄 Consolidated Billing - Room ${index + 1}:`);
+          console.log(`   roomBasePrices: [${roomBasePrices.join(', ')}]`);
+          console.log(`   totalAllRoomsBase: ${totalAllRoomsBase} (sum of base prices)`);
+          console.log(`   nightsCount: ${nightsCount}`);
+          console.log(`   totalAllRooms: ${totalAllRooms} (base × nights)`);
+          console.log(`   totalAllFees: ${totalAllFees}`);
+          console.log(`   totalAllDiscounts: ${totalAllDiscounts}`);
+          console.log(`   adjustedRoomCharge: ${adjustedRoomCharge}`);
         } else if (consolidatedBilling) {
           // Other bookings get zero room charges (consolidated billing)
           adjustedRoomCharge = 0;
+          console.log(`🔄 Consolidated Billing - Room ${index + 1}: ₱0.00 (additional room)`);
         } else {
           // Regular billing: each room gets its own charges
           adjustedRoomCharge = Math.max(totalRoomCharge + perRoomFee - perRoomDiscount, 0);
           totalGroupRoomCharges += adjustedRoomCharge;
+          console.log(`🔄 Individual Billing - Room ${index + 1}: ₱${adjustedRoomCharge.toLocaleString()} (${roomNumbers[index]}: ₱${baseRoomPrice} × ${nightsCount} nights)`);
         }
 
         // customer
@@ -4560,7 +4581,7 @@ class BookingModel {
           // Regular billing: each room gets its own charges
           const roomNumber = roomNumbers[index] || `Room-${index + 1}`;
           console.log(`🔄 Backend - Room ${index + 1}: INDIVIDUAL BILLING (${roomNumber})`);
-          roomChargeForBilling = baseRoomPrice;
+          roomChargeForBilling = totalRoomCharge; // Already includes nights multiplication
           reservationFeeForBilling = parseFloat(perRoomFeesArray[index]) || 0;
           discountForBilling = parseFloat(perRoomDiscountsArray[index]) || 0;
         }
@@ -4571,7 +4592,7 @@ class BookingModel {
           0.00,
           0.00,
           0.00,
-          qty,
+          1, // Set QTY to 1 since roomChargeForBilling already includes nights
           paymentStatus,
           'cash',
           '',
@@ -4584,7 +4605,8 @@ class BookingModel {
         const [billResult] = await connection.promise().query(billingQuery, billingValues);
 
         // Log final billing for this booking
-        const finalAmount = (roomChargeForBilling * qty) + reservationFeeForBilling - discountForBilling;
+        // Both consolidated and individual billing now have roomChargeForBilling already including nights
+        const finalAmount = roomChargeForBilling - reservationFeeForBilling - discountForBilling;
         console.log(`💰 Final Billing - Room ${index + 1}: ₱${finalAmount.toLocaleString()} (Room: ₱${roomChargeForBilling}, Fee: ₱${reservationFeeForBilling}, Discount: -₱${discountForBilling})`);
 
         // Process late check-out fee if applicable
@@ -4612,8 +4634,8 @@ class BookingModel {
         // payments for room if paid
         if (paymentStatus === 'paid') {
           // Calculate the final amount that should be paid (matches billing table calculation)
-          // Formula: (ROOM_CHARGE * QTY) + RESERVATION_FEE - DISCOUNT_AMOUNT
-          const finalAmount = (roomChargeForBilling * qty) + reservationFeeForBilling - discountForBilling;
+          // Both consolidated and individual billing now have roomChargeForBilling already including nights
+          const finalAmount = roomChargeForBilling - reservationFeeForBilling - discountForBilling;
 
           const paymentQuery = `
             INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
@@ -4621,33 +4643,62 @@ class BookingModel {
           `;
           await connection.promise().query(paymentQuery, [bookingId, billResult.insertId || bookingId, finalAmount, 'cash', encodedBy]);
 
-          // Insert payment records for reservation fee and discount if they exist (for main booking in consolidated billing)
+          // Insert payment records for reservation fee and discount
           const additionalPayments = [];
 
-          // Add reservation fee payment record (only for main booking in consolidated billing)
-          if (reservationFeeForBilling > 0) {
-            additionalPayments.push([
-              bookingId,
-              null, // No specific service ID for reservation fee
-              reservationFeeForBilling,
-              'cash',
-              'reservation_fee',
-              date,
-              encodedBy
-            ]);
-          }
+          // For consolidated billing: apply group-level fees/discounts only to main booking
+          // For individual billing: apply per-room fees/discounts to each room
+          if (consolidatedBilling && index === 0) {
+            // Add reservation fee payment record for main booking in consolidated billing
+            if (reservationFeeForBilling > 0) {
+              additionalPayments.push([
+                bookingId,
+                null, // No specific service ID for reservation fee
+                reservationFeeForBilling,
+                'cash',
+                'reservation_fee',
+                date,
+                encodedBy
+              ]);
+            }
 
-          // Add discount payment record (negative amount, only for main booking in consolidated billing)
-          if (discountForBilling > 0) {
-            additionalPayments.push([
-              bookingId,
-              null, // No specific service ID for discount
-              -discountForBilling, // Negative amount for discount
-              'cash',
-              'discount',
-              date,
-              encodedBy
-            ]);
+            // Add discount payment record for main booking in consolidated billing
+            if (discountForBilling > 0) {
+              additionalPayments.push([
+                bookingId,
+                null, // No specific service ID for discount
+                -discountForBilling, // Negative amount for discount
+                'cash',
+                'discount',
+                date,
+                encodedBy
+              ]);
+            }
+          } else if (!consolidatedBilling) {
+            // For individual billing: apply per-room fees/discounts to each room
+            if (reservationFeeForBilling > 0) {
+              additionalPayments.push([
+                bookingId,
+                null, // No specific service ID for reservation fee
+                reservationFeeForBilling,
+                'cash',
+                'reservation_fee',
+                date,
+                encodedBy
+              ]);
+            }
+
+            if (discountForBilling > 0) {
+              additionalPayments.push([
+                bookingId,
+                null, // No specific service ID for discount
+                -discountForBilling, // Negative amount for discount
+                'cash',
+                'discount',
+                date,
+                encodedBy
+              ]);
+            }
           }
 
           // Insert additional payments if any
@@ -4707,6 +4758,14 @@ class BookingModel {
       const pickupTotal = pickupPrice ? parseFloat(pickupPrice) : 0;
       const dropoffTotal = dropoffPrice ? parseFloat(dropoffPrice) : 0;
       const servicesTotal = breakfastAdultTotal + breakfastKidTotal + pickupTotal + dropoffTotal;
+
+      console.log('🔄 Grand Total Calculation:');
+      console.log(`   totalGroupRoomCharges: ₱${totalGroupRoomCharges.toLocaleString()}`);
+      console.log(`   servicesTotal: ₱${servicesTotal.toLocaleString()}`);
+      console.log(`   subtotal: ₱${(totalGroupRoomCharges + servicesTotal).toLocaleString()}`);
+      console.log(`   reservationFee: ₱${(parseFloat(reservationFee) || 0).toLocaleString()}`);
+      console.log(`   discount: ₱${(parseFloat(discount) || 0).toLocaleString()}`);
+
       const subtotal = totalGroupRoomCharges + servicesTotal;
       const grandTotal = subtotal + (parseFloat(reservationFee) || 0) - (parseFloat(discount) || 0);
 
