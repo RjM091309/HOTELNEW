@@ -2424,6 +2424,12 @@ class BookingModel {
           gb.NUMBER_OF_ROOMS,
           gb.REMARKS AS REMARKS,
           b.BOOKING_CHANNEL,
+          /* Total active remarks across all bookings in this group */
+          (
+            SELECT COUNT(*) FROM remarks rm 
+            WHERE rm.ACTIVE = 1 
+              AND rm.BOOKING_ID IN (SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = gb.IDNo)
+          ) AS remarks_count,
           GROUP_CONCAT(r.ROOM_NUMBER ORDER BY r.ROOM_NUMBER SEPARATOR ', ') AS room_numbers,
           COUNT(b.IDNo) AS total_bookings,
           -- Calculate total payment excluding extended days
@@ -2506,6 +2512,806 @@ class BookingModel {
     } catch (error) {
       console.error('Error in getGroupBookingDetails:', error);
       throw error;
+    }
+  }
+
+  // Aggregate remarks for a whole group
+  static async getGroupRemarksByGroup(groupId) {
+    try {
+      // First booking id
+      const firstBookingRows = await queryDatabasePromise(
+        `SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ? ORDER BY IDNo ASC LIMIT 1`,
+        [groupId]
+      );
+
+      // Collect remarks from remarks table across all group bookings
+      const remarkRows = await queryDatabasePromise(
+        `SELECT r.IDNo, r.BOOKING_ID, r.CATEGORY, r.REMARK_TEXT, r.ENCODED_BY, r.ENCODED_DT, r.EDITDED_BY, r.EDITDED_DT, r.ACTIVE,
+                u1.FULLNAME as ENCODED_BY_NAME,
+                u2.FULLNAME as EDITDED_BY_NAME
+         FROM remarks r
+         LEFT JOIN user_info u1 ON r.ENCODED_BY = u1.IDno
+         LEFT JOIN user_info u2 ON r.EDITDED_BY = u2.IDno
+         WHERE r.ACTIVE = 1 AND r.BOOKING_ID IN (SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ?)
+         ORDER BY r.ENCODED_DT DESC`,
+        [groupId]
+      );
+
+      // Include group_booking.REMARKS as a virtual row at the top if present
+      const groupRows = await queryDatabasePromise(
+        `SELECT REMARKS FROM group_booking WHERE IDNo = ?`,
+        [groupId]
+      );
+      const groupRemarks = (groupRows[0]?.REMARKS || '').trim();
+      if (groupRemarks) {
+        // Avoid duplication: if the same exact text already exists in remarks table, do not add virtual row
+        const hasDuplicate = remarkRows.some(r => (r?.REMARK_TEXT || '').trim() === groupRemarks);
+        if (!hasDuplicate) {
+        remarkRows.unshift({
+          IDNo: 0,
+          BOOKING_ID: firstBookingRows[0]?.IDNo || null,
+          CATEGORY: 'Group',
+          REMARK_TEXT: groupRemarks,
+          ENCODED_BY: null,
+          ENCODED_DT: null,
+          EDITDED_BY: null,
+          EDITDED_DT: null,
+          ACTIVE: 1,
+          ENCODED_BY_NAME: 'Group Booking',
+          EDITDED_BY_NAME: null
+        });
+        }
+      }
+
+      return remarkRows;
+    } catch (err) {
+      console.error('Error fetching group remarks:', err);
+      return [];
+    }
+  }
+
+  // Add a remark for a group (attach to first booking and update group_booking.REMARKS)
+  static async addGroupRemark({ groupId, category, remarkText, encodedBy }) {
+    try {
+      const firstRows = await queryDatabasePromise(
+        `SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ? ORDER BY IDNo ASC LIMIT 1`,
+        [groupId]
+      );
+      const firstBookingId = firstRows[0]?.IDNo;
+      if (!firstBookingId) return { success: false, message: 'No booking found for group' };
+
+      // Insert into remarks table
+      await queryDatabasePromise(
+        `INSERT INTO remarks (BOOKING_ID, CATEGORY, REMARK_TEXT, ENCODED_BY, EDITDED_BY) VALUES (?, ?, ?, ?, ?)`,
+        [firstBookingId, category || 'Booking', remarkText, encodedBy, encodedBy]
+      );
+
+      // Also update/append to group_booking.REMARKS (append with separator)
+      const groupRows = await queryDatabasePromise(`SELECT REMARKS FROM group_booking WHERE IDNo = ?`, [groupId]);
+      const current = groupRows[0]?.REMARKS || '';
+      const merged = current ? `${current}\n--\n${remarkText}` : remarkText;
+      await queryDatabasePromise(`UPDATE group_booking SET REMARKS = ? WHERE IDNo = ?`, [merged, groupId]);
+
+      return { success: true, message: 'Group remark added' };
+    } catch (err) {
+      console.error('Error adding group remark:', err);
+      return { success: false, message: 'Failed to add group remark' };
+    }
+  }
+
+  // Get edit group booking details
+  static async getEditGroupBookingDetails(groupBookingId) {
+    try {
+      // Get group booking info
+      const groupQuery = `
+        SELECT
+          gb.IDNo,
+          gb.GROUP_NAME,
+          gb.CONTACT_NO,
+          gb.NUMBER_OF_ROOMS,
+          gb.GROUP_RESERVATION_FEE,
+          gb.GROUP_DISCOUNT,
+          gb.REMARKS,
+          gb.ENCODED_BY,
+          gb.ENCODED_DT
+        FROM group_booking gb
+        WHERE gb.IDNo = ?
+      `;
+
+      const groupResult = await queryDatabasePromise(groupQuery, [groupBookingId]);
+
+      if (!groupResult || groupResult.length === 0) {
+        return null;
+      }
+
+      const groupBooking = groupResult[0];
+
+      // Get individual bookings in the group
+      const bookingsQuery = `
+        SELECT
+          b.IDNo as bookingId,
+          b.CUSTOMER_ID,
+          c.NAME as fullname,
+          c.CONTACTNo as number,
+          c.TYPE as guestType,
+          c.LEVEL as guestLevel,
+          b.ROOM_ID,
+          r.ROOM_NUMBER,
+          r.ROOM_BED,
+          r.ROOM_VIEW,
+          r.ROOM_FLOOR,
+          r.ROOM_SIZE,
+          r.ROOM_DESCRIPTION,
+          b.CHECK_IN_DATE,
+          b.CHECK_OUT_DATE,
+          b.BOOKING_STATUS,
+          b.BOOKING_CHANNEL,
+          b.GUESTS_COUNT,
+          b.LATE_CHECKOUT,
+          b.CHECK_IN_STATUS,
+          b.REMARKS,
+          b.CONFIRMATION_NUMBER,
+          b.AGENCY_ID,
+          b.IS_DIRECT_RESERVATION,
+          bill.PAYMENT_STATUS,
+          bill.RESERVATION_FEE,
+          bill.DISCOUNT_AMOUNT,
+          bill.ROOM_CHARGE,
+          bill.QTY
+        FROM booking b
+        JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+        JOIN room r ON b.ROOM_ID = r.IDNo
+        LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID
+        WHERE b.GROUP_BOOKING_ID = ?
+        ORDER BY b.IDNo
+      `;
+
+      const bookingsResult = await queryDatabasePromise(bookingsQuery, [groupBookingId]);
+
+      // Determine if consolidated billing was used
+      let isConsolidatedBilling = false;
+      if (bookingsResult.length > 1) {
+        // Calculate total room charges across all bookings
+        const totalRoomCharges = bookingsResult.reduce((sum, booking) => {
+          return sum + (parseFloat(booking.ROOM_CHARGE || 0) * parseInt(booking.QTY || 1));
+        }, 0);
+
+        // Get charges for the main booking (first booking)
+        const mainBookingCharges = parseFloat(bookingsResult[0]?.ROOM_CHARGE || 0) * parseInt(bookingsResult[0]?.QTY || 1);
+
+        // If main booking has all/sum of charges, it was likely consolidated billing
+        // This is a heuristic since we don't store the preference directly
+        isConsolidatedBilling = mainBookingCharges > 0 && mainBookingCharges >= totalRoomCharges * 0.8; // 80% threshold
+      }
+
+      // Get services for the group
+      const servicesQuery = `
+        SELECT
+          bs.BOOKING_ID,
+          bs.SERVICE_ID,
+          s.SERVICE_NAME,
+          bs.QTY,
+          bs.TOTAL_COST,
+          bs.STATUS
+        FROM booking_service bs
+        JOIN services s ON bs.SERVICE_ID = s.IDNo
+        JOIN booking b ON bs.BOOKING_ID = b.IDNo
+        WHERE b.GROUP_BOOKING_ID = ?
+      `;
+
+      const servicesResult = await queryDatabasePromise(servicesQuery, [groupBookingId]);
+      
+      // Debug: Log services found
+      console.log('🔍 Services found for group booking:', groupBookingId);
+      console.log('🔍 Services result:', servicesResult);
+
+      // Format date range
+      const firstBooking = bookingsResult[0];
+      if (!firstBooking) {
+        return null;
+      }
+
+      const checkInDate = new Date(firstBooking.CHECK_IN_DATE);
+      const checkOutDate = new Date(firstBooking.CHECK_OUT_DATE);
+      const diffInTime = checkOutDate.getTime() - checkInDate.getTime();
+      const diffInDays = Math.round(diffInTime / (1000 * 3600 * 24));
+
+      const checkInFormatted = checkInDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const checkOutFormatted = checkOutDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const daterange = `${checkInFormatted} to ${checkOutFormatted} (${diffInDays} night/s)`;
+
+      // Get selected rooms and prices
+      const selectedRooms = bookingsResult.map(b => b.ROOM_ID).join(',');
+      const selectedRoomPrices = bookingsResult.map(b => b.ROOM_CHARGE).join(',');
+
+      // Calculate bed requirements from selected rooms
+      const bedRequirements = { bed1: 0, bed2: 0 };
+      bookingsResult.forEach(booking => {
+        const bedCount = parseInt(booking.ROOM_BED, 10);
+        if (bedCount === 1) {
+          bedRequirements.bed1++;
+        } else if (bedCount === 2) {
+          bedRequirements.bed2++;
+        }
+      });
+
+      // Group services by booking ID and categorize them
+      const servicesByBooking = {};
+      const groupServices = {
+        breakfastAdult: { qty: '0', price: '0', id: '' },
+        breakfastKid: { qty: '0', price: '0', id: '' },
+        pickup: { price: '0', id: '' },
+        dropoff: { price: '0', id: '' }
+      };
+
+      servicesResult.forEach(service => {
+        if (!servicesByBooking[service.BOOKING_ID]) {
+          servicesByBooking[service.BOOKING_ID] = [];
+        }
+        servicesByBooking[service.BOOKING_ID].push(service);
+
+        // Categorize group-level services (services for any booking in the group)
+        console.log('🔍 Checking service booking ID:', service.BOOKING_ID, 'vs first booking ID:', firstBooking.bookingId);
+        // Check if this service belongs to any booking in the group
+        const belongsToGroup = bookingsResult.some(booking => booking.bookingId === service.BOOKING_ID);
+        if (belongsToGroup) {
+          const serviceName = service.SERVICE_NAME.toLowerCase();
+          console.log('🔍 Processing service:', serviceName, 'ID:', service.SERVICE_ID);
+          
+          // Use service ID matching as primary method, with name fallback
+          if (service.SERVICE_ID === 74 || (serviceName.includes('adult') && serviceName.includes('breakfast'))) {
+            console.log('✅ Found breakfast adult service');
+            groupServices.breakfastAdult = {
+              qty: service.QTY,
+              price: service.TOTAL_COST,
+              id: service.SERVICE_ID
+            };
+          } else if (service.SERVICE_ID === 75 || (serviceName.includes('kid') && serviceName.includes('breakfast'))) {
+            console.log('✅ Found breakfast kid service');
+            groupServices.breakfastKid = {
+              qty: service.QTY,
+              price: service.TOTAL_COST,
+              id: service.SERVICE_ID
+            };
+          } else if (service.SERVICE_ID === 76 || serviceName.includes('pick')) {
+            console.log('✅ Found pickup service');
+            groupServices.pickup = {
+              price: service.TOTAL_COST,
+              id: service.SERVICE_ID
+            };
+          } else if (service.SERVICE_ID === 77 || serviceName.includes('drop')) {
+            console.log('✅ Found dropoff service');
+            groupServices.dropoff = {
+              price: service.TOTAL_COST,
+              id: service.SERVICE_ID
+            };
+            console.log('🔍 Set dropoff service:', groupServices.dropoff);
+          } else {
+            console.log('❌ Service not categorized:', serviceName, 'ID:', service.SERVICE_ID);
+          }
+        }
+      });
+
+      return {
+        groupBookingId: groupBooking.IDNo,
+        groupName: groupBooking.GROUP_NAME,
+        groupContact: groupBooking.CONTACT_NO,
+        numberOfRooms: groupBooking.NUMBER_OF_ROOMS,
+        reservationFee: groupBooking.GROUP_RESERVATION_FEE,
+        discount: groupBooking.GROUP_DISCOUNT,
+        remarks: groupBooking.REMARKS,
+        selectedRooms,
+        selectedRoomPrice: selectedRoomPrices,
+        qty: diffInDays,
+        daterange,
+        guestType: bookingsResult[0]?.guestType, // Default guest type
+        guestLevel: bookingsResult[0]?.guestLevel, // Default guest level
+        checkInStatus: firstBooking.CHECK_IN_STATUS,
+        checkOutStatus: firstBooking.LATE_CHECKOUT,
+        paymentStatus: firstBooking.PAYMENT_STATUS,
+        bookingRoute: firstBooking.BOOKING_CHANNEL,
+        agencyId: firstBooking.AGENCY_ID,
+        consolidatedBilling: isConsolidatedBilling, // Derived from billing data
+        bedRequirements: bedRequirements, // Calculated from selected rooms
+        // Services data
+        breakfastAdultQty: groupServices.breakfastAdult.qty || '0',
+        breakfastAdultPrice: groupServices.breakfastAdult.price || '0',
+        breakfastAdultId: groupServices.breakfastAdult.id || '',
+        breakfastKidQty: groupServices.breakfastKid.qty || '0',
+        breakfastKidPrice: groupServices.breakfastKid.price || '0',
+        breakfastKidId: groupServices.breakfastKid.id || '',
+        pickupServiceId: groupServices.pickup.id || '',
+        pickupPrice: groupServices.pickup.price || '0',
+        dropoffServiceId: groupServices.dropoff.id || '',
+        dropoffPrice: groupServices.dropoff.price || '0',
+        // Individual booking data for form population
+        bookings: bookingsResult
+      };
+      
+      // Debug: Log final group services
+      console.log('🔍 Final group services:', {
+        breakfastAdult: groupServices.breakfastAdult,
+        breakfastKid: groupServices.breakfastKid,
+        pickup: groupServices.pickup,
+        dropoff: groupServices.dropoff
+      });
+
+    } catch (error) {
+      console.error('Error in getEditGroupBookingDetails:', error);
+      throw error;
+    }
+  }
+
+  // Update group booking
+  static async updateGroupBooking(data) {
+    const {
+      groupBookingId,
+      selectedRooms,
+      selectedRoomPrice,
+      qty,
+      daterange,
+      groupName,
+      groupContact,
+      numberOfRooms,
+      paymentStatus,
+      bookingRoute,
+      guestType,
+      guestLevel,
+      checkInStatus,
+      checkOutStatus,
+      remarks,
+      agencyId = null,
+      breakfastAdultQty,
+      breakfastAdultPrice,
+      breakfastAdultId,
+      breakfastKidQty,
+      breakfastKidPrice,
+      breakfastKidId,
+      pickupServiceId,
+      pickupPrice,
+      dropoffServiceId,
+      dropoffPrice,
+      reservationFee = 0,
+      discount = 0,
+      consolidatedBilling = false,
+      encodedBy,
+      date
+    } = data;
+
+
+    // Helper: parse daterange "MMM DD, YYYY to MMM DD, YYYY (..optional..)"
+    const moment = require('moment');
+    const [rawCheckIn = '', rawCheckOut = ''] = (daterange || '').split(' to ');
+    const normalizeDate = (raw, isCheckIn) => {
+      if (!raw) return null;
+      const clean = raw.split(' (')[0].trim();
+      const time = isCheckIn ? '14:00:00' : (checkOutStatus == 1 ? '23:00:00' : '11:00:00');
+      const parsed = moment(clean, 'MMM DD, YYYY');
+      if (!parsed.isValid()) return null;
+      return `${parsed.format('YYYY-MM-DD')} ${time}`;
+    };
+    const checkInDate = normalizeDate(rawCheckIn, true);
+    const checkOutDate = normalizeDate(rawCheckOut, false);
+    if (!checkInDate || !checkOutDate) {
+      throw new Error('Invalid date range supplied for group booking update');
+    }
+
+    // Get connection for transaction
+    const connection = await new Promise((resolve, reject) => {
+      pool.getConnection((err, conn) => (err ? reject(err) : resolve(conn)));
+    });
+
+    try {
+      // Begin transaction
+      await new Promise((resolve, reject) => connection.beginTransaction(err => (err ? reject(err) : resolve())));
+
+      // Update group_booking table
+      const updateGroupQuery = `
+        UPDATE group_booking
+        SET GROUP_NAME = ?, CONTACT_NO = ?, NUMBER_OF_ROOMS = ?, GROUP_RESERVATION_FEE = ?, GROUP_DISCOUNT = ?, REMARKS = ?, ENCODED_BY = ?, ENCODED_DT = ?
+        WHERE IDNo = ?
+      `;
+
+      await connection.promise().query(updateGroupQuery, [
+        groupName,
+        groupContact,
+        numberOfRooms,
+        parseFloat(reservationFee) || 0,
+        parseFloat(discount) || 0,
+        remarks || '',
+        encodedBy,
+        date,
+        groupBookingId
+      ]);
+
+      // Get existing bookings for this group
+      const existingBookingsQuery = `SELECT IDNo, ROOM_ID FROM booking WHERE GROUP_BOOKING_ID = ?`;
+      const [existingBookings] = await connection.promise().query(existingBookingsQuery, [groupBookingId]);
+      const existingRoomIds = existingBookings.map(b => b.ROOM_ID);
+
+      // Parse new selected rooms - ensure consistent data types
+      const newRoomIds = (selectedRooms || '').split(',').filter(Boolean).map(id => parseInt(id.trim()));
+      const newRoomPrices = (selectedRoomPrice || '').split(',').filter(Boolean).map(p => parseFloat(p));
+
+      // Handle room additions/removals - now comparing integers with integers
+      const roomsToAdd = newRoomIds.filter(id => !existingRoomIds.includes(id));
+      const roomsToRemove = existingRoomIds.filter(id => !newRoomIds.includes(id));
+      const roomsToUpdate = newRoomIds.filter(id => existingRoomIds.includes(id));
+
+      console.log('Room comparison debug:');
+      console.log('Existing room IDs:', existingRoomIds);
+      console.log('New room IDs:', newRoomIds);
+      console.log('Rooms to add:', roomsToAdd);
+      console.log('Rooms to remove:', roomsToRemove);
+      console.log('Rooms to update:', roomsToUpdate);
+
+      // Remove bookings for rooms no longer in the group
+      if (roomsToRemove.length > 0) {
+        const removeBookingIds = existingBookings
+          .filter(b => roomsToRemove.includes(b.ROOM_ID))
+          .map(b => b.IDNo);
+
+        if (removeBookingIds.length > 0) {
+          // Delete payments first
+          await connection.promise().query('DELETE FROM payments WHERE BOOKING_ID IN (?)', [removeBookingIds]);
+          // Delete booking services
+          await connection.promise().query('DELETE FROM booking_service WHERE BOOKING_ID IN (?)', [removeBookingIds]);
+          // Delete billing records
+          await connection.promise().query('DELETE FROM billing WHERE BOOKING_ID IN (?)', [removeBookingIds]);
+          // Delete bookings
+          await connection.promise().query('DELETE FROM booking WHERE IDNo IN (?)', [removeBookingIds]);
+          // Delete customers (if not used elsewhere)
+          const customerIds = existingBookings
+            .filter(b => roomsToRemove.includes(b.ROOM_ID))
+            .map(b => b.CUSTOMER_ID);
+          if (customerIds.length > 0) {
+            await connection.promise().query('DELETE FROM customer WHERE IDNo IN (?)', [customerIds]);
+          }
+        }
+      }
+
+      // Update existing bookings or add new ones
+      for (let index = 0; index < newRoomIds.length; index++) {
+        const roomId = newRoomIds[index];
+        const roomPrice = newRoomPrices[index] || 0;
+        const isExistingRoom = existingRoomIds.includes(parseInt(roomId));
+
+        if (isExistingRoom) {
+          // Update existing booking
+          const existingBooking = existingBookings.find(b => b.ROOM_ID === parseInt(roomId));
+          if (existingBooking) {
+            // Generate new confirmation number for updated booking
+            const roomQuery = 'SELECT ROOM_NUMBER FROM room WHERE IDNo = ?';
+            const [roomResult] = await connection.promise().query(roomQuery, [roomId]);
+            const roomNumber = roomResult[0]?.ROOM_NUMBER || '';
+            
+            // Generate confirmation number in format: YYYYMMDD0ROOMNUMBER
+            const datePart = moment(checkInDate).format('YYYYMMDD');
+            const confirmationNumber = `${datePart}0${roomNumber}`;
+
+            // Update booking
+            await connection.promise().query(`
+              UPDATE booking
+              SET CHECK_IN_DATE = ?, CHECK_OUT_DATE = ?, BOOKING_CHANNEL = ?, CHECK_IN_STATUS = ?, LATE_CHECKOUT = ?, REMARKS = ?, CONFIRMATION_NUMBER = ?, ENCODED_BY = ?, ENCODED_DT = ?
+              WHERE IDNo = ?
+            `, [
+              checkInDate, checkOutDate, bookingRoute, checkInStatus, checkOutStatus,
+              index === 0 ? remarks : '', confirmationNumber, encodedBy, date, existingBooking.IDNo
+            ]);
+
+            // Sync remarks to remarks table for the main booking row
+            if (index === 0) {
+              const trimmed = (remarks || '').trim();
+              if (trimmed !== '') {
+                // Upsert: if a Booking-category remark exists, update it; otherwise insert
+                const [existingRemarkRows] = await connection.promise().query(
+                  `SELECT IDNo FROM remarks WHERE BOOKING_ID = ? AND CATEGORY = 'Booking' AND ACTIVE = 1 LIMIT 1`,
+                  [existingBooking.IDNo]
+                );
+
+                if (Array.isArray(existingRemarkRows) && existingRemarkRows.length > 0) {
+                  await connection.promise().query(
+                    `UPDATE remarks SET REMARK_TEXT = ?, EDITDED_BY = ?, EDITDED_DT = CURRENT_TIMESTAMP WHERE IDNo = ? AND ACTIVE = 1`,
+                    [trimmed, encodedBy, existingRemarkRows[0].IDNo]
+                  );
+                } else {
+                  await connection.promise().query(
+                    `INSERT INTO remarks (BOOKING_ID, CATEGORY, REMARK_TEXT, ENCODED_BY, EDITDED_BY) VALUES (?, 'Booking', ?, ?, ?)`,
+                    [existingBooking.IDNo, trimmed, encodedBy, encodedBy]
+                  );
+                }
+              } else {
+                // If remarks cleared, soft-delete existing Booking-category remarks
+                await connection.promise().query(
+                  `UPDATE remarks SET ACTIVE = 0, EDITDED_BY = ?, EDITDED_DT = CURRENT_TIMESTAMP WHERE BOOKING_ID = ? AND CATEGORY = 'Booking' AND ACTIVE = 1`,
+                  [encodedBy, existingBooking.IDNo]
+                );
+              }
+            }
+
+            // Calculate billing amounts based on consolidated billing
+            let roomChargeForBilling, reservationFeeForBilling, discountForBilling;
+
+            if (consolidatedBilling && index === 0) {
+              // Main booking in consolidated billing gets all charges
+              roomChargeForBilling = newRoomPrices.reduce((sum, price) => sum + price, 0); // Total of all rooms
+              reservationFeeForBilling = parseFloat(reservationFee) || 0;
+              discountForBilling = parseFloat(discount) || 0;
+              console.log(`🔄 Room ${index + 1} (Main): CONSOLIDATED - Room Charge: ₱${roomChargeForBilling}, Fee: ₱${reservationFeeForBilling}, Discount: ₱${discountForBilling}`);
+            } else if (consolidatedBilling) {
+              // Other bookings in consolidated billing get zero charges
+              roomChargeForBilling = 0;
+              reservationFeeForBilling = 0;
+              discountForBilling = 0;
+              console.log(`🔄 Room ${index + 1}: CONSOLIDATED - Room Charge: ₱0, Fee: ₱0, Discount: ₱0`);
+            } else {
+              // Regular billing - each booking gets its own charges
+              roomChargeForBilling = roomPrice;
+              reservationFeeForBilling = 0; // Reservation fee and discount are group-level, not per booking
+              discountForBilling = 0;
+              console.log(`🔄 Room ${index + 1}: INDIVIDUAL - Room Charge: ₱${roomChargeForBilling}, Fee: ₱0, Discount: ₱0`);
+            }
+
+            // Update billing
+            await connection.promise().query(`
+              UPDATE billing
+              SET ROOM_CHARGE = ?, QTY = ?, PAYMENT_STATUS = ?, RESERVATION_FEE = ?, DISCOUNT_AMOUNT = ?, ENCODED_BY = ?, ENCODED_DT = ?
+              WHERE BOOKING_ID = ?
+            `, [
+              roomChargeForBilling, qty, paymentStatus, reservationFeeForBilling, discountForBilling, encodedBy, date, existingBooking.IDNo
+            ]);
+
+            // Update customer info for all bookings in the group
+            const guestFullName = index === 0 ? `${groupName}-1-Main` : `${groupName}-${index + 1}`;
+            await connection.promise().query(`
+              UPDATE customer
+              SET NAME = ?, CONTACTNo = ?, TYPE = ?, LEVEL = ?, ENCODED_BY = ?, ENCODED_DT = ?
+              WHERE IDNo = (SELECT CUSTOMER_ID FROM booking WHERE IDNo = ?)
+            `, [
+              guestFullName, groupContact, guestType, guestLevel, encodedBy, date, existingBooking.IDNo
+            ]);
+          }
+        } else {
+          // Add new booking
+          const guestFullName = index === 0 ? `${groupName}-1-Main` : `${groupName}-${index + 1}`;
+
+          // Insert customer
+          const [custResult] = await connection.promise().query(`
+            INSERT INTO customer (NAME, CONTACTNo, TYPE, LEVEL, ADDRESS, MESSAGE, ENCODED_BY, ENCODED_DT, ACTIVE, IS_GROUP)
+            VALUES (?, ?, ?, ?, '', '', ?, ?, 1, 1)
+          `, [
+            guestFullName, groupContact, guestType, guestLevel, encodedBy, date
+          ]);
+
+          const guestID = custResult.insertId;
+
+          // Generate confirmation number for new booking
+          const roomQuery = 'SELECT ROOM_NUMBER FROM room WHERE IDNo = ?';
+          const [roomResult] = await connection.promise().query(roomQuery, [roomId]);
+          const roomNumber = roomResult[0]?.ROOM_NUMBER || '';
+          
+          // Generate confirmation number in format: YYYYMMDD0ROOMNUMBER
+          const datePart = moment(checkInDate).format('YYYYMMDD');
+          const confirmationNumber = `${datePart}0${roomNumber}`;
+
+          // Insert booking
+          const [bookResult] = await connection.promise().query(`
+            INSERT INTO booking (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, LATE_CHECKOUT, REMARKS, CONFIRMATION_NUMBER, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, GROUP_BOOKING_ID, AGENCY_ID, IS_DIRECT_RESERVATION)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `, [
+            guestID, roomId, checkInDate, checkOutDate, 'pending', bookingRoute, 1,
+            checkOutStatus, index === 0 ? remarks : '', confirmationNumber, encodedBy, date, 1,
+            checkInStatus, groupBookingId, agencyId || null, 0
+          ]);
+
+          const bookingId = bookResult.insertId;
+
+          // Insert corresponding remarks row for the main booking if provided
+          if (index === 0) {
+            const trimmed = (remarks || '').trim();
+            if (trimmed !== '') {
+              await connection.promise().query(
+                `INSERT INTO remarks (BOOKING_ID, CATEGORY, REMARK_TEXT, ENCODED_BY, EDITDED_BY) VALUES (?, 'Booking', ?, ?, ?)`,
+                [bookingId, trimmed, encodedBy, encodedBy]
+              );
+            }
+          }
+
+          // Calculate billing amounts based on consolidated billing
+          let roomChargeForBilling, reservationFeeForBilling, discountForBilling;
+
+          if (consolidatedBilling && index === 0) {
+            // Main booking in consolidated billing gets all charges
+            roomChargeForBilling = newRoomPrices.reduce((sum, price) => sum + price, 0); // Total of all rooms
+            reservationFeeForBilling = parseFloat(reservationFee) || 0;
+            discountForBilling = parseFloat(discount) || 0;
+            console.log(`🆕 New Room ${index + 1} (Main): CONSOLIDATED - Room Charge: ₱${roomChargeForBilling}, Fee: ₱${reservationFeeForBilling}, Discount: ₱${discountForBilling}`);
+          } else if (consolidatedBilling) {
+            // Other bookings in consolidated billing get zero charges
+            roomChargeForBilling = 0;
+            reservationFeeForBilling = 0;
+            discountForBilling = 0;
+            console.log(`🆕 New Room ${index + 1}: CONSOLIDATED - Room Charge: ₱0, Fee: ₱0, Discount: ₱0`);
+          } else {
+            // Regular billing - each booking gets its own charges
+            roomChargeForBilling = roomPrice;
+            reservationFeeForBilling = 0; // Reservation fee and discount are group-level, not per booking
+            discountForBilling = 0;
+            console.log(`🆕 New Room ${index + 1}: INDIVIDUAL - Room Charge: ₱${roomChargeForBilling}, Fee: ₱0, Discount: ₱0`);
+          }
+
+          // Insert billing
+          await connection.promise().query(`
+            INSERT INTO billing (BOOKING_ID, ROOM_CHARGE, AMENITIES_CHARGE, SERVICES_CHARGE, LATE_CHECKOUT_CHARGE, QTY, PAYMENT_STATUS, PAYMENT_METHOD, REMARKS, ENCODED_BY, ENCODED_DT, ACTIVE, RESERVATION_FEE, DISCOUNT_AMOUNT)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `, [
+            bookingId, roomChargeForBilling, 0.00, 0.00, 0.00, qty, paymentStatus, 'cash', '',
+            encodedBy, date, 1, reservationFeeForBilling, discountForBilling
+          ]);
+        }
+      }
+
+      // Handle services update (delete existing and add new)
+      const firstBookingQuery = `SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ? ORDER BY IDNo LIMIT 1`;
+      const [firstBookingResult] = await connection.promise().query(firstBookingQuery, [groupBookingId]);
+      const firstBookingId = firstBookingResult[0]?.IDNo;
+
+      if (firstBookingId) {
+        // Delete existing services and their payments
+        await connection.promise().query('DELETE FROM payments WHERE BOOKING_ID = ? AND PAYMENT_TYPE = ?', [firstBookingId, 'service']);
+        await connection.promise().query('DELETE FROM booking_service WHERE BOOKING_ID = ?', [firstBookingId]);
+
+        // Add new services
+        const groupServices = [];
+
+        // Breakfast Adult
+        if (parseInt(breakfastAdultQty) > 0 && breakfastAdultId) {
+          const totalAdult = parseFloat(breakfastAdultQty) * parseFloat(breakfastAdultPrice);
+          groupServices.push([firstBookingId, breakfastAdultId, breakfastAdultQty, totalAdult, paymentStatus === 'paid' ? 'paid' : 'unpaid', encodedBy, date, 1]);
+        }
+
+        // Breakfast Kid
+        if (parseInt(breakfastKidQty) > 0 && breakfastKidId) {
+          const totalKid = parseFloat(breakfastKidQty) * parseFloat(breakfastKidPrice);
+          groupServices.push([firstBookingId, breakfastKidId, breakfastKidQty, totalKid, paymentStatus === 'paid' ? 'paid' : 'unpaid', encodedBy, date, 1]);
+        }
+
+        // Pickup
+        if (pickupServiceId && pickupPrice) {
+          groupServices.push([firstBookingId, pickupServiceId, 1, parseFloat(pickupPrice), paymentStatus === 'paid' ? 'paid' : 'unpaid', encodedBy, date, 1]);
+        }
+
+        // Dropoff
+        if (dropoffServiceId && dropoffPrice) {
+          groupServices.push([firstBookingId, dropoffServiceId, 1, parseFloat(dropoffPrice), paymentStatus === 'paid' ? 'paid' : 'unpaid', encodedBy, date, 1]);
+        }
+
+        if (groupServices.length > 0) {
+          const serviceQuery = `
+            INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE)
+            VALUES ?
+          `;
+          const [serviceResult] = await connection.promise().query(serviceQuery, [groupServices]);
+          
+          // Insert payments for services if payment status is 'paid'
+          if (paymentStatus === 'paid') {
+            const servicePayments = groupServices.map(s => [
+              firstBookingId, 
+              s[1], // SERVICE_ID (this is how Add Group Booking does it)
+              parseFloat(s[3]), // AMOUNT_PAID
+              'cash', 
+              'service', 
+              date, 
+              encodedBy
+            ]);
+            
+            const payQuery = `
+              INSERT INTO payments (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
+              VALUES ?
+            `;
+            await connection.promise().query(payQuery, [servicePayments]);
+          }
+        }
+      }
+
+      // Handle payments for reservation fees and discounts
+      if (firstBookingId) {
+        // Delete existing reservation fee and discount payments for all bookings in the group
+        const allBookingIds = existingBookings.map(b => b.IDNo);
+        if (allBookingIds.length > 0) {
+          const placeholders = allBookingIds.map(() => '?').join(',');
+          await connection.promise().query(`DELETE FROM payments WHERE BOOKING_ID IN (${placeholders}) AND PAYMENT_TYPE IN (?, ?)`, [...allBookingIds, 'reservation_fee', 'discount']);
+        }
+        
+        // Insert new payments for reservation fees and discounts
+        const additionalPayments = [];
+        
+        console.log(`🔄 Billing Mode: ${consolidatedBilling ? 'CONSOLIDATED' : 'INDIVIDUAL'}`);
+        console.log(`💰 Reservation Fee: ₱${reservationFee || 0}`);
+        console.log(`💸 Discount: ₱${discount || 0}`);
+        
+        if (consolidatedBilling) {
+          // Consolidated billing: apply fees/discounts only to main booking
+          if (parseFloat(reservationFee) > 0) {
+            additionalPayments.push([
+              firstBookingId,
+              null, // No specific service ID for reservation fee
+              parseFloat(reservationFee),
+              'cash',
+              'reservation_fee',
+              date,
+              encodedBy
+            ]);
+          }
+          
+          if (parseFloat(discount) > 0) {
+            additionalPayments.push([
+              firstBookingId,
+              null, // No specific service ID for discount
+              -parseFloat(discount), // Negative amount for discount
+              'cash',
+              'discount',
+              date,
+              encodedBy
+            ]);
+          }
+        } else {
+          // Individual billing: apply fees/discounts to each booking
+          for (let index = 0; index < newRoomIds.length; index++) {
+            const bookingId = existingBookings.find(b => b.ROOM_ID === parseInt(newRoomIds[index]))?.IDNo;
+            if (bookingId) {
+              if (parseFloat(reservationFee) > 0) {
+                additionalPayments.push([
+                  bookingId,
+                  null,
+                  parseFloat(reservationFee),
+                  'cash',
+                  'reservation_fee',
+                  date,
+                  encodedBy
+                ]);
+              }
+              
+              if (parseFloat(discount) > 0) {
+                additionalPayments.push([
+                  bookingId,
+                  null,
+                  -parseFloat(discount),
+                  'cash',
+                  'discount',
+                  date,
+                  encodedBy
+                ]);
+              }
+            }
+          }
+        }
+        
+        if (additionalPayments.length > 0) {
+          const additionalPayQuery = `
+            INSERT INTO payments
+            (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
+            VALUES ?
+          `;
+          await connection.promise().query(additionalPayQuery, [additionalPayments]);
+        }
+      }
+
+      // Commit transaction
+      await new Promise((resolve, reject) => connection.commit(err => (err ? reject(err) : resolve())));
+      connection.release();
+
+      console.log('✅ Group Booking Updated Successfully!');
+
+      return {
+        success: true,
+        message: 'Group Booking updated successfully!'
+      };
+
+    } catch (err) {
+      await new Promise(resolve => connection.rollback(() => resolve()));
+      connection.release();
+      throw err;
     }
   }
 
@@ -4029,7 +4835,7 @@ class BookingModel {
 
   // Find consecutive rooms with bed requirements (Hotel_Old logic)
   static async findConsecutiveRooms(params) {
-    const { startDate, endDate, neededRooms, floorNumber, bed1Needed = 0, bed2Needed = 0, bookingRoute, checkInStatus, checkOutStatus } = params;
+    const { startDate, endDate, neededRooms, floorNumber, bed1Needed = 0, bed2Needed = 0, bookingRoute, checkInStatus, checkOutStatus, excludeGroupBookingId } = params;
     
     try {
       const connection = await pool.promise().getConnection();
@@ -4078,9 +4884,14 @@ class BookingModel {
               AND b.ACTIVE = 1
               AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
               AND (DATE(b.CHECK_IN_DATE) < ? AND DATE(b.CHECK_OUT_DATE) > ?)
+              ${excludeGroupBookingId ? `AND b.GROUP_BOOKING_ID != ?` : ''}
           )`;
 
       const roomParams = [formattedStartDate, formattedEndDate, formattedEndDate, formattedStartDate];
+
+      if (excludeGroupBookingId) {
+        roomParams.push(excludeGroupBookingId);
+      }
 
       if (floorNumber) {
         roomParams.push(floorNumber);
@@ -4495,14 +5306,7 @@ class BookingModel {
           adjustedRoomCharge = Math.max(totalAllRooms + totalAllFees - totalAllDiscounts, 0);
           totalGroupRoomCharges = adjustedRoomCharge; // Store for later use
 
-          console.log(`🔄 Consolidated Billing - Room ${index + 1}:`);
-          console.log(`   roomBasePrices: [${roomBasePrices.join(', ')}]`);
-          console.log(`   totalAllRoomsBase: ${totalAllRoomsBase} (sum of base prices)`);
-          console.log(`   nightsCount: ${nightsCount}`);
-          console.log(`   totalAllRooms: ${totalAllRooms} (base × nights)`);
-          console.log(`   totalAllFees: ${totalAllFees}`);
-          console.log(`   totalAllDiscounts: ${totalAllDiscounts}`);
-          console.log(`   adjustedRoomCharge: ${adjustedRoomCharge}`);
+        
         } else if (consolidatedBilling) {
           // Other bookings get zero room charges (consolidated billing)
           adjustedRoomCharge = 0;
@@ -4556,6 +5360,15 @@ class BookingModel {
         const [bookResult] = await connection.promise().query(bookingQuery, bookingValues);
         const bookingId = bookResult.insertId;
         if (!firstBookingId) firstBookingId = bookingId;
+
+        // If this booking row has remarks, mirror to remarks table (like addBooking)
+        if (bookingRemarksForThisRow && bookingRemarksForThisRow.trim() !== '') {
+          await connection.promise().query(
+            `INSERT INTO remarks (BOOKING_ID, CATEGORY, REMARK_TEXT, ENCODED_BY, EDITDED_BY)
+             VALUES (?, 'Booking', ?, ?, ?)`,
+            [bookingId, bookingRemarksForThisRow.trim(), encodedBy, encodedBy]
+          );
+        }
 
         // billing
         const billingQuery = `

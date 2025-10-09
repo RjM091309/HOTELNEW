@@ -1067,7 +1067,7 @@ class BookingController {
   // Find consecutive rooms
   static async findConsecutiveRooms(req, res) {
     try {
-      let { startDate, endDate, neededRooms, floorNumber, bed1Needed = 0, bed2Needed = 0, bookingRoute, checkInStatus, checkOutStatus } = req.body;
+      let { startDate, endDate, neededRooms, floorNumber, bed1Needed = 0, bed2Needed = 0, bookingRoute, checkInStatus, checkOutStatus, excludeGroupBookingId } = req.body;
       const neededRoomsCount = parseInt(neededRooms, 10);
       const requiredBed1 = parseInt(bed1Needed, 10) || 0;
       const requiredBed2 = parseInt(bed2Needed, 10) || 0;
@@ -1091,7 +1091,8 @@ class BookingController {
         bed2Needed: requiredBed2,
         bookingRoute: normalizedBookingRoute,
         checkInStatus,
-        checkOutStatus
+        checkOutStatus,
+        excludeGroupBookingId
       });
 
       res.json(result);
@@ -1196,6 +1197,139 @@ class BookingController {
     } catch (error) {
       console.error('❌ Error in addGroupBooking:', error);
       return res.status(500).json({ success: false, message: error.message || 'Error inserting group booking' });
+    }
+  }
+
+  // Get edit group booking details
+  static async getEditGroupBooking(req, res) {
+    try {
+      const { groupBookingId } = req.params;
+
+      if (!groupBookingId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Group booking ID is required'
+        });
+      }
+
+      const groupBookingDetails = await BookingModel.getEditGroupBookingDetails(groupBookingId);
+
+      if (!groupBookingDetails) {
+        return res.status(404).json({
+          success: false,
+          message: 'Group booking not found'
+        });
+      }
+
+      res.json({
+        success: true,
+        booking: groupBookingDetails
+      });
+
+    } catch (error) {
+      console.error('Error fetching edit group booking details:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching group booking details'
+      });
+    }
+  }
+
+  // Update group booking
+  static async updateGroupBooking(req, res) {
+    try {
+      const {
+        groupBookingId,
+        selectedRooms,
+        selectedRoomPrice,
+        qty,
+        daterange,
+        groupName,
+        groupContact,
+        numberOfRooms,
+        paymentStatus,
+        bookingRoute,
+        guestType,
+        guestLevel,
+        checkInStatus,
+        checkOutStatus,
+        remarks,
+        agencyId,
+        breakfastAdultQty,
+        breakfastAdultPrice,
+        breakfastAdultId,
+        breakfastKidQty,
+        breakfastKidPrice,
+        breakfastKidId,
+        pickupServiceId,
+        pickupPrice,
+        dropoffServiceId,
+        dropoffPrice,
+        reservationFee,
+        discount,
+        consolidatedBilling
+      } = req.body;
+
+      if (!groupBookingId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Group booking ID is required'
+        });
+      }
+
+      const encodedBy = req.user?.userId;
+      if (!encodedBy) {
+        return res.status(400).json({
+          success: false,
+          message: 'User is not logged in'
+        });
+      }
+
+      const date = new Date();
+
+      const result = await BookingModel.updateGroupBooking({
+        groupBookingId,
+        selectedRooms,
+        selectedRoomPrice,
+        qty,
+        daterange,
+        groupName,
+        groupContact,
+        numberOfRooms,
+        paymentStatus,
+        bookingRoute,
+        guestType,
+        guestLevel,
+        checkInStatus,
+        checkOutStatus,
+        remarks,
+        agencyId,
+        breakfastAdultQty,
+        breakfastAdultPrice,
+        breakfastAdultId,
+        breakfastKidQty,
+        breakfastKidPrice,
+        breakfastKidId,
+        pickupServiceId,
+        pickupPrice,
+        dropoffServiceId,
+        dropoffPrice,
+        reservationFee,
+        discount,
+        consolidatedBilling: consolidatedBilling === 'true' || consolidatedBilling === true,
+        encodedBy,
+        date
+      });
+
+
+      return res.json(result);
+
+    } catch (error) {
+      console.error('Error updating group booking:', error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Error updating group booking'
+      });
     }
   }
 
@@ -1880,6 +2014,37 @@ class BookingController {
         success: false,
         message: 'Internal server error'
       });
+    }
+  }
+
+  // Group-level remarks: list all remarks from all bookings in the group, plus group_booking.REMARKS as a virtual entry
+  static async getGroupRemarksByGroup(req, res) {
+    try {
+      const { groupId } = req.params;
+      if (!groupId) return res.status(400).json({ success: false, message: 'Group ID is required' });
+
+      const remarks = await BookingModel.getGroupRemarksByGroup(groupId);
+      return res.json({ success: true, remarks });
+    } catch (err) {
+      console.error('Error fetching group remarks:', err);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  }
+
+  // Add a group remark: attaches to the first booking in the group and mirrors to group_booking.REMARKS
+  static async addGroupRemark(req, res) {
+    try {
+      const { groupId, category, remarkText } = req.body;
+      const encodedBy = req.user.userId;
+      if (!groupId || !category || !remarkText) {
+        return res.status(400).json({ success: false, message: 'groupId, category and remarkText are required' });
+      }
+      const result = await BookingModel.addGroupRemark({ groupId, category, remarkText, encodedBy });
+      if (result.success) return res.json(result);
+      return res.status(500).json({ success: false, message: result.message || 'Failed to add group remark' });
+    } catch (err) {
+      console.error('Error adding group remark:', err);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
     }
   }
 

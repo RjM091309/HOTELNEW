@@ -985,16 +985,16 @@
 
     // Always calculate the full total in frontend for user visibility
     const subtotal = roomSubtotal + servicesTotal;
-    let finalBalance = subtotal + reservationFee - discount;
+    let finalBalance = subtotal - reservationFee - discount;
 
     if (isConsolidated) {
       // Show consolidated total with indicator
       if (finalBalance < 0) {
-        $('#groupComputedTotal').html(`<span class="text-warning">${formatCurrency(0)} <small>(Bulk)</small></span>`);
+        $('#groupComputedTotal').html(`<span class="text-warning">${formatCurrency(0)} <small>(Master)</small></span>`);
         $('#groupCreditAmount').text(formatCurrency(Math.abs(finalBalance)));
         $('#groupCreditDisplay').show();
       } else {
-        $('#groupComputedTotal').html(`<span>${formatCurrency(finalBalance)} <small class="text-info">(Bulk)</small></span>`);
+        $('#groupComputedTotal').html(`<span>${formatCurrency(finalBalance)} <small class="text-info">(Master)</small></span>`);
         $('#groupCreditDisplay').hide();
       }
     } else {

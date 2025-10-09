@@ -1,0 +1,1547 @@
+<!-- Edit Group Booking Modal -->
+<link rel="stylesheet" href="/plugins/flatpicker/flatpickr.min.css">
+
+<div class="modal fade" id="modal-edit-group-booking" tabindex="-1" role="dialog" aria-labelledby="modalEditGroupBookingLabel" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title" id="modalEditGroupBookingLabel">Edit Group Booking</h4>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="window.location.reload()"></button>
+      </div>
+      <div class="modal-body">
+        <form id="editGroupBookingForm" autocomplete="off">
+          <input type="hidden" id="editGroupBookingId" name="groupBookingId">
+          <input type="hidden" id="editGroupVoucherNo" name="groupVoucherNo">
+          <input type="hidden" id="editGroupSelectedRooms" name="groupSelectedRooms">
+          <input type="hidden" id="editGroupSelectedRoomPrices" name="groupSelectedRoomPrices">
+          <input type="hidden" id="editGroupSelectedRoomNumbers" name="groupSelectedRoomNumbers">
+          <input type="hidden" id="editGroupNights" name="groupNights" value="0">
+
+          <div class="row">
+            <div class="col-lg-6">
+              <div class="form-group">
+                <label class="form-label">Select Date From To</label>
+                <input type="text" class="form-control flatpickr-input" id="editGroupDaterange" name="groupDaterange" required>
+              </div>
+            </div>
+            <div class="col-lg-3">
+              <div class="form-group">
+                <label class="form-label">Number of Rooms Needed</label>
+                <input type="number" class="form-control" id="editGroupNumberOfRooms" name="groupNumberOfRooms" min="1" required>
+              </div>
+            </div>
+            <div class="col-lg-3">
+              <div class="form-group">
+                <label class="form-label">Select Floor (Optional)</label>
+                <select class="form-select" id="editGroupFloorSelect" name="groupFloorSelect">
+                  <option value="" selected>Select Floor</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="row p-t-20">
+            <div class="col-lg-6">
+              <div class="form-group">
+                <label class="form-label">Check-In Status</label>
+                <select class="form-select" id="editGroupCheckInStatus" name="groupCheckInStatus" required>
+                  <option value="" disabled selected>Check-In Status</option>
+                  <option value="1">Regular Check In</option>
+                  <option value="0">Late Check In</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="form-group">
+                <label class="form-label">Check-Out Status</label>
+                <select class="form-select" id="editGroupCheckOutStatus" name="groupCheckOutStatus" required>
+                  <option value="" disabled selected>Check-Out Status</option>
+                  <option value="0">Regular Check Out</option>
+                  <option value="1">Late Check Out</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="row p-t-20">
+            <div class="col-lg-12 d-flex align-items-center gap-3 flex-wrap">
+              <div class="form-group mb-0">
+                <label class="form-label mb-1">Bed Requirements</label>
+                <div class="d-flex gap-3 flex-wrap">
+                  <div class="bed-requirement-group">
+                    <label class="form-label mb-1">1 Bed</label>
+                    <input type="number" class="form-control" id="editGroupBed1Count" name="groupBed1Count" min="0" value="0">
+                  </div>
+                  <div class="bed-requirement-group">
+                    <label class="form-label mb-1">2 Beds</label>
+                    <input type="number" class="form-control" id="editGroupBed2Count" name="groupBed2Count" min="0" value="0">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="row p-t-20">
+            <div class="col-lg-12 d-flex justify-content-start">
+              <button type="button" class="btn btn-success" id="editGroupSearchRooms">Search Rooms</button>
+            </div>
+          </div>
+
+          <div class="row p-t-20" id="editGroupResultsContainer" style="display: none;">
+            <div class="col-lg-12">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Available Rooms</h5>
+              </div>
+              <div id="editGroupRoomsList" class="room-list-container"></div>
+              <div class="mt-2 text-warning" id="editGroupAvailabilityWarning" style="display: none;"></div>
+              <div id="editGroupRoomBreakdown" class="mt-3"></div>
+            </div>
+          </div>
+
+          <div class="row p-t-20">
+            <div class="col-lg-6">
+              <div class="form-group">
+                <label class="form-label">Group Name</label>
+                <input type="text" class="form-control" id="editGroupName" name="groupName" required>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="form-group">
+                <label class="form-label">Group Contact Number</label>
+                <input type="text" class="form-control" id="editGroupContact" name="groupContact" required>
+              </div>
+            </div>
+          </div>
+
+          <div class="row p-t-20">
+            <div class="col-lg-6">
+              <div class="form-group">
+                <label class="form-label">Booking Resources</label>
+                <select class="form-select" id="editGroupBookingRoute" name="groupBookingRoute" required>
+                  <option value="" disabled>Select Booking Resource</option>
+                  <option value="walk-in">Walk-in</option>
+                  <option value="agency">Agency</option>
+                  <option value="booking-channel">Booking Channel</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-lg-6" id="editGroupAgencyWrapper" style="display: none;">
+              <div class="form-group">
+                <label class="form-label">Select Agency</label>
+                <select class="form-select" id="editGroupAgencySelect" name="groupAgencySelect">
+                  <option value="" disabled selected>Select Agency</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="row p-t-20">
+            <div class="col-lg-4">
+              <div class="form-group">
+                <label class="form-label">Payment Status</label>
+                <select class="form-select" id="editGroupPaymentStatus" name="groupPaymentStatus" required>
+                  <option value="" disabled selected>Payment Status</option>
+                  <option value="paid">Paid</option>
+                  <option value="unpaid">Unpaid</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="form-group">
+                <label class="form-label">Guest Type</label>
+                <select class="form-select" id="editGroupGuestType" name="groupGuestType" required>
+                  <option value="" disabled selected>Guest Type</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="form-group">
+                <label class="form-label">Guest Level</label>
+                <select class="form-select" id="editGroupGuestLevel" name="groupGuestLevel" required>
+                  <option value="" disabled selected>Guest Level</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="row p-t-20">
+            <div class="col-lg-12">
+              <div class="form-group">
+                <label class="form-label">Remarks</label>
+                <textarea class="form-control" id="editGroupRemarks" name="groupRemarks" rows="3" placeholder="Enter any additional remarks or notes for this group booking..."></textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="row p-t-20 align-items-start">
+            <div class="col-lg-4">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="editGroupIncludeBreakfast" name="groupIncludeBreakfast">
+                <label class="form-check-label" for="editGroupIncludeBreakfast">Add Breakfast</label>
+              </div>
+              <div id="editGroupBreakfastFields" class="group-breakfast-fields d-none">
+                <div class="group-quantity-wrapper">
+                  <input type="number" class="form-control" id="editGroupBreakfastAdultQty" name="groupBreakfastAdultQty" placeholder="Adult Qty" style="max-width: 90px;">
+                  <input type="number" class="form-control" id="editGroupBreakfastAdultPrice" name="groupBreakfastAdultPrice" placeholder="Adult Price" min="0" step="0.01">
+                  <input type="hidden" id="editGroupBreakfastAdultId" name="groupBreakfastAdultId">
+                </div>
+                <div class="group-quantity-wrapper">
+                  <input type="number" class="form-control" id="editGroupBreakfastKidQty" name="groupBreakfastKidQty" placeholder="Kid Qty" style="max-width: 90px;">
+                  <input type="number" class="form-control" id="editGroupBreakfastKidPrice" name="groupBreakfastKidPrice" placeholder="Kid Price" min="0" step="0.01">
+                  <input type="hidden" id="editGroupBreakfastKidId" name="groupBreakfastKidId">
+                </div>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="editGroupIncludePickup" name="groupIncludePickup">
+                <label class="form-check-label" for="editGroupIncludePickup">Add Pick-up</label>
+              </div>
+              <div id="editGroupPickupWrapper" class="mt-2" style="display: none;">
+                <input type="number" class="form-control" id="editGroupPickupPrice" name="groupPickupPrice" placeholder="Pick-up Price" min="0" step="0.01">
+                <input type="hidden" id="editGroupPickupServiceId" name="groupPickupServiceId">
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="editGroupIncludeDropoff" name="groupIncludeDropoff">
+                <label class="form-check-label" for="editGroupIncludeDropoff">Add Drop-off</label>
+              </div>
+              <div id="editGroupDropoffWrapper" class="mt-2" style="display: none;">
+                <input type="number" class="form-control" id="editGroupDropoffPrice" name="groupDropoffPrice" placeholder="Drop-off Price" min="0" step="0.01">
+                <input type="hidden" id="editGroupDropoffServiceId" name="groupDropoffServiceId">
+              </div>
+            </div>
+          </div>
+
+          <div class="row p-t-20">
+            <div class="col-lg-4">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="editGroupIncludeReservationFee">
+                <label class="form-check-label" for="editGroupIncludeReservationFee">Reservation Fee (Group)</label>
+              </div>
+              <div id="editGroupReservationFeeWrapper" class="mt-2" style="display: none;">
+                <input type="number" class="form-control" id="editGroupReservationFee" name="groupReservationFee" min="0" value="0">
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="editGroupIncludeDiscount">
+                <label class="form-check-label" for="editGroupIncludeDiscount">Discount (Group)</label>
+              </div>
+              <div id="editGroupDiscountWrapper" class="mt-2" style="display: none;">
+                <input type="number" class="form-control" id="editGroupDiscount" name="groupDiscount" min="0" value="0">
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="editGroupConsolidatedBilling">
+                <label class="form-check-label" for="editGroupConsolidatedBilling">Master Billing</label>
+              </div>
+              <div class="form-text">
+                <small class="text-muted">All charges (rooms, services, fees) go to main booking only</small>
+              </div>
+            </div>
+          </div>
+
+          <hr class="my-4">
+          <div class="row p-t-20">
+            <div class="col-lg-6">
+              <h3>Total: <span id="editGroupComputedTotal">₱0.00</span></h3>
+              <div id="editGroupCreditDisplay" style="display: none; margin-top: 10px;">
+                <span style="color: #28a745; font-weight: bold;">Credit: <span id="editGroupCreditAmount">₱0.00</span></span>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-success" id="btnEditGroupVoucherPreview">Voucher</button>
+                <button type="submit" class="btn btn-primary">Update Booking</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="window.location.reload()">Close</button>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+/* Dark Theme Styling for Edit Group Booking Modal (matching Add Group Booking) */
+#modal-edit-group-booking .modal-dialog {
+  max-height: 99vh;
+  margin: 1vh auto;
+}
+
+#modal-edit-group-booking .modal-content {
+  background-color: #2a3135;
+  color: #e0e0e0;
+  border-radius: 6px;
+  box-shadow: 0 0 10px rgba(59, 59, 59, 0.2);
+  border: 1px solid #3b3b3b;
+  max-height: 90vh;
+  overflow: visible;
+}
+
+#modal-edit-group-booking .modal-body {
+  max-height: 90vh;
+  overflow-y: auto !important;
+  padding-bottom: 0;
+}
+
+#modal-edit-group-booking .modal-header {
+  background-color: #0c2a42;
+  color: #ffffff;
+  border-bottom: 1px solid #0c2a42;
+}
+
+#modal-edit-group-booking .modal-title {
+  color: #ffffff;
+}
+
+#modal-edit-group-booking .btn-close {
+  filter: invert(1) !important;
+}
+
+#modal-edit-group-booking .btn-close:hover {
+  filter: invert(0.8) !important;
+}
+
+#modal-edit-group-booking .form-label {
+  font-size: 12px;
+  color: #cfcfcf;
+}
+
+#modal-edit-group-booking input[type="text"],
+#modal-edit-group-booking input[type="number"],
+#modal-edit-group-booking input[type="email"],
+#modal-edit-group-booking select,
+#modal-edit-group-booking textarea {
+  background-color: #41474c;
+  color: #ffffff;
+  border: 1px solid #41474c;
+}
+
+#modal-edit-group-booking input::placeholder,
+#modal-edit-group-booking textarea::placeholder {
+  color: #bbbbbb;
+}
+
+#modal-edit-group-booking select option {
+  background-color: #41474c;
+  color: #ffffff;
+}
+
+#modal-edit-group-booking h3,
+#modal-edit-group-booking h5,
+#modal-edit-group-booking label {
+  color: #ffffff;
+}
+
+#modal-edit-group-booking .btn-primary,
+#modal-edit-group-booking .btn-success {
+  background-color: #6f9c40 !important;
+  border-color: #6f9c40 !important;
+}
+
+#modal-edit-group-booking .btn-primary:hover,
+#modal-edit-group-booking .btn-success:hover {
+  background-color: #5b8435 !important;
+  border-color: #5b8435 !important;
+}
+
+#modal-edit-group-booking .form-check-label {
+  color: #dcdcdc;
+}
+
+#modal-edit-group-booking .room-list-container {
+  background-color: #1f262a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 0;
+  overflow: hidden;
+}
+
+#modal-edit-group-booking .group-rooms-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+#modal-edit-group-booking .room-option {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 8px 12px;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  position: relative;
+}
+
+#modal-edit-group-booking .room-option:hover {
+  background: rgba(111, 156, 64, 0.15);
+  border-color: rgba(111, 156, 64, 0.4);
+  transform: translateY(-1px);
+}
+
+#modal-edit-group-booking .room-option .form-check-input:checked + .form-check-label {
+  color: #9fe073;
+}
+
+#modal-edit-group-booking .room-option:has(.form-check-input:checked) {
+  background: rgba(111, 156, 64, 0.2);
+  border-color: #6f9c40;
+  box-shadow: 0 0 0 2px rgba(111, 156, 64, 0.3);
+}
+
+#modal-edit-group-booking .group-room-breakdown {
+  background: #202629;
+  border-radius: 6px;
+  padding: 16px;
+  margin-top: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#modal-edit-group-booking .group-room-breakdown b {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 1.08em;
+}
+
+#modal-edit-group-booking .group-room-breakdown ul {
+  padding-left: 20px;
+  margin: 0;
+}
+
+#modal-edit-group-booking .group-room-breakdown li {
+  font-size: 0.95em;
+  margin-bottom: 4px;
+}
+
+#modal-edit-group-booking .form-check-input:focus {
+  box-shadow: 0 0 0 0.2rem rgba(111, 156, 64, 0.25);
+  border-color: #6f9c40;
+}
+
+#modal-edit-group-booking .form-check-input:checked {
+  background-color: #6f9c40;
+  border-color: #6f9c40;
+}
+
+#modal-edit-group-booking hr {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.group-breakfast-fields {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.group-breakfast-fields.d-none {
+  display: none !important;
+}
+
+.group-quantity-wrapper {
+  display: flex;
+  gap: 8px;
+}
+
+.group-quantity-wrapper .form-control {
+  flex: 1;
+  min-width: 0;
+}
+
+.group-quantity-wrapper input[type="number"] {
+  text-align: right;
+}
+
+.group-quantity-wrapper input[type="number"]:focus {
+  border-color: #6f9c40;
+  box-shadow: 0 0 0 0.2rem rgba(111, 156, 64, 0.25);
+}
+
+/* Consolidated billing styling */
+#editGroupConsolidatedBilling:checked + label {
+  color: #6f9c40;
+  font-weight: 600;
+}
+
+.form-text small {
+  font-style: italic;
+  opacity: 0.8;
+}
+
+#modal-edit-group-booking .bed-requirement-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#modal-edit-group-booking .bed-requirement-group .form-control {
+  width: 90px;
+}
+
+#modal-edit-group-booking .form-check-label {
+  color: #dcdcdc;
+}
+
+#modal-edit-group-booking .room-list-container {
+  background-color: #1f262a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 0;
+  overflow: hidden;
+}
+
+#modal-edit-group-booking .group-rooms-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+#modal-edit-group-booking #editGroupManualRoomsContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+#modal-edit-group-booking #editGroupManualRoomsContainer .room-option {
+  flex: 0 1 calc(20% - 10px);
+}
+
+#modal-edit-group-booking .manual-rooms-container {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  padding: 16px;
+}
+
+#modal-edit-group-booking .manual-rooms-container .room-option {
+  width: 100%;
+  height: 70px;
+  min-width: 0;
+}
+
+#modal-edit-group-booking .room-option {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 8px 12px;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  position: relative;
+}
+
+#modal-edit-group-booking .room-option-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#modal-edit-group-booking .room-option .form-check-input {
+  margin-top: 0;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+#modal-edit-group-booking .room-option .form-check-label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0;
+}
+
+#modal-edit-group-booking .room-option .bed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: rgba(111, 156, 64, 0.15);
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-left: auto;
+}
+
+#modal-edit-group-booking .room-option .bed-badge i {
+  color: #9fe073;
+}
+
+#modal-edit-group-booking .room-option:hover {
+  background: rgba(111, 156, 64, 0.15);
+  border-color: rgba(111, 156, 64, 0.4);
+  transform: translateY(-1px);
+}
+
+#modal-edit-group-booking .room-option .form-check-input:checked + .form-check-label {
+  color: #9fe073;
+}
+
+#modal-edit-group-booking .room-option:has(.form-check-input:checked) {
+  background: rgba(111, 156, 64, 0.2);
+  border-color: #6f9c40;
+  box-shadow: 0 0 0 2px rgba(111, 156, 64, 0.3);
+}
+
+#modal-edit-group-booking .group-room-breakdown {
+  background: #202629;
+  border-radius: 6px;
+  padding: 16px;
+  margin-top: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#modal-edit-group-booking .group-room-breakdown b {
+  display: block;
+  margin-bottom: 6px;
+  color: #9fe073;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+#modal-edit-group-booking .group-room-breakdown ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+#modal-edit-group-booking .group-room-breakdown li {
+  padding: 4px 0;
+  color: #dcdcdc;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+#modal-edit-group-booking .group-room-breakdown li:last-child {
+  border-bottom: none;
+}
+
+#modal-edit-group-booking .room-option:has(.form-check-input:disabled) {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.04);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#modal-edit-group-booking .room-option:has(.form-check-input:disabled) .form-check-label {
+  color: #666;
+}
+
+#modal-edit-group-booking .room-option:has(.form-check-input:disabled) .bed-badge {
+  background: rgba(255, 255, 255, 0.1);
+  color: #666;
+}
+
+#modal-edit-group-booking .room-option:has(.form-check-input:disabled) .bed-badge i {
+  color: #666;
+}
+</style>
+
+<script src="/plugins/flatpicker/flatpickr.min.js"></script>
+<script>
+// Make editGroupManualSelectedRooms global so it can be accessed from other scripts
+window.editGroupManualSelectedRooms = [];
+
+(function() {
+  let editGroupFlatpickrInstance = null;
+  let editGroupBlocks = [];
+  let editGroupNonConsecutiveBlocks = [];
+  let editGroupAvailableRooms = [];
+  let editGroupManualMode = false;
+  let editGroupPickupBasePrice = '';
+  let editGroupPickupBaseId = '';
+  let editGroupDropoffBasePrice = '';
+  let editGroupDropoffBaseId = '';
+  let editGroupBreakfastAdultBasePrice = '';
+  let editGroupBreakfastAdultBaseId = '';
+  let editGroupBreakfastKidBasePrice = '';
+  let editGroupBreakfastKidBaseId = '';
+  let editGroupRequiredBed1 = 0;
+  let editGroupRequiredBed2 = 0;
+  let editGroupUnassignedConflicts = [];
+
+  function resetEditGroupForm() {
+    $('#editGroupBookingForm')[0].reset();
+    $('#editGroupSelectedRooms').val('');
+    $('#editGroupSelectedRoomPrices').val('');
+    $('#editGroupNights').val('0');
+    editGroupBlocks = [];
+    editGroupNonConsecutiveBlocks = [];
+    editGroupAvailableRooms = [];
+    editGroupManualMode = false;
+    // Don't reset window.editGroupManualSelectedRooms here - it should be preserved during edit
+    editGroupRequiredBed1 = 0;
+    editGroupRequiredBed2 = 0;
+    editGroupUnassignedConflicts = [];
+    $('#editGroupAgencyWrapper').hide();
+    $('#editGroupRoomsList').empty();
+    $('#editGroupResultsContainer').hide();
+    $('#editGroupComputedTotal').html('₱0.00');
+    $('#editGroupCreditDisplay').hide();
+    $('#editGroupCreditAmount').text('₱0.00');
+    $('#editGroupBreakfastFields').addClass('d-none');
+    $('#editGroupIncludeBreakfast, #editGroupIncludePickup, #editGroupIncludeDropoff, #editGroupIncludeReservationFee, #editGroupIncludeDiscount, #editGroupConsolidatedBilling').prop('checked', false);
+    $('#editGroupBreakfastAdultQty, #editGroupBreakfastKidQty').val('');
+    $('#editGroupPickupWrapper, #editGroupDropoffWrapper, #editGroupReservationFeeWrapper, #editGroupDiscountWrapper').hide();
+    $('#editGroupPickupPrice, #editGroupDropoffPrice, #editGroupReservationFee, #editGroupDiscount').val('');
+    $('#editGroupRoomBreakdown').removeClass('d-none');
+    $('.consolidated-indicator').remove();
+    // Reset service base variables
+    editGroupPickupBasePrice = '';
+    editGroupPickupBaseId = '';
+    editGroupDropoffBasePrice = '';
+    editGroupDropoffBaseId = '';
+    editGroupBreakfastAdultBasePrice = '';
+    editGroupBreakfastAdultBaseId = '';
+    editGroupBreakfastKidBasePrice = '';
+    editGroupBreakfastKidBaseId = '';
+  }
+
+  function initializeEditGroupFlatpickr() {
+    if (editGroupFlatpickrInstance) {
+      editGroupFlatpickrInstance.destroy();
+    }
+
+    editGroupFlatpickrInstance = flatpickr('#editGroupDaterange', {
+      mode: 'range',
+      dateFormat: 'M d, Y',
+      showMonths: 2,
+      minDate: 'today',
+      onClose: function(selectedDates, dateStr, instance) {
+        if (selectedDates.length === 2) {
+          const startDate = selectedDates[0];
+          const endDate = selectedDates[1];
+          const diffMs = endDate.getTime() - startDate.getTime();
+          const nights = Math.max(1, Math.round(diffMs / (1000 * 3600 * 24)));
+          $('#editGroupNights').val(nights);
+          instance.input.value = `${dateStr} (${nights} night/s)`;
+          computeEditGroupTotal();
+        }
+      }
+    });
+  }
+
+  function getEditSelectedDateRange() {
+    const raw = $('#editGroupDaterange').val();
+    if (!raw) return null;
+    const parts = raw.split(' to ');
+    if (parts.length < 2) return null;
+    const start = parts[0].trim();
+    const end = parts[1].split('(')[0].trim();
+    return { start, end };
+  }
+
+  function displayEditGroupRooms(blocks, title, groupNameAttr) {
+    const list = $('#editGroupRoomsList');
+    const section = $(`div[data-group-name="${groupNameAttr}"]`);
+
+    if (!section.length) {
+      const sectionHtml = `
+        <div class="group-rooms-section" data-group-name="${groupNameAttr}">
+          <h6 class="text-info mb-2">${title}</h6>
+          <div class="group-rooms-options"></div>
+        </div>`;
+      list.append(sectionHtml);
+    }
+
+    const targetContainer = list.find(`div[data-group-name="${groupNameAttr}"] .group-rooms-options`);
+    targetContainer.empty();
+
+    if (!blocks || !blocks.length) {
+      targetContainer.append('<p class="text-warning mb-0">No rooms found.</p>');
+      return;
+    }
+
+    blocks.forEach((block, index) => {
+      const blockKey = `${groupNameAttr}-${index}`;
+      const roomNumbers = block.map(room => `${room.ROOM_NUMBER}`).join(', ');
+      const roomIds = block.map(room => room.IDNo).join(',');
+      const option = `
+        <div class="form-check room-option">
+          <div class="room-option-header">
+            <input class="form-check-input" type="radio" name="editGroupBlock" id="editGroupBlock${blockKey}" data-block-group="${groupNameAttr}" data-block-index="${index}" value="${roomIds}">
+            <label class="form-check-label" for="editGroupBlock${blockKey}">
+              ${roomNumbers}
+            </label>
+          </div>
+        </div>`;
+      targetContainer.append(option);
+    });
+  }
+
+  function displayEditGroupRoomResults({ consecutiveBlocks, nonConsecutiveBlocks, availableRooms, unassignedConflicts }) {
+    const list = $('#editGroupRoomsList');
+    list.empty();
+    $('#editGroupAvailabilityWarning').hide();
+
+    editGroupUnassignedConflicts = (unassignedConflicts && unassignedConflicts.length) ? unassignedConflicts : [];
+    editGroupAvailableRooms = availableRooms || [];
+
+    // Show unassigned conflicts warning if any
+    if (editGroupUnassignedConflicts.length) {
+      const conflictText = editGroupUnassignedConflicts.map(conf =>
+        `${conf.reserved} ${conf.bed} bed rooms reserved for unassigned bookings`
+      ).join(', ');
+      $('#editGroupRoomsList').prepend(`
+        <div class="alert alert-warning mb-3">
+          <strong>Unassigned Rooms Notice:</strong> Some rooms may be reserved for unassigned bookings: ${conflictText}
+        </div>
+      `);
+    }
+
+    if (!editGroupAvailableRooms || !editGroupAvailableRooms.length) {
+      list.append('<p class="text-danger">No rooms available for the selected dates.</p>');
+      $('#editGroupResultsContainer').show();
+      $('#editGroupSelectedRooms').val('');
+      $('#editGroupSelectedRoomPrices').val('');
+      return;
+    }
+
+    // Render rooms directly in the main list container
+    const roomsHtml = editGroupAvailableRooms.map(room => {
+      const bedCount = parseInt(room.ROOM_BED, 10);
+      const bedBadge = Number.isFinite(bedCount) && bedCount > 0
+        ? `<span class="bed-badge">${bedCount}<i class="fa fa-bed"></i></span>`
+        : '';
+      const isSelected = window.editGroupManualSelectedRooms.includes(room.IDNo) ||
+                         window.editGroupManualSelectedRooms.includes(String(room.IDNo)) ||
+                         window.editGroupManualSelectedRooms.includes(parseInt(room.IDNo));
+      return `
+        <div class="form-check room-option">
+          <input class="form-check-input edit-group-manual-checkbox" type="checkbox" data-room-id="${room.IDNo}" ${isSelected ? 'checked' : ''}>
+          <label class="form-check-label ms-2">
+            ${room.ROOM_NUMBER}${bedBadge ? ` ${bedBadge}` : ''}
+          </label>
+        </div>`;
+    }).join('');
+    $('#editGroupRoomsList').append(`<div class="manual-rooms-container">${roomsHtml}</div>`);
+
+    $('#editGroupResultsContainer').show();
+    
+    // Automatically populate the breakdown for pre-selected rooms
+    updateEditManualSelectedRoomValues();
+    computeEditGroupTotal();
+    
+    // Refresh the disabled state of checkboxes
+    refreshEditManualSelectionDisabledState();
+  }
+
+
+  function attachEditGroupRoomSelectionHandler() {
+    $('#editGroupRoomsList').on('change', 'input[name="editGroupBlock"]', function() {
+      const groupNameAttr = $(this).data('block-group');
+      const blockIndex = parseInt($(this).data('block-index'), 10);
+
+      let sourceBlocks = [];
+      if (groupNameAttr === 'consecutive') {
+        sourceBlocks = editGroupBlocks;
+      } else if (groupNameAttr === 'non-consecutive') {
+        sourceBlocks = editGroupNonConsecutiveBlocks;
+      } else if (groupNameAttr === 'available') {
+        sourceBlocks = buildEditSingleRoomBlocks(editGroupAvailableRooms);
+      }
+
+      const block = sourceBlocks[blockIndex];
+      if (!block) return;
+
+      const dates = getEditSelectedDateRange();
+      if (!dates) {
+        Swal.fire('Missing Dates', 'Please select a date range first.', 'warning');
+        $(this).prop('checked', false);
+        return;
+      }
+
+      const bookingType = $('#editGroupBookingRoute').val();
+      const computedPrices = [];
+      block.forEach(room => {
+        const price = typeof room.RESOLVED_PRICE === 'number'
+          ? room.RESOLVED_PRICE
+          : (() => {
+              const seasonalPrices = room.SEASONAL_PRICES || [];
+              const bedCount = parseInt(room.ROOM_BED, 10);
+              const seasonId = getSeasonIdForDate(dates.start, seasonalPrices);
+              const match = seasonalPrices.find(price => parseInt(price.bedCount, 10) === bedCount && price.bookingType === bookingType && parseInt(price.seasonId, 10) === parseInt(seasonId, 10));
+              return match ? parseFloat(match.price) : 0;
+            })();
+        computedPrices.push(price);
+      });
+
+      const selectedIds = block.map(room => room.IDNo);
+      const selectedNumbers = block.map(room => room.ROOM_NUMBER);
+      $('#editGroupSelectedRooms').val(selectedIds.join(','));
+      $('#editGroupSelectedRoomPrices').val(computedPrices.join(','));
+      $('#editGroupSelectedRoomNumbers').val(selectedNumbers.join(','));
+    });
+  }
+
+  function buildEditSingleRoomBlocks(rooms) {
+    return rooms.map(room => [room]);
+  }
+
+  function getSeasonIdForDate(checkInDate, seasonalPrices) {
+    if (!seasonalPrices || !seasonalPrices.length) return null;
+    const checkIn = new Date(checkInDate);
+    const mmdd = `${(checkIn.getMonth() + 1).toString().padStart(2, '0')}${checkIn.getDate().toString().padStart(2, '0')}`;
+
+    for (const price of seasonalPrices) {
+      const start = new Date(price.startDate);
+      const end = new Date(price.endDate);
+      const startKey = `${(start.getMonth() + 1).toString().padStart(2, '0')}${start.getDate().toString().padStart(2, '0')}`;
+      const endKey = `${(end.getMonth() + 1).toString().padStart(2, '0')}${end.getDate().toString().padStart(2, '0')}`;
+
+      const isWithinSameYear = startKey <= endKey && mmdd >= startKey && mmdd <= endKey;
+      const crossesYear = startKey > endKey && (mmdd >= startKey || mmdd <= endKey);
+
+      if (isWithinSameYear || crossesYear) {
+        return price.seasonId;
+      }
+    }
+    return null;
+  }
+
+  function handleEditGroupSearchRooms() {
+    $('#editGroupSearchRooms').on('click', function() {
+      const dates = getEditSelectedDateRange();
+      const neededRooms = $('#editGroupNumberOfRooms').val();
+      const neededRoomsNum = parseInt(neededRooms, 10);
+      const bed1Needed = parseInt($('#editGroupBed1Count').val(), 10) || 0;
+      const bed2Needed = parseInt($('#editGroupBed2Count').val(), 10) || 0;
+      const totalBedNeeded = bed1Needed + bed2Needed;
+      const bookingRoute = $('#editGroupBookingRoute').val();
+
+      if (!dates) {
+        Swal.fire('Missing Date Range', 'Please select a valid date range.', 'warning');
+        return;
+      }
+      if (!neededRooms) {
+        Swal.fire('Missing Room Count', 'Please enter the number of rooms needed.', 'warning');
+        return;
+      }
+      if (!bookingRoute) {
+        Swal.fire('Missing Booking Resource', 'Please select a booking resource before searching for rooms.', 'warning');
+        return;
+      }
+
+      const checkInStatus = $('#editGroupCheckInStatus').val();
+      const checkOutStatus = $('#editGroupCheckOutStatus').val();
+
+      if (!checkInStatus || checkInStatus === '') {
+        Swal.fire('Missing Check-In Status', 'Please select a Check-In Status before searching for rooms.', 'warning');
+        return;
+      }
+
+      if (!checkOutStatus || checkOutStatus === '') {
+        Swal.fire('Missing Check-Out Status', 'Please select a Check-Out Status before searching for rooms.', 'warning');
+        return;
+      }
+
+      if ((bed1Needed > 0 || bed2Needed > 0) && totalBedNeeded !== neededRoomsNum) {
+        Swal.fire('Bed Count Mismatch', 'The sum of bed requirements must equal the total number of rooms needed.', 'warning');
+        return;
+      }
+
+      if (neededRoomsNum > 0 && totalBedNeeded === 0) {
+        Swal.fire('Bed Requirement Missing', 'Please specify how many rooms should have 1 bed or 2 beds before searching.', 'warning');
+        return;
+      }
+
+      editGroupRequiredBed1 = bed1Needed;
+      editGroupRequiredBed2 = bed2Needed;
+
+      $.ajax({
+        url: '/booking/find_consecutive_rooms',
+        type: 'POST',
+        data: {
+          startDate: dates.start,
+          endDate: dates.end,
+          neededRooms: neededRooms,
+          floorNumber: $('#editGroupFloorSelect').val() || '',
+          bed1Needed: bed1Needed,
+          bed2Needed: bed2Needed,
+          bookingRoute: bookingRoute,
+          checkInStatus: $('#editGroupCheckInStatus').val(),
+          checkOutStatus: $('#editGroupCheckOutStatus').val(),
+          excludeGroupBookingId: $('#editGroupBookingId').val() || ''
+        },
+        success: function(response) {
+          if (!response.success) {
+            Swal.fire('No Rooms Found', response.message || 'No available rooms for the selected criteria.', 'info');
+            displayEditGroupRoomResults({ consecutiveBlocks: [], nonConsecutiveBlocks: [], availableRooms: [] });
+            return;
+          }
+
+          const data = response.data || {};
+          let availableRooms = data.availableRooms || [];
+
+          // Include originally selected rooms even if not currently available
+          const currentBookingId = $('#editGroupBookingId').val();
+
+          if (currentBookingId && window.editGroupManualSelectedRooms.length > 0) {
+            // Get room details for originally selected rooms
+            const originallySelectedRoomDetails = [];
+            window.editGroupManualSelectedRooms.forEach(roomId => {
+              // Find room details from previous search results or add enhanced placeholder
+              const existingRoom = availableRooms.find(room => room.IDNo === roomId) ||
+                                   editGroupAvailableRooms.find(room => room.IDNo === roomId);
+              if (existingRoom) {
+                originallySelectedRoomDetails.push(existingRoom);
+              } else {
+                // Add enhanced placeholder room data if not found in current search
+                originallySelectedRoomDetails.push({
+                  IDNo: roomId,
+                  ROOM_NUMBER: `Room ${roomId}`,
+                  ROOM_BED: 1, // Default to 1 bed
+                  RESOLVED_PRICE: 1000, // Default price
+                  SEASONAL_PRICES: [] // Will use fallback pricing
+                });
+              }
+            });
+
+            // Combine available rooms with originally selected rooms (avoid duplicates)
+            const existingIds = availableRooms.map(room => room.IDNo);
+            const newRooms = originallySelectedRoomDetails.filter(room => !existingIds.includes(room.IDNo));
+            availableRooms = [...availableRooms, ...newRooms];
+          }
+
+          // Check if we have enough rooms (including originally selected ones for editing)
+          const totalAvailableRooms = availableRooms.length;
+          const originallySelectedCount = window.editGroupManualSelectedRooms.length;
+          if (neededRoomsNum > totalAvailableRooms && originallySelectedCount === 0) {
+            displayEditGroupRoomResults({ consecutiveBlocks: [], nonConsecutiveBlocks: [], availableRooms: [] });
+            return;
+          }
+
+          editGroupNonConsecutiveBlocks = data.nonConsecutiveBlocks || [];
+          editGroupAvailableRooms = availableRooms; // Update available rooms with current search results
+          displayEditGroupRoomResults({
+            consecutiveBlocks: data.consecutiveBlocks || [],
+            nonConsecutiveBlocks: editGroupNonConsecutiveBlocks,
+            availableRooms,
+            unassignedConflicts: data.unassignedConflicts || []
+          });
+        },
+        error: function(err) {
+          console.error('Error finding rooms:', err);
+          Swal.fire('Error', 'There was a problem searching for rooms. Please try again.', 'error');
+        }
+      });
+    });
+  }
+
+  function loadEditGroupData() {
+    // Load floors
+    $.ajax({
+      url: '/booking/get_floors_for_dropdown',
+      method: 'GET',
+      success: function(data) {
+        const select = $('#editGroupFloorSelect');
+        select.empty();
+        select.append('<option value="" selected>Select Floor</option>');
+        (data || []).forEach(floor => {
+          select.append(`<option value="${floor.floor_number}">${floor.floor_number} Floor</option>`);
+        });
+      },
+      error: function(err) {
+        console.error('Error fetching floors for edit group booking:', err);
+      }
+    });
+
+    // Load guest types
+    $.ajax({
+      url: '/booking/get_guest_types',
+      method: 'GET',
+      success: function(data) {
+        const select = $('#editGroupGuestType');
+        select.empty();
+        select.append('<option value="" disabled>Guest Type</option>');
+        (data || []).forEach(type => {
+          select.append(`<option value="${type.IDNo}">${type.TYPE}</option>`);
+        });
+      },
+      error: function(err) {
+        console.error('Error fetching guest types:', err);
+        $('#editGroupGuestType').html('<option value="" disabled>Error loading guest types</option>');
+      }
+    });
+
+    // Load guest levels
+    $.ajax({
+      url: '/booking/get_guest_level',
+      method: 'GET',
+      success: function(data) {
+        const select = $('#editGroupGuestLevel');
+        select.empty();
+        select.append('<option value="" disabled>Guest Level</option>');
+        (data || []).forEach(level => {
+          select.append(`<option value="${level.IDNo}">${level.TYPE}</option>`);
+        });
+      },
+      error: function(err) {
+        console.error('Error fetching guest levels:', err);
+        $('#editGroupGuestLevel').html('<option value="" disabled>Error loading guest levels</option>');
+      }
+    });
+
+    // Load agencies
+    $.ajax({
+      url: '/booking/get-agency',
+      method: 'GET',
+      success: function(data) {
+        const select = $('#editGroupAgencySelect');
+        select.empty();
+        select.append('<option value="" disabled selected>Select Agency</option>');
+        (data || []).forEach(agency => {
+          select.append(`<option value="${agency.IDNo}">${agency.NAME}</option>`);
+        });
+      },
+      error: function(err) {
+        console.error('Error fetching agencies:', err);
+      }
+    });
+  }
+
+  // Load breakfast and transport prices for edit form
+  function loadEditGroupServicePrices() {
+    // Load breakfast service IDs and prices
+    fetch('/booking/get-breakfast-prices')
+      .then(res => res.json())
+      .then(data => {
+        if (!Array.isArray(data)) return;
+        const adult = data.find(item => item.SERVICE_NAME.toLowerCase().includes('adult'));
+        const kid = data.find(item => item.SERVICE_NAME.toLowerCase().includes('kid'));
+        if (adult) {
+          editGroupBreakfastAdultBaseId = adult.IDNo;
+        }
+        if (kid) {
+          editGroupBreakfastKidBaseId = kid.IDNo;
+        }
+      })
+      .catch(err => console.error('Failed to load breakfast services:', err));
+
+    // Load transport services
+    fetch('/booking/get-pick-drop')
+      .then(res => res.json())
+      .then(data => {
+        if (!Array.isArray(data)) return;
+        const pickup = data.find(item => item.SERVICE_NAME.toLowerCase().includes('pick'));
+        const dropoff = data.find(item => item.SERVICE_NAME.toLowerCase().includes('drop'));
+        if (pickup) {
+          editGroupPickupBaseId = pickup.IDNo;
+        }
+        if (dropoff) {
+          editGroupDropoffBaseId = dropoff.IDNo;
+        }
+      })
+      .catch(err => console.error('Failed to load transport services:', err));
+  }
+
+  // Initialize when modal is shown
+  $('#modal-edit-group-booking').on('shown.bs.modal', function() {
+    // Only reset if no booking ID is set (fresh open, not editing)
+    const bookingId = $('#editGroupBookingId').val();
+    if (!bookingId) {
+      resetEditGroupForm();
+      initializeEditGroupFlatpickr();
+      loadEditGroupData();
+      loadEditGroupServicePrices();
+    } else {
+      // If editing, just ensure flatpickr is initialized and data is loaded
+      initializeEditGroupFlatpickr();
+      loadEditGroupServicePrices();
+    }
+  });
+
+  // Reset form when modal is closed
+  $('#modal-edit-group-booking').on('hidden.bs.modal', function() {
+    // Clear the booking ID to prevent editing wrong record
+    $('#editGroupBookingId').val('');
+
+    resetEditGroupForm();
+    
+    // Reset the global manual selected rooms array only when modal is completely closed
+    window.editGroupManualSelectedRooms = [];
+
+    // Also reset flatpickr instance
+    if (editGroupFlatpickrInstance) {
+      editGroupFlatpickrInstance.destroy();
+      editGroupFlatpickrInstance = null;
+    }
+
+    // Clear any dynamic content that might be left
+    $('#editGroupRoomBreakdown').empty();
+    $('#editGroupAvailabilityWarning').hide().text('');
+    
+    // Reload the page to refresh the data
+    window.location.reload();
+  });
+
+  // Booking route change handler
+  $('#editGroupBookingRoute').on('change', function() {
+    if (this.value === 'agency') {
+      $('#editGroupAgencyWrapper').show();
+    } else {
+      $('#editGroupAgencyWrapper').hide();
+      $('#editGroupAgencySelect').val('');
+    }
+  });
+
+  // Service toggles
+  $('#editGroupIncludeBreakfast').on('change', function() {
+    if (this.checked) {
+      $('#editGroupBreakfastFields').removeClass('d-none');
+    } else {
+      $('#editGroupBreakfastFields').addClass('d-none');
+      $('#editGroupBreakfastAdultQty, #editGroupBreakfastKidQty').val('');
+    }
+    computeEditGroupTotal();
+  });
+
+  $('#editGroupIncludePickup').on('change', function() {
+    if (this.checked) {
+      $('#editGroupPickupWrapper').show();
+    } else {
+      $('#editGroupPickupWrapper').hide();
+      $('#editGroupPickupPrice').val('');
+    }
+    computeEditGroupTotal();
+  });
+
+  $('#editGroupIncludeDropoff').on('change', function() {
+    if (this.checked) {
+      $('#editGroupDropoffWrapper').show();
+    } else {
+      $('#editGroupDropoffWrapper').hide();
+      $('#editGroupDropoffPrice').val('');
+    }
+    computeEditGroupTotal();
+  });
+
+  // Fee toggles
+  $('#editGroupIncludeReservationFee').on('change', function() {
+    $('#editGroupReservationFeeWrapper').toggle(this.checked);
+    if (!this.checked) { $('#editGroupReservationFee').val('0'); }
+    computeEditGroupTotal();
+  });
+
+  $('#editGroupIncludeDiscount').on('change', function() {
+    $('#editGroupDiscountWrapper').toggle(this.checked);
+    if (!this.checked) { $('#editGroupDiscount').val('0'); }
+    computeEditGroupTotal();
+  });
+
+  // Form submission
+  $('#editGroupBookingForm').on('submit', function(e) {
+    e.preventDefault();
+
+    const formData = {
+      groupBookingId: $('#editGroupBookingId').val(),
+      selectedRooms: $('#editGroupSelectedRooms').val(),
+      selectedRoomPrice: $('#editGroupSelectedRoomPrices').val(),
+      qty: $('#editGroupNights').val(),
+      daterange: $('#editGroupDaterange').val(),
+      groupName: $('#editGroupName').val(),
+      groupContact: $('#editGroupContact').val(),
+      numberOfRooms: $('#editGroupNumberOfRooms').val(),
+      paymentStatus: $('#editGroupPaymentStatus').val(),
+      bookingRoute: $('#editGroupBookingRoute').val(),
+      guestType: $('#editGroupGuestType').val(),
+      guestLevel: $('#editGroupGuestLevel').val(),
+      checkInStatus: $('#editGroupCheckInStatus').val(),
+      checkOutStatus: $('#editGroupCheckOutStatus').val(),
+      remarks: $('#editGroupRemarks').val(),
+      agencyId: $('#editGroupBookingRoute').val() === 'agency' ? $('#editGroupAgencySelect').val() : null,
+      breakfastAdultQty: $('#editGroupBreakfastAdultQty').val(),
+      breakfastAdultPrice: $('#editGroupBreakfastAdultPrice').val(),
+      breakfastAdultId: $('#editGroupBreakfastAdultId').val(),
+      breakfastKidQty: $('#editGroupBreakfastKidQty').val(),
+      breakfastKidPrice: $('#editGroupBreakfastKidPrice').val(),
+      breakfastKidId: $('#editGroupBreakfastKidId').val(),
+      pickupServiceId: $('#editGroupPickupServiceId').val(),
+      pickupPrice: $('#editGroupPickupPrice').val(),
+      dropoffServiceId: $('#editGroupDropoffServiceId').val(),
+      dropoffPrice: $('#editGroupDropoffPrice').val(),
+      reservationFee: $('#editGroupReservationFee').val(),
+      discount: $('#editGroupDiscount').val(),
+      consolidatedBilling: $('#editGroupConsolidatedBilling').is(':checked')
+    };
+
+
+    $.ajax({
+      url: '/booking/update_group_booking',
+      type: 'POST',
+      data: formData,
+      success: function(response) {
+        if (response.success) {
+          $('#modal-edit-group-booking').modal('hide');
+          Swal.fire({
+            title: 'Success!',
+            text: 'Group booking updated successfully!',
+            icon: 'success',
+            confirmButtonText: 'OK'
+          }).then(() => {
+            location.reload();
+          });
+        } else {
+          Swal.fire({
+            title: 'Error!',
+            text: response.message || 'Failed to update group booking',
+            icon: 'error',
+            confirmButtonText: 'OK'
+          });
+        }
+      },
+      error: function(err) {
+        console.error('Error updating group booking:', err);
+        Swal.fire({
+          title: 'Error!',
+          text: 'An error occurred while updating the group booking',
+          icon: 'error',
+          confirmButtonText: 'OK'
+        });
+      }
+    });
+  });
+
+  // Manual selection handlers for edit modal
+  function attachEditGroupManualSelectionHandlers() {
+    $('#editGroupRoomsList').on('change', '.edit-group-manual-checkbox', function() {
+      const roomId = $(this).data('room-id');
+      const roomIdNum = parseInt(roomId, 10);
+      if ($(this).is(':checked')) {
+        if (window.editGroupManualSelectedRooms.length < parseInt($('#editGroupNumberOfRooms').val(), 10)) {
+          window.editGroupManualSelectedRooms.push(roomId);
+        } else {
+          $(this).prop('checked', false);
+          return;
+        }
+      } else {
+        // Remove by both string and number versions
+        window.editGroupManualSelectedRooms = window.editGroupManualSelectedRooms.filter(id =>
+          id !== roomId && id !== roomIdNum && id !== String(roomIdNum)
+        );
+      }
+      
+      // Refresh the disabled state of all checkboxes
+      refreshEditManualSelectionDisabledState();
+      updateEditManualSelectedRoomValues();
+      computeEditGroupTotal();
+    });
+  }
+
+  function hasReachedEditManualSelectionLimit() {
+    const neededRooms = parseInt($('#editGroupNumberOfRooms').val(), 10) || 0;
+    const selectedCount = window.editGroupManualSelectedRooms.length;
+
+    if (editGroupRequiredBed1 || editGroupRequiredBed2) {
+      const summary = getEditManualBedSummary();
+      if (summary.bed1 >= editGroupRequiredBed1 && summary.bed2 >= editGroupRequiredBed2 && selectedCount >= neededRooms) {
+        return true;
+      }
+      return selectedCount >= neededRooms;
+    }
+
+    return neededRooms > 0 && selectedCount >= neededRooms;
+  }
+
+  function getEditManualBedSummary() {
+    const summary = { bed1: 0, bed2: 0 };
+    window.editGroupManualSelectedRooms.forEach(roomId => {
+      const room = editGroupAvailableRooms.find(r => r.IDNo === roomId);
+      if (room) {
+        const bedCount = parseInt(room.ROOM_BED, 10);
+        if (bedCount === 1) summary.bed1++;
+        else if (bedCount === 2) summary.bed2++;
+      }
+    });
+    return summary;
+  }
+
+  function refreshEditManualSelectionDisabledState() {
+    const limitReached = hasReachedEditManualSelectionLimit();
+    const summary = getEditManualBedSummary();
+    $('#editGroupRoomsList .edit-group-manual-checkbox').each(function() {
+      const roomId = parseInt($(this).data('room-id'), 10);
+      const room = editGroupAvailableRooms.find(r => r.IDNo === roomId);
+      const bedType = room ? parseInt(room.ROOM_BED, 10) : null;
+
+      // Only disable rooms that are NOT needed
+      if (editGroupRequiredBed2 === 0 && bedType === 2) {
+        // If 0 2-bed rooms needed, disable all 2-bed rooms only  
+        $(this).prop('checked', false).prop('disabled', true);
+        window.editGroupManualSelectedRooms = window.editGroupManualSelectedRooms.filter(id => id !== roomId);
+        return;
+      }
+
+      if (editGroupRequiredBed1 || editGroupRequiredBed2) {
+        if (bedType === 1 && summary.bed1 >= editGroupRequiredBed1 && !window.editGroupManualSelectedRooms.includes(roomId)) {
+          $(this).prop('disabled', true);
+          return;
+        }
+        if (bedType === 2 && summary.bed2 >= editGroupRequiredBed2 && !window.editGroupManualSelectedRooms.includes(roomId)) {
+          $(this).prop('disabled', true);
+          return;
+        }
+      }
+
+      if (limitReached && !window.editGroupManualSelectedRooms.includes(roomId)) {
+        $(this).prop('disabled', true);
+      } else {
+        $(this).prop('disabled', false);
+      }
+    });
+  }
+
+  function updateEditManualSelectedRoomValues() {
+    const selectedRooms = editGroupAvailableRooms.filter(room =>
+      window.editGroupManualSelectedRooms.includes(room.IDNo) ||
+      window.editGroupManualSelectedRooms.includes(String(room.IDNo)) ||
+      window.editGroupManualSelectedRooms.includes(parseInt(room.IDNo))
+    );
+    const dates = getEditSelectedDateRange();
+    const bookingType = $('#editGroupBookingRoute').val();
+
+    // For originally selected rooms that might not have complete data, use a default price
+    const computedBasePrices = selectedRooms.map(room => {
+      if (typeof room.RESOLVED_PRICE === 'number' && room.RESOLVED_PRICE > 0) {
+        return room.RESOLVED_PRICE;
+      }
+
+      // Try to calculate from seasonal prices
+      if (dates && room.SEASONAL_PRICES && room.SEASONAL_PRICES.length > 0) {
+        const bedCount = parseInt(room.ROOM_BED, 10) || 1;
+        const seasonId = getSeasonIdForDate(dates.start, room.SEASONAL_PRICES);
+        if (seasonId !== null) {
+          const match = room.SEASONAL_PRICES.find(price =>
+            parseInt(price.bedCount, 10) === bedCount &&
+            price.bookingType === bookingType &&
+            parseInt(price.seasonId, 10) === parseInt(seasonId, 10)
+          );
+          if (match) {
+            return parseFloat(match.price);
+          }
+        }
+      }
+
+      // Default fallback price
+      return 1000; // Default room price
+    });
+
+    $('#editGroupSelectedRooms').val(selectedRooms.map(room => room.IDNo).join(','));
+    $('#editGroupSelectedRoomPrices').val(computedBasePrices.join(','));
+
+    // Update room breakdown if needed
+    if (selectedRooms.length > 0) {
+      populateEditBreakdown(selectedRooms, computedBasePrices);
+    }
+  }
+
+  function populateEditBreakdown(selectedRooms, computedPrices) {
+    const container = $('#editGroupRoomBreakdown');
+    container.empty();
+    if (!selectedRooms || !selectedRooms.length) {
+      return;
+    }
+
+    const nights = parseInt($('#editGroupNights').val(), 10) || 0;
+    let html = '<div class="group-room-breakdown"><b>Selected Room Prices:</b><ul>';
+    selectedRooms.forEach((room, idx) => {
+      const price = computedPrices[idx] || 0;
+      const total = nights > 0 ? price * nights : price;
+      html += `<li>Room ${room.ROOM_NUMBER}: ₱${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per night ${nights > 0 ? `(${formatCurrency(total)} total)` : ''}</li>`;
+    });
+    html += '</ul></div>';
+    container.html(html);
+  }
+
+  // Initialize event handlers
+  $(document).ready(function() {
+    attachEditGroupRoomSelectionHandler();
+    attachEditGroupManualSelectionHandlers();
+    handleEditGroupSearchRooms();
+    
+    // Add event handlers for bed requirement changes
+    $('#editGroupBed1Count, #editGroupBed2Count').on('input change', function() {
+      editGroupRequiredBed1 = parseInt($('#editGroupBed1Count').val(), 10) || 0;
+      editGroupRequiredBed2 = parseInt($('#editGroupBed2Count').val(), 10) || 0;
+      refreshEditManualSelectionDisabledState();
+    });
+
+    // Auto-search when status changes
+    $('#editGroupCheckInStatus, #editGroupCheckOutStatus').on('change', function() {
+      // Clear selected rooms when status changes
+      window.editGroupManualSelectedRooms = [];
+      $('#editGroupSelectedRooms').val('');
+      $('#editGroupSelectedRoomPrices').val('');
+      $('#editGroupRoomBreakdown').empty();
+      
+      // Refresh room selection state
+      refreshEditManualSelectionDisabledState();
+      
+      const daterange = $('#editGroupDaterange').val();
+      const numberOfRooms = $('#editGroupNumberOfRooms').val();
+      const bookingRoute = $('#editGroupBookingRoute').val();
+      const checkInStatus = $('#editGroupCheckInStatus').val();
+      const checkOutStatus = $('#editGroupCheckOutStatus').val();
+      
+      // Only auto-search if all required fields are filled
+      if (daterange && numberOfRooms && bookingRoute && checkInStatus && checkOutStatus) {
+        $('#editGroupSearchRooms').click();
+      }
+    });
+
+    // Auto-compute total when fees, discounts, or services change
+    $('#editGroupReservationFee, #editGroupDiscount').on('input change', function() {
+      computeEditGroupTotal();
+    });
+
+    // Auto-compute total when breakfast quantities or prices change
+    $('#editGroupBreakfastAdultQty, #editGroupBreakfastAdultPrice, #editGroupBreakfastKidQty, #editGroupBreakfastKidPrice').on('input change', function() {
+      computeEditGroupTotal();
+    });
+
+    // Auto-compute total when pickup/dropoff prices change
+    $('#editGroupPickupPrice, #editGroupDropoffPrice').on('input change', function() {
+      computeEditGroupTotal();
+    });
+
+    // Auto-compute total when checkboxes are toggled
+    $('#editGroupIncludeReservationFee, #editGroupIncludeDiscount, #editGroupIncludeBreakfast, #editGroupIncludePickup, #editGroupIncludeDropoff, #editGroupConsolidatedBilling').on('change', function() {
+      computeEditGroupTotal();
+    });
+
+    // Set service IDs when checkboxes are checked
+    $('#editGroupIncludeBreakfast').on('change', function() {
+      if ($(this).is(':checked')) {
+        $('#editGroupBreakfastAdultId').val('74'); // Breakfast adult service ID
+        $('#editGroupBreakfastKidId').val('75'); // Breakfast kid service ID
+      }
+    });
+
+    $('#editGroupIncludePickup').on('change', function() {
+      if ($(this).is(':checked')) {
+        $('#editGroupPickupServiceId').val('76'); // Pickup service ID
+      }
+    });
+
+    $('#editGroupIncludeDropoff').on('change', function() {
+      if ($(this).is(':checked')) {
+        $('#editGroupDropoffServiceId').val('77'); // Dropoff service ID
+      }
+    });
+  });
+
+})();
+</script>

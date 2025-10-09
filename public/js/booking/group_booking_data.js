@@ -11,6 +11,7 @@ $(document).ready(function () {
                         ContactNo: item.CONTACT_NO,
                         NumberOfRooms: item.NUMBER_OF_ROOMS,
                         Remarks: item.REMARKS || '',
+                        RemarksCount: item.remarks_count,
                         RoomNumbers: item.room_numbers || 'N/A',
                         TotalBookings: item.total_bookings,
                         Channel: item.BOOKING_CHANNEL,
@@ -45,7 +46,6 @@ $(document).ready(function () {
             { data: 'ContactNo', title: 'CONTACT NUMBER' },
             { data: 'NumberOfRooms', title: 'TOTAL ROOMS' },
             { data: 'RoomNumbers', title: 'ROOM NUMBERS' },
-            { data: 'Remarks', title: 'REMARKS' },
             {
                 data: 'TotalPayment',
                 title: 'TOTAL PAYMENT',
@@ -79,27 +79,31 @@ $(document).ready(function () {
                 orderable: false,
                 render: function (data, type, row) {
                     const buttonId = `billing_btn_${row.GroupID}`;
-                    // AJAX to check payment status
+                    const remarksBtnId = `group_remarks_btn_${row.GroupID}`;
+
+                    // Async: check payment status (no UI change here currently)
                     $.ajax({
                         url: `/booking/check_group_payment_status/${row.GroupID}`,
                         method: 'GET',
-                        success: function(res) {
-                            const btn = $(`#${buttonId}`);
-                            if (res.allPaid) {
-                                btn.text('Billed');
-                            } else {
-                                btn.text('Billing');
-                            }
-                        },
-                        error: function(err) {
-                            console.error("Error checking payment status:", err);
-                        }
+                        error: function(err) { console.error('Error checking payment status:', err); }
                     });
+
+                    // Deterministic color: green only if there are actual rows in remarks table or non-empty gb.REMARKS
+                    const hasAny = (row.RemarksCount && row.RemarksCount > 0) || (row.Remarks && String(row.Remarks).trim() !== '');
+                    const baseRemarksColor = hasAny ? 'lightgreen' : 'lightgray';
+
                     return `
-                        <button id="${buttonId}" class="btn btn-sm btn-primary"
-                            onclick="viewGroupBilling(${row.GroupID})">
-                            Billing
-                        </button>`;
+                        <div style="text-align: center;">
+                            <button id="${buttonId}" class="btn btn-primary" onclick="viewGroupBilling(${row.GroupID})" title="Billing" style="width: 30px; height: 30px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px;">
+                                <i class="fa fa-credit-card"></i>
+                            </button>
+                            <button class="btn btn-warning ms-1" onclick="editGroupBooking(${row.GroupID})" title="Edit Group Booking" style="width: 30px; height: 30px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px;">
+                                <i class="fa fa-edit"></i>
+                            </button>
+                            <button id="${remarksBtnId}" class="btn btn-success ms-1" onclick="openGroupRemarksModal(${row.GroupID})" title="Remarks" style="width: 30px; height: 30px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px; background-color: ${baseRemarksColor} !important; border-color: ${baseRemarksColor} !important;">
+                                <i class="fa fa-comment-dots"></i>
+                            </button>
+                        </div>`;
                 }
             }
         ],
@@ -149,6 +153,161 @@ $(document).ready(function () {
         groupTable.ajax.url(`/booking/group_booking_data?filter=${filter}`).load();
     });
 });
+
+// ==================== GROUP REMARKS MODAL ====================
+function openGroupRemarksModal(groupId) {
+    // Remove existing modal if any
+    const existing = document.getElementById(`groupRemarksModal_${groupId}`);
+    if (existing) existing.remove();
+
+    const html = `
+    <div class="modal fade" id="groupRemarksModal_${groupId}" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+      <div class="modal-dialog modal-dialog-centered" style="max-width: 700px;">
+        <div class="modal-content">
+          <style>
+            /* Force readable colors for select and its selected value inside this modal */
+            #groupRemarksModal_${groupId} .form-select,
+            #groupRemarksModal_${groupId} .form-select option,
+            #groupRemarksModal_${groupId} .form-select option:checked {
+              color: #212529 !important;
+              background-color: #ffffff !important;
+            }
+            #groupRemarksModal_${groupId} textarea.form-control {
+              color: #212529 !important;
+              background-color: #ffffff !important;
+            }
+          </style>
+          <div class="modal-header py-2">
+            <h6 class="mb-0"><i class="fas fa-sticky-note me-2"></i><strong>Group Remarks</strong></h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body p-3">
+            <div class="card shadow-sm mb-3">
+              <div class="card-header py-2"><h6 class="mb-0 text-primary"><i class="fas fa-plus-circle me-1"></i>Add New Remark</h6></div>
+              <div class="card-body p-3">
+                <form id="groupAddRemarkForm_${groupId}">
+                  <div class="row">
+                    <div class="col-md-12 mb-2">
+                      <label class="form-label">Category</label>
+                      <select class="form-select" id="groupRemarkCategory_${groupId}" required style="color:#212529;background-color:#ffffff;">
+                        <option value="">Select Category</option>
+                        <option value="Booking" style="color:#212529;">Booking</option>
+                        <option value="Billing" style="color:#212529;">Billing</option>
+                        <option value="Complain" style="color:#212529;">Complain</option>
+                        <option value="Request" style="color:#212529;">Request</option>
+                        <option value="Discount" style="color:#212529;">Discount</option>
+                        <option value="Service" style="color:#212529;">Service</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Remark/Note</label>
+                    <textarea class="form-control" id="groupRemarkText_${groupId}" rows="3" placeholder="Enter your remark or note here..." required></textarea>
+                  </div>
+                  <div class="d-flex justify-content-end">
+                    <button type="button" class="btn btn-secondary me-2" onclick="document.getElementById('groupRemarkText_${groupId}').value='';document.getElementById('groupRemarkCategory_${groupId}').value='';"><i class="fas fa-eraser me-1"></i>Clear</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Add Remark</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+            <div class="card shadow-sm">
+              <div class="card-header py-2"><h6 class="mb-0 text-success"><i class="fas fa-list me-1"></i>Existing Remarks</h6></div>
+              <div class="card-body p-0">
+                <div class="table-responsive">
+                  <table class="table table-hover mb-0" id="groupRemarksTable_${groupId}">
+                    <thead style="background-color: #6c757d; color: white;">
+                      <tr>
+                        <th style="width: 45%;">Remark</th>
+                        <th style="width: 15%;">Category</th>
+                        <th style="width: 15%;">User</th>
+                        <th style="width: 15%;">Date</th>
+                        <th style="width: 10%;">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="groupRemarksTableBody_${groupId}"></tbody>
+                  </table>
+                </div>
+                <div id="groupNoRemarksMsg_${groupId}" class="text-center py-4 text-muted" style="display:none;">
+                  <i class="fas fa-sticky-note fa-2x mb-2"></i>
+                  <p class="mb-0">No remarks added yet.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', html);
+    const modal = new bootstrap.Modal(document.getElementById(`groupRemarksModal_${groupId}`));
+    modal.show();
+
+    // Load remarks
+    loadGroupRemarks(groupId);
+
+    // Submit handler
+    document.getElementById(`groupAddRemarkForm_${groupId}`).addEventListener('submit', function(e){
+        e.preventDefault();
+        addGroupRemark(groupId);
+    });
+}
+
+function loadGroupRemarks(groupId){
+    fetch(`/booking/group_remarks/${groupId}`)
+      .then(r=>r.json())
+      .then(resp=>{
+        const tbody = document.getElementById(`groupRemarksTableBody_${groupId}`);
+        const empty = document.getElementById(`groupNoRemarksMsg_${groupId}`);
+        tbody.innerHTML = '';
+        const rows = (resp && resp.success && Array.isArray(resp.remarks)) ? resp.remarks : [];
+        if (rows.length === 0){ empty.style.display='block'; return; } else { empty.style.display='none'; }
+        rows.forEach(rm=>{
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${(rm.REMARK_TEXT || '').replace(/\n/g,'<br>')}</td>
+            <td>${rm.CATEGORY || ''}</td>
+            <td>${rm.EDITDED_BY_NAME || rm.ENCODED_BY_NAME || ''}</td>
+            <td><small>${rm.ENCODED_DT ? new Date(rm.ENCODED_DT).toLocaleDateString() : ''}<br>${rm.ENCODED_DT ? new Date(rm.ENCODED_DT).toLocaleTimeString() : ''}</small></td>
+            <td>${rm.IDNo && rm.IDNo !== 0 ? `<i class="fas fa-trash text-danger" title="Delete Remark" style="cursor:pointer" onclick="deleteGroupRemark(${groupId}, ${rm.IDNo})"></i>` : ''}</td>`;
+          tbody.appendChild(tr);
+        });
+      })
+      .catch(err=>{ console.error('Error loading group remarks:', err); });
+}
+
+function addGroupRemark(groupId){
+    const category = document.getElementById(`groupRemarkCategory_${groupId}`).value;
+    const text = document.getElementById(`groupRemarkText_${groupId}`).value;
+    if (!category || !text){ return; }
+    fetch('/booking/group_remarks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groupId, category, remarkText: text })
+    }).then(r=>r.json()).then(resp=>{
+        if (resp && resp.success){
+            document.getElementById(`groupRemarkCategory_${groupId}`).value='';
+            document.getElementById(`groupRemarkText_${groupId}`).value='';
+            loadGroupRemarks(groupId);
+            // Recolor button
+            const btn = document.getElementById(`group_remarks_btn_${groupId}`);
+            if (btn){ btn.style.backgroundColor = 'lightgreen'; btn.style.borderColor = 'lightgreen'; }
+        } else {
+            alert(resp.message || 'Failed to add remark');
+        }
+    }).catch(err=>{ console.error('Error adding remark:', err); });
+}
+
+function deleteGroupRemark(groupId, remarkId){
+    if (!confirm('Are you sure you want to delete this remark?')) return;
+    fetch(`/booking/remarks/${remarkId}`, { method: 'DELETE' })
+      .then(r=>r.json()).then(resp=>{
+        if (resp && resp.success){ loadGroupRemarks(groupId); }
+      }).catch(err=>console.error('Error deleting remark:', err));
+}
 
 // Attach click event to set BookingID in modal for status change
 $('#group_booking_tbl').on('click', 'span[data-bs-toggle="modal"]', function () {
@@ -474,4 +633,311 @@ function formatDate(dateString) {
         day: 'numeric',
         year: 'numeric'
     });
+}
+
+// Format currency helper function
+function formatCurrency(value) {
+    return `₱${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// Compute total for edit group booking form
+function computeEditGroupTotal() {
+    const nights = parseInt($('#editGroupNights').val(), 10) || 0;
+    const pricesRaw = $('#editGroupSelectedRoomPrices').val();
+    const prices = pricesRaw ? pricesRaw.split(',').map(p => parseFloat(p) || 0) : [];
+    const baseSubtotal = prices.reduce((sum, price) => sum + price, 0);
+    const roomSubtotal = baseSubtotal * nights;
+
+    const reservationFee = $('#editGroupIncludeReservationFee').prop('checked') ? (parseFloat($('#editGroupReservationFee').val()) || 0) : 0;
+    const discount = $('#editGroupIncludeDiscount').prop('checked') ? (parseFloat($('#editGroupDiscount').val()) || 0) : 0;
+
+    const adultQty = $('#editGroupIncludeBreakfast').is(':checked') ? (parseInt($('#editGroupBreakfastAdultQty').val(), 10) || 0) : 0;
+    const adultPrice = parseFloat($('#editGroupBreakfastAdultPrice').val()) || 0;
+    const kidQty = $('#editGroupIncludeBreakfast').is(':checked') ? (parseInt($('#editGroupBreakfastKidQty').val(), 10) || 0) : 0;
+    const kidPrice = parseFloat($('#editGroupBreakfastKidPrice').val()) || 0;
+
+    const pickupPrice = $('#editGroupIncludePickup').is(':checked') ? parseFloat($('#editGroupPickupPrice').val()) || 0 : 0;
+    const dropoffPrice = $('#editGroupIncludeDropoff').is(':checked') ? parseFloat($('#editGroupDropoffPrice').val()) || 0 : 0;
+
+    const servicesTotal = (adultQty * adultPrice) + (kidQty * kidPrice) + pickupPrice + dropoffPrice;
+
+    // Check if consolidated billing is enabled
+    const isConsolidated = $('#editGroupConsolidatedBilling').is(':checked');
+
+    // Always calculate the full total in frontend for user visibility
+    const subtotal = roomSubtotal + servicesTotal;
+    let finalBalance = subtotal - reservationFee - discount;
+
+    if (isConsolidated) {
+        // Show consolidated total with indicator
+        if (finalBalance < 0) {
+            $('#editGroupComputedTotal').html(`<span class="text-warning">${formatCurrency(0)} <small>(Master)</small></span>`);
+            $('#editGroupCreditAmount').text(formatCurrency(Math.abs(finalBalance)));
+            $('#editGroupCreditDisplay').show();
+        } else {
+            $('#editGroupComputedTotal').html(`<span>${formatCurrency(finalBalance)} <small class="text-info">(Master)</small></span>`);
+            $('#editGroupCreditDisplay').hide();
+        }
+    } else {
+        // Regular billing calculation
+        if (finalBalance < 0) {
+            $('#editGroupComputedTotal').text(formatCurrency(0));
+            $('#editGroupCreditAmount').text(formatCurrency(Math.abs(finalBalance)));
+            $('#editGroupCreditDisplay').show();
+        } else {
+            $('#editGroupComputedTotal').text(formatCurrency(finalBalance));
+            $('#editGroupCreditDisplay').hide();
+        }
+    }
+}
+
+// Edit Group Booking function
+function editGroupBooking(groupBookingId) {
+    // Fetch group booking details for editing
+    fetch(`/booking/edit_group_booking/${groupBookingId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Set the booking ID first (this prevents modal reset from clearing it)
+                $('#editGroupBookingId').val(data.booking.groupBookingId);
+
+                // Ensure guest type and level dropdowns are loaded before populating form
+                ensureGuestDataLoaded().then(() => {
+                    populateEditGroupForm(data.booking);
+                    $('#modal-edit-group-booking').modal('show');
+                });
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error!',
+                    text: data.message || 'Failed to fetch group booking details',
+                    confirmButtonText: 'OK'
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error!',
+                text: 'An error occurred while fetching group booking details',
+                confirmButtonText: 'OK'
+            });
+        });
+}
+
+// Ensure guest type and level data is loaded
+function ensureGuestDataLoaded() {
+    return new Promise((resolve) => {
+        // Check if guest type dropdown has options (excluding the disabled placeholder)
+        const guestTypeSelect = $('#editGroupGuestType');
+        const guestLevelSelect = $('#editGroupGuestLevel');
+
+        if (guestTypeSelect.find('option').length > 1 && guestLevelSelect.find('option').length > 1) {
+            // Data already loaded
+            resolve();
+            return;
+        }
+
+        // Load guest types if not already loaded
+        if (guestTypeSelect.find('option').length <= 1) {
+            $.ajax({
+                url: '/booking/get_guest_types',
+                method: 'GET',
+                success: function(data) {
+                    guestTypeSelect.empty();
+                    guestTypeSelect.append('<option value="" disabled>Guest Type</option>');
+                    (data || []).forEach(type => {
+                        guestTypeSelect.append(`<option value="${type.IDNo}">${type.TYPE}</option>`);
+                    });
+                },
+                error: function(err) {
+                    console.error('Error fetching guest types:', err);
+                    guestTypeSelect.html('<option value="" disabled>Error loading guest types</option>');
+                }
+            });
+        }
+
+        // Load guest levels if not already loaded
+        if (guestLevelSelect.find('option').length <= 1) {
+            $.ajax({
+                url: '/booking/get_guest_level',
+                method: 'GET',
+                success: function(data) {
+                    guestLevelSelect.empty();
+                    guestLevelSelect.append('<option value="" disabled>Guest Level</option>');
+                    (data || []).forEach(level => {
+                        guestLevelSelect.append(`<option value="${level.IDNo}">${level.TYPE}</option>`);
+                    });
+                },
+                error: function(err) {
+                    console.error('Error fetching guest levels:', err);
+                    guestLevelSelect.html('<option value="" disabled>Error loading guest levels</option>');
+                }
+            });
+        }
+
+        // Wait a bit for AJAX calls to complete, then resolve
+        setTimeout(resolve, 300);
+    });
+}
+
+// Function to populate edit group form
+function populateEditGroupForm(booking) {
+    // Debug: Log booking data received
+    console.log('🔍 Booking data received:', booking);
+    console.log('🔍 Service data:', {
+        breakfastAdultQty: booking.breakfastAdultQty,
+        breakfastAdultPrice: booking.breakfastAdultPrice,
+        breakfastAdultId: booking.breakfastAdultId,
+        breakfastKidQty: booking.breakfastKidQty,
+        breakfastKidPrice: booking.breakfastKidPrice,
+        breakfastKidId: booking.breakfastKidId,
+        pickupPrice: booking.pickupPrice,
+        pickupServiceId: booking.pickupServiceId,
+        dropoffPrice: booking.dropoffPrice,
+        dropoffServiceId: booking.dropoffServiceId
+    });
+    
+    // Set hidden fields
+    $('#editGroupBookingId').val(booking.groupBookingId);
+    $('#editGroupSelectedRooms').val(booking.selectedRooms);
+    $('#editGroupSelectedRoomPrices').val(booking.selectedRoomPrice);
+    $('#editGroupNights').val(booking.qty);
+
+    // Populate selected rooms for pre-selection in room search results
+    if (booking.selectedRooms) {
+        window.editGroupManualSelectedRooms = booking.selectedRooms.split(',').map(id => {
+            const parsed = parseInt(id.trim());
+            return isNaN(parsed) ? id.trim() : parsed; // Keep as string if not a number
+        }).filter(id => id !== '');
+    } else {
+        window.editGroupManualSelectedRooms = [];
+    }
+
+    // Set form fields
+    $('#editGroupDaterange').val(booking.daterange);
+    $('#editGroupName').val(booking.groupName);
+    $('#editGroupContact').val(booking.groupContact);
+    $('#editGroupNumberOfRooms').val(booking.numberOfRooms);
+    $('#editGroupPaymentStatus').val(booking.paymentStatus);
+    $('#editGroupBookingRoute').val(booking.bookingRoute);
+
+    // Set bed requirements derived from selected rooms
+    if (booking.bedRequirements) {
+        $('#editGroupBed1Count').val(booking.bedRequirements.bed1 || 0);
+        $('#editGroupBed2Count').val(booking.bedRequirements.bed2 || 0);
+    }
+
+    // Set guest type and level after ensuring dropdowns are loaded
+    setTimeout(() => {
+        // Ensure values are the correct type (string vs number)
+        const guestTypeValue = String(booking.guestType || '');
+        const guestLevelValue = String(booking.guestLevel || '');
+
+        $('#editGroupGuestType').val(guestTypeValue);
+        $('#editGroupGuestLevel').val(guestLevelValue);
+
+        // Force trigger change events to update UI
+        $('#editGroupGuestType').trigger('change');
+        $('#editGroupGuestLevel').trigger('change');
+    }, 200);
+
+    $('#editGroupCheckInStatus').val(booking.checkInStatus);
+    $('#editGroupCheckOutStatus').val(booking.checkOutStatus);
+    $('#editGroupRemarks').val(booking.remarks);
+    $('#editGroupAgencySelect').val(booking.agencyId);
+
+    // Set fees - explicitly handle checked/unchecked state
+    if (parseFloat(booking.reservationFee) > 0) {
+        $('#editGroupIncludeReservationFee').prop('checked', true);
+        $('#editGroupReservationFeeWrapper').show();
+        $('#editGroupReservationFee').val(booking.reservationFee);
+    } else {
+        $('#editGroupIncludeReservationFee').prop('checked', false);
+        $('#editGroupReservationFeeWrapper').hide();
+        $('#editGroupReservationFee').val('0');
+    }
+
+    if (parseFloat(booking.discount) > 0) {
+        $('#editGroupIncludeDiscount').prop('checked', true);
+        $('#editGroupDiscountWrapper').show();
+        $('#editGroupDiscount').val(booking.discount);
+    } else {
+        $('#editGroupIncludeDiscount').prop('checked', false);
+        $('#editGroupDiscountWrapper').hide();
+        $('#editGroupDiscount').val('0');
+    }
+
+    // Set consolidated billing
+    $('#editGroupConsolidatedBilling').prop('checked', booking.consolidatedBilling || false);
+
+    // Set services - explicitly handle checked/unchecked state
+    const hasBreakfast = parseInt(booking.breakfastAdultQty) > 0 || parseInt(booking.breakfastKidQty) > 0;
+    if (hasBreakfast) {
+        $('#editGroupIncludeBreakfast').prop('checked', true);
+        $('#editGroupBreakfastFields').removeClass('d-none');
+        $('#editGroupBreakfastAdultQty').val(booking.breakfastAdultQty);
+        $('#editGroupBreakfastAdultPrice').val(booking.breakfastAdultPrice);
+        $('#editGroupBreakfastAdultId').val(booking.breakfastAdultId);
+        $('#editGroupBreakfastKidQty').val(booking.breakfastKidQty);
+        $('#editGroupBreakfastKidPrice').val(booking.breakfastKidPrice);
+        $('#editGroupBreakfastKidId').val(booking.breakfastKidId);
+    } else {
+        $('#editGroupIncludeBreakfast').prop('checked', false);
+        $('#editGroupBreakfastFields').addClass('d-none');
+        $('#editGroupBreakfastAdultQty, #editGroupBreakfastKidQty').val('');
+        // Set default service IDs when no breakfast is selected
+        $('#editGroupBreakfastAdultId').val('74'); // Default breakfast adult service ID
+        $('#editGroupBreakfastKidId').val('75'); // Default breakfast kid service ID
+    }
+
+    if (parseFloat(booking.pickupPrice) > 0) {
+        $('#editGroupIncludePickup').prop('checked', true);
+        $('#editGroupPickupWrapper').show();
+        $('#editGroupPickupPrice').val(booking.pickupPrice);
+        $('#editGroupPickupServiceId').val(booking.pickupServiceId);
+    } else {
+        $('#editGroupIncludePickup').prop('checked', false);
+        $('#editGroupPickupWrapper').hide();
+        $('#editGroupPickupPrice').val('');
+        // Set default pickup service ID when no pickup is selected
+        $('#editGroupPickupServiceId').val('76'); // Default pickup service ID
+    }
+
+    if (parseFloat(booking.dropoffPrice) > 0) {
+        $('#editGroupIncludeDropoff').prop('checked', true);
+        $('#editGroupDropoffWrapper').show();
+        $('#editGroupDropoffPrice').val(booking.dropoffPrice);
+        $('#editGroupDropoffServiceId').val(booking.dropoffServiceId);
+    } else {
+        $('#editGroupIncludeDropoff').prop('checked', false);
+        $('#editGroupDropoffWrapper').hide();
+        $('#editGroupDropoffPrice').val('');
+        // Set default dropoff service ID when no dropoff is selected
+        $('#editGroupDropoffServiceId').val('77'); // Default dropoff service ID
+    }
+
+    // Show/hide agency wrapper based on booking route
+    if (booking.bookingRoute === 'agency') {
+        $('#editGroupAgencyWrapper').show();
+    } else {
+        $('#editGroupAgencyWrapper').hide();
+    }
+
+    // Auto-search for rooms after populating form data
+    setTimeout(() => {
+        // Only search if we have the required data
+        const daterange = $('#editGroupDaterange').val();
+        const numberOfRooms = $('#editGroupNumberOfRooms').val();
+        const bookingRoute = $('#editGroupBookingRoute').val();
+
+        if (daterange && numberOfRooms && bookingRoute) {
+            // Trigger room search
+            $('#editGroupSearchRooms').click();
+        }
+    }, 1000); // Increased delay to ensure form is fully populated
+
+    // Recompute total
+    computeEditGroupTotal();
 } 
