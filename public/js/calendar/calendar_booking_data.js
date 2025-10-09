@@ -517,22 +517,30 @@ function handleEventResize(info) {
     const newCheckinDateStr = getDateString(info.event.start);
     if (isLateCO && hasRegularCheckInStartingOn(newCheckoutDateStr, roomResource.id, bookingId)) {
       Swal.fire({
-        title: 'Not Allowed',
+        title: 'Not Allowed - Late Checkout Conflict',
         html: 'Late check-out cannot be adjacent to a booking with Regular Check-in on the same date. Only Late Check-in is allowed next.',
         icon: 'error',
         confirmButtonText: 'OK'
-      }).then(() => { info.revert(); });
+      }).then(() => { 
+        // Auto-set the checkOutStatus dropdown to Regular Check Out (0) when user clicks OK
+        setCheckOutStatusDropdown(0);
+        info.revert(); 
+      });
       return;
     }
 
     // Also block placing a Regular check-in right after a Late checkout ending same date
     if (isRegularCI && hasLateCheckoutEndingOn(newCheckinDateStr, roomResource.id, bookingId)) {
       Swal.fire({
-        title: 'Not Allowed',
+        title: 'Not Allowed - Regular Check-in Conflict',
         html: 'Regular Check-in cannot directly follow a Late Check-out on the same date in the same room. Only Late Check-in may follow.',
         icon: 'error',
         confirmButtonText: 'OK'
-      }).then(() => { info.revert(); });
+      }).then(() => { 
+        // Auto-set the checkInStatus dropdown to Late Check In (0) when user clicks OK
+        setCheckInStatusDropdown(0);
+        info.revert(); 
+      });
       return;
     }
   } catch (e) {}
@@ -940,22 +948,30 @@ function handleEventDrop(info) {
     // Case 1: Late checkout cannot precede a Regular check-in next booking
     if (isLateCO && hasRegularCheckInStartingOn(newCheckoutDateStr, targetRoom.id, bookingId)) {
       Swal.fire({
-        title: 'Not Allowed',
+        title: 'Not Allowed - Late Checkout Conflict',
         html: 'Late check-out cannot directly precede a booking with Regular Check-in on the same date in the same room. Only Late Check-in is allowed next.',
         icon: 'error',
         confirmButtonText: 'OK'
-      }).then(() => { info.revert(); });
+      }).then(() => { 
+        // Auto-set the checkOutStatus dropdown to Regular Check Out (0) when user clicks OK
+        setCheckOutStatusDropdown(0);
+        info.revert(); 
+      });
       return;
     }
 
     // Case 2: Regular check-in cannot be dropped after a Late checkout ending same date
     if (isRegularCI && hasLateCheckoutEndingOn(newCheckinDateStr, targetRoom.id, bookingId)) {
       Swal.fire({
-        title: 'Not Allowed',
+        title: 'Not Allowed - Regular Check-in Conflict',
         html: 'Regular Check-in cannot directly follow a Late Check-out on the same date in the same room. Only Late Check-in may follow.',
         icon: 'error',
         confirmButtonText: 'OK'
-      }).then(() => { info.revert(); });
+      }).then(() => { 
+        // Auto-set the checkInStatus dropdown to Late Check In (0) when user clicks OK
+        setCheckInStatusDropdown(0);
+        info.revert(); 
+      });
       return;
     }
   } catch (e) {}
@@ -3085,6 +3101,60 @@ function injectDragStyles() {
 }
 
 // =============================================================================
+// DROPDOWN AUTO-SETTING FUNCTIONS
+// =============================================================================
+
+// Function to automatically set the checkOutStatus dropdown in add booking modal
+function setCheckOutStatusDropdown(value) {
+  try {
+    // Always store the preference in localStorage for future bookings
+    const prefCode = value === '0' ? 'R/O' : 'L/O';
+    localStorage.setItem('bookingCheckoutPref', prefCode);
+    
+    // Check if the add booking modal is open
+    const modal = document.getElementById('modal-addbooking');
+    if (modal && modal.classList.contains('show')) {
+      const checkOutDropdown = document.getElementById('checkOutStatus');
+      if (checkOutDropdown) {
+        checkOutDropdown.value = value;
+        checkOutDropdown.dispatchEvent(new Event('change'));
+        
+        console.log(`Auto-set checkOutStatus to ${value === '0' ? 'Regular Check Out' : 'Late Check Out'}`);
+      }
+    } else {
+      console.log(`Stored checkOutStatus preference: ${value === '0' ? 'Regular Check Out' : 'Late Check Out'} (will apply when modal opens)`);
+    }
+  } catch (error) {
+    console.error('Error setting checkOutStatus dropdown:', error);
+  }
+}
+
+// Function to automatically set the checkInStatus dropdown in add booking modal
+function setCheckInStatusDropdown(value) {
+  try {
+    // Always store the preference in localStorage for future bookings
+    const prefCode = value === '1' ? 'R/I' : 'L/I';
+    localStorage.setItem('bookingCheckinPref', prefCode);
+    
+    // Check if the add booking modal is open
+    const modal = document.getElementById('modal-addbooking');
+    if (modal && modal.classList.contains('show')) {
+      const checkInDropdown = document.getElementById('checkInStatus');
+      if (checkInDropdown) {
+        checkInDropdown.value = value;
+        checkInDropdown.dispatchEvent(new Event('change'));
+        
+        console.log(`Auto-set checkInStatus to ${value === '1' ? 'Regular Check In' : 'Late Check In'}`);
+      }
+    } else {
+      console.log(`Stored checkInStatus preference: ${value === '1' ? 'Regular Check In' : 'Late Check In'} (will apply when modal opens)`);
+    }
+  } catch (error) {
+    console.error('Error setting checkInStatus dropdown:', error);
+  }
+}
+
+// =============================================================================
 // EXPORT FUNCTIONS FOR USE IN OTHER MODULES
 // =============================================================================
 
@@ -3127,4 +3197,6 @@ window.updateEventStatus = updateEventStatus;
 window.updateEventStatusInstantly = updateEventStatusInstantly;
 window.getCalendar = getCalendar;
 window.editBookingFromCalendar = editBookingFromCalendar;
+window.setCheckOutStatusDropdown = setCheckOutStatusDropdown;
+window.setCheckInStatusDropdown = setCheckInStatusDropdown;
 

@@ -537,7 +537,7 @@
             const result = await validateAdjacencyOnDropdown();
             if (!result.valid) {
                 Swal.fire({
-                    title: 'Not Allowed',
+                    title: 'Not Allowed - Check-in Conflict',
                     html: result.reason,
                     icon: 'error',
                     confirmButtonText: 'OK'
@@ -552,7 +552,7 @@
             const result = await validateAdjacencyOnDropdown();
             if (!result.valid) {
                 Swal.fire({
-                    title: 'Not Allowed',
+                    title: 'Not Allowed - Check-out Conflict',
                     html: result.reason,
                     icon: 'error',
                     confirmButtonText: 'OK'
