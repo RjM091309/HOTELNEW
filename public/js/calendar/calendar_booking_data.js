@@ -513,6 +513,7 @@ function handleEventResize(info) {
   try {
     const isLateCO = isLateCheckout(info.event);
     const isRegularCI = isRegularCheckIn(info.event);
+    const isLateCI = isLateCheckIn(info.event);
     const newCheckoutDateStr = getDateString(newEnd);
     const newCheckinDateStr = getDateString(info.event.start);
     if (isLateCO && hasRegularCheckInStartingOn(newCheckoutDateStr, roomResource.id, bookingId)) {
@@ -942,6 +943,7 @@ function handleEventDrop(info) {
   try {
     const isLateCO = isLateCheckout(info.event);
     const isRegularCI = isRegularCheckIn(info.event);
+    const isLateCI = isLateCheckIn(info.event);
     const newCheckoutDateStr = getDateString(newEnd);
     const newCheckinDateStr = getDateString(newStart);
 
@@ -2323,6 +2325,17 @@ function isRegularCheckIn(event) {
   }
 }
 
+function isLateCheckIn(event) {
+  try {
+    const inferFromColor = () => (event.backgroundColor === '#fff700' ? 'late' : 'regular');
+    const ciRaw = event?.extendedProps?.checkInStatus;
+    const ciNorm = normalizeCheckInStatus(ciRaw, inferFromColor);
+    return ciNorm === 'late';
+  } catch (e) {
+    return false;
+  }
+}
+
 function hasRegularCheckInStartingOn(dateStr, roomId, excludeEventId) {
   const calendar = window.calendar;
   if (!calendar) return false;
@@ -2354,6 +2367,44 @@ function hasLateCheckoutEndingOn(dateStr, roomId, excludeEventId) {
       if (String(rid) !== String(roomId)) continue;
       if (getDateString(e.end) !== dateStr) continue;
       if (isLateCheckout(e)) return true;
+    } catch (err) {
+      // skip
+    }
+  }
+  return false;
+}
+
+function hasLateCheckInStartingOn(dateStr, roomId, excludeEventId) {
+  const calendar = window.calendar;
+  if (!calendar) return false;
+  const events = calendar.getEvents();
+  for (const e of events) {
+    try {
+      if (e.id === excludeEventId) continue;
+      const res = e.getResources();
+      const rid = res && res[0] ? res[0].id : undefined;
+      if (String(rid) !== String(roomId)) continue;
+      if (getDateString(e.start) !== dateStr) continue;
+      if (isLateCheckIn(e)) return true;
+    } catch (err) {
+      // skip
+    }
+  }
+  return false;
+}
+
+function hasRegularCheckoutEndingOn(dateStr, roomId, excludeEventId) {
+  const calendar = window.calendar;
+  if (!calendar) return false;
+  const events = calendar.getEvents();
+  for (const e of events) {
+    try {
+      if (e.id === excludeEventId) continue;
+      const res = e.getResources();
+      const rid = res && res[0] ? res[0].id : undefined;
+      if (String(rid) !== String(roomId)) continue;
+      if (getDateString(e.end) !== dateStr) continue;
+      if (!isLateCheckout(e)) return true; // Regular checkout (not late)
     } catch (err) {
       // skip
     }
@@ -3199,4 +3250,7 @@ window.getCalendar = getCalendar;
 window.editBookingFromCalendar = editBookingFromCalendar;
 window.setCheckOutStatusDropdown = setCheckOutStatusDropdown;
 window.setCheckInStatusDropdown = setCheckInStatusDropdown;
+window.isLateCheckIn = isLateCheckIn;
+window.hasLateCheckInStartingOn = hasLateCheckInStartingOn;
+window.hasRegularCheckoutEndingOn = hasRegularCheckoutEndingOn;
 
