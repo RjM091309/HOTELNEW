@@ -470,7 +470,7 @@ async function createDynamicRoomModal(bookingId, event, options) {
             <!-- Modal Footer -->
             <div class="modal-footer py-2" style="background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%); border-top: 1px solid #495057;">
                 <button type="button" class="btn btn-primary" onclick="showBilling('${bookingId}')">Billing</button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="window.location.reload()">Close</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
