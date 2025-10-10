@@ -92,6 +92,30 @@
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0">Available Rooms</h5>
               </div>
+              <div class="room-filter-section mb-3">
+                <div class="d-flex align-items-center w-100" style="display:flex; justify-content: space-between; width:100%;">
+                  <div class="d-flex align-items-center">
+                    <label class="text-white mb-0 me-3">Filter:</label>
+                    <div class="filter-radio-group">
+                      <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="editGroupRoomFilter" id="editFilterAll" value="all" checked>
+                        <label class="form-check-label" for="editFilterAll">All</label>
+                      </div>
+                      <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="editGroupRoomFilter" id="editFilter1B" value="1B">
+                        <label class="form-check-label" for="editFilter1B">1B</label>
+                      </div>
+                      <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="editGroupRoomFilter" id="editFilter2B" value="2B">
+                        <label class="form-check-label" for="editFilter2B">2B</label>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="text-white">
+                    <span id="editGroupRoomCount" style="margin-left: 24px;">&nbsp;&nbsp;&nbsp;&nbsp;Available: 0</span>
+                  </div>
+                </div>
+              </div>
               <div id="editGroupRoomsList" class="room-list-container"></div>
               <div class="mt-2 text-warning" id="editGroupAvailabilityWarning" style="display: none;"></div>
               <div id="editGroupRoomBreakdown" class="mt-3"></div>
@@ -648,6 +672,52 @@
 #modal-edit-group-booking .room-option:has(.form-check-input:disabled) .bed-badge i {
   color: #666;
 }
+
+/* Filter section styling for edit group booking */
+#modal-edit-group-booking .room-filter-section {
+  background-color: #1f262a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+#modal-edit-group-booking .filter-radio-group {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+#modal-edit-group-booking .filter-radio-group .form-check {
+  margin-bottom: 0;
+}
+
+#modal-edit-group-booking .filter-radio-group .form-check-input {
+  margin-top: 5;
+  margin-right: 6px;
+}
+
+#modal-edit-group-booking .filter-radio-group .form-check-label {
+  color: #dcdcdc;
+  font-size: 14px;
+  margin-bottom: 0;
+  cursor: pointer;
+}
+
+#modal-edit-group-booking .filter-radio-group .form-check-input:checked + .form-check-label {
+  color: #9fe073;
+  font-weight: 500;
+}
+
+#modal-edit-group-booking .filter-radio-group .form-check-input:focus {
+  box-shadow: 0 0 0 0.2rem rgba(111, 156, 64, 0.25);
+  border-color: #6f9c40;
+}
+
+#modal-edit-group-booking .filter-radio-group .form-check-input:checked {
+  background-color: #6f9c40;
+  border-color: #6f9c40;
+}
 </style>
 
 <script src="/plugins/flatpicker/flatpickr.min.js"></script>
@@ -831,6 +901,14 @@ window.editGroupManualSelectedRooms = [];
 
     $('#editGroupResultsContainer').show();
     
+    // Initialize filter and count
+    updateEditRoomFilterAndCount();
+    
+    // Add filter change handler
+    $('input[name="editGroupRoomFilter"]').on('change', function() {
+      updateEditRoomFilterAndCount();
+    });
+    
     // Automatically populate the breakdown for pre-selected rooms
     updateEditManualSelectedRoomValues();
     computeEditGroupTotal();
@@ -889,6 +967,42 @@ window.editGroupManualSelectedRooms = [];
 
   function buildEditSingleRoomBlocks(rooms) {
     return rooms.map(room => [room]);
+  }
+
+  function updateEditRoomFilterAndCount() {
+    const filter = $('input[name="editGroupRoomFilter"]:checked').val();
+    const roomsContainer = $('.manual-rooms-container');
+    let visibleCount = 0;
+    
+    if (!roomsContainer.length) return;
+    
+    roomsContainer.find('.room-option').each(function() {
+      const $room = $(this);
+      const $checkbox = $room.find('input[data-room-id]');
+      const roomData = $checkbox.data('room-id');
+      const room = editGroupAvailableRooms.find(r => r.IDNo === roomData);
+      
+      if (!room) {
+        $room.hide();
+        return;
+      }
+      
+      const bedType = parseInt(room.ROOM_BED, 10);
+      const shouldShow = filter === 'all' || 
+        (filter === '1B' && bedType === 1) || 
+        (filter === '2B' && bedType === 2);
+        
+      if (shouldShow) {
+        $room.show();
+        visibleCount++; // Count ALL rooms regardless of disabled state
+      } else {
+        $room.hide();
+      }
+    });
+    
+    // Update count badge
+    const filterText = filter === 'all' ? 'rooms' : filter + ' rooms';
+    $('#editGroupRoomCount').text(`Available: ${visibleCount}`);
   }
 
   function getSeasonIdForDate(checkInDate, seasonalPrices) {
@@ -1337,6 +1451,7 @@ window.editGroupManualSelectedRooms = [];
       // Refresh the disabled state of all checkboxes
       refreshEditManualSelectionDisabledState();
       updateEditManualSelectedRoomValues();
+      updateEditRoomFilterAndCount();
       computeEditGroupTotal();
     });
   }
@@ -1477,6 +1592,7 @@ window.editGroupManualSelectedRooms = [];
       editGroupRequiredBed1 = parseInt($('#editGroupBed1Count').val(), 10) || 0;
       editGroupRequiredBed2 = parseInt($('#editGroupBed2Count').val(), 10) || 0;
       refreshEditManualSelectionDisabledState();
+      updateEditRoomFilterAndCount();
     });
 
     // Auto-search when status changes
