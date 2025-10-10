@@ -673,6 +673,18 @@ margin: 5px 0;
 .memo-4 { background-color: #CCCCFF; }
 .memo-default { background-color: #FFFFFF; }
 
+/* Group Booking Memo Colors - SAME AS card-topline colors */
+.memo-green { background-color: #E8F5E8; }
+.memo-blue { background-color: #E3F2FD; }
+.memo-red { background-color: #FFEBEE; }
+.memo-violet { background-color: #F3E5F5; }
+.memo-orange { background-color: #FFF3E0; }
+.memo-pink { background-color: #FCE4EC; }
+.memo-yellow { background-color: #FFFDE7; }
+.memo-gray { background-color: #F5F5F5; }
+.memo-green2 { background-color: #E8F5E8; }
+.memo-sky { background-color: #E0F7FA; }
+
 /* Custom Switch Styling */
 .custom-switch {
 position: relative;
@@ -1583,6 +1595,18 @@ border-radius: 8px;
     .memo-3::before { background: #F44336; }
     .memo-4::before { background: #9C27B0; }
     .memo-default::before { background: rgba(255, 255, 255, 0.5); }
+
+    /* Group Booking Memo Border Colors - SAME AS card-topline colors */
+    .memo-green::before { background: #4CAF50; }
+    .memo-blue::before { background: #2196F3; }
+    .memo-red::before { background: #F44336; }
+    .memo-violet::before { background: #8A2BE2; }
+    .memo-orange::before { background: #FF9800; }
+    .memo-pink::before { background: #db7bbb; }
+    .memo-yellow::before { background: #FFC107; }
+    .memo-gray::before { background: #9E9E9E; }
+    .memo-green2::before { background: #0c2409; }
+    .memo-sky::before { background: #10b8eb; }
 
     /* Card toplines are now handled by theme-color.css for proper theme support */
 

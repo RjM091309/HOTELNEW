@@ -446,7 +446,7 @@ function calculateCardVariables(booking) {
 								</div>
 							<% } else { %>
 							<% 
-								// Group booking color management
+								// Group booking color management - PER GROUP, NOT PER FLOOR
 							const colorClasses = ['card-topline-green', 'card-topline-blue', 'card-topline-red', 'card-topline-violet', 'card-topline-orange', 'card-topline-pink','card-topline-yellow', 'card-topline-gray', 'card-topline-green2', 'card-topline-sky'];
 							const groupColors = {};
 							let colorIndex = 0;
@@ -457,10 +457,38 @@ function calculateCardVariables(booking) {
 									groupColors[groupBooking.GROUP_BOOKING_ID] = colorClasses[colorIndex % colorClasses.length];
 									colorIndex++;
 								}
-									// Override the cardClass for group bookings
+									// Override the cardClass for group bookings - PER GROUP
 									groupBooking.cardClass = groupColors[groupBooking.GROUP_BOOKING_ID];
 									const variables = calculateCardVariables(groupBooking);
 									if (variables) { // Only render if variables are valid
+										// Override cardClass from calculateCardVariables to use group-based color
+										variables.cardClass = groupColors[groupBooking.GROUP_BOOKING_ID];
+										
+										// Override memoClass to match group color - SAME AS card-topline colors
+										const groupColorClass = groupColors[groupBooking.GROUP_BOOKING_ID];
+										if (groupColorClass === 'card-topline-green') {
+											variables.memoClass = 'memo-green';
+										} else if (groupColorClass === 'card-topline-blue') {
+											variables.memoClass = 'memo-blue';
+										} else if (groupColorClass === 'card-topline-red') {
+											variables.memoClass = 'memo-red';
+										} else if (groupColorClass === 'card-topline-violet') {
+											variables.memoClass = 'memo-violet';
+										} else if (groupColorClass === 'card-topline-orange') {
+											variables.memoClass = 'memo-orange';
+										} else if (groupColorClass === 'card-topline-pink') {
+											variables.memoClass = 'memo-pink';
+										} else if (groupColorClass === 'card-topline-yellow') {
+											variables.memoClass = 'memo-yellow';
+										} else if (groupColorClass === 'card-topline-gray') {
+											variables.memoClass = 'memo-gray';
+										} else if (groupColorClass === 'card-topline-green2') {
+											variables.memoClass = 'memo-green2';
+										} else if (groupColorClass === 'card-topline-sky') {
+											variables.memoClass = 'memo-sky';
+										} else {
+											variables.memoClass = 'memo-default';
+										}
 								%>
 									<%- include('../partials/booking-card', {
 										booking: groupBooking,

@@ -4414,7 +4414,7 @@ class BookingModel {
     try {
       // Get remark details first to check category and booking ID
       const remarkDetails = await queryDatabasePromise(
-        `SELECT BOOKING_ID, CATEGORY FROM remarks WHERE IDNo = ? AND ACTIVE = 1`,
+        `SELECT BOOKING_ID, CATEGORY, REMARK_TEXT FROM remarks WHERE IDNo = ? AND ACTIVE = 1`,
         [remarkId]
       );
 
@@ -4443,6 +4443,39 @@ class BookingModel {
           );
 
           console.log(`Cleared remarks from booking table for booking ID: ${bookingId}`);
+        }
+
+        // If the booking belongs to a group, mirror the deletion in group_booking.REMARKS
+        try {
+          const bookingRow = await queryDatabasePromise(
+            `SELECT GROUP_BOOKING_ID FROM booking WHERE IDNo = ? LIMIT 1`,
+            [remarkDetails[0].BOOKING_ID]
+          );
+          const groupId = bookingRow[0]?.GROUP_BOOKING_ID || null;
+          if (groupId) {
+            const groupRows = await queryDatabasePromise(
+              `SELECT REMARKS FROM group_booking WHERE IDNo = ?`,
+              [groupId]
+            );
+            const currentRemarks = (groupRows[0]?.REMARKS || '').trim();
+            if (currentRemarks) {
+              const toRemove = (remarkDetails[0].REMARK_TEXT || '').trim();
+              if (toRemove) {
+                // group remarks are appended using "\n--\n" separator. Remove the exact chunk.
+                const pieces = currentRemarks
+                  .split('\n--\n')
+                  .map(s => s.trim())
+                  .filter(s => s.length > 0 && s !== toRemove);
+                const updated = pieces.join('\n--\n');
+                await queryDatabasePromise(
+                  `UPDATE group_booking SET REMARKS = ? WHERE IDNo = ?`,
+                  [updated || null, groupId]
+                );
+              }
+            }
+          }
+        } catch (mirrorErr) {
+          console.warn('Warning: failed to mirror remark deletion to group_booking:', mirrorErr?.message || mirrorErr);
         }
 
         return {
@@ -5642,6 +5675,7 @@ class BookingModel {
           b.CONFIRMATION_NUMBER,
           b.BOOKING_CHANNEL,
           b.IS_DIRECT_RESERVATION,
+          (SELECT COUNT(*) FROM remarks rm WHERE rm.BOOKING_ID = b.IDNo AND rm.ACTIVE = 1) AS RemarksCount,
           bill.QTY,
           b.IS_CANCELLED,
           COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
