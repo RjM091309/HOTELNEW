@@ -5236,27 +5236,14 @@ class BookingModel {
                 AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
                 AND b.GROUP_BOOKING_ID = ?
             )
-            -- OR include only 1 truly available room (limit to 1)
-            OR (NOT EXISTS (
+            -- OR include all truly available rooms
+            OR NOT EXISTS (
               SELECT 1 FROM booking b
               WHERE b.ROOM_ID = r.IDNo
                 AND b.ACTIVE = 1
                 AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
                 AND (DATE(b.CHECK_IN_DATE) < ? AND DATE(b.CHECK_OUT_DATE) > ?)
-            ) AND r.IDNo = (
-              SELECT r2.IDNo 
-              FROM room r2
-              WHERE r2.ROOM_STATUS != 3
-                AND NOT EXISTS (
-                  SELECT 1 FROM booking b2
-                  WHERE b2.ROOM_ID = r2.IDNo
-                    AND b2.ACTIVE = 1
-                    AND b2.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
-                    AND (DATE(b2.CHECK_IN_DATE) < ? AND DATE(b2.CHECK_OUT_DATE) > ?)
-                )
-              ORDER BY r2.IDNo
-              LIMIT 1
-            ))
+            )
           )`;
 
       const roomParams = [
