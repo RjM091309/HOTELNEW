@@ -2432,14 +2432,24 @@ class BookingModel {
           ) AS remarks_count,
           GROUP_CONCAT(r.ROOM_NUMBER ORDER BY r.ROOM_NUMBER SEPARATOR ', ') AS room_numbers,
           COUNT(b.IDNo) AS total_bookings,
-          -- Calculate total payment excluding extended days
+          -- Calculate total payment including services from booking_service table
           COALESCE(SUM(
             (bill.ROOM_CHARGE * 
               CASE 
                 WHEN bill.ORIGINAL_QTY IS NOT NULL THEN bill.ORIGINAL_QTY  -- Use original stay duration
                 ELSE bill.QTY  -- If no extension, use QTY normally
               END
-            ) + bill.AMENITIES_CHARGE + bill.SERVICES_CHARGE
+            ) + 
+            COALESCE((
+              SELECT SUM(bs.TOTAL_COST) 
+              FROM booking_service bs 
+              WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1
+            ), 0) +
+            COALESCE((
+              SELECT SUM(be.COST * be.QTY) 
+              FROM booking_extension be 
+              WHERE be.BOOKING_ID = b.IDNo
+            ), 0)
           ), 0) AS TOTAL_PAYMENT,
           -- Get all statuses in a group
           GROUP_CONCAT(DISTINCT b.BOOKING_STATUS ORDER BY b.BOOKING_STATUS SEPARATOR ', ') AS all_statuses,
