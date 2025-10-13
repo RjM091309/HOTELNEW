@@ -115,7 +115,7 @@ class BookingModel {
             ${groupCondition || ''}
             ${dateCondition}
             ${channelCondition}
-          ORDER BY B.IDno
+          ORDER BY b.IDNo
           ${Number.isInteger(start) && Number.isInteger(length) ? `LIMIT ${start}, ${length}` : ''};
         `;
   
