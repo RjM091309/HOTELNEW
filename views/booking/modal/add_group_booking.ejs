@@ -39,7 +39,7 @@
           </div>
 
           <div class="row p-t-20">
-            <div class="col-lg-6">
+            <div class="col-lg-4">
               <div class="form-group">
                 <label class="form-label">Check-In Status</label>
                 <select class="form-select" id="groupCheckInStatus" name="groupCheckInStatus" required>
@@ -49,13 +49,35 @@
                 </select>
               </div>
             </div>
-            <div class="col-lg-6">
+            <div class="col-lg-4">
               <div class="form-group">
                 <label class="form-label">Check-Out Status</label>
                 <select class="form-select" id="groupCheckOutStatus" name="groupCheckOutStatus" required>
                   <option value="" disabled selected>Check-Out Status</option>
                   <option value="0" selected>Regular Check Out</option>
                   <option value="1" >Late Check Out</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="form-group">
+                <label class="form-label">Booking Resources</label>
+                <select class="form-select" id="groupBookingRoute" name="groupBookingRoute" required>
+                  <option value="" disabled>Select Booking Resource</option>
+                  <option value="walk-in" selected>Walk-in</option>
+                  <option value="agency">Agency</option>
+                  <option value="booking-channel">Booking Channel</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="row p-t-20">         
+            <div class="col-lg-12" id="groupAgencyWrapper" style="display: none;">
+              <div class="form-group">
+                <label class="form-label">Select Agency</label>
+                <select class="form-select" id="groupAgencySelect" name="groupAgencySelect">
+                  <option value="" disabled selected>Select Agency</option>
                 </select>
               </div>
             </div>
@@ -110,28 +132,6 @@
               <div class="form-group">
                 <label class="form-label">Group Contact Number</label>
                 <input type="text" class="form-control" id="groupContact" name="groupContact" required>
-              </div>
-            </div>
-          </div>
-
-          <div class="row p-t-20">
-            <div class="col-lg-6">
-              <div class="form-group">
-                <label class="form-label">Booking Resources</label>
-                <select class="form-select" id="groupBookingRoute" name="groupBookingRoute" required>
-                  <option value="" disabled>Select Booking Resource</option>
-                  <option value="walk-in" selected>Walk-in</option>
-                  <option value="agency">Agency</option>
-                  <option value="booking-channel">Booking Channel</option>
-                </select>
-              </div>
-            </div>
-            <div class="col-lg-6" id="groupAgencyWrapper" style="display: none;">
-              <div class="form-group">
-                <label class="form-label">Select Agency</label>
-                <select class="form-select" id="groupAgencySelect" name="groupAgencySelect">
-                  <option value="" disabled selected>Select Agency</option>
-                </select>
               </div>
             </div>
           </div>
@@ -1782,7 +1782,7 @@
     });
 
     // Clear selected rooms when Check-in/Check-out status changes
-    $('#groupCheckInStatus, #groupCheckOutStatus').on('change', function() {
+    $('#groupCheckInStatus, #groupCheckOutStatus, #groupBookingRoute').on('change', function() {
       // Uncheck any selected block radios or manual checkboxes
       $('#groupRoomsList input[name="groupBlock"]').prop('checked', false);
       $('#groupRoomsList .group-manual-checkbox').prop('checked', false);

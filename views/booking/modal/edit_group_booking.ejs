@@ -41,7 +41,7 @@
           </div>
 
           <div class="row p-t-20">
-            <div class="col-lg-6">
+            <div class="col-lg-4">
               <div class="form-group">
                 <label class="form-label">Check-In Status</label>
                 <select class="form-select" id="editGroupCheckInStatus" name="groupCheckInStatus" required>
@@ -51,13 +51,36 @@
                 </select>
               </div>
             </div>
-            <div class="col-lg-6">
+            <div class="col-lg-4">
               <div class="form-group">
                 <label class="form-label">Check-Out Status</label>
                 <select class="form-select" id="editGroupCheckOutStatus" name="groupCheckOutStatus" required>
                   <option value="" disabled selected>Check-Out Status</option>
                   <option value="0">Regular Check Out</option>
                   <option value="1">Late Check Out</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="form-group">
+                <label class="form-label">Booking Resources</label>
+                <select class="form-select" id="editGroupBookingRoute" name="groupBookingRoute" required>
+                  <option value="" disabled>Select Booking Resource</option>
+                  <option value="walk-in">Walk-in</option>
+                  <option value="agency">Agency</option>
+                  <option value="booking-channel">Booking Channel</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="row p-t-20">
+          
+            <div class="col-lg-12" id="editGroupAgencyWrapper" style="display: none;">
+              <div class="form-group">
+                <label class="form-label">Select Agency</label>
+                <select class="form-select" id="editGroupAgencySelect" name="groupAgencySelect">
+                  <option value="" disabled selected>Select Agency</option>
                 </select>
               </div>
             </div>
@@ -133,28 +156,6 @@
               <div class="form-group">
                 <label class="form-label">Group Contact Number</label>
                 <input type="text" class="form-control" id="editGroupContact" name="groupContact" required>
-              </div>
-            </div>
-          </div>
-
-          <div class="row p-t-20">
-            <div class="col-lg-6">
-              <div class="form-group">
-                <label class="form-label">Booking Resources</label>
-                <select class="form-select" id="editGroupBookingRoute" name="groupBookingRoute" required>
-                  <option value="" disabled>Select Booking Resource</option>
-                  <option value="walk-in">Walk-in</option>
-                  <option value="agency">Agency</option>
-                  <option value="booking-channel">Booking Channel</option>
-                </select>
-              </div>
-            </div>
-            <div class="col-lg-6" id="editGroupAgencyWrapper" style="display: none;">
-              <div class="form-group">
-                <label class="form-label">Select Agency</label>
-                <select class="form-select" id="editGroupAgencySelect" name="groupAgencySelect">
-                  <option value="" disabled selected>Select Agency</option>
-                </select>
               </div>
             </div>
           </div>
@@ -971,7 +972,7 @@ window.editGroupManualSelectedRooms = [];
 
   function updateEditRoomFilterAndCount() {
     const filter = $('input[name="editGroupRoomFilter"]:checked').val();
-    const roomsContainer = $('.manual-rooms-container');
+    const roomsContainer = $('#editGroupRoomsList .manual-rooms-container'); // Make selector specific to edit modal
     let visibleCount = 0;
     
     if (!roomsContainer.length) return;
@@ -1076,7 +1077,7 @@ window.editGroupManualSelectedRooms = [];
       editGroupRequiredBed2 = bed2Needed;
 
       $.ajax({
-        url: '/booking/find_consecutive_rooms',
+        url: '/booking/find_consecutive_rooms_edit',
         type: 'POST',
         data: {
           startDate: dates.start,
@@ -1087,6 +1088,7 @@ window.editGroupManualSelectedRooms = [];
           bed2Needed: bed2Needed,
           bookingRoute: bookingRoute,
           checkInStatus: $('#editGroupCheckInStatus').val(),
+          currentGroupBookingId: $('#editGroupBookingId').val(),
           checkOutStatus: $('#editGroupCheckOutStatus').val(),
           excludeGroupBookingId: $('#editGroupBookingId').val() || ''
         },
@@ -1103,32 +1105,6 @@ window.editGroupManualSelectedRooms = [];
           // Include originally selected rooms even if not currently available
           const currentBookingId = $('#editGroupBookingId').val();
 
-          if (currentBookingId && window.editGroupManualSelectedRooms.length > 0) {
-            // Get room details for originally selected rooms
-            const originallySelectedRoomDetails = [];
-            window.editGroupManualSelectedRooms.forEach(roomId => {
-              // Find room details from previous search results or add enhanced placeholder
-              const existingRoom = availableRooms.find(room => room.IDNo === roomId) ||
-                                   editGroupAvailableRooms.find(room => room.IDNo === roomId);
-              if (existingRoom) {
-                originallySelectedRoomDetails.push(existingRoom);
-              } else {
-                // Add enhanced placeholder room data if not found in current search
-                originallySelectedRoomDetails.push({
-                  IDNo: roomId,
-                  ROOM_NUMBER: `Room ${roomId}`,
-                  ROOM_BED: 1, // Default to 1 bed
-                  RESOLVED_PRICE: 1000, // Default price
-                  SEASONAL_PRICES: [] // Will use fallback pricing
-                });
-              }
-            });
-
-            // Combine available rooms with originally selected rooms (avoid duplicates)
-            const existingIds = availableRooms.map(room => room.IDNo);
-            const newRooms = originallySelectedRoomDetails.filter(room => !existingIds.includes(room.IDNo));
-            availableRooms = [...availableRooms, ...newRooms];
-          }
 
           // Check if we have enough rooms (including originally selected ones for editing)
           const totalAvailableRooms = availableRooms.length;
@@ -1309,6 +1285,17 @@ window.editGroupManualSelectedRooms = [];
     } else {
       $('#editGroupAgencyWrapper').hide();
       $('#editGroupAgencySelect').val('');
+    }
+    
+    // Call search button on every onChange
+    const daterange = $('#editGroupDaterange').val();
+    const numberOfRooms = $('#editGroupNumberOfRooms').val();
+    const checkInStatus = $('#editGroupCheckInStatus').val();
+    const checkOutStatus = $('#editGroupCheckOutStatus').val();
+    
+    // Only auto-search if all required fields are filled
+    if (daterange && numberOfRooms && this.value && checkInStatus && checkOutStatus) {
+      $('#editGroupSearchRooms').click();
     }
   });
 

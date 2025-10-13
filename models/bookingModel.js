@@ -4917,14 +4917,9 @@ class BookingModel {
               AND b.ACTIVE = 1
               AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
               AND (DATE(b.CHECK_IN_DATE) < ? AND DATE(b.CHECK_OUT_DATE) > ?)
-              ${excludeGroupBookingId ? `AND b.GROUP_BOOKING_ID != ?` : ''}
           )`;
 
       const roomParams = [formattedStartDate, formattedEndDate, formattedEndDate, formattedStartDate];
-
-      if (excludeGroupBookingId) {
-        roomParams.push(excludeGroupBookingId);
-      }
 
       if (floorNumber) {
         roomParams.push(floorNumber);
@@ -5175,6 +5170,353 @@ class BookingModel {
 
     } catch (error) {
       console.error('Error in findConsecutiveRooms:', error);
+      throw error;
+    }
+  }
+
+  static async findConsecutiveRoomsEdit(params) {
+    const { startDate, endDate, neededRooms, floorNumber, bed1Needed = 0, bed2Needed = 0, bookingRoute, checkInStatus, checkOutStatus, excludeGroupBookingId, currentGroupBookingId } = params;
+    
+    try {
+      const connection = await pool.promise().getConnection();
+      
+      // Format dates
+      const moment = require('moment');
+      const formattedStartDate = moment(startDate, 'MMM DD, YYYY').format('YYYY-MM-DD');
+      const formattedEndDate = moment(endDate, 'MMM DD, YYYY').format('YYYY-MM-DD');
+
+      const roomsQuery = `
+        SELECT r.IDNo, r.ROOM_NUMBER, r.ROOM_FLOOR, r.ROOM_BED, r.ROOM_VIEW,
+               COALESCE(r.ROOM_PRICE, rt.BASE_PRICE) AS FINAL_PRICE,
+               r.ROOM_TYPE_ID,
+               (
+                 SELECT b.GROUP_BOOKING_ID
+                 FROM booking b
+                 WHERE b.ROOM_ID = r.IDNo
+                   AND b.ACTIVE = 1
+                   AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
+                   AND (DATE(b.CHECK_IN_DATE) < ? AND DATE(b.CHECK_OUT_DATE) > ?)
+                 LIMIT 1
+               ) AS currentGroupBookingId,
+               (
+                 SELECT CASE 
+                   WHEN b2.LATE_CHECKOUT = 1 THEN 'L/O'
+                   WHEN b2.LATE_CHECKOUT = 0 OR b2.LATE_CHECKOUT IS NULL THEN 'R/O'
+                   ELSE NULL
+                 END
+                 FROM booking b2 
+                 WHERE b2.ROOM_ID = r.IDNo 
+                   AND DATE(b2.CHECK_OUT_DATE) = ?
+                   AND (b2.IS_CANCELLED IS NULL OR b2.IS_CANCELLED != 1)
+                   AND b2.ACTIVE = 1
+                 LIMIT 1
+               ) AS checkoutType,
+               (
+                 SELECT CASE 
+                   WHEN b3.CHECK_IN_STATUS = 0 THEN 'L/I'
+                   WHEN b3.CHECK_IN_STATUS = 1 THEN 'R/I'
+                   ELSE NULL
+                 END
+                 FROM booking b3 
+                 WHERE b3.ROOM_ID = r.IDNo 
+                   AND DATE(b3.CHECK_IN_DATE) = ?
+                   AND (b3.IS_CANCELLED IS NULL OR b3.IS_CANCELLED != 1)
+                   AND b3.ACTIVE = 1
+                 LIMIT 1
+               ) AS checkinType
+        FROM room r
+        JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
+        WHERE r.ROOM_STATUS != 3
+          AND (
+            -- Only include rooms that are currently assigned to the excluded group booking
+            EXISTS (
+              SELECT 1 FROM booking b
+              WHERE b.ROOM_ID = r.IDNo
+                AND b.ACTIVE = 1
+                AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
+                AND b.GROUP_BOOKING_ID = ?
+            )
+            -- OR include only 1 truly available room (limit to 1)
+            OR (NOT EXISTS (
+              SELECT 1 FROM booking b
+              WHERE b.ROOM_ID = r.IDNo
+                AND b.ACTIVE = 1
+                AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
+                AND (DATE(b.CHECK_IN_DATE) < ? AND DATE(b.CHECK_OUT_DATE) > ?)
+            ) AND r.IDNo = (
+              SELECT r2.IDNo 
+              FROM room r2
+              WHERE r2.ROOM_STATUS != 3
+                AND NOT EXISTS (
+                  SELECT 1 FROM booking b2
+                  WHERE b2.ROOM_ID = r2.IDNo
+                    AND b2.ACTIVE = 1
+                    AND b2.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
+                    AND (DATE(b2.CHECK_IN_DATE) < ? AND DATE(b2.CHECK_OUT_DATE) > ?)
+                )
+              ORDER BY r2.IDNo
+              LIMIT 1
+            ))
+          )`;
+
+      const roomParams = [
+        formattedEndDate, formattedStartDate,  // For currentGroupBookingId subquery
+        formattedStartDate,                    // For checkoutType subquery  
+        formattedEndDate,                      // For checkinType subquery
+        currentGroupBookingId,                 // For EXISTS clause
+        formattedEndDate, formattedStartDate,  // For NOT EXISTS clause
+        formattedEndDate, formattedStartDate   // For subquery in OR condition
+      ];
+
+      if (floorNumber) {
+        roomParams.push(floorNumber);
+      }
+
+      const unassignedQuery = `
+        SELECT 
+          b.IDNo AS bookingId,
+          b.CHECK_IN_DATE,
+          b.CHECK_OUT_DATE,
+          b.BED_COUNT,
+          COALESCE(r.ROOM_BED, b.BED_COUNT) AS REQUIRED_BEDS
+        FROM booking b
+        LEFT JOIN room r ON b.ROOM_ID = r.IDNo
+        WHERE b.ACTIVE = 1
+          AND b.IS_DIRECT_RESERVATION = 1
+          AND (b.ROOM_ID = 0 OR b.ROOM_ID IS NULL)
+          AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
+          AND DATE(b.CHECK_IN_DATE) < ?
+          AND DATE(b.CHECK_OUT_DATE) > ?
+      `;
+
+      const [unassignedRows] = await connection.query(unassignedQuery, [formattedEndDate, formattedStartDate]);
+
+      const reservedBeds = unassignedRows.reduce((acc, booking) => {
+        const bedCount = parseInt(booking.REQUIRED_BEDS, 10) || 0;
+        if (bedCount === 1) acc.bed1 += 1;
+        if (bedCount === 2) acc.bed2 += 1;
+        return acc;
+      }, { bed1: 0, bed2: 0 });
+
+      const conflicts = [];
+      if (bed1Needed > 0 && reservedBeds.bed1 >= bed1Needed) {
+        conflicts.push({ bed: 1, reserved: reservedBeds.bed1 });
+      }
+      if (bed2Needed > 0 && reservedBeds.bed2 >= bed2Needed) {
+        conflicts.push({ bed: 2, reserved: reservedBeds.bed2 });
+      }
+
+      const bedNeedsAfterReserve = {
+        bed1: Math.max(bed1Needed - reservedBeds.bed1, 0),
+        bed2: Math.max(bed2Needed - reservedBeds.bed2, 0)
+      };
+
+      let finalRoomsQuery = roomsQuery;
+      if (floorNumber) {
+        finalRoomsQuery += ' AND r.ROOM_FLOOR = ?';
+      }
+      finalRoomsQuery += ' ORDER BY r.ROOM_FLOOR, CAST(r.ROOM_NUMBER AS UNSIGNED)';
+
+      const [rooms] = await connection.query(finalRoomsQuery, roomParams);
+
+      // Count total rooms by bed type
+      const totalRoomsByBed = rooms.reduce((acc, room) => {
+        const bedCount = parseInt(room.ROOM_BED, 10);
+        acc[bedCount] = (acc[bedCount] || 0) + 1;
+        return acc;
+      }, {});
+
+      // Filter out rooms that are reserved for unassigned bookings (like topbar.ejs logic)
+      const availableRooms = rooms.filter(room => {
+        const bedCount = parseInt(room.ROOM_BED, 10);
+        if (bedCount === 1) {
+          const total1Bed = totalRoomsByBed[1] || 0;
+          const available1Bed = Math.max(0, total1Bed - reservedBeds.bed1);
+          return available1Bed > 0; // Show if there are any available 1-bed rooms
+        } else if (bedCount === 2) {
+          const total2Bed = totalRoomsByBed[2] || 0;
+          const available2Bed = Math.max(0, total2Bed - reservedBeds.bed2);
+          return available2Bed > 0; // Show if there are any available 2-bed rooms
+        }
+        return true; // Show other bed types
+      });
+
+      // Apply Check-In Status and Check-Out Status filters like topbar.ejs
+      let filteredRooms = availableRooms;
+      
+      if (checkInStatus !== undefined && checkInStatus !== '' || checkOutStatus !== undefined && checkOutStatus !== '') {
+        filteredRooms = availableRooms.filter(room => {
+          const checkoutType = room.checkoutType;
+          const checkinType = room.checkinType;
+          let belongsToCheckin = true;
+          let belongsToCheckout = true;
+          
+          // Check-In Status Filter Logic - Convert numeric values to matching logic
+          if (checkInStatus === '1') {
+            // Regular Check-In (value 1): Only compatible with R/O checkout OR no checkout conflict
+            belongsToCheckin = (checkoutType === 'R/O' || !checkoutType);
+          } else if (checkInStatus === '0') {
+            // Late Check-In (value 0): Compatible with BOTH R/O and L/O checkout OR no checkout conflict
+            belongsToCheckin = (checkoutType === 'R/O' || checkoutType === 'L/O' || !checkoutType);
+          }
+          
+          // Check-Out Status Filter Logic - Convert numeric values to matching logic
+          if (checkOutStatus === '0') {
+            // Regular Check-Out (value 0): Compatible with BOTH R/I and L/I checkin OR no checkin conflict
+            belongsToCheckout = (checkinType === 'R/I' || checkinType === 'L/I' || !checkinType);
+          } else if (checkOutStatus === '1') {
+            // Late Check-Out (value 1): Only compatible with L/I checkin OR no checkin conflict
+            belongsToCheckout = (checkinType === 'L/I' || !checkinType);
+          }
+          
+          const finalResult = belongsToCheckin && belongsToCheckout;
+          return finalResult;
+        });
+      }
+
+      if (!filteredRooms.length) {
+        return {
+          success: false,
+          message: 'No rooms available for the selected dates.',
+          data: { unassignedConflicts: conflicts }
+        };
+      }
+
+      const roomIds = filteredRooms.map(r => r.IDNo);
+      const seasonalPricesMap = {};
+
+      if (roomIds.length > 0) {
+        const [seasonalRows] = await connection.query(
+          `SELECT 
+            rsp.ROOM_ID,
+            rsp.SEASON_ID,
+            s.NAME AS SEASON_NAME,
+            s.START_DATE,
+            s.END_DATE,
+            rsp.ROOM_BED AS BED_COUNT,
+            rsp.BOOKING_TYPE,
+            rsp.PRICE AS SEASONAL_PRICE
+          FROM room_season_price rsp
+          LEFT JOIN season s ON s.IDNo = rsp.SEASON_ID
+          WHERE rsp.ROOM_ID IN (?)
+          ORDER BY rsp.ROOM_ID, rsp.SEASON_ID, rsp.BOOKING_TYPE, rsp.ROOM_BED`,
+          [roomIds]
+        );
+
+        for (const row of seasonalRows) {
+          if (!seasonalPricesMap[row.ROOM_ID]) seasonalPricesMap[row.ROOM_ID] = [];
+          seasonalPricesMap[row.ROOM_ID].push({
+            seasonId: row.SEASON_ID,
+            seasonName: row.SEASON_NAME,
+            bedCount: row.BED_COUNT,
+            bookingType: row.BOOKING_TYPE,
+            price: row.SEASONAL_PRICE,
+            startDate: row.START_DATE,
+            endDate: row.END_DATE
+          });
+        }
+      }
+
+      filteredRooms.forEach(room => {
+        room.SEASONAL_PRICES = seasonalPricesMap[room.IDNo] || [];
+      });
+
+      const resolveSeasonalPrice = (room, checkInDate) => {
+        const seasonalPrices = room.SEASONAL_PRICES || [];
+        const bedCount = parseInt(room.ROOM_BED, 10);
+        const checkMoment = moment(checkInDate, 'YYYY-MM-DD');
+        if (!checkMoment.isValid()) return 0;
+
+        const matchSeason = seasonalPrices.find(price => {
+          const start = moment(price.startDate);
+          const end = moment(price.endDate);
+          if (!start.isValid() || !end.isValid()) return false;
+          const inRange = start.isSameOrBefore(end)
+            ? checkMoment.isBetween(start, end, 'day', '[]')
+            : checkMoment.isSameOrAfter(start) || checkMoment.isSameOrBefore(end);
+
+          return inRange && parseInt(price.bedCount, 10) === bedCount && price.bookingType === bookingRoute;
+        });
+
+        if (matchSeason) {
+          return parseFloat(matchSeason.price) || 0;
+        }
+
+        const fallbackSeason = seasonalPrices.find(price => {
+          const start = moment(price.startDate);
+          const end = moment(price.endDate);
+          if (!start.isValid() || !end.isValid()) return false;
+          const inRange = start.isSameOrBefore(end)
+            ? checkMoment.isBetween(start, end, 'day', '[]')
+            : checkMoment.isSameOrAfter(start) || checkMoment.isSameOrBefore(end);
+
+          return inRange && parseInt(price.bedCount, 10) === bedCount;
+        });
+
+        return fallbackSeason ? (parseFloat(fallbackSeason.price) || 0) : 0;
+      };
+
+      const attachResolvedPrices = (block) => {
+        return block.map(room => {
+          return {
+            ...room,
+            RESOLVED_PRICE: resolveSeasonalPrice(room, formattedStartDate)
+          };
+        });
+      };
+
+      filteredRooms.sort((a, b) => parseInt(a.ROOM_NUMBER, 10) - parseInt(b.ROOM_NUMBER, 10));
+
+      if (neededRooms > filteredRooms.length) {
+        return {
+          success: false,
+          message: 'Not enough rooms available after accounting for unassigned bookings.',
+          data: {
+            availableRooms: filteredRooms,
+            unassignedConflicts: conflicts
+          }
+        };
+      }
+
+      // CHECK: Validate bed requirements against available rooms
+      const bedValidationPassed = !(bed1Needed + bed2Needed) || 
+        (filteredRooms.filter(r => parseInt(r.ROOM_BED, 10) === 1).length >= bed1Needed) &&
+        (filteredRooms.filter(r => parseInt(r.ROOM_BED, 10) === 2).length >= bed2Needed);
+
+      if (!bedValidationPassed) {
+        return {
+          success: false,
+          message: 'Not enough rooms with required bed types.',
+          data: {
+            availableRooms: filteredRooms.map(room => ({
+              ...room,
+              RESOLVED_PRICE: resolveSeasonalPrice(room, formattedStartDate)
+            })),
+            unassignedConflicts: conflicts
+          }
+        };
+      }
+
+      const payload = {
+        consecutiveBlocks: [], // REMOVED: No auto-suggested consecutive blocks
+        nonConsecutiveBlocks: [], // REMOVED: No auto-suggested non-consecutive blocks
+        availableRooms: filteredRooms.map(room => ({
+          ...room,
+          RESOLVED_PRICE: resolveSeasonalPrice(room, formattedStartDate)
+        })),
+        unassignedConflicts: conflicts
+      };
+
+      connection.release();
+
+      return {
+        success: true,
+        data: payload,
+        priority: 'manual' // Manual selection is now the default
+      };
+
+    } catch (error) {
+      console.error('Error in findConsecutiveRoomsEdit:', error);
       throw error;
     }
   }

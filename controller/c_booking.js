@@ -1106,6 +1106,48 @@ class BookingController {
     }
   }
 
+  static async findConsecutiveRoomsEdit(req, res) {
+    try {
+      let { startDate, endDate, neededRooms, floorNumber, bed1Needed = 0, bed2Needed = 0, bookingRoute, checkInStatus, checkOutStatus, excludeGroupBookingId, currentGroupBookingId } = req.body;
+      const neededRoomsCount = parseInt(neededRooms, 10);
+      const requiredBed1 = parseInt(bed1Needed, 10) || 0;
+      const requiredBed2 = parseInt(bed2Needed, 10) || 0;
+      const totalRequiredBeds = requiredBed1 + requiredBed2;
+      const normalizedBookingRoute = bookingRoute || 'walk-in';
+
+      if (!startDate || !endDate || !neededRoomsCount) {
+        return res.status(400).json({ success: false, message: 'Missing parameters' });
+      }
+
+      if (totalRequiredBeds && totalRequiredBeds !== neededRoomsCount) {
+        return res.status(400).json({ success: false, message: 'Bed requirement total must equal needed rooms.' });
+      }
+
+      const result = await BookingModel.findConsecutiveRoomsEdit({
+        startDate,
+        endDate,
+        neededRooms: neededRoomsCount,
+        floorNumber,
+        bed1Needed: requiredBed1,
+        bed2Needed: requiredBed2,
+        bookingRoute: normalizedBookingRoute,
+        checkInStatus,
+        checkOutStatus,
+        excludeGroupBookingId,
+        currentGroupBookingId
+      });
+
+      res.json(result);
+
+    } catch (error) {
+      console.error("Error in find_consecutive_rooms_edit:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Error querying available rooms for edit" 
+      });
+    }
+  }
+
   static async addGroupBooking(req, res) {
     try {
       const {

@@ -64,6 +64,7 @@ router.post('/update-extend-payment-status', BookingController.updateExtendPayme
 
 // Room search
 router.post('/find_consecutive_rooms', BookingController.findConsecutiveRooms);
+router.post('/find_consecutive_rooms_edit', BookingController.findConsecutiveRoomsEdit);
 
 // Group booking
 router.post('/add_group_booking', BookingController.addGroupBooking);
