@@ -37,7 +37,7 @@ router.get('/housekeeping/cleaning-status', RoomController.getAllRoomsCleaningSt
 router.post('/housekeeping/mark-cleaned', RoomController.markRoomCleaned);
 
 // Booking endpoints (no authentication required - for guest use)
-router.get('/booking/booking_data', BookingController.getBookingData);
+router.get('/booking/booking_data', BookingController.getBookingDataEnhanced);
 router.post('/booking/get-room-details', BookingController.getRoomDetails);
 router.get('/booking/get-booking-services/:bookingId', BookingController.getBookingServices);
 

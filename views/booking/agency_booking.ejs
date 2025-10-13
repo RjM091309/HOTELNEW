@@ -8,6 +8,7 @@
                         <a class="tab-item" href="/booking">Single</a>
                         <a class="tab-item" href="/booking/group">Group</a>
                         <a class="tab-item is-active" href="/booking/agency">Agency</a>
+                        <a class="tab-item" href="/booking/all">All</a>
                     </div>
                     
                     <div style="flex: 1; display: flex; justify-content: center; margin: 0 20px;">
@@ -192,9 +193,7 @@ $(document).ready(function () {
                         RoomID: item.ROOM_NUMBER,
                         CONFIRMATION: item.CONFIRMATION_NUMBER,
                         Checkin: formatDate(item.CHECK_IN_DATE),
-                        Checkout: `<button class="btn-checkout" data-booking-id="${item.BookingID}" style="background-color: transparent; padding: 0 !important; margin: 0 !important; font-family: Poppins, sans-serif; font-size: 13px; font-weight: 400; line-height: 1.7; color: rgba(0, 0, 0, 0.87); border: none; box-shadow: none; outline: none; cursor: pointer;">
-                                        ${formatDate(item.CHECK_OUT_DATE)}
-                                    </button>`,
+                        Checkout: formatDate(item.CHECK_OUT_DATE),
                         Totalcost: item.TOTAL_COST,
                         Paymentstatus: item.PAYMENT_STATUS,
                         BookingChannel: item.BOOKING_CHANNEL,
@@ -242,13 +241,7 @@ $(document).ready(function () {
         },
         { data: 'CONFIRMATION', title: 'CONFIRMATION NUMBER' },
         { data: 'Checkin', title: 'CHECK IN' },
-        {
-            data: 'Checkout',
-            title: 'CHECK OUT',
-            render: function (data, type, row) {
-                return data;
-            }
-        },
+        { data: 'Checkout', title: 'CHECK OUT' },
         {
             data: 'Totalcost',
             title: 'TOTAL PAYMENT',

@@ -27,8 +27,9 @@ $(document).ready(function () {
                 data: null,
                 orderable: false,
                 render: function (data, type, row, meta) {
-                    // _iDisplayStart ay ang index kung saan nagsisimula ang kasalukuyang page
-                    // meta.row ay ang index ng row sa loob ng current page
+                    // Show descending numbering per current page (e.g., 9..1)
+                    var api = new $.fn.dataTable.Api(meta.settings);
+                    var info = api.page.info();
                     return meta.settings._iDisplayStart + meta.row + 1;
                 }
             },
@@ -426,7 +427,7 @@ function viewGroupBooking(groupId) {
             let bookingTable = $('#groupBookingModal tbody');
             bookingTable.empty();
 
-            if (data.bookingDetails.length > 0) {
+            if (data.bookingDetails && data.bookingDetails.length > 0) {
                 data.bookingDetails.forEach(booking => {
                     let statusClass = "label-secondary";
                     if (booking.BOOKING_STATUS.toLowerCase() === "check-in") statusClass = "label-success";
@@ -436,6 +437,7 @@ function viewGroupBooking(groupId) {
 
                     let row = `
                         <tr>
+                            <td>${booking.CUSTOMER_NAME || '-'}</td>
                             <td>${booking.ROOM_NUMBER}</td>
                             <td>${formatDate(booking.CHECK_IN_DATE)}</td>
                             <td>${formatDate(booking.CHECK_OUT_DATE)}</td>
@@ -446,7 +448,31 @@ function viewGroupBooking(groupId) {
                     bookingTable.append(row);
                 });
             } else {
-                bookingTable.append(`<tr><td colspan="6" class="text-center">No individual bookings found.</td></tr>`);
+                bookingTable.append(`<tr><td colspan="7" class="text-center">No individual bookings found.</td></tr>`);
+            }
+
+            // Fill summary table (separate table) if available
+            if (data.summary) {
+                const fmt = (n) => parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                const nRoom = parseFloat(data.summary.roomTotal || 0);
+                const nServices = parseFloat(data.summary.servicesTotal || 0);
+                const nExtensions = parseFloat(data.summary.extensionsTotal || 0);
+                const nDiscount = parseFloat(data.summary.discount || 0);
+                const nReservation = parseFloat(data.summary.reservationFee || 0);
+                const nGrand = parseFloat(data.summary.grandTotal || 0);
+
+                const summaryTbody = $('#groupBookingSummary tbody');
+                summaryTbody.empty();
+
+                const rows = [];
+                rows.push(`<tr><td class="text-start">Rooms Total</td><td class="text-end">${fmt(nRoom)}</td></tr>`);
+                if (nServices > 0) rows.push(`<tr><td class="text-start">Services Total</td><td class="text-end">${fmt(nServices)}</td></tr>`);
+                if (nExtensions > 0) rows.push(`<tr><td class="text-start">Extensions Total</td><td class="text-end">${fmt(nExtensions)}</td></tr>`);
+                if (nDiscount > 0) rows.push(`<tr><td class="text-start">Less: Discount</td><td class="text-end text-danger">-${fmt(nDiscount)}</td></tr>`);
+                if (nReservation > 0) rows.push(`<tr><td class="text-start">Less: Reservation Fee</td><td class="text-end text-danger">-${fmt(nReservation)}</td></tr>`);
+
+                summaryTbody.append(rows.join(''));
+                $('#groupBookingSummaryGrand').html(`<b>${fmt(nGrand)}</b>`);
             }
             $('#groupBookingModal').modal('show');
         },
@@ -877,11 +903,16 @@ function populateEditGroupForm(booking) {
     if (hasBreakfast) {
         $('#editGroupIncludeBreakfast').prop('checked', true);
         $('#editGroupBreakfastFields').removeClass('d-none');
-        $('#editGroupBreakfastAdultQty').val(booking.breakfastAdultQty);
-        $('#editGroupBreakfastAdultPrice').val(booking.breakfastAdultPrice);
+		$('#editGroupBreakfastAdultQty').val(booking.breakfastAdultQty);
+		// Use unit price = TOTAL_COST / QTY when QTY > 0; otherwise leave as-is
+		var _adultQty = parseFloat(booking.breakfastAdultQty) || 0;
+		var _adultTotal = parseFloat(booking.breakfastAdultPrice) || 0;
+		$('#editGroupBreakfastAdultPrice').val(_adultQty > 0 ? (_adultTotal / _adultQty).toFixed(2) : _adultTotal);
         $('#editGroupBreakfastAdultId').val(booking.breakfastAdultId);
-        $('#editGroupBreakfastKidQty').val(booking.breakfastKidQty);
-        $('#editGroupBreakfastKidPrice').val(booking.breakfastKidPrice);
+		$('#editGroupBreakfastKidQty').val(booking.breakfastKidQty);
+		var _kidQty = parseFloat(booking.breakfastKidQty) || 0;
+		var _kidTotal = parseFloat(booking.breakfastKidPrice) || 0;
+		$('#editGroupBreakfastKidPrice').val(_kidQty > 0 ? (_kidTotal / _kidQty).toFixed(2) : _kidTotal);
         $('#editGroupBreakfastKidId').val(booking.breakfastKidId);
     } else {
         $('#editGroupIncludeBreakfast').prop('checked', false);

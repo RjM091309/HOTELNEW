@@ -1,10 +1,14 @@
 $(document).ready(function () {
+    // Determine scope based on current path: single pages exclude grouped bookings; 'all' includes everything
+    const isAllPage = window.location.pathname.endsWith('/booking/all');
+    const scope = isAllPage ? 'all' : 'single';
+
     let table = $('#booking_tbl').DataTable({
         rowId: 'BookingID',
         processing: true,
         serverSide: false,
         ajax: {
-            url: '/booking/booking_data?filter=all',
+            url: `/booking/booking_data?filter=all&scope=${scope}`,
             type: 'GET',
             dataSrc: function (json) {
                 return json.data.map(item => {
@@ -19,6 +23,7 @@ $(document).ready(function () {
                     };
                     return {
                         BookingID: item.BookingID,
+                        GroupBookingId: item.GROUP_BOOKING_ID,
                         CustomerName: item.NAME,
                         RoomID: item.ROOM_NUMBER,
                         CONFIRMATION: item.CONFIRMATION_NUMBER,
@@ -56,6 +61,14 @@ $(document).ready(function () {
         initComplete: function () {
             $('#booking_tbl thead th').addClass('text-center');
         },
+        drawCallback: function () {
+            // Ensure the "#" column always starts at 1 on each page regardless of sort
+            var api = this.api();
+            var start = api.page.info().start;
+            api.column(1, { page: 'current' }).nodes().each(function (cell, i) {
+                cell.innerHTML = start + i + 1;
+            });
+        },
         columns: [  
             { data: 'BookingID', visible: false },
             {
@@ -72,7 +85,11 @@ $(document).ready(function () {
                 data: 'CustomerName',
                 title: 'GUEST NAME',
                 render: function (data, type, row) {
-                    // Make guest name clickable to show voucher details
+                    // If this row represents a group, open the group details modal instead
+                    if (row.GroupBookingId && String(row.GroupBookingId) !== '0') {
+                        return `<a href="#" onclick="openGroupFromAll(${row.GroupBookingId})" style="color: #337ab7; text-decoration: none; cursor: pointer;">${data}</a>`;
+                    }
+                    // Otherwise show voucher details for single booking
                     return `<a href="#" onclick="showVoucherDetails(${row.BookingID})" style="color: #337ab7; text-decoration: none; cursor: pointer;">${data}</a>`;
                 }
             },
@@ -252,7 +269,7 @@ $(document).ready(function () {
         filter = filter.toLowerCase();
 
         // Update the DataTable's AJAX URL
-        table.ajax.url(`/booking/booking_data?filter=${filter}`).load();
+        table.ajax.url(`/booking/booking_data?filter=${filter}&scope=${scope}`).load();
     });
     
     // Handle filter button clicks
@@ -266,7 +283,7 @@ $(document).ready(function () {
         let filter = $(this).data('filter');
         
         // Update the DataTable's AJAX URL
-        table.ajax.url(`/booking/booking_data?filter=${filter}`).load();
+        table.ajax.url(`/booking/booking_data?filter=${filter}&scope=${scope}`).load();
     });
     ;(function(){
         const params      = new URLSearchParams(window.location.search);

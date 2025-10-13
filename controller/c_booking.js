@@ -73,11 +73,35 @@ class BookingController {
     }
   }
 
-  // Get booking data for DataTables
-  static async getBookingData(req, res) {
+  // Render the all booking page
+  static async renderAllBookingPage(req, res) {
     try {
-      const start = parseInt(req.query.start, 10) || 0;   // pagination start
-      const length = parseInt(req.query.length, 10) || 10; // pagination length
+      const user = req.user ? {
+        FULLNAME: req.user.FULLNAME,
+        PERMISSIONS: req.user.PERMISSIONS
+      } : null;
+
+      res.render('booking/all_booking', {
+        title: 'All Bookings',
+        subTitle: 'All Bookings',
+        activePage: 'booking',
+        user: user
+      });
+    } catch (error) {
+      console.error('Error rendering all booking page:', error);
+      res.status(500).render('error/500', {
+        title: 'Server Error',
+        subTitle: '500 Error'
+      });
+    }
+  }
+
+  // Get booking data for DataTables
+  static async getBookingDataEnhanced(req, res) {
+    try {
+      const hasPaging = typeof req.query.start !== 'undefined' && typeof req.query.length !== 'undefined';
+      const start = hasPaging ? parseInt(req.query.start, 10) : null;   // pagination start
+      const length = hasPaging ? parseInt(req.query.length, 10) : null; // pagination length
       const draw = req.query.draw || 1;
 
       // sorting setup (unchanged)
@@ -98,8 +122,10 @@ class BookingController {
 
       // date-filter logic (unchanged)
       const filter = req.query.filter || 'all';
+      const scope = (req.query.scope || '').toLowerCase(); // 'single' | 'all' | 'agency'
       let dateCondition = '';
       let channelCondition = '';
+      let groupCondition = '';
       
       switch (filter.toLowerCase()) {
         case 'today':
@@ -149,6 +175,26 @@ class BookingController {
           dateCondition = '';
       }
 
+      // Apply grouping scope rules
+      if (scope === 'single') {
+        // Single tab: only standalone bookings
+        groupCondition = `AND b.GROUP_BOOKING_ID IS NULL`;
+      } else if (scope === 'all') {
+        // All tab: show non-group bookings plus one representative row per group
+        groupCondition = `AND (b.GROUP_BOOKING_ID IS NULL OR b.IDNo = (
+          SELECT MIN(b2.IDNo)
+          FROM booking b2
+          WHERE b2.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID
+        ))`;
+      } else {
+        groupCondition = '';
+      }
+
+      // If we are on Single scope and no explicit channel filter is applied, exclude agency rows
+      if (scope === 'single' && !channelCondition) {
+        channelCondition = `AND b.BOOKING_CHANNEL != 'agency'`;
+      }
+
       // Get booking data from model with enhanced structure
       const result = await BookingModel.getBookingDataEnhanced({
         start,
@@ -156,7 +202,8 @@ class BookingController {
         orderByColumn,
         orderDirection,
         dateCondition,
-        channelCondition
+        channelCondition,
+        groupCondition
       });
 
       res.json({
@@ -1403,17 +1450,15 @@ class BookingController {
         });
       }
 
-      const bookingDetails = await BookingModel.getGroupBookingDetails(groupId);
+      const details = await BookingModel.getGroupBookingDetails(groupId);
 
-      if (!bookingDetails || bookingDetails.length === 0) {
+      if (!details || !details.bookingDetails || details.bookingDetails.length === 0) {
         return res.status(404).json({ 
           error: "No individual bookings found for this group." 
         });
       }
 
-      res.json({ 
-        bookingDetails 
-      });
+      res.json(details);
 
     } catch (error) {
       console.error("Database error:", error);
