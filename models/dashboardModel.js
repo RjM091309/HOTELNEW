@@ -179,7 +179,7 @@ class DashboardModel {
         ) rm ON b.IDNo = rm.BOOKING_ID
         WHERE DATE(b.CHECK_IN_DATE) <= CURDATE()
         AND b.ACTIVE = 1 AND c.IS_GROUP = 1
-        ORDER BY r.ROOM_NUMBER ASC
+        ORDER BY b.GROUP_BOOKING_ID ASC, r.ROOM_NUMBER ASC
       `);
       return details;
     } catch (error) {
