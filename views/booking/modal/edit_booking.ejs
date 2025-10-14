@@ -143,14 +143,17 @@
                                     <!-- Breakfast - Adult -->
                                     <div class="mb-2 d-flex gap-2 align-items-center">
                                         <input type="number" class="form-control" id="edit_breakfastAdultQty" name="breakfastAdultQty" placeholder="Adult" style="max-width: 80px;">
-                                        <input type="number" class="form-control" id="edit_breakfastAdultPrice" name="breakfastAdultPrice" placeholder="Price per Qty" readonly>
+                                        <input type="number" class="form-control" id="edit_breakfastAdultPrice" name="breakfastAdultPrice" placeholder="Price per Qty">
+                                        <!-- For display only -->
+                                        <input type="text" class="form-control d-none" id="edit_breakfastAdultTotal" placeholder="Total" readonly style="display: none !important;">
                                         <input type="hidden" id="edit_breakfastAdultId" name="breakfastAdultId">
                                     </div>
                                 
                                     <!-- Breakfast - Kids -->
                                     <div class="d-flex gap-2 align-items-center">
                                         <input type="number" class="form-control" id="edit_breakfastKidQty" name="breakfastKidQty" placeholder="Kids" style="max-width: 80px;">
-                                        <input type="number" class="form-control" id="edit_breakfastKidPrice" name="breakfastKidPrice" placeholder="Price per Qty" readonly>
+                                        <input type="number" class="form-control" id="edit_breakfastKidPrice" name="breakfastKidPrice" placeholder="Price per Qty">
+                                        <input type="text" class="form-control d-none" id="edit_breakfastKidTotal" placeholder="Total" readonly style="display: none !important;">
                                         <input type="hidden" id="edit_breakfastKidId" name="breakfastKidId">
                                     </div>
                                 </div>
@@ -162,7 +165,7 @@
                                     <label class="form-check-label" for="edit_includePickup">Pick-up</label>
                                 </div>
                                 <div id="edit_pickupWrapper" class="mt-1" style="display: none;">
-                                    <input type="number" class="form-control" id="edit_pickupPrice" name="pickupPrice" placeholder="Pick-up Price" readonly>
+                                    <input type="number" class="form-control" id="edit_pickupPrice" name="pickupPrice" placeholder="Pick-up Price">
                                     <input type="hidden" id="edit_pickupServiceId" name="pickupServiceId">
                                 </div>
                             </div>
@@ -173,7 +176,7 @@
                                     <label class="form-check-label" for="edit_includeDropoff">Drop-off</label>
                                 </div>
                                 <div id="edit_dropoffWrapper" class="mt-1" style="display: none;">
-                                    <input type="number" class="form-control" id="edit_dropoffPrice" name="dropoffPrice" placeholder="Drop-off Price" readonly>
+                                    <input type="number" class="form-control" id="edit_dropoffPrice" name="dropoffPrice" placeholder="Drop-off Price">
                                     <input type="hidden" id="edit_dropoffServiceId" name="dropoffServiceId">
                                 </div>
                             </div>
@@ -508,6 +511,41 @@ $(document).ready(function() {
     // Initialize flatpickr
     initializeEditFlatpickr();
 
+    // Function to toggle breakfast total display for edit form
+    function toggleEditBreakfastTotalDisplay() {
+        const adultQty = parseInt($('#edit_breakfastAdultQty').val()) || 0;
+        const adultUnit = parseFloat($('#edit_breakfastAdultPrice').val()) || 0;
+        const adultTotal = adultQty * adultUnit;
+
+        const kidQty = parseInt($('#edit_breakfastKidQty').val()) || 0;
+        const kidUnit = parseFloat($('#edit_breakfastKidPrice').val()) || 0;
+        const kidTotal = kidQty * kidUnit;
+
+        // Always keep price inputs visible for manual editing
+        // Only show total when BOTH qty AND price are entered
+        if (adultQty > 0 && adultUnit > 0) {
+            $('#edit_breakfastAdultTotal')
+                .css('display', 'block')
+                .val(`${adultTotal.toFixed(2)}`);
+        } else {
+            $('#edit_breakfastAdultTotal').css('display', 'none').val('');
+        }
+
+        if (kidQty > 0 && kidUnit > 0) {
+            $('#edit_breakfastKidTotal')
+                .css('display', 'block')
+                .val(`${kidTotal.toFixed(2)}`);
+        } else {
+            $('#edit_breakfastKidTotal').css('display', 'none').val('');
+        }
+        
+        // Always recalculate total when breakfast values change
+        computeEditTotal();
+    }
+
+    // Event listeners for breakfast quantity and price changes in edit form
+    $(document).on('input', '#edit_breakfastAdultQty, #edit_breakfastKidQty, #edit_breakfastAdultPrice, #edit_breakfastKidPrice', toggleEditBreakfastTotalDisplay);
+
     // Populate Guest Type dropdown using shared utility
     populateGuestTypesDropdown('#edit_guestType', true, 'Guest Type');
 
@@ -712,6 +750,12 @@ $(document).ready(function() {
             $('#edit_breakfastKidQty').val('');
             $('#edit_breakfastKidPrice').val('');
             $('#edit_breakfastKidId').val('');
+            // Hide total fields when unchecked
+            $('#edit_breakfastAdultTotal').css('display', 'none').val('');
+            $('#edit_breakfastKidTotal').css('display', 'none').val('');
+        } else {
+            // When checked, trigger total calculation if values exist
+            toggleEditBreakfastTotalDisplay();
         }
         computeEditTotal();
     });
@@ -802,7 +846,7 @@ $(document).ready(function() {
     });
 
     // Input event listeners for total computation
-    $('#edit_reservationFeeAmount, #edit_discountAmount, #edit_breakfastAdultQty, #edit_breakfastKidQty').on('input', function() {
+    $('#edit_reservationFeeAmount, #edit_discountAmount, #edit_breakfastAdultQty, #edit_breakfastKidQty, #edit_breakfastAdultPrice, #edit_breakfastKidPrice, #edit_pickupPrice, #edit_dropoffPrice').on('input', function() {
         computeEditTotal();
     });
 

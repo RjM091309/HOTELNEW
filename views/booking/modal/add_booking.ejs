@@ -154,17 +154,17 @@
                                       <!-- Breakfast - Adult -->
                                       <div class="mb-2 d-flex gap-2 align-items-center">
                                         <input type="number" class="form-control" id="breakfastAdultQty" name="breakfastAdultQty" placeholder="Adult" style="max-width: 80px;">
-                                        <input type="number" class="form-control" id="breakfastAdultPrice" name="breakfastAdultPrice" placeholder="Price per Qty" readonly>
+                                        <input type="number" class="form-control" id="breakfastAdultPrice" name="breakfastAdultPrice" placeholder="Price per Qty">
                                          <!-- For display only -->
-                                          <input type="text" class="form-control d-none" id="breakfastAdultTotal" placeholder="Total" readonly>
+                                          <input type="text" class="form-control d-none" id="breakfastAdultTotal" placeholder="Total" readonly style="display: none !important;">
                                         <input type="hidden" id="breakfastAdultId" name="breakfastAdultId">
                                       </div>
                                   
                                       <!-- Breakfast - Kids -->
                                       <div class="d-flex gap-2 align-items-center">
                                         <input type="number" class="form-control" id="breakfastKidQty" name="breakfastKidQty" placeholder="Kids" style="max-width: 80px;">
-                                        <input type="number" class="form-control" id="breakfastKidPrice" name="breakfastKidPrice" placeholder="Price per Qty" readonly>
-                                        <input type="text" class="form-control d-none" id="breakfastKidTotal" placeholder="Total" readonly>
+                                        <input type="number" class="form-control" id="breakfastKidPrice" name="breakfastKidPrice" placeholder="Price per Qty">
+                                        <input type="text" class="form-control d-none" id="breakfastKidTotal" placeholder="Total" readonly style="display: none !important;">
                                         <input type="hidden" id="breakfastKidId" name="breakfastKidId">
                                       </div>
                                   
@@ -177,7 +177,7 @@
                                       <label class="form-check-label" for="includePickup">Pick-up</label>
                                     </div>
                                     <div id="pickupWrapper" class="mt-1" style="display: none;">
-                                      <input type="number" class="form-control" id="pickupPrice" name="pickupPrice" placeholder="Pick-up Price" readonly>
+                                      <input type="number" class="form-control" id="pickupPrice" name="pickupPrice" placeholder="Pick-up Price">
                                       <input type="hidden" id="pickupServiceId" name="pickupServiceId">
                                     </div>
                                   </div>
@@ -188,7 +188,7 @@
                                       <label class="form-check-label" for="includeDropoff">Drop-off</label>
                                     </div>
                                     <div id="dropoffWrapper" class="mt-1" style="display: none;">
-                                      <input type="number" class="form-control" id="dropoffPrice" name="dropoffPrice" placeholder="Drop-off Price" readonly>
+                                      <input type="number" class="form-control" id="dropoffPrice" name="dropoffPrice" placeholder="Drop-off Price">
                                       <input type="hidden" id="dropoffServiceId" name="dropoffServiceId">
                                     </div>
                                   </div>
