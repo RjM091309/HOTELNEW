@@ -177,6 +177,9 @@ class BookingController {
             `;
             channelCondition = `AND b.BOOKING_CHANNEL = 'agency'`;
             break;
+          case 'agency_all':
+            channelCondition = `AND b.BOOKING_CHANNEL = 'agency'`;
+            break;
           default:
             dateCondition = '';
         }

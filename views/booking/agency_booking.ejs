@@ -13,7 +13,8 @@
                     
                     <div style="flex: 1; display: flex; justify-content: center; margin: 0 20px;">
                         <div class="filter-btn-group">
-                            <button type="button" class="filter-btn active" data-filter="agency_today">Today</button>
+                            <button type="button" class="filter-btn active" data-filter="agency_all">All</button>
+                            <button type="button" class="filter-btn" data-filter="agency_today">Today</button>
                             <button type="button" class="filter-btn" data-filter="agency_last3days">Last 3 Days</button>
                             <button type="button" class="filter-btn" data-filter="agency_thisweek">This Week</button>
                             <button type="button" class="filter-btn" data-filter="agency_thismonth">This Month</button>
@@ -280,12 +281,12 @@
         $('#clearDateFilter').on('click', function() {
             dateRangePicker.clear();
             
-            // Reset to "Today" filter (default for Agency page)
+            // Reset to "All" filter (default for Agency page)
             $('.filter-btn').removeClass('active');
-            $('.filter-btn[data-filter="agency_today"]').addClass('active');
+            $('.filter-btn[data-filter="agency_all"]').addClass('active');
             
             // Update the DataTable's AJAX URL
-            $('#agency_booking_tbl').DataTable().ajax.url(`/booking/booking_data?filter=agency_today&scope=${scope}`).load();
+            $('#agency_booking_tbl').DataTable().ajax.url(`/booking/booking_data?filter=agency_all&scope=${scope}`).load();
         });
     });
 </script>
@@ -299,7 +300,7 @@ $(document).ready(function () {
         processing: true,
         serverSide: true,
         ajax: {
-            url: '/booking/booking_data?filter=agency',
+            url: '/booking/booking_data?filter=agency_all',
             type: 'GET',
             dataSrc: function (json) {
                 return json.data.map(item => {

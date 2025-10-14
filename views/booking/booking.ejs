@@ -13,7 +13,8 @@
                     
                     <div style="flex: 1; display: flex; justify-content: center; margin: 0 20px;">
                         <div class="filter-btn-group">
-                            <button type="button" class="filter-btn active" data-filter="today">Today</button>
+                            <button type="button" class="filter-btn active" data-filter="all">All</button>
+                            <button type="button" class="filter-btn" data-filter="today">Today</button>
                             <button type="button" class="filter-btn" data-filter="last3days">Last 3 Days</button>
                             <button type="button" class="filter-btn" data-filter="thisWeek">This Week</button>
                             <button type="button" class="filter-btn" data-filter="thisMonth">This Month</button>
@@ -283,12 +284,12 @@
         $('#clearDateFilter').on('click', function() {
             dateRangePicker.clear();
             
-            // Reset to "Today" filter (default for Single page)
+            // Reset to "All" filter (default for Single page)
             $('.filter-btn').removeClass('active');
-            $('.filter-btn[data-filter="today"]').addClass('active');
+            $('.filter-btn[data-filter="all"]').addClass('active');
             
             // Update the DataTable's AJAX URL
-            $('#booking_tbl').DataTable().ajax.url(`/booking/booking_data?filter=today&scope=${scope}`).load();
+            $('#booking_tbl').DataTable().ajax.url(`/booking/booking_data?filter=all&scope=${scope}`).load();
         });
     });
 </script>

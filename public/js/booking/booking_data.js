@@ -273,7 +273,13 @@ $(document).ready(function () {
     });
     
     // Initialize Flatpickr for date range picker
-    let dateRangePicker = flatpickr("#dateRangePicker", {
+    let dateRangePicker = null;
+    
+    
+    // Check if flatpickr is available and the element exists before initializing
+    if (typeof flatpickr !== 'undefined' && document.getElementById('dateRangePicker')) {
+        try {
+            dateRangePicker = flatpickr("#dateRangePicker", {
         mode: "range",
         dateFormat: "Y-m-d",
         allowInput: false,
@@ -350,7 +356,14 @@ $(document).ready(function () {
                 });
             }
         }
-    });
+        });
+        } catch (error) {
+            console.error('Error initializing Flatpickr:', error);
+            dateRangePicker = null;
+        }
+    } else {
+        console.warn('Flatpickr library not loaded or dateRangePicker element not found');
+    }
 
     // Handle filter button clicks
     $('.filter-btn').on('click', function() {
@@ -359,8 +372,6 @@ $(document).ready(function () {
         // Add active class to clicked button
         $(this).addClass('active');
         
-        // Clear custom date picker when using predefined filters
-        dateRangePicker.clear();
         
         // Get the filter value
         let filter = $(this).data('filter');
@@ -372,8 +383,6 @@ $(document).ready(function () {
     
     // Handle clear date filter
     $('#clearDateFilter').on('click', function() {
-        dateRangePicker.clear();
-        
         // Reset to "All" filter
         $('.filter-btn').removeClass('active');
         $('.filter-btn[data-filter="all"]').addClass('active');
