@@ -272,6 +272,86 @@ $(document).ready(function () {
         table.ajax.url(`/booking/booking_data?filter=${filter}&scope=${scope}`).load();
     });
     
+    // Initialize Flatpickr for date range picker
+    let dateRangePicker = flatpickr("#dateRangePicker", {
+        mode: "range",
+        dateFormat: "Y-m-d",
+        allowInput: false,
+        clickOpens: true,
+        placeholder: "Select date range",
+        showMonths: 2,
+        static: false,
+        monthSelectorType: "static",
+        prevArrow: '<i class="fa fa-chevron-left"></i>',
+        nextArrow: '<i class="fa fa-chevron-right"></i>',
+        locale: {
+            firstDayOfWeek: 1, // Monday
+            weekdays: {
+                shorthand: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+                longhand: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+            },
+            months: {
+                shorthand: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                longhand: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+            }
+        },
+        onReady: function(selectedDates, dateStr, instance) {
+            // Add custom classes for styling
+            instance.calendarContainer.classList.add('flatpickr-range-mode');
+        },
+        onClose: function(selectedDates, dateStr, instance) {
+            // Prevent immediate reopening
+            instance.input.blur();
+        },
+        onChange: function(selectedDates, dateStr, instance) {
+            // Update input display when dates are selected
+            if (selectedDates.length === 2) {
+                const startDate = selectedDates[0];
+                const endDate = selectedDates[1];
+                const formattedStart = startDate.toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric', 
+                    year: 'numeric' 
+                });
+                const formattedEnd = endDate.toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric', 
+                    year: 'numeric' 
+                });
+                instance.input.value = `${formattedStart} to ${formattedEnd}`;
+                
+                // Auto-apply filter when both dates are selected
+                // Use local date formatting to avoid timezone issues
+                const dateFrom = startDate.getFullYear() + '-' + 
+                    String(startDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                    String(startDate.getDate()).padStart(2, '0');
+                const dateTo = endDate.getFullYear() + '-' + 
+                    String(endDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                    String(endDate.getDate()).padStart(2, '0');
+                
+                // Remove active class from all predefined filter buttons
+                $('.filter-btn').removeClass('active');
+                
+                // Update the DataTable's AJAX URL with custom date range
+                table.ajax.url(`/booking/booking_data?filter=custom&scope=${scope}&dateFrom=${dateFrom}&dateTo=${dateTo}`).load();
+                
+                // Close the calendar after applying filter with a small delay
+                setTimeout(() => {
+                    instance.close();
+                }, 100);
+                
+                // Show success message
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Filter Applied',
+                    text: `Showing bookings from ${formattedStart} to ${formattedEnd}`,
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+            }
+        }
+    });
+
     // Handle filter button clicks
     $('.filter-btn').on('click', function() {
         // Remove active class from all filter buttons
@@ -279,11 +359,27 @@ $(document).ready(function () {
         // Add active class to clicked button
         $(this).addClass('active');
         
+        // Clear custom date picker when using predefined filters
+        dateRangePicker.clear();
+        
         // Get the filter value
         let filter = $(this).data('filter');
         
         // Update the DataTable's AJAX URL
         table.ajax.url(`/booking/booking_data?filter=${filter}&scope=${scope}`).load();
+    });
+    
+    
+    // Handle clear date filter
+    $('#clearDateFilter').on('click', function() {
+        dateRangePicker.clear();
+        
+        // Reset to "All" filter
+        $('.filter-btn').removeClass('active');
+        $('.filter-btn[data-filter="all"]').addClass('active');
+        
+        // Update the DataTable's AJAX URL
+        table.ajax.url(`/booking/booking_data?filter=all&scope=${scope}`).load();
     });
     ;(function(){
         const params      = new URLSearchParams(window.location.search);

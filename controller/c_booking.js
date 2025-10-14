@@ -120,59 +120,66 @@ class BookingController {
       ];
       const orderByColumn = columns[orderColumnIndex] || 'b.ENCODED_DT';
 
-      // date-filter logic (unchanged)
+      // date-filter logic (enhanced with custom date range)
       const filter = req.query.filter || 'all';
       const scope = (req.query.scope || '').toLowerCase(); // 'single' | 'all' | 'agency'
+      const dateFrom = req.query.dateFrom;
+      const dateTo = req.query.dateTo;
       let dateCondition = '';
       let channelCondition = '';
       let groupCondition = '';
       
-      switch (filter.toLowerCase()) {
-        case 'today':
-          dateCondition = `AND DATE(b.ENCODED_DT) = CURRENT_DATE()`;
-          break;
-        case 'last3days':
-          dateCondition = `
-            AND b.ENCODED_DT >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 DAY)
-            AND b.ENCODED_DT <= CURRENT_DATE()
-          `;
-          break;
-        case 'thisweek':
-          dateCondition = `AND YEARWEEK(b.ENCODED_DT, 1) = YEARWEEK(CURRENT_DATE(), 1)`;
-          break;
-        case 'thismonth':
-          dateCondition = `
-            AND MONTH(b.ENCODED_DT) = MONTH(CURRENT_DATE())
-            AND YEAR(b.ENCODED_DT)  = YEAR(CURRENT_DATE())
-          `;
-          break;
-        case 'agency':
-          channelCondition = `AND b.BOOKING_CHANNEL = 'agency'`;
-          break;
-        case 'agency_today':
-          dateCondition = `AND DATE(b.ENCODED_DT) = CURRENT_DATE()`;
-          channelCondition = `AND b.BOOKING_CHANNEL = 'agency'`;
-          break;
-        case 'agency_last3days':
-          dateCondition = `
-            AND b.ENCODED_DT >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 DAY)
-            AND b.ENCODED_DT <= CURRENT_DATE()
-          `;
-          channelCondition = `AND b.BOOKING_CHANNEL = 'agency'`;
-          break;
-        case 'agency_thisweek':
-          dateCondition = `AND YEARWEEK(b.ENCODED_DT, 1) = YEARWEEK(CURRENT_DATE(), 1)`;
-          channelCondition = `AND b.BOOKING_CHANNEL = 'agency'`;
-          break;
-        case 'agency_thismonth':
-          dateCondition = `
-            AND MONTH(b.ENCODED_DT) = MONTH(CURRENT_DATE())
-            AND YEAR(b.ENCODED_DT)  = YEAR(CURRENT_DATE())
-          `;
-          channelCondition = `AND b.BOOKING_CHANNEL = 'agency'`;
-          break;
-        default:
-          dateCondition = '';
+      // Check if custom date range is provided
+      if (dateFrom && dateTo && filter === 'custom') {
+        dateCondition = `AND DATE(b.ENCODED_DT) >= '${dateFrom}' AND DATE(b.ENCODED_DT) <= '${dateTo}'`;
+      } else {
+        switch (filter.toLowerCase()) {
+          case 'today':
+            dateCondition = `AND DATE(b.ENCODED_DT) = CURRENT_DATE()`;
+            break;
+          case 'last3days':
+            dateCondition = `
+              AND b.ENCODED_DT >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 DAY)
+              AND b.ENCODED_DT <= CURRENT_DATE()
+            `;
+            break;
+          case 'thisweek':
+            dateCondition = `AND YEARWEEK(b.ENCODED_DT, 1) = YEARWEEK(CURRENT_DATE(), 1)`;
+            break;
+          case 'thismonth':
+            dateCondition = `
+              AND MONTH(b.ENCODED_DT) = MONTH(CURRENT_DATE())
+              AND YEAR(b.ENCODED_DT)  = YEAR(CURRENT_DATE())
+            `;
+            break;
+          case 'agency':
+            channelCondition = `AND b.BOOKING_CHANNEL = 'agency'`;
+            break;
+          case 'agency_today':
+            dateCondition = `AND DATE(b.ENCODED_DT) = CURRENT_DATE()`;
+            channelCondition = `AND b.BOOKING_CHANNEL = 'agency'`;
+            break;
+          case 'agency_last3days':
+            dateCondition = `
+              AND b.ENCODED_DT >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 DAY)
+              AND b.ENCODED_DT <= CURRENT_DATE()
+            `;
+            channelCondition = `AND b.BOOKING_CHANNEL = 'agency'`;
+            break;
+          case 'agency_thisweek':
+            dateCondition = `AND YEARWEEK(b.ENCODED_DT, 1) = YEARWEEK(CURRENT_DATE(), 1)`;
+            channelCondition = `AND b.BOOKING_CHANNEL = 'agency'`;
+            break;
+          case 'agency_thismonth':
+            dateCondition = `
+              AND MONTH(b.ENCODED_DT) = MONTH(CURRENT_DATE())
+              AND YEAR(b.ENCODED_DT)  = YEAR(CURRENT_DATE())
+            `;
+            channelCondition = `AND b.BOOKING_CHANNEL = 'agency'`;
+            break;
+          default:
+            dateCondition = '';
+        }
       }
 
       // Apply grouping scope rules
@@ -186,6 +193,10 @@ class BookingController {
           FROM booking b2
           WHERE b2.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID
         ))`;
+      } else if (scope === 'agency') {
+        // Agency tab: only agency bookings
+        groupCondition = `AND b.GROUP_BOOKING_ID IS NULL`;
+        channelCondition = `AND b.BOOKING_CHANNEL = 'agency'`;
       } else {
         groupCondition = '';
       }
@@ -1426,8 +1437,10 @@ class BookingController {
   static async getGroupBookingData(req, res) {
     try {
       const filter = req.query.filter || 'all';
+      const dateFrom = req.query.dateFrom;
+      const dateTo = req.query.dateTo;
 
-      const groupBookingData = await BookingModel.getGroupBookingData(filter);
+      const groupBookingData = await BookingModel.getGroupBookingData(filter, dateFrom, dateTo);
 
       res.json(groupBookingData);
 

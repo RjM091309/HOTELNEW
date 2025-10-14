@@ -2449,18 +2449,23 @@ class BookingModel {
   }
 
   // Get group booking data
-  static async getGroupBookingData(filter) {
+  static async getGroupBookingData(filter, dateFrom, dateTo) {
     try {
       let dateCondition = '';
       
-      if (filter === 'today') {
-        dateCondition = 'AND DATE(b.ENCODED_DT) = CURDATE()';
-      } else if (filter === 'last3days') {
-        dateCondition = 'AND DATE(b.ENCODED_DT) >= DATE_SUB(CURDATE(), INTERVAL 3 DAY)';
-      } else if (filter === 'thisweek') {
-        dateCondition = 'AND YEARWEEK(b.ENCODED_DT) = YEARWEEK(CURDATE())';
-      } else if (filter === 'thismonth') {
-        dateCondition = 'AND YEAR(b.ENCODED_DT) = YEAR(CURDATE()) AND MONTH(b.ENCODED_DT) = MONTH(CURDATE())';
+      // Check if custom date range is provided
+      if (dateFrom && dateTo && filter === 'custom') {
+        dateCondition = `AND DATE(b.ENCODED_DT) >= '${dateFrom}' AND DATE(b.ENCODED_DT) <= '${dateTo}'`;
+      } else {
+        if (filter === 'today') {
+          dateCondition = 'AND DATE(b.ENCODED_DT) = CURDATE()';
+        } else if (filter === 'last3days') {
+          dateCondition = 'AND DATE(b.ENCODED_DT) >= DATE_SUB(CURDATE(), INTERVAL 3 DAY)';
+        } else if (filter === 'thisweek') {
+          dateCondition = 'AND YEARWEEK(b.ENCODED_DT) = YEARWEEK(CURDATE())';
+        } else if (filter === 'thismonth') {
+          dateCondition = 'AND YEAR(b.ENCODED_DT) = YEAR(CURDATE()) AND MONTH(b.ENCODED_DT) = MONTH(CURDATE())';
+        }
       }
 
       const query = `

@@ -18,6 +18,17 @@
                             <button type="button" class="filter-btn" data-filter="thisWeek">This Week</button>
                             <button type="button" class="filter-btn" data-filter="thisMonth">This Month</button>
                         </div>
+                        
+                        <!-- Custom Date Range Filter with Flatpickr -->
+                        <div class="custom-date-filter" style="margin-left: 20px; display: flex; align-items: center; gap: 10px;">
+                            <div class="date-picker-container">
+                                <input type="text" id="dateRangePicker" class="date-range-input" placeholder="Select date range" readonly>
+                                <i class="fa fa-calendar-alt date-picker-icon"></i>
+                            </div>
+                            <button type="button" id="clearDateFilter" class="btn btn-secondary" style="height: 25px; padding: 0 15px; font-size: 10px;">
+                                <i class="fa fa-times"></i> Clear
+                            </button>
+                        </div>
                     </div>
                     
                     <div style="flex: 0 0 auto; display: flex; gap: 10px;">
@@ -165,6 +176,121 @@
 <script>
     // Expose the openRemarksModal function globally
     window.openRemarksModal = openRemarksModal;
+    
+    // Initialize Flatpickr for date range picker on Single booking page
+    $(document).ready(function() {
+        // Determine scope for Single page
+        const scope = 'single';
+        
+        // Initialize Flatpickr for date range picker
+        let dateRangePicker = flatpickr("#dateRangePicker", {
+            mode: "range",
+            dateFormat: "Y-m-d",
+            allowInput: false,
+            clickOpens: true,
+            placeholder: "Select date range",
+            showMonths: 2,
+            static: false,
+            monthSelectorType: "static",
+            prevArrow: '<i class="fa fa-chevron-left"></i>',
+            nextArrow: '<i class="fa fa-chevron-right"></i>',
+            locale: {
+                firstDayOfWeek: 1, // Monday
+                weekdays: {
+                    shorthand: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+                    longhand: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+                },
+                months: {
+                    shorthand: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                    longhand: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+                }
+            },
+            onReady: function(selectedDates, dateStr, instance) {
+                // Add custom classes for styling
+                instance.calendarContainer.classList.add('flatpickr-range-mode');
+            },
+            onClose: function(selectedDates, dateStr, instance) {
+                // Prevent immediate reopening
+                instance.input.blur();
+            },
+            onChange: function(selectedDates, dateStr, instance) {
+                // Update input display when dates are selected
+                if (selectedDates.length === 2) {
+                    const startDate = selectedDates[0];
+                    const endDate = selectedDates[1];
+                    const formattedStart = startDate.toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        year: 'numeric' 
+                    });
+                    const formattedEnd = endDate.toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        year: 'numeric' 
+                    });
+                    instance.input.value = `${formattedStart} to ${formattedEnd}`;
+                    
+                    // Auto-apply filter when both dates are selected
+                    // Use local date formatting to avoid timezone issues
+                    const dateFrom = startDate.getFullYear() + '-' + 
+                        String(startDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                        String(startDate.getDate()).padStart(2, '0');
+                    const dateTo = endDate.getFullYear() + '-' + 
+                        String(endDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                        String(endDate.getDate()).padStart(2, '0');
+                    
+                    // Remove active class from all predefined filter buttons
+                    $('.filter-btn').removeClass('active');
+                    
+                    // Update the DataTable's AJAX URL with custom date range
+                    $('#booking_tbl').DataTable().ajax.url(`/booking/booking_data?filter=custom&scope=${scope}&dateFrom=${dateFrom}&dateTo=${dateTo}`).load();
+                    
+                    // Close the calendar after applying filter with a small delay
+                    setTimeout(() => {
+                        instance.close();
+                    }, 100);
+                    
+                    // Show success message
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Filter Applied',
+                        text: `Showing bookings from ${formattedStart} to ${formattedEnd}`,
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                }
+            }
+        });
+
+        // Handle filter button clicks
+        $('.filter-btn').on('click', function() {
+            // Remove active class from all filter buttons
+            $('.filter-btn').removeClass('active');
+            // Add active class to clicked button
+            $(this).addClass('active');
+            
+            // Clear custom date picker when using predefined filters
+            dateRangePicker.clear();
+            
+            // Get the filter value
+            let filter = $(this).data('filter');
+            
+            // Update the DataTable's AJAX URL
+            $('#booking_tbl').DataTable().ajax.url(`/booking/booking_data?filter=${filter}&scope=${scope}`).load();
+        });
+        
+        // Handle clear date filter
+        $('#clearDateFilter').on('click', function() {
+            dateRangePicker.clear();
+            
+            // Reset to "Today" filter (default for Single page)
+            $('.filter-btn').removeClass('active');
+            $('.filter-btn[data-filter="today"]').addClass('active');
+            
+            // Update the DataTable's AJAX URL
+            $('#booking_tbl').DataTable().ajax.url(`/booking/booking_data?filter=today&scope=${scope}`).load();
+        });
+    });
 </script>
 
 <script src="/js/booking/booking_submit.js"></script> 
@@ -308,5 +434,194 @@
     background-color: #0a1f2e;
     border-color: #0a1f2e;
     color: #ffffff;
+}
+
+/* Custom Date Range Filter Styles */
+.date-picker-container {
+    position: relative;
+    display: inline-block;
+}
+
+.date-range-input {
+    background-color: #2a3135 !important;
+    border: 1px solid #3B3B3B !important;
+    color: #e0e0e0 !important;
+    border-radius: 4px;
+    padding: 8px 35px 8px 12px;
+    font-size: 12px;
+    width: 200px;
+    height: 35px;
+    cursor: pointer;
+    transition: border-color 0.3s ease;
+}
+
+.date-range-input:focus {
+    border-color: #007bff !important;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    outline: none;
+}
+
+.date-picker-icon {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #e0e0e0;
+    cursor: pointer;
+    pointer-events: none;
+}
+
+.custom-date-filter .btn {
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.custom-date-filter .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* Flatpickr Custom Styling for Dark Theme */
+.flatpickr-calendar {
+    background: #ffffff !important;
+    border: 1px solid #dee2e6 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
+    font-family: inherit !important;
+}
+
+.flatpickr-calendar.open {
+    z-index: 9999 !important;
+}
+
+.flatpickr-calendar .flatpickr-months {
+    background: #f8f9fa !important;
+    border-bottom: 1px solid #dee2e6 !important;
+    border-radius: 8px 8px 0 0 !important;
+    padding: 15px 20px !important;
+}
+
+.flatpickr-calendar .flatpickr-month {
+    background: transparent !important;
+    color: #333 !important;
+    font-weight: 600 !important;
+    font-size: 16px !important;
+}
+
+.flatpickr-calendar .flatpickr-prev-month,
+.flatpickr-calendar .flatpickr-next-month {
+    color: #666 !important;
+    padding: 5px 10px !important;
+    border-radius: 4px !important;
+    transition: background-color 0.2s ease !important;
+}
+
+.flatpickr-calendar .flatpickr-prev-month:hover,
+.flatpickr-calendar .flatpickr-next-month:hover {
+    background-color: #f8f9fa !important;
+    color: #333 !important;
+}
+
+.flatpickr-calendar .flatpickr-weekdays {
+    background: #f8f9fa !important;
+    border-bottom: 1px solid #dee2e6 !important;
+}
+
+.flatpickr-calendar .flatpickr-weekday {
+    color: #666 !important;
+    font-weight: 600 !important;
+    font-size: 12px !important;
+    padding: 8px 4px !important;
+}
+
+.flatpickr-calendar .flatpickr-days {
+    background: #ffffff !important;
+}
+
+.flatpickr-calendar .flatpickr-day {
+    color: #333 !important;
+    background: #ffffff !important;
+    border: 1px solid transparent !important;
+    transition: all 0.2s ease !important;
+    font-size: 14px !important;
+}
+
+.flatpickr-calendar .flatpickr-day:hover {
+    background-color: #f8f9fa !important;
+    border-color: #dee2e6 !important;
+}
+
+.flatpickr-calendar .flatpickr-day.selected {
+    background-color: #007bff !important;
+    color: white !important;
+    border-color: #007bff !important;
+}
+
+.flatpickr-calendar .flatpickr-day.startRange,
+.flatpickr-calendar .flatpickr-day.endRange {
+    background-color: #007bff !important;
+    color: white !important;
+    border-color: #007bff !important;
+}
+
+.flatpickr-calendar .flatpickr-day.inRange {
+    background-color: #e3f2fd !important;
+    color: #1976d2 !important;
+    border-color: transparent !important;
+}
+
+.flatpickr-calendar .flatpickr-day.today {
+    border-color: #007bff !important;
+    font-weight: 600 !important;
+}
+
+.flatpickr-calendar .flatpickr-day.today:hover {
+    background-color: #f8f9fa !important;
+}
+
+.flatpickr-calendar .flatpickr-day.disabled {
+    color: #ccc !important;
+    cursor: not-allowed !important;
+    background-color: #f8f9fa !important;
+}
+
+.flatpickr-calendar .flatpickr-day.disabled:hover {
+    background-color: #f8f9fa !important;
+    border-color: transparent !important;
+}
+
+/* Range Mode Specific Styling */
+.flatpickr-calendar.rangeMode .flatpickr-day.inRange {
+    background-color: #e3f2fd !important;
+    color: #1976d2 !important;
+}
+
+.flatpickr-calendar.rangeMode .flatpickr-day.startRange,
+.flatpickr-calendar.rangeMode .flatpickr-day.endRange {
+    background-color: #007bff !important;
+    color: white !important;
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 1200px) {
+    .custom-date-filter {
+        flex-direction: column;
+        gap: 8px;
+        margin-left: 10px;
+    }
+    
+    .date-range-input {
+        width: 180px;
+    }
+    
+    .custom-date-filter .btn {
+        padding: 0 10px;
+        font-size: 11px;
+    }
+    
+    .flatpickr-calendar {
+        width: 100% !important;
+        max-width: 300px !important;
+    }
 }
 </style> 
