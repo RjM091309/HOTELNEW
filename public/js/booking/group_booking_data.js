@@ -16,7 +16,9 @@ $(document).ready(function () {
                         TotalBookings: item.total_bookings,
                         Channel: item.BOOKING_CHANNEL,
                         Status: item.STATUS_OVERVIEW,
-                        TotalPayment: item.TOTAL_PAYMENT
+                        TotalPayment: item.TOTAL_PAYMENT,
+                        TotalPaid: item.TOTAL_PAID,
+                        PaymentStatus: item.PAYMENT_STATUS
                     };
                 });
             },
@@ -57,11 +59,51 @@ $(document).ready(function () {
                     });
                 }
             },
+            {
+                data: null,
+                title: 'TOTAL BALANCE',
+                render: function (data, type, row) {
+                    const totalPayment = parseFloat(row.TotalPayment) || 0;
+                    const totalPaid = parseFloat(row.TotalPaid) || 0;
+                    const balance = totalPayment - totalPaid;
+                    
+                    // Format the balance as currency (matching single booking table)
+                    const formattedBalance = balance.toLocaleString('en-US', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    });
+                    
+                    // Add color coding for balance (matching single booking table)
+                    if (balance > 0) {
+                        return `<span style="color: #d9534f; font-weight: bold;">₱${formattedBalance}</span>`;
+                    } else if (balance < 0) {
+                        return `<span style="color: #5cb85c; font-weight: bold;">₱${formattedBalance}</span>`;
+                    } else {
+                        return `<span>₱${formattedBalance}</span>`;
+                    }
+                }
+            },
+            {
+                data: 'PaymentStatus',
+                title: 'PAYMENT STATUS',
+                type: 'string',
+                render: function (data, type, row) {
+                    // For sorting and filtering, return the raw normalized data
+                    if (type === 'sort' || type === 'type' || type === 'filter') {
+                        return data; // Already normalized in dataSrc
+                    }
+                    // For display, return the styled HTML (matching single booking table)
+                    const labelClass = data === 'paid' ? 'label-success' : 'label-danger';
+                    const displayText = data === 'paid' ? 'PAID' : 'UNPAID';
+                    return `<div style="text-align: center;"><span class="label label-sm ${labelClass}">${displayText}</span></div>`;
+                }
+            },
+          
             { data: 'Channel', title: 'BOOKING CHANNEL' },
             {
                 data: 'Status',
                 title: 'BOOKING STATUS',
-                visible: false, // This hides the column
+                visible: true, // Make the column visible
                 render: function (data) {
                     let labelClass = "label-secondary";
                     if (data === "ALL CHECK-IN") labelClass = "label-success";
@@ -71,7 +113,7 @@ $(document).ready(function () {
                     else if (data.includes("PENDING & CHECK-IN")) labelClass = "label-dark";
                     else if (data.includes("PENDING & CHECK-OUT")) labelClass = "label-light";
 
-                    return `<span class="label label-sm ${labelClass}">${data}</span>`;
+                    return `<div style="text-align: center;"><span class="label label-sm ${labelClass}">${data}</span></div>`;
                 }
             },
             {
@@ -110,7 +152,62 @@ $(document).ready(function () {
         ],
         language: {
             emptyTable: "No group bookings available."
-        }
+        },
+        columnDefs: [
+            {
+                targets: 0, // # column
+                width: '40px',
+                className: 'text-center'
+            },
+            {
+                targets: 1, // GROUP NAME
+                width: '100px'
+            },
+            {
+                targets: 2, // CONTACT NUMBER
+                width: '100px',
+                className: 'text-center'
+            },
+            {
+                targets: 3, // TOTAL ROOMS
+                width: '80px',
+                className: 'text-center'
+            },
+            {
+                targets: 4, // ROOM NUMBERS
+                width: '170px'
+            },
+            {
+                targets: 5, // TOTAL PAYMENT
+                width: '100px',
+                className: 'text-right'
+            },
+            {
+                targets: 6, // TOTAL BALANCE
+                width: '100px',
+                className: 'text-right'
+            },
+            {
+                targets: 7, // PAYMENT STATUS
+                width: '100px',
+                className: 'text-center'
+            },
+            {
+                targets: 8, // BOOKING CHANNEL
+                width: '100px',
+                className: 'text-center'
+            },
+            {
+                targets: 9, // BOOKING STATUS
+                width: '120px',
+                className: 'text-center'
+            },
+            {
+                targets: 10, // ACTION
+                width: '100px',
+                className: 'text-center'
+            }
+        ]
     });
     
     // Handle custom tab clicks (Single/Group)

@@ -42,9 +42,8 @@ function populateDropdownFromCache(selector, addPlaceholder, placeholderText) {
     const floorDropdown = $(selector);
     floorDropdown.empty();
     
-    if (addPlaceholder) {
-        floorDropdown.append(`<option value="" disabled selected>${placeholderText}</option>`);
-    }
+    // Always add "Select Floor" option first
+    floorDropdown.append(`<option value="" disabled selected>Select Floor</option>`);
 
     (floorDataCache || []).forEach(function(floor) {
         floorDropdown.append(`<option value="${floor.floor_number}">${floor.floor_number} Floor</option>`);

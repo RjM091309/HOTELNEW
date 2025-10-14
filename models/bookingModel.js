@@ -2485,6 +2485,29 @@ class BookingModel {
             - COALESCE(gb.GROUP_DISCOUNT, 0)
             - COALESCE(gb.GROUP_RESERVATION_FEE, 0)
           ) AS TOTAL_PAYMENT,
+          -- Calculate total paid amount for the group
+          COALESCE(SUM(
+            CASE 
+              WHEN bill.PAYMENT_STATUS = 'paid' THEN 
+                (bill.ROOM_CHARGE * 
+                  CASE 
+                    WHEN bill.ORIGINAL_QTY IS NOT NULL THEN bill.ORIGINAL_QTY
+                    ELSE bill.QTY
+                  END
+                ) + 
+                COALESCE((
+                  SELECT SUM(bs.TOTAL_COST) 
+                  FROM booking_service bs 
+                  WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1 AND bs.STATUS = 'paid'
+                ), 0) +
+                COALESCE((
+                  SELECT SUM(be.COST * be.QTY) 
+                  FROM booking_extension be 
+                  WHERE be.BOOKING_ID = b.IDNo AND be.PAYMENT_STATUS = 'paid'
+                ), 0)
+              ELSE 0
+            END
+          ), 0) AS TOTAL_PAID,
           -- Get all statuses in a group
           GROUP_CONCAT(DISTINCT b.BOOKING_STATUS ORDER BY b.BOOKING_STATUS SEPARATOR ', ') AS all_statuses,
           -- Status Overview Logic
@@ -2505,7 +2528,23 @@ class BookingModel {
             WHEN GROUP_CONCAT(DISTINCT b.BOOKING_STATUS ORDER BY b.BOOKING_STATUS) = 'pending' 
               THEN 'ALL PENDING'
             ELSE 'MIXED STATUS'
-          END AS STATUS_OVERVIEW
+          END AS STATUS_OVERVIEW,
+          -- Payment Status Logic (similar to getBookingDataEnhanced)
+          CASE 
+            WHEN COUNT(CASE WHEN bill.PAYMENT_STATUS = 'paid' THEN 1 END) = COUNT(b.IDNo)
+              AND COUNT(CASE WHEN EXISTS(
+                SELECT 1 FROM booking_service bs 
+                WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1 AND bs.STATUS = 'unpaid'
+              ) THEN 1 END) = 0
+              AND COUNT(CASE WHEN EXISTS(
+                SELECT 1 FROM booking_extension be 
+                WHERE be.BOOKING_ID = b.IDNo AND be.PAYMENT_STATUS = 'unpaid'
+              ) THEN 1 END) = 0
+              THEN 'paid'
+            WHEN COUNT(CASE WHEN bill.PAYMENT_STATUS = 'paid' THEN 1 END) > 0
+              THEN 'partial_paid'
+            ELSE 'unpaid'
+          END AS PAYMENT_STATUS
         FROM booking b
         JOIN group_booking gb ON b.GROUP_BOOKING_ID = gb.IDNo
         JOIN room r ON b.ROOM_ID = r.IDNo
