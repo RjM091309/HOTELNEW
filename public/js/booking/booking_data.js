@@ -592,7 +592,7 @@ function showVoucherDetails(bookingID) {
                 document.getElementById('voucher-total-balance').textContent = `PHP ${parseFloat(totalBalance).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
                 // Grand Total (Total Amount + Reservation Fee - Discount)
-                const grandTotal = (parseFloat(data.total || 0) + parseFloat(reservationFee) - parseFloat(discountAmount));
+                const grandTotal = (parseFloat(data.total || 0));
                 document.getElementById('voucher-grand-total').textContent = `PHP ${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
                 
                 // Store booking ID for download function

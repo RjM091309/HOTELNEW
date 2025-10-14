@@ -418,7 +418,7 @@ class DashboardModel {
           JOIN room r ON b1.ROOM_ID = r.IDNo
           LEFT JOIN customer c1 ON b1.CUSTOMER_ID = c1.IDNo
           LEFT JOIN booking b2 ON b1.ROOM_ID = b2.ROOM_ID 
-            AND DATE(b2.CHECK_IN_DATE) >= DATE(b1.CHECK_OUT_DATE) 
+            AND DATE(b2.CHECK_IN_DATE) = DATE(b1.CHECK_OUT_DATE) 
             AND b2.ACTIVE = 1
           LEFT JOIN customer c2 ON b2.CUSTOMER_ID = c2.IDNo
           WHERE 
