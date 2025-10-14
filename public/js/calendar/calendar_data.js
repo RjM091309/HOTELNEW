@@ -2,9 +2,13 @@
 // CALENDAR CONFIGURATION AND INITIALIZATION
 // =============================================================================
 
-// Load booking module first to ensure all booking functions are available
-// This module contains all booking-related functionality
-// <script src="/js/calendar/calendar_booking_data.js"></script>
+// Load calendar modules in dependency order
+// <script src="/js/calendar/calendar_utils.js"></script>
+// <script src="/js/calendar/calendar_events.js"></script>
+// <script src="/js/calendar/calendar_modals.js"></script>
+// <script src="/js/calendar/calendar_drag_drop.js"></script>
+// <script src="/js/calendar/calendar_validation.js"></script>
+// <script src="/js/calendar/calendar_styles.js"></script>
 
 // IMPORTANT: This calendar integrates with the room menu modal (room-menu_data.js)
 // When events are dragged and dropped to transfer rooms, the transfer is logged
@@ -612,8 +616,8 @@ function processRoomsData(roomsData) {
   return sortedFloors;
 }
 
-// These functions are now moved to calendar_booking_data.js module
-// They are available globally via window.processBookingsData and window.getBookingColor
+// NOTE: processBookingsData() has been removed - backend now handles all data processing
+// getBookingColor() is still available globally via window.getBookingColor
 
 // =============================================================================
 // SCROLL TO DATE FUNCTIONALITY - REMOVED
@@ -871,7 +875,7 @@ async function loadCalendarData() {
         if (!res.ok) throw new Error(`Rooms API error: ${res.status}`);
         return res.json();
       }),
-      fetch('/calendar/bookings').then(res => {
+      fetch('/calendar/api/bookings/optimized').then(res => {
         if (!res.ok) throw new Error(`Bookings API error: ${res.status}`);
         return res.json();
       })
@@ -885,8 +889,9 @@ async function loadCalendarData() {
     // OPTIMIZED: Process data in chunks to prevent blocking
     const sortedFloors = processRoomsData(roomsData);
     
-    // Process bookings with performance optimization
-    const events = await processBookingsData(bookingsData);
+    // OPTIMIZED: Backend already returns FullCalendar-formatted events
+    // No need to process through processBookingsData since backend handles it
+    const events = bookingsData;
 
     // Render calendar with performance optimization
     const renderStart = Date.now();

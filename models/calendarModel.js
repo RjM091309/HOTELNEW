@@ -87,7 +87,7 @@ class CalendarModel {
     }
   }
 
-  // Get bookings for FullCalendar
+  // Get bookings for FullCalendar - OPTIMIZED VERSION
   static async getBookingsForCalendar(start, end) {
     try {
       const results = await queryDatabasePromise(`
@@ -125,6 +125,96 @@ class CalendarModel {
 
       return events;
     } catch (error) {
+      throw error;
+    }
+  }
+
+  // NEW: Get optimized bookings for calendar with pre-processed data
+  static async getOptimizedBookingsForCalendar(start, end) {
+    try {
+      // Build query with optional date filtering
+      let whereClause = 'WHERE b.ACTIVE = 1';
+      let queryParams = [];
+      
+      if (start && end) {
+        whereClause += ' AND (b.CHECK_IN_DATE <= ? AND b.CHECK_OUT_DATE > ?)';
+        queryParams = [end, start];
+      }
+      
+      const rows = await queryDatabasePromise(`
+        SELECT 
+          b.IDNo AS id,
+          b.ROOM_ID AS resourceIds,
+          c.NAME AS title,
+          b.CHECK_IN_DATE AS start,
+          b.CHECK_OUT_DATE AS end,
+          -- Pre-calculated background colors
+          CASE 
+            WHEN b.BOOKING_STATUS = 'check-In' THEN 'green'
+            WHEN b.BOOKING_STATUS = 'check-Out' THEN '#B3B3B3'
+            WHEN b.BOOKING_STATUS = 'pending' AND COALESCE(b.CHECK_IN_STATUS, 1) = 0 THEN '#fff700'
+            WHEN b.BOOKING_STATUS = 'pending' THEN '#e53935'
+            WHEN b.BOOKING_STATUS = 'cancelled' THEN '#000000'
+            ELSE 'pink'
+          END AS backgroundColor,
+          -- Pre-calculated extended properties
+          COALESCE(bill.ROOM_CHARGE, 0) + COALESCE(bill.AMENITIES_CHARGE, 0) + COALESCE(bill.SERVICES_CHARGE, 0) + COALESCE(bill.LATE_CHECKOUT_CHARGE, 0) AS totalCost,
+          bill.PAYMENT_STATUS AS paymentStatus,
+          DATEDIFF(b.CHECK_OUT_DATE, b.CHECK_IN_DATE) AS totalDays,
+          b.BOOKING_STATUS AS bookingStatus,
+          COALESCE(b.CHECK_IN_STATUS, 1) AS checkInStatus,
+          COALESCE(b.LATE_CHECKOUT, 0) AS checkOutStatus,
+          b.GROUP_BOOKING_ID AS groupBookingId,
+          -- Pre-calculated composite status for styling
+          CASE 
+            WHEN b.BOOKING_STATUS = 'pending' THEN 
+              CONCAT(
+                CASE WHEN COALESCE(b.CHECK_IN_STATUS, 1) = 1 THEN 'regular' ELSE 'late' END,
+                '|',
+                CASE WHEN COALESCE(b.LATE_CHECKOUT, 0) = 1 THEN 'late' ELSE 'regular' END
+              )
+            WHEN b.BOOKING_STATUS = 'check-In' THEN 
+              CONCAT('occupied|', CASE WHEN COALESCE(b.LATE_CHECKOUT, 0) = 1 THEN 'late' ELSE 'regular' END)
+            ELSE 'none'
+          END AS compositeStatus
+        FROM booking b
+        INNER JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+        LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo AND bill.ACTIVE = 1
+        ${whereClause}
+        ORDER BY b.CHECK_IN_DATE ASC
+      `, queryParams);
+      
+      // Format the data for FullCalendar
+      return rows.map(row => {
+        // Ensure proper date formatting for FullCalendar
+        const startDate = new Date(row.start);
+        const endDate = new Date(row.end);
+        
+        // Set check-in time to 2 PM and check-out time to 11 AM
+        startDate.setHours(14, 0, 0, 0);  // 2 PM
+        endDate.setHours(11, 0, 0, 0);    // 11 AM
+        
+        return {
+          id: String(row.id),
+          resourceIds: [String(row.resourceIds)],
+          title: row.title || 'No Name',
+          start: startDate.toISOString(),
+          end: endDate.toISOString(),
+          backgroundColor: row.backgroundColor,
+          extendedProps: {
+            totalCost: row.totalCost,
+            paymentStatus: row.paymentStatus,
+            totalDays: row.totalDays,
+            bookingStatus: row.bookingStatus,
+            checkInStatus: row.checkInStatus,
+            checkOutStatus: row.checkOutStatus,
+            groupBookingId: row.groupBookingId,
+            compositeStatus: row.compositeStatus
+          }
+        };
+      });
+    } catch (error) {
+      console.error('❌ Error in getOptimizedBookingsForCalendar:', error.message);
       throw error;
     }
   }
@@ -1449,6 +1539,77 @@ class CalendarModel {
 
       return { success: true, bookings };
     } catch (error) {
+      throw error;
+    }
+  }
+
+  // NEW: Backend overlap detection - replaces frontend logic
+  static async checkBookingOverlaps(roomId, checkIn, checkOut, excludeBookingId = null) {
+    try {
+      const whereClause = excludeBookingId ? 'AND b.IDNo != ?' : '';
+      const params = excludeBookingId ? [roomId, checkIn, checkOut, excludeBookingId] : [roomId, checkIn, checkOut];
+      
+      const overlaps = await queryDatabasePromise(`
+        SELECT 
+          b.IDNo,
+          c.NAME AS CUSTOMER_NAME,
+          b.CHECK_IN_DATE,
+          b.CHECK_OUT_DATE,
+          b.BOOKING_STATUS
+        FROM booking b
+        INNER JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+        WHERE b.ROOM_ID = ?
+          AND b.ACTIVE = 1
+          AND (
+            (b.CHECK_IN_DATE < ? AND b.CHECK_OUT_DATE > ?) OR
+            (b.CHECK_IN_DATE < ? AND b.CHECK_OUT_DATE > ?)
+          )
+          ${whereClause}
+      `, params);
+      
+      return overlaps;
+    } catch (error) {
+      console.error('❌ Error in checkBookingOverlaps:', error.message);
+      throw error;
+    }
+  }
+
+  // NEW: Backend validation for booking rules - replaces frontend logic
+  static async validateBookingRules(roomId, checkIn, checkOut, bookingId = null) {
+    try {
+      const conflicts = await queryDatabasePromise(`
+        SELECT 
+          'late_checkout_conflict' as conflict_type,
+          b.IDNo,
+          c.NAME as customer_name
+        FROM booking b
+        INNER JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+        WHERE b.ROOM_ID = ?
+          AND b.ACTIVE = 1
+          AND b.CHECK_IN_DATE = DATE(?)
+          AND COALESCE(b.CHECK_IN_STATUS, 1) = 1
+          AND COALESCE(b.LATE_CHECKOUT, 0) = 1
+          ${bookingId ? 'AND b.IDNo != ?' : ''}
+        
+        UNION ALL
+        
+        SELECT 
+          'regular_checkin_conflict' as conflict_type,
+          b.IDNo,
+          c.NAME as customer_name
+        FROM booking b
+        INNER JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+        WHERE b.ROOM_ID = ?
+          AND b.ACTIVE = 1
+          AND b.CHECK_OUT_DATE = DATE(?)
+          AND COALESCE(b.LATE_CHECKOUT, 0) = 1
+          AND COALESCE(b.CHECK_IN_STATUS, 1) = 1
+          ${bookingId ? 'AND b.IDNo != ?' : ''}
+      `, bookingId ? [roomId, checkOut, bookingId, roomId, checkIn, bookingId] : [roomId, checkOut, roomId, checkIn]);
+      
+      return conflicts;
+    } catch (error) {
+      console.error('❌ Error in validateBookingRules:', error.message);
       throw error;
     }
   }

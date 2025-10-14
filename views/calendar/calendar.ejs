@@ -14,7 +14,13 @@
 <script src="/socket.io/socket.io.js"></script>
 
 <script src="/js/dashboard/socket-config.js"></script>
-<script src="/js/calendar/calendar_booking_data.js"></script>
+<!-- Calendar Modules (load in dependency order) -->
+<script src="/js/calendar/calendar_utils.js"></script>
+<script src="/js/calendar/calendar_events.js"></script>
+<script src="/js/calendar/calendar_modals.js"></script>
+<script src="/js/calendar/calendar_drag_drop.js"></script>
+<script src="/js/calendar/calendar_validation.js"></script>
+<script src="/js/calendar/calendar_styles.js"></script>
 <script src="/js/calendar/calendar_data.js"></script>
 <script src="/js/dashboard/room-menu_data.js"></script>
 

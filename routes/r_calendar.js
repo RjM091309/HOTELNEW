@@ -16,10 +16,28 @@ router.get('/api/bookings',
   CalendarController.getBookingsForCalendar
 );
 
+// NEW: Optimized bookings endpoint - replaces heavy frontend processing
+router.get('/api/bookings/optimized', 
+  CalendarSecurity.rateLimit,
+  CalendarSecurity.setSecurityHeaders,
+  CalendarController.getOptimizedBookingsForCalendar
+);
+
 router.get('/api/bookings/details', 
   CalendarSecurity.validateDateRange(), 
   CalendarSecurity.rateLimit,
   CalendarController.getDetailedBookings
+);
+
+// NEW: Backend validation endpoints - replaces frontend logic
+router.get('/api/bookings/check-overlaps', 
+  CalendarSecurity.rateLimit,
+  CalendarController.checkBookingOverlaps
+);
+
+router.get('/api/bookings/validate-rules', 
+  CalendarSecurity.rateLimit,
+  CalendarController.validateBookingRules
 );
 
 router.post('/api/update-booking', 

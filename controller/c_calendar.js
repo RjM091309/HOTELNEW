@@ -95,6 +95,26 @@ class CalendarController {
     }
   }
 
+  // NEW: Get optimized bookings for FullCalendar with pre-processed data
+  static async getOptimizedBookingsForCalendar(req, res) {
+    try {
+      // Make start and end parameters optional to match original behavior
+      const { start, end } = req.query;
+
+      // Using optimized booking endpoint
+      
+      // If no date range provided, get all bookings (like original endpoint)
+      const events = await CalendarModel.getOptimizedBookingsForCalendar(start, end);
+      res.json(events);
+    } catch (error) {
+      console.error('Error fetching optimized bookings for calendar:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error'
+      });
+    }
+  }
+
   // Get detailed bookings for a specific date
   static async getDetailedBookings(req, res) {
     try {
@@ -371,7 +391,7 @@ class CalendarController {
       const result = await CalendarModel.transferRoom(bookingId, oldRoomNumber, newRoomId, transferDate);
       
       if (result.success) {
-        console.log('✅ Calendar transfer successful:', result);
+        // Calendar transfer successful
         res.json({ 
           success: true,
           message: result.message 
@@ -872,6 +892,72 @@ class CalendarController {
       }
     } catch (error) {
       console.error('Error fetching detailed unassigned rooms:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error'
+      });
+    }
+  }
+
+  // NEW: Check booking overlaps - replaces frontend logic
+  static async checkBookingOverlaps(req, res) {
+    try {
+      const { roomId, checkIn, checkOut, excludeBookingId } = req.query;
+
+      if (!roomId || !checkIn || !checkOut) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Missing required parameters (roomId, checkIn, checkOut).' 
+        });
+      }
+
+      const overlaps = await CalendarModel.checkBookingOverlaps(
+        roomId, 
+        checkIn, 
+        checkOut, 
+        excludeBookingId || null
+      );
+      
+      res.json({ 
+        success: true, 
+        overlaps: overlaps,
+        hasOverlaps: overlaps.length > 0
+      });
+    } catch (error) {
+      console.error('Error checking booking overlaps:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error'
+      });
+    }
+  }
+
+  // NEW: Validate booking rules - replaces frontend logic
+  static async validateBookingRules(req, res) {
+    try {
+      const { roomId, checkIn, checkOut, bookingId } = req.query;
+
+      if (!roomId || !checkIn || !checkOut) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Missing required parameters (roomId, checkIn, checkOut).' 
+        });
+      }
+
+      const conflicts = await CalendarModel.validateBookingRules(
+        roomId, 
+        checkIn, 
+        checkOut, 
+        bookingId || null
+      );
+      
+      res.json({ 
+        success: true, 
+        conflicts: conflicts,
+        hasConflicts: conflicts.length > 0
+      });
+    } catch (error) {
+      console.error('Error validating booking rules:', error);
       res.status(500).json({
         success: false,
         message: 'Server error'

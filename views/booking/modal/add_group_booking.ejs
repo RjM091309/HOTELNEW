@@ -1195,59 +1195,18 @@
   }
 
   function fetchGroupFloors() {
-    $.ajax({
-      url: '/booking/get_floors_for_dropdown',
-      method: 'GET',
-      success: function(data) {
-        const select = $('#groupFloorSelect');
-        select.empty();
-        select.append('<option value="" selected>Select Floor</option>');
-        (data || []).forEach(floor => {
-          select.append(`<option value="${floor.floor_number}">${floor.floor_number} Floor</option>`);
-        });
-      },
-      error: function(err) {
-        console.error('Error fetching floors for group booking:', err);
-      }
-    });
+    // Use shared floor dropdown utility
+    populateFloorDropdownGeneric('#groupFloorSelect', true, 'Select Floor');
   }
 
   function loadGroupGuestTypes() {
-    $.ajax({
-      url: '/booking/get_guest_types',
-      method: 'GET',
-      success: function(data) {
-        const select = $('#groupGuestType');
-        select.empty();
-        select.append('<option value="" disabled selected>Guest Type</option>');
-        (data || []).forEach(type => {
-          const selected = type.IDNo == 1 ? ' selected' : '';
-          select.append(`<option value="${type.IDNo}"${selected}>${type.TYPE}</option>`);
-        });
-      },
-      error: function(err) {
-        console.error('Error fetching guest types:', err);
-      }
-    });
+    // Use shared guest types utility
+    populateGuestTypesDropdown('#groupGuestType', true, 'Guest Type');
   }
 
   function loadGroupGuestLevels() {
-    $.ajax({
-      url: '/booking/get_guest_level',
-      method: 'GET',
-      success: function(data) {
-        const select = $('#groupGuestLevel');
-        select.empty();
-        select.append('<option value="" disabled selected>Guest Level</option>');
-        (data || []).forEach(level => {
-          const selected = level.IDNo == 9 ? ' selected' : '';
-          select.append(`<option value="${level.IDNo}"${selected}>${level.TYPE}</option>`);
-        });
-      },
-      error: function(err) {
-        console.error('Error fetching guest levels:', err);
-      }
-    });
+    // Use shared guest levels utility
+    populateGuestLevelsDropdown('#groupGuestLevel', true, 'Guest Level');
   }
 
   function loadGroupAgencies() {
@@ -1269,9 +1228,8 @@
   }
 
   function loadGroupBreakfastPrices() {
-    // Load breakfast service IDs only, not prices
-    fetch('/booking/get-breakfast-prices')
-      .then(res => res.json())
+    // Load breakfast service IDs only, not prices using shared utility
+    getBreakfastPrices()
       .then(data => {
         if (!Array.isArray(data)) return;
         const adult = data.find(item => item.SERVICE_NAME.toLowerCase().includes('adult'));
@@ -1290,8 +1248,8 @@
     groupPickupBaseId = '';
     groupDropoffBaseId = '';
 
-    fetch('/booking/get-pick-drop')
-      .then(res => res.json())
+    // Use shared pick & drop utility
+    getPickDropPrices()
       .then(data => {
         if (!Array.isArray(data)) return;
         const pickup = data.find(item => item.SERVICE_NAME.toLowerCase().includes('pick'));

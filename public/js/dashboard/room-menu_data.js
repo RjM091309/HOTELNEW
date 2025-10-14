@@ -1015,34 +1015,9 @@ function loadGuestTypeAndLevel(customerId, bookingId) {
                 return;
             }
             
-            let guestType = 'N/A';
-            let guestLevel = 'N/A';
-            
-            // Map guest type based on the values from guest-profile.ejs
-            if (customerData.TYPE) {
-                const typeValue = parseInt(customerData.TYPE);
-                switch(typeValue) {
-                    case 1: guestType = 'Golf'; break;
-                    case 2: guestType = 'Group'; break;
-                    case 3: guestType = 'Casino'; break;
-                    case 4: guestType = 'Learning'; break;
-                    case 5: guestType = 'Relaxing'; break;
-                    case 6: guestType = 'Entertainment'; break;
-                    case 7: guestType = 'Investment'; break;
-                    default: guestType = 'N/A';
-                }
-            }
-            
-            // Map guest level based on the values from guest-profile.ejs
-            if (customerData.LEVEL) {
-                const levelValue = parseInt(customerData.LEVEL);
-                switch(levelValue) {
-                    case 1: guestLevel = 'VIP'; break;
-                    case 2: guestLevel = 'Regular'; break;
-                    case 3: guestLevel = 'New Guest'; break;
-                    default: guestLevel = 'N/A';
-                }
-            }
+            // Use the actual names from the API response
+            let guestType = customerData.TYPE_NAME || 'N/A';
+            let guestLevel = customerData.LEVEL_NAME || 'N/A';
             
             // Update the display elements
             const guestTypeElement = document.getElementById(`guest-type-${bookingId}`);

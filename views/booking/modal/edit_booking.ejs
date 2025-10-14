@@ -508,53 +508,14 @@ $(document).ready(function() {
     // Initialize flatpickr
     initializeEditFlatpickr();
 
-    // Populate Guest Type dropdown
-    $.ajax({
-        url: '/booking/get_guest_types',
-        method: 'GET',
-        success: function (data) {
-            const dropdown = $('#edit_guestType');
-            dropdown.empty().append('<option disabled selected>Guest Type</option>');
-            data.forEach(guestType => {
-                dropdown.append(`<option value="${guestType.IDNo}">${guestType.TYPE}</option>`);
-            });
-        },
-        error: function (err) {
-            console.error('Error fetching guest types:', err);
-        }
-    });
+    // Populate Guest Type dropdown using shared utility
+    populateGuestTypesDropdown('#edit_guestType', true, 'Guest Type');
 
-    // Populate Guest Level dropdown
-    $.ajax({
-        url: '/booking/get_guest_level',
-        method: 'GET',
-        success: function (data) {
-            const dropdown = $('#edit_guestLevel');
-            dropdown.empty().append('<option disabled selected>Guest Level</option>');
-            data.forEach(guestLevel => {
-                dropdown.append(`<option value="${guestLevel.IDNo}">${guestLevel.TYPE}</option>`);
-            });
-        },
-        error: function (err) {
-            console.error('Error fetching guest levels:', err);
-        }
-    });
+    // Populate Guest Level dropdown using shared utility
+    populateGuestLevelsDropdown('#edit_guestLevel', true, 'Guest Level');
 
-    // Populate Floor Dropdown
-    $.ajax({
-        url: '/booking/get_floors_for_dropdown',
-        method: 'GET',
-        success: function (data) {
-            const floorDropdown = $('#edit_addFloor');
-            floorDropdown.empty().append('<option value="" disabled selected>Select Floor</option>');
-            data.forEach(floor => {
-                floorDropdown.append(`<option value="${floor.floor_number}">${floor.floor_number} Floor</option>`);
-            });
-        },
-        error: function (err) {
-            console.error('Error fetching floors:', err);
-        }
-    });
+    // Populate Floor Dropdown using shared utility
+    populateFloorDropdownGeneric('#edit_addFloor', true, 'Select Floor');
 
     // Populate Rooms based on selected floor
     $('#edit_addFloor').change(function () {
@@ -703,9 +664,8 @@ $(document).ready(function() {
         }
     });
 
-    // Fetch breakfast and transport prices
-    fetch('/booking/get-breakfast-prices')
-        .then(res => res.json())
+    // Fetch breakfast and transport prices using shared utility
+    getBreakfastPrices()
         .then(serviceData => {
             if (!Array.isArray(serviceData)) throw new Error('Invalid response format');
 
@@ -723,9 +683,8 @@ $(document).ready(function() {
         })
         .catch(err => console.error('Failed to load breakfast prices:', err));
 
-    // Fetch transport rates
-    fetch('/booking/get-pick-drop')
-        .then(res => res.json())
+    // Fetch transport rates using shared utility
+    getPickDropPrices()
         .then(data => {
             if (!Array.isArray(data)) return console.error("Invalid transport data:", data);
 
