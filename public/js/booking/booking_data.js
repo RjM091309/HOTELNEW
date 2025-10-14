@@ -175,58 +175,60 @@ $(document).ready(function () {
                 const paymentStatus = row.Paymentstatus.toLowerCase();
                 const bookingStatus = row.BookingStatus?.toLowerCase(); // safe check
 
-                const buttonClass = paymentStatus === 'paid' ? 'btn-primary' : 'btn-primary';
-
                 const isDirect = String(row.IsDirectReservation) === '1';
 
                 let html = `<div style="text-align: center;">`;
+
+                // Billing action
                 if (isDirect) {
                     html += `
-                    <button class="btn btn-secondary" disabled title="Disabled for Direct Reservation" style="opacity: .6; cursor: not-allowed; width: 30px; height: 30px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px;">
-                        <i class="fa fa-credit-card"></i>
-                    </button>`;
+                        <span class="label label-sm label-default" title="Disabled for Direct Reservation" style="opacity:.6; cursor:not-allowed; margin:0 2px; display:inline-block;">
+                            <i class="fa fa-credit-card"></i>
+                        </span>`;
                 } else {
                     html += `
-                    <button class="btn ${buttonClass}" onclick="showBilling(${row.BookingID})" title="Billing" style="width: 30px; height: 30px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px;">
-                        <i class="fa fa-credit-card"></i>
-                    </button>`;
+                        <span class="label label-sm label-billing" onclick="showBilling(${row.BookingID})" title="Billing" style="cursor:pointer; margin:0 2px; display:inline-block;">
+                            <i class="fa fa-credit-card"></i>
+                        </span>`;
                 }
 
-                // Add Edit button
+                // Edit action
                 html += `
-                    <button class="btn btn-warning ms-1" onclick="${isDirect ? `editDirect(${row.BookingID})` : `editBooking(${row.BookingID})`}" title="Edit Booking" style="width: 30px; height: 30px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px;">
+                    <span class="label label-sm label-warning ms-1" onclick="${isDirect ? `editDirect(${row.BookingID})` : `editBooking(${row.BookingID})`}" title="Edit Booking" style="cursor:pointer; margin:0 2px; display:inline-block;">
                         <i class="fa fa-edit"></i>
-                    </button>`;
+                    </span>`;
 
-                // Add Remarks button - only if there are remarks or different styling
-                if ((row.BookingRemarks && row.BookingRemarks.trim() !== '') || (row.RemarksCount && row.RemarksCount > 0)) {
+                // Remarks action (highlight if remarks exist)
+                const hasRemarks = (row.BookingRemarks && row.BookingRemarks.trim() !== '') || (row.RemarksCount && row.RemarksCount > 0);
+                if (hasRemarks) {
                     html += `
-                        <button class="btn btn-success ms-1" onclick="openRemarksModal(${row.BookingID})" title="Remarks" style="width: 30px; height: 30px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; background-color: lightgreen !important; border-color: lightgreen !important; font-size: 12px;">
+                        <span class="label label-sm label-success ms-1" onclick="openRemarksModal(${row.BookingID})" title="Remarks" style="cursor:pointer; margin:0 2px; display:inline-block;">
                             <i class="fa fa-comment-dots"></i>
-                        </button>`;
+                        </span>`;
                 } else {
                     html += `
-                        <button class="btn btn-success ms-1" onclick="openRemarksModal(${row.BookingID})" title="Remarks" style="width: 30px; height: 30px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; background-color: lightgray !important; border-color: lightgray !important; font-size: 12px;">
+                        <span class="label label-sm label-muted ms-1" onclick="openRemarksModal(${row.BookingID})" title="Remarks" style="cursor:pointer; margin:0 2px; display:inline-block;">
                             <i class="fa fa-comment-dots"></i>
-                        </button>`;
+                        </span>`;
                 }
 
-                // Add Download Voucher button
+                // Download voucher action
                 html += `
-                    <button class="btn btn-info ms-1" onclick="downloadVoucher(${row.BookingID})" title="Download Voucher" style="width: 30px; height: 30px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px;">
+                    <span class="label label-sm label-download ms-1" onclick="downloadVoucher(${row.BookingID})" title="Download Voucher" style="cursor:pointer; margin:0 2px; display:inline-block;">
                         <i class="fa fa-download"></i>
-                    </button>`;
+                    </span>`;
 
+                // Cancel action
                 if (bookingStatus === 'pending') {
                     html += `
-                        <button class="btn btn-danger ms-1" onclick="openCancelBookingModal(${row.BookingID})" title="Cancel Booking" style="width: 30px; height: 30px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px;">
-                            <i class="fa fa-cancel"></i>
-                        </button>`;
+                        <span class="label label-sm label-danger ms-1" onclick="openCancelBookingModal(${row.BookingID})" title="Cancel Booking" style="cursor:pointer; margin:0 2px; display:inline-block;">
+                            <i class="fa fa-times"></i>
+                        </span>`;
                 } else if (bookingStatus === 'cancelled') {
                     html += `
-                        <button class="btn btn-danger ms-1" disabled title="Cancelled" style="width: 30px; height: 30px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px;">
+                        <span class="label label-sm label-danger ms-1" title="Cancelled" style="opacity:.6; cursor:not-allowed; margin:0 2px; display:inline-block;">
                             <i class="fa fa-ban"></i>
-                        </button>`;
+                        </span>`;
                 }
 
                 html += `</div>`;

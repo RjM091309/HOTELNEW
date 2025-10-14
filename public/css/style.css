@@ -7834,6 +7834,34 @@ h6 .label {
 .label-danger[href]:hover {
   background-color: rgba(231, 61, 74, 0.3) !important;
 }
+.label-muted {
+  background: rgba(149, 165, 166, 0.18) !important;
+  border: 1px solid rgba(149, 165, 166, 0.3) !important;
+  color: #ecf0f1 !important;
+}
+.label-muted[href]:focus,
+.label-muted[href]:hover {
+  background-color: rgba(149, 165, 166, 0.28) !important;
+}
+
+/* Custom: distinct colors for billing and download actions */
+.label-billing {
+  background: rgba(52, 152, 219, 0.2) !important; /* distinct blue */
+  border: 1px solid rgba(52, 152, 219, 0.35) !important;
+}
+.label-billing[href]:focus,
+.label-billing[href]:hover {
+  background-color: rgba(41, 128, 185, 0.3) !important;
+}
+
+.label-download {
+  background: rgba(155, 89, 182, 0.2) !important; /* violet */
+  border: 1px solid rgba(155, 89, 182, 0.35) !important;
+}
+.label-download[href]:focus,
+.label-download[href]:hover {
+  background-color: rgba(142, 68, 173, 0.3) !important;
+}
 .label.label-icon {
   padding: 4px 0 4px 4px;
   margin-right: 2px;
