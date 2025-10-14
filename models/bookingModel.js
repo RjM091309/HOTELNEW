@@ -53,8 +53,10 @@ class BookingModel {
             bill.QTY,
             b.IS_CANCELLED,
             COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
-              + COALESCE(services_total.TOTAL_SERVICES_COST, 0)
-              + COALESCE(extensions_total.TOTAL_EXTENSIONS_COST, 0) AS TOTAL_COST,
+              + COALESCE(all_services_total.TOTAL_SERVICES_COST, 0)
+              + COALESCE(all_extensions_total.TOTAL_EXTENSIONS_COST, 0)
+              - COALESCE(bill.RESERVATION_FEE, 0)
+              - COALESCE(bill.DISCOUNT_AMOUNT, 0) AS TOTAL_COST,
             CASE 
               WHEN bill.PAYMENT_STATUS = 'paid' 
                 AND COALESCE(services_unpaid_count.TOTAL_UNPAID_SERVICES, 0) = 0
@@ -64,12 +66,12 @@ class BookingModel {
             END AS PAYMENT_STATUS,
             CASE 
               WHEN bill.PAYMENT_STATUS = 'paid' THEN 
-                COALESCE(services_total.TOTAL_SERVICES_COST, 0)
-                + COALESCE(extensions_total.TOTAL_EXTENSIONS_COST, 0)
+                COALESCE(services_unpaid_total.TOTAL_SERVICES_COST, 0)
+                + COALESCE(extensions_unpaid_total.TOTAL_EXTENSIONS_COST, 0)
               ELSE 
                 COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
-                + COALESCE(services_total.TOTAL_SERVICES_COST, 0)
-                + COALESCE(extensions_total.TOTAL_EXTENSIONS_COST, 0)
+                + COALESCE(all_services_total.TOTAL_SERVICES_COST, 0)
+                + COALESCE(all_extensions_total.TOTAL_EXTENSIONS_COST, 0)
                 - COALESCE(bill.RESERVATION_FEE, 0)
                 - COALESCE(bill.DISCOUNT_AMOUNT, 0)
             END AS BALANCE
@@ -84,9 +86,24 @@ class BookingModel {
                 bs.BOOKING_ID,
                 SUM(bs.TOTAL_COST) AS TOTAL_SERVICES_COST
               FROM booking_service bs
+              WHERE bs.ACTIVE = 1
+              GROUP BY bs.BOOKING_ID
+            ) all_services_total ON b.IDNo = all_services_total.BOOKING_ID
+            LEFT JOIN (
+              SELECT 
+                be.BOOKING_ID,
+                SUM(be.QTY * be.COST) AS TOTAL_EXTENSIONS_COST
+              FROM booking_extension be
+              GROUP BY be.BOOKING_ID
+            ) all_extensions_total ON b.IDNo = all_extensions_total.BOOKING_ID
+            LEFT JOIN (
+              SELECT 
+                bs.BOOKING_ID,
+                SUM(bs.TOTAL_COST) AS TOTAL_SERVICES_COST
+              FROM booking_service bs
               WHERE bs.ACTIVE = 1 AND bs.STATUS = 'unpaid'
               GROUP BY bs.BOOKING_ID
-            ) services_total ON b.IDNo = services_total.BOOKING_ID
+            ) services_unpaid_total ON b.IDNo = services_unpaid_total.BOOKING_ID
             LEFT JOIN (
               SELECT 
                 be.BOOKING_ID,
@@ -94,7 +111,7 @@ class BookingModel {
               FROM booking_extension be
               WHERE be.PAYMENT_STATUS = 'unpaid'
               GROUP BY be.BOOKING_ID
-            ) extensions_total ON b.IDNo = extensions_total.BOOKING_ID
+            ) extensions_unpaid_total ON b.IDNo = extensions_unpaid_total.BOOKING_ID
             LEFT JOIN (
               SELECT 
                 bs.BOOKING_ID,
