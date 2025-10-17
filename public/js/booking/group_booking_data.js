@@ -591,7 +591,7 @@ function viewGroupBilling(groupId) {
                 return;
             }
 
-            $('#invoiceNumber').text(`${data.BOOKING_ID}`);
+            $('#confNumber').text(`${data.invoiceNumber}`);
             $('#GroupName').text(data.GroupName);
             $('#invoiceDate').text(new Date().toLocaleDateString());
 
@@ -658,10 +658,36 @@ function viewGroupBilling(groupId) {
                 }
             });
 
-            let balance = totalAmount - totalPaid;
-            $('#totalAmount').text(totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            // Get reservation fee and discount from data
+            const reservationFee = parseFloat(data.reservationFee || 0);
+            const discount = parseFloat(data.discount || 0);
+            
+            // Calculate final amounts
+            const subtotal = totalAmount;
+            const finalTotal = subtotal - reservationFee - discount;
+            let balance = finalTotal - totalPaid;
+            
+            // Update display values
+            $('#totalAmount').text(finalTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
             $('#totalPaid').text(totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
             $('#balanceAmount').text(balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            
+            // Update reservation fee and discount fields
+            if (reservationFee > 0) {
+                $('#billingReservationFeeAmount').text(reservationFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                $('#reservationFeeRow').show();
+            } else {
+                $('#billingReservationFeeAmount').text('0.00');
+                $('#reservationFeeRow').hide();
+            }
+            
+            if (discount > 0) {
+                $('#billingDiscountAmount').text(discount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                $('#discountRow').show();
+            } else {
+                $('#billingDiscountAmount').text('0.00');
+                $('#discountRow').hide();
+            }
 
             const allPaid = allBillingData.every(bill => bill.PAYMENT_STATUS === 'paid' || bill.STATUS === 'paid');
             const paymentBtn = $('#groupProceedPaymentButton');
@@ -670,6 +696,9 @@ function viewGroupBilling(groupId) {
             } else {
                 paymentBtn.prop('disabled', false).text('Proceed to Payment');
             }
+
+            // Show/hide paid image based on payment status
+            updateGroupPaymentStatus();
 
             $('#groupBillingModal').modal('show');
         },
@@ -683,7 +712,7 @@ function viewGroupBilling(groupId) {
 // SHOW GROUP PAYMENT
 function openGroupPaymentModal() {
     let selectedBookingIDs = [];
-    let totalBalance = parseFloat($('#balanceAmount').text().replace(/,/g, '')) || 0;
+    let totalBalance = parseFloat($('#balanceAmount').text().replace(/[₹$,]/g, '')) || 0;
 
     $('#billingDetails tr').each(function () {
         let bookingID = $(this).data('booking-id');
@@ -694,6 +723,13 @@ function openGroupPaymentModal() {
 
     $('#bookingID').val(selectedBookingIDs.join(','));
     $('#groupPaymentAmount').val(totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    
+    // Update the enhanced payment modal fields with consistent formatting
+    $('#groupPaymentTotalAmount').text(totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    $('#groupPaymentAmountInput').val(totalBalance);
+    $('#groupPaymentAmountDisplay').text(totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    
+    // Show payment modal WITHOUT closing the billing modal
     $('#group_modal-payment').modal('show');
 }
 

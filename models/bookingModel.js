@@ -3471,7 +3471,8 @@ class BookingModel {
       // Query for Room Charges ONLY (prevents duplication)
       const roomBillingQuery = `
         SELECT 
-          b.IDNo AS BOOKING_ID,  
+          b.IDNo AS BOOKING_ID,
+          b.CONFIRMATION_NUMBER AS invoiceNumber,
           DATE(bill.ENCODED_DT) AS date,
           gb.GROUP_NAME,  
           r.ROOM_NUMBER,  
@@ -3494,7 +3495,12 @@ class BookingModel {
           b.IDNo AS BOOKING_ID,
           r.ROOM_NUMBER,
           s.SERVICE_NAME AS description,
-          s.SERVICE_COST AS charges,
+          CASE 
+            WHEN LOWER(s.SERVICE_NAME) LIKE '%breakfast%'
+              AND (LOWER(s.SERVICE_NAME) LIKE '%adult%' OR LOWER(s.SERVICE_NAME) LIKE '%kid%')
+            THEN (bs.TOTAL_COST / NULLIF(bs.QTY, 0))
+            ELSE bs.TOTAL_COST
+          END AS charges,
           bs.QTY AS service_qty,
           bs.STATUS
         FROM booking_service bs
@@ -3516,11 +3522,26 @@ class BookingModel {
       const invoiceNumber = roomResults.length > 0 ? roomResults[0].invoiceNumber : "Not Assigned";
       const GroupName = roomResults.length > 0 ? roomResults[0].GROUP_NAME : "Unknown Group";
 
+      // Get group summary data including reservation fee and discount
+      const summaryQuery = `
+        SELECT 
+          COALESCE(gb.GROUP_DISCOUNT, 0) AS group_discount,
+          COALESCE(gb.GROUP_RESERVATION_FEE, 0) AS reservation_fee
+        FROM group_booking gb
+        WHERE gb.IDNo = ?
+      `;
+
+      const [summaryRow] = await queryDatabasePromise(summaryQuery, [groupId]);
+      const reservationFee = parseFloat(summaryRow?.reservation_fee || 0);
+      const discount = parseFloat(summaryRow?.group_discount || 0);
+
       return {
-        invoiceNumber,
+        invoiceNumber: invoiceNumber,
         GroupName,
         roomBillingDetails: roomResults,  // Room charges
-        serviceBillingDetails: serviceResults  // Service charges
+        serviceBillingDetails: serviceResults,  // Service charges
+        reservationFee: reservationFee,
+        discount: discount
       };
 
     } catch (error) {

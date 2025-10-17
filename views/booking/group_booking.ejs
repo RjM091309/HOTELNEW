@@ -113,119 +113,12 @@
     </div>
 </div>
 
-<!-- Group Billing Modal -->
-<div class="modal fade" id="groupBillingModal" tabindex="-1" aria-labelledby="groupBillingModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-xl" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><b>Billing No.</b> <span class="pull-right" id="invoiceNumber"></span></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="row">
-                    <div class="col-md-12">
-                        <div class="pull-left">
-                            <address>
-                                <img src="/img/logo.png" alt="logo" class="logo-default" />
-                                <p class="text-muted m-l-5">Aditya Hotel, <br> Opp. Town Hall, <br> Ahmedabad - 380015</p>
-                            </address>
-                        </div>
-                        <div class="pull-right text-right">
-                            <address>
-                                <p class="addr-font-h3">To,</p>
-                                <p class="font-bold addr-font-h4" id="GroupName"></p>
-                                <p class="text-muted m-l-30" id="guestAddress"></p>
-                                <p class="m-t-30">
-                                    <b>Invoice Date:</b> <i class="fa fa-calendar"></i> <span id="invoiceDate"></span>
-                                </p>
-                            </address>
-                        </div>
-                    </div>
-                    <div class="col-md-12">
-                        <div class="table-responsive m-t-40">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th class="text-center">#</th>
-                                        <th class="text-center">Room #</th>
-                                        <th class="text-center">Descriptions</th>
-                                        <th class="text-center">Charges</th>
-                                        <th class="text-center">QTY</th>
-                                        <th class="text-right">Amount</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="billingDetails">
-                                    <!-- Billing data will be inserted here -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="col-md-12">
-                        <div class="pull-right m-t-30 text-right">
-                            <p class="text-success"><b>Paid:</b> <span id="totalPaid"></span></p>
-                            <p class="text-danger"><b>Balance:</b> <span id="balanceAmount"></span></p>
-                            <h3><b>Total:</b> <span id="totalAmount"></span></h3>
-                        </div>
-                        <div class="clearfix"></div>
-                        <hr>
-                        <div class="text-right">
-                            <button type="button" class="btn btn-danger" id="groupProceedPaymentButton" onclick="openGroupPaymentModal()">Proceed to Payment</button>
 
-                            <!-- UPDATED BUTTON: using groupBillingModal as the target ID -->
-                            <button onclick="printDiv('groupBillingModal')" class="btn btn-default btn-outline" type="button">
-                                <span><i class="fa fa-print"></i> Print</span>
-                            </button>
-
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- GROUP PAYMENT MODAL -->
-<div class="modal fade" id="group_modal-payment" tabindex="-1" role="dialog" aria-labelledby="paymentModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="groupPaymentModalLabel">Payment</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="paymentForm">
-                    <!-- Hidden Input for Booking ID -->
-                    <input type="hidden" id="bookingID" name="bookingID">
-
-                    <div class="mb-3">
-                        <label for="groupPaymentAmount" class="form-label">Amount to Pay</label>
-                        <input type="text" class="form-control" id="groupPaymentAmount" readonly>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="groupPaymentMethod" class="form-label">Payment Method</label>
-                        <select class="form-select" name="groupPaymentMethod" id="groupPaymentMethod" required>
-                            <option value="" selected disabled>Select Payment Method</option>
-                            <option value="cash">Cash</option>
-                            <option value="credit_card">Credit Card</option>
-                        </select>
-                    </div>
-                    <div id="groupPaymentDetails">
-                        <!-- Dynamic payment details will appear here -->
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" id="groupConfirmPaymentButton" class="btn btn-success">Confirm Payment</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <%- include('../booking/modal/add_group_booking') %>
 <%- include('../booking/modal/edit_group_booking') %>
+<%- include('../booking/modal/group_billing') %>
+<%- include('../booking/modal/group_payment') %>
 <%- include('../booking/modal/billing') %>
 <%- include('../booking/modal/status') %>
 

@@ -1,0 +1,971 @@
+<!-- Enhanced Group Payment Modal -->
+<div class="modal fade" id="group_modal-payment" tabindex="-1" role="dialog" aria-labelledby="groupPaymentModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+        <div class="modal-content payment-modal-content">
+            <!-- Enhanced Header -->
+            <div class="modal-header payment-modal-header">
+                <div class="header-content">
+               
+                    <div class="header-text">
+                        <h5 class="modal-title" id="groupPaymentModalLabel">Group Payment</h5>
+                   
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="closeGroupPaymentModal()"></button>
+            </div>
+
+            <!-- Enhanced Body -->
+            <div class="modal-body payment-modal-body">
+                <!-- Payment Summary Card -->
+                <div class="payment-summary-card">
+                    <div class="summary-header">
+                        <h6><i class="fa fa-receipt"></i> Payment Summary</h6>
+                    </div>
+                    <div class="summary-content">
+                        <div class="summary-row">
+                            <span class="summary-label">Total Amount:</span>
+                            <span class="summary-value total-amount" id="groupPaymentTotalAmount">0.00</span>
+                        </div>
+                        <div class="summary-row">
+                            <span class="summary-label">Amount to Pay:</span>
+                            <span class="summary-value amount-to-pay" id="groupPaymentAmountDisplay">0.00</span>
+                        </div>
+                        <div class="summary-row balance-row" id="balanceRow" style="display: none;">
+                            <span class="summary-label">Remaining Balance:</span>
+                            <span class="summary-value balance-amount" id="remainingBalance">0.00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payment Form -->
+                <form id="groupPaymentForm" class="payment-form">
+                    <!-- Hidden Input for Booking ID -->
+                    <input type="hidden" id="bookingID" name="bookingID">
+                    <input type="hidden" id="groupPaymentAmount" name="groupPaymentAmount">
+
+                    <!-- Payment Amount Input -->
+                    <div class="form-group payment-amount-group">
+                        <label for="groupPaymentAmountInput" class="form-label">
+                            <i class="fa fa-money"></i> Payment Amount
+                        </label>
+                        <div class="input-group">
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="groupPaymentAmountInput" 
+                                   name="groupPaymentAmountInput"
+                                   step="0.01"
+                                   min="0"
+                                   placeholder="Enter amount to pay"
+                                   required>
+                        </div>
+                        <div class="form-text">Enter the amount you want to pay</div>
+                    </div>
+                    
+                    <!-- Payment Method Selection -->
+                    <div class="form-group payment-method-group">
+                        <label for="groupPaymentMethod" class="form-label">
+                            <i class="fa fa-credit-card"></i> Payment Method
+                        </label>
+                        <div class="payment-method-options">
+                            <div class="payment-option" data-method="cash">
+                                <div class="option-icon">
+                                    <i class="fa fa-money"></i>
+                                </div>
+                                <div class="option-content">
+                                    <div class="option-title">Cash</div>
+                                    <div class="option-description">Pay with cash</div>
+                                </div>
+                                <div class="option-radio">
+                                    <input type="radio" name="groupPaymentMethod" value="cash" id="cashPayment">
+                                    <label for="cashPayment"></label>
+                                </div>
+                            </div>
+                            
+                            <div class="payment-option" data-method="credit_card">
+                                <div class="option-icon">
+                                    <i class="fa fa-credit-card"></i>
+                                </div>
+                                <div class="option-content">
+                                    <div class="option-title">Credit Card</div>
+                                    <div class="option-description">Visa, Mastercard, etc.</div>
+                                </div>
+                                <div class="option-radio">
+                                    <input type="radio" name="groupPaymentMethod" value="credit_card" id="cardPayment">
+                                    <label for="cardPayment"></label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Payment Details -->
+                    <div id="groupPaymentDetails" class="payment-details-section">
+                        <!-- Payment method specific details will appear here -->
+                    </div>
+
+                    <!-- Payment Notes -->
+                    <div class="form-group payment-notes-group">
+                        <label for="paymentNotes" class="form-label">
+                            <i class="fa fa-sticky-note"></i> Payment Notes (Optional)
+                        </label>
+                        <textarea class="form-control" 
+                                  id="paymentNotes" 
+                                  name="paymentNotes" 
+                                  rows="3" 
+                                  placeholder="Add any additional notes about this payment..."></textarea>
+                    </div>
+                </form>
+
+                <!-- Payment Status Messages -->
+                <div id="paymentStatusMessages" class="payment-status-messages" style="display: none;">
+                    <!-- Status messages will appear here -->
+                </div>
+            </div>
+
+            <!-- Enhanced Footer -->
+            <div class="modal-footer payment-modal-footer">
+                <div class="footer-actions">
+                    <button type="button" class="btn btn-secondary btn-cancel" data-bs-dismiss="modal" onclick="closeGroupPaymentModal()">
+                        <i class="fa fa-times"></i> Cancel
+                    </button>
+                    <button type="button" id="groupConfirmPaymentButton" class="btn btn-success btn-confirm-payment">
+                        <i class="fa fa-check"></i> 
+                        <span class="btn-text">Confirm Payment</span>
+                        <span class="btn-loading" style="display: none;">
+                            <i class="fa fa-spinner fa-spin"></i> Processing...
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Group Payment Modal Specific Styles - Scoped to avoid affecting other modals */
+
+/* Modal Container */
+#group_modal-payment .modal-content {
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    border: none;
+    overflow: hidden;
+    z-index: 1080 !important;
+}
+
+#group_modal-payment {
+    z-index: 1080 !important;
+}
+
+#group_modal-payment .modal-backdrop {
+    z-index: 1075 !important;
+}
+
+/* Header Styles */
+#group_modal-payment .modal-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 20px 25px;
+    position: relative;
+}
+
+#group_modal-payment .modal-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.9), rgba(118, 75, 162, 0.9));
+    z-index: -1;
+}
+
+#group_modal-payment .header-content {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+#group_modal-payment .header-text h5 {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 600;
+}
+
+/* Body Styles */
+#group_modal-payment .modal-body {
+    padding: 25px;
+    background: #f8f9fa;
+}
+
+/* Payment Summary Card */
+#group_modal-payment .payment-summary-card {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 25px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e9ecef;
+}
+
+#group_modal-payment .summary-header {
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #f1f3f4;
+}
+
+#group_modal-payment .summary-header h6 {
+    margin: 0;
+    color: #495057;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#group_modal-payment .summary-header i {
+    color: #28a745;
+}
+
+#group_modal-payment .summary-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+#group_modal-payment .summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+}
+
+#group_modal-payment .summary-label {
+    color: #6c757d;
+    font-weight: 500;
+}
+
+#group_modal-payment .summary-value {
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+#group_modal-payment .total-amount {
+    color: #007bff;
+}
+
+#group_modal-payment .amount-to-pay {
+    color: #28a745;
+}
+
+#group_modal-payment .balance-amount {
+    color: #dc3545;
+}
+
+#group_modal-payment .balance-row {
+    border-top: 2px solid #f1f3f4;
+    padding-top: 15px;
+    margin-top: 10px;
+}
+
+/* Payment Form Styles */
+#group_modal-payment .payment-form {
+    background: white;
+    border-radius: 10px;
+    padding: 25px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e9ecef;
+}
+
+#group_modal-payment .form-group {
+    margin-bottom: 25px;
+}
+
+#group_modal-payment .form-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#group_modal-payment .form-label i {
+    color: #007bff;
+    width: 16px;
+}
+
+#group_modal-payment .input-group {
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+#group_modal-payment .form-text {
+    font-size: 0.85rem;
+    color: #6c757d;
+    margin-top: 5px;
+}
+
+/* Input Field Styles - Scoped to Group Payment Modal */
+#group_modal-payment input[type="number"], 
+#group_modal-payment input[type="text"], 
+#group_modal-payment textarea {
+    color: #000000 !important;
+    background-color: #ffffff !important;
+    border: 1px solid #ced4da;
+    border-radius: 0;
+    padding: 12px 15px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+#group_modal-payment input[type="number"]:focus, 
+#group_modal-payment input[type="text"]:focus, 
+#group_modal-payment textarea:focus {
+    color: #000000 !important;
+    background-color: #ffffff !important;
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+#group_modal-payment input[type="number"]::placeholder, 
+#group_modal-payment input[type="text"]::placeholder, 
+#group_modal-payment textarea::placeholder {
+    color: #6c757d !important;
+}
+
+#group_modal-payment input[type="number"]:not(:placeholder-shown), 
+#group_modal-payment input[type="text"]:not(:placeholder-shown), 
+#group_modal-payment textarea:not(:placeholder-shown) {
+    color: #000000 !important;
+}
+
+/* Specific targeting for payment amount input */
+#groupPaymentAmountInput {
+    color: #000000 !important;
+    background-color: #ffffff !important;
+}
+
+#groupPaymentAmountInput:focus {
+    color: #000000 !important;
+    background-color: #ffffff !important;
+}
+
+#groupPaymentAmountInput:not(:placeholder-shown) {
+    color: #000000 !important;
+}
+
+/* Specific targeting for payment notes textarea */
+#paymentNotes {
+    color: #000000 !important;
+    background-color: #ffffff !important;
+    resize: vertical;
+    min-height: 80px;
+}
+
+#paymentNotes:focus {
+    color: #000000 !important;
+    background-color: #ffffff !important;
+}
+
+#paymentNotes:not(:placeholder-shown) {
+    color: #000000 !important;
+}
+
+/* Payment Method Options */
+#group_modal-payment .payment-method-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 10px;
+}
+
+#group_modal-payment .payment-option {
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+}
+
+#group_modal-payment .payment-option:hover {
+    border-color: #007bff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2);
+}
+
+#group_modal-payment .payment-option.selected {
+    border-color: #007bff;
+    background: rgba(0, 123, 255, 0.05);
+}
+
+#group_modal-payment .option-icon {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 18px;
+}
+
+#group_modal-payment .option-content {
+    flex: 1;
+}
+
+#group_modal-payment .option-title {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 2px;
+}
+
+#group_modal-payment .option-description {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+#group_modal-payment .option-radio {
+    position: relative;
+}
+
+#group_modal-payment .option-radio input[type="radio"] {
+    opacity: 0;
+    position: absolute;
+}
+
+#group_modal-payment .option-radio label {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #ced4da;
+    border-radius: 50%;
+    display: block;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+#group_modal-payment .option-radio input[type="radio"]:checked + label {
+    border-color: #007bff;
+    background: #007bff;
+}
+
+#group_modal-payment .option-radio input[type="radio"]:checked + label::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    background: white;
+    border-radius: 50%;
+}
+
+/* Payment Details Section */
+#group_modal-payment .payment-details-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 20px;
+    border: 1px solid #e9ecef;
+}
+
+/* Payment Status Messages */
+#group_modal-payment .payment-status-messages {
+    margin-top: 20px;
+}
+
+#group_modal-payment .alert {
+    border-radius: 8px;
+    border: none;
+    padding: 15px 20px;
+}
+
+/* Footer Styles */
+#group_modal-payment .modal-footer {
+    background: white;
+    border: none;
+    padding: 20px 25px;
+    box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.1);
+}
+
+#group_modal-payment .footer-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: flex-end;
+    width: 100%;
+}
+
+/* Button Styles - Scoped to Group Payment Modal */
+#group_modal-payment .btn {
+    padding: 12px 25px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+    border: none;
+    position: relative;
+    overflow: hidden;
+}
+
+#group_modal-payment .btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s ease;
+}
+
+#group_modal-payment .btn:hover::before {
+    left: 100%;
+}
+
+#group_modal-payment .btn-cancel {
+    background: #6c757d;
+    color: white;
+}
+
+#group_modal-payment .btn-cancel:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+}
+
+#group_modal-payment .btn-confirm-payment {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    min-width: 180px;
+}
+
+#group_modal-payment .btn-confirm-payment:hover {
+    background: linear-gradient(135deg, #20c997, #28a745);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+#group_modal-payment .btn-confirm-payment:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+#group_modal-payment .btn-loading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    #group_modal-payment .modal-content {
+        margin: 10px;
+    }
+    
+    #group_modal-payment .payment-method-options {
+        grid-template-columns: 1fr;
+    }
+    
+    #group_modal-payment .footer-actions {
+        flex-direction: column;
+    }
+    
+    #group_modal-payment .btn {
+        width: 100%;
+    }
+    
+    #group_modal-payment .header-content {
+        flex-direction: column;
+        text-align: center;
+        gap: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    #group_modal-payment .modal-body {
+        padding: 15px;
+    }
+    
+    #group_modal-payment .payment-form {
+        padding: 15px;
+    }
+    
+    #group_modal-payment .payment-summary-card {
+        padding: 15px;
+    }
+    
+    #group_modal-payment .summary-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+    
+    #group_modal-payment .summary-value {
+        font-size: 1rem;
+    }
+}
+
+/* Animation for modal appearance */
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-50px) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+#group_modal-payment .modal-content {
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+/* Success animation */
+@keyframes paymentSuccess {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+#group_modal-payment .payment-success {
+    animation: paymentSuccess 0.6s ease-in-out;
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+#group_modal-payment .fa-spinner {
+    animation: spin 1s linear infinite;
+}
+</style>
+
+<script>
+// Enhanced Group Payment Modal JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize payment modal functionality
+    initializeGroupPaymentModal();
+});
+
+function initializeGroupPaymentModal() {
+    // Payment method selection
+    const paymentOptions = document.querySelectorAll('.payment-option');
+    const paymentDetailsSection = document.getElementById('groupPaymentDetails');
+    const paymentAmountInput = document.getElementById('groupPaymentAmountInput');
+    const paymentAmountDisplay = document.getElementById('groupPaymentAmountDisplay');
+    const totalAmountDisplay = document.getElementById('groupPaymentTotalAmount');
+    const remainingBalanceDisplay = document.getElementById('remainingBalance');
+    const balanceRow = document.getElementById('balanceRow');
+    const confirmButton = document.getElementById('groupConfirmPaymentButton');
+    const paymentForm = document.getElementById('groupPaymentForm');
+
+    // Payment method selection handler
+    paymentOptions.forEach(option => {
+        option.addEventListener('click', function() {
+            // Remove selected class from all options
+            paymentOptions.forEach(opt => opt.classList.remove('selected'));
+            
+            // Add selected class to clicked option
+            this.classList.add('selected');
+            
+            // Check the radio button
+            const radio = this.querySelector('input[type="radio"]');
+            radio.checked = true;
+            
+            // Show payment method specific details
+            showPaymentMethodDetails(radio.value);
+            
+            // Update form validation
+            validatePaymentForm();
+        });
+    });
+
+    // Payment amount input handler
+    if (paymentAmountInput) {
+        paymentAmountInput.addEventListener('input', function() {
+            const amount = parseFloat(this.value) || 0;
+            const totalAmount = parseFloat(totalAmountDisplay.textContent.replace(',', '')) || 0;
+            
+            // Update display with consistent US formatting
+            paymentAmountDisplay.textContent = amount.toLocaleString('en-US', {minimumFractionDigits: 2});
+            
+            // Show/hide balance row
+            if (amount < totalAmount) {
+                const remaining = totalAmount - amount;
+                remainingBalanceDisplay.textContent = remaining.toLocaleString('en-US', {minimumFractionDigits: 2});
+                balanceRow.style.display = 'flex';
+            } else {
+                balanceRow.style.display = 'none';
+            }
+            
+            // Update hidden field
+            document.getElementById('groupPaymentAmount').value = amount;
+            
+            // Validate form
+            validatePaymentForm();
+        });
+    }
+
+    // Form validation
+    function validatePaymentForm() {
+        const amount = parseFloat(paymentAmountInput.value) || 0;
+        const selectedMethod = document.querySelector('input[name="groupPaymentMethod"]:checked');
+        
+        if (amount > 0 && selectedMethod) {
+            confirmButton.disabled = false;
+            confirmButton.classList.remove('btn-secondary');
+            confirmButton.classList.add('btn-success');
+        } else {
+            confirmButton.disabled = true;
+            confirmButton.classList.remove('btn-success');
+            confirmButton.classList.add('btn-secondary');
+        }
+    }
+
+    // Show payment method specific details
+    function showPaymentMethodDetails(method) {
+        let detailsHTML = '';
+        
+        switch(method) {
+            case 'cash':
+                detailsHTML = `
+                    <div class="payment-method-info">
+                        <h6><i class="fa fa-money"></i> Cash Payment</h6>
+                        <p class="text-muted">Please collect the cash amount and update the payment status.</p>
+                        <div class="alert alert-info">
+                            <i class="fa fa-info-circle"></i>
+                            <strong>Note:</strong> Ensure you have sufficient cash available before confirming.
+                        </div>
+                    </div>
+                `;
+                break;
+                
+            case 'credit_card':
+                detailsHTML = `
+                    <div class="payment-method-info">
+                        <h6><i class="fa fa-credit-card"></i> Credit Card Payment</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="cardNumber" class="form-label">Card Number</label>
+                                <input type="text" class="form-control" id="cardNumber" placeholder="1234 5678 9012 3456" maxlength="19">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="expiryDate" class="form-label">Expiry</label>
+                                <input type="text" class="form-control" id="expiryDate" placeholder="MM/YY" maxlength="5">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="cvv" class="form-label">CVV</label>
+                                <input type="text" class="form-control" id="cvv" placeholder="123" maxlength="3">
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <label for="cardholderName" class="form-label">Cardholder Name</label>
+                            <input type="text" class="form-control" id="cardholderName" placeholder="John Doe">
+                        </div>
+                    </div>
+                `;
+                break;
+        }
+        
+        paymentDetailsSection.innerHTML = detailsHTML;
+        
+        // Add input formatting for credit card
+        if (method === 'credit_card') {
+            addCreditCardFormatting();
+        }
+    }
+
+    // Credit card input formatting
+    function addCreditCardFormatting() {
+        const cardNumberInput = document.getElementById('cardNumber');
+        const expiryInput = document.getElementById('expiryDate');
+        const cvvInput = document.getElementById('cvv');
+        
+        if (cardNumberInput) {
+            cardNumberInput.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\s/g, '').replace(/[^0-9]/gi, '');
+                let formattedValue = value.match(/.{1,4}/g)?.join(' ') || value;
+                e.target.value = formattedValue;
+            });
+        }
+        
+        if (expiryInput) {
+            expiryInput.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\D/g, '');
+                if (value.length >= 2) {
+                    value = value.substring(0, 2) + '/' + value.substring(2, 4);
+                }
+                e.target.value = value;
+            });
+        }
+        
+        if (cvvInput) {
+            cvvInput.addEventListener('input', function(e) {
+                e.target.value = e.target.value.replace(/[^0-9]/g, '');
+            });
+        }
+    }
+
+    // Payment confirmation handler
+    if (confirmButton) {
+        confirmButton.addEventListener('click', function() {
+            processGroupPayment();
+        });
+    }
+
+    // Process payment function
+    function processGroupPayment() {
+        const amount = parseFloat(paymentAmountInput.value) || 0;
+        const method = document.querySelector('input[name="groupPaymentMethod"]:checked')?.value;
+        const notes = document.getElementById('paymentNotes').value;
+        
+        if (!amount || !method) {
+            showPaymentStatus('error', 'Please fill in all required fields.');
+            return;
+        }
+        
+        // Show loading state
+        showLoadingState(true);
+        
+        // Simulate payment processing
+        setTimeout(() => {
+            showLoadingState(false);
+            
+            // Show success message
+            showPaymentStatus('success', `Payment of ${amount.toLocaleString('en-US', {minimumFractionDigits: 2})} via ${method.replace('_', ' ').toUpperCase()} processed successfully!`);
+            
+            // Add success animation
+            confirmButton.classList.add('payment-success');
+            
+            // Close modal after delay
+            setTimeout(() => {
+                $('#group_modal-payment').modal('hide');
+                // Reset form
+                resetPaymentForm();
+            }, 2000);
+            
+        }, 2000);
+    }
+
+    // Show loading state
+    function showLoadingState(show) {
+        const btnText = confirmButton.querySelector('.btn-text');
+        const btnLoading = confirmButton.querySelector('.btn-loading');
+        
+        if (show) {
+            btnText.style.display = 'none';
+            btnLoading.style.display = 'flex';
+            confirmButton.disabled = true;
+        } else {
+            btnText.style.display = 'inline';
+            btnLoading.style.display = 'none';
+            confirmButton.disabled = false;
+        }
+    }
+
+    // Show payment status message
+    function showPaymentStatus(type, message) {
+        const statusContainer = document.getElementById('paymentStatusMessages');
+        const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+        const iconClass = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+        
+        statusContainer.innerHTML = `
+            <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                <i class="fa ${iconClass}"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        statusContainer.style.display = 'block';
+    }
+
+    // Reset payment form
+    function resetPaymentForm() {
+        paymentForm.reset();
+        paymentOptions.forEach(opt => opt.classList.remove('selected'));
+        paymentDetailsSection.innerHTML = '';
+        document.getElementById('paymentStatusMessages').style.display = 'none';
+        confirmButton.classList.remove('payment-success');
+        balanceRow.style.display = 'none';
+    }
+
+    // Initialize form validation
+    validatePaymentForm();
+}
+
+// Note: openGroupPaymentModal function is already defined in group_booking_data.js
+// and it properly handles getting the amount from balanceAmount element
+
+// Function to properly close the group payment modal
+function closeGroupPaymentModal() {
+    // Hide the payment modal
+    $('#group_modal-payment').modal('hide');
+    
+    // Remove any lingering modal backdrops
+    setTimeout(function() {
+        // Remove any extra modal backdrops that might be causing issues
+        $('.modal-backdrop').remove();
+        
+        // Ensure the billing modal is still active and clickable
+        const billingModal = document.getElementById('groupBillingModal');
+        if (billingModal) {
+            // Remove any disabled state
+            billingModal.style.pointerEvents = 'auto';
+            billingModal.style.zIndex = '1070';
+            
+            // Re-enable all interactive elements
+            const interactiveElements = billingModal.querySelectorAll('button, input, select, textarea, a');
+            interactiveElements.forEach(function(element) {
+                element.style.pointerEvents = 'auto';
+                element.disabled = false;
+            });
+        }
+        
+        // Reset body overflow if needed
+        document.body.style.overflow = '';
+        document.body.classList.remove('modal-open');
+    }, 300);
+}
+
+// Add event listener for modal close events
+$(document).ready(function() {
+    $('#group_modal-payment').on('hidden.bs.modal', function() {
+        // Clean up when modal is closed
+        setTimeout(function() {
+            $('.modal-backdrop').remove();
+            
+            // Ensure billing modal is clickable
+            const billingModal = document.getElementById('groupBillingModal');
+            if (billingModal) {
+                billingModal.style.pointerEvents = 'auto';
+                billingModal.style.zIndex = '1070';
+            }
+            
+            // Reset body state
+            document.body.style.overflow = '';
+            document.body.classList.remove('modal-open');
+        }, 100);
+    });
+});
+</script>
