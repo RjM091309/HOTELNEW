@@ -1,43 +1,134 @@
-<div class="modal fade" id="modal-payment" tabindex="-1" role="dialog" aria-labelledby="paymentModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false" style="z-index: 1080 !important;">
-    <div class="modal-dialog modal-dialog-centered" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
+<!-- Enhanced Payment Modal -->
+<div class="modal fade" id="modal-payment" tabindex="-1" role="dialog" aria-labelledby="paymentModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+        <div class="modal-content payment-modal-content">
+            <!-- Enhanced Header -->
+            <div class="modal-header payment-modal-header">
+                <div class="header-content">
+                    <div class="header-text">
                 <h5 class="modal-title" id="paymentModalLabel">Payment</h5>
+                    </div>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <form id="paymentForm">
-                    <div class="mb-3">
-                        <label for="paymentAmount" class="form-label">Amount to Pay</label>
-                        <input type="text" class="form-control" id="paymentAmount" readonly>
+
+            <!-- Enhanced Body -->
+            <div class="modal-body payment-modal-body">
+                <!-- Payment Form -->
+                <form id="paymentForm" class="payment-form">
+                    <!-- Hidden Input for Booking ID -->
+                    <input type="hidden" id="bookingID" name="bookingID">
+                    <input type="hidden" id="paymentAmount" name="paymentAmount">
+                    <input type="hidden" id="paymentMethod" name="paymentMethod">
+
+                    <!-- Payment Amount Input -->
+                    <div class="form-group payment-amount-group">
+                        <label for="paymentAmountInput" class="form-label">
+                            <i class="fa fa-money"></i> Amount to Pay
+                        </label>
+                        <div class="input-group">
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="paymentAmountInput" 
+                                   name="paymentAmountInput"
+                                   step="0.01"
+                                   min="0"
+                                   placeholder="Enter amount to pay"
+                                   readonly>
+                        </div>
                     </div>
                     
-                    <div class="mb-3">
-                        <label for="paymentMethod" class="form-label">Payment Method</label>
-                        <select class="form-select" name="paymentMethod" id="paymentMethod" required>
-                            <option value="" selected disabled>Select Payment Method</option>
-                            <option value="cash">Cash</option>
-                            <option value="credit_card">Credit Card</option>
-                            <!-- <option value="paypal">PayPal</option> -->
-                            
-                        </select>
+                    <!-- Payment Method Selection -->
+                    <div class="form-group payment-method-group">
+                        <label for="paymentMethod" class="form-label">
+                            <i class="fa fa-credit-card"></i> Payment Method
+                        </label>
+                        <div class="payment-method-options">
+                            <div class="payment-option" data-method="cash">
+                                <div class="option-icon">
+                                    <i class="fa fa-money"></i>
+                                </div>
+                                <div class="option-content">
+                                    <div class="option-title">Cash</div>
+                                    <div class="option-description">Pay with cash</div>
+                                </div>
+                                <div class="option-radio">
+                                    <input type="radio" name="paymentMethod" value="cash" id="cashPayment">
+                                    <label for="cashPayment"></label>
+                                </div>
                     </div>
-                    <div id="paymentDetails">
-                        <!-- Dynamic payment details will appear here -->
+                    
+                            <div class="payment-option" data-method="credit_card">
+                                <div class="option-icon">
+                                    <i class="fa fa-credit-card"></i>
+                                </div>
+                                <div class="option-content">
+                                    <div class="option-title">Credit Card</div>
+                                    <div class="option-description">Visa, Mastercard, etc.</div>
+                                </div>
+                                <div class="option-radio">
+                                    <input type="radio" name="paymentMethod" value="credit_card" id="cardPayment">
+                                    <label for="cardPayment"></label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Payment Details -->
+                    <div id="paymentDetails" class="payment-details-section">
+                        <!-- Payment method specific details will appear here -->
+                    </div>
+
+                    <!-- Payment Notes -->
+                    <div class="form-group payment-notes-group">
+                        <label for="paymentNotes" class="form-label">
+                            <i class="fa fa-sticky-note"></i> Payment Notes (Optional)
+                        </label>
+                        <textarea class="form-control" 
+                                  id="paymentNotes" 
+                                  name="paymentNotes" 
+                                  rows="3" 
+                                  placeholder="Add any additional notes about this payment..."></textarea>
                     </div>
                 </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" id="confirmPaymentButton" class="btn btn-success">Confirm Payment</button>
+
+                <!-- Payment Status Messages -->
+                <div id="paymentStatusMessages" class="payment-status-messages" style="display: none;">
+                    <!-- Status messages will appear here -->
             </div>
         </div>
        
+            <!-- Enhanced Footer -->
+            <div class="modal-footer payment-modal-footer">
+                <div class="footer-actions">
+                    <button type="button" class="btn btn-secondary btn-cancel" data-bs-dismiss="modal">
+                        <i class="fa fa-times"></i> Cancel
+                    </button>
+                    <button type="button" id="confirmPaymentButton" class="btn btn-success btn-confirm-payment">
+                        <i class="fa fa-check"></i> 
+                        <span class="btn-text">Confirm Payment</span>
+                        <span class="btn-loading" style="display: none;">
+                            <i class="fa fa-spinner fa-spin"></i> Processing...
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
 <style>
-/* Ensure payment modal appears above billing modal */
+/* Payment Modal Specific Styles - Scoped to avoid affecting other modals */
+
+/* Modal Container */
+#modal-payment .modal-content {
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    border: none;
+    overflow: hidden;
+    z-index: 1080 !important;
+}
+
 #modal-payment {
     z-index: 1080 !important;
 }
@@ -46,127 +137,415 @@
     z-index: 1075 !important;
 }
 
-/* Ensure payment modal content is properly positioned */
-#modal-payment .modal-dialog {
-    z-index: 1085 !important;
+/* Header Styles */
+#modal-payment .modal-header {
+    background: #0c2a42;
+    color: white;
+    border: none;
+    padding: 20px 25px;
+    position: relative;
 }
 
-/* Fix any potential overlay issues */
-.modal-backdrop + .modal-backdrop {
-    z-index: 1074 !important;
+#modal-payment .modal-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #0c2a42;
+    z-index: -1;
 }
 
-/* Payment Modal Input Styling - Default Black Text */
-#modal-payment .form-control {
-    background: #ffffff !important;
-    border: 1px solid #ced4da !important;
-    color: #000000 !important;
-    font-weight: 500 !important;
+#modal-payment .header-content {
+    display: flex;
+    align-items: center;
+    gap: 15px;
 }
 
-#modal-payment .form-control:focus {
-    background: #ffffff !important;
-    border-color: #3498db !important;
-    color: #000000 !important;
-    box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25) !important;
+#modal-payment .header-text h5 {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 600;
 }
 
-#modal-payment .form-control:read-only {
-    background: #f8f9fa !important;
-    color: #000000 !important;
-    border-color: #ced4da !important;
+/* Body Styles */
+#modal-payment .modal-body {
+    padding: 25px;
+    background: #f8f9fa;
 }
 
-#modal-payment .form-select {
-    background: #ffffff !important;
-    border: 1px solid #ced4da !important;
-    color: #000000 !important;
-    font-weight: 500 !important;
+/* Payment Form Styles */
+#modal-payment .payment-form {
+    background: white;
+    border-radius: 10px;
+    padding: 25px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e9ecef;
 }
 
-#modal-payment .form-select:focus {
-    background: #ffffff !important;
-    border-color: #3498db !important;
-    color: #000000 !important;
-    box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25) !important;
+#modal-payment .form-group {
+    margin-bottom: 25px;
 }
 
-#modal-payment .form-select option {
-    background: #ffffff !important;
-    color: #000000 !important;
-}
-
-#modal-payment .form-select option:hover {
-    background: #f8f9fa !important;
-    color: #000000 !important;
-}
-
-#modal-payment .form-select option:checked {
-    background: #3498db !important;
-    color: #ffffff !important;
-}
-
-/* Force select text to be black */
-#modal-payment select.form-select {
-    color: #000000 !important;
-}
-
-#modal-payment select.form-select option {
-    color: #000000 !important;
-}
-
-/* Additional specificity for select elements */
-#modal-payment .form-select,
-#modal-payment select,
-#modal-payment select option {
-    color: #000000 !important;
-}
-
-/* Label styling */
 #modal-payment .form-label {
-    color: #ffffff !important;
-    font-weight: 500 !important;
-    margin-bottom: 8px !important;
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
-/* Placeholder styling */
-#modal-payment .form-control::placeholder {
+#modal-payment .form-label i {
+    color: #007bff;
+    width: 16px;
+}
+
+#modal-payment .input-group {
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Input Field Styles - Scoped to Payment Modal */
+#modal-payment input[type="number"], 
+#modal-payment input[type="text"], 
+#modal-payment textarea {
+    color: #000000 !important;
+    background-color: #ffffff !important;
+    border: 1px solid #ced4da;
+    border-radius: 0;
+    padding: 12px 15px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+#modal-payment input[type="number"]:focus, 
+#modal-payment input[type="text"]:focus, 
+#modal-payment textarea:focus {
+    color: #000000 !important;
+    background-color: #ffffff !important;
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+#modal-payment input[type="number"]::placeholder, 
+#modal-payment input[type="text"]::placeholder, 
+#modal-payment textarea::placeholder {
     color: #6c757d !important;
 }
 
-#modal-payment .form-select:invalid {
-    color: #6c757d !important;
+#modal-payment input[type="number"]:not(:placeholder-shown), 
+#modal-payment input[type="text"]:not(:placeholder-shown), 
+#modal-payment textarea:not(:placeholder-shown) {
+    color: #000000 !important;
 }
 
-/* Force select dropdown text to be black with higher specificity */
-#modal-payment select.form-select,
-#modal-payment .form-select,
-#modal-payment select {
+/* Specific targeting for payment amount input */
+#paymentAmountInput {
     color: #000000 !important;
     background-color: #ffffff !important;
 }
 
-#modal-payment select.form-select option,
-#modal-payment .form-select option,
-#modal-payment select option {
+#paymentAmountInput:focus {
     color: #000000 !important;
     background-color: #ffffff !important;
 }
 
-/* Override any Bootstrap default colors */
-#modal-payment .form-select:not([size]):not([multiple]) {
+#paymentAmountInput:not(:placeholder-shown) {
     color: #000000 !important;
 }
 
-/* Hover effects */
-#modal-payment .form-control:hover,
-#modal-payment .form-select:hover {
-    background: #ffffff !important;
-    border-color: #adb5bd !important;
+/* Specific targeting for payment notes textarea */
+#paymentNotes {
+    color: #000000 !important;
+    background-color: #ffffff !important;
+    resize: vertical;
+    min-height: 80px;
+}
+
+#paymentNotes:focus {
+    color: #000000 !important;
+    background-color: #ffffff !important;
+}
+
+#paymentNotes:not(:placeholder-shown) {
     color: #000000 !important;
 }
 
+/* Payment Method Options */
+#modal-payment .payment-method-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 10px;
+}
 
+#modal-payment .payment-option {
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+}
+
+#modal-payment .payment-option:hover {
+    border-color: #007bff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2);
+}
+
+#modal-payment .payment-option.selected {
+    border-color: #007bff;
+    background: rgba(0, 123, 255, 0.05);
+}
+
+#modal-payment .option-icon {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 18px;
+}
+
+#modal-payment .option-content {
+    flex: 1;
+}
+
+#modal-payment .option-title {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 2px;
+}
+
+#modal-payment .option-description {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+#modal-payment .option-radio {
+    position: relative;
+}
+
+#modal-payment .option-radio input[type="radio"] {
+    opacity: 0;
+    position: absolute;
+}
+
+#modal-payment .option-radio label {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #ced4da;
+    border-radius: 50%;
+    display: block;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+#modal-payment .option-radio input[type="radio"]:checked + label {
+    border-color: #007bff;
+    background: #007bff;
+}
+
+#modal-payment .option-radio input[type="radio"]:checked + label::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    background: white;
+    border-radius: 50%;
+}
+
+/* Payment Details Section */
+#modal-payment .payment-details-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 20px;
+    border: 1px solid #e9ecef;
+}
+
+/* Payment Status Messages */
+#modal-payment .payment-status-messages {
+    margin-top: 20px;
+}
+
+#modal-payment .alert {
+    border-radius: 8px;
+    border: none;
+    padding: 15px 20px;
+}
+
+/* Footer Styles */
+#modal-payment .modal-footer {
+    background: white;
+    border: none;
+    padding: 20px 25px;
+    box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.1);
+}
+
+#modal-payment .footer-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: flex-end;
+    width: 100%;
+}
+
+/* Button Styles - Scoped to Payment Modal */
+#modal-payment .btn {
+    padding: 12px 25px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+    border: none;
+    position: relative;
+    overflow: hidden;
+}
+
+#modal-payment .btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s ease;
+}
+
+#modal-payment .btn:hover::before {
+    left: 100%;
+}
+
+#modal-payment .btn-cancel {
+    background: #6c757d;
+    color: white;
+}
+
+#modal-payment .btn-cancel:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+}
+
+#modal-payment .btn-confirm-payment {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    min-width: 180px;
+}
+
+#modal-payment .btn-confirm-payment:hover {
+    background: linear-gradient(135deg, #20c997, #28a745);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+#modal-payment .btn-confirm-payment:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+#modal-payment .btn-loading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    #modal-payment .modal-content {
+        margin: 10px;
+    }
+    
+    #modal-payment .payment-method-options {
+        grid-template-columns: 1fr;
+    }
+    
+    #modal-payment .footer-actions {
+        flex-direction: column;
+    }
+    
+    #modal-payment .btn {
+        width: 100%;
+    }
+    
+    #modal-payment .header-content {
+        flex-direction: column;
+        text-align: center;
+        gap: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    #modal-payment .modal-body {
+        padding: 15px;
+    }
+    
+    #modal-payment .payment-form {
+        padding: 15px;
+    }
+}
+
+/* Animation for modal appearance */
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-50px) scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+#modal-payment .modal-content {
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+/* Success animation */
+@keyframes paymentSuccess {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+#modal-payment .payment-success {
+    animation: paymentSuccess 0.6s ease-in-out;
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+#modal-payment .fa-spinner {
+    animation: spin 1s linear infinite;
+}
 </style>
 
 

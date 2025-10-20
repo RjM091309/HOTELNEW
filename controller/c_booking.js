@@ -1541,7 +1541,7 @@ class BookingController {
   // Process group payment
   static async groupPayment(req, res) {
     try {
-      const { bookingIDs, amountPaid, paymentMethod } = req.body;
+      const { bookingIDs, amountPaid, paymentMethod, paymentNotes } = req.body;
       const encodedBy = req.user.userId;
 
       if (!bookingIDs || amountPaid <= 0 || !paymentMethod) {
@@ -1554,6 +1554,7 @@ class BookingController {
         bookingIDs, 
         amountPaid, 
         paymentMethod, 
+        paymentNotes,
         encodedBy 
       });
 
@@ -1646,6 +1647,56 @@ class BookingController {
       res.status(500).json({ 
         success: false, 
         message: 'Failed to cancel booking.' 
+      });
+    }
+  }
+
+  // Cancel group booking
+  static async cancelGroupBooking(req, res) {
+    try {
+      const { groupId, reason, manual, manualRefund } = req.body;
+      const encodedBy = req.user.userId;
+
+      if (!groupId || !encodedBy) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Missing group ID or user session.' 
+        });
+      }
+
+      const result = await BookingModel.cancelGroupBooking({ 
+        groupId, 
+        reason, 
+        manual, 
+        manualRefund, 
+        encodedBy 
+      });
+
+      res.json({ 
+        success: true, 
+        message: 'Group booking cancelled successfully.' 
+      });
+
+    } catch (error) {
+      console.error("Group cancellation error:", error);
+      
+      if (error.message === 'Group booking not found.') {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Group booking not found.' 
+        });
+      }
+      
+      if (error.message === 'Group has active bookings.') {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Cannot cancel group booking with active check-ins.' 
+        });
+      }
+
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to cancel group booking.' 
       });
     }
   }

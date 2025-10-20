@@ -108,10 +108,12 @@ $(document).ready(function () {
                     let labelClass = "label-secondary";
                     if (data === "ALL CHECK-IN") labelClass = "label-success";
                     else if (data === "ALL CHECK-OUT") labelClass = "label-warning";
+                    else if (data === "ALL CANCELLED") labelClass = "label-danger";
                     else if (data === "PARTIAL CHECK-OUT") labelClass = "label-primary";
                     else if (data === "ALL PENDING") labelClass = "label-info";
                     else if (data.includes("PENDING & CHECK-IN")) labelClass = "label-dark";
                     else if (data.includes("PENDING & CHECK-OUT")) labelClass = "label-light";
+                    else if (data.includes("CANCELLED")) labelClass = "label-danger";
 
                     return `<div style="text-align: center;"><span class="label label-sm ${labelClass}">${data}</span></div>`;
                 }
@@ -135,6 +137,24 @@ $(document).ready(function () {
                     const hasAny = (row.RemarksCount && row.RemarksCount > 0) || (row.Remarks && String(row.Remarks).trim() !== '');
                     const baseRemarksColor = hasAny ? 'lightgreen' : 'lightgray';
 
+                    // Check if group booking can be cancelled (all bookings are pending)
+                    // Since group status is determined by individual booking statuses
+                    const canCancel = row.Status === 'ALL PENDING';
+                    const isCancelled = row.Status.includes('CANCELLED');
+                    
+                    let cancelButton = '';
+                    if (canCancel) {
+                        cancelButton = `
+                            <button class="btn btn-danger ms-1" onclick="openGroupCancelBookingModal(${row.GroupID})" title="Cancel Group Booking" style="width: 30px; height: 30px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px;">
+                                <i class="fa fa-times"></i>
+                            </button>`;
+                    } else if (isCancelled) {
+                        cancelButton = `
+                            <button class="btn btn-danger ms-1" title="Cancelled" style="width: 30px; height: 30px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px; opacity: 0.6; cursor: not-allowed;">
+                                <i class="fa fa-ban"></i>
+                            </button>`;
+                    }
+
                     return `
                         <div style="text-align: center;">
                             <button id="${buttonId}" class="btn btn-primary" onclick="viewGroupBilling(${row.GroupID})" title="Billing" style="width: 30px; height: 30px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px;">
@@ -146,6 +166,7 @@ $(document).ready(function () {
                             <button id="${remarksBtnId}" class="btn btn-success ms-1" onclick="openGroupRemarksModal(${row.GroupID})" title="Remarks" style="width: 30px; height: 30px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px; background-color: ${baseRemarksColor} !important; border-color: ${baseRemarksColor} !important;">
                                 <i class="fa fa-comment-dots"></i>
                             </button>
+                            ${cancelButton}
                         </div>`;
                 }
             }
@@ -665,11 +686,21 @@ function viewGroupBilling(groupId) {
             // Calculate final amounts
             const subtotal = totalAmount;
             const finalTotal = subtotal - reservationFee - discount;
-            let balance = finalTotal - totalPaid;
+            
+            // Adjust totalPaid to account for reservation fee and discount
+            // If all items are paid, the actual paid amount should be finalTotal, not subtotal
+            const allItemsPaid = allBillingData.every(bill => bill.PAYMENT_STATUS === 'paid' || bill.STATUS === 'paid');
+            let adjustedTotalPaid = totalPaid;
+            if (allItemsPaid) {
+                // If everything is paid, the paid amount should be finalTotal (after fees/discounts)
+                adjustedTotalPaid = finalTotal;
+            }
+            
+            let balance = finalTotal - adjustedTotalPaid;
             
             // Update display values
             $('#totalAmount').text(finalTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-            $('#totalPaid').text(totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#totalPaid').text(adjustedTotalPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
             $('#balanceAmount').text(balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
             
             // Update reservation fee and discount fields
@@ -757,10 +788,12 @@ $(document).on('click', '#groupConfirmPaymentButton', function () {
         cancelButtonText: 'Cancel'
     }).then((result) => {
         if (result.isConfirmed) {
+            let paymentNotes = $('#paymentNotes').val() || '';
             let paymentData = {
                 bookingIDs: bookingIDs,
                 amountPaid: amountPaid,
-                paymentMethod: paymentMethod
+                paymentMethod: paymentMethod,
+                paymentNotes: paymentNotes
             };
 
             $.ajax({
@@ -1104,4 +1137,20 @@ function populateEditGroupForm(booking) {
 
     // Recompute total
     computeEditGroupTotal();
-} 
+}
+
+// ==================== GROUP CANCEL BOOKING FUNCTIONALITY ====================
+
+// OPEN GROUP CANCEL BOOKING MODAL
+function openGroupCancelBookingModal(groupId) {
+    // Set the group ID and show the cancel modal
+    $('#cancelGroupBookingId').val(groupId);
+    $('#groupCancelReason').val('');
+    $('#groupManualRefund').val('');
+    $('#groupManualOverrideToggle').prop('checked', false);
+    $('#groupManualFields').hide();
+    
+    $('#modal-cancel-group-booking').modal('show');
+}
+
+// ==================== END OF GROUP CANCEL BOOKING FUNCTIONALITY ==================== 

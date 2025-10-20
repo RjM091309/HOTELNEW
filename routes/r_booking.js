@@ -84,6 +84,7 @@ router.post('/generate-group-voucher', BookingController.generateGroupVoucher);
 router.get('/bookings', BookingController.getBookings);
 router.get('/rooms', BookingController.getRooms);
 router.post('/cancel', BookingController.cancelBooking);
+router.post('/cancel_group', BookingController.cancelGroupBooking);
 
 
 // Utility routes

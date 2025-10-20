@@ -37,11 +37,20 @@ document.getElementById('proceedToPaymentButton').addEventListener('click', func
 
     console.log('Balance for payment:', totalPayment);
 
+    // Set both old and new payment amount fields
     const paymentAmountField = document.getElementById('paymentAmount');
+    const paymentAmountInputField = document.getElementById('paymentAmountInput');
+    
     if (totalPayment) {
+        // Remove currency symbols and parse the amount
+        const cleanAmount = totalPayment.replace(/[₹$,]/g, '');
+        const numericAmount = parseFloat(cleanAmount) || 0;
+        
         paymentAmountField.value = totalPayment;
+        paymentAmountInputField.value = numericAmount;
     } else {
         paymentAmountField.value = "N/A";
+        paymentAmountInputField.value = 0;
     }
 
     const paymentModal = new bootstrap.Modal(document.getElementById('modal-payment'));

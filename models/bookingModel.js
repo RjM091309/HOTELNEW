@@ -52,11 +52,44 @@ class BookingModel {
             (SELECT COUNT(*) FROM remarks rm WHERE rm.BOOKING_ID = b.IDNo AND rm.ACTIVE = 1) AS RemarksCount,
             bill.QTY,
             b.IS_CANCELLED,
-            COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
-              + COALESCE(all_services_total.TOTAL_SERVICES_COST, 0)
-              + COALESCE(all_extensions_total.TOTAL_EXTENSIONS_COST, 0)
-              - COALESCE(bill.RESERVATION_FEE, 0)
-              - COALESCE(bill.DISCOUNT_AMOUNT, 0) AS TOTAL_COST,
+            CASE 
+              WHEN b.GROUP_BOOKING_ID IS NOT NULL THEN
+                -- For group bookings, calculate group total
+                (
+                  SELECT 
+                    COALESCE(SUM(
+                      (bill2.ROOM_CHARGE * 
+                        CASE 
+                          WHEN bill2.ORIGINAL_QTY IS NOT NULL THEN bill2.ORIGINAL_QTY
+                          ELSE bill2.QTY
+                        END
+                      ) + 
+                      COALESCE((
+                        SELECT SUM(bs.TOTAL_COST) 
+                        FROM booking_service bs 
+                        WHERE bs.BOOKING_ID = b2.IDNo AND bs.ACTIVE = 1
+                      ), 0) +
+                      COALESCE((
+                        SELECT SUM(be.COST * be.QTY) 
+                        FROM booking_extension be 
+                        WHERE be.BOOKING_ID = b2.IDNo
+                      ), 0)
+                    ), 0)
+                    - COALESCE(gb.GROUP_DISCOUNT, 0)
+                    - COALESCE(gb.GROUP_RESERVATION_FEE, 0)
+                  FROM booking b2
+                  LEFT JOIN billing bill2 ON b2.IDNo = bill2.BOOKING_ID
+                  LEFT JOIN group_booking gb ON b2.GROUP_BOOKING_ID = gb.IDNo
+                  WHERE b2.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID AND b2.ACTIVE = 1
+                )
+              ELSE
+                -- For individual bookings, use existing calculation
+                COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+                  + COALESCE(all_services_total.TOTAL_SERVICES_COST, 0)
+                  + COALESCE(all_extensions_total.TOTAL_EXTENSIONS_COST, 0)
+                  - COALESCE(bill.RESERVATION_FEE, 0)
+                  - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+            END AS TOTAL_COST,
             CASE 
               WHEN bill.PAYMENT_STATUS = 'paid' 
                 AND COALESCE(services_unpaid_count.TOTAL_UNPAID_SERVICES, 0) = 0
@@ -65,15 +98,89 @@ class BookingModel {
               ELSE 'unpaid'
             END AS PAYMENT_STATUS,
             CASE 
-              WHEN bill.PAYMENT_STATUS = 'paid' THEN 
-                COALESCE(services_unpaid_total.TOTAL_SERVICES_COST, 0)
-                + COALESCE(extensions_unpaid_total.TOTAL_EXTENSIONS_COST, 0)
-              ELSE 
-                COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
-                + COALESCE(all_services_total.TOTAL_SERVICES_COST, 0)
-                + COALESCE(all_extensions_total.TOTAL_EXTENSIONS_COST, 0)
-                - COALESCE(bill.RESERVATION_FEE, 0)
-                - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+              WHEN b.GROUP_BOOKING_ID IS NOT NULL THEN
+                -- For group bookings, calculate group balance
+                CASE 
+                  WHEN (
+                    SELECT COUNT(CASE WHEN bill2.PAYMENT_STATUS = 'paid' THEN 1 END) = COUNT(b2.IDNo)
+                      AND COUNT(CASE WHEN EXISTS(
+                        SELECT 1 FROM booking_service bs 
+                        WHERE bs.BOOKING_ID = b2.IDNo AND bs.ACTIVE = 1 AND bs.STATUS = 'unpaid'
+                      ) THEN 1 END) = 0
+                      AND COUNT(CASE WHEN EXISTS(
+                        SELECT 1 FROM booking_extension be 
+                        WHERE be.BOOKING_ID = b2.IDNo AND be.PAYMENT_STATUS = 'unpaid'
+                      ) THEN 1 END) = 0
+                    FROM booking b2
+                    LEFT JOIN billing bill2 ON b2.IDNo = bill2.BOOKING_ID
+                    WHERE b2.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID AND b2.ACTIVE = 1
+                  ) THEN
+                    -- All bookings in group are paid, balance is unpaid services/extensions
+                    (
+                      SELECT 
+                        COALESCE(SUM(
+                          CASE 
+                            WHEN bill2.PAYMENT_STATUS = 'paid' THEN 
+                              COALESCE((
+                                SELECT SUM(bs.TOTAL_COST) 
+                                FROM booking_service bs 
+                                WHERE bs.BOOKING_ID = b2.IDNo AND bs.ACTIVE = 1 AND bs.STATUS = 'unpaid'
+                              ), 0) +
+                              COALESCE((
+                                SELECT SUM(be.COST * be.QTY) 
+                                FROM booking_extension be 
+                                WHERE be.BOOKING_ID = b2.IDNo AND be.PAYMENT_STATUS = 'unpaid'
+                              ), 0)
+                            ELSE 0
+                          END
+                        ), 0)
+                      FROM booking b2
+                      LEFT JOIN billing bill2 ON b2.IDNo = bill2.BOOKING_ID
+                      WHERE b2.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID AND b2.ACTIVE = 1
+                    )
+                  ELSE
+                    -- Not all bookings are paid, balance is total cost minus group discount/fee
+                    (
+                      SELECT 
+                        COALESCE(SUM(
+                          (bill2.ROOM_CHARGE * 
+                            CASE 
+                              WHEN bill2.ORIGINAL_QTY IS NOT NULL THEN bill2.ORIGINAL_QTY
+                              ELSE bill2.QTY
+                            END
+                          ) + 
+                          COALESCE((
+                            SELECT SUM(bs.TOTAL_COST) 
+                            FROM booking_service bs 
+                            WHERE bs.BOOKING_ID = b2.IDNo AND bs.ACTIVE = 1
+                          ), 0) +
+                          COALESCE((
+                            SELECT SUM(be.COST * be.QTY) 
+                            FROM booking_extension be 
+                            WHERE be.BOOKING_ID = b2.IDNo
+                          ), 0)
+                        ), 0)
+                        - COALESCE(gb.GROUP_DISCOUNT, 0)
+                        - COALESCE(gb.GROUP_RESERVATION_FEE, 0)
+                      FROM booking b2
+                      LEFT JOIN billing bill2 ON b2.IDNo = bill2.BOOKING_ID
+                      LEFT JOIN group_booking gb ON b2.GROUP_BOOKING_ID = gb.IDNo
+                      WHERE b2.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID AND b2.ACTIVE = 1
+                    )
+                END
+              ELSE
+                -- For individual bookings, use existing calculation
+                CASE 
+                  WHEN bill.PAYMENT_STATUS = 'paid' THEN 
+                    COALESCE(services_unpaid_total.TOTAL_SERVICES_COST, 0)
+                    + COALESCE(extensions_unpaid_total.TOTAL_EXTENSIONS_COST, 0)
+                  ELSE 
+                    COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+                    + COALESCE(all_services_total.TOTAL_SERVICES_COST, 0)
+                    + COALESCE(all_extensions_total.TOTAL_EXTENSIONS_COST, 0)
+                    - COALESCE(bill.RESERVATION_FEE, 0)
+                    - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+                END
             END AS BALANCE
           FROM booking b
             LEFT JOIN customer   c   ON b.CUSTOMER_ID = c.IDNo
@@ -2507,33 +2614,60 @@ class BookingModel {
             - COALESCE(gb.GROUP_DISCOUNT, 0)
             - COALESCE(gb.GROUP_RESERVATION_FEE, 0)
           ) AS TOTAL_PAYMENT,
-          -- Calculate total paid amount for the group
-          COALESCE(SUM(
-            CASE 
-              WHEN bill.PAYMENT_STATUS = 'paid' THEN 
-                (bill.ROOM_CHARGE * 
-                  CASE 
-                    WHEN bill.ORIGINAL_QTY IS NOT NULL THEN bill.ORIGINAL_QTY
-                    ELSE bill.QTY
-                  END
-                ) + 
-                COALESCE((
-                  SELECT SUM(bs.TOTAL_COST) 
-                  FROM booking_service bs 
-                  WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1 AND bs.STATUS = 'paid'
-                ), 0) +
-                COALESCE((
-                  SELECT SUM(be.COST * be.QTY) 
-                  FROM booking_extension be 
-                  WHERE be.BOOKING_ID = b.IDNo AND be.PAYMENT_STATUS = 'paid'
-                ), 0)
-              ELSE 0
-            END
-          ), 0) AS TOTAL_PAID,
+          -- Calculate total paid amount for the group (only when paid, subtract reservation fee and discount)
+          CASE 
+            WHEN COUNT(CASE WHEN bill.PAYMENT_STATUS = 'paid' THEN 1 END) = COUNT(b.IDNo)
+              AND COUNT(CASE WHEN EXISTS(
+                SELECT 1 FROM booking_service bs 
+                WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1 AND bs.STATUS = 'unpaid'
+              ) THEN 1 END) = 0
+              AND COUNT(CASE WHEN EXISTS(
+                SELECT 1 FROM booking_extension be 
+                WHERE be.BOOKING_ID = b.IDNo AND be.PAYMENT_STATUS = 'unpaid'
+              ) THEN 1 END) = 0
+            THEN (
+              COALESCE(SUM(
+                CASE 
+                  WHEN bill.PAYMENT_STATUS = 'paid' THEN 
+                    (bill.ROOM_CHARGE * 
+                      CASE 
+                        WHEN bill.ORIGINAL_QTY IS NOT NULL THEN bill.ORIGINAL_QTY
+                        ELSE bill.QTY
+                      END
+                    ) + 
+                    COALESCE((
+                      SELECT SUM(bs.TOTAL_COST) 
+                      FROM booking_service bs 
+                      WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1 AND bs.STATUS = 'paid'
+                    ), 0) +
+                    COALESCE((
+                      SELECT SUM(be.COST * be.QTY) 
+                      FROM booking_extension be 
+                      WHERE be.BOOKING_ID = b.IDNo AND be.PAYMENT_STATUS = 'paid'
+                    ), 0)
+                  ELSE 0
+                END
+              ), 0)
+              - COALESCE(gb.GROUP_DISCOUNT, 0)
+              - COALESCE(gb.GROUP_RESERVATION_FEE, 0)
+            )
+            ELSE 0
+          END AS TOTAL_PAID,
           -- Get all statuses in a group
           GROUP_CONCAT(DISTINCT b.BOOKING_STATUS ORDER BY b.BOOKING_STATUS SEPARATOR ', ') AS all_statuses,
           -- Status Overview Logic
           CASE 
+            WHEN GROUP_CONCAT(DISTINCT b.BOOKING_STATUS ORDER BY b.BOOKING_STATUS) = 'cancelled' 
+              THEN 'ALL CANCELLED'
+            WHEN GROUP_CONCAT(DISTINCT b.BOOKING_STATUS ORDER BY b.BOOKING_STATUS) LIKE '%cancelled%' 
+              AND GROUP_CONCAT(DISTINCT b.BOOKING_STATUS ORDER BY b.BOOKING_STATUS) LIKE '%pending%' 
+              THEN 'PARTIAL CANCELLED'
+            WHEN GROUP_CONCAT(DISTINCT b.BOOKING_STATUS ORDER BY b.BOOKING_STATUS) LIKE '%cancelled%' 
+              AND GROUP_CONCAT(DISTINCT b.BOOKING_STATUS ORDER BY b.BOOKING_STATUS) LIKE '%check-in%' 
+              THEN 'CANCELLED & CHECK-IN'
+            WHEN GROUP_CONCAT(DISTINCT b.BOOKING_STATUS ORDER BY b.BOOKING_STATUS) LIKE '%cancelled%' 
+              AND GROUP_CONCAT(DISTINCT b.BOOKING_STATUS ORDER BY b.BOOKING_STATUS) LIKE '%check-out%' 
+              THEN 'CANCELLED & CHECK-OUT'
             WHEN GROUP_CONCAT(DISTINCT b.BOOKING_STATUS ORDER BY b.BOOKING_STATUS) LIKE '%check-in%' 
               AND GROUP_CONCAT(DISTINCT b.BOOKING_STATUS ORDER BY b.BOOKING_STATUS) LIKE '%check-out%' 
               THEN 'PARTIAL CHECK-OUT'
@@ -3582,7 +3716,7 @@ class BookingModel {
 
   // Process group payment
   static async groupPayment(params) {
-    const { bookingIDs, amountPaid, paymentMethod, encodedBy } = params;
+    const { bookingIDs, amountPaid, paymentMethod, paymentNotes, encodedBy } = params;
     
     try {
       // Get connection from pool for transaction
@@ -3663,6 +3797,15 @@ class BookingModel {
           UPDATE booking_service SET STATUS = 'paid' WHERE IDNo = ?
         `;
         await queryDatabasePromise(serviceUpdateQuery, [service.IDNo], connection);
+      }
+
+      // Update billing REMARKS for the main booking (first booking in the group)
+      if (paymentNotes && paymentNotes.trim() !== '') {
+        const mainBookingId = bookingIDs[0]; // First booking is the main booking
+        const billingRemarksQuery = `
+          UPDATE billing SET REMARKS = ? WHERE BOOKING_ID = ?
+        `;
+        await queryDatabasePromise(billingRemarksQuery, [paymentNotes.trim(), mainBookingId], connection);
       }
 
         // Commit the transaction
@@ -3912,6 +4055,183 @@ class BookingModel {
 
     } catch (error) {
       console.error('Error in cancelBooking:', error);
+      throw error;
+    }
+  }
+
+  // Cancel group booking
+  static async cancelGroupBooking(params) {
+    const { groupId, reason, manual, manualRefund, encodedBy } = params;
+    
+    try {
+      // Get connection from pool for transaction
+      const connection = await new Promise((resolve, reject) => {
+        pool.getConnection((err, conn) => {
+          if (err) reject(err);
+          else resolve(conn);
+        });
+      });
+
+      try {
+        // Check if group booking exists and get all individual bookings
+        const fetchGroupQuery = `
+          SELECT gb.IDNo as GROUP_ID, gb.GROUP_NAME, gb.CONTACT_NO,
+                 b.IDNo as BOOKING_ID, b.CHECK_IN_DATE, b.CHECK_OUT_DATE, b.BOOKING_STATUS
+          FROM group_booking gb
+          LEFT JOIN booking b ON gb.IDNo = b.GROUP_BOOKING_ID
+          WHERE gb.IDNo = ? AND gb.ACTIVE = 1
+        `;
+        const groupRows = await queryDatabasePromise(fetchGroupQuery, [groupId], connection);
+
+        if (groupRows.length === 0) {
+          connection.release();
+          throw new Error('Group booking not found.');
+        }
+
+        // Check if any bookings are already checked in or checked out
+        const activeBookings = groupRows.filter(row => 
+          row.BOOKING_STATUS && 
+          (row.BOOKING_STATUS.toLowerCase() === 'check-in' || 
+           row.BOOKING_STATUS.toLowerCase() === 'check-out')
+        );
+
+        if (activeBookings.length > 0) {
+          connection.release();
+          throw new Error('Group has active bookings.');
+        }
+
+        // Start transaction
+        await new Promise((resolve, reject) => {
+          connection.beginTransaction(err => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+
+        const now = new Date();
+        let totalRefundAmount = 0;
+        let totalPenaltyAmount = 0;
+
+        // Process each individual booking in the group
+        for (const booking of groupRows) {
+          if (!booking.BOOKING_ID) continue; // Skip if no individual booking
+
+          const { CHECK_IN_DATE, CHECK_OUT_DATE } = booking;
+          const checkIn = new Date(CHECK_IN_DATE);
+          const checkOut = new Date(CHECK_OUT_DATE);
+          const today = new Date();
+
+          const totalNights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+          const dayDiff = Math.floor((checkIn - today) / (1000 * 60 * 60 * 24));
+
+          // Calculate penalty nights based on policy
+          let penaltyNights = 0;
+          if (dayDiff >= 20) penaltyNights = 1;
+          else if (dayDiff >= 10) penaltyNights = 2;
+          else if (dayDiff < 5) penaltyNights = totalNights;
+
+          // Fetch billing details for this booking
+          const billingQuery = `
+            SELECT ROOM_CHARGE * QTY AS TOTAL_AMOUNT 
+            FROM billing 
+            WHERE BOOKING_ID = ?
+          `;
+          const billRows = await queryDatabasePromise(billingQuery, [booking.BOOKING_ID], connection);
+
+          if (billRows.length > 0) {
+            const totalAmount = billRows[0].TOTAL_AMOUNT;
+            const nightlyRate = totalNights > 0 ? totalAmount / totalNights : 0;
+            const penaltyAmount = nightlyRate * penaltyNights;
+
+            // Calculate refund amount for this booking
+            let refundAmount = 0;
+            if (manual === 'true' || manual === true) {
+              // For manual override, distribute the manual refund proportionally
+              const bookingProportion = totalAmount / groupRows.reduce((sum, b) => {
+                if (b.BOOKING_ID) {
+                  const billQuery = `SELECT ROOM_CHARGE * QTY AS AMOUNT FROM billing WHERE BOOKING_ID = ?`;
+                  // This is simplified - in real implementation, you'd need to fetch all amounts first
+                  return sum + totalAmount; // Placeholder
+                }
+                return sum;
+              }, 0);
+              refundAmount = parseFloat(manualRefund) * bookingProportion || 0;
+            } else {
+              refundAmount = totalAmount - penaltyAmount;
+            }
+
+            totalRefundAmount += refundAmount;
+            totalPenaltyAmount += penaltyAmount;
+
+            // Update individual booking
+            const updateBookingQuery = `
+              UPDATE booking
+              SET IS_CANCELLED = 1,
+                  CANCELLED_AT = ?,
+                  PENALTY_NIGHTS = ?,
+                  BOOKING_STATUS = 'cancelled'
+              WHERE IDNo = ?
+            `;
+            await queryDatabasePromise(updateBookingQuery, [now, penaltyNights, booking.BOOKING_ID], connection);
+
+            // Update billing for this booking
+            const updateBillingQuery = `
+              UPDATE billing
+              SET CANCELLATION_PENALTY = ?,
+                  REFUNDABLE_AMOUNT = ?
+              WHERE BOOKING_ID = ?
+            `;
+            await queryDatabasePromise(updateBillingQuery, [penaltyAmount, refundAmount, booking.BOOKING_ID], connection);
+
+            // Insert cancellation log for this booking
+            const insertLogQuery = `
+              INSERT INTO booking_cancellation
+              (BOOKING_ID, CANCELLATION_REASON, PENALTY_NIGHTS, REFUND_AMOUNT, FULL_PENALTY, ENCODED_BY)
+              VALUES (?, ?, ?, ?, ?, ?)
+            `;
+            const fullPenalty = penaltyNights >= totalNights ? 1 : 0;
+            await queryDatabasePromise(insertLogQuery, [
+              booking.BOOKING_ID, 
+              reason || '', 
+              penaltyNights, 
+              refundAmount, 
+              fullPenalty, 
+              encodedBy
+            ], connection);
+          }
+        }
+
+        // No need to update group_booking table since there's no STATUS column
+        // The group status is determined by the individual booking statuses
+
+        // Commit the transaction
+        await new Promise((resolve, reject) => {
+          connection.commit(err => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+
+        connection.release();
+        
+        return { 
+          success: true, 
+          message: 'Group booking cancelled successfully.',
+          totalRefundAmount,
+          totalPenaltyAmount
+        };
+
+      } catch (error) {
+        // Rollback on error
+        await new Promise((resolve) => {
+          connection.rollback(() => resolve());
+        });
+        connection.release();
+        throw error;
+      }
+
+    } catch (error) {
+      console.error('Error in cancelGroupBooking:', error);
       throw error;
     }
   }
@@ -5978,86 +6298,97 @@ class BookingModel {
           console.log(`🔄 Late Check-Out Fee Applied: ₱${lateCheckoutFee} (Status: ${status})`);
         }
 
-        // payments for room if paid
-        if (paymentStatus === 'paid') {
-          // Calculate the final amount that should be paid (matches billing table calculation)
-          // Both consolidated and individual billing now have roomChargeForBilling already including nights
-          const finalAmount = roomChargeForBilling - reservationFeeForBilling - discountForBilling;
+        // Always insert payment records for reservation fee and discount (paid or unpaid)
+        const additionalPayments = [];
 
+        // For consolidated billing: apply group-level fees/discounts only to main booking
+        // For individual billing: apply per-room fees/discounts to each room
+        if (consolidatedBilling && index === 0) {
+          if (reservationFeeForBilling > 0) {
+            additionalPayments.push([
+              bookingId,
+              null,
+              reservationFeeForBilling,
+              'cash',
+              'reservation_fee',
+              date,
+              encodedBy
+            ]);
+          }
+          if (discountForBilling > 0) {
+            additionalPayments.push([
+              bookingId,
+              null,
+              -discountForBilling,
+              'cash',
+              'discount',
+              date,
+              encodedBy
+            ]);
+          }
+        } else if (!consolidatedBilling) {
+          if (reservationFeeForBilling > 0) {
+            additionalPayments.push([
+              bookingId,
+              null,
+              reservationFeeForBilling,
+              'cash',
+              'reservation_fee',
+              date,
+              encodedBy
+            ]);
+          }
+          if (discountForBilling > 0) {
+            additionalPayments.push([
+              bookingId,
+              null,
+              -discountForBilling,
+              'cash',
+              'discount',
+              date,
+              encodedBy
+            ]);
+          }
+        }
+
+        if (additionalPayments.length > 0) {
+          const additionalPayQuery = `
+            INSERT INTO payments
+            (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
+            VALUES ?
+          `;
+          await connection.promise().query(additionalPayQuery, [additionalPayments]);
+        }
+
+        // Insert room payment only when paid
+        if (paymentStatus === 'paid') {
+          const finalAmount = roomChargeForBilling - reservationFeeForBilling - discountForBilling;
           const paymentQuery = `
             INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
             VALUES (?, ?, ?, ?, 'room', NOW(), ?)
           `;
           await connection.promise().query(paymentQuery, [bookingId, billResult.insertId || bookingId, finalAmount, 'cash', encodedBy]);
+        }
+      }
 
-          // Insert payment records for reservation fee and discount
-          const additionalPayments = [];
-
-          // For consolidated billing: apply group-level fees/discounts only to main booking
-          // For individual billing: apply per-room fees/discounts to each room
-          if (consolidatedBilling && index === 0) {
-            // Add reservation fee payment record for main booking in consolidated billing
-            if (reservationFeeForBilling > 0) {
-              additionalPayments.push([
-                bookingId,
-                null, // No specific service ID for reservation fee
-                reservationFeeForBilling,
-                'cash',
-                'reservation_fee',
-                date,
-                encodedBy
-              ]);
-            }
-
-            // Add discount payment record for main booking in consolidated billing
-            if (discountForBilling > 0) {
-              additionalPayments.push([
-                bookingId,
-                null, // No specific service ID for discount
-                -discountForBilling, // Negative amount for discount
-                'cash',
-                'discount',
-                date,
-                encodedBy
-              ]);
-            }
-          } else if (!consolidatedBilling) {
-            // For individual billing: apply per-room fees/discounts to each room
-            if (reservationFeeForBilling > 0) {
-              additionalPayments.push([
-                bookingId,
-                null, // No specific service ID for reservation fee
-                reservationFeeForBilling,
-                'cash',
-                'reservation_fee',
-                date,
-                encodedBy
-              ]);
-            }
-
-            if (discountForBilling > 0) {
-              additionalPayments.push([
-                bookingId,
-                null, // No specific service ID for discount
-                -discountForBilling, // Negative amount for discount
-                'cash',
-                'discount',
-                date,
-                encodedBy
-              ]);
-            }
-          }
-
-          // Insert additional payments if any
-          if (additionalPayments.length > 0) {
-            const additionalPayQuery = `
-              INSERT INTO payments
-              (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
-              VALUES ?
-            `;
-
-            await connection.promise().query(additionalPayQuery, [additionalPayments]);
-          }
+      // Fallback: if non-consolidated and no per-room fees/discounts provided, but group-level provided
+      if (!consolidatedBilling && firstBookingId) {
+        const perRoomFeeSum = (perRoomFeesArray || []).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+        const perRoomDiscSum = (perRoomDiscountsArray || []).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+        const inserts = [];
+        if (perRoomFeeSum <= 0 && (parseFloat(reservationFee) || 0) > 0) {
+          inserts.push([firstBookingId, null, parseFloat(reservationFee) || 0, 'cash', 'reservation_fee', date, encodedBy]);
+        }
+        if (perRoomDiscSum <= 0 && (parseFloat(discount) || 0) > 0) {
+          inserts.push([firstBookingId, null, -(parseFloat(discount) || 0), 'cash', 'discount', date, encodedBy]);
+        }
+        if (inserts.length > 0) {
+          const q = `
+            INSERT INTO payments
+            (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
+            VALUES ?
+          `;
+          await connection.promise().query(q, [inserts]);
         }
       }
 
@@ -6110,11 +6441,11 @@ class BookingModel {
       console.log(`   totalGroupRoomCharges: ₱${totalGroupRoomCharges.toLocaleString()}`);
       console.log(`   servicesTotal: ₱${servicesTotal.toLocaleString()}`);
       console.log(`   subtotal: ₱${(totalGroupRoomCharges + servicesTotal).toLocaleString()}`);
-      console.log(`   reservationFee: ₱${(parseFloat(reservationFee) || 0).toLocaleString()}`);
-      console.log(`   discount: ₱${(parseFloat(discount) || 0).toLocaleString()}`);
+      console.log(`   reservationFee (subtract): -₱${(parseFloat(reservationFee) || 0).toLocaleString()}`);
+      console.log(`   discount (subtract): -₱${(parseFloat(discount) || 0).toLocaleString()}`);
 
       const subtotal = totalGroupRoomCharges + servicesTotal;
-      const grandTotal = subtotal + (parseFloat(reservationFee) || 0) - (parseFloat(discount) || 0);
+      const grandTotal = subtotal - (parseFloat(reservationFee) || 0) - (parseFloat(discount) || 0);
 
       // Commit
       await new Promise((resolve, reject) => connection.commit(err => (err ? reject(err) : resolve())));

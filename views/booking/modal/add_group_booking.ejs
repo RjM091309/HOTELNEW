@@ -219,7 +219,7 @@
             <div class="col-lg-4">
               <div class="form-check mb-2">
                 <input class="form-check-input" type="checkbox" id="groupIncludeReservationFee">
-                <label class="form-check-label" for="groupIncludeReservationFee">Reservation Fee (Group)</label>
+                <label class="form-check-label" for="groupIncludeReservationFee">Reservation Fee</label>
               </div>
               <div id="groupReservationFeeWrapper" class="mt-2" style="display: none;">
                 <input type="number" class="form-control" id="groupReservationFee" name="groupReservationFee" min="0" value="0">
@@ -228,7 +228,7 @@
             <div class="col-lg-4">
               <div class="form-check mb-2">
                 <input class="form-check-input" type="checkbox" id="groupIncludeDiscount">
-                <label class="form-check-label" for="groupIncludeDiscount">Discount (Group)</label>
+                <label class="form-check-label" for="groupIncludeDiscount">Discount</label>
               </div>
               <div id="groupDiscountWrapper" class="mt-2" style="display: none;">
                 <input type="number" class="form-control" id="groupDiscount" name="groupDiscount" min="0" value="0">
@@ -547,6 +547,18 @@
   font-weight: 600;
 }
 
+/* Disabled reservation fee styling */
+#groupIncludeReservationFee:disabled + label {
+  color: #666666;
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+#groupIncludeReservationFee:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .form-text small {
   font-style: italic;
   opacity: 0.8;
@@ -725,6 +737,12 @@
     $('#groupPickupServiceId, #groupDropoffServiceId').val('');
     $('#groupRoomBreakdown').removeClass('d-none');
     $('.consolidated-indicator').remove();
+    
+    // Reset reservation fee checkbox state
+    $('#groupIncludeReservationFee').prop('checked', false).prop('disabled', false);
+    $('#groupReservationFeeWrapper').hide();
+    $('#groupReservationFee').val('0');
+    
     applyGroupBreakfastDefaults();
   }
 
@@ -1737,6 +1755,29 @@
 
       computeGroupTotal();
       updateGroupChargeBreakdown();
+    });
+
+    // Handle Payment Status changes - disable Reservation Fee when Paid
+    $('#groupPaymentStatus').on('change', function() {
+      const paymentStatus = $(this).val();
+      const reservationFeeCheckbox = $('#groupIncludeReservationFee');
+      const reservationFeeWrapper = $('#groupReservationFeeWrapper');
+      
+      if (paymentStatus === 'paid') {
+        // Disable reservation fee checkbox and hide wrapper
+        reservationFeeCheckbox.prop('checked', false).prop('disabled', true);
+        reservationFeeWrapper.hide();
+        $('#groupReservationFee').val('0');
+        console.log('💰 Payment Status: PAID - Reservation Fee disabled');
+      } else {
+        // Enable reservation fee checkbox
+        reservationFeeCheckbox.prop('disabled', false);
+        console.log('💰 Payment Status: UNPAID - Reservation Fee enabled');
+      }
+      
+      // Recalculate totals and update breakdown
+      updateGroupChargeBreakdown();
+      computeGroupTotal();
     });
 
     // Clear selected rooms when Check-in/Check-out status changes

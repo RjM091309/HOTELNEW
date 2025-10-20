@@ -17,7 +17,7 @@
             <!-- Enhanced Body -->
             <div class="modal-body payment-modal-body">
                 <!-- Payment Summary Card -->
-                <div class="payment-summary-card">
+                <!-- <div class="payment-summary-card">
                     <div class="summary-header">
                         <h6><i class="fa fa-receipt"></i> Payment Summary</h6>
                     </div>
@@ -35,13 +35,14 @@
                             <span class="summary-value balance-amount" id="remainingBalance">0.00</span>
                         </div>
                     </div>
-                </div>
+                </div> -->
 
                 <!-- Payment Form -->
                 <form id="groupPaymentForm" class="payment-form">
                     <!-- Hidden Input for Booking ID -->
                     <input type="hidden" id="bookingID" name="bookingID">
                     <input type="hidden" id="groupPaymentAmount" name="groupPaymentAmount">
+                    <input type="hidden" id="groupPaymentMethod" name="groupPaymentMethod">
 
                     <!-- Payment Amount Input -->
                     <div class="form-group payment-amount-group">
@@ -56,9 +57,9 @@
                                    step="0.01"
                                    min="0"
                                    placeholder="Enter amount to pay"
-                                   required>
+                                   readonly>
                         </div>
-                        <div class="form-text">Enter the amount you want to pay</div>
+                        <!-- <div class="form-text">Enter the amount you want to pay</div> -->
                     </div>
                     
                     <!-- Payment Method Selection -->
@@ -162,7 +163,7 @@
 
 /* Header Styles */
 #group_modal-payment .modal-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #0c2a42;
     color: white;
     border: none;
     padding: 20px 25px;
@@ -176,7 +177,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.9), rgba(118, 75, 162, 0.9));
+    background: #0c2a42;
     z-index: -1;
 }
 
@@ -698,6 +699,10 @@ function initializeGroupPaymentModal() {
             
             // Update form validation
             validatePaymentForm();
+
+            // Sync hidden input expected by existing handler
+            const hiddenMethodInput = document.getElementById('groupPaymentMethod');
+            if (hiddenMethodInput) hiddenMethodInput.value = radio.value;
         });
     });
 
@@ -827,46 +832,7 @@ function initializeGroupPaymentModal() {
         }
     }
 
-    // Payment confirmation handler
-    if (confirmButton) {
-        confirmButton.addEventListener('click', function() {
-            processGroupPayment();
-        });
-    }
-
-    // Process payment function
-    function processGroupPayment() {
-        const amount = parseFloat(paymentAmountInput.value) || 0;
-        const method = document.querySelector('input[name="groupPaymentMethod"]:checked')?.value;
-        const notes = document.getElementById('paymentNotes').value;
-        
-        if (!amount || !method) {
-            showPaymentStatus('error', 'Please fill in all required fields.');
-            return;
-        }
-        
-        // Show loading state
-        showLoadingState(true);
-        
-        // Simulate payment processing
-        setTimeout(() => {
-            showLoadingState(false);
-            
-            // Show success message
-            showPaymentStatus('success', `Payment of ${amount.toLocaleString('en-US', {minimumFractionDigits: 2})} via ${method.replace('_', ' ').toUpperCase()} processed successfully!`);
-            
-            // Add success animation
-            confirmButton.classList.add('payment-success');
-            
-            // Close modal after delay
-            setTimeout(() => {
-                $('#group_modal-payment').modal('hide');
-                // Reset form
-                resetPaymentForm();
-            }, 2000);
-            
-        }, 2000);
-    }
+    // Note: actual payment submit is handled in public/js/booking/group_booking_data.js
 
     // Show loading state
     function showLoadingState(show) {

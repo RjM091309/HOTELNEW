@@ -121,6 +121,7 @@
 <%- include('../booking/modal/group_payment') %>
 <%- include('../booking/modal/billing') %>
 <%- include('../booking/modal/status') %>
+<%- include('../booking/modal/cancel_group_booking') %>
 
 <script src="/js/booking/group_booking_data.js"></script>
 
@@ -312,6 +313,117 @@
         width: 100% !important;
         max-width: 300px !important;
     }
+}
+
+/* Cancel Group Booking Modal Dark Theme - Matching Group Booking Theme */
+#modal-cancel-group-booking .form-label {
+    font-size: 12px;
+}
+
+#modal-cancel-group-booking .btn-close {
+    filter: invert(1) !important;
+}
+
+#modal-cancel-group-booking .btn-close:hover {
+    filter: invert(0.8) !important; /* Slightly lighter on hover */
+}
+
+/* Modal Background */
+#modal-cancel-group-booking .modal-content {
+    background-color: #2a3135;
+    color: #e0e0e0; /* Light text */
+    border-radius: 6px;
+    box-shadow: 0 0 10px rgba(59,59,59, 0.2); /* Slight neon glow */
+    border: 1px solid #3B3B3B;
+}
+
+/* Modal Header */
+#modal-cancel-group-booking .modal-header {
+    background-color: #dc3545; /* Red theme for cancel */
+    color: #ffffff;
+    border-bottom: 1px solid #dc3545;
+}
+
+/* Modal Title */
+#modal-cancel-group-booking .modal-title {
+    color: #ffffff;
+}
+
+/* Close button (X) */
+#modal-cancel-group-booking .btn-close {
+    filter: brightness(200%);
+}
+
+/* Form Controls */
+#modal-cancel-group-booking .form-control {
+    background-color: #41474c !important;
+    border-color: #3B3B3B !important;
+    color: #e0e0e0 !important;
+}
+
+#modal-cancel-group-booking .form-control:focus {
+    background-color: #41474c !important;
+    border-color: #dc3545 !important;
+    color: #e0e0e0 !important;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+#modal-cancel-group-booking .form-check-input {
+    background-color: #41474c !important;
+    border-color: #3B3B3B !important;
+}
+
+#modal-cancel-group-booking .form-check-input:checked {
+    background-color: #dc3545 !important;
+    border-color: #dc3545 !important;
+}
+
+#modal-cancel-group-booking .form-check-label {
+    color: #e0e0e0 !important;
+}
+
+/* Alert Styling */
+#modal-cancel-group-booking .alert-warning {
+    background-color: #664d03 !important;
+    border-color: #ffc107 !important;
+    color: #fff3cd !important;
+}
+
+/* Modal Footer */
+#modal-cancel-group-booking .modal-footer {
+    background-color: #2a3135;
+    border-top: 1px solid #3B3B3B;
+}
+
+/* Button Styling */
+#modal-cancel-group-booking .btn-secondary {
+    background-color: #41474c;
+    border-color: #3B3B3B;
+    color: #e0e0e0;
+}
+
+#modal-cancel-group-booking .btn-secondary:hover {
+    background-color: #3B3B3B;
+    border-color: #2a3135;
+    color: #ffffff;
+}
+
+#modal-cancel-group-booking .btn-danger {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: #ffffff;
+}
+
+#modal-cancel-group-booking .btn-danger:hover {
+    background-color: #c82333;
+    border-color: #bd2130;
+    color: #ffffff;
+}
+
+#modal-cancel-group-booking .btn-danger:disabled {
+    background-color: #6c757d;
+    border-color: #6c757d;
+    opacity: 0.65;
 }
 </style>
 
