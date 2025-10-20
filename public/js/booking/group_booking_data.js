@@ -135,7 +135,7 @@ $(document).ready(function () {
 
                     // Deterministic color: green only if there are actual rows in remarks table or non-empty gb.REMARKS
                     const hasAny = (row.RemarksCount && row.RemarksCount > 0) || (row.Remarks && String(row.Remarks).trim() !== '');
-                    const baseRemarksColor = hasAny ? 'lightgreen' : 'lightgray';
+                    const baseRemarksColor = hasAny ? 'rgba(39, 164, 176, 0.3)' : 'rgba(149, 165, 166, 0.28)';
 
                     // Check if group booking can be cancelled (all bookings are pending)
                     // Since group status is determined by individual booking statuses
@@ -145,25 +145,25 @@ $(document).ready(function () {
                     let cancelButton = '';
                     if (canCancel) {
                         cancelButton = `
-                            <button class="btn btn-danger ms-1" onclick="openGroupCancelBookingModal(${row.GroupID})" title="Cancel Group Booking" style="width: 30px; height: 30px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px;">
+                            <button class="label label-sm label-danger ms-1" onclick="openGroupCancelBookingModal(${row.GroupID})" title="Cancel Group Booking" style="width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px;">
                                 <i class="fa fa-times"></i>
                             </button>`;
                     } else if (isCancelled) {
                         cancelButton = `
-                            <button class="btn btn-danger ms-1" title="Cancelled" style="width: 30px; height: 30px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px; opacity: 0.6; cursor: not-allowed;">
+                            <button class="label label-sm label-danger ms-1" title="Cancelled" style="width: 30px; height: 30px;  padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px; opacity: 0.6; cursor: not-allowed;">
                                 <i class="fa fa-ban"></i>
                             </button>`;
                     }
 
                     return `
                         <div style="text-align: center;">
-                            <button id="${buttonId}" class="btn btn-primary" onclick="viewGroupBilling(${row.GroupID})" title="Billing" style="width: 30px; height: 30px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px;">
+                            <button id="${buttonId}" class="label label-sm label-billing" onclick="viewGroupBilling(${row.GroupID})" title="Billing" style="width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px;">
                                 <i class="fa fa-credit-card"></i>
                             </button>
-                            <button class="btn btn-warning ms-1" onclick="editGroupBooking(${row.GroupID})" title="Edit Group Booking" style="width: 30px; height: 30px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px;">
+                            <button class="label label-sm label-warning ms-1" onclick="editGroupBooking(${row.GroupID})" title="Edit Group Booking" style="width: 30px; height: 30px;  padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px;">
                                 <i class="fa fa-edit"></i>
                             </button>
-                            <button id="${remarksBtnId}" class="btn btn-success ms-1" onclick="openGroupRemarksModal(${row.GroupID})" title="Remarks" style="width: 30px; height: 30px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px; background-color: ${baseRemarksColor} !important; border-color: ${baseRemarksColor} !important;">
+                            <button id="${remarksBtnId}" class="label label-sm label-success ms-1" onclick="openGroupRemarksModal(${row.GroupID})" title="Remarks" style="width: 30px; height: 30px;  padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px; background-color: ${baseRemarksColor} !important; border-color: ${baseRemarksColor} !important;">
                                 <i class="fa fa-comment-dots"></i>
                             </button>
                             ${cancelButton}
