@@ -2614,45 +2614,33 @@ class BookingModel {
             - COALESCE(gb.GROUP_DISCOUNT, 0)
             - COALESCE(gb.GROUP_RESERVATION_FEE, 0)
           ) AS TOTAL_PAYMENT,
-          -- Calculate total paid amount for the group (only when paid, subtract reservation fee and discount)
-          CASE 
-            WHEN COUNT(CASE WHEN bill.PAYMENT_STATUS = 'paid' THEN 1 END) = COUNT(b.IDNo)
-              AND COUNT(CASE WHEN EXISTS(
-                SELECT 1 FROM booking_service bs 
-                WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1 AND bs.STATUS = 'unpaid'
-              ) THEN 1 END) = 0
-              AND COUNT(CASE WHEN EXISTS(
-                SELECT 1 FROM booking_extension be 
-                WHERE be.BOOKING_ID = b.IDNo AND be.PAYMENT_STATUS = 'unpaid'
-              ) THEN 1 END) = 0
-            THEN (
-              COALESCE(SUM(
-                CASE 
-                  WHEN bill.PAYMENT_STATUS = 'paid' THEN 
-                    (bill.ROOM_CHARGE * 
-                      CASE 
-                        WHEN bill.ORIGINAL_QTY IS NOT NULL THEN bill.ORIGINAL_QTY
-                        ELSE bill.QTY
-                      END
-                    ) + 
-                    COALESCE((
-                      SELECT SUM(bs.TOTAL_COST) 
-                      FROM booking_service bs 
-                      WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1 AND bs.STATUS = 'paid'
-                    ), 0) +
-                    COALESCE((
-                      SELECT SUM(be.COST * be.QTY) 
-                      FROM booking_extension be 
-                      WHERE be.BOOKING_ID = b.IDNo AND be.PAYMENT_STATUS = 'paid'
-                    ), 0)
-                  ELSE 0
-                END
-              ), 0)
-              - COALESCE(gb.GROUP_DISCOUNT, 0)
-              - COALESCE(gb.GROUP_RESERVATION_FEE, 0)
-            )
-            ELSE 0
-          END AS TOTAL_PAID,
+          -- Calculate total paid amount for the group (including partial payments)
+          (
+            COALESCE(SUM(
+              CASE 
+                WHEN bill.PAYMENT_STATUS = 'paid' THEN 
+                  (bill.ROOM_CHARGE * 
+                    CASE 
+                      WHEN bill.ORIGINAL_QTY IS NOT NULL THEN bill.ORIGINAL_QTY
+                      ELSE bill.QTY
+                    END
+                  ) + 
+                  COALESCE((
+                    SELECT SUM(bs.TOTAL_COST) 
+                    FROM booking_service bs 
+                    WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1 AND bs.STATUS = 'paid'
+                  ), 0) +
+                  COALESCE((
+                    SELECT SUM(be.COST * be.QTY) 
+                    FROM booking_extension be 
+                    WHERE be.BOOKING_ID = b.IDNo AND be.PAYMENT_STATUS = 'paid'
+                  ), 0)
+                ELSE 0
+              END
+            ), 0)
+            - COALESCE(gb.GROUP_DISCOUNT, 0)
+            - COALESCE(gb.GROUP_RESERVATION_FEE, 0)
+          ) AS TOTAL_PAID,
           -- Get all statuses in a group
           GROUP_CONCAT(DISTINCT b.BOOKING_STATUS ORDER BY b.BOOKING_STATUS SEPARATOR ', ') AS all_statuses,
           -- Status Overview Logic
