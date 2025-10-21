@@ -1982,7 +1982,7 @@ class BookingModel {
 
   // Process payment
   static async processPayment(params) {
-    const { paymentMethod, bookingId, encodedBy } = params;
+    const { paymentMethod, bookingId, paymentNotes, encodedBy } = params;
 
     try {
       // Get connection from pool for transaction
@@ -2032,9 +2032,9 @@ class BookingModel {
 
           await new Promise((resolve, reject) => {
             connection.query(
-              `INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
-              VALUES (?, ?, ?, ?, 'room', NOW(), ?)`,
-              [bookingId, billingId, roomAmount, paymentMethod, encodedBy],
+              `INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
+              VALUES (?, ?, ?, ?, 'room', NOW(), ?, ?)`,
+              [bookingId, billingId, roomAmount, paymentMethod, encodedBy, paymentNotes || ''],
               (err) => {
                 if (err) reject(err);
                 else resolve();
@@ -2165,6 +2165,21 @@ class BookingModel {
             connection.query(
               `UPDATE booking_pick_drop SET STATUS = 'paid' WHERE IDNo = ?`,
               [pd.IDNo],
+              (err) => {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          });
+        }
+
+        // Step 6: Insert payment notes into remarks table if provided
+        if (paymentNotes && paymentNotes.trim() !== '') {
+          await new Promise((resolve, reject) => {
+            connection.query(
+              `INSERT INTO remarks (BOOKING_ID, CATEGORY, REMARK_TEXT, ENCODED_BY, ENCODED_DT, ACTIVE)
+              VALUES (?, 'Payment', ?, ?, NOW(), 1)`,
+              [bookingId, paymentNotes.trim(), encodedBy],
               (err) => {
                 if (err) reject(err);
                 else resolve();
@@ -2638,8 +2653,11 @@ class BookingModel {
                 ELSE 0
               END
             ), 0)
-            - COALESCE(gb.GROUP_DISCOUNT, 0)
-            - COALESCE(gb.GROUP_RESERVATION_FEE, 0)
+            - CASE 
+                WHEN COUNT(CASE WHEN bill.PAYMENT_STATUS = 'paid' THEN 1 END) > 0 
+                THEN COALESCE(gb.GROUP_DISCOUNT, 0) + COALESCE(gb.GROUP_RESERVATION_FEE, 0)
+                ELSE 0
+              END
           ) AS TOTAL_PAID,
           -- Get all statuses in a group
           GROUP_CONCAT(DISTINCT b.BOOKING_STATUS ORDER BY b.BOOKING_STATUS SEPARATOR ', ') AS all_statuses,
@@ -3745,17 +3763,19 @@ class BookingModel {
           const originalQty = bill.ORIGINAL_QTY ?? bill.QTY;
           const amountToPay = bill.ROOM_CHARGE * originalQty;
 
-        // Insert payment record for room
+        // Insert payment record for room (add REMARKS to all room payments in group)
         const paymentInsertQuery = `
-          INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY) 
-          VALUES (?, ?, ?, ?, 'room', NOW(), ?)
+          INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS) 
+          VALUES (?, ?, ?, ?, 'room', NOW(), ?, ?)
         `;
+        
         await queryDatabasePromise(paymentInsertQuery, [
           bill.BOOKING_ID, 
           bill.IDNo, 
           amountToPay, 
           paymentMethod, 
-          encodedBy
+          encodedBy,
+          paymentNotes || ''
         ], connection);
 
         // Update billing table
@@ -3787,13 +3807,14 @@ class BookingModel {
         await queryDatabasePromise(serviceUpdateQuery, [service.IDNo], connection);
       }
 
-      // Update billing REMARKS for the main booking (first booking in the group)
+      // Insert payment notes into remarks table if provided (one entry per group payment)
       if (paymentNotes && paymentNotes.trim() !== '') {
-        const mainBookingId = bookingIDs[0]; // First booking is the main booking
-        const billingRemarksQuery = `
-          UPDATE billing SET REMARKS = ? WHERE BOOKING_ID = ?
+        const mainBookingId = bookingIDs[0]; // First booking is the main booking for remarks
+        const remarksInsertQuery = `
+          INSERT INTO remarks (BOOKING_ID, CATEGORY, REMARK_TEXT, ENCODED_BY, ENCODED_DT, ACTIVE)
+          VALUES (?, 'Payment', ?, ?, NOW(), 1)
         `;
-        await queryDatabasePromise(billingRemarksQuery, [paymentNotes.trim(), mainBookingId], connection);
+        await queryDatabasePromise(remarksInsertQuery, [mainBookingId, paymentNotes.trim(), encodedBy], connection);
       }
 
         // Commit the transaction

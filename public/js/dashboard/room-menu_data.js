@@ -3948,10 +3948,12 @@ function createRemarksModal(bookingId) {
                                             <option value="">Select Category</option>
                                             <option value="Booking">Booking</option>
                                             <option value="Billing">Billing</option>
+                                            <option value="Payment">Payment</option>
                                             <option value="Complain">Complain</option>
                                             <option value="Request">Request</option>
                                             <option value="Discount">Discount</option>
                                             <option value="Service">Service</option>
+                                            
                                 
                                         </select>
                                     </div>

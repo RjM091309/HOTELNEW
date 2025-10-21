@@ -812,7 +812,7 @@ class BookingController {
   // Process payment
   static async processPayment(req, res) {
     try {
-      const { paymentMethod, bookingId } = req.body;
+      const { paymentMethod, bookingId, paymentNotes } = req.body;
       const encodedBy = req.user.userId; // Use JWT user ID instead of session
 
       if (!paymentMethod || !bookingId) {
@@ -826,6 +826,7 @@ class BookingController {
       const result = await BookingModel.processPayment({
         paymentMethod,
         bookingId,
+        paymentNotes: paymentNotes || '', // Include payment notes, default to empty string
         encodedBy
       });
 

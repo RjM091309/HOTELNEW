@@ -23,6 +23,7 @@ const paymentsModel = {
         p.PAYMENT_TYPE,
         p.PAYMENT_DATE,
         p.ENCODED_BY,
+        p.REMARKS,
         b.CONFIRMATION_NUMBER,
         c.NAME AS GUEST_NAME,
         r.ROOM_NUMBER
@@ -190,7 +191,7 @@ const paymentsModel = {
     );
 
     const [payments] = await pool.promise().query(
-      `SELECT AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE
+      `SELECT AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, REMARKS
        FROM payments
        WHERE BOOKING_ID = ?
        ORDER BY PAYMENT_DATE DESC`, [bookingId]
