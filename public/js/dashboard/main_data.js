@@ -1212,6 +1212,9 @@ $(document).ready(function() {
                 // Get the room ID from the card
                 const roomId = $(this).closest('.card').attr('data-idno');
                 
+                // Get the room number from the card header
+                const roomNumber = $(this).closest('.card').find('.card-head header').text().trim();
+                
                 // Send AJAX request to update check-out status
                 $.ajax({
                     url: '/dashboard/booking/update_status',
@@ -1291,7 +1294,7 @@ $(document).ready(function() {
                                         }
                                         
                                         // Show success toast
-                                        PMSCore.showSuccess('Check-Out Successful!', `Booking ID ${bookingId} has been checked out and room ${roomId} moved to cleaning tab.`);
+                                        PMSCore.showSuccess('Check-Out Successful!', `Booking ID ${bookingId} has been checked out and room ${roomNumber} moved to cleaning tab.`);
                                         $(this).prop('disabled', true);
                                         PMSCore.debugLog('Check-out successful (SweetAlert)', { bookingId, status: newStatus, lateCheckOut, roomId });
                                         
@@ -1351,8 +1354,12 @@ $(document).ready(function() {
         const isCurrentlyOn = broomIcon.hasClass('on');
         const card = $(this).closest('.card');
         
+        // Get room number from the card header
+        const roomNumber = card.find('.card-head header').text().trim();
+        
         console.log('Cleaning container clicked:', {
             roomId: roomId,
+            roomNumber: roomNumber,
             isCurrentlyOn: isCurrentlyOn,
             broomIconClasses: broomIcon.attr('class')
         });
@@ -1362,7 +1369,7 @@ $(document).ready(function() {
             // Show SweetAlert2 confirmation
             Swal.fire({
                 title: "Move to Available Room?",
-                text: `Are you sure you want to move room ${roomId} to Available Room tab?`,
+                text: `Are you sure you want to move room ${roomNumber} to Available Room tab?`,
                 icon: "question",
                 showCancelButton: true,
                 confirmButtonColor: "#28a745",
@@ -1430,7 +1437,7 @@ $(document).ready(function() {
             // But keeping it for safety
             Swal.fire({
                 title: "Mark as Cleaning?",
-                text: `Are you sure you want to mark room ${roomId} as Cleaning?`,
+                text: `Are you sure you want to mark room ${roomNumber} as Cleaning?`,
                 icon: "question",
                 showCancelButton: true,
                 confirmButtonColor: "#ffc107",
