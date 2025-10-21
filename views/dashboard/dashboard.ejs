@@ -684,7 +684,11 @@ function calculateCardVariables(booking) {
 								%>
                                     <div class="card <%= cardClass %>" data-floor="<%= cleaningRoom.ROOM_FLOOR %>">
                                         <div class="card-head" style="text-align: center; display: flex; align-items: center; justify-content: space-between;">
-                                            <!-- Room Number -->
+                                           <!-- Cleaning Toggle Button -->
+											<div class="cleaning-container" data-room-id="<%= cleaningRoom.ROOM_ID %>">
+												<i class="fas fa-broom on"></i>
+											</div>
+											<!-- Room Number -->
                                             <header style="flex-grow: 1; text-align: center; font-weight: bold;"><%= cleaningRoom.ROOM_NUMBER %></header>
                                         </div>
 										<div class="card-body">
