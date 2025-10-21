@@ -1081,11 +1081,14 @@ $(document).ready(function() {
     $(document).on('change', '.custom-toggle-checkin', function() {
         const bookingId = $(this).attr('data-idno');
         const newStatus = 'check-In';
+        
+        // Get the room number from the card header
+        const roomNumber = $(this).closest('.card').find('.card-head header').text().trim();
 
         // Show SweetAlert2 confirmation
         Swal.fire({
             title: "Check In Guest?",
-            text: `Are you sure you want to check in booking ID ${bookingId}?`,
+            text: `Are you sure you want to check in Room ${roomNumber}?`,
             icon: "question",
             showCancelButton: true,
             confirmButtonColor: "#28a745",
@@ -1186,11 +1189,14 @@ $(document).ready(function() {
         const bookingId = $(this).attr('data-idno');
         const newStatus = 'check-Out';
         const lateCheckOut = $(this).attr('data-late-checkout');
+        
+        // Get the room number from the card header
+        const roomNumber = $(this).closest('.card').find('.card-head header').text().trim();
 
         // Show SweetAlert2 confirmation
         Swal.fire({
             title: "Check Out Guest?",
-            text: `Are you sure you want to check out booking ID ${bookingId}?`,
+            text: `Are you sure you want to check out Room ${roomNumber}?`,
             icon: "question",
             showCancelButton: true,
             confirmButtonColor: "#dc3545",
