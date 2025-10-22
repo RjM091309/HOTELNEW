@@ -129,6 +129,17 @@ const paymentsController = {
       console.error('Error fetching breakdown:', err);
       res.status(500).json({ success: false, message: 'Failed to fetch breakdown' });
     }
+  },
+
+  getPaymentsByBooking: async (req, res) => {
+    try {
+      const { bookingId } = req.params;
+      const data = await paymentsModel.listPayments({ bookingId });
+      res.json(data);
+    } catch (err) {
+      console.error('Error getting payments by booking:', err);
+      res.status(500).json({ success: false, message: 'Failed to get payments' });
+    }
   }
 };
 

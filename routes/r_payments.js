@@ -14,6 +14,9 @@ router.get('/payments_data', paymentsController.tableData);
 // Sales summary
 router.get('/sales-summary', paymentsController.salesSummary);
 
+// Get payments by booking ID
+router.get('/get-payments/:bookingId', paymentsController.getPaymentsByBooking);
+
 // Detailed breakdown for a booking
 router.get('/breakdown/:bookingId', paymentsController.breakdown);
 

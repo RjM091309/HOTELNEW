@@ -14,6 +14,71 @@
 
             <!-- Enhanced Body -->
             <div class="modal-body payment-modal-body">
+                <!-- Payment Summary Card -->
+                <div class="payment-summary-card">
+                    <div class="summary-header">
+                        <h6><i class="fa fa-receipt"></i> Payment Summary</h6>
+                    </div>
+                    <div class="summary-content">
+                        <!-- Room Charges -->
+                        <div class="summary-row" id="roomRow" style="display: none;">
+                            <span class="summary-label">Room Charges:</span>
+                            <span class="summary-value" id="roomAmount">0.00</span>
+                        </div>
+                        
+                        <!-- Extensions -->
+                        <div class="summary-row" id="extensionRow" style="display: none;">
+                            <span class="summary-label">Extensions:</span>
+                            <span class="summary-value" id="extensionAmount">0.00</span>
+                        </div>
+                        
+                        <!-- Services -->
+                        <div class="summary-row" id="serviceRow" style="display: none;">
+                            <span class="summary-label">Services:</span>
+                            <span class="summary-value" id="serviceAmount">0.00</span>
+                        </div>
+                        
+                        <!-- Reservation Fee -->
+                        <div class="summary-row" id="paymentReservationFeeRow" style="display: none;">
+                            <span class="summary-label">Reservation Fee:</span>
+                            <span class="summary-value" id="paymentReservationFeeAmount">0.00</span>
+                        </div>
+                        
+                        <!-- Discount -->
+                        <div class="summary-row" id="paymentDiscountRow" style="display: none;">
+                            <span class="summary-label">Discount:</span>
+                            <span class="summary-value" id="paymentDiscountAmount">0.00</span>
+                        </div>
+                        
+                        <!-- Divider -->
+                        <div class="summary-divider"></div>
+                        
+                        <!-- Subtotal -->
+                        <div class="summary-row" id="subtotalRow" style="display: none;">
+                            <span class="summary-label">Subtotal:</span>
+                            <span class="summary-value subtotal-amount" id="subtotalAmount">0.00</span>
+                        </div>
+                        
+                        <!-- Amount Paid -->
+                        <div class="summary-row" id="amountPaidRow" style="display: none;">
+                            <span class="summary-label">Amount Paid:</span>
+                            <span class="summary-value amount-paid" id="amountPaid">0.00</span>
+                        </div>
+                        
+                        <!-- Total Amount to Pay -->
+                        <div class="summary-row">
+                            <span class="summary-label">Total Amount to Pay:</span>
+                            <span class="summary-value total-amount" id="paymentTotalAmount">0.00</span>
+                        </div>
+                        
+                        <!-- Remaining Balance -->
+                        <div class="summary-row balance-row" id="balanceRow" style="display: none;">
+                            <span class="summary-label">Remaining Balance:</span>
+                            <span class="summary-value balance-amount" id="remainingBalance">0.00</span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Payment Form -->
                 <form id="paymentForm" class="payment-form">
                     <!-- Hidden Input for Booking ID -->
@@ -34,7 +99,7 @@
                                    step="0.01"
                                    min="0"
                                    placeholder="Enter amount to pay"
-                                   readonly>
+                                   >
                         </div>
                     </div>
                     
@@ -95,9 +160,9 @@
                 <!-- Payment Status Messages -->
                 <div id="paymentStatusMessages" class="payment-status-messages" style="display: none;">
                     <!-- Status messages will appear here -->
+                </div>
             </div>
-        </div>
-       
+
             <!-- Enhanced Footer -->
             <div class="modal-footer payment-modal-footer">
                 <div class="footer-actions">
@@ -173,6 +238,110 @@
 #modal-payment .modal-body {
     padding: 25px;
     background: #f8f9fa;
+}
+
+/* Payment Summary Card */
+#modal-payment .payment-summary-card {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 25px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e9ecef;
+}
+
+#modal-payment .summary-header {
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #f1f3f4;
+}
+
+#modal-payment .summary-header h6 {
+    margin: 0;
+    color: #495057;
+    font-weight: 600;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#modal-payment .summary-header i {
+    color: #28a745;
+}
+
+#modal-payment .summary-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#modal-payment .summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+}
+
+#modal-payment .summary-label {
+    color: #6c757d;
+    font-weight: 500;
+    font-size: 0.85rem;
+}
+
+#modal-payment .summary-value {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #495057;
+}
+
+/* Breakdown values - make them more visible */
+#modal-payment #roomAmount,
+#modal-payment #extensionAmount,
+#modal-payment #serviceAmount {
+    color: #495057 !important;
+    font-weight: 600 !important;
+}
+
+/* Reservation Fee and Discount - make them red */
+#modal-payment #paymentReservationFeeAmount,
+#modal-payment #paymentDiscountAmount {
+    color: #dc3545 !important;
+    font-weight: 600 !important;
+}
+
+#modal-payment .summary-divider {
+    height: 1px;
+    background: #e9ecef;
+    margin: 2px 0;
+}
+
+#modal-payment .total-amount {
+    color: #007bff;
+}
+
+#modal-payment .amount-to-pay {
+    color: #28a745;
+}
+
+#modal-payment .balance-amount {
+    color: #dc3545;
+}
+
+#modal-payment .amount-paid {
+    color: #28a745;
+    font-weight: 600;
+}
+
+#modal-payment .subtotal-amount {
+    color: #6c757d;
+    font-weight: 600;
+}
+
+#modal-payment .balance-row {
+    border-top: 2px solid #f1f3f4;
+    padding-top: 2px;
+    margin-top: 2px;
 }
 
 /* Payment Form Styles */

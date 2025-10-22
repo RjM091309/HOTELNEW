@@ -31,31 +31,8 @@ document.getElementById('modal-billing').addEventListener('hidden.bs.modal', fun
     modalElement.innerHTML = modalElement.innerHTML; // Reset modal content
 });
 
-document.getElementById('proceedToPaymentButton').addEventListener('click', function () {
-    // Get the Balance (not total) from the Billing Modal
-    const totalPayment = document.getElementById('balanceAmount').textContent.trim();
-
-    console.log('Balance for payment:', totalPayment);
-
-    // Set both old and new payment amount fields
-    const paymentAmountField = document.getElementById('paymentAmount');
-    const paymentAmountInputField = document.getElementById('paymentAmountInput');
-    
-    if (totalPayment) {
-        // Remove currency symbols and parse the amount
-        const cleanAmount = totalPayment.replace(/[₹$,]/g, '');
-        const numericAmount = parseFloat(cleanAmount) || 0;
-        
-        paymentAmountField.value = totalPayment;
-        paymentAmountInputField.value = numericAmount;
-    } else {
-        paymentAmountField.value = "N/A";
-        paymentAmountInputField.value = 0;
-    }
-
-    const paymentModal = new bootstrap.Modal(document.getElementById('modal-payment'));
-    paymentModal.show();
-});
+// Note: The proceedToPaymentButton event handler is now handled in billing.ejs
+// This ensures proper Payment Summary Card updates
 
 document.getElementById('generateInvoiceBtn').addEventListener('click', function () {
     const bookingId = document.getElementById('hiddenBookingId').value;
@@ -71,7 +48,7 @@ document.getElementById('generateInvoiceBtn').addEventListener('click', function
 
 // Unified Billing Loader used across pages (overrides other definitions)
 // This ensures the same content and calculations everywhere
-window.showBilling = function (bookingID) {
+window.showBilling = async function (bookingID) {
     try {
         const bookingInput = document.getElementById('hiddenBookingId');
         if (bookingInput) {
@@ -85,7 +62,7 @@ window.showBilling = function (bookingID) {
             url: `/booking/get-billing/${bookingID}?_=${Date.now()}`,
             method: 'GET',
             cache: false,
-            success: function (data) {
+            success: async function (data) {
                 const tbody = document.querySelector('#modal-billing table tbody');
                 if (!tbody) {
                     console.error('Billing table body not found');
@@ -94,7 +71,14 @@ window.showBilling = function (bookingID) {
                 tbody.innerHTML = '';
                 data.items.forEach((item, index) => {
                     const isPaid = item.status === 'paid';
-                    const paidTextClass = isPaid ? 'text-success' : '';
+                    const isPartial = item.status === 'partial';
+                    let paidTextClass = '';
+                    if (isPaid) {
+                        paidTextClass = 'text-success';
+                    } else if (isPartial) {
+                        paidTextClass = 'text-warning';
+                    }
+                    
                     const row = `
                     <tr>
                     <td class="text-center ${paidTextClass}">${index + 1}</td>
@@ -112,41 +96,52 @@ window.showBilling = function (bookingID) {
                 const discountAmount = parseFloat(data.discountAmount) || 0;
                 const discountApplied = parseInt(data.discountApplied) || 0; // Default to 0 (not applied)
 
-                // Calculate balance using same logic as room-menu_data.js
-                // For billing, we need to calculate unpaid amount from items
-                let totalPaid = 0;
-                let totalUnpaid = 0;
-                data.items.forEach(item => {
-                    const amount = parseFloat(item.subTotal) || 0;
-                    if (item.status === 'paid') totalPaid += amount; else totalUnpaid += amount;
-                });
+                // Calculate actual balance considering partial payments
+                // Get total payments made from payments table
+                const paymentsResponse = await fetch(`/payments/get-payments/${bookingID}?_=${Date.now()}`);
+                const paymentsData = await paymentsResponse.json();
+                
+                const totalPaymentsMade = paymentsData.reduce((sum, payment) => {
+                    console.log('Payment Record:', {
+                        IDNo: payment.IDNo,
+                        AMOUNT_PAID: payment.AMOUNT_PAID,
+                        PAYMENT_TYPE: payment.PAYMENT_TYPE,
+                        PAYMENT_DATE: payment.PAYMENT_DATE
+                    });
+                    
+                    // Exclude reservation_fee and discount payments from paid amount
+                    if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
+                        console.log('Excluding payment type:', payment.PAYMENT_TYPE);
+                        return sum;
+                    }
+                    
+                    return sum + parseFloat(payment.AMOUNT_PAID);
+                }, 0);
+                
+                console.log('Total Payments Made:', totalPaymentsMade);
+
+                // Calculate gross total (before reservation fee and discount)
+                const grossTotal = subTotal;
+                
+                // Calculate net balance (after reservation fee and discount)
+                const netBalance = grossTotal - reservationFee - discountAmount;
+                
+                // Calculate remaining balance after payments
+                const remainingBalance = Math.max(0, netBalance - totalPaymentsMade);
 
                 // Debug logging
                 console.log('Billing Debug:', {
-                    totalUnpaid,
+                    subTotal,
+                    grossTotal,
                     reservationFee,
                     discountAmount,
-                    discountApplied,
-                    subTotal
+                    netBalance,
+                    totalPaymentsMade,
+                    remainingBalance,
+                    paymentsData
                 });
 
-                // Start with total unpaid from items
-                let balanceToShow = totalUnpaid;
-                
-                // Always subtract Reservation Fee (already paid)
-                if (reservationFee > 0) {
-                    balanceToShow -= reservationFee;
-                }
-                
-                // If discount is not yet applied (flag=0), subtract it as well
-                if (discountApplied === 0 && discountAmount > 0) {
-                    balanceToShow -= discountAmount;
-                }
-                
-                // Never show negative balance
-                if (balanceToShow < 0) balanceToShow = 0;
-
-                console.log('Final balance calculation:', balanceToShow);
+                const balanceToShow = remainingBalance;
 
                 const setText = (id, value) => {
                     const el = document.getElementById(id);
@@ -158,13 +153,8 @@ window.showBilling = function (bookingID) {
                 setText('invoiceDate', data.invoiceDate || 'N/A');
                 setText('confNumber', data.confNumber || 'N/A');
 
-                // Display Paid Amount net of discount when discount has already been applied
-                // Example: Room 10,500 with 500 discount => show 10,000 as Paid Amount
-                const displayPaidAmount = (discountApplied === 1)
-                    ? Math.max(0, (totalPaid - (discountAmount || 0)))
-                    : totalPaid;
-
-                setText('totalPaid', displayPaidAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                // Display Paid Amount - show actual payments made
+                setText('totalPaid', totalPaymentsMade.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
                 setText('balanceAmount', balanceToShow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
                 // GRAND TOTAL should be the subtotal (before discount)
                 setText('totalPayment', subTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));

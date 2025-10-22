@@ -209,9 +209,82 @@
 					
 					paymentAmountField.value = totalPayment;
 					paymentAmountInputField.value = numericAmount;
+					
+					// Calculate breakdown from billing data
+					const billingTable = document.querySelector('#modal-billing table tbody');
+					let roomAmount = 0;
+					let extensionAmount = 0;
+					let serviceAmount = 0;
+					
+					if (billingTable) {
+						const rows = billingTable.querySelectorAll('tr');
+						rows.forEach(row => {
+							const description = row.cells[2].textContent.trim();
+							const subTotal = parseFloat(row.cells[5].textContent.replace(/[₹$,]/g, '')) || 0;
+							
+							if (description.toLowerCase().includes('room') || description.toLowerCase().includes('bedroom')) {
+								roomAmount += subTotal;
+							} else if (description.toLowerCase().includes('extension') || description.toLowerCase().includes('extend')) {
+								extensionAmount += subTotal;
+							} else {
+								serviceAmount += subTotal;
+							}
+						});
+					}
+					
+					// Get reservation fee and discount
+					const reservationFeeElement = document.getElementById('billingReservationFeeAmount');
+					const discountElement = document.getElementById('billingDiscountAmount');
+					const reservationFee = reservationFeeElement ? parseFloat(reservationFeeElement.textContent.replace(/[₹$,]/g, '')) || 0 : 0;
+					const discountAmount = discountElement ? parseFloat(discountElement.textContent.replace(/[₹$,]/g, '')) || 0 : 0;
+					
+					console.log('Payment Summary Debug:', {
+						roomAmount,
+						extensionAmount,
+						serviceAmount,
+						reservationFee,
+						discountAmount,
+						numericAmount
+					});
+					
+					// Get amount already paid from billing data
+					const totalPaidElement = document.getElementById('totalPaid');
+					const amountPaid = totalPaidElement ? parseFloat(totalPaidElement.textContent.replace(/[₹$,]/g, '')) || 0 : 0;
+					
+					console.log('Amount Paid Debug:', amountPaid);
+					
+					// Update Payment Summary Card with breakdown
+					if (typeof updatePaymentSummaryCard === 'function') {
+						updatePaymentSummaryCard(numericAmount, {
+							roomAmount: roomAmount,
+							extensionAmount: extensionAmount,
+							serviceAmount: serviceAmount,
+							reservationFee: reservationFee,
+							discountAmount: discountAmount,
+							amountPaid: amountPaid
+						});
+					} else {
+						// Fallback to simple update
+						const paymentTotalAmountElement = document.getElementById('paymentTotalAmount');
+						
+						if (paymentTotalAmountElement) {
+							paymentTotalAmountElement.textContent = numericAmount.toLocaleString('en-US', {minimumFractionDigits: 2});
+						}
+					}
 				} else {
 					paymentAmountField.value = "N/A";
 					paymentAmountInputField.value = 0;
+					
+					// Reset Payment Summary Card elements
+					if (typeof updatePaymentSummaryCard === 'function') {
+						updatePaymentSummaryCard(0, {});
+					} else {
+						const paymentTotalAmountElement = document.getElementById('paymentTotalAmount');
+						
+						if (paymentTotalAmountElement) {
+							paymentTotalAmountElement.textContent = '0.00';
+						}
+					}
 				}
 
 				// Close billing modal first

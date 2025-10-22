@@ -1611,18 +1611,40 @@ function calculateTotalCost(bookingId) {
 }
 
 // Calculate balance
-function calculateBalance(bookingId, currentBookingId) {
-fetch(`/booking/unpaid_balance/${bookingId}`)
-    .then(response => response.json())
-    .then(data => {
-        let totalUnpaid = data.total_unpaid_balance || 0;
-        let reservationFee = data.reservation_fee || 0;
-        let discountAmount = data.discount_amount || 0;
-        let discountRemarks = (data.discount_remarks || '').trim();
-        let discountAppliedFlag = parseInt(data.discount_applied, 10) || 0;
-
-      
-
+async function calculateBalance(bookingId, currentBookingId) {
+    try {
+        // Fetch billing data
+        const billingResponse = await fetch(`/booking/get-billing/${bookingId}?_=${Date.now()}`);
+        const billingData = await billingResponse.json();
+        
+        // Fetch actual payments made
+        const paymentsResponse = await fetch(`/payments/get-payments/${bookingId}?_=${Date.now()}`);
+        const paymentsData = await paymentsResponse.json();
+        
+        // Calculate total payments made (exclude reservation_fee and discount payments)
+        const totalPaymentsMade = paymentsData.reduce((sum, payment) => {
+            if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
+                return sum;
+            }
+            return sum + parseFloat(payment.AMOUNT_PAID);
+        }, 0);
+        
+        // Get billing details
+        const subTotal = parseFloat(billingData.subTotal);
+        const reservationFee = parseFloat(billingData.reservationFee) || 0;
+        const discountAmount = parseFloat(billingData.discountAmount) || 0;
+        const discountRemarks = (billingData.discountRemarks || '').trim();
+        const discountAppliedFlag = parseInt(billingData.discountApplied, 10) || 0;
+        
+        // Calculate gross total (before reservation fee and discount)
+        const grossTotal = subTotal;
+        
+        // Calculate net balance (after reservation fee and discount)
+        const netBalance = grossTotal - reservationFee - discountAmount;
+        
+        // Calculate remaining balance after payments
+        const remainingBalance = Math.max(0, netBalance - totalPaymentsMade);
+        
         // Handle Reservation Fee Display
         if (reservationFee > 0) {
             const reservationFeeRow = document.getElementById(`reservation-fee-row-${bookingId}`);
@@ -1661,7 +1683,7 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
                 // Set label based on discount_applied flag from API (default to Applied when unknown)
                 const label = document.querySelector(`#discount-row-${bookingId} .summary-item label`);
                 if (label) {
-                    const discountAppliedFlag = typeof data.discount_applied !== 'undefined' ? parseInt(data.discount_applied, 10) : 1;
+                    const discountAppliedFlag = typeof billingData.discountApplied !== 'undefined' ? parseInt(billingData.discountApplied, 10) : 1;
                     if (discountAppliedFlag === 0) {
                         label.textContent = 'Discount';
                     } else {
@@ -1713,18 +1735,8 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
             }
         }
 
-        // Adjust balance: when DISCOUNT_APPLIED = 0, subtract discount from outstanding balance
-        // Base balance is sum of unpaid charges
-        let balanceToShow = totalUnpaid;
-        // Always subtract Reservation Fee (already paid)
-        if (reservationFee > 0) {
-            balanceToShow -= reservationFee;
-        }
-        // If discount is not yet applied (flag=0), subtract it as well
-        if (discountAppliedFlag === 0 && discountAmount > 0) {
-            balanceToShow -= discountAmount;
-        }
-        if (balanceToShow < 0) balanceToShow = 0;
+        // Use the correct balance calculation (same as billing.js)
+        const balanceToShow = remainingBalance;
 
         // Format Balance with Comma Separator
         let formattedBalance = balanceToShow.toLocaleString('en-US', {
@@ -1741,8 +1753,8 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
             } else {
                 balanceElement.innerHTML = `<span class="text-success"><strong>₱0.00</strong></span>`;
             }
-            } else {
-                console.error(`❌ Balance element not found: Balance-${bookingId}`);
+        } else {
+            console.error(`❌ Balance element not found: Balance-${bookingId}`);
         }
 
         // Hide/Show Discount Section based on payment status
@@ -1758,10 +1770,10 @@ fetch(`/booking/unpaid_balance/${bookingId}`)
                 discountSection.style.display = 'block';
             }
         }
-    })
-    .catch(error => {
-            console.error('❌ Error fetching balance:', error);
-    });
+        
+    } catch (error) {
+        console.error('❌ Error calculating balance:', error);
+    }
 }
 
 // Function to show billing

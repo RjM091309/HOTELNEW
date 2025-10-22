@@ -169,19 +169,27 @@ class BookingModel {
                     )
                 END
               ELSE
-                -- For individual bookings, use existing calculation
-                CASE 
-                  WHEN bill.PAYMENT_STATUS = 'paid' THEN 
-                    COALESCE(services_unpaid_total.TOTAL_SERVICES_COST, 0)
-                    + COALESCE(extensions_unpaid_total.TOTAL_EXTENSIONS_COST, 0)
-                  ELSE 
-                    COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
-                    + COALESCE(all_services_total.TOTAL_SERVICES_COST, 0)
-                    + COALESCE(all_extensions_total.TOTAL_EXTENSIONS_COST, 0)
-                    - COALESCE(bill.RESERVATION_FEE, 0)
-                    - COALESCE(bill.DISCOUNT_AMOUNT, 0)
-                END
-            END AS BALANCE
+                -- For individual bookings, always calculate balance considering actual payments made
+                -- (regardless of PAYMENT_STATUS to ensure accurate balance)
+                ROUND(GREATEST(0, 
+                  COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+                  + COALESCE(all_services_total.TOTAL_SERVICES_COST, 0)
+                  + COALESCE(all_extensions_total.TOTAL_EXTENSIONS_COST, 0)
+                  - COALESCE(bill.RESERVATION_FEE, 0)
+                  - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+                  - COALESCE(actual_payments.TOTAL_PAYMENTS_MADE, 0)
+                ), 2)
+            END AS BALANCE,
+            -- Debug logging fields
+            COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) AS DEBUG_ROOM_COST,
+            COALESCE(all_services_total.TOTAL_SERVICES_COST, 0) AS DEBUG_SERVICES_COST,
+            COALESCE(all_extensions_total.TOTAL_EXTENSIONS_COST, 0) AS DEBUG_EXTENSIONS_COST,
+            COALESCE(bill.RESERVATION_FEE, 0) AS DEBUG_RESERVATION_FEE,
+            COALESCE(bill.DISCOUNT_AMOUNT, 0) AS DEBUG_DISCOUNT_AMOUNT,
+            COALESCE(actual_payments.TOTAL_PAYMENTS_MADE, 0) AS DEBUG_TOTAL_PAYMENTS_MADE,
+            bill.PAYMENT_STATUS AS DEBUG_PAYMENT_STATUS,
+            COALESCE(services_unpaid_total.TOTAL_SERVICES_COST, 0) AS DEBUG_UNPAID_SERVICES,
+            COALESCE(extensions_unpaid_total.TOTAL_EXTENSIONS_COST, 0) AS DEBUG_UNPAID_EXTENSIONS
           FROM booking b
             LEFT JOIN customer   c   ON b.CUSTOMER_ID = c.IDNo
             LEFT JOIN agency     a   ON b.AGENCY_ID   = a.IDNo
@@ -235,6 +243,14 @@ class BookingModel {
               WHERE be.PAYMENT_STATUS = 'unpaid'
               GROUP BY be.BOOKING_ID
             ) extensions_unpaid_count ON b.IDNo = extensions_unpaid_count.BOOKING_ID
+            LEFT JOIN (
+              SELECT 
+                p.BOOKING_ID,
+                SUM(p.AMOUNT_PAID) AS TOTAL_PAYMENTS_MADE
+              FROM payments p
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount')
+              GROUP BY p.BOOKING_ID
+            ) actual_payments ON b.IDNo = actual_payments.BOOKING_ID
           WHERE b.ACTIVE = 1
             ${groupCondition || ''}
             ${dateCondition}
@@ -307,7 +323,6 @@ class BookingModel {
       `;
       
       const results = await queryDatabasePromise(query, [bookingId]);
-      console.log('Booking services query results:', results);
       return results;
     } catch (error) {
       console.error('Error in getBookingServices:', error);
@@ -787,7 +802,6 @@ class BookingModel {
                 console.error('❌ Failed to insert reservation fee/discount payments:', err);
                 reject(err);
               } else {
-                console.log('✅ Reservation fee and discount payments inserted successfully');
                 resolve();
               }
             });
@@ -967,7 +981,6 @@ class BookingModel {
             });
           }
 
-          console.log(`🔄 Late Check-Out Fee Applied: ₱${lateCheckoutFee} (Status: ${status})`);
         }
 
         // Add booking remarks to remarks table if bookingRemarks has content
@@ -983,7 +996,6 @@ class BookingModel {
                 console.error('❌ Failed to insert booking remarks:', err);
                 reject(err);
               } else {
-                console.log('✅ Booking remarks inserted successfully');
                 resolve(results);
               }
             });
@@ -1445,7 +1457,6 @@ class BookingModel {
             [mergedText, editedBy, existingRemark[0].IDNo]
           );
           
-          console.log('✅ Discount remarks merged successfully');
         } else {
           // Insert new discount remark
           await queryDatabasePromise(
@@ -1454,7 +1465,6 @@ class BookingModel {
             [bookingId, remarks.trim(), editedBy, editedBy]
           );
           
-          console.log('✅ Discount remarks inserted successfully');
         }
       }
 
@@ -1808,6 +1818,32 @@ class BookingModel {
       const roomRate = parseFloat(b.ROOM_CHARGE);
       const originalQty = parseInt(b.ORIGINAL_QTY) || parseInt(b.QTY);
 
+      // Get actual payments made for this booking
+      const paymentsQuery = `
+        SELECT AMOUNT_PAID, PAYMENT_TYPE
+        FROM payments 
+        WHERE BOOKING_ID = ?
+      `;
+      const paymentsData = await queryDatabasePromise(paymentsQuery, [bookingId]);
+      
+      // Calculate total payments made
+      const totalPaymentsMade = paymentsData.reduce((sum, payment) => {
+        return sum + parseFloat(payment.AMOUNT_PAID);
+      }, 0);
+
+      // Calculate room amount and determine status
+      const roomAmount = roomRate * originalQty;
+      const reservationFee = parseFloat(b.RESERVATION_FEE) || 0;
+      const discountAmount = parseFloat(b.DISCOUNT_AMOUNT) || 0;
+      const netRoomAmount = roomAmount - reservationFee - discountAmount;
+      
+      let roomStatus = 'unpaid';
+      if (totalPaymentsMade >= netRoomAmount) {
+        roomStatus = 'paid';
+      } else if (totalPaymentsMade > 0) {
+        roomStatus = 'partial';
+      }
+
       // Base room billing
       const roomItems = [{
         date: b.CHECK_IN_DATE,
@@ -1815,7 +1851,7 @@ class BookingModel {
         basePrice: roomRate,
         qty: originalQty,
         subTotal: roomRate * originalQty,
-        status: b.PAYMENT_STATUS
+        status: roomStatus
       }];
 
       // Fetch customer data
@@ -1982,7 +2018,7 @@ class BookingModel {
 
   // Process payment
   static async processPayment(params) {
-    const { paymentMethod, bookingId, paymentNotes, encodedBy } = params;
+    const { paymentMethod, bookingId, paymentNotes, paymentAmount, encodedBy } = params;
 
     try {
       // Get connection from pool for transaction
@@ -2022,39 +2058,36 @@ class BookingModel {
         const billing = billingRows[0];
         const billingId = billing.IDNo;
 
-        // Step 2: Determine what to pay
+        // Step 2: Calculate total amounts and determine payment allocation
         const originalQty = billing.ORIGINAL_QTY ?? billing.QTY;
         const extendedQty = billing.QTY - originalQty;
 
-        // Process room payment if unpaid
+        // Calculate room amount - consider partial payments, reservation fee, and discount
+        let fullRoomAmount = 0;
         if (billing.PAYMENT_STATUS !== 'paid' && originalQty > 0) {
-          const roomAmount = billing.ROOM_CHARGE * originalQty;
-
-          await new Promise((resolve, reject) => {
-            connection.query(
-              `INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
-              VALUES (?, ?, ?, ?, 'room', NOW(), ?, ?)`,
-              [bookingId, billingId, roomAmount, paymentMethod, encodedBy, paymentNotes || ''],
-              (err) => {
-                if (err) reject(err);
-                else resolve();
-              }
-            );
+          const totalRoomCost = parseFloat(billing.ROOM_CHARGE) * parseFloat(originalQty);
+          
+          // Get total room payments already made
+          const roomPaymentsQuery = `
+            SELECT COALESCE(SUM(AMOUNT_PAID), 0) as totalRoomPaid
+            FROM payments 
+            WHERE BOOKING_ID = ? AND PAYMENT_TYPE = 'room'
+          `;
+          const roomPaymentsRows = await new Promise((resolve, reject) => {
+            connection.query(roomPaymentsQuery, [bookingId], (err, rows) => {
+              if (err) reject(err);
+              else resolve(rows);
+            });
           });
-
-          await new Promise((resolve, reject) => {
-            connection.query(
-              `UPDATE billing SET PAYMENT_STATUS = 'paid', PAYMENT_METHOD = ? WHERE IDNo = ?`,
-              [paymentMethod, billingId],
-              (err) => {
-                if (err) reject(err);
-                else resolve();
-              }
-            );
-          });
+          
+          const totalRoomPaid = parseFloat(roomPaymentsRows[0].totalRoomPaid) || 0;
+          
+          // Calculate net room cost (after reservation fee and discount)
+          const netRoomCost = totalRoomCost - parseFloat(billing.RESERVATION_FEE) - parseFloat(billing.DISCOUNT_AMOUNT);
+          fullRoomAmount = Math.max(0, netRoomCost - totalRoomPaid);
         }
-
-        // Step 3: Pay all unpaid extensions from booking_extension
+        
+        // Get unpaid extensions total
         const extensionQuery = `
           SELECT IDNo, QTY, COST FROM booking_extension 
           WHERE BOOKING_ID = ? AND PAYMENT_STATUS = 'unpaid'
@@ -2065,56 +2098,55 @@ class BookingModel {
             else resolve(rows);
           });
         });
-
-        for (let ext of extensionRows) {
-          const amountToPay = ext.QTY * ext.COST;
-
-          await new Promise((resolve, reject) => {
-            connection.query(
-              `INSERT INTO payments (
-                BOOKING_ID, BOOKING_EXTENSION_ID, AMOUNT_PAID, PAYMENT_METHOD,
-                PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY
-              )
-              VALUES (?, ?, ?, ?, 'extended', NOW(), ?)`,
-              [bookingId, ext.IDNo, amountToPay, paymentMethod, encodedBy],
-              (err) => {
-                if (err) reject(err);
-                else resolve();
-              }
-            );
-          });
-
-          await new Promise((resolve, reject) => {
-            connection.query(
-              `UPDATE booking_extension SET PAYMENT_STATUS = 'paid' WHERE IDNo = ?`,
-              [ext.IDNo],
-              (err) => {
-                if (err) reject(err);
-                else resolve();
-              }
-            );
-          });
-        }
-
-        // Step 4: Get unpaid services
+        
+        const totalExtensionAmount = extensionRows.reduce((sum, ext) => sum + (parseFloat(ext.QTY) * parseFloat(ext.COST)), 0);
+        
+        // Get services with remaining balance (exclude fully paid or overpaid services)
         const serviceQuery = `
-          SELECT IDNo, TOTAL_COST FROM booking_service 
-          WHERE BOOKING_ID = ? AND STATUS != 'paid'
+            SELECT 
+              bs.IDNo, 
+              bs.TOTAL_COST,
+              COALESCE(SUM(p.AMOUNT_PAID), 0) as totalPaid,
+              (bs.TOTAL_COST - COALESCE(SUM(p.AMOUNT_PAID), 0)) as remainingAmount
+            FROM booking_service bs
+            LEFT JOIN payments p ON p.BOOKING_SERVICE_ID = bs.IDNo AND p.PAYMENT_TYPE = 'service'
+            WHERE bs.BOOKING_ID = ?
+            GROUP BY bs.IDNo, bs.TOTAL_COST
+            HAVING remainingAmount > 0
         `;
+        
         const serviceRows = await new Promise((resolve, reject) => {
           connection.query(serviceQuery, [bookingId], (err, rows) => {
             if (err) reject(err);
             else resolve(rows);
           });
         });
+        
+        // Use remaining amount instead of total cost for payment allocation
+        const totalServiceAmount = serviceRows.reduce((sum, service) => sum + parseFloat(service.remainingAmount), 0);
+        
+        // Calculate net balance
+        // Note: reservation fee and discount are already deducted from fullRoomAmount in Step 3
+        const reservationFee = parseFloat(billing.RESERVATION_FEE) || 0;
+        const discountAmount = parseFloat(billing.DISCOUNT_AMOUNT) || 0;
+        const grossTotal = fullRoomAmount + totalExtensionAmount + totalServiceAmount;
+        const netBalance = grossTotal; // No need to deduct reservation fee and discount again
+        
+        // Determine payment amount
+        const paymentAmountToUse = paymentAmount !== null && paymentAmount !== undefined ? paymentAmount : netBalance;
+        let remainingPayment = Math.min(paymentAmountToUse, netBalance);
+        
+        // Step 3: Process payments in priority order (Room -> Extensions -> Services)
+        
+        // 1. Pay room first
+        if (remainingPayment > 0 && fullRoomAmount > 0) {
+          const roomPaymentAmount = Math.min(remainingPayment, fullRoomAmount);
 
-        // Step 5: Process each unpaid service
-        for (let service of serviceRows) {
           await new Promise((resolve, reject) => {
             connection.query(
-              `INSERT INTO payments (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY) 
-              VALUES (?, ?, ?, ?, 'service', NOW(), ?)`,
-              [bookingId, service.IDNo, service.TOTAL_COST, paymentMethod, encodedBy],
+              `INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
+              VALUES (?, ?, ?, ?, 'room', NOW(), ?, ?)`,
+                                [bookingId, billingId, roomPaymentAmount, paymentMethod, encodedBy, paymentNotes || 'Room payment'],
               (err) => {
                 if (err) reject(err);
                 else resolve();
@@ -2122,10 +2154,236 @@ class BookingModel {
             );
           });
 
+
+          // Determine billing status: paid, partial, or unpaid
+          let newPaymentStatus = 'unpaid';
+          if (roomPaymentAmount >= fullRoomAmount) {
+              newPaymentStatus = 'paid';
+          } else if (roomPaymentAmount > 0) {
+              newPaymentStatus = 'partial';
+          }
+
           await new Promise((resolve, reject) => {
             connection.query(
-              `UPDATE booking_service SET STATUS = 'paid' WHERE IDNo = ?`,
-              [service.IDNo],
+              `UPDATE billing SET PAYMENT_STATUS = ?, PAYMENT_METHOD = ? WHERE IDNo = ?`,
+              [newPaymentStatus, paymentMethod, billingId],
+              (err) => {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          });
+          
+          remainingPayment -= roomPaymentAmount;
+        }
+
+        // 2. Pay extensions if remaining payment available
+        if (remainingPayment > 0 && extensionRows.length > 0) {
+
+        for (let ext of extensionRows) {
+            if (remainingPayment <= 0) break;
+            
+            const extensionAmount = parseFloat(ext.QTY) * parseFloat(ext.COST);
+            const extensionPaymentAmount = Math.min(remainingPayment, extensionAmount);
+
+          await new Promise((resolve, reject) => {
+            connection.query(
+              `INSERT INTO payments (
+                BOOKING_ID, BOOKING_EXTENSION_ID, AMOUNT_PAID, PAYMENT_METHOD,
+                                        PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS
+              )
+                                    VALUES (?, ?, ?, ?, 'extended', NOW(), ?, ?)`,
+                                    [bookingId, ext.IDNo, extensionPaymentAmount, paymentMethod, encodedBy, paymentNotes || 'Extension payment'],
+              (err) => {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          });
+
+
+            // Determine extension status: paid, partial, or unpaid
+            let newExtensionStatus = 'unpaid';
+            if (extensionPaymentAmount >= extensionAmount) {
+                newExtensionStatus = 'paid';
+            } else if (extensionPaymentAmount > 0) {
+                newExtensionStatus = 'partial';
+            }
+
+          await new Promise((resolve, reject) => {
+            connection.query(
+                `UPDATE booking_extension SET PAYMENT_STATUS = ? WHERE IDNo = ?`,
+                [newExtensionStatus, ext.IDNo],
+              (err) => {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          });
+            
+            remainingPayment -= extensionPaymentAmount;
+          }
+        }
+
+        // 3. Pay services if remaining payment available
+        if (remainingPayment > 0 && serviceRows.length > 0) {
+          
+        for (let service of serviceRows) {
+            if (remainingPayment <= 0) break;
+            
+            const serviceCost = parseFloat(service.remainingAmount);
+            const servicePaymentAmount = Math.min(remainingPayment, serviceCost);
+
+                            await new Promise((resolve, reject) => {
+                                connection.query(
+                                    `INSERT INTO payments (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS) 
+                                    VALUES (?, ?, ?, ?, 'service', NOW(), ?, ?)`,
+                                    [bookingId, service.IDNo, servicePaymentAmount, paymentMethod, encodedBy, paymentNotes || 'Service payment'],
+                                    (err) => {
+                                        if (err) reject(err);
+                                        else resolve();
+                                    }
+                                );
+                            });
+
+
+            // Determine service status: paid, partial, or unpaid
+            let newServiceStatus = 'unpaid';
+            if (servicePaymentAmount >= serviceCost) {
+                newServiceStatus = 'paid';
+            } else if (servicePaymentAmount > 0) {
+                newServiceStatus = 'partial';
+            }
+
+          await new Promise((resolve, reject) => {
+            connection.query(
+                `UPDATE booking_service SET STATUS = ? WHERE IDNo = ?`,
+                [newServiceStatus, service.IDNo],
+              (err) => {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          });
+            
+            remainingPayment -= servicePaymentAmount;
+          }
+        }
+        
+
+        // Step 5: Check if all balances are cleared, mark everything as 'paid'
+        // Calculate remaining balance after this payment
+        // We need to check if there are still unpaid amounts for room, extensions, and services
+        
+        // Check remaining room amount - consider partial payments, reservation fee, and discount
+        const remainingRoomQuery = `
+          SELECT 
+            COALESCE((SELECT SUM(AMOUNT_PAID) FROM payments WHERE BOOKING_ID = ? AND PAYMENT_TYPE = 'room'), 0) as roomPaid,
+            COALESCE((SELECT ROOM_CHARGE * COALESCE(ORIGINAL_QTY, QTY) FROM billing WHERE BOOKING_ID = ? AND ACTIVE = 1 LIMIT 1), 0) as totalRoomCost,
+            COALESCE((SELECT RESERVATION_FEE FROM billing WHERE BOOKING_ID = ? AND ACTIVE = 1 LIMIT 1), 0) as reservationFee,
+            COALESCE((SELECT DISCOUNT_AMOUNT FROM billing WHERE BOOKING_ID = ? AND ACTIVE = 1 LIMIT 1), 0) as discountAmount
+        `;
+        const roomRows = await new Promise((resolve, reject) => {
+          connection.query(remainingRoomQuery, [bookingId, bookingId, bookingId, bookingId], (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows);
+          });
+        });
+
+        const roomPaid = parseFloat(roomRows[0].roomPaid) || 0;
+        const totalRoomCost = parseFloat(roomRows[0].totalRoomCost) || 0;
+        const remainingReservationFee = parseFloat(roomRows[0].reservationFee) || 0;
+        const remainingDiscountAmount = parseFloat(roomRows[0].discountAmount) || 0;
+        
+        // Calculate net room cost (after reservation fee and discount)
+        const netRoomCost = totalRoomCost - remainingReservationFee - remainingDiscountAmount;
+        const remainingRoom = Math.max(0, netRoomCost - roomPaid);
+        
+        
+        // Check remaining extension amounts
+        const remainingExtensionQuery = `
+          SELECT COALESCE(SUM(be.QTY * be.COST), 0) as totalExtensionCost,
+                 COALESCE(SUM(CASE WHEN p.AMOUNT_PAID IS NULL THEN 0 ELSE p.AMOUNT_PAID END), 0) as extensionPaid
+          FROM booking_extension be
+          LEFT JOIN payments p ON p.BOOKING_EXTENSION_ID = be.IDNo AND p.PAYMENT_TYPE = 'extended'
+          WHERE be.BOOKING_ID = ?
+        `;
+        const remainingExtensionRows = await new Promise((resolve, reject) => {
+          connection.query(remainingExtensionQuery, [bookingId], (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows);
+          });
+        });
+        
+        const totalExtensionCost = parseFloat(remainingExtensionRows[0].totalExtensionCost) || 0;
+        const extensionPaid = parseFloat(remainingExtensionRows[0].extensionPaid) || 0;
+        const remainingExtensions = Math.max(0, totalExtensionCost - extensionPaid);
+        
+        // Check remaining service amounts - consider partial payments
+        const remainingServiceQuery = `
+          SELECT 
+            bs.IDNo,
+            bs.TOTAL_COST,
+            COALESCE(SUM(p.AMOUNT_PAID), 0) as servicePaid
+          FROM booking_service bs
+          LEFT JOIN payments p ON p.BOOKING_SERVICE_ID = bs.IDNo AND p.PAYMENT_TYPE = 'service'
+          WHERE bs.BOOKING_ID = ?
+          GROUP BY bs.IDNo, bs.TOTAL_COST
+        `;
+        const remainingServiceRows = await new Promise((resolve, reject) => {
+          connection.query(remainingServiceQuery, [bookingId], (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows);
+          });
+        });
+        
+        let remainingServices = 0;
+        for (let service of remainingServiceRows) {
+          const serviceCost = parseFloat(service.TOTAL_COST);
+          const servicePaid = parseFloat(service.servicePaid);
+          const serviceRemaining = Math.max(0, serviceCost - servicePaid);
+          remainingServices += serviceRemaining;
+          
+        }
+        
+        // Calculate total remaining balance
+        const totalRemainingBalance = remainingRoom + remainingExtensions + remainingServices;
+        
+        
+                    // If balance is zero or negative, mark all remaining items as 'paid'
+                    if (totalRemainingBalance <= 0) {
+          
+          // Mark billing as paid
+          if (billing.PAYMENT_STATUS !== 'paid') {
+          await new Promise((resolve, reject) => {
+            connection.query(
+                `UPDATE billing SET PAYMENT_STATUS = 'paid' WHERE IDNo = ?`,
+                [billingId],
+              (err) => {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          });
+          }
+
+          // Mark all extensions as paid
+          await new Promise((resolve, reject) => {
+            connection.query(
+              `UPDATE booking_extension SET PAYMENT_STATUS = 'paid' WHERE BOOKING_ID = ? AND PAYMENT_STATUS != 'paid'`,
+              [bookingId],
+              (err) => {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          });
+          
+          // Mark all services as paid
+          await new Promise((resolve, reject) => {
+            connection.query(
+              `UPDATE booking_service SET STATUS = 'paid' WHERE BOOKING_ID = ? AND STATUS != 'paid'`,
+              [bookingId],
               (err) => {
                 if (err) reject(err);
                 else resolve();
@@ -2151,9 +2409,9 @@ class BookingModel {
             connection.query(
               `INSERT INTO payments (
                 BOOKING_ID, BOOKING_PICKDROP_ID, AMOUNT_PAID, PAYMENT_METHOD, 
-                PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY
-              ) VALUES (?, ?, ?, ?, 'pickdrop', NOW(), ?)`,
-              [bookingId, pd.IDNo, pd.RATE, paymentMethod, encodedBy],
+                                    PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS
+                                ) VALUES (?, ?, ?, ?, 'pickdrop', NOW(), ?, ?)`,
+                                [bookingId, pd.IDNo, pd.RATE, paymentMethod, encodedBy, paymentNotes || 'Pickup/Dropoff payment'],
               (err) => {
                 if (err) reject(err);
                 else resolve();
@@ -2992,8 +3250,6 @@ class BookingModel {
       const servicesResult = await queryDatabasePromise(servicesQuery, [groupBookingId]);
       
       // Debug: Log services found
-      console.log('🔍 Services found for group booking:', groupBookingId);
-      console.log('🔍 Services result:', servicesResult);
 
       // Format date range
       const firstBooking = bookingsResult[0];
@@ -3041,12 +3297,10 @@ class BookingModel {
         servicesByBooking[service.BOOKING_ID].push(service);
 
         // Categorize group-level services (services for any booking in the group)
-        console.log('🔍 Checking service booking ID:', service.BOOKING_ID, 'vs first booking ID:', firstBooking.bookingId);
         // Check if this service belongs to any booking in the group
         const belongsToGroup = bookingsResult.some(booking => booking.bookingId === service.BOOKING_ID);
         if (belongsToGroup) {
           const serviceName = service.SERVICE_NAME.toLowerCase();
-          console.log('🔍 Processing service:', serviceName, 'ID:', service.SERVICE_ID);
           
           // Use service ID matching as primary method, with name fallback
           if (service.SERVICE_ID === 74 || (serviceName.includes('adult') && serviceName.includes('breakfast'))) {
@@ -6304,7 +6558,6 @@ class BookingModel {
             await connection.promise().query(lateCheckoutPaymentQuery, [bookingId, lateCheckoutResult[0].insertId, parseFloat(lateCheckoutFee), 'cash', encodedBy]);
           }
 
-          console.log(`🔄 Late Check-Out Fee Applied: ₱${lateCheckoutFee} (Status: ${status})`);
         }
 
         // Always insert payment records for reservation fee and discount (paid or unpaid)

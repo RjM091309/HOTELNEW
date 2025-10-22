@@ -45,8 +45,12 @@ function initializePaymentModal() {
     const paymentOptions = document.querySelectorAll('.payment-option');
     const paymentDetailsSection = document.getElementById('paymentDetails');
     const paymentAmountInput = document.getElementById('paymentAmountInput');
+    const totalAmountDisplay = document.getElementById('paymentTotalAmount');
+    const remainingBalanceDisplay = document.getElementById('remainingBalance');
+    const balanceRow = document.getElementById('balanceRow');
     const confirmButton = document.getElementById('confirmPaymentButton');
     const paymentForm = document.getElementById('paymentForm');
+
 
     if (!paymentOptions.length) return; // Exit if enhanced modal not present
 
@@ -75,10 +79,83 @@ function initializePaymentModal() {
         });
     });
 
+    // Payment amount input handler
+    if (paymentAmountInput) {
+        paymentAmountInput.addEventListener('input', function() {
+            const amount = parseFloat(this.value) || 0;
+            const totalAmount = parseFloat(totalAmountDisplay.textContent.replace(',', '')) || 0;
+            
+            // Validate: Amount cannot exceed total amount to pay
+            if (amount > totalAmount) {
+                // Reset to total amount if exceeded
+                this.value = totalAmount;
+                const adjustedAmount = totalAmount;
+                
+                // Show error message
+                showPaymentStatus('error', `Amount cannot exceed ₱${totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2})}`);
+                
+                // Update hidden field with adjusted amount
+                const hiddenPaymentAmount = document.getElementById('paymentAmount');
+                if (hiddenPaymentAmount) {
+                    hiddenPaymentAmount.value = adjustedAmount;
+                }
+                
+                // Hide balance row since amount equals total
+                if (balanceRow) {
+                    balanceRow.style.display = 'none';
+                }
+                
+                // Validate form
+                validatePaymentForm();
+                return;
+            }
+            
+            // Clear any previous error messages
+            const statusContainer = document.getElementById('paymentStatusMessages');
+            if (statusContainer) {
+                statusContainer.innerHTML = '';
+                statusContainer.style.display = 'none';
+            }
+            
+            // Show/hide balance row
+            if (amount < totalAmount) {
+                const remaining = totalAmount - amount;
+                if (remainingBalanceDisplay) {
+                    remainingBalanceDisplay.textContent = remaining.toLocaleString('en-US', {minimumFractionDigits: 2});
+                }
+                if (balanceRow) {
+                    balanceRow.style.display = 'flex';
+                }
+            } else {
+                if (balanceRow) {
+                    balanceRow.style.display = 'none';
+                }
+            }
+            
+            // Update hidden field
+            const hiddenPaymentAmount = document.getElementById('paymentAmount');
+            if (hiddenPaymentAmount) {
+                hiddenPaymentAmount.value = amount;
+            }
+            
+            // Validate form
+            validatePaymentForm();
+        });
+    }
+
     // Form validation
     function validatePaymentForm() {
         const amount = parseFloat(paymentAmountInput.value) || 0;
+        const totalAmount = parseFloat(totalAmountDisplay.textContent.replace(',', '')) || 0;
         const selectedMethod = document.querySelector('input[name="paymentMethod"]:checked');
+        
+        // Check if amount exceeds total amount to pay
+        if (amount > totalAmount) {
+            confirmButton.disabled = true;
+            confirmButton.classList.remove('btn-success');
+            confirmButton.classList.add('btn-secondary');
+            return;
+        }
         
         if (amount > 0 && selectedMethod) {
             confirmButton.disabled = false;
@@ -175,8 +252,157 @@ function initializePaymentModal() {
         }
     }
 
+    // Reset payment form
+    function resetPaymentForm() {
+        paymentForm.reset();
+        paymentOptions.forEach(opt => opt.classList.remove('selected'));
+        paymentDetailsSection.innerHTML = '';
+        document.getElementById('paymentStatusMessages').style.display = 'none';
+        confirmButton.classList.remove('payment-success');
+        balanceRow.style.display = 'none';
+    }
+
     // Initialize form validation
     validatePaymentForm();
+}
+
+// Helper functions for payment modal
+function showLoadingState(show) {
+    const confirmButton = document.getElementById('confirmPaymentButton');
+    const btnText = confirmButton.querySelector('.btn-text');
+    const btnLoading = confirmButton.querySelector('.btn-loading');
+    
+    if (show) {
+        btnText.style.display = 'none';
+        btnLoading.style.display = 'flex';
+        confirmButton.disabled = true;
+    } else {
+        btnText.style.display = 'inline';
+        btnLoading.style.display = 'none';
+        confirmButton.disabled = false;
+    }
+}
+
+function showPaymentStatus(type, message) {
+    const statusContainer = document.getElementById('paymentStatusMessages');
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+    const iconClass = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+    
+    statusContainer.innerHTML = `
+        <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+            <i class="fa ${iconClass}"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    statusContainer.style.display = 'block';
+}
+
+// Function to manually update Payment Summary Card with breakdown
+function updatePaymentSummaryCard(totalAmount, breakdown = {}) {
+    console.log('updatePaymentSummaryCard called with:', { totalAmount, breakdown });
+    
+    const paymentTotalAmountElement = document.getElementById('paymentTotalAmount');
+    const paymentAmountInputElement = document.getElementById('paymentAmountInput');
+    
+    // Update breakdown rows
+    const roomRow = document.getElementById('roomRow');
+    const roomAmount = document.getElementById('roomAmount');
+    const extensionRow = document.getElementById('extensionRow');
+    const extensionAmount = document.getElementById('extensionAmount');
+    const serviceRow = document.getElementById('serviceRow');
+    const serviceAmount = document.getElementById('serviceAmount');
+    const reservationFeeRow = document.getElementById('paymentReservationFeeRow');
+    const reservationFeeAmount = document.getElementById('paymentReservationFeeAmount');
+    const discountRow = document.getElementById('paymentDiscountRow');
+    const discountAmount = document.getElementById('paymentDiscountAmount');
+    const amountPaidRow = document.getElementById('amountPaidRow');
+    const amountPaidElement = document.getElementById('amountPaid');
+    const subtotalRow = document.getElementById('subtotalRow');
+    const subtotalElement = document.getElementById('subtotalAmount');
+    
+    // Show/hide and populate room charges
+    if (breakdown.roomAmount && breakdown.roomAmount > 0) {
+        if (roomRow) roomRow.style.display = 'flex';
+        if (roomAmount) roomAmount.textContent = breakdown.roomAmount.toLocaleString('en-US', {minimumFractionDigits: 2});
+    } else {
+        if (roomRow) roomRow.style.display = 'none';
+    }
+    
+    // Show/hide and populate extensions
+    if (breakdown.extensionAmount && breakdown.extensionAmount > 0) {
+        if (extensionRow) extensionRow.style.display = 'flex';
+        if (extensionAmount) extensionAmount.textContent = breakdown.extensionAmount.toLocaleString('en-US', {minimumFractionDigits: 2});
+    } else {
+        if (extensionRow) extensionRow.style.display = 'none';
+    }
+    
+    // Show/hide and populate services
+    if (breakdown.serviceAmount && breakdown.serviceAmount > 0) {
+        if (serviceRow) serviceRow.style.display = 'flex';
+        if (serviceAmount) serviceAmount.textContent = breakdown.serviceAmount.toLocaleString('en-US', {minimumFractionDigits: 2});
+    } else {
+        if (serviceRow) serviceRow.style.display = 'none';
+    }
+    
+    // Show/hide and populate reservation fee
+    if (breakdown.reservationFee && breakdown.reservationFee > 0) {
+        if (reservationFeeRow) reservationFeeRow.style.display = 'flex';
+        if (reservationFeeAmount) reservationFeeAmount.textContent = breakdown.reservationFee.toLocaleString('en-US', {minimumFractionDigits: 2});
+        console.log('Reservation Fee shown:', breakdown.reservationFee);
+    } else {
+        if (reservationFeeRow) reservationFeeRow.style.display = 'none';
+        console.log('Reservation Fee hidden:', breakdown.reservationFee);
+    }
+    
+    // Show/hide and populate discount
+    if (breakdown.discountAmount && breakdown.discountAmount > 0) {
+        if (discountRow) discountRow.style.display = 'flex';
+        if (discountAmount) discountAmount.textContent = breakdown.discountAmount.toLocaleString('en-US', {minimumFractionDigits: 2});
+        console.log('Discount shown:', breakdown.discountAmount);
+    } else {
+        if (discountRow) discountRow.style.display = 'none';
+        console.log('Discount hidden:', breakdown.discountAmount);
+    }
+    
+    // Calculate and show subtotal
+    const roomTotal = breakdown.roomAmount || 0;
+    const extensionTotal = breakdown.extensionAmount || 0;
+    const serviceTotal = breakdown.serviceAmount || 0;
+    const reservationFeeTotal = breakdown.reservationFee || 0;
+    const discountTotal = breakdown.discountAmount || 0;
+    
+    const subtotal = roomTotal + extensionTotal + serviceTotal - reservationFeeTotal - discountTotal;
+    
+    if (subtotal > 0) {
+        if (subtotalRow) subtotalRow.style.display = 'flex';
+        if (subtotalElement) subtotalElement.textContent = subtotal.toLocaleString('en-US', {minimumFractionDigits: 2});
+        console.log('Subtotal shown:', subtotal);
+    } else {
+        if (subtotalRow) subtotalRow.style.display = 'none';
+        console.log('Subtotal hidden:', subtotal);
+    }
+    
+    // Show/hide and populate amount paid
+    if (breakdown.amountPaid && breakdown.amountPaid > 0) {
+        if (amountPaidRow) amountPaidRow.style.display = 'flex';
+        if (amountPaidElement) amountPaidElement.textContent = breakdown.amountPaid.toLocaleString('en-US', {minimumFractionDigits: 2});
+        console.log('Amount Paid shown:', breakdown.amountPaid);
+    } else {
+        if (amountPaidRow) amountPaidRow.style.display = 'none';
+        console.log('Amount Paid hidden:', breakdown.amountPaid);
+    }
+    
+    // Update total amount to pay
+    if (paymentTotalAmountElement) {
+        const formattedAmount = totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2});
+        paymentTotalAmountElement.textContent = formattedAmount;
+    }
+    
+    // Update input field
+    if (paymentAmountInputElement) {
+        paymentAmountInputElement.value = totalAmount;
+    }
 }
 
 // Initialize a flag to determine if the Billing Modal should reopen
@@ -244,9 +470,13 @@ $('#confirmPaymentButton').on('click', function () {
         cancelButtonText: 'Cancel'
     }).then((result) => {
         if (result.isConfirmed) {
+            // Show loading state
+            showLoadingState(true);
+            
             // Prepare payment data
             const paymentData = {
                 bookingId: bookingId,
+                paymentAmount: numericAmount,
                 paymentMethod: paymentMethod,
                 paymentNotes: paymentNotes
             };
@@ -258,6 +488,8 @@ $('#confirmPaymentButton').on('click', function () {
                 contentType: 'application/json',
                 data: JSON.stringify(paymentData), // Send as JSON
                 success: function (response) {
+                    showLoadingState(false);
+                    
                     if (response.success) {
                         // Prevent reopening of the Billing Modal
                         shouldReopenBillingModal = false;
@@ -279,6 +511,7 @@ $('#confirmPaymentButton').on('click', function () {
                         });
                     } else {
                         // Handle payment failure
+                        showPaymentStatus('error', response.message);
                         Swal.fire({
                             title: 'Payment Failed!',
                             text: response.message,
@@ -289,7 +522,10 @@ $('#confirmPaymentButton').on('click', function () {
                     }
                 },
                 error: function () {
+                    showLoadingState(false);
+                    
                     // Handle server or AJAX error
+                    showPaymentStatus('error', 'An error occurred while processing the payment.');
                     Swal.fire({
                         title: 'Error!',
                         text: 'An error occurred while processing the payment.',
