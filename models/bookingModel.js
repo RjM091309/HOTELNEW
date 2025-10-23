@@ -6493,7 +6493,7 @@ class BookingModel {
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
-        let roomChargeForBilling, reservationFeeForBilling, discountForBilling;
+        let roomChargeForBilling, reservationFeeForBilling, discountForBilling, roomRatePerNight, quantityForBilling;
 
         if (consolidatedBilling && index === 0) {
           // Main booking in consolidated billing gets all charges
@@ -6501,12 +6501,19 @@ class BookingModel {
           roomChargeForBilling = adjustedRoomCharge; // Total of all rooms
           reservationFeeForBilling = parseFloat(reservationFee) || 0;
           discountForBilling = parseFloat(discount) || 0;
+          
+          // For consolidated billing, calculate average room rate per night
+          const totalRoomsBase = roomBasePrices.reduce((sum, price) => sum + price, 0);
+          roomRatePerNight = totalRoomsBase; // Sum of all room rates per night
+          quantityForBilling = nightsCount; // Number of nights
         } else if (consolidatedBilling) {
           // Other bookings in consolidated billing have no charges
           console.log(`🔄 Backend - Room ${index + 1}: CONSOLIDATED BILLING (Other Booking - ₱0.00)`);
           roomChargeForBilling = 0;
           reservationFeeForBilling = 0;
           discountForBilling = 0;
+          roomRatePerNight = 0;
+          quantityForBilling = nightsCount;
         } else {
           // Regular billing: each room gets its own charges
           const roomNumber = roomNumbers[index] || `Room-${index + 1}`;
@@ -6514,15 +6521,17 @@ class BookingModel {
           roomChargeForBilling = totalRoomCharge; // Already includes nights multiplication
           reservationFeeForBilling = parseFloat(perRoomFeesArray[index]) || 0;
           discountForBilling = parseFloat(perRoomDiscountsArray[index]) || 0;
+          roomRatePerNight = baseRoomPrice; // Room rate per night
+          quantityForBilling = nightsCount; // Number of nights
         }
 
         const billingValues = [
           bookingId,
-          roomChargeForBilling,
+          roomRatePerNight, // Room rate per night (not total)
           0.00,
           0.00,
           0.00,
-          1, // Set QTY to 1 since roomChargeForBilling already includes nights
+          quantityForBilling, // QTY should be number of nights
           paymentStatus,
           'cash',
           '',

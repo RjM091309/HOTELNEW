@@ -118,6 +118,37 @@
               <div class="mt-2 text-warning" id="groupAvailabilityWarning" style="display: none;"></div>
               <div class="mt-2 text-muted" id="groupManualSelectionInfo" style="display: none;"></div>
               <div id="groupRoomBreakdown" class="mt-3"></div>
+              
+              <!-- Manual Room Rate Section -->
+              <div id="groupManualRateSection" class="mt-3" style="display: none;">
+                <div class="manual-rate-container">
+                  <h6 class="text-info mb-3">
+                    <i class="fa fa-edit"></i> Manual Room Rates
+                    <small class="text-muted">(Override default rates)</small>
+                  </h6>
+                  
+                  <!-- Rate Type Toggle -->
+                  <div class="rate-type-toggle mb-3">
+                    <div class="btn-group" role="group">
+                      <input type="radio" class="btn-check" name="rateType" id="individualRates" value="individual" checked>
+                      <label class="btn btn-outline-success" for="individualRates">Individual Rooms</label>
+                      
+                      <input type="radio" class="btn-check" name="rateType" id="bedBasedRates" value="bed-based">
+                      <label class="btn btn-outline-success" for="bedBasedRates">Bed-Based Pricing</label>
+                    </div>
+                  </div>
+                  
+                  <!-- Individual Room Rates -->
+                  <div id="individualRateSection">
+                    <div id="groupManualRateList" class="manual-rate-list"></div>
+                  </div>
+                  
+                  <!-- Bed-Based Rates -->
+                  <div id="bedBasedRateSection" style="display: none;">
+                    <div id="groupBedBasedRateList" class="bed-based-rate-list"></div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -672,6 +703,201 @@
   }
 }
 
+/* Manual Rate Section Styling */
+#modal-add-group-booking .manual-rate-container {
+  background-color: #1f262a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+#modal-add-group-booking .manual-rate-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+#modal-add-group-booking .manual-rate-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  min-height: 32px;
+}
+
+#modal-add-group-booking .manual-rate-item:hover {
+  background: rgba(111, 156, 64, 0.1);
+  border-color: rgba(111, 156, 64, 0.3);
+}
+
+#modal-add-group-booking .manual-rate-item .room-info {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#modal-add-group-booking .manual-rate-item .room-number {
+  font-weight: 600;
+  color: #ffffff;
+  min-width: 50px;
+  font-size: 13px;
+}
+
+#modal-add-group-booking .manual-rate-item .bed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: rgba(111, 156, 64, 0.15);
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+#modal-add-group-booking .manual-rate-item .bed-badge i {
+  color: #9fe073;
+}
+
+#modal-add-group-booking .manual-rate-item .rate-input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#modal-add-group-booking .manual-rate-item .rate-input-group .form-control {
+  width: 60px;
+  text-align: right;
+  padding: 3px 5px;
+  font-size: 12px;
+}
+
+
+
+/* Manual Rates Checkbox Styling */
+#modal-add-group-booking .group-room-breakdown .form-check {
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+
+#modal-add-group-booking .group-room-breakdown .form-check-input {
+  margin-top: 0;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+#modal-add-group-booking .group-room-breakdown .form-check-label {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0;
+  cursor: pointer;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+#modal-add-group-booking .group-room-breakdown .form-check-input:checked {
+  background-color: #6f9c40;
+  border-color: #6f9c40;
+}
+
+#modal-add-group-booking .group-room-breakdown .form-check-input:focus {
+  box-shadow: 0 0 0 0.2rem rgba(111, 156, 64, 0.25);
+  border-color: #6f9c40;
+}
+
+/* Rate Type Toggle Styling */
+#modal-add-group-booking .rate-type-toggle .btn-group {
+  width: 100%;
+}
+
+#modal-add-group-booking .rate-type-toggle .btn {
+  flex: 1;
+  font-size: 12px;
+  padding: 6px 12px;
+}
+
+#modal-add-group-booking .rate-type-toggle .btn-check:checked + .btn {
+  background-color: #6f9c40;
+  border-color: #6f9c40;
+  color: #ffffff;
+}
+
+/* Bed-Based Rate List Styling */
+#modal-add-group-booking .bed-based-rate-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+#modal-add-group-booking .bed-based-rate-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  min-height: 40px;
+}
+
+#modal-add-group-booking .bed-based-rate-item:hover {
+  background: rgba(111, 156, 64, 0.1);
+  border-color: rgba(111, 156, 64, 0.3);
+}
+
+#modal-add-group-booking .bed-based-rate-item .bed-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#modal-add-group-booking .bed-based-rate-item .bed-label {
+  font-weight: 600;
+  color: #ffffff;
+  font-size: 14px;
+}
+
+#modal-add-group-booking .bed-based-rate-item .bed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: rgba(111, 156, 64, 0.15);
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+#modal-add-group-booking .bed-based-rate-item .bed-badge i {
+  color: #9fe073;
+}
+
+#modal-add-group-booking .bed-based-rate-item .room-count {
+  font-size: 12px;
+  color: #bbbbbb;
+}
+
+#modal-add-group-booking .bed-based-rate-item .rate-input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#modal-add-group-booking .bed-based-rate-item .rate-input-group .form-control {
+  width: 90px;
+  text-align: right;
+  padding: 4px 8px;
+  font-size: 14px;
+}
+
 </style>
 
 <script src="/plugins/flatpicker/flatpickr.min.js"></script>
@@ -694,6 +920,8 @@
   let groupRequiredBed1 = 0;
   let groupRequiredBed2 = 0;
   let groupUnassignedConflicts = [];
+  let groupManualRates = {}; // Store manual rates for each room
+  let groupBedBasedRates = {}; // Store bed-based rates {1: price, 2: price}
 
   function applyGroupBreakfastDefaults() {
     // Only set service IDs, not prices
@@ -718,6 +946,8 @@
     groupRequiredBed1 = 0;
     groupRequiredBed2 = 0;
     groupUnassignedConflicts = [];
+    groupManualRates = {}; // Clear manual rates
+    groupBedBasedRates = {}; // Clear bed-based rates
     setManualSelectionMode(false);
     $('#groupManualSelectToggle').prop('disabled', false);
     $('#groupAgencyWrapper').hide();
@@ -726,6 +956,8 @@
     $('#groupManualSelectionInfo').hide();
     $('#groupRoomBreakdown').empty();
     $('#groupResultsContainer').hide();
+    $('#groupManualRateSection').hide(); // Hide manual rate section
+    $('#groupEnableManualRates').prop('checked', false); // Reset manual rates checkbox
     $('#groupComputedTotal').html('₱0.00');
     $('#groupCreditDisplay').hide();
     $('#groupCreditAmount').text('₱0.00');
@@ -1030,13 +1262,29 @@
 
   function populateBreakdown(block, computedPrices) {
     const container = $('#groupRoomBreakdown');
+    
+    // Get the current state of the checkbox BEFORE emptying the container
+    const isManualRatesChecked = $('#groupEnableManualRates').is(':checked');
+    
     container.empty();
     if (!block || !block.length) {
       return;
     }
 
     const nights = parseInt($('#groupNights').val(), 10) || 0;
-    let html = '<div class="group-room-breakdown"><b>Selected Room Prices:</b><ul>';
+    let html = `
+      <div class="group-room-breakdown">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <b>Selected Room Prices:</b>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="groupEnableManualRates" name="groupEnableManualRates" ${isManualRatesChecked ? 'checked' : ''}>
+            <label class="form-check-label" for="groupEnableManualRates">
+              Manual Room Rates
+            </label>
+          </div>
+        </div>
+        <ul>`;
+    
     block.forEach((room, idx) => {
       const price = computedPrices[idx] || 0;
       const total = nights > 0 ? price * nights : price;
@@ -1044,6 +1292,210 @@
     });
     html += '</ul></div>';
     container.html(html);
+  }
+
+  function displayManualRateInputs(selectedRooms) {
+    const container = $('#groupManualRateList');
+    const section = $('#groupManualRateSection');
+    
+    if (!selectedRooms || !selectedRooms.length) {
+      section.hide();
+      return;
+    }
+
+    // Check if manual rates checkbox is checked
+    const isManualRatesEnabled = $('#groupEnableManualRates').is(':checked');
+    if (!isManualRatesEnabled) {
+      section.hide();
+      return;
+    }
+
+    container.empty();
+    
+    selectedRooms.forEach(room => {
+      const roomId = room.IDNo;
+      const roomNumber = room.ROOM_NUMBER;
+      const bedCount = parseInt(room.ROOM_BED, 10);
+      const bedBadge = Number.isFinite(bedCount) && bedCount > 0
+        ? `<span class="bed-badge">${bedCount}<i class="fa fa-bed"></i></span>`
+        : '';
+      
+      // Get default rate
+      const dates = getSelectedDateRange();
+      const bookingType = $('#groupBookingRoute').val();
+      const defaultRate = typeof room.RESOLVED_PRICE === 'number'
+        ? room.RESOLVED_PRICE
+        : (() => {
+            const seasonalPrices = room.SEASONAL_PRICES || [];
+            const seasonId = getSeasonIdForDate(dates.start, seasonalPrices);
+            const match = seasonalPrices.find(price => 
+              parseInt(price.bedCount, 10) === bedCount && 
+              price.bookingType === bookingType && 
+              parseInt(price.seasonId, 10) === parseInt(seasonId, 10)
+            );
+            return match ? parseFloat(match.price) : 0;
+          })();
+      
+      // Get manual rate if exists
+      const manualRate = groupManualRates[roomId] || defaultRate;
+      
+      const rateItem = `
+        <div class="manual-rate-item" data-room-id="${roomId}">
+          <div class="room-info">
+            <span class="room-number">${roomNumber}</span>
+            ${bedBadge}
+          </div>
+          <div class="rate-input-group">
+            <input type="number" 
+                   class="form-control manual-rate-input" 
+                   data-room-id="${roomId}" 
+                   data-default-rate="${defaultRate}"
+                   value="${manualRate}" 
+                   min="0" 
+                   step="0.01"
+                   placeholder="Enter rate">
+          </div>
+        </div>`;
+      
+      container.append(rateItem);
+    });
+    
+    section.show();
+  }
+
+  function displayBedBasedRateInputs(selectedRooms) {
+    const container = $('#groupBedBasedRateList');
+    const section = $('#bedBasedRateSection');
+    
+    if (!selectedRooms || !selectedRooms.length) {
+      section.hide();
+      return;
+    }
+
+    // Group rooms by bed count
+    const roomsByBed = {};
+    selectedRooms.forEach(room => {
+      const bedCount = parseInt(room.ROOM_BED, 10);
+      if (!roomsByBed[bedCount]) {
+        roomsByBed[bedCount] = [];
+      }
+      roomsByBed[bedCount].push(room);
+    });
+
+    container.empty();
+    
+    // Create bed-based rate inputs
+    Object.keys(roomsByBed).sort().forEach(bedCount => {
+      const rooms = roomsByBed[bedCount];
+      const roomNumbers = rooms.map(r => r.ROOM_NUMBER).join(', ');
+      const roomCount = rooms.length;
+      
+      // Get default rate for this bed type (use first room as reference)
+      const firstRoom = rooms[0];
+      const dates = getSelectedDateRange();
+      const bookingType = $('#groupBookingRoute').val();
+      const defaultRate = typeof firstRoom.RESOLVED_PRICE === 'number'
+        ? firstRoom.RESOLVED_PRICE
+        : (() => {
+            const seasonalPrices = firstRoom.SEASONAL_PRICES || [];
+            const seasonId = getSeasonIdForDate(dates.start, seasonalPrices);
+            const match = seasonalPrices.find(price => 
+              parseInt(price.bedCount, 10) === parseInt(bedCount, 10) && 
+              price.bookingType === bookingType && 
+              parseInt(price.seasonId, 10) === parseInt(seasonId, 10)
+            );
+            return match ? parseFloat(match.price) : 0;
+          })();
+      
+      // Get bed-based rate if exists
+      const bedBasedRate = groupBedBasedRates[bedCount] || defaultRate;
+      
+       const bedItem = `
+         <div class="bed-based-rate-item" data-bed-count="${bedCount}">
+           <div class="bed-info">
+             <span class="bed-label">${bedCount} Bed Room${bedCount > 1 ? 's' : ''}</span>
+             <span class="bed-badge">${bedCount}<i class="fa fa-bed"></i></span>
+           </div>
+           <div class="rate-input-group">
+             <input type="number" 
+                    class="form-control bed-based-rate-input" 
+                    data-bed-count="${bedCount}" 
+                    data-default-rate="${defaultRate}"
+                    value="${bedBasedRate}" 
+                    min="0" 
+                    step="0.01"
+                    placeholder="Enter rate">
+           </div>
+         </div>`;
+      
+      container.append(bedItem);
+    });
+    
+    section.show();
+  }
+
+  function attachManualRateHandlers() {
+    // Handle manual rates checkbox toggle
+    $(document).on('change', '#groupEnableManualRates', function() {
+      const isChecked = $(this).is(':checked');
+      const selectedRooms = groupAvailableRooms.filter(room => groupManualSelectedRooms.includes(room.IDNo));
+      
+      if (isChecked && selectedRooms.length > 0) {
+        const rateType = $('input[name="rateType"]:checked').val();
+        if (rateType === 'individual') {
+          displayManualRateInputs(selectedRooms);
+        } else {
+          displayBedBasedRateInputs(selectedRooms);
+        }
+      } else {
+        $('#groupManualRateSection').hide();
+        // Clear manual rates when disabled
+        groupManualRates = {};
+        groupBedBasedRates = {};
+        updateManualSelectedRoomValuesWithoutRecreating();
+        computeGroupTotal();
+      }
+    });
+    
+    // Handle rate type toggle
+    $(document).on('change', 'input[name="rateType"]', function() {
+      const selectedRooms = groupAvailableRooms.filter(room => groupManualSelectedRooms.includes(room.IDNo));
+      const rateType = $(this).val();
+      
+      if (rateType === 'individual') {
+        $('#individualRateSection').show();
+        $('#bedBasedRateSection').hide();
+        displayManualRateInputs(selectedRooms);
+      } else {
+        $('#individualRateSection').hide();
+        $('#bedBasedRateSection').show();
+        displayBedBasedRateInputs(selectedRooms);
+      }
+    });
+    
+    // Handle individual manual rate input changes
+    $(document).on('input', '.manual-rate-input', function() {
+      const roomId = parseInt($(this).data('room-id'), 10);
+      const newRate = parseFloat($(this).val()) || 0;
+      
+      if (newRate >= 0) {
+        groupManualRates[roomId] = newRate;
+        updateManualSelectedRoomValuesWithoutRecreating();
+        computeGroupTotal();
+      }
+    });
+    
+    // Handle bed-based rate input changes
+    $(document).on('input', '.bed-based-rate-input', function() {
+      const bedCount = parseInt($(this).data('bed-count'), 10);
+      const newRate = parseFloat($(this).val()) || 0;
+      
+      if (newRate >= 0) {
+        groupBedBasedRates[bedCount] = newRate;
+        updateManualSelectedRoomValuesWithoutRecreating();
+        computeGroupTotal();
+      }
+    });
   }
 
   function attachRoomSelectionHandler() {
@@ -1622,6 +2074,14 @@
     const bookingType = $('#groupBookingRoute').val();
 
     const computedBasePrices = selectedRooms.map(room => {
+      const roomId = room.IDNo;
+      
+      // Use manual rate if available, otherwise use default rate
+      if (groupManualRates[roomId] !== undefined) {
+        return groupManualRates[roomId];
+      }
+      
+      // Default rate calculation
       const basePrice = typeof room.RESOLVED_PRICE === 'number'
         ? room.RESOLVED_PRICE
         : (() => {
@@ -1631,7 +2091,7 @@
             const match = seasonalPrices.find(price => parseInt(price.bedCount, 10) === bedCount && price.bookingType === bookingType && parseInt(price.seasonId, 10) === parseInt(seasonId, 10));
             return match ? parseFloat(match.price) : 0;
           })();
-      const roomId = room.IDNo;
+      
       return basePrice;
     });
 
@@ -1642,6 +2102,61 @@
 
     populateBreakdown(selectedRooms, computedBasePrices);
     updateGroupChargeBreakdown();
+    
+    // Display manual rate inputs for selected rooms
+    displayManualRateInputs(selectedRooms);
+  }
+
+  function updateManualSelectedRoomValuesWithoutRecreating() {
+    const selectedRooms = groupAvailableRooms.filter(room => groupManualSelectedRooms.includes(room.IDNo));
+    const dates = getSelectedDateRange();
+    const bookingType = $('#groupBookingRoute').val();
+
+    const computedBasePrices = selectedRooms.map(room => {
+      const roomId = room.IDNo;
+      const bedCount = parseInt(room.ROOM_BED, 10);
+      
+      // Check if bed-based pricing is active
+      const rateType = $('input[name="rateType"]:checked').val();
+      if (rateType === 'bed-based' && groupBedBasedRates[bedCount] !== undefined) {
+        return groupBedBasedRates[bedCount];
+      }
+      
+      // Use individual manual rate if available, otherwise use default rate
+      if (groupManualRates[roomId] !== undefined) {
+        return groupManualRates[roomId];
+      }
+      
+      // Default rate calculation
+      const basePrice = typeof room.RESOLVED_PRICE === 'number'
+        ? room.RESOLVED_PRICE
+        : (() => {
+            const seasonalPrices = room.SEASONAL_PRICES || [];
+            const seasonId = dates ? getSeasonIdForDate(dates.start, seasonalPrices) : null;
+            const match = seasonalPrices.find(price => parseInt(price.bedCount, 10) === bedCount && price.bookingType === bookingType && parseInt(price.seasonId, 10) === parseInt(seasonId, 10));
+            return match ? parseFloat(match.price) : 0;
+          })();
+      
+      return basePrice;
+    });
+
+    $('#groupSelectedRooms').val(selectedRooms.map(room => room.IDNo).join(','));
+    $('#groupSelectedRoomPrices').val(computedBasePrices.join(','));
+
+    populateBreakdown(selectedRooms, computedBasePrices);
+    updateGroupChargeBreakdown();
+    
+    // DON'T recreate manual rate inputs - just update the values in existing inputs
+    selectedRooms.forEach(room => {
+      const roomId = room.IDNo;
+      const manualRate = groupManualRates[roomId];
+      if (manualRate !== undefined) {
+        const input = $(`.manual-rate-input[data-room-id="${roomId}"]`);
+        if (input.length && input.val() !== manualRate.toString()) {
+          input.val(manualRate);
+        }
+      }
+    });
   }
 
   function attachBookingRouteHandler() {
@@ -1704,6 +2219,7 @@
     attachToggles();
     attachRoomSelectionHandler();
     attachManualSelectionHandlers();
+    attachManualRateHandlers();
     attachBookingRouteHandler();
     handleSearchRooms();
 
