@@ -109,6 +109,9 @@
 
           <div class="row p-t-20" id="groupResultsContainer" style="display: none;">
             <div class="col-lg-12">
+              <!-- Bed Availability Summary Container -->
+              <div id="groupBedAvailabilitySummary" class="mb-3"></div>
+              
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-0">Available Rooms</h5>
                 <!-- REMOVED: Manual selection toggle - now default method -->
@@ -1075,10 +1078,12 @@
     });
   }
 
-  function displayGroupRoomResults({ consecutiveBlocks, nonConsecutiveBlocks, availableRooms, unassignedConflicts }, priority) {
+  function displayGroupRoomResults({ consecutiveBlocks, nonConsecutiveBlocks, availableRooms, unassignedConflicts }, priority, hasEnoughRooms = true) {
     // REMOVED: Auto-suggested blocks logic - manual selection only
     const list = $('#groupRoomsList');
+    const summaryContainer = $('#groupBedAvailabilitySummary');
     list.empty();
+    summaryContainer.empty();
     $('#groupManualRoomsContainer').empty();
     $('#groupManualSelectionInfo').hide();
     $('#groupRoomBreakdown').empty();
@@ -1108,66 +1113,108 @@
       return;
     }
 
-    // Show filter and room count
-    $('#groupRoomsList').append(`
-      <div class="room-filter-section mb-3">
-        <div class="d-flex align-items-center w-100" style="display:flex; justify-content: space-between; width:100%;">
-          <div class="d-flex align-items-center">
-            <label class="text-white mb-0 me-3">Filter:</label>
-            <div class="filter-radio-group">
-              <div class="form-check form-check-inline">
-                <input class="form-check-input" type="radio" name="groupRoomFilter" id="filterAll" value="all" checked>
-                <label class="form-check-label" for="filterAll">All</label>
+    // Only show bed availability summary when there are not enough rooms
+    if (!hasEnoughRooms) {
+      // Calculate and display bed availability counts prominently
+      const bed1Count = groupAvailableRooms.filter(r => parseInt(r.ROOM_BED, 10) === 1).length;
+      const bed2Count = groupAvailableRooms.filter(r => parseInt(r.ROOM_BED, 10) === 2).length;
+      const totalAvailable = groupAvailableRooms.length;
+      
+      // Show bed availability summary at the top
+      let bedAvailabilityHtml = `
+        <div class="bed-availability-summary mb-3 p-3" style="background-color: rgba(255, 255, 255, 0.05); border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.1);">
+          <h6 class="text-info mb-2">
+            <i class="fa fa-info-circle"></i> Available Rooms Summary
+          </h6>
+          <div class="row">
+            <div class="col-md-4">
+              <div class="text-center">
+                <div class="h5 mb-1 text-success">${bed1Count}</div>
+                <div class="text-muted small">1-Bed Rooms</div>
               </div>
-              <div class="form-check form-check-inline">
-                <input class="form-check-input" type="radio" name="groupRoomFilter" id="filter1B" value="1B">
-                <label class="form-check-label" for="filter1B">1B</label>
+            </div>
+            <div class="col-md-4">
+              <div class="text-center">
+                <div class="h5 mb-1 text-success">${bed2Count}</div>
+                <div class="text-muted small">2-Bed Rooms</div>
               </div>
-              <div class="form-check form-check-inline">
-                <input class="form-check-input" type="radio" name="groupRoomFilter" id="filter2B" value="2B">
-                <label class="form-check-label" for="filter2B">2B</label>
+            </div>
+            <div class="col-md-4">
+              <div class="text-center">
+                <div class="h5 mb-1 text-primary">${totalAvailable}</div>
+                <div class="text-muted small">Total Available</div>
               </div>
             </div>
           </div>
-          <div class="text-white">
-            <span id="groupRoomCount" style="margin-left: 24px;">&nbsp;&nbsp;&nbsp;&nbsp;Available: 0</span>
+        </div>
+      `;
+      
+      summaryContainer.append(bedAvailabilityHtml);
+    }
+
+    // Only show room listings if there are enough rooms
+    if (hasEnoughRooms) {
+      // Show filter and room count
+      $('#groupRoomsList').append(`
+        <div class="room-filter-section mb-3">
+          <div class="d-flex align-items-center w-100" style="display:flex; justify-content: space-between; width:100%;">
+            <div class="d-flex align-items-center">
+              <label class="text-white mb-0 me-3">Filter:</label>
+              <div class="filter-radio-group">
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="groupRoomFilter" id="filterAll" value="all" checked>
+                  <label class="form-check-label" for="filterAll">All</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="groupRoomFilter" id="filter1B" value="1B">
+                  <label class="form-check-label" for="filter1B">1B</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="groupRoomFilter" id="filter2B" value="2B">
+                  <label class="form-check-label" for="filter2B">2B</label>
+                </div>
+              </div>
+            </div>
+            <div class="text-white">
+              <span id="groupRoomCount" style="margin-left: 24px;">&nbsp;&nbsp;&nbsp;&nbsp;Available: 0</span>
+            </div>
           </div>
         </div>
-      </div>
-    `);
-    
-    // Render rooms directly in the main list container, not in the hidden manual container
-    if (!groupAvailableRooms || !groupAvailableRooms.length) {
-      $('#groupRoomsList').append('<p class="text-warning">No rooms available for manual selection.</p>');
-    } else {
-      const roomsHtml = groupAvailableRooms.map(room => {
-        const disabled = false; // REMOVED: Disable logic - allow all rooms to be selectable
-        const bedCount = parseInt(room.ROOM_BED, 10);
-        const bedBadge = Number.isFinite(bedCount) && bedCount > 0
-          ? `<span class="bed-badge">${bedCount}<i class="fa fa-bed"></i></span>`
-          : '';
-        return `
-          <div class="form-check room-option${disabled ? ' disabled-room' : ''}">
-            <input class="form-check-input group-manual-checkbox" type="checkbox" data-room-id="${room.IDNo}" ${groupManualSelectedRooms.includes(room.IDNo) ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
-            <label class="form-check-label ms-2">
-              ${room.ROOM_NUMBER}${bedBadge ? ` ${bedBadge}` : ''}
-            </label>
-          </div>`;
-      }).join('');
-      $('#groupRoomsList').append(`<div class="manual-rooms-container">${roomsHtml}</div>`);
+      `);
+      
+      // Render rooms directly in the main list container, not in the hidden manual container
+      if (!groupAvailableRooms || !groupAvailableRooms.length) {
+        $('#groupRoomsList').append('<p class="text-warning">No rooms available for manual selection.</p>');
+      } else {
+        const roomsHtml = groupAvailableRooms.map(room => {
+          const disabled = false; // REMOVED: Disable logic - allow all rooms to be selectable
+          const bedCount = parseInt(room.ROOM_BED, 10);
+          const bedBadge = Number.isFinite(bedCount) && bedCount > 0
+            ? `<span class="bed-badge">${bedCount}<i class="fa fa-bed"></i></span>`
+            : '';
+          return `
+            <div class="form-check room-option${disabled ? ' disabled-room' : ''}">
+              <input class="form-check-input group-manual-checkbox" type="checkbox" data-room-id="${room.IDNo}" ${groupManualSelectedRooms.includes(room.IDNo) ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
+              <label class="form-check-label ms-2">
+                ${room.ROOM_NUMBER}${bedBadge ? ` ${bedBadge}` : ''}
+              </label>
+            </div>`;
+        }).join('');
+        $('#groupRoomsList').append(`<div class="manual-rooms-container">${roomsHtml}</div>`);
+      }
+      
+      // Initialize filter and count
+      updateRoomFilterAndCount();
+      
+      // Add filter change handler
+      $('input[name="groupRoomFilter"]').on('change', function() {
+        updateRoomFilterAndCount();
+      });
+      
+      updateManualSelectionInfo();
     }
     
     $('#groupResultsContainer').show();
-    
-    // Initialize filter and count
-    updateRoomFilterAndCount();
-    
-    // Add filter change handler
-    $('input[name="groupRoomFilter"]').on('change', function() {
-      updateRoomFilterAndCount();
-    });
-    
-    updateManualSelectionInfo();
   }
 
   function buildSingleRoomBlocks(rooms) {
@@ -1616,7 +1663,14 @@
         success: function(response) {
           if (!response.success) {
             Swal.fire('No Rooms Found', response.message || 'No available rooms for the selected criteria.', 'info');
-            displayGroupRoomResults({ consecutiveBlocks: [], nonConsecutiveBlocks: [], availableRooms: [] });
+            // Pass available rooms data even when search fails to show bed counts
+            const availableRooms = response.data && response.data.availableRooms ? response.data.availableRooms : [];
+            displayGroupRoomResults({ 
+              consecutiveBlocks: [], 
+              nonConsecutiveBlocks: [], 
+              availableRooms: availableRooms,
+              unassignedConflicts: response.data && response.data.unassignedConflicts ? response.data.unassignedConflicts : []
+            }, null, false);
             if (response.data && response.data.availableBedSummary) {
               showBedSummaryWarning(response.data.availableBedSummary, neededRoomsNum, bed1Needed, bed2Needed, response.data.unassignedConflicts, response.data.availableRooms || []);
             } else if (response.data && response.data.unassignedConflicts) {
@@ -1630,7 +1684,13 @@
           const availableCount = availableRooms.length;
 
           if (neededRoomsNum > availableCount) {
-            displayGroupRoomResults({ consecutiveBlocks: [], nonConsecutiveBlocks: [], availableRooms: [] });
+            // Pass available rooms data to show bed counts even when not enough rooms
+            displayGroupRoomResults({ 
+              consecutiveBlocks: [], 
+              nonConsecutiveBlocks: [], 
+              availableRooms: availableRooms,
+              unassignedConflicts: data.unassignedConflicts || []
+            }, null, false);
             setManualSelectionMode(false);
             if (data.unassignedConflicts && data.unassignedConflicts.length) {
               showUnassignedConflictWarning(data.unassignedConflicts, availableRooms);
@@ -1650,7 +1710,7 @@
             nonConsecutiveBlocks: groupNonConsecutiveBlocks,
             availableRooms,
             unassignedConflicts: data.unassignedConflicts || []
-          });
+          }, null, true);
 
           if (groupManualMode) {
             refreshManualSelectionDisabledState();
@@ -1915,9 +1975,19 @@
   function toggleAvailabilityWarning(show, message) {
     const warning = $('#groupAvailabilityWarning');
     if (show) {
-      warning.text(message || '').show();
+      // Create a more prominent warning with better styling
+      const warningHtml = `
+        <div class="alert alert-warning d-flex align-items-center mb-3" style="background-color: rgba(255, 193, 7, 0.1); border: 1px solid rgba(255, 193, 7, 0.3); border-radius: 6px;">
+          <i class="fa fa-exclamation-triangle text-warning me-3" style="font-size: 1.2em;"></i>
+          <div class="flex-grow-1">
+            <strong class="text-warning">Room Availability Notice</strong>
+            <div class="text-white mt-1">${message || ''}</div>
+          </div>
+        </div>
+      `;
+      warning.html(warningHtml).show();
     } else {
-      warning.text('').hide();
+      warning.html('').hide();
     }
   }
 
@@ -1947,7 +2017,7 @@
       : '';
 
     const message = [
-      `Available rooms (${parts.join(', ')}) do not meet ${neededCount} required rooms.`,
+      `Available rooms (${parts.join(', ')}) do not meet the requirement of ${neededCount} rooms.`,
       requirementInfo,
       availability ? `Currently available: ${availability}` : ''
     ].filter(Boolean).join(' ');
