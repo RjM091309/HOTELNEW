@@ -1122,27 +1122,27 @@
       
       // Show bed availability summary at the top
       let bedAvailabilityHtml = `
-        <div class="bed-availability-summary mb-3 p-3" style="background-color: rgba(255, 255, 255, 0.05); border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.1);">
-          <h6 class="text-info mb-2">
+        <div class="bed-availability-summary mb-1 p-1" style="background-color: rgba(255, 255, 255, 0.05); border-radius: 3px; border: 1px solid rgba(255, 255, 255, 0.1);">
+          <h6 class="text-info mb-0" style="font-size: 12px; line-height: 1.2;">
             <i class="fa fa-info-circle"></i> Available Rooms Summary
           </h6>
-          <div class="row">
+          <div class="row mt-1">
             <div class="col-md-4">
               <div class="text-center">
-                <div class="h5 mb-1 text-success">${bed1Count}</div>
-                <div class="text-muted small">1-Bed Rooms</div>
+                <div class="h6 mb-0 text-success" style="font-size: 16px; line-height: 1;">${bed1Count}</div>
+                <div class="text-muted" style="font-size: 10px; line-height: 1;">1-Bed Rooms</div>
               </div>
             </div>
             <div class="col-md-4">
               <div class="text-center">
-                <div class="h5 mb-1 text-success">${bed2Count}</div>
-                <div class="text-muted small">2-Bed Rooms</div>
+                <div class="h6 mb-0 text-success" style="font-size: 16px; line-height: 1;">${bed2Count}</div>
+                <div class="text-muted" style="font-size: 10px; line-height: 1;">2-Bed Rooms</div>
               </div>
             </div>
             <div class="col-md-4">
               <div class="text-center">
-                <div class="h5 mb-1 text-primary">${totalAvailable}</div>
-                <div class="text-muted small">Total Available</div>
+                <div class="h6 mb-0 text-primary" style="font-size: 16px; line-height: 1;">${totalAvailable}</div>
+                <div class="text-muted" style="font-size: 10px; line-height: 1;">Total Available</div>
               </div>
             </div>
           </div>
