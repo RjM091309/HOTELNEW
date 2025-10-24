@@ -20,6 +20,7 @@
                     <input type="hidden" id="room_type_hidden" name="room_type_hidden">
                     <input type="hidden" id="voucherNo" name="voucherNo">
                     <input type="hidden" id="lateCheckoutFee" name="lateCheckoutFee" value="0">
+                    <input type="hidden" id="paidAmountHidden" name="paidAmountHidden" value="0">
 
                     <div class="row">
 
@@ -196,17 +197,20 @@
                                   
                             </div>
 <hr class="my-4">
-                            <div id="divpaymentStatus" class="col-lg-4">
+                            <div id="divpaidAmount" class="col-lg-3">
                                 <div class="form-group">
-                                    <label class="form-label">Payment Status</label>
-                                    <select class="form-select" id="paymentStatus" name="paymentStatus" required>
-                                        <option disabled selected>Payment Status</option>
-                                        <option value="paid" selected>Paid</option>
-                                        <option value="unpaid">Unpaid</option>
-                                    </select>
+                                    <label class="form-label">Paid Amount</label>
+                                    <input class="form-control" type="number" id="paidAmount" name="paidAmount" placeholder="Enter paid amount" step="0.01" min="0" max="999999" value="0" onblur="formatPaidAmount(this)">
                                 </div>
                             </div>
-                            <div id="divtxtCheckInStatus" class="col-lg-4">
+                            
+                            <div id="divpaymentStatus" class="col-lg-3">
+                                <div class="form-group">
+                                    <label class="form-label">Payment Status</label>
+                                    <input class="form-control" type="text" id="paymentStatus" name="paymentStatus" readonly style="background-color: #2a3135; color: #ffffff;">
+                                </div>
+                            </div>
+                            <div id="divtxtCheckInStatus" class="col-lg-3">
                                 <div class="form-group">
                                   <label class="form-label">Check-In Status</label>
                                   <select class="form-select" name="checkInStatus" id="checkInStatus" required>
@@ -217,7 +221,7 @@
                                 </div>
                               </div>
 
-                              <div id="divcheckOutStatus" class="col-lg-4">
+                              <div id="divcheckOutStatus" class="col-lg-3">
                                 <div class="form-group">
                                   <label class="form-label">Check-Out Status</label>
                                   <select class="form-select" name="checkOutStatus" id="checkOutStatus" required>
@@ -262,21 +266,9 @@
                                 </div>
                               </div>
 
-                              <!-- Reservation Fee and Discount Section -->
+                              <!-- Discount Section -->
                               <hr class="my-4">
                               <div class="row p-t-20">
-                                <div class="col-lg-6">
-                                  <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" id="includeReservationFee">
-                                    <label class="form-check-label" for="includeReservationFee">Reservation Fee</label>
-                                  </div>
-                                  <div id="reservationFeeWrapper" class="mt-2" style="display: none;">
-                                    <input type="number" class="form-control" id="reservationFeeAmount" name="reservationFeeAmount" placeholder="Enter Reservation Fee Amount" step="1" min="0">
-                                    <small class="text-muted" style="font-size: 11px; color: #bbbbbb !important;">(Downpayment - not included in total)</small>
-                                    <small class="text-warning" style="font-size: 11px; color: #ffc107 !important; display: none;" id="reservationFeeRequired">*Required for Direct Reservations</small>
-                                  </div>
-                                </div>
-                                
                                 <div class="col-lg-6">
                                   <div class="form-check mb-2">
                                     <input class="form-check-input" type="checkbox" id="includeDiscount">
@@ -288,9 +280,13 @@
                                 </div>
                               </div>
 
-                              <h3>Total: <span id="computedTotal">0.00</span></h3>
-                              <div id="creditDisplay" style="display: none; margin-top: 10px;">
-                                <span style="color: #28a745; font-weight: bold;">Credit: <span id="creditAmount">0.00</span></span>
+                              <div class="row">
+                                <div class="col-lg-6">
+                                  <h3>Total: <span id="computedTotal">0.00</span></h3>
+                                </div>
+                                <div class="col-lg-6">
+                                  <h3>Balance: <span id="computedBalance">0.00</span></h3>
+                                </div>
                               </div>
 
                         
@@ -357,6 +353,11 @@
 		var bookingScript = document.createElement('script');
 		bookingScript.src = '/js/booking/add_booking.js';
 		document.body.appendChild(bookingScript);
+
+		// Load booking_submit.js for form submission handling
+		var submitScript = document.createElement('script');
+		submitScript.src = '/js/booking/booking_submit.js';
+		document.body.appendChild(submitScript);
 
 		// When the Add Booking modal is shown, apply saved check-in/out preferences
 		try {
@@ -778,6 +779,29 @@
 .modal-backdrop {
     z-index: 1040 !important; /* Ensure the backdrop stays behind Swal */
 }
+
+/* Payment Status field styling */
+#modal-addbooking #paymentStatus {
+    background-color: #2a3135 !important;
+    color: #ffffff !important;
+    border: 1px solid #41474c !important;
+    font-weight: bold;
+    text-align: center;
+}
+
+#modal-addbooking #paymentStatus.status-paid {
+    color: #28a745 !important;
+}
+
+#modal-addbooking #paymentStatus.status-partial {
+    color: #ffc107 !important;
+}
+
+#modal-addbooking #paymentStatus.status-unpaid {
+    color: #dc3545 !important;
+}
+
+
 
 /* ROOM IN GROUP BOOKING SEARCH */
 

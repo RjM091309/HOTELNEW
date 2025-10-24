@@ -185,14 +185,17 @@
                         <hr class="my-4">
                         
                         <!-- PAYMENT AND STATUS SECTION -->
+                         <div id="edit_divpaidAmount" class="col-lg-3">
+                             <div class="form-group">
+                                 <label class="form-label">Paid Amount</label>
+                                 <input class="form-control" type="number" id="edit_paidAmount" name="paidAmount" placeholder="Enter paid amount" step="0.01" min="0" max="999999" onblur="formatEditPaidAmount(this)">
+                             </div>
+                         </div>
+                        
                         <div id="edit_divpaymentStatus" class="col-lg-3">
                             <div class="form-group">
                                 <label class="form-label">Payment Status</label>
-                                <select class="form-select" id="edit_paymentStatus" name="paymentStatus" required>
-                                    <option disabled selected>Payment Status</option>
-                                    <option value="paid">Paid</option>
-                                    <option value="unpaid">Unpaid</option>
-                                </select>
+                                <input class="form-control" type="text" id="edit_paymentStatus" name="paymentStatus" readonly style="background-color: #2a3135; color: #ffffff;">
                             </div>
                         </div>
                         
@@ -243,20 +246,9 @@
                             </div>
                         </div>
 
-                        <!-- Reservation Fee and Discount Section -->
+                        <!-- Discount Section -->
                         <hr class="my-4">
                         <div class="row p-t-20">
-                            <div class="col-lg-6">
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" id="edit_includeReservationFee">
-                                    <label class="form-check-label" for="edit_includeReservationFee">Reservation Fee</label>
-                                </div>
-                                <div id="edit_reservationFeeWrapper" class="mt-2" style="display: none;">
-                                    <input type="number" class="form-control" id="edit_reservationFeeAmount" name="reservationFeeAmount" placeholder="Enter Reservation Fee Amount" step="1" min="0">
-                                    <small class="text-muted" style="font-size: 11px; color: #bbbbbb !important;">(Downpayment - not included in total)</small>
-                                </div>
-                            </div>
-                            
                             <div class="col-lg-6">
                                 <div class="form-check mb-2">
                                     <input class="form-check-input" type="checkbox" id="edit_includeDiscount">
@@ -268,7 +260,14 @@
                             </div>
                         </div>
 
-                        <h3>Total: <span id="edit_computedTotal">0.00</span></h3>
+                        <div class="row">
+                            <div class="col-lg-6">
+                                <h3>Total: <span id="edit_computedTotal">0.00</span></h3>
+                            </div>
+                            <div class="col-lg-6">
+                                <h3>Balance: <span id="edit_computedBalance">0.00</span></h3>
+                            </div>
+                        </div>
                         <div id="edit_creditDisplay" style="display: none; margin-top: 10px;">
                             <span style="color: #28a745; font-weight: bold;">Credit: <span id="edit_creditAmount">0.00</span></span>
                         </div>
@@ -364,22 +363,40 @@
     color: #dcdcdc;
 }
 
-#modal-editbooking #edit_reservationFeeWrapper,
 #modal-editbooking #edit_discountWrapper {
     margin-top: 10px;
 }
 
-#modal-editbooking #edit_reservationFeeAmount,
 #modal-editbooking #edit_discountAmount {
     background-color: #41474c;
     color: #ffffff;
     border: 1px solid #41474c;
 }
 
-#modal-editbooking #edit_reservationFeeAmount:focus,
 #modal-editbooking #edit_discountAmount:focus {
     border-color: #6f9c40;
     box-shadow: 0 0 0 0.2rem rgba(111, 156, 64, 0.25);
+}
+
+/* Payment Status field styling */
+#modal-editbooking #edit_paymentStatus {
+    background-color: #2a3135 !important;
+    color: #ffffff !important;
+    border: 1px solid #41474c !important;
+    font-weight: bold;
+    text-align: center;
+}
+
+#modal-editbooking #edit_paymentStatus.status-paid {
+    color: #28a745 !important;
+}
+
+#modal-editbooking #edit_paymentStatus.status-partial {
+    color: #ffc107 !important;
+}
+
+#modal-editbooking #edit_paymentStatus.status-unpaid {
+    color: #dc3545 !important;
 }
 
 /* Search results styling */
@@ -778,13 +795,6 @@ $(document).ready(function() {
         computeEditTotal();
     });
 
-    $('#edit_includeReservationFee').on('change', function () {
-        $('#edit_reservationFeeWrapper').toggle(this.checked);
-        if (!this.checked) {
-            $('#edit_reservationFeeAmount').val('');
-        }
-        computeEditTotal();
-    });
 
     $('#edit_includeDiscount').on('change', function () {
         $('#edit_discountWrapper').toggle(this.checked);
@@ -814,23 +824,7 @@ $(document).ready(function() {
         }
     });
 
-    // Payment Status logic: disable reservation fee when paid
-    function checkEditPaymentStatus() {
-        const status = $('#edit_paymentStatus').val();
-        if (status === 'paid') {
-            $('#edit_includeReservationFee').prop('checked', false).prop('disabled', true);
-            $('#edit_reservationFeeWrapper').hide();
-            $('#edit_reservationFeeAmount').val('');
-        } else {
-            $('#edit_includeReservationFee').prop('disabled', false);
-            // do not auto-check; wrapper shown only when user checks
-        }
-        computeEditTotal();
-    }
-
-    $('#edit_paymentStatus').on('change', checkEditPaymentStatus);
-    // initial sync on load
-    checkEditPaymentStatus();
+    // Note: Payment status logic removed - now using paid amount input
 
     // Manual price toggle
     $('#edit_manualPriceToggle').change(function () {
@@ -846,7 +840,13 @@ $(document).ready(function() {
     });
 
     // Input event listeners for total computation
-    $('#edit_reservationFeeAmount, #edit_discountAmount, #edit_breakfastAdultQty, #edit_breakfastKidQty, #edit_breakfastAdultPrice, #edit_breakfastKidPrice, #edit_pickupPrice, #edit_dropoffPrice').on('input', function() {
+    $('#edit_discountAmount, #edit_paidAmount, #edit_breakfastAdultQty, #edit_breakfastKidQty, #edit_breakfastAdultPrice, #edit_breakfastKidPrice, #edit_pickupPrice, #edit_dropoffPrice').on('input', function() {
+        computeEditTotal();
+    });
+    
+    // Additional specific event listener for paid amount to ensure it triggers
+    $('#edit_paidAmount').on('input change keyup', function() {
+        console.log('Paid amount changed:', $(this).val());
         computeEditTotal();
     });
 
@@ -863,6 +863,7 @@ $(document).ready(function() {
             number: $('#edit_txtNumber').val(),
             daterange: $('#edit_daterange').val(),
             maxOccupants: $('#edit_maxOccupants').val(),
+            paidAmount: $('#edit_paidAmount').val(),
             paymentStatus: $('#edit_paymentStatus').val(),
             price: $('#edit_baseprice').val(),
             diffindays: $('#edit_diffindays').val(),
@@ -888,7 +889,6 @@ $(document).ready(function() {
             dropoffPrice: $('#edit_includeDropoff').prop('checked') ? $('#edit_dropoffPrice').val() : '0',
             
             // Fees
-            reservationFee: $('#edit_includeReservationFee').prop('checked') ? $('#edit_reservationFeeAmount').val() : '0.00',
             discount: $('#edit_includeDiscount').prop('checked') ? $('#edit_discountAmount').val() : '0.00'
         };
         
@@ -899,6 +899,12 @@ $(document).ready(function() {
             data: formData,
             success: function (response) {
                 if (response.success) {
+                    // Process payment if paid amount > 0
+                    const paidAmount = parseFloat(formData.paidAmount) || 0;
+                    if (paidAmount > 0) {
+                        processEditBookingPayment(bookingId, paidAmount, 'cash', 'Payment update');
+                    }
+                    
                     $('#modal-editbooking').modal('hide');
                     Swal.fire({
                         title: 'Success!',
@@ -1071,8 +1077,15 @@ $(document).ready(function() {
     });
 })();
 
+// Function to format paid amount to 2 decimal places
+function formatEditPaidAmount(input) {
+    const value = parseFloat(input.value) || 0;
+    input.value = value.toFixed(2);
+}
+
 // Function to compute total for edit form
 function computeEditTotal() {
+    console.log('computeEditTotal called');
     const roomRate = parseFloat($('#edit_baseprice').val()) || 0;
     const nights = parseInt($('#edit_diffindays').val()) || 1;
     
@@ -1084,19 +1097,61 @@ function computeEditTotal() {
     const pickupPrice = $('#edit_includePickup').prop('checked') ? parseFloat($('#edit_pickupPrice').val()) || 0 : 0;
     const dropoffPrice = $('#edit_includeDropoff').prop('checked') ? parseFloat($('#edit_dropoffPrice').val()) || 0 : 0;
     
-    const reservationFee = $('#edit_includeReservationFee').prop('checked') ? parseFloat($('#edit_reservationFeeAmount').val()) || 0 : 0;
     const discount = $('#edit_includeDiscount').prop('checked') ? parseFloat($('#edit_discountAmount').val()) || 0 : 0;
     
+    // Get paid amount and validate it doesn't exceed total
+    let paidAmount = parseFloat($('#edit_paidAmount').val()) || 0;
+    
     const subtotal = (roomRate * nights) + (adultQty * adultPrice) + (kidQty * kidPrice) + pickupPrice + dropoffPrice;
-    const finalBalance = subtotal - reservationFee - discount;
+    const finalBalance = subtotal - discount;
+    
+    console.log('Paid Amount:', paidAmount, 'Final Balance:', finalBalance);
+    
+    // Prevent paid amount from exceeding total
+    if (paidAmount > finalBalance) {
+        paidAmount = finalBalance;
+        $('#edit_paidAmount').val(paidAmount.toFixed(2));
+    }
+    
+    // Calculate balance (total - paid amount)
+    const balance = finalBalance - paidAmount;
+    
+    // Determine payment status
+    let paymentStatus;
+    if (paidAmount <= 0) {
+        paymentStatus = 'unpaid';
+    } else if (paidAmount >= finalBalance) {
+        paymentStatus = 'paid';
+    } else {
+        paymentStatus = 'partial';
+    }
+    
+    console.log('Payment Status:', paymentStatus);
+    
+    // Update payment status display
+    $('#edit_paymentStatus').val(paymentStatus);
+    
+    // Update payment status styling with CSS classes
+    $('#edit_paymentStatus').removeClass('status-paid status-partial status-unpaid');
+    if (paymentStatus === 'paid') {
+        $('#edit_paymentStatus').addClass('status-paid');
+    } else if (paymentStatus === 'partial') {
+        $('#edit_paymentStatus').addClass('status-partial');
+    } else {
+        $('#edit_paymentStatus').addClass('status-unpaid');
+    }
     
     if (finalBalance < 0) {
         $('#edit_computedTotal').html('<b>0.00</b>');
         $('#edit_creditAmount').html(Math.abs(finalBalance).toLocaleString(undefined, { minimumFractionDigits: 2 }));
         $('#edit_creditDisplay').show();
+        // Balance is same as total when total is negative
+        $('#edit_computedBalance').html('<b>' + balance.toLocaleString(undefined, { minimumFractionDigits: 2 }) + '</b>');
     } else {
         $('#edit_computedTotal').html('<b>' + finalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 }) + '</b>');
         $('#edit_creditDisplay').hide();
+        // Show balance (total - paid amount)
+        $('#edit_computedBalance').html('<b>' + balance.toLocaleString(undefined, { minimumFractionDigits: 2 }) + '</b>');
     }
 }
 
@@ -1111,7 +1166,8 @@ function populateEditForm(booking) {
     $('#edit_txtFullNameAdd').val(booking.fullname);
     $('#edit_txtNumber').val(booking.number);
     $('#edit_maxOccupants').val(booking.GUESTS_COUNT);
-    $('#edit_paymentStatus').val(booking.PAYMENT_STATUS);
+    $('#edit_paidAmount').val(booking.paidAmount || '');
+    $('#edit_paymentStatus').val(booking.PAYMENT_STATUS || 'UNPAID');
     $('#edit_price').val(booking.price);
     $('#edit_baseprice').val(booking.price);
     $('#edit_diffindays').val(booking.diffindays);
@@ -1155,13 +1211,7 @@ function populateEditForm(booking) {
         $('#edit_dropoffServiceId').val(booking.dropoffServiceId);
     }
     
-    // Set reservation fee and discount
-    if (parseFloat(booking.RESERVATION_FEE) > 0) {
-        $('#edit_includeReservationFee').prop('checked', true);
-        $('#edit_reservationFeeWrapper').show();
-        $('#edit_reservationFeeAmount').val(booking.RESERVATION_FEE);
-    }
-    
+    // Set discount
     if (parseFloat(booking.DISCOUNT_AMOUNT) > 0) {
         $('#edit_includeDiscount').prop('checked', true);
         $('#edit_discountWrapper').show();
@@ -1348,4 +1398,31 @@ $(document).ready(function() {
         event.preventDefault();
     });
 });
+
+// Function to process payment for edit booking
+function processEditBookingPayment(bookingId, paymentAmount, paymentMethod, paymentNotes) {
+    const paymentData = {
+        bookingId: bookingId,
+        paymentAmount: parseFloat(paymentAmount),
+        paymentMethod: paymentMethod,
+        paymentNotes: paymentNotes || 'Payment update'
+    };
+
+    $.ajax({
+        url: '/booking/process-payment',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(paymentData),
+        success: function (response) {
+            if (response.success) {
+                console.log('Payment processed successfully for booking:', bookingId);
+            } else {
+                console.error('Payment processing failed:', response.message);
+            }
+        },
+        error: function (xhr, status, error) {
+            console.error('Error processing payment:', error);
+        }
+    });
+}
 </script>

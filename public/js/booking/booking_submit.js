@@ -14,6 +14,7 @@ $(document).ready(function () {
         const groupName = $('#groupName').val();
         const groupContact = $('#groupContact').val();
         const numberOfRooms = $('#numberOfRooms').val();
+        const paidAmount = $('#paidAmount').val();
         const paymentStatus = $('#paymentStatus').val();
         const bookingRoute = $('#bookingRoute').val();
         const guestType = $('#guestType').val();
@@ -30,6 +31,11 @@ $(document).ready(function () {
         const pickupPrice = $('#pickupPrice').val();
         const dropoffServiceId = $('#dropoffServiceId').val();
         const dropoffPrice = $('#dropoffPrice').val();
+        
+        // Discount and fees for group booking
+        const discountAmount = $('#includeDiscount').is(':checked') ? $('#discountAmount').val() : 0;
+        const reservationFeeAmount = $('#includeReservationFee').is(':checked') ? $('#reservationFeeAmount').val() : 0;
+        const lateCheckoutFee = $('#lateCheckoutFee').val();
   
         if (!selectedRooms || !daterange || !groupName || !groupContact || !numberOfRooms) {
           Swal.fire({
@@ -45,17 +51,140 @@ $(document).ready(function () {
           type: 'POST',
           data: {
             selectedRooms, selectedRoomPrice, qty, daterange, groupName, groupContact, numberOfRooms,
-            paymentStatus, bookingRoute, guestType, guestLevel, checkInStatus,
+            paidAmount, paymentStatus, bookingRoute, guestType, guestLevel, checkInStatus,
             breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
             breakfastKidQty, breakfastKidPrice, breakfastKidId,
-            pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice
+            pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
+            discount: discountAmount, reservationFee: reservationFeeAmount, lateCheckoutFee
           },
           success: function (response) {
             $('#modal-addbooking').modal('hide');
+            
+            // Payment processing is now handled automatically in the backend
+            // No need for separate payment processing calls
+            
+            // Auto-download group voucher if booking was successful
+            if (response.success && response.groupBookingId) {
+              // Create a form to trigger group voucher download
+              const form = $('<form>', {
+                method: 'POST',
+                action: '/booking/generate-group-voucher',
+                target: '_blank'
+              });
+              
+              // Add group booking data to form
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'groupBookingId',
+                value: response.groupBookingId
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'voucherNo',
+                value: response.confirmationNumber || $('#voucherNo').val()
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'groupName',
+                value: groupName
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'groupContact',
+                value: groupContact
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'dateFrom',
+                value: daterange.split(' to ')[0]
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'dateTo',
+                value: daterange.split(' to ')[1].split('(')[0].trim()
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'roomSummary',
+                value: selectedRooms ? selectedRooms.split(',').map(r => r.trim()).join(', ') : ''
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'total',
+                value: $('#computedTotal').text()
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'remarks',
+                value: $('#bookingRemarks').val()
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'breakfastAdult',
+                value: breakfastAdultQty
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'breakfastKid',
+                value: breakfastKidQty
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'pickup',
+                value: $('#includePickup').is(':checked') ? pickupPrice : 0
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'dropoff',
+                value: $('#includeDropoff').is(':checked') ? dropoffPrice : 0
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'reservationFee',
+                value: $('#includeReservationFee').is(':checked') ? reservationFeeAmount : 0
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'discount',
+                value: $('#includeDiscount').is(':checked') ? discountAmount : 0
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'checkOutStatus',
+                value: $('#checkOutStatus').val()
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'lateCheckoutFee',
+                value: lateCheckoutFee
+              }));
+              
+              // Submit form to trigger download
+              $('body').append(form);
+              form.submit();
+              form.remove();
+            }
+            
             setTimeout(function() {
               Swal.fire({
                 title: 'Group Booking Successful!',
-                text: 'The group booking has been added successfully.',
+                text: 'The group booking has been added successfully. Voucher is downloading...',
                 icon: 'success',
                 confirmButtonText: 'OK'
               }).then(() => window.location.reload());
@@ -78,6 +207,7 @@ $(document).ready(function () {
         const number = $('#txtNumber').val();
         const address = $('#txtAddress').val();
         const guestsCount = $('#maxOccupants').val();
+        const paidAmount = $('#paidAmount').val();
         const paymentStatus = $('#paymentStatus').val();
         const roomPrice = $('#baseprice').val();
         const qty = $('#diffindays').val();
@@ -100,6 +230,11 @@ $(document).ready(function () {
         const pickupPrice = $('#pickupPrice').val();
         const dropoffServiceId = $('#dropoffServiceId').val();
         const dropoffPrice = $('#dropoffPrice').val();
+        
+        // Discount and fees
+        const discountAmount = $('#includeDiscount').is(':checked') ? $('#discountAmount').val() : 0;
+        const reservationFeeAmount = $('#includeReservationFee').is(':checked') ? $('#reservationFeeAmount').val() : 0;
+        const lateCheckoutFee = $('#lateCheckoutFee').val();
   
         if (!roomId || !daterange || !fullname || !guestsCount || !paymentStatus || !roomPrice || !guestType || !guestLevel) {
           Swal.fire({
@@ -109,20 +244,24 @@ $(document).ready(function () {
           });
           return;
         }
-  
+        
         $.ajax({
           url: '/booking/add_booking',
           type: 'POST',
           data: {
             room_id: roomId, fullname, number, address, daterange, maxOccupants: guestsCount,
-            paymentStatus, price: roomPrice, diffindays: qty, guestType, guestLevel, guestID: txtGuestID,
+            paidAmount, paymentStatus, price: roomPrice, diffindays: qty, guestType, guestLevel, guestID: txtGuestID,
             bookingRoute, checkInStatus, bookingRemarks, agencyID, voucherNo,
             breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
             breakfastKidQty, breakfastKidPrice, breakfastKidId,
-            pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice
+            pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
+            discount: discountAmount, reservationFee: reservationFeeAmount, lateCheckoutFee
           },
           success: function (response) {
             $('#modal-addbooking').modal('hide');
+            
+            // Payment processing is now handled automatically in the backend
+            // No need for separate payment processing calls
             
             // Auto-download voucher if booking was successful
             if (response.success && response.bookingId) {
@@ -142,32 +281,140 @@ $(document).ready(function () {
               
               form.append($('<input>', {
                 type: 'hidden',
+                name: 'voucherNo',
+                value: response.confirmationNumber || voucherNo
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
                 name: 'fullname',
                 value: fullname
               }));
               
               form.append($('<input>', {
                 type: 'hidden',
-                name: 'daterange',
-                value: daterange
+                name: 'contactNumber',
+                value: number
               }));
               
               form.append($('<input>', {
                 type: 'hidden',
-                name: 'roomPrice',
-                value: roomPrice
+                name: 'dateFrom',
+                value: daterange.split(' to ')[0]
               }));
               
               form.append($('<input>', {
                 type: 'hidden',
-                name: 'paymentStatus',
-                value: paymentStatus
+                name: 'dateTo',
+                value: daterange.split(' to ')[1].split('(')[0].trim()
               }));
               
               form.append($('<input>', {
                 type: 'hidden',
-                name: 'voucherNo',
-                value: response.confirmationNumber || voucherNo
+                name: 'bedCount',
+                value: $('#bedCount').val()
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'roomNumber',
+                value: $('#addroom option:selected').text()
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'roomView',
+                value: $('#room_type').val()
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'roomType',
+                value: $('#room_type_hidden').val()
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'roomRate',
+                value: $('#price').val()
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'breakfastAdult',
+                value: breakfastAdultQty
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'breakfastAdultPrice',
+                value: breakfastAdultPrice
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'breakfastKid',
+                value: breakfastKidQty
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'breakfastKidPrice',
+                value: breakfastKidPrice
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'pickup',
+                value: $('#includePickup').is(':checked') ? pickupPrice : 0
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'dropoff',
+                value: $('#includeDropoff').is(':checked') ? dropoffPrice : 0
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'remarks',
+                value: bookingRemarks
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'total',
+                value: $('#computedTotal').text()
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'checkInStatus',
+                value: checkInStatus
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'checkOutStatus',
+                value: $('#checkOutStatus').val()
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'lateCheckoutFee',
+                value: lateCheckoutFee
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'reservationFee',
+                value: $('#includeReservationFee').is(':checked') ? reservationFeeAmount : 0
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'discount',
+                value: $('#includeDiscount').is(':checked') ? discountAmount : 0
               }));
               
               // Submit form to trigger download
@@ -196,4 +443,5 @@ $(document).ready(function () {
         });
       }
     });
-  }); 
+  });
+

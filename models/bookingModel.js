@@ -808,6 +808,43 @@ class BookingModel {
           });
         }
 
+        // Insert payment record for the paid amount if payment status is 'paid' or 'partial'
+        if (paymentStatus === 'paid' || paymentStatus === 'partial') {
+          // Calculate the paid amount from the controller
+          const paidAmount = parseFloat(bookingData.paidAmount) || 0;
+          
+          if (paidAmount > 0) {
+            const paymentQuery = `
+              INSERT INTO payments 
+              (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            
+            const paymentValues = [
+              bookingId,
+              null, // No specific service ID for room payment
+                paidAmount,
+                'cash',
+                'room', // Payment type for room charges
+                date,
+                encodedBy,
+              'Initial payment for booking'
+            ];
+            
+            await new Promise((resolve, reject) => {
+              connection.query(paymentQuery, paymentValues, (err) => {
+                if (err) {
+                  console.error('❌ Failed to insert room payment:', err);
+                  reject(err);
+                } else {
+                  console.log(`✅ Room payment of ₱${paidAmount} recorded for booking ${bookingId}`);
+                  resolve();
+                }
+              });
+            });
+          }
+        }
+
         // Insert breakfast services if provided
         const services = [];
 
@@ -932,7 +969,7 @@ class BookingModel {
               s[1],             // SERVICE_ID
               parseFloat(s[3]), // AMOUNT
               'cash',           // PAYMENT_METHOD
-              'service',        // PAYMENT_TYPE
+              'service',        // PAYMENT_STATUS
               date,
               encodedBy
             ]);
@@ -2144,9 +2181,9 @@ class BookingModel {
 
           await new Promise((resolve, reject) => {
             connection.query(
-              `INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
-              VALUES (?, ?, ?, ?, 'room', NOW(), ?, ?)`,
-                                [bookingId, billingId, roomPaymentAmount, paymentMethod, encodedBy, paymentNotes || 'Room payment'],
+              `INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
+              VALUES (?, ?, ?, ?, 'room', NOW(), ?)`,
+                                [bookingId, billingId, roomPaymentAmount, paymentMethod, encodedBy],
               (err) => {
                 if (err) reject(err);
                 else resolve();
@@ -2236,9 +2273,9 @@ class BookingModel {
 
                             await new Promise((resolve, reject) => {
                                 connection.query(
-                                    `INSERT INTO payments (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS) 
-                                    VALUES (?, ?, ?, ?, 'service', NOW(), ?, ?)`,
-                                    [bookingId, service.IDNo, servicePaymentAmount, paymentMethod, encodedBy, paymentNotes || 'Service payment'],
+                                    `INSERT INTO payments (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY) 
+                                    VALUES (?, ?, ?, ?, 'service', NOW(), ?)`,
+                                    [bookingId, service.IDNo, servicePaymentAmount, paymentMethod, encodedBy],
                                     (err) => {
                                         if (err) reject(err);
                                         else resolve();
@@ -3770,9 +3807,9 @@ class BookingModel {
         // Insert new payments for reservation fees and discounts
         const additionalPayments = [];
         
-        console.log(`🔄 Billing Mode: ${consolidatedBilling ? 'CONSOLIDATED' : 'INDIVIDUAL'}`);
-        console.log(`💰 Reservation Fee: ₱${reservationFee || 0}`);
-        console.log(`💸 Discount: ₱${discount || 0}`);
+        // console.log(`🔄 Billing Mode: ${consolidatedBilling ? 'CONSOLIDATED' : 'INDIVIDUAL'}`);
+        // console.log(`💰 Reservation Fee: ₱${reservationFee || 0}`);
+        // console.log(`💸 Discount: ₱${discount || 0}`);
         
         if (consolidatedBilling) {
           // Consolidated billing: apply fees/discounts only to main booking
@@ -3838,6 +3875,33 @@ class BookingModel {
             VALUES ?
           `;
           await connection.promise().query(additionalPayQuery, [additionalPayments]);
+        }
+      }
+
+      // Insert payment record for the paid amount if payment status is 'paid' or 'partial'
+      if (paymentStatus === 'paid' || paymentStatus === 'partial') {
+        const paidAmount = parseFloat(data.paidAmount) || 0;
+        
+        if (paidAmount > 0 && firstBookingId) {
+          const paymentQuery = `
+            INSERT INTO payments 
+            (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `;
+          
+          const paymentValues = [
+            firstBookingId,
+            null, // No specific service ID for room payment
+              paidAmount,
+              'cash',
+              'room', // Payment type for group room charges
+              date,
+              encodedBy,
+            'Initial payment for group booking'
+          ];
+          
+          await connection.promise().query(paymentQuery, paymentValues);
+          console.log(`✅ Group room payment of ₱${paidAmount} recorded for group booking ${firstBookingId}`);
         }
       }
 
@@ -4017,10 +4081,10 @@ class BookingModel {
           const originalQty = bill.ORIGINAL_QTY ?? bill.QTY;
           const amountToPay = bill.ROOM_CHARGE * originalQty;
 
-        // Insert payment record for room (add REMARKS to all room payments in group)
+        // Insert payment record for room
         const paymentInsertQuery = `
-          INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS) 
-          VALUES (?, ?, ?, ?, 'room', NOW(), ?, ?)
+          INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY) 
+          VALUES (?, ?, ?, ?, 'room', NOW(), ?)
         `;
         
         await queryDatabasePromise(paymentInsertQuery, [
@@ -4028,8 +4092,7 @@ class BookingModel {
           bill.IDNo, 
           amountToPay, 
           paymentMethod, 
-          encodedBy,
-          paymentNotes || ''
+          encodedBy
         ], connection);
 
         // Update billing table
@@ -5344,11 +5407,21 @@ class BookingModel {
       const breakfastKidPrice = booking.breakfastKidQty > 0 ? 
         (booking.breakfastKidPrice / booking.breakfastKidQty) : 0;
 
+      // Calculate total paid amount from payments table
+      const paidAmountQuery = `
+        SELECT COALESCE(SUM(AMOUNT_PAID), 0) as totalPaid
+        FROM payments 
+        WHERE BOOKING_ID = ? AND PAYMENT_TYPE NOT IN ('reservation_fee', 'discount')
+      `;
+      const paidAmountResult = await queryDatabasePromise(paidAmountQuery, [bookingId]);
+      const totalPaidAmount = parseFloat(paidAmountResult[0]?.totalPaid) || 0;
+
       const formattedBooking = {
         ...booking,
         daterange,
         breakfastAdultPrice: breakfastAdultPrice.toFixed(2),
-        breakfastKidPrice: breakfastKidPrice.toFixed(2)
+        breakfastKidPrice: breakfastKidPrice.toFixed(2),
+        paidAmount: totalPaidAmount.toFixed(2)
       };
 
       return formattedBooking;
@@ -5364,12 +5437,12 @@ class BookingModel {
     return new Promise((resolve, reject) => {
       const {
         bookingId, room_id, fullname, number, daterange, maxOccupants,
-        paymentStatus, price, diffindays, guestType, guestLevel,
+        paidAmount, paymentStatus, price, diffindays, guestType, guestLevel,
         bookingRoute, checkInStatus, checkOutStatus, bookingRemarks, agencyID, bedCount,
         breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
         breakfastKidQty, breakfastKidPrice, breakfastKidId,
         pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
-        reservationFee, discount, editedBy
+        discount, editedBy
       } = params;
 
       const editDate = new Date();
@@ -5449,13 +5522,13 @@ class BookingModel {
             // 3. Update billing information
             const billingUpdateQuery = `
               UPDATE billing 
-              SET ROOM_CHARGE = ?, QTY = ?, PAYMENT_STATUS = ?, RESERVATION_FEE = ?, 
+              SET ROOM_CHARGE = ?, QTY = ?, PAYMENT_STATUS = ?, 
                   DISCOUNT_AMOUNT = ?, EDITED_BY = ?, EDITED_DT = ?
               WHERE BOOKING_ID = ?
             `;
             await connection.promise().query(billingUpdateQuery, [
               numericRoomPrice, diffindays, paymentStatus, 
-              parseFloat(reservationFee) || 0.00, parseFloat(discount) || 0.00,
+              parseFloat(discount) || 0.00,
               editedBy, editDate, bookingId
             ]);
 
@@ -5504,40 +5577,22 @@ class BookingModel {
               await connection.promise().query(serviceQuery, [services]);
             }
 
-            // 6. Update payments if status changed to paid
-            if (paymentStatus === 'paid') {
+            // 6. Update payments based on paid amount
+            if (paymentStatus === 'paid' || paymentStatus === 'partial') {
               // Delete existing payments for this booking
               await connection.promise().query('DELETE FROM payments WHERE BOOKING_ID = ?', [bookingId]);
               
-              // Insert new payment records
-              const payments = [];
-              
-              // Room payment
-              const roomAmount = numericRoomPrice * diffindays;
-              payments.push([bookingId, null, roomAmount, 'cash', 'room', editDate, editedBy]);
-              
-              // Service payments
-              services.forEach(service => {
-                payments.push([bookingId, service[1], service[3], 'cash', 'service', editDate, editedBy]);
-              });
-              
-              // Reservation fee payment
-              if (parseFloat(reservationFee) > 0) {
-                payments.push([bookingId, null, parseFloat(reservationFee), 'cash', 'reservation_fee', editDate, editedBy]);
-              }
-              
-              // Discount payment (negative amount)
-              if (parseFloat(discount) > 0) {
-                payments.push([bookingId, null, -parseFloat(discount), 'cash', 'discount', editDate, editedBy]);
-              }
-              
-              if (payments.length > 0) {
+              // Insert payment record for the paid amount
+              const paidAmountNum = parseFloat(paidAmount) || 0;
+              if (paidAmountNum > 0) {
                 const paymentQuery = `
                   INSERT INTO payments 
                   (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
-                  VALUES ?
+                  VALUES (?, ?, ?, ?, ?, ?, ?)
                 `;
-                await connection.promise().query(paymentQuery, [payments]);
+                await connection.promise().query(paymentQuery, [
+                  bookingId, null, paidAmountNum, 'cash', 'room', editDate, editedBy
+                ]);
               }
             }
 
@@ -6388,13 +6443,13 @@ class BookingModel {
       const perRoomFeesArray = Array.isArray(perRoomReservationFees) ? perRoomReservationFees : (typeof perRoomReservationFees === 'string' ? perRoomReservationFees.split(',') : []);
       const perRoomDiscountsArray = Array.isArray(perRoomDiscounts) ? perRoomDiscounts : (typeof perRoomDiscounts === 'string' ? perRoomDiscounts.split(',') : []);
 
-      console.log('🔄 Group Booking Debug Info:');
-      console.log(`   selectedRoomPrice: "${selectedRoomPrice}"`);
-      console.log(`   roomBasePrices: [${roomBasePrices.join(', ')}]`);
-      console.log(`   perRoomFeesArray: [${perRoomFeesArray.join(', ')}]`);
-      console.log(`   perRoomDiscountsArray: [${perRoomDiscountsArray.join(', ')}]`);
-      console.log(`   nightsCount: ${nightsCount}`);
-      console.log(`   consolidatedBilling: ${consolidatedBilling}`);
+      // console.log('🔄 Group Booking Debug Info:');
+      // console.log(`   selectedRoomPrice: "${selectedRoomPrice}"`);
+      // console.log(`   roomBasePrices: [${roomBasePrices.join(', ')}]`);
+      // console.log(`   perRoomFeesArray: [${perRoomFeesArray.join(', ')}]`);
+      // console.log(`   perRoomDiscountsArray: [${perRoomDiscountsArray.join(', ')}]`);
+      // console.log(`   nightsCount: ${nightsCount}`);
+      // console.log(`   consolidatedBilling: ${consolidatedBilling}`);
 
       let firstBookingId = null;
       let totalGroupRoomCharges = 0;
@@ -6427,12 +6482,12 @@ class BookingModel {
         } else if (consolidatedBilling) {
           // Other bookings get zero room charges (consolidated billing)
           adjustedRoomCharge = 0;
-          console.log(`🔄 Consolidated Billing - Room ${index + 1}: ₱0.00 (additional room)`);
+          // console.log(`🔄 Consolidated Billing - Room ${index + 1}: ₱0.00 (additional room)`);
         } else {
           // Regular billing: each room gets its own charges
           adjustedRoomCharge = Math.max(totalRoomCharge + perRoomFee - perRoomDiscount, 0);
           totalGroupRoomCharges += adjustedRoomCharge;
-          console.log(`🔄 Individual Billing - Room ${index + 1}: ₱${adjustedRoomCharge.toLocaleString()} (${roomNumbers[index]}: ₱${baseRoomPrice} × ${nightsCount} nights)`);
+          // console.log(`🔄 Individual Billing - Room ${index + 1}: ₱${adjustedRoomCharge.toLocaleString()} (${roomNumbers[index]}: ₱${baseRoomPrice} × ${nightsCount} nights)`);
         }
 
         // customer
@@ -6546,7 +6601,7 @@ class BookingModel {
         // Log final billing for this booking
         // Both consolidated and individual billing now have roomChargeForBilling already including nights
         const finalAmount = roomChargeForBilling - reservationFeeForBilling - discountForBilling;
-        console.log(`💰 Final Billing - Room ${index + 1}: ₱${finalAmount.toLocaleString()} (Room: ₱${roomChargeForBilling}, Fee: ₱${reservationFeeForBilling}, Discount: -₱${discountForBilling})`);
+        // console.log(`💰 Final Billing - Room ${index + 1}: ₱${finalAmount.toLocaleString()} (Room: ₱${roomChargeForBilling}, Fee: ₱${reservationFeeForBilling}, Discount: -₱${discountForBilling})`);
 
         // Process late check-out fee if applicable
         if (checkOutStatus == 1 && parseFloat(lateCheckoutFee) > 0) {
@@ -6708,12 +6763,12 @@ class BookingModel {
       const dropoffTotal = dropoffPrice ? parseFloat(dropoffPrice) : 0;
       const servicesTotal = breakfastAdultTotal + breakfastKidTotal + pickupTotal + dropoffTotal;
 
-      console.log('🔄 Grand Total Calculation:');
-      console.log(`   totalGroupRoomCharges: ₱${totalGroupRoomCharges.toLocaleString()}`);
-      console.log(`   servicesTotal: ₱${servicesTotal.toLocaleString()}`);
-      console.log(`   subtotal: ₱${(totalGroupRoomCharges + servicesTotal).toLocaleString()}`);
-      console.log(`   reservationFee (subtract): -₱${(parseFloat(reservationFee) || 0).toLocaleString()}`);
-      console.log(`   discount (subtract): -₱${(parseFloat(discount) || 0).toLocaleString()}`);
+      // console.log('🔄 Grand Total Calculation:');
+      // console.log(`   totalGroupRoomCharges: ₱${totalGroupRoomCharges.toLocaleString()}`);
+      // console.log(`   servicesTotal: ₱${servicesTotal.toLocaleString()}`);
+      // console.log(`   subtotal: ₱${(totalGroupRoomCharges + servicesTotal).toLocaleString()}`);
+      // console.log(`   reservationFee (subtract): -₱${(parseFloat(reservationFee) || 0).toLocaleString()}`);
+      // console.log(`   discount (subtract): -₱${(parseFloat(discount) || 0).toLocaleString()}`);
 
       const subtotal = totalGroupRoomCharges + servicesTotal;
       const grandTotal = subtotal - (parseFloat(reservationFee) || 0) - (parseFloat(discount) || 0);
@@ -6723,8 +6778,8 @@ class BookingModel {
       connection.release();
 
       console.log('✅ Group Booking Process Completed Successfully!');
-      console.log(`🎯 Grand Total: ₱${grandTotal.toLocaleString()}`);
-      console.log(`🏷️  Confirmation Number: ${confirmationNumber}`);
+      // console.log(`🎯 Grand Total: ₱${grandTotal.toLocaleString()}`);
+      // console.log(`🏷️  Confirmation Number: ${confirmationNumber}`);
 
       return { success: true, message: 'Group Booking added successfully!', confirmationNumber, grandTotal, reservationFee: parseFloat(reservationFee) || 0, discount: parseFloat(discount) || 0 };
     } catch (err) {

@@ -125,7 +125,7 @@ class CalendarController {
         return res.status(400).json({ success: false, message: 'Missing date parameter.' });
       }
 
-      console.log(`Fetching bookings for date: ${date}`); // Debugging
+      // console.log(`Fetching bookings for date: ${date}`); // Debugging
 
       const bookings = await CalendarModel.getDetailedBookings(date);
       res.json({ success: true, bookings });
@@ -164,16 +164,16 @@ class CalendarController {
         });
       }
 
-      console.log('📥 Calendar API processing update:', { 
-        bookingId: id, 
-        room, 
-        checkIn, 
-        checkOut, 
-        isExtended,
-        isRoomTransfer,
-        oldRoomNumber,
-        newRoomId
-      });
+      // console.log('📥 Calendar API processing update:', { 
+      //   bookingId: id, 
+      //   room, 
+      //   checkIn, 
+      //   checkOut, 
+      //   isExtended,
+      //   isRoomTransfer,
+      //   oldRoomNumber,
+      //   newRoomId
+      // });
 
       const result = await CalendarModel.updateBooking(
         id,
@@ -327,9 +327,9 @@ class CalendarController {
   static async getRooms(req, res) {
     try {
       const rooms = await CalendarModel.getAllRooms();
-      console.log('📅 Rooms data:', rooms);
-      console.log('📅 Rooms data type:', typeof rooms);
-      console.log('📅 Rooms is array:', Array.isArray(rooms));
+      // console.log('📅 Rooms data:', rooms);
+      // console.log('📅 Rooms data type:', typeof rooms);
+      // console.log('📅 Rooms is array:', Array.isArray(rooms));
       res.json(rooms);
     } catch (error) {
       console.error('Error fetching rooms:', error);
@@ -341,7 +341,7 @@ class CalendarController {
   static async getBookings(req, res) {
     try {
       const bookings = await CalendarModel.getAllBookings();
-      console.log('📅 Bookings data:', bookings);
+      // console.log('📅 Bookings data:', bookings);
       res.json(bookings);
     } catch (error) {
       console.error('Error fetching bookings:', error);
@@ -385,7 +385,7 @@ class CalendarController {
         });
       }
 
-      console.log('🔄 Calendar transfer request:', { bookingId, oldRoomNumber, newRoomId, transferDate });
+      // console.log('🔄 Calendar transfer request:', { bookingId, oldRoomNumber, newRoomId, transferDate });
 
       // Process room transfer using the same logic as dashboard
       const result = await CalendarModel.transferRoom(bookingId, oldRoomNumber, newRoomId, transferDate);
@@ -397,7 +397,7 @@ class CalendarController {
           message: result.message 
         });
       } else {
-        console.log('❌ Calendar transfer failed:', result);
+        // console.log('❌ Calendar transfer failed:', result);
         res.status(400).json({ error: result.error });
       }
     } catch (error) {

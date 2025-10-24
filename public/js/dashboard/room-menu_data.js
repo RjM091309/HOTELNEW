@@ -470,6 +470,9 @@ async function createDynamicRoomModal(bookingId, event, options) {
             <!-- Modal Footer -->
             <div class="modal-footer py-2" style="background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%); border-top: 1px solid #495057;">
                 <button type="button" class="btn btn-primary" onclick="showBilling('${bookingId}')">Billing</button>
+                <button type="button" class="btn btn-secondary" onclick="viewFullBookingDetails('${bookingId}')">
+                    <i class="fas fa-file-alt me-2"></i>View Details
+                </button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
@@ -2172,6 +2175,7 @@ window.calculateExtensionCost = calculateExtensionCost;
 window.openRoomMenuModal = openRoomMenuModal;
 window.openCheckoutBacktrackModal = openCheckoutBacktrackModal;
 window.toggleCustomCost = toggleCustomCost;
+window.viewFullBookingDetails = viewFullBookingDetails;
 
 // Initialize transfer modal immediately
 function initializeTransferModal() {
@@ -3386,7 +3390,7 @@ function openCheckoutBacktrackModal(bookingId, event) {
                         </button>
 
                         <button type="button" class="btn btn-secondary" onclick="viewFullBookingDetails('${bookingId}')" >
-                            <i class="fas fa-file-alt me-2"></i>View Full Details
+                            <i class="fas fa-file-alt me-2"></i>View Details
                         </button>
 
                          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" >

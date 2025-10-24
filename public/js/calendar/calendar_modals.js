@@ -306,11 +306,11 @@ function showPendingModal(event) {
     `,
     icon: 'info',
     cancelButtonText: 'Edit Details',
-    denyButtonText: 'Cancel',
+    denyButtonText: 'View Details',
     showCancelButton: true,
     showDenyButton: true,
     cancelButtonColor: '#007bff', // Blue for edit details
-    denyButtonColor: '#6c757d',
+    denyButtonColor: '#28a745', // Green for View Details
     background: '#2a3135',
     color: '#ffffff',
     width: '500px'
@@ -348,6 +348,9 @@ function showPendingModal(event) {
     } else if (result.dismiss === Swal.DismissReason.cancel) {
       // Edit Booking button clicked
       editBookingFromCalendar(bookingId);
+    } else if (result.dismiss === Swal.DismissReason.deny) {
+      // View Details button clicked
+      viewFullBookingDetails(bookingId);
     }
   });
 }

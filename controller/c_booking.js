@@ -396,7 +396,7 @@ class BookingController {
         address = '', // Default address to empty string if not provided
         daterange,
         maxOccupants,
-        paymentStatus,
+        paidAmount, // New field for paid amount
         price,
         diffindays,
         guestType,
@@ -434,6 +434,35 @@ class BookingController {
 
       if (!encodedBy) {
         return res.status(400).json({ success: false, message: 'User is not logged in' });
+      }
+
+      // Calculate payment status based on paid amount
+      const paidAmountNum = parseFloat(paidAmount) || 0;
+      const roomPriceNum = parseFloat(price) || 0;
+      const reservationFeeNum = parseFloat(reservationFee) || 0;
+      const discountNum = parseFloat(discount) || 0;
+      const lateCheckoutFeeNum = parseFloat(lateCheckoutFee) || 0;
+      
+      // Calculate services costs
+      const breakfastAdultCost = (parseInt(breakfastAdultQty) || 0) * (parseFloat(breakfastAdultPrice) || 0);
+      const breakfastKidCost = (parseInt(breakfastKidQty) || 0) * (parseFloat(breakfastKidPrice) || 0);
+      const pickupCost = parseFloat(pickupPrice) || 0;
+      const dropoffCost = parseFloat(dropoffPrice) || 0;
+      
+      // Calculate total amount (matching frontend calculation)
+      const roomTotal = roomPriceNum * parseInt(diffindays) || 1;
+      const servicesTotal = breakfastAdultCost + breakfastKidCost + pickupCost + dropoffCost;
+      const subtotal = roomTotal + servicesTotal + lateCheckoutFeeNum;
+      const totalAmount = subtotal + reservationFeeNum - discountNum;
+      
+      // Determine payment status
+      let paymentStatus;
+      if (paidAmountNum <= 0) {
+        paymentStatus = 'unpaid';
+      } else if (paidAmountNum >= totalAmount) {
+        paymentStatus = 'paid';
+      } else {
+        paymentStatus = 'partial';
       }
 
       // console.log('Received booking data:', req.body);
@@ -513,6 +542,7 @@ class BookingController {
         maxOccupants,
         confirmationNumber,
         paymentStatus,
+        paidAmount,
         diffindays,
         numericRoomPrice,
         encodedBy,
@@ -1255,7 +1285,7 @@ class BookingController {
         groupName,
         groupContact,
         numberOfRooms,
-        paymentStatus,
+        paidAmount,
         bookingRoute,
         guestType,
         guestLevel,
@@ -1293,6 +1323,30 @@ class BookingController {
         return res.status(400).json({ success: false, message: 'User is not logged in' });
       }
 
+      // Calculate payment status based on paid amount for group booking
+      const paidAmountNum = parseFloat(paidAmount) || 0;
+      const reservationFeeNum = parseFloat(reservationFee) || 0;
+      const discountNum = parseFloat(discount) || 0;
+      
+      // For group booking, we need to calculate total from room prices
+      const roomPrices = selectedRoomPrice.split(',').map(p => parseFloat(p) || 0);
+      const totalRoomPrice = roomPrices.reduce((sum, price) => sum + price, 0) * parseInt(qty);
+      
+      // Calculate total amount
+      const totalAmount = totalRoomPrice + reservationFeeNum - discountNum;
+      
+      // Determine payment status
+      let paymentStatus;
+      if (paidAmountNum <= 0) {
+        paymentStatus = 'unpaid';
+      } else if (paidAmountNum >= totalAmount) {
+        paymentStatus = 'paid';
+      } else {
+        paymentStatus = 'partial';
+      }
+
+      console.log(`Group Booking Payment Status Calculation: Total=${totalAmount}, Paid=${paidAmountNum}, Status=${paymentStatus}`);
+
       const date = new Date();
 
       const result = await BookingModel.addGroupBooking({
@@ -1304,6 +1358,7 @@ class BookingController {
         groupContact,
         numberOfRooms,
         paymentStatus,
+        paidAmount,
         bookingRoute,
         guestType,
         guestLevel,
@@ -1386,7 +1441,7 @@ class BookingController {
         groupName,
         groupContact,
         numberOfRooms,
-        paymentStatus,
+        paidAmount,
         bookingRoute,
         guestType,
         guestLevel,
@@ -1435,7 +1490,7 @@ class BookingController {
         groupName,
         groupContact,
         numberOfRooms,
-        paymentStatus,
+        paidAmount,
         bookingRoute,
         guestType,
         guestLevel,
@@ -2040,18 +2095,34 @@ class BookingController {
 
       const {
         room_id, fullname, number, daterange, maxOccupants,
-        paymentStatus, price, diffindays, guestType, guestLevel,
+        paidAmount, price, diffindays, guestType, guestLevel,
         bookingRoute, checkInStatus, checkOutStatus, bookingRemarks, agencyID, bedCount,
         breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
         breakfastKidQty, breakfastKidPrice, breakfastKidId,
         pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
-        reservationFee, discount
+        discount
       } = req.body;
 
       const editedBy = req.user.userId; // Use JWT user ID
 
       if (!editedBy) {
         return res.status(400).json({ success: false, message: 'User is not logged in' });
+      }
+
+      // Calculate payment status based on paid amount
+      const paidAmountNum = parseFloat(paidAmount) || 0;
+      const roomPriceNum = parseFloat(price) || 0;
+      const discountNum = parseFloat(discount) || 0;
+      
+      const totalAmount = roomPriceNum - discountNum;
+      
+      let paymentStatus;
+      if (paidAmountNum <= 0) {
+        paymentStatus = 'unpaid';
+      } else if (paidAmountNum >= totalAmount) {
+        paymentStatus = 'paid';
+      } else {
+        paymentStatus = 'partial';
       }
 
       const result = await BookingModel.updateBooking({
@@ -2061,6 +2132,7 @@ class BookingController {
         number,
         daterange,
         maxOccupants,
+        paidAmount,
         paymentStatus,
         price,
         diffindays,
@@ -2082,7 +2154,6 @@ class BookingController {
         pickupPrice,
         dropoffServiceId,
         dropoffPrice,
-        reservationFee,
         discount,
         editedBy
       });
@@ -2122,7 +2193,7 @@ class BookingController {
         excludeBookingId
       });
 
-      console.log('Available rooms response:', availableRooms);
+      // console.log('Available rooms response:', availableRooms);
 
       res.json(availableRooms);
 

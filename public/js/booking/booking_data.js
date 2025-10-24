@@ -153,9 +153,26 @@ $(document).ready(function () {
                     if (type === 'sort' || type === 'type' || type === 'filter') {
                         return data; // Already normalized in dataSrc
                     }
-                    // For display, return the styled HTML
-                    const labelClass = data === 'paid' ? 'label-success' : 'label-danger';
-                    const displayText = data === 'paid' ? 'PAID' : 'UNPAID';
+                    
+                    // Calculate actual payment status based on balance
+                    const balance = parseFloat(row.Balance) || 0;
+                    const totalCost = parseFloat(row.Totalcost) || 0;
+                    let labelClass, displayText;
+                    
+                    if (balance <= 0) {
+                        // No balance or negative balance (overpaid) = PAID
+                        labelClass = 'label-success';
+                        displayText = 'PAID';
+                    } else if (balance < totalCost) {
+                        // Has balance but less than total = PARTIAL
+                        labelClass = 'label-warning';
+                        displayText = 'PARTIAL';
+                    } else {
+                        // Balance equals total = UNPAID
+                        labelClass = 'label-danger';
+                        displayText = 'UNPAID';
+                    }
+                    
                     return `<div style="text-align: center;"><span class="label label-sm ${labelClass}">${displayText}</span></div>`;
                 }
             },
