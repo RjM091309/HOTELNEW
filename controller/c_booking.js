@@ -220,39 +220,6 @@ class BookingController {
         groupCondition
       });
 
-      // Debug logging for balance calculation
-      console.log('=== BOOKING DATA BALANCE DEBUG ===');
-      result.rows.forEach((row, index) => {
-        if (index < 3) { // Log first 3 rows only
-          const roomCost = parseFloat(row.DEBUG_ROOM_COST) || 0;
-          const servicesCost = parseFloat(row.DEBUG_SERVICES_COST) || 0;
-          const extensionsCost = parseFloat(row.DEBUG_EXTENSIONS_COST) || 0;
-          const reservationFee = parseFloat(row.DEBUG_RESERVATION_FEE) || 0;
-          const discountAmount = parseFloat(row.DEBUG_DISCOUNT_AMOUNT) || 0;
-          const totalPaymentsMade = parseFloat(row.DEBUG_TOTAL_PAYMENTS_MADE) || 0;
-          const balance = parseFloat(row.BALANCE) || 0;
-          
-          const manualCalculation = roomCost + servicesCost + extensionsCost - reservationFee - discountAmount - totalPaymentsMade;
-          
-          console.log(`Booking ${row.BookingID} (${row.NAME}):`, {
-            BALANCE: row.BALANCE,
-            DEBUG_ROOM_COST: row.DEBUG_ROOM_COST,
-            DEBUG_SERVICES_COST: row.DEBUG_SERVICES_COST,
-            DEBUG_EXTENSIONS_COST: row.DEBUG_EXTENSIONS_COST,
-            DEBUG_RESERVATION_FEE: row.DEBUG_RESERVATION_FEE,
-            DEBUG_DISCOUNT_AMOUNT: row.DEBUG_DISCOUNT_AMOUNT,
-            DEBUG_TOTAL_PAYMENTS_MADE: row.DEBUG_TOTAL_PAYMENTS_MADE,
-            DEBUG_PAYMENT_STATUS: row.DEBUG_PAYMENT_STATUS,
-            DEBUG_UNPAID_SERVICES: row.DEBUG_UNPAID_SERVICES,
-            DEBUG_UNPAID_EXTENSIONS: row.DEBUG_UNPAID_EXTENSIONS,
-            CALCULATION: `${row.DEBUG_ROOM_COST} + ${row.DEBUG_SERVICES_COST} + ${row.DEBUG_EXTENSIONS_COST} - ${row.DEBUG_RESERVATION_FEE} - ${row.DEBUG_DISCOUNT_AMOUNT} - ${row.DEBUG_TOTAL_PAYMENTS_MADE} = ${row.BALANCE}`,
-            MANUAL_CALCULATION: `${roomCost} + ${servicesCost} + ${extensionsCost} - ${reservationFee} - ${discountAmount} - ${totalPaymentsMade} = ${manualCalculation}`,
-            DIFFERENCE: `SQL: ${balance} vs Manual: ${manualCalculation} (Diff: ${balance - manualCalculation})`,
-            PAID_STATUS_LOGIC: `PAYMENT_STATUS='${row.DEBUG_PAYMENT_STATUS}' -> Using ${row.DEBUG_PAYMENT_STATUS === 'paid' ? 'unpaid services/extensions' : 'full calculation'}`
-          });
-        }
-      });
-      console.log('=== END BALANCE DEBUG ===');
 
       res.json({
         draw,
@@ -781,7 +748,7 @@ class BookingController {
   // Remove service
   static async removeService(req, res) {
     try {
-      const { bookingId, serviceId, isExtension, isTransport } = req.body;
+      const { bookingId, serviceId, isExtension, isTransport, removalReason } = req.body;
 
       if (!bookingId || serviceId === undefined) {
         return res.status(400).json({ 
@@ -793,8 +760,12 @@ class BookingController {
         bookingId,
         serviceId,
         isExtension,
-        isTransport
+        isTransport,
+        removalReason,
+        userId: req.user?.userId || null
       });
+
+      console.log('Remove service - User ID:', req.user?.userId, 'Removal reason:', removalReason);
 
       res.json({
         success: true,

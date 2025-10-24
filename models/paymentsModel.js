@@ -26,11 +26,13 @@ const paymentsModel = {
         p.REMARKS,
         b.CONFIRMATION_NUMBER,
         c.NAME AS GUEST_NAME,
-        r.ROOM_NUMBER
+        r.ROOM_NUMBER,
+        u.FULLNAME AS NAME
       FROM payments p
       LEFT JOIN booking b ON b.IDNo = p.BOOKING_ID
       LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
       LEFT JOIN room r ON r.IDNo = b.ROOM_ID
+      LEFT JOIN user_info u ON u.IDNo = p.ENCODED_BY
       ${whereSql}
       ORDER BY p.PAYMENT_DATE DESC
       LIMIT ?`;
@@ -143,6 +145,8 @@ const paymentsModel = {
          bill.CANCELLATION_PENALTY,
          bill.RESERVATION_FEE,
          bill.DISCOUNT_AMOUNT,
+         bill.PAYMENT_STATUS AS ROOM_PAYMENT_STATUS,
+         bill.IDNo AS BILLING_ID,
          COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) AS ROOM_TOTAL,
          COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0) AS SERVICES_TOTAL,
          COALESCE((SELECT SUM(be.COST) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo), 0) AS EXTENSIONS_TOTAL,
@@ -178,10 +182,11 @@ const paymentsModel = {
     if (!booking) return null;
 
     const [services] = await pool.promise().query(
-      `SELECT s.SERVICE_NAME, bs.QTY, bs.TOTAL_COST, bs.STATUS
+      `SELECT s.SERVICE_NAME, bs.QTY, bs.TOTAL_COST, bs.STATUS, bs.ACTIVE, bs.EDITED_DT, bs.EDITED_BY, bs.REMARKS, bs.IDNo AS BOOKING_SERVICE_ID, u.FULLNAME AS EDITED_BY_NAME
        FROM booking_service bs
        JOIN services s ON bs.SERVICE_ID = s.IDNo
-       WHERE bs.BOOKING_ID = ? AND bs.ACTIVE = 1`, [bookingId]
+       LEFT JOIN user_info u ON u.IDNo = bs.EDITED_BY
+       WHERE bs.BOOKING_ID = ?`, [bookingId]
     );
 
     const [extensions] = await pool.promise().query(
@@ -191,10 +196,11 @@ const paymentsModel = {
     );
 
     const [payments] = await pool.promise().query(
-      `SELECT AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, REMARKS
-       FROM payments
-       WHERE BOOKING_ID = ?
-       ORDER BY PAYMENT_DATE DESC`, [bookingId]
+      `SELECT p.AMOUNT_PAID, p.PAYMENT_METHOD, p.PAYMENT_TYPE, p.PAYMENT_DATE, p.REMARKS, p.BILLING_ID, p.BOOKING_SERVICE_ID, u.FULLNAME AS NAME
+       FROM payments p
+       LEFT JOIN user_info u ON u.IDNo = p.ENCODED_BY
+       WHERE p.BOOKING_ID = ?
+       ORDER BY p.PAYMENT_DATE DESC`, [bookingId]
     );
 
     return { booking, services, extensions, payments };

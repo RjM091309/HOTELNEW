@@ -320,8 +320,11 @@ async function createDynamicRoomModal(bookingId, event, options) {
                 
                 <!-- Room Reservation Details -->
                 <div class="card shadow-sm mb-3" style="background-color: #ffffff; border: 1px solid #dee2e6;">
-                    <div class="card-header py-2" style="background-color: #ffffff; border-bottom: 1px solid #dee2e6; color: #495057;">
+                    <div class="card-header py-2 d-flex justify-content-between align-items-center" style="background-color: #ffffff; border-bottom: 1px solid #dee2e6; color: #495057;">
                         <h6 class="mb-0">Room Reservation Details</h6>
+                        <button type="button" class="btn btn-info btn-sm" onclick="showPayments('${bookingId}')">
+                            <i class="fas fa-credit-card me-1"></i>Payments
+                        </button>
                     </div>
                     <div class="card-body p-2" style="background-color: #ffffff;">
                         <div class="row">
@@ -469,6 +472,7 @@ async function createDynamicRoomModal(bookingId, event, options) {
             
             <!-- Modal Footer -->
             <div class="modal-footer py-2" style="background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%); border-top: 1px solid #495057;">
+               
                 <button type="button" class="btn btn-primary" onclick="showBilling('${bookingId}')">Billing</button>
                 <button type="button" class="btn btn-secondary" onclick="viewFullBookingDetails('${bookingId}')">
                     <i class="fas fa-file-alt me-2"></i>View Details
@@ -1503,14 +1507,47 @@ if (!serviceToRemove || !serviceToRemove.SERVICE_ID) {
 }
 
 Swal.fire({
-    title: 'Are you sure?',
-    text: "Are you sure to remove this service?",
-    icon: 'warning',
+    title: 'Remove Service',
+    text: "Please provide a reason for removing this service:",
+    input: 'text',
+    inputPlaceholder: 'Enter reason for removal...',
+    inputValidator: (value) => {
+        if (!value || value.trim() === '') {
+            return 'You need to provide a reason!';
+        }
+    },
     showCancelButton: true,
     confirmButtonText: 'Yes, remove it!',
-    cancelButtonText: 'Cancel'
+    cancelButtonText: 'Cancel',
+    icon: 'warning',
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    focusConfirm: false,
+    preConfirm: () => {
+        const input = Swal.getInput();
+        if (!input || !input.value || input.value.trim() === '') {
+            Swal.showValidationMessage('You need to provide a reason!');
+            return false;
+        }
+        return input.value;
+    },
+    didOpen: () => {
+        setTimeout(() => {
+            const input = Swal.getInput();
+            if (input) {
+                input.focus();
+                input.select();
+                // Prevent focus from going to other elements
+                input.addEventListener('blur', (e) => {
+                    e.preventDefault();
+                    input.focus();
+                });
+            }
+        }, 200);
+    }
 }).then((result) => {
     if (result.isConfirmed) {
+        const removalReason = result.value;
         const bookingIdInput = document.getElementById(`bookingID-${bookingId}`);
         const bookingIdValue = bookingIdInput ? bookingIdInput.value : null;
         const isExtension = serviceToRemove.SERVICE_NAME === 'Extended Day' || serviceToRemove.SERVICE_ID === -999;
@@ -1525,7 +1562,8 @@ Swal.fire({
                 bookingId: bookingIdValue,
                 serviceId: serviceToRemove.SERVICE_ID,
                 isExtension: isExtension,
-                isTransport: isTransport
+                isTransport: isTransport,
+                removalReason: removalReason
             })
         })
         .then(response => response.json())
@@ -1784,6 +1822,744 @@ function showBilling(bookingId) {
     if (window.showBilling) return window.showBilling(bookingId);
     console.error('Global showBilling is not available');
 }
+
+// Function to show payments
+function showPayments(bookingId) {
+    // Remove any existing payments modal
+    const existingModal = document.getElementById(`paymentsModal_${bookingId}`);
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    // Create payments modal HTML
+    const modalHTML = `
+    <div class="modal fade" id="paymentsModal_${bookingId}" tabindex="-1" aria-labelledby="paymentsModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content" style="background-color: #ffffff; border: 4px solid transparent;">
+                
+                <!-- Modal Header -->
+                <div class="modal-header py-2" style="background-color: #0c2a42; border-bottom: 1px solid #eeeeee;">
+                    <h6 class="modal-title mb-0" style="color: #ffffff;">
+                        <i class="fas fa-credit-card me-2"></i>
+                        <strong>Payment Details</strong>
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                
+                <!-- Modal Body -->
+                <div class="modal-body p-3" style="background-color: #ffffff; color: #495057;">
+                    <!-- Loading indicator -->
+                    <div id="payments-loading-${bookingId}" class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Loading payment details...</p>
+                    </div>
+                    
+                    
+                    <!-- Payment Items Table -->
+                    <div id="payment-items-${bookingId}" style="display: none;">
+                        <h6 class="mb-3">
+                            <i class="fas fa-list me-1"></i>Payment Items
+                        </h6>
+                        <div class="table-responsive">
+                            <table class="table table-bordered" style="background-color: white !important;">
+                                <thead style="background-color: white !important;">
+                                    <tr style="background-color: white !important;">
+                                        <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Item</th>
+                                        <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Amount</th>
+                                        <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Status</th>
+                                        <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Method</th>
+                                        <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Remarks</th>
+                                        <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Payment Date</th>
+                                        <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Processed By</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="payment-items-table-${bookingId}" style="background-color: white !important;">
+                                    <!-- Payment items will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Payment Summary at Bottom -->
+                        <div id="payment-summary-${bookingId}" class="mt-3" style="display: none;">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="text-center py-1">
+                            <div class="text-primary mb-0" style="font-size: 0.7rem;">
+                                <i class="fas fa-receipt me-1"></i>Total Amount
+                            </div>
+                            <div class="text-primary mb-0" id="total-amount-${bookingId}" style="font-size: 1rem;">₱0.00</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center py-1">
+                            <div class="text-success mb-0" style="font-size: 0.7rem;">
+                                <i class="fas fa-check-circle me-1"></i>Total Paid
+                            </div>
+                            <div class="text-success mb-0" id="total-paid-${bookingId}" style="font-size: 1rem;">₱0.00</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center py-1">
+                            <div class="text-warning mb-0" style="font-size: 0.7rem;">
+                                <i class="fas fa-tag me-1"></i>Discount
+                            </div>
+                            <div class="text-warning mb-0" id="total-discount-${bookingId}" style="font-size: 1rem;">₱0.00</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center py-1">
+                            <div class="text-danger mb-0" style="font-size: 0.7rem;">
+                                <i class="fas fa-exclamation-circle me-1"></i>Balance
+                            </div>
+                            <div class="text-danger mb-0" id="balance-due-${bookingId}" style="font-size: 1rem;">₱0.00</div>
+                        </div>
+                    </div>
+                </div>
+                        </div>
+                    </div>
+                    
+                    <!-- No payments message -->
+                    <div id="no-payments-${bookingId}" style="display: none;" class="text-center py-4">
+                        <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
+                        <h6 class="text-muted">No payment items found</h6>
+                        <p class="text-muted small">All charges will appear here once they are recorded.</p>
+                    </div>
+                </div>
+                
+                <!-- Modal Footer -->
+                <div class="modal-footer py-2" style="background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%); border-top: 1px solid #495057;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    `;
+
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    // Show the modal
+    const modal = document.getElementById(`paymentsModal_${bookingId}`);
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+
+    // Load payment data
+    loadPaymentData(bookingId);
+
+    // Clean up modal when hidden
+    modal.addEventListener('hidden.bs.modal', function () {
+        modal.remove();
+    });
+}
+
+// Function to load payment data
+async function loadPaymentData(bookingId) {
+    try {
+        // Show loading indicator
+        const loadingDiv = document.getElementById(`payments-loading-${bookingId}`);
+        const summaryDiv = document.getElementById(`payment-summary-${bookingId}`);
+        const itemsDiv = document.getElementById(`payment-items-${bookingId}`);
+        const noPaymentsDiv = document.getElementById(`no-payments-${bookingId}`);
+        
+        if (loadingDiv) loadingDiv.style.display = 'block';
+        if (summaryDiv) summaryDiv.style.display = 'none';
+        if (itemsDiv) itemsDiv.style.display = 'none';
+        if (noPaymentsDiv) noPaymentsDiv.style.display = 'none';
+
+        // Try to fetch data from APIs, with fallback to mock data
+        let allPaymentItems = [];
+        let hasApiData = false;
+
+        try {
+            // Fetch both payments and breakdown data
+            const [paymentsResponse, breakdownResponse] = await Promise.all([
+                fetch(`/payments/get-payments/${bookingId}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                }),
+                fetch(`/payments/breakdown/${bookingId}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+            ]);
+
+            if (paymentsResponse.ok) {
+                const paymentsData = await paymentsResponse.json();
+                console.log('Payments API Response:', paymentsData);
+                
+                // Add payments from payments table (exclude discount and reservation_fee)
+                if (paymentsData && paymentsData.length > 0) {
+                    paymentsData.forEach(payment => {
+                        // Skip discount and reservation_fee entries
+                        if (payment.PAYMENT_TYPE && 
+                            (payment.PAYMENT_TYPE.toLowerCase() === 'discount' || 
+                             payment.PAYMENT_TYPE.toLowerCase() === 'reservation_fee')) {
+                            return; // Skip this payment
+                        }
+                        
+                allPaymentItems.push({
+                    type: 'payment',
+                    item_name: getPaymentTypeName(payment.PAYMENT_TYPE),
+                    description: payment.REMARKS || payment.PAYMENT_METHOD || 'Payment',
+                    amount: parseFloat(payment.AMOUNT_PAID || 0),
+                    status: payment.AMOUNT_PAID > 0 && payment.PAYMENT_DATE ? 'paid' : 'unpaid',
+                    payment_date: payment.PAYMENT_DATE,
+                    icon: getPaymentIcon(payment.PAYMENT_TYPE),
+                    processed_by: payment.NAME || 'System',
+                    payment_method: payment.PAYMENT_METHOD || '-',
+                    remarks: payment.REMARKS || '-'
+                });
+                    });
+                    hasApiData = true;
+                }
+            }
+
+            if (breakdownResponse.ok) {
+                const breakdownData = await breakdownResponse.json();
+                console.log('Breakdown API Response:', breakdownData);
+                
+                // Add breakdown items if available
+                if (breakdownData && breakdownData.success) {
+                    // Add room cost
+                    if (breakdownData.booking && breakdownData.booking.ROOM_TOTAL > 0) {
+                        // Use actual payment status from billing table
+                        const roomStatus = breakdownData.booking.ROOM_PAYMENT_STATUS || 'unpaid';
+                        
+                        // Find corresponding payment for room cost using BILLING_ID
+                        let roomPayment = null;
+                        if (breakdownData.payments && breakdownData.payments.length > 0) {
+                            // First try to find by BILLING_ID if available
+                            if (breakdownData.booking.BILLING_ID) {
+                                roomPayment = breakdownData.payments.find(p => 
+                                    p.BILLING_ID && p.BILLING_ID == breakdownData.booking.BILLING_ID
+                                );
+                            }
+                            
+                            // If not found by BILLING_ID, try by PAYMENT_TYPE
+                            if (!roomPayment) {
+                                roomPayment = breakdownData.payments.find(p => 
+                                    p.PAYMENT_TYPE === 'room_payment' || 
+                                    p.PAYMENT_TYPE === 'room'
+                                );
+                            }
+                        }
+                        
+                        allPaymentItems.push({
+                            type: 'room',
+                            item_name: 'Room Cost',
+                            description: `Room ${breakdownData.booking.ROOM_NUMBER || 'N/A'} - ${breakdownData.booking.QTY || 0} day(s)`,
+                            amount: parseFloat(breakdownData.booking.ROOM_TOTAL || 0),
+                            status: roomStatus,
+                            payment_date: roomPayment ? roomPayment.PAYMENT_DATE : null,
+                            icon: 'fa-bed',
+                            processed_by: roomPayment ? roomPayment.NAME || 'System' : '-',
+                            payment_method: roomPayment ? roomPayment.PAYMENT_METHOD : '-',
+                            remarks: roomPayment ? roomPayment.REMARKS : '-'
+                        });
+                    }
+
+                    // Add services
+                    if (breakdownData.services && breakdownData.services.length > 0) {
+                        breakdownData.services.forEach(service => {
+                            // Check if service is cancelled (ACTIVE = 0)
+                            const isCancelled = service.ACTIVE === 0;
+                            
+                            // Use actual status from booking_service table, but show "Cancelled" if ACTIVE = 0
+                            const serviceStatus = isCancelled ? 'Cancelled' : (service.STATUS || 'unpaid');
+                            
+                            // Find corresponding payment for this service using specific BOOKING_SERVICE_ID
+                            let servicePayment = null;
+                            if (!isCancelled && breakdownData.payments && breakdownData.payments.length > 0) {
+                                // Find by specific BOOKING_SERVICE_ID
+                                if (service.BOOKING_SERVICE_ID) {
+                                    servicePayment = breakdownData.payments.find(p => 
+                                        p.BOOKING_SERVICE_ID && p.BOOKING_SERVICE_ID == service.BOOKING_SERVICE_ID
+                                    );
+                                }
+                            }
+                            
+                            allPaymentItems.push({
+                                type: 'service',
+                                item_name: service.SERVICE_NAME || 'Service',
+                                description: `Service - Qty: ${service.QTY || 1}`,
+                                amount: parseFloat(service.TOTAL_COST || 0),
+                                status: serviceStatus,
+                                payment_date: isCancelled ? service.EDITED_DT : (servicePayment ? servicePayment.PAYMENT_DATE : null),
+                                icon: 'fa-concierge-bell',
+                                processed_by: isCancelled ? service.EDITED_BY_NAME : (servicePayment ? servicePayment.NAME || 'System' : '-'),
+                                payment_method: isCancelled ? '-' : (servicePayment ? servicePayment.PAYMENT_METHOD : '-'),
+                                remarks: isCancelled ? service.REMARKS : (servicePayment ? servicePayment.REMARKS : '-'),
+                                isCancelled: isCancelled // Add flag to identify cancelled services
+                            });
+                        });
+                    }
+
+                    // Add extensions
+                    if (breakdownData.extensions && breakdownData.extensions.length > 0) {
+                        breakdownData.extensions.forEach(extension => {
+                            const extensionStatus = extension.PAYMENT_STATUS || 'unpaid';
+                            
+                            // Find corresponding payment for this extension
+                            let extensionPayment = null;
+                            if (breakdownData.payments && breakdownData.payments.length > 0) {
+                                extensionPayment = breakdownData.payments.find(p => 
+                                    p.PAYMENT_TYPE === 'extension_payment' || 
+                                    p.PAYMENT_TYPE === 'extension' ||
+                                    (p.BOOKING_EXTENSION_ID && p.BOOKING_EXTENSION_ID > 0)
+                                );
+                            }
+                            
+                            allPaymentItems.push({
+                                type: 'extension',
+                                item_name: 'Room Extension',
+                                description: `Extended stay - ${extension.QTY || 0} day(s)`,
+                                amount: parseFloat(extension.COST || 0),
+                                status: extensionStatus,
+                                payment_date: extensionPayment ? extensionPayment.PAYMENT_DATE : null,
+                                icon: 'fa-calendar-plus',
+                                processed_by: extensionPayment ? extensionPayment.NAME || 'System' : '-',
+                                payment_method: extensionPayment ? extensionPayment.PAYMENT_METHOD : '-',
+                                remarks: extensionPayment ? extensionPayment.REMARKS : '-'
+                            });
+                        });
+                    }
+                    hasApiData = true;
+                }
+            }
+        } catch (apiError) {
+            console.warn('API not available, using fallback data:', apiError);
+        }
+
+        // If no API data, use fallback data from the current modal
+        if (!hasApiData) {
+            console.log('Using fallback data for booking:', bookingId);
+            allPaymentItems = getFallbackPaymentData(bookingId);
+        }
+
+        // Hide loading indicator
+        if (loadingDiv) loadingDiv.style.display = 'none';
+
+        if (allPaymentItems.length > 0) {
+            displayPaymentData(bookingId, allPaymentItems);
+        } else {
+            // Show no payments message
+            if (noPaymentsDiv) noPaymentsDiv.style.display = 'block';
+        }
+
+    } catch (error) {
+        console.error('Error loading payment data:', error);
+        
+        // Hide loading indicator
+        const loadingDiv = document.getElementById(`payments-loading-${bookingId}`);
+        if (loadingDiv) loadingDiv.style.display = 'none';
+        
+        // Try fallback data
+        try {
+            const fallbackData = getFallbackPaymentData(bookingId);
+            if (fallbackData.length > 0) {
+                displayPaymentData(bookingId, fallbackData);
+                return;
+            }
+        } catch (fallbackError) {
+            console.error('Fallback data also failed:', fallbackError);
+        }
+        
+        // Show error message
+        const noPaymentsDiv = document.getElementById(`no-payments-${bookingId}`);
+        if (noPaymentsDiv) {
+            noPaymentsDiv.innerHTML = `
+                <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+                <h6 class="text-warning">Error Loading Payments</h6>
+                <p class="text-muted small">Unable to load payment details. Please try again.</p>
+            `;
+            noPaymentsDiv.style.display = 'block';
+        }
+    }
+}
+
+// Function to get fallback payment data from current modal
+function getFallbackPaymentData(bookingId) {
+    const fallbackItems = [];
+    
+    try {
+        // Get room cost from the modal
+        const roomCostElement = document.getElementById(`total-room-cost-${bookingId}`);
+        const roomRateElement = document.getElementById(`room-rate-${bookingId}`);
+        const totalDaysElement = document.getElementById(`total-days-${bookingId}`);
+        const roomTypeElement = document.getElementById(`room-type-${bookingId}`);
+        
+        if (roomCostElement && roomRateElement && totalDaysElement) {
+            const roomCostText = roomCostElement.textContent;
+            const roomCost = parseFloat(roomCostText.replace(/[^\d.]/g, '')) || 0;
+            const roomRate = parseFloat(roomRateElement.textContent.replace(/[^\d.]/g, '')) || 0;
+            const days = parseInt(totalDaysElement.textContent) || 0;
+            const roomType = roomTypeElement ? roomTypeElement.textContent : 'Room';
+            
+            if (roomCost > 0) {
+                fallbackItems.push({
+                    type: 'room',
+                    item_name: 'Room Cost',
+                    description: `${roomType} - ${days} day(s) @ ₱${roomRate.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`,
+                    amount: roomCost,
+                    status: 'unpaid', // Default to unpaid
+                    payment_date: null,
+                    icon: 'fa-bed',
+                    processed_by: '-',
+                    payment_method: '-',
+                    remarks: '-'
+                });
+            }
+        }
+
+        // Get services from the added services list
+        const servicesList = document.getElementById(`added-services-list-${bookingId}`);
+        if (servicesList) {
+            const serviceItems = servicesList.querySelectorAll('.service-item');
+            serviceItems.forEach(item => {
+                const serviceName = item.querySelector('.service-name')?.textContent || 'Service';
+                const serviceCost = item.querySelector('.service-cost')?.textContent || '₱0.00';
+                const cost = parseFloat(serviceCost.replace(/[^\d.]/g, '')) || 0;
+                
+                if (cost > 0) {
+                    fallbackItems.push({
+                        type: 'service',
+                        item_name: serviceName,
+                        description: 'Additional Service',
+                        amount: cost,
+                        status: 'unpaid',
+                        payment_date: null,
+                        icon: 'fa-concierge-bell',
+                        processed_by: '-',
+                        payment_method: '-',
+                        remarks: '-'
+                    });
+                }
+            });
+        }
+
+        // Get grand total
+        const grandTotalElement = document.getElementById(`grand-total-${bookingId}`);
+        if (grandTotalElement) {
+            const grandTotalText = grandTotalElement.textContent;
+            const grandTotal = parseFloat(grandTotalText.replace(/[^\d.]/g, '')) || 0;
+            
+            // If we have a grand total but no room cost item, add it
+            if (grandTotal > 0 && !fallbackItems.some(item => item.type === 'room')) {
+                fallbackItems.push({
+                    type: 'room',
+                    item_name: 'Total Charges',
+                    description: 'All booking charges',
+                    amount: grandTotal,
+                    status: 'unpaid',
+                    payment_date: null,
+                    icon: 'fa-receipt'
+                });
+            }
+        }
+
+    } catch (error) {
+        console.error('Error getting fallback data:', error);
+    }
+    
+    return fallbackItems;
+}
+
+// Helper function to get payment type name
+function getPaymentTypeName(paymentType) {
+    if (!paymentType) return 'Payment';
+    
+    switch (paymentType.toLowerCase()) {
+        case 'room': return 'Room Payment';
+        case 'service': return 'Service Payment';
+        case 'extension': return 'Extension Payment';
+        default: return paymentType;
+    }
+}
+
+// Helper function to get payment icon
+function getPaymentIcon(paymentType) {
+    if (!paymentType) return 'fa-receipt';
+    
+    switch (paymentType.toLowerCase()) {
+        case 'room': return 'fa-bed';
+        case 'service': return 'fa-concierge-bell';
+        case 'extension': return 'fa-calendar-plus';
+        default: return 'fa-receipt';
+    }
+}
+
+// Function to display payment data
+function displayPaymentData(bookingId, payments) {
+    const summaryDiv = document.getElementById(`payment-summary-${bookingId}`);
+    const itemsDiv = document.getElementById(`payment-items-${bookingId}`);
+    const tableBody = document.getElementById(`payment-items-table-${bookingId}`);
+
+    if (!payments || payments.length === 0) {
+        const noPaymentsDiv = document.getElementById(`no-payments-${bookingId}`);
+        if (noPaymentsDiv) noPaymentsDiv.style.display = 'block';
+        return;
+    }
+
+    // Calculate totals
+    let totalPaid = 0;
+    let totalAmount = 0;
+    let balanceDue = 0;
+
+    // Clear existing table rows
+    if (tableBody) tableBody.innerHTML = '';
+
+    // Sort payments by type and amount
+    const sortedPayments = payments.sort((a, b) => {
+        // Sort by type: room first, then services, then extensions, then payments
+        const typeOrder = { 'room': 1, 'service': 2, 'extension': 3, 'payment': 4 };
+        const aOrder = typeOrder[a.type] || 5;
+        const bOrder = typeOrder[b.type] || 5;
+        
+        if (aOrder !== bOrder) {
+            return aOrder - bOrder;
+        }
+        
+        // Then sort by amount (highest first)
+        return b.amount - a.amount;
+    });
+
+    // Process each payment item
+    sortedPayments.forEach((payment, index) => {
+        const amount = parseFloat(payment.amount || 0);
+        const isPaid = payment.status === 'paid';
+        const isPartial = payment.status === 'partial';
+        
+        // Only add to totalAmount if it's not a payment record (to avoid double counting)
+        // AND if it's not a cancelled service
+        if (payment.type !== 'payment' && !payment.isCancelled) {
+            totalAmount += amount;
+        }
+        
+        // Only add to totalPaid if it's an actual payment record
+        if (payment.type === 'payment' && (isPaid || isPartial)) {
+            totalPaid += amount;
+        }
+
+        // Skip displaying Payment records if there's a corresponding original item
+        if (payment.type === 'payment') {
+            // Skip Room Payment if there's a Room Cost (regardless of amount difference)
+            if (payment.item_name && payment.item_name.toLowerCase().includes('room')) {
+                const hasRoomCost = sortedPayments.some(p => 
+                    p.type === 'room'
+                );
+                if (hasRoomCost) {
+                    return; // Skip displaying this room payment
+                }
+            }
+            
+            // Skip Service Payment if there's a Service (regardless of amount difference)
+            if (payment.item_name && payment.item_name.toLowerCase().includes('service')) {
+                const hasService = sortedPayments.some(p => 
+                    p.type === 'service'
+                );
+                if (hasService) {
+                    return; // Skip displaying this service payment
+                }
+            }
+        }
+
+        // Create simple table row with white background
+        const row = document.createElement('tr');
+        row.style.backgroundColor = 'white !important';
+        row.style.setProperty('background-color', 'white', 'important');
+        
+        // Format payment date (date and time)
+        let paymentDateText = '-';
+        if (payment.payment_date) {
+            try {
+                const paymentDate = new Date(payment.payment_date);
+                paymentDateText = paymentDate.toLocaleString('en-PH', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                });
+            } catch (error) {
+                paymentDateText = payment.payment_date;
+            }
+        }
+
+        // Status text and styling
+        let statusText, statusClass;
+        if (payment.isCancelled) {
+            statusText = 'Cancelled';
+            statusClass = 'text-secondary';
+        } else if (isPaid) {
+            statusText = 'Paid';
+            statusClass = 'text-success';
+        } else if (isPartial) {
+            statusText = 'Partial';
+            statusClass = 'text-warning';
+        } else {
+            statusText = 'Unpaid';
+            statusClass = 'text-danger';
+        }
+
+            row.innerHTML = `
+                <td style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">
+                    ${payment.item_name || 'Payment Item'}
+                </td>
+                <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right; color: black; background-color: white !important;">
+                    ₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                </td>
+                <td style="border: 1px solid #dee2e6; padding: 8px; text-align: center; background-color: white !important;">
+                    <span class="${statusClass}">${statusText}</span>
+                </td>
+                <td style="border: 1px solid #dee2e6; padding: 8px; text-align: center; color: black; background-color: white !important;">
+                    ${payment.payment_method || '-'}
+                </td>
+                <td style="border: 1px solid #dee2e6; padding: 8px; text-align: center; color: black; background-color: white !important;">
+                    ${payment.remarks || '-'}
+                </td>
+                <td style="border: 1px solid #dee2e6; padding: 8px; text-align: center; color: black; background-color: white !important;">
+                    ${paymentDateText}
+                </td>
+                <td style="border: 1px solid #dee2e6; padding: 8px; text-align: center; color: black; background-color: white !important;">
+                    ${payment.processed_by || '-'}
+                </td>
+            `;
+        
+        if (tableBody) tableBody.appendChild(row);
+    });
+
+    // Calculate balance due (including discount)
+    let totalDiscount = 0;
+    
+    // Get discount from the modal if available
+    const discountElement = document.getElementById(`discount-amount-${bookingId}`);
+    if (discountElement) {
+        const discountText = discountElement.textContent;
+        totalDiscount = parseFloat(discountText.replace(/[^\d.]/g, '')) || 0;
+    }
+    
+    balanceDue = totalAmount - totalPaid - totalDiscount;
+
+
+    // Update summary with smaller styling
+    const totalAmountElement = document.getElementById(`total-amount-${bookingId}`);
+    
+    if (totalAmountElement) {
+        totalAmountElement.textContent = `₱${totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
+    }
+
+    const totalPaidElement = document.getElementById(`total-paid-${bookingId}`);
+    if (totalPaidElement) {
+        totalPaidElement.textContent = `₱${totalPaid.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
+    }
+
+    const totalDiscountElement = document.getElementById(`total-discount-${bookingId}`);
+    if (totalDiscountElement) {
+        totalDiscountElement.textContent = `₱${totalDiscount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
+    }
+
+    const balanceDueElement = document.getElementById(`balance-due-${bookingId}`);
+    if (balanceDueElement) {
+        balanceDueElement.textContent = `₱${balanceDue.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
+    }
+
+    // Show/hide discount section based on discount amount
+    const discountSection = document.querySelector(`#payment-summary-${bookingId} .col-md-3:nth-child(3)`);
+    if (discountSection) {
+        if (totalDiscount > 0) {
+            discountSection.style.display = 'block';
+            // Adjust column classes when discount is shown (4 columns)
+            const summaryRow = document.querySelector(`#payment-summary-${bookingId} .row`);
+            if (summaryRow) {
+                summaryRow.querySelectorAll('.col-md-3').forEach(col => {
+                    col.className = 'col-md-3';
+                });
+            }
+        } else {
+            discountSection.style.display = 'none';
+            // Adjust column classes when discount is hidden (3 columns)
+            const summaryRow = document.querySelector(`#payment-summary-${bookingId} .row`);
+            if (summaryRow) {
+                summaryRow.querySelectorAll('.col-md-3').forEach(col => {
+                    if (!col.style.display || col.style.display !== 'none') {
+                        col.className = 'col-md-4';
+                    }
+                });
+            }
+        }
+    }
+
+
+    // Show summary and items
+    if (summaryDiv) summaryDiv.style.display = 'block';
+    if (itemsDiv) itemsDiv.style.display = 'block';
+}
+
+// Test function for Payments feature
+function testPaymentsFeature(bookingId = '123') {
+    console.log('🧪 Testing Payments Feature for Booking ID:', bookingId);
+    
+    // Test 1: Test API endpoints
+    console.log('📡 Testing API endpoints...');
+    
+    fetch(`/payments/get-payments/${bookingId}`)
+        .then(response => {
+            console.log('✅ Payments API Status:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('📊 Payments Data:', data);
+        })
+        .catch(error => {
+            console.log('❌ Payments API Error:', error);
+        });
+    
+    fetch(`/payments/breakdown/${bookingId}`)
+        .then(response => {
+            console.log('✅ Breakdown API Status:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('📊 Breakdown Data:', data);
+        })
+        .catch(error => {
+            console.log('❌ Breakdown API Error:', error);
+        });
+    
+    // Test 2: Test fallback data
+    console.log('🔄 Testing fallback data...');
+    try {
+        const fallbackData = getFallbackPaymentData(bookingId);
+        console.log('📊 Fallback Data:', fallbackData);
+    } catch (error) {
+        console.log('❌ Fallback Data Error:', error);
+    }
+    
+    // Test 3: Test helper functions
+    console.log('🔧 Testing helper functions...');
+    console.log('Payment Type Names:', {
+        'room': getPaymentTypeName('room'),
+        'service': getPaymentTypeName('service'),
+        'extension': getPaymentTypeName('extension'),
+        'unknown': getPaymentTypeName('unknown')
+    });
+    
+    console.log('Payment Icons:', {
+        'room': getPaymentIcon('room'),
+        'service': getPaymentIcon('service'),
+        'extension': getPaymentIcon('extension'),
+        'unknown': getPaymentIcon('unknown')
+    });
+    
+    console.log('✅ Payments Feature Test Complete!');
+    console.log('💡 To test the modal, click the Payments button in any room modal.');
+}
+
+// Make test function available globally
+window.testPaymentsFeature = testPaymentsFeature;
 
 // Real working extend modal function
 function openExtendModal(roomId, checkoutDate, bookingId) {

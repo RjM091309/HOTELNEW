@@ -1628,7 +1628,7 @@ class BookingModel {
 
   // Remove service (handles regular services, extensions, and transport)
   static async removeService(params) {
-    const { bookingId, serviceId, isExtension, isTransport } = params;
+    const { bookingId, serviceId, isExtension, isTransport, removalReason, userId } = params;
 
     try {
       // Get connection from pool for transaction
@@ -1758,14 +1758,16 @@ class BookingModel {
 
           const totalCost = results[0].TOTAL_COST;
 
+          console.log('BookingModel.removeService - userId:', userId, 'removalReason:', removalReason);
+
           const updateActiveQuery = `
             UPDATE booking_service
-            SET ACTIVE = 0
+            SET ACTIVE = 0, REMARKS = ?, EDITED_BY = ?, EDITED_DT = NOW()
             WHERE BOOKING_ID = ? AND SERVICE_ID = ?
           `;
 
           await new Promise((resolve, reject) => {
-            connection.query(updateActiveQuery, [bookingId, serviceId], (err) => {
+            connection.query(updateActiveQuery, [removalReason || '', userId, bookingId, serviceId], (err) => {
               if (err) reject(err);
               else resolve();
             });
@@ -6857,3 +6859,5 @@ class BookingModel {
 }
 
 module.exports = BookingModel;
+
+
