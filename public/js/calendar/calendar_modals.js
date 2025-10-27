@@ -305,54 +305,96 @@ function showPendingModal(event) {
       </div>
     `,
     icon: 'info',
-    cancelButtonText: 'Edit Details',
-    denyButtonText: 'View Details',
-    showCancelButton: true,
-    showDenyButton: true,
-    cancelButtonColor: '#007bff', // Blue for edit details
-    denyButtonColor: '#28a745', // Green for View Details
+    showCancelButton: false,
+    showDenyButton: false,
+    showConfirmButton: false,
     background: '#2a3135',
     color: '#ffffff',
-    width: '500px'
+    width: '500px',
+    footer: `
+      <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+        <button id="btn-view-details" class="swal2-styled" style="background-color: #28a745; border: none; padding: 10px 20px; border-radius: 4px; color: white; cursor: pointer; font-weight: 500;">
+          General Info
+        </button>
+        <button id="btn-edit-details" class="swal2-styled" style="background-color: #007bff; border: none; padding: 10px 20px; border-radius: 4px; color: white; cursor: pointer; font-weight: 500;">
+          Edit Details
+        </button>
+      </div>
+    `
   };
 
   // Add check-in button only if check-in is available
   if (canCheckIn) {
-    modalConfig.confirmButtonText = 'Check-In Now';
-    modalConfig.showConfirmButton = true;
-    modalConfig.confirmButtonColor = '#e53935'; // Red for regular check-in
-  } else {
-    modalConfig.showConfirmButton = false;
+    modalConfig.footer = `
+      <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+        <button id="btn-view-details" class="swal2-styled" style="background-color: #28a745; border: none; padding: 10px 20px; border-radius: 4px; color: white; cursor: pointer; font-weight: 500;">
+          General Info
+        </button>
+        <button id="btn-edit-details" class="swal2-styled" style="background-color: #007bff; border: none; padding: 10px 20px; border-radius: 4px; color: white; cursor: pointer; font-weight: 500;">
+          Edit Details
+        </button>
+        <button id="btn-checkin" class="swal2-styled" style="background-color: #e53935; border: none; padding: 10px 20px; border-radius: 4px; color: white; cursor: pointer; font-weight: 500;">
+          Check-In Now
+        </button>
+      </div>
+    `;
   }
 
   Swal.fire(modalConfig).then((result) => {
-    if (result.isConfirmed && canCheckIn) {
-      // Show confirmation dialog
-      Swal.fire({
-        title: 'Confirm Check-In',
-        text: 'Are you sure you want to check-in this guest?',
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'Yes, Check-In',
-        cancelButtonText: 'Cancel',
-        confirmButtonColor: '#28a745', // Green for check-in
-        cancelButtonColor: '#6c757d',
-        background: '#2a3135',
-        color: '#ffffff'
-      }).then((confirmResult) => {
-        if (confirmResult.isConfirmed) {
-          // Process the check-in
-          checkInReservation(bookingId, event);
+    // This will handle the modal closing but we handle buttons with event listeners
+  });
+
+  // Add event listeners for custom buttons after modal is shown
+  setTimeout(() => {
+    // General Info button - opens dynamicRoomModal
+    const viewDetailsBtn = document.getElementById('btn-view-details');
+    if (viewDetailsBtn) {
+      viewDetailsBtn.addEventListener('click', () => {
+        Swal.close();
+        // Open the dynamic room modal
+        if (typeof openRoomMenuModal === 'function') {
+          openRoomMenuModal(bookingId, event);
+        } else {
+          console.error('openRoomMenuModal function not found');
         }
       });
-    } else if (result.dismiss === Swal.DismissReason.cancel) {
-      // Edit Booking button clicked
-      editBookingFromCalendar(bookingId);
-    } else if (result.dismiss === Swal.DismissReason.deny) {
-      // View Details button clicked
-      viewFullBookingDetails(bookingId);
     }
-  });
+
+    // Edit Details button
+    const editDetailsBtn = document.getElementById('btn-edit-details');
+    if (editDetailsBtn) {
+      editDetailsBtn.addEventListener('click', () => {
+        Swal.close();
+        editBookingFromCalendar(bookingId);
+      });
+    }
+
+    // Check-In button (only if available)
+    const checkInBtn = document.getElementById('btn-checkin');
+    if (checkInBtn && canCheckIn) {
+      checkInBtn.addEventListener('click', () => {
+        Swal.close();
+        // Show confirmation dialog
+        Swal.fire({
+          title: 'Confirm Check-In',
+          text: 'Are you sure you want to check-in this guest?',
+          icon: 'question',
+          showCancelButton: true,
+          confirmButtonText: 'Yes, Check-In',
+          cancelButtonText: 'Cancel',
+          confirmButtonColor: '#28a745', // Green for check-in
+          cancelButtonColor: '#6c757d',
+          background: '#2a3135',
+          color: '#ffffff'
+        }).then((confirmResult) => {
+          if (confirmResult.isConfirmed) {
+            // Process the check-in
+            checkInReservation(bookingId, event);
+          }
+        });
+      });
+    }
+  }, 100);
 }
 
 // Function to show cancelled reservation modal

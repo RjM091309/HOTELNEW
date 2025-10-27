@@ -17,6 +17,8 @@
                     <input type="hidden" id="edit_guestID" name="guestID">
                     <input type="hidden" id="edit_voucherNo" name="voucherNo">
                     <input type="hidden" id="edit_room_type_hidden" name="room_type_hidden">
+                    <input type="hidden" id="edit_lateCheckoutFee" name="lateCheckoutFee" value="0">
+                    <input type="hidden" id="edit_paidAmountHidden" name="paidAmountHidden" value="0">
 
                     <div class="row">
                         <!-- BEGIN DATE AND ROOM SELECTION SECTION -->
@@ -187,7 +189,7 @@
                         <!-- PAYMENT AND STATUS SECTION -->
                          <div id="edit_divpaidAmount" class="col-lg-3">
                              <div class="form-group">
-                                 <label class="form-label">Paid Amount</label>
+                                 <label class="form-label">Paid</label>
                                  <input class="form-control" type="number" id="edit_paidAmount" name="paidAmount" placeholder="Enter paid amount" step="0.01" min="0" max="999999" onblur="formatEditPaidAmount(this)">
                              </div>
                          </div>
@@ -221,7 +223,19 @@
                             </div>
                         </div>
 
-                        <div id="edit_divtxtGuestType" class="col-lg-3">
+                        <!-- Late Checkout Fee Display - appears below when visible -->
+                        <div id="edit_lateCheckoutFeeDisplay" class="col-lg-12" style="display: none;">
+                            <div class="row">
+                                <div class="col-lg-3">
+                                    <div class="form-group">
+                                        <label class="form-label">Late Checkout Fee</label>
+                                        <input class="form-control" type="number" id="edit_lateCheckoutFeeInput" name="lateCheckoutFeeInput" placeholder="0.00" step="0.01" min="0">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="edit_divtxtGuestType" class="col-lg-6">
                             <div class="form-group">
                                 <label class="form-label">Guest Type</label>
                                 <select class="form-select" id="edit_guestType" name="guestType" data-placeholder="Guest Type" required>
@@ -230,7 +244,7 @@
                             </div>
                         </div>
 
-                        <div id="edit_divtxtGuestLevel" class="col-lg-3">
+                        <div id="edit_divtxtGuestLevel" class="col-lg-6">
                             <div class="form-group">
                                 <label class="form-label">Guest Level</label>
                                 <select class="form-select" id="edit_guestLevel" name="guestLevel" required>
@@ -261,10 +275,13 @@
                         </div>
 
                         <div class="row">
-                            <div class="col-lg-6">
+                            <div class="col-lg-4">
                                 <h3>Total: <span id="edit_computedTotal">0.00</span></h3>
                             </div>
-                            <div class="col-lg-6">
+                            <div class="col-lg-4">
+                                <h3>Paid: <span id="edit_computedPaidAmount">0.00</span></h3>
+                            </div>
+                            <div class="col-lg-4">
                                 <h3>Balance: <span id="edit_computedBalance">0.00</span></h3>
                             </div>
                         </div>
@@ -480,6 +497,22 @@
 #modal-editbooking .modal-body { 
     -ms-overflow-style: none; 
     scrollbar-width: none; 
+}
+
+/* Total, Paid, and Balance styling */
+#modal-editbooking #edit_computedTotal {
+    color: #17a2b8 !important; /* Blue color */
+    font-weight: bold;
+}
+
+#modal-editbooking #edit_computedBalance {
+    color: #fd7e14 !important; /* Orange color */
+    font-weight: bold;
+}
+
+#modal-editbooking #edit_computedPaidAmount {
+    color: #28a745 !important; /* Green color */
+    font-weight: bold;
 }
 </style>
 
@@ -850,6 +883,18 @@ $(document).ready(function() {
         computeEditTotal();
     });
 
+    // Calculate late check-out fee when check-out status changes
+    $('#edit_checkOutStatus').on('change', function() {
+        calculateEditLateCheckoutFee();
+    });
+
+    // Sync late checkout fee input with hidden field
+    $(document).on('input', '#edit_lateCheckoutFeeInput', function() {
+        const value = parseFloat($(this).val()) || 0;
+        $('#edit_lateCheckoutFee').val(value);
+        computeEditTotal();
+    });
+
     // Edit form submission
     $('#editbooking').off('submit').on('submit', function (e) {
         e.preventDefault();
@@ -872,6 +917,7 @@ $(document).ready(function() {
             bookingRoute: $('#edit_bookingRoute').val(),
             checkInStatus: $('#edit_checkInStatus').val(),
             checkOutStatus: $('#edit_checkOutStatus').val(),
+            lateCheckoutFee: $('#edit_lateCheckoutFee').val(),
             bookingRemarks: $('#edit_bookingRemarks').val(),
             agencyID: $('#edit_agencySelect').val(),
             bedCount: $('#edit_bedCount').val(),
@@ -1034,10 +1080,13 @@ $(document).ready(function() {
     let prevCI = null;
     let prevCO = null;
 
-    $(document).ready(function(){
+    // Initialize previous values when modal is shown
+    $(document).on('shown.bs.modal', '#modal-editbooking', function() {
         prevCI = $('#edit_checkInStatus').val();
         prevCO = $('#edit_checkOutStatus').val();
+    });
 
+    $(document).ready(function(){
         $('#edit_checkInStatus').on('focus', function(){ prevCI = $(this).val(); });
         $('#edit_checkOutStatus').on('focus', function(){ prevCO = $(this).val(); });
 
@@ -1083,6 +1132,45 @@ function formatEditPaidAmount(input) {
     input.value = value.toFixed(2);
 }
 
+// Function to calculate late check-out fee for edit form
+function calculateEditLateCheckoutFee() {
+    const checkOutStatus = $('#edit_checkOutStatus').val();
+    const existingFee = $('#edit_lateCheckoutFee').val();
+    
+    // Only calculate if we have valid data
+    if (!checkOutStatus) {
+        // If no existing fee, set to 0
+        if (!existingFee || parseFloat(existingFee) == 0) {
+            $('#edit_lateCheckoutFee').val(0);
+            $('#edit_lateCheckoutFeeDisplay').hide();
+        }
+        return;
+    }
+    
+    let lateCheckoutFee = 0;
+    
+    if (checkOutStatus == 1) { // Late Check Out
+        // Only set to 2000 if there's no existing fee
+        if (!existingFee || parseFloat(existingFee) == 0) {
+            lateCheckoutFee = 2000; // ₱2,000 default fee for Late Check Out
+            $('#edit_lateCheckoutFee').val(lateCheckoutFee);
+            $('#edit_lateCheckoutFeeInput').val(lateCheckoutFee);
+        } else {
+            // Keep the existing fee
+            lateCheckoutFee = parseFloat(existingFee);
+        }
+        $('#edit_lateCheckoutFeeDisplay').show();
+    } else {
+        // Regular Check Out - no fee
+        $('#edit_lateCheckoutFee').val(0);
+        $('#edit_lateCheckoutFeeInput').val(0);
+        $('#edit_lateCheckoutFeeDisplay').hide();
+    }
+    
+    // Recalculate total to include late check-out fee
+    computeEditTotal();
+}
+
 // Function to compute total for edit form
 function computeEditTotal() {
     console.log('computeEditTotal called');
@@ -1099,10 +1187,13 @@ function computeEditTotal() {
     
     const discount = $('#edit_includeDiscount').prop('checked') ? parseFloat($('#edit_discountAmount').val()) || 0 : 0;
     
+    // Get late check-out fee
+    const lateCheckoutFee = parseFloat($('#edit_lateCheckoutFee').val()) || 0;
+    
     // Get paid amount and validate it doesn't exceed total
     let paidAmount = parseFloat($('#edit_paidAmount').val()) || 0;
     
-    const subtotal = (roomRate * nights) + (adultQty * adultPrice) + (kidQty * kidPrice) + pickupPrice + dropoffPrice;
+    const subtotal = (roomRate * nights) + (adultQty * adultPrice) + (kidQty * kidPrice) + pickupPrice + dropoffPrice + lateCheckoutFee;
     const finalBalance = subtotal - discount;
     
     console.log('Paid Amount:', paidAmount, 'Final Balance:', finalBalance);
@@ -1147,11 +1238,15 @@ function computeEditTotal() {
         $('#edit_creditDisplay').show();
         // Balance is same as total when total is negative
         $('#edit_computedBalance').html('<b>' + balance.toLocaleString(undefined, { minimumFractionDigits: 2 }) + '</b>');
+        // Update paid amount display
+        $('#edit_computedPaidAmount').html('<b>' + paidAmount.toLocaleString(undefined, { minimumFractionDigits: 2 }) + '</b>');
     } else {
         $('#edit_computedTotal').html('<b>' + finalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 }) + '</b>');
         $('#edit_creditDisplay').hide();
         // Show balance (total - paid amount)
         $('#edit_computedBalance').html('<b>' + balance.toLocaleString(undefined, { minimumFractionDigits: 2 }) + '</b>');
+        // Update paid amount display
+        $('#edit_computedPaidAmount').html('<b>' + paidAmount.toLocaleString(undefined, { minimumFractionDigits: 2 }) + '</b>');
     }
 }
 
@@ -1175,7 +1270,29 @@ function populateEditForm(booking) {
     $('#edit_guestLevel').val(booking.guestLevel);
     $('#edit_bookingRoute').val(booking.BOOKING_CHANNEL);
     $('#edit_checkInStatus').val(booking.CHECK_IN_STATUS);
-    $('#edit_checkOutStatus').val(booking.LATE_CHECKOUT);
+    
+    // Set check-out status - handle null/undefined values
+    console.log('DEBUG: booking.LATE_CHECKOUT =', booking.LATE_CHECKOUT);
+    const checkOutStatus = booking.LATE_CHECKOUT !== null && booking.LATE_CHECKOUT !== undefined 
+        ? booking.LATE_CHECKOUT 
+        : 0; // Default to 0 (Regular Check Out)
+    console.log('DEBUG: Setting checkOutStatus to', checkOutStatus);
+    $('#edit_checkOutStatus').val(checkOutStatus);
+    console.log('DEBUG: Actual dropdown value after setting:', $('#edit_checkOutStatus').val());
+    
+    // Set late checkout fee if it exists
+    console.log('DEBUG: booking.lateCheckoutFee =', booking.lateCheckoutFee);
+    if (booking.lateCheckoutFee && parseFloat(booking.lateCheckoutFee) > 0) {
+        $('#edit_lateCheckoutFee').val(parseFloat(booking.lateCheckoutFee));
+        $('#edit_lateCheckoutFeeInput').val(parseFloat(booking.lateCheckoutFee));
+        $('#edit_lateCheckoutFeeDisplay').show(); // Show the field
+    }
+    
+    // Trigger late checkout fee calculation after setting check-out status
+    setTimeout(() => {
+        calculateEditLateCheckoutFee();
+        console.log('DEBUG: After setTimeout, dropdown value:', $('#edit_checkOutStatus').val());
+    }, 300); // Increased delay to ensure form is fully populated
     $('#edit_bookingRemarks').val(booking.REMARKS);
     $('#edit_agencySelect').val(booking.agencyID);
     $('#edit_bedCount').val(booking.ROOM_BED === 1 ? '1' : booking.ROOM_BED === 2 ? '2' : 'N/A');

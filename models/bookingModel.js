@@ -480,6 +480,7 @@ class BookingModel {
           rt.NAME AS ROOM_TYPE,
           b.CHECK_IN_DATE,
           b.CHECK_OUT_DATE,
+          b.REMARKS,
           bill.ROOM_CHARGE AS ROOM_RATE,
 
           -- Fallback to QTY if ORIGINAL_QTY is NULL
@@ -5373,6 +5374,9 @@ class BookingModel {
           bs_dropoff.TOTAL_COST as dropoffPrice,
           bs_dropoff.SERVICE_ID as dropoffServiceId,
           
+          bs_late_checkout.TOTAL_COST as lateCheckoutFee,
+          bs_late_checkout.SERVICE_ID as lateCheckoutServiceId,
+          
           ag.IDNo as agencyID,
           ag.NAME as agencyName
           
@@ -5385,6 +5389,7 @@ class BookingModel {
         LEFT JOIN booking_service bs_kid ON bs_kid.BOOKING_ID = b.IDNo AND bs_kid.SERVICE_ID = 75 AND bs_kid.ACTIVE = 1
         LEFT JOIN booking_service bs_pickup ON bs_pickup.BOOKING_ID = b.IDNo AND bs_pickup.SERVICE_ID = 76 AND bs_pickup.ACTIVE = 1
         LEFT JOIN booking_service bs_dropoff ON bs_dropoff.BOOKING_ID = b.IDNo AND bs_dropoff.SERVICE_ID = 77 AND bs_dropoff.ACTIVE = 1
+        LEFT JOIN booking_service bs_late_checkout ON bs_late_checkout.BOOKING_ID = b.IDNo AND bs_late_checkout.SERVICE_ID = 72 AND bs_late_checkout.ACTIVE = 1
         LEFT JOIN agency ag ON b.AGENCY_ID = ag.IDNo
         WHERE b.IDNo = ? AND b.ACTIVE = 1
       `;

@@ -20,6 +20,7 @@ $(document).ready(function () {
         const guestType = $('#guestType').val();
         const guestLevel = $('#guestLevel').val();
         const checkInStatus = $('#checkInStatus').val();
+        const checkOutStatus = $('#checkOutStatus').val();
         // Group-level services fields
         const breakfastAdultQty = $('#breakfastAdultQty').val();
         const breakfastAdultPrice = $('#breakfastAdultPrice').val();
@@ -36,6 +37,7 @@ $(document).ready(function () {
         const discountAmount = $('#includeDiscount').is(':checked') ? $('#discountAmount').val() : 0;
         const reservationFeeAmount = $('#includeReservationFee').is(':checked') ? $('#reservationFeeAmount').val() : 0;
         const lateCheckoutFee = $('#lateCheckoutFee').val();
+        console.log('DEBUG Group Booking: lateCheckoutFee =', lateCheckoutFee, 'checkOutStatus =', $('#checkOutStatus').val());
   
         if (!selectedRooms || !daterange || !groupName || !groupContact || !numberOfRooms) {
           Swal.fire({
@@ -51,7 +53,7 @@ $(document).ready(function () {
           type: 'POST',
           data: {
             selectedRooms, selectedRoomPrice, qty, daterange, groupName, groupContact, numberOfRooms,
-            paidAmount, paymentStatus, bookingRoute, guestType, guestLevel, checkInStatus,
+            paidAmount, paymentStatus, bookingRoute, guestType, guestLevel, checkInStatus, checkOutStatus,
             breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
             breakfastKidQty, breakfastKidPrice, breakfastKidId,
             pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
@@ -68,8 +70,8 @@ $(document).ready(function () {
               // Create a form to trigger group voucher download
               const form = $('<form>', {
                 method: 'POST',
-                action: '/booking/generate-group-voucher',
-                target: '_blank'
+                action: '/booking/generate-group-voucher?download=1',
+                target: '_self'
               });
               
               // Add group booking data to form
@@ -216,6 +218,7 @@ $(document).ready(function () {
         const txtGuestID = $('#guestID').val();
         const bookingRoute = $('#bookingRoute').val();
         const checkInStatus = $('#checkInStatus').val();
+        const checkOutStatus = $('#checkOutStatus').val();
         const bookingRemarks = $('#bookingRemarks').val();
         const agencyID = $('#agencySelect').val();
         const voucherNo = $('#voucherNo').val();
@@ -235,6 +238,7 @@ $(document).ready(function () {
         const discountAmount = $('#includeDiscount').is(':checked') ? $('#discountAmount').val() : 0;
         const reservationFeeAmount = $('#includeReservationFee').is(':checked') ? $('#reservationFeeAmount').val() : 0;
         const lateCheckoutFee = $('#lateCheckoutFee').val();
+        console.log('DEBUG Single Booking: lateCheckoutFee =', lateCheckoutFee, 'checkOutStatus =', $('#checkOutStatus').val());
   
         if (!roomId || !daterange || !fullname || !guestsCount || !paymentStatus || !roomPrice || !guestType || !guestLevel) {
           Swal.fire({
@@ -251,7 +255,7 @@ $(document).ready(function () {
           data: {
             room_id: roomId, fullname, number, address, daterange, maxOccupants: guestsCount,
             paidAmount, paymentStatus, price: roomPrice, diffindays: qty, guestType, guestLevel, guestID: txtGuestID,
-            bookingRoute, checkInStatus, bookingRemarks, agencyID, voucherNo,
+            bookingRoute, checkInStatus, checkOutStatus, bookingRemarks, agencyID, voucherNo,
             breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
             breakfastKidQty, breakfastKidPrice, breakfastKidId,
             pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
@@ -268,8 +272,8 @@ $(document).ready(function () {
               // Create a form to trigger voucher download
               const form = $('<form>', {
                 method: 'POST',
-                action: '/booking/generate-voucher',
-                target: '_blank'
+                action: '/booking/generate-voucher?download=1',
+                target: '_self'
               });
               
               // Add booking data to form

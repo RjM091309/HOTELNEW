@@ -232,6 +232,18 @@
                                 </div>
                               </div>
 
+                              <!-- Late Checkout Fee Display - appears below when visible -->
+                              <div id="lateCheckoutFeeDisplay" class="col-lg-12" style="display: none;">
+                                <div class="row">
+                                  <div class="col-lg-3">
+                                    <div class="form-group">
+                                      <label class="form-label">Late Checkout Fee</label>
+                                      <input class="form-control" type="number" id="lateCheckoutFeeInput" name="lateCheckoutFeeInput" placeholder="0.00" step="0.01" min="0">
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
                           
                             
 
@@ -281,10 +293,13 @@
                               </div>
 
                               <div class="row">
-                                <div class="col-lg-6">
+                                <div class="col-lg-4">
                                   <h3>Total: <span id="computedTotal">0.00</span></h3>
                                 </div>
-                                <div class="col-lg-6">
+                                <div class="col-lg-4">
+                                  <h3>Paid: <span id="computedPaidAmount">0.00</span></h3>
+                                </div>
+                                <div class="col-lg-4">
                                   <h3>Balance: <span id="computedBalance">0.00</span></h3>
                                 </div>
                               </div>
@@ -842,12 +857,17 @@
 
 /* Total and Balance styling */
 #computedTotal {
-    color: #28a745 !important; /* Green color */
+    color: #17a2b8 !important; /* Blue color */
     font-weight: bold;
 }
 
 #computedBalance {
     color: #fd7e14 !important; /* Orange color */
+    font-weight: bold;
+}
+
+#computedPaidAmount {
+    color: #28a745 !important; /* Green color */
     font-weight: bold;
 }
 

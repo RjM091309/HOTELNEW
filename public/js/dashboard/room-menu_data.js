@@ -286,10 +286,8 @@ async function createDynamicRoomModal(bookingId, event, options) {
                         <i class="fas fa-exchange-alt"></i> Transfer
                     </button>
                     
-                    ${lateCheckout === '1' ? 
-                        '<button class="btn btn-sm btn-secondary" disabled>Late Check-Out Applied</button>' :
-                        '<button class="btn btn-sm btn-secondary" onclick="openLateCheckoutModal(\'' + roomId + '\', \'' + checkOutDate + '\', \'' + bookingId + '\')">Late Check-Out</button>'
-                    }
+                    <!-- Late Checkout Button - will be updated dynamically after services load -->
+                    <button class="btn btn-sm btn-secondary" id="lateCheckoutBtn-${bookingId}" onclick="openLateCheckoutModal('${roomId}', '${checkOutDate}', '${bookingId}')">Late Check-Out</button>
                     
                     <button class="btn btn-sm btn-success" 
                             id="btnExtend" 
@@ -378,6 +376,18 @@ async function createDynamicRoomModal(bookingId, event, options) {
                                             <span class="badge bg-success ms-1">Paid</span>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Special Notes Section -->
+                        <div class="remarks-section mb-3" id="remarks-section-${bookingId}" style="display: none;">
+                            <div class="section-header">
+                                <i class="fas fa-sticky-note me-1"></i>Special Notes
+                            </div>
+                            <div class="section-body">
+                                <div id="remarks-display-${bookingId}" class="remarks-box">
+                                    <!-- Remarks will be displayed here -->
                                 </div>
                             </div>
                         </div>
@@ -704,6 +714,17 @@ modalStyle.textContent = `
     #dynamicRoomModal_${bookingId} .discount-section .btn-outline-success:hover{
         filter: brightness(0.95);
     }
+    /* Remarks section styling */
+    #dynamicRoomModal_${bookingId} .remarks-section{
+        background:#ffffff; border:1px solid #e9ecef; border-radius:6px; padding:10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    #dynamicRoomModal_${bookingId} .remarks-section .section-header{
+        color:#28a745; font-weight:600; font-size:0.9rem; border-bottom:2px solid #28a745; padding-bottom:4px; margin-bottom:8px;
+    }
+    #dynamicRoomModal_${bookingId} .remarks-section .section-body{ padding-top:2px; }
+    #dynamicRoomModal_${bookingId} .remarks-box{
+        background:#f8f9fa; border:1px solid #e9ecef; border-radius:6px; padding:8px 10px; color:#495057; font-size:0.9rem; line-height:1.5; min-height:40px;
+    }
 `;
 
 document.head.appendChild(modalStyle);
@@ -917,6 +938,24 @@ fetch(`/booking/booking_details/${bookingIdValue}`)
         // Debug: Log all available data fields
 
 
+        // Display Remarks (if exists)
+        console.log('📝 Booking Remarks Data:', data.REMARKS);
+        console.log('📝 Full Booking Data:', data);
+        console.log('📝 All Booking Data Keys:', Object.keys(data));
+        
+        const remarksSection = document.getElementById(`remarks-section-${bookingId}`);
+        const remarksDisplay = document.getElementById(`remarks-display-${bookingId}`);
+        if (remarksSection && remarksDisplay) {
+            if (data.REMARKS && data.REMARKS.trim() !== '') {
+                console.log('✅ Found remarks:', data.REMARKS);
+                remarksDisplay.textContent = data.REMARKS;
+                remarksSection.style.display = 'block';
+            } else {
+                console.log('❌ No remarks found or empty');
+                remarksSection.style.display = 'none';
+            }
+        }
+
         // Update Room Rate
         let roomRate = parseFloat(data.ROOM_RATE) || 0;
         const roomRateElement = document.getElementById(`room-rate-${bookingId}`);
@@ -1100,6 +1139,9 @@ fetch(`/booking/get-booking-services/${bookingIdValue}`)
         // Refresh the displayed list using the same bookingId
         updateAddedServicesList(bookingId);
         
+        // Check if late checkout service exists and update button
+        updateLateCheckoutButton(bookingId, services);
+        
         // Recalculate totals after loading services
         calculateTotalCost(bookingId);
     })
@@ -1107,6 +1149,27 @@ fetch(`/booking/get-booking-services/${bookingIdValue}`)
         console.error('Error fetching guest details:', error);
         toastError('Error', 'Failed to load guest details. Please try again.');
     });
+}
+
+// Function to update late checkout button state
+function updateLateCheckoutButton(bookingId, services) {
+    const lateCheckoutBtn = document.getElementById(`lateCheckoutBtn-${bookingId}`);
+    if (!lateCheckoutBtn) return;
+    
+    // Check if service ID 72 (Late Checkout) exists in services
+    const hasLateCheckout = services.some(service => service.SERVICE_ID === 72);
+    
+    if (hasLateCheckout) {
+        // Disable button and change text
+        lateCheckoutBtn.disabled = true;
+        lateCheckoutBtn.textContent = 'Late Check-Out Applied';
+        lateCheckoutBtn.setAttribute('title', 'Late Check-Out has already been applied');
+    } else {
+        // Keep button enabled
+        lateCheckoutBtn.disabled = false;
+        lateCheckoutBtn.textContent = 'Late Check-Out';
+        lateCheckoutBtn.removeAttribute('title');
+    }
 }
 
 // Load transfer history
@@ -1834,7 +1897,7 @@ function showPayments(bookingId) {
     // Create payments modal HTML
     const modalHTML = `
     <div class="modal fade" id="paymentsModal_${bookingId}" tabindex="-1" aria-labelledby="paymentsModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
             <div class="modal-content" style="background-color: #ffffff; border: 4px solid transparent;">
                 
                 <!-- Modal Header -->
