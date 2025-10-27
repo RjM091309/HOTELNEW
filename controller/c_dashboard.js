@@ -537,7 +537,8 @@ class DashboardController {
   // Process stay extension
   static async extendStay(req, res) {
     try {
-      const { roomId, checkoutDate, daysToExtend, bookingId, newRoomId } = req.body;
+      const { roomId, checkoutDate, daysToExtend, bookingId, newRoomId, cost } = req.body;
+      const userId = req.user?.userId || null;
 
       if (!roomId || !checkoutDate || !daysToExtend || !bookingId) {
         return res.status(400).json({ 
@@ -546,7 +547,7 @@ class DashboardController {
         });
       }
 
-      const result = await DashboardModel.extendStay(roomId, checkoutDate, daysToExtend, bookingId, newRoomId);
+      const result = await DashboardModel.extendStay(roomId, checkoutDate, daysToExtend, bookingId, newRoomId, cost, userId);
       
       if (result.success) {
         // Get the io instance from the app

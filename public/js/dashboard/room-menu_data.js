@@ -2162,11 +2162,15 @@ async function loadPaymentData(bookingId) {
                     // Add extensions
                     if (breakdownData.extensions && breakdownData.extensions.length > 0) {
                         breakdownData.extensions.forEach(extension => {
-                            const extensionStatus = extension.PAYMENT_STATUS || 'unpaid';
+                            // Check if extension is cancelled (ACTIVE = 0)
+                            const isCancelled = extension.ACTIVE === 0;
+                            
+                            // Use actual status from booking_extension table, but show "Cancelled" if ACTIVE = 0
+                            const extensionStatus = isCancelled ? 'Cancelled' : (extension.PAYMENT_STATUS || 'unpaid');
                             
                             // Find corresponding payment for this extension
                             let extensionPayment = null;
-                            if (breakdownData.payments && breakdownData.payments.length > 0) {
+                            if (!isCancelled && breakdownData.payments && breakdownData.payments.length > 0) {
                                 extensionPayment = breakdownData.payments.find(p => 
                                     p.PAYMENT_TYPE === 'extension_payment' || 
                                     p.PAYMENT_TYPE === 'extension' ||
@@ -2180,11 +2184,12 @@ async function loadPaymentData(bookingId) {
                                 description: `Extended stay - ${extension.QTY || 0} day(s)`,
                                 amount: parseFloat(extension.COST || 0),
                                 status: extensionStatus,
-                                payment_date: extensionPayment ? extensionPayment.PAYMENT_DATE : null,
+                                payment_date: isCancelled ? extension.EDITED_DT : (extensionPayment ? extensionPayment.PAYMENT_DATE : null),
                                 icon: 'fa-calendar-plus',
-                                processed_by: extensionPayment ? extensionPayment.NAME || 'System' : '-',
-                                payment_method: extensionPayment ? extensionPayment.PAYMENT_METHOD : '-',
-                                remarks: extensionPayment ? extensionPayment.REMARKS : '-'
+                                processed_by: isCancelled ? extension.EDITED_BY_NAME : (extensionPayment ? extensionPayment.NAME || 'System' : '-'),
+                                payment_method: isCancelled ? '-' : (extensionPayment ? extensionPayment.PAYMENT_METHOD : '-'),
+                                remarks: isCancelled ? extension.REMARKS : (extensionPayment ? extensionPayment.REMARKS : '-'),
+                                isCancelled: isCancelled // Add flag to identify cancelled extensions
                             });
                         });
                     }
@@ -2941,20 +2946,21 @@ function confirmExtension(roomId, checkoutDate, bookingId) {
     reverseButtons: true
   }).then((result) => {
     if (result.isConfirmed) {
-      // Process the extension
-      processExtension(roomId, checkoutDate, daysToExtend, bookingId, window.selectedExtensionRoomId);
+      // Process the extension with cost
+      processExtension(roomId, checkoutDate, daysToExtend, bookingId, window.selectedExtensionRoomId, totalCost);
     }
   });
 }
 
 // Function to process the extension
-function processExtension(roomId, checkoutDate, daysToExtend, bookingId, newRoomId = null) {
+function processExtension(roomId, checkoutDate, daysToExtend, bookingId, newRoomId = null, cost = 0) {
   const extensionData = {
     roomId: roomId,
     checkoutDate: checkoutDate,
     daysToExtend: parseInt(daysToExtend),
     bookingId: bookingId,
-    newRoomId: newRoomId
+    newRoomId: newRoomId,
+    cost: parseFloat(cost)
   };
   
   fetch('/dashboard/extend-stay', {

@@ -170,14 +170,14 @@ class GuestModel {
           COALESCE((
               SELECT SUM(QTY) 
               FROM booking_extension 
-              WHERE BOOKING_ID = b.IDNo
+              WHERE BOOKING_ID = b.IDNo AND ACTIVE = 1
           ), 0) AS EXTENDED_DAYS,
           COALESCE(bill.ORIGINAL_QTY, bill.QTY) AS TOTAL_DAYS,
           (COALESCE(bill.ORIGINAL_QTY, bill.QTY) * bill.ROOM_CHARGE) +
           COALESCE((
               SELECT SUM(COST * QTY) 
-              FROM booking_extension 
-              WHERE BOOKING_ID = b.IDNo
+              FROM booking_extension  
+              WHERE BOOKING_ID = b.IDNo AND ACTIVE = 1
           ), 0) AS TOTAL_ROOM_COST,
           (COALESCE(bill.ORIGINAL_QTY, bill.QTY) * bill.ROOM_CHARGE) AS ROOM_COST,
           (
@@ -190,7 +190,7 @@ class GuestModel {
                   SELECT SUM(p2.AMOUNT_PAID) 
                   FROM payments p2 
                   WHERE p2.BOOKING_EXTENSION_ID IN (
-                      SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo
+                      SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo AND ACTIVE = 1
                   )
               ), 0)
           ) AS TOTAL_PAID,

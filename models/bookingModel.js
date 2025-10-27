@@ -72,7 +72,7 @@ class BookingModel {
                       COALESCE((
                         SELECT SUM(be.COST * be.QTY) 
                         FROM booking_extension be 
-                        WHERE be.BOOKING_ID = b2.IDNo
+                        WHERE be.BOOKING_ID = b2.IDNo AND be.ACTIVE = 1
                       ), 0)
                     ), 0)
                     - COALESCE(gb.GROUP_DISCOUNT, 0)
@@ -109,7 +109,7 @@ class BookingModel {
                       ) THEN 1 END) = 0
                       AND COUNT(CASE WHEN EXISTS(
                         SELECT 1 FROM booking_extension be 
-                        WHERE be.BOOKING_ID = b2.IDNo AND be.PAYMENT_STATUS = 'unpaid'
+                        WHERE be.BOOKING_ID = b2.IDNo AND be.PAYMENT_STATUS = 'unpaid' AND be.ACTIVE = 1
                       ) THEN 1 END) = 0
                     FROM booking b2
                     LEFT JOIN billing bill2 ON b2.IDNo = bill2.BOOKING_ID
@@ -157,7 +157,7 @@ class BookingModel {
                           COALESCE((
                             SELECT SUM(be.COST * be.QTY) 
                             FROM booking_extension be 
-                            WHERE be.BOOKING_ID = b2.IDNo
+                            WHERE be.BOOKING_ID = b2.IDNo AND be.ACTIVE = 1
                           ), 0)
                         ), 0)
                         - COALESCE(gb.GROUP_DISCOUNT, 0)
@@ -208,7 +208,8 @@ class BookingModel {
               SELECT 
                 be.BOOKING_ID,
                 SUM(be.QTY * be.COST) AS TOTAL_EXTENSIONS_COST
-              FROM booking_extension be
+              FROM booking_extension be 
+              WHERE be.ACTIVE = 1
               GROUP BY be.BOOKING_ID
             ) all_extensions_total ON b.IDNo = all_extensions_total.BOOKING_ID
             LEFT JOIN (
@@ -224,7 +225,7 @@ class BookingModel {
                 be.BOOKING_ID,
                 SUM(be.QTY * be.COST) AS TOTAL_EXTENSIONS_COST
               FROM booking_extension be
-              WHERE be.PAYMENT_STATUS = 'unpaid'
+              WHERE be.PAYMENT_STATUS = 'unpaid' AND be.ACTIVE = 1
               GROUP BY be.BOOKING_ID
             ) extensions_unpaid_total ON b.IDNo = extensions_unpaid_total.BOOKING_ID
             LEFT JOIN (
@@ -240,7 +241,7 @@ class BookingModel {
                 be.BOOKING_ID,
                 COUNT(*) AS TOTAL_UNPAID_EXTENSIONS
               FROM booking_extension be
-              WHERE be.PAYMENT_STATUS = 'unpaid'
+              WHERE be.PAYMENT_STATUS = 'unpaid' AND be.ACTIVE = 1
               GROUP BY be.BOOKING_ID
             ) extensions_unpaid_count ON b.IDNo = extensions_unpaid_count.BOOKING_ID
             LEFT JOIN (
@@ -490,7 +491,7 @@ class BookingModel {
           COALESCE((
               SELECT SUM(QTY) 
               FROM booking_extension 
-              WHERE BOOKING_ID = b.IDNo
+              WHERE BOOKING_ID = b.IDNo AND ACTIVE = 1
           ), 0) AS EXTENDED_DAYS,
 
           -- Total days = original + extended
@@ -500,8 +501,8 @@ class BookingModel {
           (COALESCE(bill.ORIGINAL_QTY, bill.QTY) * bill.ROOM_CHARGE) +
           COALESCE((
               SELECT SUM(COST * QTY) 
-              FROM booking_extension 
-              WHERE BOOKING_ID = b.IDNo
+              FROM booking_extension  
+              WHERE BOOKING_ID = b.IDNo AND ACTIVE = 1
           ), 0) AS TOTAL_ROOM_COST,
 
           (COALESCE(bill.ORIGINAL_QTY, bill.QTY) * bill.ROOM_CHARGE) AS ROOM_COST,
@@ -517,7 +518,7 @@ class BookingModel {
                   SELECT SUM(p2.AMOUNT_PAID) 
                   FROM payments p2 
                   WHERE p2.BOOKING_EXTENSION_ID IN (
-                      SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo
+                      SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo AND ACTIVE = 1
                   )
               ), 0)
           ) AS TOTAL_PAID,
@@ -1333,36 +1334,54 @@ class BookingModel {
     try {
       const query = `
         SELECT 
-          -- Unpaid Room Charge (original stay)
+          -- Room Charge with remaining balance (considering partial payments, reservation fee, and discount)
           COALESCE((
               SELECT 
-                  CASE 
-                      WHEN b.PAYMENT_STATUS = 'unpaid' THEN b.ROOM_CHARGE * COALESCE(b.ORIGINAL_QTY, b.QTY)
-                      ELSE 0
-                  END
+                  (b.ROOM_CHARGE * COALESCE(b.ORIGINAL_QTY, b.QTY) - COALESCE(b.RESERVATION_FEE, 0) - COALESCE(b.DISCOUNT_AMOUNT, 0)) 
+                  - COALESCE((
+                      SELECT SUM(p.AMOUNT_PAID) 
+                      FROM payments p 
+                      WHERE p.BOOKING_ID = b.BOOKING_ID 
+                      AND p.PAYMENT_TYPE != 'discount'
+                  ), 0)
               FROM billing b
               WHERE b.BOOKING_ID = ?
           ), 0) AS room_charge_unpaid,
 
-          -- Unpaid Extension Charges
+          -- Extension Charges with remaining balance (considering partial payments)
           COALESCE((
-              SELECT SUM(be.COST * be.QTY)
+              SELECT SUM(GREATEST(0, be.COST * be.QTY - COALESCE((
+                  SELECT SUM(p.AMOUNT_PAID) 
+                  FROM payments p 
+                  WHERE p.BOOKING_EXTENSION_ID = be.IDNo
+                  AND p.PAYMENT_TYPE = 'extended'
+              ), 0)))
               FROM booking_extension be
-              WHERE be.BOOKING_ID = ? AND be.PAYMENT_STATUS = 'unpaid'
+              WHERE be.BOOKING_ID = ? AND be.ACTIVE = 1
           ), 0) AS extension_charge_unpaid,
 
-          -- Unpaid Service Charges
+          -- Service Charges with remaining balance (considering partial payments)
           COALESCE((
-              SELECT SUM(bs.TOTAL_COST)
+              SELECT SUM(GREATEST(0, bs.TOTAL_COST - COALESCE((
+                  SELECT SUM(p.AMOUNT_PAID) 
+                  FROM payments p 
+                  WHERE p.BOOKING_SERVICE_ID = bs.IDNo
+                  AND p.PAYMENT_TYPE = 'service'
+              ), 0)))
               FROM booking_service bs
-              WHERE bs.BOOKING_ID = ? AND bs.STATUS = 'unpaid' AND bs.ACTIVE = 1
+              WHERE bs.BOOKING_ID = ? AND bs.ACTIVE = 1
           ), 0) AS service_unpaid,
 
-          -- Unpaid Transport Charges
+          -- Transport Charges with remaining balance (considering partial payments)
           COALESCE((
-              SELECT SUM(pd.RATE)
+              SELECT SUM(GREATEST(0, pd.RATE - COALESCE((
+                  SELECT SUM(p.AMOUNT_PAID) 
+                  FROM payments p 
+                  WHERE p.BOOKING_PICKDROP_ID = pd.IDNo
+                  AND p.PAYMENT_TYPE = 'pickdrop'
+              ), 0)))
               FROM booking_pick_drop pd
-              WHERE pd.BOOKING_ID = ? AND pd.STATUS = 'unpaid' AND pd.ACTIVE = 1
+              WHERE pd.BOOKING_ID = ? AND pd.ACTIVE = 1
           ), 0) AS transport_unpaid,
 
           -- Reservation Fee (always applied to reduce balance)
@@ -1386,34 +1405,51 @@ class BookingModel {
               WHERE b.BOOKING_ID = ?
           ), 0) AS discount_applied,
 
-          -- Total Outstanding Balance
+          -- Total Outstanding Balance (considering all partial payments)
           (
               COALESCE((
                   SELECT 
-                      CASE 
-                          WHEN b.PAYMENT_STATUS = 'unpaid' THEN b.ROOM_CHARGE * COALESCE(b.ORIGINAL_QTY, b.QTY)
-                          ELSE 0
-                      END
+                      GREATEST(0, (b.ROOM_CHARGE * COALESCE(b.ORIGINAL_QTY, b.QTY) - COALESCE(b.RESERVATION_FEE, 0) - COALESCE(b.DISCOUNT_AMOUNT, 0)) - COALESCE((
+                          SELECT SUM(p.AMOUNT_PAID) 
+                          FROM payments p 
+                          WHERE p.BOOKING_ID = b.BOOKING_ID 
+                          AND p.PAYMENT_TYPE != 'discount'
+                      ), 0))
                   FROM billing b
                   WHERE b.BOOKING_ID = ?
               ), 0)
               +
               COALESCE((
-                  SELECT SUM(be.COST * be.QTY)
+                  SELECT SUM(GREATEST(0, be.COST * be.QTY - COALESCE((
+                      SELECT SUM(p.AMOUNT_PAID) 
+                      FROM payments p 
+                      WHERE p.BOOKING_EXTENSION_ID = be.IDNo
+                      AND p.PAYMENT_TYPE = 'extended'
+                  ), 0)))
                   FROM booking_extension be
-                  WHERE be.BOOKING_ID = ? AND be.PAYMENT_STATUS = 'unpaid'
+                  WHERE be.BOOKING_ID = ? AND be.ACTIVE = 1
               ), 0)
               +
               COALESCE((
-                  SELECT SUM(bs.TOTAL_COST)
+                  SELECT SUM(GREATEST(0, bs.TOTAL_COST - COALESCE((
+                      SELECT SUM(p.AMOUNT_PAID) 
+                      FROM payments p 
+                      WHERE p.BOOKING_SERVICE_ID = bs.IDNo
+                      AND p.PAYMENT_TYPE = 'service'
+                  ), 0)))
                   FROM booking_service bs
-                  WHERE bs.BOOKING_ID = ? AND bs.STATUS = 'unpaid' AND bs.ACTIVE = 1
+                  WHERE bs.BOOKING_ID = ? AND bs.ACTIVE = 1
               ), 0)
               +
               COALESCE((
-                  SELECT SUM(pd.RATE)
+                  SELECT SUM(GREATEST(0, pd.RATE - COALESCE((
+                      SELECT SUM(p.AMOUNT_PAID) 
+                      FROM payments p 
+                      WHERE p.BOOKING_PICKDROP_ID = pd.IDNo
+                      AND p.PAYMENT_TYPE = 'pickdrop'
+                  ), 0)))
                   FROM booking_pick_drop pd
-                  WHERE pd.BOOKING_ID = ? AND pd.STATUS = 'unpaid' AND pd.ACTIVE = 1
+                  WHERE pd.BOOKING_ID = ? AND pd.ACTIVE = 1
               ), 0)
           ) AS total_unpaid_balance,
           COALESCE((
@@ -1421,14 +1457,20 @@ class BookingModel {
           ), '') AS discount_remarks
       `;
       
-      // Ensure param count matches query (13 parameters)
+      // Ensure param count matches query
       const results = await queryDatabasePromise(query, [
-        bookingId, bookingId, bookingId, bookingId, 
-        bookingId, bookingId, bookingId, bookingId,
-        bookingId, /* discount_amount */ 
-        bookingId, /* discount_applied */
-        bookingId, bookingId, bookingId, bookingId,
-        bookingId
+        bookingId, // room_charge_unpaid
+        bookingId, // extension_charge_unpaid
+        bookingId, // service_unpaid
+        bookingId, // transport_unpaid
+        bookingId, // reservation_fee
+        bookingId, // discount_amount
+        bookingId, // discount_applied
+        bookingId, // total_unpaid_balance (room)
+        bookingId, // total_unpaid_balance (extension)
+        bookingId, // total_unpaid_balance (service)
+        bookingId, // total_unpaid_balance (transport)
+        bookingId  // discount_remarks
       ]);
 
       const balanceData = results.length > 0 ? results[0] : {
@@ -1529,7 +1571,7 @@ class BookingModel {
       const extensionQuery = `
         SELECT IDNo AS SERVICE_ID, EXTEND_DATE AS ENCODED_DT, QTY, COST, PAYMENT_STATUS
         FROM booking_extension
-        WHERE BOOKING_ID = ?
+        WHERE BOOKING_ID = ? AND ACTIVE = 1
       `;
       const extensionRows = await queryDatabasePromise(extensionQuery, [bookingId]);
 
@@ -1538,7 +1580,7 @@ class BookingModel {
         SERVICE_ID: -999, // extended stay
         SERVICE_NAME: 'Extended Stay',
         QTY: ext.QTY,
-        TOTAL_COST: ext.COST * ext.QTY,
+        TOTAL_COST: ext.COST,
         STATUS: ext.PAYMENT_STATUS,
         ENCODED_DT: ext.ENCODED_DT
       }));
@@ -1650,24 +1692,107 @@ class BookingModel {
         });
 
         if (isExtension) {
-          // Handle booking_extension deletion
-          const query = `
-            DELETE FROM booking_extension
-            WHERE BOOKING_ID = ? AND PAYMENT_STATUS = 'unpaid'
+          // Step 1: Get the extension details first
+          const getExtensionQuery = `
+            SELECT QTY, COST FROM booking_extension 
+            WHERE BOOKING_ID = ? AND ACTIVE = 1
+            ORDER BY IDNo DESC
+            LIMIT 1
+          `;
+          
+          const extension = await new Promise((resolve, reject) => {
+            connection.query(getExtensionQuery, [bookingId], (err, result) => {
+              if (err) reject(err);
+              else resolve(result);
+            });
+          });
+
+          if (extension.length === 0) {
+            throw new Error('No extension found to remove.');
+          }
+
+          const extensionData = extension[0];
+          const daysToRemove = extensionData.QTY;
+
+          // Step 2: Get current booking details
+          const getBookingQuery = `
+            SELECT CHECK_OUT_DATE, EXTENDED_DAYS
+            FROM booking
+            WHERE IDNo = ?
+          `;
+          
+          const booking = await new Promise((resolve, reject) => {
+            connection.query(getBookingQuery, [bookingId], (err, result) => {
+              if (err) reject(err);
+              else resolve(result);
+            });
+          });
+
+          if (booking.length === 0) {
+            throw new Error('Booking not found.');
+          }
+
+          const bookingData = booking[0];
+          const currentCheckoutDate = new Date(bookingData.CHECK_OUT_DATE);
+          
+          // Step 3: Calculate new checkout date by subtracting the extension days
+          const newCheckoutDate = new Date(currentCheckoutDate);
+          newCheckoutDate.setDate(newCheckoutDate.getDate() - daysToRemove);
+
+          // Step 4: Update booking_extension (soft delete)
+          const updateExtensionQuery = `
+            UPDATE booking_extension
+            SET ACTIVE = 0, 
+                EDITED_BY = ?, 
+                EDITED_DT = NOW(),
+                REMARKS = ?
+            WHERE BOOKING_ID = ? AND ACTIVE = 1
             ORDER BY IDNo DESC
             LIMIT 1
           `;
 
           const result = await new Promise((resolve, reject) => {
-            connection.query(query, [bookingId], (err, result) => {
+            connection.query(updateExtensionQuery, [userId, removalReason, bookingId], (err, result) => {
               if (err) reject(err);
               else resolve(result);
             });
           });
 
           if (result.affectedRows === 0) {
-            throw new Error('No unpaid extension found to remove.');
+            throw new Error('No extension found to remove.');
           }
+
+          // Step 5: Update booking to revert checkout date and reduce extended days
+          const updateBookingQuery = `
+            UPDATE booking
+            SET EXTENDED_DAYS = GREATEST(0, EXTENDED_DAYS - ?),
+                CHECK_OUT_DATE = ?
+            WHERE IDNo = ?
+          `;
+          
+          await new Promise((resolve, reject) => {
+            connection.query(updateBookingQuery, [daysToRemove, newCheckoutDate, bookingId], (err, result) => {
+              if (err) reject(err);
+              else resolve(result);
+            });
+          });
+
+          // Step 6: If extended days becomes 0, reset the EXTENDED flag
+          const resetExtendedQuery = `
+            UPDATE booking
+            SET EXTENDED = CASE 
+              WHEN EXTENDED_DAYS = 0 THEN 0 
+              ELSE EXTENDED 
+            END
+            WHERE IDNo = ?
+          `;
+          
+          await new Promise((resolve, reject) => {
+            connection.query(resetExtendedQuery, [bookingId], (err, result) => {
+              if (err) reject(err);
+              else resolve(result);
+            });
+          });
 
           // Commit the transaction
           await new Promise((resolve, reject) => {
@@ -1682,7 +1807,9 @@ class BookingModel {
           return {
             success: true,
             message: 'Extension removed successfully!',
-            totalCost: 0
+            totalCost: 0,
+            newCheckoutDate: newCheckoutDate,
+            daysRemoved: daysToRemove
           };
 
         } else if (isTransport) {
@@ -1920,7 +2047,7 @@ class BookingModel {
       const extensionQuery = `
         SELECT EXTEND_DATE, QTY, COST, PAYMENT_STATUS
         FROM booking_extension
-        WHERE BOOKING_ID = ?
+        WHERE BOOKING_ID = ? AND ACTIVE = 1
       `;
       const extensionData = await queryDatabasePromise(extensionQuery, [bookingId]);
 
@@ -2130,7 +2257,7 @@ class BookingModel {
         // Get unpaid extensions total
         const extensionQuery = `
           SELECT IDNo, QTY, COST FROM booking_extension 
-          WHERE BOOKING_ID = ? AND PAYMENT_STATUS = 'unpaid'
+          WHERE BOOKING_ID = ? AND PAYMENT_STATUS = 'unpaid' AND ACTIVE = 1
         `;
         const extensionRows = await new Promise((resolve, reject) => {
           connection.query(extensionQuery, [bookingId], (err, rows) => {
@@ -2346,7 +2473,7 @@ class BookingModel {
                  COALESCE(SUM(CASE WHEN p.AMOUNT_PAID IS NULL THEN 0 ELSE p.AMOUNT_PAID END), 0) as extensionPaid
           FROM booking_extension be
           LEFT JOIN payments p ON p.BOOKING_EXTENSION_ID = be.IDNo AND p.PAYMENT_TYPE = 'extended'
-          WHERE be.BOOKING_ID = ?
+          WHERE be.BOOKING_ID = ? AND be.ACTIVE = 1
         `;
         const remainingExtensionRows = await new Promise((resolve, reject) => {
           connection.query(remainingExtensionQuery, [bookingId], (err, rows) => {
@@ -2921,7 +3048,7 @@ class BookingModel {
               COALESCE((
                 SELECT SUM(be.COST * be.QTY) 
                 FROM booking_extension be 
-                WHERE be.BOOKING_ID = b.IDNo
+                WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1
               ), 0)
             ), 0)
             - COALESCE(gb.GROUP_DISCOUNT, 0)
@@ -2946,7 +3073,7 @@ class BookingModel {
                   COALESCE((
                     SELECT SUM(be.COST * be.QTY) 
                     FROM booking_extension be 
-                    WHERE be.BOOKING_ID = b.IDNo AND be.PAYMENT_STATUS = 'paid'
+                    WHERE be.BOOKING_ID = b.IDNo AND be.PAYMENT_STATUS = 'paid' AND be.ACTIVE = 1
                   ), 0)
                 ELSE 0
               END
@@ -2998,7 +3125,7 @@ class BookingModel {
               ) THEN 1 END) = 0
               AND COUNT(CASE WHEN EXISTS(
                 SELECT 1 FROM booking_extension be 
-                WHERE be.BOOKING_ID = b.IDNo AND be.PAYMENT_STATUS = 'unpaid'
+                WHERE be.BOOKING_ID = b.IDNo AND be.PAYMENT_STATUS = 'unpaid' AND be.ACTIVE = 1
               ) THEN 1 END) = 0
               THEN 'paid'
             WHEN COUNT(CASE WHEN bill.PAYMENT_STATUS = 'paid' THEN 1 END) > 0
@@ -3067,7 +3194,7 @@ class BookingModel {
             SELECT SUM(be.COST * be.QTY)
             FROM booking_extension be
             JOIN booking b3 ON be.BOOKING_ID = b3.IDNo
-            WHERE b3.GROUP_BOOKING_ID = ?
+            WHERE b3.GROUP_BOOKING_ID = ? AND be.ACTIVE = 1
           ), 0) AS extensions_total,
           COALESCE(gb.GROUP_DISCOUNT, 0) AS group_discount,
           COALESCE(gb.GROUP_RESERVATION_FEE, 0) AS reservation_fee
@@ -4699,12 +4826,12 @@ class BookingModel {
         bill.ROOM_CHARGE AS ROOM_RATE,
 
         COALESCE(bill.QTY) AS ORIGINAL_DAYS,
-        COALESCE((SELECT SUM(QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo), 0) AS EXTENDED_DAYS,
+        COALESCE((SELECT SUM(QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo AND ACTIVE = 1), 0) AS EXTENDED_DAYS,
         COALESCE(bill.QTY + EXTENDED_DAYS) AS TOTAL_NIGHTS,
 
         (COALESCE(bill.QTY) * bill.ROOM_CHARGE) AS ROOM_COST,
         (COALESCE(bill.QTY) * bill.ROOM_CHARGE) +
-        COALESCE((SELECT SUM(COST * QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo), 0) AS ROOM_TOTAL,
+        COALESCE((SELECT SUM(COST * QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo AND ACTIVE = 1), 0) AS ROOM_TOTAL,
 
         (
           SELECT COALESCE(SUM(bs.TOTAL_COST), 0)
@@ -4723,14 +4850,14 @@ class BookingModel {
          FROM booking_service bs
          WHERE bs.BOOKING_ID = b.IDNo AND bs.STATUS = 'unpaid' AND bs.ACTIVE = 1) AS SERVICES_UNPAID,
 
-        COALESCE((SELECT SUM(COST * QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo), 0) AS EXTENDED_TOTAL,
+        COALESCE((SELECT SUM(COST * QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo AND ACTIVE = 1), 0) AS EXTENDED_TOTAL,
 
         COALESCE((SELECT SUM(p2.AMOUNT_PAID) FROM payments p2 WHERE p2.BOOKING_EXTENSION_ID IN (
-          SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo)), 0) AS EXTENDED_PAID,
+          SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo AND ACTIVE = 1)), 0) AS EXTENDED_PAID,
 
-        COALESCE((SELECT SUM(COST * QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo), 0) -
+        COALESCE((SELECT SUM(COST * QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo AND ACTIVE = 1), 0) -
         COALESCE((SELECT SUM(p2.AMOUNT_PAID) FROM payments p2 WHERE p2.BOOKING_EXTENSION_ID IN (
-          SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo)), 0) AS EXTENDED_UNPAID,
+          SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo AND ACTIVE = 1)), 0) AS EXTENDED_UNPAID,
 
         (COALESCE((SELECT SUM(p.AMOUNT_PAID) 
                    FROM payments p 
@@ -4738,7 +4865,7 @@ class BookingModel {
          COALESCE((SELECT SUM(p2.AMOUNT_PAID) 
                    FROM payments p2 
                    WHERE p2.BOOKING_EXTENSION_ID IN (
-                     SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo)), 0)) AS ROOM_PAID,
+                     SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo AND ACTIVE = 1)), 0)) AS ROOM_PAID,
 
         ((COALESCE((SELECT SUM(p.AMOUNT_PAID) 
                     FROM payments p 
@@ -4746,13 +4873,13 @@ class BookingModel {
           COALESCE((SELECT SUM(p2.AMOUNT_PAID) 
                     FROM payments p2 
                     WHERE p2.BOOKING_EXTENSION_ID IN (
-                      SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo)), 0)) +
+                      SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo AND ACTIVE = 1)), 0)) +
          (SELECT COALESCE(SUM(bs.TOTAL_COST), 0)
           FROM booking_service bs
           WHERE bs.BOOKING_ID = b.IDNo AND bs.STATUS = 'paid' AND bs.ACTIVE = 1)) AS TOTAL_PAID,
 
         ((COALESCE(bill.ORIGINAL_QTY, bill.QTY) * bill.ROOM_CHARGE) +
-         COALESCE((SELECT SUM(COST * QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo), 0) +
+         COALESCE((SELECT SUM(COST * QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo AND ACTIVE = 1), 0) +
          (SELECT COALESCE(SUM(bs.TOTAL_COST), 0)
           FROM booking_service bs
           WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1) -
@@ -4760,7 +4887,7 @@ class BookingModel {
          COALESCE(bill.DISCOUNT_AMOUNT, 0)) AS GRAND_TOTAL,
 
         (((COALESCE(bill.ORIGINAL_QTY, bill.QTY) * bill.ROOM_CHARGE) +
-          COALESCE((SELECT SUM(COST * QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo), 0) +
+          COALESCE((SELECT SUM(COST * QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo AND ACTIVE = 1), 0) +
           (SELECT COALESCE(SUM(bs.TOTAL_COST), 0)
            FROM booking_service bs
            WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1) -
@@ -4772,7 +4899,7 @@ class BookingModel {
            COALESCE((SELECT SUM(p2.AMOUNT_PAID) 
                      FROM payments p2 
                      WHERE p2.BOOKING_EXTENSION_ID IN (
-                       SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo)), 0)) +
+                       SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo AND ACTIVE = 1)), 0)) +
           (SELECT COALESCE(SUM(bs.TOTAL_COST), 0)
            FROM booking_service bs
            WHERE bs.BOOKING_ID = b.IDNo AND bs.STATUS = 'paid' AND bs.ACTIVE = 1))) AS TOTAL_UNPAID
@@ -6847,7 +6974,7 @@ class BookingModel {
               be.BOOKING_ID,
               SUM(be.QTY * be.COST) AS TOTAL_EXTENSIONS_COST
             FROM booking_extension be
-            WHERE be.PAYMENT_STATUS = 'unpaid'
+            WHERE be.PAYMENT_STATUS = 'unpaid' AND be.ACTIVE = 1
             GROUP BY be.BOOKING_ID
           ) extensions_total ON b.IDNo = extensions_total.BOOKING_ID
         WHERE b.IDNo = ? AND b.ACTIVE = 1

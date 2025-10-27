@@ -376,14 +376,8 @@ class CalendarModel {
           
           console.log('✅ Booking EXTENDED flags updated successfully');
 
-          // Insert booking_extension record if we have an extensionDate
-          if (extensionDate) {
-            await queryDatabasePromise(`
-              INSERT INTO booking_extension (
-                BOOKING_ID, EXTEND_DATE, QTY, COST, PAYMENT_STATUS, ENCODED_BY
-              ) VALUES (?, ?, ?, 0, 'unpaid', 1)
-            `, [id, extensionDate, daysAdded]);
-          }
+          // NOTE: booking_extension record is inserted in extendStay method, not here
+          // This updateBooking method is only for updating the booking dates/flags
         }
       }
 
@@ -858,7 +852,7 @@ class CalendarModel {
   }
 
   // Extend stay (copied from dashboard logic)
-  static async extendStay(currentRoomId, newRoomId, daysToExtend, bookingId, cost) {
+  static async extendStay(currentRoomId, newRoomId, daysToExtend, bookingId, cost, userId = null) {
     try {
       const parsedCost = parseFloat(cost) || 0;
 
@@ -973,7 +967,7 @@ class CalendarModel {
         bookingId,
         daysToExtend,
         parsedCost,
-        1 // Default system user ID for calendar extensions
+        userId// Use actual user ID or default to 1
       ]);
 
       return { success: true };
@@ -996,7 +990,7 @@ class CalendarModel {
           be.ENCODED_BY,
           DATE_FORMAT(be.EXTEND_DATE, '%m/%d/%Y') as FORMATTED_DATE
         FROM booking_extension be
-        WHERE be.BOOKING_ID = ?
+        WHERE be.BOOKING_ID = ? AND be.ACTIVE = 1
         ORDER BY be.EXTEND_DATE DESC
       `, [bookingId]);
 
@@ -1012,8 +1006,8 @@ class CalendarModel {
       // Get the extension details first
       const extensionQuery = `
         SELECT QTY, COST, BOOKING_ID
-        FROM booking_extension
-        WHERE IDNo = ? AND BOOKING_ID = ?
+        FROM booking_extension 
+        WHERE IDNo = ? AND BOOKING_ID = ? AND ACTIVE = 1
       `;
       const extension = await queryDatabasePromise(extensionQuery, [extensionId, bookingId]);
 

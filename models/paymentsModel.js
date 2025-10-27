@@ -70,7 +70,7 @@ const paymentsModel = {
           COALESCE(bill.LATE_CHECKOUT_CHARGE, 0) +
           COALESCE(bill.CANCELLATION_PENALTY, 0) +
           COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0) +
-          COALESCE((SELECT SUM(be.COST) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo), 0)
+          COALESCE((SELECT SUM(be.COST) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
         ) AS TOTAL_AMOUNT,
         COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE != 'discount'), 0) AS TOTAL_PAID,
         (
@@ -80,7 +80,7 @@ const paymentsModel = {
           COALESCE(bill.LATE_CHECKOUT_CHARGE, 0) +
           COALESCE(bill.CANCELLATION_PENALTY, 0) +
           COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0) +
-          COALESCE((SELECT SUM(be.COST) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo), 0)
+          COALESCE((SELECT SUM(be.COST) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
         ) - COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE != 'discount'), 0) - COALESCE(bill.DISCOUNT_AMOUNT, 0) AS BALANCE,
         b.ENCODED_DT AS BOOKING_DATE
       FROM booking b
@@ -103,7 +103,7 @@ const paymentsModel = {
       COALESCE(bill.LATE_CHECKOUT_CHARGE, 0) +
       COALESCE(bill.CANCELLATION_PENALTY, 0) +
       COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0) +
-      COALESCE((SELECT SUM(be.COST) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo), 0)`;
+      COALESCE((SELECT SUM(be.COST) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)`;
 
     const paidExpr = `(SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE != 'discount')`;
 
@@ -149,7 +149,7 @@ const paymentsModel = {
          bill.IDNo AS BILLING_ID,
          COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) AS ROOM_TOTAL,
          COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0) AS SERVICES_TOTAL,
-         COALESCE((SELECT SUM(be.COST) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo), 0) AS EXTENSIONS_TOTAL,
+         COALESCE((SELECT SUM(be.COST) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0) AS EXTENSIONS_TOTAL,
          (
            COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) +
            COALESCE(bill.AMENITIES_CHARGE, 0) +
@@ -157,7 +157,7 @@ const paymentsModel = {
            COALESCE(bill.LATE_CHECKOUT_CHARGE, 0) +
            COALESCE(bill.CANCELLATION_PENALTY, 0) +
            COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0) +
-           COALESCE((SELECT SUM(be.COST) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo), 0)
+           COALESCE((SELECT SUM(be.COST) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
          ) AS TOTAL_AMOUNT,
          COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE != 'discount'), 0) AS TOTAL_PAID,
          (
@@ -167,7 +167,7 @@ const paymentsModel = {
            COALESCE(bill.LATE_CHECKOUT_CHARGE, 0) +
            COALESCE(bill.CANCELLATION_PENALTY, 0) +
            COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0) +
-           COALESCE((SELECT SUM(be.COST) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo), 0)
+           COALESCE((SELECT SUM(be.COST) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
          ) - COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE != 'discount'), 0) - COALESCE(bill.DISCOUNT_AMOUNT, 0) AS BALANCE
        FROM booking b
        LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
@@ -190,9 +190,10 @@ const paymentsModel = {
     );
 
     const [extensions] = await pool.promise().query(
-      `SELECT EXTEND_DATE, QTY, COST, PAYMENT_STATUS
-       FROM booking_extension
-       WHERE BOOKING_ID = ?`, [bookingId]
+      `SELECT be.EXTEND_DATE, be.QTY, be.COST, be.PAYMENT_STATUS, be.ACTIVE, be.EDITED_DT, be.EDITED_BY, be.REMARKS, u.FULLNAME AS EDITED_BY_NAME
+       FROM booking_extension be
+       LEFT JOIN user_info u ON u.IDNo = be.EDITED_BY
+       WHERE be.BOOKING_ID = ?`, [bookingId]
     );
 
     const [payments] = await pool.promise().query(

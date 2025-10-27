@@ -1376,7 +1376,7 @@ class DashboardModel {
   }
 
   // Process stay extension
-  static async extendStay(roomId, checkoutDate, daysToExtend, bookingId, newRoomId = null) {
+  static async extendStay(roomId, checkoutDate, daysToExtend, bookingId, newRoomId = null, cost = 0, userId = null) {
     try {
       // Calculate new checkout date
       const currentCheckout = new Date(checkoutDate);
@@ -1441,13 +1441,15 @@ class DashboardModel {
       const insertExtensionQuery = `
         INSERT INTO booking_extension (
           BOOKING_ID, EXTEND_DATE, QTY, COST, PAYMENT_STATUS, ENCODED_BY
-        ) VALUES (?, ?, ?, 0, 'unpaid', 1)
+        ) VALUES (?, ?, ?, ?, 'unpaid', ?)
       `;
       
       await queryDatabasePromise(insertExtensionQuery, [
         bookingId, 
         new Date().toISOString().slice(0, 19).replace('T', ' '), 
-        daysToExtend
+        daysToExtend,
+        cost,
+        userId
       ]);
       
       return {

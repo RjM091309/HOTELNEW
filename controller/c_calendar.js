@@ -471,6 +471,7 @@ class CalendarController {
   static async extendStay(req, res) {
     try {
       const { currentRoomId, newRoomId, daysToExtend, bookingId, cost } = req.body;
+      const userId = req.user?.userId || null;
 
       if (!currentRoomId || !daysToExtend || !bookingId) {
         return res.status(400).json({ 
@@ -479,7 +480,7 @@ class CalendarController {
         });
       }
 
-      const result = await CalendarModel.extendStay(currentRoomId, newRoomId, daysToExtend, bookingId, cost);
+      const result = await CalendarModel.extendStay(currentRoomId, newRoomId, daysToExtend, bookingId, cost, userId);
       
       if (result.success) {
 
