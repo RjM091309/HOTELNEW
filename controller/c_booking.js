@@ -2161,7 +2161,7 @@ class BookingController {
         breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
         breakfastKidQty, breakfastKidPrice, breakfastKidId,
         pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
-        discount
+        discount, lateCheckoutFee
       } = req.body;
 
       const editedBy = req.user.userId; // Use JWT user ID
@@ -2216,6 +2216,7 @@ class BookingController {
         dropoffServiceId,
         dropoffPrice,
         discount,
+        lateCheckoutFee,
         editedBy
       });
 

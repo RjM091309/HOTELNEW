@@ -5578,7 +5578,7 @@ class BookingModel {
         breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
         breakfastKidQty, breakfastKidPrice, breakfastKidId,
         pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
-        discount, editedBy
+        discount, lateCheckoutFee, editedBy
       } = params;
 
       const editDate = new Date();
@@ -5711,6 +5711,21 @@ class BookingModel {
                 VALUES ?
               `;
               await connection.promise().query(serviceQuery, [services]);
+            }
+
+            // 5A. Handle late checkout fee if applicable
+            if (checkOutStatus == 1 && parseFloat(lateCheckoutFee) > 0) {
+              console.log('✅ Adding late checkout service to booking_service (EDIT)');
+              const lateCheckoutQuery = `
+                INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE)
+                VALUES (?, 72, 1, ?, ?, ?, NOW(), 1)
+              `;
+              
+              const lateCheckoutStatus = paymentStatus === 'paid' ? 'paid' : 'unpaid';
+              await connection.promise().query(lateCheckoutQuery, [
+                bookingId, lateCheckoutFee, lateCheckoutStatus, editedBy
+              ]);
+              console.log('✅ Late checkout service added successfully');
             }
 
             // 6. Update payments based on paid amount
