@@ -601,22 +601,34 @@ function downloadVoucher(bookingID) {
         }
     });
 
-    // Create a hidden iframe to trigger download
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    iframe.src = '/booking/voucher/' + bookingID + '?download=1';
-    document.body.appendChild(iframe);
+    // Create a form to trigger voucher download (same method as auto-download)
+    const form = $('<form>', {
+        method: 'POST',
+        action: '/booking/generate-voucher?download=1',
+        target: '_self'
+    });
     
-    // Remove iframe after download starts
+    // Add booking data to form
+    form.append($('<input>', {
+        type: 'hidden',
+        name: 'bookingId',
+        value: bookingID
+    }));
+    
+    // Submit the form to trigger download
+    $('body').append(form);
+    form.submit();
+    
+    // Remove form and show success after a delay
     setTimeout(() => {
-        document.body.removeChild(iframe);
+        form.remove();
         Swal.fire({
             icon: 'success',
             title: 'PDF Voucher Downloaded!',
             text: 'Your voucher has been downloaded as PDF automatically.',
             confirmButtonText: 'OK'
         });
-    }, 2000);
+    }, 1500);
 }
 
 // Function to show voucher details modal
@@ -711,13 +723,24 @@ function showVoucherDetails(bookingID) {
                     discountAmountRow.style.display = 'none';
                 }
                 
-                // Total balance (actual unpaid amount)
-                const totalBalance = data.totalBalance || 0;
-                document.getElementById('voucher-total-balance').textContent = `PHP ${parseFloat(totalBalance).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-
-                // Grand Total (Total Amount + Reservation Fee - Discount)
-                const grandTotal = (parseFloat(data.total || 0));
-                document.getElementById('voucher-grand-total').textContent = `PHP ${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                // Calculate TOTAL AMOUNT (subTotal + reservationFee - discount)
+                const subTotal = parseFloat(data.total || 0);
+                const totalAmount = subTotal + parseFloat(reservationFee) - parseFloat(discountAmount);
+                
+                // Get PAID AMOUNT (from API response)
+                const paidAmount = parseFloat(data.paidAmount || 0);
+                
+                // Calculate BALANCE
+                const balance = totalAmount - paidAmount;
+                
+                // Display TOTAL AMOUNT
+                document.getElementById('voucher-total-amount').textContent = `PHP ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                
+                // Display PAID AMOUNT
+                document.getElementById('voucher-paid-amount').textContent = `PHP ${paidAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                
+                // Display BALANCE
+                document.getElementById('voucher-balance').textContent = `PHP ${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
                 
                 // Store booking ID for download function
                 document.getElementById('modal-voucher-details').setAttribute('data-booking-id', bookingID);

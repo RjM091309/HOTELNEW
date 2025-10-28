@@ -1836,6 +1836,96 @@ class BookingController {
         FULLNAME: req.user.FULLNAME,
       } : { FULLNAME: 'System User' };
 
+      // If bookingId is provided instead of full voucher data, fetch it from database
+      if (!data.voucherNo && data.bookingId) {
+        const voucherData = await BookingModel.getVoucherData(data.bookingId);
+        
+        if (!voucherData) {
+          return res.status(404).send('Booking not found');
+        }
+
+        // Generate PDF using the same method as manual download
+        const { chromium } = require('playwright');
+        const path = require('path');
+        const ejs = require('ejs');
+        const fs = require('fs').promises;
+
+        // Render EJS template
+        const templatePath = path.join(__dirname, '../views/booking/pdf/booking_voucher.ejs');
+        const templateContent = await fs.readFile(templatePath, 'utf-8');
+        
+        // Get voucher number
+        const voucherNo = voucherData.confirmationNumber || data.bookingId;
+        
+        // Calculate breakfast info
+        const breakfastAdult = voucherData.breakfastAdultQty || 0;
+        const breakfastKid = voucherData.breakfastKidQty || 0;
+        const pickup = voucherData.pickupPrice || 0;
+        const dropoff = voucherData.dropoffPrice || 0;
+        const lateCheckoutFee = parseFloat(voucherData.lateCheckoutFee) || 0;
+        
+        // Get billing data for totals
+        const billingData = await BookingModel.getBilling(data.bookingId);
+        
+        // Calculate total from billing data
+        const subTotal = billingData.subTotal || 0;
+        const reservationFee = billingData.reservationFee || 0;
+        const discountAmount = billingData.discountAmount || 0;
+        
+        // Total amount
+        const total = subTotal + reservationFee - discountAmount;
+        
+        // Get paid amount and balance from voucher data (already calculated in query)
+        const paidAmount = parseFloat(voucherData.paidAmount) || 0;
+        const balance = total - paidAmount;
+
+        // Render the HTML
+        const html = await ejs.render(templateContent, {
+          voucherNo,
+          fullname: voucherData.fullname,
+          dateFrom: voucherData.dateFrom,
+          dateTo: voucherData.dateTo,
+          roomNumber: voucherData.roomNumber || 'Unassigned',
+          roomType: voucherData.roomType || 'Unassigned',
+          remarks: voucherData.remarks || 'Room Accommodation',
+          breakfastAdult,
+          breakfastKid,
+          pickup,
+          dropoff,
+          reservationFee: voucherData.reservationFee || 0,
+          discount: voucherData.discount || 0,
+          checkOutStatus: voucherData.checkOutStatus,
+          lateCheckoutFee,
+          total,
+          paidAmount,
+          balance,
+          encodedBy: user.FULLNAME,
+          imageUrl: `file://${path.join(__dirname, '../public/img/logo.png')}`
+        });
+
+        // Generate PDF with playwright
+        const browser = await chromium.launch();
+        const page = await browser.newPage();
+        await page.setContent(html, { waitUntil: 'networkidle' });
+        const pdfBuffer = await page.pdf({ 
+          format: 'A4',
+          printBackground: true,
+          margin: { top: '0', bottom: '0', left: '0', right: '0' }
+        });
+        await browser.close();
+
+        // Send PDF
+        const filename = `voucher-${voucherNo}.pdf`;
+        const download = req.query.download === '1';
+        res.set({
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `${download ? 'attachment' : 'inline'}; filename="${filename}"`,
+          'Content-Length': pdfBuffer.length.toString()
+        });
+        res.send(pdfBuffer);
+        return;
+      }
+
       if (!data || !data.voucherNo) {
         return res.status(400).json({ 
           error: "Voucher data is required" 
@@ -2433,25 +2523,96 @@ class BookingController {
         });
       }
 
-      // Generate PDF using a PDF library (like puppeteer or jsPDF)
-      // For now, we'll return the data structure
-      res.set({
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `${download ? 'attachment' : 'inline'}; filename="voucher-${voucherData.confirmationNumber || bookingId}.pdf"`
+      // Use playwright to generate PDF from EJS template
+      const { chromium } = require('playwright');
+      const path = require('path');
+      const ejs = require('ejs');
+      const fs = require('fs').promises;
+
+      // Get encoded by user
+      const user = req.user ? {
+        FULLNAME: req.user.FULLNAME,
+      } : { FULLNAME: 'System User' };
+
+      // Render EJS template
+      const templatePath = path.join(__dirname, '../views/booking/pdf/booking_voucher.ejs');
+      const templateContent = await fs.readFile(templatePath, 'utf-8');
+      
+      // Get voucher number
+      const voucherNo = voucherData.confirmationNumber || bookingId;
+      
+      // Calculate breakfast info
+      const breakfastAdult = voucherData.breakfastAdultQty || 0;
+      const breakfastKid = voucherData.breakfastKidQty || 0;
+      const pickup = voucherData.pickupPrice || 0;
+      const dropoff = voucherData.dropoffPrice || 0;
+      const lateCheckoutFee = parseFloat(voucherData.lateCheckoutFee) || 0;
+      
+      // Get billing data for totals
+      const billingData = await BookingModel.getBilling(bookingId);
+      
+      // Calculate total from billing data
+      const subTotal = billingData.subTotal || 0;
+      const reservationFee = billingData.reservationFee || 0;
+      const discountAmount = billingData.discountAmount || 0;
+      
+      // Total amount
+      const total = subTotal + reservationFee - discountAmount;
+      
+      // Get paid amount and balance from voucher data (already calculated in query)
+      const paidAmount = parseFloat(voucherData.paidAmount) || 0;
+      const balance = total - paidAmount;
+
+      // Render the HTML - pass raw dates and let template format them
+      const html = await ejs.render(templateContent, {
+        voucherNo,
+        fullname: voucherData.fullname,
+        dateFrom: voucherData.dateFrom,
+        dateTo: voucherData.dateTo,
+        roomNumber: voucherData.roomNumber || 'Unassigned',
+        roomType: voucherData.roomType || 'Unassigned',
+        remarks: voucherData.remarks || 'Room Accommodation',
+        breakfastAdult,
+        breakfastKid,
+        pickup,
+        dropoff,
+        reservationFee: voucherData.reservationFee || 0,
+        discount: voucherData.discount || 0,
+        checkOutStatus: voucherData.checkOutStatus,
+        lateCheckoutFee,
+        total,
+        paidAmount,
+        balance,
+        encodedBy: user.FULLNAME,
+        imageUrl: `file://${path.join(__dirname, '../public/img/logo.png')}`
       });
 
-      // This would be replaced with actual PDF generation
-      res.json({
-        success: true,
-        message: 'Voucher generated successfully',
-        data: voucherData
+      // Generate PDF with playwright
+      const browser = await chromium.launch();
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle' });
+      const pdfBuffer = await page.pdf({ 
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '0', bottom: '0', left: '0', right: '0' }
       });
+      await browser.close();
+
+      // Send PDF
+      const filename = `voucher-${voucherNo}.pdf`;
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `${download ? 'attachment' : 'inline'}; filename="${filename}"`,
+        'Content-Length': pdfBuffer.length.toString()
+      });
+      res.send(pdfBuffer);
 
     } catch (error) {
       console.error('Error generating voucher PDF:', error);
       res.status(500).json({
         success: false,
-        message: 'Error generating voucher PDF'
+        message: 'Error generating voucher PDF',
+        error: error.message
       });
     }
   }

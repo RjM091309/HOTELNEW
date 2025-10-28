@@ -113,11 +113,11 @@
       </tr>
       <tr>
         <td class="label">ARRIVAL DATE:</td>
-        <td><%= dateFrom %></td>
+        <td><%= new Date(dateFrom).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) %></td>
       </tr>
       <tr>
         <td class="label">DEPARTURE DATE:</td>
-        <td><%= dateTo %></td>
+        <td><%= new Date(dateTo).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) %></td>
       </tr>
       <tr>
         <td class="label">NO. PAX:</td>
@@ -127,11 +127,14 @@
         <td class="label">LENGTH OF STAY:</td>
         <td>
           <% 
-            const from = new Date(dateFrom);
-            const to = new Date(dateTo);
-            const diffDays = Math.ceil((to - from) / (1000 * 60 * 60 * 24));
+            try {
+              const from = new Date(dateFrom);
+              const to = new Date(dateTo);
+              const diffDays = Math.ceil((to - from) / (1000 * 60 * 60 * 24));
+              const nights = diffDays || 1;
           %>
-          <%= diffDays %> NIGHT<%= diffDays > 1 ? 'S' : '' %>
+          <%= nights %> NIGHT<%= nights > 1 ? 'S' : '' %>
+          <% } catch(e) { %>1 NIGHT<% } %>
         </td>
       </tr>
       <tr>
@@ -188,16 +191,46 @@
     </table>
 
     <%
-    const cleanTotal = parseFloat((total || '0').toString().replace(/,/g, ''));
+    // Safely get values with multiple fallbacks
+    let cleanTotal = 0;
+    let cleanPaid = 0;
+    let cleanBalance = 0;
+    
+    // Get total
+    if (typeof total !== 'undefined' && total !== null && total !== '') {
+        cleanTotal = parseFloat(total.toString().replace(/,/g, '')) || 0;
+    }
+    
+    // Get paid amount
+    if (typeof paidAmount !== 'undefined' && paidAmount !== null && paidAmount !== '') {
+        cleanPaid = parseFloat(paidAmount.toString().replace(/,/g, '')) || 0;
+    }
+    
+    // Get or compute balance
+    if (typeof balance !== 'undefined' && balance !== null && balance !== '') {
+        cleanBalance = parseFloat(balance.toString().replace(/,/g, '')) || 0;
+    } else {
+        // Compute balance from total and paid
+        cleanBalance = Math.max(0, cleanTotal - cleanPaid);
+    }
     %>
     <table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-weight: bold; font-size: 14px;">
         <tr style="background: #d9d9d9; border-top: 2px solid #000; border-bottom: 2px solid #000;">
-          <td style="padding: 10px; text-align: center;">
-            TOTAL BALANCE: PHP <%= cleanTotal.toLocaleString() %>
+          <td style="padding: 10px; width: 30%; text-align: left;">
+            <strong>TOTAL AMOUNT:</strong><br>
+            <span style="font-size: 16px;">PHP <%= cleanTotal.toLocaleString() %></span>
+          </td>
+          <td style="padding: 10px; width: 40%; text-align: center;">
+            <strong>PAID AMOUNT:</strong><br>
+            <span style="font-size: 16px;">PHP <%= cleanPaid.toLocaleString() %></span>
+          </td>
+          <td style="padding: 10px; width: 30%; text-align: right;">
+            <strong>BALANCE:</strong><br>
+            <span style="font-size: 16px;">PHP <%= cleanBalance.toLocaleString() %></span>
           </td>
         </tr>
         <tr>
-          <td style="padding: 8px; text-align: center;">
+          <td colspan="3" style="padding: 8px; text-align: center;">
             PREPARED BY: <%= encodedBy %>
           </td>
         </tr>

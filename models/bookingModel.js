@@ -5008,12 +5008,14 @@ class BookingModel {
       const { chromium } = require('playwright');
       const ejs = require('ejs');
       
+      const templateData = {
+        ...data,
+        encodedBy: user.FULLNAME
+      };
+      
       const html = await ejs.renderFile(
         path.join(__dirname, '../views/booking/pdf/booking_voucher.ejs'),
-        {
-          ...data,
-          encodedBy: user.FULLNAME
-        }
+        templateData
       );
 
       const browser = await chromium.launch({ headless: true });
@@ -6955,7 +6957,17 @@ class BookingModel {
               + COALESCE(extensions_total.TOTAL_EXTENSIONS_COST, 0)
               - COALESCE(bill.RESERVATION_FEE, 0)
               - COALESCE(bill.DISCOUNT_AMOUNT, 0)
-          END AS totalBalance
+          END AS totalBalance,
+          -- Payments total
+          COALESCE(payments_total.TOTAL_PAID, 0) AS paidAmount,
+          -- Breakfast fields
+          bs_adult.QTY AS breakfastAdultQty,
+          bs_kid.QTY AS breakfastKidQty,
+          -- Pickup/Dropoff fields
+          bs_pickup.TOTAL_COST AS pickupPrice,
+          bs_dropoff.TOTAL_COST AS dropoffPrice,
+          -- Late checkout fee
+          bs_late.TOTAL_COST AS lateCheckoutFee
         FROM booking b
           LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
           LEFT JOIN room r ON b.ROOM_ID = r.IDNo
@@ -6966,7 +6978,7 @@ class BookingModel {
               bs.BOOKING_ID,
               SUM(bs.TOTAL_COST) AS TOTAL_SERVICES_COST
             FROM booking_service bs
-            WHERE bs.ACTIVE = 1 AND bs.STATUS = 'unpaid'
+            WHERE bs.ACTIVE = 1
             GROUP BY bs.BOOKING_ID
           ) services_total ON b.IDNo = services_total.BOOKING_ID
           LEFT JOIN (
@@ -6974,9 +6986,33 @@ class BookingModel {
               be.BOOKING_ID,
               SUM(be.QTY * be.COST) AS TOTAL_EXTENSIONS_COST
             FROM booking_extension be
-            WHERE be.PAYMENT_STATUS = 'unpaid' AND be.ACTIVE = 1
+            WHERE be.ACTIVE = 1
             GROUP BY be.BOOKING_ID
           ) extensions_total ON b.IDNo = extensions_total.BOOKING_ID
+          -- Payments total
+          LEFT JOIN (
+            SELECT 
+              p.BOOKING_ID,
+              SUM(p.AMOUNT_PAID) AS TOTAL_PAID
+            FROM payments p
+            WHERE p.BOOKING_ID IS NOT NULL
+            GROUP BY p.BOOKING_ID
+          ) payments_total ON b.IDNo = payments_total.BOOKING_ID
+          -- Breakfast Adult (Service ID = 80)
+          LEFT JOIN booking_service bs_adult ON b.IDNo = bs_adult.BOOKING_ID 
+            AND bs_adult.SERVICE_ID = 80 AND bs_adult.ACTIVE = 1
+          -- Breakfast Kid (Service ID = 81)
+          LEFT JOIN booking_service bs_kid ON b.IDNo = bs_kid.BOOKING_ID 
+            AND bs_kid.SERVICE_ID = 81 AND bs_kid.ACTIVE = 1
+          -- Pickup (Service ID = 90)
+          LEFT JOIN booking_service bs_pickup ON b.IDNo = bs_pickup.BOOKING_ID 
+            AND bs_pickup.SERVICE_ID = 90 AND bs_pickup.ACTIVE = 1
+          -- Dropoff (Service ID = 91)
+          LEFT JOIN booking_service bs_dropoff ON b.IDNo = bs_dropoff.BOOKING_ID 
+            AND bs_dropoff.SERVICE_ID = 91 AND bs_dropoff.ACTIVE = 1
+          -- Late Checkout (Service ID = 72)
+          LEFT JOIN booking_service bs_late ON b.IDNo = bs_late.BOOKING_ID 
+            AND bs_late.SERVICE_ID = 72 AND bs_late.ACTIVE = 1
         WHERE b.IDNo = ? AND b.ACTIVE = 1
       `;
 
