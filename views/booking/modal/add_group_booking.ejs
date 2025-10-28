@@ -215,6 +215,10 @@
                 <label class="form-check-label" for="groupIncludeBreakfast">Add Breakfast</label>
               </div>
               <div id="groupBreakfastFields" class="group-breakfast-fields d-none">
+                <div class="form-check mb-2">
+                  <input class="form-check-input" type="checkbox" id="groupBreakfastIndividual">
+                  <label class="form-check-label" for="groupBreakfastIndividual">Individual (per room)</label>
+                </div>
                 <div class="group-quantity-wrapper">
                   <input type="number" class="form-control" id="groupBreakfastAdultQty" name="groupBreakfastAdultQty" placeholder="Adult Qty" style="max-width: 90px;">
                   <input type="number" class="form-control" id="groupBreakfastAdultPrice" name="groupBreakfastAdultPrice" placeholder="Adult Price" min="0" step="0.01">
@@ -270,11 +274,11 @@
             </div>
             <div class="col-lg-4">
               <div class="form-check mb-2">
-                <input class="form-check-input" type="checkbox" id="groupConsolidatedBilling">
-                <label class="form-check-label" for="groupConsolidatedBilling">Master Billing</label>
+                <input class="form-check-input" type="checkbox" id="groupIndividualBilling">
+                <label class="form-check-label" for="groupIndividualBilling">Individual Billing</label>
               </div>
               <div class="form-text">
-                <small class="text-muted">All charges (rooms, services, fees) go to main booking only</small>
+                <small class="text-muted">If unchecked, all charges go to main booking (Master Billing)</small>
               </div>
             </div>
           </div>
@@ -575,8 +579,8 @@
   box-shadow: 0 0 0 0.2rem rgba(111, 156, 64, 0.25);
 }
 
-/* Consolidated billing styling */
-#groupConsolidatedBilling:checked + label {
+/* Individual billing styling */
+#groupIndividualBilling:checked + label {
   color: #6f9c40;
   font-weight: 600;
 }
@@ -965,7 +969,8 @@
     $('#groupCreditDisplay').hide();
     $('#groupCreditAmount').text('₱0.00');
     $('#groupBreakfastFields').addClass('d-none');
-    $('#groupIncludeBreakfast, #groupIncludePickup, #groupIncludeDropoff, #groupConsolidatedBilling').prop('checked', false);
+    $('#groupIncludeBreakfast, #groupIncludePickup, #groupIncludeDropoff, #groupIndividualBilling').prop('checked', false); // Default to Master Billing (unchecked)
+    $('#groupBreakfastIndividual').prop('checked', false); // Default breakfast to group (not individual)
     $('#groupBreakfastAdultQty, #groupBreakfastKidQty').val('');
     $('#groupPickupWrapper, #groupDropoffWrapper').hide();
     $('#groupPickupPrice, #groupDropoffPrice').val('');
@@ -1271,14 +1276,22 @@
     const adultPrice = parseFloat($('#groupBreakfastAdultPrice').val()) || 0;
     const kidQty = $('#groupIncludeBreakfast').is(':checked') ? (parseInt($('#groupBreakfastKidQty').val(), 10) || 0) : 0;
     const kidPrice = parseFloat($('#groupBreakfastKidPrice').val()) || 0;
+    const breakfastIndividual = $('#groupBreakfastIndividual').is(':checked');
 
     const pickupPrice = $('#groupIncludePickup').is(':checked') ? parseFloat($('#groupPickupPrice').val()) || 0 : 0;
     const dropoffPrice = $('#groupIncludeDropoff').is(':checked') ? parseFloat($('#groupDropoffPrice').val()) || 0 : 0;
 
-    const servicesTotal = (adultQty * adultPrice) + (kidQty * kidPrice) + pickupPrice + dropoffPrice;
+    // Get number of rooms for individual service calculations
+    const selectedRooms = $('#groupSelectedRooms').val();
+    const numRooms = selectedRooms ? selectedRooms.split(',').length : 1;
 
-    // Check if consolidated billing is enabled
-    const isConsolidated = $('#groupConsolidatedBilling').is(':checked');
+    const breakfastTotal = (adultQty * adultPrice) + (kidQty * kidPrice);
+    const breakfastTotalWithIndividual = breakfastIndividual ? breakfastTotal * numRooms : breakfastTotal;
+
+    const servicesTotal = breakfastTotalWithIndividual + pickupPrice + dropoffPrice;
+
+    // Check if individual billing is enabled (inverted logic)
+    const isConsolidated = !$('#groupIndividualBilling').is(':checked');
 
     // Always calculate the full total in frontend for user visibility
     const subtotal = roomSubtotal + servicesTotal;
@@ -1839,6 +1852,11 @@
       computeGroupTotal();
     });
 
+    // Add event listeners for individual service checkboxes
+    $('#groupBreakfastIndividual').on('change', function() {
+      computeGroupTotal();
+    });
+
     $('#groupBreakfastAdultQty, #groupBreakfastKidQty, #groupPickupPrice, #groupDropoffPrice').on('input', function() {
       computeGroupTotal();
       // Validate that price is not empty if service is checked
@@ -2298,8 +2316,8 @@
     $('#modal-add-group-booking').on('shown.bs.modal', function() {
       resetGroupForm();
       initializeGroupFlatpickr();
-      // Ensure consolidated indicator is properly initialized
-      $('#groupConsolidatedBilling').trigger('change');
+      // Ensure individual billing indicator is properly initialized
+      $('#groupIndividualBilling').trigger('change');
     });
 
     // Toggle wrappers and recalc
@@ -2321,10 +2339,11 @@
       computeGroupTotal();
     });
 
-    // Handle consolidated billing checkbox
-    $('#groupConsolidatedBilling').on('change', function() {
-      const isConsolidated = $(this).is(':checked');
-      console.log('🔄 Frontend - Consolidated Billing Checkbox Changed:', isConsolidated ? 'CHECKED (Consolidated)' : 'UNCHECKED (Individual)');
+    // Handle individual billing checkbox (inverted logic)
+    $('#groupIndividualBilling').on('change', function() {
+      const isIndividual = $(this).is(':checked');
+      const isConsolidated = !isIndividual; // Inverted logic
+      console.log('🔄 Frontend - Individual Billing Checkbox Changed:', isIndividual ? 'CHECKED (Individual)' : 'UNCHECKED (Master/Consolidated)');
 
       if (isConsolidated) {
         // Show consolidated billing indicator but keep room breakdown visible
@@ -2419,7 +2438,7 @@
       // Extract numeric value, handling consolidated format
       const numericTotal = totalText.replace(/[^0-9.]/g, '').split(' ')[0] || '0';
 
-      const isConsolidated = $('#groupConsolidatedBilling').is(':checked');
+      const isConsolidated = !$('#groupIndividualBilling').is(':checked'); // Inverted logic
       const bookingData = {
         voucherNo: vno,
         fullname: $('#groupName').val() || 'Group Booking',

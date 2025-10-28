@@ -205,6 +205,10 @@
                 <label class="form-check-label" for="editGroupIncludeBreakfast">Add Breakfast</label>
               </div>
               <div id="editGroupBreakfastFields" class="group-breakfast-fields d-none">
+                <div class="form-check mb-2">
+                  <input class="form-check-input" type="checkbox" id="editGroupBreakfastIndividual">
+                  <label class="form-check-label" for="editGroupBreakfastIndividual">Individual (per room)</label>
+                </div>
                 <div class="group-quantity-wrapper">
                   <input type="number" class="form-control" id="editGroupBreakfastAdultQty" name="groupBreakfastAdultQty" placeholder="Adult Qty" style="max-width: 90px;">
                   <input type="number" class="form-control" id="editGroupBreakfastAdultPrice" name="groupBreakfastAdultPrice" placeholder="Adult Price" min="0" step="0.01">
@@ -260,11 +264,11 @@
             </div>
             <div class="col-lg-4">
               <div class="form-check mb-2">
-                <input class="form-check-input" type="checkbox" id="editGroupConsolidatedBilling">
-                <label class="form-check-label" for="editGroupConsolidatedBilling">Master Billing</label>
+                <input class="form-check-input" type="checkbox" id="editGroupIndividualBilling">
+                <label class="form-check-label" for="editGroupIndividualBilling">Individual Billing</label>
               </div>
               <div class="form-text">
-                <small class="text-muted">All charges (rooms, services, fees) go to main booking only</small>
+                <small class="text-muted">If unchecked, all charges go to main booking (Master Billing)</small>
               </div>
             </div>
           </div>
@@ -491,8 +495,8 @@
   box-shadow: 0 0 0 0.2rem rgba(111, 156, 64, 0.25);
 }
 
-/* Consolidated billing styling */
-#editGroupConsolidatedBilling:checked + label {
+/* Individual billing styling */
+#editGroupIndividualBilling:checked + label {
   color: #6f9c40;
   font-weight: 600;
 }
@@ -764,7 +768,8 @@ window.editGroupManualSelectedRooms = [];
     $('#editGroupCreditDisplay').hide();
     $('#editGroupCreditAmount').text('₱0.00');
     $('#editGroupBreakfastFields').addClass('d-none');
-    $('#editGroupIncludeBreakfast, #editGroupIncludePickup, #editGroupIncludeDropoff, #editGroupIncludeReservationFee, #editGroupIncludeDiscount, #editGroupConsolidatedBilling').prop('checked', false);
+    $('#editGroupIncludeBreakfast, #editGroupIncludePickup, #editGroupIncludeDropoff, #editGroupIncludeReservationFee, #editGroupIncludeDiscount, #editGroupIndividualBilling').prop('checked', false); // Default to Master Billing (unchecked)
+    $('#editGroupBreakfastIndividual').prop('checked', false); // Default breakfast to group (not individual)
     $('#editGroupBreakfastAdultQty, #editGroupBreakfastKidQty').val('');
     $('#editGroupPickupWrapper, #editGroupDropoffWrapper, #editGroupReservationFeeWrapper, #editGroupDiscountWrapper').hide();
     $('#editGroupPickupPrice, #editGroupDropoffPrice, #editGroupReservationFee, #editGroupDiscount').val('');
@@ -1370,13 +1375,14 @@ window.editGroupManualSelectedRooms = [];
       breakfastKidQty: $('#editGroupBreakfastKidQty').val(),
       breakfastKidPrice: $('#editGroupBreakfastKidPrice').val(),
       breakfastKidId: $('#editGroupBreakfastKidId').val(),
+      breakfastIndividual: $('#editGroupBreakfastIndividual').is(':checked') ? 'on' : '',
       pickupServiceId: $('#editGroupPickupServiceId').val(),
       pickupPrice: $('#editGroupPickupPrice').val(),
       dropoffServiceId: $('#editGroupDropoffServiceId').val(),
       dropoffPrice: $('#editGroupDropoffPrice').val(),
       reservationFee: $('#editGroupReservationFee').val(),
       discount: $('#editGroupDiscount').val(),
-      consolidatedBilling: $('#editGroupConsolidatedBilling').is(':checked')
+      individualBilling: $('#editGroupIndividualBilling').is(':checked') ? 'on' : '' // Inverted logic
     };
 
 
@@ -1621,7 +1627,12 @@ window.editGroupManualSelectedRooms = [];
     });
 
     // Auto-compute total when checkboxes are toggled
-    $('#editGroupIncludeReservationFee, #editGroupIncludeDiscount, #editGroupIncludeBreakfast, #editGroupIncludePickup, #editGroupIncludeDropoff, #editGroupConsolidatedBilling').on('change', function() {
+    $('#editGroupIncludeReservationFee, #editGroupIncludeDiscount, #editGroupIncludeBreakfast, #editGroupIncludePickup, #editGroupIncludeDropoff, #editGroupIndividualBilling').on('change', function() {
+      computeEditGroupTotal();
+    });
+
+    // Auto-compute total when breakfast individual checkbox is toggled
+    $('#editGroupBreakfastIndividual').on('change', function() {
       computeEditGroupTotal();
     });
 

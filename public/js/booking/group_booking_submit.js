@@ -25,8 +25,11 @@ $(document).ready(function () {
     const breakfastKidQty = $('#groupBreakfastKidQty').val();
     const breakfastKidPrice = $('#groupBreakfastKidPrice').val();
     const breakfastKidId = $('#groupBreakfastKidId').val();
+    const breakfastIndividual = $('#groupBreakfastIndividual').is(':checked');
+    
     const pickupServiceId = $('#groupPickupServiceId').val();
     const pickupPrice = $('#groupPickupPrice').val();
+    
     const dropoffServiceId = $('#groupDropoffServiceId').val();
     const dropoffPrice = $('#groupDropoffPrice').val();
 
@@ -64,9 +67,10 @@ $(document).ready(function () {
     const reservationFee = parseFloat(state.reservationFee) || 0;
     const discount = parseFloat(state.discount) || 0;
 
-    // Get consolidated billing flag
-    const consolidatedBilling = $('#groupConsolidatedBilling').is(':checked');
-    console.log('🔄 Frontend - Consolidated Billing Checkbox:', consolidatedBilling ? 'CHECKED' : 'UNCHECKED');
+    // Get individual billing flag (inverted logic - checked = individual, unchecked = consolidated)
+    const individualBilling = $('#groupIndividualBilling').is(':checked');
+    const consolidatedBilling = !individualBilling; // Inverted logic
+    console.log('🔄 Frontend - Individual Billing Checkbox:', individualBilling ? 'CHECKED (Individual)' : 'UNCHECKED (Master/Consolidated)');
 
     // Get agency ID if booking route is agency
     const agencyId = bookingRoute === 'agency' ? $('#groupAgencySelect').val() || null : null;
@@ -103,13 +107,14 @@ $(document).ready(function () {
       breakfastKidQty,
       breakfastKidPrice,
       breakfastKidId,
+      breakfastIndividual: breakfastIndividual ? 'on' : '',
       pickupServiceId,
       pickupPrice,
       dropoffServiceId,
       dropoffPrice,
       reservationFee,
       discount,
-      consolidatedBilling: consolidatedBilling ? 'on' : '',
+      individualBilling: individualBilling ? 'on' : '', // Inverted logic
       perRoomReservationFees: perRoomFees,
       perRoomDiscounts
     };

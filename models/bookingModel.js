@@ -3022,6 +3022,7 @@ class BookingModel {
           gb.CONTACT_NO,
           gb.NUMBER_OF_ROOMS,
           gb.REMARKS AS REMARKS,
+          gb.BILLING_TYPE,
           b.BOOKING_CHANNEL,
           /* Total active remarks across all bookings in this group */
           (
@@ -3328,7 +3329,8 @@ class BookingModel {
           gb.GROUP_DISCOUNT,
           gb.REMARKS,
           gb.ENCODED_BY,
-          gb.ENCODED_DT
+          gb.ENCODED_DT,
+          gb.BILLING_TYPE
         FROM group_booking gb
         WHERE gb.IDNo = ?
       `;
@@ -3383,21 +3385,8 @@ class BookingModel {
 
       const bookingsResult = await queryDatabasePromise(bookingsQuery, [groupBookingId]);
 
-      // Determine if consolidated billing was used
-      let isConsolidatedBilling = false;
-      if (bookingsResult.length > 1) {
-        // Calculate total room charges across all bookings
-        const totalRoomCharges = bookingsResult.reduce((sum, booking) => {
-          return sum + (parseFloat(booking.ROOM_CHARGE || 0) * parseInt(booking.QTY || 1));
-        }, 0);
-
-        // Get charges for the main booking (first booking)
-        const mainBookingCharges = parseFloat(bookingsResult[0]?.ROOM_CHARGE || 0) * parseInt(bookingsResult[0]?.QTY || 1);
-
-        // If main booking has all/sum of charges, it was likely consolidated billing
-        // This is a heuristic since we don't store the preference directly
-        isConsolidatedBilling = mainBookingCharges > 0 && mainBookingCharges >= totalRoomCharges * 0.8; // 80% threshold
-      }
+      // Get billing type from database (1 = Master, 0 = Individual)
+      const isConsolidatedBilling = groupBooking.BILLING_TYPE === 1;
 
       // Get services for the group
       const servicesQuery = `
@@ -3503,6 +3492,29 @@ class BookingModel {
         }
       });
 
+      // Debug: Log final group services
+      console.log('🔍 Final group services:', {
+        breakfastAdult: groupServices.breakfastAdult,
+        breakfastKid: groupServices.breakfastKid,
+        pickup: groupServices.pickup,
+        dropoff: groupServices.dropoff
+      });
+
+      // Detect if breakfast is applied individually
+      // If breakfast service exists in MORE THAN ONE booking, it's individual
+      const breakfastAdultBookings = servicesResult.filter(s => {
+        const serviceName = s.SERVICE_NAME.toLowerCase();
+        return s.SERVICE_ID === 74 || (serviceName.includes('adult') && serviceName.includes('breakfast'));
+      }).map(s => s.BOOKING_ID);
+      
+      const breakfastKidBookings = servicesResult.filter(s => {
+        const serviceName = s.SERVICE_NAME.toLowerCase();
+        return s.SERVICE_ID === 75 || (serviceName.includes('kid') && serviceName.includes('breakfast'));
+      }).map(s => s.BOOKING_ID);
+      
+      const uniqueBreakfastBookings = new Set([...breakfastAdultBookings, ...breakfastKidBookings]);
+      const isBreakfastIndividual = uniqueBreakfastBookings.size > 1;
+
       return {
         groupBookingId: groupBooking.IDNo,
         groupName: groupBooking.GROUP_NAME,
@@ -3524,6 +3536,7 @@ class BookingModel {
         agencyId: firstBooking.AGENCY_ID,
         consolidatedBilling: isConsolidatedBilling, // Derived from billing data
         bedRequirements: bedRequirements, // Calculated from selected rooms
+        breakfastIndividual: isBreakfastIndividual, // Detected: true if breakfast exists in multiple bookings
         // Services data
         breakfastAdultQty: groupServices.breakfastAdult.qty || '0',
         breakfastAdultPrice: groupServices.breakfastAdult.price || '0',
@@ -3538,14 +3551,6 @@ class BookingModel {
         // Individual booking data for form population
         bookings: bookingsResult
       };
-      
-      // Debug: Log final group services
-      console.log('🔍 Final group services:', {
-        breakfastAdult: groupServices.breakfastAdult,
-        breakfastKid: groupServices.breakfastKid,
-        pickup: groupServices.pickup,
-        dropoff: groupServices.dropoff
-      });
 
     } catch (error) {
       console.error('Error in getEditGroupBookingDetails:', error);
@@ -3578,13 +3583,14 @@ class BookingModel {
       breakfastKidQty,
       breakfastKidPrice,
       breakfastKidId,
+      breakfastIndividual = false,
       pickupServiceId,
       pickupPrice,
       dropoffServiceId,
       dropoffPrice,
       reservationFee = 0,
       discount = 0,
-      consolidatedBilling = false,
+      consolidatedBilling = true, // Default: Master Billing (changed from false to true)
       encodedBy,
       date
     } = data;
@@ -3619,7 +3625,7 @@ class BookingModel {
       // Update group_booking table
       const updateGroupQuery = `
         UPDATE group_booking
-        SET GROUP_NAME = ?, CONTACT_NO = ?, NUMBER_OF_ROOMS = ?, GROUP_RESERVATION_FEE = ?, GROUP_DISCOUNT = ?, REMARKS = ?, ENCODED_BY = ?
+        SET GROUP_NAME = ?, CONTACT_NO = ?, NUMBER_OF_ROOMS = ?, GROUP_RESERVATION_FEE = ?, GROUP_DISCOUNT = ?, REMARKS = ?, ENCODED_BY = ?, BILLING_TYPE = ?
         WHERE IDNo = ?
       `;
 
@@ -3631,6 +3637,7 @@ class BookingModel {
         parseFloat(discount) || 0,
         remarks || '',
         encodedBy,
+        consolidatedBilling ? 1 : 0, // 1 = Master, 0 = Individual
         
         groupBookingId
       ]);
@@ -3863,38 +3870,81 @@ class BookingModel {
       }
 
       // Handle services update (delete existing and add new)
-      const firstBookingQuery = `SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ? ORDER BY IDNo LIMIT 1`;
-      const [firstBookingResult] = await connection.promise().query(firstBookingQuery, [groupBookingId]);
-      const firstBookingId = firstBookingResult[0]?.IDNo;
+      // Get all booking IDs for this group
+      const allBookingIdsQuery = `SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ? ORDER BY IDNo`;
+      const [allBookings] = await connection.promise().query(allBookingIdsQuery, [groupBookingId]);
+      const targetBookingIds = allBookings.map(b => b.IDNo);
 
-      if (firstBookingId) {
-        // Delete existing services and their payments
-        await connection.promise().query('DELETE FROM payments WHERE BOOKING_ID = ? AND PAYMENT_TYPE = ?', [firstBookingId, 'service']);
-        await connection.promise().query('DELETE FROM booking_service WHERE BOOKING_ID = ?', [firstBookingId]);
+      // Delete existing services for all bookings and their payments
+      for (const bookingId of targetBookingIds) {
+        await connection.promise().query('DELETE FROM payments WHERE BOOKING_ID = ? AND PAYMENT_TYPE = ?', [bookingId, 'service']);
+        await connection.promise().query('DELETE FROM booking_service WHERE BOOKING_ID = ?', [bookingId]);
+      }
 
-        // Add new services
+      if (targetBookingIds.length > 0) {
         const groupServices = [];
+        const servicePayments = [];
 
         // Breakfast Adult
         if (parseInt(breakfastAdultQty) > 0 && breakfastAdultId) {
           const totalAdult = parseFloat(breakfastAdultQty) * parseFloat(breakfastAdultPrice);
-          groupServices.push([firstBookingId, breakfastAdultId, breakfastAdultQty, totalAdult, paymentStatus === 'paid' ? 'paid' : 'unpaid', encodedBy, date, 1]);
+          const serviceStatus = paymentStatus === 'paid' ? 'paid' : 'unpaid';
+          
+          if (breakfastIndividual) {
+            // Apply individually to each booking
+            for (const bookingId of targetBookingIds) {
+              groupServices.push([bookingId, breakfastAdultId, breakfastAdultQty, totalAdult, serviceStatus, encodedBy, date, 1]);
+              if (paymentStatus === 'paid') {
+                servicePayments.push([bookingId, breakfastAdultId, parseFloat(totalAdult), 'cash', 'service', date, encodedBy]);
+              }
+            }
+          } else {
+            // Apply only to first booking
+            groupServices.push([targetBookingIds[0], breakfastAdultId, breakfastAdultQty, totalAdult, serviceStatus, encodedBy, date, 1]);
+            if (paymentStatus === 'paid') {
+              servicePayments.push([targetBookingIds[0], breakfastAdultId, parseFloat(totalAdult), 'cash', 'service', date, encodedBy]);
+            }
+          }
         }
 
         // Breakfast Kid
         if (parseInt(breakfastKidQty) > 0 && breakfastKidId) {
           const totalKid = parseFloat(breakfastKidQty) * parseFloat(breakfastKidPrice);
-          groupServices.push([firstBookingId, breakfastKidId, breakfastKidQty, totalKid, paymentStatus === 'paid' ? 'paid' : 'unpaid', encodedBy, date, 1]);
+          const serviceStatus = paymentStatus === 'paid' ? 'paid' : 'unpaid';
+          
+          if (breakfastIndividual) {
+            // Apply individually to each booking
+            for (const bookingId of targetBookingIds) {
+              groupServices.push([bookingId, breakfastKidId, breakfastKidQty, totalKid, serviceStatus, encodedBy, date, 1]);
+              if (paymentStatus === 'paid') {
+                servicePayments.push([bookingId, breakfastKidId, parseFloat(totalKid), 'cash', 'service', date, encodedBy]);
+              }
+            }
+          } else {
+            // Apply only to first booking
+            groupServices.push([targetBookingIds[0], breakfastKidId, breakfastKidQty, totalKid, serviceStatus, encodedBy, date, 1]);
+            if (paymentStatus === 'paid') {
+              servicePayments.push([targetBookingIds[0], breakfastKidId, parseFloat(totalKid), 'cash', 'service', date, encodedBy]);
+            }
+          }
         }
 
         // Pickup
         if (pickupServiceId && pickupPrice) {
-          groupServices.push([firstBookingId, pickupServiceId, 1, parseFloat(pickupPrice), paymentStatus === 'paid' ? 'paid' : 'unpaid', encodedBy, date, 1]);
+          const serviceStatus = paymentStatus === 'paid' ? 'paid' : 'unpaid';
+          groupServices.push([targetBookingIds[0], pickupServiceId, 1, parseFloat(pickupPrice), serviceStatus, encodedBy, date, 1]);
+          if (paymentStatus === 'paid') {
+            servicePayments.push([targetBookingIds[0], pickupServiceId, parseFloat(pickupPrice), 'cash', 'service', date, encodedBy]);
+          }
         }
 
         // Dropoff
         if (dropoffServiceId && dropoffPrice) {
-          groupServices.push([firstBookingId, dropoffServiceId, 1, parseFloat(dropoffPrice), paymentStatus === 'paid' ? 'paid' : 'unpaid', encodedBy, date, 1]);
+          const serviceStatus = paymentStatus === 'paid' ? 'paid' : 'unpaid';
+          groupServices.push([targetBookingIds[0], dropoffServiceId, 1, parseFloat(dropoffPrice), serviceStatus, encodedBy, date, 1]);
+          if (paymentStatus === 'paid') {
+            servicePayments.push([targetBookingIds[0], dropoffServiceId, parseFloat(dropoffPrice), 'cash', 'service', date, encodedBy]);
+          }
         }
 
         if (groupServices.length > 0) {
@@ -3902,20 +3952,10 @@ class BookingModel {
             INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE)
             VALUES ?
           `;
-          const [serviceResult] = await connection.promise().query(serviceQuery, [groupServices]);
+          await connection.promise().query(serviceQuery, [groupServices]);
           
           // Insert payments for services if payment status is 'paid'
-          if (paymentStatus === 'paid') {
-            const servicePayments = groupServices.map(s => [
-              firstBookingId, 
-              s[1], // SERVICE_ID (this is how Add Group Booking does it)
-              parseFloat(s[3]), // AMOUNT_PAID
-              'cash', 
-              'service', 
-              date, 
-              encodedBy
-            ]);
-            
+          if (servicePayments.length > 0) {
             const payQuery = `
               INSERT INTO payments (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
               VALUES ?
@@ -4531,7 +4571,7 @@ class BookingModel {
       try {
         // Check if group booking exists and get all individual bookings
         const fetchGroupQuery = `
-          SELECT gb.IDNo as GROUP_ID, gb.GROUP_NAME, gb.CONTACT_NO,
+          SELECT gb.IDNo as GROUP_ID, gb.GROUP_NAME, gb.CONTACT_NO, gb.BILLING_TYPE,
                  b.IDNo as BOOKING_ID, b.CHECK_IN_DATE, b.CHECK_OUT_DATE, b.BOOKING_STATUS
           FROM group_booking gb
           LEFT JOIN booking b ON gb.IDNo = b.GROUP_BOOKING_ID
@@ -6494,13 +6534,14 @@ class BookingModel {
       breakfastKidQty,
       breakfastKidPrice,
       breakfastKidId,
+      breakfastIndividual = false,
       pickupServiceId,
       pickupPrice,
       dropoffServiceId,
       dropoffPrice,
       reservationFee = 0,
       discount = 0,
-      consolidatedBilling = false,
+      consolidatedBilling = true, // Default: Master Billing (changed from false to true)
       perRoomReservationFees = [],
       perRoomDiscounts = [],
       lateCheckoutFee = 0,
@@ -6574,8 +6615,8 @@ class BookingModel {
 
       // Insert into group_booking
       const groupBookingQuery = `
-        INSERT INTO group_booking (GROUP_NAME, CONTACT_NO, NUMBER_OF_ROOMS, ENCODED_BY, GROUP_RESERVATION_FEE, GROUP_DISCOUNT, REMARKS)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO group_booking (GROUP_NAME, CONTACT_NO, NUMBER_OF_ROOMS, ENCODED_BY, GROUP_RESERVATION_FEE, GROUP_DISCOUNT, REMARKS, BILLING_TYPE)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `;
       const [groupResult] = await connection.promise().query(groupBookingQuery, [
         groupName,
@@ -6584,7 +6625,8 @@ class BookingModel {
         encodedBy,
         parseFloat(reservationFee) || 0,
         parseFloat(discount) || 0,
-        remarks || ''
+        remarks || '',
+        consolidatedBilling ? 1 : 0 // 1 = Master, 0 = Individual
       ]);
       const groupBookingId = groupResult.insertId;
 
@@ -6869,35 +6911,97 @@ class BookingModel {
         }
       }
 
-      // Insert group-level services against firstBookingId
-      if (firstBookingId) {
+      // Insert group-level services
+      // Get all booking IDs for this group
+      const allBookingIds = [];
+      for (let index = 0; index < roomIds.length; index++) {
+        const roomId = roomIds[index];
+        const [existingBooking] = await connection.promise().query(
+          'SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ? AND ROOM_ID = ? ORDER BY IDNo ASC LIMIT 1',
+          [groupBookingId, roomId]
+        );
+        if (existingBooking && existingBooking.length > 0) {
+          allBookingIds.push(existingBooking[0].IDNo);
+        }
+      }
+      
+      // If no bookings found yet, use firstBookingId as fallback
+      const targetBookingIds = allBookingIds.length > 0 ? allBookingIds : (firstBookingId ? [firstBookingId] : []);
+      
+      if (targetBookingIds.length > 0) {
         const groupServices = [];
+        const servicePayments = [];
+        
         // Breakfast Adult
         if (parseInt(breakfastAdultQty) > 0 && breakfastAdultId) {
           const totalAdult = parseFloat(breakfastAdultQty) * parseFloat(breakfastAdultPrice);
-          groupServices.push([firstBookingId, breakfastAdultId, breakfastAdultQty, totalAdult, paymentStatus === 'paid' ? 'paid' : 'unpaid', encodedBy, date, 1]);
+          const serviceStatus = paymentStatus === 'paid' ? 'paid' : 'unpaid';
+          
+          if (breakfastIndividual) {
+            // Apply individually to each booking
+            for (const bookingId of targetBookingIds) {
+              groupServices.push([bookingId, breakfastAdultId, breakfastAdultQty, totalAdult, serviceStatus, encodedBy, date, 1]);
+              if (paymentStatus === 'paid') {
+                servicePayments.push([bookingId, breakfastAdultId, parseFloat(totalAdult), 'cash', 'service', date, encodedBy]);
+              }
+            }
+          } else {
+            // Apply only to first booking
+            groupServices.push([targetBookingIds[0], breakfastAdultId, breakfastAdultQty, totalAdult, serviceStatus, encodedBy, date, 1]);
+            if (paymentStatus === 'paid') {
+              servicePayments.push([targetBookingIds[0], breakfastAdultId, parseFloat(totalAdult), 'cash', 'service', date, encodedBy]);
+            }
+          }
         }
+        
         // Breakfast Kid
         if (parseInt(breakfastKidQty) > 0 && breakfastKidId) {
           const totalKid = parseFloat(breakfastKidQty) * parseFloat(breakfastKidPrice);
-          groupServices.push([firstBookingId, breakfastKidId, breakfastKidQty, totalKid, paymentStatus === 'paid' ? 'paid' : 'unpaid', encodedBy, date, 1]);
+          const serviceStatus = paymentStatus === 'paid' ? 'paid' : 'unpaid';
+          
+          if (breakfastIndividual) {
+            // Apply individually to each booking
+            for (const bookingId of targetBookingIds) {
+              groupServices.push([bookingId, breakfastKidId, breakfastKidQty, totalKid, serviceStatus, encodedBy, date, 1]);
+              if (paymentStatus === 'paid') {
+                servicePayments.push([bookingId, breakfastKidId, parseFloat(totalKid), 'cash', 'service', date, encodedBy]);
+              }
+            }
+          } else {
+            // Apply only to first booking
+            groupServices.push([targetBookingIds[0], breakfastKidId, breakfastKidQty, totalKid, serviceStatus, encodedBy, date, 1]);
+            if (paymentStatus === 'paid') {
+              servicePayments.push([targetBookingIds[0], breakfastKidId, parseFloat(totalKid), 'cash', 'service', date, encodedBy]);
+            }
+          }
         }
+        
         // Pickup
         if (pickupServiceId && pickupPrice) {
-          groupServices.push([firstBookingId, pickupServiceId, 1, parseFloat(pickupPrice), paymentStatus === 'paid' ? 'paid' : 'unpaid', encodedBy, date, 1]);
+          const serviceStatus = paymentStatus === 'paid' ? 'paid' : 'unpaid';
+          groupServices.push([targetBookingIds[0], pickupServiceId, 1, parseFloat(pickupPrice), serviceStatus, encodedBy, date, 1]);
+          if (paymentStatus === 'paid') {
+            servicePayments.push([targetBookingIds[0], pickupServiceId, parseFloat(pickupPrice), 'cash', 'service', date, encodedBy]);
+          }
         }
+        
         // Dropoff
         if (dropoffServiceId && dropoffPrice) {
-          groupServices.push([firstBookingId, dropoffServiceId, 1, parseFloat(dropoffPrice), paymentStatus === 'paid' ? 'paid' : 'unpaid', encodedBy, date, 1]);
+          const serviceStatus = paymentStatus === 'paid' ? 'paid' : 'unpaid';
+          groupServices.push([targetBookingIds[0], dropoffServiceId, 1, parseFloat(dropoffPrice), serviceStatus, encodedBy, date, 1]);
+          if (paymentStatus === 'paid') {
+            servicePayments.push([targetBookingIds[0], dropoffServiceId, parseFloat(dropoffPrice), 'cash', 'service', date, encodedBy]);
+          }
         }
+        
         if (groupServices.length > 0) {
           const serviceQuery = `
             INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE)
             VALUES ?
           `;
           await connection.promise().query(serviceQuery, [groupServices]);
-          if (paymentStatus === 'paid') {
-            const servicePayments = groupServices.map(s => [firstBookingId, s[1], parseFloat(s[3]), 'cash', 'service', date, encodedBy]);
+          
+          if (servicePayments.length > 0) {
             const payQuery = `
               INSERT INTO payments (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
               VALUES ?
@@ -6908,8 +7012,14 @@ class BookingModel {
       }
 
       // Calculate services total and grand total
-      const breakfastAdultTotal = (parseInt(breakfastAdultQty) > 0 && breakfastAdultPrice) ? parseFloat(breakfastAdultQty) * parseFloat(breakfastAdultPrice) : 0;
-      const breakfastKidTotal = (parseInt(breakfastKidQty) > 0 && breakfastKidPrice) ? parseFloat(breakfastKidQty) * parseFloat(breakfastKidPrice) : 0;
+      // If individual breakfast, multiply by number of rooms; otherwise, apply once
+      const numRooms = targetBookingIds.length;
+      const breakfastAdultTotal = (parseInt(breakfastAdultQty) > 0 && breakfastAdultPrice) 
+        ? parseFloat(breakfastAdultQty) * parseFloat(breakfastAdultPrice) * (breakfastIndividual ? numRooms : 1) 
+        : 0;
+      const breakfastKidTotal = (parseInt(breakfastKidQty) > 0 && breakfastKidPrice) 
+        ? parseFloat(breakfastKidQty) * parseFloat(breakfastKidPrice) * (breakfastIndividual ? numRooms : 1) 
+        : 0;
       const pickupTotal = pickupPrice ? parseFloat(pickupPrice) : 0;
       const dropoffTotal = dropoffPrice ? parseFloat(dropoffPrice) : 0;
       const servicesTotal = breakfastAdultTotal + breakfastKidTotal + pickupTotal + dropoffTotal;

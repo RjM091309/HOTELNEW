@@ -1270,24 +1270,28 @@ class BookingController {
         breakfastKidQty,
         breakfastKidPrice,
         breakfastKidId,
+        breakfastIndividual: breakfastIndividualValue,
         pickupServiceId,
         pickupPrice,
         dropoffServiceId,
         dropoffPrice,
         reservationFee,
         discount,
-        consolidatedBilling: consolidatedBillingValue,
+        individualBilling: individualBillingValue,
         perRoomReservationFees,
         perRoomDiscounts,
         directReservationFlag,
         lateCheckoutFee = 0
       } = req.body;
 
-      // Convert consolidatedBilling checkbox value to boolean
-      // Checkbox sends "on" when checked, undefined/false when unchecked
-      console.log('🔄 Backend Controller - Received consolidatedBillingValue:', consolidatedBillingValue, 'Type:', typeof consolidatedBillingValue);
-      const consolidatedBilling = consolidatedBillingValue === 'on';
-      console.log('🔄 Backend Controller - Converted consolidatedBilling:', consolidatedBilling);
+      // Convert individualBilling checkbox value to boolean (inverted logic)
+      // If checked = individual billing, if unchecked = consolidated/master billing (default)
+      console.log('🔄 Backend Controller - Received individualBillingValue:', individualBillingValue, 'Type:', typeof individualBillingValue);
+      const consolidatedBilling = individualBillingValue !== 'on'; // Inverted: unchecked = consolidated
+      console.log('🔄 Backend Controller - Converted to consolidatedBilling:', consolidatedBilling, '(Individual:', !consolidatedBilling, ')');
+      
+      // Convert individual service flag (only for Breakfast)
+      const breakfastIndividual = breakfastIndividualValue === 'on';
 
       const encodedBy = req.user?.userId;
       if (!encodedBy) {
@@ -1343,6 +1347,7 @@ class BookingController {
         breakfastKidQty,
         breakfastKidPrice,
         breakfastKidId,
+        breakfastIndividual,
         pickupServiceId,
         pickupPrice,
         dropoffServiceId,
@@ -1426,13 +1431,14 @@ class BookingController {
         breakfastKidQty,
         breakfastKidPrice,
         breakfastKidId,
+        breakfastIndividual: breakfastIndividualValue,
         pickupServiceId,
         pickupPrice,
         dropoffServiceId,
         dropoffPrice,
         reservationFee,
         discount,
-        consolidatedBilling
+        individualBilling: individualBillingValue
       } = req.body;
 
       if (!groupBookingId) {
@@ -1449,6 +1455,9 @@ class BookingController {
           message: 'User is not logged in'
         });
       }
+
+      // Convert individual service flag (only for Breakfast)
+      const breakfastIndividual = breakfastIndividualValue === 'on';
 
       const date = new Date();
 
@@ -1475,13 +1484,14 @@ class BookingController {
         breakfastKidQty,
         breakfastKidPrice,
         breakfastKidId,
+        breakfastIndividual,
         pickupServiceId,
         pickupPrice,
         dropoffServiceId,
         dropoffPrice,
         reservationFee,
         discount,
-        consolidatedBilling: consolidatedBilling === 'true' || consolidatedBilling === true,
+        consolidatedBilling: individualBillingValue !== 'on', // Inverted logic: unchecked = consolidated
         encodedBy,
         date
       });

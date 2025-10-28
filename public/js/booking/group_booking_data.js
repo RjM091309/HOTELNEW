@@ -851,10 +851,19 @@ function computeEditGroupTotal() {
     const pickupPrice = $('#editGroupIncludePickup').is(':checked') ? parseFloat($('#editGroupPickupPrice').val()) || 0 : 0;
     const dropoffPrice = $('#editGroupIncludeDropoff').is(':checked') ? parseFloat($('#editGroupDropoffPrice').val()) || 0 : 0;
 
-    const servicesTotal = (adultQty * adultPrice) + (kidQty * kidPrice) + pickupPrice + dropoffPrice;
+    // Check if breakfast should be applied individually
+    const breakfastIndividual = $('#editGroupBreakfastIndividual').is(':checked');
+    const selectedRooms = $('#editGroupSelectedRooms').val();
+    const numRooms = selectedRooms ? selectedRooms.split(',').length : 1;
 
-    // Check if consolidated billing is enabled
-    const isConsolidated = $('#editGroupConsolidatedBilling').is(':checked');
+    // Calculate breakfast total with individual logic
+    const breakfastTotal = (adultQty * adultPrice) + (kidQty * kidPrice);
+    const breakfastTotalWithIndividual = breakfastIndividual ? breakfastTotal * numRooms : breakfastTotal;
+
+    const servicesTotal = breakfastTotalWithIndividual + pickupPrice + dropoffPrice;
+
+    // Check if consolidated billing is enabled (inverted logic)
+    const isConsolidated = !$('#editGroupIndividualBilling').is(':checked');
 
     // Always calculate the full total in frontend for user visibility
     const subtotal = roomSubtotal + servicesTotal;
@@ -1061,14 +1070,17 @@ function populateEditGroupForm(booking) {
         $('#editGroupDiscount').val('0');
     }
 
-    // Set consolidated billing
-    $('#editGroupConsolidatedBilling').prop('checked', booking.consolidatedBilling || false);
+    // Set individual billing (inverted logic: if consolidatedBilling is true, checkbox is unchecked)
+    $('#editGroupIndividualBilling').prop('checked', booking.consolidatedBilling === false);
 
     // Set services - explicitly handle checked/unchecked state
     const hasBreakfast = parseInt(booking.breakfastAdultQty) > 0 || parseInt(booking.breakfastKidQty) > 0;
     if (hasBreakfast) {
         $('#editGroupIncludeBreakfast').prop('checked', true);
         $('#editGroupBreakfastFields').removeClass('d-none');
+        
+        // Set breakfast individual checkbox based on backend detection
+        $('#editGroupBreakfastIndividual').prop('checked', booking.breakfastIndividual === true);
 		$('#editGroupBreakfastAdultQty').val(booking.breakfastAdultQty);
 		// Use unit price = TOTAL_COST / QTY when QTY > 0; otherwise leave as-is
 		var _adultQty = parseFloat(booking.breakfastAdultQty) || 0;
