@@ -14,6 +14,7 @@
           <input type="hidden" id="groupSelectedRoomPrices" name="groupSelectedRoomPrices">
           <input type="hidden" id="groupSelectedRoomNumbers" name="groupSelectedRoomNumbers">
           <input type="hidden" id="groupNights" name="groupNights" value="0">
+          <input type="hidden" id="groupPaidAmountHidden" name="groupPaidAmountHidden" value="0">
 
           <div class="row">
             <div class="col-lg-6">
@@ -171,17 +172,21 @@
           </div>
 
           <div class="row p-t-20">
-            <div class="col-lg-4">
+            <div class="col-lg-3">
               <div class="form-group">
-                <label class="form-label">Payment Status</label>
-                <select class="form-select" id="groupPaymentStatus" name="groupPaymentStatus" required>
-                  <option value="" disabled selected>Payment Status</option>
-                  <option value="paid">Paid</option>
-                  <option value="unpaid">Unpaid</option>
-                </select>
+                <label class="form-label">Paid Amount</label>
+                <input class="form-control" type="number" id="groupPaidAmount" name="groupPaidAmount" placeholder="Enter paid amount" step="0.01" min="0" max="999999" value="0">
               </div>
             </div>
-            <div class="col-lg-4">
+            
+            <div class="col-lg-3">
+              <div class="form-group">
+                <label class="form-label">Payment Status</label>
+                <input class="form-control" type="text" id="groupPaymentStatus" name="groupPaymentStatus" readonly style="background-color: #2a3135; color: #ffffff;">
+              </div>
+            </div>
+            
+            <div class="col-lg-3">
               <div class="form-group">
                 <label class="form-label">Guest Type</label>
                 <select class="form-select" id="groupGuestType" name="groupGuestType" required>
@@ -189,7 +194,7 @@
                 </select>
               </div>
             </div>
-            <div class="col-lg-4">
+            <div class="col-lg-3">
               <div class="form-group">
                 <label class="form-label">Guest Level</label>
                 <select class="form-select" id="groupGuestLevel" name="groupGuestLevel" required>
@@ -256,15 +261,6 @@
           <div class="row p-t-20">
             <div class="col-lg-4">
               <div class="form-check mb-2">
-                <input class="form-check-input" type="checkbox" id="groupIncludeReservationFee">
-                <label class="form-check-label" for="groupIncludeReservationFee">Reservation Fee</label>
-              </div>
-              <div id="groupReservationFeeWrapper" class="mt-2" style="display: none;">
-                <input type="number" class="form-control" id="groupReservationFee" name="groupReservationFee" min="0" value="0">
-              </div>
-            </div>
-            <div class="col-lg-4">
-              <div class="form-check mb-2">
                 <input class="form-check-input" type="checkbox" id="groupIncludeDiscount">
                 <label class="form-check-label" for="groupIncludeDiscount">Discount</label>
               </div>
@@ -287,13 +283,19 @@
 
           <hr class="my-4">
           <div class="row p-t-20">
-            <div class="col-lg-6">
-              <h3>Total: <span id="groupComputedTotal">₱0.00</span></h3>
-              <div id="groupCreditDisplay" style="display: none; margin-top: 10px;">
-                <span style="color: #28a745; font-weight: bold;">Credit: <span id="groupCreditAmount">₱0.00</span></span>
-              </div>
+            <div class="col-lg-4">
+              <h3>Total: <span id="groupComputedTotal">0.00</span></h3>
             </div>
-            <div class="col-lg-6">
+            <div class="col-lg-4">
+              <h3>Paid: <span id="groupComputedPaidAmount">0.00</span></h3>
+            </div>
+            <div class="col-lg-4">
+              <h3>Balance: <span id="groupComputedBalance">0.00</span></h3>
+            </div>
+          </div>
+          
+          <div class="row p-t-20">
+            <div class="col-lg-12">
               <div class="d-flex justify-content-end gap-2">
                 <button type="button" class="btn btn-success" id="btnGroupVoucherPreview">Voucher</button>
                 <button type="submit" class="btn btn-primary">Save Booking</button>
@@ -583,18 +585,6 @@
 #groupIndividualBilling:checked + label {
   color: #6f9c40;
   font-weight: 600;
-}
-
-/* Disabled reservation fee styling */
-#groupIncludeReservationFee:disabled + label {
-  color: #666666;
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-#groupIncludeReservationFee:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
 }
 
 .form-text small {
@@ -905,6 +895,43 @@
   font-size: 14px;
 }
 
+/* Total, Paid, and Balance styling */
+#groupComputedTotal {
+  color: #17a2b8 !important; /* Blue color */
+  font-weight: bold;
+}
+
+#groupComputedBalance {
+  color: #fd7e14 !important; /* Orange color */
+  font-weight: bold;
+}
+
+#groupComputedPaidAmount {
+  color: #28a745 !important; /* Green color */
+  font-weight: bold;
+}
+
+/* Payment Status field styling */
+#modal-add-group-booking #groupPaymentStatus {
+  background-color: #2a3135 !important;
+  color: #ffffff !important;
+  border: 1px solid #41474c !important;
+  font-weight: bold;
+  text-align: center;
+}
+
+#modal-add-group-booking #groupPaymentStatus.status-paid {
+  color: #28a745 !important;
+}
+
+#modal-add-group-booking #groupPaymentStatus.status-partial {
+  color: #ffc107 !important;
+}
+
+#modal-add-group-booking #groupPaymentStatus.status-unpaid {
+  color: #dc3545 !important;
+}
+
 </style>
 
 <script src="/plugins/flatpicker/flatpickr.min.js"></script>
@@ -965,7 +992,9 @@
     $('#groupResultsContainer').hide();
     $('#groupManualRateSection').hide(); // Hide manual rate section
     $('#groupEnableManualRates').prop('checked', false); // Reset manual rates checkbox
-    $('#groupComputedTotal').html('₱0.00');
+    $('#groupComputedTotal').html('0.00');
+    $('#groupComputedPaidAmount').html('0.00');
+    $('#groupComputedBalance').html('0.00');
     $('#groupCreditDisplay').hide();
     $('#groupCreditAmount').text('₱0.00');
     $('#groupBreakfastFields').addClass('d-none');
@@ -977,11 +1006,6 @@
     $('#groupPickupServiceId, #groupDropoffServiceId').val('');
     $('#groupRoomBreakdown').removeClass('d-none');
     $('.consolidated-indicator').remove();
-    
-    // Reset reservation fee checkbox state
-    $('#groupIncludeReservationFee').prop('checked', false).prop('disabled', false);
-    $('#groupReservationFeeWrapper').hide();
-    $('#groupReservationFee').val('0');
     
     applyGroupBreakfastDefaults();
   }
@@ -1012,6 +1036,13 @@
 
   function formatCurrency(value) {
     return `₱${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  function formatPaidAmount(input) {
+    const value = parseFloat(input.value) || 0;
+    input.value = value.toFixed(2);
+    // Sync with hidden field
+    $('#groupPaidAmountHidden').val(value.toFixed(2));
   }
 
   function getSelectedDateRange() {
@@ -1269,7 +1300,6 @@
     const baseSubtotal = prices.reduce((sum, price) => sum + price, 0);
     const roomSubtotal = baseSubtotal * nights;
 
-    const reservationFee = $('#groupIncludeReservationFee').prop('checked') ? (parseFloat($('#groupReservationFee').val()) || 0) : 0;
     const discount = $('#groupIncludeDiscount').prop('checked') ? (parseFloat($('#groupDiscount').val()) || 0) : 0;
 
     const adultQty = $('#groupIncludeBreakfast').is(':checked') ? (parseInt($('#groupBreakfastAdultQty').val(), 10) || 0) : 0;
@@ -1295,27 +1325,63 @@
 
     // Always calculate the full total in frontend for user visibility
     const subtotal = roomSubtotal + servicesTotal;
-    let finalBalance = subtotal - reservationFee - discount;
+    let finalBalance = subtotal - discount;
+
+    // Get paid amount and validate it doesn't exceed total
+    let paidAmount = parseFloat($('#groupPaidAmount').val()) || 0;
+    
+    // Prevent paid amount from exceeding total
+    if (paidAmount > finalBalance) {
+      paidAmount = finalBalance;
+      $('#groupPaidAmount').val(paidAmount.toFixed(2));
+      $('#groupPaidAmountHidden').val(paidAmount.toFixed(2));
+    }
+    
+    // Calculate balance (total - paid amount)
+    const balance = finalBalance - paidAmount;
+    
+    // Determine payment status
+    let paymentStatus;
+    if (paidAmount <= 0) {
+      paymentStatus = 'unpaid';
+    } else if (paidAmount >= finalBalance) {
+      paymentStatus = 'paid';
+    } else {
+      paymentStatus = 'partial';
+    }
+    
+    // Update payment status field
+    $('#groupPaymentStatus').val(paymentStatus);
+    
+    // Update payment status styling with CSS classes
+    $('#groupPaymentStatus').removeClass('status-paid status-partial status-unpaid');
+    if (paymentStatus === 'paid') {
+      $('#groupPaymentStatus').addClass('status-paid');
+    } else if (paymentStatus === 'partial') {
+      $('#groupPaymentStatus').addClass('status-partial');
+    } else {
+      $('#groupPaymentStatus').addClass('status-unpaid');
+    }
+
+    // Update paid amount display (format without currency symbol)
+    $('#groupComputedPaidAmount').html('<b>' + paidAmount.toLocaleString(undefined, { minimumFractionDigits: 2 }) + '</b>');
+    
+    // Update balance display (format without currency symbol)
+    $('#groupComputedBalance').html('<b>' + balance.toLocaleString(undefined, { minimumFractionDigits: 2 }) + '</b>');
 
     if (isConsolidated) {
       // Show consolidated total with indicator
       if (finalBalance < 0) {
-        $('#groupComputedTotal').html(`<span class="text-warning">${formatCurrency(0)} <small>(Master)</small></span>`);
-        $('#groupCreditAmount').text(formatCurrency(Math.abs(finalBalance)));
-        $('#groupCreditDisplay').show();
+        $('#groupComputedTotal').html(`<b class="text-warning">0.00 <small>(Master)</small></b>`);
       } else {
-        $('#groupComputedTotal').html(`<span>${formatCurrency(finalBalance)} <small class="text-info">(Master)</small></span>`);
-        $('#groupCreditDisplay').hide();
+        $('#groupComputedTotal').html(`<b>${finalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })} <small class="text-info">(Master)</small></b>`);
       }
     } else {
       // Regular billing calculation
       if (finalBalance < 0) {
-        $('#groupComputedTotal').text(formatCurrency(0));
-        $('#groupCreditAmount').text(formatCurrency(Math.abs(finalBalance)));
-        $('#groupCreditDisplay').show();
+        $('#groupComputedTotal').html('<b class="text-warning">0.00</b>');
       } else {
-        $('#groupComputedTotal').text(formatCurrency(finalBalance));
-        $('#groupCreditDisplay').hide();
+        $('#groupComputedTotal').html('<b>' + finalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 }) + '</b>');
       }
     }
   }
@@ -2260,12 +2326,11 @@
   }
 
   function updateGroupChargeBreakdown() {
-    const reservationFee = $('#groupIncludeReservationFee').prop('checked') ? (parseFloat($('#groupReservationFee').val()) || 0) : 0;
     const discount = $('#groupIncludeDiscount').prop('checked') ? (parseFloat($('#groupDiscount').val()) || 0) : 0;
     const container = $('#groupRoomBreakdown');
     if (!container.length) return;
 
-    if (!reservationFee && !discount) {
+    if (!discount) {
       container.find('.group-fee-discount-summary').remove();
       return;
     }
@@ -2277,9 +2342,6 @@
     }
 
     const lines = [];
-    if (reservationFee) {
-      lines.push(`<li>Reservation Fee (Group): ${formatCurrency(reservationFee)}</li>`);
-    }
     if (discount) {
       lines.push(`<li>Discount (Group): -${formatCurrency(discount)}</li>`);
     }
@@ -2290,7 +2352,6 @@
 
   function getGroupBookingState() {
     return {
-      reservationFee: $('#groupIncludeReservationFee').prop('checked') ? (parseFloat($('#groupReservationFee').val()) || 0) : 0,
       discount: $('#groupIncludeDiscount').prop('checked') ? (parseFloat($('#groupDiscount').val()) || 0) : 0
     };
   }
@@ -2313,6 +2374,12 @@
 
     $('#groupBookingForm').on('input change', computeGroupTotal);
 
+    // Paid amount formatting and update handler
+    $('#groupPaidAmount').on('blur', function() {
+      formatPaidAmount(this);
+      computeGroupTotal();
+    });
+
     $('#modal-add-group-booking').on('shown.bs.modal', function() {
       resetGroupForm();
       initializeGroupFlatpickr();
@@ -2321,12 +2388,6 @@
     });
 
     // Toggle wrappers and recalc
-    $('#groupIncludeReservationFee').on('change', function() {
-      $('#groupReservationFeeWrapper').toggle(this.checked);
-      if (!this.checked) { $('#groupReservationFee').val('0'); }
-      updateGroupChargeBreakdown();
-      computeGroupTotal();
-    });
     $('#groupIncludeDiscount').on('change', function() {
       $('#groupDiscountWrapper').toggle(this.checked);
       if (!this.checked) { $('#groupDiscount').val('0'); }
@@ -2334,7 +2395,7 @@
       computeGroupTotal();
     });
 
-    $('#groupReservationFee, #groupDiscount').on('input', function() {
+    $('#groupDiscount').on('input', function() {
       updateGroupChargeBreakdown();
       computeGroupTotal();
     });
@@ -2362,28 +2423,6 @@
       updateGroupChargeBreakdown();
     });
 
-    // Handle Payment Status changes - disable Reservation Fee when Paid
-    $('#groupPaymentStatus').on('change', function() {
-      const paymentStatus = $(this).val();
-      const reservationFeeCheckbox = $('#groupIncludeReservationFee');
-      const reservationFeeWrapper = $('#groupReservationFeeWrapper');
-      
-      if (paymentStatus === 'paid') {
-        // Disable reservation fee checkbox and hide wrapper
-        reservationFeeCheckbox.prop('checked', false).prop('disabled', true);
-        reservationFeeWrapper.hide();
-        $('#groupReservationFee').val('0');
-        console.log('💰 Payment Status: PAID - Reservation Fee disabled');
-      } else {
-        // Enable reservation fee checkbox
-        reservationFeeCheckbox.prop('disabled', false);
-        console.log('💰 Payment Status: UNPAID - Reservation Fee enabled');
-      }
-      
-      // Recalculate totals and update breakdown
-      updateGroupChargeBreakdown();
-      computeGroupTotal();
-    });
 
     // Clear selected rooms when Check-in/Check-out status changes
     $('#groupCheckInStatus, #groupCheckOutStatus, #groupBookingRoute').on('change', function() {
@@ -2461,7 +2500,6 @@
         checkInStatus: $('#groupCheckInStatus').val(),
         checkOutStatus: $('#groupCheckOutStatus').val(),
         lateCheckoutFee: 0,
-        reservationFee: $('#groupIncludeReservationFee').is(':checked') ? ($('#groupReservationFee').val() || 0) : 0,
         discount: $('#groupIncludeDiscount').is(':checked') ? ($('#groupDiscount').val() || 0) : 0,
         directReservationFlag: false
       };

@@ -619,8 +619,9 @@ function viewGroupBilling(groupId) {
             let billingTable = $('#billingDetails');
             billingTable.empty();
 
-            let totalAmount = 0;
-            let totalPaid = 0;
+            // Use backend-computed totals
+            let totalAmount = parseFloat(data.grandTotal || 0);
+            let totalPaid = parseFloat(data.totalPaid || 0);
             let rowNumber = 1;
 
             let allBillingData = [...data.roomBillingDetails, ...data.serviceBillingDetails];
@@ -636,11 +637,6 @@ function viewGroupBilling(groupId) {
                 let chargeAmount = parseFloat(bill.charges) || 0;
                 let amount = chargeAmount * (bill.room_qty || bill.service_qty || 1);
                 let paidIcon = (bill.PAYMENT_STATUS === 'paid' || bill.STATUS === 'paid') ? '✅' : '';
-
-                if (bill.PAYMENT_STATUS === 'paid' || bill.STATUS === 'paid') {
-                    totalPaid += amount;
-                }
-                totalAmount += amount;
 
                 if (currentRoom !== bill.ROOM_NUMBER && currentRoom !== null) {
                     // Insert total row for previous room
@@ -679,24 +675,14 @@ function viewGroupBilling(groupId) {
                 }
             });
 
-            // Get reservation fee and discount from data
+            // Get reservation fee and discount from data (already applied in grandTotal)
             const reservationFee = parseFloat(data.reservationFee || 0);
             const discount = parseFloat(data.discount || 0);
             
-            // Calculate final amounts
-            const subtotal = totalAmount;
-            const finalTotal = subtotal - reservationFee - discount;
-            
-            // Adjust totalPaid to account for reservation fee and discount
-            // If all items are paid, the actual paid amount should be finalTotal, not subtotal
-            const allItemsPaid = allBillingData.every(bill => bill.PAYMENT_STATUS === 'paid' || bill.STATUS === 'paid');
-            let adjustedTotalPaid = totalPaid;
-            if (allItemsPaid) {
-                // If everything is paid, the paid amount should be finalTotal (after fees/discounts)
-                adjustedTotalPaid = finalTotal;
-            }
-            
-            let balance = finalTotal - adjustedTotalPaid;
+            // Use backend totals directly
+            const finalTotal = totalAmount;
+            const adjustedTotalPaid = totalPaid;
+            let balance = Math.max(0, finalTotal - adjustedTotalPaid);
             
             // Update display values
             $('#totalAmount').text(finalTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));

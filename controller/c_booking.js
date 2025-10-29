@@ -1275,10 +1275,8 @@ class BookingController {
         pickupPrice,
         dropoffServiceId,
         dropoffPrice,
-        reservationFee,
         discount,
         individualBilling: individualBillingValue,
-        perRoomReservationFees,
         perRoomDiscounts,
         directReservationFlag,
         lateCheckoutFee = 0
@@ -1300,15 +1298,21 @@ class BookingController {
 
       // Calculate payment status based on paid amount for group booking
       const paidAmountNum = parseFloat(paidAmount) || 0;
-      const reservationFeeNum = parseFloat(reservationFee) || 0;
       const discountNum = parseFloat(discount) || 0;
       
       // For group booking, we need to calculate total from room prices
       const roomPrices = selectedRoomPrice.split(',').map(p => parseFloat(p) || 0);
       const totalRoomPrice = roomPrices.reduce((sum, price) => sum + price, 0) * parseInt(qty);
       
-      // Calculate total amount
-      const totalAmount = totalRoomPrice + reservationFeeNum - discountNum;
+      // Calculate services total
+      const breakfastAdultTotal = parseFloat(breakfastAdultQty) * parseFloat(breakfastAdultPrice) || 0;
+      const breakfastKidTotal = parseFloat(breakfastKidQty) * parseFloat(breakfastKidPrice) || 0;
+      const pickupTotal = parseFloat(pickupPrice) || 0;
+      const dropoffTotal = parseFloat(dropoffPrice) || 0;
+      const servicesTotal = breakfastAdultTotal + breakfastKidTotal + pickupTotal + dropoffTotal;
+      
+      // Calculate total amount (rooms + services - discount)
+      const totalAmount = totalRoomPrice + servicesTotal - discountNum;
       
       // Determine payment status
       let paymentStatus;
@@ -1333,7 +1337,7 @@ class BookingController {
         groupContact,
         numberOfRooms,
         paymentStatus,
-        paidAmount,
+        paidAmount: paidAmountNum,
         bookingRoute,
         guestType,
         guestLevel,
@@ -1352,10 +1356,8 @@ class BookingController {
         pickupPrice,
         dropoffServiceId,
         dropoffPrice,
-        reservationFee,
         discount,
         consolidatedBilling,
-        perRoomReservationFees,
         perRoomDiscounts,
         lateCheckoutFee,
         encodedBy,

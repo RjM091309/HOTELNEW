@@ -101,7 +101,10 @@ window.showBilling = async function (bookingID) {
                 const paymentsResponse = await fetch(`/payments/get-payments/${bookingID}?_=${Date.now()}`);
                 const paymentsData = await paymentsResponse.json();
                 
-                const totalPaymentsMade = paymentsData.reduce((sum, payment) => {
+                // Extract payments array from response - handle both array and object responses
+                const paymentsArray = (paymentsData && paymentsData.data) ? paymentsData.data : (Array.isArray(paymentsData) ? paymentsData : []);
+                
+                const totalPaymentsMade = paymentsArray.reduce((sum, payment) => {
                     console.log('Payment Record:', {
                         IDNo: payment.IDNo,
                         AMOUNT_PAID: payment.AMOUNT_PAID,

@@ -62,10 +62,10 @@ $(document).ready(function () {
 
     const state = typeof window.getGroupBookingState === 'function'
       ? window.getGroupBookingState()
-      : { reservationFee: 0, discount: 0 };
+      : { discount: 0 };
 
-    const reservationFee = parseFloat(state.reservationFee) || 0;
     const discount = parseFloat(state.discount) || 0;
+    const paidAmount = parseFloat($('#groupPaidAmount').val()) || 0;
 
     // Get individual billing flag (inverted logic - checked = individual, unchecked = consolidated)
     const individualBilling = $('#groupIndividualBilling').is(':checked');
@@ -75,13 +75,11 @@ $(document).ready(function () {
     // Get agency ID if booking route is agency
     const agencyId = bookingRoute === 'agency' ? $('#groupAgencySelect').val() || null : null;
 
-    const perRoomFees = [];
     const perRoomDiscounts = [];
     const selectedRoomIds = selectedRooms.split(',');
 
     // Set all per-room values to 0 since per-room adjustments are removed
     selectedRoomIds.forEach(() => {
-      perRoomFees.push(0);
       perRoomDiscounts.push(0);
     });
 
@@ -112,10 +110,9 @@ $(document).ready(function () {
       pickupPrice,
       dropoffServiceId,
       dropoffPrice,
-      reservationFee,
+      paidAmount,
       discount,
       individualBilling: individualBilling ? 'on' : '', // Inverted logic
-      perRoomReservationFees: perRoomFees,
       perRoomDiscounts
     };
 
@@ -136,30 +133,30 @@ $(document).ready(function () {
 
           // Show the actual calculated amounts from backend response
           const grandTotal = parseFloat(response.grandTotal) || 0;
-          const reservationFee = parseFloat(response.reservationFee) || 0;
           const discount = parseFloat(response.discount) || 0;
+          const paidAmount = parseFloat(response.paidAmount) || 0;
 
           // Calculate the breakdown consistently for both billing types
-          // Backend formula: grandTotal = (roomCharges + services) + reservationFee - discount
-          // So: subtotal = grandTotal - reservationFee + discount
-          const subtotal = grandTotal - reservationFee + discount;
+          // Backend formula: grandTotal = (roomCharges + services) - discount
+          // So: subtotal = grandTotal + discount
+          const subtotal = grandTotal + discount;
 
           const details = response && response.grandTotal !== undefined
             ? `Grand Total: ₱${grandTotal.toLocaleString()}\n\n` +
               `Breakdown:\n` +
-              `• Reservation Fee: ₱${reservationFee.toLocaleString()}\n` +
-              `• Discount: -₱${discount.toLocaleString()}\n\n` +
+              `• Discount: -₱${discount.toLocaleString()}\n` +
+              `• Paid Amount: ₱${paidAmount.toLocaleString()}\n` +
+              `• Balance: ₱${(grandTotal - paidAmount).toLocaleString()}\n\n` +
               `${isConsolidated ? '✅ Master Billing: All charges applied to main booking' : '✅ Individual Billing: Separate charges per room'}`
             : `The group booking has been added successfully.\n\n${isConsolidated ? '✅ Master Billing: All charges applied to main booking' : '✅ Individual Billing: Separate charges per room'}`;
 
           console.log('🔄 Success Message - Debug Values:', {
             rawResponse: response,
             grandTotal: grandTotal,
-            reservationFee: reservationFee,
             discount: discount,
+            paidAmount: paidAmount,
             isConsolidated: isConsolidated,
-            calculatedSubtotal: subtotal,
-            verification: `subtotal(${subtotal}) + reservationFee(${reservationFee}) - discount(${discount}) = ${subtotal + reservationFee - discount} (should equal grandTotal: ${grandTotal})`
+            calculatedSubtotal: subtotal
           });
 
           Swal.fire({
