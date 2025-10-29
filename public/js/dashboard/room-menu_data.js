@@ -4546,7 +4546,7 @@ function loadServicesCost(bookingId) {
                     const cost = parseFloat(service.TOTAL_COST) || 0;
                     const quantity = parseInt(service.QTY) || 0;
                     if (!isNaN(cost) && !isNaN(quantity)) {
-                        totalServicesCost += cost * quantity;
+                        totalServicesCost += cost;
                     }
                 });
             }

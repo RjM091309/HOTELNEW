@@ -14,6 +14,9 @@ router.get('/agency', BookingController.renderAgencyBookingPage);
 // Route to render the all booking page
 router.get('/all', BookingController.renderAllBookingPage);
 
+// Route to render the unpaid booking page
+router.get('/unpaid', BookingController.renderUnpaidBookingPage);
+
 // API Routes for booking data
 router.get('/booking_data', BookingController.getBookingDataEnhanced);
 router.get('/booking_details/:bookingID', BookingController.getBookingDetails);

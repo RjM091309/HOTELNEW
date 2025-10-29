@@ -1,0 +1,85 @@
+<!-- start page content -->
+<div class="row">
+    <div class="col-xl-12 col-md-12 col-12">
+        <div class="dashboard-card">
+            <div class="dashboard-card-header">
+                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                    <div class="tab-bar">
+                        <a class="tab-item" href="/booking">Single</a>
+                        <a class="tab-item" href="/booking/group">Group</a>
+                        <a class="tab-item" href="/booking/agency">Agency</a>
+                        <a class="tab-item" href="/booking/all">All</a>
+                        <a class="tab-item is-active" href="/booking/unpaid">Unpaid</a>
+                    </div>
+
+                    <div style="flex: 1; display: flex; justify-content: center; margin: 0 20px;">
+                        <div class="filter-btn-group">
+                            <button type="button" class="filter-btn active" data-filter="all">All</button>
+                            <button type="button" class="filter-btn" data-filter="today">Today</button>
+                            <button type="button" class="filter-btn" data-filter="last3days">Last 3 Days</button>
+                            <button type="button" class="filter-btn" data-filter="thisWeek">This Week</button>
+                            <button type="button" class="filter-btn" data-filter="thisMonth">This Month</button>
+                        </div>
+                        
+                        <!-- Custom Date Range Filter with Flatpickr -->
+                        <div class="custom-date-filter" style="margin-left: 20px; display: flex; align-items: center; gap: 10px;">
+                            <div class="date-picker-container">
+                                <input type="text" id="dateRangePicker" class="date-range-input" placeholder="Select date range" readonly>
+                                <i class="fa fa-calendar-alt date-picker-icon"></i>
+                            </div>
+                            <button type="button" id="clearDateFilter" class="btn btn-secondary" style="height: 25px; padding: 0 15px; font-size: 10px;">
+                                <i class="fa fa-times"></i> Clear
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="flex: 0 0 auto; display: flex; gap: 10px;">
+                        <button type="button" class="btn btn-success" data-bs-toggle="modal"
+                        data-bs-target="#modal-addbooking"><i class="fa fa-plus"></i> Add
+                            Booking
+                        </button>
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal"
+                        data-bs-target="#modal-add-group-booking"><i class="fa fa-users"></i> Add
+                           Group Booking
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="dashboard-card-body">
+                <div class="table-scrollable">
+                    <table id="booking_tbl" class="table table-hover table-bordered full-width">
+                        <thead>
+                        <tr>
+                            <th style="display:none"></th>
+                            <th>#</th>
+                            <th>GUEST NAME</th>
+                            <th>ROOM NUMBER</th>
+                            <th>CONFIRMATION NUMBER</th>
+                            <th>CHECK IN</th>
+                            <th>CHECK OUT</th>
+                            <th>TOTAL PAYMENT</th>
+                            <th>BALANCE</th>
+                            <th>BOOKING CHANNEL</th>
+                            <th>PAYMENT STATUS</th>
+                            <th>BOOKING STATUS</th>
+                            <th>ACTION</th>
+                        </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('../booking/modal/billing') %>
+<%- include('../booking/modal/status') %>
+<%- include('../booking/modal/cancel_booking') %>
+<%- include('../booking/modal/edit_booking') %>
+<%- include('../booking/modal/add_booking') %>
+<%- include('../booking/modal/add_group_booking') %>
+
+<script src="/js/booking/unpaid_booking_data.js"></script>
+<script src="/js/dashboard/room-menu_data.js"></script>
+

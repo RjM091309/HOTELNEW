@@ -96,6 +96,29 @@ class BookingController {
     }
   }
 
+  // Render the unpaid booking page
+  static async renderUnpaidBookingPage(req, res) {
+    try {
+      const user = req.user ? {
+        FULLNAME: req.user.FULLNAME,
+        PERMISSIONS: req.user.PERMISSIONS
+      } : null;
+
+      res.render('booking/unpaid_booking', {
+        title: 'Unpaid Bookings',
+        subTitle: 'Unpaid Bookings',
+        activePage: 'booking',
+        user: user
+      });
+    } catch (error) {
+      console.error('Error rendering unpaid booking page:', error);
+      res.status(500).render('error/500', {
+        title: 'Server Error',
+        subTitle: '500 Error'
+      });
+    }
+  }
+
   // Get booking data for DataTables
   static async getBookingDataEnhanced(req, res) {
     try {

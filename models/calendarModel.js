@@ -151,6 +151,15 @@ class CalendarModel {
           -- Pre-calculated background colors
           CASE 
             WHEN b.BOOKING_STATUS = 'check-In' THEN 'green'
+            WHEN b.BOOKING_STATUS = 'check-Out' 
+              AND (
+                COALESCE(bill.PAYMENT_STATUS,'unpaid') <> 'paid'
+                OR EXISTS (
+                  SELECT 1 FROM booking_service bs 
+                  WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1 AND bs.STATUS <> 'paid'
+                )
+              )
+              THEN '#0b3d91' -- dark blue when checked out but has balance (rooms or services)
             WHEN b.BOOKING_STATUS = 'check-Out' THEN '#B3B3B3'
             WHEN b.BOOKING_STATUS = 'pending' AND COALESCE(b.CHECK_IN_STATUS, 1) = 0 THEN '#fff700'
             WHEN b.BOOKING_STATUS = 'pending' THEN '#e53935'
