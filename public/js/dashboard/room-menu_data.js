@@ -1723,15 +1723,18 @@ async function calculateBalance(bookingId, currentBookingId) {
         
         // Fetch actual payments made
         const paymentsResponse = await fetch(`/payments/get-payments/${bookingId}?_=${Date.now()}`);
-        const paymentsData = await paymentsResponse.json();
+        const paymentsResponseData = await paymentsResponse.json();
+        
+        // Extract payments array from response
+        const paymentsData = (paymentsResponseData && paymentsResponseData.data) ? paymentsResponseData.data : (Array.isArray(paymentsResponseData) ? paymentsResponseData : []);
         
         // Calculate total payments made (exclude reservation_fee and discount payments)
-        const totalPaymentsMade = paymentsData.reduce((sum, payment) => {
+        const totalPaymentsMade = (paymentsData && Array.isArray(paymentsData)) ? paymentsData.reduce((sum, payment) => {
             if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
                 return sum;
             }
             return sum + parseFloat(payment.AMOUNT_PAID);
-        }, 0);
+        }, 0) : 0;
         
         // Get billing details
         const subTotal = parseFloat(billingData.subTotal);
@@ -1923,13 +1926,41 @@ function showPayments(bookingId) {
                     <!-- Payment Items Table -->
                     <div id="payment-items-${bookingId}" style="display: none;">
                         <h6 class="mb-3">
-                            <i class="fas fa-list me-1"></i>Payment Items
+                            <i class="fas fa-list me-1"></i>Charges & Payments
+                        </h6>
+                        
+                        <!-- Charges Section -->
+                        <div class="mb-3">
+                            <h6 class="text-primary mb-2">
+                                <i class="fas fa-receipt me-1"></i>Charges
                         </h6>
                         <div class="table-responsive">
                             <table class="table table-bordered" style="background-color: white !important;">
                                 <thead style="background-color: white !important;">
                                     <tr style="background-color: white !important;">
                                         <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Item</th>
+                                            <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Amount</th>
+                                            <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Status</th>
+                                            <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Remarks</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="charges-items-table-${bookingId}" style="background-color: white !important;">
+                                        <!-- Charges will be populated here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Payments Section -->
+                        <div class="mb-3">
+                            <h6 class="text-success mb-2">
+                                <i class="fas fa-money-bill-wave me-1"></i>Payments Made
+                            </h6>
+                            <div class="table-responsive">
+                                <table class="table table-bordered" style="background-color: white !important;">
+                                    <thead style="background-color: white !important;">
+                                        <tr style="background-color: white !important;">
+                                            <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Payment Type</th>
                                         <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Amount</th>
                                         <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Status</th>
                                         <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Method</th>
@@ -1938,10 +1969,11 @@ function showPayments(bookingId) {
                                         <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Processed By</th>
                                     </tr>
                                 </thead>
-                                <tbody id="payment-items-table-${bookingId}" style="background-color: white !important;">
-                                    <!-- Payment items will be populated here -->
+                                    <tbody id="payments-table-${bookingId}" style="background-color: white !important;">
+                                        <!-- Payments will be populated here -->
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                         
                         <!-- Payment Summary at Bottom -->
@@ -2034,9 +2066,130 @@ async function loadPaymentData(bookingId) {
         // Try to fetch data from APIs, with fallback to mock data
         let allPaymentItems = [];
         let hasApiData = false;
+        let groupData = null;
 
         try {
-            // Fetch both payments and breakdown data
+            // First, try to fetch group breakdown to see if this is a group booking
+            const groupBreakdownResponse = await fetch(`/payments/group-breakdown/${bookingId}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (groupBreakdownResponse.ok) {
+                groupData = await groupBreakdownResponse.json();
+                
+                // Only process if it's actually a group booking
+                if (!groupData.success || !groupData.isGroup) {
+                    groupData = null; // Not a group booking
+                }
+            }
+
+            // If it's a group booking, use group data
+            if (groupData && groupData.success && groupData.isGroup) {
+                // Process group bookings
+                groupData.bookings.forEach(booking => {
+                    // Add room cost for this booking
+                    if (booking.ROOM_TOTAL > 0) {
+                        allPaymentItems.push({
+                            type: 'room',
+                            item_name: `Room ${booking.ROOM_NUMBER}`,
+                            description: `Room ${booking.ROOM_NUMBER} - ${booking.QTY || 0} day(s)`,
+                            amount: parseFloat(booking.ROOM_TOTAL || 0),
+                            status: booking.ROOM_PAYMENT_STATUS || 'unpaid',
+                            payment_date: null,
+                            icon: 'fa-bed',
+                            processed_by: '-',
+                            payment_method: '-',
+                            remarks: '-',
+                            bookingId: booking.BOOKING_ID,
+                            roomNumber: booking.ROOM_NUMBER
+                        });
+                    }
+                });
+
+                // Add services for all group bookings
+                if (groupData.services && groupData.services.length > 0) {
+                    groupData.services.forEach(service => {
+                        const isCancelled = service.ACTIVE === 0;
+                        const serviceStatus = isCancelled ? 'Cancelled' : (service.STATUS || 'unpaid');
+                        
+                        allPaymentItems.push({
+                            type: 'service',
+                            item_name: `${service.SERVICE_NAME || 'Service'} (Room ${service.ROOM_NUMBER})`,
+                            description: `Service - Qty: ${service.QTY || 1}`,
+                            amount: parseFloat(service.TOTAL_COST || 0),
+                            status: serviceStatus,
+                            payment_date: isCancelled ? service.EDITED_DT : null,
+                            icon: 'fa-concierge-bell',
+                            processed_by: isCancelled ? service.EDITED_BY_NAME : '-',
+                            payment_method: '-',
+                            remarks: isCancelled ? service.REMARKS : '-',
+                            isCancelled: isCancelled,
+                            bookingId: service.BOOKING_ID,
+                            roomNumber: service.ROOM_NUMBER
+                        });
+                    });
+                }
+
+                // Add extensions for all group bookings
+                if (groupData.extensions && groupData.extensions.length > 0) {
+                    groupData.extensions.forEach(extension => {
+                        const isCancelled = extension.ACTIVE === 0;
+                        const extensionStatus = isCancelled ? 'Cancelled' : (extension.PAYMENT_STATUS || 'unpaid');
+                        
+                        allPaymentItems.push({
+                            type: 'extension',
+                            item_name: `Room Extension (Room ${extension.ROOM_NUMBER})`,
+                            description: `Extended stay - ${extension.QTY || 0} day(s)`,
+                            amount: parseFloat(extension.COST || 0),
+                            status: extensionStatus,
+                            payment_date: isCancelled ? extension.EDITED_DT : null,
+                            icon: 'fa-calendar-plus',
+                            processed_by: isCancelled ? extension.EDITED_BY_NAME : '-',
+                            payment_method: '-',
+                            remarks: isCancelled ? extension.REMARKS : '-',
+                            isCancelled: isCancelled,
+                            bookingId: extension.BOOKING_ID,
+                            roomNumber: extension.ROOM_NUMBER
+                        });
+                    });
+                }
+
+                // Add payments for all group bookings
+                if (groupData.payments && groupData.payments.length > 0) {
+                    groupData.payments.forEach(payment => {
+                        if (payment.PAYMENT_TYPE && 
+                            (payment.PAYMENT_TYPE.toLowerCase() === 'discount' || 
+                             payment.PAYMENT_TYPE.toLowerCase() === 'reservation_fee')) {
+                            return; // Skip discount and reservation_fee
+                        }
+                        
+                        allPaymentItems.push({
+                            type: 'payment',
+                            item_name: `Payment - Room ${payment.ROOM_NUMBER}`,
+                            description: payment.REMARKS || payment.PAYMENT_METHOD || 'Payment',
+                            amount: parseFloat(payment.AMOUNT_PAID || 0),
+                            status: payment.AMOUNT_PAID > 0 && payment.PAYMENT_DATE ? 'paid' : 'unpaid',
+                            payment_date: payment.PAYMENT_DATE,
+                            icon: getPaymentIcon(payment.PAYMENT_TYPE),
+                            processed_by: payment.NAME || 'System',
+                            payment_method: payment.PAYMENT_METHOD || '-',
+                            remarks: payment.REMARKS || '-',
+                            bookingId: payment.BOOKING_ID,
+                            roomNumber: payment.ROOM_NUMBER
+                        });
+                    });
+                }
+
+                // Update modal title to show group name
+                const modalHeader = document.querySelector(`#paymentsModal_${bookingId} .modal-title strong`);
+                if (modalHeader && groupData.groupName) {
+                    modalHeader.textContent = `Payment Details - ${groupData.groupName}`;
+                }
+
+                hasApiData = true;
+            } else {
+                // Not a group booking, use regular breakdown
             const [paymentsResponse, breakdownResponse] = await Promise.all([
                 fetch(`/payments/get-payments/${bookingId}`, {
                     method: 'GET',
@@ -2049,8 +2202,10 @@ async function loadPaymentData(bookingId) {
             ]);
 
             if (paymentsResponse.ok) {
-                const paymentsData = await paymentsResponse.json();
-                console.log('Payments API Response:', paymentsData);
+                const paymentsDataResponse = await paymentsResponse.json();
+                
+                // Extract the data array from the response
+                const paymentsData = (paymentsDataResponse && paymentsDataResponse.data) ? paymentsDataResponse.data : (Array.isArray(paymentsDataResponse) ? paymentsDataResponse : []);
                 
                 // Add payments from payments table (exclude discount and reservation_fee)
                 if (paymentsData && paymentsData.length > 0) {
@@ -2062,12 +2217,19 @@ async function loadPaymentData(bookingId) {
                             return; // Skip this payment
                         }
                         
+                // Determine payment status more accurately
+                let paymentStatus = 'unpaid';
+                const amountPaid = parseFloat(payment.AMOUNT_PAID || 0);
+                if (amountPaid > 0 && payment.PAYMENT_DATE) {
+                    paymentStatus = 'paid';
+                }
+                        
                 allPaymentItems.push({
                     type: 'payment',
                     item_name: getPaymentTypeName(payment.PAYMENT_TYPE),
                     description: payment.REMARKS || payment.PAYMENT_METHOD || 'Payment',
-                    amount: parseFloat(payment.AMOUNT_PAID || 0),
-                    status: payment.AMOUNT_PAID > 0 && payment.PAYMENT_DATE ? 'paid' : 'unpaid',
+                    amount: amountPaid,
+                    status: paymentStatus,
                     payment_date: payment.PAYMENT_DATE,
                     icon: getPaymentIcon(payment.PAYMENT_TYPE),
                     processed_by: payment.NAME || 'System',
@@ -2076,12 +2238,11 @@ async function loadPaymentData(bookingId) {
                 });
                     });
                     hasApiData = true;
+                    }
                 }
-            }
 
-            if (breakdownResponse.ok) {
+                if (breakdownResponse.ok) {
                 const breakdownData = await breakdownResponse.json();
-                console.log('Breakdown API Response:', breakdownData);
                 
                 // Add breakdown items if available
                 if (breakdownData && breakdownData.success) {
@@ -2194,15 +2355,15 @@ async function loadPaymentData(bookingId) {
                         });
                     }
                     hasApiData = true;
+                    }
                 }
             }
         } catch (apiError) {
-            console.warn('API not available, using fallback data:', apiError);
+            // API not available, will use fallback data
         }
 
         // If no API data, use fallback data from the current modal
         if (!hasApiData) {
-            console.log('Using fallback data for booking:', bookingId);
             allPaymentItems = getFallbackPaymentData(bookingId);
         }
 
@@ -2210,7 +2371,14 @@ async function loadPaymentData(bookingId) {
         if (loadingDiv) loadingDiv.style.display = 'none';
 
         if (allPaymentItems.length > 0) {
-            displayPaymentData(bookingId, allPaymentItems);
+            // Pass group data if it's a group booking
+            const displayOptions = groupData && groupData.isGroup ? { 
+                isGroup: true, 
+                groupDiscount: groupData.groupDiscount, 
+                groupReservationFee: groupData.groupReservationFee,
+                groupName: groupData.groupName
+            } : { isGroup: false };
+            displayPaymentData(bookingId, allPaymentItems, displayOptions);
         } else {
             // Show no payments message
             if (noPaymentsDiv) noPaymentsDiv.style.display = 'block';
@@ -2231,7 +2399,7 @@ async function loadPaymentData(bookingId) {
                 return;
             }
         } catch (fallbackError) {
-            console.error('Fallback data also failed:', fallbackError);
+            // Fallback data failed
         }
         
         // Show error message
@@ -2359,10 +2527,11 @@ function getPaymentIcon(paymentType) {
 }
 
 // Function to display payment data
-function displayPaymentData(bookingId, payments) {
+function displayPaymentData(bookingId, payments, options = {}) {
     const summaryDiv = document.getElementById(`payment-summary-${bookingId}`);
     const itemsDiv = document.getElementById(`payment-items-${bookingId}`);
-    const tableBody = document.getElementById(`payment-items-table-${bookingId}`);
+    const chargesTableBody = document.getElementById(`charges-items-table-${bookingId}`);
+    const paymentsTableBody = document.getElementById(`payments-table-${bookingId}`);
 
     if (!payments || payments.length === 0) {
         const noPaymentsDiv = document.getElementById(`no-payments-${bookingId}`);
@@ -2374,14 +2543,23 @@ function displayPaymentData(bookingId, payments) {
     let totalPaid = 0;
     let totalAmount = 0;
     let balanceDue = 0;
+    
+    // Get group-level discount and reservation fee from options
+    const groupDiscount = parseFloat(options.groupDiscount || 0) || 0;
+    const groupReservationFee = parseFloat(options.groupReservationFee || 0) || 0;
+
+    // Separate charges from payments
+    const charges = payments.filter(p => p.type !== 'payment');
+    const paymentRecords = payments.filter(p => p.type === 'payment');
 
     // Clear existing table rows
-    if (tableBody) tableBody.innerHTML = '';
+    if (chargesTableBody) chargesTableBody.innerHTML = '';
+    if (paymentsTableBody) paymentsTableBody.innerHTML = '';
 
-    // Sort payments by type and amount
-    const sortedPayments = payments.sort((a, b) => {
-        // Sort by type: room first, then services, then extensions, then payments
-        const typeOrder = { 'room': 1, 'service': 2, 'extension': 3, 'payment': 4 };
+    // Sort charges by type and amount
+    const sortedCharges = charges.sort((a, b) => {
+        // Sort by type: room first, then services, then extensions
+        const typeOrder = { 'room': 1, 'service': 2, 'extension': 3 };
         const aOrder = typeOrder[a.type] || 5;
         const bOrder = typeOrder[b.type] || 5;
         
@@ -2389,54 +2567,78 @@ function displayPaymentData(bookingId, payments) {
             return aOrder - bOrder;
         }
         
-        // Then sort by amount (highest first)
-        return b.amount - a.amount;
+        // Then sort by amount (highest first) - ensure both amounts are valid numbers
+        const aAmount = isNaN(parseFloat(a.amount)) ? 0 : parseFloat(a.amount);
+        const bAmount = isNaN(parseFloat(b.amount)) ? 0 : parseFloat(b.amount);
+        return bAmount - aAmount;
     });
 
-    // Process each payment item
-    sortedPayments.forEach((payment, index) => {
-        const amount = parseFloat(payment.amount || 0);
-        const isPaid = payment.status === 'paid';
-        const isPartial = payment.status === 'partial';
+    // Sort payments by date (most recent first)
+    const sortedPayments = paymentRecords.sort((a, b) => {
+        if (!a.payment_date && !b.payment_date) return 0;
+        if (!a.payment_date) return 1;
+        if (!b.payment_date) return -1;
+        return new Date(b.payment_date) - new Date(a.payment_date);
+    });
+
+    // Process charges - display in charges table
+    sortedCharges.forEach((charge, index) => {
+        const amount = (isNaN(parseFloat(charge.amount)) ? 0 : parseFloat(charge.amount)) || 0;
         
-        // Only add to totalAmount if it's not a payment record (to avoid double counting)
-        // AND if it's not a cancelled service
-        if (payment.type !== 'payment' && !payment.isCancelled) {
+        // Add to totalAmount if not cancelled
+        if (!charge.isCancelled) {
             totalAmount += amount;
         }
         
-        // Only add to totalPaid if it's an actual payment record
-        if (payment.type === 'payment' && (isPaid || isPartial)) {
-            totalPaid += amount;
+        // Status text and styling
+        let statusText, statusClass;
+        if (charge.isCancelled) {
+            statusText = 'Cancelled';
+            statusClass = 'text-secondary';
+        } else if (charge.status === 'paid') {
+            statusText = 'Paid';
+            statusClass = 'text-success';
+        } else if (charge.status === 'partial') {
+            statusText = 'Partial';
+            statusClass = 'text-warning';
+        } else {
+            statusText = 'Unpaid';
+            statusClass = 'text-danger';
         }
 
-        // Skip displaying Payment records if there's a corresponding original item
-        if (payment.type === 'payment') {
-            // Skip Room Payment if there's a Room Cost (regardless of amount difference)
-            if (payment.item_name && payment.item_name.toLowerCase().includes('room')) {
-                const hasRoomCost = sortedPayments.some(p => 
-                    p.type === 'room'
-                );
-                if (hasRoomCost) {
-                    return; // Skip displaying this room payment
-                }
-            }
-            
-            // Skip Service Payment if there's a Service (regardless of amount difference)
-            if (payment.item_name && payment.item_name.toLowerCase().includes('service')) {
-                const hasService = sortedPayments.some(p => 
-                    p.type === 'service'
-                );
-                if (hasService) {
-                    return; // Skip displaying this service payment
-                }
-            }
-        }
-
-        // Create simple table row with white background
+        // Create table row for charges
         const row = document.createElement('tr');
         row.style.backgroundColor = 'white !important';
         row.style.setProperty('background-color', 'white', 'important');
+        
+        row.innerHTML = `
+            <td style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">
+                ${charge.item_name || 'Charge Item'}
+            </td>
+            <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right; color: black; background-color: white !important;">
+                ₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+            </td>
+            <td style="border: 1px solid #dee2e6; padding: 8px; text-align: center; background-color: white !important;">
+                <span class="${statusClass}">${statusText}</span>
+            </td>
+            <td style="border: 1px solid #dee2e6; padding: 8px; text-align: center; color: black; background-color: white !important;">
+                ${charge.remarks || '-'}
+            </td>
+        `;
+        
+        if (chargesTableBody) chargesTableBody.appendChild(row);
+    });
+
+    // Process payments - display in payments table
+    sortedPayments.forEach((payment, index) => {
+        const amount = (isNaN(parseFloat(payment.amount)) ? 0 : parseFloat(payment.amount)) || 0;
+        const isPaid = payment.status === 'paid';
+        const isPartial = payment.status === 'partial';
+        
+        // Add to totalPaid if it's an actual payment record
+        if (isPaid || isPartial) {
+            totalPaid += amount;
+        }
         
         // Format payment date (date and time)
         let paymentDateText = '-';
@@ -2458,10 +2660,7 @@ function displayPaymentData(bookingId, payments) {
 
         // Status text and styling
         let statusText, statusClass;
-        if (payment.isCancelled) {
-            statusText = 'Cancelled';
-            statusClass = 'text-secondary';
-        } else if (isPaid) {
+        if (isPaid) {
             statusText = 'Paid';
             statusClass = 'text-success';
         } else if (isPartial) {
@@ -2472,9 +2671,14 @@ function displayPaymentData(bookingId, payments) {
             statusClass = 'text-danger';
         }
 
+        // Create table row for payments
+        const row = document.createElement('tr');
+        row.style.backgroundColor = 'white !important';
+        row.style.setProperty('background-color', 'white', 'important');
+
             row.innerHTML = `
                 <td style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">
-                    ${payment.item_name || 'Payment Item'}
+                ${payment.item_name || 'Payment'}
                 </td>
                 <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right; color: black; background-color: white !important;">
                     ₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
@@ -2496,42 +2700,54 @@ function displayPaymentData(bookingId, payments) {
                 </td>
             `;
         
-        if (tableBody) tableBody.appendChild(row);
+        if (paymentsTableBody) paymentsTableBody.appendChild(row);
     });
 
-    // Calculate balance due (including discount)
+    // Calculate balance due (including discount and reservation fee)
     let totalDiscount = 0;
     
-    // Get discount from the modal if available
+    // Use group discount/reservation fee if it's a group booking, otherwise try to get from modal
+    if (options && options.isGroup) {
+        totalDiscount = (isNaN(groupDiscount) ? 0 : groupDiscount) + (isNaN(groupReservationFee) ? 0 : groupReservationFee);
+    } else {
+        // Get discount from the modal if available (for individual bookings)
     const discountElement = document.getElementById(`discount-amount-${bookingId}`);
     if (discountElement) {
         const discountText = discountElement.textContent;
         totalDiscount = parseFloat(discountText.replace(/[^\d.]/g, '')) || 0;
+        }
     }
     
-    balanceDue = totalAmount - totalPaid - totalDiscount;
+    // Ensure balanceDue is a valid number
+    const calculatedBalance = totalAmount - totalPaid - totalDiscount;
+    balanceDue = isNaN(calculatedBalance) ? 0 : Math.max(0, calculatedBalance);
 
 
     // Update summary with smaller styling
     const totalAmountElement = document.getElementById(`total-amount-${bookingId}`);
     
     if (totalAmountElement) {
-        totalAmountElement.textContent = `₱${totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
+        const displayTotalAmount = isNaN(totalAmount) ? 0 : totalAmount;
+        totalAmountElement.textContent = `₱${displayTotalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
     }
 
     const totalPaidElement = document.getElementById(`total-paid-${bookingId}`);
     if (totalPaidElement) {
-        totalPaidElement.textContent = `₱${totalPaid.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
+        const displayTotalPaid = isNaN(totalPaid) ? 0 : totalPaid;
+        totalPaidElement.textContent = `₱${displayTotalPaid.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
     }
 
     const totalDiscountElement = document.getElementById(`total-discount-${bookingId}`);
     if (totalDiscountElement) {
-        totalDiscountElement.textContent = `₱${totalDiscount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
+        // For group bookings, show the total discount and reservation fee
+        const displayDiscount = isNaN(totalDiscount) ? 0 : totalDiscount;
+        totalDiscountElement.textContent = `₱${displayDiscount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
     }
 
     const balanceDueElement = document.getElementById(`balance-due-${bookingId}`);
     if (balanceDueElement) {
-        balanceDueElement.textContent = `₱${balanceDue.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
+        const displayBalance = isNaN(balanceDue) ? 0 : balanceDue;
+        balanceDueElement.textContent = `₱${displayBalance.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
     }
 
     // Show/hide discount section based on discount amount

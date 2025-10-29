@@ -135,10 +135,25 @@ const paymentsController = {
     try {
       const { bookingId } = req.params;
       const data = await paymentsModel.listPayments({ bookingId });
-      res.json(data);
+      res.json({ success: true, data });
     } catch (err) {
       console.error('Error getting payments by booking:', err);
       res.status(500).json({ success: false, message: 'Failed to get payments' });
+    }
+  },
+
+  groupBreakdown: async (req, res) => {
+    try {
+      const bookingId = req.params.bookingId;
+      const result = await paymentsModel.groupBookingBreakdown(bookingId);
+      if (!result) {
+        // Not a group booking, or booking not found - return 200 with flag
+        return res.json({ success: false, isGroup: false, message: 'Not a group booking or booking not found' });
+      }
+      res.json({ success: true, ...result });
+    } catch (err) {
+      console.error('Error fetching group breakdown:', err);
+      res.status(500).json({ success: false, message: 'Failed to fetch group breakdown' });
     }
   }
 };

@@ -20,6 +20,9 @@ router.get('/get-payments/:bookingId', paymentsController.getPaymentsByBooking);
 // Detailed breakdown for a booking
 router.get('/breakdown/:bookingId', paymentsController.breakdown);
 
+// Group booking breakdown
+router.get('/group-breakdown/:bookingId', paymentsController.groupBreakdown);
+
 module.exports = router;
 
 
