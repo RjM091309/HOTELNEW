@@ -3346,6 +3346,17 @@ class BookingModel {
 
       const bookingsResult = await queryDatabasePromise(bookingsQuery, [groupBookingId]);
 
+      // Get total paid across the group (room + service payments)
+      const paidSumQuery = `
+        SELECT COALESCE(SUM(p.AMOUNT_PAID), 0) AS totalPaid
+        FROM payments p
+        JOIN booking b ON p.BOOKING_ID = b.IDNo
+        WHERE b.GROUP_BOOKING_ID = ?
+          AND p.PAYMENT_TYPE IN ('room','service','extended')
+      `;
+      const paidSumResult = await queryDatabasePromise(paidSumQuery, [groupBookingId]);
+      const groupTotalPaid = parseFloat(paidSumResult?.[0]?.totalPaid || 0);
+
       // Get billing type from database (1 = Master, 0 = Individual)
       const isConsolidatedBilling = groupBooking.BILLING_TYPE === 1;
 
@@ -3510,7 +3521,10 @@ class BookingModel {
         dropoffServiceId: groupServices.dropoff.id || '',
         dropoffPrice: groupServices.dropoff.price || '0',
         // Individual booking data for form population
-        bookings: bookingsResult
+        bookings: bookingsResult,
+        // expose group-wide paid figures for edit prefill
+        totalPaid: groupTotalPaid,
+        paidAmount: groupTotalPaid
       };
 
     } catch (error) {
@@ -3607,6 +3621,8 @@ class BookingModel {
       const existingBookingsQuery = `SELECT IDNo, ROOM_ID FROM booking WHERE GROUP_BOOKING_ID = ?`;
       const [existingBookings] = await connection.promise().query(existingBookingsQuery, [groupBookingId]);
       const existingRoomIds = existingBookings.map(b => b.ROOM_ID);
+      // Use the earliest/first booking in the group as the anchor booking for consolidated entries
+      const firstBookingId = existingBookings && existingBookings.length > 0 ? existingBookings[0].IDNo : null;
 
       // Parse new selected rooms - ensure consistent data types
       const newRoomIds = (selectedRooms || '').split(',').filter(Boolean).map(id => parseInt(id.trim()));

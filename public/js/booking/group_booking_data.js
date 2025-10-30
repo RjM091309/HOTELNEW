@@ -1035,6 +1035,21 @@ function populateEditGroupForm(booking) {
     $('#editGroupRemarks').val(booking.remarks);
     $('#editGroupAgencySelect').val(booking.agencyId);
 
+    // Initialize Paid Amount like single edit: prefer paidAmount, then totalPaid, else 0
+    if (booking.paidAmount !== undefined && booking.paidAmount !== null && booking.paidAmount !== '') {
+        const initPaid = parseFloat(booking.paidAmount) || 0;
+        console.log('[EditGroup] Using booking.paidAmount for initial paid:', booking.paidAmount, '→', initPaid);
+        $('#editGroupPaidAmount').val(initPaid.toFixed(2));
+        console.log('[EditGroup] #editGroupPaidAmount set to:', $('#editGroupPaidAmount').val());
+    } else if (booking.totalPaid !== undefined && booking.totalPaid !== null && booking.totalPaid !== '') {
+        const initPaid = parseFloat(booking.totalPaid) || 0;
+        console.log('[EditGroup] Using booking.totalPaid for initial paid:', booking.totalPaid, '→', initPaid);
+        $('#editGroupPaidAmount').val(initPaid.toFixed(2));
+        console.log('[EditGroup] #editGroupPaidAmount set to:', $('#editGroupPaidAmount').val());
+    } else {
+        console.log('[EditGroup] No paid amount value provided in response; leaving field unchanged');
+    }
+
     // Set fees - explicitly handle checked/unchecked state
     if (parseFloat(booking.reservationFee) > 0) {
         $('#editGroupIncludeReservationFee').prop('checked', true);

@@ -1461,7 +1461,6 @@ class BookingController {
         pickupPrice,
         dropoffServiceId,
         dropoffPrice,
-        reservationFee,
         discount,
         individualBilling: individualBillingValue
       } = req.body;
@@ -1484,6 +1483,21 @@ class BookingController {
       // Convert individual service flag (only for Breakfast)
       const breakfastIndividual = breakfastIndividualValue === 'on';
 
+      // Compute payment status based on paidAmount and recomputed total (rooms + services - discount)
+      const paidAmountNum = parseFloat(paidAmount) || 0;
+      const discountNum = parseFloat(discount) || 0;
+      const roomPrices = (selectedRoomPrice || '').split(',').map(p => parseFloat(p) || 0);
+      const totalRoomPrice = roomPrices.reduce((sum, price) => sum + price, 0) * (parseInt(qty, 10) || 0);
+      const servicesTotal = (parseFloat(breakfastAdultQty) * parseFloat(breakfastAdultPrice) || 0)
+        + (parseFloat(breakfastKidQty) * parseFloat(breakfastKidPrice) || 0)
+        + (parseFloat(pickupPrice) || 0)
+        + (parseFloat(dropoffPrice) || 0);
+      const totalAmount = totalRoomPrice + servicesTotal - discountNum;
+      let paymentStatus;
+      if (paidAmountNum <= 0) paymentStatus = 'unpaid';
+      else if (paidAmountNum >= totalAmount) paymentStatus = 'paid';
+      else paymentStatus = 'partial';
+
       const date = new Date();
 
       const result = await BookingModel.updateGroupBooking({
@@ -1495,6 +1509,7 @@ class BookingController {
         groupName,
         groupContact,
         numberOfRooms,
+        paymentStatus,
         paidAmount,
         bookingRoute,
         guestType,
@@ -1514,7 +1529,6 @@ class BookingController {
         pickupPrice,
         dropoffServiceId,
         dropoffPrice,
-        reservationFee,
         discount,
         consolidatedBilling: individualBillingValue !== 'on', // Inverted logic: unchecked = consolidated
         encodedBy,
