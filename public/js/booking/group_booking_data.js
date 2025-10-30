@@ -312,7 +312,7 @@ function openGroupRemarksModal(groupId) {
                         <option value="">Select Category</option>
                         <option value="Booking" style="color:#212529;">Booking</option>
                         <option value="Billing" style="color:#212529;">Billing</option>
-                        <option value="Complain" style="color:#212529;">Complain</option>
+                        
                         <option value="Request" style="color:#212529;">Request</option>
                         <option value="Discount" style="color:#212529;">Discount</option>
                         <option value="Service" style="color:#212529;">Service</option>

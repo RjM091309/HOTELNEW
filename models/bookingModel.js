@@ -58,12 +58,7 @@ class BookingModel {
                 (
                   SELECT 
                     COALESCE(SUM(
-                      (bill2.ROOM_CHARGE * 
-                        CASE 
-                          WHEN bill2.ORIGINAL_QTY IS NOT NULL THEN bill2.ORIGINAL_QTY
-                          ELSE bill2.QTY
-                        END
-                      ) + 
+                      (bill2.ROOM_CHARGE * (CASE WHEN COALESCE(bill2.CHECKOUT_REFUND,0) > 0 THEN bill2.QTY ELSE COALESCE(bill2.ORIGINAL_QTY, bill2.QTY) END)) + 
                       COALESCE((
                         SELECT SUM(bs.TOTAL_COST) 
                         FROM booking_service bs 
@@ -104,13 +99,8 @@ class BookingModel {
                   -- Group Grand Total
                   (
                     SELECT 
-                      COALESCE(SUM(
-                        (bill2.ROOM_CHARGE * 
-                          CASE 
-                            WHEN bill2.ORIGINAL_QTY IS NOT NULL THEN bill2.ORIGINAL_QTY
-                            ELSE bill2.QTY
-                          END
-                        ) + 
+                    COALESCE(SUM(
+                        (bill2.ROOM_CHARGE * (CASE WHEN COALESCE(bill2.CHECKOUT_REFUND,0) > 0 THEN bill2.QTY ELSE COALESCE(bill2.ORIGINAL_QTY, bill2.QTY) END)) + 
                         COALESCE((
                           SELECT SUM(bs.TOTAL_COST) 
                           FROM booking_service bs 
@@ -273,6 +263,17 @@ class BookingModel {
     }
   }
 
+  // Helper: get all booking IDs in the same group as a given booking
+  static async getGroupBookingIdsByBooking(bookingId) {
+    const q1 = `SELECT GROUP_BOOKING_ID FROM booking WHERE IDNo = ? AND ACTIVE = 1 LIMIT 1`;
+    const [row] = await pool.promise().query(q1, [bookingId]);
+    const groupId = row?.[0]?.GROUP_BOOKING_ID;
+    if (!groupId) return [];
+    const q2 = `SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ? AND ACTIVE = 1`;
+    const [rows] = await pool.promise().query(q2, [groupId]);
+    return rows.map(r => r.IDNo);
+  }
+
   // Get booking services
   static async getBookingServices(bookingId) {
     try {
@@ -418,6 +419,177 @@ class BookingModel {
     }
   }
 
+  // New: Checkout bookings now (set CHECK_OUT_DATE=NOW, status to check-Out, update room status)
+  static async checkoutBookings({ bookingIds, encodedBy, refundBookingId = null, refundAmount = 0 }) {
+    if (!bookingIds || bookingIds.length === 0) {
+      throw new Error('No bookings to checkout');
+    }
+
+    const ids = Array.isArray(bookingIds) ? bookingIds : [bookingIds];
+
+    const connection = await new Promise((resolve, reject) => {
+      pool.getConnection((err, conn) => (err ? reject(err) : resolve(conn)));
+    });
+
+    try {
+      await new Promise((resolve, reject) => {
+        connection.beginTransaction(err => (err ? reject(err) : resolve()));
+      });
+
+      // Update bookings: status and checkout timestamp
+      const updateBookingSql = `
+        UPDATE booking
+        SET BOOKING_STATUS = 'check-Out', CHECK_OUT_DATE = NOW()
+        WHERE IDNo IN (?) AND ACTIVE = 1
+      `;
+      await new Promise((resolve, reject) => {
+        connection.query(updateBookingSql, [ids], (err, res) => (err ? reject(err) : resolve(res)));
+      });
+
+      // Update related room status to Cleaning (4)
+      const updateRoomSql = `
+        UPDATE room r
+        JOIN booking b ON b.ROOM_ID = r.IDNo
+        SET r.ROOM_STATUS = 4
+        WHERE b.IDNo IN (?) AND b.ACTIVE = 1
+      `;
+      await new Promise((resolve, reject) => {
+        connection.query(updateRoomSql, [ids], (err, res) => (err ? reject(err) : resolve(res)));
+      });
+
+      // Update billing.QTY to actual days, preserve ORIGINAL_QTY if not set
+      const updateBillingQtySql = `
+        UPDATE billing bill
+        JOIN booking b ON bill.BOOKING_ID = b.IDNo
+        SET bill.ORIGINAL_QTY = COALESCE(bill.ORIGINAL_QTY, bill.QTY),
+            bill.QTY = GREATEST(1, DATEDIFF(DATE(NOW()), DATE(b.CHECK_IN_DATE)))
+        WHERE b.IDNo IN (?) AND bill.ACTIVE = 1
+      `;
+      await new Promise((resolve, reject) => {
+        connection.query(updateBillingQtySql, [ids], (err, res) => (err ? reject(err) : resolve(res)));
+      });
+
+      // Optional: Insert refund(s) and update billing.CHECKOUT_REFUND, with caps to avoid negative balances.
+      if (refundBookingId && refundAmount > 0) {
+        // If multiple bookings were checked out (group scope), split proportionally by room amount
+        const targetIds = ids.includes(refundBookingId) && ids.length > 1 ? ids : [refundBookingId];
+
+        // Fetch room amounts (ROOM_CHARGE * QTY) for proportion
+        const roomAmtRows = await new Promise((resolve, reject) => {
+          connection.query(
+            `SELECT b.IDNo AS bookingId, (bill.ROOM_CHARGE * bill.QTY) AS roomAmount
+             FROM booking b JOIN billing bill ON bill.BOOKING_ID = b.IDNo AND bill.ACTIVE = 1
+             WHERE b.IDNo IN (?)`,
+            [targetIds],
+            (err, rows) => (err ? reject(err) : resolve(rows))
+          );
+        });
+        const totalRoomAmount = roomAmtRows.reduce((s, r) => s + (parseFloat(r.roomAmount) || 0), 0) || 1;
+
+        // Helper to compute allowable refund per booking (paid - net, not below 0)
+        async function computeAllowable(bookingId) {
+          // Sum services and extensions
+          const [svcRow] = await new Promise((resolve, reject) => {
+            connection.query(
+              `SELECT COALESCE(SUM(bs.TOTAL_COST),0) AS svcTotal
+               FROM booking_service bs WHERE bs.BOOKING_ID = ? AND bs.ACTIVE = 1`,
+              [bookingId],
+              (err, rows) => (err ? reject(err) : resolve(rows))
+            );
+          });
+          const [extRow] = await new Promise((resolve, reject) => {
+            connection.query(
+              `SELECT COALESCE(SUM(COST * QTY),0) AS extTotal
+               FROM booking_extension WHERE BOOKING_ID = ? AND ACTIVE = 1`,
+              [bookingId],
+              (err, rows) => (err ? reject(err) : resolve(rows))
+            );
+          });
+          const [billRow2] = await new Promise((resolve, reject) => {
+            connection.query(
+              `SELECT IDNo AS billingId, ROOM_CHARGE, QTY, COALESCE(RESERVATION_FEE,0) AS reservationFee,
+                      COALESCE(DISCOUNT_AMOUNT,0) AS discountAmount, COALESCE(CHECKOUT_REFUND,0) AS checkoutRefund
+               FROM billing WHERE BOOKING_ID = ? AND ACTIVE = 1 LIMIT 1`,
+              [bookingId],
+              (err, rows) => (err ? reject(err) : resolve(rows))
+            );
+          });
+          const [payRow] = await new Promise((resolve, reject) => {
+            connection.query(
+              `SELECT COALESCE(SUM(AMOUNT_PAID),0) AS paid
+               FROM payments WHERE BOOKING_ID = ? AND PAYMENT_TYPE NOT IN ('reservation_fee','discount')`,
+              [bookingId],
+              (err, rows) => (err ? reject(err) : resolve(rows))
+            );
+          });
+          const subTotal = (parseFloat(billRow2.ROOM_CHARGE) * parseFloat(billRow2.QTY)) + (parseFloat(svcRow?.svcTotal) || 0) + (parseFloat(extRow?.extTotal) || 0);
+          const currentNet = subTotal - parseFloat(billRow2.reservationFee) - parseFloat(billRow2.discountAmount) - parseFloat(billRow2.checkoutRefund || 0);
+          const paid = parseFloat(payRow?.paid) || 0;
+          const overpay = paid - currentNet; // amount we can refund without creating negative balance
+          return { maxRefund: Math.max(0, overpay), billingId: billRow2?.billingId || null };
+        }
+
+        // Iterate and distribute
+        for (const r of roomAmtRows) {
+          const share = (parseFloat(r.roomAmount) || 0) / totalRoomAmount;
+          const desired = refundAmount * share;
+          const { maxRefund, billingId } = await computeAllowable(r.bookingId);
+          const toRefund = Math.min(Math.abs(desired), maxRefund);
+          if (toRefund <= 0) continue;
+
+          // Update billing accumulator
+          await new Promise((resolve, reject) => {
+            connection.query(
+              `UPDATE billing SET CHECKOUT_REFUND = COALESCE(CHECKOUT_REFUND,0) + ? WHERE BOOKING_ID = ? AND ACTIVE = 1`,
+              [toRefund, r.bookingId],
+              (err, res) => (err ? reject(err) : resolve(res))
+            );
+          });
+
+          // Insert negative payment row
+          const refundSql = billingId
+            ? `INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
+               VALUES (?, ?, ?, 'cash', 'refund', NOW(), ?, 'Checkout refund')`
+            : `INSERT INTO payments (BOOKING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
+               VALUES (?, ?, 'cash', 'refund', NOW(), ?, 'Checkout refund')`;
+          const refundParams = billingId
+            ? [r.bookingId, billingId, -toRefund, encodedBy || 'system']
+            : [r.bookingId, -toRefund, encodedBy || 'system'];
+          await new Promise((resolve, reject) => {
+            connection.query(refundSql, refundParams, (err, res) => (err ? reject(err) : resolve(res)));
+          });
+        }
+      }
+
+      // Compute original vs actual days for reporting
+      const daysQuery = `
+        SELECT 
+          b.IDNo AS bookingId,
+          DATE(b.CHECK_IN_DATE) AS checkInDate,
+          DATE(b.CHECK_OUT_DATE) AS plannedCheckOut,
+          DATEDIFF(DATE(NOW()), DATE(b.CHECK_IN_DATE)) AS actualDays,
+          COALESCE(bill.ORIGINAL_QTY, bill.QTY) AS originalDays
+        FROM booking b
+        LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo AND bill.ACTIVE = 1
+        WHERE b.IDNo IN (?)
+      `;
+      const daysRows = await new Promise((resolve, reject) => {
+        connection.query(daysQuery, [ids], (err, rows) => (err ? reject(err) : resolve(rows)));
+      });
+
+      await new Promise((resolve, reject) => {
+        connection.commit(err => (err ? reject(err) : resolve()));
+      });
+
+      return { success: true, message: 'Checked out successfully', days: daysRows };
+    } catch (err) {
+      try { await new Promise(r => connection.rollback(() => r())); } catch (e) {}
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }
+
   // Cancel booking
   static async cancelBooking(bookingId, reason) {
     try {
@@ -455,8 +627,7 @@ class BookingModel {
           b.REMARKS,
           bill.ROOM_CHARGE AS ROOM_RATE,
 
-          -- Fallback to QTY if ORIGINAL_QTY is NULL
-          COALESCE(bill.ORIGINAL_QTY, bill.QTY) AS ORIGINAL_DAYS,
+          bill.QTY AS ORIGINAL_DAYS,
 
           -- Extended days from booking_extension
           COALESCE((
@@ -466,17 +637,17 @@ class BookingModel {
           ), 0) AS EXTENDED_DAYS,
 
           -- Total days = original + extended
-          COALESCE(bill.ORIGINAL_QTY, bill.QTY) AS TOTAL_DAYS,
+          bill.QTY AS TOTAL_DAYS,
 
           -- Total room cost = base + extended
-          (COALESCE(bill.ORIGINAL_QTY, bill.QTY) * bill.ROOM_CHARGE) +
+          (bill.QTY * bill.ROOM_CHARGE) +
           COALESCE((
               SELECT SUM(COST * QTY) 
               FROM booking_extension  
               WHERE BOOKING_ID = b.IDNo AND ACTIVE = 1
           ), 0) AS TOTAL_ROOM_COST,
 
-          (COALESCE(bill.ORIGINAL_QTY, bill.QTY) * bill.ROOM_CHARGE) AS ROOM_COST,
+          (bill.QTY * bill.ROOM_CHARGE) AS ROOM_COST,
 
           -- Total Paid = original payments + extension payments
           (
@@ -781,8 +952,9 @@ class BookingModel {
           });
         }
 
-        // Insert payment record for the paid amount if payment status is 'paid' or 'partial'
-        if (paymentStatus === 'paid' || paymentStatus === 'partial') {
+        // Insert payment record for the paid amount only for PARTIAL payments
+        // When fully paid, a consolidated room payment is inserted later from billing
+        if (paymentStatus === 'partial') {
           // Calculate the paid amount from the controller
           const paidAmount = parseFloat(bookingData.paidAmount) || 0;
           
@@ -1308,7 +1480,7 @@ class BookingModel {
           -- Room Charge with remaining balance (considering partial payments, reservation fee, and discount)
           COALESCE((
               SELECT 
-                  (b.ROOM_CHARGE * COALESCE(b.ORIGINAL_QTY, b.QTY) - COALESCE(b.RESERVATION_FEE, 0) - COALESCE(b.DISCOUNT_AMOUNT, 0)) 
+                  (b.ROOM_CHARGE * b.QTY - COALESCE(b.RESERVATION_FEE, 0) - COALESCE(b.DISCOUNT_AMOUNT, 0)) 
                   - COALESCE((
                       SELECT SUM(p.AMOUNT_PAID) 
                       FROM payments p 
@@ -1380,7 +1552,7 @@ class BookingModel {
           (
               COALESCE((
                   SELECT 
-                      GREATEST(0, (b.ROOM_CHARGE * COALESCE(b.ORIGINAL_QTY, b.QTY) - COALESCE(b.RESERVATION_FEE, 0) - COALESCE(b.DISCOUNT_AMOUNT, 0)) - COALESCE((
+                      GREATEST(0, (b.ROOM_CHARGE * b.QTY - COALESCE(b.RESERVATION_FEE, 0) - COALESCE(b.DISCOUNT_AMOUNT, 0)) - COALESCE((
                           SELECT SUM(p.AMOUNT_PAID) 
                           FROM payments p 
                           WHERE p.BOOKING_ID = b.BOOKING_ID 
@@ -1932,10 +2104,10 @@ class BookingModel {
           bi.AMENITIES_CHARGE,
           bi.SERVICES_CHARGE,
           bi.QTY,
-          bi.ORIGINAL_QTY,
           bi.PAYMENT_STATUS,
           bi.RESERVATION_FEE,
           bi.DISCOUNT_AMOUNT,
+          COALESCE(bi.CHECKOUT_REFUND, 0) AS CHECKOUT_REFUND,
           bi.DISCOUNT_APPLIED,
           rt.NAME AS ROOM_TYPE
         FROM booking b
@@ -1954,7 +2126,7 @@ class BookingModel {
       const b = bookingData[0];
       const customerId = b.customerId;
       const roomRate = parseFloat(b.ROOM_CHARGE);
-      const originalQty = parseInt(b.ORIGINAL_QTY) || parseInt(b.QTY);
+      const originalQty = parseInt(b.QTY);
 
       // Get actual payments made for this booking
       const paymentsQuery = `
@@ -1973,7 +2145,8 @@ class BookingModel {
       const roomAmount = roomRate * originalQty;
       const reservationFee = parseFloat(b.RESERVATION_FEE) || 0;
       const discountAmount = parseFloat(b.DISCOUNT_AMOUNT) || 0;
-      const netRoomAmount = roomAmount - reservationFee - discountAmount;
+      const checkoutRefund = parseFloat(b.CHECKOUT_REFUND) || 0;
+      const netRoomAmount = roomAmount - reservationFee - discountAmount - checkoutRefund;
       
       let roomStatus = 'unpaid';
       if (totalPaymentsMade >= netRoomAmount) {
@@ -2080,6 +2253,7 @@ class BookingModel {
         subTotal: subTotal,
         reservationFee: parseFloat(b.RESERVATION_FEE) || 0,
         discountAmount: parseFloat(b.DISCOUNT_AMOUNT) || 0,
+        checkoutRefund: checkoutRefund,
         discountApplied: b.DISCOUNT_APPLIED === 1 ? 1 : 0
       };
 
@@ -2178,7 +2352,7 @@ class BookingModel {
 
         // Step 1: Get billing info
         const billingQuery = `
-          SELECT IDNo, ROOM_CHARGE, QTY, ORIGINAL_QTY, PAYMENT_STATUS, EXTEND_PAYMENT_STATUS, RESERVATION_FEE, DISCOUNT_AMOUNT
+          SELECT IDNo, ROOM_CHARGE, QTY, PAYMENT_STATUS, EXTEND_PAYMENT_STATUS, RESERVATION_FEE, DISCOUNT_AMOUNT
           FROM billing 
           WHERE BOOKING_ID = ? AND ACTIVE = 1 LIMIT 1
         `;
@@ -2197,8 +2371,8 @@ class BookingModel {
         const billingId = billing.IDNo;
 
         // Step 2: Calculate total amounts and determine payment allocation
-        const originalQty = billing.ORIGINAL_QTY ?? billing.QTY;
-        const extendedQty = billing.QTY - originalQty;
+        const originalQty = billing.QTY;
+        const extendedQty = 0;
 
         // Calculate room amount - consider partial payments, reservation fee, and discount
         let fullRoomAmount = 0;
@@ -2417,7 +2591,7 @@ class BookingModel {
         const remainingRoomQuery = `
           SELECT 
             COALESCE((SELECT SUM(AMOUNT_PAID) FROM payments WHERE BOOKING_ID = ? AND PAYMENT_TYPE = 'room'), 0) as roomPaid,
-            COALESCE((SELECT ROOM_CHARGE * COALESCE(ORIGINAL_QTY, QTY) FROM billing WHERE BOOKING_ID = ? AND ACTIVE = 1 LIMIT 1), 0) as totalRoomCost,
+            COALESCE((SELECT ROOM_CHARGE * QTY FROM billing WHERE BOOKING_ID = ? AND ACTIVE = 1 LIMIT 1), 0) as totalRoomCost,
             COALESCE((SELECT RESERVATION_FEE FROM billing WHERE BOOKING_ID = ? AND ACTIVE = 1 LIMIT 1), 0) as reservationFee,
             COALESCE((SELECT DISCOUNT_AMOUNT FROM billing WHERE BOOKING_ID = ? AND ACTIVE = 1 LIMIT 1), 0) as discountAmount
         `;
@@ -3006,12 +3180,7 @@ class BookingModel {
           -- Calculate total payment including services, then subtract group discount and reservation fee
           (
             COALESCE(SUM(
-              (bill.ROOM_CHARGE * 
-                CASE 
-                  WHEN bill.ORIGINAL_QTY IS NOT NULL THEN bill.ORIGINAL_QTY  -- Use original stay duration
-                  ELSE bill.QTY  -- If no extension, use QTY normally
-                END
-              ) + 
+              (bill.ROOM_CHARGE * bill.QTY) + 
               COALESCE((
                 SELECT SUM(bs.TOTAL_COST) 
                 FROM booking_service bs 
@@ -4063,14 +4232,14 @@ class BookingModel {
           r.ROOM_NUMBER,  
           'Room Charge' AS description,
           bill.ROOM_CHARGE AS charges,
-          COALESCE(bill.ORIGINAL_QTY, bill.QTY) AS room_qty,
+          bill.QTY AS room_qty,
           bill.PAYMENT_STATUS
         FROM billing bill
         JOIN booking b ON bill.BOOKING_ID = b.IDNo
         JOIN group_booking gb ON b.GROUP_BOOKING_ID = gb.IDNo  
         JOIN room r ON b.ROOM_ID = r.IDNo  
         WHERE b.GROUP_BOOKING_ID = ?
-        GROUP BY bill.BOOKING_ID, gb.GROUP_NAME, r.ROOM_NUMBER, bill.ROOM_CHARGE, bill.ORIGINAL_QTY, bill.QTY, bill.PAYMENT_STATUS
+        GROUP BY bill.BOOKING_ID, gb.GROUP_NAME, r.ROOM_NUMBER, bill.ROOM_CHARGE, bill.QTY, bill.PAYMENT_STATUS
         ORDER BY r.ROOM_NUMBER ASC, bill.BOOKING_ID ASC
       `;
 
@@ -4211,7 +4380,7 @@ class BookingModel {
 
         // Fetch UNPAID billing records
         const billingQuery = `
-          SELECT IDNo, BOOKING_ID, ROOM_CHARGE, QTY, ORIGINAL_QTY 
+          SELECT IDNo, BOOKING_ID, ROOM_CHARGE, QTY 
           FROM billing 
           WHERE BOOKING_ID IN (?) AND PAYMENT_STATUS != 'paid'
         `;
@@ -4227,7 +4396,7 @@ class BookingModel {
 
         // Process Room Payments
         for (let bill of billingResults) {
-          const originalQty = bill.ORIGINAL_QTY ?? bill.QTY;
+          const originalQty = bill.QTY;
           const amountToPay = bill.ROOM_CHARGE * originalQty;
 
         // Insert payment record for room
@@ -4897,7 +5066,7 @@ class BookingModel {
           FROM booking_service bs
           WHERE bs.BOOKING_ID = b.IDNo AND bs.STATUS = 'paid' AND bs.ACTIVE = 1)) AS TOTAL_PAID,
 
-        ((COALESCE(bill.ORIGINAL_QTY, bill.QTY) * bill.ROOM_CHARGE) +
+        ((bill.QTY * bill.ROOM_CHARGE) +
          COALESCE((SELECT SUM(COST * QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo AND ACTIVE = 1), 0) +
          (SELECT COALESCE(SUM(bs.TOTAL_COST), 0)
           FROM booking_service bs
@@ -4905,7 +5074,7 @@ class BookingModel {
          COALESCE(bill.RESERVATION_FEE, 0) -
          COALESCE(bill.DISCOUNT_AMOUNT, 0)) AS GRAND_TOTAL,
 
-        (((COALESCE(bill.ORIGINAL_QTY, bill.QTY) * bill.ROOM_CHARGE) +
+        (((bill.QTY * bill.ROOM_CHARGE) +
           COALESCE((SELECT SUM(COST * QTY) FROM booking_extension WHERE BOOKING_ID = b.IDNo AND ACTIVE = 1), 0) +
           (SELECT COALESCE(SUM(bs.TOTAL_COST), 0)
            FROM booking_service bs
@@ -7196,6 +7365,69 @@ class BookingModel {
     } catch (error) {
       console.error('Error in getVoucherData:', error);
       throw error;
+    }
+  }
+
+  // ==================== COMPLAINT / REQUEST (complaint_request table) ====================
+  static async listComplaintRequestByBooking(bookingId) {
+    try {
+      const sql = `
+        SELECT cr.*,
+               u1.FULLNAME AS ENCODED_BY_NAME,
+               u2.FULLNAME AS EDITDED_BY_NAME
+        FROM complaint_request cr
+        LEFT JOIN user_info u1 ON cr.ENCODED_BY = u1.IDno
+        LEFT JOIN user_info u2 ON cr.EDITDED_BY = u2.IDno
+        WHERE cr.BOOKING_ID = ? AND cr.ACTIVE = 1
+        ORDER BY cr.ENCODED_DT DESC, cr.IDNo DESC`;
+      return await queryDatabasePromise(sql, [bookingId]);
+    } catch (e) {
+      console.error('Error listComplaintRequestByBooking:', e);
+      return [];
+    }
+  }
+
+  static async addComplaintRequest({ bookingId, type, details, encodedBy }) {
+    try {
+      const sql = `INSERT INTO complaint_request (BOOKING_ID, TYPE, DETAILS, STATUS, ENCODED_BY) VALUES (?, ?, ?, 0, ?)`; // 0 = not complete
+      const res = await queryDatabasePromise(sql, [bookingId, type, details, encodedBy]);
+      return res.insertId;
+    } catch (e) {
+      console.error('Error addComplaintRequest:', e);
+      throw e;
+    }
+  }
+
+  static async updateComplaintRequestStatus({ id, status, editedBy }) {
+    try {
+      const sql = `UPDATE complaint_request SET STATUS = ?, EDITDED_BY = ?, EDITDED_DT = CURRENT_TIMESTAMP WHERE IDNo = ? AND ACTIVE = 1`;
+      await queryDatabasePromise(sql, [status, editedBy, id]);
+      return true;
+    } catch (e) {
+      console.error('Error updateComplaintRequestStatus:', e);
+      throw e;
+    }
+  }
+
+  static async deleteComplaintRequest(id) {
+    try {
+      const sql = `UPDATE complaint_request SET ACTIVE = 0, EDITDED_DT = CURRENT_TIMESTAMP WHERE IDNo = ?`;
+      await queryDatabasePromise(sql, [id]);
+      return true;
+    } catch (e) {
+      console.error('Error deleteComplaintRequest:', e);
+      throw e;
+    }
+  }
+
+  static async updateComplaintRequest({ id, type, details, editedBy }) {
+    try {
+      const sql = `UPDATE complaint_request SET TYPE = ?, DETAILS = ?, EDITDED_BY = ?, EDITDED_DT = CURRENT_TIMESTAMP WHERE IDNo = ? AND ACTIVE = 1`;
+      await queryDatabasePromise(sql, [type, details, editedBy, id]);
+      return true;
+    } catch (e) {
+      console.error('Error updateComplaintRequest:', e);
+      throw e;
     }
   }
 }

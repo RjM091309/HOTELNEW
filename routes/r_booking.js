@@ -25,6 +25,8 @@ router.get('/unpaid_balance/:bookingId', BookingController.getUnpaidBalance);
 router.get('/get-booking-services/:bookingId', BookingController.getBookingServices);
 router.get('/get-billing/:id', BookingController.getBilling);
 router.post('/update_status', BookingController.updateBookingStatus);
+// New checkout route (anytime checkout, supports group scope)
+router.post('/checkout', BookingController.checkoutBookings);
 
 // Booking creation
 router.post('/add_booking', BookingController.addBooking);
@@ -124,6 +126,13 @@ router.post('/remarks', BookingController.addRemark);
 router.get('/remarks/booking/:bookingId', BookingController.getRemarksByBooking);
 router.put('/remarks/:remarkId', BookingController.updateRemark);
 router.delete('/remarks/:remarkId', BookingController.deleteRemark);
+
+// Complaint / Request routes
+router.get('/complaint-request/:bookingId', BookingController.listComplaintRequest);
+router.post('/complaint-request', BookingController.addComplaintRequest);
+router.put('/complaint-request/:id', BookingController.updateComplaintRequest);
+router.put('/complaint-request/:id/status', BookingController.updateComplaintRequestStatus);
+router.delete('/complaint-request/:id', BookingController.deleteComplaintRequest);
 
 // Group remarks (aggregate by group booking)
 router.get('/group_remarks/:groupId', BookingController.getGroupRemarksByGroup);

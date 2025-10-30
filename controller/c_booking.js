@@ -326,6 +326,38 @@ class BookingController {
     }
   }
 
+  // New: Checkout endpoint (supports individual or group scope)
+  static async checkoutBookings(req, res) {
+    try {
+      const { bookingId, scope = 'individual', hasRefund = false, refundAmount = 0 } = req.body;
+      const encodedBy = req.user?.userId;
+
+      if (!bookingId) {
+        return res.status(400).json({ success: false, message: 'bookingId is required' });
+      }
+
+      let bookingIds = [bookingId];
+      if (scope === 'group') {
+        // Find all bookings within the same group as the provided bookingId
+        const result = await BookingModel.getGroupBookingIdsByBooking(bookingId);
+        if (result && Array.isArray(result) && result.length > 0) {
+          bookingIds = result;
+        }
+      }
+
+      const out = await BookingModel.checkoutBookings({ 
+        bookingIds, 
+        encodedBy,
+        refundBookingId: bookingId,
+        refundAmount: hasRefund ? parseFloat(refundAmount) || 0 : 0
+      });
+      return res.json({ success: true, message: out.message, data: out.days });
+    } catch (error) {
+      console.error('❌ Checkout error:', error);
+      return res.status(500).json({ success: false, message: error.message || 'Checkout failed' });
+    }
+  }
+
   // Get floors for dropdown
   static async getFloorsForDropdown(req, res) {
     try {
@@ -2664,6 +2696,72 @@ class BookingController {
         message: 'Error generating voucher PDF',
         error: error.message
       });
+    }
+  }
+
+  // ==================== COMPLAINT / REQUEST API ====================
+  static async listComplaintRequest(req, res) {
+    try {
+      const bookingId = req.params.bookingId;
+      const rows = await BookingModel.listComplaintRequestByBooking(bookingId);
+      return res.json({ success: true, data: rows });
+    } catch (e) {
+      console.error('Error listComplaintRequest:', e);
+      return res.status(500).json({ success: false, message: 'Failed to load complaint/request' });
+    }
+  }
+
+  static async addComplaintRequest(req, res) {
+    try {
+      const { bookingId, type, details } = req.body;
+      if (!bookingId || !type || !details) return res.status(400).json({ success: false, message: 'Missing fields' });
+      const encodedBy = req.user?.userId || req.session?.user?.userId || req.body?.encodedBy || 'system';
+      const id = await BookingModel.addComplaintRequest({ bookingId, type, details, encodedBy });
+      return res.json({ success: true, id });
+    } catch (e) {
+      console.error('Error addComplaintRequest:', e);
+      return res.status(500).json({ success: false, message: 'Failed to add complaint/request' });
+    }
+  }
+
+  static async updateComplaintRequestStatus(req, res) {
+    try {
+      const id = req.params.id;
+      const { status } = req.body;
+      if (!id || (status === undefined || status === null)) return res.status(400).json({ success: false, message: 'Missing fields' });
+      const editedBy = req.user?.userId || req.session?.user?.userId || req.body?.editedBy || 'system';
+      // Normalize to numeric 0/1; only '1' or 1 means complete
+      const normalized = (status === 1 || status === '1') ? 1 : 0;
+      await BookingModel.updateComplaintRequestStatus({ id, status: normalized, editedBy });
+      return res.json({ success: true });
+    } catch (e) {
+      console.error('Error updateComplaintRequestStatus:', e);
+      return res.status(500).json({ success: false, message: 'Failed to update status' });
+    }
+  }
+
+  static async deleteComplaintRequest(req, res) {
+    try {
+      const id = req.params.id;
+      await BookingModel.deleteComplaintRequest(id);
+      return res.json({ success: true });
+    } catch (e) {
+      console.error('Error deleteComplaintRequest:', e);
+      return res.status(500).json({ success: false, message: 'Failed to delete complaint/request' });
+    }
+  }
+
+  static async updateComplaintRequest(req, res) {
+    try {
+      const id = req.params.id;
+      const { type, details } = req.body;
+      if (!id || !type || !details) return res.status(400).json({ success: false, message: 'Missing fields' });
+      const editedBy = req.user?.userId || req.session?.user?.userId || req.body?.editedBy || 'system';
+      await BookingModel.updateComplaintRequest({ id, type, details, editedBy });
+      return res.json({ success: true });
+    } catch (e) {
+      console.error('Error updateComplaintRequest:', e);
+      return res.status(500).json({ success: false, message: 'Failed to update complaint/request' });
     }
   }
 }

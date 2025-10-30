@@ -320,9 +320,18 @@ async function createDynamicRoomModal(bookingId, event, options) {
                 <div class="card shadow-sm mb-3" style="background-color: #ffffff; border: 1px solid #dee2e6;">
                     <div class="card-header py-2 d-flex justify-content-between align-items-center" style="background-color: #ffffff; border-bottom: 1px solid #dee2e6; color: #495057;">
                         <h6 class="mb-0">Room Reservation Details</h6>
-                        <button type="button" class="btn btn-info btn-sm" onclick="showPayments('${bookingId}')">
-                            <i class="fas fa-credit-card me-1"></i>Payments
-                        </button>
+                        <div class="d-flex align-items-center">
+                            <button type="button" class="btn btn-danger btn-sm" onclick="triggerCheckout('${bookingId}')">
+                                <i class="fas fa-sign-out-alt me-1"></i>Checkout
+                            </button>
+                            <button type="button" class="btn btn-warning btn-sm ms-1 position-relative" id="crButton_${bookingId}" onclick="openComplaintRequestModal('${bookingId}')" style="overflow:visible;">
+                                <i class="fas fa-exclamation-circle me-1"></i>Complaint/Request
+                                <span id="crCount_${bookingId}" class="badge rounded-pill bg-danger" style="display:none; position:absolute; top:-6px; right:-6px; transform:none; min-width:18px; height:18px; padding:2px 6px; font-size:10px; line-height:14px; z-index:2; box-shadow:0 0 0 2px rgba(255,255,255,0.8);">0</span>
+                            </button>
+                            <button type="button" class="btn btn-info btn-sm ms-1" onclick="showPayments('${bookingId}')">
+                                <i class="fas fa-credit-card me-1"></i>Payments
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body p-2" style="background-color: #ffffff;">
                         <div class="row">
@@ -745,6 +754,8 @@ setTimeout(() => {
     loadBookingDetails(bookingId);
     loadGuestDetails(bookingId);
     loadTransferHistory(bookingId, bookingId);
+    // Update initial complaint/request badge count
+    try { loadComplaintRequests(bookingId); } catch(_){}
     
     // Initialize custom cost input state
     const customCostInput = document.getElementById(`service-cost-${bookingId}`);
@@ -1887,6 +1898,181 @@ async function calculateBalance(bookingId, currentBookingId) {
 function showBilling(bookingId) {
     if (window.showBilling) return window.showBilling(bookingId);
     console.error('Global showBilling is not available');
+}
+
+// Trigger checkout: use SweetAlert with a refund checkbox and amount input
+function triggerCheckout(bookingId) {
+    // Try to show current balance in the prompt (optional)
+    let balanceText = '';
+    try {
+        const balEl = document.getElementById(`Balance-${bookingId}`);
+        if (balEl) {
+            const txt = balEl.textContent.replace(/\s+/g, ' ').trim();
+            if (txt) balanceText = txt;
+        }
+    } catch (e) {}
+
+    // Inject one-time styles for prettier Swal
+    if (!document.getElementById('swal-checkout-styles')) {
+        const style = document.createElement('style');
+        style.id = 'swal-checkout-styles';
+        style.textContent = `
+            .swal-checkout .swal2-title{ font-size:1.25rem; font-weight:700; color:#2b2f32; margin-top:.25rem; }
+            .swal-checkout .section-label{ font-size:.75rem; text-transform:uppercase; letter-spacing:.3px; color:#6c757d; font-weight:600; display:block; margin-bottom:.25rem; }
+            .swal-checkout .balance-pill{ display:inline-block; padding:.25rem .5rem; border-radius:999px; background:#f1f3f5; color:#0c5460; font-weight:700; font-size:.85rem; }
+            .swal-checkout .swal2-actions{ margin-top: .75rem; }
+            .swal-checkout .choice-row{ margin-top:.5rem; }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // Workaround: Disable Bootstrap modal focus trap while Swal is open
+    const openBsModal = document.querySelector('.modal.show');
+    let bsModalInstance = null;
+    let prevFocusCfg = null;
+    let focustrapDeactivated = false;
+    if (openBsModal && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        try {
+            bsModalInstance = bootstrap.Modal.getInstance(openBsModal);
+            if (bsModalInstance && bsModalInstance._config) {
+                prevFocusCfg = bsModalInstance._config.focus;
+                bsModalInstance._config.focus = false;
+            }
+            openBsModal.setAttribute('data-bs-focus', 'false');
+            // Explicitly deactivate Bootstrap's internal FocusTrap if present
+            if (bsModalInstance && bsModalInstance._focustrap && typeof bsModalInstance._focustrap.deactivate === 'function') {
+                bsModalInstance._focustrap.deactivate();
+                focustrapDeactivated = true;
+            }
+        } catch (e) { /* ignore */ }
+    }
+
+    // Check if booking belongs to a group to offer scope options
+    let isGroupBooking = false;
+    fetch(`/payments/group-breakdown/${bookingId}`, { method: 'GET', headers: { 'Content-Type': 'application/json' } })
+        .then(r => r.ok ? r.json() : null)
+        .then(groupData => {
+            if (groupData && groupData.success && groupData.isGroup) {
+                isGroupBooking = true;
+            }
+        })
+        .catch(() => { /* ignore and proceed without group options */ })
+        .finally(() => {
+            const groupHtml = isGroupBooking ? `
+                <div style="text-align:left; margin-top:10px;">
+                    <label class="form-label" style="margin-bottom:4px;">Checkout Scope</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="checkoutScope" id="scopeIndividual" value="individual" checked>
+                        <label class="form-check-label" for="scopeIndividual">This booking only</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="checkoutScope" id="scopeGroup" value="group">
+                        <label class="form-check-label" for="scopeGroup">Entire group</label>
+                    </div>
+                </div>
+            ` : '';
+
+            Swal.fire({
+                iconHtml: '<i class="fas fa-clipboard-check" style="color:#0d6efd;"></i>',
+                title: 'Confirm Checkout',
+                html: `
+                    <div style=\"text-align:left; margin-bottom:8px; color:#6c757d;\">
+                        <span class=\"section-label\">Summary</span>
+                        Proceed to checkout this booking?
+                        ${balanceText ? `<div style=\"margin-top:6px;\"><span class=\"section-label\">Balance</span><span class=\"balance-pill\">${balanceText}</span></div>` : ''}
+                    </div>
+                    ${groupHtml}
+                    <div class=\"form-check choice-row\" style=\"text-align:left;\">
+                        <input class=\"form-check-input\" type=\"checkbox\" value=\"\" id=\"withRefundChk\">
+                        <label class=\"form-check-label\" for=\"withRefundChk\">With refund</label>
+                    </div>
+                    <div id=\"refundAmtWrap\" style=\"margin-top:10px; display:none; text-align:left;\">
+                        <label for=\"refundAmountInput\" class=\"form-label\" style=\"margin-bottom:4px;\">Refund Amount</label>
+                        <input type=\"number\" min=\"0\" step=\"0.01\" id=\"refundAmountInput\" class=\"swal2-input\" placeholder=\"0.00\" style=\"width:100%; box-sizing:border-box; margin:0;\">
+                        <small class=\"text-muted\" style=\"display:block; margin-top:6px;\">Enter the exact refund to give to the guest.</small>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Proceed',
+                cancelButtonText: 'Cancel',
+                customClass: {
+                    popup: 'swal-checkout',
+                    confirmButton: 'btn btn-primary',
+                    cancelButton: 'btn btn-secondary'
+                },
+                buttonsStyling: false,
+                showClass: { popup: 'swal2-show' },
+                hideClass: { popup: 'swal2-hide' },
+                willClose: () => {
+                    // Restore Bootstrap modal focus behavior
+                    if (openBsModal && bsModalInstance && bsModalInstance._config) {
+                        try {
+                            bsModalInstance._config.focus = (prevFocusCfg !== null ? prevFocusCfg : true);
+                            openBsModal.setAttribute('data-bs-focus', String(prevFocusCfg !== false));
+                            if (focustrapDeactivated && bsModalInstance._focustrap && typeof bsModalInstance._focustrap.activate === 'function') {
+                                bsModalInstance._focustrap.activate();
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
+                },
+                focusConfirm: false,
+                didOpen: () => {
+                    const chk = document.getElementById('withRefundChk');
+                    const wrap = document.getElementById('refundAmtWrap');
+                    const input = document.getElementById('refundAmountInput');
+                    if (chk && wrap) {
+                        chk.addEventListener('change', () => {
+                            wrap.style.display = chk.checked ? 'block' : 'none';
+                            if (chk.checked && input) setTimeout(() => input.focus(), 0);
+                        });
+                    }
+                },
+                preConfirm: () => {
+                    const chk = document.getElementById('withRefundChk');
+                    const input = document.getElementById('refundAmountInput');
+                    const hasRefund = !!(chk && chk.checked);
+                    let amount = 0;
+                    if (hasRefund) {
+                        amount = parseFloat(input && input.value ? input.value : '');
+                        if (isNaN(amount) || amount < 0) {
+                            Swal.showValidationMessage('Please enter a valid refund amount.');
+                            return false;
+                        }
+                    }
+                    let scope = 'individual';
+                    const sel = document.querySelector('input[name="checkoutScope"]:checked');
+                    if (sel && (sel.value === 'group' || sel.value === 'individual')) scope = sel.value;
+                    return { hasRefund, amount, scope };
+                }
+            }).then((result) => {
+                if (result.isConfirmed && result.value) {
+                    startCheckoutProcess(bookingId, result.value.hasRefund, result.value.amount || 0, result.value.scope || 'individual');
+                }
+            });
+        });
+}
+
+// Handle selection (stub for now)
+function startCheckoutProcess(bookingId, hasRefund, refundAmount = 0, scope = 'individual') {
+    // Call backend checkout API
+    fetch('/booking/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId, scope, hasRefund, refundAmount })
+    })
+    .then(r => r.json())
+    .then(resp => {
+        if (resp && resp.success) {
+            toastSuccess('Checkout', 'Checkout completed successfully.');
+            setTimeout(() => { location.reload(); }, 600);
+        } else {
+            throw new Error(resp?.message || 'Checkout failed');
+        }
+    })
+    .catch(err => {
+        console.error('Checkout error:', err);
+        toastError('Checkout', 'Failed to checkout.');
+    });
 }
 
 // Function to show payments
@@ -3227,6 +3413,8 @@ window.saveServices = saveServices;
 window.calculateTotalCost = calculateTotalCost;
 window.calculateBalance = calculateBalance;
 window.showBilling = showBilling;
+window.triggerCheckout = triggerCheckout;
+window.startCheckoutProcess = startCheckoutProcess;
 window.openExtendModal = openExtendModal;
 window.checkRoomAvailability = checkRoomAvailability;
 window.renderAvailableRooms = renderAvailableRooms;
@@ -4915,8 +5103,24 @@ function updateBillingPaymentStatus(bookingId) {
 
 // Function to view full booking details (redirect to booking page)
 function viewFullBookingDetails(bookingId) {
-    window.open(`/booking?highlight=${bookingId}`, '_blank');
-} 
+    // Detect if this booking belongs to a group; prefer payments group-breakdown for accurate groupId
+    fetch(`/payments/group-breakdown/${bookingId}`)
+        .then(function(res){
+            return res && res.ok ? res.json() : null;
+        })
+        .then(function(resp){
+            var isGroup = !!(resp && (resp.success || resp.isGroup) && resp.isGroup);
+            var groupId = isGroup ? (resp.groupId || resp.GROUP_ID || resp.group_id) : null;
+            if (isGroup && groupId && String(groupId) !== '0') {
+                window.open(`/booking/group?highlight=${groupId}`, '_blank');
+                return;
+            }
+            window.open(`/booking?highlight=${bookingId}`, '_blank');
+        })
+        .catch(function(){
+            window.open(`/booking?highlight=${bookingId}`, '_blank');
+        });
+}
 
 // Function to load existing services from database for the dynamic modal
 function loadExistingServicesForModal(bookingId) {
@@ -4985,6 +5189,23 @@ function openRemarksModal(bookingId) {
     createRemarksModal(bookingId);
 }
 
+// Shortcut to open remarks modal focused for Complaint/Request entry
+function openComplaintRequestModal(bookingId) {
+    createRemarksModal(bookingId);
+    // After the modal is inserted into DOM, preset category to 'complaint' and focus textarea
+    setTimeout(() => {
+        const categorySel = document.getElementById(`remarkCategory_${bookingId}`);
+        if (categorySel) {
+            // Prefer 'complaint' if available, else fallback to 'request' if present
+            const hasComplaint = Array.from(categorySel.options).some(o => o.value.toLowerCase() === 'complaint');
+            const target = hasComplaint ? 'complaint' : (Array.from(categorySel.options).some(o => o.value.toLowerCase() === 'request') ? 'request' : '');
+            if (target) categorySel.value = target;
+        }
+        const txt = document.getElementById(`remarkText_${bookingId}`);
+        if (txt) txt.focus();
+    }, 200);
+}
+
 // Function to create remarks modal
 function createRemarksModal(bookingId) {
     // Remove existing remarks modal if any
@@ -5026,7 +5247,7 @@ function createRemarksModal(bookingId) {
                                             <option value="Booking">Booking</option>
                                             <option value="Billing">Billing</option>
                                             <option value="Payment">Payment</option>
-                                            <option value="Complain">Complain</option>
+                                          
                                             <option value="Request">Request</option>
                                             <option value="Discount">Discount</option>
                                             <option value="Service">Service</option>
@@ -5382,11 +5603,362 @@ async function updateRemark(bookingId, remarkId) {
 
 // Make functions globally accessible
 window.openRemarksModal = openRemarksModal;
+window.openComplaintRequestModal = openComplaintRequestModal;
 window.addRemark = addRemark;
 window.clearRemarkForm = clearRemarkForm;
 window.deleteRemark = deleteRemark;
 window.editRemark = editRemark;
 window.updateRemark = updateRemark;
+
+
+// ==================== COMPLAINT / REQUEST MODAL ====================
+// This UI is dedicated to Complaints and Requests only, built on top of the
+// existing remarks endpoints. Status is encoded in the remark text prefix:
+// "[OPEN] " for received (red) and "[DONE] " for completed (green).
+
+function openComplaintRequestModal(bookingId) {
+    createComplaintRequestModal(bookingId);
+}
+
+function createComplaintRequestModal(bookingId) {
+    const existing = document.getElementById(`complaintRequestModal_${bookingId}`);
+    if (existing) existing.remove();
+
+    const html = `
+    <div class="modal fade" id="complaintRequestModal_${bookingId}" tabindex="-1" aria-labelledby="complaintRequestLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 700px;">
+            <div class="modal-content" style="background-color: #ffffff; border: 1px solid #dee2e6;">
+                <div class="modal-header py-2" style="background:#ffffff; border-bottom:1px solid #eeeeee;">
+                    <h6 class="modal-title mb-0" id="complaintRequestLabel" style="color:#495057;">
+                        <i class="fas fa-clipboard-list me-2"></i><strong>Complaints / Requests</strong>
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-3" style="background-color:#ffffff; color:#495057;">
+                    <div class="card shadow-sm mb-3" style="background:#ffffff; border:1px solid #dee2e6;">
+                        <div class="card-header py-2" style="background:#f8f9fa; border-bottom:1px solid #dee2e6;">
+                            <h6 class="mb-0 text-primary"><i class="fas fa-plus-circle me-1"></i>Create Complaint/Request</h6>
+                        </div>
+                        <div class="card-body p-3">
+                            <form id="crForm_${bookingId}">
+                                <div class="row g-2">
+                                    <div class="col-md-12">
+                                        <label class="form-label">Type</label>
+                                        <select class="form-select" id="crType_${bookingId}" required>
+                                            <option value="" selected disabled>Select</option>
+                                            <option value="complaint">Complaint</option>
+                                            <option value="request">Request</option>
+                                        </select>
+                                    </div>
+                                    <!-- Status removed; new entries default to OPEN (not complete) -->
+                                    <div class="col-md-12">
+                                        <label class="form-label">Details</label>
+                                        <textarea class="form-control" id="crDetails_${bookingId}" rows="3" placeholder="Enter customer complaint/request details" required></textarea>
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-end mt-2">
+                                    <button type="button" class="btn btn-secondary me-2" onclick="document.getElementById('crForm_${bookingId}').reset()"><i class="fas fa-eraser me-1"></i>Clear</button>
+                                    <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Save</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm" style="background-color: #ffffff; border: 1px solid #dee2e6;">
+                        <div class="card-header py-2" style="background-color: #f8f9fa; border-bottom: 1px solid #dee2e6;">
+                            <h6 class="mb-0 text-success">
+                                <i class="fas fa-list me-1"></i>Entries
+                            </h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0" id="crTable_${bookingId}" style="background-color: white;">
+                                    <thead style="background-color: #6c757d; color: white;">
+                                        <tr>
+                                            <th style="color: white;">Details</th>
+                                            <th style="color: white;">Type</th>
+                                            <th style="color: white;">Status</th>
+                                            <th style="color: white;">User</th>
+                                            <th style="color: white;">Date/Time</th>
+                                            <th style="color: white;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="crTableBody_${bookingId}" style="background-color: white; color: black;"></tbody>
+                                </table>
+                            </div>
+                            <div id="crEmpty_${bookingId}" class="text-center py-4 text-muted" style="display: none;">
+                                <i class="fas fa-clipboard-list fa-2x mb-2"></i>
+                                <p class="mb-0">No complaints/requests yet.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer py-2" style="background:#ffffff; border-top:1px solid #eeeeee;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', html);
+    const modal = new bootstrap.Modal(document.getElementById(`complaintRequestModal_${bookingId}`));
+    modal.show();
+
+    document.getElementById(`crForm_${bookingId}`).addEventListener('submit', function(e){
+        e.preventDefault();
+        addComplaintRequest(bookingId);
+    });
+
+    loadComplaintRequests(bookingId);
+}
+
+async function loadComplaintRequests(bookingId) {
+    try {
+        const res = await fetch(`/booking/complaint-request/${bookingId}`);
+        const data = await res.json();
+        const rows = Array.isArray(data?.data) ? data.data : [];
+        // Update badge count for open items (STATUS = 0)
+        try {
+            const openCount = rows.filter(r => Number(r.STATUS) === 0).length;
+            const badgeEl = document.getElementById(`crCount_${bookingId}`);
+            if (badgeEl) {
+                if (openCount > 0) {
+                    badgeEl.textContent = String(openCount);
+                    badgeEl.style.display = 'inline-block';
+                } else {
+                    badgeEl.style.display = 'none';
+                }
+            }
+        } catch(_){}
+        renderComplaintRequests(bookingId, rows);
+    } catch (e) {
+        console.error('Failed to load complaints/requests:', e);
+        renderComplaintRequests(bookingId, []);
+    }
+}
+
+function parseCRStatusAndText(text) {
+    const t = text || '';
+    if (t.startsWith('[OPEN] ')) return { status: 'OPEN', details: t.substring(7) };
+    if (t.startsWith('[DONE] ')) return { status: 'DONE', details: t.substring(7) };
+    return { status: 'OPEN', details: t };
+}
+
+function buildCRText(status, details) {
+    const prefix = status === 'DONE' ? '[DONE] ' : '[OPEN] ';
+    return prefix + (details || '').trim();
+}
+
+function renderComplaintRequests(bookingId, rows) {
+    const tbody = document.getElementById(`crTableBody_${bookingId}`);
+    const empty = document.getElementById(`crEmpty_${bookingId}`);
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!rows.length) {
+        empty.style.display = 'block';
+        return;
+    }
+    empty.style.display = 'none';
+
+    // Local helper to format to MM/DD/YY HH:MM (24h)
+    const formatMMDDYY_HHMM = (dateObj) => {
+        if (!(dateObj instanceof Date) || isNaN(dateObj)) return '';
+        const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const dd = String(dateObj.getDate()).padStart(2, '0');
+        const yy = String(dateObj.getFullYear()).slice(-2);
+        const hh = String(dateObj.getHours()).padStart(2, '0');
+        const mi = String(dateObj.getMinutes()).padStart(2, '0');
+        return `${mm}/${dd}/${yy} ${hh}:${mi}`;
+    };
+
+    rows.forEach(r => {
+        const status = Number(r.STATUS) || 0; // 0 not complete, 1 complete
+        const badge = status === 1
+            ? '<span class="badge" style="background-color:#198754 !important; color:#ffffff !important; font-weight:600; padding:4px 4px; border-radius:12px; text-transform:none !important;">Completed</span>'
+            : '<span class="badge" style="background-color:#dc3545 !important; color:#ffffff !important; font-weight:600; padding:4px 4px; border-radius:12px; text-transform:none !important;">Not Complete</span>';
+        const when = formatMMDDYY_HHMM(new Date(r.EDITDED_DT || r.ENCODED_DT));
+        const type = (String(r.TYPE).toLowerCase() === 'complaint') ? 'Complaint' : 'Request';
+        const toggleTo = status === 1 ? 0 : 1;
+        const toggleLabel = status === 1 ? 'Mark Not Complete' : 'Mark Completed';
+
+        const tr = document.createElement('tr');
+        tr.style.backgroundColor = 'white';
+        tr.style.color = 'black';
+        const markAction = status === 1
+            ? `<i class=\"fas fa-undo-alt text-warning\" title=\"Mark Not Complete\" style=\"cursor:pointer;\" onclick=\"toggleComplaintRequestStatus(${r.IDNo}, 0, '${bookingId}')\"></i>`
+            : `<i class=\"fas fa-check-circle text-success\" title=\"Mark Completed\" style=\"cursor:pointer;\" onclick=\"toggleComplaintRequestStatus(${r.IDNo}, 1, '${bookingId}')\"></i>`;
+        tr.innerHTML = `
+            <td style="background-color: white; color: #6c757d; max-width:380px; word-wrap:break-word;">${r.DETAILS}</td>
+            <td style="background-color: white; color: #6c757d;">${type}</td>
+            <td style="background-color: white;">${badge}</td>
+            <td style="background-color: white; color: #6c757d;">${(r.EDITDED_BY_NAME || r.EDITDED_BY) ? (r.EDITDED_BY_NAME || r.EDITDED_BY) : (r.ENCODED_BY_NAME || r.ENCODED_BY || '')}</td>
+            <td style="background-color: white; color: #6c757d;">${when}</td>
+            <td style="background-color: white;">
+                <i class=\"fas fa-edit text-primary me-2\" title=\"Edit\" style=\"cursor:pointer;\" onclick=\"editComplaintRequest(${r.IDNo}, '${bookingId}', '${String(r.TYPE).toLowerCase()}', \`${(r.DETAILS || '').replace(/`/g, '\\`').replace(/\\/g, '\\\\')}\`)\"></i>
+                ${markAction}
+                &nbsp;&nbsp;
+                <i class=\"fas fa-trash text-danger\" title=\"Delete\" style=\"cursor:pointer;\" onclick=\"deleteComplaintRequest(${r.IDNo}, '${bookingId}')\"></i>
+            </td>`;
+        tbody.appendChild(tr);
+    });
+}
+
+async function addComplaintRequest(bookingId) {
+    const type = document.getElementById(`crType_${bookingId}`).value;
+    const details = (document.getElementById(`crDetails_${bookingId}`).value || '').trim();
+    if (!type || !details) { toastError('Error', 'Please fill all fields'); return; }
+    try {
+        const resp = await fetch('/booking/complaint-request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bookingId: bookingId, type: type, details: details })
+        });
+        const result = await resp.json();
+        if (!result.success) throw new Error(result.message || 'Failed');
+        document.getElementById(`crForm_${bookingId}`).reset();
+        await loadComplaintRequests(bookingId);
+        toastSuccess('Saved', 'Entry added');
+        // also refresh remarks button color if present
+        if (typeof updateRemarksButtonColor === 'function') { try { await updateRemarksButtonColor(bookingId); } catch(_){} }
+    } catch (e) {
+        console.error('Add complaint/request failed:', e);
+        toastError('Error', 'Could not save');
+    }
+}
+
+async function toggleComplaintRequestStatus(remarkId, toStatus, bookingId) {
+    try {
+        // Confirm action
+        if (typeof Swal !== 'undefined') {
+            const verb = Number(toStatus) === 1 ? 'mark as completed' : 'mark as not complete';
+            const res = await Swal.fire({
+                title: 'Are you sure?',
+                text: `Do you want to ${verb}?`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Yes',
+                cancelButtonText: 'Cancel'
+            });
+            if (!res.isConfirmed) return;
+        } else if (!confirm('Continue with this change?')) {
+            return;
+        }
+
+        const upd = await fetch(`/booking/complaint-request/${remarkId}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: Number(toStatus) })
+        });
+        const ok = await upd.json();
+        if (!ok.success) throw new Error(ok.message || 'Failed');
+        await loadComplaintRequests(bookingId);
+        toastSuccess('Updated', 'Status updated');
+    } catch (e) {
+        console.error('Toggle status failed:', e);
+        toastError('Error', 'Could not update status');
+    }
+}
+
+async function deleteComplaintRequest(remarkId, bookingId) {
+    try {
+        // Confirm deletion
+        if (typeof Swal !== 'undefined') {
+            const res = await Swal.fire({
+                title: 'Delete this entry?',
+                text: 'This action cannot be undone.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Delete',
+                cancelButtonText: 'Cancel'
+            });
+            if (!res.isConfirmed) return;
+        } else if (!confirm('Delete this entry?')) {
+            return;
+        }
+
+        const resp = await fetch(`/booking/complaint-request/${remarkId}`, { method: 'DELETE' });
+        const out = await resp.json();
+        if (!out.success) throw new Error(out.message || 'Failed');
+        await loadComplaintRequests(bookingId);
+        toastSuccess('Deleted', 'Entry deleted');
+    } catch (e) {
+        console.error('Delete complaint/request failed:', e);
+        toastError('Error', 'Could not delete');
+    }
+}
+
+// Edit complaint/request modal and update
+function editComplaintRequest(id, bookingId, type, details) {
+    const modalId = `editComplaintRequestModal_${id}`;
+    const existing = document.getElementById(modalId);
+    if (existing) existing.remove();
+    const html = `
+    <div class="modal fade" id="${modalId}" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 500px;">
+            <div class="modal-content" style="background-color:#ffffff; color:#000; border:1px solid #dee2e6;">
+                <div class="modal-header" style="background-color:#ffffff; border-bottom:1px solid #dee2e6;">
+                    <style>
+                        /* Force black text inside inputs for this modal */
+                        #${modalId} .form-control, #${modalId} .form-select { color:#000 !important; }
+                        #${modalId} ::placeholder { color:#000 !important; opacity:0.6; }
+                    </style>
+                    <h5 class="modal-title" style="color:#000;"><i class="fas fa-edit me-2"></i>Edit Complaint/Request</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" style="background-color:#ffffff;">
+                    <div class="mb-3">
+                        <label class="form-label" style="color:#000;">Type</label>
+                        <select class="form-select" id="crEditType_${id}" style="background-color:#ffffff; color:#000; border:1px solid #ced4da;">
+                            <option value="complaint">Complaint</option>
+                            <option value="request">Request</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="color:#000;">Details</label>
+                        <textarea class="form-control" id="crEditDetails_${id}" rows="4" style="background-color:#ffffff; color:#000; border:1px solid #ced4da;"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer" style="background-color:#ffffff; border-top:1px solid #dee2e6;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="updateComplaintRequest(${id}, '${bookingId}')">Update</button>
+                </div>
+            </div>
+        </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+    const modal = new bootstrap.Modal(document.getElementById(modalId));
+    const t = String(type || 'complaint').toLowerCase();
+    document.getElementById(`crEditType_${id}`).value = (t === 'request' ? 'request' : 'complaint');
+    document.getElementById(`crEditDetails_${id}`).value = details || '';
+    modal.show();
+}
+
+async function updateComplaintRequest(id, bookingId) {
+    const type = document.getElementById(`crEditType_${id}`).value;
+    const details = document.getElementById(`crEditDetails_${id}`).value.trim();
+    if (!type || !details) { toastError('Error', 'Please fill all fields'); return; }
+    try {
+        const resp = await fetch(`/booking/complaint-request/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type, details })
+        });
+        const out = await resp.json();
+        if (!out.success) throw new Error(out.message || 'Failed');
+        const modalEl = document.getElementById(`editComplaintRequestModal_${id}`);
+        if (modalEl) bootstrap.Modal.getInstance(modalEl).hide();
+        await loadComplaintRequests(bookingId);
+        toastSuccess('Updated', 'Complaint/Request updated');
+    } catch (e) {
+        console.error('Error updating complaint/request:', e);
+        toastError('Error', 'Could not update');
+    }
+}
+
+window.editComplaintRequest = editComplaintRequest;
+window.updateComplaintRequest = updateComplaintRequest;
 
 
 // Function to load services
