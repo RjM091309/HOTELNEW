@@ -610,6 +610,9 @@ function viewGroupBilling(groupId) {
         url: `/booking/group_billing_details/${groupId}`,
         type: 'GET',
         success: function (data) {
+            // Expose groupId to the modal for actions (e.g., generate invoice)
+            var modalEl = document.getElementById('groupBillingModal');
+            if (modalEl) { modalEl.dataset.groupId = groupId; }
             if (!data || (data.roomBillingDetails.length === 0 && data.serviceBillingDetails.length === 0)) {
                 alert("No billing records found for this group.");
                 return;

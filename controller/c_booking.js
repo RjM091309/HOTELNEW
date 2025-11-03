@@ -2029,6 +2029,32 @@ class BookingController {
     }
   }
 
+  // Generate group invoice PDF
+  static async generateGroupInvoice(req, res) {
+    try {
+      const { groupId } = req.params;
+      const user = req.user ? { FULLNAME: req.user.FULLNAME } : null;
+
+      if (!groupId) {
+        return res.status(400).json({ error: 'Group ID is required' });
+      }
+
+      const invoiceData = await BookingModel.generateGroupInvoice({ groupId, user });
+
+      const filename = `group-invoice-${invoiceData.confirmationNumber || 'unknown'}.pdf`;
+
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename=${filename}`,
+        'Content-Length': invoiceData.pdfBuffer.length
+      });
+      res.send(invoiceData.pdfBuffer);
+    } catch (error) {
+      console.error('❌ Error generating group invoice PDF:', error);
+      res.status(500).send('Internal Server Error');
+    }
+  }
+
   // Generate group voucher PDF
   static async generateGroupVoucher(req, res) {
     try {

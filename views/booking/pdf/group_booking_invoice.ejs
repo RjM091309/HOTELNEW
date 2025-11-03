@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Group Invoice</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .header { text-align: center; margin-bottom: 20px; }
+    .header img { height: 150px; }
+    .invoice-title { font-size: 28px; font-weight: bold; margin: 15px 0; }
+    .sub-header { text-align: center; font-size: 14px; }
+
+    .meta { display: flex; justify-content: space-between; margin-top: 10px; }
+    .billed-to { margin-top: 10px; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+    th, td { border: 1px solid #f3c200; padding: 10px; text-align: center; }
+
+    .totals { margin-top: 20px; font-size: 14px; margin-left: auto; width: fit-content; text-align: left; }
+    .totals .label { font-weight: bold; margin: 0; }
+    .totals .sub { font-weight: normal; margin: 0 0 2px 20px; font-size: 12px; }
+    .totals p { margin: 2px 0; }
+
+    .remarks-title { font-weight: bold; font-size: 14px; background: #e3e8ed; padding: 10px; margin-top: 30px; }
+    .red { color: red; font-weight: bold; }
+    .bank { display: flex; justify-content: space-between; margin-top: 30px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <img src="<%= imageUrl %>" alt="logo" class="logo-default" />
+    <div class="invoice-title">GROUP INVOICE</div>
+    <div class="sub-header">
+      <div>Clark Terrace Building, Lot 2 Block 1, The Villages Prince Balagtas Avenue,</div>
+      <div>Clark Freeport Zone, Pampanga, 2023</div>
+      <div>(GLOBE) 0945 146 7000 (SMART) 0969 049 7000</div>
+    </div>
+  </div>
+
+  <div class="meta">
+    <div><b>Date:</b> <%= DATE_ISSUED %></div>
+    <div><b>Invoice #:</b> <%= INVOICE_NO %></div>
+  </div>
+
+  <div class="billed-to">
+    <b>Group:</b> <%= DISPLAY_NAME %>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ROOM #</th>
+        <th>DESCRIPTION</th>
+        <th>CHARGES</th>
+        <th>QTY</th>
+        <th>AMOUNT</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (Array.isArray(ROWS) && ROWS.length) { %>
+        <% ROWS.forEach(function(row){ %>
+          <tr>
+            <td><%= row.ROOM_NUMBER || '-' %></td>
+            <td><%= row.DESCRIPTION %></td>
+            <td>PHP <%= parseFloat(row.CHARGES || 0).toLocaleString() %></td>
+            <td><%= row.QTY || '-' %></td>
+            <td>PHP <%= (parseFloat(row.CHARGES || 0) * (parseFloat(row.QTY || 1))).toLocaleString() %></td>
+          </tr>
+        <% }) %>
+      <% } else { %>
+        <tr>
+          <td colspan="5">No itemized rows available</td>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <p class="label"><b>CHARGE SUMMARY:</b></p>
+    <p class="sub">ROOM: PHP <%= parseFloat(ROOM_TOTAL || 0).toLocaleString() %></p>
+    <% if (SERVICES_TOTAL > 0) { %>
+      <p class="sub">SERVICES: PHP <%= parseFloat(SERVICES_TOTAL).toLocaleString() %></p>
+    <% } %>
+    <% if (typeof RESERVATION_FEE !== 'undefined' && parseFloat(RESERVATION_FEE) > 0) { %>
+      <p class="sub" style="color:#28a745;">RESERVATION FEE: -PHP <%= parseFloat(RESERVATION_FEE).toLocaleString() %></p>
+    <% } %>
+    <% if (typeof DISCOUNT !== 'undefined' && parseFloat(DISCOUNT) > 0) { %>
+      <p class="sub" style="color:#28a745;">DISCOUNT: -PHP <%= parseFloat(DISCOUNT).toLocaleString() %></p>
+    <% } %>
+    <p class="label"><b>TOTAL CHARGES:</b> PHP <%= parseFloat(GRAND_TOTAL || 0).toLocaleString() %></p>
+  </div>
+
+  <div class="remarks-title">REMARKS</div>
+  <div class="totals">
+    <p class="label"><b>TAX:</b> PHP 0</p>
+    <p class="label"><b>PAYMENT:</b> PHP <%= parseFloat(TOTAL_PAID || 0).toLocaleString() %></p>
+    <% if (parseFloat(ROOM_TOTAL || 0) > 0) { %>
+      <p class="sub">ROOM PAID: PHP <%= parseFloat(ROOM_PAID || 0).toLocaleString() %></p>
+    <% } %>
+    <% if (parseFloat(SERVICES_TOTAL || 0) > 0) { %>
+      <p class="sub">SERVICES PAID: PHP <%= parseFloat(SERVICES_PAID || 0).toLocaleString() %></p>
+    <% } %>
+    <% if (typeof RESERVATION_FEE !== 'undefined' && parseFloat(RESERVATION_FEE) > 0) { %>
+      <p class="sub" style="color:#28a745;">RESERVATION FEE PAID: -PHP <%= parseFloat(RESERVATION_FEE).toLocaleString() %></p>
+    <% } %>
+    <% if (typeof DISCOUNT !== 'undefined' && parseFloat(DISCOUNT) > 0) { %>
+      <p class="sub" style="color:#28a745;">DISCOUNT APPLIED: -PHP <%= parseFloat(DISCOUNT).toLocaleString() %></p>
+    <% } %>
+    <p class="label"><b class="red">TOTAL DUE:</b> <span class="red">PHP <%= parseFloat(TOTAL_UNPAID || 0).toLocaleString() %></span></p>
+  </div>
+
+  <div class="bank">
+    <div style="line-height:1.5;">
+      <b>M STAY HOTEL BANK ACCOUNT</b><br>
+      BANK DETAILS: BDO<br>
+      BANK NAME: M STAY HOTEL CORP.<br>
+      ACCOUNT NUMBER: 005738009996
+    </div>
+    <div style="text-align:right; font-weight:bold; align-self:flex-start;">
+      ISSUED BY: <%= ISSUED_BY %>
+    </div>
+  </div>
+</body>
+</html>
+
+

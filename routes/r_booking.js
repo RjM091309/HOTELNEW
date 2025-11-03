@@ -109,6 +109,7 @@ router.get('/get-agency', BookingController.getAgency);
 router.get('/generate-invoice/:bookingId', BookingController.generateInvoice);
 router.post('/generate-voucher', BookingController.generateVoucher);
 router.post('/generate-group-voucher', BookingController.generateGroupVoucher);
+router.get('/generate-group-invoice/:groupId', BookingController.generateGroupInvoice);
 
 // Service routes
 router.get('/get-breakfast-prices', BookingController.getBreakfastPrices);

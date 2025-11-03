@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Ensure proceed to payment button is properly initialized
     setTimeout(function() {
         const proceedButton = document.getElementById('groupProceedPaymentButton');
+        const genInvoiceBtn = document.getElementById('generateGroupInvoiceBtn');
         if (proceedButton) {
             // Remove any existing event listeners
             proceedButton.replaceWith(proceedButton.cloneNode(true));
@@ -42,6 +43,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Show payment modal WITHOUT closing billing modal
                 const paymentModal = new bootstrap.Modal(document.getElementById('group_modal-payment'));
                 paymentModal.show();
+            });
+        }
+        if (genInvoiceBtn) {
+            // Reset listeners
+            genInvoiceBtn.replaceWith(genInvoiceBtn.cloneNode(true));
+            const newBtn = document.getElementById('generateGroupInvoiceBtn');
+            newBtn.addEventListener('click', function() {
+                const modal = document.getElementById('groupBillingModal');
+                const groupId = modal && modal.dataset ? modal.dataset.groupId : null;
+                if (!groupId) {
+                    alert('Missing Group ID!');
+                    return;
+                }
+                const url = `/booking/generate-group-invoice/${groupId}`;
+                window.open(url, '_blank');
             });
         }
     }, 1000);

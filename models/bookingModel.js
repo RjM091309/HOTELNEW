@@ -4461,6 +4461,76 @@ class BookingModel {
     }
   }
 
+  // Generate group invoice PDF
+  static async generateGroupInvoice(params) {
+    const { groupId, user } = params;
+    try {
+      // Reuse existing aggregation
+      const details = await BookingModel.getGroupBillingDetails(groupId);
+
+      const path = require('path');
+      const fs = require('fs');
+      const imagePath = path.join(__dirname, '../public/img/Logo-Gold.png');
+      const imageBase64 = fs.existsSync(imagePath) ? fs.readFileSync(imagePath, 'base64') : '';
+
+      // Map rows for template
+      const rows = [];
+      (details.roomBillingDetails || []).forEach(r => {
+        rows.push({
+          ROOM_NUMBER: r.ROOM_NUMBER,
+          DESCRIPTION: 'Room Charge',
+          CHARGES: parseFloat(r.charges) || 0,
+          QTY: parseInt(r.room_qty, 10) || 0
+        });
+      });
+      (details.serviceBillingDetails || []).forEach(s => {
+        rows.push({
+          ROOM_NUMBER: s.ROOM_NUMBER,
+          DESCRIPTION: s.description,
+          CHARGES: parseFloat(s.charges) || 0,
+          QTY: parseInt(s.service_qty, 10) || 0
+        });
+      });
+
+      const date = new Date();
+
+      const templateData = {
+        DATE_ISSUED: date.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' }),
+        INVOICE_NO: details.invoiceNumber || `G${groupId}`,
+        DISPLAY_NAME: details.GroupName || 'Group',
+        ROWS: rows,
+        ROOM_TOTAL: parseFloat(details.roomTotal || 0),
+        SERVICES_TOTAL: parseFloat(details.servicesTotal || 0),
+        RESERVATION_FEE: parseFloat(details.reservationFee || 0),
+        DISCOUNT: parseFloat(details.discount || 0),
+        GRAND_TOTAL: parseFloat(details.grandTotal || 0),
+        TOTAL_PAID: parseFloat(details.totalPaid || 0),
+        SERVICES_PAID: 0, // not split accurately; optional
+        ROOM_PAID: 0,     // optional breakdown (can be refined later)
+        TOTAL_UNPAID: Math.max(0, parseFloat(details.grandTotal || 0) - parseFloat(details.totalPaid || 0)),
+        imageUrl: imageBase64 ? `data:image/png;base64,${imageBase64}` : '',
+        ISSUED_BY: user?.FULLNAME || 'N/A'
+      };
+
+      const { chromium } = require('playwright');
+      const ejs = require('ejs');
+      const templatePath = path.join(__dirname, '../views/booking/pdf/group_booking_invoice.ejs');
+      const html = await ejs.renderFile(templatePath, templateData);
+
+      const browser = await chromium.launch({ headless: true });
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle0' });
+      const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
+      await browser.close();
+
+      return { pdfBuffer, confirmationNumber: templateData.INVOICE_NO };
+
+    } catch (error) {
+      console.error('Error in generateGroupInvoice:', error);
+      throw error;
+    }
+  }
+
   // Check group payment status
   static async checkGroupPaymentStatus(groupId) {
     try {
