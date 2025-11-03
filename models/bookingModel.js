@@ -4276,11 +4276,12 @@ class BookingModel {
       const invoiceNumber = roomResults.length > 0 ? roomResults[0].invoiceNumber : "Not Assigned";
       const GroupName = roomResults.length > 0 ? roomResults[0].GROUP_NAME : "Unknown Group";
 
-      // Get group summary data including reservation fee and discount
+      // Get group summary data including reservation fee, discount, and billing type
       const summaryQuery = `
         SELECT 
           COALESCE(gb.GROUP_DISCOUNT, 0) AS group_discount,
-          COALESCE(gb.GROUP_RESERVATION_FEE, 0) AS reservation_fee
+          COALESCE(gb.GROUP_RESERVATION_FEE, 0) AS reservation_fee,
+          COALESCE(gb.BILLING_TYPE, 0) AS billing_type
         FROM group_booking gb
         WHERE gb.IDNo = ?
       `;
@@ -4288,6 +4289,7 @@ class BookingModel {
       const [summaryRow] = await queryDatabasePromise(summaryQuery, [groupId]);
       const reservationFee = parseFloat(summaryRow?.reservation_fee || 0);
       const discount = parseFloat(summaryRow?.group_discount || 0);
+      const billingType = parseInt(summaryRow?.billing_type);
 
       // Compute totals from items
       const roomTotal = roomResults.reduce((sum, r) => sum + ((parseFloat(r.charges) || 0) * (parseInt(r.room_qty, 10) || 0)), 0);
@@ -4313,6 +4315,7 @@ class BookingModel {
         serviceBillingDetails: serviceResults,  // Service charges
         reservationFee: reservationFee,
         discount: discount,
+        billingType: billingType,  // 1 = Consolidated/Master, 0 = Individual
         roomTotal: roomTotal,
         servicesTotal: servicesTotal,
         grandTotal: grandTotal,

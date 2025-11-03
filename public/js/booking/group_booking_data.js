@@ -707,8 +707,15 @@ function viewGroupBilling(groupId) {
             }
 
             const allPaid = allBillingData.every(bill => bill.PAYMENT_STATUS === 'paid' || bill.STATUS === 'paid');
+            const billingType = parseInt(data.billingType || 0); // 1 = Consolidated/Master, 0 = Individual
             const paymentBtn = $('#groupProceedPaymentButton');
-            if (allPaid) {
+            
+            // Disable button if Individual Billing (BILLING_TYPE = 0) or if all paid
+            if (billingType === 0) {
+                paymentBtn.prop('disabled', true)
+                    .text('Individual Billing - Please pay individually.')
+                    .attr('title', 'Individual billing requires payment through individual room menus');
+            } else if (allPaid) {
                 paymentBtn.prop('disabled', true).text('Payment Completed');
             } else {
                 paymentBtn.prop('disabled', false).text('Proceed to Payment');
