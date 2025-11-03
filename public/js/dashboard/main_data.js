@@ -990,37 +990,46 @@ $(document).ready(function() {
         setTimeout(toggleMoveToOccupiedButton, 100);
     });
 
-    // CHECK-IN TOGGLE
+    // CHECK-IN TOGGLE (REVERSIBLE)
     $(document).on('change', '.custom-toggle-checkin', function() {
-        const bookingId = $(this).attr('data-idno');
-        const newStatus = 'check-In';
+        const $toggle = $(this);
+        const bookingId = $toggle.attr('data-idno');
+        const isChecked = $toggle.is(':checked');
+        
+        // Determine new status based on toggle state
+        const newStatus = isChecked ? 'check-In' : 'pending';
+        const action = isChecked ? 'check in' : 'revert to pending';
         
         // Get the room number from the card header
-        const roomNumber = $(this).closest('.card').find('.card-head header').text().trim();
+        const roomNumber = $toggle.closest('.card').find('.card-head header').text().trim();
 
         // Show SweetAlert2 confirmation
         Swal.fire({
-            title: "Check In Guest?",
-            text: `Are you sure you want to check in Room ${roomNumber}?`,
+            title: isChecked ? "Check In Guest?" : "Revert Check-In?",
+            text: isChecked 
+                ? `Are you sure you want to check in Room ${roomNumber}?`
+                : `Are you sure you want to revert Room ${roomNumber} back to pending status?`,
             icon: "question",
             showCancelButton: true,
-            confirmButtonColor: "#28a745",
-            confirmButtonText: "Yes, check in!",
+            confirmButtonColor: isChecked ? "#28a745" : "#ffc107",
+            confirmButtonText: isChecked ? "Yes, check in!" : "Yes, revert!",
             cancelButtonText: "No, cancel",
             allowOutsideClick: false
         }).then((result) => {
             if (result.isConfirmed) {
                 // Show loading state
                 Swal.fire({
-                    title: "Checking In...",
-                    text: "Please wait while we process the check-in.",
+                    title: isChecked ? "Checking In..." : "Reverting...",
+                    text: isChecked 
+                        ? "Please wait while we process the check-in."
+                        : "Please wait while we revert the status.",
                     allowOutsideClick: false,
                     didOpen: () => {
                         Swal.showLoading();
                     }
                 });
 
-                // Send AJAX request to update check-in status
+                // Send AJAX request to update booking status
                 $.ajax({
                     url: '/dashboard/booking/update_status',
                     type: 'POST',
@@ -1036,264 +1045,374 @@ $(document).ready(function() {
                         try {
                             PMSCore.validateResponse(response);
                             
-                            // Move the card to the "Checked-In" tab if it exists
-                            const card = $(this).closest('.card');
-                            if (card.length) {
-                                const checkedInTab = $('#checked-in-content .scrollable-container');
-                                if (checkedInTab.length) {
-                                    // Add smooth transition
-                                    card.css({
-                                        'transition': 'opacity 0.5s ease-out, transform 0.5s ease-out',
-                                        'opacity': '0',
-                                        'transform': 'scale(0.95)'
-                                    });
-                                    
-                                    setTimeout(() => {
-                                        // Move card to checked-in tab
-                                        checkedInTab.append(card);
+                            const card = $toggle.closest('.card');
+                            
+                            if (isChecked) {
+                                // Check-in: Move the card to the "Checked-In" tab if it exists
+                                if (card.length) {
+                                    const checkedInTab = $('#checked-in-content .scrollable-container');
+                                    if (checkedInTab.length) {
+                                        // Add smooth transition
                                         card.css({
-                                            'opacity': '1',
-                                            'transform': 'scale(1)'
+                                            'transition': 'opacity 0.5s ease-out, transform 0.5s ease-out',
+                                            'opacity': '0',
+                                            'transform': 'scale(0.95)'
                                         });
-                                        PMSCore.debugLog('Card moved to checked-in tab (SweetAlert)', { bookingId });
-                                    }, 500);
+                                        
+                                        setTimeout(() => {
+                                            // Move card to checked-in tab
+                                            checkedInTab.append(card);
+                                            card.css({
+                                                'opacity': '1',
+                                                'transform': 'scale(1)'
+                                            });
+                                            PMSCore.debugLog('Card moved to checked-in tab (SweetAlert)', { bookingId });
+                                        }, 500);
+                                    }
                                 }
+                                
+                                // Show success toast
+                                PMSCore.showSuccess('Check-In Successful!', `Booking ID ${bookingId} has been checked in successfully.`);
+                            } else {
+                                // Revert: Move the card back to the appropriate tab (pending/today check-in)
+                                if (card.length) {
+                                    const pendingTab = $('#today-check-in-content .scrollable-container, #pending-content .scrollable-container');
+                                    if (pendingTab.length) {
+                                        // Add smooth transition
+                                        card.css({
+                                            'transition': 'opacity 0.5s ease-out, transform 0.5s ease-out',
+                                            'opacity': '0',
+                                            'transform': 'scale(0.95)'
+                                        });
+                                        
+                                        setTimeout(() => {
+                                            // Move card back to pending/today check-in tab
+                                            pendingTab.first().append(card);
+                                            card.css({
+                                                'opacity': '1',
+                                                'transform': 'scale(1)'
+                                            });
+                                            PMSCore.debugLog('Card moved back to pending tab (SweetAlert)', { bookingId });
+                                        }, 500);
+                                    }
+                                }
+                                
+                                // Show success toast
+                                PMSCore.showSuccess('Status Reverted!', `Booking ID ${bookingId} has been reverted to pending status.`);
                             }
                             
-                            // Show success toast
-                            PMSCore.showSuccess('Check-In Successful!', `Booking ID ${bookingId} has been checked in successfully.`);
-                            $(this).prop('disabled', true);
-                            PMSCore.debugLog('Check-in successful (SweetAlert)', { bookingId, status: newStatus });
+                            // Update card's booking status attribute
+                            card.attr('data-booking-status', newStatus);
+                            
+                            PMSCore.debugLog(`Status update successful (SweetAlert)`, { bookingId, status: newStatus, action });
                             
                             // Trigger Socket.IO event after all processing is complete
                             if (typeof dashboardSocket !== 'undefined') {
                                 dashboardSocket.emit('dashboard-updated', {
                                     action: 'booking-status-updated',
-                                    message: `Booking ${bookingId} checked in successfully`,
+                                    message: `Booking ${bookingId} ${action} successfully`,
                                     data: response.data
                                 });
                             }
                         } catch (error) {
-                            PMSCore.handleError(error, 'check-in SweetAlert success handler');
+                            PMSCore.handleError(error, `${action} SweetAlert success handler`);
                             // Show error toast
-                            PMSCore.showError('Check-In Failed!', response.message || 'Failed to check in the booking.');
-                            $(this).prop('checked', false);
+                            PMSCore.showError(`${isChecked ? 'Check-In' : 'Revert'} Failed!`, response.message || `Failed to ${action} the booking.`);
+                            $toggle.prop('checked', !isChecked); // Revert toggle state
                         }
                     },
                     error: (xhr, status, error) => {
                         // Close loading dialog
                         Swal.close();
                         
-                        PMSCore.handleError(error, 'check-in SweetAlert AJAX error');
+                        PMSCore.handleError(error, `${action} SweetAlert AJAX error`);
                         // Show error toast
-                        PMSCore.showError('Error!', 'An error occurred while checking in the booking.');
-                        $(this).prop('checked', false);
+                        PMSCore.showError('Error!', `An error occurred while ${action} the booking.`);
+                        $toggle.prop('checked', !isChecked); // Revert toggle state
                     }
                 });
             } else {
                 // User cancelled - reset toggle
-                $(this).prop('checked', false);
+                $toggle.prop('checked', !isChecked);
             }
         });
     });
 
-    // CHECK-OUT TOGGLE
+    // CHECK-OUT TOGGLE (REVERSIBLE)
     $(document).on('change', '.custom-toggle-checkout', function() {
         const $toggle = $(this);
-        const bookingId = $(this).attr('data-idno');
-        const newStatus = 'check-Out';
-        const lateCheckOut = $(this).attr('data-late-checkout');
+        const bookingId = $toggle.attr('data-idno');
+        const isChecked = $toggle.is(':checked');
+        const lateCheckOut = $toggle.attr('data-late-checkout');
+        
+        // Determine new status based on toggle state
+        const newStatus = isChecked ? 'check-Out' : 'check-In';
+        const action = isChecked ? 'check out' : 'revert to check-in';
         
         // Get the room number from the card header
-        const roomNumber = $(this).closest('.card').find('.card-head header').text().trim();
+        const roomNumber = $toggle.closest('.card').find('.card-head header').text().trim();
+        const roomId = $toggle.closest('.card').attr('data-idno');
 
-        // First, check for unpaid balance
-        $.ajax({
-            url: `/booking/unpaid_balance/${bookingId}`,
-            type: 'GET',
-            success: function(balanceData) {
-                const totalBalance = parseFloat(balanceData.total_unpaid_balance) || 0;
-                const formattedBalance = totalBalance.toLocaleString('en-US', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                });
-                
-                let confirmTitle = "Check Out Guest?";
-                let confirmText = `Are you sure you want to check out Room ${roomNumber}?`;
-                
-                // If there's an unpaid balance, show it in the popup
-                if (totalBalance > 0) {
-                    confirmTitle = "⚠️ Outstanding Balance Alert";
-                    confirmText = `Room ${roomNumber} has an outstanding balance of <strong style="color: #dc3545; font-size: 1.2em;">₱${formattedBalance}</strong>.<br><br>Are you sure you want to proceed with check-out?`;
+        if (isChecked) {
+            // CHECK-OUT: First check for unpaid balance
+            $.ajax({
+                url: `/booking/unpaid_balance/${bookingId}`,
+                type: 'GET',
+                success: function(balanceData) {
+                    const totalBalance = parseFloat(balanceData.total_unpaid_balance) || 0;
+                    const formattedBalance = totalBalance.toLocaleString('en-US', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    });
+                    
+                    let confirmTitle = "Check Out Guest?";
+                    let confirmText = `Are you sure you want to check out Room ${roomNumber}?`;
+                    
+                    // If there's an unpaid balance, show it in the popup
+                    if (totalBalance > 0) {
+                        confirmTitle = "⚠️ Outstanding Balance Alert";
+                        confirmText = `Room ${roomNumber} has an outstanding balance of <strong style="color: #dc3545; font-size: 1.2em;">₱${formattedBalance}</strong>.<br><br>Are you sure you want to proceed with check-out?`;
+                    }
+
+                    // Show SweetAlert2 confirmation with balance info
+                    Swal.fire({
+                        title: confirmTitle,
+                        html: confirmText,
+                        icon: totalBalance > 0 ? "warning" : "question",
+                        showCancelButton: true,
+                        confirmButtonColor: "#dc3545",
+                        confirmButtonText: "Yes, check out!",
+                        cancelButtonText: "No, cancel",
+                        allowOutsideClick: false
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            processCheckout($toggle, bookingId, newStatus, lateCheckOut, roomId, roomNumber);
+                        } else {
+                            $toggle.prop('checked', false);
+                        }
+                    });
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error fetching balance:', error);
+                    PMSCore.showError('Error!', 'Unable to fetch balance information. Please try again.');
+                    $toggle.prop('checked', false);
                 }
+            });
+        } else {
+            // REVERT TO CHECK-IN: Show confirmation
+            Swal.fire({
+                title: "Revert Check-Out?",
+                text: `Are you sure you want to revert Room ${roomNumber} back to check-in status?`,
+                icon: "question",
+                showCancelButton: true,
+                confirmButtonColor: "#ffc107",
+                confirmButtonText: "Yes, revert!",
+                cancelButtonText: "No, cancel",
+                allowOutsideClick: false
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    processCheckoutRevert($toggle, bookingId, newStatus, roomId, roomNumber);
+                } else {
+                    $toggle.prop('checked', true);
+                }
+            });
+        }
+    });
 
-                // Show SweetAlert2 confirmation with balance info
-                Swal.fire({
-                    title: confirmTitle,
-                    html: confirmText,
-                    icon: totalBalance > 0 ? "warning" : "question",
-                    showCancelButton: true,
-                    confirmButtonColor: "#dc3545",
-                    confirmButtonText: "Yes, check out!",
-                    cancelButtonText: "No, cancel",
-                    allowOutsideClick: false
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        // Show loading state
-                        Swal.fire({
-                            title: "Checking Out...",
-                            text: "Please wait while we process the check-out.",
-                            allowOutsideClick: false,
-                            didOpen: () => {
-                                Swal.showLoading();
-                            }
-                        });
+    // Helper function for checkout process
+    function processCheckout($toggle, bookingId, newStatus, lateCheckOut, roomId, roomNumber) {
+        // Show loading state
+        Swal.fire({
+            title: "Checking Out...",
+            text: "Please wait while we process the check-out.",
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
 
-                        // Get the room ID from the card
-                        const roomId = $toggle.closest('.card').attr('data-idno');
-                        
-                        // Get the room number from the card header (re-fetch since we're in different scope)
-                        const roomNumberDisplay = $toggle.closest('.card').find('.card-head header').text().trim();
-                        
-                        // Send AJAX request to update check-out status
+        // Send AJAX request to update check-out status
+        $.ajax({
+            url: '/dashboard/booking/update_status',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                BookingID: bookingId,
+                status: newStatus,
+                lateCheckOut: lateCheckOut || null
+            }),
+            success: (response) => {
+                Swal.close();
+                
+                try {
+                    PMSCore.validateResponse(response);
+                    
+                    const card = $toggle.closest('.card');
+                    
+                    // Update card visual state but keep it in checkout tab
+                    card.attr('data-booking-status', newStatus);
+                    card.addClass('checked-out-card'); // Add class for styling if needed
+                    
+                    // Add visual indicator that checkout is complete
+                    card.css({
+                        'opacity': '0.8',
+                        'border-left': '4px solid #28a745' // Green border to indicate completed checkout
+                    });
+                    
+                    // Now update the room status to Cleaning
+                    if (roomId) {
                         $.ajax({
-                            url: '/dashboard/booking/update_status',
-                            type: 'POST',
+                            url: `/dashboard/room_maintenance/updateStatus/${roomId}`,
+                            type: 'PUT',
                             contentType: 'application/json',
-                            data: JSON.stringify({
-                                BookingID: bookingId,
-                                status: newStatus,
-                                lateCheckOut: lateCheckOut || null
-                            }),
-                            success: (response) => {
-                                // Close loading dialog
-                                Swal.close();
+                            data: JSON.stringify({ status: 4 }), // 4 = Cleaning
+                            success: function(roomResponse) {
+                                console.log('Room status updated to cleaning:', roomResponse);
                                 
-                                try {
-                                    PMSCore.validateResponse(response);
-                                    
-                                    // Remove card from checkout tab immediately after successful booking update
-                                    const card = $toggle.closest('.card');
-                                    if (card.length) {
-                                        card.fadeOut(500, function() {
-                                            $(this).remove();
-                                            PMSCore.debugLog('Card removed from checkout tab after successful booking update', { bookingId });
-                                        });
-                                    }
-                                    
-                                    // Now update the room status to Cleaning
-                                    if (roomId) {
-                                        $.ajax({
-                                            url: `/dashboard/room_maintenance/updateStatus/${roomId}`,
-                                            type: 'PUT',
-                                            contentType: 'application/json',
-                                            data: JSON.stringify({ status: 4 }), // 4 = Cleaning
-                                            success: function(roomResponse) {
-                                                console.log('Room status updated to cleaning:', roomResponse);
-                                                
-                                                // Move the card to the cleaning tab with smooth animation
-                                                const card = $toggle.closest('.card');
-                                                if (card.length) {
-                                                    const cleaningTab = $('#cleaning-content .scrollable-container');
-                                                    if (cleaningTab.length) {
-                                                        // Add smooth transition
-                                                        card.css({
-                                                            'transition': 'opacity 0.5s ease-out, transform 0.5s ease-out',
-                                                            'opacity': '0',
-                                                            'transform': 'scale(0.95)'
-                                                        });
-                                                        
-                                                        setTimeout(() => {
-                                                            // Move card to cleaning tab
-                                                            cleaningTab.append(card);
-                                                            card.css({
-                                                                'opacity': '1',
-                                                                'transform': 'scale(1)'
-                                                            });
-                                                            
-                                                            // Update card attributes for cleaning tab
-                                                            card.find('.custom-toggle-checkin, .custom-toggle-checkout').hide();
-                                                            card.find('.badge').hide();
-                                                            card.find('.progress').hide();
-                                                            
-                                                            PMSCore.debugLog('Card moved to cleaning tab after checkout (SweetAlert)', { bookingId });
-                                                        }, 500);
-                                                        
-                                                        // Remove card from checkout tab after successful move
-                                                        setTimeout(() => {
-                                                            card.remove();
-                                                            PMSCore.debugLog('Card removed from checkout tab', { bookingId });
-                                                        }, 1000);
-                                                    } else {
-                                                        // Fallback: remove card if cleaning tab doesn't exist
-                                                        setTimeout(() => {
-                                                            card.remove();
-                                                            PMSCore.debugLog('Card removed after checkout (no cleaning tab)', { bookingId });
-                                                        }, 500);
-                                                    }
-                                                }
-                                                
-                                                // Show success toast
-                                                PMSCore.showSuccess('Check-Out Successful!', `Booking ID ${bookingId} has been checked out and room ${roomNumberDisplay} moved to cleaning tab.`);
-                                                $toggle.prop('disabled', true);
-                                                PMSCore.debugLog('Check-out successful (SweetAlert)', { bookingId, status: newStatus, lateCheckOut, roomId });
-                                                
-                                                // Trigger Socket.IO event after all processing is complete
-                                                if (typeof dashboardSocket !== 'undefined') {
-                                                    dashboardSocket.emit('dashboard-updated', {
-                                                        action: 'booking-status-updated',
-                                                        message: `Booking ${bookingId} checked out successfully`,
-                                                        data: response.data
-                                                    });
-                                                }
-                                                
-                                                // Smooth reload of dashboard data
-                                                setTimeout(() => {
-                                                    reloadDashboardData();
-                                                }, 1000);
-                                            },
-                                            error: function(roomXhr, roomStatus, roomError) {
-                                                console.error('Failed to update room status:', roomError);
-                                                // Still show success for booking update, but warn about room status
-                                                PMSCore.showWarning('Check-Out Partially Successful!', `Booking ${bookingId} checked out, but room status update failed.`);
-                                            }
-                                        });
-                                    } else {
-                                        // If no room ID, just show success for booking update
-                                        PMSCore.showSuccess('Check-Out Successful!', `Booking ID ${bookingId} has been checked out successfully.`);
-                                        $toggle.prop('disabled', true);
-                                    }
-                                } catch (error) {
-                                    PMSCore.handleError(error, 'check-out SweetAlert success handler');
-                                    // Show error toast
-                                    PMSCore.showError('Check-Out Failed!', response.message || 'Failed to check out the booking.');
-                                    $toggle.prop('checked', false);
+                                PMSCore.showSuccess('Check-Out Successful!', `Booking ID ${bookingId} has been checked out. Room ${roomNumber} is now in cleaning status.`);
+                                
+                                PMSCore.debugLog('Check-out successful', { bookingId, status: newStatus, lateCheckOut, roomId });
+                                
+                                // Trigger Socket.IO event
+                                if (typeof dashboardSocket !== 'undefined') {
+                                    dashboardSocket.emit('dashboard-updated', {
+                                        action: 'booking-status-updated',
+                                        message: `Booking ${bookingId} checked out successfully`,
+                                        data: response.data
+                                    });
                                 }
-                            },
-                            error: (xhr, status, error) => {
-                                // Close loading dialog
-                                Swal.close();
                                 
-                                PMSCore.handleError(error, 'check-out SweetAlert AJAX error');
-                                // Show error toast
-                                PMSCore.showError('Error!', 'An error occurred while checking out the booking.');
-                                $toggle.prop('checked', false);
+                                // Refresh dashboard data to reflect updated status
+                                setTimeout(() => {
+                                    reloadDashboardData();
+                                }, 1000);
+                            },
+                            error: function(roomXhr, roomStatus, roomError) {
+                                console.error('Failed to update room status:', roomError);
+                                PMSCore.showWarning('Check-Out Partially Successful!', `Booking ${bookingId} checked out, but room status update failed.`);
+                                // Still update the card status even if room status update failed
+                                reloadDashboardData();
                             }
                         });
                     } else {
-                        // User cancelled - reset toggle
-                        $toggle.prop('checked', false);
+                        PMSCore.showSuccess('Check-Out Successful!', `Booking ID ${bookingId} has been checked out successfully.`);
+                        // Refresh dashboard data
+                        setTimeout(() => {
+                            reloadDashboardData();
+                        }, 1000);
                     }
-                });
+                } catch (error) {
+                    PMSCore.handleError(error, 'check-out success handler');
+                    PMSCore.showError('Check-Out Failed!', response.message || 'Failed to check out the booking.');
+                    $toggle.prop('checked', false);
+                }
             },
-            error: function(xhr, status, error) {
-                // Error fetching balance - show error and reset toggle
-                console.error('Error fetching balance:', error);
-                PMSCore.showError('Error!', 'Unable to fetch balance information. Please try again.');
+            error: (xhr, status, error) => {
+                Swal.close();
+                PMSCore.handleError(error, 'check-out AJAX error');
+                PMSCore.showError('Error!', 'An error occurred while checking out the booking.');
                 $toggle.prop('checked', false);
             }
         });
-    });
+    }
+
+    // Helper function for checkout revert process
+    function processCheckoutRevert($toggle, bookingId, newStatus, roomId, roomNumber) {
+        // Show loading state
+        Swal.fire({
+            title: "Reverting...",
+            text: "Please wait while we revert the check-out status.",
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        // Send AJAX request to update status back to check-In
+        $.ajax({
+            url: '/dashboard/booking/update_status',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                BookingID: bookingId,
+                status: newStatus
+            }),
+            success: (response) => {
+                Swal.close();
+                
+                try {
+                    PMSCore.validateResponse(response);
+                    
+                    const card = $toggle.closest('.card');
+                    
+                    // Update room status back to Occupied
+                    if (roomId) {
+                        $.ajax({
+                            url: `/dashboard/room_maintenance/updateStatus/${roomId}`,
+                            type: 'PUT',
+                            contentType: 'application/json',
+                            data: JSON.stringify({ status: 2 }), // 2 = Occupied
+                            success: function(roomResponse) {
+                                console.log('Room status updated to occupied:', roomResponse);
+                                
+                                // Keep card in checkout tab, just update visual state
+                                if (card.length) {
+                                    // Remove checkout styling
+                                    card.removeClass('checked-out-card');
+                                    card.css({
+                                        'opacity': '1',
+                                        'border-left': '' // Remove green border
+                                    });
+                                    
+                                    // Show toggles and elements again
+                                    card.find('.custom-toggle-checkin, .custom-toggle-checkout').show();
+                                    card.find('.badge').show();
+                                    card.find('.progress').show();
+                                    
+                                    PMSCore.debugLog('Card status reverted in checkout tab', { bookingId });
+                                }
+                                
+                                PMSCore.showSuccess('Status Reverted!', `Booking ID ${bookingId} has been reverted to check-in status.`);
+                                card.attr('data-booking-status', newStatus);
+                                
+                                PMSCore.debugLog('Check-out revert successful', { bookingId, status: newStatus, roomId });
+                                
+                                // Trigger Socket.IO event
+                                if (typeof dashboardSocket !== 'undefined') {
+                                    dashboardSocket.emit('dashboard-updated', {
+                                        action: 'booking-status-updated',
+                                        message: `Booking ${bookingId} reverted to check-in successfully`,
+                                        data: response.data
+                                    });
+                                }
+                                
+                                setTimeout(() => {
+                                    reloadDashboardData();
+                                }, 1000);
+                            },
+                            error: function(roomXhr, roomStatus, roomError) {
+                                console.error('Failed to update room status:', roomError);
+                                PMSCore.showWarning('Revert Partially Successful!', `Booking ${bookingId} reverted, but room status update failed.`);
+                            }
+                        });
+                    } else {
+                        PMSCore.showSuccess('Status Reverted!', `Booking ID ${bookingId} has been reverted to check-in status.`);
+                        card.attr('data-booking-status', newStatus);
+                    }
+                } catch (error) {
+                    PMSCore.handleError(error, 'check-out revert success handler');
+                    PMSCore.showError('Revert Failed!', response.message || 'Failed to revert the booking status.');
+                    $toggle.prop('checked', true);
+                }
+            },
+            error: (xhr, status, error) => {
+                Swal.close();
+                PMSCore.handleError(error, 'check-out revert AJAX error');
+                PMSCore.showError('Error!', 'An error occurred while reverting the booking status.');
+                $toggle.prop('checked', true);
+            }
+        });
+    }
 
     // CLEANING UPDATE
     $(document).on('click', '.cleaning-container', function() {

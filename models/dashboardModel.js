@@ -270,7 +270,12 @@ class DashboardModel {
           WHERE ACTIVE = 1 
           GROUP BY BOOKING_ID
         ) rm ON b.IDNo = rm.BOOKING_ID
-        WHERE b.ACTIVE = 1 AND DATE(b.CHECK_OUT_DATE) <= CURDATE() AND b.BOOKING_STATUS = 'check-In'
+        WHERE b.ACTIVE = 1 
+          AND (
+            (b.BOOKING_STATUS = 'check-In' AND DATE(b.CHECK_OUT_DATE) <= CURDATE())
+            OR 
+            (b.BOOKING_STATUS = 'check-Out' AND DATE(b.CHECK_OUT_DATE) = CURDATE())
+          )
         ORDER BY r.ROOM_NUMBER ASC
       `);
       return details;

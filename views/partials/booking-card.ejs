@@ -11,7 +11,7 @@
                     class="custom-toggle-<%= toggleType === 'checkout' ? 'checkout' : 'checkin' %>" 
                     data-idno="<%= booking.BookingID %>"
                     data-late-checkout="<%= booking.LATE_CHECKOUT %>"
-                    <%= booking.BookingStatus === (toggleType === 'checkout' ? 'check-Out' : 'check-In') ? 'checked disabled' : '' %>
+                    <%= booking.BookingStatus === (toggleType === 'checkout' ? 'check-Out' : 'check-In') ? 'checked' : '' %>
                 >
                 <span class="custom-slider"></span>
             </label>
