@@ -10,6 +10,7 @@
       <div class="modal-body">
         <form id="groupBookingForm" autocomplete="off">
           <input type="hidden" id="groupVoucherNo" name="groupVoucherNo">
+          <input type="hidden" id="groupBookingId" name="groupBookingId">
           <input type="hidden" id="groupSelectedRooms" name="groupSelectedRooms">
           <input type="hidden" id="groupSelectedRoomPrices" name="groupSelectedRoomPrices">
           <input type="hidden" id="groupSelectedRoomNumbers" name="groupSelectedRoomNumbers">
@@ -2253,6 +2254,7 @@
 
     $('#groupSelectedRooms').val(selectedRooms.map(room => room.IDNo).join(','));
     $('#groupSelectedRoomPrices').val(computedBasePrices.join(','));
+    $('#groupSelectedRoomNumbers').val(selectedRooms.map(room => room.ROOM_NUMBER).join(','));
 
     populateBreakdown(selectedRooms, computedBasePrices);
     updateGroupChargeBreakdown();
@@ -2296,6 +2298,7 @@
 
     $('#groupSelectedRooms').val(selectedRooms.map(room => room.IDNo).join(','));
     $('#groupSelectedRoomPrices').val(computedBasePrices.join(','));
+    $('#groupSelectedRoomNumbers').val(selectedRooms.map(room => room.ROOM_NUMBER).join(','));
 
     populateBreakdown(selectedRooms, computedBasePrices);
     updateGroupChargeBreakdown();
@@ -2448,65 +2451,148 @@
     });
     // Generate voucher no. on open and when dates change
     function generateGroupVoucherNo() {
-      const now = new Date();
-      const yyyy = now.getFullYear();
-      const mm = String(now.getMonth() + 1).padStart(2, '0');
-      const dd = String(now.getDate()).padStart(2, '0');
-      const hours = String(now.getHours()).padStart(2, '0');
-      const minutes = String(now.getMinutes()).padStart(2, '0');
-      // Group voucher: GV + yyyymmdd + HHMM
-      return `GV${yyyy}${mm}${dd}${hours}${minutes}`;
+      // Prefer confirmation-style number based on first selected room and arrival date
+      const daterange = $('#groupDaterange').val() || '';
+      const dateFromStr = daterange.includes(' to ') ? daterange.split(' to ')[0] : '';
+
+      let datePart = '';
+      if (dateFromStr) {
+        const d = new Date(dateFromStr);
+        if (!isNaN(d.getTime())) {
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          datePart = `${yyyy}${mm}${dd}`;
+        }
+      }
+
+      // Find the first room number selected
+      const selectedRoomNumbers = ($('#groupSelectedRoomNumbers').val()||'').split(',').filter(Boolean);
+      let firstRoomNumber = '';
+      if (selectedRoomNumbers.length > 0) {
+        firstRoomNumber = selectedRoomNumbers[0];
+      } else {
+        const selectedRoomIds = ($('#groupSelectedRooms').val()||'').split(',').filter(Boolean);
+        if (selectedRoomIds.length > 0 && typeof groupAvailableRooms !== 'undefined' && Array.isArray(groupAvailableRooms)) {
+          const match = groupAvailableRooms.find(r => String(r.IDNo) === String(selectedRoomIds[0]));
+          if (match && match.ROOM_NUMBER) firstRoomNumber = match.ROOM_NUMBER;
+        }
+      }
+
+      if (datePart && firstRoomNumber) {
+        // Match confirmation number format: yyyymmdd + '0' + first room number
+        return `${datePart}0${firstRoomNumber}`;
+      }
+
+      // If no valid dateFrom but we have a room number, use today's date with room number
+      if (firstRoomNumber) {
+        const today = new Date();
+        const tyyyy = today.getFullYear();
+        const tmm = String(today.getMonth() + 1).padStart(2, '0');
+        const tdd = String(today.getDate()).padStart(2, '0');
+        return `${tyyyy}${tmm}${tdd}0${firstRoomNumber}`;
+      }
+
+      // // Final fallback: time-based temporary voucher during preview
+      // const now = new Date();
+      // const yyyy = now.getFullYear();
+      // const mm = String(now.getMonth() + 1).padStart(2, '0');
+      // const dd = String(now.getDate()).padStart(2, '0');
+      // const hours = String(now.getHours()).padStart(2, '0');
+      // const minutes = String(now.getMinutes()).padStart(2, '0');
+      // return `GV${yyyy}${mm}${dd}${hours}${minutes}`;
     }
 
     $('#groupVoucherNo').val(generateGroupVoucherNo());
 
     $('#btnGroupVoucherPreview').on('click', function() {
-      const vno = $('#groupVoucherNo').val() || generateGroupVoucherNo();
-      $('#groupVoucherNo').val(vno);
+      // Check if there's an existing group booking ID (for edit mode)
+      // If yes, fetch the confirmation number from the first booking
+      const groupBookingId = $('#groupBookingId').val();
+      let vno = $('#groupVoucherNo').val();
+      
+      // If no voucher number set and we have a group booking ID, try to fetch confirmation number
+      if (!vno && groupBookingId) {
+        // Try to get confirmation number from existing booking
+        $.ajax({
+          url: `/booking/get-group-voucher-data/${groupBookingId}`,
+          method: 'GET',
+          async: false, // Synchronous to wait for result
+          success: function (response) {
+            if (response.success && response.data && response.data.confirmationNumber) {
+              vno = response.data.confirmationNumber;
+              $('#groupVoucherNo').val(vno);
+            }
+          }
+        });
+      }
+      
+      // If still no voucher number, generate one (for new bookings in preview mode)
+      if (!vno) {
+        vno = generateGroupVoucherNo();
+        $('#groupVoucherNo').val(vno);
+      }
 
       const daterange = $('#groupDaterange').val() || '';
       const dateFrom = daterange.includes(' to ') ? daterange.split(' to ')[0] : '';
       const dateTo = daterange.includes(' to ') ? daterange.split(' to ')[1].split('(')[0].trim() : '';
       // Prefer precomputed room numbers from hidden input
       const selectedRoomNumbers = ($('#groupSelectedRoomNumbers').val()||'').split(',').filter(Boolean);
-      const roomNumbersForVoucher = selectedRoomNumbers.length
-        ? selectedRoomNumbers.join(', ')
-        : ($('#groupSelectedRooms').val()||'').split(',').filter(Boolean).join(', ');
+      let roomNumbersForVoucher = '';
+      
+      if (selectedRoomNumbers.length > 0) {
+        roomNumbersForVoucher = selectedRoomNumbers.join(', ');
+      } else {
+        // Fallback: If room numbers not available, try to get from available rooms by ID
+        const selectedRoomIds = ($('#groupSelectedRooms').val()||'').split(',').filter(Boolean);
+        if (selectedRoomIds.length > 0 && groupAvailableRooms.length > 0) {
+          const roomNumbersFromIds = selectedRoomIds.map(id => {
+            const room = groupAvailableRooms.find(r => r.IDNo.toString() === id.toString());
+            return room ? room.ROOM_NUMBER : null;
+          }).filter(Boolean);
+          roomNumbersForVoucher = roomNumbersFromIds.length > 0 
+            ? roomNumbersFromIds.join(', ') 
+            : 'No rooms selected';
+        } else {
+          roomNumbersForVoucher = 'No rooms selected';
+        }
+      }
 
       const totalText = $('#groupComputedTotal').text() || '0';
       // Extract numeric value, handling consolidated format
       const numericTotal = totalText.replace(/[^0-9.]/g, '').split(' ')[0] || '0';
+      
+      const paidText = $('#groupComputedPaidAmount').text() || '0';
+      const numericPaid = paidText.replace(/[^0-9.]/g, '').split(' ')[0] || '0';
+      
+      const balanceText = $('#groupComputedBalance').text() || '0';
+      const numericBalance = balanceText.replace(/[^0-9.]/g, '').split(' ')[0] || '0';
 
       const isConsolidated = !$('#groupIndividualBilling').is(':checked'); // Inverted logic
       const bookingData = {
         voucherNo: vno,
-        fullname: $('#groupName').val() || 'Group Booking',
-        contactNumber: $('#groupContact').val() || '',
+        groupName: $('#groupName').val() || 'Group Booking',
+        groupContact: $('#groupContact').val() || '',
         dateFrom: dateFrom,
         dateTo: dateTo,
-        bedCount: '',
-        roomNumber: isConsolidated ? 'Bulk - ' + roomNumbersForVoucher : roomNumbersForVoucher,
-        roomView: '',
-        roomType: isConsolidated ? 'Group (Bulk)' : 'Group',
-        roomRate: '',
+        roomSummary: roomNumbersForVoucher || 'No rooms selected',
         breakfastAdult: $('#groupBreakfastAdultQty').val() || 0,
-        breakfastAdultPrice: $('#groupBreakfastAdultPrice').val() || 0,
         breakfastKid: $('#groupBreakfastKidQty').val() || 0,
-        breakfastKidPrice: $('#groupBreakfastKidPrice').val() || 0,
-        pickup: $('#groupIncludePickup').is(':checked') ? ($('#groupPickupPrice').val() || 0) : 0,
-        dropoff: $('#groupIncludeDropoff').is(':checked') ? ($('#groupDropoffPrice').val() || 0) : 0,
+        pickup: $('#groupIncludePickup').is(':checked') ? (parseFloat($('#groupPickupPrice').val()) || 0) : 0,
+        dropoff: $('#groupIncludeDropoff').is(':checked') ? (parseFloat($('#groupDropoffPrice').val()) || 0) : 0,
         remarks: $('#groupRemarks').val() || '',
         total: numericTotal,
-        checkInStatus: $('#groupCheckInStatus').val(),
-        checkOutStatus: $('#groupCheckOutStatus').val(),
+        paidAmount: numericPaid,
+        balance: numericBalance,
+        checkOutStatus: $('#groupCheckOutStatus').val() || 0,
         lateCheckoutFee: 0,
-        discount: $('#groupIncludeDiscount').is(':checked') ? ($('#groupDiscount').val() || 0) : 0,
-        directReservationFlag: false
+        discount: $('#groupIncludeDiscount').is(':checked') ? (parseFloat($('#groupDiscount').val()) || 0) : 0,
+        reservationFee: 0 // Default to 0 for group bookings
       };
 
       const form = $('<form>', {
         method: 'POST',
-        action: '/booking/generate-voucher',
+        action: '/booking/generate-group-voucher',
         target: '_blank'
       });
       for (let key in bookingData) {

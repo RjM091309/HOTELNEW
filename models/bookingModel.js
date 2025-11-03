@@ -3702,6 +3702,141 @@ class BookingModel {
     }
   }
 
+  // Get group voucher data
+  static async getGroupVoucherData(groupId) {
+    try {
+      // Get group booking info with confirmation number from first booking
+      const groupQuery = `
+        SELECT
+          gb.IDNo,
+          gb.GROUP_NAME,
+          gb.CONTACT_NO,
+          gb.GROUP_RESERVATION_FEE,
+          gb.GROUP_DISCOUNT,
+          gb.REMARKS,
+          MIN(b.CHECK_IN_DATE) AS dateFrom,
+          MAX(b.CHECK_OUT_DATE) AS dateTo,
+          (SELECT b2.CONFIRMATION_NUMBER 
+           FROM booking b2 
+           WHERE b2.GROUP_BOOKING_ID = gb.IDNo AND b2.ACTIVE = 1 
+           ORDER BY b2.IDNo ASC 
+           LIMIT 1) AS confirmationNumber
+        FROM group_booking gb
+        JOIN booking b ON gb.IDNo = b.GROUP_BOOKING_ID
+        WHERE gb.IDNo = ? AND b.ACTIVE = 1
+        GROUP BY gb.IDNo
+      `;
+
+      const groupResult = await queryDatabasePromise(groupQuery, [groupId]);
+
+      if (!groupResult || groupResult.length === 0) {
+        return null;
+      }
+
+      const groupBooking = groupResult[0];
+
+      // Get room numbers
+      const roomsQuery = `
+        SELECT GROUP_CONCAT(DISTINCT r.ROOM_NUMBER ORDER BY r.ROOM_NUMBER SEPARATOR ', ') AS room_numbers
+        FROM booking b
+        JOIN room r ON b.ROOM_ID = r.IDNo
+        WHERE b.GROUP_BOOKING_ID = ? AND b.ACTIVE = 1
+      `;
+      const roomsResult = await queryDatabasePromise(roomsQuery, [groupId]);
+      const roomNumbers = roomsResult?.[0]?.room_numbers || '';
+
+      // Calculate total (room charges + services - discount - reservation fee)
+      const totalQuery = `
+        SELECT
+          COALESCE(SUM(
+            (bill.ROOM_CHARGE * bill.QTY) + 
+            COALESCE((
+              SELECT SUM(bs.TOTAL_COST) 
+              FROM booking_service bs 
+              WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1
+            ), 0) +
+            COALESCE((
+              SELECT SUM(be.COST * be.QTY) 
+              FROM booking_extension be 
+              WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1
+            ), 0)
+          ), 0)
+          - COALESCE(gb.GROUP_DISCOUNT, 0)
+          - COALESCE(gb.GROUP_RESERVATION_FEE, 0)
+          AS total
+        FROM booking b
+        JOIN group_booking gb ON b.GROUP_BOOKING_ID = gb.IDNo
+        LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID
+        WHERE b.GROUP_BOOKING_ID = ? AND b.ACTIVE = 1
+      `;
+      const totalResult = await queryDatabasePromise(totalQuery, [groupId]);
+      const total = parseFloat(totalResult?.[0]?.total || 0);
+
+      // Get total paid
+      const paidQuery = `
+        SELECT COALESCE(SUM(p.AMOUNT_PAID), 0) AS totalPaid
+        FROM payments p
+        JOIN booking b ON p.BOOKING_ID = b.IDNo
+        WHERE b.GROUP_BOOKING_ID = ?
+          AND p.PAYMENT_TYPE IN ('room','service','extended')
+      `;
+      const paidResult = await queryDatabasePromise(paidQuery, [groupId]);
+      const paidAmount = parseFloat(paidResult?.[0]?.totalPaid || 0);
+
+      // Calculate balance
+      const balance = Math.max(0, total - paidAmount);
+
+      // Get breakfast totals (sum across all bookings in group)
+      // Using service IDs: 74 = Breakfast Adult, 75 = Breakfast Kid, 76 = Pickup, 77 = Dropoff
+      const breakfastQuery = `
+        SELECT 
+          SUM(CASE WHEN bs.SERVICE_ID = 74 THEN bs.QTY ELSE 0 END) AS breakfastAdult,
+          SUM(CASE WHEN bs.SERVICE_ID = 75 THEN bs.QTY ELSE 0 END) AS breakfastKid,
+          SUM(CASE WHEN bs.SERVICE_ID = 76 THEN bs.TOTAL_COST ELSE 0 END) AS pickup,
+          SUM(CASE WHEN bs.SERVICE_ID = 77 THEN bs.TOTAL_COST ELSE 0 END) AS dropoff
+        FROM booking_service bs
+        JOIN booking b ON bs.BOOKING_ID = b.IDNo
+        WHERE b.GROUP_BOOKING_ID = ? AND bs.ACTIVE = 1
+      `;
+      const breakfastResult = await queryDatabasePromise(breakfastQuery, [groupId]);
+
+      // Get check-out status (0 = normal, 1 = late checkout)
+      const checkoutQuery = `
+        SELECT MAX(CASE WHEN b.LATE_CHECKOUT = 1 THEN 1 ELSE 0 END) AS checkOutStatus
+        FROM booking b
+        WHERE b.GROUP_BOOKING_ID = ? AND b.ACTIVE = 1
+      `;
+      const checkoutResult = await queryDatabasePromise(checkoutQuery, [groupId]);
+      const checkOutStatus = checkoutResult?.[0]?.checkOutStatus || 0;
+
+      return {
+        groupId: groupBooking.IDNo,
+        groupName: groupBooking.GROUP_NAME || 'Group Booking',
+        groupContact: groupBooking.CONTACT_NO || '',
+        dateFrom: groupBooking.dateFrom ? new Date(groupBooking.dateFrom).toISOString().split('T')[0] : '',
+        dateTo: groupBooking.dateTo ? new Date(groupBooking.dateTo).toISOString().split('T')[0] : '',
+        roomSummary: roomNumbers,
+        remarks: groupBooking.REMARKS || '',
+        breakfastAdult: parseInt(breakfastResult?.[0]?.breakfastAdult || 0),
+        breakfastKid: parseInt(breakfastResult?.[0]?.breakfastKid || 0),
+        pickup: parseFloat(breakfastResult?.[0]?.pickup || 0),
+        dropoff: parseFloat(breakfastResult?.[0]?.dropoff || 0),
+        total: total,
+        paidAmount: paidAmount,
+        balance: balance,
+        checkOutStatus: checkOutStatus,
+        lateCheckoutFee: 0,
+        discount: parseFloat(groupBooking.GROUP_DISCOUNT || 0),
+        reservationFee: parseFloat(groupBooking.GROUP_RESERVATION_FEE || 0),
+        confirmationNumber: groupBooking.confirmationNumber || null
+      };
+
+    } catch (error) {
+      console.error('Error in getGroupVoucherData:', error);
+      throw error;
+    }
+  }
+
   // Update group booking
   static async updateGroupBooking(data) {
     const {
@@ -4276,12 +4411,11 @@ class BookingModel {
       const invoiceNumber = roomResults.length > 0 ? roomResults[0].invoiceNumber : "Not Assigned";
       const GroupName = roomResults.length > 0 ? roomResults[0].GROUP_NAME : "Unknown Group";
 
-      // Get group summary data including reservation fee, discount, and billing type
+      // Get group summary data including reservation fee and discount
       const summaryQuery = `
         SELECT 
           COALESCE(gb.GROUP_DISCOUNT, 0) AS group_discount,
-          COALESCE(gb.GROUP_RESERVATION_FEE, 0) AS reservation_fee,
-          COALESCE(gb.BILLING_TYPE, 0) AS billing_type
+          COALESCE(gb.GROUP_RESERVATION_FEE, 0) AS reservation_fee
         FROM group_booking gb
         WHERE gb.IDNo = ?
       `;
@@ -4289,7 +4423,6 @@ class BookingModel {
       const [summaryRow] = await queryDatabasePromise(summaryQuery, [groupId]);
       const reservationFee = parseFloat(summaryRow?.reservation_fee || 0);
       const discount = parseFloat(summaryRow?.group_discount || 0);
-      const billingType = parseInt(summaryRow?.billing_type);
 
       // Compute totals from items
       const roomTotal = roomResults.reduce((sum, r) => sum + ((parseFloat(r.charges) || 0) * (parseInt(r.room_qty, 10) || 0)), 0);
@@ -4315,7 +4448,6 @@ class BookingModel {
         serviceBillingDetails: serviceResults,  // Service charges
         reservationFee: reservationFee,
         discount: discount,
-        billingType: billingType,  // 1 = Consolidated/Master, 0 = Individual
         roomTotal: roomTotal,
         servicesTotal: servicesTotal,
         grandTotal: grandTotal,
@@ -5201,7 +5333,8 @@ class BookingModel {
       
       const templateData = {
         ...data,
-        encodedBy: user.FULLNAME
+        encodedBy: user.FULLNAME,
+        reservationFee: data.reservationFee !== undefined ? data.reservationFee : 0
       };
       
       const html = await ejs.renderFile(
@@ -5237,9 +5370,50 @@ class BookingModel {
       const path = require('path');
       const fs = require('fs');
       const imagePath = path.join(__dirname, '../public/img/Logo-Black.JPG');
-      const imageBase64 = fs.readFileSync(imagePath, 'base64');
+      
+      let imageBase64 = '';
+      let imageUrl = '';
+      
+      try {
+        if (fs.existsSync(imagePath)) {
+          imageBase64 = fs.readFileSync(imagePath, 'base64');
+          imageUrl = `data:image/png;base64,${imageBase64}`;
+        } else {
+          console.warn('Logo image not found, using placeholder');
+          imageUrl = '';
+        }
+      } catch (imgError) {
+        console.error('Error loading image:', imgError);
+        imageUrl = '';
+      }
 
-      data.imageUrl = `data:image/png;base64,${imageBase64}`;
+      // Ensure all required variables have defaults
+      const templateData = {
+        voucherNo: data.voucherNo || 'N/A',
+        groupName: data.groupName || 'Group Booking',
+        groupContact: data.groupContact || '',
+        dateFrom: data.dateFrom || '',
+        dateTo: data.dateTo || '',
+        roomSummary: data.roomSummary || 'No rooms selected',
+        remarks: data.remarks || '',
+        breakfastAdult: data.breakfastAdult || 0,
+        breakfastKid: data.breakfastKid || 0,
+        pickup: data.pickup || 0,
+        dropoff: data.dropoff || 0,
+        total: data.total || '0',
+        paidAmount: data.paidAmount !== undefined ? data.paidAmount : 0,
+        balance: data.balance !== undefined ? data.balance : (() => {
+          const total = parseFloat(data.total || 0);
+          const paid = parseFloat(data.paidAmount || 0);
+          return Math.max(0, total - paid);
+        })(),
+        checkOutStatus: data.checkOutStatus || 0,
+        lateCheckoutFee: data.lateCheckoutFee || 0,
+        discount: data.discount || 0,
+        reservationFee: data.reservationFee !== undefined ? data.reservationFee : 0,
+        imageUrl: imageUrl,
+        encodedBy: user.FULLNAME || 'System User'
+      };
 
       // Generate PDF using Playwright
       const { chromium } = require('playwright');
@@ -5247,10 +5421,7 @@ class BookingModel {
       
       const html = await ejs.renderFile(
         path.join(__dirname, '../views/booking/pdf/booking_group_voucher.ejs'),
-        {
-          ...data,
-          encodedBy: user.FULLNAME
-        }
+        templateData
       );
 
       const browser = await chromium.launch({ headless: true });

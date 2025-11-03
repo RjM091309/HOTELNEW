@@ -85,7 +85,6 @@ router.post('/group_payment', BookingController.groupPayment);
 // Group booking edit
 router.get('/edit_group_booking/:groupBookingId', BookingController.getEditGroupBooking);
 router.post('/update_group_booking', BookingController.updateGroupBooking);
-router.post('/generate-group-voucher', BookingController.generateGroupVoucher);
 router.get('/bookings', BookingController.getBookings);
 router.get('/rooms', BookingController.getRooms);
 router.post('/cancel', BookingController.cancelBooking);
@@ -140,6 +139,7 @@ router.post('/group_remarks', BookingController.addGroupRemark);
 
 // Voucher routes
 router.get('/get-voucher-data/:bookingId', BookingController.getVoucherData);
+router.get('/get-group-voucher-data/:groupId', BookingController.getGroupVoucherData);
 router.get('/voucher/:bookingId', BookingController.generateVoucherPDF);
 
 module.exports = router;

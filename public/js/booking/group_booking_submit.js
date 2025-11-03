@@ -128,6 +128,79 @@ $(document).ready(function () {
       data: ajaxData,
       success: function (response) {
         $('#modal-add-group-booking').modal('hide');
+        
+        // Prepare voucher data for auto-download
+        const daterange = $('#groupDaterange').val() || '';
+        const dateFrom = daterange.includes(' to ') ? daterange.split(' to ')[0] : '';
+        const dateTo = daterange.includes(' to ') ? daterange.split(' to ')[1].split('(')[0].trim() : '';
+        // Get room numbers - prefer from hidden field, fallback to converting IDs to numbers
+        const selectedRoomNumbers = ($('#groupSelectedRoomNumbers').val()||'').split(',').filter(Boolean);
+        let roomNumbersForVoucher = '';
+        
+        if (selectedRoomNumbers.length > 0) {
+          roomNumbersForVoucher = selectedRoomNumbers.join(', ');
+        } else {
+          // Note: In submit context, we don't have access to groupAvailableRooms array
+          // So we'll use a placeholder - room numbers should already be set before submit
+          roomNumbersForVoucher = 'No rooms selected';
+        }
+
+        const totalText = $('#groupComputedTotal').text() || '0';
+        const numericTotal = totalText.replace(/[^0-9.]/g, '').split(' ')[0] || '0';
+        
+        const paidText = $('#groupComputedPaidAmount').text() || '0';
+        const numericPaid = paidText.replace(/[^0-9.]/g, '').split(' ')[0] || '0';
+        
+        const balanceText = $('#groupComputedBalance').text() || '0';
+        const numericBalance = balanceText.replace(/[^0-9.]/g, '').split(' ')[0] || '0';
+
+        // Use confirmation number from response as voucher number
+        // If no confirmation number in response, fallback to auto-generated
+        let vno = response.confirmationNumber;
+        if (!vno) {
+          const now = new Date();
+          const yyyy = now.getFullYear();
+          const mm = String(now.getMonth() + 1).padStart(2, '0');
+          const dd = String(now.getDate()).padStart(2, '0');
+          const hours = String(now.getHours()).padStart(2, '0');
+          const minutes = String(now.getMinutes()).padStart(2, '0');
+          vno = `GV${yyyy}${mm}${dd}${hours}${minutes}`;
+        }
+
+        const bookingData = {
+          voucherNo: vno,
+          groupName: $('#groupName').val() || 'Group Booking',
+          groupContact: $('#groupContact').val() || '',
+          dateFrom: dateFrom,
+          dateTo: dateTo,
+          roomSummary: roomNumbersForVoucher || 'No rooms selected',
+          breakfastAdult: $('#groupBreakfastAdultQty').val() || 0,
+          breakfastKid: $('#groupBreakfastKidQty').val() || 0,
+          pickup: $('#groupIncludePickup').is(':checked') ? (parseFloat($('#groupPickupPrice').val()) || 0) : 0,
+          dropoff: $('#groupIncludeDropoff').is(':checked') ? (parseFloat($('#groupDropoffPrice').val()) || 0) : 0,
+          remarks: $('#groupRemarks').val() || '',
+          total: numericTotal,
+          paidAmount: numericPaid,
+          balance: numericBalance,
+          checkOutStatus: $('#groupCheckOutStatus').val() || 0,
+          lateCheckoutFee: 0,
+          discount: $('#groupIncludeDiscount').is(':checked') ? (parseFloat($('#groupDiscount').val()) || 0) : 0,
+          reservationFee: 0
+        };
+
+        // Create form to trigger voucher download
+        const form = $('<form>', {
+          method: 'POST',
+          action: '/booking/generate-group-voucher?download=1',
+          target: '_blank'
+        });
+        for (let key in bookingData) {
+          form.append($('<input>', { type: 'hidden', name: key, value: bookingData[key] }));
+        }
+        $('body').append(form);
+        form.submit();
+        form.remove();
+
         setTimeout(function () {
           const isConsolidated = consolidatedBilling;
 
@@ -147,8 +220,10 @@ $(document).ready(function () {
               `• Discount: -₱${discount.toLocaleString()}\n` +
               `• Paid Amount: ₱${paidAmount.toLocaleString()}\n` +
               `• Balance: ₱${(grandTotal - paidAmount).toLocaleString()}\n\n` +
-              `${isConsolidated ? '✅ Master Billing: All charges applied to main booking' : '✅ Individual Billing: Separate charges per room'}`
-            : `The group booking has been added successfully.\n\n${isConsolidated ? '✅ Master Billing: All charges applied to main booking' : '✅ Individual Billing: Separate charges per room'}`;
+              `${isConsolidated ? '✅ Master Billing: All charges applied to main booking' : '✅ Individual Billing: Separate charges per room'}\n\n` +
+              `✅ Voucher is downloading...`
+            : `The group booking has been added successfully.\n\n${isConsolidated ? '✅ Master Billing: All charges applied to main booking' : '✅ Individual Billing: Separate charges per room'}\n\n` +
+              `✅ Voucher is downloading...`;
 
           console.log('🔄 Success Message - Debug Values:', {
             rawResponse: response,
@@ -165,7 +240,7 @@ $(document).ready(function () {
             icon: 'success',
             confirmButtonText: 'OK'
           }).then(() => window.location.reload());
-        }, 300);
+        }, 400);
       },
       error: function () {
         Swal.fire({

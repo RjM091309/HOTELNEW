@@ -166,6 +166,9 @@ $(document).ready(function () {
                             <button id="${remarksBtnId}" class="label label-sm label-success ms-1" onclick="openGroupRemarksModal(${row.GroupID})" title="Remarks" style="width: 30px; height: 30px;  padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px; background-color: ${baseRemarksColor} !important; border-color: ${baseRemarksColor} !important;">
                                 <i class="fa fa-comment-dots"></i>
                             </button>
+                            <button class="label label-sm label-download ms-1" onclick="downloadGroupVoucher(${row.GroupID})" title="Download Voucher" style="width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px;">
+                                <i class="fa fa-download"></i>
+                            </button>
                             ${cancelButton}
                         </div>`;
                 }
@@ -825,6 +828,11 @@ function formatCurrency(value) {
     return `₱${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function formatPaidAmount(input) {
+    const value = parseFloat(input.value) || 0;
+    input.value = value.toFixed(2);
+}
+
 // Compute total for edit group booking form
 function computeEditGroupTotal() {
     const nights = parseInt($('#editGroupNights').val(), 10) || 0;
@@ -833,54 +841,87 @@ function computeEditGroupTotal() {
     const baseSubtotal = prices.reduce((sum, price) => sum + price, 0);
     const roomSubtotal = baseSubtotal * nights;
 
-    const reservationFee = $('#editGroupIncludeReservationFee').prop('checked') ? (parseFloat($('#editGroupReservationFee').val()) || 0) : 0;
     const discount = $('#editGroupIncludeDiscount').prop('checked') ? (parseFloat($('#editGroupDiscount').val()) || 0) : 0;
 
     const adultQty = $('#editGroupIncludeBreakfast').is(':checked') ? (parseInt($('#editGroupBreakfastAdultQty').val(), 10) || 0) : 0;
     const adultPrice = parseFloat($('#editGroupBreakfastAdultPrice').val()) || 0;
     const kidQty = $('#editGroupIncludeBreakfast').is(':checked') ? (parseInt($('#editGroupBreakfastKidQty').val(), 10) || 0) : 0;
     const kidPrice = parseFloat($('#editGroupBreakfastKidPrice').val()) || 0;
+    const breakfastIndividual = $('#editGroupBreakfastIndividual').is(':checked');
 
     const pickupPrice = $('#editGroupIncludePickup').is(':checked') ? parseFloat($('#editGroupPickupPrice').val()) || 0 : 0;
     const dropoffPrice = $('#editGroupIncludeDropoff').is(':checked') ? parseFloat($('#editGroupDropoffPrice').val()) || 0 : 0;
 
-    // Check if breakfast should be applied individually
-    const breakfastIndividual = $('#editGroupBreakfastIndividual').is(':checked');
+    // Get number of rooms for individual service calculations
     const selectedRooms = $('#editGroupSelectedRooms').val();
     const numRooms = selectedRooms ? selectedRooms.split(',').length : 1;
 
-    // Calculate breakfast total with individual logic
     const breakfastTotal = (adultQty * adultPrice) + (kidQty * kidPrice);
     const breakfastTotalWithIndividual = breakfastIndividual ? breakfastTotal * numRooms : breakfastTotal;
 
     const servicesTotal = breakfastTotalWithIndividual + pickupPrice + dropoffPrice;
 
-    // Check if consolidated billing is enabled (inverted logic)
+    // Check if individual billing is enabled (inverted logic)
     const isConsolidated = !$('#editGroupIndividualBilling').is(':checked');
 
     // Always calculate the full total in frontend for user visibility
     const subtotal = roomSubtotal + servicesTotal;
-    let finalBalance = subtotal - reservationFee - discount;
+    let finalBalance = subtotal - discount;
+
+    // Get paid amount and validate it doesn't exceed total
+    let paidAmount = parseFloat($('#editGroupPaidAmount').val()) || 0;
+    
+    // Prevent paid amount from exceeding total
+    if (paidAmount > finalBalance) {
+        paidAmount = finalBalance;
+        $('#editGroupPaidAmount').val(paidAmount.toFixed(2));
+    }
+    
+    // Calculate balance (total - paid amount)
+    const balance = finalBalance - paidAmount;
+    
+    // Determine payment status
+    let paymentStatus;
+    if (paidAmount <= 0) {
+        paymentStatus = 'unpaid';
+    } else if (paidAmount >= finalBalance) {
+        paymentStatus = 'paid';
+    } else {
+        paymentStatus = 'partial';
+    }
+    
+    // Update payment status field
+    $('#editGroupPaymentStatus').val(paymentStatus);
+    
+    // Update payment status styling with CSS classes
+    $('#editGroupPaymentStatus').removeClass('status-paid status-partial status-unpaid');
+    if (paymentStatus === 'paid') {
+        $('#editGroupPaymentStatus').addClass('status-paid');
+    } else if (paymentStatus === 'partial') {
+        $('#editGroupPaymentStatus').addClass('status-partial');
+    } else {
+        $('#editGroupPaymentStatus').addClass('status-unpaid');
+    }
+
+    // Update paid amount display (format without currency symbol)
+    $('#editGroupComputedPaidAmount').html('<b>' + paidAmount.toLocaleString(undefined, { minimumFractionDigits: 2 }) + '</b>');
+    
+    // Update balance display (format without currency symbol)
+    $('#editGroupComputedBalance').html('<b>' + balance.toLocaleString(undefined, { minimumFractionDigits: 2 }) + '</b>');
 
     if (isConsolidated) {
         // Show consolidated total with indicator
         if (finalBalance < 0) {
-            $('#editGroupComputedTotal').html(`<span class="text-warning">${formatCurrency(0)} <small>(Master)</small></span>`);
-            $('#editGroupCreditAmount').text(formatCurrency(Math.abs(finalBalance)));
-            $('#editGroupCreditDisplay').show();
+            $('#editGroupComputedTotal').html(`<b class="text-warning">0.00 <small>(Master)</small></b>`);
         } else {
-            $('#editGroupComputedTotal').html(`<span>${formatCurrency(finalBalance)} <small class="text-info">(Master)</small></span>`);
-            $('#editGroupCreditDisplay').hide();
+            $('#editGroupComputedTotal').html(`<b>${finalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })} <small class="text-info">(Master)</small></b>`);
         }
     } else {
         // Regular billing calculation
         if (finalBalance < 0) {
-            $('#editGroupComputedTotal').text(formatCurrency(0));
-            $('#editGroupCreditAmount').text(formatCurrency(Math.abs(finalBalance)));
-            $('#editGroupCreditDisplay').show();
+            $('#editGroupComputedTotal').html('<b class="text-warning">0.00</b>');
         } else {
-            $('#editGroupComputedTotal').text(formatCurrency(finalBalance));
-            $('#editGroupCreditDisplay').hide();
+            $('#editGroupComputedTotal').html('<b>' + finalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 }) + '</b>');
         }
     }
 }
@@ -1056,6 +1097,11 @@ function populateEditGroupForm(booking) {
     } else {
         console.log('[EditGroup] No paid amount value provided in response; leaving field unchanged');
     }
+    
+    // Trigger computation after setting paid amount
+    setTimeout(() => {
+        computeEditGroupTotal();
+    }, 100);
 
     // Set fees - explicitly handle checked/unchecked state
     if (parseFloat(booking.reservationFee) > 0) {
@@ -1152,11 +1198,15 @@ function populateEditGroupForm(booking) {
         if (daterange && numberOfRooms && bookingRoute) {
             // Trigger room search
             $('#editGroupSearchRooms').click();
+            // Compute total after room search completes (with delay to allow AJAX to finish)
+            setTimeout(() => {
+                computeEditGroupTotal();
+            }, 2000);
+        } else {
+            // If no room search, compute immediately
+            computeEditGroupTotal();
         }
     }, 1000); // Increased delay to ensure form is fully populated
-
-    // Recompute total
-    computeEditGroupTotal();
 }
 
 // ==================== GROUP CANCEL BOOKING FUNCTIONALITY ====================
@@ -1173,4 +1223,109 @@ function openGroupCancelBookingModal(groupId) {
     $('#modal-cancel-group-booking').modal('show');
 }
 
-// ==================== END OF GROUP CANCEL BOOKING FUNCTIONALITY ==================== 
+// ==================== END OF GROUP CANCEL BOOKING FUNCTIONALITY ====================
+
+// Function to download group voucher
+function downloadGroupVoucher(groupId) {
+    // Show loading indicator
+    Swal.fire({
+        title: 'Generating Voucher...',
+        text: 'Please wait while we prepare your voucher.',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    // First, fetch the group voucher data
+    $.ajax({
+        url: `/booking/get-group-voucher-data/${groupId}`,
+        method: 'GET',
+        success: function (response) {
+            if (response.success && response.data) {
+                const data = response.data;
+                
+                // Use confirmation number from main booking as voucher number
+                // If no confirmation number, fallback to auto-generated
+                let vno = data.confirmationNumber;
+                if (!vno) {
+                    const now = new Date();
+                    const yyyy = now.getFullYear();
+                    const mm = String(now.getMonth() + 1).padStart(2, '0');
+                    const dd = String(now.getDate()).padStart(2, '0');
+                    const hours = String(now.getHours()).padStart(2, '0');
+                    const minutes = String(now.getMinutes()).padStart(2, '0');
+                    vno = `GV${yyyy}${mm}${dd}${hours}${minutes}`;
+                }
+
+                // Prepare voucher data
+                const bookingData = {
+                    voucherNo: vno,
+                    groupName: data.groupName || 'Group Booking',
+                    groupContact: data.groupContact || '',
+                    dateFrom: data.dateFrom || '',
+                    dateTo: data.dateTo || '',
+                    roomSummary: data.roomSummary || 'No rooms selected',
+                    breakfastAdult: data.breakfastAdult || 0,
+                    breakfastKid: data.breakfastKid || 0,
+                    pickup: data.pickup || 0,
+                    dropoff: data.dropoff || 0,
+                    remarks: data.remarks || '',
+                    total: data.total || '0',
+                    paidAmount: data.paidAmount || 0,
+                    balance: data.balance || 0,
+                    checkOutStatus: data.checkOutStatus || 0,
+                    lateCheckoutFee: data.lateCheckoutFee || 0,
+                    discount: data.discount || 0,
+                    reservationFee: data.reservationFee || 0
+                };
+
+                // Create form to trigger voucher download
+                const form = $('<form>', {
+                    method: 'POST',
+                    action: '/booking/generate-group-voucher?download=1',
+                    target: '_self'
+                });
+                
+                // Add booking data to form
+                for (let key in bookingData) {
+                    form.append($('<input>', {
+                        type: 'hidden',
+                        name: key,
+                        value: bookingData[key]
+                    }));
+                }
+                
+                // Submit the form to trigger download
+                $('body').append(form);
+                form.submit();
+                
+                // Remove form and show success after a delay
+                setTimeout(() => {
+                    form.remove();
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'PDF Voucher Downloaded!',
+                        text: 'Your group voucher has been downloaded as PDF automatically.',
+                        confirmButtonText: 'OK'
+                    });
+                }, 1500);
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Failed to fetch group voucher data.',
+                    confirmButtonText: 'OK'
+                });
+            }
+        },
+        error: function () {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'An error occurred while fetching group voucher data.',
+                confirmButtonText: 'OK'
+            });
+        }
+    });
+} 

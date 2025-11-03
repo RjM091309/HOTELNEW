@@ -295,8 +295,9 @@ async function createDynamicRoomModal(bookingId, event, options) {
                         <i class="fas fa-plus-circle"></i> Extend
                     </button>
                     
-                    <button class="btn btn-sm ${remarksButtonClass}" onclick="openRemarksModal('${bookingId}')">
-                        <i class="fas fa-sticky-note"></i> Remarks
+                  
+                    <button type="button" class="btn btn-danger btn-sm" onclick="triggerCheckout('${bookingId}')" style="transition: none; opacity: 1 !important;">
+                                <i class="fas fa-sign-out-alt me-1"></i>Checkout
                     </button>
                 </div>
             </div>
@@ -320,15 +321,15 @@ async function createDynamicRoomModal(bookingId, event, options) {
                 <div class="card shadow-sm mb-3" style="background-color: #ffffff; border: 1px solid #dee2e6;">
                     <div class="card-header py-2 d-flex justify-content-between align-items-center" style="background-color: #ffffff; border-bottom: 1px solid #dee2e6; color: #495057;">
                         <h6 class="mb-0">Room Reservation Details</h6>
-                        <div class="d-flex align-items-center">
-                            <button type="button" class="btn btn-danger btn-sm" onclick="triggerCheckout('${bookingId}')">
-                                <i class="fas fa-sign-out-alt me-1"></i>Checkout
-                            </button>
-                            <button type="button" class="btn btn-warning btn-sm ms-1 position-relative" id="crButton_${bookingId}" onclick="openComplaintRequestModal('${bookingId}')" style="overflow:visible;">
+                        <div class="d-flex align-items-center gap-1">
+                            <button class="btn btn-sm ${remarksButtonClass}" onclick="openRemarksModal('${bookingId}')">
+                        <i class="fas fa-sticky-note"></i> Remarks
+                    </button>
+                            <button type="button" class="btn btn-warning btn-sm ms-1 position-relative" id="crButton_${bookingId}" onclick="openComplaintRequestModal('${bookingId}')" >
                                 <i class="fas fa-exclamation-circle me-1"></i>Complaint/Request
-                                <span id="crCount_${bookingId}" class="badge rounded-pill bg-danger" style="display:none; position:absolute; top:-6px; right:-6px; transform:none; min-width:18px; height:18px; padding:2px 6px; font-size:10px; line-height:14px; z-index:2; box-shadow:0 0 0 2px rgba(255,255,255,0.8);">0</span>
+                                <span id="crCount_${bookingId}" class="badge rounded-pill bg-danger" style="display:none; position:absolute; top:-6px; right:-6px; transform:none; min-width:18px; height:18px; padding:2px 6px; font-size:10px; line-height:14px; z-index:10; box-shadow:0 0 0 2px rgba(255,255,255,0.8); pointer-events:none;">0</span>
                             </button>
-                            <button type="button" class="btn btn-info btn-sm ms-1" onclick="showPayments('${bookingId}')">
+                            <button type="button" class="btn btn-info btn-sm ms-1" onclick="showPayments('${bookingId}')" style="transition: none; opacity: 1 !important;">
                                 <i class="fas fa-credit-card me-1"></i>Payments
                             </button>
                         </div>
@@ -547,8 +548,18 @@ modalStyle.textContent = `
         box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
     }
     
-    #dynamicRoomModal_${bookingId} .btn:hover {
+    #dynamicRoomModal_${bookingId} .btn:hover:not([style*="opacity: 1"]) {
         opacity: 0.9 !important;
+    }
+    
+    #dynamicRoomModal_${bookingId} .card-header .btn {
+        transition: none !important;
+        opacity: 1 !important;
+    }
+    
+    #dynamicRoomModal_${bookingId} .card-header .btn:hover {
+        opacity: 1 !important;
+        filter: brightness(0.95);
     }
     
     #dynamicRoomModal_${bookingId} .card:hover {
@@ -3461,8 +3472,17 @@ function initializeTransferModal() {
                 border-color: #dee2e6 !important;
             }
             
-            .modal .btn:hover {
+            .modal .btn:hover:not([style*="opacity: 1"]) {
                 opacity: 0.9 !important;
+            }
+            
+            .modal .card-header .btn {
+                transition: none !important;
+            }
+            
+            .modal .card-header .btn:hover {
+                opacity: 1 !important;
+                filter: brightness(0.95);
             }
             
             .modal .card:hover {
@@ -3497,8 +3517,18 @@ function initializeTransferModal() {
                 border-color: #dee2e6 !important;
             }
             
-            [id^="dynamicRoomModal_"] .btn:hover {
+            [id^="dynamicRoomModal_"] .btn:hover:not([style*="opacity: 1"]) {
                 opacity: 0.9 !important;
+            }
+            
+            [id^="dynamicRoomModal_"] .card-header .btn {
+                transition: none !important;
+                opacity: 1 !important;
+            }
+            
+            [id^="dynamicRoomModal_"] .card-header .btn:hover {
+                opacity: 1 !important;
+                filter: brightness(0.95);
             }
             
             [id^="dynamicRoomModal_"] .card:hover {

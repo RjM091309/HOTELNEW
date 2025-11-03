@@ -2037,25 +2037,43 @@ class BookingController {
         FULLNAME: req.user.FULLNAME,
       } : { FULLNAME: 'System User' };
 
-      if (!data || !data.voucherNo) {
+      if (!data) {
         return res.status(400).json({ 
+          success: false,
           error: "Group voucher data is required" 
         });
+      }
+
+      // Generate voucher number if not provided
+      if (!data.voucherNo) {
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        data.voucherNo = `GV${yyyy}${mm}${dd}${hours}${minutes}`;
       }
 
       const voucherData = await BookingModel.generateGroupVoucher({ data, user });
       
       const download = req.query.download === '1';
+      const filename = `group-voucher-${data.voucherNo}.pdf`;
+      
       res.set({
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `${download ? 'attachment' : 'inline'}; filename="group-voucher-${data.voucherNo}.pdf"`,
-        'Content-Length': voucherData.pdfBuffer.length
+        'Content-Disposition': `${download ? 'attachment' : 'inline'}; filename="${filename}"`,
+        'Content-Length': voucherData.pdfBuffer.length.toString()
       });
       res.send(voucherData.pdfBuffer);
 
     } catch (error) {
       console.error('Group Voucher Preview Error:', error);
-      res.status(500).send('Group voucher preview failed.');
+      res.status(500).json({
+        success: false,
+        error: 'Group voucher preview failed.',
+        message: error.message
+      });
     }
   }
 
@@ -2528,25 +2546,6 @@ class BookingController {
     }
   }
 
-  // Generate group voucher
-  static async generateGroupVoucher(req, res) {
-    try {
-      const bookingData = req.body;
-      
-      // Render the group voucher PDF
-      res.render('booking/pdf/booking_group_voucher', {
-        booking: bookingData,
-        title: 'Group Booking Voucher'
-      });
-
-    } catch (error) {
-      console.error('Error generating group voucher:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error generating voucher'
-      });
-    }
-  }
 
   // Get voucher data for modal display
   static async getVoucherData(req, res) {
@@ -2579,6 +2578,41 @@ class BookingController {
       res.status(500).json({
         success: false,
         message: 'Error fetching voucher data'
+      });
+    }
+  }
+
+  // Get group voucher data
+  static async getGroupVoucherData(req, res) {
+    try {
+      const { groupId } = req.params;
+
+      if (!groupId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Group ID is required'
+        });
+      }
+
+      const voucherData = await BookingModel.getGroupVoucherData(groupId);
+
+      if (!voucherData) {
+        return res.status(404).json({
+          success: false,
+          message: 'Group booking not found'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: voucherData
+      });
+
+    } catch (error) {
+      console.error('Error fetching group voucher data:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching group voucher data'
       });
     }
   }

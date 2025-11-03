@@ -161,7 +161,7 @@
         </td>
       </tr>
       
-      <% if (reservationFee && parseFloat(reservationFee) > 0) { %>
+      <% if (typeof reservationFee !== 'undefined' && reservationFee && parseFloat(reservationFee) > 0) { %>
       <tr>
         <td class="label">RESERVATION FEE:</td>
         <td>PHP <%= parseFloat(reservationFee).toLocaleString() %></td>
