@@ -419,6 +419,84 @@ class BookingModel {
     }
   }
 
+  // Check if room is occupied (has active checked-in booking)
+  static async checkRoomOccupied(bookingId) {
+    try {
+      // First, get the room ID for this booking
+      const getRoomQuery = `
+        SELECT ROOM_ID 
+        FROM booking 
+        WHERE IDNo = ? AND ACTIVE = 1
+      `;
+      const roomResult = await queryDatabasePromise(getRoomQuery, [bookingId]);
+      
+      if (roomResult.length === 0) {
+        return { 
+          isOccupied: false, 
+          message: 'Booking not found' 
+        };
+      }
+
+      const roomId = roomResult[0].ROOM_ID;
+
+      // Get current booking dates to check for overlap
+      const getCurrentBookingQuery = `
+        SELECT CHECK_IN_DATE, CHECK_OUT_DATE
+        FROM booking
+        WHERE IDNo = ? AND ACTIVE = 1
+      `;
+      const currentBookingResult = await queryDatabasePromise(getCurrentBookingQuery, [bookingId]);
+      
+      if (currentBookingResult.length === 0) {
+        return {
+          isOccupied: false,
+          message: 'Current booking dates not found'
+        };
+      }
+
+      const currentCheckIn = currentBookingResult[0].CHECK_IN_DATE;
+      const currentCheckOut = currentBookingResult[0].CHECK_OUT_DATE;
+
+      // Check if there's another active checked-in booking for this room with overlapping dates
+      // Two bookings overlap if: check_in < other_checkout AND check_out > other_checkin
+      const checkOccupiedQuery = `
+        SELECT 
+          b.IDNo AS BookingID,
+          c.NAME AS CustomerName,
+          b.BOOKING_STATUS,
+          b.CHECK_IN_DATE,
+          b.CHECK_OUT_DATE
+        FROM booking b
+        LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+        WHERE b.ROOM_ID = ?
+          AND b.IDNo != ?
+          AND b.ACTIVE = 1
+          AND b.BOOKING_STATUS = 'check-In'
+          AND b.CHECK_IN_DATE < ?
+          AND b.CHECK_OUT_DATE > ?
+        LIMIT 1
+      `;
+      
+      const occupiedResult = await queryDatabasePromise(checkOccupiedQuery, [roomId, bookingId, currentCheckOut, currentCheckIn]);
+      
+      if (occupiedResult.length > 0) {
+        return {
+          isOccupied: true,
+          occupiedBooking: occupiedResult[0],
+          message: `Room is currently occupied by ${occupiedResult[0].CustomerName || 'another guest'}`
+        };
+      }
+
+      return {
+        isOccupied: false,
+        message: 'Room is available'
+      };
+    } catch (error) {
+      console.error('Error checking room occupancy:', error);
+      throw error;
+    }
+  }
+
   // New: Checkout bookings now (set CHECK_OUT_DATE=NOW, status to check-Out, update room status)
   static async checkoutBookings({ bookingIds, encodedBy, refundBookingId = null, refundAmount = 0 }) {
     if (!bookingIds || bookingIds.length === 0) {

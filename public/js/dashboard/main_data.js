@@ -1003,6 +1003,62 @@ $(document).ready(function() {
         // Get the room number from the card header
         const roomNumber = $toggle.closest('.card').find('.card-head header').text().trim();
 
+        // If checking in, first check if room is occupied
+        if (isChecked) {
+            // Show loading state while checking
+            Swal.fire({
+                title: "Checking Room Status...",
+                text: "Please wait while we verify room availability.",
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            // Check if room is occupied
+            $.ajax({
+                url: '/dashboard/booking/check_room_occupied',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    BookingID: bookingId
+                }),
+                success: (response) => {
+                    Swal.close();
+                    
+                    if (response.success && response.isOccupied) {
+                        // Room is occupied, show error popup
+                        Swal.fire({
+                            title: "Cannot Check In!",
+                            text: `Cannot check in to Room ${roomNumber} because it is still occupied.${response.data ? ` Currently checked in: ${response.data.CustomerName || 'another guest'}.` : ''}`,
+                            icon: "error",
+                            confirmButtonColor: "#dc3545",
+                            confirmButtonText: "OK",
+                            allowOutsideClick: false
+                        });
+                        // Revert toggle state
+                        $toggle.prop('checked', false);
+                        return;
+                    }
+                    
+                    // Room is available, proceed with check-in confirmation
+                    proceedWithCheckInConfirmation($toggle, bookingId, roomNumber, newStatus, action, isChecked);
+                },
+                error: (xhr, status, error) => {
+                    Swal.close();
+                    PMSCore.handleError(error, 'Check room occupied AJAX error');
+                    PMSCore.showError('Error!', 'An error occurred while checking room status.');
+                    $toggle.prop('checked', false); // Revert toggle state
+                }
+            });
+        } else {
+            // Reverting to pending, proceed directly with confirmation
+            proceedWithCheckInConfirmation($toggle, bookingId, roomNumber, newStatus, action, isChecked);
+        }
+    });
+
+    // Helper function to proceed with check-in confirmation
+    function proceedWithCheckInConfirmation($toggle, bookingId, roomNumber, newStatus, action, isChecked) {
         // Show SweetAlert2 confirmation
         Swal.fire({
             title: isChecked ? "Check In Guest?" : "Revert Check-In?",
@@ -1136,7 +1192,7 @@ $(document).ready(function() {
                 $toggle.prop('checked', !isChecked);
             }
         });
-    });
+    }
 
     // CHECK-OUT TOGGLE (REVERSIBLE)
     $(document).on('change', '.custom-toggle-checkout', function() {

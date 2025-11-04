@@ -206,6 +206,36 @@ class DashboardController {
     }
   }
 
+  // Check if room is occupied before check-in
+  static async checkRoomOccupied(req, res) {
+    try {
+      const { BookingID } = req.body;
+      
+      if (!BookingID) {
+        return res.status(400).json({
+          success: false,
+          message: 'BookingID is required'
+        });
+      }
+
+      const BookingModel = require('../models/bookingModel');
+      const result = await BookingModel.checkRoomOccupied(BookingID);
+      
+      res.json({
+        success: true,
+        isOccupied: result.isOccupied,
+        message: result.message,
+        data: result.occupiedBooking || null
+      });
+    } catch (error) {
+      console.error('Error checking room occupancy:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error'
+      });
+    }
+  }
+
   // Update booking status controller
   static async updateBookingStatus(req, res) {
     try {

@@ -16,6 +16,7 @@ router.get('/transfer-logs/:bookingId', DashboardController.getTransferLogs);
 router.post('/transfer-room', DashboardController.transferRoom);
 
 // Booking status routes
+router.post('/booking/check_room_occupied', DashboardController.checkRoomOccupied);
 router.post('/booking/update_status', DashboardController.updateBookingStatus);
 
 // Room maintenance routes
