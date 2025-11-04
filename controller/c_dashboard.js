@@ -157,6 +157,17 @@ class DashboardController {
     }
   }
 
+  // Complaints/Requests/Remarks summary counts
+  static async getComplaintRequestSummary(req, res) {
+    try {
+      const summary = await DashboardModel.getComplaintRequestSummary();
+      res.json({ success: true, data: summary });
+    } catch (error) {
+      console.error('Error fetching complaint/request summary:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  }
+
   // Check move to occupied controller
   static async checkMoveToOccupied(req, res) {
     try {

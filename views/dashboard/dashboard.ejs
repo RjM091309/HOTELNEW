@@ -76,8 +76,8 @@ function calculateCardVariables(booking) {
 }
 %>
 <div class="state-overview">
-	<div class="row mb-4">
-		<div class="col-xl-3 col-md-6 col-8">
+	<div class="row mb-4 overview-row">
+		<div class="col-xl-20p col-md-6 col-8">
 			<div class="dashboard-card naranja ">
 				<div class="dashboard-card-header bg-blue">
 					<div class="dashboard-card-header-title ">Booking Overview</div>
@@ -110,7 +110,7 @@ function calculateCardVariables(booking) {
 		</div>
 
 
-		<div class="col-xl-3 col-md-6 col-8">
+		<div class="col-xl-20p col-md-6 col-8">
 			<div class="dashboard-card naranja">
 				<div class="dashboard-card-header">
 					<div class="dashboard-card-header-title">Check-out Overview</div>
@@ -139,7 +139,7 @@ function calculateCardVariables(booking) {
 			</div>
 		</div>
 
-		<div class="col-xl-3 col-md-6 col-8">
+		<div class="col-xl-20p col-md-6 col-8">
 			<div class="dashboard-card naranja">
 				<div class="dashboard-card-header">
 					<div class="dashboard-card-header-title">Rooms Overview</div>
@@ -178,7 +178,7 @@ function calculateCardVariables(booking) {
 			</div>
 		</div>
 
-		<div class="col-xl-3 col-md-6 col-8">
+		<div class="col-xl-20p col-md-6 col-8">
 			<div class="dashboard-card naranja">
 				<div class="dashboard-card-header">
 					<div class="dashboard-card-header-title">Monthly Booking Overview</div>
@@ -202,6 +202,36 @@ function calculateCardVariables(booking) {
 						<span class="dashboard-btn-row-metric">
 							<%= pendingBookingsMonthly || 0 %>
 						</span>
+					</a>
+				</div>
+			</div>
+		</div>
+		
+		<!-- Added 5th card: Housekeeping Overview -->
+		<div class="col-xl-20p col-md-6 col-8">
+			<div class="dashboard-card naranja">
+				<div class="dashboard-card-header">
+					<div class="dashboard-card-header-title">Complaints/Request/Remarks</div>
+					<span class="info-box-icon push-bottom"><i class="material-icons">cleaning_services</i></span>
+				</div>
+				<div class="dashboard-card-body">
+					<a class="dashboard-btn-row">
+						<span class="dashboard-btn-row-item">Complaints</span>
+						<span class="dashboard-btn-row-metric">
+							<span class="badge-mini badge-mini--completed"><span class="badge-label">Completed</span><span id="complaintsCompletedCount">0</span></span>
+							<span class="badge-mini badge-mini--pending"><span class="badge-label">Not Complete</span><span id="complaintsPendingCount">0</span></span>
+						</span>
+					</a>
+					<a class="dashboard-btn-row">
+						<span class="dashboard-btn-row-item">Requests</span>
+						<span class="dashboard-btn-row-metric">
+							<span class="badge-mini badge-mini--completed"><span class="badge-label">Completed</span><span id="requestsCompletedCount">0</span></span>
+							<span class="badge-mini badge-mini--pending"><span class="badge-label">Not Complete</span><span id="requestsPendingCount">0</span></span>
+						</span>
+					</a>
+					<a class="dashboard-btn-row">
+						<span class="dashboard-btn-row-item">Remarks</span>
+						<span class="dashboard-btn-row-metric"><span id="remarksTotalCount">0</span></span>
 					</a>
 				</div>
 			</div>
@@ -903,6 +933,26 @@ function calculateCardVariables(booking) {
 				updateCleaningIconByRoom(data.roomNumber, isOn);
 			});
 		}
+
+		// Load Complaints/Requests/Remarks counts into mini badges
+		var crrUrl = '/dashboard/crr-counts';
+		// Fallback to root if router is mounted at '/'
+		if (!window.location.pathname.startsWith('/dashboard')) {
+			crrUrl = '/crr-counts';
+		}
+		fetch(crrUrl)
+			.then(function(resp){ return resp.ok ? resp.json() : null; })
+			.then(function(data){
+				if (!data || !data.success) return;
+				var d = data.data || {};
+				var el;
+				el = document.getElementById('complaintsCompletedCount'); if (el) el.textContent = d.complaintsCompleted || 0;
+				el = document.getElementById('complaintsPendingCount'); if (el) el.textContent = d.complaintsPending || 0;
+				el = document.getElementById('requestsCompletedCount'); if (el) el.textContent = d.requestsCompleted || 0;
+				el = document.getElementById('requestsPendingCount'); if (el) el.textContent = d.requestsPending || 0;
+				el = document.getElementById('remarksTotalCount'); if (el) el.textContent = d.remarksTotal || 0;
+			})
+			.catch(function(){ /* ignore */ });
 		
 		// Load complaint/request counts for all booking cards after scripts are loaded
 		setTimeout(function() {
@@ -1049,6 +1099,71 @@ function openRemarksModalFromData(element) {
 					
 					
 <style>
+/* Force first overview cards to fit in a single row */
+.overview-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 10px;
+}
+.overview-row > .col-xl-20p {
+  flex: 0 0 19.4%;
+  max-width: 19.4%;
+  padding-left: 0;
+  padding-right: 0;
+}
+/* Prevent metric/badges from wrapping awkwardly on narrow windows */
+.dashboard-card .dashboard-btn-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* keep label left, metrics right */
+}
+.dashboard-card .dashboard-btn-row .dashboard-btn-row-item {
+  flex: 1 1 auto;
+  min-width: 0; /* allow text to truncate instead of pushing */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 8px; /* breathing room before metrics */
+}
+.dashboard-card .dashboard-btn-row .dashboard-btn-row-metric {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap; /* keep numbers + badges in one line */
+  min-width: 120px; /* keep a little room for badges */
+  margin-left: auto; /* push metric block to the far right */
+  justify-content: flex-end;
+  text-align: right;
+  position: relative !important; /* prevent theme from absoluting this */
+  right: auto !important;
+}
+/* Mini badges for Complaints completed/pending */
+.badge-mini {
+  display: inline-block;
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 6px;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+.badge-mini .badge-label { font-weight: 600; margin-right: 4px; opacity: .9; }
+.badge-mini--completed { background: rgba(40,167,69,.15); color: #28a745; }
+.badge-mini--pending { background: rgba(220,53,69,.15); color: #dc3545; }
+
+/* Responsive tweaks for very narrow widths */
+@media (max-width: 1400px) {
+  .overview-row > .col-xl-20p { max-width: 19.4%; }
+  .badge-mini { font-size: 9px; padding: 2px 5px; }
+  .dashboard-card .dashboard-btn-row .dashboard-btn-row-metric { min-width: 100px; gap: 4px; }
+}
+@media (max-width: 1200px) {
+  .badge-mini { font-size: 8.5px; padding: 1px 4px; }
+  .dashboard-card .dashboard-btn-row .dashboard-btn-row-metric { min-width: 90px; }
+  /* When space is tight, hide labels and show counts only */
+  .badge-mini .badge-label { display: none; }
+  .badge-mini { background: transparent; padding: 0; margin-left: 8px; }
+}
 /* Remarks Button Styling */
 .remarks-btn {
   width: 100%;

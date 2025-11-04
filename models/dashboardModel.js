@@ -730,6 +730,37 @@ class DashboardModel {
     }
   }
 
+  // Get complaints/requests/remarks summary counts
+  static async getComplaintRequestSummary() {
+    try {
+      const complaintsCompleted = await queryDatabasePromise(
+        `SELECT COUNT(*) AS cnt FROM complaint_request WHERE TYPE='complaint' AND STATUS = 1 AND ACTIVE = 1`
+      );
+      const complaintsPending = await queryDatabasePromise(
+        `SELECT COUNT(*) AS cnt FROM complaint_request WHERE TYPE='complaint' AND STATUS = 0 AND ACTIVE = 1`
+      );
+      const requestsCompleted = await queryDatabasePromise(
+        `SELECT COUNT(*) AS cnt FROM complaint_request WHERE TYPE='request' AND STATUS = 1 AND ACTIVE = 1`
+      );
+      const requestsPending = await queryDatabasePromise(
+        `SELECT COUNT(*) AS cnt FROM complaint_request WHERE TYPE='request' AND STATUS = 0 AND ACTIVE = 1`
+      );
+      const remarksTotal = await queryDatabasePromise(
+        `SELECT COUNT(*) AS cnt FROM remarks WHERE ACTIVE = 1`
+      );
+
+      return {
+        complaintsCompleted: complaintsCompleted[0]?.cnt || 0,
+        complaintsPending: complaintsPending[0]?.cnt || 0,
+        requestsCompleted: requestsCompleted[0]?.cnt || 0,
+        requestsPending: requestsPending[0]?.cnt || 0,
+        remarksTotal: remarksTotal[0]?.cnt || 0
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
   // Get transfer logs
    // Get transfer logs
   static async getTransferLogs(occupiedRoomDetails) {

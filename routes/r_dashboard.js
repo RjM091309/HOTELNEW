@@ -27,6 +27,8 @@ router.get('/room-monitoring', DashboardController.getRoomMonitoring);
 
 // Dashboard counts for real-time updates
 router.get('/counts', DashboardController.getDashboardCounts);
+// Complaints/Requests/Remarks counts
+router.get('/crr-counts', DashboardController.getComplaintRequestSummary);
 
 // Late check-out routes
 router.get('/late-check-room', DashboardController.checkLateCheckRoom);
