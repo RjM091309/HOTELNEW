@@ -1953,12 +1953,52 @@ class BookingController {
         const reservationFee = billingData.reservationFee || 0;
         const discountAmount = billingData.discountAmount || 0;
         
+        // Use roomCharges if provided, otherwise calculate from billing table
+        let roomCharges = 0;
+        if (data.roomCharges !== undefined && data.roomCharges !== null && data.roomCharges !== '') {
+          roomCharges = parseFloat(data.roomCharges.toString().replace(/[,\s₱₹$]/g, '')) || 0;
+        } else {
+          const { queryDatabasePromise } = require('../config/database');
+          const roomChargesQuery = `
+            SELECT COALESCE(SUM(ROOM_CHARGE * QTY), 0) AS roomCharges
+            FROM billing
+            WHERE BOOKING_ID = ?
+          `;
+          const roomChargesResult = await queryDatabasePromise(roomChargesQuery, [data.bookingId]);
+          roomCharges = parseFloat(roomChargesResult?.[0]?.roomCharges || 0);
+        }
+        
+        // Use servicesTotal if provided, otherwise calculate from booking_service table
+        let servicesTotal = 0;
+        if (data.servicesTotal !== undefined && data.servicesTotal !== null && data.servicesTotal !== '') {
+          servicesTotal = parseFloat(data.servicesTotal.toString().replace(/[,\s₱₹$]/g, '')) || 0;
+        } else {
+          const { queryDatabasePromise } = require('../config/database');
+          // Calculate services total from booking_service table (excluding late checkout - service ID 72)
+          const servicesTotalQuery = `
+            SELECT COALESCE(SUM(TOTAL_COST), 0) AS servicesTotal
+            FROM booking_service
+            WHERE BOOKING_ID = ? 
+              AND ACTIVE = 1
+              AND SERVICE_ID != 72
+          `;
+          const servicesTotalResult = await queryDatabasePromise(servicesTotalQuery, [data.bookingId]);
+          servicesTotal = parseFloat(servicesTotalResult?.[0]?.servicesTotal || 0);
+        }
+        
         // Total amount
         const total = subTotal + reservationFee - discountAmount;
         
-        // Get paid amount and balance from voucher data (already calculated in query)
-        const paidAmount = parseFloat(voucherData.paidAmount) || 0;
-        const balance = total - paidAmount;
+        // Use paidAmount if provided from form data, otherwise use voucherData (ensure non-negative)
+        let paidAmount = 0;
+        if (data.paidAmount !== undefined && data.paidAmount !== null && data.paidAmount !== '') {
+          paidAmount = Math.max(0, parseFloat(data.paidAmount.toString().replace(/[,\s₱₹$]/g, '')) || 0);
+        } else {
+          paidAmount = Math.max(0, parseFloat(voucherData.paidAmount) || 0);
+        }
+        
+        // Calculate balance
+        const balance = Math.max(0, total - paidAmount);
 
         // Render the HTML
         const html = await ejs.render(templateContent, {
@@ -1980,6 +2020,8 @@ class BookingController {
           total,
           paidAmount,
           balance,
+          roomCharges,
+          servicesTotal,
           encodedBy: user.FULLNAME,
           imageUrl: `file://${path.join(__dirname, '../public/img/logo.png')}`
         });

@@ -141,24 +141,11 @@
       </tr>
       <% } %>
       
-      <% if (discount && parseFloat(discount) > 0) { %>
-      <tr>
-        <td class="label">DISCOUNT:</td>
-        <td>PHP <%= parseFloat(discount).toLocaleString() %></td>
-      </tr>
-      <% } %>
-      
       <% if (checkOutStatus == 1) { %>
       <tr>
         <td class="label">CHECK-OUT STATUS:</td>
         <td>Late Check-Out</td>
       </tr>
-          <% if (lateCheckoutFee && parseFloat(lateCheckoutFee) > 0) { %>
-      <tr>
-        <td class="label">LATE CHECK-OUT FEE:</td>
-        <td>PHP <%= parseFloat(lateCheckoutFee).toLocaleString() %></td>
-      </tr>
-          <% } %>
       <% } %>
       
     </table>
@@ -168,6 +155,10 @@
     let cleanTotal = 0;
     let cleanPaid = 0;
     let cleanBalance = 0;
+    let cleanRoomCharges = 0;
+    let cleanServices = 0;
+    let cleanDiscount = 0;
+    let cleanLateCheckoutFee = 0;
     
     // Get total
     if (typeof total !== 'undefined' && total !== null && total !== '') {
@@ -186,7 +177,55 @@
         // Compute balance from total and paid
         cleanBalance = Math.max(0, cleanTotal - cleanPaid);
     }
+    
+    // Get room charges (if provided)
+    if (typeof roomCharges !== 'undefined' && roomCharges !== null && roomCharges !== '') {
+        const roomChargesStr = roomCharges.toString().trim().replace(/[,\s₱₹$]/g, '').replace(/[^\d.]/g, '');
+        cleanRoomCharges = parseFloat(roomChargesStr) || 0;
+    }
+    
+    // Get services total (if provided)
+    if (typeof servicesTotal !== 'undefined' && servicesTotal !== null && servicesTotal !== '') {
+        const servicesStr = servicesTotal.toString().trim().replace(/,/g, '').replace(/[^\d.]/g, '');
+        cleanServices = parseFloat(servicesStr) || 0;
+    }
+    
+    // Get discount (if provided)
+    if (typeof discount !== 'undefined' && discount !== null && discount !== '') {
+        const discountStr = discount.toString().trim().replace(/[,\s₱₹$]/g, '').replace(/[^\d.]/g, '');
+        cleanDiscount = parseFloat(discountStr) || 0;
+    }
+    
+    // Get late checkout fee (if provided)
+    if (typeof lateCheckoutFee !== 'undefined' && lateCheckoutFee !== null && lateCheckoutFee !== '') {
+        const lateCheckoutStr = lateCheckoutFee.toString().trim().replace(/[,\s₱₹$]/g, '').replace(/[^\d.]/g, '');
+        cleanLateCheckoutFee = parseFloat(lateCheckoutStr) || 0;
+    }
     %>
+    
+    <!-- Charges Breakdown -->
+    <table style="width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 10px;">
+      <tr>
+        <td style="padding: 8px; border: 1px solid #000; font-weight: bold; width: 50%;">Total Room Charges:</td>
+        <td style="padding: 8px; border: 1px solid #000; text-align: right; width: 50%;">PHP <%= cleanRoomCharges.toLocaleString() %></td>
+      </tr>
+      <tr>
+        <td style="padding: 8px; border: 1px solid #000; font-weight: bold; width: 50%;">Total Services:</td>
+        <td style="padding: 8px; border: 1px solid #000; text-align: right; width: 50%;">PHP <%= cleanServices.toLocaleString() %></td>
+      </tr>
+      <% if (cleanLateCheckoutFee > 0) { %>
+      <tr>
+        <td style="padding: 8px; border: 1px solid #000; font-weight: bold; width: 50%;">Late Check-out Fee:</td>
+        <td style="padding: 8px; border: 1px solid #000; text-align: right; width: 50%;">PHP <%= cleanLateCheckoutFee.toLocaleString() %></td>
+      </tr>
+      <% } %>
+      <% if (cleanDiscount > 0) { %>
+      <tr>
+        <td style="padding: 8px; border: 1px solid #000; font-weight: bold; width: 50%;">Discount:</td>
+        <td style="padding: 8px; border: 1px solid #000; text-align: right; width: 50%; color: #d9534f;">-PHP <%= cleanDiscount.toLocaleString() %></td>
+      </tr>
+      <% } %>
+    </table>
     <table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-weight: bold; font-size: 14px;">
         <tr style="background: #d9d9d9; border-top: 2px solid #000; border-bottom: 2px solid #000;">
           <td style="padding: 10px; width: 30%; text-align: left;">

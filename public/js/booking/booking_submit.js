@@ -208,29 +208,26 @@ $(document).ready(function () {
                 value: bookingRemarks
               }));
               
+              // Add balance and paidAmount fields - remove commas first
+              const computedTotalText = $('#computedTotal').text().replace(/,/g, '');
+              const computedBalanceText = $('#computedBalance').text().trim().replace(/,/g, '');
+              const computedPaidAmountText = $('#computedPaidAmount').text().trim().replace(/,/g, '');
+              
               form.append($('<input>', {
                 type: 'hidden',
                 name: 'total',
-                value: $('#computedTotal').text()
+                value: computedTotalText
               }));
               
-              // Add balance and paidAmount fields
-              const computedTotalText = $('#computedTotal').text();
-              const computedBalanceText = $('#computedBalance').text().trim();
-              const computedPaidAmountText = $('#computedPaidAmount').text().trim();
-              
-              // Fallback if values are empty
-              let balanceValue = (!computedBalanceText || computedBalanceText === '0.00') ? '0.00' : computedBalanceText;
+              // Calculate paidAmount value (remove commas)
               let paidAmountValue = (!computedPaidAmountText || computedPaidAmountText === '0.00') 
-                ? (paidAmount || '0') 
-                : computedPaidAmountText;
+                ? (parseFloat((paidAmount || '0').toString().replace(/,/g, '')) || 0).toFixed(2)
+                : parseFloat(computedPaidAmountText).toFixed(2);
               
-              // If balance is still empty, compute it
-              if (!balanceValue || balanceValue === '0.00') {
-                const totalNum = parseFloat(computedTotalText.replace(/,/g, '')) || 0;
-                const paidNum = parseFloat((paidAmount || '0').replace(/,/g, '')) || 0;
-                balanceValue = Math.max(0, totalNum - paidNum).toFixed(2);
-              }
+              // Always recalculate balance from total and paidAmount to ensure accuracy
+              const totalNum = parseFloat(computedTotalText.replace(/,/g, '')) || 0;
+              const paidNum = parseFloat(paidAmountValue.replace(/,/g, '')) || 0;
+              const balanceValue = Math.max(0, totalNum - paidNum).toFixed(2);
               
               form.append($('<input>', {
                 type: 'hidden',
@@ -242,6 +239,35 @@ $(document).ready(function () {
                 type: 'hidden',
                 name: 'paidAmount',
                 value: paidAmountValue
+              }));
+              
+              // Calculate room charges and services total for voucher
+              const priceValue = $('#price').val();
+              const roomRateStr = priceValue ? priceValue.toString().replace(/[,\s₱₹$]/g, '') : '0';
+              const roomRate = parseFloat(roomRateStr) || 0;
+              const nights = parseInt($('#diffindays').val()) || 1;
+              const roomCharges = Math.round((roomRate * nights) * 100) / 100;
+              
+              const breakfastAdultQtyNum = parseInt(breakfastAdultQty) || 0;
+              const breakfastAdultPriceNum = parseFloat(breakfastAdultPrice) || 0;
+              const breakfastKidQtyNum = parseInt(breakfastKidQty) || 0;
+              const breakfastKidPriceNum = parseFloat(breakfastKidPrice) || 0;
+              const breakfastTotal = (breakfastAdultQtyNum * breakfastAdultPriceNum) + (breakfastKidQtyNum * breakfastKidPriceNum);
+              const pickupNum = $('#includePickup').is(':checked') ? (parseFloat(pickupPrice) || 0) : 0;
+              const dropoffNum = $('#includeDropoff').is(':checked') ? (parseFloat(dropoffPrice) || 0) : 0;
+              // Exclude late checkout fee from servicesTotal as it's displayed separately
+              const servicesTotal = parseFloat((breakfastTotal + pickupNum + dropoffNum).toFixed(2));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'roomCharges',
+                value: roomCharges.toFixed(2)
+              }));
+              
+              form.append($('<input>', {
+                type: 'hidden',
+                name: 'servicesTotal',
+                value: servicesTotal.toFixed(2)
               }));
               
               form.append($('<input>', {

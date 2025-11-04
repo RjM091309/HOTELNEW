@@ -1286,7 +1286,9 @@ function downloadGroupVoucher(groupId) {
                     checkOutStatus: data.checkOutStatus || 0,
                     lateCheckoutFee: data.lateCheckoutFee || 0,
                     discount: data.discount || 0,
-                    reservationFee: data.reservationFee || 0
+                    reservationFee: data.reservationFee || 0,
+                    roomCharges: data.roomCharges !== undefined ? data.roomCharges.toFixed(2) : '0.00',
+                    servicesTotal: data.servicesTotal !== undefined ? data.servicesTotal.toFixed(2) : '0.00'
                 };
 
                 // Create form to trigger voucher download

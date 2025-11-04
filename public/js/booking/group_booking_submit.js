@@ -154,6 +154,28 @@ $(document).ready(function () {
         const balanceText = $('#groupComputedBalance').text() || '0';
         const numericBalance = balanceText.replace(/[^0-9.]/g, '').split(' ')[0] || '0';
 
+        // Calculate room charges
+        const nights = parseInt($('#groupNights').val(), 10) || 0;
+        const pricesRaw = $('#groupSelectedRoomPrices').val();
+        const prices = pricesRaw ? pricesRaw.split(',').map(p => parseFloat(p) || 0) : [];
+        const baseSubtotal = prices.reduce((sum, price) => sum + price, 0);
+        const roomCharges = baseSubtotal * nights;
+        
+        // Calculate services total (exclude late checkout fee)
+        const adultQty = $('#groupIncludeBreakfast').is(':checked') ? (parseInt($('#groupBreakfastAdultQty').val(), 10) || 0) : 0;
+        const adultPrice = parseFloat($('#groupBreakfastAdultPrice').val()) || 0;
+        const kidQty = $('#groupIncludeBreakfast').is(':checked') ? (parseInt($('#groupBreakfastKidQty').val(), 10) || 0) : 0;
+        const kidPrice = parseFloat($('#groupBreakfastKidPrice').val()) || 0;
+        const breakfastIndividual = $('#groupBreakfastIndividual').is(':checked');
+        const selectedRooms = $('#groupSelectedRooms').val();
+        const numRooms = selectedRooms ? selectedRooms.split(',').length : 1;
+        const breakfastTotal = (adultQty * adultPrice) + (kidQty * kidPrice);
+        const breakfastTotalWithIndividual = breakfastIndividual ? breakfastTotal * numRooms : breakfastTotal;
+        const pickupPrice = $('#groupIncludePickup').is(':checked') ? parseFloat($('#groupPickupPrice').val()) || 0 : 0;
+        const dropoffPrice = $('#groupIncludeDropoff').is(':checked') ? parseFloat($('#groupDropoffPrice').val()) || 0 : 0;
+        // Exclude late checkout fee from servicesTotal as it's displayed separately
+        const servicesTotal = breakfastTotalWithIndividual + pickupPrice + dropoffPrice;
+
         // Use confirmation number from response as voucher number
         // If no confirmation number in response, fallback to auto-generated
         let vno = response.confirmationNumber;
@@ -176,8 +198,10 @@ $(document).ready(function () {
           roomSummary: roomNumbersForVoucher || 'No rooms selected',
           breakfastAdult: $('#groupBreakfastAdultQty').val() || 0,
           breakfastKid: $('#groupBreakfastKidQty').val() || 0,
-          pickup: $('#groupIncludePickup').is(':checked') ? (parseFloat($('#groupPickupPrice').val()) || 0) : 0,
-          dropoff: $('#groupIncludeDropoff').is(':checked') ? (parseFloat($('#groupDropoffPrice').val()) || 0) : 0,
+          breakfastAdultPrice: adultPrice,
+          breakfastKidPrice: kidPrice,
+          pickup: pickupPrice,
+          dropoff: dropoffPrice,
           remarks: $('#groupRemarks').val() || '',
           total: numericTotal,
           paidAmount: numericPaid,
@@ -185,7 +209,9 @@ $(document).ready(function () {
           checkOutStatus: $('#groupCheckOutStatus').val() || 0,
           lateCheckoutFee: 0,
           discount: $('#groupIncludeDiscount').is(':checked') ? (parseFloat($('#groupDiscount').val()) || 0) : 0,
-          reservationFee: 0
+          reservationFee: 0,
+          roomCharges: roomCharges.toFixed(2),
+          servicesTotal: servicesTotal.toFixed(2)
         };
 
         // Create form to trigger voucher download

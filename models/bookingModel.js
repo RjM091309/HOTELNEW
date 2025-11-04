@@ -3745,32 +3745,32 @@ class BookingModel {
       const roomsResult = await queryDatabasePromise(roomsQuery, [groupId]);
       const roomNumbers = roomsResult?.[0]?.room_numbers || '';
 
-      // Calculate total (room charges + services - discount - reservation fee)
-      const totalQuery = `
-        SELECT
-          COALESCE(SUM(
-            (bill.ROOM_CHARGE * bill.QTY) + 
-            COALESCE((
-              SELECT SUM(bs.TOTAL_COST) 
-              FROM booking_service bs 
-              WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1
-            ), 0) +
-            COALESCE((
-              SELECT SUM(be.COST * be.QTY) 
-              FROM booking_extension be 
-              WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1
-            ), 0)
-          ), 0)
-          - COALESCE(gb.GROUP_DISCOUNT, 0)
-          - COALESCE(gb.GROUP_RESERVATION_FEE, 0)
-          AS total
+      // Calculate room charges (sum of all room charges)
+      const roomChargesQuery = `
+        SELECT COALESCE(SUM(bill.ROOM_CHARGE * bill.QTY), 0) AS roomCharges
         FROM booking b
         JOIN group_booking gb ON b.GROUP_BOOKING_ID = gb.IDNo
         LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID
         WHERE b.GROUP_BOOKING_ID = ? AND b.ACTIVE = 1
       `;
-      const totalResult = await queryDatabasePromise(totalQuery, [groupId]);
-      const total = parseFloat(totalResult?.[0]?.total || 0);
+      const roomChargesResult = await queryDatabasePromise(roomChargesQuery, [groupId]);
+      const roomCharges = parseFloat(roomChargesResult?.[0]?.roomCharges || 0);
+
+      // Calculate services total (sum of all services, excluding late checkout)
+      // Late checkout service ID is typically 72
+      const servicesTotalQuery = `
+        SELECT COALESCE(SUM(bs.TOTAL_COST), 0) AS servicesTotal
+        FROM booking_service bs
+        JOIN booking b ON bs.BOOKING_ID = b.IDNo
+        WHERE b.GROUP_BOOKING_ID = ? 
+          AND bs.ACTIVE = 1
+          AND bs.SERVICE_ID != 72
+      `;
+      const servicesTotalResult = await queryDatabasePromise(servicesTotalQuery, [groupId]);
+      const servicesTotal = parseFloat(servicesTotalResult?.[0]?.servicesTotal || 0);
+
+      // Calculate total (room charges + services - discount - reservation fee)
+      const total = roomCharges + servicesTotal - parseFloat(groupBooking.GROUP_DISCOUNT || 0) - parseFloat(groupBooking.GROUP_RESERVATION_FEE || 0);
 
       // Get total paid
       const paidQuery = `
@@ -3828,7 +3828,9 @@ class BookingModel {
         lateCheckoutFee: 0,
         discount: parseFloat(groupBooking.GROUP_DISCOUNT || 0),
         reservationFee: parseFloat(groupBooking.GROUP_RESERVATION_FEE || 0),
-        confirmationNumber: groupBooking.confirmationNumber || null
+        confirmationNumber: groupBooking.confirmationNumber || null,
+        roomCharges: roomCharges,
+        servicesTotal: servicesTotal
       };
 
     } catch (error) {
@@ -5401,10 +5403,25 @@ class BookingModel {
       const { chromium } = require('playwright');
       const ejs = require('ejs');
       
+      // Ensure paidAmount and balance are non-negative (remove commas when parsing)
+      const paidAmount = Math.max(0, parseFloat((data.paidAmount || 0).toString().replace(/,/g, '')));
+      const total = parseFloat((data.total || 0).toString().replace(/,/g, ''));
+      // Use passed balance if available, otherwise calculate
+      let balance = 0;
+      if (data.balance !== undefined && data.balance !== null && data.balance !== '') {
+        balance = Math.max(0, parseFloat(data.balance.toString().replace(/,/g, '')));
+      } else {
+        balance = Math.max(0, total - paidAmount);
+      }
+      
       const templateData = {
         ...data,
         encodedBy: user.FULLNAME,
-        reservationFee: data.reservationFee !== undefined ? data.reservationFee : 0
+        reservationFee: data.reservationFee !== undefined ? data.reservationFee : 0,
+        roomCharges: data.roomCharges !== undefined ? data.roomCharges : 0,
+        servicesTotal: data.servicesTotal !== undefined ? data.servicesTotal : 0,
+        paidAmount: paidAmount,
+        balance: balance
       };
       
       const html = await ejs.renderFile(
@@ -5457,6 +5474,39 @@ class BookingModel {
         imageUrl = '';
       }
 
+      // Use servicesTotal if provided, otherwise calculate from breakfast/pickup/dropoff
+      let servicesTotal = 0;
+      if (data.servicesTotal !== undefined && data.servicesTotal !== null && data.servicesTotal !== '') {
+        servicesTotal = parseFloat(data.servicesTotal.toString().replace(/[,\s₱₹$]/g, '')) || 0;
+      } else {
+        // Calculate servicesTotal (exclude late checkout fee)
+        const breakfastAdultQty = parseInt(data.breakfastAdult || 0);
+        const breakfastKidQty = parseInt(data.breakfastKid || 0);
+        const breakfastAdultPrice = parseFloat(data.breakfastAdultPrice || 0);
+        const breakfastKidPrice = parseFloat(data.breakfastKidPrice || 0);
+        const breakfastTotal = (breakfastAdultQty * breakfastAdultPrice) + (breakfastKidQty * breakfastKidPrice);
+        const pickup = parseFloat(data.pickup || 0);
+        const dropoff = parseFloat(data.dropoff || 0);
+        // Exclude late checkout fee from servicesTotal as it's displayed separately
+        servicesTotal = breakfastTotal + pickup + dropoff;
+      }
+      
+      // Use roomCharges if provided, otherwise calculate from total
+      let roomCharges = 0;
+      if (data.roomCharges !== undefined && data.roomCharges !== null && data.roomCharges !== '') {
+        roomCharges = parseFloat(data.roomCharges.toString().replace(/[,\s₱₹$]/g, '')) || 0;
+      } else {
+        // Calculate from total
+        const total = parseFloat(data.total.toString().replace(/[,\s₱₹$]/g, '')) || 0;
+        const lateCheckoutFee = parseFloat(data.lateCheckoutFee || 0);
+        const discount = parseFloat(data.discount || 0);
+        const reservationFee = parseFloat(data.reservationFee || 0);
+        // total = roomCharges + servicesTotal + lateCheckoutFee - discount + reservationFee
+        // roomCharges = total - servicesTotal - lateCheckoutFee + discount - reservationFee
+        roomCharges = total - servicesTotal - lateCheckoutFee + discount - reservationFee;
+        roomCharges = Math.max(0, roomCharges); // Ensure non-negative
+      }
+      
       // Ensure all required variables have defaults
       const templateData = {
         voucherNo: data.voucherNo || 'N/A',
@@ -5481,6 +5531,8 @@ class BookingModel {
         lateCheckoutFee: data.lateCheckoutFee || 0,
         discount: data.discount || 0,
         reservationFee: data.reservationFee !== undefined ? data.reservationFee : 0,
+        roomCharges: roomCharges,
+        servicesTotal: servicesTotal,
         imageUrl: imageUrl,
         encodedBy: user.FULLNAME || 'System User'
       };
