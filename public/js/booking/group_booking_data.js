@@ -712,6 +712,12 @@ function viewGroupBilling(groupId) {
                 $('#discountRow').hide();
             }
 
+            // Update Total Room Charges and Total Services
+            const groupRoomTotal = parseFloat(data.roomTotal || 0);
+            const groupServicesTotal = parseFloat(data.servicesTotal || 0);
+            $('#totalRoomCharges').text(groupRoomTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#totalServices').text(groupServicesTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
             const allPaid = allBillingData.every(bill => bill.PAYMENT_STATUS === 'paid' || bill.STATUS === 'paid');
             const billingType = parseInt(data.billingType || 0); // 1 = Consolidated/Master, 0 = Individual
             const paymentBtn = $('#groupProceedPaymentButton');

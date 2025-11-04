@@ -162,6 +162,27 @@ window.showBilling = async function (bookingID) {
                 // GRAND TOTAL should be the subtotal (before discount)
                 setText('totalPayment', subTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
+                // Calculate Total Room Charges and Total Services
+                let totalRoomCharges = 0;
+                let totalServices = 0;
+                
+                data.items.forEach(item => {
+                    const amount = parseFloat(item.subTotal) || 0;
+                    const description = (item.description || '').toLowerCase();
+                    
+                    // Check if it's a room charge
+                    if (description.includes('room') || description.includes('bedroom') || description.includes('room charge')) {
+                        totalRoomCharges += amount;
+                    } else {
+                        // Everything else is considered a service
+                        totalServices += amount;
+                    }
+                });
+                
+                // Update Total Room Charges and Total Services
+                setText('totalRoomCharges', totalRoomCharges.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                setText('totalServices', totalServices.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
                 // Reservation Fee UI
                 (function(){
                     const row = document.getElementById('reservationFeeRow');
