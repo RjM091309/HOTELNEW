@@ -131,7 +131,7 @@
             </div>
         <% } %>
 
-        <!-- Memo Section -->
+        <!-- Memo Section (temporarily disabled)
         <div class="memo <%= memoClass %>" 
              data-booking-id="<%= booking.BookingID %>"
              data-room-number="<%= booking.ROOM_NUMBER %>"
@@ -146,6 +146,51 @@
                     No Remarks
                 <% } %>
             </p>
+        </div>
+        -->
+
+        <!-- Remarks Type Indicators: S/C/R/M -->
+        <div class="remarks-indicators-container">
+            <div class="remarks-indicator remarks-special" 
+                 data-type="S" 
+                 title="SPECIAL"
+                 data-booking-id="<%= booking.BookingID %>"
+                 data-room-number="<%= booking.ROOM_NUMBER %>"
+                 data-customer-name="<%= booking.CustomerName %>"
+                 data-remarks="<%= booking.REMARKS || '' %>"
+                 onclick="openRemarksModalFromData(this)" 
+                 style="cursor: pointer;">
+                <span>S</span>
+            </div>
+            <div class="remarks-indicator remarks-complaint" 
+                 data-type="C" 
+                 title="COMPLAINT"
+                 data-booking-id="<%= booking.BookingID %>"
+                 onclick="openComplaintModal('<%= booking.BookingID %>')" 
+                 style="cursor: pointer; position: relative; overflow: visible;">
+                <span>C</span>
+                <span id="crComplaintCount_<%= booking.BookingID %>" class="cr-badge-count cr-badge-complaint" style="display:none;">0</span>
+            </div>
+            <div class="remarks-indicator remarks-request" 
+                 data-type="R" 
+                 title="REQUEST"
+                 data-booking-id="<%= booking.BookingID %>"
+                 onclick="openRequestModal('<%= booking.BookingID %>')" 
+                 style="cursor: pointer; position: relative; overflow: visible;">
+                <span>R</span>
+                <span id="crRequestCount_<%= booking.BookingID %>" class="cr-badge-count cr-badge-request" style="display:none;">0</span>
+            </div>
+            <div class="remarks-indicator remarks-memo" 
+                 data-type="M" 
+                 title="MEMO"
+                 data-booking-id="<%= booking.BookingID %>"
+                 data-room-number="<%= booking.ROOM_NUMBER %>"
+                 data-customer-name="<%= booking.CustomerName %>"
+                 data-remarks="<%= booking.REMARKS || '' %>"
+                 onclick="openRemarksModalFromData(this)" 
+                 style="cursor: pointer;">
+                <span>M</span>
+            </div>
         </div>
         
 

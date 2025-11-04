@@ -903,6 +903,13 @@ function calculateCardVariables(booking) {
 				updateCleaningIconByRoom(data.roomNumber, isOn);
 			});
 		}
+		
+		// Load complaint/request counts for all booking cards after scripts are loaded
+		setTimeout(function() {
+			if (typeof window.loadAllBookingCardComplaintCounts === 'function') {
+				window.loadAllBookingCardComplaintCounts();
+			}
+		}, 1000);
 	});
 </script>
 
@@ -1020,8 +1027,18 @@ function openRemarksModalFromData(element) {
     const roomNumber = element.getAttribute('data-room-number');
     const customerName = element.getAttribute('data-customer-name');
     const currentRemarks = element.getAttribute('data-remarks');
+    const dataType = element.getAttribute('data-type');
     
-    // Call the existing function
+    // Check if this is from M (Memo) button
+    if (dataType === 'M') {
+        // Use the room-menu modal with Memo preset
+        if (typeof window.openRemarksModalWithMemo === 'function') {
+            window.openRemarksModalWithMemo(bookingId);
+            return;
+        }
+    }
+    
+    // Call the existing function for other cases
     openRemarksModal(bookingId, roomNumber, customerName, currentRemarks);
 }
 
@@ -1328,6 +1345,122 @@ function openRemarksModalFromData(element) {
   0% { opacity: 1; }
   50% { opacity: .35; }
   100% { opacity: 1; }
+}
+
+/* Remarks Type Indicators (S/C/R/M) */
+.remarks-indicators-container {
+  display: flex;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 6px;
+  border: 2px solid #a1ac06;
+  border-radius: 6px;
+  background: rgba(220, 53, 69, 0.1);
+  justify-content: space-between;
+  overflow: visible;
+  position: relative;
+}
+
+.remarks-indicator {
+  flex: 1;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: visible;
+}
+
+.remarks-indicator span {
+  color: #fff;
+  font-weight: bold;
+  font-size: 14px;
+ 
+  z-index: 1;
+}
+
+.remarks-indicator.remarks-special {
+  background-color: #ffc107;
+}
+
+.remarks-indicator.remarks-complaint {
+  background-color: #910714;
+}
+
+.remarks-indicator.remarks-request {
+  background-color: #074588;
+}
+
+.remarks-indicator.remarks-memo {
+  background-color: #15812e;
+}
+
+.remarks-indicator:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.remarks-indicator:active {
+  transform: scale(0.95);
+}
+
+/* Badge Count Styling for C and R buttons */
+.cr-badge-count {
+  position: absolute;
+  top: -10px;
+  right: -4px;
+  min-width: 12px;
+  height: 12px;
+  padding: 0 3px;
+  font-size: 10px !important;
+  line-height: 14px;
+  z-index: 20;
+  pointer-events: none;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.3),
+    0 0 0 2px rgba(255, 255, 255, 0.95),
+    0 0 0 3px rgba(0, 0, 0, 0.1);
+  transform: scale(1);
+  transition: all 0.2s ease;
+  letter-spacing: -0.5px;
+  animation: badge-pulse 2s ease-in-out infinite;
+}
+
+.cr-badge-complaint {
+  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+  color: #fff;
+  
+}
+
+.cr-badge-request {
+  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+  color: #fff;
+
+}
+
+@keyframes badge-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 
+      0 2px 4px rgba(0, 0, 0, 0.3),
+      0 0 0 2px rgba(255, 255, 255, 0.95),
+      0 0 0 3px rgba(0, 0, 0, 0.1);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 
+      0 3px 6px rgba(0, 0, 0, 0.4),
+      0 0 0 2px rgba(255, 255, 255, 0.95),
+      0 0 0 4px rgba(220, 53, 69, 0.3);
+  }
 }
 </style>
 

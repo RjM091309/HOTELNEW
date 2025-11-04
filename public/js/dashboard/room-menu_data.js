@@ -325,9 +325,9 @@ async function createDynamicRoomModal(bookingId, event, options) {
                             <button class="btn btn-sm ${remarksButtonClass}" onclick="openRemarksModal('${bookingId}')">
                         <i class="fas fa-sticky-note"></i> Remarks
                     </button>
-                            <button type="button" class="btn btn-warning btn-sm ms-1 position-relative" id="crButton_${bookingId}" onclick="openComplaintRequestModal('${bookingId}')" >
+                            <button type="button" class="btn btn-warning btn-sm ms-1 position-relative" id="crButton_${bookingId}" onclick="openComplaintRequestModal('${bookingId}')" style="overflow: visible;">
                                 <i class="fas fa-exclamation-circle me-1"></i>Complaint/Request
-                                <span id="crCount_${bookingId}" class="badge rounded-pill bg-danger" style="display:none; position:absolute; top:-6px; right:-6px; transform:none; min-width:18px; height:18px; padding:2px 6px; font-size:10px; line-height:14px; z-index:10; box-shadow:0 0 0 2px rgba(255,255,255,0.8); pointer-events:none;">0</span>
+                                <span id="crCount_${bookingId}" class="badge rounded-pill bg-danger" style="display:none; position:absolute; top:-8px; right:-10px; transform:none; min-width:20px; height:20px; padding:2px 7px; font-size:11px; font-weight:bold; line-height:16px; z-index:10; box-shadow:0 0 0 2px rgba(255,255,255,0.8); pointer-events:none; text-align:center; display:flex; align-items:center; justify-content:center;">0</span>
                             </button>
                             <button type="button" class="btn btn-info btn-sm ms-1" onclick="showPayments('${bookingId}')" style="transition: none; opacity: 1 !important;">
                                 <i class="fas fa-credit-card me-1"></i>Payments
@@ -5219,6 +5219,20 @@ function openRemarksModal(bookingId) {
     createRemarksModal(bookingId);
 }
 
+// Open remarks modal with Memo category preset
+function openRemarksModalWithMemo(bookingId) {
+    createRemarksModal(bookingId);
+    // After modal is created, preset category to 'Memo'
+    setTimeout(() => {
+        const categorySel = document.getElementById(`remarkCategory_${bookingId}`);
+        if (categorySel) {
+            categorySel.value = 'Memo';
+        }
+        const txt = document.getElementById(`remarkText_${bookingId}`);
+        if (txt) txt.focus();
+    }, 200);
+}
+
 // Shortcut to open remarks modal focused for Complaint/Request entry
 function openComplaintRequestModal(bookingId) {
     createRemarksModal(bookingId);
@@ -5278,7 +5292,7 @@ function createRemarksModal(bookingId) {
                                             <option value="Billing">Billing</option>
                                             <option value="Payment">Payment</option>
                                           
-                                            <option value="Request">Request</option>
+                                            <option value="Memo">Memo</option>
                                             <option value="Discount">Discount</option>
                                             <option value="Service">Service</option>
                                             
@@ -5633,7 +5647,11 @@ async function updateRemark(bookingId, remarkId) {
 
 // Make functions globally accessible
 window.openRemarksModal = openRemarksModal;
+window.openRemarksModalWithMemo = openRemarksModalWithMemo;
 window.openComplaintRequestModal = openComplaintRequestModal;
+window.openComplaintModal = openComplaintModal;
+window.openRequestModal = openRequestModal;
+window.loadAllBookingCardComplaintCounts = loadAllBookingCardComplaintCounts;
 window.addRemark = addRemark;
 window.clearRemarkForm = clearRemarkForm;
 window.deleteRemark = deleteRemark;
@@ -5648,6 +5666,30 @@ window.updateRemark = updateRemark;
 
 function openComplaintRequestModal(bookingId) {
     createComplaintRequestModal(bookingId);
+}
+
+// Open Complaint/Request modal with Complaint type preset
+function openComplaintModal(bookingId) {
+    createComplaintRequestModal(bookingId);
+    // After modal is created, preset type to 'complaint'
+    setTimeout(() => {
+        const typeSelect = document.getElementById(`crType_${bookingId}`);
+        if (typeSelect) {
+            typeSelect.value = 'complaint';
+        }
+    }, 100);
+}
+
+// Open Complaint/Request modal with Request type preset
+function openRequestModal(bookingId) {
+    createComplaintRequestModal(bookingId);
+    // After modal is created, preset type to 'request'
+    setTimeout(() => {
+        const typeSelect = document.getElementById(`crType_${bookingId}`);
+        if (typeSelect) {
+            typeSelect.value = 'request';
+        }
+    }, 100);
 }
 
 function createComplaintRequestModal(bookingId) {
@@ -5754,9 +5796,33 @@ async function loadComplaintRequests(bookingId) {
             if (badgeEl) {
                 if (openCount > 0) {
                     badgeEl.textContent = String(openCount);
-                    badgeEl.style.display = 'inline-block';
+                    badgeEl.style.display = 'flex';
                 } else {
                     badgeEl.style.display = 'none';
+                }
+            }
+            
+            // Update C and R badge counts on booking cards
+            const complaintCount = rows.filter(r => Number(r.STATUS) === 0 && String(r.TYPE).toLowerCase() === 'complaint').length;
+            const requestCount = rows.filter(r => Number(r.STATUS) === 0 && String(r.TYPE).toLowerCase() === 'request').length;
+            
+            const complaintBadgeEl = document.getElementById(`crComplaintCount_${bookingId}`);
+            if (complaintBadgeEl) {
+                if (complaintCount > 0) {
+                    complaintBadgeEl.textContent = String(complaintCount);
+                    complaintBadgeEl.style.display = 'flex';
+                } else {
+                    complaintBadgeEl.style.display = 'none';
+                }
+            }
+            
+            const requestBadgeEl = document.getElementById(`crRequestCount_${bookingId}`);
+            if (requestBadgeEl) {
+                if (requestCount > 0) {
+                    requestBadgeEl.textContent = String(requestCount);
+                    requestBadgeEl.style.display = 'flex';
+                } else {
+                    requestBadgeEl.style.display = 'none';
                 }
             }
         } catch(_){}
@@ -5764,6 +5830,21 @@ async function loadComplaintRequests(bookingId) {
     } catch (e) {
         console.error('Failed to load complaints/requests:', e);
         renderComplaintRequests(bookingId, []);
+    }
+}
+
+// Load complaint/request counts for all visible booking cards
+async function loadAllBookingCardComplaintCounts() {
+    try {
+        // Get all booking cards on the page
+        const bookingCards = document.querySelectorAll('.card[data-booking-id]');
+        const bookingIds = Array.from(bookingCards).map(card => card.getAttribute('data-booking-id')).filter(Boolean);
+        
+        // Load counts for each booking
+        const promises = bookingIds.map(bookingId => loadComplaintRequests(bookingId));
+        await Promise.all(promises);
+    } catch (e) {
+        console.error('Failed to load booking card complaint counts:', e);
     }
 }
 
