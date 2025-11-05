@@ -212,7 +212,7 @@ function calculateCardVariables(booking) {
 			<div class="dashboard-card naranja">
 				<div class="dashboard-card-header">
 					<div class="dashboard-card-header-title">Complaints/Request/Remarks</div>
-					<span class="info-box-icon push-bottom"><i class="material-icons">cleaning_services</i></span>
+					<span class="info-box-icon push-bottom"><i class="material-icons"></i></span>
 				</div>
 				<div class="dashboard-card-body">
 					<a class="dashboard-btn-row" id="complaintsBtn" style="cursor: pointer;">
@@ -2722,6 +2722,7 @@ async function deleteRequestFromModal(id) {
   transition: all 0.2s ease;
   position: relative;
   overflow: visible;
+  background-color: #6c757d; /* default gray */
 }
 
 .remarks-indicator span {
@@ -2732,21 +2733,14 @@ async function deleteRequestFromModal(id) {
   z-index: 1;
 }
 
-.remarks-indicator.remarks-special {
-  background-color: #ffc107;
-}
+.remarks-indicator.remarks-special { background-color: #6c757d; }
+.remarks-indicator.remarks-memo { background-color: #6c757d; }
+.remarks-indicator.remarks-memo.has-count { background-color: #15812e; }
+.remarks-indicator.remarks-special.has-count { background-color: #ffc107; }
 
-.remarks-indicator.remarks-complaint {
-  background-color: #910714;
-}
-
-.remarks-indicator.remarks-request {
-  background-color: #074588;
-}
-
-.remarks-indicator.remarks-memo {
-  background-color: #15812e;
-}
+/* Only colorize when there is an active count */
+.remarks-indicator.remarks-complaint.has-count { background-color: #910714; }
+.remarks-indicator.remarks-request.has-count { background-color: #074588; }
 
 .remarks-indicator:hover {
   transform: scale(1.05);

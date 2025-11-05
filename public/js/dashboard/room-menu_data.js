@@ -5811,8 +5811,12 @@ async function loadComplaintRequests(bookingId) {
                 if (complaintCount > 0) {
                     complaintBadgeEl.textContent = String(complaintCount);
                     complaintBadgeEl.style.display = 'flex';
+            const indicator = complaintBadgeEl.closest('.remarks-indicator');
+            if (indicator) indicator.classList.add('has-count');
                 } else {
                     complaintBadgeEl.style.display = 'none';
+            const indicator = complaintBadgeEl.closest('.remarks-indicator');
+            if (indicator) indicator.classList.remove('has-count');
                 }
             }
             
@@ -5821,8 +5825,12 @@ async function loadComplaintRequests(bookingId) {
                 if (requestCount > 0) {
                     requestBadgeEl.textContent = String(requestCount);
                     requestBadgeEl.style.display = 'flex';
+            const indicator = requestBadgeEl.closest('.remarks-indicator');
+            if (indicator) indicator.classList.add('has-count');
                 } else {
                     requestBadgeEl.style.display = 'none';
+            const indicator = requestBadgeEl.closest('.remarks-indicator');
+            if (indicator) indicator.classList.remove('has-count');
                 }
             }
         } catch(_){}
@@ -5841,11 +5849,39 @@ async function loadAllBookingCardComplaintCounts() {
         const bookingIds = Array.from(bookingCards).map(card => card.getAttribute('data-booking-id')).filter(Boolean);
         
         // Load counts for each booking
-        const promises = bookingIds.map(bookingId => loadComplaintRequests(bookingId));
-        await Promise.all(promises);
+        const crPromises = bookingIds.map(bookingId => loadComplaintRequests(bookingId));
+        await Promise.all(crPromises);
+
+        // After CR, update Memo indicator coloring based on remarks category
+        const memoPromises = bookingIds.map(bookingId => updateMemoIndicator(bookingId));
+        await Promise.all(memoPromises);
     } catch (e) {
         console.error('Failed to load booking card complaint counts:', e);
     }
+}
+
+// Check remarks and colorize Memo indicator if there is at least one 'Memo' category
+async function updateMemoIndicator(bookingId) {
+    try {
+        const res = await fetch(`/booking/remarks/booking/${bookingId}`);
+        const json = await res.json();
+        const remarks = (json && json.success && Array.isArray(json.remarks)) ? json.remarks : [];
+        const hasMemo = remarks.some(r => String(r.CATEGORY).toLowerCase() === 'memo');
+        const hasNonMemoRemark = remarks.some(r => String(r.CATEGORY).toLowerCase() !== 'memo');
+
+        const card = document.querySelector(`.card[data-booking-id="${bookingId}"]`);
+        if (!card) return;
+        const memoEl = card.querySelector('.remarks-indicator.remarks-memo');
+        if (memoEl) {
+            if (hasMemo) memoEl.classList.add('has-count'); else memoEl.classList.remove('has-count');
+        }
+
+        // S: colorize if there is any non-Memo remark
+        const specialEl = card.querySelector('.remarks-indicator.remarks-special');
+        if (specialEl) {
+            if (hasNonMemoRemark) specialEl.classList.add('has-count'); else specialEl.classList.remove('has-count');
+        }
+    } catch (_) { /* no-op */ }
 }
 
 function parseCRStatusAndText(text) {
