@@ -229,8 +229,8 @@ function calculateCardVariables(booking) {
 							<span class="badge-mini badge-mini--pending"><span class="badge-label">Not Complete</span><span id="requestsPendingCount">0</span></span>
 						</span>
 					</a>
-					<a class="dashboard-btn-row">
-						<span class="dashboard-btn-row-item">Remarks</span>
+                    <a class="dashboard-btn-row" id="remarksBtn" style="cursor: pointer;">
+                        <span class="dashboard-btn-row-item">Remarks</span>
 						<span class="dashboard-btn-row-metric"><span id="remarksTotalCount">0</span></span>
 					</a>
 				</div>
@@ -970,6 +970,15 @@ function calculateCardVariables(booking) {
             });
         }
 
+        // Add click event listener to remarks list button
+        var remarksBtn = document.getElementById('remarksBtn');
+        if (remarksBtn) {
+            remarksBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                openRemarksListModal();
+            });
+        }
+
         // Add click event listener to requests button
         var requestsBtn = document.getElementById('requestsBtn');
         if (requestsBtn) {
@@ -1199,6 +1208,51 @@ function calculateCardVariables(booking) {
     </div>
 </div>
 
+<!-- Remarks List Modal -->
+<div class="modal fade" id="remarksListModal" tabindex="-1" aria-labelledby="remarksListModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(145deg, #2a3135, #1f2528); border-bottom: 1px solid #495057;">
+                <h5 class="modal-title" id="remarksListModalLabel" style="color: #fff;">
+                    <i class="fas fa-sticky-note me-2"></i>
+                    Remarks List
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="background: #2a3135; color: #fff; padding: 25px;">
+                <div id="remarksListContainer">
+                    <div id="remarksLoading" style="text-align: center; padding: 40px;">
+                        <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: #6c757d;"></i>
+                        <p style="margin-top: 15px; color: #adb5bd;">Loading remarks...</p>
+                    </div>
+                    <div id="remarksListContent" style="display: none;">
+                        <div class="table-scrollable">
+                            <table id="remarksTable" class="table table-hover table-bordered full-width">
+                                <thead>
+                                    <tr>
+                                        <th class="text-center">Room</th>
+                                        <th class="text-center">Guest</th>
+                                        <th class="text-center">Category</th>
+                                        <th>Remark</th>
+                                        <th class="text-center">Created</th>
+                                        <th class="text-center">Created By</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div id="remarksEmpty" style="display: none; text-align: center; padding: 40px;">
+                        <i class="fas fa-check-circle" style="font-size: 3rem; color: #6c757d; margin-bottom: 1rem;"></i>
+                        <h4 style="color: #6c757d; margin-bottom: 0.5rem;">No Remarks</h4>
+                        <p style="color: #6c757d; font-size: 0.9rem;">There are no remarks to display.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+</div>
 <!-- Remarks Modal JavaScript Functions -->
 <script>
 // Global variables for remarks modal
@@ -1780,6 +1834,90 @@ function updateRequestsFilterButtons() {
     });
 }
 
+// Remarks List Modal logic
+let remarksDataTable = null;
+
+function openRemarksListModal() {
+    const modal = new bootstrap.Modal(document.getElementById('remarksListModal'));
+    document.getElementById('remarksLoading').style.display = 'block';
+    document.getElementById('remarksListContent').style.display = 'none';
+    document.getElementById('remarksEmpty').style.display = 'none';
+    if (remarksDataTable) {
+        remarksDataTable.destroy();
+        remarksDataTable = null;
+    }
+    modal.show();
+    loadAllRemarks();
+    $('#remarksListModal').on('hidden.bs.modal', function() {
+        if (remarksDataTable) { remarksDataTable.destroy(); remarksDataTable = null; }
+    });
+}
+
+async function loadAllRemarks() {
+    try {
+        const url = window.location.pathname.startsWith('/dashboard') ? '/dashboard/remarks' : '/remarks';
+        const resp = await fetch(url);
+        const result = await resp.json();
+        document.getElementById('remarksLoading').style.display = 'none';
+        const rows = (result && result.success && Array.isArray(result.data)) ? result.data : [];
+        if (!remarksDataTable) initializeRemarksDataTable();
+        remarksDataTable.clear();
+        remarksDataTable.rows.add(rows);
+        remarksDataTable.order([[4, 'desc']]).draw();
+        if (rows.length > 0) {
+            document.getElementById('remarksListContent').style.display = 'block';
+            document.getElementById('remarksEmpty').style.display = 'none';
+        } else {
+            document.getElementById('remarksListContent').style.display = 'none';
+            document.getElementById('remarksEmpty').style.display = 'block';
+        }
+    } catch (e) {
+        console.error('Error loading remarks:', e);
+        document.getElementById('remarksLoading').style.display = 'none';
+        document.getElementById('remarksListContent').style.display = 'none';
+        const empty = document.getElementById('remarksEmpty');
+        empty.style.display = 'block';
+        empty.innerHTML = `
+            <i class="fas fa-exclamation-circle" style="font-size: 3rem; color: #dc3545; margin-bottom: 1rem;"></i>
+            <h4 style="color: #dc3545; margin-bottom: 0.5rem;">Error Loading Remarks</h4>
+            <p style="color: #6c757d; font-size: 0.9rem;">Please try again.</p>
+        `;
+    }
+}
+
+function initializeRemarksDataTable() {
+    remarksDataTable = $('#remarksTable').DataTable({
+        paging: true,
+        pageLength: 10,
+        lengthChange: true,
+        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
+        searching: true,
+        ordering: true,
+        order: [[4, 'desc']],
+        info: true,
+        autoWidth: false,
+        serverSide: false,
+        data: [],
+        columns: [
+            { data: 'ROOM_NUMBER', title: 'Room', className: 'text-center', render: d => d ? `<span style="font-weight: 600;">${d}</span>` : '-' },
+            { data: 'CUSTOMER_NAME', title: 'Guest', className: 'text-center', render: d => d || '-' },
+            { data: 'CATEGORY', title: 'Category', className: 'text-center', render: d => (d || '-').toUpperCase() },
+            { data: 'REMARK_TEXT', title: 'Remark', render: function(d){ const t=d||''; const s=t.length>120?t.slice(0,120)+'...':t; return `<div style="white-space: pre-wrap; word-wrap: break-word; font-size: 13px; line-height: 1.4; max-width: 420px;" title="${(t||'').replace(/"/g,'&quot;')}">${s||'-'}</div>`; } },
+            { data: 'ENCODED_DT', title: 'Created', className: 'text-center', render: function(d){ if(!d) return '-'; return new Date(d).toLocaleString('en-US',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}); } },
+            { data: 'ENCODED_BY_NAME', title: 'Created By', className: 'text-center', render: d => d || '-' }
+        ],
+        language: {
+            emptyTable: 'No remarks available',
+            lengthMenu: 'Show _MENU_ entries',
+            info: 'Showing _START_ to _END_ of _TOTAL_ entries',
+            infoEmpty: 'Showing 0 to 0 of 0 entries',
+            infoFiltered: '(filtered from _MAX_ total entries)',
+            search: 'Search:',
+            paginate: { first: 'First', last: 'Last', next: 'Next', previous: 'Previous' }
+        },
+        dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
+    });
+}
 function filterRequests(filter) {
     currentRequestsFilter = filter;
     updateRequestsFilterButtons();

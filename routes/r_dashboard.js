@@ -35,6 +35,9 @@ router.get('/complaints', DashboardController.getAllComplaints);
 // Get all requests
 router.get('/requests', DashboardController.getAllRequests);
 
+// Get all remarks
+router.get('/remarks', DashboardController.getAllRemarks);
+
 // Late check-out routes
 router.get('/late-check-room', DashboardController.checkLateCheckRoom);
 router.post('/late-checkout', DashboardController.processLateCheckout);

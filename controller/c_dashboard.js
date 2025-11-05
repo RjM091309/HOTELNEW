@@ -190,6 +190,17 @@ class DashboardController {
     }
   }
 
+  // Get all remarks
+  static async getAllRemarks(req, res) {
+    try {
+      const remarks = await DashboardModel.getAllRemarks();
+      res.json({ success: true, data: remarks });
+    } catch (error) {
+      console.error('Error fetching all remarks:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  }
+
   // Check move to occupied controller
   static async checkMoveToOccupied(req, res) {
     try {

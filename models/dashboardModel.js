@@ -833,6 +833,39 @@ class DashboardModel {
     }
   }
 
+  // Get all remarks with booking details
+  static async getAllRemarks() {
+    try {
+      const remarks = await queryDatabasePromise(`
+        SELECT 
+          r.IDNo,
+          r.BOOKING_ID,
+          r.CATEGORY,
+          r.REMARK_TEXT,
+          r.ENCODED_DT,
+          r.EDITDED_DT,
+          r.ENCODED_BY,
+          r.EDITDED_BY,
+          u1.FULLNAME AS ENCODED_BY_NAME,
+          u2.FULLNAME AS EDITDED_BY_NAME,
+          b.ROOM_ID,
+          rm.ROOM_NUMBER,
+          c.NAME AS CUSTOMER_NAME
+        FROM remarks r
+        LEFT JOIN booking b ON r.BOOKING_ID = b.IDNo
+        LEFT JOIN room rm ON b.ROOM_ID = rm.IDNo
+        LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+        LEFT JOIN user_info u1 ON r.ENCODED_BY = u1.IDno
+        LEFT JOIN user_info u2 ON r.EDITDED_BY = u2.IDno
+        WHERE r.ACTIVE = 1
+        ORDER BY r.ENCODED_DT DESC, r.IDNo DESC
+      `);
+      return remarks;
+    } catch (error) {
+      throw error;
+    }
+  }
+
   // Get transfer logs
    // Get transfer logs
   static async getTransferLogs(occupiedRoomDetails) {
