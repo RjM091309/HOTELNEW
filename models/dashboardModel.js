@@ -761,6 +761,78 @@ class DashboardModel {
     }
   }
 
+  // Get all complaints with booking details
+  static async getAllComplaints() {
+    try {
+      const complaints = await queryDatabasePromise(`
+        SELECT 
+          cr.IDNo,
+          cr.BOOKING_ID,
+          cr.TYPE,
+          cr.DETAILS,
+          cr.STATUS,
+          cr.ENCODED_DT,
+          cr.COMPLETED_DT,
+          cr.ENCODED_BY,
+          cr.COMPLETED_BY,
+          u1.FULLNAME AS ENCODED_BY_NAME,
+          u3.FULLNAME AS COMPLETED_BY_NAME,
+          b.ROOM_ID,
+          r.ROOM_NUMBER,
+          c.NAME AS CUSTOMER_NAME,
+          b.CHECK_IN_DATE,
+          b.CHECK_OUT_DATE
+        FROM complaint_request cr
+        LEFT JOIN booking b ON cr.BOOKING_ID = b.IDNo
+        LEFT JOIN room r ON b.ROOM_ID = r.IDNo
+        LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+        LEFT JOIN user_info u1 ON cr.ENCODED_BY = u1.IDno
+        LEFT JOIN user_info u3 ON cr.COMPLETED_BY = u3.IDno
+        WHERE cr.TYPE = 'complaint' AND cr.ACTIVE = 1
+        ORDER BY cr.ENCODED_DT DESC, cr.IDNo DESC
+      `);
+      return complaints;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Get all requests with booking details
+  static async getAllRequests() {
+    try {
+      const requests = await queryDatabasePromise(`
+        SELECT 
+          cr.IDNo,
+          cr.BOOKING_ID,
+          cr.TYPE,
+          cr.DETAILS,
+          cr.STATUS,
+          cr.ENCODED_DT,
+          cr.COMPLETED_DT,
+          cr.ENCODED_BY,
+          cr.COMPLETED_BY,
+          u1.FULLNAME AS ENCODED_BY_NAME,
+          u3.FULLNAME AS COMPLETED_BY_NAME,
+          b.ROOM_ID,
+          r.ROOM_NUMBER,
+          c.NAME AS CUSTOMER_NAME,
+          b.CHECK_IN_DATE,
+          b.CHECK_OUT_DATE
+        FROM complaint_request cr
+        LEFT JOIN booking b ON cr.BOOKING_ID = b.IDNo
+        LEFT JOIN room r ON b.ROOM_ID = r.IDNo
+        LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+        LEFT JOIN user_info u1 ON cr.ENCODED_BY = u1.IDno
+        LEFT JOIN user_info u3 ON cr.COMPLETED_BY = u3.IDno
+        WHERE cr.TYPE = 'request' AND cr.ACTIVE = 1
+        ORDER BY cr.ENCODED_DT DESC, cr.IDNo DESC
+      `);
+      return requests;
+    } catch (error) {
+      throw error;
+    }
+  }
+
   // Get transfer logs
    // Get transfer logs
   static async getTransferLogs(occupiedRoomDetails) {

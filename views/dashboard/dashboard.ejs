@@ -215,14 +215,14 @@ function calculateCardVariables(booking) {
 					<span class="info-box-icon push-bottom"><i class="material-icons">cleaning_services</i></span>
 				</div>
 				<div class="dashboard-card-body">
-					<a class="dashboard-btn-row">
+					<a class="dashboard-btn-row" id="complaintsBtn" style="cursor: pointer;">
 						<span class="dashboard-btn-row-item">Complaints</span>
 						<span class="dashboard-btn-row-metric">
 							<span class="badge-mini badge-mini--completed"><span class="badge-label">Completed</span><span id="complaintsCompletedCount">0</span></span>
 							<span class="badge-mini badge-mini--pending"><span class="badge-label">Not Complete</span><span id="complaintsPendingCount">0</span></span>
 						</span>
 					</a>
-					<a class="dashboard-btn-row">
+					<a class="dashboard-btn-row" id="requestsBtn" style="cursor: pointer;">
 						<span class="dashboard-btn-row-item">Requests</span>
 						<span class="dashboard-btn-row-metric">
 							<span class="badge-mini badge-mini--completed"><span class="badge-label">Completed</span><span id="requestsCompletedCount">0</span></span>
@@ -960,6 +960,38 @@ function calculateCardVariables(booking) {
 				window.loadAllBookingCardComplaintCounts();
 			}
 		}, 1000);
+
+        // Add click event listener to complaints button
+        var complaintsBtn = document.getElementById('complaintsBtn');
+        if (complaintsBtn) {
+            complaintsBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                openComplaintsModal();
+            });
+        }
+
+        // Add click event listener to requests button
+        var requestsBtn = document.getElementById('requestsBtn');
+        if (requestsBtn) {
+            requestsBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                openRequestsModal();
+            });
+        }
+
+        // Add click event listeners to filter buttons
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.btn-filter')) {
+                var filterBtn = e.target.closest('.btn-filter');
+                var filter = filterBtn.getAttribute('data-filter');
+                // Check if it's from complaints or requests modal
+                if (filterBtn.closest('#complaintsFilters')) {
+                    filterComplaints(filter);
+                } else if (filterBtn.closest('#requestsFilters')) {
+                    filterRequests(filter);
+                }
+            }
+        });
 	});
 </script>
 
@@ -1032,6 +1064,141 @@ function calculateCardVariables(booking) {
     </div>
 </div>
 
+<!-- Complaints Modal -->
+<div class="modal fade" id="complaintsModal" tabindex="-1" aria-labelledby="complaintsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(145deg, #2a3135, #1f2528); border-bottom: 1px solid #495057;">
+                <h5 class="modal-title" id="complaintsModalLabel" style="color: #fff;">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Complaints List
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="background: #2a3135; color: #fff; padding: 25px;">
+                <!-- Filter Buttons -->
+                <div id="complaintsFilters" style="display: none; margin-bottom: 20px;">
+                    <div class="filter-btn-group" role="group">
+                        <button type="button" class="filter-btn btn-filter active" data-filter="all">
+                            All (<span id="totalCount">0</span>)
+                        </button>
+                        <button type="button" class="filter-btn btn-filter" data-filter="completed">
+                            Completed
+                        </button>
+                        <button type="button" class="filter-btn btn-filter" data-filter="not-completed">
+                            Not Complete
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="complaintsListContainer">
+                    <div id="complaintsLoading" style="text-align: center; padding: 40px;">
+                        <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: #6c757d;"></i>
+                        <p style="margin-top: 15px; color: #adb5bd;">Loading complaints...</p>
+                    </div>
+                    <div id="complaintsListContent" style="display: none;">
+                        <div class="table-scrollable">
+                            <table id="complaintsTable" class="table table-hover table-bordered full-width">
+                                <thead>
+                                    <tr>
+                                        <th class="text-center">Room</th>
+                                        <th class="text-center">Guest</th>
+                                        <th>Details</th>
+                                        <th class="text-center">Status</th>
+                                        <th class="text-center">Created</th>
+                                        <th class="text-center">Created By</th>
+                                        <th class="text-center">Completed By</th>
+                                        <th class="text-center">Completed</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- DataTables will populate this -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div id="complaintsEmpty" style="display: none; text-align: center; padding: 40px;">
+                        <i class="fas fa-check-circle" style="font-size: 3rem; color: #6c757d; margin-bottom: 1rem;"></i>
+                        <h4 style="color: #6c757d; margin-bottom: 0.5rem;">No Complaints</h4>
+                        <p style="color: #6c757d; font-size: 0.9rem;">There are no complaints to display.</p>
+                    </div>
+                </div>
+            </div>
+            <!-- <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style=" font-weight: 600;">
+                    <i class="fas fa-times me-2"></i>Close
+                </button>
+            </div> -->
+        </div>
+    </div>
+</div>
+
+<!-- Requests Modal -->
+<div class="modal fade" id="requestsModal" tabindex="-1" aria-labelledby="requestsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(145deg, #2a3135, #1f2528); border-bottom: 1px solid #495057;">
+                <h5 class="modal-title" id="requestsModalLabel" style="color: #fff;">
+                    <i class="fas fa-clipboard-list me-2"></i>
+                    Requests List
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="background: #2a3135; color: #fff; padding: 25px;">
+                <!-- Filter Buttons -->
+                <div id="requestsFilters" style="display: none; margin-bottom: 20px;">
+                    <div class="filter-btn-group" role="group">
+                        <button type="button" class="filter-btn btn-filter active" data-filter="all">
+                            All (<span id="requestsTotalCount">0</span>)
+                        </button>
+                        <button type="button" class="filter-btn btn-filter" data-filter="completed">
+                            Completed
+                        </button>
+                        <button type="button" class="filter-btn btn-filter" data-filter="not-completed">
+                            Not Complete
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="requestsListContainer">
+                    <div id="requestsLoading" style="text-align: center; padding: 40px;">
+                        <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: #6c757d;"></i>
+                        <p style="margin-top: 15px; color: #adb5bd;">Loading requests...</p>
+                    </div>
+                    <div id="requestsListContent" style="display: none;">
+                        <div class="table-scrollable">
+                            <table id="requestsTable" class="table table-hover table-bordered full-width">
+                                <thead>
+                                    <tr>
+                                        <th class="text-center">Room</th>
+                                        <th class="text-center">Guest</th>
+                                        <th>Details</th>
+                                        <th class="text-center">Status</th>
+                                        <th class="text-center">Created</th>
+                                        <th class="text-center">Created By</th>
+                                        <th class="text-center">Completed By</th>
+                                        <th class="text-center">Completed</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- DataTables will populate this -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div id="requestsEmpty" style="display: none; text-align: center; padding: 40px;">
+                        <i class="fas fa-check-circle" style="font-size: 3rem; color: #6c757d; margin-bottom: 1rem;"></i>
+                        <h4 style="color: #6c757d; margin-bottom: 0.5rem;">No Requests</h4>
+                        <p style="color: #6c757d; font-size: 0.9rem;">There are no requests to display.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Remarks Modal JavaScript Functions -->
 <script>
 // Global variables for remarks modal
@@ -1092,7 +1259,937 @@ function openRemarksModalFromData(element) {
     openRemarksModal(bookingId, roomNumber, customerName, currentRemarks);
 }
 
- 
+// Complaints Modal Functions
+let allComplaintsData = []; // Store all complaints data
+let currentFilter = 'all'; // Current filter state
+let complaintsDataTable = null; // DataTable instance
+
+function openComplaintsModal() {
+    const modal = new bootstrap.Modal(document.getElementById('complaintsModal'));
+    
+    // Show loading state
+    document.getElementById('complaintsLoading').style.display = 'block';
+    document.getElementById('complaintsListContent').style.display = 'none';
+    document.getElementById('complaintsEmpty').style.display = 'none';
+    document.getElementById('complaintsFilters').style.display = 'none';
+    
+    // Reset filter to 'all'
+    currentFilter = 'all';
+    updateFilterButtons();
+    
+    // Destroy existing DataTable if it exists
+    if (complaintsDataTable) {
+        complaintsDataTable.destroy();
+        complaintsDataTable = null;
+    }
+    
+    // Show modal
+    modal.show();
+    
+    // Load complaints
+    loadAllComplaints();
+    
+    // Destroy DataTable when modal is closed
+    $('#complaintsModal').on('hidden.bs.modal', function() {
+        if (complaintsDataTable) {
+            complaintsDataTable.destroy();
+            complaintsDataTable = null;
+        }
+    });
+}
+
+function updateFilterButtons() {
+    const buttons = document.querySelectorAll('#complaintsFilters .btn-filter');
+    buttons.forEach(btn => {
+        if (btn.getAttribute('data-filter') === currentFilter) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+}
+
+function filterComplaints(filter) {
+    currentFilter = filter;
+    updateFilterButtons();
+    
+    let filteredData = [];
+    
+    if (filter === 'all') {
+        filteredData = allComplaintsData;
+    } else if (filter === 'completed') {
+        filteredData = allComplaintsData.filter(c => Number(c.STATUS) === 1);
+    } else if (filter === 'not-completed') {
+        filteredData = allComplaintsData.filter(c => Number(c.STATUS) === 0);
+    }
+    
+    // Update count
+    document.getElementById('totalCount').textContent = allComplaintsData.length;
+    
+    // Update DataTable with filtered data
+    if (complaintsDataTable) {
+        complaintsDataTable.clear();
+        complaintsDataTable.rows.add(filteredData);
+        complaintsDataTable.order([[4, 'asc']]).draw(); // Always sort by Created date descending (latest first)
+        
+        if (filteredData.length > 0) {
+            document.getElementById('complaintsListContent').style.display = 'block';
+            document.getElementById('complaintsEmpty').style.display = 'none';
+        } else {
+            document.getElementById('complaintsListContent').style.display = 'none';
+            document.getElementById('complaintsEmpty').style.display = 'block';
+        }
+    } else {
+        // Render filtered data (fallback if DataTable not initialized)
+        if (filteredData.length > 0) {
+            renderComplaintsList(filteredData);
+            document.getElementById('complaintsListContent').style.display = 'block';
+            document.getElementById('complaintsEmpty').style.display = 'none';
+        } else {
+            document.getElementById('complaintsListContent').style.display = 'none';
+            document.getElementById('complaintsEmpty').style.display = 'block';
+        }
+    }
+}
+
+async function loadAllComplaints() {
+    try {
+        const url = window.location.pathname.startsWith('/dashboard') 
+            ? '/dashboard/complaints' 
+            : '/complaints';
+        
+        const response = await fetch(url);
+        const result = await response.json();
+        
+        // Hide loading
+        document.getElementById('complaintsLoading').style.display = 'none';
+        
+        if (result.success && result.data && result.data.length > 0) {
+            // Store all complaints data
+            allComplaintsData = result.data;
+            
+            // Show filters
+            const filtersDiv = document.getElementById('complaintsFilters');
+            filtersDiv.style.display = 'block';
+            
+            // Update count
+            document.getElementById('totalCount').textContent = result.data.length;
+            
+            // Initialize DataTable if not already initialized
+            if (!complaintsDataTable) {
+                initializeComplaintsDataTable();
+            }
+            
+            // Apply current filter
+            filterComplaints(currentFilter);
+        } else {
+            document.getElementById('complaintsFilters').style.display = 'none';
+            document.getElementById('complaintsListContent').style.display = 'none';
+            document.getElementById('complaintsEmpty').style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error loading complaints:', error);
+        document.getElementById('complaintsLoading').style.display = 'none';
+        document.getElementById('complaintsFilters').style.display = 'none';
+        document.getElementById('complaintsListContent').style.display = 'none';
+        document.getElementById('complaintsEmpty').style.display = 'block';
+        document.getElementById('complaintsEmpty').innerHTML = `
+            <i class="fas fa-exclamation-circle" style="font-size: 3rem; color: #dc3545; margin-bottom: 1rem;"></i>
+            <h4 style="color: #dc3545; margin-bottom: 0.5rem;">Error Loading Complaints</h4>
+            <p style="color: #6c757d; font-size: 0.9rem;">Failed to load complaints. Please try again.</p>
+        `;
+    }
+}
+
+function renderComplaintsList(complaints) {
+    // This function is kept as fallback but DataTable will handle rendering
+    if (complaintsDataTable) {
+        complaintsDataTable.clear();
+        complaintsDataTable.rows.add(complaints);
+        complaintsDataTable.draw();
+    }
+}
+
+function initializeComplaintsDataTable() {
+    complaintsDataTable = $('#complaintsTable').DataTable({
+        paging: true,
+        pageLength: 10,
+        lengthChange: true,
+        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+        searching: true,
+        ordering: true,
+        order: [[4, 'desc']], // Sort by Created date descending
+        info: true,
+        autoWidth: false,
+        serverSide: false,
+        data: [],
+        columns: [
+            {
+                data: 'ROOM_NUMBER',
+                title: 'Room',
+                className: 'text-center',
+                render: function(data) {
+                    return data ? `<span style="font-weight: 600;">${data}</span>` : '-';
+                }
+            },
+            {
+                data: 'CUSTOMER_NAME',
+                title: 'Guest',
+                className: 'text-center',
+                render: function(data) {
+                    return data || '-';
+                }
+            },
+            {
+                data: 'DETAILS',
+                title: 'Details',
+                render: function(data) {
+                    const details = data || 'No details provided';
+                    const truncatedDetails = details.length > 100 ? details.substring(0, 100) + '...' : details;
+                    return `<div style="white-space: pre-wrap; word-wrap: break-word; font-size: 13px; line-height: 1.4; max-width: 300px;" title="${(details || '').replace(/"/g, '&quot;')}">${truncatedDetails}</div>`;
+                }
+            },
+            {
+                data: 'STATUS',
+                title: 'Status',
+                className: 'text-center',
+                render: function(data, type, row) {
+                    const status = Number(row.STATUS) === 1 ? 'COMPLETED' : 'NOT COMPLETE';
+                    const statusClass = Number(row.STATUS) === 1 ? 'label-success' : 'label-danger';
+                    return `<div style="text-align: center;"><span class="label label-sm ${statusClass} complaints-status-badge">${status}</span></div>`;
+                }
+            },
+            {
+                data: 'ENCODED_DT',
+                title: 'Created',
+                className: 'text-center',
+                render: function(data) {
+                    if (!data) return 'N/A';
+                    return new Date(data).toLocaleString('en-US', { 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric', 
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        hour12: false
+                    });
+                }
+            },
+            {
+                data: 'ENCODED_BY_NAME',
+                title: 'Created By',
+                className: 'text-center',
+                render: function(data) {
+                    return data || '-';
+                }
+            },
+            {
+                data: 'COMPLETED_BY_NAME',
+                title: 'Completed By',
+                className: 'text-center',
+                render: function(data) {
+                    return data || '-';
+                }
+            },
+            {
+                data: 'COMPLETED_DT',
+                title: 'Completed',
+                className: 'text-center',
+                render: function(data) {
+                    if (!data) return '-';
+                    return new Date(data).toLocaleString('en-US', { 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric', 
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        hour12: false
+                    });
+                }
+            },
+            {
+                data: null,
+                title: 'Actions',
+                className: 'text-center',
+                orderable: false,
+                searchable: false,
+                render: function(data, type, row) {
+                    const status = Number(row.STATUS) === 1 ? 1 : 0;
+                    const markAction = status === 1
+                        ? `<i class="fas fa-undo-alt text-warning" title="Mark Not Complete" style="cursor:pointer; margin: 0 5px;" onclick="toggleComplaintStatus(${row.IDNo}, 0)"></i>`
+                        : `<i class="fas fa-check-circle text-success" title="Mark Completed" style="cursor:pointer; margin: 0 5px;" onclick="toggleComplaintStatus(${row.IDNo}, 1)"></i>`;
+                    
+                    // Escape details for use in JavaScript string
+                    const detailsEscaped = String(row.DETAILS || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n').replace(/\r/g, '');
+                    const typeEscaped = String(row.TYPE || 'complaint').toLowerCase();
+                    return `
+                        <i class="fas fa-edit text-primary" title="Edit" style="cursor:pointer; margin: 0 5px;" onclick="editComplaintFromModal(${row.IDNo}, '${typeEscaped}', '${detailsEscaped}')"></i>
+                        ${markAction}
+                        <i class="fas fa-trash text-danger" title="Delete" style="cursor:pointer; margin: 0 5px;" onclick="deleteComplaintFromModal(${row.IDNo})"></i>
+                    `;
+                }
+            }
+        ],
+        rowCallback: function(row, data) {
+            if (Number(data.STATUS) === 0) {
+                $(row).css('background-color', 'rgba(220, 53, 69, 0.1)');
+            }
+        },
+        language: {
+            emptyTable: "No complaints available",
+            lengthMenu: "Show _MENU_ entries",
+            info: "Showing _START_ to _END_ of _TOTAL_ entries",
+            infoEmpty: "Showing 0 to 0 of 0 entries",
+            infoFiltered: "(filtered from _MAX_ total entries)",
+            search: "Search:",
+            paginate: {
+                first: "First",
+                last: "Last",
+                next: "Next",
+                previous: "Previous"
+            }
+        },
+        dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
+    });
+}
+
+// Complaints Actions Functions
+async function editComplaintFromModal(id, type, details) {
+    const modalId = `editComplaintModal_${id}`;
+    const existing = document.getElementById(modalId);
+    if (existing) existing.remove();
+    
+    // Decode HTML entities and escape sequences
+    const decodedDetails = details
+        .replace(/&quot;/g, '"')
+        .replace(/\\n/g, '\n')
+        .replace(/\\r/g, '\r')
+        .replace(/\\\\/g, '\\')
+        .replace(/\\'/g, "'");
+    
+    const html = `
+    <div class="modal fade" id="${modalId}" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 500px;">
+            <div class="modal-content" style="background-color:#2a3135; color:#fff; border:1px solid #495057;">
+                <div class="modal-header" style="background-color:#2a3135; border-bottom:1px solid #495057;">
+                    <h5 class="modal-title" style="color:#fff;"><i class="fas fa-edit me-2"></i>Edit Complaint/Request</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" style="background-color:#2a3135;">
+                    <div class="mb-3">
+                        <label class="form-label" style="color:#fff;">Type</label>
+                        <select class="form-select" id="complaintEditType_${id}" style="background-color:#41474c; color:#fff; border:1px solid #495057;">
+                            <option value="complaint" ${type === 'complaint' ? 'selected' : ''}>Complaint</option>
+                            <option value="request" ${type === 'request' ? 'selected' : ''}>Request</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="color:#fff;">Details</label>
+                        <textarea class="form-control" id="complaintEditDetails_${id}" rows="4" style="background-color:#41474c; color:#fff; border:1px solid #495057;">${decodedDetails.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer" style="background-color:#2a3135; border-top:1px solid #495057;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="updateComplaintFromModal(${id})">Update</button>
+                </div>
+            </div>
+        </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+    const modal = new bootstrap.Modal(document.getElementById(modalId));
+    modal.show();
+}
+
+async function updateComplaintFromModal(id) {
+    const type = document.getElementById(`complaintEditType_${id}`).value;
+    const details = document.getElementById(`complaintEditDetails_${id}`).value.trim();
+    if (!type || !details) {
+        if (typeof toastError === 'function') {
+            toastError('Error', 'Please fill all fields');
+        } else {
+            alert('Please fill all fields');
+        }
+        return;
+    }
+    try {
+        const resp = await fetch(`/booking/complaint-request/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: type, details: details })
+        });
+        const result = await resp.json();
+        if (!result.success) throw new Error(result.message || 'Failed');
+        
+        // Close edit modal
+        const editModal = bootstrap.Modal.getInstance(document.getElementById(`editComplaintModal_${id}`));
+        if (editModal) editModal.hide();
+        
+        // Reload complaints data
+        await loadAllComplaints();
+        
+        if (typeof toastSuccess === 'function') {
+            toastSuccess('Updated', 'Complaint updated');
+        } else {
+            alert('Complaint updated');
+        }
+    } catch (e) {
+        console.error('Update complaint failed:', e);
+        if (typeof toastError === 'function') {
+            toastError('Error', 'Could not update complaint');
+        } else {
+            alert('Could not update complaint');
+        }
+    }
+}
+
+async function toggleComplaintStatus(id, toStatus) {
+    try {
+        // Confirm action
+        if (typeof Swal !== 'undefined') {
+            const verb = Number(toStatus) === 1 ? 'mark as completed' : 'mark as not complete';
+            const res = await Swal.fire({
+                title: 'Are you sure?',
+                text: `Do you want to ${verb}?`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Yes',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#6f9c40',
+                cancelButtonColor: '#6c757d'
+            });
+            if (!res.isConfirmed) return;
+        } else if (!confirm('Continue with this change?')) {
+            return;
+        }
+
+        const upd = await fetch(`/booking/complaint-request/${id}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: Number(toStatus) })
+        });
+        const ok = await upd.json();
+        if (!ok.success) throw new Error(ok.message || 'Failed');
+        
+        // Reload complaints data
+        await loadAllComplaints();
+        
+        if (typeof toastSuccess === 'function') {
+            toastSuccess('Updated', 'Status updated');
+        } else {
+            alert('Status updated');
+        }
+    } catch (e) {
+        console.error('Toggle status failed:', e);
+        if (typeof toastError === 'function') {
+            toastError('Error', 'Could not update status');
+        } else {
+            alert('Could not update status');
+        }
+    }
+}
+
+async function deleteComplaintFromModal(id) {
+    try {
+        // Confirm deletion
+        if (typeof Swal !== 'undefined') {
+            const res = await Swal.fire({
+                title: 'Delete this complaint?',
+                text: 'This action cannot be undone.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Delete',
+                cancelButtonText: 'Cancel'
+            });
+            if (!res.isConfirmed) return;
+        } else if (!confirm('Delete this complaint?')) {
+            return;
+        }
+
+        const del = await fetch(`/booking/complaint-request/${id}`, {
+            method: 'DELETE'
+        });
+        const ok = await del.json();
+        if (!ok.success) throw new Error(ok.message || 'Failed');
+        
+        // Reload complaints data
+        await loadAllComplaints();
+        
+        if (typeof toastSuccess === 'function') {
+            toastSuccess('Deleted', 'Complaint deleted');
+        } else {
+            alert('Complaint deleted');
+        }
+    } catch (e) {
+        console.error('Delete complaint failed:', e);
+        if (typeof toastError === 'function') {
+            toastError('Error', 'Could not delete complaint');
+        } else {
+            alert('Could not delete complaint');
+        }
+    }
+}
+
+// Requests Modal Functions
+let allRequestsData = []; // Store all requests data
+let currentRequestsFilter = 'all'; // Current filter state
+let requestsDataTable = null; // DataTable instance
+
+function openRequestsModal() {
+    const modal = new bootstrap.Modal(document.getElementById('requestsModal'));
+    
+    // Show loading state
+    document.getElementById('requestsLoading').style.display = 'block';
+    document.getElementById('requestsListContent').style.display = 'none';
+    document.getElementById('requestsEmpty').style.display = 'none';
+    document.getElementById('requestsFilters').style.display = 'none';
+    
+    // Reset filter to 'all'
+    currentRequestsFilter = 'all';
+    updateRequestsFilterButtons();
+    
+    // Destroy existing DataTable if it exists
+    if (requestsDataTable) {
+        requestsDataTable.destroy();
+        requestsDataTable = null;
+    }
+    
+    // Show modal
+    modal.show();
+    
+    // Load requests
+    loadAllRequests();
+    
+    // Destroy DataTable when modal is closed
+    $('#requestsModal').on('hidden.bs.modal', function() {
+        if (requestsDataTable) {
+            requestsDataTable.destroy();
+            requestsDataTable = null;
+        }
+    });
+}
+
+function updateRequestsFilterButtons() {
+    const buttons = document.querySelectorAll('#requestsFilters .btn-filter');
+    buttons.forEach(btn => {
+        if (btn.getAttribute('data-filter') === currentRequestsFilter) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+}
+
+function filterRequests(filter) {
+    currentRequestsFilter = filter;
+    updateRequestsFilterButtons();
+    
+    let filteredData = [];
+    
+    if (filter === 'all') {
+        filteredData = allRequestsData;
+    } else if (filter === 'completed') {
+        filteredData = allRequestsData.filter(r => Number(r.STATUS) === 1);
+    } else if (filter === 'not-completed') {
+        filteredData = allRequestsData.filter(r => Number(r.STATUS) === 0);
+    }
+    
+    // Update count
+    document.getElementById('requestsTotalCount').textContent = allRequestsData.length;
+    
+    // Update DataTable with filtered data
+    if (requestsDataTable) {
+        requestsDataTable.clear();
+        requestsDataTable.rows.add(filteredData);
+        requestsDataTable.order([[4, 'desc']]).draw(); // Always sort by Created date descending (latest first)
+        
+        if (filteredData.length > 0) {
+            document.getElementById('requestsListContent').style.display = 'block';
+            document.getElementById('requestsEmpty').style.display = 'none';
+        } else {
+            document.getElementById('requestsListContent').style.display = 'none';
+            document.getElementById('requestsEmpty').style.display = 'block';
+        }
+    } else {
+        // Render filtered data (fallback if DataTable not initialized)
+        if (filteredData.length > 0) {
+            document.getElementById('requestsListContent').style.display = 'block';
+            document.getElementById('requestsEmpty').style.display = 'none';
+        } else {
+            document.getElementById('requestsListContent').style.display = 'none';
+            document.getElementById('requestsEmpty').style.display = 'block';
+        }
+    }
+}
+
+async function loadAllRequests() {
+    try {
+        const url = window.location.pathname.startsWith('/dashboard')
+            ? '/dashboard/requests'
+            : '/requests';
+
+        const response = await fetch(url);
+        const result = await response.json();
+
+        // Hide loading
+        document.getElementById('requestsLoading').style.display = 'none';
+
+        if (result.success && result.data && result.data.length > 0) {
+            // Store all requests data
+            allRequestsData = result.data;
+
+            // Show filters
+            const filtersDiv = document.getElementById('requestsFilters');
+            filtersDiv.style.display = 'block';
+
+            // Update count
+            document.getElementById('requestsTotalCount').textContent = result.data.length;
+
+            // Initialize DataTable if not already initialized
+            if (!requestsDataTable) {
+                initializeRequestsDataTable();
+            }
+
+            // Apply current filter
+            filterRequests(currentRequestsFilter);
+        } else {
+            document.getElementById('requestsFilters').style.display = 'none';
+            document.getElementById('requestsListContent').style.display = 'none';
+            document.getElementById('requestsEmpty').style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error loading requests:', error);
+        document.getElementById('requestsLoading').style.display = 'none';
+        document.getElementById('requestsFilters').style.display = 'none';
+        document.getElementById('requestsListContent').style.display = 'none';
+        document.getElementById('requestsEmpty').style.display = 'block';
+        document.getElementById('requestsEmpty').innerHTML = `
+            <i class="fas fa-exclamation-circle" style="font-size: 3rem; color: #dc3545; margin-bottom: 1rem;"></i>
+            <h4 style="color: #dc3545; margin-bottom: 0.5rem;">Error Loading Requests</h4>
+            <p style="color: #6c757d; font-size: 0.9rem;">Failed to load requests. Please try again.</p>
+        `;
+    }
+}
+
+function initializeRequestsDataTable() {
+    requestsDataTable = $('#requestsTable').DataTable({
+        paging: true,
+        pageLength: 10,
+        lengthChange: true,
+        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+        searching: true,
+        ordering: true,
+        order: [[4, 'desc']], // Sort by Created date descending
+        info: true,
+        autoWidth: false,
+        serverSide: false,
+        data: [],
+        columns: [
+            {
+                data: 'ROOM_NUMBER',
+                title: 'Room',
+                className: 'text-center',
+                render: function(data) {
+                    return data ? `<span style="font-weight: 600;">${data}</span>` : '-';
+                }
+            },
+            {
+                data: 'CUSTOMER_NAME',
+                title: 'Guest',
+                className: 'text-center',
+                render: function(data) {
+                    return data || '-';
+                }
+            },
+            {
+                data: 'DETAILS',
+                title: 'Details',
+                render: function(data) {
+                    const details = data || 'No details provided';
+                    const truncatedDetails = details.length > 100 ? details.substring(0, 100) + '...' : details;
+                    return `<div style="white-space: pre-wrap; word-wrap: break-word; font-size: 13px; line-height: 1.4; max-width: 300px;" title="${(details || '').replace(/"/g, '&quot;')}">${truncatedDetails}</div>`;
+                }
+            },
+            {
+                data: 'STATUS',
+                title: 'Status',
+                className: 'text-center',
+                render: function(data, type, row) {
+                    const status = Number(row.STATUS) === 1 ? 'COMPLETED' : 'NOT COMPLETE';
+                    const statusClass = Number(row.STATUS) === 1 ? 'label-success' : 'label-danger';
+                    return `<div style="text-align: center;"><span class="label label-sm ${statusClass} complaints-status-badge">${status}</span></div>`;
+                }
+            },
+            {
+                data: 'ENCODED_DT',
+                title: 'Created',
+                className: 'text-center',
+                render: function(data) {
+                    if (!data) return 'N/A';
+                    return new Date(data).toLocaleString('en-US', { 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric', 
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        hour12: false
+                    });
+                }
+            },
+            {
+                data: 'ENCODED_BY_NAME',
+                title: 'Created By',
+                className: 'text-center',
+                render: function(data) {
+                    return data || '-';
+                }
+            },
+            {
+                data: 'COMPLETED_BY_NAME',
+                title: 'Completed By',
+                className: 'text-center',
+                render: function(data) {
+                    return data || '-';
+                }
+            },
+            {
+                data: 'COMPLETED_DT',
+                title: 'Completed',
+                className: 'text-center',
+                render: function(data) {
+                    if (!data) return '-';
+                    return new Date(data).toLocaleString('en-US', { 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric', 
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        hour12: false
+                    });
+                }
+            },
+            {
+                data: null,
+                title: 'Actions',
+                className: 'text-center',
+                orderable: false,
+                searchable: false,
+                render: function(data, type, row) {
+                    const status = Number(row.STATUS) === 1 ? 1 : 0;
+                    const markAction = status === 1
+                        ? `<i class="fas fa-undo-alt text-warning" title="Mark Not Complete" style="cursor:pointer; margin: 0 5px;" onclick="toggleRequestStatus(${row.IDNo}, 0)"></i>`
+                        : `<i class="fas fa-check-circle text-success" title="Mark Completed" style="cursor:pointer; margin: 0 5px;" onclick="toggleRequestStatus(${row.IDNo}, 1)"></i>`;
+                    
+                    // Escape details for use in JavaScript string
+                    const detailsEscaped = String(row.DETAILS || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n').replace(/\r/g, '');
+                    const typeEscaped = String(row.TYPE || 'request').toLowerCase();
+                    return `
+                        <i class="fas fa-edit text-primary" title="Edit" style="cursor:pointer; margin: 0 5px;" onclick="editRequestFromModal(${row.IDNo}, '${typeEscaped}', '${detailsEscaped}')"></i>
+                        ${markAction}
+                        <i class="fas fa-trash text-danger" title="Delete" style="cursor:pointer; margin: 0 5px;" onclick="deleteRequestFromModal(${row.IDNo})"></i>
+                    `;
+                }
+            }
+        ],
+        rowCallback: function(row, data) {
+            if (Number(data.STATUS) === 0) {
+                $(row).css('background-color', 'rgba(220, 53, 69, 0.1)');
+            }
+        },
+        language: {
+            emptyTable: "No requests available",
+            lengthMenu: "Show _MENU_ entries",
+            info: "Showing _START_ to _END_ of _TOTAL_ entries",
+            infoEmpty: "Showing 0 to 0 of 0 entries",
+            infoFiltered: "(filtered from _MAX_ total entries)",
+            search: "Search:",
+            paginate: {
+                first: "First",
+                last: "Last",
+                next: "Next",
+                previous: "Previous"
+            }
+        },
+        dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
+    });
+}
+
+// Requests Actions Functions
+async function editRequestFromModal(id, type, details) {
+    const modalId = `editRequestModal_${id}`;
+    const existing = document.getElementById(modalId);
+    if (existing) existing.remove();
+    
+    // Decode HTML entities and escape sequences
+    const decodedDetails = details
+        .replace(/&quot;/g, '"')
+        .replace(/\\n/g, '\n')
+        .replace(/\\r/g, '\r')
+        .replace(/\\\\/g, '\\')
+        .replace(/\\'/g, "'");
+    
+    const html = `
+    <div class="modal fade" id="${modalId}" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 500px;">
+            <div class="modal-content" style="background-color:#2a3135; color:#fff; border:1px solid #495057;">
+                <div class="modal-header" style="background-color:#2a3135; border-bottom:1px solid #495057;">
+                    <h5 class="modal-title" style="color:#fff;"><i class="fas fa-edit me-2"></i>Edit Complaint/Request</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" style="background-color:#2a3135;">
+                    <div class="mb-3">
+                        <label class="form-label" style="color:#fff;">Type</label>
+                        <select class="form-select" id="requestEditType_${id}" style="background-color:#41474c; color:#fff; border:1px solid #495057;">
+                            <option value="complaint" ${type === 'complaint' ? 'selected' : ''}>Complaint</option>
+                            <option value="request" ${type === 'request' ? 'selected' : ''}>Request</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="color:#fff;">Details</label>
+                        <textarea class="form-control" id="requestEditDetails_${id}" rows="4" style="background-color:#41474c; color:#fff; border:1px solid #495057;">${decodedDetails.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer" style="background-color:#2a3135; border-top:1px solid #495057;">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="updateRequestFromModal(${id})">Update</button>
+                </div>
+            </div>
+        </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+    const modal = new bootstrap.Modal(document.getElementById(modalId));
+    modal.show();
+}
+
+async function updateRequestFromModal(id) {
+    const type = document.getElementById(`requestEditType_${id}`).value;
+    const details = document.getElementById(`requestEditDetails_${id}`).value.trim();
+    if (!type || !details) {
+        if (typeof toastError === 'function') {
+            toastError('Error', 'Please fill all fields');
+        } else {
+            alert('Please fill all fields');
+        }
+        return;
+    }
+    try {
+        const resp = await fetch(`/booking/complaint-request/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: type, details: details })
+        });
+        const result = await resp.json();
+        if (!result.success) throw new Error(result.message || 'Failed');
+        
+        // Close edit modal
+        const editModal = bootstrap.Modal.getInstance(document.getElementById(`editRequestModal_${id}`));
+        if (editModal) editModal.hide();
+        
+        // Reload requests data
+        await loadAllRequests();
+        
+        if (typeof toastSuccess === 'function') {
+            toastSuccess('Updated', 'Request updated');
+        } else {
+            alert('Request updated');
+        }
+    } catch (e) {
+        console.error('Update request failed:', e);
+        if (typeof toastError === 'function') {
+            toastError('Error', 'Could not update request');
+        } else {
+            alert('Could not update request');
+        }
+    }
+}
+
+async function toggleRequestStatus(id, toStatus) {
+    try {
+        // Confirm action
+        if (typeof Swal !== 'undefined') {
+            const verb = Number(toStatus) === 1 ? 'mark as completed' : 'mark as not complete';
+            const res = await Swal.fire({
+                title: 'Are you sure?',
+                text: `Do you want to ${verb}?`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Yes',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#6f9c40',
+                cancelButtonColor: '#6c757d'
+            });
+            if (!res.isConfirmed) return;
+        } else if (!confirm('Continue with this change?')) {
+            return;
+        }
+
+        const upd = await fetch(`/booking/complaint-request/${id}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: Number(toStatus) })
+        });
+        const ok = await upd.json();
+        if (!ok.success) throw new Error(ok.message || 'Failed');
+        
+        // Reload requests data
+        await loadAllRequests();
+        
+        if (typeof toastSuccess === 'function') {
+            toastSuccess('Updated', 'Status updated');
+        } else {
+            alert('Status updated');
+        }
+    } catch (e) {
+        console.error('Toggle status failed:', e);
+        if (typeof toastError === 'function') {
+            toastError('Error', 'Could not update status');
+        } else {
+            alert('Could not update status');
+        }
+    }
+}
+
+async function deleteRequestFromModal(id) {
+    try {
+        // Confirm deletion
+        if (typeof Swal !== 'undefined') {
+            const res = await Swal.fire({
+                title: 'Delete this request?',
+                text: 'This action cannot be undone.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Delete',
+                cancelButtonText: 'Cancel'
+            });
+            if (!res.isConfirmed) return;
+        } else if (!confirm('Delete this request?')) {
+            return;
+        }
+
+        const del = await fetch(`/booking/complaint-request/${id}`, {
+            method: 'DELETE'
+        });
+        const ok = await del.json();
+        if (!ok.success) throw new Error(ok.message || 'Failed');
+        
+        // Reload requests data
+        await loadAllRequests();
+        
+        if (typeof toastSuccess === 'function') {
+            toastSuccess('Deleted', 'Request deleted');
+        } else {
+            alert('Request deleted');
+        }
+    } catch (e) {
+        console.error('Delete request failed:', e);
+        if (typeof toastError === 'function') {
+            toastError('Error', 'Could not delete request');
+        } else {
+            alert('Could not delete request');
+        }
+    }
+}
 
 </script>
 					
@@ -1577,6 +2674,251 @@ function openRemarksModalFromData(element) {
       0 0 0 4px rgba(220, 53, 69, 0.3);
   }
 }
+
+/* Complaints & Requests Modal DataTables Styling - Shared CSS */
+#complaintsModal .table-scrollable,
+#requestsModal .table-scrollable {
+  margin-bottom: 0;
+}
+
+#complaintsModal .dataTables_wrapper,
+#requestsModal .dataTables_wrapper {
+  color: #e0e0e0;
+}
+
+#complaintsModal .dataTables_wrapper .dataTables_length,
+#complaintsModal .dataTables_wrapper .dataTables_filter,
+#complaintsModal .dataTables_wrapper .dataTables_info,
+#complaintsModal .dataTables_wrapper .dataTables_paginate,
+#requestsModal .dataTables_wrapper .dataTables_length,
+#requestsModal .dataTables_wrapper .dataTables_filter,
+#requestsModal .dataTables_wrapper .dataTables_info,
+#requestsModal .dataTables_wrapper .dataTables_paginate {
+  color: #e0e0e0;
+  font-size: 12px;
+}
+
+#complaintsModal .dataTables_wrapper .dataTables_length select,
+#complaintsModal .dataTables_wrapper .dataTables_filter input,
+#requestsModal .dataTables_wrapper .dataTables_length select,
+#requestsModal .dataTables_wrapper .dataTables_filter input {
+  background-color: #41474c;
+  border: 1px solid #495057;
+  color: #e0e0e0;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  height: 28px;
+}
+
+#complaintsModal .dataTables_wrapper .dataTables_length select:focus,
+#complaintsModal .dataTables_wrapper .dataTables_filter input:focus,
+#requestsModal .dataTables_wrapper .dataTables_length select:focus,
+#requestsModal .dataTables_wrapper .dataTables_filter input:focus {
+  outline: none;
+  border-color: #6c757d;
+}
+
+#complaintsModal .dataTables_wrapper .dataTables_paginate,
+#requestsModal .dataTables_wrapper .dataTables_paginate {
+  gap: 0.25rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 10px 0 !important;
+  padding: 0 !important;
+}
+
+#complaintsModal .dataTables_wrapper .dataTables_paginate ul.pagination,
+#requestsModal .dataTables_wrapper .dataTables_paginate ul.pagination {
+  gap: 0.25rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  list-style: none !important;
+  background: transparent !important;
+  border: none !important;
+  flex-wrap: wrap !important;
+}
+
+#complaintsModal .dataTables_wrapper .dataTables_paginate ul.pagination .page-item,
+#requestsModal .dataTables_wrapper .dataTables_paginate ul.pagination .page-item {
+  margin: 0 2px !important;
+  background: transparent !important;
+  position: relative !important;
+}
+
+#complaintsModal .dataTables_wrapper .dataTables_paginate ul.pagination .page-item .page-link,
+#requestsModal .dataTables_wrapper .dataTables_paginate ul.pagination .page-item .page-link {
+  width: 2rem !important;
+  height: 2rem !important;
+  padding: 0 !important;
+  border-radius: 4px !important;
+  font-weight: 600 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  border: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  background: linear-gradient(145deg, #2a3135, #1f2528) !important;
+  color: #b0b3c7 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.1),
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  outline: none !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+#complaintsModal .dataTables_wrapper .dataTables_paginate ul.pagination .page-item .page-link:hover,
+#requestsModal .dataTables_wrapper .dataTables_paginate ul.pagination .page-item .page-link:hover {
+  background: linear-gradient(145deg, #3a4145, #2f3538) !important;
+  color: #ffffff !important;
+  transform: translateY(-2px) !important;
+  text-decoration: none !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.15),
+    0 2px 6px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+
+#complaintsModal .dataTables_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link,
+#requestsModal .dataTables_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link {
+  background: linear-gradient(145deg, #41474c, #2a3135) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  position: relative !important;
+  overflow: hidden !important;
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.2),
+    0 2px 6px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+}
+
+#complaintsModal .dataTables_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link:hover,
+#requestsModal .dataTables_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link:hover {
+  transform: translateY(-1px) !important;
+  background: linear-gradient(145deg, #4a5156, #2f3538) !important;
+  color: #ffffff !important;
+  box-shadow: 
+    0 6px 16px rgba(0, 0, 0, 0.25),
+    0 3px 8px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+#complaintsModal .dataTables_wrapper .dataTables_paginate ul.pagination .page-item.disabled .page-link,
+#requestsModal .dataTables_wrapper .dataTables_paginate ul.pagination .page-item.disabled .page-link {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
+  background: linear-gradient(145deg, #1f2528, #1a1f22) !important;
+  color: #666 !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+#complaintsModal .dataTables_wrapper .dataTables_paginate ul.pagination .page-item.disabled .page-link:hover,
+#requestsModal .dataTables_wrapper .dataTables_paginate ul.pagination .page-item.disabled .page-link:hover {
+  transform: none !important;
+  background: linear-gradient(145deg, #1f2528, #1a1f22) !important;
+  color: #666 !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  box-shadow: none !important;
+}
+
+#complaintsModal .dataTables_wrapper .dataTables_paginate ul.pagination .page-item:first-child .page-link,
+#complaintsModal .dataTables_wrapper .dataTables_paginate ul.pagination .page-item:last-child .page-link,
+#requestsModal .dataTables_wrapper .dataTables_paginate ul.pagination .page-item:first-child .page-link,
+#requestsModal .dataTables_wrapper .dataTables_paginate ul.pagination .page-item:last-child .page-link {
+  font-weight: 700 !important;
+  font-size: 0.7rem !important;
+  letter-spacing: 0.5px !important;
+  text-transform: uppercase !important;
+  width: auto !important;
+  min-width: 3rem !important;
+  padding: 0 0.75rem !important;
+}
+
+/* Complaints & Requests Status Badge Styling - Shared CSS */
+#complaintsModal .complaints-status-badge.label-success,
+#requestsModal .complaints-status-badge.label-success {
+  background: rgba(46, 216, 182, 0.2) !important;
+  border: 1px solid rgba(46, 216, 182, 0.3) !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  border-radius: 4px !important;
+  box-shadow: 0 2px 4px rgba(42, 122, 110, 0.3) !important;
+  padding: 4px 10px !important;
+  font-size: 9px !important;
+}
+
+#complaintsModal .complaints-status-badge.label-danger,
+#requestsModal .complaints-status-badge.label-danger {
+  background: rgba(255, 83, 112, 0.2) !important;
+  border: 1px solid rgba(255, 83, 112, 0.3) !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  border-radius: 2px !important;
+  box-shadow: 0 2px 4px rgba(138, 58, 74, 0.3) !important;
+  padding: 4px 10px !important;
+  font-size: 9px !important;
+}
+
+/* Complaints & Requests Filter Buttons Styling - Shared CSS */
+#complaintsFilters .filter-btn-group,
+#requestsFilters .filter-btn-group {
+  display: inline-flex;
+  gap: 2px;
+}
+
+#complaintsFilters .filter-btn-group .filter-btn,
+#requestsFilters .filter-btn-group .filter-btn {
+  background: rgba(73, 80, 87, 0.8);
+  border: 1px solid #495057;
+  color: #adb5bd;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 1px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#complaintsFilters .filter-btn-group .filter-btn:hover,
+#requestsFilters .filter-btn-group .filter-btn:hover {
+  background: rgba(111, 156, 64, 0.3);
+  border-color: rgba(111, 156, 64, 0.5);
+  color: #fff;
+}
+
+#complaintsFilters .filter-btn-group .filter-btn.active,
+#requestsFilters .filter-btn-group .filter-btn.active {
+  background: #6f9c40;
+  border-color: #6f9c40;
+  color: #fff;
+  font-weight: 600;
+}
+
+#complaintsFilters .filter-btn-group .filter-btn.active:hover,
+#requestsFilters .filter-btn-group .filter-btn.active:hover {
+  background: #7aab45;
+  border-color: #7aab45;
+}
+
 </style>
 
 <!-- Include Billing Modal -->

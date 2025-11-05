@@ -29,6 +29,11 @@ router.get('/room-monitoring', DashboardController.getRoomMonitoring);
 router.get('/counts', DashboardController.getDashboardCounts);
 // Complaints/Requests/Remarks counts
 router.get('/crr-counts', DashboardController.getComplaintRequestSummary);
+// Get all complaints
+router.get('/complaints', DashboardController.getAllComplaints);
+
+// Get all requests
+router.get('/requests', DashboardController.getAllRequests);
 
 // Late check-out routes
 router.get('/late-check-room', DashboardController.checkLateCheckRoom);

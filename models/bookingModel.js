@@ -7773,7 +7773,7 @@ class BookingModel {
 
   static async updateComplaintRequestStatus({ id, status, editedBy }) {
     try {
-      const sql = `UPDATE complaint_request SET STATUS = ?, EDITDED_BY = ?, EDITDED_DT = CURRENT_TIMESTAMP WHERE IDNo = ? AND ACTIVE = 1`;
+      const sql = `UPDATE complaint_request SET STATUS = ?, COMPLETED_BY = ?, COMPLETED_DT = CURRENT_TIMESTAMP WHERE IDNo = ? AND ACTIVE = 1`;
       await queryDatabasePromise(sql, [status, editedBy, id]);
       return true;
     } catch (e) {

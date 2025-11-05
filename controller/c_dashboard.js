@@ -168,6 +168,28 @@ class DashboardController {
     }
   }
 
+  // Get all complaints
+  static async getAllComplaints(req, res) {
+    try {
+      const complaints = await DashboardModel.getAllComplaints();
+      res.json({ success: true, data: complaints });
+    } catch (error) {
+      console.error('Error fetching all complaints:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  }
+
+  // Get all requests
+  static async getAllRequests(req, res) {
+    try {
+      const requests = await DashboardModel.getAllRequests();
+      res.json({ success: true, data: requests });
+    } catch (error) {
+      console.error('Error fetching all requests:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  }
+
   // Check move to occupied controller
   static async checkMoveToOccupied(req, res) {
     try {
