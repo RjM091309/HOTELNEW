@@ -457,8 +457,9 @@ class BookingModel {
       const currentCheckIn = currentBookingResult[0].CHECK_IN_DATE;
       const currentCheckOut = currentBookingResult[0].CHECK_OUT_DATE;
 
-      // Check if there's another active checked-in booking for this room with overlapping dates
-      // Two bookings overlap if: check_in < other_checkout AND check_out > other_checkin
+      // Check if there's another active checked-in booking for this room
+      // IMPORTANT: If status is "check-In", room is occupied regardless of dates
+      // This handles cases where guest hasn't checked out even after scheduled check-out date
       const checkOccupiedQuery = `
         SELECT 
           b.IDNo AS BookingID,
@@ -472,12 +473,10 @@ class BookingModel {
           AND b.IDNo != ?
           AND b.ACTIVE = 1
           AND b.BOOKING_STATUS = 'check-In'
-          AND b.CHECK_IN_DATE < ?
-          AND b.CHECK_OUT_DATE > ?
         LIMIT 1
       `;
       
-      const occupiedResult = await queryDatabasePromise(checkOccupiedQuery, [roomId, bookingId, currentCheckOut, currentCheckIn]);
+      const occupiedResult = await queryDatabasePromise(checkOccupiedQuery, [roomId, bookingId]);
       
       if (occupiedResult.length > 0) {
         return {

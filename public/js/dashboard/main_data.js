@@ -994,9 +994,15 @@ $(document).ready(function() {
     $(document).on('change', '.custom-toggle-checkin', function() {
         const $toggle = $(this);
         const bookingId = $toggle.attr('data-idno');
+        
+        // Read the NEW state (after user clicked)
+        // User clicked OFF → ON means they want to check in (isChecked = true)
+        // User clicked ON → OFF means they want to revert (isChecked = false)
         const isChecked = $toggle.is(':checked');
         
-        // Determine new status based on toggle state
+        // Immediately revert toggle to prevent flicker
+        // We'll set it back after successful confirmation
+        $toggle.prop('checked', !isChecked);
         const newStatus = isChecked ? 'check-In' : 'pending';
         const action = isChecked ? 'check in' : 'revert to pending';
         
@@ -1005,16 +1011,6 @@ $(document).ready(function() {
 
         // If checking in, first check if room is occupied
         if (isChecked) {
-            // Show loading state while checking
-            Swal.fire({
-                title: "Checking Room Status...",
-                text: "Please wait while we verify room availability.",
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
-
             // Check if room is occupied
             $.ajax({
                 url: '/dashboard/booking/check_room_occupied',
@@ -1024,8 +1020,6 @@ $(document).ready(function() {
                     BookingID: bookingId
                 }),
                 success: (response) => {
-                    Swal.close();
-                    
                     if (response.success && response.isOccupied) {
                         // Room is occupied, show error popup
                         Swal.fire({
@@ -1036,20 +1030,18 @@ $(document).ready(function() {
                             confirmButtonText: "OK",
                             allowOutsideClick: false
                         });
-                        // Revert toggle state
-                        $toggle.prop('checked', false);
+                        // Toggle already reverted at start, no need to change
                         return;
                     }
                     
                     // Room is available, proceed with check-in confirmation
                     proceedWithCheckInConfirmation($toggle, bookingId, roomNumber, newStatus, action, isChecked);
                 },
-                error: (xhr, status, error) => {
-                    Swal.close();
-                    PMSCore.handleError(error, 'Check room occupied AJAX error');
-                    PMSCore.showError('Error!', 'An error occurred while checking room status.');
-                    $toggle.prop('checked', false); // Revert toggle state
-                }
+                    error: (xhr, status, error) => {
+                        PMSCore.handleError(error, 'Check room occupied AJAX error');
+                        PMSCore.showError('Error!', 'An error occurred while checking room status.');
+                        // Toggle already reverted at start, no need to change
+                    }
             });
         } else {
             // Reverting to pending, proceed directly with confirmation
@@ -1073,18 +1065,6 @@ $(document).ready(function() {
             allowOutsideClick: false
         }).then((result) => {
             if (result.isConfirmed) {
-                // Show loading state
-                Swal.fire({
-                    title: isChecked ? "Checking In..." : "Reverting...",
-                    text: isChecked 
-                        ? "Please wait while we process the check-in."
-                        : "Please wait while we revert the status.",
-                    allowOutsideClick: false,
-                    didOpen: () => {
-                        Swal.showLoading();
-                    }
-                });
-
                 // Send AJAX request to update booking status
                 $.ajax({
                     url: '/dashboard/booking/update_status',
@@ -1095,11 +1075,11 @@ $(document).ready(function() {
                         status: newStatus
                     }),
                     success: (response) => {
-                        // Close loading dialog
-                        Swal.close();
-                        
                         try {
                             PMSCore.validateResponse(response);
+                            
+                            // Update toggle state after successful confirmation
+                            $toggle.prop('checked', isChecked);
                             
                             const card = $toggle.closest('.card');
                             
@@ -1174,22 +1154,18 @@ $(document).ready(function() {
                             PMSCore.handleError(error, `${action} SweetAlert success handler`);
                             // Show error toast
                             PMSCore.showError(`${isChecked ? 'Check-In' : 'Revert'} Failed!`, response.message || `Failed to ${action} the booking.`);
-                            $toggle.prop('checked', !isChecked); // Revert toggle state
+                            // Toggle already reverted at start, no need to change
                         }
                     },
                     error: (xhr, status, error) => {
-                        // Close loading dialog
-                        Swal.close();
-                        
                         PMSCore.handleError(error, `${action} SweetAlert AJAX error`);
                         // Show error toast
                         PMSCore.showError('Error!', `An error occurred while ${action} the booking.`);
-                        $toggle.prop('checked', !isChecked); // Revert toggle state
+                        // Toggle already reverted at start, no need to change
                     }
                 });
             } else {
-                // User cancelled - reset toggle
-                $toggle.prop('checked', !isChecked);
+                // User cancelled - toggle already reverted at start, no need to change
             }
         });
     }
