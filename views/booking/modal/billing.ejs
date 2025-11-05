@@ -184,6 +184,32 @@
 	// Also check payment status after a short delay to ensure elements are loaded
 	setTimeout(updatePaymentStatus, 500);
 	
+	// Ensure invoice button is properly initialized when modal is shown
+	const modalBilling = document.getElementById('modal-billing');
+	if (modalBilling) {
+		modalBilling.addEventListener('shown.bs.modal', function() {
+			const invoiceBtn = document.getElementById('generateInvoiceBtn');
+			if (invoiceBtn) {
+				// Remove any existing event listeners by cloning
+				const newInvoiceBtn = invoiceBtn.cloneNode(true);
+				invoiceBtn.parentNode.replaceChild(newInvoiceBtn, invoiceBtn);
+				
+				// Attach event listener to the new button
+				newInvoiceBtn.addEventListener('click', function() {
+					const bookingId = document.getElementById('hiddenBookingId').value;
+
+					if (!bookingId) {
+						alert("Missing Booking ID!");
+						return;
+					}
+
+					const url = `/booking/generate-invoice/${bookingId}`;
+					window.open(url, '_blank');
+				});
+			}
+		});
+	}
+	
 	// Ensure proceed to payment button is properly initialized
 	setTimeout(function() {
 		const proceedButton = document.getElementById('proceedToPaymentButton');

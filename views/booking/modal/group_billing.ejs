@@ -167,6 +167,33 @@
     var groupBillingScript = document.createElement('script');
     groupBillingScript.src = '/js/booking/group_billing.js';
     document.body.appendChild(groupBillingScript);
+    
+    // Ensure group invoice button is properly initialized when modal is shown
+    document.addEventListener('DOMContentLoaded', function() {
+        const groupBillingModal = document.getElementById('groupBillingModal');
+        if (groupBillingModal) {
+            groupBillingModal.addEventListener('shown.bs.modal', function() {
+                const genInvoiceBtn = document.getElementById('generateGroupInvoiceBtn');
+                if (genInvoiceBtn) {
+                    // Remove any existing event listeners by cloning
+                    const newInvoiceBtn = genInvoiceBtn.cloneNode(true);
+                    genInvoiceBtn.parentNode.replaceChild(newInvoiceBtn, genInvoiceBtn);
+                    
+                    // Attach event listener to the new button
+                    newInvoiceBtn.addEventListener('click', function() {
+                        const modal = document.getElementById('groupBillingModal');
+                        const groupId = modal && modal.dataset ? modal.dataset.groupId : null;
+                        if (!groupId) {
+                            alert('Missing Group ID!');
+                            return;
+                        }
+                        const url = `/booking/generate-group-invoice/${groupId}`;
+                        window.open(url, '_blank');
+                    });
+                }
+            });
+        }
+    });
 </script>
 
 <style>

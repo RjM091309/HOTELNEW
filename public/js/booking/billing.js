@@ -34,16 +34,34 @@ document.getElementById('modal-billing').addEventListener('hidden.bs.modal', fun
 // Note: The proceedToPaymentButton event handler is now handled in billing.ejs
 // This ensures proper Payment Summary Card updates
 
-document.getElementById('generateInvoiceBtn').addEventListener('click', function () {
-    const bookingId = document.getElementById('hiddenBookingId').value;
+// Initialize invoice button event listener when modal is shown
+document.addEventListener('DOMContentLoaded', function() {
+    // Use event delegation or attach listener when modal is shown
+    const modalBilling = document.getElementById('modal-billing');
+    if (modalBilling) {
+        // Attach listener when modal is shown
+        modalBilling.addEventListener('shown.bs.modal', function() {
+            const invoiceBtn = document.getElementById('generateInvoiceBtn');
+            if (invoiceBtn) {
+                // Remove any existing event listeners by cloning
+                const newInvoiceBtn = invoiceBtn.cloneNode(true);
+                invoiceBtn.parentNode.replaceChild(newInvoiceBtn, invoiceBtn);
+                
+                // Attach event listener to the new button
+                newInvoiceBtn.addEventListener('click', function() {
+                    const bookingId = document.getElementById('hiddenBookingId').value;
 
-    if (!bookingId) {
-        alert("Missing Booking ID!");
-        return;
+                    if (!bookingId) {
+                        alert("Missing Booking ID!");
+                        return;
+                    }
+
+                    const url = `/booking/generate-invoice/${bookingId}`;
+                    window.open(url, '_blank');
+                });
+            }
+        });
     }
-
-    const url = `/booking/generate-invoice/${bookingId}`;
-    window.open(url, '_blank');
 }); 
 
 // Unified Billing Loader used across pages (overrides other definitions)
