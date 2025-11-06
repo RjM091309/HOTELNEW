@@ -292,6 +292,10 @@
                     
                     <!-- Submit button -->
                     <div class="modal-footer">
+                        <!-- Voucher button -->
+                        <button type="button" class="btn btn-primary" id="edit_btnGenerateVoucherPreview">
+                            Voucher
+                        </button>
                         <button type="submit" class="btn btn-primary">Update Booking</button>
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" >Close</button>
                     </div>
@@ -979,6 +983,116 @@ $(document).ready(function() {
                 });
             }
         });
+    });
+
+    // Voucher generation button handler for edit form
+    $('#edit_btnGenerateVoucherPreview').on('click', function () {
+        // Check if this is a direct reservation (no room selected)
+        const roomId = $('#edit_addroom').val();
+        const isDirectReservation = !roomId || roomId === '';
+
+        // Get the raw text values from the elements and remove commas
+        let computedTotalRaw = $('#edit_computedTotal').text().trim().replace(/,/g, '');
+        let computedBalanceRaw = $('#edit_computedBalance').text().trim().replace(/,/g, '');
+        let computedPaidAmountRaw = $('#edit_computedPaidAmount').text().trim().replace(/,/g, '');
+        
+        // Fallback: If values are empty, try to get from paidAmount field
+        if (!computedPaidAmountRaw || computedPaidAmountRaw === '0.00') {
+            const paidAmountValue = $('#edit_paidAmount').val() || $('#edit_paidAmountHidden').val() || '0';
+            computedPaidAmountRaw = parseFloat(paidAmountValue.toString().replace(/,/g, '')).toFixed(2);
+        }
+        
+        // If still empty or 0, use computed from total
+        if (!computedTotalRaw || computedTotalRaw === '0.00') {
+            // Try to compute total from form values
+            const roomRate = parseFloat($('#edit_price').val().toString().replace(/,/g, '')) || 0;
+            const nights = parseInt($('#edit_diffindays').val()) || 1;
+            const subtotal = roomRate * nights;
+            computedTotalRaw = subtotal.toFixed(2);
+        }
+        
+        // Always recalculate balance from total and paidAmount to ensure accuracy
+        const totalValue = parseFloat(computedTotalRaw.replace(/,/g, '')) || 0;
+        const paidValue = parseFloat(computedPaidAmountRaw.replace(/,/g, '')) || 0;
+        const balance = totalValue - paidValue;
+        computedBalanceRaw = Math.max(0, balance).toFixed(2);
+
+        // Calculate room charges and services
+        const priceValue = $('#edit_price').val();
+        const roomRateStr = priceValue ? priceValue.toString().replace(/[,\s₱₹$]/g, '') : '0';
+        const roomRate = parseFloat(roomRateStr) || 0;
+        const nights = parseInt($('#edit_diffindays').val()) || 1;
+        const roomCharges = Math.round((roomRate * nights) * 100) / 100; // Round to 2 decimals
+        
+        const breakfastAdultQty = parseInt($('#edit_breakfastAdultQty').val()) || 0;
+        const breakfastAdultPrice = parseFloat($('#edit_breakfastAdultPrice').val().toString().replace(/,/g, '')) || 0;
+        const breakfastKidQty = parseInt($('#edit_breakfastKidQty').val()) || 0;
+        const breakfastKidPrice = parseFloat($('#edit_breakfastKidPrice').val().toString().replace(/,/g, '')) || 0;
+        const breakfastTotal = parseFloat(((breakfastAdultQty * breakfastAdultPrice) + (breakfastKidQty * breakfastKidPrice)).toFixed(2));
+        
+        const pickup = $('#edit_includePickup').is(':checked') ? (parseFloat($('#edit_pickupPrice').val().toString().replace(/,/g, '')) || 0) : 0;
+        const dropoff = $('#edit_includeDropoff').is(':checked') ? (parseFloat($('#edit_dropoffPrice').val().toString().replace(/,/g, '')) || 0) : 0;
+        const lateCheckoutFee = parseFloat($('#edit_lateCheckoutFee').val().toString().replace(/,/g, '')) || 0;
+        // Exclude late checkout fee from servicesTotal as it's displayed separately
+        const servicesTotal = parseFloat((breakfastTotal + pickup + dropoff).toFixed(2));
+
+        // Get room number text
+        let roomNumberText = 'NO ROOM ASSIGNED';
+        if (!isDirectReservation) {
+            const selectedRoomOption = $('#edit_addroom option:selected');
+            roomNumberText = selectedRoomOption.length ? selectedRoomOption.text() : 'NO ROOM ASSIGNED';
+        }
+
+        const bookingData = {
+            voucherNo: $('#edit_voucherNo').val() || $('#edit_bookingId').val(),
+            fullname: $('#edit_bookingRoute').val() === 'agency' 
+                ? $('#edit_agencySelect option:selected').text() 
+                : $('#edit_txtFullNameAdd').val(),
+            contactNumber: $('#edit_txtNumber').val(),
+            dateFrom: $('#edit_daterange').val().split(' to ')[0],
+            dateTo: $('#edit_daterange').val().split(' to ')[1].split('(')[0].trim(),
+            bedCount: $('#edit_bedCount').val(),
+            roomNumber: isDirectReservation ? 'NO ROOM ASSIGNED' : roomNumberText,
+            roomView: isDirectReservation ? 'N/A' : $('#edit_room_type').val(),
+            roomType: isDirectReservation ? 'NO ROOM ASSIGNED' : $('#edit_room_type_hidden').val(),
+            roomRate: $('#edit_price').val(),
+            breakfastAdult: $('#edit_breakfastAdultQty').val() || '0',
+            breakfastAdultPrice: $('#edit_breakfastAdultPrice').val() || '0',
+            breakfastKid: $('#edit_breakfastKidQty').val() || '0',
+            breakfastKidPrice: $('#edit_breakfastKidPrice').val() || '0',
+            pickup: $('#edit_includePickup').is(':checked') ? $('#edit_pickupPrice').val() : 0,
+            dropoff: $('#edit_includeDropoff').is(':checked') ? $('#edit_dropoffPrice').val() : 0,
+            remarks: $('#edit_bookingRemarks').val(),
+            total: computedTotalRaw,
+            balance: computedBalanceRaw,
+            paidAmount: computedPaidAmountRaw,
+            checkInStatus: $('#edit_checkInStatus').val(),
+            checkOutStatus: $('#edit_checkOutStatus').val(),
+            lateCheckoutFee: $('#edit_lateCheckoutFee').val() || '0',
+            reservationFee: '0', // Edit form doesn't have reservation fee
+            discount: $('#edit_includeDiscount').is(':checked') ? $('#edit_discountAmount').val() : 0,
+            roomCharges: roomCharges.toFixed(2),
+            servicesTotal: servicesTotal.toFixed(2),
+            directReservationFlag: isDirectReservation ? 'true' : 'false',
+        };
+        
+        const form = $('<form>', {
+            method: 'POST',
+            action: '/booking/generate-voucher',
+            target: '_blank'
+        });
+
+        for (let key in bookingData) {
+            form.append($('<input>', {
+                type: 'hidden',
+                name: key,
+                value: bookingData[key]
+            }));
+        }
+
+        $('body').append(form);
+        form.submit();
+        form.remove();
     });
 });
 

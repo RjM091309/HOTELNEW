@@ -285,6 +285,7 @@
             <div class="row p-t-20">
               <div class="col-lg-12">
                 <div class="d-flex justify-content-end gap-2">
+                  <button type="button" class="btn btn-success" id="editBtnGroupVoucherPreview">Voucher</button>
                   <button type="submit" class="btn btn-primary">Update Booking</button>
                   <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="window.location.reload()">Close</button>
                 </div>
@@ -1681,6 +1682,163 @@ window.editGroupManualSelectedRooms = [];
     // Auto-compute total when paid amount changes
     $('#editGroupPaidAmount').on('input change', function() {
       computeEditGroupTotal();
+    });
+
+    // Voucher generation button handler for edit group booking
+    $('#editBtnGroupVoucherPreview').on('click', function() {
+      // Check if there's an existing group booking ID
+      const groupBookingId = $('#editGroupBookingId').val();
+      let vno = $('#editGroupVoucherNo').val();
+      
+      // If no voucher number set and we have a group booking ID, try to fetch confirmation number
+      if (!vno && groupBookingId) {
+        // Try to get confirmation number from existing booking
+        $.ajax({
+          url: `/booking/get-group-voucher-data/${groupBookingId}`,
+          method: 'GET',
+          async: false, // Synchronous to wait for result
+          success: function (response) {
+            if (response.success && response.data && response.data.confirmationNumber) {
+              vno = response.data.confirmationNumber;
+              $('#editGroupVoucherNo').val(vno);
+            }
+          }
+        });
+      }
+      
+      // If still no voucher number, generate one based on date and room
+      if (!vno) {
+        const daterange = $('#editGroupDaterange').val() || '';
+        const dateFromStr = daterange.includes(' to ') ? daterange.split(' to ')[0] : '';
+        let datePart = '';
+        if (dateFromStr) {
+          const d = new Date(dateFromStr);
+          if (!isNaN(d.getTime())) {
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            datePart = `${yyyy}${mm}${dd}`;
+          }
+        }
+        const selectedRoomNumbers = ($('#editGroupSelectedRoomNumbers').val()||'').split(',').filter(Boolean);
+        let firstRoomNumber = '';
+        if (selectedRoomNumbers.length > 0) {
+          firstRoomNumber = selectedRoomNumbers[0];
+        } else {
+          const selectedRoomIds = ($('#editGroupSelectedRooms').val()||'').split(',').filter(Boolean);
+          if (selectedRoomIds.length > 0 && editGroupAvailableRooms.length > 0) {
+            const match = editGroupAvailableRooms.find(r => String(r.IDNo) === String(selectedRoomIds[0]));
+            if (match && match.ROOM_NUMBER) firstRoomNumber = match.ROOM_NUMBER;
+          }
+        }
+        if (datePart && firstRoomNumber) {
+          vno = `${datePart}0${firstRoomNumber}`;
+        } else if (firstRoomNumber) {
+          const today = new Date();
+          const tyyyy = today.getFullYear();
+          const tmm = String(today.getMonth() + 1).padStart(2, '0');
+          const tdd = String(today.getDate()).padStart(2, '0');
+          vno = `${tyyyy}${tmm}${tdd}0${firstRoomNumber}`;
+        } else {
+          vno = groupBookingId || 'GV' + Date.now();
+        }
+        $('#editGroupVoucherNo').val(vno);
+      }
+
+      const daterange = $('#editGroupDaterange').val() || '';
+      const dateFrom = daterange.includes(' to ') ? daterange.split(' to ')[0] : '';
+      const dateTo = daterange.includes(' to ') ? daterange.split(' to ')[1].split('(')[0].trim() : '';
+      
+      // Prefer precomputed room numbers from hidden input
+      const selectedRoomNumbers = ($('#editGroupSelectedRoomNumbers').val()||'').split(',').filter(Boolean);
+      let roomNumbersForVoucher = '';
+      
+      if (selectedRoomNumbers.length > 0) {
+        roomNumbersForVoucher = selectedRoomNumbers.join(', ');
+      } else {
+        // Fallback: If room numbers not available, try to get from available rooms by ID
+        const selectedRoomIds = ($('#editGroupSelectedRooms').val()||'').split(',').filter(Boolean);
+        if (selectedRoomIds.length > 0 && editGroupAvailableRooms.length > 0) {
+          const roomNumbersFromIds = selectedRoomIds.map(id => {
+            const room = editGroupAvailableRooms.find(r => r.IDNo.toString() === id.toString());
+            return room ? room.ROOM_NUMBER : null;
+          }).filter(Boolean);
+          roomNumbersForVoucher = roomNumbersFromIds.length > 0 
+            ? roomNumbersFromIds.join(', ') 
+            : 'No rooms selected';
+        } else {
+          roomNumbersForVoucher = 'No rooms selected';
+        }
+      }
+
+      const totalText = $('#editGroupComputedTotal').text() || '0';
+      // Extract numeric value, handling consolidated format
+      const numericTotal = totalText.replace(/[^0-9.]/g, '').split(' ')[0] || '0';
+      
+      const paidText = $('#editGroupComputedPaidAmount').text() || '0';
+      const numericPaid = paidText.replace(/[^0-9.]/g, '').split(' ')[0] || '0';
+      
+      const balanceText = $('#editGroupComputedBalance').text() || '0';
+      const numericBalance = balanceText.replace(/[^0-9.]/g, '').split(' ')[0] || '0';
+
+      // Calculate room charges
+      const nights = parseInt($('#editGroupNights').val(), 10) || 0;
+      const pricesRaw = $('#editGroupSelectedRoomPrices').val();
+      const prices = pricesRaw ? pricesRaw.split(',').map(p => parseFloat(p) || 0) : [];
+      const baseSubtotal = prices.reduce((sum, price) => sum + price, 0);
+      const roomCharges = baseSubtotal * nights;
+      
+      // Calculate services total (exclude late checkout fee)
+      const adultQty = $('#editGroupIncludeBreakfast').is(':checked') ? (parseInt($('#editGroupBreakfastAdultQty').val(), 10) || 0) : 0;
+      const adultPrice = parseFloat($('#editGroupBreakfastAdultPrice').val()) || 0;
+      const kidQty = $('#editGroupIncludeBreakfast').is(':checked') ? (parseInt($('#editGroupBreakfastKidQty').val(), 10) || 0) : 0;
+      const kidPrice = parseFloat($('#editGroupBreakfastKidPrice').val()) || 0;
+      const breakfastIndividual = $('#editGroupBreakfastIndividual').is(':checked');
+      const selectedRooms = $('#editGroupSelectedRooms').val();
+      const numRooms = selectedRooms ? selectedRooms.split(',').length : 1;
+      const breakfastTotal = (adultQty * adultPrice) + (kidQty * kidPrice);
+      const breakfastTotalWithIndividual = breakfastIndividual ? breakfastTotal * numRooms : breakfastTotal;
+      const pickupPrice = $('#editGroupIncludePickup').is(':checked') ? parseFloat($('#editGroupPickupPrice').val()) || 0 : 0;
+      const dropoffPrice = $('#editGroupIncludeDropoff').is(':checked') ? parseFloat($('#editGroupDropoffPrice').val()) || 0 : 0;
+      // Exclude late checkout fee from servicesTotal as it's displayed separately
+      const servicesTotal = breakfastTotalWithIndividual + pickupPrice + dropoffPrice;
+
+      const bookingData = {
+        voucherNo: vno,
+        groupName: $('#editGroupName').val() || 'Group Booking',
+        groupContact: $('#editGroupContact').val() || '',
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        roomSummary: roomNumbersForVoucher || 'No rooms selected',
+        breakfastAdult: $('#editGroupBreakfastAdultQty').val() || 0,
+        breakfastKid: $('#editGroupBreakfastKidQty').val() || 0,
+        breakfastAdultPrice: adultPrice,
+        breakfastKidPrice: kidPrice,
+        pickup: pickupPrice,
+        dropoff: dropoffPrice,
+        remarks: $('#editGroupRemarks').val() || '',
+        total: numericTotal,
+        paidAmount: numericPaid,
+        balance: numericBalance,
+        checkOutStatus: $('#editGroupCheckOutStatus').val() || 0,
+        lateCheckoutFee: 0,
+        discount: $('#editGroupIncludeDiscount').is(':checked') ? (parseFloat($('#editGroupDiscount').val()) || 0) : 0,
+        reservationFee: 0, // Default to 0 for group bookings
+        roomCharges: roomCharges.toFixed(2),
+        servicesTotal: servicesTotal.toFixed(2)
+      };
+
+      const form = $('<form>', {
+        method: 'POST',
+        action: '/booking/generate-group-voucher',
+        target: '_blank'
+      });
+      for (let key in bookingData) {
+        form.append($('<input>', { type: 'hidden', name: key, value: bookingData[key] }));
+      }
+      $('body').append(form);
+      form.submit();
+      form.remove();
     });
   });
 

@@ -123,8 +123,21 @@
         <td class="remarks-box">
           <% 
             const lines = [];
-            if (remarks && remarks.trim()) lines.push(remarks.trim());
-            lines.push('Room Accomodation');
+            if (remarks && remarks.trim()) {
+              lines.push(remarks.trim());
+            }
+            
+            // Only add default "Room Accommodation" if remarks is empty or doesn't already contain accommodation text
+            const remarksLower = (remarks || '').toLowerCase();
+            const hasAccommodationText = remarksLower.includes('room accommodation') || 
+                                         remarksLower.includes('room accomodation') ||
+                                         remarksLower.includes('accommodation') ||
+                                         remarksLower.includes('accomodation');
+            
+            if (!hasAccommodationText) {
+              lines.push('Room Accommodation');
+            }
+            
             const paxTotal = (parseInt(breakfastAdult || 0) || 0) + (parseInt(breakfastKid || 0) || 0);
             if (paxTotal > 0) lines.push(`${paxTotal} Pax Breakfast Included`);
             if (pickup && parseFloat(pickup) > 0) lines.push('With Pick-Up');
