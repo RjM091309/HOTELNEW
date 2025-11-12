@@ -351,7 +351,12 @@ class BookingController {
         refundBookingId: bookingId,
         refundAmount: hasRefund ? parseFloat(refundAmount) || 0 : 0
       });
-      return res.json({ success: true, message: out.message, data: out.days });
+      return res.json({ 
+        success: true, 
+        message: out.message, 
+        data: out.days,
+        refundInfo: out.refundInfo || null
+      });
     } catch (error) {
       console.error('❌ Checkout error:', error);
       return res.status(500).json({ success: false, message: error.message || 'Checkout failed' });

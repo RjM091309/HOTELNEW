@@ -546,7 +546,8 @@ class BookingModel {
         connection.query(updateBillingQtySql, [ids], (err, res) => (err ? reject(err) : resolve(res)));
       });
 
-      // Optional: Insert refund(s) and update billing.CHECKOUT_REFUND, with caps to avoid negative balances.
+      // Optional: Insert refund(s) and update billing.CHECKOUT_REFUND (manual refund amount, no capping)
+      let refundInfo = { requested: refundAmount, processed: 0, details: [] };
       if (refundBookingId && refundAmount > 0) {
         // If multiple bookings were checked out (group scope), split proportionally by room amount
         const targetIds = ids.includes(refundBookingId) && ids.length > 1 ? ids : [refundBookingId];
@@ -563,56 +564,33 @@ class BookingModel {
         });
         const totalRoomAmount = roomAmtRows.reduce((s, r) => s + (parseFloat(r.roomAmount) || 0), 0) || 1;
 
-        // Helper to compute allowable refund per booking (paid - net, not below 0)
-        async function computeAllowable(bookingId) {
-          // Sum services and extensions
-          const [svcRow] = await new Promise((resolve, reject) => {
+        // Get billing ID for each booking
+        async function getBillingId(bookingId) {
+          const [billRow] = await new Promise((resolve, reject) => {
             connection.query(
-              `SELECT COALESCE(SUM(bs.TOTAL_COST),0) AS svcTotal
-               FROM booking_service bs WHERE bs.BOOKING_ID = ? AND bs.ACTIVE = 1`,
+              `SELECT IDNo AS billingId FROM billing WHERE BOOKING_ID = ? AND ACTIVE = 1 LIMIT 1`,
               [bookingId],
               (err, rows) => (err ? reject(err) : resolve(rows))
             );
           });
-          const [extRow] = await new Promise((resolve, reject) => {
-            connection.query(
-              `SELECT COALESCE(SUM(COST * QTY),0) AS extTotal
-               FROM booking_extension WHERE BOOKING_ID = ? AND ACTIVE = 1`,
-              [bookingId],
-              (err, rows) => (err ? reject(err) : resolve(rows))
-            );
-          });
-          const [billRow2] = await new Promise((resolve, reject) => {
-            connection.query(
-              `SELECT IDNo AS billingId, ROOM_CHARGE, QTY, COALESCE(RESERVATION_FEE,0) AS reservationFee,
-                      COALESCE(DISCOUNT_AMOUNT,0) AS discountAmount, COALESCE(CHECKOUT_REFUND,0) AS checkoutRefund
-               FROM billing WHERE BOOKING_ID = ? AND ACTIVE = 1 LIMIT 1`,
-              [bookingId],
-              (err, rows) => (err ? reject(err) : resolve(rows))
-            );
-          });
-          const [payRow] = await new Promise((resolve, reject) => {
-            connection.query(
-              `SELECT COALESCE(SUM(AMOUNT_PAID),0) AS paid
-               FROM payments WHERE BOOKING_ID = ? AND PAYMENT_TYPE NOT IN ('reservation_fee','discount')`,
-              [bookingId],
-              (err, rows) => (err ? reject(err) : resolve(rows))
-            );
-          });
-          const subTotal = (parseFloat(billRow2.ROOM_CHARGE) * parseFloat(billRow2.QTY)) + (parseFloat(svcRow?.svcTotal) || 0) + (parseFloat(extRow?.extTotal) || 0);
-          const currentNet = subTotal - parseFloat(billRow2.reservationFee) - parseFloat(billRow2.discountAmount) - parseFloat(billRow2.checkoutRefund || 0);
-          const paid = parseFloat(payRow?.paid) || 0;
-          const overpay = paid - currentNet; // amount we can refund without creating negative balance
-          return { maxRefund: Math.max(0, overpay), billingId: billRow2?.billingId || null };
+          return billRow?.billingId || null;
         }
 
-        // Iterate and distribute
+        // Iterate and distribute refund proportionally
         for (const r of roomAmtRows) {
           const share = (parseFloat(r.roomAmount) || 0) / totalRoomAmount;
-          const desired = refundAmount * share;
-          const { maxRefund, billingId } = await computeAllowable(r.bookingId);
-          const toRefund = Math.min(Math.abs(desired), maxRefund);
-          if (toRefund <= 0) continue;
+          const toRefund = refundAmount * share;
+          
+          if (toRefund <= 0) {
+            refundInfo.details.push({ 
+              bookingId: r.bookingId, 
+              requested: toRefund, 
+              processed: 0
+            });
+            continue;
+          }
+
+          const billingId = await getBillingId(r.bookingId);
 
           // Update billing accumulator
           await new Promise((resolve, reject) => {
@@ -634,6 +612,13 @@ class BookingModel {
             : [r.bookingId, -toRefund, encodedBy || 'system'];
           await new Promise((resolve, reject) => {
             connection.query(refundSql, refundParams, (err, res) => (err ? reject(err) : resolve(res)));
+          });
+
+          refundInfo.processed += toRefund;
+          refundInfo.details.push({ 
+            bookingId: r.bookingId, 
+            requested: toRefund, 
+            processed: toRefund
           });
         }
       }
@@ -658,7 +643,13 @@ class BookingModel {
         connection.commit(err => (err ? reject(err) : resolve()));
       });
 
-      return { success: true, message: 'Checked out successfully', days: daysRows };
+      // Build success message with refund info if applicable
+      let message = 'Checked out successfully';
+      if (refundInfo.requested > 0) {
+        message = `Checked out successfully. Refund of ₱${refundInfo.processed.toFixed(2)} processed.`;
+      }
+
+      return { success: true, message, days: daysRows, refundInfo };
     } catch (err) {
       try { await new Promise(r => connection.rollback(() => r())); } catch (e) {}
       throw err;

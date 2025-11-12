@@ -1959,16 +1959,10 @@ function triggerCheckout(bookingId) {
     }
 
     // Check if booking belongs to a group to offer scope options
-    let isGroupBooking = false;
     fetch(`/payments/group-breakdown/${bookingId}`, { method: 'GET', headers: { 'Content-Type': 'application/json' } })
         .then(r => r.ok ? r.json() : null)
         .then(groupData => {
-            if (groupData && groupData.success && groupData.isGroup) {
-                isGroupBooking = true;
-            }
-        })
-        .catch(() => { /* ignore and proceed without group options */ })
-        .finally(() => {
+            const isGroupBooking = !!(groupData && groupData.success && groupData.isGroup);
             const groupHtml = isGroupBooking ? `
                 <div style="text-align:left; margin-top:10px;">
                     <label class="form-label" style="margin-bottom:4px;">Checkout Scope</label>
@@ -2027,18 +2021,48 @@ function triggerCheckout(bookingId) {
                     }
                 },
                 focusConfirm: false,
-                didOpen: () => {
+                didOpen: async () => {
                     const chk = document.getElementById('withRefundChk');
                     const wrap = document.getElementById('refundAmtWrap');
                     const input = document.getElementById('refundAmountInput');
                     if (chk && wrap) {
+                        // Check if payments exist for this booking
+                        try {
+                            const paymentsResponse = await fetch(`/payments/get-payments/${bookingId}?_=${Date.now()}`);
+                            const paymentsData = await paymentsResponse.json();
+                            const paymentsArray = (paymentsData && paymentsData.data) ? paymentsData.data : (Array.isArray(paymentsData) ? paymentsData : []);
+                            
+                            // Calculate total paid (exclude reservation_fee and discount)
+                            const totalPaid = (paymentsArray && Array.isArray(paymentsArray)) ? paymentsArray.reduce((sum, payment) => {
+                                if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
+                                    return sum;
+                                }
+                                return sum + parseFloat(payment.AMOUNT_PAID);
+                            }, 0) : 0;
+                            
+                            // Disable checkbox if no payments were made
+                            if (totalPaid <= 0) {
+                                chk.disabled = true;
+                                chk.checked = false;
+                                wrap.style.display = 'none';
+                            }
+                        } catch (error) {
+                            console.error('Error fetching payments:', error);
+                            // If fetch fails, disable checkbox as a safety measure
+                            chk.disabled = true;
+                            chk.checked = false;
+                            wrap.style.display = 'none';
+                        }
+                        
                         chk.addEventListener('change', () => {
-                            wrap.style.display = chk.checked ? 'block' : 'none';
-                            if (chk.checked && input) setTimeout(() => input.focus(), 0);
+                            if (!chk.disabled) {
+                                wrap.style.display = chk.checked ? 'block' : 'none';
+                                if (chk.checked && input) setTimeout(() => input.focus(), 0);
+                            }
                         });
                     }
                 },
-                preConfirm: () => {
+                preConfirm: async () => {
                     const chk = document.getElementById('withRefundChk');
                     const input = document.getElementById('refundAmountInput');
                     const hasRefund = !!(chk && chk.checked);
@@ -2047,6 +2071,193 @@ function triggerCheckout(bookingId) {
                         amount = parseFloat(input && input.value ? input.value : '');
                         if (isNaN(amount) || amount < 0) {
                             Swal.showValidationMessage('Please enter a valid refund amount.');
+                            return false;
+                        }
+                        if (amount === 0) {
+                            Swal.showValidationMessage('Please enter a refund amount greater than 0.');
+                            return false;
+                        }
+                        
+                        // Check if refund amount exceeds paid amount
+                        try {
+                            const paymentsResponse = await fetch(`/payments/get-payments/${bookingId}?_=${Date.now()}`);
+                            const paymentsData = await paymentsResponse.json();
+                            const paymentsArray = (paymentsData && paymentsData.data) ? paymentsData.data : (Array.isArray(paymentsData) ? paymentsData : []);
+                            
+                            // Calculate total paid (exclude reservation_fee and discount)
+                            const totalPaid = (paymentsArray && Array.isArray(paymentsArray)) ? paymentsArray.reduce((sum, payment) => {
+                                if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
+                                    return sum;
+                                }
+                                return sum + parseFloat(payment.AMOUNT_PAID);
+                            }, 0) : 0;
+                            
+                            // Check if refund amount exceeds paid amount
+                            if (amount > totalPaid) {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'Refund Amount Exceeds Paid Amount',
+                                    html: `
+                                        <p>The refund amount (₱${amount.toFixed(2)}) exceeds the total paid amount (₱${totalPaid.toFixed(2)}).</p>
+                                        <p><strong>You cannot refund more than what was paid.</strong></p>
+                                    `,
+                                    confirmButtonText: 'OK',
+                                    confirmButtonColor: '#0d6efd'
+                                });
+                                return false;
+                            }
+                        } catch (error) {
+                            console.error('Error fetching payments:', error);
+                            Swal.showValidationMessage('Unable to verify payment amount. Please try again.');
+                            return false;
+                        }
+                    }
+                    let scope = 'individual';
+                    const sel = document.querySelector('input[name="checkoutScope"]:checked');
+                    if (sel && (sel.value === 'group' || sel.value === 'individual')) scope = sel.value;
+                    return { hasRefund, amount, scope };
+                }
+            }).then((result) => {
+                if (result.isConfirmed && result.value) {
+                    startCheckoutProcess(bookingId, result.value.hasRefund, result.value.amount || 0, result.value.scope || 'individual');
+                }
+            });
+        })
+        .catch(() => {
+            // If group check fails, proceed with individual checkout only
+            const groupHtml = '';
+            Swal.fire({
+                iconHtml: '<i class="fas fa-clipboard-check" style="color:#0d6efd;"></i>',
+                title: 'Confirm Checkout',
+                html: `
+                    <div style=\"text-align:left; margin-bottom:8px; color:#6c757d;\">
+                        <span class=\"section-label\">Summary</span>
+                        Proceed to checkout this booking?
+                        ${balanceText ? `<div style=\"margin-top:6px;\"><span class=\"section-label\">Balance</span><span class=\"balance-pill\">${balanceText}</span></div>` : ''}
+                    </div>
+                    ${groupHtml}
+                    <div class=\"form-check choice-row\" style=\"text-align:left;\">
+                        <input class=\"form-check-input\" type=\"checkbox\" value=\"\" id=\"withRefundChk\">
+                        <label class=\"form-check-label\" for=\"withRefundChk\">With refund</label>
+                    </div>
+                    <div id=\"refundAmtWrap\" style=\"margin-top:10px; display:none; text-align:left;\">
+                        <label for=\"refundAmountInput\" class=\"form-label\" style=\"margin-bottom:4px;\">Refund Amount</label>
+                        <input type=\"number\" min=\"0\" step=\"0.01\" id=\"refundAmountInput\" class=\"swal2-input\" placeholder=\"0.00\" style=\"width:100%; box-sizing:border-box; margin:0;\">
+                        <small class=\"text-muted\" style=\"display:block; margin-top:6px;\">Enter the exact refund to give to the guest.</small>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Proceed',
+                cancelButtonText: 'Cancel',
+                customClass: {
+                    popup: 'swal-checkout',
+                    confirmButton: 'btn btn-primary',
+                    cancelButton: 'btn btn-secondary'
+                },
+                buttonsStyling: false,
+                showClass: { popup: 'swal2-show' },
+                hideClass: { popup: 'swal2-hide' },
+                willClose: () => {
+                    // Restore Bootstrap modal focus behavior
+                    if (openBsModal && bsModalInstance && bsModalInstance._config) {
+                        try {
+                            bsModalInstance._config.focus = (prevFocusCfg !== null ? prevFocusCfg : true);
+                            openBsModal.setAttribute('data-bs-focus', String(prevFocusCfg !== false));
+                            if (focustrapDeactivated && bsModalInstance._focustrap && typeof bsModalInstance._focustrap.activate === 'function') {
+                                bsModalInstance._focustrap.activate();
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
+                },
+                focusConfirm: false,
+                didOpen: async () => {
+                    const chk = document.getElementById('withRefundChk');
+                    const wrap = document.getElementById('refundAmtWrap');
+                    const input = document.getElementById('refundAmountInput');
+                    if (chk && wrap) {
+                        // Check if payments exist for this booking
+                        try {
+                            const paymentsResponse = await fetch(`/payments/get-payments/${bookingId}?_=${Date.now()}`);
+                            const paymentsData = await paymentsResponse.json();
+                            const paymentsArray = (paymentsData && paymentsData.data) ? paymentsData.data : (Array.isArray(paymentsData) ? paymentsData : []);
+                            
+                            // Calculate total paid (exclude reservation_fee and discount)
+                            const totalPaid = (paymentsArray && Array.isArray(paymentsArray)) ? paymentsArray.reduce((sum, payment) => {
+                                if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
+                                    return sum;
+                                }
+                                return sum + parseFloat(payment.AMOUNT_PAID);
+                            }, 0) : 0;
+                            
+                            // Disable checkbox if no payments were made
+                            if (totalPaid <= 0) {
+                                chk.disabled = true;
+                                chk.checked = false;
+                                wrap.style.display = 'none';
+                            }
+                        } catch (error) {
+                            console.error('Error fetching payments:', error);
+                            // If fetch fails, disable checkbox as a safety measure
+                            chk.disabled = true;
+                            chk.checked = false;
+                            wrap.style.display = 'none';
+                        }
+                        
+                        chk.addEventListener('change', () => {
+                            if (!chk.disabled) {
+                                wrap.style.display = chk.checked ? 'block' : 'none';
+                                if (chk.checked && input) setTimeout(() => input.focus(), 0);
+                            }
+                        });
+                    }
+                },
+                preConfirm: async () => {
+                    const chk = document.getElementById('withRefundChk');
+                    const input = document.getElementById('refundAmountInput');
+                    const hasRefund = !!(chk && chk.checked);
+                    let amount = 0;
+                    if (hasRefund) {
+                        amount = parseFloat(input && input.value ? input.value : '');
+                        if (isNaN(amount) || amount < 0) {
+                            Swal.showValidationMessage('Please enter a valid refund amount.');
+                            return false;
+                        }
+                        if (amount === 0) {
+                            Swal.showValidationMessage('Please enter a refund amount greater than 0.');
+                            return false;
+                        }
+                        
+                        // Check if refund amount exceeds paid amount
+                        try {
+                            const paymentsResponse = await fetch(`/payments/get-payments/${bookingId}?_=${Date.now()}`);
+                            const paymentsData = await paymentsResponse.json();
+                            const paymentsArray = (paymentsData && paymentsData.data) ? paymentsData.data : (Array.isArray(paymentsData) ? paymentsData : []);
+                            
+                            // Calculate total paid (exclude reservation_fee and discount)
+                            const totalPaid = (paymentsArray && Array.isArray(paymentsArray)) ? paymentsArray.reduce((sum, payment) => {
+                                if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
+                                    return sum;
+                                }
+                                return sum + parseFloat(payment.AMOUNT_PAID);
+                            }, 0) : 0;
+                            
+                            // Check if refund amount exceeds paid amount
+                            if (amount > totalPaid) {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'Refund Amount Exceeds Paid Amount',
+                                    html: `
+                                        <p>The refund amount (₱${amount.toFixed(2)}) exceeds the total paid amount (₱${totalPaid.toFixed(2)}).</p>
+                                        <p><strong>You cannot refund more than what was paid.</strong></p>
+                                    `,
+                                    confirmButtonText: 'OK',
+                                    confirmButtonColor: '#0d6efd'
+                                });
+                                return false;
+                            }
+                        } catch (error) {
+                            console.error('Error fetching payments:', error);
+                            Swal.showValidationMessage('Unable to verify payment amount. Please try again.');
                             return false;
                         }
                     }
@@ -2063,18 +2274,36 @@ function triggerCheckout(bookingId) {
         });
 }
 
-// Handle selection (stub for now)
+// Handle checkout process
 function startCheckoutProcess(bookingId, hasRefund, refundAmount = 0, scope = 'individual') {
+    // Show loading state
+    Swal.fire({
+        title: 'Processing Checkout...',
+        text: 'Please wait while we process your checkout.',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
     // Call backend checkout API
     fetch('/booking/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bookingId, scope, hasRefund, refundAmount })
     })
-    .then(r => r.json())
+    .then(r => {
+        if (!r.ok) {
+            return r.json().then(err => Promise.reject(err));
+        }
+        return r.json();
+    })
     .then(resp => {
         if (resp && resp.success) {
-            toastSuccess('Checkout', 'Checkout completed successfully.');
+            Swal.close();
+            // Show message
+            let message = resp.message || 'Checkout completed successfully.';
+            toastSuccess('Checkout', message);
             setTimeout(() => { location.reload(); }, 600);
         } else {
             throw new Error(resp?.message || 'Checkout failed');
@@ -2082,7 +2311,9 @@ function startCheckoutProcess(bookingId, hasRefund, refundAmount = 0, scope = 'i
     })
     .catch(err => {
         console.error('Checkout error:', err);
-        toastError('Checkout', 'Failed to checkout.');
+        Swal.close();
+        const errorMessage = err?.message || err?.error || 'Failed to checkout. Please try again.';
+        toastError('Checkout', errorMessage);
     });
 }
 
