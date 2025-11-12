@@ -323,11 +323,11 @@ async function createDynamicRoomModal(bookingId, event, options) {
                         <h6 class="mb-0">Room Reservation Details</h6>
                         <div class="d-flex align-items-center gap-1">
                             <button class="btn btn-sm ${remarksButtonClass}" onclick="openRemarksModal('${bookingId}')">
-                        <i class="fas fa-sticky-note"></i> Remarks
-                    </button>
-                            <button type="button" class="btn btn-warning btn-sm ms-1 position-relative" id="crButton_${bookingId}" onclick="openComplaintRequestModal('${bookingId}')" style="overflow: visible;">
+                                <i class="fas fa-sticky-note"></i> Remarks
+                            </button>
+                            <button type="button" class="btn btn-warning btn-sm ms-1 position-relative" id="crButton_${bookingId}" onclick="openComplaintRequestModal('${bookingId}')" style="overflow: visible; z-index: 1;">
                                 <i class="fas fa-exclamation-circle me-1"></i>Complaint/Request
-                                <span id="crCount_${bookingId}" class="badge rounded-pill bg-danger" style="display:none; position:absolute; top:-8px; right:-10px; transform:none; min-width:20px; height:20px; padding:2px 7px; font-size:11px; font-weight:bold; line-height:16px; z-index:10; box-shadow:0 0 0 2px rgba(255,255,255,0.8); pointer-events:none; text-align:center; display:flex; align-items:center; justify-content:center;">0</span>
+                                <span id="crCount_${bookingId}" class="badge rounded-pill bg-danger" style="display:none; position:absolute; top:-8px; right:-10px; transform:none; min-width:20px; height:20px; padding:2px 7px; font-size:11px; font-weight:bold; line-height:16px; z-index:3; box-shadow:0 0 0 2px rgba(255,255,255,0.8); pointer-events:none; text-align:center; align-items:center; justify-content:center;">0</span>
                             </button>
                             <button type="button" class="btn btn-info btn-sm ms-1" onclick="showPayments('${bookingId}')" style="transition: none; opacity: 1 !important;">
                                 <i class="fas fa-credit-card me-1"></i>Payments
@@ -555,11 +555,19 @@ modalStyle.textContent = `
     #dynamicRoomModal_${bookingId} .card-header .btn {
         transition: none !important;
         opacity: 1 !important;
+        position: relative;
+        z-index: 1;
     }
     
     #dynamicRoomModal_${bookingId} .card-header .btn:hover {
         opacity: 1 !important;
         filter: brightness(0.95);
+        z-index: 2;
+    }
+    
+    #dynamicRoomModal_${bookingId} .card-header .btn .badge {
+        pointer-events: none !important;
+        z-index: 3;
     }
     
     #dynamicRoomModal_${bookingId} .card:hover {
@@ -3709,11 +3717,19 @@ function initializeTransferModal() {
             
             .modal .card-header .btn {
                 transition: none !important;
+                position: relative;
+                z-index: 1;
             }
             
             .modal .card-header .btn:hover {
                 opacity: 1 !important;
                 filter: brightness(0.95);
+                z-index: 2;
+            }
+            
+            .modal .card-header .btn .badge {
+                pointer-events: none !important;
+                z-index: 3;
             }
             
             .modal .card:hover {
@@ -3755,11 +3771,19 @@ function initializeTransferModal() {
             [id^="dynamicRoomModal_"] .card-header .btn {
                 transition: none !important;
                 opacity: 1 !important;
+                position: relative;
+                z-index: 1;
             }
             
             [id^="dynamicRoomModal_"] .card-header .btn:hover {
                 opacity: 1 !important;
                 filter: brightness(0.95);
+                z-index: 2;
+            }
+            
+            [id^="dynamicRoomModal_"] .card-header .btn .badge {
+                pointer-events: none !important;
+                z-index: 3;
             }
             
             [id^="dynamicRoomModal_"] .card:hover {
