@@ -204,6 +204,7 @@ async function updateRemarksButtonColor(bookingId) {
 // Function to create a dynamic room modal
 async function createDynamicRoomModal(bookingId, event, options) {
   let roomNumber, roomId, guestName, checkInDate, checkOutDate, daysDiff, roomType, customerType, customerLevel, totalCost, lateCheckout;
+  let shouldDisableCheckout = false;
   
   // Check if data is coming from calendar event
   if (options && options.isFromCalendar) {
@@ -236,6 +237,9 @@ async function createDynamicRoomModal(bookingId, event, options) {
     lateCheckout = roomCard.getAttribute('data-late-checkout');
     customerType = roomCard.getAttribute('data-customer-type') || 'Day/s';
     customerLevel = roomCard.getAttribute('data-customer-level') || '';
+    const isInCheckedInTab = !!roomCard.closest('#checked-in-content');
+    const isInCheckoutTab = !!roomCard.closest('#checkout-content');
+    shouldDisableCheckout = isInCheckedInTab || isInCheckoutTab;
 
     // Get guest info from the card content - improved data extraction
     const cardBody = roomCard.querySelector('.card-body');
@@ -261,6 +265,11 @@ async function createDynamicRoomModal(bookingId, event, options) {
   // Check if remarks exist for this booking
   const hasRemarks = await checkRemarksExist(bookingId);
   const remarksButtonClass = hasRemarks ? 'btn-danger' : 'btn-info';
+
+  const checkoutButtonAttributes = shouldDisableCheckout ? 'disabled aria-disabled="true" tabindex="-1"' : '';
+  const checkoutButtonStyle = shouldDisableCheckout
+    ? 'transition: none; opacity: 0.6 !important; cursor: not-allowed; pointer-events: none;'
+    : 'transition: none; opacity: 1 !important;';
 
   // Create modal HTML
   const modalHTML = `
@@ -296,7 +305,7 @@ async function createDynamicRoomModal(bookingId, event, options) {
                     </button>
                     
                   
-                    <button type="button" class="btn btn-danger btn-sm" onclick="triggerCheckout('${bookingId}')" style="transition: none; opacity: 1 !important;">
+                    <button type="button" class="btn btn-danger btn-sm" ${checkoutButtonAttributes} onclick="triggerCheckout('${bookingId}')" style="${checkoutButtonStyle}">
                                 <i class="fas fa-sign-out-alt me-1"></i>Checkout
                     </button>
                 </div>
@@ -445,13 +454,19 @@ async function createDynamicRoomModal(bookingId, event, options) {
                         <!-- Summary Section -->
                         <div class="summary-section">
                             <div class="row">
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <div class="summary-item">
                                         <label class="text-muted small mb-0">Grand Total</label>
                                         <div class="summary-value" id="grand-total-${bookingId}">${totalCost}</div>
                                     </div>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-4">
+                                    <div class="summary-item">
+                                        <label class="text-muted small mb-0">Paid</label>
+                                        <div class="summary-value" id="Paid-${bookingId}">₱0.00</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
                                     <div class="summary-item">
                                         <label class="text-muted small mb-0">Balance</label>
                                         <div class="summary-value" id="Balance-${bookingId}">₱0.00</div>
@@ -1019,7 +1034,7 @@ fetch(`/booking/booking_details/${bookingIdValue}`)
         if (data.PAYMENT_STATUS === 'paid') {
             paymentStatusElement = `<span class="badge bg-success">Paid</span>`;
         } else if (data.PAYMENT_STATUS === 'partial_paid') {
-            paymentStatusElement = `<span class="badge bg-warning">Partial Paid</span><br><small class="text-muted">Paid: ₱${formattedPaidAmount}</small>`;
+            paymentStatusElement = `<span class="badge bg-warning">Partial Paid</span>`;
         } else {
             paymentStatusElement = `<span class="badge bg-warning">Unpaid</span>`;
         }
@@ -1050,9 +1065,14 @@ fetch(`/booking/booking_details/${bookingIdValue}`)
     
         }
 
-        // Grand Total and Balance
+        // Grand Total, Paid, and Balance
         const grandTotalElement = document.getElementById(`grand-total-${bookingId}`);
-        if (grandTotalElement) grandTotalElement.textContent = `₱${formattedTotalRoomCost}`;
+        if (grandTotalElement) grandTotalElement.innerHTML = `<span class="text-primary"><strong>₱${formattedTotalRoomCost}</strong></span>`;
+
+        const paidElement = document.getElementById(`Paid-${bookingId}`);
+        if (paidElement) {
+            paidElement.innerHTML = `<span class="text-success"><strong>₱${formattedPaidAmount}</strong></span>`;
+        }
 
         const balanceElement = document.getElementById(`Balance-${bookingId}`);
         if (balanceElement) {
@@ -1737,7 +1757,7 @@ function calculateTotalCost(bookingId) {
     // Update Grand Total Display
     const grandTotalElement = document.getElementById(`grand-total-${bookingId}`);
     if (grandTotalElement) {
-        grandTotalElement.textContent = `₱${formattedGrandTotal}`;
+        grandTotalElement.innerHTML = `<span class="text-primary"><strong>₱${formattedGrandTotal}</strong></span>`;
     }
     
     // Debug logging
@@ -1881,6 +1901,20 @@ async function calculateBalance(bookingId, currentBookingId) {
             maximumFractionDigits: 2
         });
 
+        // Format Paid Amount with Comma Separator
+        let formattedPaid = totalPaymentsMade.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+
+        // Display Paid in UI
+        let paidElement = document.getElementById(`Paid-${bookingId}`);
+        if (paidElement) {
+            paidElement.innerHTML = `<span class="text-success"><strong>₱${formattedPaid}</strong></span>`;
+        } else {
+            console.error(`❌ Paid element not found: Paid-${bookingId}`);
+        }
+
         // Display Balance in UI
         let balanceElement = document.getElementById(`Balance-${bookingId}`);
             
@@ -1921,13 +1955,31 @@ function showBilling(bookingId) {
 
 // Trigger checkout: use SweetAlert with a refund checkbox and amount input
 function triggerCheckout(bookingId) {
-    // Try to show current balance in the prompt (optional)
+    // Try to show current balance, grand total, and paid in the prompt
     let balanceText = '';
+    let grandTotalText = '';
+    let paidText = '';
     try {
         const balEl = document.getElementById(`Balance-${bookingId}`);
         if (balEl) {
             const txt = balEl.textContent.replace(/\s+/g, ' ').trim();
             if (txt) balanceText = txt;
+        }
+    } catch (e) {}
+    try {
+        const grandTotalEl = document.getElementById(`grand-total-${bookingId}`);
+        if (grandTotalEl) {
+            // Extract text content, removing HTML tags
+            const txt = grandTotalEl.textContent.replace(/\s+/g, ' ').trim();
+            if (txt) grandTotalText = txt;
+        }
+    } catch (e) {}
+    try {
+        const paidEl = document.getElementById(`Paid-${bookingId}`);
+        if (paidEl) {
+            // Extract text content, removing HTML tags
+            const txt = paidEl.textContent.replace(/\s+/g, ' ').trim();
+            if (txt) paidText = txt;
         }
     } catch (e) {}
 
@@ -1937,8 +1989,11 @@ function triggerCheckout(bookingId) {
         style.id = 'swal-checkout-styles';
         style.textContent = `
             .swal-checkout .swal2-title{ font-size:1.25rem; font-weight:700; color:#2b2f32; margin-top:.25rem; }
-            .swal-checkout .section-label{ font-size:.75rem; text-transform:uppercase; letter-spacing:.3px; color:#6c757d; font-weight:600; display:block; margin-bottom:.25rem; }
-            .swal-checkout .balance-pill{ display:inline-block; padding:.25rem .5rem; border-radius:999px; background:#f1f3f5; color:#0c5460; font-weight:700; font-size:.85rem; }
+            .swal-checkout .section-label{ font-size:.75rem; text-transform:uppercase; letter-spacing:.3px; color:#6c757d; font-weight:600; display:block; margin-bottom:.25rem; text-align:center; }
+            .swal-checkout .balance-pill{ display:inline-block; padding:.25rem .5rem; border-radius:999px; background:#f1f3f5; color:#0c5460; font-weight:700; font-size:1.1rem; text-align:center; }
+            .swal-checkout .grand-total-pill{ color:#0d6efd !important; }
+            .swal-checkout .paid-pill{ color:#28a745 !important; }
+            .swal-checkout .balance-pill-red{ color:#dc3545 !important; }
             .swal-checkout .swal2-actions{ margin-top: .75rem; }
             .swal-checkout .choice-row{ margin-top:.5rem; }
         `;
@@ -1992,7 +2047,11 @@ function triggerCheckout(bookingId) {
                     <div style=\"text-align:left; margin-bottom:8px; color:#6c757d;\">
                         <span class=\"section-label\">Summary</span>
                         Proceed to checkout this booking?
-                        ${balanceText ? `<div style=\"margin-top:6px;\"><span class=\"section-label\">Balance</span><span class=\"balance-pill\">${balanceText}</span></div>` : ''}
+                        <div style=\"display:flex; gap:12px; margin-top:8px; flex-wrap:wrap; justify-content:center; align-items:center;\">
+                            ${grandTotalText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Grand Total</span><span class=\"balance-pill grand-total-pill\">${grandTotalText}</span></div>` : ''}
+                            ${paidText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Paid</span><span class=\"balance-pill paid-pill\">${paidText}</span></div>` : ''}
+                            ${balanceText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Balance</span><span class=\"balance-pill balance-pill-red\">${balanceText}</span></div>` : ''}
+                        </div>
                     </div>
                     ${groupHtml}
                     <div class=\"form-check choice-row\" style=\"text-align:left;\">
@@ -2004,6 +2063,14 @@ function triggerCheckout(bookingId) {
                         <input type=\"number\" min=\"0\" step=\"0.01\" id=\"refundAmountInput\" class=\"swal2-input\" placeholder=\"0.00\" style=\"width:100%; box-sizing:border-box; margin:0;\">
                         <small class=\"text-muted\" style=\"display:block; margin-top:6px;\">Enter the exact refund to give to the guest.</small>
                     </div>
+                    <style>
+                        .swal2-actions {
+                            gap: 10px !important;
+                        }
+                        .swal2-actions button {
+                            margin: 0 !important;
+                        }
+                    </style>
                 `,
                 showCancelButton: true,
                 confirmButtonText: 'Proceed',
@@ -2086,8 +2153,9 @@ function triggerCheckout(bookingId) {
                             return false;
                         }
                         
-                        // Check if refund amount exceeds paid amount
+                        // Check if refund amount exceeds paid amount and overpayment
                         try {
+                            // Fetch payments
                             const paymentsResponse = await fetch(`/payments/get-payments/${bookingId}?_=${Date.now()}`);
                             const paymentsData = await paymentsResponse.json();
                             const paymentsArray = (paymentsData && paymentsData.data) ? paymentsData.data : (Array.isArray(paymentsData) ? paymentsData : []);
@@ -2114,8 +2182,79 @@ function triggerCheckout(bookingId) {
                                 });
                                 return false;
                             }
+                            
+                            // Fetch billing data to get net balance (what they should pay)
+                            const billingResponse = await fetch(`/booking/get-billing/${bookingId}?_=${Date.now()}`);
+                            const billingData = await billingResponse.json();
+                            
+                            // Fetch booking details to get check-in date for actual days calculation
+                            const bookingResponse = await fetch(`/booking/booking_details/${bookingId}?_=${Date.now()}`);
+                            const bookingData = await bookingResponse.json();
+                            
+                            const reservationFee = parseFloat(billingData.reservationFee) || 0;
+                            const discountAmount = parseFloat(billingData.discountAmount) || 0;
+                            
+                            // Calculate actual days stayed (for early checkout)
+                            let actualDays = 1;
+                            if (bookingData && bookingData.CHECK_IN_DATE) {
+                                const checkInDate = new Date(bookingData.CHECK_IN_DATE);
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0);
+                                checkInDate.setHours(0, 0, 0, 0);
+                                const diffTime = today - checkInDate;
+                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                actualDays = Math.max(1, diffDays);
+                            }
+                            
+                            // Recalculate subtotal based on actual days stayed
+                            // Get room rate from first billing item (room item)
+                            let roomRate = 0;
+                            let servicesAndExtensionsTotal = 0;
+                            
+                            if (billingData.items && billingData.items.length > 0) {
+                                // First item is usually the room
+                                const roomItem = billingData.items[0];
+                                roomRate = parseFloat(roomItem.basePrice) || 0;
+                                            
+                                // Calculate services and extensions (items after the first room item)
+                                // These don't change based on days
+                                for (let i = 1; i < billingData.items.length; i++) {
+                                    servicesAndExtensionsTotal += parseFloat(billingData.items[i].subTotal) || 0;
+                                }
+                            }
+                            
+                            // Calculate net balance based on actual days
+                            // Room amount = roomRate * actualDays
+                            // Plus services/extensions
+                            // Minus reservation fee and discount
+                            const roomAmountForActualDays = roomRate * actualDays;
+                            const grossTotal = roomAmountForActualDays + servicesAndExtensionsTotal;
+                            const netBalance = grossTotal - reservationFee - discountAmount;
+                            
+                            // Calculate overpayment (paid - what they should pay)
+                            const overpayment = Math.max(0, totalPaid - netBalance);
+                            
+                            // Check if refund amount exceeds overpayment
+                            if (amount > overpayment) {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'Refund Amount Exceeds Overpayment',
+                                    html: `
+                                        <p>The refund amount (₱${amount.toFixed(2)}) exceeds the overpayment amount (₱${overpayment.toFixed(2)}).</p>
+                                        <p><strong>You cannot refund more than the overpayment (paid amount minus net amount due).</strong></p>
+                                        <p style="margin-top:8px; font-size:0.9em; color:#6c757d;">
+                                            Net Amount Due: ₱${netBalance.toFixed(2)}<br>
+                                            Total Paid: ₱${totalPaid.toFixed(2)}<br>
+                                            Maximum Refund: ₱${overpayment.toFixed(2)}
+                                        </p>
+                                    `,
+                                    confirmButtonText: 'OK',
+                                    confirmButtonColor: '#0d6efd'
+                                });
+                                return false;
+                            }
                         } catch (error) {
-                            console.error('Error fetching payments:', error);
+                            console.error('Error fetching payments or billing:', error);
                             Swal.showValidationMessage('Unable to verify payment amount. Please try again.');
                             return false;
                         }
@@ -2141,7 +2280,11 @@ function triggerCheckout(bookingId) {
                     <div style=\"text-align:left; margin-bottom:8px; color:#6c757d;\">
                         <span class=\"section-label\">Summary</span>
                         Proceed to checkout this booking?
-                        ${balanceText ? `<div style=\"margin-top:6px;\"><span class=\"section-label\">Balance</span><span class=\"balance-pill\">${balanceText}</span></div>` : ''}
+                        <div style=\"display:flex; gap:12px; margin-top:8px; flex-wrap:wrap; justify-content:center; align-items:center;\">
+                            ${grandTotalText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Grand Total</span><span class=\"balance-pill grand-total-pill\">${grandTotalText}</span></div>` : ''}
+                            ${paidText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Paid</span><span class=\"balance-pill paid-pill\">${paidText}</span></div>` : ''}
+                            ${balanceText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Balance</span><span class=\"balance-pill balance-pill-red\">${balanceText}</span></div>` : ''}
+                        </div>
                     </div>
                     ${groupHtml}
                     <div class=\"form-check choice-row\" style=\"text-align:left;\">
@@ -2153,6 +2296,14 @@ function triggerCheckout(bookingId) {
                         <input type=\"number\" min=\"0\" step=\"0.01\" id=\"refundAmountInput\" class=\"swal2-input\" placeholder=\"0.00\" style=\"width:100%; box-sizing:border-box; margin:0;\">
                         <small class=\"text-muted\" style=\"display:block; margin-top:6px;\">Enter the exact refund to give to the guest.</small>
                     </div>
+                    <style>
+                        .swal2-actions {
+                            gap: 5px !important;
+                        }
+                        .swal2-actions button {
+                            margin: 0 !important;
+                        }
+                    </style>
                 `,
                 showCancelButton: true,
                 confirmButtonText: 'Proceed',
@@ -2235,8 +2386,9 @@ function triggerCheckout(bookingId) {
                             return false;
                         }
                         
-                        // Check if refund amount exceeds paid amount
+                        // Check if refund amount exceeds paid amount and overpayment
                         try {
+                            // Fetch payments
                             const paymentsResponse = await fetch(`/payments/get-payments/${bookingId}?_=${Date.now()}`);
                             const paymentsData = await paymentsResponse.json();
                             const paymentsArray = (paymentsData && paymentsData.data) ? paymentsData.data : (Array.isArray(paymentsData) ? paymentsData : []);
@@ -2263,8 +2415,79 @@ function triggerCheckout(bookingId) {
                                 });
                                 return false;
                             }
+                            
+                            // Fetch billing data to get net balance (what they should pay)
+                            const billingResponse = await fetch(`/booking/get-billing/${bookingId}?_=${Date.now()}`);
+                            const billingData = await billingResponse.json();
+                            
+                            // Fetch booking details to get check-in date for actual days calculation
+                            const bookingResponse = await fetch(`/booking/booking_details/${bookingId}?_=${Date.now()}`);
+                            const bookingData = await bookingResponse.json();
+                            
+                            const reservationFee = parseFloat(billingData.reservationFee) || 0;
+                            const discountAmount = parseFloat(billingData.discountAmount) || 0;
+                            
+                            // Calculate actual days stayed (for early checkout)
+                            let actualDays = 1;
+                            if (bookingData && bookingData.CHECK_IN_DATE) {
+                                const checkInDate = new Date(bookingData.CHECK_IN_DATE);
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0);
+                                checkInDate.setHours(0, 0, 0, 0);
+                                const diffTime = today - checkInDate;
+                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                actualDays = Math.max(1, diffDays);
+                            }
+                            
+                            // Recalculate subtotal based on actual days stayed
+                            // Get room rate from first billing item (room item)
+                            let roomRate = 0;
+                            let servicesAndExtensionsTotal = 0;
+                            
+                            if (billingData.items && billingData.items.length > 0) {
+                                // First item is usually the room
+                                const roomItem = billingData.items[0];
+                                roomRate = parseFloat(roomItem.basePrice) || 0;
+                                            
+                                // Calculate services and extensions (items after the first room item)
+                                // These don't change based on days
+                                for (let i = 1; i < billingData.items.length; i++) {
+                                    servicesAndExtensionsTotal += parseFloat(billingData.items[i].subTotal) || 0;
+                                }
+                            }
+                            
+                            // Calculate net balance based on actual days
+                            // Room amount = roomRate * actualDays
+                            // Plus services/extensions
+                            // Minus reservation fee and discount
+                            const roomAmountForActualDays = roomRate * actualDays;
+                            const grossTotal = roomAmountForActualDays + servicesAndExtensionsTotal;
+                            const netBalance = grossTotal - reservationFee - discountAmount;
+                            
+                            // Calculate overpayment (paid - what they should pay)
+                            const overpayment = Math.max(0, totalPaid - netBalance);
+                            
+                            // Check if refund amount exceeds overpayment
+                            if (amount > overpayment) {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'Refund Amount Exceeds Overpayment',
+                                    html: `
+                                      
+                                        <p><strong>You cannot refund more than the overpayment (paid amount minus net amount due).</strong></p>
+                                        <p style="margin-top:8px; font-size:0.9em; color:#6c757d;">
+                                            Net Amount Due: ₱${netBalance.toFixed(2)}<br>
+                                            Total Paid: ₱${totalPaid.toFixed(2)}<br>
+                                            Maximum Refund: ₱${overpayment.toFixed(2)}
+                                        </p>
+                                    `,
+                                    confirmButtonText: 'OK',
+                                    confirmButtonColor: '#0d6efd'
+                                });
+                                return false;
+                            }
                         } catch (error) {
-                            console.error('Error fetching payments:', error);
+                            console.error('Error fetching payments or billing:', error);
                             Swal.showValidationMessage('Unable to verify payment amount. Please try again.');
                             return false;
                         }
