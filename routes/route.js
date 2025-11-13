@@ -17,6 +17,7 @@ const integrationRoutes = require('./r_integration');
 const roomClearanceRoutes = require('./r_room_clearance');
 const bookingChannelRoutes = require('./r_booking_channel');
 const paymentsRoutes = require('./r_payments');
+const telegramRoutes = require('./r_telegram');
 const apiRoutes = require('./r_api');
 
 // Auth middleware
@@ -25,6 +26,10 @@ const AuthMiddleware = require('../middleware/m_auth');
 // Public routes (no authentication required)
 router.use('/', loginRoutes);
 router.use('/api', apiRoutes);
+
+// Telegram webhook endpoint (public - Telegram needs to access this)
+const TelegramController = require('../controller/c_telegram');
+router.post('/telegram/webhook/update', TelegramController.handleWebhook);
 
 
 // Protected routes (require authentication)
@@ -42,6 +47,7 @@ router.use('/integration', AuthMiddleware.requireAuth, integrationRoutes);
 router.use('/booking_channel', AuthMiddleware.requireAuth, bookingChannelRoutes);
 router.use('/payments', AuthMiddleware.requireAuth, paymentsRoutes);
 router.use('/room_clearance', AuthMiddleware.requireAuth, roomClearanceRoutes);
+router.use('/telegram', AuthMiddleware.requireAuth, telegramRoutes);
 
 // Redirect root to dashboard if authenticated, otherwise to login
 router.get('/', AuthMiddleware.redirectIfAuthenticated, (req, res) => {

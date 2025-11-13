@@ -1,0 +1,421 @@
+
+<!-- ======================================== -->
+<!-- DAILY SETTLEMENT PAGE -->
+<!-- ======================================== -->
+
+<!-- Main Content Area -->
+<div class="row">
+    <div class="col-xl-12 col-md-12 col-12">
+        <div class="dashboard-card">
+            <div class="dashboard-card-header">
+                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                    <header style="margin: 0;">Daily Settlement Report</header>
+                    <div style="font-size: 1.1rem;">
+                        <i class="material-icons" style="margin-right: 5px; vertical-align: middle;">date_range</i>
+                        <span id="reportPeriod">Loading...</span>
+                    </div>
+                </div>
+                <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: flex-end;">
+                    <button id="btnRefresh" class="btn btn-primary" style="min-width: 150px;">
+                        <i class="material-icons" style="vertical-align: middle; margin-right: 5px;">refresh</i> 
+                        <span>Refresh</span>
+                    </button>
+                    <button id="btnSendTelegram" class="btn btn-success" style="min-width: 180px;">
+                        <i class="material-icons" style="vertical-align: middle; margin-right: 5px;">send</i> 
+                        <span>Send via Telegram</span>
+                    </button>
+                </div>
+            </div>
+            <div class="dashboard-card-body">
+                
+                <!-- Loading Indicator -->
+                <div id="loadingIndicator" class="text-center" style="display: none; padding: 20px;">
+                    <i class="fa fa-spinner fa-spin fa-3x"></i>
+                    <p>Loading settlement data...</p>
+                </div>
+
+                <!-- Error Message -->
+                <div id="errorMessage" class="alert alert-danger" style="display: none;"></div>
+
+                <!-- Settlement Report -->
+                <div id="settlementContent">
+                    <!-- Check-Ins Section -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 style="color: #b4b6bd;"><i class="material-icons" style="vertical-align: middle;">check_circle</i> Check-Ins : <span id="checkInCount">0</span></h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="checkInsList" class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th style="color: #b4b6bd; text-align: center;">Room</th>
+                                                    <th style="color: #b4b6bd; text-align: center;">Guest Name</th>
+                                                    <th style="color: #b4b6bd; text-align: center;">Check-In Date</th>
+                                                    <th style="color: #b4b6bd; text-align: center;">Type</th>
+                                                    <th style="color: #b4b6bd; text-align: center;">Confirmation</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="checkInsTableBody" style="color: #b4b6bd;">
+                                                <tr><td colspan="5" class="text-center">Loading...</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Check-Outs Section -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 style="color: #b4b6bd;"><i class="material-icons" style="vertical-align: middle;">exit_to_app</i> Check-Outs : <span id="checkOutCount">0</span></h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="checkOutsList" class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th style="color: #b4b6bd; text-align: center;">Room</th>
+                                                    <th style="color: #b4b6bd; text-align: center;">Guest Name</th>
+                                                    <th style="color: #b4b6bd; text-align: center;">Check-Out Date</th>
+                                                    <th style="color: #b4b6bd; text-align: center;">Type</th>
+                                                    <th style="color: #b4b6bd; text-align: center;">Stay Days</th>
+                                                    <th style="color: #b4b6bd; text-align: center;">Confirmation</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="checkOutsTableBody" style="color: #b4b6bd;">
+                                                <tr><td colspan="6" class="text-center">Loading...</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pending Section -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 style="color: #b4b6bd;"><i class="material-icons" style="vertical-align: middle;">schedule</i> Pending : <span id="pendingCount">0</span></h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="pendingList" class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th style="color: #b4b6bd; text-align: center;">Room</th>
+                                                    <th style="color: #b4b6bd; text-align: center;">Guest Name</th>
+                                                    <th style="color: #b4b6bd; text-align: center;">Check-In Date</th>
+                                                    <th style="color: #b4b6bd; text-align: center;">Check-Out Date</th>
+                                                    <th style="color: #b4b6bd; text-align: center;">Stay Days</th>
+                                                    <th style="color: #b4b6bd; text-align: center;">Confirmation</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="pendingTableBody" style="color: #b4b6bd;">
+                                                <tr><td colspan="6" class="text-center">Loading...</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Room Availability Section -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 style="color: #b4b6bd;"><i class="material-icons">hotel</i> Expected Room Availability for Today</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <div class="stat-card">
+                                                <div class="stat-value" id="totalRooms">0</div>
+                                                <div class="stat-label">Total Rooms</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="stat-card">
+                                                <div class="stat-value text-success" id="availableRooms">0</div>
+                                                <div class="stat-label">Available</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="stat-card">
+                                                <div class="stat-value text-warning" id="occupiedRooms">0</div>
+                                                <div class="stat-label">Occupied</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="stat-card">
+                                                <div class="stat-value text-info" id="cleaningRooms">0</div>
+                                                <div class="stat-label">Cleaning</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-3">
+                                        <div class="col-md-3">
+                                            <div class="stat-card">
+                                                <div class="stat-value text-danger" id="maintenanceRooms">0</div>
+                                                <div class="stat-label">Maintenance</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="stat-card">
+                                                <div class="stat-value" id="occupancyRate">0%</div>
+                                                <div class="stat-label">Occupancy Rate</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="stat-card">
+                                                <div class="stat-value text-primary" id="expectedCheckIns">0</div>
+                                                <div class="stat-label">Expected Check-Ins</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="stat-card">
+                                                <div class="stat-value text-primary" id="expectedCheckOuts">0</div>
+                                                <div class="stat-label">Expected Check-Outs</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<style>
+.stat-card {
+    text-align: center;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+.stat-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #333;
+}
+.stat-label {
+    font-size: 0.9rem;
+    color: #666;
+    margin-top: 5px;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let settlementData = null;
+
+    // Load settlement data
+    function loadSettlement() {
+        document.getElementById('loadingIndicator').style.display = 'block';
+        document.getElementById('settlementContent').style.display = 'none';
+        document.getElementById('errorMessage').style.display = 'none';
+
+        fetch('/telegram/settlement/data', {
+            credentials: 'include'
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('loadingIndicator').style.display = 'none';
+            
+            if (data.success) {
+                settlementData = data.data;
+                displaySettlement(data.data);
+                document.getElementById('settlementContent').style.display = 'block';
+            } else {
+                showError(data.message || 'Failed to load settlement data');
+            }
+        })
+        .catch(error => {
+            document.getElementById('loadingIndicator').style.display = 'none';
+            showError('Error loading settlement data: ' + error.message);
+        });
+    }
+
+    function displaySettlement(data) {
+        // Period
+        document.getElementById('reportPeriod').textContent = 
+            `${data.period.startFormatted} to ${data.period.endFormatted}`;
+
+        // Check-Ins
+        document.getElementById('checkInCount').textContent = data.checkIns.count;
+        const checkInsBody = document.getElementById('checkInsTableBody');
+        if (data.checkIns.count > 0) {
+            checkInsBody.innerHTML = data.checkIns.data.map(item => `
+                <tr style="color: #b4b6bd;">
+                    <td style="color: #b4b6bd; text-align: center;">${item.ROOM_NUMBER || 'N/A'}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CUSTOMER_NAME || 'N/A'}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${new Date(item.CHECK_IN_DATE).toLocaleString()}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CHECK_IN_TYPE}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CONFIRMATION_NUMBER || 'N/A'}</td>
+                </tr>
+            `).join('');
+        } else {
+            checkInsBody.innerHTML = '<tr style="color: #b4b6bd;"><td colspan="5" class="text-center" style="color: #b4b6bd;">No check-ins during this period</td></tr>';
+        }
+
+        // Check-Outs
+        document.getElementById('checkOutCount').textContent = data.checkOuts.count;
+        const checkOutsBody = document.getElementById('checkOutsTableBody');
+        if (data.checkOuts.count > 0) {
+            checkOutsBody.innerHTML = data.checkOuts.data.map(item => `
+                <tr style="color: #b4b6bd;">
+                    <td style="color: #b4b6bd; text-align: center;">${item.ROOM_NUMBER || 'N/A'}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CUSTOMER_NAME || 'N/A'}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${new Date(item.CHECK_OUT_DATE).toLocaleString()}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CHECK_OUT_TYPE}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.STAY_DAYS} day(s)</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CONFIRMATION_NUMBER || 'N/A'}</td>
+                </tr>
+            `).join('');
+        } else {
+            checkOutsBody.innerHTML = '<tr style="color: #b4b6bd;"><td colspan="6" class="text-center" style="color: #b4b6bd;">No check-outs during this period</td></tr>';
+        }
+
+        // Pending
+        document.getElementById('pendingCount').textContent = data.pending.count;
+        const pendingBody = document.getElementById('pendingTableBody');
+        if (data.pending.count > 0) {
+            pendingBody.innerHTML = data.pending.data.map(item => `
+                <tr style="color: #b4b6bd;">
+                    <td style="color: #b4b6bd; text-align: center;">${item.ROOM_NUMBER || 'N/A'}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CUSTOMER_NAME || 'N/A'}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${new Date(item.CHECK_IN_DATE).toLocaleString()}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CHECK_OUT_DATE || 'N/A'}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.STAY_DAYS} day(s)</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CONFIRMATION_NUMBER || 'N/A'}</td>
+                </tr>
+            `).join('');
+        } else {
+            pendingBody.innerHTML = '<tr style="color: #b4b6bd;"><td colspan="6" class="text-center" style="color: #b4b6bd;">No pending bookings during this period</td></tr>';
+        }
+
+        // Room Availability
+        const availability = data.roomAvailability;
+        document.getElementById('totalRooms').textContent = availability.totalRooms;
+        document.getElementById('availableRooms').textContent = availability.availableRooms;
+        document.getElementById('occupiedRooms').textContent = availability.occupiedRooms;
+        document.getElementById('cleaningRooms').textContent = availability.cleaningRooms;
+        document.getElementById('maintenanceRooms').textContent = availability.maintenanceRooms;
+        document.getElementById('occupancyRate').textContent = availability.occupancyRate + '%';
+        document.getElementById('expectedCheckIns').textContent = availability.expectedCheckIns;
+        document.getElementById('expectedCheckOuts').textContent = availability.expectedCheckOuts;
+    }
+
+    function showError(message) {
+        document.getElementById('errorMessage').textContent = message;
+        document.getElementById('errorMessage').style.display = 'block';
+    }
+
+    // Refresh button
+    document.getElementById('btnRefresh').addEventListener('click', loadSettlement);
+
+    // Load saved chat ID
+    let savedChatId = null;
+    function loadBotConfig() {
+        fetch('/telegram/config', {
+            credentials: 'include'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data) {
+                if (data.data.CHAT_ID) {
+                    savedChatId = data.data.CHAT_ID;
+                    document.getElementById('btnSendTelegram').disabled = false;
+                } else {
+                    document.getElementById('btnSendTelegram').disabled = true;
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error loading bot config:', error);
+            document.getElementById('btnSendTelegram').disabled = true;
+        });
+    }
+
+    // Send via Telegram button
+    document.getElementById('btnSendTelegram').addEventListener('click', function() {
+        if (!savedChatId) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Chat ID Not Configured',
+                text: 'Please configure it in Telegram settings first.',
+                confirmButtonColor: '#3085d6'
+            });
+            return;
+        }
+        sendReport(savedChatId);
+    });
+
+    function sendReport(chatId) {
+        const btn = document.getElementById('btnSendTelegram');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="material-icons">hourglass_empty</i> Sending...';
+
+        fetch('/telegram/settlement/send', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include'
+        })
+        .then(response => response.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            
+            if (data.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Success!',
+                    text: 'Report sent successfully to Telegram!',
+                    confirmButtonColor: '#3085d6',
+                    timer: 2000,
+                    showConfirmButton: true
+                });
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: data.message || 'Failed to send report',
+                    confirmButtonColor: '#3085d6'
+                });
+            }
+        })
+        .catch(error => {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Error sending report: ' + error.message,
+                confirmButtonColor: '#3085d6'
+            });
+        });
+    }
+
+    // Initial load
+    loadSettlement();
+    loadBotConfig();
+});
+</script>
+

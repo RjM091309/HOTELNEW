@@ -114,7 +114,24 @@
 				<li class="menu-heading" style="margin-top: 15px;">
 					<span>Management</span>
 				</li>
-				
+
+				<li class="nav-item <%= activePage === 'daily_settlement' ? 'active' : '' %>">
+					<a href="/telegram/settlement" class="nav-link ">
+						<span class="title">Daily Settlement </span>
+						<i class="material-icons">assessment</i>
+						<span class="selected"></span>
+					</a>
+				</li>
+			
+
+				<li class="nav-item <%= activePage === 'payments' ? 'active' : '' %>">
+					<a href="/payments" class="nav-link ">
+						<span class="title">Payment Management </span>
+						<i class="material-icons">payment</i>
+						<span class="selected"></span>
+					</a>
+				</li>
+
 				<li class="nav-item <%= activePage === 'expenses' ? 'active' : '' %>">
 					<a href="/expenses" class="nav-link ">
 						<span class="title">Expenses </span>
@@ -123,14 +140,6 @@
 					</a>
 				</li>
 
-			<li class="nav-item <%= activePage === 'payments' ? 'active' : '' %>">
-				<a href="/payments" class="nav-link ">
-					<span class="title">Payment Management </span>
-					<i class="material-icons">payment</i>
-					<span class="selected"></span>
-				</a>
-			</li>
-
 				<li class="nav-item <%= activePage === 'room_clearance' ? 'active' : '' %>">
 					<a href="/room_clearance" class="nav-link ">
 						<span class="title">Room Clearance </span>
@@ -138,6 +147,8 @@
 						<span class="selected"></span>
 					</a>
 				</li>
+
+			
 				
 				<li class="nav-item <%= activePage === 'services' ? 'active' : '' %>">
 					<a href="/services" class="nav-link ">
@@ -175,18 +186,24 @@
 				
 
 				<!-- Settings Section -->
-				<li class="nav-item <%= activePage === 'integration' ? 'open' : '' %>">
+				<li class="nav-item <%= (activePage === 'integration' || activePage === 'telegram_settings') ? 'open' : '' %>">
 					<a class="nav-link nav-toggle nav-main-link-submenu" data-toggle="submenu" aria-haspopup="true"
-						aria-expanded="<%= activePage === 'integration' ? 'true' : 'false' %>" href="#">
+						aria-expanded="<%= (activePage === 'integration' || activePage === 'telegram_settings') ? 'true' : 'false' %>" href="#">
 						<i class="material-icons">settings</i>
 						<span class="title">Settings</span>
-						<span class="arrow <%= activePage === 'integration' ? 'open' : '' %>"></span>
+						<span class="arrow <%= (activePage === 'integration' || activePage === 'telegram_settings') ? 'open' : '' %>"></span>
 					</a>
-					<ul class="sub-menu <%= activePage === 'integration' ? 'show' : '' %>">
+					<ul class="sub-menu <%= (activePage === 'integration' || activePage === 'telegram_settings') ? 'show' : '' %>" <% if (activePage === 'integration' || activePage === 'telegram_settings') { %>style="display: block;"<% } %>>
 						<li class="nav-item">
 							<a class="nav-link <%= activePage === 'integration' ? 'active' : '' %>" href="/integration">
 								<i class="fa fa-genderless"></i>
 								<span class="title">Integration</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link <%= activePage === 'telegram_settings' ? 'active' : '' %>" href="/telegram/settings">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Telegram Settings</span>
 							</a>
 						</li>
 					</ul>

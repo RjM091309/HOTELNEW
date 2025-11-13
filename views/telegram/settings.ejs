@@ -1,0 +1,287 @@
+
+<!-- ======================================== -->
+<!-- TELEGRAM SETTINGS PAGE -->
+<!-- ======================================== -->
+
+<!-- Main Content Area -->
+<div class="row">
+    <div class="col-xl-12 col-md-12 col-12">
+        <div class="dashboard-card">
+            <div class="dashboard-card-header">
+                <header>Telegram Bot Settings</header>
+            </div>
+            <div class="dashboard-card-body">
+                
+                <!-- Loading Indicator -->
+                <div id="loadingIndicator" class="text-center" style="display: none; padding: 20px;">
+                    <i class="fa fa-spinner fa-spin fa-3x"></i>
+                    <p>Loading...</p>
+                </div>
+
+                <!-- Error Message -->
+                <div id="errorMessage" class="alert alert-danger" style="display: none;"></div>
+
+                <!-- Success Message -->
+                <div id="successMessage" class="alert alert-success" style="display: none;"></div>
+
+                <!-- Telegram Bot Configuration Form -->
+                <form id="telegramConfigForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="botToken" style="color: #fff;">Bot Token <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="botToken" placeholder="Enter bot token from @BotFather" required>
+                                <small class="form-text text-muted">
+                                    Get your bot token from <a href="https://t.me/BotFather" target="_blank">@BotFather</a> on Telegram
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="chatId" style="color: #fff;">Chat ID <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="chatId" placeholder="Enter your Telegram Chat ID (e.g., 5809817914)" required>
+                                <small class="form-text text-muted">
+                                    Your Telegram Chat ID where reports will be sent.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 30px;">
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <button type="submit" class="btn btn-primary" id="btnSaveConfig" style="min-width: 180px;">
+                                <i class="material-icons" style="vertical-align: middle; margin-right: 5px;">save</i> 
+                                <span>Save Configuration</span>
+                            </button>
+                            <!-- <button type="button" class="btn btn-info" id="btnTestBot" style="min-width: 180px;">
+                                <i class="material-icons" style="vertical-align: middle; margin-right: 5px;">check_circle</i> 
+                                <span>Test Bot Connection</span>
+                            </button> -->
+                            <button type="button" class="btn btn-danger" id="btnDeleteConfig" style="min-width: 180px;">
+                                <i class="material-icons" style="vertical-align: middle; margin-right: 5px;">delete</i> 
+                                <span>Delete Configuration</span>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Current Configuration Display -->
+                <div id="currentConfig" style="margin-top: 20px; display: none;">
+                    <hr style="border-color: #e0e0e0; margin: 20px 0;">
+                    <h5 style="margin-bottom: 12px; font-weight: 600; color: #fff;">Current Configuration</h5>
+                    <div class="card" style="border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); height: auto; min-height: 40px;">
+                        <div class="card-body" style="padding: 10px 20px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; flex-wrap: wrap; gap: 15px;">
+                                <div style="flex: 1; min-width: 150px;">
+                                    <strong style="color: #fff; display: block; margin-bottom: 2px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Bot Name</strong>
+                                    <span id="displayBotName" style="font-size: 14px; color: #fff; font-weight: 500;">-</span>
+                                </div>
+                                <div style="flex: 2; min-width: 200px;">
+                                    <strong style="color: #fff; display: block; margin-bottom: 2px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Bot Token</strong>
+                                    <span id="displayBotToken" style="font-size: 12px; color: #fff; word-break: break-all; font-family: 'Courier New', monospace;">-</span>
+                                </div>
+                                <div style="flex: 1; min-width: 120px;">
+                                    <strong style="color: #fff; display: block; margin-bottom: 2px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Chat ID</strong>
+                                    <span id="displayChatId" style="font-size: 14px; color: #fff; font-weight: 500;">-</span>
+                                </div>
+                                <div style="flex: 1; min-width: 100px;">
+                                    <strong style="color: #fff; display: block; margin-bottom: 2px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Status</strong>
+                                    <span id="displayStatus" class="label label-sm label-success" style="padding: 4px 10px; font-size: 11px; font-weight: 600; border-radius: 20px; background-color: #e0e0e0; color: #fff; display: inline-block;">ACTIVE</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load current configuration
+    loadCurrentConfig();
+
+    // Form submit
+    document.getElementById('telegramConfigForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveConfiguration();
+    });
+
+    // Test bot button
+    document.getElementById('btnTestBot').addEventListener('click', function() {
+        testBotConnection();
+    });
+
+    // Delete config button
+    document.getElementById('btnDeleteConfig').addEventListener('click', function() {
+        if (confirm('Are you sure you want to delete the Telegram bot configuration? This action cannot be undone.')) {
+            deleteConfiguration();
+        }
+    });
+
+    function loadCurrentConfig() {
+        document.getElementById('loadingIndicator').style.display = 'block';
+        hideMessages();
+
+        fetch('/telegram/config', {
+            credentials: 'include'
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('loadingIndicator').style.display = 'none';
+            
+            if (data.success && data.data) {
+                // Fill form with existing data
+                if (data.data.BOT_TOKEN) {
+                    document.getElementById('botToken').value = data.data.BOT_TOKEN;
+                }
+                if (data.data.CHAT_ID) {
+                    document.getElementById('chatId').value = data.data.CHAT_ID;
+                }
+
+                // Show current config display
+                document.getElementById('currentConfig').style.display = 'block';
+                document.getElementById('displayBotName').textContent = data.data.BOT_NAME || 'N/A';
+                document.getElementById('displayBotToken').textContent = data.data.BOT_TOKEN || 'N/A';
+                document.getElementById('displayChatId').textContent = data.data.CHAT_ID || 'N/A';
+            } else {
+                document.getElementById('currentConfig').style.display = 'none';
+            }
+        })
+        .catch(error => {
+            document.getElementById('loadingIndicator').style.display = 'none';
+            showError('Error loading configuration: ' + error.message);
+        });
+    }
+
+    function saveConfiguration() {
+        const botToken = document.getElementById('botToken').value.trim();
+        const chatId = document.getElementById('chatId').value.trim();
+
+        if (!botToken) {
+            showError('Bot token is required');
+            return;
+        }
+
+        if (!chatId) {
+            showError('Chat ID is required');
+            return;
+        }
+
+        const btn = document.getElementById('btnSaveConfig');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...';
+        hideMessages();
+
+        fetch('/telegram/config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                botToken: botToken,
+                chatId: chatId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+
+            if (data.success) {
+                showSuccess('Telegram bot configured successfully!');
+                loadCurrentConfig();
+            } else {
+                showError(data.message || 'Failed to save configuration');
+            }
+        })
+        .catch(error => {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            showError('Error saving configuration: ' + error.message);
+        });
+    }
+
+    function testBotConnection() {
+        const btn = document.getElementById('btnTestBot');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Testing...';
+        hideMessages();
+
+        fetch('/telegram/test', {
+            method: 'POST',
+            credentials: 'include'
+        })
+        .then(response => response.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+
+            if (data.success) {
+                showSuccess('Bot connection successful! Bot Name: ' + (data.data.first_name || 'N/A') + ' (@' + (data.data.username || 'N/A') + ')');
+            } else {
+                showError('Bot connection failed: ' + data.message);
+            }
+        })
+        .catch(error => {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            showError('Error testing bot: ' + error.message);
+        });
+    }
+
+    function deleteConfiguration() {
+        const btn = document.getElementById('btnDeleteConfig');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Deleting...';
+        hideMessages();
+
+        fetch('/telegram/config', {
+            method: 'DELETE',
+            credentials: 'include'
+        })
+        .then(response => response.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+
+            if (data.success) {
+                showSuccess('Configuration deleted successfully');
+                // Clear form
+                document.getElementById('telegramConfigForm').reset();
+                document.getElementById('currentConfig').style.display = 'none';
+            } else {
+                showError(data.message || 'Failed to delete configuration');
+            }
+        })
+        .catch(error => {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            showError('Error deleting configuration: ' + error.message);
+        });
+    }
+
+    function showError(message) {
+        document.getElementById('errorMessage').textContent = message;
+        document.getElementById('errorMessage').style.display = 'block';
+        document.getElementById('successMessage').style.display = 'none';
+    }
+
+    function showSuccess(message) {
+        document.getElementById('successMessage').textContent = message;
+        document.getElementById('successMessage').style.display = 'block';
+        document.getElementById('errorMessage').style.display = 'none';
+    }
+
+    function hideMessages() {
+        document.getElementById('errorMessage').style.display = 'none';
+        document.getElementById('successMessage').style.display = 'none';
+    }
+});
+</script>
+
