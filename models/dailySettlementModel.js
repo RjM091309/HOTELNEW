@@ -28,6 +28,14 @@ class DailySettlementModel {
             // Get expected room availability for today
             const roomAvailability = await this.getExpectedRoomAvailability(today);
             
+            // Get expected check-ins/out for today (detailed lists)
+            const expectedCheckInsToday = await this.getExpectedCheckInsToday(today);
+            const expectedCheckOutsToday = await this.getExpectedCheckOutsToday(today);
+            
+            // Align counts with detailed data
+            roomAvailability.expectedCheckIns = expectedCheckInsToday.count;
+            roomAvailability.expectedCheckOuts = expectedCheckOutsToday.count;
+            
             return {
                 period: {
                     start: periodStart.format('YYYY-MM-DD HH:mm:ss'),
@@ -38,6 +46,8 @@ class DailySettlementModel {
                 checkIns,
                 checkOuts,
                 pending,
+                expectedCheckInsToday,
+                expectedCheckOutsToday,
                 roomAvailability,
                 generatedAt: moment().format('YYYY-MM-DD HH:mm:ss')
             };
@@ -178,6 +188,85 @@ class DailySettlementModel {
             };
         } catch (error) {
             console.error('Error getting pending bookings:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Get expected check-ins today (detailed)
+     */
+    static async getExpectedCheckInsToday(today) {
+        try {
+            const query = `
+                SELECT 
+                    b.IDNo,
+                    b.CONFIRMATION_NUMBER,
+                    r.ROOM_NUMBER,
+                    c.NAME AS CUSTOMER_NAME,
+                    DATE_FORMAT(b.CHECK_IN_DATE, '%Y-%m-%d %H:%i:%s') AS CHECK_IN_DATE,
+                    DATE_FORMAT(b.CHECK_OUT_DATE, '%Y-%m-%d') AS CHECK_OUT_DATE,
+                    b.BOOKING_STATUS,
+                    b.GUESTS_COUNT,
+                    b.BOOKING_CHANNEL
+                FROM booking b
+                LEFT JOIN room r ON b.ROOM_ID = r.IDNo
+                LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+                WHERE b.ACTIVE = 1
+                    AND b.BOOKING_STATUS = 'pending'
+                    AND DATE(b.CHECK_IN_DATE) = DATE(?)
+                ORDER BY b.CHECK_IN_DATE ASC
+            `;
+            
+            const results = await queryDatabasePromise(query, [
+                today.format('YYYY-MM-DD')
+            ]);
+            
+            return {
+                count: results.length,
+                data: results
+            };
+        } catch (error) {
+            console.error('Error getting expected check-ins today:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Get expected check-outs today (detailed)
+     */
+    static async getExpectedCheckOutsToday(today) {
+        try {
+            const query = `
+                SELECT 
+                    b.IDNo,
+                    b.CONFIRMATION_NUMBER,
+                    r.ROOM_NUMBER,
+                    c.NAME AS CUSTOMER_NAME,
+                    DATE_FORMAT(b.CHECK_IN_DATE, '%Y-%m-%d') AS CHECK_IN_DATE,
+                    DATE_FORMAT(b.CHECK_OUT_DATE, '%Y-%m-%d %H:%i:%s') AS CHECK_OUT_DATE,
+                    b.BOOKING_STATUS,
+                    b.GUESTS_COUNT,
+                    b.BOOKING_CHANNEL,
+                    GREATEST(1, DATEDIFF(b.CHECK_OUT_DATE, b.CHECK_IN_DATE)) AS STAY_DAYS
+                FROM booking b
+                LEFT JOIN room r ON b.ROOM_ID = r.IDNo
+                LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+                WHERE b.ACTIVE = 1
+                    AND b.BOOKING_STATUS = 'check-In'
+                    AND DATE(b.CHECK_OUT_DATE) = DATE(?)
+                ORDER BY b.CHECK_OUT_DATE ASC
+            `;
+            
+            const results = await queryDatabasePromise(query, [
+                today.format('YYYY-MM-DD')
+            ]);
+            
+            return {
+                count: results.length,
+                data: results
+            };
+        } catch (error) {
+            console.error('Error getting expected check-outs today:', error);
             throw error;
         }
     }

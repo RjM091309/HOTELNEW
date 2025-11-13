@@ -128,6 +128,63 @@
                         </div>
                     </div>
 
+                    <!-- Expected Check-Ins Today Section -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 style="color: #b4b6bd;"><i class="material-icons" style="vertical-align: middle;">check_circle</i> Check-Ins Today : <span id="expectedCheckInsTodayCount">0</span></h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="expectedCheckInsTodayList" class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th style="color: #b4b6bd; text-align: center;">Room</th>
+                                                    <th style="color: #b4b6bd; text-align: center;">Guest Name</th>
+                                                    <th style="color: #b4b6bd; text-align: center;">Check-In Date</th>
+                                                    <th style="color: #b4b6bd; text-align: center;">Confirmation</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="expectedCheckInsTodayTableBody" style="color: #b4b6bd;">
+                                                <tr><td colspan="4" class="text-center">Loading...</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Expected Check-Outs Today Section -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 style="color: #b4b6bd;"><i class="material-icons" style="vertical-align: middle;">exit_to_app</i> Check-Outs Today : <span id="expectedCheckOutsTodayCount">0</span></h5>
+                                </div>
+                                <div class="card-body">
+                                    <div id="expectedCheckOutsTodayList" class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th style="color: #b4b6bd; text-align: center;">Room</th>
+                                                    <th style="color: #b4b6bd; text-align: center;">Guest Name</th>
+                                                    <th style="color: #b4b6bd; text-align: center;">Check-Out Date</th>
+                                                    <th style="color: #b4b6bd; text-align: center;">Stay Days</th>
+                                                    <th style="color: #b4b6bd; text-align: center;">Confirmation</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="expectedCheckOutsTodayTableBody" style="color: #b4b6bd;">
+                                                <tr><td colspan="5" class="text-center">Loading...</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Room Availability Section -->
                     <div class="row mb-4">
                         <div class="col-md-12">
@@ -263,7 +320,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <tr style="color: #b4b6bd;">
                     <td style="color: #b4b6bd; text-align: center;">${item.ROOM_NUMBER || 'N/A'}</td>
                     <td style="color: #b4b6bd; text-align: center;">${item.CUSTOMER_NAME || 'N/A'}</td>
-                    <td style="color: #b4b6bd; text-align: center;">${new Date(item.CHECK_IN_DATE).toLocaleString()}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CHECK_IN_DATE ? moment(item.CHECK_IN_DATE).format('MMM DD, YYYY') : 'N/A'}</td>
                     <td style="color: #b4b6bd; text-align: center;">${item.CHECK_IN_TYPE}</td>
                     <td style="color: #b4b6bd; text-align: center;">${item.CONFIRMATION_NUMBER || 'N/A'}</td>
                 </tr>
@@ -280,7 +337,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <tr style="color: #b4b6bd;">
                     <td style="color: #b4b6bd; text-align: center;">${item.ROOM_NUMBER || 'N/A'}</td>
                     <td style="color: #b4b6bd; text-align: center;">${item.CUSTOMER_NAME || 'N/A'}</td>
-                    <td style="color: #b4b6bd; text-align: center;">${new Date(item.CHECK_OUT_DATE).toLocaleString()}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CHECK_OUT_DATE ? moment(item.CHECK_OUT_DATE).format('MMM DD, YYYY') : 'N/A'}</td>
                     <td style="color: #b4b6bd; text-align: center;">${item.CHECK_OUT_TYPE}</td>
                     <td style="color: #b4b6bd; text-align: center;">${item.STAY_DAYS} day(s)</td>
                     <td style="color: #b4b6bd; text-align: center;">${item.CONFIRMATION_NUMBER || 'N/A'}</td>
@@ -298,14 +355,49 @@ document.addEventListener('DOMContentLoaded', function() {
                 <tr style="color: #b4b6bd;">
                     <td style="color: #b4b6bd; text-align: center;">${item.ROOM_NUMBER || 'N/A'}</td>
                     <td style="color: #b4b6bd; text-align: center;">${item.CUSTOMER_NAME || 'N/A'}</td>
-                    <td style="color: #b4b6bd; text-align: center;">${new Date(item.CHECK_IN_DATE).toLocaleString()}</td>
-                    <td style="color: #b4b6bd; text-align: center;">${item.CHECK_OUT_DATE || 'N/A'}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CHECK_IN_DATE ? moment(item.CHECK_IN_DATE).format('MMM DD, YYYY') : 'N/A'}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CHECK_OUT_DATE ? moment(item.CHECK_OUT_DATE).format('MMM DD, YYYY') : 'N/A'}</td>
                     <td style="color: #b4b6bd; text-align: center;">${item.STAY_DAYS} day(s)</td>
                     <td style="color: #b4b6bd; text-align: center;">${item.CONFIRMATION_NUMBER || 'N/A'}</td>
                 </tr>
             `).join('');
         } else {
             pendingBody.innerHTML = '<tr style="color: #b4b6bd;"><td colspan="6" class="text-center" style="color: #b4b6bd;">No pending bookings during this period</td></tr>';
+        }
+
+        // Check-Ins Today
+        const expectedCheckInsToday = data.expectedCheckInsToday || { count: 0, data: [] };
+        document.getElementById('expectedCheckInsTodayCount').textContent = expectedCheckInsToday.count;
+        const expectedCheckInsTodayBody = document.getElementById('expectedCheckInsTodayTableBody');
+        if (expectedCheckInsToday.count > 0) {
+            expectedCheckInsTodayBody.innerHTML = expectedCheckInsToday.data.map(item => `
+                <tr style="color: #b4b6bd;">
+                    <td style="color: #b4b6bd; text-align: center;">${item.ROOM_NUMBER || 'N/A'}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CUSTOMER_NAME || 'N/A'}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CHECK_IN_DATE ? moment(item.CHECK_IN_DATE).format('MMM DD, YYYY') : 'N/A'}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CONFIRMATION_NUMBER || 'N/A'}</td>
+                </tr>
+            `).join('');
+        } else {
+            expectedCheckInsTodayBody.innerHTML = '<tr style="color: #b4b6bd;"><td colspan="4" class="text-center" style="color: #b4b6bd;">No check-ins scheduled for today</td></tr>';
+        }
+
+        // Check-Outs Today
+        const expectedCheckOutsToday = data.expectedCheckOutsToday || { count: 0, data: [] };
+        document.getElementById('expectedCheckOutsTodayCount').textContent = expectedCheckOutsToday.count;
+        const expectedCheckOutsTodayBody = document.getElementById('expectedCheckOutsTodayTableBody');
+        if (expectedCheckOutsToday.count > 0) {
+            expectedCheckOutsTodayBody.innerHTML = expectedCheckOutsToday.data.map(item => `
+                <tr style="color: #b4b6bd;">
+                    <td style="color: #b4b6bd; text-align: center;">${item.ROOM_NUMBER || 'N/A'}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CUSTOMER_NAME || 'N/A'}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CHECK_OUT_DATE ? moment(item.CHECK_OUT_DATE).format('MMM DD, YYYY') : 'N/A'}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.STAY_DAYS || 0}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CONFIRMATION_NUMBER || 'N/A'}</td>
+                </tr>
+            `).join('');
+        } else {
+            expectedCheckOutsTodayBody.innerHTML = '<tr style="color: #b4b6bd;"><td colspan="5" class="text-center" style="color: #b4b6bd;">No check-outs scheduled for today</td></tr>';
         }
 
         // Room Availability
