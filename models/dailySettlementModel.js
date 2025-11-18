@@ -36,6 +36,9 @@ class DailySettlementModel {
             roomAvailability.expectedCheckIns = expectedCheckInsToday.count;
             roomAvailability.expectedCheckOuts = expectedCheckOutsToday.count;
             
+            // Get sales/revenue data
+            const sales = await this.getSalesRevenue(periodStart, periodEnd);
+            
             return {
                 period: {
                     start: periodStart.format('YYYY-MM-DD HH:mm:ss'),
@@ -49,6 +52,7 @@ class DailySettlementModel {
                 expectedCheckInsToday,
                 expectedCheckOutsToday,
                 roomAvailability,
+                sales,
                 generatedAt: moment().format('YYYY-MM-DD HH:mm:ss')
             };
         } catch (error) {
@@ -276,11 +280,11 @@ class DailySettlementModel {
      */
     static async getExpectedRoomAvailability(today) {
         try {
-            // Get total active rooms
+            // Get total active rooms (including all statuses)
             const totalRoomsQuery = `
                 SELECT COUNT(*) AS TOTAL_ROOMS
                 FROM room
-                WHERE ACTIVE = 1 AND ROOM_STATUS != 3
+                WHERE ACTIVE = 1
             `;
             const totalRoomsResult = await queryDatabasePromise(totalRoomsQuery);
             const totalRooms = totalRoomsResult[0]?.TOTAL_ROOMS || 0;
@@ -293,8 +297,7 @@ class DailySettlementModel {
                 WHERE r.ACTIVE = 1 
                     AND b.ACTIVE = 1
                     AND b.BOOKING_STATUS = 'check-In'
-                    AND DATE(b.CHECK_IN_DATE) <= DATE(?)
-                    AND DATE(b.CHECK_OUT_DATE) >= DATE(?)
+                   
             `;
             const occupiedResult = await queryDatabasePromise(occupiedRoomsQuery, [
                 today.format('YYYY-MM-DD'),
@@ -361,6 +364,63 @@ class DailySettlementModel {
             };
         } catch (error) {
             console.error('Error getting room availability:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Get sales revenue data for the period
+     * Room Revenue: Payments with PAYMENT_TYPE = 'room'
+     * Sales Revenue: Payments with PAYMENT_TYPE = 'service', 'extended', 'pickdrop', etc.
+     */
+    static async getSalesRevenue(periodStart, periodEnd) {
+        try {
+            // Get Room Revenue - payments made for room charges during the period
+            const roomRevenueQuery = `
+                SELECT 
+                    COALESCE(SUM(p.AMOUNT_PAID), 0) AS ROOM_REVENUE
+                FROM payments p
+                INNER JOIN booking b ON p.BOOKING_ID = b.IDNo
+                WHERE p.PAYMENT_TYPE = 'room'
+                    AND p.PAYMENT_DATE >= ?
+                    AND p.PAYMENT_DATE <= ?
+                    AND b.ACTIVE = 1
+            `;
+            
+            const roomRevenueResult = await queryDatabasePromise(roomRevenueQuery, [
+                periodStart.format('YYYY-MM-DD HH:mm:ss'),
+                periodEnd.format('YYYY-MM-DD HH:mm:ss')
+            ]);
+            const roomRevenue = parseFloat(roomRevenueResult[0]?.ROOM_REVENUE || 0);
+            
+            // Get Sales Revenue - payments made for services, extensions, pickdrop, etc.
+            const salesRevenueQuery = `
+                SELECT 
+                    COALESCE(SUM(p.AMOUNT_PAID), 0) AS SALES_REVENUE
+                FROM payments p
+                INNER JOIN booking b ON p.BOOKING_ID = b.IDNo
+                WHERE p.PAYMENT_TYPE IN ('service', 'extended', 'pickdrop')
+                    AND p.PAYMENT_DATE >= ?
+                    AND p.PAYMENT_DATE <= ?
+                    AND b.ACTIVE = 1
+            `;
+            
+            const salesRevenueResult = await queryDatabasePromise(salesRevenueQuery, [
+                periodStart.format('YYYY-MM-DD HH:mm:ss'),
+                periodEnd.format('YYYY-MM-DD HH:mm:ss')
+            ]);
+            const salesRevenue = parseFloat(salesRevenueResult[0]?.SALES_REVENUE || 0);
+            
+            // Calculate Total Revenue
+            const totalRevenue = roomRevenue + salesRevenue;
+            
+            return {
+                roomRevenue: roomRevenue.toFixed(2),
+                salesRevenue: salesRevenue.toFixed(2),
+                totalRevenue: totalRevenue.toFixed(2)
+            };
+        } catch (error) {
+            console.error('Error getting sales revenue:', error);
             throw error;
         }
     }

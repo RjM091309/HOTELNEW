@@ -438,7 +438,10 @@ class TelegramController {
                 });
             }
 
-            const result = await DailySettlementService.sendReport(config.CHAT_ID);
+            // Get section from request body (booking, expected, availability, sales)
+            const section = req.body?.section || null;
+
+            const result = await DailySettlementService.sendReport(config.CHAT_ID, section);
             
             res.json({ 
                 success: true, 

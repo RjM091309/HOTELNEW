@@ -10,20 +10,6 @@
             <div class="dashboard-card-header">
                 <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
                     <header style="margin: 0;">Daily Settlement Report</header>
-                    <div style="font-size: 1.1rem;">
-                        <i class="material-icons" style="margin-right: 5px; vertical-align: middle;">date_range</i>
-                        <span id="reportPeriod">Loading...</span>
-                    </div>
-                </div>
-                <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: flex-end;">
-                    <button id="btnRefresh" class="btn btn-primary" style="min-width: 150px;">
-                        <i class="material-icons" style="vertical-align: middle; margin-right: 5px;">refresh</i> 
-                        <span>Refresh</span>
-                    </button>
-                    <button id="btnSendTelegram" class="btn btn-success" style="min-width: 180px;">
-                        <i class="material-icons" style="vertical-align: middle; margin-right: 5px;">send</i> 
-                        <span>Send via Telegram</span>
-                    </button>
                 </div>
             </div>
             <div class="dashboard-card-body">
@@ -39,146 +25,163 @@
 
                 <!-- Settlement Report -->
                 <div id="settlementContent">
-                    <!-- Check-Ins Section -->
+                    <!-- Booking Status Section (Combined Card) -->
                     <div class="row mb-4">
                         <div class="col-md-12">
                             <div class="card">
                                 <div class="card-header">
-                                    <h5 style="color: #b4b6bd;"><i class="material-icons" style="vertical-align: middle;">check_circle</i> Check-Ins : <span id="checkInCount">0</span></h5>
+                                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                                        <h5 style="color: #b4b6bd; margin: 0;">
+                                            <i class="material-icons" style="vertical-align: middle;">event</i> Booking Status
+                                            <span style="font-size: 0.9rem; margin-left: 15px;">
+                                                <i class="material-icons" style="vertical-align: middle; font-size: 18px;">date_range</i>
+                                                <span id="reportPeriod">Loading...</span>
+                                            </span>
+                                        </h5>
+                                        <button class="btn btn-success btn-sm btnSendTelegram telegram-btn" data-section="booking">
+                                            <i class="material-icons">send</i> 
+                                            <span>Send via Telegram</span>
+                                        </button>
+                                    </div>
                                 </div>
                                 <div class="card-body">
-                                    <div id="checkInsList" class="table-responsive">
-                                        <table class="table table-striped">
-                                            <thead>
-                                                <tr>
-                                                    <th style="color: #b4b6bd; text-align: center;">Room</th>
-                                                    <th style="color: #b4b6bd; text-align: center;">Guest Name</th>
-                                                    <th style="color: #b4b6bd; text-align: center;">Check-In Date</th>
-                                                    <th style="color: #b4b6bd; text-align: center;">Type</th>
-                                                    <th style="color: #b4b6bd; text-align: center;">Confirmation</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="checkInsTableBody" style="color: #b4b6bd;">
-                                                <tr><td colspan="5" class="text-center">Loading...</td></tr>
-                                            </tbody>
-                                        </table>
+                                    <!-- Check-Ins Section -->
+                                    <div style="margin-bottom: 30px;">
+                                        <h6 style="color: #b4b6bd; margin-bottom: 15px;">
+                                            <i class="material-icons" style="vertical-align: middle; font-size: 20px;">check_circle</i> 
+                                            Check-Ins : <span id="checkInCount">0</span>
+                                        </h6>
+                                        <div id="checkInsList" class="table-responsive">
+                                            <table class="table table-striped">
+                                                <thead>
+                                                    <tr>
+                                                        <th style="color: #b4b6bd; text-align: center;">Room</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Guest Name</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Check-In Date</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Type</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Confirmation</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="checkInsTableBody" style="color: #b4b6bd;">
+                                                    <tr><td colspan="5" class="text-center">Loading...</td></tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    <!-- Check-Outs Section -->
+                                    <div style="margin-bottom: 30px;">
+                                        <h6 style="color: #b4b6bd; margin-bottom: 15px;">
+                                            <i class="material-icons" style="vertical-align: middle; font-size: 20px;">exit_to_app</i> 
+                                            Check-Outs : <span id="checkOutCount">0</span>
+                                        </h6>
+                                        <div id="checkOutsList" class="table-responsive">
+                                            <table class="table table-striped">
+                                                <thead>
+                                                    <tr>
+                                                        <th style="color: #b4b6bd; text-align: center;">Room</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Guest Name</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Check-Out Date</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Type</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Stay Days</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Confirmation</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="checkOutsTableBody" style="color: #b4b6bd;">
+                                                    <tr><td colspan="6" class="text-center">Loading...</td></tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    <!-- Pending Section -->
+                                    <div>
+                                        <h6 style="color: #b4b6bd; margin-bottom: 15px;">
+                                            <i class="material-icons" style="vertical-align: middle; font-size: 20px;">schedule</i> 
+                                            Pending : <span id="pendingCount">0</span>
+                                        </h6>
+                                        <div id="pendingList" class="table-responsive">
+                                            <table class="table table-striped">
+                                                <thead>
+                                                    <tr>
+                                                        <th style="color: #b4b6bd; text-align: center;">Room</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Guest Name</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Check-In Date</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Check-Out Date</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Stay Days</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Confirmation</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="pendingTableBody" style="color: #b4b6bd;">
+                                                    <tr><td colspan="6" class="text-center">Loading...</td></tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Check-Outs Section -->
+                    <!-- Expected Today Section (Combined Card) -->
                     <div class="row mb-4">
                         <div class="col-md-12">
                             <div class="card">
                                 <div class="card-header">
-                                    <h5 style="color: #b4b6bd;"><i class="material-icons" style="vertical-align: middle;">exit_to_app</i> Check-Outs : <span id="checkOutCount">0</span></h5>
-                                </div>
-                                <div class="card-body">
-                                    <div id="checkOutsList" class="table-responsive">
-                                        <table class="table table-striped">
-                                            <thead>
-                                                <tr>
-                                                    <th style="color: #b4b6bd; text-align: center;">Room</th>
-                                                    <th style="color: #b4b6bd; text-align: center;">Guest Name</th>
-                                                    <th style="color: #b4b6bd; text-align: center;">Check-Out Date</th>
-                                                    <th style="color: #b4b6bd; text-align: center;">Type</th>
-                                                    <th style="color: #b4b6bd; text-align: center;">Stay Days</th>
-                                                    <th style="color: #b4b6bd; text-align: center;">Confirmation</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="checkOutsTableBody" style="color: #b4b6bd;">
-                                                <tr><td colspan="6" class="text-center">Loading...</td></tr>
-                                            </tbody>
-                                        </table>
+                                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                                        <h5 style="color: #b4b6bd; margin: 0;"><i class="material-icons" style="vertical-align: middle;">today</i> Expected Today</h5>
+                                        <button class="btn btn-success btn-sm btnSendTelegram telegram-btn" data-section="expected">
+                                            <i class="material-icons">send</i> 
+                                            <span>Send via Telegram</span>
+                                        </button>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Pending Section -->
-                    <div class="row mb-4">
-                        <div class="col-md-12">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h5 style="color: #b4b6bd;"><i class="material-icons" style="vertical-align: middle;">schedule</i> Pending : <span id="pendingCount">0</span></h5>
-                                </div>
                                 <div class="card-body">
-                                    <div id="pendingList" class="table-responsive">
-                                        <table class="table table-striped">
-                                            <thead>
-                                                <tr>
-                                                    <th style="color: #b4b6bd; text-align: center;">Room</th>
-                                                    <th style="color: #b4b6bd; text-align: center;">Guest Name</th>
-                                                    <th style="color: #b4b6bd; text-align: center;">Check-In Date</th>
-                                                    <th style="color: #b4b6bd; text-align: center;">Check-Out Date</th>
-                                                    <th style="color: #b4b6bd; text-align: center;">Stay Days</th>
-                                                    <th style="color: #b4b6bd; text-align: center;">Confirmation</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="pendingTableBody" style="color: #b4b6bd;">
-                                                <tr><td colspan="6" class="text-center">Loading...</td></tr>
-                                            </tbody>
-                                        </table>
+                                    <!-- Expected Check-Ins Today Section -->
+                                    <div style="margin-bottom: 30px;">
+                                        <h6 style="color: #b4b6bd; margin-bottom: 15px;">
+                                            <i class="material-icons" style="vertical-align: middle; font-size: 20px;">check_circle</i> 
+                                            Check-Ins Today : <span id="expectedCheckInsTodayCount">0</span>
+                                        </h6>
+                                        <div id="expectedCheckInsTodayList" class="table-responsive">
+                                            <table class="table table-striped">
+                                                <thead>
+                                                    <tr>
+                                                        <th style="color: #b4b6bd; text-align: center;">Room</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Guest Name</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Check-In Date</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Confirmation</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="expectedCheckInsTodayTableBody" style="color: #b4b6bd;">
+                                                    <tr><td colspan="4" class="text-center">Loading...</td></tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
-                    <!-- Expected Check-Ins Today Section -->
-                    <div class="row mb-4">
-                        <div class="col-md-12">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h5 style="color: #b4b6bd;"><i class="material-icons" style="vertical-align: middle;">check_circle</i> Check-Ins Today : <span id="expectedCheckInsTodayCount">0</span></h5>
-                                </div>
-                                <div class="card-body">
-                                    <div id="expectedCheckInsTodayList" class="table-responsive">
-                                        <table class="table table-striped">
-                                            <thead>
-                                                <tr>
-                                                    <th style="color: #b4b6bd; text-align: center;">Room</th>
-                                                    <th style="color: #b4b6bd; text-align: center;">Guest Name</th>
-                                                    <th style="color: #b4b6bd; text-align: center;">Check-In Date</th>
-                                                    <th style="color: #b4b6bd; text-align: center;">Confirmation</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="expectedCheckInsTodayTableBody" style="color: #b4b6bd;">
-                                                <tr><td colspan="4" class="text-center">Loading...</td></tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Expected Check-Outs Today Section -->
-                    <div class="row mb-4">
-                        <div class="col-md-12">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h5 style="color: #b4b6bd;"><i class="material-icons" style="vertical-align: middle;">exit_to_app</i> Check-Outs Today : <span id="expectedCheckOutsTodayCount">0</span></h5>
-                                </div>
-                                <div class="card-body">
-                                    <div id="expectedCheckOutsTodayList" class="table-responsive">
-                                        <table class="table table-striped">
-                                            <thead>
-                                                <tr>
-                                                    <th style="color: #b4b6bd; text-align: center;">Room</th>
-                                                    <th style="color: #b4b6bd; text-align: center;">Guest Name</th>
-                                                    <th style="color: #b4b6bd; text-align: center;">Check-Out Date</th>
-                                                    <th style="color: #b4b6bd; text-align: center;">Stay Days</th>
-                                                    <th style="color: #b4b6bd; text-align: center;">Confirmation</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="expectedCheckOutsTodayTableBody" style="color: #b4b6bd;">
-                                                <tr><td colspan="5" class="text-center">Loading...</td></tr>
-                                            </tbody>
-                                        </table>
+                                    <!-- Expected Check-Outs Today Section -->
+                                    <div>
+                                        <h6 style="color: #b4b6bd; margin-bottom: 15px;">
+                                            <i class="material-icons" style="vertical-align: middle; font-size: 20px;">exit_to_app</i> 
+                                            Check-Outs Today : <span id="expectedCheckOutsTodayCount">0</span>
+                                        </h6>
+                                        <div id="expectedCheckOutsTodayList" class="table-responsive">
+                                            <table class="table table-striped">
+                                                <thead>
+                                                    <tr>
+                                                        <th style="color: #b4b6bd; text-align: center;">Room</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Guest Name</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Check-Out Date</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Stay Days</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Confirmation</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="expectedCheckOutsTodayTableBody" style="color: #b4b6bd;">
+                                                    <tr><td colspan="5" class="text-center">Loading...</td></tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -190,7 +193,13 @@
                         <div class="col-md-12">
                             <div class="card">
                                 <div class="card-header">
-                                    <h5 style="color: #b4b6bd;"><i class="material-icons">hotel</i> Expected Room Availability for Today</h5>
+                                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                                        <h5 style="color: #b4b6bd; margin: 0;"><i class="material-icons">hotel</i> Expected Room Availability for Today</h5>
+                                        <button class="btn btn-success btn-sm btnSendTelegram telegram-btn" data-section="availability">
+                                            <i class="material-icons">send</i> 
+                                            <span>Send via Telegram</span>
+                                        </button>
+                                    </div>
                                 </div>
                                 <div class="card-body">
                                     <div class="row">
@@ -249,6 +258,51 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Sales Section -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                                        <h5 style="color: #b4b6bd; margin: 0;">
+                                            <i class="material-icons" style="vertical-align: middle;">attach_money</i> Sales Revenue
+                                            <span style="font-size: 0.9rem; margin-left: 15px;">
+                                                <i class="material-icons" style="vertical-align: middle; font-size: 18px;">date_range</i>
+                                                <span id="reportPeriodSales">Loading...</span>
+                                            </span>
+                                        </h5>
+                                        <button class="btn btn-success btn-sm btnSendTelegram telegram-btn" data-section="sales">
+                                            <i class="material-icons">send</i> 
+                                            <span>Send via Telegram</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                                                <div class="stat-value" style="color: white; font-size: 2.5rem;" id="roomRevenue">₱0.00</div>
+                                                <div class="stat-label" style="color: rgba(255,255,255,0.9);">Room Revenue</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+                                                <div class="stat-value" style="color: white; font-size: 2.5rem;" id="salesRevenue">₱0.00</div>
+                                                <div class="stat-label" style="color: rgba(255,255,255,0.9);">Sales Revenue</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
+                                                <div class="stat-value" style="color: white; font-size: 2.5rem;" id="totalRevenue">₱0.00</div>
+                                                <div class="stat-label" style="color: rgba(255,255,255,0.9);">Total Revenue</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -273,6 +327,52 @@
     font-size: 0.9rem;
     color: #666;
     margin-top: 5px;
+}
+
+/* Telegram Button Styles */
+.telegram-btn {
+    background: linear-gradient(135deg, #0088cc 0%, #00a8e8 100%);
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    color: white;
+    font-weight: 500;
+    font-size: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 136, 204, 0.3);
+    cursor: pointer;
+}
+
+.telegram-btn:hover {
+    background: linear-gradient(135deg, #0077b3 0%, #0099d1 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 136, 204, 0.4);
+    color: white;
+}
+
+.telegram-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 136, 204, 0.3);
+}
+
+.telegram-btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.6;
+    transform: none;
+    box-shadow: none;
+}
+
+.telegram-btn .material-icons {
+    font-size: 18px;
+    vertical-align: middle;
+}
+
+.telegram-btn span {
+    vertical-align: middle;
 }
 </style>
 
@@ -309,8 +409,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function displaySettlement(data) {
         // Period
-        document.getElementById('reportPeriod').textContent = 
-            `${data.period.startFormatted} to ${data.period.endFormatted}`;
+        const periodText = `${data.period.startFormatted} to ${data.period.endFormatted}`;
+        document.getElementById('reportPeriod').textContent = periodText;
+        document.getElementById('reportPeriodSales').textContent = periodText;
 
         // Check-Ins
         document.getElementById('checkInCount').textContent = data.checkIns.count;
@@ -410,15 +511,18 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('occupancyRate').textContent = availability.occupancyRate + '%';
         document.getElementById('expectedCheckIns').textContent = availability.expectedCheckIns;
         document.getElementById('expectedCheckOuts').textContent = availability.expectedCheckOuts;
+
+        // Sales Revenue
+        const sales = data.sales || { roomRevenue: '0.00', salesRevenue: '0.00', totalRevenue: '0.00' };
+        document.getElementById('roomRevenue').textContent = '₱' + parseFloat(sales.roomRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('salesRevenue').textContent = '₱' + parseFloat(sales.salesRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('totalRevenue').textContent = '₱' + parseFloat(sales.totalRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     function showError(message) {
         document.getElementById('errorMessage').textContent = message;
         document.getElementById('errorMessage').style.display = 'block';
     }
-
-    // Refresh button
-    document.getElementById('btnRefresh').addEventListener('click', loadSettlement);
 
     // Load saved chat ID
     let savedChatId = null;
@@ -431,34 +535,45 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.success && data.data) {
                 if (data.data.CHAT_ID) {
                     savedChatId = data.data.CHAT_ID;
-                    document.getElementById('btnSendTelegram').disabled = false;
+                    // Enable all send buttons
+                    document.querySelectorAll('.btnSendTelegram').forEach(btn => {
+                        btn.disabled = false;
+                    });
                 } else {
-                    document.getElementById('btnSendTelegram').disabled = true;
+                    // Disable all send buttons
+                    document.querySelectorAll('.btnSendTelegram').forEach(btn => {
+                        btn.disabled = true;
+                    });
                 }
             }
         })
         .catch(error => {
             console.error('Error loading bot config:', error);
-            document.getElementById('btnSendTelegram').disabled = true;
+            // Disable all send buttons on error
+            document.querySelectorAll('.btnSendTelegram').forEach(btn => {
+                btn.disabled = true;
+            });
         });
     }
 
-    // Send via Telegram button
-    document.getElementById('btnSendTelegram').addEventListener('click', function() {
-        if (!savedChatId) {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Chat ID Not Configured',
-                text: 'Please configure it in Telegram settings first.',
-                confirmButtonColor: '#3085d6'
-            });
-            return;
-        }
-        sendReport(savedChatId);
+    // Send via Telegram buttons (for each section)
+    document.querySelectorAll('.btnSendTelegram').forEach(button => {
+        button.addEventListener('click', function() {
+            if (!savedChatId) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Chat ID Not Configured',
+                    text: 'Please configure it in Telegram settings first.',
+                    confirmButtonColor: '#3085d6'
+                });
+                return;
+            }
+            const section = this.getAttribute('data-section');
+            sendReport(savedChatId, section, this);
+        });
     });
 
-    function sendReport(chatId) {
-        const btn = document.getElementById('btnSendTelegram');
+    function sendReport(chatId, section, btn) {
         const originalText = btn.innerHTML;
         btn.disabled = true;
         btn.innerHTML = '<i class="material-icons">hourglass_empty</i> Sending...';
@@ -468,6 +583,7 @@ document.addEventListener('DOMContentLoaded', function() {
             headers: {
                 'Content-Type': 'application/json'
             },
+            body: JSON.stringify({ section: section }),
             credentials: 'include'
         })
         .then(response => response.json())
@@ -505,7 +621,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Initial load
+    // Initial load - disable buttons until config is loaded
+    document.querySelectorAll('.btnSendTelegram').forEach(btn => {
+        btn.disabled = true;
+    });
+    
     loadSettlement();
     loadBotConfig();
 });
