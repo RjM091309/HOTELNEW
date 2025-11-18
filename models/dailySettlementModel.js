@@ -396,7 +396,7 @@ class DailySettlementModel {
             // Get Sales Revenue - payments made for services, extensions, pickdrop, etc.
             const salesRevenueQuery = `
                 SELECT 
-                    COALESCE(SUM(p.AMOUNT_PAID), 0) AS SALES_REVENUE
+                    COALESCE(SUM(p.AMOUNT_PAID), 0) AS SERVICES_REVENUE
                 FROM payments p
                 INNER JOIN booking b ON p.BOOKING_ID = b.IDNo
                 WHERE p.PAYMENT_TYPE IN ('service', 'extended', 'pickdrop')
@@ -409,18 +409,18 @@ class DailySettlementModel {
                 periodStart.format('YYYY-MM-DD HH:mm:ss'),
                 periodEnd.format('YYYY-MM-DD HH:mm:ss')
             ]);
-            const salesRevenue = parseFloat(salesRevenueResult[0]?.SALES_REVENUE || 0);
+            const servicesRevenue = parseFloat(salesRevenueResult[0]?.SERVICES_REVENUE || 0);
             
             // Calculate Total Revenue
-            const totalRevenue = roomRevenue + salesRevenue;
+            const totalRevenue = roomRevenue + servicesRevenue;
             
             return {
                 roomRevenue: roomRevenue.toFixed(2),
-                salesRevenue: salesRevenue.toFixed(2),
+                servicesRevenue: servicesRevenue.toFixed(2),
                 totalRevenue: totalRevenue.toFixed(2)
             };
         } catch (error) {
-            console.error('Error getting sales revenue:', error);
+            console.error('Error getting services revenue:', error);
             throw error;
         }
     }

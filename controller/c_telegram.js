@@ -1,6 +1,10 @@
 const TelegramModel = require('../models/telegramModel');
 const TelegramService = require('../services/telegramService');
 const DailySettlementService = require('../services/dailySettlementService');
+const KakaoTalkModel = require('../models/kakaoTalkModel');
+const KakaoTalkService = require('../services/kakaoTalkService');
+const axios = require('axios');
+const querystring = require('querystring');
 
 class TelegramController {
     
@@ -453,6 +457,283 @@ class TelegramController {
             res.status(500).json({ 
                 success: false, 
                 message: 'Failed to send daily settlement: ' + (error.message || 'Unknown error')
+            });
+        }
+    }
+
+    // ========================================
+    // KAKAOTALK METHODS
+    // ========================================
+
+    /**
+     * Initiate KakaoTalk OAuth login
+     */
+    static async kakaoLogin(req, res) {
+        try {
+            const config = await KakaoTalkModel.getConfig();
+            
+            if (!config || !config.REST_API_KEY) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'KakaoTalk REST API Key not configured. Please configure it in settings first.'
+                });
+            }
+
+            const redirectUri = `${req.protocol}://${req.get('host')}/telegram/kakao/callback`;
+            // Request talk_message scope for sending messages
+            const scope = 'talk_message';
+            const kakaoAuthURL = `https://kauth.kakao.com/oauth/authorize?response_type=code&client_id=${config.REST_API_KEY}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}`;
+
+            console.log('Kakao OAuth URL:', kakaoAuthURL);
+
+            res.json({
+                success: true,
+                authUrl: kakaoAuthURL
+            });
+        } catch (error) {
+            console.error('Error initiating KakaoTalk login:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to initiate KakaoTalk login: ' + (error.message || 'Unknown error')
+            });
+        }
+    }
+
+    /**
+     * KakaoTalk OAuth callback
+     */
+    static async kakaoCallback(req, res) {
+        try {
+            const { code } = req.query;
+            
+            if (!code) {
+                return res.redirect('/telegram/settings?error=no_code');
+            }
+
+            const config = await KakaoTalkModel.getConfig();
+            
+            if (!config || !config.REST_API_KEY) {
+                return res.redirect('/telegram/settings?error=no_api_key');
+            }
+
+            const redirectUri = `${req.protocol}://${req.get('host')}/telegram/kakao/callback`;
+
+            // Exchange code for access token
+            const tokenParams = querystring.stringify({
+                grant_type: 'authorization_code',
+                client_id: config.REST_API_KEY,
+                redirect_uri: redirectUri,
+                code: code
+            });
+
+            const tokenResponse = await axios.post(
+                'https://kauth.kakao.com/oauth/token',
+                tokenParams,
+                {
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'
+                    }
+                }
+            );
+
+            console.log('Token response received:', {
+                hasAccessToken: !!tokenResponse.data.access_token,
+                hasRefreshToken: !!tokenResponse.data.refresh_token,
+                scope: tokenResponse.data.scope
+            });
+
+            const { access_token, refresh_token } = tokenResponse.data;
+
+            // Get user info
+            const userInfoResponse = await axios.get(
+                'https://kapi.kakao.com/v2/user/me',
+                {
+                    headers: {
+                        'Authorization': `Bearer ${access_token}`
+                    }
+                }
+            );
+
+            // Save access token
+            await KakaoTalkModel.updateAccessToken(
+                access_token,
+                refresh_token,
+                req.user?.userId || null
+            );
+
+            // Update user info if needed
+            await KakaoTalkModel.saveConfig(
+                config.REST_API_KEY,
+                access_token,
+                refresh_token,
+                userInfoResponse.data,
+                req.user?.userId || null
+            );
+
+            res.redirect('/telegram/settings?kakao_success=true');
+        } catch (error) {
+            console.error('Error in KakaoTalk callback:', error);
+            res.redirect(`/telegram/settings?error=${encodeURIComponent(error.response?.data?.error_description || error.message || 'unknown_error')}`);
+        }
+    }
+
+    /**
+     * Get KakaoTalk config
+     */
+    static async getKakaoConfig(req, res) {
+        try {
+            const config = await KakaoTalkModel.getConfig();
+            if (!config) {
+                return res.json({ success: true, data: null, message: 'No KakaoTalk configured' });
+            }
+            
+            // Don't send access token in response for security
+            res.json({
+                success: true,
+                data: {
+                    REST_API_KEY: config.REST_API_KEY,
+                    hasAccessToken: !!config.ACCESS_TOKEN,
+                    USER_INFO: config.USER_INFO ? JSON.parse(config.USER_INFO) : null
+                }
+            });
+        } catch (error) {
+            console.error('Error getting KakaoTalk config:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to get KakaoTalk config: ' + (error.message || 'Unknown error')
+            });
+        }
+    }
+
+    /**
+     * Save KakaoTalk REST API Key
+     */
+    static async saveKakaoConfig(req, res) {
+        try {
+            const { restApiKey } = req.body;
+            
+            if (!restApiKey) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'REST API Key is required'
+                });
+            }
+
+            const existing = await KakaoTalkModel.getConfig();
+            const accessToken = existing?.ACCESS_TOKEN || null;
+            const refreshToken = existing?.REFRESH_TOKEN || null;
+            const userInfo = existing?.USER_INFO ? JSON.parse(existing.USER_INFO) : null;
+
+            await KakaoTalkModel.saveConfig(
+                restApiKey,
+                accessToken,
+                refreshToken,
+                userInfo,
+                req.user?.userId || null
+            );
+
+            res.json({
+                success: true,
+                message: 'KakaoTalk REST API Key saved successfully'
+            });
+        } catch (error) {
+            console.error('Error saving KakaoTalk config:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to save KakaoTalk config: ' + (error.message || 'Unknown error')
+            });
+        }
+    }
+
+    /**
+     * Send settlement report via KakaoTalk
+     */
+    static async sendSettlementKakaoTalk(req, res) {
+        try {
+            const config = await KakaoTalkModel.getConfig();
+            
+            if (!config || !config.ACCESS_TOKEN) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'KakaoTalk not configured. Please complete OAuth authentication first.'
+                });
+            }
+
+            // Get section from request body
+            const section = req.body?.section || null;
+
+            const result = await DailySettlementService.sendReportKakaoTalk(section);
+            
+            res.json({
+                success: true,
+                message: 'Daily settlement report sent successfully to KakaoTalk',
+                data: result.data
+            });
+        } catch (error) {
+            console.error('Error sending daily settlement via KakaoTalk:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to send daily settlement via KakaoTalk: ' + (error.message || 'Unknown error')
+            });
+        }
+    }
+
+    /**
+     * Test KakaoTalk connection
+     */
+    static async testKakaoTalk(req, res) {
+        try {
+            const config = await KakaoTalkModel.getConfig();
+            
+            if (!config) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'KakaoTalk not configured. Please save REST API Key first.'
+                });
+            }
+
+            if (!config.ACCESS_TOKEN) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'KakaoTalk not authenticated. Please complete OAuth authentication first by clicking "Login with Kakao".'
+                });
+            }
+
+         
+            const kakaoTalkService = new KakaoTalkService(config.ACCESS_TOKEN);
+            const result = await kakaoTalkService.sendMessageToSelf('🧪 Test message from Hotel Management System');
+
+            console.log('KakaoTalk test result:', {
+                success: result.success,
+                message: result.message,
+                hasData: !!result.data
+            });
+
+            if (result.success) {
+                res.json({
+                    success: true,
+                    message: 'Test message sent successfully to your KakaoTalk!'
+                });
+            } else {
+                // Log detailed error for debugging
+                console.error('KakaoTalk test failed:', {
+                    message: result.message,
+                    configExists: !!config,
+                    accessTokenExists: !!config.ACCESS_TOKEN,
+                    accessTokenLength: config.ACCESS_TOKEN ? config.ACCESS_TOKEN.length : 0
+                });
+                
+                res.status(400).json({
+                    success: false,
+                    message: 'Failed to send test message: ' + (result.message || 'Unknown error'),
+                    details: result.message
+                });
+            }
+        } catch (error) {
+            console.error('Error testing KakaoTalk:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to test KakaoTalk: ' + (error.message || 'Unknown error')
             });
         }
     }

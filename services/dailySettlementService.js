@@ -1,6 +1,8 @@
 const DailySettlementModel = require('../models/dailySettlementModel');
 const TelegramModel = require('../models/telegramModel');
 const TelegramService = require('./telegramService');
+const KakaoTalkModel = require('../models/kakaoTalkModel');
+const KakaoTalkService = require('./kakaoTalkService');
 const moment = require('moment');
 
 class DailySettlementService {
@@ -155,7 +157,7 @@ class DailySettlementService {
     }
     
     /**
-     * Format Sales Revenue section
+     * Format Services Revenue section
      */
     static formatSalesRevenue(period, sales) {
         let report = `💰 *SALES REVENUE*\n\n`;
@@ -164,8 +166,8 @@ class DailySettlementService {
         report += `💵 *ROOM REVENUE*\n`;
         report += `₱${parseFloat(sales.roomRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`;
         
-        report += `💳 *SALES REVENUE*\n`;
-        report += `₱${parseFloat(sales.salesRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`;
+        report += `💳 *SERVICES REVENUE*\n`;
+        report += `₱${parseFloat(sales.servicesRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`;
         
         report += `📊 *TOTAL REVENUE*\n`;
         report += `₱${parseFloat(sales.totalRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`;
@@ -253,6 +255,41 @@ class DailySettlementService {
             };
         } catch (error) {
             console.error('Error sending daily settlement report:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Send daily settlement report via KakaoTalk (to yourself)
+     * @param {string} section - Optional section to send (booking, expected, availability, sales)
+     */
+    static async sendReportKakaoTalk(section = null) {
+        try {
+            // Get KakaoTalk configuration
+            const config = await KakaoTalkModel.getConfig();
+            
+            if (!config || !config.ACCESS_TOKEN) {
+                throw new Error('KakaoTalk not configured. Please complete OAuth authentication first.');
+            }
+            
+            // Generate report with section
+            const report = await this.generateReport(section);
+            
+            // Send via KakaoTalk (to yourself)
+            const kakaoTalkService = new KakaoTalkService(config.ACCESS_TOKEN);
+            const result = await kakaoTalkService.sendMessageToSelf(report);
+            
+            if (!result.success) {
+                throw new Error(result.message || 'Failed to send report');
+            }
+            
+            return {
+                success: true,
+                message: 'Daily settlement report sent successfully to KakaoTalk',
+                data: result.data
+            };
+        } catch (error) {
+            console.error('Error sending daily settlement report via KakaoTalk:', error);
             throw error;
         }
     }

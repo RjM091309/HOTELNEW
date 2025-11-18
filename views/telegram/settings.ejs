@@ -95,6 +95,87 @@
             </div>
         </div>
     </div>
+
+    <!-- KakaoTalk Settings Section -->
+    <div class="row" style="margin-top: 30px;">
+        <div class="col-xl-12 col-md-12 col-12">
+            <div class="dashboard-card">
+                <div class="dashboard-card-header">
+                    <header>KakaoTalk Settings</header>
+                </div>
+                <div class="dashboard-card-body">
+                    
+                    <!-- Loading Indicator -->
+                    <div id="kakaoLoadingIndicator" class="text-center" style="display: none; padding: 20px;">
+                        <i class="fa fa-spinner fa-spin fa-3x"></i>
+                        <p>Loading...</p>
+                    </div>
+
+                    <!-- Error Message -->
+                    <div id="kakaoErrorMessage" class="alert alert-danger" style="display: none;"></div>
+
+                    <!-- Success Message -->
+                    <div id="kakaoSuccessMessage" class="alert alert-success" style="display: none;"></div>
+
+                    <!-- KakaoTalk Configuration Form -->
+                    <form id="kakaoConfigForm">
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <label for="restApiKey" style="color: #fff;">REST API Key <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="restApiKey" placeholder="Enter REST API Key from Kakao Developers" required>
+                                    <small class="form-text text-muted">
+                                        Get your REST API Key from <a href="https://developers.kakao.com/" target="_blank">Kakao Developers</a> → Your App → App Settings
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-top: 30px;">
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                <button type="submit" class="btn btn-primary" id="btnSaveKakaoConfig" style="min-width: 180px;">
+                                    <i class="material-icons" style="vertical-align: middle; margin-right: 5px;">save</i> 
+                                    <span>Save REST API Key</span>
+                                </button>
+                                <button type="button" class="btn btn-success" id="btnLoginKakao" style="min-width: 180px;">
+                                    <i class="material-icons" style="vertical-align: middle; margin-right: 5px;">login</i> 
+                                    <span>Login with Kakao</span>
+                                </button>
+                                <button type="button" class="btn btn-info" id="btnTestKakao" style="min-width: 180px;">
+                                    <i class="material-icons" style="vertical-align: middle; margin-right: 5px;">check_circle</i> 
+                                    <span>Test Connection</span>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Current KakaoTalk Configuration Display -->
+                    <div id="currentKakaoConfig" style="margin-top: 20px; display: none;">
+                        <hr style="border-color: #e0e0e0; margin: 20px 0;">
+                        <h5 style="margin-bottom: 12px; font-weight: 600; color: #fff;">Current KakaoTalk Configuration</h5>
+                        <div class="card" style="border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); height: auto; min-height: 40px;">
+                            <div class="card-body" style="padding: 10px 20px;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; flex-wrap: wrap; gap: 15px;">
+                                    <div style="flex: 2; min-width: 200px;">
+                                        <strong style="color: #fff; display: block; margin-bottom: 2px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">REST API Key</strong>
+                                        <span id="displayRestApiKey" style="font-size: 12px; color: #fff; word-break: break-all; font-family: 'Courier New', monospace;">-</span>
+                                    </div>
+                                    <div style="flex: 1; min-width: 150px;">
+                                        <strong style="color: #fff; display: block; margin-bottom: 2px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Access Token</strong>
+                                        <span id="displayAccessToken" style="font-size: 14px; color: #fff; font-weight: 500;">-</span>
+                                    </div>
+                                    <div style="flex: 1; min-width: 100px;">
+                                        <strong style="color: #fff; display: block; margin-bottom: 2px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Status</strong>
+                                        <span id="displayKakaoStatus" class="label label-sm label-success" style="padding: 4px 10px; font-size: 11px; font-weight: 600; border-radius: 20px; background-color: #e0e0e0; color: #fff; display: inline-block;">ACTIVE</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -103,22 +184,31 @@ document.addEventListener('DOMContentLoaded', function() {
     loadCurrentConfig();
 
     // Form submit
-    document.getElementById('telegramConfigForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        saveConfiguration();
-    });
+    const telegramConfigForm = document.getElementById('telegramConfigForm');
+    if (telegramConfigForm) {
+        telegramConfigForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            saveConfiguration();
+        });
+    }
 
-    // Test bot button
-    document.getElementById('btnTestBot').addEventListener('click', function() {
-        testBotConnection();
-    });
+    // Test bot button (check if exists since it might be commented out)
+    const btnTestBot = document.getElementById('btnTestBot');
+    if (btnTestBot) {
+        btnTestBot.addEventListener('click', function() {
+            testBotConnection();
+        });
+    }
 
     // Delete config button
-    document.getElementById('btnDeleteConfig').addEventListener('click', function() {
-        if (confirm('Are you sure you want to delete the Telegram bot configuration? This action cannot be undone.')) {
-            deleteConfiguration();
-        }
-    });
+    const btnDeleteConfig = document.getElementById('btnDeleteConfig');
+    if (btnDeleteConfig) {
+        btnDeleteConfig.addEventListener('click', function() {
+            if (confirm('Are you sure you want to delete the Telegram bot configuration? This action cannot be undone.')) {
+                deleteConfiguration();
+            }
+        });
+    }
 
     function loadCurrentConfig() {
         document.getElementById('loadingIndicator').style.display = 'block';
@@ -281,6 +371,253 @@ document.addEventListener('DOMContentLoaded', function() {
     function hideMessages() {
         document.getElementById('errorMessage').style.display = 'none';
         document.getElementById('successMessage').style.display = 'none';
+    }
+
+    // ========================================
+    // KAKAOTALK CONFIGURATION
+    // ========================================
+    
+    // Check if KakaoTalk elements exist before adding listeners
+    const kakaoConfigForm = document.getElementById('kakaoConfigForm');
+    const btnLoginKakao = document.getElementById('btnLoginKakao');
+    const btnTestKakao = document.getElementById('btnTestKakao');
+
+    if (kakaoConfigForm) {
+        // Load current KakaoTalk configuration
+        loadCurrentKakaoConfig();
+
+        // KakaoTalk form submit
+        kakaoConfigForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            saveKakaoConfiguration();
+        });
+    }
+
+    if (btnLoginKakao) {
+        // Login with Kakao button
+        btnLoginKakao.addEventListener('click', function() {
+            loginWithKakao();
+        });
+    }
+
+    if (btnTestKakao) {
+        // Test KakaoTalk button
+        btnTestKakao.addEventListener('click', function() {
+            testKakaoConnection();
+        });
+    }
+
+    function loadCurrentKakaoConfig() {
+        const loadingIndicator = document.getElementById('kakaoLoadingIndicator');
+        const restApiKeyInput = document.getElementById('restApiKey');
+        const currentConfig = document.getElementById('currentKakaoConfig');
+        const displayRestApiKey = document.getElementById('displayRestApiKey');
+        const displayAccessToken = document.getElementById('displayAccessToken');
+        
+        if (!loadingIndicator) return;
+        
+        loadingIndicator.style.display = 'block';
+        hideKakaoMessages();
+
+        fetch('/telegram/kakao/config', {
+            credentials: 'include'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (loadingIndicator) loadingIndicator.style.display = 'none';
+            
+            if (data.success && data.data) {
+                // Fill form with existing data
+                if (restApiKeyInput && data.data.REST_API_KEY) {
+                    restApiKeyInput.value = data.data.REST_API_KEY;
+                }
+
+                // Show current config display
+                if (currentConfig) currentConfig.style.display = 'block';
+                if (displayRestApiKey) displayRestApiKey.textContent = data.data.REST_API_KEY || 'N/A';
+                if (displayAccessToken) displayAccessToken.textContent = data.data.hasAccessToken ? '✓ Configured' : '✗ Not configured';
+                
+                // Enable/disable login button
+                if (btnLoginKakao) {
+                    if (data.data.REST_API_KEY && !data.data.hasAccessToken) {
+                        btnLoginKakao.disabled = false;
+                    } else if (data.data.hasAccessToken) {
+                        btnLoginKakao.disabled = true;
+                        btnLoginKakao.innerHTML = '<i class="material-icons" style="vertical-align: middle; margin-right: 5px;">check_circle</i> <span>Already Authenticated</span>';
+                    }
+                }
+            } else {
+                if (currentConfig) currentConfig.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            if (loadingIndicator) loadingIndicator.style.display = 'none';
+            showKakaoError('Error loading KakaoTalk configuration: ' + error.message);
+        });
+    }
+
+    function saveKakaoConfiguration() {
+        const restApiKeyInput = document.getElementById('restApiKey');
+        if (!restApiKeyInput) return;
+        
+        const restApiKey = restApiKeyInput.value.trim();
+
+        if (!restApiKey) {
+            showKakaoError('REST API Key is required');
+            return;
+        }
+
+        const btn = document.getElementById('btnSaveKakaoConfig');
+        if (!btn) return;
+        
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...';
+        hideKakaoMessages();
+
+        fetch('/telegram/kakao/config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                restApiKey: restApiKey
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => {
+                    throw new Error(err.message || 'Server error');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+
+            if (data.success) {
+                showKakaoSuccess('REST API Key saved successfully! Now click "Login with Kakao" to authenticate.');
+                loadCurrentKakaoConfig();
+            } else {
+                showKakaoError(data.message || 'Failed to save configuration');
+            }
+        })
+        .catch(error => {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+            console.error('Error saving KakaoTalk config:', error);
+            showKakaoError('Error saving configuration: ' + (error.message || 'Unknown error. Please check if the database table exists.'));
+        });
+    }
+
+    function loginWithKakao() {
+        if (!btnLoginKakao) return;
+        
+        const originalText = btnLoginKakao.innerHTML;
+        btnLoginKakao.disabled = true;
+        btnLoginKakao.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Redirecting...';
+        hideKakaoMessages();
+
+        fetch('/telegram/kakao/login', {
+            credentials: 'include'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (btnLoginKakao) {
+                btnLoginKakao.disabled = false;
+                btnLoginKakao.innerHTML = originalText;
+            }
+
+            if (data.success && data.authUrl) {
+                // Redirect to Kakao login
+                window.location.href = data.authUrl;
+            } else {
+                showKakaoError(data.message || 'Failed to initiate Kakao login');
+            }
+        })
+        .catch(error => {
+            if (btnLoginKakao) {
+                btnLoginKakao.disabled = false;
+                btnLoginKakao.innerHTML = originalText;
+            }
+            showKakaoError('Error initiating Kakao login: ' + error.message);
+        });
+    }
+
+    function testKakaoConnection() {
+        if (!btnTestKakao) return;
+        
+        const originalText = btnTestKakao.innerHTML;
+        btnTestKakao.disabled = true;
+        btnTestKakao.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Testing...';
+        hideKakaoMessages();
+
+        fetch('/telegram/kakao/test', {
+            method: 'POST',
+            credentials: 'include'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (btnTestKakao) {
+                btnTestKakao.disabled = false;
+                btnTestKakao.innerHTML = originalText;
+            }
+
+            if (data.success) {
+                showKakaoSuccess('KakaoTalk connection successful! Test message sent to your KakaoTalk.');
+            } else {
+                showKakaoError('KakaoTalk connection failed: ' + data.message);
+            }
+        })
+        .catch(error => {
+            if (btnTestKakao) {
+                btnTestKakao.disabled = false;
+                btnTestKakao.innerHTML = originalText;
+            }
+            showKakaoError('Error testing KakaoTalk: ' + error.message);
+        });
+    }
+
+    function showKakaoError(message) {
+        const errorMsg = document.getElementById('kakaoErrorMessage');
+        const successMsg = document.getElementById('kakaoSuccessMessage');
+        if (errorMsg) {
+            errorMsg.textContent = message;
+            errorMsg.style.display = 'block';
+        }
+        if (successMsg) successMsg.style.display = 'none';
+    }
+
+    function showKakaoSuccess(message) {
+        const successMsg = document.getElementById('kakaoSuccessMessage');
+        const errorMsg = document.getElementById('kakaoErrorMessage');
+        if (successMsg) {
+            successMsg.textContent = message;
+            successMsg.style.display = 'block';
+        }
+        if (errorMsg) errorMsg.style.display = 'none';
+    }
+
+    function hideKakaoMessages() {
+        const errorMsg = document.getElementById('kakaoErrorMessage');
+        const successMsg = document.getElementById('kakaoSuccessMessage');
+        if (errorMsg) errorMsg.style.display = 'none';
+        if (successMsg) successMsg.style.display = 'none';
+    }
+
+    // Check for URL parameters (for OAuth callback)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('kakao_success') === 'true') {
+        showKakaoSuccess('KakaoTalk authentication successful! You can now send messages.');
+        loadCurrentKakaoConfig();
+    } else if (urlParams.get('error')) {
+        showKakaoError('KakaoTalk authentication failed: ' + decodeURIComponent(urlParams.get('error')));
     }
 });
 </script>

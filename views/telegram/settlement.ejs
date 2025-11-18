@@ -25,12 +25,141 @@
 
                 <!-- Settlement Report -->
                 <div id="settlementContent">
+                    <!-- Services Section -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                                        <h5 style="color: #b4b6bd; margin: 0;">
+                                            <i class="material-icons" style="vertical-align: middle;">attach_money</i> Sales Revenue
+                                            <span style="font-size: 0.9rem; margin-left: 15px;">
+                                                <i class="material-icons" style="vertical-align: middle; font-size: 18px;">date_range</i>
+                                                <span id="reportPeriodSales">Loading...</span>
+                                            </span>
+                                        </h5>
+                                        <div class="btn-group-wrapper">
+                                            <button class="btn btn-success btn-sm btnSendTelegram telegram-btn" data-section="sales">
+                                                <i class="material-icons">send</i> 
+                                                <span>Send via Telegram</span>
+                                            </button>
+                                            <button class="btn btn-warning btn-sm btnSendKakao kakao-btn" data-section="sales">
+                                                <i class="material-icons">chat</i> 
+                                                <span>Send via Kakao</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                                                <div class="stat-value" style="color: white; font-size: 2.5rem;" id="roomRevenue">₱0.00</div>
+                                                <div class="stat-label" style="color: rgba(255,255,255,0.9);">Room Revenue</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+                                                <div class="stat-value" style="color: white; font-size: 2.5rem;" id="servicesRevenue">₱0.00</div>
+                                                <div class="stat-label" style="color: rgba(255,255,255,0.9);">Services Revenue</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
+                                                <div class="stat-value" style="color: white; font-size: 2.5rem;" id="totalRevenue">₱0.00</div>
+                                                <div class="stat-label" style="color: rgba(255,255,255,0.9);">Total Revenue</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                     <!-- Room Availability Section -->
+                     <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                                        <h5 style="color: #b4b6bd; margin: 0;"><i class="material-icons">hotel</i> Expected Room Availability for Today</h5>
+                                        <div class="btn-group-wrapper">
+                                            <button class="btn btn-success btn-sm btnSendTelegram telegram-btn" data-section="availability">
+                                                <i class="material-icons">send</i> 
+                                                <span>Send via Telegram</span>
+                                            </button>
+                                            <button class="btn btn-warning btn-sm btnSendKakao kakao-btn" data-section="availability">
+                                                <i class="material-icons">chat</i> 
+                                                <span>Send via Kakao</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <div class="stat-card">
+                                                <div class="stat-value" id="totalRooms">0</div>
+                                                <div class="stat-label">Total Rooms</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="stat-card">
+                                                <div class="stat-value text-success" id="availableRooms">0</div>
+                                                <div class="stat-label">Available</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="stat-card">
+                                                <div class="stat-value text-warning" id="occupiedRooms">0</div>
+                                                <div class="stat-label">Occupied</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="stat-card">
+                                                <div class="stat-value text-info" id="cleaningRooms">0</div>
+                                                <div class="stat-label">Cleaning</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-3">
+                                        <div class="col-md-3">
+                                            <div class="stat-card">
+                                                <div class="stat-value text-danger" id="maintenanceRooms">0</div>
+                                                <div class="stat-label">Maintenance</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="stat-card">
+                                                <div class="stat-value" id="occupancyRate">0%</div>
+                                                <div class="stat-label">Occupancy Rate</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="stat-card">
+                                                <div class="stat-value text-primary" id="expectedCheckIns">0</div>
+                                                <div class="stat-label">Expected Check-Ins</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="stat-card">
+                                                <div class="stat-value text-primary" id="expectedCheckOuts">0</div>
+                                                <div class="stat-label">Expected Check-Outs</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
                     <!-- Booking Status Section (Combined Card) -->
                     <div class="row mb-4">
                         <div class="col-md-12">
                             <div class="card">
                                 <div class="card-header">
-                                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
                                         <h5 style="color: #b4b6bd; margin: 0;">
                                             <i class="material-icons" style="vertical-align: middle;">event</i> Booking Status
                                             <span style="font-size: 0.9rem; margin-left: 15px;">
@@ -38,10 +167,16 @@
                                                 <span id="reportPeriod">Loading...</span>
                                             </span>
                                         </h5>
-                                        <button class="btn btn-success btn-sm btnSendTelegram telegram-btn" data-section="booking">
-                                            <i class="material-icons">send</i> 
-                                            <span>Send via Telegram</span>
-                                        </button>
+                                        <div class="btn-group-wrapper">
+                                            <button class="btn btn-success btn-sm btnSendTelegram telegram-btn" data-section="booking">
+                                                <i class="material-icons">send</i> 
+                                                <span>Send via Telegram</span>
+                                            </button>
+                                            <button class="btn btn-warning btn-sm btnSendKakao kakao-btn" data-section="booking">
+                                                <i class="material-icons">chat</i> 
+                                                <span>Send via Kakao</span>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="card-body">
@@ -128,12 +263,18 @@
                         <div class="col-md-12">
                             <div class="card">
                                 <div class="card-header">
-                                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
                                         <h5 style="color: #b4b6bd; margin: 0;"><i class="material-icons" style="vertical-align: middle;">today</i> Expected Today</h5>
-                                        <button class="btn btn-success btn-sm btnSendTelegram telegram-btn" data-section="expected">
-                                            <i class="material-icons">send</i> 
-                                            <span>Send via Telegram</span>
-                                        </button>
+                                        <div class="btn-group-wrapper">
+                                            <button class="btn btn-success btn-sm btnSendTelegram telegram-btn" data-section="expected">
+                                                <i class="material-icons">send</i> 
+                                                <span>Send via Telegram</span>
+                                            </button>
+                                            <button class="btn btn-warning btn-sm btnSendKakao kakao-btn" data-section="expected">
+                                                <i class="material-icons">chat</i> 
+                                                <span>Send via Kakao</span>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="card-body">
@@ -188,121 +329,7 @@
                         </div>
                     </div>
 
-                    <!-- Room Availability Section -->
-                    <div class="row mb-4">
-                        <div class="col-md-12">
-                            <div class="card">
-                                <div class="card-header">
-                                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">
-                                        <h5 style="color: #b4b6bd; margin: 0;"><i class="material-icons">hotel</i> Expected Room Availability for Today</h5>
-                                        <button class="btn btn-success btn-sm btnSendTelegram telegram-btn" data-section="availability">
-                                            <i class="material-icons">send</i> 
-                                            <span>Send via Telegram</span>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="card-body">
-                                    <div class="row">
-                                        <div class="col-md-3">
-                                            <div class="stat-card">
-                                                <div class="stat-value" id="totalRooms">0</div>
-                                                <div class="stat-label">Total Rooms</div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="stat-card">
-                                                <div class="stat-value text-success" id="availableRooms">0</div>
-                                                <div class="stat-label">Available</div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="stat-card">
-                                                <div class="stat-value text-warning" id="occupiedRooms">0</div>
-                                                <div class="stat-label">Occupied</div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="stat-card">
-                                                <div class="stat-value text-info" id="cleaningRooms">0</div>
-                                                <div class="stat-label">Cleaning</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="row mt-3">
-                                        <div class="col-md-3">
-                                            <div class="stat-card">
-                                                <div class="stat-value text-danger" id="maintenanceRooms">0</div>
-                                                <div class="stat-label">Maintenance</div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="stat-card">
-                                                <div class="stat-value" id="occupancyRate">0%</div>
-                                                <div class="stat-label">Occupancy Rate</div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="stat-card">
-                                                <div class="stat-value text-primary" id="expectedCheckIns">0</div>
-                                                <div class="stat-label">Expected Check-Ins</div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-3">
-                                            <div class="stat-card">
-                                                <div class="stat-value text-primary" id="expectedCheckOuts">0</div>
-                                                <div class="stat-label">Expected Check-Outs</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Sales Section -->
-                    <div class="row mb-4">
-                        <div class="col-md-12">
-                            <div class="card">
-                                <div class="card-header">
-                                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">
-                                        <h5 style="color: #b4b6bd; margin: 0;">
-                                            <i class="material-icons" style="vertical-align: middle;">attach_money</i> Sales Revenue
-                                            <span style="font-size: 0.9rem; margin-left: 15px;">
-                                                <i class="material-icons" style="vertical-align: middle; font-size: 18px;">date_range</i>
-                                                <span id="reportPeriodSales">Loading...</span>
-                                            </span>
-                                        </h5>
-                                        <button class="btn btn-success btn-sm btnSendTelegram telegram-btn" data-section="sales">
-                                            <i class="material-icons">send</i> 
-                                            <span>Send via Telegram</span>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="card-body">
-                                    <div class="row">
-                                        <div class="col-md-4">
-                                            <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-                                                <div class="stat-value" style="color: white; font-size: 2.5rem;" id="roomRevenue">₱0.00</div>
-                                                <div class="stat-label" style="color: rgba(255,255,255,0.9);">Room Revenue</div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
-                                                <div class="stat-value" style="color: white; font-size: 2.5rem;" id="salesRevenue">₱0.00</div>
-                                                <div class="stat-label" style="color: rgba(255,255,255,0.9);">Sales Revenue</div>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
-                                                <div class="stat-value" style="color: white; font-size: 2.5rem;" id="totalRevenue">₱0.00</div>
-                                                <div class="stat-label" style="color: rgba(255,255,255,0.9);">Total Revenue</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                   
                 </div>
             </div>
         </div>
@@ -373,6 +400,48 @@
 
 .telegram-btn span {
     vertical-align: middle;
+}
+
+.kakao-btn {
+    background: linear-gradient(135deg, #f5e14c 0%, #f1c40f 100%);
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    color: #2c3e50;
+    font-weight: 500;
+    font-size: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    cursor: pointer;
+}
+
+.kakao-btn:hover {
+    background: linear-gradient(135deg, #e1c31a 0%, #f1c40f 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.25);
+    color: #2c3e50;
+}
+
+.kakao-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+
+.kakao-btn:disabled {
+    background: #b8b8b8;
+    cursor: not-allowed;
+    opacity: 0.6;
+    transform: none;
+    box-shadow: none;
+}
+
+.btn-group-wrapper {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 </style>
 
@@ -512,10 +581,10 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('expectedCheckIns').textContent = availability.expectedCheckIns;
         document.getElementById('expectedCheckOuts').textContent = availability.expectedCheckOuts;
 
-        // Sales Revenue
-        const sales = data.sales || { roomRevenue: '0.00', salesRevenue: '0.00', totalRevenue: '0.00' };
+        // Services Revenue
+        const sales = data.sales || { roomRevenue: '0.00', servicesRevenue: '0.00', totalRevenue: '0.00' };
         document.getElementById('roomRevenue').textContent = '₱' + parseFloat(sales.roomRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        document.getElementById('salesRevenue').textContent = '₱' + parseFloat(sales.salesRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('servicesRevenue').textContent = '₱' + parseFloat(sales.servicesRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         document.getElementById('totalRevenue').textContent = '₱' + parseFloat(sales.totalRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
@@ -526,6 +595,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Load saved chat ID
     let savedChatId = null;
+    let kakaoConfigured = false;
     function loadBotConfig() {
         fetch('/telegram/config', {
             credentials: 'include'
@@ -551,6 +621,27 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error loading bot config:', error);
             // Disable all send buttons on error
             document.querySelectorAll('.btnSendTelegram').forEach(btn => {
+                btn.disabled = true;
+            });
+        });
+    }
+
+    function loadKakaoConfig() {
+        fetch('/telegram/kakao/config', {
+            credentials: 'include'
+        })
+        .then(response => response.json())
+        .then(data => {
+            const hasAccessToken = data.success && data.data && data.data.hasAccessToken;
+            kakaoConfigured = hasAccessToken;
+            document.querySelectorAll('.btnSendKakao').forEach(btn => {
+                btn.disabled = !hasAccessToken;
+            });
+        })
+        .catch(error => {
+            console.error('Error loading Kakao config:', error);
+            kakaoConfigured = false;
+            document.querySelectorAll('.btnSendKakao').forEach(btn => {
                 btn.disabled = true;
             });
         });
@@ -621,13 +712,82 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Send via Kakao buttons
+    document.querySelectorAll('.btnSendKakao').forEach(button => {
+        button.addEventListener('click', function() {
+            if (!kakaoConfigured) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'KakaoTalk Not Configured',
+                    text: 'Please authenticate KakaoTalk in settings first.',
+                    confirmButtonColor: '#f1c40f'
+                });
+                return;
+            }
+            const section = this.getAttribute('data-section');
+            sendReportKakao(section, this);
+        });
+    });
+
+    function sendReportKakao(section, btn) {
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="material-icons">hourglass_empty</i> Sending...';
+
+        fetch('/telegram/settlement/send/kakaotalk', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ section: section }),
+            credentials: 'include'
+        })
+        .then(response => response.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+
+            if (data.success) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Success!',
+                    text: 'Report sent successfully to KakaoTalk!',
+                    confirmButtonColor: '#f1c40f',
+                    timer: 2000,
+                    showConfirmButton: true
+                });
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: data.message || 'Failed to send report via KakaoTalk',
+                    confirmButtonColor: '#f1c40f'
+                });
+            }
+        })
+        .catch(error => {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Error sending KakaoTalk report: ' + error.message,
+                confirmButtonColor: '#f1c40f'
+            });
+        });
+    }
+
     // Initial load - disable buttons until config is loaded
     document.querySelectorAll('.btnSendTelegram').forEach(btn => {
+        btn.disabled = true;
+    });
+    document.querySelectorAll('.btnSendKakao').forEach(btn => {
         btn.disabled = true;
     });
     
     loadSettlement();
     loadBotConfig();
+    loadKakaoConfig();
 });
 </script>
 
