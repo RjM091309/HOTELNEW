@@ -48,11 +48,13 @@ class DailySettlementService {
      * Format Booking Status section
      */
     static formatBookingStatus(period, checkIns, checkOuts, pending) {
-        let report = `📅 *BOOKING STATUS*\n\n`; //booking status
-        report += `Period: ${period.startFormatted} to ${period.endFormatted}\n\n`; //period
+        let report = `📅 체크인 & 아웃 현황\n\n`; //booking status
+        const startKorean = moment(period.start, 'YYYY-MM-DD HH:mm:ss').locale('ko').format('YYYY년 MM월 DD일 HH:mm');
+        const endKorean = moment(period.end, 'YYYY-MM-DD HH:mm:ss').locale('ko').format('YYYY년 MM월 DD일 HH:mm');
+        report += `기간: ${startKorean} ~ ${endKorean}\n\n`; //period
         
         // Check-Ins
-        report += `✅ *CHECK-INS* : ${checkIns.count}\n`; //check-ins
+        report += `✅ 체크인 : ${checkIns.count}\n`; //check-ins
         // if (checkIns.count > 0) {
         //     checkIns.data.forEach(item => {
         //         report += `  • Room ${item.ROOM_NUMBER || 'N/A'}: ${item.CUSTOMER_NAME || 'N/A'}\n`;
@@ -66,7 +68,7 @@ class DailySettlementService {
         report += `\n`;
         
         // Check-Outs
-        report += `🚪 *CHECK-OUTS* : ${checkOuts.count}\n`; //check-outs    
+        report += `🚪 체크아웃 : ${checkOuts.count}\n`; //check-outs    
         // if (checkOuts.count > 0) {
         //     checkOuts.data.forEach(item => {
         //         report += `  • Room ${item.ROOM_NUMBER || 'N/A'}: ${item.CUSTOMER_NAME || 'N/A'}\n`;
@@ -81,7 +83,7 @@ class DailySettlementService {
         report += `\n`;
         
         // Pending
-        report += `⏳ *PENDING* : ${pending.count}\n`; //pending
+        // report += `⏳ *PENDING* : ${pending.count}\n`; //pending
         // if (pending.count > 0) {
         //     pending.data.forEach(item => {
         //         report += `  • Room ${item.ROOM_NUMBER || 'N/A'}: ${item.CUSTOMER_NAME || 'N/A'}\n`;
@@ -95,7 +97,7 @@ class DailySettlementService {
         // }
         report += `\n`;
         
-        report += `_Generated: ${moment().format('MMM DD, YYYY hh:mm A')}_`; //generated time
+        report += `작성일: ${moment().locale('ko').format('YYYY년 MM월 DD일 HH:mm')}`; //generated time
         return report;
     }
     
@@ -104,7 +106,8 @@ class DailySettlementService {
      */
     static formatExpectedToday(period, expectedCheckInsToday, expectedCheckOutsToday) {
         let report = `📋 *EXPECTED TODAY*\n\n`; //expected today
-        report += `Date: ${moment().format('MMM DD, YYYY')}\n\n`; //date
+        const todayKorean = moment().locale('ko').format('YYYY년 MM월 DD일');
+        report += `Date: ${todayKorean}\n\n`; //date
         
         // Expected Check-Ins Today
         report += `✅ *EXPECTED CHECK-INS TODAY* : ${expectedCheckInsToday.count}\n`; //expected check-ins today
@@ -133,7 +136,7 @@ class DailySettlementService {
         // }
         report += `\n`;
         
-        report += `_Generated: ${moment().format('MMM DD, YYYY hh:mm A')}_`; //generated time
+        report += `_Generated: ${moment().locale('ko').format('YYYY년 MM월 DD일 HH:mm')}_`; //generated time
         return report;
     }
     
@@ -141,18 +144,19 @@ class DailySettlementService {
      * Format Room Availability section
      */
     static formatRoomAvailability(period, roomAvailability) {
-        let report = `🏨 *EXPECTED ROOM AVAILABILITY FOR TODAY*\n\n`; //expected room availability for today
-        report += `Date: ${moment().format('MMM DD, YYYY')}\n\n`; //date
+        let report = `🏨 실시간 가용객실 현황\n\n`; //expected room availability for today
+        const availabilityDate = moment().locale('ko').format('YYYY년 MM월 DD일');
+        report += `기간: ${availabilityDate}\n\n`; //date
         
-        report += `📊 *ROOM STATISTICS*\n`; //room statistics
-        report += `Total Rooms: ${roomAvailability.totalRooms}\n`; //total rooms
-        report += `✅ Available: ${roomAvailability.availableRooms}\n`; //available rooms
-        report += `🛏️ Occupied: ${roomAvailability.occupiedRooms}\n`; //occupied rooms
-        report += `🧹 Cleaning: ${roomAvailability.cleaningRooms}\n`; //cleaning rooms
-        report += `🔧 Maintenance: ${roomAvailability.maintenanceRooms}\n`; //maintenance rooms
-        report += `📈 Occupancy Rate: ${roomAvailability.occupancyRate}%\n\n`; //occupancy rate
+        // report += `📊 *ROOM STATISTICS*\n`; //room statistics
+        report += `총객실: ${roomAvailability.totalRooms}\n\n`; //total rooms
+        report += `✅ 가용객실: ${roomAvailability.availableRooms}\n\n`; //available rooms
+        report += `🛏️ 투숙객실: ${roomAvailability.occupiedRooms}\n\n`; //occupied rooms
+        report += `🧹 청소중: ${roomAvailability.cleaningRooms}\n\n`; //cleaning rooms
+        report += `🔧 유지보수: ${roomAvailability.maintenanceRooms}\n\n`; //maintenance rooms
+        report += `📈 객실 가동율(보수중인 객실 제외): ${roomAvailability.occupancyRate}%\n\n\n`; //occupancy rate
         
-        report += `_Generated: ${moment().format('MMM DD, YYYY hh:mm A')}_`; //generated time
+        report += `작성일: ${moment().locale('ko').format('YYYY년 MM월 DD일 HH:mm')}`; //generated time
         return report;
     }
     
@@ -160,19 +164,21 @@ class DailySettlementService {
      * Format Services Revenue section
      */
     static formatSalesRevenue(period, sales) {
-        let report = `💰 *일 매출 정산*\n\n`; //daily sales settlement
-        report += `Period: ${period.startFormatted} to ${period.endFormatted}\n\n`; //period
+        let report = `💰 일 매출 현황\n\n`; //daily sales settlement
+        const salesStartKorean = moment(period.start, 'YYYY-MM-DD HH:mm:ss').locale('ko').format('YYYY년 MM월 DD일 HH:mm');
+        const salesEndKorean = moment(period.end, 'YYYY-MM-DD HH:mm:ss').locale('ko').format('YYYY년 MM월 DD일 HH:mm');
+        report += `기간: ${salesStartKorean} ~ ${salesEndKorean}\n\n`; //period
         
-        report += `💵 *ROOM REVENUE*\n`; //room revenue
+        report += `💵 객실 매출\n`; //room revenue
         report += `₱${parseFloat(sales.roomRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`;
         
-        report += `💳 *SERVICES REVENUE*\n`; //services revenue
+        report += `💳 서비스 매출\n`; //services revenue
         report += `₱${parseFloat(sales.servicesRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`;
         
-        report += `📊 *TOTAL REVENUE*\n`; //total revenue
+        report += `📊 매출 합계\n`; //total revenue
         report += `₱${parseFloat(sales.totalRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`;
         
-        report += `_Generated: ${moment().format('MMM DD, YYYY hh:mm A')}_`; //generated time
+        report += `작성일: ${moment().locale('ko').format('YYYY년 MM월 DD일 HH:mm')}`; //generated time
         return report;
     }
     

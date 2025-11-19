@@ -352,6 +352,8 @@ class DailySettlementModel {
             ]);
             const expectedCheckOuts = expectedCheckOutsResult[0]?.EXPECTED_CHECK_OUTS || 0;
             
+            const activeRooms = totalRooms - maintenanceRooms;
+            
             return {
                 totalRooms,
                 occupiedRooms,
@@ -360,7 +362,7 @@ class DailySettlementModel {
                 availableRooms,
                 expectedCheckIns,
                 expectedCheckOuts,
-                occupancyRate: totalRooms > 0 ? ((occupiedRooms / totalRooms) * 100).toFixed(2) : 0
+                occupancyRate: activeRooms > 0 ? ((occupiedRooms / activeRooms) * 100).toFixed(2) : 0
             };
         } catch (error) {
             console.error('Error getting room availability:', error);
