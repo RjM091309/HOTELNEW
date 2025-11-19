@@ -149,6 +149,10 @@
                                     <i class="material-icons" style="vertical-align: middle; margin-right: 5px;">check_circle</i> 
                                     <span>Test Connection</span>
                                 </button>
+                                <button type="button" class="btn btn-danger" id="btnDeleteKakaoConfig" style="min-width: 180px; display: inline-flex; align-items: center; justify-content: center;">
+                                    <i class="material-icons" style="vertical-align: middle; margin-right: 5px;">delete</i> 
+                                    <span>Delete Configuration</span>
+                                </button>
                             </div>
                         </div>
                     </form>
@@ -419,6 +423,16 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    const btnDeleteKakaoConfig = document.getElementById('btnDeleteKakaoConfig');
+    if (btnDeleteKakaoConfig) {
+        // Delete KakaoTalk config button
+        btnDeleteKakaoConfig.addEventListener('click', function() {
+            if (confirm('Are you sure you want to delete the KakaoTalk configuration? This action cannot be undone.')) {
+                deleteKakaoConfiguration();
+            }
+        });
+    }
+
     function loadCurrentKakaoConfig() {
         const loadingIndicator = document.getElementById('kakaoLoadingIndicator');
         const restApiKeyInput = document.getElementById('restApiKey');
@@ -663,6 +677,48 @@ document.addEventListener('DOMContentLoaded', function() {
             successMsg.style.display = 'block';
         }
         if (errorMsg) errorMsg.style.display = 'none';
+    }
+
+    function deleteKakaoConfiguration() {
+        const btn = document.getElementById('btnDeleteKakaoConfig');
+        if (!btn) return;
+        
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Deleting...';
+        hideKakaoMessages();
+
+        fetch('/telegram/kakao/config', {
+            method: 'DELETE',
+            credentials: 'include'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+
+            if (data.success) {
+                showKakaoSuccess('KakaoTalk configuration deleted successfully');
+                // Clear form
+                const restApiKeyInput = document.getElementById('restApiKey');
+                if (restApiKeyInput) restApiKeyInput.value = '';
+                const currentConfig = document.getElementById('currentKakaoConfig');
+                if (currentConfig) currentConfig.style.display = 'none';
+                // Reload config to update button states
+                loadCurrentKakaoConfig();
+            } else {
+                showKakaoError(data.message || 'Failed to delete configuration');
+            }
+        })
+        .catch(error => {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+            showKakaoError('Error deleting configuration: ' + error.message);
+        });
     }
 
     function hideKakaoMessages() {

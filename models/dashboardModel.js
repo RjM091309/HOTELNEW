@@ -276,6 +276,7 @@ class DashboardModel {
             OR 
             (b.BOOKING_STATUS = 'check-Out' AND DATE(b.CHECK_OUT_DATE) = CURDATE())
           )
+            AND r.ROOM_STATUS != 1
         ORDER BY r.ROOM_NUMBER ASC
       `);
       return details;

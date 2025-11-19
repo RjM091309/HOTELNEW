@@ -21,6 +21,7 @@ router.post('/settlement/send', TelegramController.sendDailySettlement);
 // KakaoTalk Routes
 router.get('/kakao/config', TelegramController.getKakaoConfig);
 router.post('/kakao/config', TelegramController.saveKakaoConfig);
+router.delete('/kakao/config', TelegramController.deleteKakaoConfig);
 router.get('/kakao/login', TelegramController.kakaoLogin);
 router.get('/kakao/callback', TelegramController.kakaoCallback);
 router.post('/kakao/test', TelegramController.testKakaoTalk);

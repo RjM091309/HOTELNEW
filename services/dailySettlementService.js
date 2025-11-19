@@ -48,11 +48,11 @@ class DailySettlementService {
      * Format Booking Status section
      */
     static formatBookingStatus(period, checkIns, checkOuts, pending) {
-        let report = `📅 *BOOKING STATUS*\n\n`;
-        report += `Period: ${period.startFormatted} to ${period.endFormatted}\n\n`;
+        let report = `📅 *BOOKING STATUS*\n\n`; //booking status
+        report += `Period: ${period.startFormatted} to ${period.endFormatted}\n\n`; //period
         
         // Check-Ins
-        report += `✅ *CHECK-INS* : ${checkIns.count}\n`;
+        report += `✅ *CHECK-INS* : ${checkIns.count}\n`; //check-ins
         // if (checkIns.count > 0) {
         //     checkIns.data.forEach(item => {
         //         report += `  • Room ${item.ROOM_NUMBER || 'N/A'}: ${item.CUSTOMER_NAME || 'N/A'}\n`;
@@ -66,7 +66,7 @@ class DailySettlementService {
         report += `\n`;
         
         // Check-Outs
-        report += `🚪 *CHECK-OUTS* : ${checkOuts.count}\n`;
+        report += `🚪 *CHECK-OUTS* : ${checkOuts.count}\n`; //check-outs    
         // if (checkOuts.count > 0) {
         //     checkOuts.data.forEach(item => {
         //         report += `  • Room ${item.ROOM_NUMBER || 'N/A'}: ${item.CUSTOMER_NAME || 'N/A'}\n`;
@@ -81,7 +81,7 @@ class DailySettlementService {
         report += `\n`;
         
         // Pending
-        report += `⏳ *PENDING* : ${pending.count}\n`;
+        report += `⏳ *PENDING* : ${pending.count}\n`; //pending
         // if (pending.count > 0) {
         //     pending.data.forEach(item => {
         //         report += `  • Room ${item.ROOM_NUMBER || 'N/A'}: ${item.CUSTOMER_NAME || 'N/A'}\n`;
@@ -95,7 +95,7 @@ class DailySettlementService {
         // }
         report += `\n`;
         
-        report += `_Generated: ${moment().format('MMM DD, YYYY hh:mm A')}_`;
+        report += `_Generated: ${moment().format('MMM DD, YYYY hh:mm A')}_`; //generated time
         return report;
     }
     
@@ -103,11 +103,11 @@ class DailySettlementService {
      * Format Expected Today section
      */
     static formatExpectedToday(period, expectedCheckInsToday, expectedCheckOutsToday) {
-        let report = `📋 *EXPECTED TODAY*\n\n`;
-        report += `Date: ${moment().format('MMM DD, YYYY')}\n\n`;
+        let report = `📋 *EXPECTED TODAY*\n\n`; //expected today
+        report += `Date: ${moment().format('MMM DD, YYYY')}\n\n`; //date
         
         // Expected Check-Ins Today
-        report += `✅ *EXPECTED CHECK-INS TODAY* : ${expectedCheckInsToday.count}\n`;
+        report += `✅ *EXPECTED CHECK-INS TODAY* : ${expectedCheckInsToday.count}\n`; //expected check-ins today
         // if (expectedCheckInsToday.count > 0) {
         //     expectedCheckInsToday.data.forEach(item => {
         //         report += `  • Room ${item.ROOM_NUMBER || 'N/A'}: ${item.CUSTOMER_NAME || 'N/A'}\n`;
@@ -120,7 +120,7 @@ class DailySettlementService {
         report += `\n`;
         
         // Expected Check-Outs Today
-        report += `🚪 *EXPECTED CHECK-OUTS TODAY* : ${expectedCheckOutsToday.count}\n`;
+        report += `🚪 *EXPECTED CHECK-OUTS TODAY* : ${expectedCheckOutsToday.count}\n`; //expected check-outs today
         // if (expectedCheckOutsToday.count > 0) {
         //     expectedCheckOutsToday.data.forEach(item => {
         //         report += `  • Room ${item.ROOM_NUMBER || 'N/A'}: ${item.CUSTOMER_NAME || 'N/A'}\n`;
@@ -133,7 +133,7 @@ class DailySettlementService {
         // }
         report += `\n`;
         
-        report += `_Generated: ${moment().format('MMM DD, YYYY hh:mm A')}_`;
+        report += `_Generated: ${moment().format('MMM DD, YYYY hh:mm A')}_`; //generated time
         return report;
     }
     
@@ -141,18 +141,18 @@ class DailySettlementService {
      * Format Room Availability section
      */
     static formatRoomAvailability(period, roomAvailability) {
-        let report = `🏨 *EXPECTED ROOM AVAILABILITY FOR TODAY*\n\n`;
-        report += `Date: ${moment().format('MMM DD, YYYY')}\n\n`;
+        let report = `🏨 *EXPECTED ROOM AVAILABILITY FOR TODAY*\n\n`; //expected room availability for today
+        report += `Date: ${moment().format('MMM DD, YYYY')}\n\n`; //date
         
-        report += `📊 *ROOM STATISTICS*\n`;
-        report += `Total Rooms: ${roomAvailability.totalRooms}\n`;
-        report += `✅ Available: ${roomAvailability.availableRooms}\n`;
-        report += `🛏️ Occupied: ${roomAvailability.occupiedRooms}\n`;
-        report += `🧹 Cleaning: ${roomAvailability.cleaningRooms}\n`;
-        report += `🔧 Maintenance: ${roomAvailability.maintenanceRooms}\n`;
-        report += `📈 Occupancy Rate: ${roomAvailability.occupancyRate}%\n\n`;
+        report += `📊 *ROOM STATISTICS*\n`; //room statistics
+        report += `Total Rooms: ${roomAvailability.totalRooms}\n`; //total rooms
+        report += `✅ Available: ${roomAvailability.availableRooms}\n`; //available rooms
+        report += `🛏️ Occupied: ${roomAvailability.occupiedRooms}\n`; //occupied rooms
+        report += `🧹 Cleaning: ${roomAvailability.cleaningRooms}\n`; //cleaning rooms
+        report += `🔧 Maintenance: ${roomAvailability.maintenanceRooms}\n`; //maintenance rooms
+        report += `📈 Occupancy Rate: ${roomAvailability.occupancyRate}%\n\n`; //occupancy rate
         
-        report += `_Generated: ${moment().format('MMM DD, YYYY hh:mm A')}_`;
+        report += `_Generated: ${moment().format('MMM DD, YYYY hh:mm A')}_`; //generated time
         return report;
     }
     
@@ -160,19 +160,19 @@ class DailySettlementService {
      * Format Services Revenue section
      */
     static formatSalesRevenue(period, sales) {
-        let report = `💰 *일 매출 정산*\n\n`;
-        report += `Period: ${period.startFormatted} to ${period.endFormatted}\n\n`;
+        let report = `💰 *일 매출 정산*\n\n`; //daily sales settlement
+        report += `Period: ${period.startFormatted} to ${period.endFormatted}\n\n`; //period
         
-        report += `💵 *ROOM REVENUE*\n`;
+        report += `💵 *ROOM REVENUE*\n`; //room revenue
         report += `₱${parseFloat(sales.roomRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`;
         
-        report += `💳 *SERVICES REVENUE*\n`;
+        report += `💳 *SERVICES REVENUE*\n`; //services revenue
         report += `₱${parseFloat(sales.servicesRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`;
         
-        report += `📊 *TOTAL REVENUE*\n`;
+        report += `📊 *TOTAL REVENUE*\n`; //total revenue
         report += `₱${parseFloat(sales.totalRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`;
         
-        report += `_Generated: ${moment().format('MMM DD, YYYY hh:mm A')}_`;
+        report += `_Generated: ${moment().format('MMM DD, YYYY hh:mm A')}_`; //generated time
         return report;
     }
     
@@ -180,37 +180,37 @@ class DailySettlementService {
      * Format Full Report (all sections)
      */
     static formatFullReport(period, checkIns, checkOuts, pending, expectedCheckInsToday, expectedCheckOutsToday, roomAvailability, sales) {
-        let report = `📊 *DAILY SETTLEMENT REPORT*\n\n`;
-        report += `📅 *Period:*\n`;
-        report += `${period.startFormatted} to ${period.endFormatted}\n\n`;
+        let report = `📊 *DAILY SETTLEMENT REPORT*\n\n`; //daily settlement report
+        report += `📅 *Period:*\n`; //period
+        report += `${period.startFormatted} to ${period.endFormatted}\n\n`; 
         
         // Check-Ins Section
-        report += `✅ *CHECK-INS* : ${checkIns.count}\n`;
+        report += `✅ *CHECK-INS* : ${checkIns.count}\n`; //check-ins
         report += `\n`;
         
         // Check-Outs Section
-        report += `🚪 *CHECK-OUTS* : ${checkOuts.count}\n`;
+        report += `🚪 *CHECK-OUTS* : ${checkOuts.count}\n`; //check-outs
         report += `\n`;
         
         // Pending Section
-        report += `⏳ *PENDING* : ${pending.count}\n`;
+        report += `⏳ *PENDING* : ${pending.count}\n`; //pending
         report += `\n`;
 
         // Expected Today
-        report += `📋 *EXPECTED FOR TODAY*\n`;
-        report += `Expected Check-Ins: ${roomAvailability.expectedCheckIns}\n`;
-        report += `Expected Check-Outs: ${roomAvailability.expectedCheckOuts}\n\n`;
+        report += `📋 *EXPECTED FOR TODAY*\n`; //expected for today
+        report += `Expected Check-Ins: ${roomAvailability.expectedCheckIns}\n`; //expected check-ins
+        report += `Expected Check-Outs: ${roomAvailability.expectedCheckOuts}\n\n`; //expected check-outs
         
         // Room Availability Section
-        report += `🏨 *EXPECTED ROOM AVAILABILITY FOR TODAY*\n`;
-        report += `Total Rooms: ${roomAvailability.totalRooms}\n`;
-        report += `✅ Available: ${roomAvailability.availableRooms}\n`;
-        report += `🛏️ Occupied: ${roomAvailability.occupiedRooms}\n`;
-        report += `🧹 Cleaning: ${roomAvailability.cleaningRooms}\n`;
+        report += `🏨 *EXPECTED ROOM AVAILABILITY FOR TODAY*\n`; //expected room availability for today
+        report += `Total Rooms: ${roomAvailability.totalRooms}\n`; //total rooms
+        report += `✅ Available: ${roomAvailability.availableRooms}\n`; //available rooms
+        report += `🛏️ Occupied: ${roomAvailability.occupiedRooms}\n`; //occupied rooms
+        report += `🧹 Cleaning: ${roomAvailability.cleaningRooms}\n`; //cleaning rooms
         report += `🔧 Maintenance: ${roomAvailability.maintenanceRooms}\n`;
-        report += `📈 Occupancy Rate: ${roomAvailability.occupancyRate}%\n\n`;
+        report += `📈 Occupancy Rate: ${roomAvailability.occupancyRate}%\n\n`; //occupancy rate
         
-        report += `_Generated: ${moment().format('MMM DD, YYYY hh:mm A')}_`;
+        report += `_Generated: ${moment().format('MMM DD, YYYY hh:mm A')}_`; //generated time
         
         return report;
     }

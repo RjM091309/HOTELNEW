@@ -788,6 +788,27 @@ class TelegramController {
             });
         }
     }
+
+    /**
+     * Delete KakaoTalk configuration
+     */
+    static async deleteKakaoConfig(req, res) {
+        try {
+            const deleted = await KakaoTalkModel.deleteConfig(req.user?.userId || null);
+            
+            if (deleted) {
+                res.json({ success: true, message: 'KakaoTalk configuration deleted successfully' });
+            } else {
+                res.status(404).json({ success: false, message: 'No KakaoTalk configuration found to delete' });
+            }
+        } catch (error) {
+            console.error('Error deleting KakaoTalk config:', error);
+            res.status(500).json({ 
+                success: false, 
+                message: 'Failed to delete KakaoTalk configuration: ' + (error.message || 'Unknown error')
+            });
+        }
+    }
 }
 
 // Helper function to process updates asynchronously
