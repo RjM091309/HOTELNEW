@@ -88,6 +88,23 @@ if (dashboardSocket) {
                         showDashboardNotification(data.message, data.action);
                     }
                     break;
+                    
+                case 'new-booking-checkin-today':
+                    // Handle new booking with check-in today - add to checked-in tab
+                    if (data.data && data.data.booking) {
+                        if (typeof addBookingToCheckedInTab === 'function') {
+                            addBookingToCheckedInTab(data.data.booking);
+                        }
+                    }
+                    
+                    // Also refresh the overview cards
+                    refreshDashboardOverviewCards();
+                    
+                    // Show notification
+                    if (data.message) {
+                        showDashboardNotification(data.message, data.action);
+                    }
+                    break;
             }
         }
     });

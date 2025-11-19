@@ -351,6 +351,46 @@ class BookingController {
         refundBookingId: bookingId,
         refundAmount: hasRefund ? parseFloat(refundAmount) || 0 : 0
       });
+      
+      // Emit Socket.IO event for calendar real-time updates
+      const io = req.app.get('io');
+      if (io && out && out.success) {
+        try {
+          // Fetch updated booking details for each checked out booking
+          const updatedBookings = [];
+          for (const id of bookingIds) {
+            const bookingDetails = await BookingModel.getBookingDetails(id);
+            if (bookingDetails) {
+              updatedBookings.push({
+                bookingId: id,
+                checkOutDate: bookingDetails.CHECK_OUT_DATE,
+                bookingStatus: 'check-Out',
+                ...bookingDetails
+              });
+            }
+          }
+          
+          if (updatedBookings.length > 0) {
+            const eventData = {
+              action: 'booking-checked-out',
+              message: 'Booking(s) checked out successfully',
+              data: {
+                bookings: updatedBookings,
+                bookingIds: bookingIds,
+                timestamp: new Date().toISOString()
+              }
+            };
+            
+            // Emit to dashboard and calendar rooms
+            io.to('dashboard-room').emit('dashboard-refresh', eventData);
+            io.emit('calendar-booking-updated', eventData);
+            console.log('📡 Emitted booking-checked-out event for bookings:', bookingIds);
+          }
+        } catch (err) {
+          console.error('Error emitting checkout socket event:', err);
+        }
+      }
+      
       return res.json({ 
         success: true, 
         message: out.message, 
@@ -600,6 +640,41 @@ class BookingController {
       });
 
 
+
+      // Check if check-in date is today and emit socket event
+      const today = moment().format('YYYY-MM-DD');
+      const checkInDateOnly = checkInDate.split(' ')[0]; // Get date part only
+      
+      if (checkInDateOnly === today && result.bookingId) {
+        // Emit Socket.IO event for new booking with check-in today
+        const io = req.app.get('io');
+        if (io) {
+          // Fetch booking details in dashboard format (same as getTodayCheckInDetails)
+          try {
+            const DashboardModel = require('../models/dashboardModel');
+            const todayCheckInBookings = await DashboardModel.getTodayCheckInDetails();
+            // Find the newly created booking
+            const newBooking = todayCheckInBookings.find(b => b.BookingID == result.bookingId);
+            
+            if (newBooking) {
+              const eventData = {
+                action: 'new-booking-checkin-today',
+                message: 'New booking with check-in today has been created',
+                data: {
+                  booking: newBooking,
+                  bookingId: result.bookingId,
+                  timestamp: new Date().toISOString()
+                }
+              };
+              
+              io.to('dashboard-room').emit('dashboard-refresh', eventData);
+              console.log('📡 Emitted new-booking-checkin-today event for booking:', result.bookingId);
+            }
+          } catch (err) {
+            console.error('Error fetching booking details for socket emission:', err);
+          }
+        }
+      }
 
       res.json({
         success: true,

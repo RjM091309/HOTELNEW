@@ -218,6 +218,8 @@ class CalendarController {
           };
           
           io.to('dashboard-room').emit('dashboard-refresh', eventData);
+          // Also emit to calendar for real-time updates
+          io.emit('calendar-booking-updated', eventData);
         }
         
         res.json({

@@ -1105,8 +1105,172 @@ const findHeader = setInterval(() => {
   // Initialize search and filter functionality
   initializeSearchAndFilter();
 
+  // Setup Socket.IO for real-time calendar updates
+  if (typeof io !== 'undefined') {
+    const calendarSocket = io({
+      transports: ['websocket', 'polling'],
+      upgrade: true,
+      rememberUpgrade: true,
+      timeout: 20000
+    });
+
+    calendarSocket.on('connect', () => {
+      console.log('🔌 Calendar connected to Socket.IO server');
+    });
+
+    calendarSocket.on('disconnect', () => {
+      console.log('🔌 Calendar disconnected from Socket.IO server');
+    });
+
+    // Listen for booking checkout updates and general booking updates
+    calendarSocket.on('calendar-booking-updated', (data) => {
+      console.log('📡 Received calendar booking update event:', data);
+      
+      if (data && data.data) {
+        if (data.action === 'booking-checked-out' && data.data.bookings) {
+          // Update calendar events for checked out bookings
+          updateCalendarEventsForCheckout(data.data.bookings);
+        } else if (data.action === 'booking-updated' || data.action === 'booking-extended') {
+          // Update calendar event for general booking updates (including checkout date changes)
+          updateCalendarEventForBooking(data.data);
+        }
+      }
+    });
+
+    // Also listen to dashboard-refresh events for checkout
+    if (typeof window.dashboardSocket !== 'undefined' && window.dashboardSocket) {
+      window.dashboardSocket.on('dashboard-refresh', (data) => {
+        if (data && data.action === 'booking-checked-out' && data.data && data.data.bookings) {
+          console.log('📡 Received dashboard-refresh checkout event:', data);
+          updateCalendarEventsForCheckout(data.data.bookings);
+        }
+      });
+    }
+
+    // Store socket globally for calendar
+    window.calendarSocket = calendarSocket;
+  }
 
 });
+
+// Function to update calendar events when checkout happens
+function updateCalendarEventsForCheckout(bookings) {
+  if (!window.calendar || !bookings || bookings.length === 0) {
+    return;
+  }
+
+  try {
+    bookings.forEach(bookingData => {
+      const bookingId = String(bookingData.bookingId || bookingData.BookingID);
+      if (!bookingId) return;
+
+      // Find the event in the calendar
+      const event = window.calendar.getEventById(bookingId);
+      if (!event) {
+        console.log('Event not found for booking:', bookingId);
+        return;
+      }
+
+      // Get updated checkout date
+      const checkOutDate = bookingData.checkOutDate || bookingData.CHECK_OUT_DATE;
+      if (!checkOutDate) return;
+
+      // Parse the checkout date
+      const newEndDate = new Date(checkOutDate);
+      // Set checkout time to 11:00 AM (AM cell)
+      newEndDate.setHours(11, 0, 0, 0);
+
+      // Update event end date
+      event.setEnd(newEndDate);
+
+      // Update event extendedProps if needed
+      if (event.setExtendedProp) {
+        event.setExtendedProp('bookingStatus', 'check-Out');
+        event.setExtendedProp('checkOutDate', checkOutDate);
+      }
+
+      // Update event title/display if needed
+      if (event.setProp) {
+        event.setProp('title', event.title || ''); // Keep existing title
+      }
+
+      console.log('✅ Updated calendar event for booking:', bookingId, 'New checkout:', newEndDate);
+    });
+
+    // Refresh calendar to show changes
+    window.calendar.render();
+  } catch (error) {
+    console.error('Error updating calendar events for checkout:', error);
+    // Fallback: refetch all events if update fails
+    if (window.calendar && typeof window.calendar.refetchEvents === 'function') {
+      window.calendar.refetchEvents();
+    }
+  }
+}
+
+// Function to update calendar event for general booking updates (checkout date changes, etc.)
+function updateCalendarEventForBooking(bookingData) {
+  if (!window.calendar || !bookingData) {
+    return;
+  }
+
+  try {
+    const bookingId = String(bookingData.bookingId);
+    if (!bookingId) return;
+
+    // Find the event in the calendar
+    const event = window.calendar.getEventById(bookingId);
+    if (!event) {
+      console.log('Event not found for booking:', bookingId);
+      return;
+    }
+
+    // Update checkout date if provided
+    if (bookingData.checkOut) {
+      const newEndDate = new Date(bookingData.checkOut);
+      // Set checkout time to 11:00 AM (AM cell)
+      newEndDate.setHours(11, 0, 0, 0);
+      event.setEnd(newEndDate);
+    }
+
+    // Update check-in date if provided
+    if (bookingData.checkIn) {
+      const newStartDate = new Date(bookingData.checkIn);
+      // Set check-in time to 2:00 PM (PM cell)
+      newStartDate.setHours(14, 0, 0, 0);
+      event.setStart(newStartDate);
+    }
+
+    // Update room if provided
+    if (bookingData.newRoom) {
+      const newResource = window.calendar.getResourceById(String(bookingData.newRoom));
+      if (newResource) {
+        event.setResources([newResource]);
+      }
+    }
+
+    // Update extendedProps
+    if (event.setExtendedProp) {
+      if (bookingData.checkOut) {
+        event.setExtendedProp('checkOutDate', bookingData.checkOut);
+      }
+      if (bookingData.isExtended) {
+        event.setExtendedProp('isExtended', true);
+      }
+    }
+
+    console.log('✅ Updated calendar event for booking:', bookingId);
+    
+    // Refresh calendar to show changes
+    window.calendar.render();
+  } catch (error) {
+    console.error('Error updating calendar event for booking:', error);
+    // Fallback: refetch all events if update fails
+    if (window.calendar && typeof window.calendar.refetchEvents === 'function') {
+      window.calendar.refetchEvents();
+    }
+  }
+}
 
 // =============================================================================
 // SEARCH AND FILTER FUNCTIONALITY
