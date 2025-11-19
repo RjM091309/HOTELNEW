@@ -26,6 +26,13 @@ function reloadDashboardData() {
                 }
             });
             
+            // Initialize S/C/R/M indicator colors after reload
+            setTimeout(() => {
+                if (typeof window.loadAllBookingCardComplaintCounts === 'function') {
+                    window.loadAllBookingCardComplaintCounts();
+                }
+            }, 300);
+            
             // Update counts and stats if they exist
             const newCounts = doc.querySelectorAll('[data-count]');
             newCounts.forEach(function(element) {
@@ -219,6 +226,13 @@ document.addEventListener('DOMContentLoaded', function () {
       contents.forEach((content) => content.classList.remove('active-tab'));
       const target = tab.getAttribute('data-target');
       document.getElementById(target).classList.add('active-tab');
+      
+      // Initialize S/C/R/M indicator colors when tab is switched
+      setTimeout(() => {
+        if (typeof window.loadAllBookingCardComplaintCounts === 'function') {
+          window.loadAllBookingCardComplaintCounts();
+        }
+      }, 100);
     });
   });
 });
@@ -332,6 +346,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isNewestActive) {
           sortByNewest();
         }
+        
+        // Initialize S/C/R/M indicator colors when tab is switched
+        setTimeout(() => {
+          if (typeof window.loadAllBookingCardComplaintCounts === 'function') {
+            window.loadAllBookingCardComplaintCounts();
+          }
+        }, 100);
       }
     });
   });
@@ -544,6 +565,12 @@ $(document).ready(function () {
                                   // Smooth reload of dashboard data
                                   setTimeout(() => {
                                       reloadDashboardData();
+                                      // Initialize S/C/R/M indicator colors after reload
+                                      setTimeout(() => {
+                                          if (typeof window.loadAllBookingCardComplaintCounts === 'function') {
+                                              window.loadAllBookingCardComplaintCounts();
+                                          }
+                                      }, 500);
                                   }, 1000);
                               },
                               error: function (xhr, status, error) {

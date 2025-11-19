@@ -5894,6 +5894,11 @@ async function addRemark(bookingId) {
             // Update button color to reflect new remarks
             await updateRemarksButtonColor(bookingId);
             
+            // Update S and M indicator colors on booking card
+            if (typeof updateMemoIndicator === 'function') {
+                await updateMemoIndicator(bookingId);
+            }
+            
             toastSuccess('Success', 'Remark added successfully!');
         } else {
             toastError('Error', result.message || 'Failed to add remark');
@@ -6008,6 +6013,11 @@ async function deleteRemark(bookingId, remarkId) {
             // Update table
             updateRemarksTable(bookingId);
             
+            // Update S and M indicator colors on booking card
+            if (typeof updateMemoIndicator === 'function') {
+                await updateMemoIndicator(bookingId);
+            }
+            
             toastSuccess('Success', 'Remark deleted successfully!');
         } else {
             toastError('Error', result.message || 'Failed to delete remark');
@@ -6106,6 +6116,11 @@ async function updateRemark(bookingId, remarkId) {
             
             // Reload remarks
             await loadRemarks(bookingId);
+            
+            // Update S and M indicator colors on booking card
+            if (typeof updateMemoIndicator === 'function') {
+                await updateMemoIndicator(bookingId);
+            }
             
             toastSuccess('Success', 'Remark updated successfully!');
         } else {
@@ -6319,18 +6334,26 @@ async function loadComplaintRequests(bookingId) {
     }
 }
 
-// Load complaint/request counts for all visible booking cards
+// Load complaint/request counts for ALL booking cards across ALL tabs
+// This function processes cards in all tabs (checked-in, occupied, checkout, etc.)
+// to ensure colors are ready when user switches between tabs
 async function loadAllBookingCardComplaintCounts() {
     try {
-        // Get all booking cards on the page
+        // Get ALL booking cards on the page (from all tabs, not just active tab)
+        // This ensures colors are initialized for all tabs, not just the currently visible one
         const bookingCards = document.querySelectorAll('.card[data-booking-id]');
         const bookingIds = Array.from(bookingCards).map(card => card.getAttribute('data-booking-id')).filter(Boolean);
+        
+        if (bookingIds.length === 0) {
+            return;
+        }
         
         // Load counts for each booking
         const crPromises = bookingIds.map(bookingId => loadComplaintRequests(bookingId));
         await Promise.all(crPromises);
 
         // After CR, update Memo indicator coloring based on remarks category
+        // This updates S (Special) and M (Memo) indicator colors
         const memoPromises = bookingIds.map(bookingId => updateMemoIndicator(bookingId));
         await Promise.all(memoPromises);
     } catch (e) {
@@ -6446,6 +6469,8 @@ async function addComplaintRequest(bookingId) {
         toastSuccess('Saved', 'Entry added');
         // also refresh remarks button color if present
         if (typeof updateRemarksButtonColor === 'function') { try { await updateRemarksButtonColor(bookingId); } catch(_){} }
+        // Update S and M indicator colors on booking card
+        if (typeof updateMemoIndicator === 'function') { try { await updateMemoIndicator(bookingId); } catch(_){} }
     } catch (e) {
         console.error('Add complaint/request failed:', e);
         toastError('Error', 'Could not save');
@@ -6479,6 +6504,8 @@ async function toggleComplaintRequestStatus(remarkId, toStatus, bookingId) {
         if (!ok.success) throw new Error(ok.message || 'Failed');
         await loadComplaintRequests(bookingId);
         toastSuccess('Updated', 'Status updated');
+        // Update S and M indicator colors on booking card
+        if (typeof updateMemoIndicator === 'function') { try { await updateMemoIndicator(bookingId); } catch(_){} }
     } catch (e) {
         console.error('Toggle status failed:', e);
         toastError('Error', 'Could not update status');
@@ -6508,6 +6535,8 @@ async function deleteComplaintRequest(remarkId, bookingId) {
         if (!out.success) throw new Error(out.message || 'Failed');
         await loadComplaintRequests(bookingId);
         toastSuccess('Deleted', 'Entry deleted');
+        // Update S and M indicator colors on booking card
+        if (typeof updateMemoIndicator === 'function') { try { await updateMemoIndicator(bookingId); } catch(_){} }
     } catch (e) {
         console.error('Delete complaint/request failed:', e);
         toastError('Error', 'Could not delete');
@@ -6576,6 +6605,8 @@ async function updateComplaintRequest(id, bookingId) {
         if (modalEl) bootstrap.Modal.getInstance(modalEl).hide();
         await loadComplaintRequests(bookingId);
         toastSuccess('Updated', 'Complaint/Request updated');
+        // Update S and M indicator colors on booking card
+        if (typeof updateMemoIndicator === 'function') { try { await updateMemoIndicator(bookingId); } catch(_){} }
     } catch (e) {
         console.error('Error updating complaint/request:', e);
         toastError('Error', 'Could not update');

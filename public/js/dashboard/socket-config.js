@@ -143,6 +143,12 @@ function refreshExtendedTab() {
         success: function(response) {
             if (response.success) {
                 updateExtendedTab(response.data);
+                // Initialize S/C/R/M indicator colors after tab update
+                setTimeout(() => {
+                    if (typeof window.loadAllBookingCardComplaintCounts === 'function') {
+                        window.loadAllBookingCardComplaintCounts();
+                    }
+                }, 300);
             }
         },
         error: function(xhr, status, error) {
@@ -163,6 +169,12 @@ function refreshCheckInTabs() {
         success: function(response) {
             if (response.success) {
                 updateCheckInTabs(response.data);
+                // Initialize S/C/R/M indicator colors after tab update
+                setTimeout(() => {
+                    if (typeof window.loadAllBookingCardComplaintCounts === 'function') {
+                        window.loadAllBookingCardComplaintCounts();
+                    }
+                }, 300);
             }
         },
         error: function(xhr, status, error) {
