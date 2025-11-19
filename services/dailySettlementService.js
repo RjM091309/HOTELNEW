@@ -49,7 +49,7 @@ class DailySettlementService {
      */
     static formatBookingStatus(period, checkIns, checkOuts, pending) {
         let report = `📅 *BOOKING STATUS*\n\n`;
-        report += `*Period:* ${period.startFormatted} to ${period.endFormatted}\n\n`;
+        report += `Period: ${period.startFormatted} to ${period.endFormatted}\n\n`;
         
         // Check-Ins
         report += `✅ *CHECK-INS* : ${checkIns.count}\n`;
@@ -104,7 +104,7 @@ class DailySettlementService {
      */
     static formatExpectedToday(period, expectedCheckInsToday, expectedCheckOutsToday) {
         let report = `📋 *EXPECTED TODAY*\n\n`;
-        report += `*Date:* ${moment().format('MMM DD, YYYY')}\n\n`;
+        report += `Date: ${moment().format('MMM DD, YYYY')}\n\n`;
         
         // Expected Check-Ins Today
         report += `✅ *EXPECTED CHECK-INS TODAY* : ${expectedCheckInsToday.count}\n`;
@@ -142,7 +142,7 @@ class DailySettlementService {
      */
     static formatRoomAvailability(period, roomAvailability) {
         let report = `🏨 *EXPECTED ROOM AVAILABILITY FOR TODAY*\n\n`;
-        report += `*Date:* ${moment().format('MMM DD, YYYY')}\n\n`;
+        report += `Date: ${moment().format('MMM DD, YYYY')}\n\n`;
         
         report += `📊 *ROOM STATISTICS*\n`;
         report += `Total Rooms: ${roomAvailability.totalRooms}\n`;
@@ -160,8 +160,8 @@ class DailySettlementService {
      * Format Services Revenue section
      */
     static formatSalesRevenue(period, sales) {
-        let report = `💰 * 일 매출 정산 *\n\n`;
-        report += `*Period:* ${period.startFormatted} to ${period.endFormatted}\n\n`;
+        let report = `💰 *일 매출 정산*\n\n`;
+        report += `Period: ${period.startFormatted} to ${period.endFormatted}\n\n`;
         
         report += `💵 *ROOM REVENUE*\n`;
         report += `₱${parseFloat(sales.roomRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`;
@@ -275,9 +275,23 @@ class DailySettlementService {
             // Generate report with section
             const report = await this.generateReport(section);
             
-            // Send via KakaoTalk (to yourself)
-            const kakaoTalkService = new KakaoTalkService(config.ACCESS_TOKEN);
-            const result = await kakaoTalkService.sendMessageToSelf(report);
+            // Send via KakaoTalk (to yourself) with automatic token refresh
+            const kakaoTalkService = new KakaoTalkService(
+                config.ACCESS_TOKEN,
+                config.REFRESH_TOKEN,
+                config.REST_API_KEY
+            );
+            const result = await kakaoTalkService.sendMessageToSelfWithRefresh(report);
+            
+            // If token was refreshed, save the new tokens to database
+            if (result.tokenRefreshed && result.newAccessToken) {
+                await KakaoTalkModel.updateAccessToken(
+                    result.newAccessToken,
+                    result.newRefreshToken || config.REFRESH_TOKEN,
+                    null
+                );
+                console.log('KakaoTalk access token refreshed and saved to database');
+            }
             
             if (!result.success) {
                 throw new Error(result.message || 'Failed to send report');

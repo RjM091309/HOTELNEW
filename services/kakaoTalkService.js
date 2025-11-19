@@ -2,8 +2,10 @@ const axios = require('axios');
 const querystring = require('querystring');
 
 class KakaoTalkService {
-    constructor(accessToken) {
+    constructor(accessToken, refreshToken = null, restApiKey = null) {
         this.accessToken = accessToken;
+        this.refreshToken = refreshToken;
+        this.restApiKey = restApiKey;
         this.baseURL = 'https://kapi.kakao.com';
     }
 
@@ -120,6 +122,109 @@ class KakaoTalkService {
         } catch (error) {
             return false;
         }
+    }
+
+    /**
+     * Refresh access token using refresh token
+     * @returns {Promise<{success: boolean, accessToken?: string, refreshToken?: string, message?: string}>}
+     */
+    async refreshAccessToken() {
+        try {
+            if (!this.refreshToken || this.refreshToken.trim() === '') {
+                return {
+                    success: false,
+                    message: 'Refresh token is required. Please re-authenticate.'
+                };
+            }
+
+            if (!this.restApiKey || this.restApiKey.trim() === '') {
+                return {
+                    success: false,
+                    message: 'REST API Key is required for token refresh.'
+                };
+            }
+
+            const tokenParams = querystring.stringify({
+                grant_type: 'refresh_token',
+                client_id: this.restApiKey,
+                refresh_token: this.refreshToken
+            });
+
+            const response = await axios.post(
+                'https://kauth.kakao.com/oauth/token',
+                tokenParams,
+                {
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'
+                    }
+                }
+            );
+
+            const { access_token, refresh_token } = response.data;
+
+            // Update tokens
+            this.accessToken = access_token;
+            if (refresh_token) {
+                this.refreshToken = refresh_token; // New refresh token (optional, may not be returned)
+            }
+
+            return {
+                success: true,
+                accessToken: access_token,
+                refreshToken: refresh_token || this.refreshToken
+            };
+        } catch (error) {
+            console.error('Error refreshing KakaoTalk token:', {
+                message: error.message,
+                status: error.response?.status,
+                data: error.response?.data
+            });
+
+            return {
+                success: false,
+                message: error.response?.data?.error_description || error.response?.data?.msg || error.message || 'Failed to refresh token'
+            };
+        }
+    }
+
+    /**
+     * Send message with automatic token refresh on expiration
+     */
+    async sendMessageToSelfWithRefresh(message, options = {}) {
+        // Try sending message first
+        let result = await this.sendMessageToSelf(message, options);
+
+        // If token expired (401), try to refresh and retry
+        if (!result.success && result.message && (
+            result.message.includes('this access token does not exist') ||
+            result.message.includes('expired') ||
+            result.message.includes('invalid')
+        )) {
+            console.log('Access token expired, attempting to refresh...');
+            const refreshResult = await this.refreshAccessToken();
+
+            if (refreshResult.success) {
+                // Retry sending message with new token
+                result = await this.sendMessageToSelf(message, options);
+                
+                // Return refresh info if successful
+                if (result.success) {
+                    return {
+                        ...result,
+                        tokenRefreshed: true,
+                        newAccessToken: refreshResult.accessToken,
+                        newRefreshToken: refreshResult.refreshToken
+                    };
+                }
+            } else {
+                return {
+                    success: false,
+                    message: `Token expired and refresh failed: ${refreshResult.message}. Please re-authenticate.`
+                };
+            }
+        }
+
+        return result;
     }
 }
 

@@ -587,13 +587,31 @@ class TelegramController {
                 return res.json({ success: true, data: null, message: 'No KakaoTalk configured' });
             }
             
+            // Calculate days since last token update (EDITED_DT or ENCODED_DT)
+            const lastUpdateDate = config.EDITED_DT || config.ENCODED_DT;
+            let daysSinceLastAuth = null;
+            let shouldShowReauth = false;
+            
+            if (lastUpdateDate && config.ACCESS_TOKEN) {
+                const lastUpdate = new Date(lastUpdateDate);
+                const now = new Date();
+                const diffTime = Math.abs(now - lastUpdate);
+                daysSinceLastAuth = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                
+                // Show re-authenticate button if it's been 25+ days (refresh token expires in ~30 days)
+                shouldShowReauth = daysSinceLastAuth >= 25;
+            }
+            
             // Don't send access token in response for security
             res.json({
                 success: true,
                 data: {
                     REST_API_KEY: config.REST_API_KEY,
                     hasAccessToken: !!config.ACCESS_TOKEN,
-                    USER_INFO: config.USER_INFO ? JSON.parse(config.USER_INFO) : null
+                    hasRefreshToken: !!config.REFRESH_TOKEN,
+                    USER_INFO: config.USER_INFO ? JSON.parse(config.USER_INFO) : null,
+                    daysSinceLastAuth: daysSinceLastAuth,
+                    shouldShowReauth: shouldShowReauth
                 }
             });
         } catch (error) {
@@ -620,9 +638,22 @@ class TelegramController {
             }
 
             const existing = await KakaoTalkModel.getConfig();
-            const accessToken = existing?.ACCESS_TOKEN || null;
-            const refreshToken = existing?.REFRESH_TOKEN || null;
-            const userInfo = existing?.USER_INFO ? JSON.parse(existing.USER_INFO) : null;
+            
+            // Check if REST API Key has changed
+            const apiKeyChanged = existing && existing.REST_API_KEY && existing.REST_API_KEY !== restApiKey;
+            
+            // If API key changed, clear access token and refresh token (user needs to re-authenticate)
+            let accessToken = null;
+            let refreshToken = null;
+            let userInfo = null;
+            
+            if (!apiKeyChanged && existing) {
+                // API key not changed, keep existing tokens
+                accessToken = existing.ACCESS_TOKEN || null;
+                refreshToken = existing.REFRESH_TOKEN || null;
+                userInfo = existing.USER_INFO ? JSON.parse(existing.USER_INFO) : null;
+            }
+            // If API key changed, tokens will be null (cleared)
 
             await KakaoTalkModel.saveConfig(
                 restApiKey,
@@ -632,9 +663,14 @@ class TelegramController {
                 req.user?.userId || null
             );
 
+            const message = apiKeyChanged 
+                ? 'KakaoTalk REST API Key saved successfully. Please log in again with the new API key.'
+                : 'KakaoTalk REST API Key saved successfully';
+
             res.json({
                 success: true,
-                message: 'KakaoTalk REST API Key saved successfully'
+                message: message,
+                apiKeyChanged: apiKeyChanged
             });
         } catch (error) {
             console.error('Error saving KakaoTalk config:', error);
@@ -699,14 +735,29 @@ class TelegramController {
                 });
             }
 
-         
-            const kakaoTalkService = new KakaoTalkService(config.ACCESS_TOKEN);
-            const result = await kakaoTalkService.sendMessageToSelf('🧪 Test message from Hotel Management System');
+            // Use sendMessageToSelfWithRefresh for automatic token refresh
+            const kakaoTalkService = new KakaoTalkService(
+                config.ACCESS_TOKEN,
+                config.REFRESH_TOKEN,
+                config.REST_API_KEY
+            );
+            const result = await kakaoTalkService.sendMessageToSelfWithRefresh('Hello, This is Hotel Management System');
+
+            // If token was refreshed, save the new tokens to database
+            if (result.tokenRefreshed && result.newAccessToken) {
+                await KakaoTalkModel.updateAccessToken(
+                    result.newAccessToken,
+                    result.newRefreshToken || config.REFRESH_TOKEN,
+                    req.user?.userId || null
+                );
+                console.log('KakaoTalk access token refreshed and saved to database');
+            }
 
             console.log('KakaoTalk test result:', {
                 success: result.success,
                 message: result.message,
-                hasData: !!result.data
+                hasData: !!result.data,
+                tokenRefreshed: result.tokenRefreshed || false
             });
 
             if (result.success) {

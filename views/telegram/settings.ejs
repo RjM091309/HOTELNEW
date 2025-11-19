@@ -133,15 +133,19 @@
 
                         <div class="form-group" style="margin-top: 30px;">
                             <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                <button type="submit" class="btn btn-primary" id="btnSaveKakaoConfig" style="min-width: 180px;">
+                                <button type="submit" class="btn btn-primary" id="btnSaveKakaoConfig" style="min-width: 180px; display: inline-flex; align-items: center; justify-content: center;">
                                     <i class="material-icons" style="vertical-align: middle; margin-right: 5px;">save</i> 
                                     <span>Save REST API Key</span>
                                 </button>
-                                <button type="button" class="btn btn-success" id="btnLoginKakao" style="min-width: 180px;">
-                                    <i class="material-icons" style="vertical-align: middle; margin-right: 5px;">login</i> 
+                                <button type="button" class="btn btn-success" id="btnLoginKakao" style="min-width: 180px; display: inline-flex; align-items: center; justify-content: center;">
+                                    <i class="material-icons" style="vertical-align: middle; margin-right: 5px;">account_circle</i> 
                                     <span>Login with Kakao</span>
                                 </button>
-                                <button type="button" class="btn btn-info" id="btnTestKakao" style="min-width: 180px;">
+                                <button type="button" class="btn btn-warning" id="btnReauthKakao" style="min-width: 180px; display: none; align-items: center; justify-content: center;">
+                                    <i class="material-icons" style="vertical-align: middle; margin-right: 5px;">refresh</i> 
+                                    <span>Re-authenticate</span>
+                                </button>
+                                <button type="button" class="btn btn-info" id="btnTestKakao" style="min-width: 180px; display: inline-flex; align-items: center; justify-content: center;">
                                     <i class="material-icons" style="vertical-align: middle; margin-right: 5px;">check_circle</i> 
                                     <span>Test Connection</span>
                                 </button>
@@ -380,6 +384,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Check if KakaoTalk elements exist before adding listeners
     const kakaoConfigForm = document.getElementById('kakaoConfigForm');
     const btnLoginKakao = document.getElementById('btnLoginKakao');
+    const btnReauthKakao = document.getElementById('btnReauthKakao');
     const btnTestKakao = document.getElementById('btnTestKakao');
 
     if (kakaoConfigForm) {
@@ -396,6 +401,13 @@ document.addEventListener('DOMContentLoaded', function() {
     if (btnLoginKakao) {
         // Login with Kakao button
         btnLoginKakao.addEventListener('click', function() {
+            loginWithKakao();
+        });
+    }
+
+    if (btnReauthKakao) {
+        // Re-authenticate button
+        btnReauthKakao.addEventListener('click', function() {
             loginWithKakao();
         });
     }
@@ -435,15 +447,58 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Show current config display
                 if (currentConfig) currentConfig.style.display = 'block';
                 if (displayRestApiKey) displayRestApiKey.textContent = data.data.REST_API_KEY || 'N/A';
-                if (displayAccessToken) displayAccessToken.textContent = data.data.hasAccessToken ? '✓ Configured' : '✗ Not configured';
+                if (displayAccessToken) {
+                    let statusText = data.data.hasAccessToken ? '✓ Configured' : '✗ Not configured';
+                    if (data.data.hasAccessToken && data.data.daysSinceLastAuth !== null) {
+                        if (data.data.daysSinceLastAuth >= 25) {
+                            statusText += ` (${data.data.daysSinceLastAuth} days - Re-authenticate needed)`;
+                        } else {
+                            statusText += ` (${data.data.daysSinceLastAuth} days ago)`;
+                        }
+                    }
+                    displayAccessToken.textContent = statusText;
+                }
                 
-                // Enable/disable login button
-                if (btnLoginKakao) {
-                    if (data.data.REST_API_KEY && !data.data.hasAccessToken) {
-                        btnLoginKakao.disabled = false;
-                    } else if (data.data.hasAccessToken) {
+                // Show/hide login and re-authenticate buttons
+                if (data.data.REST_API_KEY) {
+                    if (data.data.hasAccessToken) {
+                        // Already authenticated - check if we should show re-authenticate button
+                        if (data.data.shouldShowReauth) {
+                            // 25+ days since last auth - show re-authenticate button, hide login button
+                            if (btnLoginKakao) {
+                                btnLoginKakao.style.display = 'none';
+                            }
+                            if (btnReauthKakao) {
+                                btnReauthKakao.style.display = 'inline-flex';
+                                btnReauthKakao.disabled = false;
+                            }
+                        } else {
+                            // Less than 25 days - hide both buttons (automatic refresh will handle it)
+                            if (btnLoginKakao) {
+                                btnLoginKakao.style.display = 'none';
+                            }
+                            if (btnReauthKakao) {
+                                btnReauthKakao.style.display = 'none';
+                            }
+                        }
+                    } else {
+                        // Not authenticated - show login button, hide re-authenticate button
+                        if (btnLoginKakao) {
+                            btnLoginKakao.style.display = 'inline-flex';
+                            btnLoginKakao.disabled = false;
+                        }
+                        if (btnReauthKakao) {
+                            btnReauthKakao.style.display = 'none';
+                        }
+                    }
+                } else {
+                    // No REST API Key - hide both buttons
+                    if (btnLoginKakao) {
+                        btnLoginKakao.style.display = 'inline-flex';
                         btnLoginKakao.disabled = true;
-                        btnLoginKakao.innerHTML = '<i class="material-icons" style="vertical-align: middle; margin-right: 5px;">check_circle</i> <span>Already Authenticated</span>';
+                    }
+                    if (btnReauthKakao) {
+                        btnReauthKakao.style.display = 'none';
                     }
                 }
             } else {
@@ -500,7 +555,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             if (data.success) {
-                showKakaoSuccess('REST API Key saved successfully! Now click "Login with Kakao" to authenticate.');
+                if (data.apiKeyChanged) {
+                    showKakaoSuccess('REST API Key saved successfully! Access token has been cleared. Please click "Login with Kakao" to authenticate with the new API key.');
+                } else {
+                    showKakaoSuccess('REST API Key saved successfully!');
+                }
+                // Reload config to update button states
                 loadCurrentKakaoConfig();
             } else {
                 showKakaoError(data.message || 'Failed to save configuration');
@@ -517,11 +577,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function loginWithKakao() {
-        if (!btnLoginKakao) return;
+        const activeButton = btnReauthKakao && btnReauthKakao.style.display !== 'none' ? btnReauthKakao : btnLoginKakao;
+        if (!activeButton) return;
         
-        const originalText = btnLoginKakao.innerHTML;
-        btnLoginKakao.disabled = true;
-        btnLoginKakao.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Redirecting...';
+        const originalText = activeButton.innerHTML;
+        activeButton.disabled = true;
+        activeButton.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Redirecting...';
         hideKakaoMessages();
 
         fetch('/telegram/kakao/login', {
@@ -529,9 +590,9 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(data => {
-            if (btnLoginKakao) {
-                btnLoginKakao.disabled = false;
-                btnLoginKakao.innerHTML = originalText;
+            if (activeButton) {
+                activeButton.disabled = false;
+                activeButton.innerHTML = originalText;
             }
 
             if (data.success && data.authUrl) {
@@ -542,9 +603,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(error => {
-            if (btnLoginKakao) {
-                btnLoginKakao.disabled = false;
-                btnLoginKakao.innerHTML = originalText;
+            if (activeButton) {
+                activeButton.disabled = false;
+                activeButton.innerHTML = originalText;
             }
             showKakaoError('Error initiating Kakao login: ' + error.message);
         });
