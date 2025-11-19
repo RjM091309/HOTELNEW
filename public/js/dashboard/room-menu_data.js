@@ -5002,10 +5002,17 @@ function openCheckoutBacktrackModal(bookingId, event) {
     const roomNumber = event.getResources()[0]?.title || 'N/A';
     const guestName = event.title || 'Unknown Guest';
     const checkInDate = event.start;
-    const checkOutDate = event.end;
+    // Handle same-day check-in/check-out: if end is null, use start date
+    let checkOutDate = event.end;
+    if (!checkOutDate || checkOutDate === null) {
+        // For same-day bookings, use check-in date as check-out date
+        checkOutDate = new Date(checkInDate);
+    }
     
     // Calculate days difference
     const daysDiff = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
+    // Ensure minimum 1 day for same-day bookings
+    const displayDaysDiff = daysDiff <= 0 ? 1 : daysDiff;
     
     // Create modal HTML
     const modalHTML = `
@@ -5059,7 +5066,7 @@ function openCheckoutBacktrackModal(bookingId, event) {
                                                         </div>
                                                         <div>
                                                             <small style="color: #6c757d; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Duration</small>
-                                                            <div style="color: #495057; font-weight: 600; font-size: 16px;">${daysDiff} day${daysDiff !== 1 ? 's' : ''}</div>
+                                                            <div style="color: #495057; font-weight: 600; font-size: 16px;">${displayDaysDiff} day${displayDaysDiff !== 1 ? 's' : ''}</div>
                                                         </div>
                                                     </div>
                                                 </div>
