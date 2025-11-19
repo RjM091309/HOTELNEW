@@ -160,7 +160,7 @@ class DailySettlementService {
      * Format Services Revenue section
      */
     static formatSalesRevenue(period, sales) {
-        let report = `💰 *SALES REVENUE*\n\n`;
+        let report = `💰 * 일 매출 정산 *\n\n`;
         report += `*Period:* ${period.startFormatted} to ${period.endFormatted}\n\n`;
         
         report += `💵 *ROOM REVENUE*\n`;
