@@ -169,6 +169,14 @@ class TelegramService {
      */
     async sendMessageWithKeyboard(chatId, text, keyboard) {
         try {
+            if (!keyboard || !Array.isArray(keyboard)) {
+                console.error('Invalid keyboard format:', keyboard);
+                return { 
+                    success: false, 
+                    message: 'Invalid keyboard format' 
+                };
+            }
+
             const payload = {
                 chat_id: chatId,
                 text: text,
@@ -178,8 +186,18 @@ class TelegramService {
             };
 
             const response = await axios.post(`${this.baseURL}/sendMessage`, payload);
-            return { success: true, data: response.data.result };
+            
+            if (response.data.ok) {
+                return { success: true, data: response.data.result };
+            } else {
+                console.error('Telegram API error:', response.data);
+                return { 
+                    success: false, 
+                    message: response.data.description || 'Unknown error' 
+                };
+            }
         } catch (error) {
+            console.error('Error sending message with keyboard:', error.response?.data || error.message);
             return { 
                 success: false, 
                 message: error.response?.data?.description || error.message 
@@ -224,6 +242,79 @@ class TelegramService {
             };
 
             const response = await axios.post(`${this.baseURL}/deleteMessage`, payload);
+            return { success: true, data: response.data };
+        } catch (error) {
+            return { 
+                success: false, 
+                message: error.response?.data?.description || error.message 
+            };
+        }
+    }
+
+    /**
+     * Answer callback query (to remove loading state)
+     * @param {string} callbackQueryId - Callback query ID
+     * @param {string} text - Optional text to show
+     * @param {boolean} showAlert - Whether to show as alert
+     */
+    async answerCallbackQuery(callbackQueryId, text = '', showAlert = false) {
+        try {
+            const payload = {
+                callback_query_id: callbackQueryId,
+                text: text,
+                show_alert: showAlert
+            };
+
+            const response = await axios.post(`${this.baseURL}/answerCallbackQuery`, payload);
+            return { success: true, data: response.data };
+        } catch (error) {
+            return { 
+                success: false, 
+                message: error.response?.data?.description || error.message 
+            };
+        }
+    }
+
+    /**
+     * Set bot commands menu
+     * @param {array} commands - Array of command objects [{command: 'start', description: 'Start bot'}]
+     */
+    async setMyCommands(commands) {
+        try {
+            const payload = {
+                commands: commands
+            };
+
+            const response = await axios.post(`${this.baseURL}/setMyCommands`, payload);
+            return { success: true, data: response.data };
+        } catch (error) {
+            return { 
+                success: false, 
+                message: error.response?.data?.description || error.message 
+            };
+        }
+    }
+
+    /**
+     * Set chat menu button (persistent menu button)
+     * @param {object} menuButton - Menu button object
+     */
+    async setChatMenuButton(chatId = null, menuButton = null) {
+        try {
+            const payload = {};
+            if (chatId) {
+                payload.chat_id = chatId;
+            }
+            if (menuButton) {
+                payload.menu_button = menuButton;
+            } else {
+                // Default: set commands menu button
+                payload.menu_button = {
+                    type: 'commands'
+                };
+            }
+
+            const response = await axios.post(`${this.baseURL}/setChatMenuButton`, payload);
             return { success: true, data: response.data };
         } catch (error) {
             return { 

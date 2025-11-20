@@ -333,7 +333,7 @@ class DailySettlementModel {
     }
     
     /**
-     * Get total booked rooms today (unique rooms booked today based on CHECK_IN_DATE)
+     * Get total booked rooms today (unique rooms occupied today based on stay overlap)
      */
     static async getTotalBookedRoomsToday(today) {
         try {
@@ -353,13 +353,16 @@ class DailySettlementModel {
                 LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
                 WHERE b.ACTIVE = 1
                     AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
-                    AND DATE(b.CHECK_IN_DATE) = DATE(?)
+                    AND DATE(?) >= DATE(b.CHECK_IN_DATE)
+                    AND DATE(?) < DATE(b.CHECK_OUT_DATE)
                 GROUP BY r.ROOM_NUMBER, b.IDNo
                 ORDER BY b.CHECK_IN_DATE ASC
             `;
             
+            const formattedDate = today.format('YYYY-MM-DD');
             const results = await queryDatabasePromise(query, [
-                today.format('YYYY-MM-DD')
+                formattedDate,
+                formattedDate
             ]);
             
             return {
@@ -379,6 +382,7 @@ class DailySettlementModel {
         try {
             const monthStart = today.clone().startOf('month');
             const monthEnd = today.clone().endOf('month');
+            const monthEndPlusOne = monthEnd.clone().add(1, 'day');
             
             // Get total active rooms (excluding maintenance)
             const totalRoomsQuery = `
@@ -401,12 +405,12 @@ class DailySettlementModel {
                 FROM booking b
                 WHERE b.ACTIVE = 1
                     AND b.BOOKING_STATUS IN ('check-In', 'check-Out')
-                    AND b.CHECK_IN_DATE <= ?
-                    AND (b.CHECK_OUT_DATE >= ? OR b.CHECK_OUT_DATE IS NULL)
+                    AND DATE(b.CHECK_IN_DATE) <= DATE(?)
+                    AND (DATE(b.CHECK_OUT_DATE) >= DATE(?) OR b.CHECK_OUT_DATE IS NULL)
             `;
             
             const occupiedNightsResult = await queryDatabasePromise(occupiedNightsQuery, [
-                monthEnd.format('YYYY-MM-DD'),
+                monthEndPlusOne.format('YYYY-MM-DD'),
                 monthStart.format('YYYY-MM-DD'),
                 monthEnd.format('YYYY-MM-DD'),
                 monthStart.format('YYYY-MM-DD')
@@ -434,6 +438,7 @@ class DailySettlementModel {
         try {
             const monthStart = today.clone().startOf('month');
             const monthEnd = today.clone().endOf('month');
+            const monthEndPlusOne = monthEnd.clone().add(1, 'day');
             
             // Get total active rooms (excluding maintenance)
             const totalRoomsQuery = `
@@ -456,12 +461,12 @@ class DailySettlementModel {
                 FROM booking b
                 WHERE b.ACTIVE = 1
                     AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
-                    AND b.CHECK_IN_DATE <= ?
-                    AND b.CHECK_OUT_DATE >= ?
+                    AND DATE(b.CHECK_IN_DATE) <= DATE(?)
+                    AND DATE(b.CHECK_OUT_DATE) >= DATE(?)
             `;
             
             const bookedNightsResult = await queryDatabasePromise(bookedNightsQuery, [
-                monthEnd.format('YYYY-MM-DD'),
+                monthEndPlusOne.format('YYYY-MM-DD'),
                 monthStart.format('YYYY-MM-DD'),
                 monthEnd.format('YYYY-MM-DD'),
                 monthStart.format('YYYY-MM-DD')
@@ -498,12 +503,9 @@ class DailySettlementModel {
             
             // Get occupied rooms (currently checked in)
             const occupiedRoomsQuery = `
-                SELECT COUNT(DISTINCT r.IDNo) AS OCCUPIED_ROOMS
-                FROM room r
-                INNER JOIN booking b ON r.IDNo = b.ROOM_ID
-                WHERE r.ACTIVE = 1 
-                    AND b.ACTIVE = 1
-                    AND b.BOOKING_STATUS = 'check-In'
+                 SELECT COUNT(*) AS OCCUPIED_ROOMS
+                FROM room
+                WHERE ACTIVE = 1 AND ROOM_STATUS = 2
                    
             `;
             const occupiedResult = await queryDatabasePromise(occupiedRoomsQuery, [
@@ -530,8 +532,14 @@ class DailySettlementModel {
             const maintenanceResult = await queryDatabasePromise(maintenanceRoomsQuery);
             const maintenanceRooms = maintenanceResult[0]?.MAINTENANCE_ROOMS || 0;
             
-            // Calculate available rooms
-            const availableRooms = totalRooms - occupiedRooms - cleaningRooms - maintenanceRooms;
+            // Get available rooms (vacant/ready status)
+            const availableRoomsQuery = `
+                SELECT COUNT(*) AS AVAILABLE_ROOMS
+                FROM room
+                WHERE ACTIVE = 1 AND ROOM_STATUS = 1
+            `;
+            const availableRoomsResult = await queryDatabasePromise(availableRoomsQuery);
+            const availableRooms = availableRoomsResult[0]?.AVAILABLE_ROOMS || 0;
             
             // Get expected check-ins today
             const expectedCheckInsQuery = `

@@ -13,6 +13,11 @@ router.get('/webhook', TelegramController.getWebhookInfo);
 router.post('/webhook', TelegramController.setWebhook);
 router.delete('/webhook', TelegramController.deleteWebhook);
 
+// Polling Routes (for testing without webhook)
+router.post('/polling/start', TelegramController.startPolling);
+router.post('/polling/stop', TelegramController.stopPolling);
+router.get('/polling/status', TelegramController.getPollingStatus);
+
 // Daily Settlement Routes
 router.get('/settlement', TelegramController.getDailySettlementPage);
 router.get('/settlement/data', TelegramController.getDailySettlement);

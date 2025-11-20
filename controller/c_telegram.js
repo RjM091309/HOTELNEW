@@ -80,6 +80,26 @@ class TelegramController {
                 req.user?.userId || null
             );
 
+            // Set up bot commands menu - only reports
+            await this.setupBotCommands(telegramService);
+
+            // Set chat menu button to show commands (persistent menu)
+            if (chatId) {
+                await telegramService.setChatMenuButton(chatId);
+            }
+
+            // Restart polling if it was running (for testing without webhook)
+            if (isPolling) {
+                restartPolling().catch(err => {
+                    console.error('Error restarting polling after config save:', err);
+                });
+            } else {
+                // Start polling if bot is configured
+                startPolling().catch(err => {
+                    console.error('Error starting polling after config save:', err);
+                });
+            }
+
             res.json({ 
                 success: true, 
                 message: 'Telegram bot configured successfully',
@@ -285,6 +305,56 @@ class TelegramController {
         }
     }
 
+    // Polling Control Methods (for testing without webhook)
+    static async startPolling(req, res) {
+        try {
+            await startPolling();
+            res.json({ 
+                success: true, 
+                message: 'Polling started successfully',
+                isPolling: isPolling
+            });
+        } catch (error) {
+            console.error('Error starting polling:', error);
+            res.status(500).json({ 
+                success: false, 
+                message: 'Failed to start polling: ' + (error.message || 'Unknown error')
+            });
+        }
+    }
+
+    static async stopPolling(req, res) {
+        try {
+            stopPolling();
+            res.json({ 
+                success: true, 
+                message: 'Polling stopped successfully',
+                isPolling: isPolling
+            });
+        } catch (error) {
+            console.error('Error stopping polling:', error);
+            res.status(500).json({ 
+                success: false, 
+                message: 'Failed to stop polling: ' + (error.message || 'Unknown error')
+            });
+        }
+    }
+
+    static async getPollingStatus(req, res) {
+        try {
+            res.json({ 
+                success: true, 
+                isPolling: isPolling,
+                message: isPolling ? 'Polling is active' : 'Polling is not active'
+            });
+        } catch (error) {
+            res.status(500).json({ 
+                success: false, 
+                message: 'Failed to get polling status'
+            });
+        }
+    }
+
     // Webhook Handler Methods
     static async handleWebhook(req, res) {
         try {
@@ -329,54 +399,102 @@ class TelegramController {
         }
     }
 
+    // Helper function to get report buttons (to avoid duplication)
+    static getReportButtons() {
+        return [
+            [
+                { text: '📅 체크인 & 아웃 현황', callback_data: 'report_booking' },
+                { text: '📋 예약현황', callback_data: 'report_expected' }
+            ],
+            [
+                { text: '🏨 실시간 가용객실 현황', callback_data: 'report_availability' },
+                { text: '💰 일 매출 현황', callback_data: 'report_sales' }
+            ]
+        ];
+    }
+
+    // Helper function to set up bot commands (to avoid duplication)
+    static async setupBotCommands(telegramService) {
+        const commands = [
+            { command: 'reports', description: 'Show report buttons' }
+        ];
+        await telegramService.setMyCommands(commands);
+    }
+
     static async handleMessage(message, telegramService) {
         const chatId = message.chat.id;
         const text = message.text || '';
         const username = message.from?.username || 'Unknown';
 
-        console.log(`Received message from ${username} (${chatId}): ${text}`);
+        // Get report buttons using helper function
+        const reportButtons = this.getReportButtons();
 
-        // Example: Handle /start command
+        // Handle /start command - show welcome with buttons
         if (text.startsWith('/start')) {
-            await telegramService.sendMessage(
+            const result = await telegramService.sendMessageWithKeyboard(
                 chatId,
-                'Welcome to Hotel Management Bot! 🏨\n\n' +
-                'Available commands:\n' +
-                '/help - Show help message\n' +
-                '/status - Check bot status'
+                '🏨 Welcome!\n\n' +
+                'Select a report to view:',
+                reportButtons
             );
+            if (!result.success) {
+                console.error('Error sending /start message with keyboard:', result.message);
+            }
         }
-        // Example: Handle /help command
+        // Handle /help command - show help with buttons
         else if (text.startsWith('/help')) {
-            await telegramService.sendMessage(
+            const result = await telegramService.sendMessageWithKeyboard(
                 chatId,
-                'Hotel Management Bot Commands:\n\n' +
+                'Hotel Management Bot\n\n' +
+                'Available Commands:\n' +
                 '/start - Start the bot\n' +
-                '/help - Show this help message\n' +
-                '/status - Check bot status'
+                '/help - Show this help\n' +
+                '/status - Check bot status\n\n' +
+                'Select a report below:',
+                reportButtons
             );
+            if (!result.success) {
+                console.error('Error sending /help message with keyboard:', result.message);
+            }
         }
-        // Example: Handle /status command
+        // Handle /status command - show status with buttons
         else if (text.startsWith('/status')) {
             const botInfo = await telegramService.getMe();
             if (botInfo.success) {
-                await telegramService.sendMessage(
-                    chatId,
-                    `Bot Status: ✅ Active\n` +
+                const statusMessage = `Bot Status: ✅ Active\n` +
                     `Bot Name: ${botInfo.data.first_name}\n` +
                     `Username: @${botInfo.data.username}\n` +
-                    `Bot ID: ${botInfo.data.id}`
+                    `Bot ID: ${botInfo.data.id}\n\n` +
+                    `Select a report below:`;
+                
+                const result = await telegramService.sendMessageWithKeyboard(
+                    chatId,
+                    statusMessage,
+                    reportButtons
+                );
+                if (!result.success) {
+                    console.error('Error sending /status message with keyboard:', result.message);
+                }
+            }
+        }
+        // Handle /reports command - show buttons
+        else if (text.startsWith('/reports')) {
+            const result = await telegramService.sendMessageWithKeyboard(
+                chatId,
+                '📊 Select the report you want to view:',
+                reportButtons
+            );
+            if (!result.success) {
+                console.error('Error sending /reports message with keyboard:', result.message);
+                // Try to send without buttons as fallback
+                await telegramService.sendMessage(
+                    chatId,
+                    '❌ Error showing buttons. Please try again or contact support.'
                 );
             }
         }
-        // Handle other messages
-        else if (text.trim()) {
-            // Echo the message back (you can customize this)
-            await telegramService.sendMessage(
-                chatId,
-                `You said: ${text}\n\nType /help for available commands.`
-            );
-        }
+        // Handle other messages - do nothing (no response)
+        // Users should use commands like /start, /reports, /help, /status
     }
 
     static async handleCallbackQuery(callbackQuery, telegramService) {
@@ -384,17 +502,64 @@ class TelegramController {
         const data = callbackQuery.data;
         const queryId = callbackQuery.id;
 
-        console.log(`Received callback query: ${data}`);
-
         // Answer the callback query to remove loading state
-        await telegramService.sendMessage(chatId, `You selected: ${data}`);
+        await telegramService.answerCallbackQuery(queryId, 'Loading report...', false);
 
-        // You can add more callback query handling logic here
+        try {
+            // Get bot configuration
+            const config = await TelegramModel.getBotConfig();
+            if (!config || !config.BOT_TOKEN) {
+                await telegramService.sendMessage(chatId, '❌ Error: Telegram bot not configured');
+                return;
+            }
+
+            // Handle different report types
+            let section = null;
+            let reportName = '';
+
+            if (data === 'report_booking') {
+                section = 'booking';
+                reportName = '체크인 & 아웃 현황';
+            } else if (data === 'report_expected') {
+                section = 'expected';
+                reportName = '예약현황';
+            } else if (data === 'report_availability') {
+                section = 'availability';
+                reportName = '실시간 가용객실 현황';
+            } else if (data === 'report_sales') {
+                section = 'sales';
+                reportName = '일 매출 현황';
+            } else {
+                await telegramService.sendMessage(chatId, '❌ Unknown report type');
+                return;
+            }
+
+            // Generate and send the report
+            const report = await DailySettlementService.generateReport(section);
+            
+            // Send the report
+            const result = await telegramService.sendMessage(chatId, report, {
+                parse_mode: 'Markdown'
+            });
+
+            if (!result.success) {
+                await telegramService.sendMessage(
+                    chatId, 
+                    `❌ Error sending ${reportName} report: ${result.message || 'Unknown error'}`
+                );
+            }
+
+        } catch (error) {
+            console.error('Error handling callback query:', error);
+            await telegramService.sendMessage(
+                chatId, 
+                `❌ Error generating report: ${error.message || 'Unknown error'}`
+            );
+        }
     }
 
     static async handleEditedMessage(message, telegramService) {
         const chatId = message.chat.id;
-        console.log(`Message edited in chat ${chatId}`);
         // Add your logic for handling edited messages
     }
 
@@ -484,8 +649,6 @@ class TelegramController {
             const scope = 'talk_message';
             const kakaoAuthURL = `https://kauth.kakao.com/oauth/authorize?response_type=code&client_id=${config.REST_API_KEY}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}`;
 
-            console.log('Kakao OAuth URL:', kakaoAuthURL);
-
             res.json({
                 success: true,
                 authUrl: kakaoAuthURL
@@ -535,12 +698,6 @@ class TelegramController {
                     }
                 }
             );
-
-            console.log('Token response received:', {
-                hasAccessToken: !!tokenResponse.data.access_token,
-                hasRefreshToken: !!tokenResponse.data.refresh_token,
-                scope: tokenResponse.data.scope
-            });
 
             const { access_token, refresh_token } = tokenResponse.data;
 
@@ -750,15 +907,7 @@ class TelegramController {
                     result.newRefreshToken || config.REFRESH_TOKEN,
                     req.user?.userId || null
                 );
-                console.log('KakaoTalk access token refreshed and saved to database');
             }
-
-            console.log('KakaoTalk test result:', {
-                success: result.success,
-                message: result.message,
-                hasData: !!result.data,
-                tokenRefreshed: result.tokenRefreshed || false
-            });
 
             if (result.success) {
                 res.json({
@@ -815,6 +964,111 @@ class TelegramController {
 async function processTelegramUpdate(update) {
     await TelegramController.processUpdate(update);
 }
+
+// Polling variables
+let pollingInterval = null;
+let lastUpdateId = 0;
+let isPolling = false;
+
+/**
+ * Start polling for Telegram updates (for testing without webhook)
+ */
+async function startPolling() {
+    if (isPolling) {
+        return;
+    }
+
+    try {
+        const config = await TelegramModel.getBotConfig();
+        if (!config || !config.BOT_TOKEN) {
+            return;
+        }
+
+        isPolling = true;
+
+        const telegramService = new TelegramService(config.BOT_TOKEN);
+
+        // Delete any existing webhook first (polling and webhook can't work together)
+        await telegramService.deleteWebhook();
+
+        // Set up bot commands menu - only reports
+        await TelegramController.setupBotCommands(telegramService);
+
+        // Start polling
+        pollForUpdates(telegramService);
+    } catch (error) {
+        console.error('Error starting Telegram polling:', error);
+        isPolling = false;
+    }
+}
+
+/**
+ * Poll for updates from Telegram
+ */
+async function pollForUpdates(telegramService) {
+    if (!isPolling) return;
+
+    try {
+        const result = await telegramService.getUpdates({
+            offset: lastUpdateId + 1,
+            timeout: 30, // Long polling - wait up to 30 seconds
+            limit: 100
+        });
+
+        if (result.success && result.data && result.data.length > 0) {
+            for (const update of result.data) {
+                // Update lastUpdateId
+                if (update.update_id >= lastUpdateId) {
+                    lastUpdateId = update.update_id;
+                }
+
+                // Process the update
+                await TelegramController.processUpdate(update);
+            }
+        }
+    } catch (error) {
+        console.error('Error polling for updates:', error);
+        // Wait a bit before retrying on error
+        await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+
+    // Continue polling
+    if (isPolling) {
+        setTimeout(() => pollForUpdates(telegramService), 100); // Small delay before next poll
+    }
+}
+
+/**
+ * Stop polling for Telegram updates
+ */
+function stopPolling() {
+    if (pollingInterval) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+    }
+    isPolling = false;
+}
+
+/**
+ * Restart polling (useful when bot config changes)
+ */
+async function restartPolling() {
+    stopPolling();
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+    await startPolling();
+}
+
+// Export polling functions
+TelegramController.startPolling = startPolling;
+TelegramController.stopPolling = stopPolling;
+TelegramController.restartPolling = restartPolling;
+TelegramController.isPolling = () => isPolling;
+
+// Auto-start polling when module loads (if bot is configured)
+// This allows testing without webhook setup
+startPolling().catch(error => {
+    console.error('Failed to start Telegram polling on startup:', error);
+});
 
 module.exports = TelegramController;
 
