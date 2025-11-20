@@ -71,6 +71,26 @@
                                             </div>
                                         </div>
                                     </div>
+                                    <div class="row mt-3">
+                                        <div class="col-md-4">
+                                            <div class="stat-card" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white;">
+                                                <div class="stat-value" style="color: white; font-size: 2.5rem;" id="monthlyRoomRevenue">₱0.00</div>
+                                                <div class="stat-label" style="color: rgba(255,255,255,0.9);">Room Revenue (Monthly)</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="stat-card" style="background: linear-gradient(135deg, #f09819 0%, #edde5d 100%); color: white;">
+                                                <div class="stat-value" style="color: white; font-size: 2.5rem;" id="monthlyServicesRevenue">₱0.00</div>
+                                                <div class="stat-label" style="color: rgba(255,255,255,0.9);">Services Revenue (Monthly)</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="stat-card" style="background: linear-gradient(135deg, #8360c3 0%, #2ebf91 100%); color: white;">
+                                                <div class="stat-value" style="color: white; font-size: 2.5rem;" id="monthlyTotalRevenue">₱0.00</div>
+                                                <div class="stat-label" style="color: rgba(255,255,255,0.9);">Total Revenue (Monthly)</div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -278,6 +298,22 @@
                                     </div>
                                 </div>
                                 <div class="card-body">
+                                    <!-- Occupancy Rate Cards -->
+                                    <div class="row mb-4">
+                                        <div class="col-md-6">
+                                            <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                                                <div class="stat-value" style="color: white; font-size: 2.5rem;" id="occupancyRateOfMonth">0</div>
+                                                <div class="stat-label" style="color: rgba(255,255,255,0.9);">Occupancy Rate of Month</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
+                                                <div class="stat-value" style="color: white; font-size: 2.5rem;" id="expectedOccupancyRateOfMonth">0</div>
+                                                <div class="stat-label" style="color: rgba(255,255,255,0.9);">Expected Occupancy Rate of Month</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <!-- Expected Check-Ins Today Section -->
                                     <div style="margin-bottom: 30px;">
                                         <h6 style="color: #b4b6bd; margin-bottom: 15px;">
@@ -301,24 +337,48 @@
                                         </div>
                                     </div>
 
-                                    <!-- Expected Check-Outs Today Section -->
-                                    <div>
+                                    <!-- Total Bookings Today Section -->
+                                    <div style="margin-bottom: 30px;">
                                         <h6 style="color: #b4b6bd; margin-bottom: 15px;">
-                                            <i class="material-icons" style="vertical-align: middle; font-size: 20px;">exit_to_app</i> 
-                                            Check-Outs Today : <span id="expectedCheckOutsTodayCount">0</span>
+                                            <i class="material-icons" style="vertical-align: middle; font-size: 20px;">event</i> 
+                                            Total Bookings Today : <span id="totalBookingsTodayCount">0</span>
                                         </h6>
-                                        <div id="expectedCheckOutsTodayList" class="table-responsive">
+                                        <div id="totalBookingsTodayList" class="table-responsive">
                                             <table class="table table-striped">
                                                 <thead>
                                                     <tr>
                                                         <th style="color: #b4b6bd; text-align: center;">Room</th>
                                                         <th style="color: #b4b6bd; text-align: center;">Guest Name</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Check-In Date</th>
                                                         <th style="color: #b4b6bd; text-align: center;">Check-Out Date</th>
-                                                        <th style="color: #b4b6bd; text-align: center;">Stay Days</th>
                                                         <th style="color: #b4b6bd; text-align: center;">Confirmation</th>
                                                     </tr>
                                                 </thead>
-                                                <tbody id="expectedCheckOutsTodayTableBody" style="color: #b4b6bd;">
+                                                <tbody id="totalBookingsTodayTableBody" style="color: #b4b6bd;">
+                                                    <tr><td colspan="5" class="text-center">Loading...</td></tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    <!-- Total Booked Rooms Today Section -->
+                                    <div>
+                                        <h6 style="color: #b4b6bd; margin-bottom: 15px;">
+                                            <i class="material-icons" style="vertical-align: middle; font-size: 20px;">hotel</i> 
+                                            Total Booked Rooms Today : <span id="totalBookedRoomsTodayCount">0</span>
+                                        </h6>
+                                        <div id="totalBookedRoomsTodayList" class="table-responsive">
+                                            <table class="table table-striped">
+                                                <thead>
+                                                    <tr>
+                                                        <th style="color: #b4b6bd; text-align: center;">Room</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Guest Name</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Check-In Date</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Check-Out Date</th>
+                                                        <th style="color: #b4b6bd; text-align: center;">Confirmation</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="totalBookedRoomsTodayTableBody" style="color: #b4b6bd;">
                                                     <tr><td colspan="5" class="text-center">Loading...</td></tr>
                                                 </tbody>
                                             </table>
@@ -552,22 +612,40 @@ document.addEventListener('DOMContentLoaded', function() {
             expectedCheckInsTodayBody.innerHTML = '<tr style="color: #b4b6bd;"><td colspan="4" class="text-center" style="color: #b4b6bd;">No check-ins scheduled for today</td></tr>';
         }
 
-        // Check-Outs Today
-        const expectedCheckOutsToday = data.expectedCheckOutsToday || { count: 0, data: [] };
-        document.getElementById('expectedCheckOutsTodayCount').textContent = expectedCheckOutsToday.count;
-        const expectedCheckOutsTodayBody = document.getElementById('expectedCheckOutsTodayTableBody');
-        if (expectedCheckOutsToday.count > 0) {
-            expectedCheckOutsTodayBody.innerHTML = expectedCheckOutsToday.data.map(item => `
+        // Total Bookings Today
+        const totalBookingsToday = data.totalBookingsToday || { count: 0, data: [] };
+        document.getElementById('totalBookingsTodayCount').textContent = totalBookingsToday.count;
+        const totalBookingsTodayBody = document.getElementById('totalBookingsTodayTableBody');
+        if (totalBookingsToday.count > 0) {
+            totalBookingsTodayBody.innerHTML = totalBookingsToday.data.map(item => `
                 <tr style="color: #b4b6bd;">
                     <td style="color: #b4b6bd; text-align: center;">${item.ROOM_NUMBER || 'N/A'}</td>
                     <td style="color: #b4b6bd; text-align: center;">${item.CUSTOMER_NAME || 'N/A'}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CHECK_IN_DATE ? moment(item.CHECK_IN_DATE).format('MMM DD, YYYY') : 'N/A'}</td>
                     <td style="color: #b4b6bd; text-align: center;">${item.CHECK_OUT_DATE ? moment(item.CHECK_OUT_DATE).format('MMM DD, YYYY') : 'N/A'}</td>
-                    <td style="color: #b4b6bd; text-align: center;">${item.STAY_DAYS || 0}</td>
                     <td style="color: #b4b6bd; text-align: center;">${item.CONFIRMATION_NUMBER || 'N/A'}</td>
                 </tr>
             `).join('');
         } else {
-            expectedCheckOutsTodayBody.innerHTML = '<tr style="color: #b4b6bd;"><td colspan="5" class="text-center" style="color: #b4b6bd;">No check-outs scheduled for today</td></tr>';
+            totalBookingsTodayBody.innerHTML = '<tr style="color: #b4b6bd;"><td colspan="5" class="text-center" style="color: #b4b6bd;">No bookings for today</td></tr>';
+        }
+
+        // Total Booked Rooms Today
+        const totalBookedRoomsToday = data.totalBookedRoomsToday || { count: 0, data: [] };
+        document.getElementById('totalBookedRoomsTodayCount').textContent = totalBookedRoomsToday.count;
+        const totalBookedRoomsTodayBody = document.getElementById('totalBookedRoomsTodayTableBody');
+        if (totalBookedRoomsToday.count > 0) {
+            totalBookedRoomsTodayBody.innerHTML = totalBookedRoomsToday.data.map(item => `
+                <tr style="color: #b4b6bd;">
+                    <td style="color: #b4b6bd; text-align: center;">${item.ROOM_NUMBER || 'N/A'}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CUSTOMER_NAME || 'N/A'}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CHECK_IN_DATE ? moment(item.CHECK_IN_DATE).format('MMM DD, YYYY') : 'N/A'}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CHECK_OUT_DATE ? moment(item.CHECK_OUT_DATE).format('MMM DD, YYYY') : 'N/A'}</td>
+                    <td style="color: #b4b6bd; text-align: center;">${item.CONFIRMATION_NUMBER || 'N/A'}</td>
+                </tr>
+            `).join('');
+        } else {
+            totalBookedRoomsTodayBody.innerHTML = '<tr style="color: #b4b6bd;"><td colspan="5" class="text-center" style="color: #b4b6bd;">No rooms booked for today</td></tr>';
         }
 
         // Room Availability
@@ -581,11 +659,25 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('expectedCheckIns').textContent = availability.expectedCheckIns;
         document.getElementById('expectedCheckOuts').textContent = availability.expectedCheckOuts;
 
+        // Occupancy Rate of Month
+        const occupancyRateOfMonth = data.occupancyRateOfMonth || '0';
+        document.getElementById('occupancyRateOfMonth').textContent = occupancyRateOfMonth + '%';
+
+        // Expected Occupancy Rate of Month
+        const expectedOccupancyRateOfMonth = data.expectedOccupancyRateOfMonth || '0';
+        document.getElementById('expectedOccupancyRateOfMonth').textContent = expectedOccupancyRateOfMonth + '%';
+
         // Services Revenue
         const sales = data.sales || { roomRevenue: '0.00', servicesRevenue: '0.00', totalRevenue: '0.00' };
         document.getElementById('roomRevenue').textContent = '₱' + parseFloat(sales.roomRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         document.getElementById('servicesRevenue').textContent = '₱' + parseFloat(sales.servicesRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         document.getElementById('totalRevenue').textContent = '₱' + parseFloat(sales.totalRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        
+        // Monthly Services Revenue
+        const monthlySales = data.monthlySales || { roomRevenue: '0.00', servicesRevenue: '0.00', totalRevenue: '0.00' };
+        document.getElementById('monthlyRoomRevenue').textContent = '₱' + parseFloat(monthlySales.roomRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('monthlyServicesRevenue').textContent = '₱' + parseFloat(monthlySales.servicesRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('monthlyTotalRevenue').textContent = '₱' + parseFloat(monthlySales.totalRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     function showError(message) {

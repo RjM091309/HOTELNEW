@@ -4061,7 +4061,7 @@ class BookingModel {
             // Update booking
             await connection.promise().query(`
               UPDATE booking
-              SET CHECK_IN_DATE = ?, CHECK_OUT_DATE = ?, BOOKING_CHANNEL = ?, CHECK_IN_STATUS = ?, LATE_CHECKOUT = ?, REMARKS = ?, CONFIRMATION_NUMBER = ?, ENCODED_BY = ?, ENCODED_DT = ?
+              SET CHECK_IN_DATE = ?, CHECK_OUT_DATE = ?, BOOKING_CHANNEL = ?, CHECK_IN_STATUS = ?, LATE_CHECKOUT = ?, REMARKS = ?, CONFIRMATION_NUMBER = ?, EDITED_BY = ?, EDITED_DT = ?
               WHERE IDNo = ?
             `, [
               checkInDate, checkOutDate, bookingRoute, checkInStatus, checkOutStatus,

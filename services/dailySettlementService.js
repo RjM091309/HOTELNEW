@@ -27,17 +27,17 @@ class DailySettlementService {
      * @param {string} section - Section to format (booking, expected, availability, sales)
      */
     static formatReport(settlement, section = null) {
-        const { period, checkIns, checkOuts, pending, expectedCheckInsToday, expectedCheckOutsToday, roomAvailability, sales } = settlement;
+        const { period, checkIns, checkOuts, pending, expectedCheckInsToday, expectedCheckOutsToday, totalBookingsToday, totalBookedRoomsToday, roomAvailability, occupancyRateOfMonth, expectedOccupancyRateOfMonth, sales, monthlySales } = settlement;
         
         // Format based on section
         if (section === 'booking') {
             return this.formatBookingStatus(period, checkIns, checkOuts, pending);
         } else if (section === 'expected') {
-            return this.formatExpectedToday(period, expectedCheckInsToday, expectedCheckOutsToday);
+            return this.formatExpectedToday(period, expectedCheckInsToday, totalBookingsToday, totalBookedRoomsToday, occupancyRateOfMonth, expectedOccupancyRateOfMonth);
         } else if (section === 'availability') {
             return this.formatRoomAvailability(period, roomAvailability);
         } else if (section === 'sales') {
-            return this.formatSalesRevenue(period, sales);
+            return this.formatSalesRevenue(period, sales, monthlySales);
         } else {
             // Full report (default)
             return this.formatFullReport(period, checkIns, checkOuts, pending, expectedCheckInsToday, expectedCheckOutsToday, roomAvailability, sales);
@@ -104,13 +104,13 @@ class DailySettlementService {
     /**
      * Format Expected Today section
      */
-    static formatExpectedToday(period, expectedCheckInsToday, expectedCheckOutsToday) {
-        let report = `📋 *EXPECTED TODAY*\n\n`; //expected today
+    static formatExpectedToday(period, expectedCheckInsToday, totalBookingsToday, totalBookedRoomsToday, occupancyRateOfMonth, expectedOccupancyRateOfMonth) {
+        let report = `📋 예약현황\n\n`; //expected today
         const todayKorean = moment().locale('ko').format('YYYY년 MM월 DD일');
-        report += `Date: ${todayKorean}\n\n`; //date
+        report += `기간: ${todayKorean}\n\n`; //date
         
         // Expected Check-Ins Today
-        report += `✅ *EXPECTED CHECK-INS TODAY* : ${expectedCheckInsToday.count}\n`; //expected check-ins today
+        report += `✅ 금일 예상 체크인  : ${expectedCheckInsToday?.count || 0}\n`; //expected check-ins today
         // if (expectedCheckInsToday.count > 0) {
         //     expectedCheckInsToday.data.forEach(item => {
         //         report += `  • Room ${item.ROOM_NUMBER || 'N/A'}: ${item.CUSTOMER_NAME || 'N/A'}\n`;
@@ -122,21 +122,21 @@ class DailySettlementService {
         // }
         report += `\n`;
         
-        // Expected Check-Outs Today
-        report += `🚪 *EXPECTED CHECK-OUTS TODAY* : ${expectedCheckOutsToday.count}\n`; //expected check-outs today
-        // if (expectedCheckOutsToday.count > 0) {
-        //     expectedCheckOutsToday.data.forEach(item => {
-        //         report += `  • Room ${item.ROOM_NUMBER || 'N/A'}: ${item.CUSTOMER_NAME || 'N/A'}\n`;
-        //         report += `    Check-Out: ${item.CHECK_OUT_DATE ? moment(item.CHECK_OUT_DATE).format('MMM DD, YYYY') : 'N/A'}\n`;
-        //         report += `    Stay Days: ${item.STAY_DAYS || 0} day(s)\n`;
-        //         report += `    Confirmation: ${item.CONFIRMATION_NUMBER || 'N/A'}\n\n`;
-        //     });
-        // } else {
-        //     report += `  No check-outs scheduled for today\n\n`;
-        // }
+        // Total Bookings Today
+        report += `📅 예약 건수 : ${totalBookingsToday?.count || 0}\n`; //total bookings today
         report += `\n`;
         
-        report += `_Generated: ${moment().locale('ko').format('YYYY년 MM월 DD일 HH:mm')}_`; //generated time
+        // Total Booked Rooms Today
+        report += `🏨 예약 객실수 : ${totalBookedRoomsToday?.count || 0}\n`; //total booked rooms today
+        report += `\n`;
+
+         // Occupancy Rate of Month
+         report += `📊 당월 객실 가동율(누적) : ${occupancyRateOfMonth || '0.00'}%\n\n`; //occupancy rate of month
+        
+         // Expected Occupancy Rate of Month
+         report += `📈 당월 예상 가동율(객실 가동율 + 예약객실수) : ${expectedOccupancyRateOfMonth || '0.00'}%\n\n`; //expected occupancy rate of month
+        
+        report += `작성일 ${moment().locale('ko').format('YYYY년 MM월 DD일 HH:mm')}`; //generated time
         return report;
     }
     
@@ -163,11 +163,14 @@ class DailySettlementService {
     /**
      * Format Services Revenue section
      */
-    static formatSalesRevenue(period, sales) {
+    static formatSalesRevenue(period, sales, monthlySales) {
         let report = `💰 일 매출 현황\n\n`; //daily sales settlement
         const salesStartKorean = moment(period.start, 'YYYY-MM-DD HH:mm:ss').locale('ko').format('YYYY년 MM월 DD일 HH:mm');
         const salesEndKorean = moment(period.end, 'YYYY-MM-DD HH:mm:ss').locale('ko').format('YYYY년 MM월 DD일 HH:mm');
         report += `기간: ${salesStartKorean} ~ ${salesEndKorean}\n\n`; //period
+
+        report += `📊 매출 합계\n`; //total revenue
+        report += `₱${parseFloat(sales.totalRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`;
         
         report += `💵 객실 매출\n`; //room revenue
         report += `₱${parseFloat(sales.roomRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`;
@@ -175,8 +178,17 @@ class DailySettlementService {
         report += `💳 서비스 매출\n`; //services revenue
         report += `₱${parseFloat(sales.servicesRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`;
         
-        report += `📊 매출 합계\n`; //total revenue
-        report += `₱${parseFloat(sales.totalRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`;
+        // Add Monthly Revenue section in English
+        // report += `\n📅 Monthly Revenue\n\n`; //monthly revenue header
+
+        report += `📊 월 누적매출\n`; //total revenue monthly
+        report += `₱${parseFloat(monthlySales.totalRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`;
+
+        report += `💵 객실 매출\n`; //room revenue monthly
+        report += `₱${parseFloat(monthlySales.roomRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`;
+        
+        report += `💳 서비스 매출\n`; //services revenue monthly
+        report += `₱${parseFloat(monthlySales.servicesRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`; 
         
         report += `작성일: ${moment().locale('ko').format('YYYY년 MM월 DD일 HH:mm')}`; //generated time
         return report;

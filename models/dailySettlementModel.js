@@ -36,8 +36,21 @@ class DailySettlementModel {
             roomAvailability.expectedCheckIns = expectedCheckInsToday.count;
             roomAvailability.expectedCheckOuts = expectedCheckOutsToday.count;
             
+            // Get total bookings today
+            const totalBookingsToday = await this.getTotalBookingsToday(today);
+            
+            // Get total booked rooms today
+            const totalBookedRoomsToday = await this.getTotalBookedRoomsToday(today);
+            
+            // Get occupancy rates
+            const occupancyRateOfMonth = await this.getOccupancyRateOfMonth(today);
+            const expectedOccupancyRateOfMonth = await this.getExpectedOccupancyRateOfMonth(today);
+            
             // Get sales/revenue data
             const sales = await this.getSalesRevenue(periodStart, periodEnd);
+            
+            // Get monthly sales/revenue data
+            const monthlySales = await this.getMonthlySalesRevenue(today);
             
             return {
                 period: {
@@ -51,8 +64,13 @@ class DailySettlementModel {
                 pending,
                 expectedCheckInsToday,
                 expectedCheckOutsToday,
+                totalBookingsToday,
+                totalBookedRoomsToday,
                 roomAvailability,
+                occupancyRateOfMonth,
+                expectedOccupancyRateOfMonth,
                 sales,
+                monthlySales,
                 generatedAt: moment().format('YYYY-MM-DD HH:mm:ss')
             };
         } catch (error) {
@@ -276,6 +294,195 @@ class DailySettlementModel {
     }
     
     /**
+     * Get total bookings today (all bookings encoded today based on ENCODED_DT)
+     */
+    static async getTotalBookingsToday(today) {
+        try {
+            const query = `
+                SELECT 
+                    b.IDNo,
+                    b.CONFIRMATION_NUMBER,
+                    r.ROOM_NUMBER,
+                    c.NAME AS CUSTOMER_NAME,
+                    DATE_FORMAT(b.CHECK_IN_DATE, '%Y-%m-%d %H:%i:%s') AS CHECK_IN_DATE,
+                    DATE_FORMAT(b.CHECK_OUT_DATE, '%Y-%m-%d') AS CHECK_OUT_DATE,
+                    b.BOOKING_STATUS,
+                    b.GUESTS_COUNT,
+                    b.BOOKING_CHANNEL
+                FROM booking b
+                LEFT JOIN room r ON b.ROOM_ID = r.IDNo
+                LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+                WHERE b.ACTIVE = 1
+                    AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
+                    AND DATE(b.ENCODED_DT) = DATE(?)
+                ORDER BY b.ENCODED_DT ASC
+            `;
+            
+            const results = await queryDatabasePromise(query, [
+                today.format('YYYY-MM-DD')
+            ]);
+            
+            return {
+                count: results.length,
+                data: results
+            };
+        } catch (error) {
+            console.error('Error getting total bookings today:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Get total booked rooms today (unique rooms booked today based on CHECK_IN_DATE)
+     */
+    static async getTotalBookedRoomsToday(today) {
+        try {
+            const query = `
+                SELECT 
+                    b.IDNo,
+                    b.CONFIRMATION_NUMBER,
+                    r.ROOM_NUMBER,
+                    c.NAME AS CUSTOMER_NAME,
+                    DATE_FORMAT(b.CHECK_IN_DATE, '%Y-%m-%d %H:%i:%s') AS CHECK_IN_DATE,
+                    DATE_FORMAT(b.CHECK_OUT_DATE, '%Y-%m-%d') AS CHECK_OUT_DATE,
+                    b.BOOKING_STATUS,
+                    b.GUESTS_COUNT,
+                    b.BOOKING_CHANNEL
+                FROM booking b
+                LEFT JOIN room r ON b.ROOM_ID = r.IDNo
+                LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+                WHERE b.ACTIVE = 1
+                    AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
+                    AND DATE(b.CHECK_IN_DATE) = DATE(?)
+                GROUP BY r.ROOM_NUMBER, b.IDNo
+                ORDER BY b.CHECK_IN_DATE ASC
+            `;
+            
+            const results = await queryDatabasePromise(query, [
+                today.format('YYYY-MM-DD')
+            ]);
+            
+            return {
+                count: results.length,
+                data: results
+            };
+        } catch (error) {
+            console.error('Error getting total booked rooms today:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Get occupancy rate of month (current month)
+     */
+    static async getOccupancyRateOfMonth(today) {
+        try {
+            const monthStart = today.clone().startOf('month');
+            const monthEnd = today.clone().endOf('month');
+            
+            // Get total active rooms (excluding maintenance)
+            const totalRoomsQuery = `
+                SELECT COUNT(*) AS TOTAL_ROOMS
+                FROM room
+                WHERE ACTIVE = 1 AND (ROOM_STATUS != 3 OR ROOM_STATUS IS NULL)
+            `;
+            const totalRoomsResult = await queryDatabasePromise(totalRoomsQuery);
+            const totalRooms = totalRoomsResult[0]?.TOTAL_ROOMS || 0;
+            
+            // Get total occupied room nights for the month
+            const occupiedNightsQuery = `
+                SELECT 
+                    SUM(
+                        GREATEST(1, DATEDIFF(
+                            LEAST(COALESCE(b.CHECK_OUT_DATE, CURDATE()), ?),
+                            GREATEST(b.CHECK_IN_DATE, ?)
+                        ))
+                    ) AS OCCUPIED_NIGHTS
+                FROM booking b
+                WHERE b.ACTIVE = 1
+                    AND b.BOOKING_STATUS IN ('check-In', 'check-Out')
+                    AND b.CHECK_IN_DATE <= ?
+                    AND (b.CHECK_OUT_DATE >= ? OR b.CHECK_OUT_DATE IS NULL)
+            `;
+            
+            const occupiedNightsResult = await queryDatabasePromise(occupiedNightsQuery, [
+                monthEnd.format('YYYY-MM-DD'),
+                monthStart.format('YYYY-MM-DD'),
+                monthEnd.format('YYYY-MM-DD'),
+                monthStart.format('YYYY-MM-DD')
+            ]);
+            const occupiedNights = occupiedNightsResult[0]?.OCCUPIED_NIGHTS || 0;
+            
+            // Calculate occupancy rate: (occupied nights / (total rooms * days in month)) * 100
+            const daysInMonth = monthEnd.diff(monthStart, 'days') + 1;
+            const totalAvailableNights = totalRooms * daysInMonth;
+            const occupancyRate = totalAvailableNights > 0 
+                ? ((occupiedNights / totalAvailableNights) * 100).toFixed(2) 
+                : '0.00';
+            
+            return occupancyRate;
+        } catch (error) {
+            console.error('Error getting occupancy rate of month:', error);
+            return '0.00';
+        }
+    }
+    
+    /**
+     * Get expected occupancy rate of month (based on bookings)
+     */
+    static async getExpectedOccupancyRateOfMonth(today) {
+        try {
+            const monthStart = today.clone().startOf('month');
+            const monthEnd = today.clone().endOf('month');
+            
+            // Get total active rooms (excluding maintenance)
+            const totalRoomsQuery = `
+                SELECT COUNT(*) AS TOTAL_ROOMS
+                FROM room
+                WHERE ACTIVE = 1 AND (ROOM_STATUS != 3 OR ROOM_STATUS IS NULL)
+            `;
+            const totalRoomsResult = await queryDatabasePromise(totalRoomsQuery);
+            const totalRooms = totalRoomsResult[0]?.TOTAL_ROOMS || 0;
+            
+            // Get total booked room nights for the month (all bookings, excluding cancelled)
+            const bookedNightsQuery = `
+                SELECT 
+                    SUM(
+                        GREATEST(1, DATEDIFF(
+                            LEAST(b.CHECK_OUT_DATE, ?),
+                            GREATEST(b.CHECK_IN_DATE, ?)
+                        ))
+                    ) AS BOOKED_NIGHTS
+                FROM booking b
+                WHERE b.ACTIVE = 1
+                    AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
+                    AND b.CHECK_IN_DATE <= ?
+                    AND b.CHECK_OUT_DATE >= ?
+            `;
+            
+            const bookedNightsResult = await queryDatabasePromise(bookedNightsQuery, [
+                monthEnd.format('YYYY-MM-DD'),
+                monthStart.format('YYYY-MM-DD'),
+                monthEnd.format('YYYY-MM-DD'),
+                monthStart.format('YYYY-MM-DD')
+            ]);
+            const bookedNights = bookedNightsResult[0]?.BOOKED_NIGHTS || 0;
+            
+            // Calculate expected occupancy rate: (booked nights / (total rooms * days in month)) * 100
+            const daysInMonth = monthEnd.diff(monthStart, 'days') + 1;
+            const totalAvailableNights = totalRooms * daysInMonth;
+            const expectedOccupancyRate = totalAvailableNights > 0 
+                ? ((bookedNights / totalAvailableNights) * 100).toFixed(2) 
+                : '0.00';
+            
+            return expectedOccupancyRate;
+        } catch (error) {
+            console.error('Error getting expected occupancy rate of month:', error);
+            return '0.00';
+        }
+    }
+    
+    /**
      * Get expected room availability for today
      */
     static async getExpectedRoomAvailability(today) {
@@ -372,18 +579,18 @@ class DailySettlementModel {
     
     /**
      * Get sales revenue data for the period
-     * Room Revenue: Payments with PAYMENT_TYPE = 'room'
-     * Sales Revenue: Payments with PAYMENT_TYPE = 'service', 'extended', 'pickdrop', etc.
+     * Room Revenue: Payments with PAYMENT_TYPE = 'room', 'extended'
+     * Sales Revenue: Payments with PAYMENT_TYPE = 'service', 'pickdrop', etc.
      */
     static async getSalesRevenue(periodStart, periodEnd) {
         try {
-            // Get Room Revenue - payments made for room charges during the period
+            // Get Room Revenue - payments made for room charges and extensions during the period
             const roomRevenueQuery = `
                 SELECT 
                     COALESCE(SUM(p.AMOUNT_PAID), 0) AS ROOM_REVENUE
                 FROM payments p
                 INNER JOIN booking b ON p.BOOKING_ID = b.IDNo
-                WHERE p.PAYMENT_TYPE = 'room'
+                WHERE p.PAYMENT_TYPE IN ('room', 'extended')
                     AND p.PAYMENT_DATE >= ?
                     AND p.PAYMENT_DATE <= ?
                     AND b.ACTIVE = 1
@@ -395,13 +602,13 @@ class DailySettlementModel {
             ]);
             const roomRevenue = parseFloat(roomRevenueResult[0]?.ROOM_REVENUE || 0);
             
-            // Get Sales Revenue - payments made for services, extensions, pickdrop, etc.
+            // Get Sales Revenue - payments made for services, pickdrop, etc.
             const salesRevenueQuery = `
                 SELECT 
                     COALESCE(SUM(p.AMOUNT_PAID), 0) AS SERVICES_REVENUE
                 FROM payments p
                 INNER JOIN booking b ON p.BOOKING_ID = b.IDNo
-                WHERE p.PAYMENT_TYPE IN ('service', 'extended', 'pickdrop')
+                WHERE p.PAYMENT_TYPE IN ('service', 'pickdrop')
                     AND p.PAYMENT_DATE >= ?
                     AND p.PAYMENT_DATE <= ?
                     AND b.ACTIVE = 1
@@ -423,6 +630,67 @@ class DailySettlementModel {
             };
         } catch (error) {
             console.error('Error getting services revenue:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Get monthly sales revenue data for the current month
+     * Room Revenue: Payments with PAYMENT_TYPE = 'room', 'extended'
+     * Sales Revenue: Payments with PAYMENT_TYPE = 'service', 'pickdrop', etc.
+     */
+    static async getMonthlySalesRevenue(today) {
+        try {
+            // Get start of current month
+            const monthStart = today.clone().startOf('month').set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
+            const monthEnd = today.clone().endOf('month').set({ hour: 23, minute: 59, second: 59, millisecond: 999 });
+            
+            // Get Room Revenue - payments made for room charges and extensions during the month
+            const roomRevenueQuery = `
+                SELECT 
+                    COALESCE(SUM(p.AMOUNT_PAID), 0) AS ROOM_REVENUE
+                FROM payments p
+                INNER JOIN booking b ON p.BOOKING_ID = b.IDNo
+                WHERE p.PAYMENT_TYPE IN ('room', 'extended')
+                    AND p.PAYMENT_DATE >= ?
+                    AND p.PAYMENT_DATE <= ?
+                    AND b.ACTIVE = 1
+            `;
+            
+            const roomRevenueResult = await queryDatabasePromise(roomRevenueQuery, [
+                monthStart.format('YYYY-MM-DD HH:mm:ss'),
+                monthEnd.format('YYYY-MM-DD HH:mm:ss')
+            ]);
+            const roomRevenue = parseFloat(roomRevenueResult[0]?.ROOM_REVENUE || 0);
+            
+            // Get Sales Revenue - payments made for services, pickdrop, etc.
+            const salesRevenueQuery = `
+                SELECT 
+                    COALESCE(SUM(p.AMOUNT_PAID), 0) AS SERVICES_REVENUE
+                FROM payments p
+                INNER JOIN booking b ON p.BOOKING_ID = b.IDNo
+                WHERE p.PAYMENT_TYPE IN ('service', 'pickdrop')
+                    AND p.PAYMENT_DATE >= ?
+                    AND p.PAYMENT_DATE <= ?
+                    AND b.ACTIVE = 1
+            `;
+            
+            const salesRevenueResult = await queryDatabasePromise(salesRevenueQuery, [
+                monthStart.format('YYYY-MM-DD HH:mm:ss'),
+                monthEnd.format('YYYY-MM-DD HH:mm:ss')
+            ]);
+            const servicesRevenue = parseFloat(salesRevenueResult[0]?.SERVICES_REVENUE || 0);
+            
+            // Calculate Total Revenue
+            const totalRevenue = roomRevenue + servicesRevenue;
+            
+            return {
+                roomRevenue: roomRevenue.toFixed(2),
+                servicesRevenue: servicesRevenue.toFixed(2),
+                totalRevenue: totalRevenue.toFixed(2)
+            };
+        } catch (error) {
+            console.error('Error getting monthly sales revenue:', error);
             throw error;
         }
     }
