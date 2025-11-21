@@ -188,7 +188,7 @@ class TelegramService {
             const response = await axios.post(`${this.baseURL}/sendMessage`, payload);
             
             if (response.data.ok) {
-                return { success: true, data: response.data.result };
+            return { success: true, data: response.data.result };
             } else {
                 console.error('Telegram API error:', response.data);
                 return { 
