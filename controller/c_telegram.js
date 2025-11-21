@@ -707,7 +707,7 @@ class TelegramController {
             // All succeeded
             res.json({ 
                 success: true, 
-                message: `Daily settlement report sent successfully to all ${chatIds.length} Chat ID(s)`,
+                message: `Daily settlement report sent successfully!`,
                 data: result.results
             });
         } catch (error) {
