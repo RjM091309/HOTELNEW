@@ -81,7 +81,7 @@ class TelegramController {
             );
 
             // Set up bot commands menu - only reports
-            await this.setupBotCommands(telegramService);
+            await TelegramController.setupBotCommands(telegramService);
 
             // Set chat menu button to show commands (persistent menu)
             if (chatId) {
