@@ -54,11 +54,17 @@ class TelegramController {
                 }
             }
             
+            // Get Chat IDs as array
+            const chatIdsArray = TelegramModel.getChatIdsArray(config);
+            
             // Add bot username and link to response
             const responseData = {
                 ...config,
                 BOT_USERNAME: botUsername,
-                BOT_LINK: botUsername ? `https://t.me/${botUsername}` : null
+                BOT_LINK: botUsername ? `https://t.me/${botUsername}` : null,
+                CHAT_IDS: chatIdsArray,
+                // Backward compatibility: keep CHAT_ID as first item or null
+                CHAT_ID: chatIdsArray.length > 0 ? chatIdsArray[0] : null
             };
             
             // For settings page, send full token (it's a secure page)
@@ -71,10 +77,26 @@ class TelegramController {
 
     static async saveBotConfig(req, res) {
         try {
-            const { botToken, chatId } = req.body;
+            const { botToken, chatIds } = req.body;
+            
+            // Support both old format (single chatId) and new format (array of chatIds)
+            let chatIdsArray = chatIds;
+            if (!chatIdsArray && req.body.chatId) {
+                // Backward compatibility: single chatId
+                chatIdsArray = [req.body.chatId];
+            }
             
             if (!botToken) {
                 return res.status(400).json({ success: false, message: 'Bot token is required' });
+            }
+
+            // Validate chatIds if provided
+            if (chatIdsArray) {
+                if (!Array.isArray(chatIdsArray)) {
+                    chatIdsArray = [chatIdsArray];
+                }
+                // Filter out empty values
+                chatIdsArray = chatIdsArray.filter(id => id && String(id).trim());
             }
 
             // Test the bot token first
@@ -106,16 +128,22 @@ class TelegramController {
             await TelegramModel.saveBotConfig(
                 botToken,
                 botName,
-                chatId || null,
+                chatIdsArray || null,
                 req.user?.userId || null
             );
 
             // Set up bot commands menu - only reports
             await TelegramController.setupBotCommands(telegramService);
 
-            // Set chat menu button to show commands (persistent menu)
-            if (chatId) {
-                await telegramService.setChatMenuButton(chatId);
+            // Set chat menu button to show commands (persistent menu) for all chat IDs
+            if (chatIdsArray && chatIdsArray.length > 0) {
+                for (const chatId of chatIdsArray) {
+                    try {
+                        await telegramService.setChatMenuButton(chatId);
+                    } catch (error) {
+                        console.warn(`Failed to set chat menu button for chatId ${chatId}:`, error.message);
+                    }
+                }
             }
 
             // Restart polling if it was running (for testing without webhook)
@@ -137,7 +165,7 @@ class TelegramController {
                     botName: botName,
                     botId: botInfo.id,
                     username: botInfo.username,
-                    chatId: chatId || null
+                    chatIds: chatIdsArray || []
                 }
             });
         } catch (error) {
@@ -627,41 +655,60 @@ class TelegramController {
 
     static async sendDailySettlement(req, res) {
         try {
-            // Get chatId from saved config
+            // Get chatIds from saved config
             const config = await TelegramModel.getBotConfig();
             
-            if (!config || !config.CHAT_ID) {
+            if (!config) {
                 return res.status(400).json({ 
                     success: false, 
-                    message: 'Chat ID not configured. Please save Chat ID in Telegram bot configuration first.' 
+                    message: 'Telegram bot not configured. Please configure bot first.' 
+                });
+            }
+            
+            // Get Chat IDs array
+            const chatIds = TelegramModel.getChatIdsArray(config);
+            
+            if (!chatIds || chatIds.length === 0) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Chat ID not configured. Please save at least one Chat ID in Telegram bot configuration first.' 
                 });
             }
 
             // Get section from request body (booking, expected, availability, sales)
             const section = req.body?.section || null;
 
-            const result = await DailySettlementService.sendReport(config.CHAT_ID, section);
+            // Send to all Chat IDs
+            const result = await DailySettlementService.sendReportToAll(chatIds, section);
             
-            // Check if result indicates chat not found
-            if (!result.success && result.errorCode === 'CHAT_NOT_FOUND') {
+            // Check results
+            const successCount = result.results.filter(r => r.success).length;
+            const failCount = result.results.filter(r => !r.success).length;
+            
+            if (successCount === 0) {
+                // All failed
+                const firstError = result.results.find(r => !r.success);
                 return res.status(400).json({ 
                     success: false, 
-                    message: result.message || 'Chat not found. Please make sure the user has started a conversation with the bot by sending /start command.',
-                    errorCode: 'CHAT_NOT_FOUND'
+                    message: firstError?.message || 'Failed to send daily settlement report to all Chat IDs',
+                    results: result.results
                 });
             }
             
-            if (!result.success) {
-                return res.status(500).json({ 
-                    success: false, 
-                    message: result.message || 'Failed to send daily settlement report'
+            if (failCount > 0) {
+                // Some succeeded, some failed
+                return res.json({ 
+                    success: true, 
+                    message: `Daily settlement report sent successfully to ${successCount} out of ${chatIds.length} Chat ID(s). ${failCount} failed.`,
+                    data: result.results
                 });
             }
             
+            // All succeeded
             res.json({ 
                 success: true, 
-                message: 'Daily settlement report sent successfully',
-                data: result.data
+                message: `Daily settlement report sent successfully to all ${chatIds.length} Chat ID(s)`,
+                data: result.results
             });
         } catch (error) {
             console.error('Error sending daily settlement:', error);

@@ -288,6 +288,83 @@ class DailySettlementService {
     }
     
     /**
+     * Send daily settlement report via Telegram to multiple Chat IDs
+     * @param {Array<string>} chatIds - Array of Telegram chat IDs to send to
+     * @param {string} section - Optional section to send (booking, expected, availability, sales)
+     */
+    static async sendReportToAll(chatIds = [], section = null) {
+        try {
+            // Get bot configuration
+            const config = await TelegramModel.getBotConfig();
+            
+            if (!config || !config.BOT_TOKEN) {
+                throw new Error('Telegram bot not configured');
+            }
+            
+            if (!chatIds || chatIds.length === 0) {
+                throw new Error('At least one Chat ID is required to send report');
+            }
+            
+            // Generate report with section (only once)
+            const report = await this.generateReport(section);
+            
+            // Send via Telegram to all Chat IDs
+            const telegramService = new TelegramService(config.BOT_TOKEN);
+            const results = [];
+            
+            for (const chatId of chatIds) {
+                try {
+                    const result = await telegramService.sendMessage(chatId, report, {
+                        parse_mode: 'Markdown'
+                    });
+                    
+                    if (!result.success) {
+                        // Check if error is "chat not found"
+                        if (result.message && result.message.toLowerCase().includes('chat not found')) {
+                            results.push({
+                                success: false,
+                                chatId: chatId,
+                                message: 'Chat not found. Please make sure the user has started a conversation with the bot by sending /start command.',
+                                errorCode: 'CHAT_NOT_FOUND'
+                            });
+                        } else {
+                            results.push({
+                                success: false,
+                                chatId: chatId,
+                                message: result.message || 'Failed to send report',
+                                errorCode: 'SEND_FAILED'
+                            });
+                        }
+                    } else {
+                        results.push({
+                            success: true,
+                            chatId: chatId,
+                            message: 'Daily settlement report sent successfully',
+                            data: result.data
+                        });
+                    }
+                } catch (error) {
+                    console.error(`Error sending report to chatId ${chatId}:`, error);
+                    results.push({
+                        success: false,
+                        chatId: chatId,
+                        message: error.message || 'Failed to send report',
+                        errorCode: 'EXCEPTION'
+                    });
+                }
+            }
+            
+            return {
+                success: true,
+                results: results
+            };
+        } catch (error) {
+            console.error('Error sending daily settlement report to all Chat IDs:', error);
+            throw error;
+        }
+    }
+    
+    /**
      * Send daily settlement report via KakaoTalk (to yourself)
      * @param {string} section - Optional section to send (booking, expected, availability, sales)
      */

@@ -685,8 +685,8 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('errorMessage').style.display = 'block';
     }
 
-    // Load saved chat ID
-    let savedChatId = null;
+    // Load saved chat IDs
+    let hasChatIds = false;
     let kakaoConfigured = false;
     function loadBotConfig() {
         fetch('/telegram/config', {
@@ -695,8 +695,11 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success && data.data) {
-                if (data.data.CHAT_ID) {
-                    savedChatId = data.data.CHAT_ID;
+                // Check for CHAT_IDS array (new format) or CHAT_ID (old format for backward compatibility)
+                const chatIds = data.data.CHAT_IDS || (data.data.CHAT_ID ? [data.data.CHAT_ID] : []);
+                hasChatIds = chatIds.length > 0;
+                
+                if (hasChatIds) {
                     // Enable all send buttons
                     document.querySelectorAll('.btnSendTelegram').forEach(btn => {
                         btn.disabled = false;
@@ -707,6 +710,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         btn.disabled = true;
                     });
                 }
+            } else {
+                // Disable all send buttons if no config
+                document.querySelectorAll('.btnSendTelegram').forEach(btn => {
+                    btn.disabled = true;
+                });
             }
         })
         .catch(error => {
@@ -742,21 +750,21 @@ document.addEventListener('DOMContentLoaded', function() {
     // Send via Telegram buttons (for each section)
     document.querySelectorAll('.btnSendTelegram').forEach(button => {
         button.addEventListener('click', function() {
-            if (!savedChatId) {
+            if (!hasChatIds) {
                 Swal.fire({
                     icon: 'warning',
                     title: 'Chat ID Not Configured',
-                    text: 'Please configure it in Telegram settings first.',
+                    text: 'Please configure at least one Chat ID in Telegram settings first.',
                     confirmButtonColor: '#3085d6'
                 });
                 return;
             }
             const section = this.getAttribute('data-section');
-            sendReport(savedChatId, section, this);
+            sendReport(section, this);
         });
     });
 
-    function sendReport(chatId, section, btn) {
+    function sendReport(section, btn) {
         const originalText = btn.innerHTML;
         btn.disabled = true;
         btn.innerHTML = '<i class="material-icons">hourglass_empty</i> Sending...';
@@ -775,12 +783,14 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.innerHTML = originalText;
             
             if (data.success) {
+                // Check if message contains info about multiple Chat IDs
+                const message = data.message || 'Report sent successfully to Telegram!';
                 Swal.fire({
                     icon: 'success',
                     title: 'Success!',
-                    text: 'Report sent successfully to Telegram!',
+                    text: message,
                     confirmButtonColor: '#3085d6',
-                    timer: 2000,
+                    timer: 3000,
                     showConfirmButton: true
                 });
             } else {

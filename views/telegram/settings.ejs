@@ -38,10 +38,16 @@
                         </div>
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label for="chatId" style="color: #fff;">Chat ID <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="chatId" placeholder="Enter your Telegram Chat ID (e.g., 5809817914)" required>
-                                <small class="form-text text-muted">
-                                    Your Telegram Chat ID where reports will be sent.
+                                <label style="color: #fff;">Chat IDs <span class="text-danger">*</span></label>
+                                <div id="chatIdsContainer">
+                                    <!-- Chat IDs will be dynamically added here -->
+                                </div>
+                                <button type="button" class="btn btn-sm btn-success" id="btnAddChatId" style="margin-top: 10px;">
+                                    <i class="material-icons" style="vertical-align: middle; font-size: 16px; margin-right: 3px;">add</i>
+                                    Add Chat ID
+                                </button>
+                                <small class="form-text text-muted" style="display: block; margin-top: 5px;">
+                                    Add one or more Telegram Chat IDs where reports will be sent. Reports will be sent to all saved Chat IDs.
                                 </small>
                             </div>
                         </div>
@@ -81,8 +87,8 @@
                                     <span id="displayBotToken" style="font-size: 12px; color: #fff; word-break: break-all; font-family: 'Courier New', monospace;">-</span>
                                 </div>
                                 <div style="flex: 1; min-width: 120px;">
-                                    <strong style="color: #fff; display: block; margin-bottom: 2px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Chat ID</strong>
-                                    <span id="displayChatId" style="font-size: 14px; color: #fff; font-weight: 500;">-</span>
+                                    <strong style="color: #fff; display: block; margin-bottom: 2px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Chat IDs</strong>
+                                    <span id="displayChatIds" style="font-size: 14px; color: #fff; font-weight: 500;">-</span>
                                 </div>
                                 <div style="flex: 1; min-width: 100px;">
                                     <strong style="color: #fff; display: block; margin-bottom: 2px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Status</strong>
@@ -212,8 +218,63 @@
     </div>
 </div>
 
+<style>
+    #chatIdsContainer {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+    
+    .chat-id-item {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+    }
+    
+    .chat-id-item .chat-id-input {
+        flex: 1;
+    }
+    
+    .chat-id-item .btn-remove-chat-id {
+        flex-shrink: 0;
+        width: 30px !important;
+        height: 30px !important;
+        min-width: 30px !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-radius: 4px !important;
+        border: none !important;
+    }
+    
+    .chat-id-item .btn-remove-chat-id i {
+        margin: 0 !important;
+        vertical-align: middle !important;
+    }
+    
+    @media (max-width: 992px) {
+        #chatIdsContainer {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    
+    @media (max-width: 576px) {
+        #chatIdsContainer {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Chat IDs management variables - must be declared before functions that use them
+    let chatIdCounter = 0;
+    
+    // Initialize with one empty Chat ID input
+    addChatIdInput();
+    
     // Load current configuration
     loadCurrentConfig();
 
@@ -260,15 +321,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.data.BOT_TOKEN) {
                     document.getElementById('botToken').value = data.data.BOT_TOKEN;
                 }
-                if (data.data.CHAT_ID) {
-                    document.getElementById('chatId').value = data.data.CHAT_ID;
-                }
+                
+                // Load Chat IDs array
+                const chatIds = data.data.CHAT_IDS || (data.data.CHAT_ID ? [data.data.CHAT_ID] : []);
+                loadChatIds(chatIds);
 
                 // Show current config display
                 document.getElementById('currentConfig').style.display = 'block';
                 document.getElementById('displayBotName').textContent = data.data.BOT_NAME || 'N/A';
                 document.getElementById('displayBotToken').textContent = data.data.BOT_TOKEN || 'N/A';
-                document.getElementById('displayChatId').textContent = data.data.CHAT_ID || 'N/A';
+                
+                // Display Chat IDs
+                const chatIdsDisplay = chatIds.length > 0 
+                    ? chatIds.join(', ') 
+                    : 'N/A';
+                document.getElementById('displayChatIds').textContent = chatIdsDisplay;
                 
                 // Show bot link section if bot username is available
                 const botLinkSection = document.getElementById('botLinkSection');
@@ -293,17 +360,86 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Chat IDs management functions
+    function addChatIdInput(value = '') {
+        const container = document.getElementById('chatIdsContainer');
+        const chatIdDiv = document.createElement('div');
+        chatIdDiv.className = 'chat-id-item';
+        chatIdDiv.dataset.id = chatIdCounter++;
+        
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'form-control chat-id-input';
+        input.placeholder = 'Enter Chat ID';
+        input.value = value;
+        input.required = true;
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn btn-sm btn-danger btn-remove-chat-id';
+        removeBtn.innerHTML = '<i class="material-icons" style="vertical-align: middle; font-size: 16px;">delete</i>';
+        removeBtn.onclick = function() {
+            chatIdDiv.remove();
+            updateChatIdRequired();
+        };
+        
+        chatIdDiv.appendChild(input);
+        chatIdDiv.appendChild(removeBtn);
+        container.appendChild(chatIdDiv);
+        
+        updateChatIdRequired();
+    }
+    
+    function loadChatIds(chatIds) {
+        const container = document.getElementById('chatIdsContainer');
+        container.innerHTML = '';
+        
+        if (chatIds && chatIds.length > 0) {
+            chatIds.forEach(chatId => {
+                addChatIdInput(chatId);
+            });
+        } else {
+            // Add at least one empty input
+            addChatIdInput();
+        }
+    }
+    
+    function getAllChatIds() {
+        const inputs = document.querySelectorAll('.chat-id-input');
+        const chatIds = [];
+        inputs.forEach(input => {
+            const value = input.value.trim();
+            if (value) {
+                chatIds.push(value);
+            }
+        });
+        return chatIds;
+    }
+    
+    function updateChatIdRequired() {
+        const inputs = document.querySelectorAll('.chat-id-input');
+        // Only require the first input
+        inputs.forEach((input, index) => {
+            input.required = index === 0;
+        });
+    }
+    
+    // Add Chat ID button
+    document.getElementById('btnAddChatId').addEventListener('click', function() {
+        addChatIdInput();
+    });
+
     function saveConfiguration() {
         const botToken = document.getElementById('botToken').value.trim();
-        const chatId = document.getElementById('chatId').value.trim();
+        const chatIds = getAllChatIds();
 
         if (!botToken) {
             showError('Bot token is required');
             return;
         }
 
-        if (!chatId) {
-            showError('Chat ID is required');
+        if (chatIds.length === 0) {
+            showError('At least one Chat ID is required');
             return;
         }
 
@@ -321,7 +457,7 @@ document.addEventListener('DOMContentLoaded', function() {
             credentials: 'include',
             body: JSON.stringify({
                 botToken: botToken,
-                chatId: chatId
+                chatIds: chatIds
             })
         })
         .then(response => response.json())
@@ -330,7 +466,7 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.innerHTML = originalText;
 
             if (data.success) {
-                showSuccess('Telegram bot configured successfully!');
+                showSuccess('Telegram bot configured successfully! Reports will be sent to all saved Chat IDs.');
                 loadCurrentConfig();
             } else {
                 showError(data.message || 'Failed to save configuration');
@@ -392,6 +528,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 showSuccess('Configuration deleted successfully');
                 // Clear form
                 document.getElementById('telegramConfigForm').reset();
+                document.getElementById('chatIdsContainer').innerHTML = '';
+                addChatIdInput(); // Add one empty input
                 document.getElementById('currentConfig').style.display = 'none';
             } else {
                 showError(data.message || 'Failed to delete configuration');
