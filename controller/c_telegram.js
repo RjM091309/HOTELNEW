@@ -31,9 +31,39 @@ class TelegramController {
             if (!config) {
                 return res.json({ success: true, data: null, message: 'No Telegram bot configured' });
             }
+            
+            // Extract bot username from BOT_NAME if available (format: "Name (@username)")
+            let botUsername = null;
+            if (config.BOT_NAME) {
+                const usernameMatch = config.BOT_NAME.match(/@(\w+)\)/);
+                if (usernameMatch) {
+                    botUsername = usernameMatch[1];
+                }
+            }
+            
+            // If username not found in BOT_NAME, try to get it from bot API
+            if (!botUsername && config.BOT_TOKEN) {
+                try {
+                    const telegramService = new TelegramService(config.BOT_TOKEN);
+                    const botInfo = await telegramService.getMe();
+                    if (botInfo.success && botInfo.data && botInfo.data.username) {
+                        botUsername = botInfo.data.username;
+                    }
+                } catch (error) {
+                    console.error('Error getting bot info:', error);
+                }
+            }
+            
+            // Add bot username and link to response
+            const responseData = {
+                ...config,
+                BOT_USERNAME: botUsername,
+                BOT_LINK: botUsername ? `https://t.me/${botUsername}` : null
+            };
+            
             // For settings page, send full token (it's a secure page)
             // For API calls, we can mask it if needed
-            res.json({ success: true, data: config });
+            res.json({ success: true, data: responseData });
         } catch (error) {
             res.status(500).json({ success: false, message: 'Failed to fetch Telegram bot config' });
         }
@@ -611,6 +641,22 @@ class TelegramController {
             const section = req.body?.section || null;
 
             const result = await DailySettlementService.sendReport(config.CHAT_ID, section);
+            
+            // Check if result indicates chat not found
+            if (!result.success && result.errorCode === 'CHAT_NOT_FOUND') {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: result.message || 'Chat not found. Please make sure the user has started a conversation with the bot by sending /start command.',
+                    errorCode: 'CHAT_NOT_FOUND'
+                });
+            }
+            
+            if (!result.success) {
+                return res.status(500).json({ 
+                    success: false, 
+                    message: result.message || 'Failed to send daily settlement report'
+                });
+            }
             
             res.json({ 
                 success: true, 

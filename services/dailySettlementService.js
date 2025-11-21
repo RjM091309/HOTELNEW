@@ -170,25 +170,25 @@ class DailySettlementService {
         report += `기간: ${salesStartKorean} ~ ${salesEndKorean}\n\n`; //period
 
         report += `📊 매출 합계\n`; //total revenue
-        report += `₱${parseFloat(sales.totalRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`;
+        report += `₱${parseFloat(sales.totalRevenue).toLocaleString('en-US')}\n\n`;
         
         report += `💵 객실 매출\n`; //room revenue
-        report += `₱${parseFloat(sales.roomRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`;
+        report += `₱${parseFloat(sales.roomRevenue).toLocaleString('en-US')}\n\n`;
         
         report += `💳 서비스 매출\n`; //services revenue
-        report += `₱${parseFloat(sales.servicesRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`;
+        report += `₱${parseFloat(sales.servicesRevenue).toLocaleString('en-US')}\n\n`;
         
         // Add Monthly Revenue section in English
         // report += `\n📅 Monthly Revenue\n\n`; //monthly revenue header
 
         report += `📊 월 누적매출\n`; //total revenue monthly
-        report += `₱${parseFloat(monthlySales.totalRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`;
+        report += `₱${parseFloat(monthlySales.totalRevenue).toLocaleString('en-US')}\n\n`;
 
         report += `💵 객실 매출\n`; //room revenue monthly
-        report += `₱${parseFloat(monthlySales.roomRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`;
+        report += `₱${parseFloat(monthlySales.roomRevenue).toLocaleString('en-US')}\n\n`;
         
         report += `💳 서비스 매출\n`; //services revenue monthly
-        report += `₱${parseFloat(monthlySales.servicesRevenue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n`; 
+        report += `₱${parseFloat(monthlySales.servicesRevenue).toLocaleString('en-US')}\n\n`; 
         
         report += `작성일: ${moment().locale('ko').format('YYYY년 MM월 DD일 HH:mm')}`; //generated time
         return report;
@@ -263,6 +263,16 @@ class DailySettlementService {
             });
             
             if (!result.success) {
+                // Check if error is "chat not found" - user hasn't started conversation with bot
+                if (result.message && result.message.toLowerCase().includes('chat not found')) {
+                    console.warn(`Chat not found for chatId ${chatId}. User may not have started a conversation with the bot.`);
+                    return {
+                        success: false,
+                        message: 'Chat not found. Please make sure the user has started a conversation with the bot by sending /start command.',
+                        errorCode: 'CHAT_NOT_FOUND',
+                        data: null
+                    };
+                }
                 throw new Error(result.message || 'Failed to send report');
             }
             

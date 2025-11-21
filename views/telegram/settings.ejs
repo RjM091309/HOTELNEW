@@ -91,6 +91,32 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- Bot Link and Instructions -->
+                    <div id="botLinkSection" style="margin-top: 15px; display: none;">
+                        <div class="alert alert-info" style="background-color: #1e88e5; border-color: #1e88e5; color: #fff; border-radius: 6px; padding: 10px 15px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                                <div style="flex: 1; min-width: 200px;">
+                                    <div style="margin-bottom: 5px;">
+                                        <i class="fa fa-info-circle" style="margin-right: 5px;"></i>
+                                        <strong style="font-size: 13px;">Start Bot Conversation:</strong>
+                                    </div>
+                                    <div style="font-size: 12px; margin-bottom: 8px;">
+                                        Bot: <span id="displayBotUsername" style="font-weight: 600;">-</span>
+                                    </div>
+                                    <small style="color: #e3f2fd; font-size: 11px;">
+                                        Click link below, then press "START" in Telegram
+                                    </small>
+                                </div>
+                                <div style="flex: 0 0 auto;">
+                                    <a id="botLink" href="#" target="_blank" style="display: inline-block; padding: 8px 16px; background-color: #fff; color: #1e88e5; text-decoration: none; border-radius: 4px; font-weight: 600; font-size: 12px; white-space: nowrap;">
+                                        <i class="fa fa-telegram" style="margin-right: 5px;"></i>
+                                        Open Bot
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -243,8 +269,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('displayBotName').textContent = data.data.BOT_NAME || 'N/A';
                 document.getElementById('displayBotToken').textContent = data.data.BOT_TOKEN || 'N/A';
                 document.getElementById('displayChatId').textContent = data.data.CHAT_ID || 'N/A';
+                
+                // Show bot link section if bot username is available
+                const botLinkSection = document.getElementById('botLinkSection');
+                const displayBotUsername = document.getElementById('displayBotUsername');
+                const botLink = document.getElementById('botLink');
+                
+                if (data.data.BOT_USERNAME && data.data.BOT_LINK) {
+                    botLinkSection.style.display = 'block';
+                    displayBotUsername.textContent = '@' + data.data.BOT_USERNAME;
+                    botLink.href = data.data.BOT_LINK;
+                } else {
+                    botLinkSection.style.display = 'none';
+                }
             } else {
                 document.getElementById('currentConfig').style.display = 'none';
+                document.getElementById('botLinkSection').style.display = 'none';
             }
         })
         .catch(error => {
