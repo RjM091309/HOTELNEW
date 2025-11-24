@@ -587,24 +587,69 @@ class DailySettlementModel {
     
     /**
      * Get sales revenue data for the period
-     * Room Revenue: Payments with PAYMENT_TYPE = 'room', 'extended'
+     * Room Revenue: Payments with PAYMENT_TYPE = 'room', 'extended' minus discounts
      * Sales Revenue: Payments with PAYMENT_TYPE = 'service', 'pickdrop', etc.
+     * Total Revenue: Room + Services minus refunds
      */
     static async getSalesRevenue(periodStart, periodEnd) {
         try {
             // Get Room Revenue - payments made for room charges and extensions during the period
+            // Include discounts only if booking is fully paid AND no refund exists (refund already includes discount)
+            // Refunds always included
             const roomRevenueQuery = `
                 SELECT 
-                    COALESCE(SUM(p.AMOUNT_PAID), 0) AS ROOM_REVENUE
+                    COALESCE(SUM(
+                        CASE 
+                            WHEN p.PAYMENT_TYPE = 'discount' THEN
+                                -- Only include discount if:
+                                -- 1. Booking is fully paid
+                                -- 2. No refund exists for this booking (refund already includes discount)
+                                CASE 
+                                    WHEN EXISTS (
+                                        SELECT 1 
+                                        FROM billing bill
+                                        WHERE bill.BOOKING_ID = p.BOOKING_ID
+                                        AND bill.ACTIVE = 1
+                                        AND (
+                                            bill.PAYMENT_STATUS = 'paid'
+                                            OR (
+                                                (bill.ROOM_CHARGE * bill.QTY 
+                                                - COALESCE(bill.RESERVATION_FEE, 0) 
+                                                - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+                                                - COALESCE((
+                                                    SELECT SUM(p2.AMOUNT_PAID) 
+                                                    FROM payments p2 
+                                                    WHERE p2.BOOKING_ID = bill.BOOKING_ID 
+                                                    AND p2.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount')
+                                                ), 0)) <= 0
+                                            )
+                                        )
+                                    )
+                                    AND NOT EXISTS (
+                                        SELECT 1 
+                                        FROM payments p_refund
+                                        WHERE p_refund.BOOKING_ID = p.BOOKING_ID
+                                        AND p_refund.PAYMENT_TYPE = 'refund'
+                                        AND p_refund.PAYMENT_DATE >= ?
+                                        AND p_refund.PAYMENT_DATE <= ?
+                                    )
+                                    THEN p.AMOUNT_PAID
+                                    ELSE 0
+                                END
+                            ELSE p.AMOUNT_PAID
+                        END
+                    ), 0) AS ROOM_REVENUE
                 FROM payments p
                 INNER JOIN booking b ON p.BOOKING_ID = b.IDNo
-                WHERE p.PAYMENT_TYPE IN ('room', 'extended')
+                WHERE p.PAYMENT_TYPE IN ('room', 'extended', 'discount', 'refund')
                     AND p.PAYMENT_DATE >= ?
                     AND p.PAYMENT_DATE <= ?
                     AND b.ACTIVE = 1
             `;
             
             const roomRevenueResult = await queryDatabasePromise(roomRevenueQuery, [
+                periodStart.format('YYYY-MM-DD HH:mm:ss'),
+                periodEnd.format('YYYY-MM-DD HH:mm:ss'),
                 periodStart.format('YYYY-MM-DD HH:mm:ss'),
                 periodEnd.format('YYYY-MM-DD HH:mm:ss')
             ]);
@@ -628,12 +673,36 @@ class DailySettlementModel {
             ]);
             const servicesRevenue = parseFloat(salesRevenueResult[0]?.SERVICES_REVENUE || 0);
             
-            // Calculate Total Revenue
+            // Get Refunds - negative amounts that reduce revenue
+            // Note: Refunds are already included in roomRevenue, but we need to get them separately for display
+            const refundsQuery = `
+                SELECT 
+                    COALESCE(SUM(p.AMOUNT_PAID), 0) AS TOTAL_REFUNDS
+                FROM payments p
+                INNER JOIN booking b ON p.BOOKING_ID = b.IDNo
+                WHERE p.PAYMENT_TYPE = 'refund'
+                    AND p.PAYMENT_DATE >= ?
+                    AND p.PAYMENT_DATE <= ?
+                    AND b.ACTIVE = 1
+            `;
+            
+            const refundsResult = await queryDatabasePromise(refundsQuery, [
+                periodStart.format('YYYY-MM-DD HH:mm:ss'),
+                periodEnd.format('YYYY-MM-DD HH:mm:ss')
+            ]);
+            const totalRefunds = parseFloat(refundsResult[0]?.TOTAL_REFUNDS || 0);
+            
+            // Total Deductions - set to 0 since discounts and refunds are already in room revenue
+            const totalDeductions = 0;
+            
+            // Calculate Total Revenue (Room + Services)
+            // Note: refunds are already deducted from roomRevenue, so we don't need to subtract them again
             const totalRevenue = roomRevenue + servicesRevenue;
             
             return {
                 roomRevenue: roomRevenue.toFixed(2),
                 servicesRevenue: servicesRevenue.toFixed(2),
+                totalDeductions: Math.abs(totalDeductions).toFixed(2), // Return as positive for display
                 totalRevenue: totalRevenue.toFixed(2)
             };
         } catch (error) {
@@ -644,8 +713,9 @@ class DailySettlementModel {
     
     /**
      * Get monthly sales revenue data for the current month
-     * Room Revenue: Payments with PAYMENT_TYPE = 'room', 'extended'
+     * Room Revenue: Payments with PAYMENT_TYPE = 'room', 'extended' minus discounts
      * Sales Revenue: Payments with PAYMENT_TYPE = 'service', 'pickdrop', etc.
+     * Total Revenue: Room + Services minus refunds
      */
     static async getMonthlySalesRevenue(today) {
         try {
@@ -654,18 +724,62 @@ class DailySettlementModel {
             const monthEnd = today.clone().endOf('month').set({ hour: 23, minute: 59, second: 59, millisecond: 999 });
             
             // Get Room Revenue - payments made for room charges and extensions during the month
+            // Include discounts only if booking is fully paid AND no refund exists (refund already includes discount)
+            // Refunds always included
             const roomRevenueQuery = `
                 SELECT 
-                    COALESCE(SUM(p.AMOUNT_PAID), 0) AS ROOM_REVENUE
+                    COALESCE(SUM(
+                        CASE 
+                            WHEN p.PAYMENT_TYPE = 'discount' THEN
+                                -- Only include discount if:
+                                -- 1. Booking is fully paid
+                                -- 2. No refund exists for this booking (refund already includes discount)
+                                CASE 
+                                    WHEN EXISTS (
+                                        SELECT 1 
+                                        FROM billing bill
+                                        WHERE bill.BOOKING_ID = p.BOOKING_ID
+                                        AND bill.ACTIVE = 1
+                                        AND (
+                                            bill.PAYMENT_STATUS = 'paid'
+                                            OR (
+                                                (bill.ROOM_CHARGE * bill.QTY 
+                                                - COALESCE(bill.RESERVATION_FEE, 0) 
+                                                - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+                                                - COALESCE((
+                                                    SELECT SUM(p2.AMOUNT_PAID) 
+                                                    FROM payments p2 
+                                                    WHERE p2.BOOKING_ID = bill.BOOKING_ID 
+                                                    AND p2.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount')
+                                                ), 0)) <= 0
+                                            )
+                                        )
+                                    )
+                                    AND NOT EXISTS (
+                                        SELECT 1 
+                                        FROM payments p_refund
+                                        WHERE p_refund.BOOKING_ID = p.BOOKING_ID
+                                        AND p_refund.PAYMENT_TYPE = 'refund'
+                                        AND p_refund.PAYMENT_DATE >= ?
+                                        AND p_refund.PAYMENT_DATE <= ?
+                                    )
+                                    THEN p.AMOUNT_PAID
+                                    ELSE 0
+                                END
+                            ELSE p.AMOUNT_PAID
+                        END
+                    ), 0) AS ROOM_REVENUE
                 FROM payments p
                 INNER JOIN booking b ON p.BOOKING_ID = b.IDNo
-                WHERE p.PAYMENT_TYPE IN ('room', 'extended')
+                WHERE p.PAYMENT_TYPE IN ('room', 'extended', 'discount', 'refund')
                     AND p.PAYMENT_DATE >= ?
                     AND p.PAYMENT_DATE <= ?
                     AND b.ACTIVE = 1
             `;
             
             const roomRevenueResult = await queryDatabasePromise(roomRevenueQuery, [
+                monthStart.format('YYYY-MM-DD HH:mm:ss'),
+                monthEnd.format('YYYY-MM-DD HH:mm:ss'),
                 monthStart.format('YYYY-MM-DD HH:mm:ss'),
                 monthEnd.format('YYYY-MM-DD HH:mm:ss')
             ]);
@@ -689,12 +803,36 @@ class DailySettlementModel {
             ]);
             const servicesRevenue = parseFloat(salesRevenueResult[0]?.SERVICES_REVENUE || 0);
             
-            // Calculate Total Revenue
+            // Get Refunds - negative amounts that reduce revenue
+            // Note: Refunds are already included in roomRevenue, but we need to get them separately for display
+            const refundsQuery = `
+                SELECT 
+                    COALESCE(SUM(p.AMOUNT_PAID), 0) AS TOTAL_REFUNDS
+                FROM payments p
+                INNER JOIN booking b ON p.BOOKING_ID = b.IDNo
+                WHERE p.PAYMENT_TYPE = 'refund'
+                    AND p.PAYMENT_DATE >= ?
+                    AND p.PAYMENT_DATE <= ?
+                    AND b.ACTIVE = 1
+            `;
+            
+            const refundsResult = await queryDatabasePromise(refundsQuery, [
+                monthStart.format('YYYY-MM-DD HH:mm:ss'),
+                monthEnd.format('YYYY-MM-DD HH:mm:ss')
+            ]);
+            const totalRefunds = parseFloat(refundsResult[0]?.TOTAL_REFUNDS || 0);
+            
+            // Total Deductions - set to 0 since discounts and refunds are already in room revenue
+            const totalDeductions = 0;
+            
+            // Calculate Total Revenue (Room + Services)
+            // Note: refunds are already deducted from roomRevenue, so we don't need to subtract them again
             const totalRevenue = roomRevenue + servicesRevenue;
             
             return {
                 roomRevenue: roomRevenue.toFixed(2),
                 servicesRevenue: servicesRevenue.toFixed(2),
+                totalDeductions: Math.abs(totalDeductions).toFixed(2), // Return as positive for display
                 totalRevenue: totalRevenue.toFixed(2)
             };
         } catch (error) {

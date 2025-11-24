@@ -712,22 +712,55 @@ function viewGroupBilling(groupId) {
                 $('#discountRow').hide();
             }
 
-            // Update Total Room Charges and Total Services
-            const groupRoomTotal = parseFloat(data.roomTotal || 0);
-            const groupServicesTotal = parseFloat(data.servicesTotal || 0);
+            // Calculate Total Room Charges, Total Services, and Total Penalty from items
+            let calculatedRoomTotal = 0;
+            let calculatedServicesTotal = 0;
+            let calculatedPenaltyTotal = 0;
+            
+            allBillingData.forEach(bill => {
+                const amount = parseFloat(bill.charges || bill.service_cost || 0) * parseFloat(bill.room_qty || bill.service_qty || 1);
+                const description = (bill.description || '').toLowerCase();
+                
+                if (description.includes('penalty')) {
+                    calculatedPenaltyTotal += amount;
+                } else if (description.includes('room') || description.includes('bedroom')) {
+                    calculatedRoomTotal += amount;
+                } else {
+                    calculatedServicesTotal += amount;
+                }
+            });
+            
+            // Use calculated values or fallback to backend values
+            const groupRoomTotal = calculatedRoomTotal > 0 ? calculatedRoomTotal : parseFloat(data.roomTotal || 0);
+            const groupServicesTotal = calculatedServicesTotal > 0 ? calculatedServicesTotal : parseFloat(data.servicesTotal || 0);
+            const groupPenaltyTotal = calculatedPenaltyTotal;
+            
             $('#totalRoomCharges').text(groupRoomTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
             $('#totalServices').text(groupServicesTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            
+            // Update Total Penalty (show/hide based on amount)
+            const penaltyRow = $('#totalPenaltyRow');
+            const penaltyElement = $('#totalPenalty');
+            if (penaltyRow.length && penaltyElement.length) {
+                if (groupPenaltyTotal > 0) {
+                    penaltyRow.show();
+                    penaltyElement.text(groupPenaltyTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                } else {
+                    penaltyRow.hide();
+                }
+            }
 
-            const allPaid = allBillingData.every(bill => bill.PAYMENT_STATUS === 'paid' || bill.STATUS === 'paid');
+            // Check if fully paid based on balance (not just PAYMENT_STATUS, since penalty items might have different status)
+            const isFullyPaid = balance <= 0 && adjustedTotalPaid > 0 && finalTotal > 0;
             const billingType = parseInt(data.billingType || 0); // 1 = Consolidated/Master, 0 = Individual
             const paymentBtn = $('#groupProceedPaymentButton');
             
-            // Disable button if Individual Billing (BILLING_TYPE = 0) or if all paid
+            // Disable button if Individual Billing (BILLING_TYPE = 0) or if fully paid
             if (billingType === 0) {
                 paymentBtn.prop('disabled', true)
                     .text('Individual Billing - Please pay individually.')
                     .attr('title', 'Individual billing requires payment through individual room menus');
-            } else if (allPaid) {
+            } else if (isFullyPaid) {
                 paymentBtn.prop('disabled', true).text('Payment Completed');
             } else {
                 paymentBtn.prop('disabled', false).text('Proceed to Payment');

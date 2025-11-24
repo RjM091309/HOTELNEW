@@ -702,45 +702,49 @@ function showVoucherDetails(bookingID) {
                 document.getElementById('voucher-remarks').textContent = data.remarks || 'Room Accommodation';
                 
                 // Reservation fee (from billing data) - only show if > 0
-                const reservationFee = data.reservationFee || 0;
+                const reservationFee = parseFloat(data.reservationFee || 0);
                 const reservationFeeRow = document.getElementById('reservation-fee-row');
                 
-                if (parseFloat(reservationFee) > 0) {
-                    document.getElementById('voucher-reservation-fee').textContent = `PHP ${parseFloat(reservationFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                if (reservationFee > 0) {
+                    document.getElementById('voucher-reservation-fee').textContent = `PHP ${reservationFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
                     reservationFeeRow.style.display = 'table-row';
                 } else {
                     reservationFeeRow.style.display = 'none';
                 }
                 
                 // Discount amount (from billing data) - only show if > 0
-                const discountAmount = data.discount || 0;
+                const discountAmount = parseFloat(data.discount || 0);
                 const discountAmountRow = document.getElementById('discount-amount-row');
                 
-                if (parseFloat(discountAmount) > 0) {
-                    document.getElementById('voucher-discount-amount').textContent = `PHP ${parseFloat(discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                if (discountAmount > 0) {
+                    document.getElementById('voucher-discount-amount').textContent = `PHP ${discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
                     discountAmountRow.style.display = 'table-row';
                 } else {
                     discountAmountRow.style.display = 'none';
                 }
                 
-                // Calculate TOTAL AMOUNT (subTotal + reservationFee - discount)
-                const subTotal = parseFloat(data.total || 0);
-                const totalAmount = subTotal + parseFloat(reservationFee) - parseFloat(discountAmount);
+                // Helpers for consistent numeric parsing/formatting
+                const parseAmount = (value) => {
+                    const parsed = parseFloat(value);
+                    return isNaN(parsed) ? 0 : parsed;
+                };
+                const formatCurrency = (value) => `PHP ${value.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
                 
-                // Get PAID AMOUNT (from API response)
-                const paidAmount = parseFloat(data.paidAmount || 0);
+                // Calculate totals
+                const grossTotal = Math.max(0, parseAmount(data.total));
+                const normalizedDiscountAmount = Math.max(0, discountAmount);
+                const paidAmountRaw = parseAmount(data.paidAmount);
                 
-                // Calculate BALANCE
-                const balance = totalAmount - paidAmount;
+                // Net due should exclude discounts (already shown separately)
+                const netDueAmount = Math.max(0, grossTotal - normalizedDiscountAmount);
+                // Paid amount from API includes discounts as negative values, add them back for display
+                const paidAmountDisplay = Math.max(0, paidAmountRaw + normalizedDiscountAmount);
+                const balance = Math.max(0, netDueAmount - paidAmountDisplay);
                 
-                // Display TOTAL AMOUNT
-                document.getElementById('voucher-total-amount').textContent = `PHP ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-                
-                // Display PAID AMOUNT
-                document.getElementById('voucher-paid-amount').textContent = `PHP ${paidAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-                
-                // Display BALANCE
-                document.getElementById('voucher-balance').textContent = `PHP ${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                // Display totals
+                document.getElementById('voucher-total-amount').textContent = formatCurrency(grossTotal);
+                document.getElementById('voucher-paid-amount').textContent = formatCurrency(paidAmountDisplay);
+                document.getElementById('voucher-balance').textContent = formatCurrency(balance);
                 
                 // Store booking ID for download function
                 document.getElementById('modal-voucher-details').setAttribute('data-booking-id', bookingID);

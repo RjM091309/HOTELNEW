@@ -68,7 +68,8 @@ class BookingModel {
                         SELECT SUM(be.COST * be.QTY) 
                         FROM booking_extension be 
                         WHERE be.BOOKING_ID = b2.IDNo AND be.ACTIVE = 1
-                      ), 0)
+                      ), 0) +
+                      COALESCE(bill2.CANCELLATION_PENALTY, 0)
                     ), 0)
                     - COALESCE(gb.GROUP_DISCOUNT, 0)
                     - COALESCE(gb.GROUP_RESERVATION_FEE, 0)
@@ -82,6 +83,7 @@ class BookingModel {
                 COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
                   + COALESCE(all_services_total.TOTAL_SERVICES_COST, 0)
                   + COALESCE(all_extensions_total.TOTAL_EXTENSIONS_COST, 0)
+                  + COALESCE(bill.CANCELLATION_PENALTY, 0)
                   - COALESCE(bill.RESERVATION_FEE, 0)
                   - COALESCE(bill.DISCOUNT_AMOUNT, 0)
             END AS TOTAL_COST,
@@ -110,7 +112,8 @@ class BookingModel {
                           SELECT SUM(be.COST * be.QTY) 
                           FROM booking_extension be 
                           WHERE be.BOOKING_ID = b2.IDNo AND be.ACTIVE = 1
-                        ), 0)
+                        ), 0) +
+                        COALESCE(bill2.CANCELLATION_PENALTY, 0)
                       ), 0)
                       - COALESCE(gb.GROUP_DISCOUNT, 0)
                       - COALESCE(gb.GROUP_RESERVATION_FEE, 0)
@@ -136,6 +139,7 @@ class BookingModel {
                   COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
                   + COALESCE(all_services_total.TOTAL_SERVICES_COST, 0)
                   + COALESCE(all_extensions_total.TOTAL_EXTENSIONS_COST, 0)
+                  + COALESCE(bill.CANCELLATION_PENALTY, 0)
                   - COALESCE(bill.RESERVATION_FEE, 0)
                   - COALESCE(bill.DISCOUNT_AMOUNT, 0)
                   - COALESCE(actual_payments.TOTAL_PAYMENTS_MADE, 0)
@@ -497,7 +501,7 @@ class BookingModel {
   }
 
   // New: Checkout bookings now (set CHECK_OUT_DATE=NOW, status to check-Out, update room status)
-  static async checkoutBookings({ bookingIds, encodedBy, refundBookingId = null, refundAmount = 0 }) {
+  static async checkoutBookings({ bookingIds, encodedBy, refundBookingId = null, refundAmount = 0, penaltyAmount = 0 }) {
     if (!bookingIds || bookingIds.length === 0) {
       throw new Error('No bookings to checkout');
     }
@@ -547,7 +551,9 @@ class BookingModel {
       });
 
       // Optional: Insert refund(s) and update billing.CHECKOUT_REFUND (manual refund amount, no capping)
+      const normalizedPenaltyAmount = Math.max(0, parseFloat(penaltyAmount) || 0);
       let refundInfo = { requested: refundAmount, processed: 0, details: [] };
+      let penaltyInfo = { requested: normalizedPenaltyAmount, processed: 0 };
       if (refundBookingId && refundAmount > 0) {
         // If multiple bookings were checked out (group scope), split proportionally by room amount
         const targetIds = ids.includes(refundBookingId) && ids.length > 1 ? ids : [refundBookingId];
@@ -623,6 +629,105 @@ class BookingModel {
         }
       }
 
+      // Record penalty (reuse cancellation_penalty column for checkout penalties)
+      if (refundBookingId && normalizedPenaltyAmount > 0) {
+        await new Promise((resolve, reject) => {
+          connection.query(
+            `UPDATE billing 
+             SET CANCELLATION_PENALTY = COALESCE(CANCELLATION_PENALTY, 0) + ?
+             WHERE BOOKING_ID = ? AND ACTIVE = 1`,
+            [normalizedPenaltyAmount, refundBookingId],
+            (err, res) => (err ? reject(err) : resolve(res))
+          );
+        });
+        penaltyInfo.processed = normalizedPenaltyAmount;
+      }
+
+      // Recalculate and update PAYMENT_STATUS for all checked out bookings
+      for (const bookingId of ids) {
+        // Get billing details
+        const billingRows = await new Promise((resolve, reject) => {
+          connection.query(
+            `SELECT bill.IDNo, bill.ROOM_CHARGE, bill.QTY, bill.RESERVATION_FEE, bill.DISCOUNT_AMOUNT, 
+                    bill.CHECKOUT_REFUND, bill.CANCELLATION_PENALTY,
+                    (SELECT COALESCE(SUM(bs.TOTAL_COST), 0) FROM booking_service bs WHERE bs.BOOKING_ID = ? AND bs.ACTIVE = 1) AS services_total,
+                    (SELECT COALESCE(SUM(be.COST * be.QTY), 0) FROM booking_extension be WHERE be.BOOKING_ID = ? AND be.ACTIVE = 1) AS extensions_total
+             FROM billing bill
+             WHERE bill.BOOKING_ID = ? AND bill.ACTIVE = 1
+             LIMIT 1`,
+            [bookingId, bookingId, bookingId],
+            (err, rows) => (err ? reject(err) : resolve(rows))
+          );
+        });
+
+        if (billingRows.length > 0) {
+          const bill = billingRows[0];
+          const roomCharge = parseFloat(bill.ROOM_CHARGE) || 0;
+          const qty = parseInt(bill.QTY) || 1;
+          const reservationFee = parseFloat(bill.RESERVATION_FEE) || 0;
+          const discountAmount = parseFloat(bill.DISCOUNT_AMOUNT) || 0;
+          const checkoutRefund = parseFloat(bill.CHECKOUT_REFUND) || 0;
+          const penalty = parseFloat(bill.CANCELLATION_PENALTY) || 0;
+          const servicesTotal = parseFloat(bill.services_total) || 0;
+          const extensionsTotal = parseFloat(bill.extensions_total) || 0;
+
+          // Calculate new total (room + services + extensions + penalty - reservation fee - discount)
+          const newTotal = (roomCharge * qty) + servicesTotal + extensionsTotal + penalty - reservationFee - discountAmount;
+
+          // Get total payments made (including refunds which are negative)
+          const paymentsRows = await new Promise((resolve, reject) => {
+            connection.query(
+              `SELECT COALESCE(SUM(AMOUNT_PAID), 0) AS total_paid
+               FROM payments
+               WHERE BOOKING_ID = ? AND PAYMENT_TYPE NOT IN ('reservation_fee', 'discount')`,
+              [bookingId],
+              (err, rows) => (err ? reject(err) : resolve(rows))
+            );
+          });
+
+          const totalPaid = parseFloat(paymentsRows[0]?.total_paid || 0);
+          const balance = newTotal - totalPaid;
+
+          // Determine payment status
+          let newPaymentStatus = 'unpaid';
+          if (balance <= 0) {
+            newPaymentStatus = 'paid';
+          } else if (totalPaid > 0 && balance < newTotal) {
+            newPaymentStatus = 'partial';
+          }
+
+          // Update PAYMENT_STATUS
+          await new Promise((resolve, reject) => {
+            connection.query(
+              `UPDATE billing SET PAYMENT_STATUS = ? WHERE IDNo = ?`,
+              [newPaymentStatus, bill.IDNo],
+              (err, res) => (err ? reject(err) : resolve(res))
+            );
+          });
+
+          // If fully paid (balance <= 0), update all service and extension statuses to 'paid'
+          if (balance <= 0) {
+            // Update booking_service status to 'paid'
+            await new Promise((resolve, reject) => {
+              connection.query(
+                `UPDATE booking_service SET STATUS = 'paid' WHERE BOOKING_ID = ? AND ACTIVE = 1 AND STATUS != 'paid'`,
+                [bookingId],
+                (err, res) => (err ? reject(err) : resolve(res))
+              );
+            });
+
+            // Update booking_extension status to 'paid'
+            await new Promise((resolve, reject) => {
+              connection.query(
+                `UPDATE booking_extension SET PAYMENT_STATUS = 'paid' WHERE BOOKING_ID = ? AND ACTIVE = 1 AND PAYMENT_STATUS != 'paid'`,
+                [bookingId],
+                (err, res) => (err ? reject(err) : resolve(res))
+              );
+            });
+          }
+        }
+      }
+
       // Compute original vs actual days for reporting
       const daysQuery = `
         SELECT 
@@ -644,12 +749,15 @@ class BookingModel {
       });
 
       // Build success message with refund info if applicable
-      let message = 'Checked out successfully';
+      let message = 'Checked out successfully.';
       if (refundInfo.requested > 0) {
         message = `Checked out successfully. Refund of ₱${refundInfo.processed.toFixed(2)} processed.`;
       }
+      if (penaltyInfo.processed > 0) {
+        message += ` Penalty of ₱${penaltyInfo.processed.toFixed(2)} recorded.`;
+      }
 
-      return { success: true, message, days: daysRows, refundInfo };
+      return { success: true, message, days: daysRows, refundInfo, penaltyInfo };
     } catch (err) {
       try { await new Promise(r => connection.rollback(() => r())); } catch (e) {}
       throw err;
@@ -2175,6 +2283,7 @@ class BookingModel {
           bi.PAYMENT_STATUS,
           bi.RESERVATION_FEE,
           bi.DISCOUNT_AMOUNT,
+          COALESCE(bi.CANCELLATION_PENALTY, 0) AS PENALTY_AMOUNT,
           COALESCE(bi.CHECKOUT_REFUND, 0) AS CHECKOUT_REFUND,
           bi.DISCOUNT_APPLIED,
           rt.NAME AS ROOM_TYPE
@@ -2214,6 +2323,7 @@ class BookingModel {
       const reservationFee = parseFloat(b.RESERVATION_FEE) || 0;
       const discountAmount = parseFloat(b.DISCOUNT_AMOUNT) || 0;
       const checkoutRefund = parseFloat(b.CHECKOUT_REFUND) || 0;
+      const penaltyAmount = parseFloat(b.PENALTY_AMOUNT) || 0;
       const netRoomAmount = roomAmount - reservationFee - discountAmount - checkoutRefund;
       
       let roomStatus = 'unpaid';
@@ -2304,8 +2414,17 @@ class BookingModel {
         status: row.STATUS
       }));
 
+      const penaltyItems = penaltyAmount > 0 ? [{
+        date: b.CHECK_OUT_DATE || b.CHECK_IN_DATE,
+        description: 'Penalty',
+        basePrice: penaltyAmount,
+        qty: 1,
+        subTotal: penaltyAmount,
+        status: 'penalty'
+      }] : [];
+
       // Combine all items
-      const allItems = [...roomItems, ...serviceItems, ...transportItems];
+      const allItems = [...roomItems, ...serviceItems, ...transportItems, ...penaltyItems];
 
       // Calculate subtotal
       const subTotal = allItems.reduce((sum, item) => sum + item.subTotal, 0);
@@ -2322,6 +2441,7 @@ class BookingModel {
         reservationFee: parseFloat(b.RESERVATION_FEE) || 0,
         discountAmount: parseFloat(b.DISCOUNT_AMOUNT) || 0,
         checkoutRefund: checkoutRefund,
+        penaltyAmount: penaltyAmount,
         discountApplied: b.DISCOUNT_APPLIED === 1 ? 1 : 0
       };
 
@@ -7651,7 +7771,8 @@ class BookingModel {
           b.LATE_CHECKOUT AS checkOutStatus,
           COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
             + COALESCE(services_total.TOTAL_SERVICES_COST, 0)
-            + COALESCE(extensions_total.TOTAL_EXTENSIONS_COST, 0) AS total,
+            + COALESCE(extensions_total.TOTAL_EXTENSIONS_COST, 0)
+            + COALESCE(bill.CANCELLATION_PENALTY, 0) AS total,
           COALESCE(bill.RESERVATION_FEE, 0) AS reservationFee,
           COALESCE(bill.DISCOUNT_AMOUNT, 0) AS discount,
           CASE 

@@ -1696,7 +1696,7 @@ Swal.fire({
 }
 
 // Calculate total cost
-function calculateTotalCost(bookingId) {
+async function calculateTotalCost(bookingId) {
     // Get room cost from the hidden field first, then fallback to display element
     let roomCost = 0;
     const hiddenRoomCostField = document.getElementById(`hidden-room-cost-${bookingId}`);
@@ -1737,13 +1737,24 @@ function calculateTotalCost(bookingId) {
         return sum;
     }, 0);
 
+    // Get penalty amount from billing data
+    let penaltyAmount = 0;
+    try {
+        const billingResponse = await fetch(`/booking/get-billing/${bookingId}?_=${Date.now()}`);
+        const billingData = await billingResponse.json();
+        penaltyAmount = parseFloat(billingData.penaltyAmount) || 0;
+    } catch (error) {
+        console.error('Error fetching penalty amount:', error);
+    }
+
     // Ensure all values are valid numbers
     if (isNaN(roomCost)) roomCost = 0;
     if (isNaN(lateCheckoutCharge)) lateCheckoutCharge = 0;
     if (isNaN(extraServicesCost)) extraServicesCost = 0;
+    if (isNaN(penaltyAmount)) penaltyAmount = 0;
 
-    // Compute final grand total
-    let grandTotal = roomCost + extraServicesCost + lateCheckoutCharge;
+    // Compute final grand total (including penalty)
+    let grandTotal = roomCost + extraServicesCost + lateCheckoutCharge + penaltyAmount;
 
     // Validate grand total
     if (isNaN(grandTotal)) grandTotal = 0;
@@ -1790,11 +1801,23 @@ async function calculateBalance(bookingId, currentBookingId) {
         const subTotal = parseFloat(billingData.subTotal);
         const reservationFee = parseFloat(billingData.reservationFee) || 0;
         const discountAmount = parseFloat(billingData.discountAmount) || 0;
+        const penaltyAmount = parseFloat(billingData.penaltyAmount) || 0;
         const discountRemarks = (billingData.discountRemarks || '').trim();
         const discountAppliedFlag = parseInt(billingData.discountApplied, 10) || 0;
         
         // Calculate gross total (before reservation fee and discount)
+        // Note: subTotal already includes penalty from billing model
         const grossTotal = subTotal;
+        
+        // Update Grand Total to include penalty (subTotal already includes it, but update display)
+        const grandTotalElement = document.getElementById(`grand-total-${bookingId}`);
+        if (grandTotalElement) {
+            const formattedGrandTotal = grossTotal.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+            grandTotalElement.innerHTML = `<span class="text-primary"><strong>₱${formattedGrandTotal}</strong></span>`;
+        }
         
         // Calculate net balance (after reservation fee and discount)
         const netBalance = grossTotal - reservationFee - discountAmount;
@@ -2142,6 +2165,88 @@ function triggerCheckout(bookingId) {
                     const input = document.getElementById('refundAmountInput');
                     const hasRefund = !!(chk && chk.checked);
                     let amount = 0;
+                    let penaltyAmount = 0;
+                    let computedOverpayment = 0;
+                    
+                    // Helper to compute financial context for this checkout
+                    let checkoutContextCache = null;
+                    const ensureCheckoutContext = async () => {
+                        if (checkoutContextCache) return checkoutContextCache;
+                        try {
+                            const [paymentsResponse, billingResponse, bookingResponse] = await Promise.all([
+                                fetch(`/payments/get-payments/${bookingId}?_=${Date.now()}`),
+                                fetch(`/booking/get-billing/${bookingId}?_=${Date.now()}`),
+                                fetch(`/booking/booking_details/${bookingId}?_=${Date.now()}`)
+                            ]);
+                            
+                            const paymentsData = await paymentsResponse.json();
+                            const billingData = await billingResponse.json();
+                            const bookingData = await bookingResponse.json();
+                            
+                            const paymentsArray = (paymentsData && paymentsData.data) ? paymentsData.data : (Array.isArray(paymentsData) ? paymentsData : []);
+                            const totalPaid = (paymentsArray && Array.isArray(paymentsArray)) ? paymentsArray.reduce((sum, payment) => {
+                                if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
+                                    return sum;
+                                }
+                                return sum + parseFloat(payment.AMOUNT_PAID);
+                            }, 0) : 0;
+                            
+                            const reservationFee = parseFloat(billingData.reservationFee) || 0;
+                            const discountAmount = parseFloat(billingData.discountAmount) || 0;
+                            
+                            let roomRate = 0;
+                            let originalQty = 1;
+                            if (billingData.items && billingData.items.length > 0) {
+                                const roomItem = billingData.items[0];
+                                roomRate = parseFloat(roomItem.basePrice) || 0;
+                                originalQty = parseFloat(roomItem.qty) || 1;
+                            }
+                            
+                            let servicesAndExtensionsTotal = 0;
+                            if (billingData.items && billingData.items.length > 1) {
+                                for (let i = 1; i < billingData.items.length; i++) {
+                                    const desc = (billingData.items[i].description || '').toLowerCase();
+                                    if (desc.includes('penalty')) {
+                                        continue;
+                                    }
+                                    servicesAndExtensionsTotal += parseFloat(billingData.items[i].subTotal) || 0;
+                                }
+                            }
+                            
+                            let actualDays = 1;
+                            if (bookingData && bookingData.CHECK_IN_DATE) {
+                                const checkInDate = new Date(bookingData.CHECK_IN_DATE);
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0);
+                                checkInDate.setHours(0, 0, 0, 0);
+                                const diffTime = today - checkInDate;
+                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                actualDays = Math.max(1, diffDays);
+                            }
+                            actualDays = Math.min(actualDays, originalQty);
+                            
+                            const roomAmountForActualDays = roomRate * actualDays;
+                            const grossTotal = roomAmountForActualDays + servicesAndExtensionsTotal;
+                            const netBalance = grossTotal - reservationFee - discountAmount;
+                            const overpayment = Math.max(0, totalPaid - netBalance);
+                            
+                            checkoutContextCache = {
+                                totalPaid,
+                                reservationFee,
+                                discountAmount,
+                                roomRate,
+                                actualDays,
+                                grossTotal,
+                                netBalance,
+                                overpayment
+                            };
+                            return checkoutContextCache;
+                        } catch (error) {
+                            console.error('Error computing checkout context:', error);
+                            throw error;
+                        }
+                    };
+                    
                     if (hasRefund) {
                         amount = parseFloat(input && input.value ? input.value : '');
                         if (isNaN(amount) || amount < 0) {
@@ -2153,22 +2258,10 @@ function triggerCheckout(bookingId) {
                             return false;
                         }
                         
-                        // Check if refund amount exceeds paid amount and overpayment
                         try {
-                            // Fetch payments
-                            const paymentsResponse = await fetch(`/payments/get-payments/${bookingId}?_=${Date.now()}`);
-                            const paymentsData = await paymentsResponse.json();
-                            const paymentsArray = (paymentsData && paymentsData.data) ? paymentsData.data : (Array.isArray(paymentsData) ? paymentsData : []);
+                            const context = await ensureCheckoutContext();
+                            const { totalPaid, overpayment, netBalance } = context;
                             
-                            // Calculate total paid (exclude reservation_fee and discount)
-                            const totalPaid = (paymentsArray && Array.isArray(paymentsArray)) ? paymentsArray.reduce((sum, payment) => {
-                                if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
-                                    return sum;
-                                }
-                                return sum + parseFloat(payment.AMOUNT_PAID);
-                            }, 0) : 0;
-                            
-                            // Check if refund amount exceeds paid amount
                             if (amount > totalPaid) {
                                 Swal.fire({
                                     icon: 'warning',
@@ -2183,58 +2276,6 @@ function triggerCheckout(bookingId) {
                                 return false;
                             }
                             
-                            // Fetch billing data to get net balance (what they should pay)
-                            const billingResponse = await fetch(`/booking/get-billing/${bookingId}?_=${Date.now()}`);
-                            const billingData = await billingResponse.json();
-                            
-                            // Fetch booking details to get check-in date for actual days calculation
-                            const bookingResponse = await fetch(`/booking/booking_details/${bookingId}?_=${Date.now()}`);
-                            const bookingData = await bookingResponse.json();
-                            
-                            const reservationFee = parseFloat(billingData.reservationFee) || 0;
-                            const discountAmount = parseFloat(billingData.discountAmount) || 0;
-                            
-                            // Calculate actual days stayed (for early checkout)
-                            let actualDays = 1;
-                            if (bookingData && bookingData.CHECK_IN_DATE) {
-                                const checkInDate = new Date(bookingData.CHECK_IN_DATE);
-                                const today = new Date();
-                                today.setHours(0, 0, 0, 0);
-                                checkInDate.setHours(0, 0, 0, 0);
-                                const diffTime = today - checkInDate;
-                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                                actualDays = Math.max(1, diffDays);
-                            }
-                            
-                            // Recalculate subtotal based on actual days stayed
-                            // Get room rate from first billing item (room item)
-                            let roomRate = 0;
-                            let servicesAndExtensionsTotal = 0;
-                            
-                            if (billingData.items && billingData.items.length > 0) {
-                                // First item is usually the room
-                                const roomItem = billingData.items[0];
-                                roomRate = parseFloat(roomItem.basePrice) || 0;
-                                            
-                                // Calculate services and extensions (items after the first room item)
-                                // These don't change based on days
-                                for (let i = 1; i < billingData.items.length; i++) {
-                                    servicesAndExtensionsTotal += parseFloat(billingData.items[i].subTotal) || 0;
-                                }
-                            }
-                            
-                            // Calculate net balance based on actual days
-                            // Room amount = roomRate * actualDays
-                            // Plus services/extensions
-                            // Minus reservation fee and discount
-                            const roomAmountForActualDays = roomRate * actualDays;
-                            const grossTotal = roomAmountForActualDays + servicesAndExtensionsTotal;
-                            const netBalance = grossTotal - reservationFee - discountAmount;
-                            
-                            // Calculate overpayment (paid - what they should pay)
-                            const overpayment = Math.max(0, totalPaid - netBalance);
-                            
-                            // Check if refund amount exceeds overpayment
                             if (amount > overpayment) {
                                 Swal.fire({
                                     icon: 'warning',
@@ -2253,20 +2294,41 @@ function triggerCheckout(bookingId) {
                                 });
                                 return false;
                             }
+                            
+                            computedOverpayment = overpayment;
+                            penaltyAmount = Math.max(0, overpayment - amount);
                         } catch (error) {
-                            console.error('Error fetching payments or billing:', error);
                             Swal.showValidationMessage('Unable to verify payment amount. Please try again.');
                             return false;
+                        }
+                    } else {
+                        try {
+                            const context = await ensureCheckoutContext();
+                            computedOverpayment = context.overpayment;
+                            if (computedOverpayment > 0) {
+                                penaltyAmount = computedOverpayment;
+                            }
+                        } catch (error) {
+                            console.warn('Skipping automatic penalty calculation due to error:', error);
                         }
                     }
                     let scope = 'individual';
                     const sel = document.querySelector('input[name="checkoutScope"]:checked');
                     if (sel && (sel.value === 'group' || sel.value === 'individual')) scope = sel.value;
-                    return { hasRefund, amount, scope };
+                    if (!hasRefund && computedOverpayment > 0) {
+                        penaltyAmount = computedOverpayment;
+                    }
+                    return { hasRefund, amount, scope, penaltyAmount };
                 }
             }).then((result) => {
                 if (result.isConfirmed && result.value) {
-                    startCheckoutProcess(bookingId, result.value.hasRefund, result.value.amount || 0, result.value.scope || 'individual');
+                    startCheckoutProcess(
+                        bookingId,
+                        result.value.hasRefund,
+                        result.value.amount || 0,
+                        result.value.scope || 'individual',
+                        result.value.penaltyAmount || 0
+                    );
                 }
             });
         })
@@ -2375,6 +2437,8 @@ function triggerCheckout(bookingId) {
                     const input = document.getElementById('refundAmountInput');
                     const hasRefund = !!(chk && chk.checked);
                     let amount = 0;
+                    let penaltyAmount = 0;
+                    let computedOverpayment = 0;
                     if (hasRefund) {
                         amount = parseFloat(input && input.value ? input.value : '');
                         if (isNaN(amount) || amount < 0) {
@@ -2466,6 +2530,7 @@ function triggerCheckout(bookingId) {
                             
                             // Calculate overpayment (paid - what they should pay)
                             const overpayment = Math.max(0, totalPaid - netBalance);
+                            computedOverpayment = overpayment;
                             
                             // Check if refund amount exceeds overpayment
                             if (amount > overpayment) {
@@ -2473,7 +2538,7 @@ function triggerCheckout(bookingId) {
                                     icon: 'warning',
                                     title: 'Refund Amount Exceeds Overpayment',
                                     html: `
-                                      
+                                        <p>The refund amount (₱${amount.toFixed(2)}) exceeds the overpayment amount (₱${overpayment.toFixed(2)}).</p>
                                         <p><strong>You cannot refund more than the overpayment (paid amount minus net amount due).</strong></p>
                                         <p style="margin-top:8px; font-size:0.9em; color:#6c757d;">
                                             Net Amount Due: ₱${netBalance.toFixed(2)}<br>
@@ -2486,27 +2551,35 @@ function triggerCheckout(bookingId) {
                                 });
                                 return false;
                             }
+
+                            penaltyAmount = Math.max(0, overpayment - amount);
                         } catch (error) {
                             console.error('Error fetching payments or billing:', error);
                             Swal.showValidationMessage('Unable to verify payment amount. Please try again.');
                             return false;
                         }
                     }
-                    let scope = 'individual';
-                    const sel = document.querySelector('input[name="checkoutScope"]:checked');
-                    if (sel && (sel.value === 'group' || sel.value === 'individual')) scope = sel.value;
-                    return { hasRefund, amount, scope };
+                    if (!hasRefund && computedOverpayment > 0) {
+                        penaltyAmount = computedOverpayment;
+                    }
+                    return { hasRefund, amount, penaltyAmount };
                 }
             }).then((result) => {
                 if (result.isConfirmed && result.value) {
-                    startCheckoutProcess(bookingId, result.value.hasRefund, result.value.amount || 0, result.value.scope || 'individual');
+                    startCheckoutProcess(
+                        bookingId,
+                        result.value.hasRefund,
+                        result.value.amount || 0,
+                        'individual',
+                        result.value.penaltyAmount || 0
+                    );
                 }
             });
         });
 }
 
 // Handle checkout process
-function startCheckoutProcess(bookingId, hasRefund, refundAmount = 0, scope = 'individual') {
+function startCheckoutProcess(bookingId, hasRefund, refundAmount = 0, scope = 'individual', penaltyAmount = 0) {
     // Show loading state
     Swal.fire({
         title: 'Processing Checkout...',
@@ -2521,7 +2594,7 @@ function startCheckoutProcess(bookingId, hasRefund, refundAmount = 0, scope = 'i
     fetch('/booking/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId, scope, hasRefund, refundAmount })
+        body: JSON.stringify({ bookingId, scope, hasRefund, refundAmount, penaltyAmount })
     })
     .then(r => {
         if (!r.ok) {

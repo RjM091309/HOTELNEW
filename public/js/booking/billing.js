@@ -180,16 +180,20 @@ window.showBilling = async function (bookingID) {
                 // GRAND TOTAL should be the subtotal (before discount)
                 setText('totalPayment', subTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
-                // Calculate Total Room Charges and Total Services
+                // Calculate Total Room Charges, Total Services, and Total Penalty
                 let totalRoomCharges = 0;
                 let totalServices = 0;
+                let totalPenalty = 0;
                 
                 data.items.forEach(item => {
                     const amount = parseFloat(item.subTotal) || 0;
                     const description = (item.description || '').toLowerCase();
                     
-                    // Check if it's a room charge
-                    if (description.includes('room') || description.includes('bedroom') || description.includes('room charge')) {
+                    // Check if it's a penalty
+                    if (description.includes('penalty')) {
+                        totalPenalty += amount;
+                    } else if (description.includes('room') || description.includes('bedroom') || description.includes('room charge')) {
+                        // Room charges
                         totalRoomCharges += amount;
                     } else {
                         // Everything else is considered a service
@@ -200,6 +204,18 @@ window.showBilling = async function (bookingID) {
                 // Update Total Room Charges and Total Services
                 setText('totalRoomCharges', totalRoomCharges.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
                 setText('totalServices', totalServices.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                
+                // Update Total Penalty (show/hide based on amount)
+                const penaltyRow = document.getElementById('totalPenaltyRow');
+                const penaltyElement = document.getElementById('totalPenalty');
+                if (penaltyRow && penaltyElement) {
+                    if (totalPenalty > 0) {
+                        penaltyRow.style.display = 'flex';
+                        penaltyElement.textContent = totalPenalty.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    } else {
+                        penaltyRow.style.display = 'none';
+                    }
+                }
 
                 // Reservation Fee UI
                 (function(){
@@ -245,7 +261,9 @@ window.showBilling = async function (bookingID) {
                     }
                 })();
 
-                const allPaid = data.items.every(item => item.status === 'paid') && (balanceToShow <= 0);
+                // Check if fully paid: balance should be 0 or less
+                // Penalty items can have status 'penalty' or 'paid', so we check balance instead of all items being 'paid'
+                const allPaid = balanceToShow <= 0 && totalPaymentsMade > 0;
                 const paidImageOverlay = document.getElementById('paidImageOverlay');
                 const proceedBtn = document.getElementById('proceedToPaymentButton');
                 if (allPaid) {

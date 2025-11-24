@@ -81,6 +81,7 @@ function updateGroupPaymentStatus() {
     const totalPaymentElement = document.getElementById('totalAmount');
     const balanceAmountElement = document.getElementById('balanceAmount');
     const paidImageOverlay = document.getElementById('paidImageOverlay');
+    const paymentBtn = document.getElementById('groupProceedPaymentButton');
     
     // Check if elements exist
     if (!totalPaidElement || !totalPaymentElement || !balanceAmountElement || !paidImageOverlay) {
@@ -93,16 +94,33 @@ function updateGroupPaymentStatus() {
     const balanceAmount = parseFloat(balanceAmountElement.textContent.replace(/[₹₱,]/g, '')) || 0;
     
     // Check if payment is truly complete - improved logic
-    const isPaymentComplete = (balanceAmount <= 0 && totalPaid > 0 && totalPayment > 0 && totalPaid >= totalPayment);
+    // Balance should be 0 or less, and there should be payments made
+    const isPaymentComplete = (balanceAmount <= 0 && totalPaid > 0 && totalPayment > 0);
     
     if (isPaymentComplete) {
         // Show paid image only when payment is complete
         paidImageOverlay.style.display = 'block';
         paidImageOverlay.classList.add('show-paid-status');
+        
+        // Update proceed button to show "Payment Completed"
+        if (paymentBtn) {
+            paymentBtn.disabled = true;
+            paymentBtn.textContent = 'Payment Completed';
+            paymentBtn.classList.remove('btn-payment');
+            paymentBtn.classList.add('btn-success');
+        }
     } else {
         // Hide paid image for unpaid or partial payments
         paidImageOverlay.style.display = 'none';
         paidImageOverlay.classList.remove('show-paid-status');
+        
+        // Update proceed button to show "Proceed to Payment" (only if not individual billing)
+        if (paymentBtn && !paymentBtn.hasAttribute('data-individual-billing')) {
+            paymentBtn.disabled = false;
+            paymentBtn.textContent = 'Proceed to Payment';
+            paymentBtn.classList.remove('btn-success');
+            paymentBtn.classList.add('btn-payment');
+        }
     }
 }
 
