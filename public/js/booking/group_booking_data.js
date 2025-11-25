@@ -64,8 +64,9 @@ $(document).ready(function () {
                 title: 'TOTAL BALANCE',
                 render: function (data, type, row) {
                     const totalPayment = parseFloat(row.TotalPayment) || 0;
-                    const totalPaid = parseFloat(row.TotalPaid) || 0;
-                    const balance = totalPayment - totalPaid;
+                    const totalPaidRaw = parseFloat(row.TotalPaid) || 0;
+                    const appliedPaid = Math.min(totalPaidRaw, totalPayment);
+                    const balance = Math.max(0, totalPayment - appliedPaid);
                     
                     // Format the balance as currency (matching single booking table)
                     const formattedBalance = balance.toLocaleString('en-US', {
@@ -626,8 +627,8 @@ function viewGroupBilling(groupId) {
             billingTable.empty();
 
             // Use backend-computed totals
-            let totalAmount = parseFloat(data.grandTotal || 0);
-            let totalPaid = parseFloat(data.totalPaid || 0);
+            let totalAmount = Math.max(0, parseFloat(data.grandTotal || 0));
+            let totalPaid = Math.max(0, parseFloat(data.totalPaid || 0));
             let rowNumber = 1;
 
             let allBillingData = [...data.roomBillingDetails, ...data.serviceBillingDetails];
@@ -687,12 +688,12 @@ function viewGroupBilling(groupId) {
             
             // Use backend totals directly
             const finalTotal = totalAmount;
-            const adjustedTotalPaid = totalPaid;
-            let balance = Math.max(0, finalTotal - adjustedTotalPaid);
+            const appliedPaidAmount = Math.min(totalPaid, finalTotal);
+            const balance = Math.max(0, finalTotal - appliedPaidAmount);
             
             // Update display values
             $('#totalAmount').text(finalTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-            $('#totalPaid').text(adjustedTotalPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#totalPaid').text(appliedPaidAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
             $('#balanceAmount').text(balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
             
             // Update reservation fee and discount fields
@@ -733,7 +734,7 @@ function viewGroupBilling(groupId) {
             // Use calculated values or fallback to backend values
             const groupRoomTotal = calculatedRoomTotal > 0 ? calculatedRoomTotal : parseFloat(data.roomTotal || 0);
             const groupServicesTotal = calculatedServicesTotal > 0 ? calculatedServicesTotal : parseFloat(data.servicesTotal || 0);
-            const groupPenaltyTotal = calculatedPenaltyTotal;
+            const groupPenaltyTotal = calculatedPenaltyTotal > 0 ? calculatedPenaltyTotal : parseFloat(data.penaltyTotal || 0) || 0;
             
             $('#totalRoomCharges').text(groupRoomTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
             $('#totalServices').text(groupServicesTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -751,7 +752,7 @@ function viewGroupBilling(groupId) {
             }
 
             // Check if fully paid based on balance (not just PAYMENT_STATUS, since penalty items might have different status)
-            const isFullyPaid = balance <= 0 && adjustedTotalPaid > 0 && finalTotal > 0;
+            const isFullyPaid = balance <= 0 && appliedPaidAmount > 0 && finalTotal > 0;
             const billingType = parseInt(data.billingType || 0); // 1 = Consolidated/Master, 0 = Individual
             const paymentBtn = $('#groupProceedPaymentButton');
             

@@ -96,42 +96,42 @@ class BookingModel {
             END AS PAYMENT_STATUS,
             CASE 
               WHEN b.GROUP_BOOKING_ID IS NOT NULL THEN
-                -- Group balance = Group Grand Total - Actual Payments (room + service)
-                (
-                  -- Group Grand Total
-                  (
-                    SELECT 
-                    COALESCE(SUM(
-                        (bill2.ROOM_CHARGE * (CASE WHEN COALESCE(bill2.CHECKOUT_REFUND,0) > 0 THEN bill2.QTY ELSE COALESCE(bill2.ORIGINAL_QTY, bill2.QTY) END)) + 
-                        COALESCE((
-                          SELECT SUM(bs.TOTAL_COST) 
-                          FROM booking_service bs 
-                          WHERE bs.BOOKING_ID = b2.IDNo AND bs.ACTIVE = 1
-                        ), 0) +
-                        COALESCE((
-                          SELECT SUM(be.COST * be.QTY) 
-                          FROM booking_extension be 
-                          WHERE be.BOOKING_ID = b2.IDNo AND be.ACTIVE = 1
-                        ), 0) +
-                        COALESCE(bill2.CANCELLATION_PENALTY, 0)
-                      ), 0)
-                      - COALESCE(gb.GROUP_DISCOUNT, 0)
-                      - COALESCE(gb.GROUP_RESERVATION_FEE, 0)
-                    FROM booking b2
-                    LEFT JOIN billing bill2 ON b2.IDNo = bill2.BOOKING_ID
-                    LEFT JOIN group_booking gb ON b2.GROUP_BOOKING_ID = gb.IDNo
-                    WHERE b2.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID AND b2.ACTIVE = 1
-                  )
-                  -
-                  -- Actual payments made for the whole group (room + service)
-                  (
-                    SELECT COALESCE(SUM(p.AMOUNT_PAID), 0)
-                    FROM payments p
-                    JOIN booking b3 ON p.BOOKING_ID = b3.IDNo
-                    WHERE b3.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID
-                      AND p.PAYMENT_TYPE IN ('room','service')
-                  )
-                )
+            -- Group balance = max(0, Group Grand Total - Actual Payments (room + service))
+            GREATEST(0,
+              (
+                -- Group Grand Total
+                SELECT 
+                COALESCE(SUM(
+                    (bill2.ROOM_CHARGE * (CASE WHEN COALESCE(bill2.CHECKOUT_REFUND,0) > 0 THEN bill2.QTY ELSE COALESCE(bill2.ORIGINAL_QTY, bill2.QTY) END)) + 
+                    COALESCE((
+                      SELECT SUM(bs.TOTAL_COST) 
+                      FROM booking_service bs 
+                      WHERE bs.BOOKING_ID = b2.IDNo AND bs.ACTIVE = 1
+                    ), 0) +
+                    COALESCE((
+                      SELECT SUM(be.COST * be.QTY) 
+                      FROM booking_extension be 
+                      WHERE be.BOOKING_ID = b2.IDNo AND be.ACTIVE = 1
+                    ), 0) +
+                    COALESCE(bill2.CANCELLATION_PENALTY, 0)
+                  ), 0)
+                  - COALESCE(gb.GROUP_DISCOUNT, 0)
+                  - COALESCE(gb.GROUP_RESERVATION_FEE, 0)
+                FROM booking b2
+                LEFT JOIN billing bill2 ON b2.IDNo = bill2.BOOKING_ID
+                LEFT JOIN group_booking gb ON b2.GROUP_BOOKING_ID = gb.IDNo
+                WHERE b2.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID AND b2.ACTIVE = 1
+              )
+              -
+              (
+                -- Actual payments made for the whole group (room + service)
+                SELECT COALESCE(SUM(p.AMOUNT_PAID), 0)
+                FROM payments p
+                JOIN booking b3 ON p.BOOKING_ID = b3.IDNo
+                WHERE b3.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID
+                  AND p.PAYMENT_TYPE IN ('room','service')
+              )
+            )
               ELSE
                 -- For individual bookings, always calculate balance considering actual payments made
                 -- (regardless of PAYMENT_STATUS to ensure accurate balance)
@@ -3378,7 +3378,8 @@ class BookingModel {
                 SELECT SUM(be.COST * be.QTY) 
                 FROM booking_extension be 
                 WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1
-              ), 0)
+              ), 0) +
+              COALESCE(bill.CANCELLATION_PENALTY, 0)
             ), 0)
             - COALESCE(gb.GROUP_DISCOUNT, 0)
             - COALESCE(gb.GROUP_RESERVATION_FEE, 0)
@@ -4558,7 +4559,8 @@ class BookingModel {
           'Room Charge' AS description,
           bill.ROOM_CHARGE AS charges,
           bill.QTY AS room_qty,
-          bill.PAYMENT_STATUS
+          bill.PAYMENT_STATUS,
+          COALESCE(bill.CANCELLATION_PENALTY, 0) AS PENALTY_AMOUNT
         FROM billing bill
         JOIN booking b ON bill.BOOKING_ID = b.IDNo
         JOIN group_booking gb ON b.GROUP_BOOKING_ID = gb.IDNo  
@@ -4617,7 +4619,26 @@ class BookingModel {
       // Compute totals from items
       const roomTotal = roomResults.reduce((sum, r) => sum + ((parseFloat(r.charges) || 0) * (parseInt(r.room_qty, 10) || 0)), 0);
       const servicesTotal = serviceResults.reduce((sum, s) => sum + ((parseFloat(s.charges) || 0) * (parseInt(s.service_qty, 10) || 0)), 0);
-      const grandTotal = Math.max(0, (roomTotal + servicesTotal) - discount - reservationFee);
+      
+      // Build penalty rows from room results
+      const penaltyRows = [];
+      let penaltyTotal = 0;
+      roomResults.forEach(row => {
+        const penaltyAmount = parseFloat(row.PENALTY_AMOUNT || 0);
+        if (penaltyAmount > 0) {
+          penaltyTotal += penaltyAmount;
+          penaltyRows.push({
+            BOOKING_ID: row.BOOKING_ID,
+            ROOM_NUMBER: row.ROOM_NUMBER,
+            description: 'Penalty',
+            charges: penaltyAmount,
+            service_qty: 1,
+            STATUS: 'penalty'
+          });
+        }
+      });
+      
+      const grandTotal = Math.max(0, (roomTotal + servicesTotal + penaltyTotal) - discount - reservationFee);
 
       // Sum of payments from payments table (room + service only)
       const paidQuery = `
@@ -4635,11 +4656,12 @@ class BookingModel {
         invoiceNumber: invoiceNumber,
         GroupName,
         roomBillingDetails: roomResults,  // Room charges
-        serviceBillingDetails: serviceResults,  // Service charges
+        serviceBillingDetails: [...serviceResults, ...penaltyRows],  // Service charges + penalties
         reservationFee: reservationFee,
         discount: discount,
         roomTotal: roomTotal,
         servicesTotal: servicesTotal,
+        penaltyTotal: penaltyTotal,
         grandTotal: grandTotal,
         totalPaid: totalPaid,
         balance: balance
