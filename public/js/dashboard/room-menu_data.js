@@ -3895,20 +3895,27 @@ function confirmExtension(roomId, checkoutDate, bookingId) {
   }).then((result) => {
     if (result.isConfirmed) {
       // Process the extension with cost
-      processExtension(roomId, checkoutDate, daysToExtend, bookingId, window.selectedExtensionRoomId, totalCost);
+      processExtension(
+        roomId,
+        checkoutDate,
+        daysToExtend,
+        bookingId,
+        window.selectedExtensionRoomId,
+        costPerDay
+      );
     }
   });
 }
 
 // Function to process the extension
-function processExtension(roomId, checkoutDate, daysToExtend, bookingId, newRoomId = null, cost = 0) {
+function processExtension(roomId, checkoutDate, daysToExtend, bookingId, newRoomId = null, costPerDay = 0) {
   const extensionData = {
     roomId: roomId,
     checkoutDate: checkoutDate,
     daysToExtend: parseInt(daysToExtend),
     bookingId: bookingId,
     newRoomId: newRoomId,
-    cost: parseFloat(cost)
+    cost: parseFloat(costPerDay)
   };
   
   fetch('/dashboard/extend-stay', {
