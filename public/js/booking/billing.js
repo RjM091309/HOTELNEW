@@ -174,7 +174,43 @@ window.showBilling = async function (bookingID) {
                 setText('invoiceDate', data.invoiceDate || 'N/A');
                 setText('confNumber', data.confNumber || 'N/A');
 
-                // Display Paid Amount - show actual payments made
+                // Get refund information from billing data
+                const refundAmount = parseFloat(data.refundAmount) || 0;
+                const totalPaidBeforeRefund = parseFloat(data.totalPaidBeforeRefund) || 0;
+                
+                // Display refund information if there's a refund
+                const refundAmountRow = document.getElementById('refundAmountRow');
+                const totalPaidBeforeRefundRow = document.getElementById('totalPaidBeforeRefundRow');
+                const refundAmountElement = document.getElementById('refundAmount');
+                const totalPaidBeforeRefundElement = document.getElementById('totalPaidBeforeRefund');
+                
+                if (refundAmount > 0) {
+                    // Show refund rows
+                    if (refundAmountRow) {
+                        refundAmountRow.style.display = 'flex';
+                    }
+                    if (totalPaidBeforeRefundRow) {
+                        totalPaidBeforeRefundRow.style.display = 'flex';
+                    }
+                    
+                    // Set refund values
+                    if (refundAmountElement) {
+                        refundAmountElement.textContent = refundAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    }
+                    if (totalPaidBeforeRefundElement) {
+                        totalPaidBeforeRefundElement.textContent = totalPaidBeforeRefund.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    }
+                } else {
+                    // Hide refund rows if no refund
+                    if (refundAmountRow) {
+                        refundAmountRow.style.display = 'none';
+                    }
+                    if (totalPaidBeforeRefundRow) {
+                        totalPaidBeforeRefundRow.style.display = 'none';
+                    }
+                }
+                
+                // Display Paid Amount - show actual payments made (after refund)
                 setText('totalPaid', totalPaymentsMade.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
                 setText('balanceAmount', balanceToShow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
                 // GRAND TOTAL should be the subtotal (before discount)
@@ -189,8 +225,8 @@ window.showBilling = async function (bookingID) {
                     const amount = parseFloat(item.subTotal) || 0;
                     const description = (item.description || '').toLowerCase();
                     
-                    // Check if it's a penalty
-                    if (description.includes('penalty')) {
+                    // Check if it's a penalty or cancellation fee
+                    if (description.includes('penalty') || description.includes('cancellation fee')) {
                         totalPenalty += amount;
                     } else if (description.includes('room') || description.includes('bedroom') || description.includes('room charge')) {
                         // Room charges

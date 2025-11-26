@@ -722,7 +722,7 @@ function viewGroupBilling(groupId) {
                 const amount = parseFloat(bill.charges || bill.service_cost || 0) * parseFloat(bill.room_qty || bill.service_qty || 1);
                 const description = (bill.description || '').toLowerCase();
                 
-                if (description.includes('penalty')) {
+                if (description.includes('penalty') || description.includes('cancellation fee')) {
                     calculatedPenaltyTotal += amount;
                 } else if (description.includes('room') || description.includes('bedroom')) {
                     calculatedRoomTotal += amount;

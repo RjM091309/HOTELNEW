@@ -95,7 +95,7 @@
                                             </div>
                                             <div class="note-item" id="totalPenaltyRow" style="display: none;">
                                                 <i class="fa fa-exclamation-triangle"></i>
-                                                <span style="font-size: 1.05rem;">Total Penalty: <strong id="totalPenalty">0.00</strong></span>
+                                                <span style="font-size: 1.05rem;">Cancellation Fee: <strong id="totalPenalty">0.00</strong></span>
                                             </div>
                                             <div class="note-item">
                                                 <i class="fa fa-check-circle"></i>
@@ -111,6 +111,11 @@
                                             </div>
                                             
                                            
+                                            <!-- Total Paid Before Refund (Conditional - only show if there's a refund) -->
+                                            <div class="summary-row" id="totalPaidBeforeRefundRow" style="display: none;">
+                                                <span class="summary-label">Total Paid (Before Cancelled):</span>
+                                                <span class="summary-value paid-before-refund-amount" id="totalPaidBeforeRefund">0.00</span>
+                                            </div>
                                             <div class="summary-row">
                                                 <span class="summary-label">Paid Amount:</span>
                                                 <span class="summary-value paid-amount" id="totalPaid">₹0.00</span>
@@ -124,6 +129,11 @@
                                             <div class="summary-row" id="discountRow">
                                                 <span class="summary-label">Discount Applied:</span>
                                                 <span class="summary-value discount-amount" id="billingDiscountAmount"></span>
+                                            </div>
+                                            <!-- Refund Amount (Conditional - only show if there's a refund) -->
+                                            <div class="summary-row" id="refundAmountRow" style="display: none;">
+                                                <span class="summary-label">Refund Amount:</span>
+                                                <span class="summary-value refund-amount" id="refundAmount">0.00</span>
                                             </div>
                                             <div class="summary-row">
                                                 <span class="summary-label">Balance:</span>
@@ -956,6 +966,15 @@
     color: #27ae60;
 }
 
+.paid-before-refund-amount {
+    color: #3498db;
+}
+
+.refund-amount {
+    color: #e67e22;
+    font-weight: 700;
+}
+
 .balance-amount {
     color: #e74c3c;
 }
@@ -1494,6 +1513,16 @@
     
     .paid-amount {
         color: #006600 !important;
+        font-weight: bold !important;
+    }
+    
+    .paid-before-refund-amount {
+        color: #0066cc !important;
+        font-weight: bold !important;
+    }
+    
+    .refund-amount {
+        color: #cc6600 !important;
         font-weight: bold !important;
     }
     

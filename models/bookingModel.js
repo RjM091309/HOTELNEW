@@ -2313,17 +2313,44 @@ class BookingModel {
       `;
       const paymentsData = await queryDatabasePromise(paymentsQuery, [bookingId]);
       
-      // Calculate total payments made
-      const totalPaymentsMade = paymentsData.reduce((sum, payment) => {
-        return sum + parseFloat(payment.AMOUNT_PAID);
-      }, 0);
-
-      // Calculate room amount and determine status
+      // Calculate room amount and get billing values
       const roomAmount = roomRate * originalQty;
       const reservationFee = parseFloat(b.RESERVATION_FEE) || 0;
       const discountAmount = parseFloat(b.DISCOUNT_AMOUNT) || 0;
       const checkoutRefund = parseFloat(b.CHECKOUT_REFUND) || 0;
       const penaltyAmount = parseFloat(b.PENALTY_AMOUNT) || 0;
+      
+      // Calculate total payments made (includes refunds which are negative)
+      const totalPaymentsMade = paymentsData.reduce((sum, payment) => {
+        return sum + parseFloat(payment.AMOUNT_PAID);
+      }, 0);
+      
+      // Calculate total paid before refund (only positive payments)
+      const totalPaidBeforeRefund = paymentsData.reduce((sum, payment) => {
+        const amount = parseFloat(payment.AMOUNT_PAID) || 0;
+        // Exclude reservation_fee, discount, and refund payments; only count positive amounts
+        if (
+          payment.PAYMENT_TYPE === 'reservation_fee' ||
+          payment.PAYMENT_TYPE === 'discount' ||
+          payment.PAYMENT_TYPE === 'refund'
+        ) {
+          return sum;
+        }
+        return sum + Math.max(0, amount);
+      }, 0);
+      
+      // Calculate refund amount (sum of negative payments or use CHECKOUT_REFUND)
+      const refundAmountFromPayments = paymentsData.reduce((sum, payment) => {
+        const amount = parseFloat(payment.AMOUNT_PAID) || 0;
+        // Only count actual refund entries (negative amount + refund type)
+        if (payment.PAYMENT_TYPE === 'refund' && amount < 0) {
+          return sum + Math.abs(amount);
+        }
+        return sum;
+      }, 0);
+      
+      // Use the larger of checkoutRefund from billing table or calculated refund from payments
+      const refundAmount = Math.max(checkoutRefund, refundAmountFromPayments);
       const netRoomAmount = roomAmount - reservationFee - discountAmount - checkoutRefund;
       
       let roomStatus = 'unpaid';
@@ -2416,7 +2443,7 @@ class BookingModel {
 
       const penaltyItems = penaltyAmount > 0 ? [{
         date: b.CHECK_OUT_DATE || b.CHECK_IN_DATE,
-        description: 'Penalty',
+        description: 'Cancellation Fee',
         basePrice: penaltyAmount,
         qty: 1,
         subTotal: penaltyAmount,
@@ -2441,6 +2468,8 @@ class BookingModel {
         reservationFee: parseFloat(b.RESERVATION_FEE) || 0,
         discountAmount: parseFloat(b.DISCOUNT_AMOUNT) || 0,
         checkoutRefund: checkoutRefund,
+        refundAmount: refundAmount,
+        totalPaidBeforeRefund: totalPaidBeforeRefund,
         penaltyAmount: penaltyAmount,
         discountApplied: b.DISCOUNT_APPLIED === 1 ? 1 : 0
       };
@@ -4630,7 +4659,7 @@ class BookingModel {
           penaltyRows.push({
             BOOKING_ID: row.BOOKING_ID,
             ROOM_NUMBER: row.ROOM_NUMBER,
-            description: 'Penalty',
+            description: 'Cancellation Fee',
             charges: penaltyAmount,
             service_qty: 1,
             STATUS: 'penalty'
@@ -4640,16 +4669,70 @@ class BookingModel {
       
       const grandTotal = Math.max(0, (roomTotal + servicesTotal + penaltyTotal) - discount - reservationFee);
 
-      // Sum of payments from payments table (room + service only)
+      // Get all payments from payments table to calculate refund data
       const paidQuery = `
-        SELECT COALESCE(SUM(p.AMOUNT_PAID), 0) AS paidTotal
+        SELECT p.AMOUNT_PAID, p.PAYMENT_TYPE
         FROM payments p
         JOIN booking b ON p.BOOKING_ID = b.IDNo
         WHERE b.GROUP_BOOKING_ID = ?
-          AND p.PAYMENT_TYPE IN ('room','service')
       `;
-      const [paidRow] = await queryDatabasePromise(paidQuery, [groupId]);
-      const totalPaid = parseFloat(paidRow?.paidTotal || 0);
+      const paymentsData = await queryDatabasePromise(paidQuery, [groupId]);
+      
+      // Calculate total payments made (includes refunds which are negative)
+      const totalPaymentsMade = paymentsData.reduce((sum, payment) => {
+        return sum + parseFloat(payment.AMOUNT_PAID);
+      }, 0);
+      
+      // Calculate total paid before refund (only positive payments, excluding reservation_fee and discount)
+      const totalPaidBeforeRefund = paymentsData.reduce((sum, payment) => {
+        const amount = parseFloat(payment.AMOUNT_PAID) || 0;
+        // Exclude reservation_fee, discount, and refund payments; only count positive amounts
+        if (
+          payment.PAYMENT_TYPE === 'reservation_fee' ||
+          payment.PAYMENT_TYPE === 'discount' ||
+          payment.PAYMENT_TYPE === 'refund'
+        ) {
+          return sum;
+        }
+        return sum + Math.max(0, amount);
+      }, 0);
+      
+      // Calculate refund amount (sum of negative payments or sum of CHECKOUT_REFUND from billing)
+      const refundAmountFromPayments = paymentsData.reduce((sum, payment) => {
+        const amount = parseFloat(payment.AMOUNT_PAID) || 0;
+        // Only count actual refund entries (negative amount + refund type)
+        if (payment.PAYMENT_TYPE === 'refund' && amount < 0) {
+          return sum + Math.abs(amount);
+        }
+        return sum;
+      }, 0);
+      
+      // Get total checkout refund from billing table
+      const checkoutRefundQuery = `
+        SELECT COALESCE(SUM(bi.CHECKOUT_REFUND), 0) AS totalCheckoutRefund
+        FROM billing bi
+        JOIN booking b ON bi.BOOKING_ID = b.IDNo
+        WHERE b.GROUP_BOOKING_ID = ? AND bi.ACTIVE = 1
+      `;
+      const [refundRow] = await queryDatabasePromise(checkoutRefundQuery, [groupId]);
+      const totalCheckoutRefund = parseFloat(refundRow?.totalCheckoutRefund || 0);
+      
+      // Use the larger of checkoutRefund from billing table or calculated refund from payments
+      const refundAmount = Math.max(totalCheckoutRefund, refundAmountFromPayments);
+      
+      // Calculate total paid (only room and service payments, excluding refunds)
+      const totalPaid = paymentsData.reduce((sum, payment) => {
+        const amount = parseFloat(payment.AMOUNT_PAID) || 0;
+        // Only count room and service payments, exclude refunds (negative), reservation_fee, and discount
+        if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount' || amount < 0) {
+          return sum;
+        }
+        if (payment.PAYMENT_TYPE === 'room' || payment.PAYMENT_TYPE === 'service') {
+          return sum + amount;
+        }
+        return sum;
+      }, 0);
+      
       const balance = Math.max(0, grandTotal - totalPaid);
 
       return {
@@ -4664,6 +4747,8 @@ class BookingModel {
         penaltyTotal: penaltyTotal,
         grandTotal: grandTotal,
         totalPaid: totalPaid,
+        totalPaidBeforeRefund: totalPaidBeforeRefund,
+        refundAmount: refundAmount,
         balance: balance
       };
 
