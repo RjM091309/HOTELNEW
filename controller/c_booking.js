@@ -329,7 +329,7 @@ class BookingController {
   // New: Checkout endpoint (supports individual or group scope)
   static async checkoutBookings(req, res) {
     try {
-      const { bookingId, scope = 'individual', hasRefund = false, refundAmount = 0, penaltyAmount = 0 } = req.body;
+      const { bookingId, scope = 'individual', hasRefund = false, refundAmount = 0, penaltyAmount = 0, applyDiscount = false } = req.body;
       const encodedBy = req.user?.userId;
 
       if (!bookingId) {
@@ -350,7 +350,8 @@ class BookingController {
         encodedBy,
         refundBookingId: bookingId,
         refundAmount: hasRefund ? parseFloat(refundAmount) || 0 : 0,
-        penaltyAmount: parseFloat(penaltyAmount) || 0
+        penaltyAmount: parseFloat(penaltyAmount) || 0,
+        applyDiscount: applyDiscount === true || applyDiscount === 'true'
       });
       
       // Emit Socket.IO event for calendar real-time updates

@@ -1976,6 +1976,100 @@ function showBilling(bookingId) {
     console.error('Global showBilling is not available');
 }
 
+// Helper function to compute checkout context (financial details)
+async function computeCheckoutContext(bookingId) {
+    try {
+        const [paymentsResponse, billingResponse, bookingResponse] = await Promise.all([
+            fetch(`/payments/get-payments/${bookingId}?_=${Date.now()}`),
+            fetch(`/booking/get-billing/${bookingId}?_=${Date.now()}`),
+            fetch(`/booking/booking_details/${bookingId}?_=${Date.now()}`)
+        ]);
+        
+        const paymentsData = await paymentsResponse.json();
+        const billingData = await billingResponse.json();
+        const bookingData = await bookingResponse.json();
+        
+        const paymentsArray = (paymentsData && paymentsData.data) ? paymentsData.data : (Array.isArray(paymentsData) ? paymentsData : []);
+        const totalPaid = (paymentsArray && Array.isArray(paymentsArray)) ? paymentsArray.reduce((sum, payment) => {
+            if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
+                return sum;
+            }
+            return sum + parseFloat(payment.AMOUNT_PAID);
+        }, 0) : 0;
+        
+        const reservationFee = parseFloat(billingData.reservationFee) || 0;
+        const discountAmount = parseFloat(billingData.discountAmount) || 0;
+        
+        let roomRate = 0;
+        let originalQty = 1;
+        if (billingData.items && billingData.items.length > 0) {
+            const roomItem = billingData.items[0];
+            roomRate = parseFloat(roomItem.basePrice) || 0;
+            originalQty = parseFloat(roomItem.qty) || 1;
+        }
+        
+        let servicesAndExtensionsTotal = 0;
+        if (billingData.items && billingData.items.length > 1) {
+            for (let i = 1; i < billingData.items.length; i++) {
+                const desc = (billingData.items[i].description || '').toLowerCase();
+                if (desc.includes('penalty')) {
+                    continue;
+                }
+                servicesAndExtensionsTotal += parseFloat(billingData.items[i].subTotal) || 0;
+            }
+        }
+        
+        let actualDays = 1;
+        if (bookingData && bookingData.CHECK_IN_DATE) {
+            const checkInDate = new Date(bookingData.CHECK_IN_DATE);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            checkInDate.setHours(0, 0, 0, 0);
+            const diffTime = today - checkInDate;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            actualDays = Math.max(1, diffDays);
+        }
+        actualDays = Math.min(actualDays, originalQty);
+        
+        // Calculate original Grand Total (before early checkout adjustment)
+        const originalRoomAmount = roomRate * originalQty;
+        const originalGrossTotal = originalRoomAmount + servicesAndExtensionsTotal;
+        const originalGrandTotal = originalGrossTotal - reservationFee - discountAmount;
+        
+        // Calculate adjusted amounts for actual days stayed (early checkout)
+        // For early checkout, Net Balance = Room Rate × Actual Days + Services - Reservation Fee
+        // Discount is NOT applied to early checkout (it was for the original booking period)
+        const roomAmountForActualDays = roomRate * actualDays;
+        const grossTotal = roomAmountForActualDays + servicesAndExtensionsTotal;
+        // Net Balance for early checkout: only subtract reservation fee, NOT discount
+        const netBalance = grossTotal - reservationFee;
+        
+        // Overpayment should be based on what they actually owe (netBalance after early checkout adjustment)
+        // If they paid more than what they owe after adjustment, that's the overpayment
+        const overpayment = Math.max(0, totalPaid - netBalance);
+        
+        return {
+            totalPaid,
+            reservationFee,
+            discountAmount,
+            roomRate,
+            originalQty,
+            actualDays,
+            servicesAndExtensionsTotal,
+            roomAmountForActualDays,
+            grossTotal,
+            netBalance,
+            overpayment,
+            originalRoomAmount,
+            originalGrossTotal,
+            originalGrandTotal
+        };
+    } catch (error) {
+        console.error('Error computing checkout context:', error);
+        return null;
+    }
+}
+
 // Trigger checkout: use SweetAlert with a refund checkbox and amount input
 function triggerCheckout(bookingId) {
     // Try to show current balance, grand total, and paid in the prompt
@@ -2047,7 +2141,7 @@ function triggerCheckout(bookingId) {
     // Check if booking belongs to a group to offer scope options
     fetch(`/payments/group-breakdown/${bookingId}`, { method: 'GET', headers: { 'Content-Type': 'application/json' } })
         .then(r => r.ok ? r.json() : null)
-        .then(groupData => {
+        .then(async (groupData) => {
             const isGroupBooking = !!(groupData && groupData.success && groupData.isGroup);
             const groupHtml = isGroupBooking ? `
                 <div style="text-align:left; margin-top:10px;">
@@ -2063,6 +2157,62 @@ function triggerCheckout(bookingId) {
                 </div>
             ` : '';
 
+            // Compute checkout context upfront to display details
+            const checkoutContext = await computeCheckoutContext(bookingId);
+            
+            // Format amounts for display
+            const formatCurrency = (amount) => {
+                return `₱${parseFloat(amount || 0).toFixed(2)}`;
+            };
+
+            // Build details HTML
+            let detailsHtml = '';
+            let discountOptionHtml = '';
+            if (checkoutContext) {
+                const { totalPaid, netBalance, overpayment, actualDays, roomRate, roomAmountForActualDays, servicesAndExtensionsTotal, grossTotal, reservationFee, discountAmount, originalQty } = checkoutContext;
+                
+                // Check if it's early checkout and has discount
+                const isEarlyCheckout = actualDays < originalQty;
+                const hasDiscount = discountAmount > 0;
+                
+                // Add discount option checkbox if early checkout and has discount
+                // By default, checkbox is UNCHECKED (discount NOT applied to early checkout)
+                if (isEarlyCheckout && hasDiscount) {
+                    discountOptionHtml = `
+                        <div class="form-check choice-row" style="text-align:left; margin-top:10px;">
+                            <input class="form-check-input" type="checkbox" value="" id="applyDiscountChk">
+                            <label class="form-check-label" for="applyDiscountChk">Apply discount to early checkout</label>
+                        </div>
+                    `;
+                }
+                
+                // Calculate initial Net Balance WITHOUT discount (since checkbox is unchecked by default)
+                const initialNetBalance = grossTotal - reservationFee;
+                const initialOverpayment = Math.max(0, totalPaid - initialNetBalance);
+                
+                detailsHtml = `
+                    <div id="checkoutDetailsSection" style="margin-top:15px; padding:12px; background:#f8f9fa; border-radius:6px; border:1px solid #dee2e6;">
+                        <div style="font-weight:600; color:#495057; margin-bottom:10px; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px;">Checkout Details</div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.875rem;">
+                            <div><span style="color:#6c757d;">Actual Days:</span> <strong>${actualDays}</strong></div>
+                            <div><span style="color:#6c757d;">Room Rate/Day:</span> <strong>${formatCurrency(roomRate)}</strong></div>
+                            <div><span style="color:#6c757d;">Room Amount:</span> <strong>${formatCurrency(roomAmountForActualDays)}</strong></div>
+                            <div><span style="color:#6c757d;">Services:</span> <strong>${formatCurrency(servicesAndExtensionsTotal)}</strong></div>
+                            <div><span style="color:#6c757d;">Discount:</span> <strong id="discountDisplay">${formatCurrency(0)}</strong></div>
+                                <div><span style="color:#6c757d;">Adjusted Total:</span> <strong style="color:#0d6efd;" id="netBalanceDisplay">${formatCurrency(initialNetBalance)}</strong></div>
+                            <div><span style="color:#6c757d;">Overpayment:</span> <strong style="color:${initialOverpayment > 0 ? '#dc3545' : '#6c757d'}" id="overpaymentDisplay">${formatCurrency(initialOverpayment)}</strong></div>
+                        </div>
+                        <div id="overpaymentWarning" style="${initialOverpayment > 0 ? 'display:block' : 'display:none'}; margin-top:10px; padding:8px; background:#fff3cd; border-left:3px solid #ffc107; border-radius:4px; font-size:0.85rem;">
+                            <strong style="color:#856404;">⚠️ Overpayment Detected</strong>
+                            <div style="margin-top:4px; color:#856404;" id="overpaymentWarningText">
+                                Guest paid ${formatCurrency(totalPaid)} but only owes ${formatCurrency(initialNetBalance)}. 
+                                Overpayment of ${formatCurrency(initialOverpayment)} will be applied as penalty unless refund is selected.
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
             Swal.fire({
                 iconHtml: '<i class="fas fa-clipboard-check" style="color:#0d6efd;"></i>',
                 title: 'Confirm Checkout',
@@ -2076,7 +2226,9 @@ function triggerCheckout(bookingId) {
                             ${balanceText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Balance</span><span class=\"balance-pill balance-pill-red\">${balanceText}</span></div>` : ''}
                         </div>
                     </div>
+                    ${detailsHtml}
                     ${groupHtml}
+                    ${discountOptionHtml}
                     <div class=\"form-check choice-row\" style=\"text-align:left;\">
                         <input class=\"form-check-input\" type=\"checkbox\" value=\"\" id=\"withRefundChk\">
                         <label class=\"form-check-label\" for=\"withRefundChk\">With refund</label>
@@ -2085,6 +2237,11 @@ function triggerCheckout(bookingId) {
                         <label for=\"refundAmountInput\" class=\"form-label\" style=\"margin-bottom:4px;\">Refund Amount</label>
                         <input type=\"number\" min=\"0\" step=\"0.01\" id=\"refundAmountInput\" class=\"swal2-input\" placeholder=\"0.00\" style=\"width:100%; box-sizing:border-box; margin:0;\">
                         <small class=\"text-muted\" style=\"display:block; margin-top:6px;\">Enter the exact refund to give to the guest.</small>
+                    </div>
+                    <div id=\"cancellationFeeWrap\" style=\"margin-top:10px; text-align:left;\">
+                        <label for=\"cancellationFeeInput\" class=\"form-label\" style=\"margin-bottom:4px;\">Cancellation Fee</label>
+                        <input type=\"number\" min=\"0\" step=\"0.01\" id=\"cancellationFeeInput\" class=\"swal2-input\" placeholder=\"0.00\" style=\"width:100%; box-sizing:border-box; margin:0;\">
+                        <small id=\"cancellationFeeHelp\" class=\"text-muted\" style=\"display:block; margin-top:6px; display:none;\">Enter the exact cancellation fee.</small>
                     </div>
                     <style>
                         .swal2-actions {
@@ -2120,131 +2277,752 @@ function triggerCheckout(bookingId) {
                 },
                 focusConfirm: false,
                 didOpen: async () => {
+                    // Store checkout context in modal for use in preConfirm
+                    let checkoutContextCache = checkoutContext;
+                    
+                    // If context wasn't computed yet, compute it now
+                    if (!checkoutContextCache) {
+                        checkoutContextCache = await computeCheckoutContext(bookingId);
+                    }
+                    
+                    // Update details section if it exists and context is available
+                    const detailsSection = document.getElementById('checkoutDetailsSection');
+                    if (detailsSection && checkoutContextCache) {
+                        const { totalPaid, netBalance, overpayment, actualDays, roomRate, roomAmountForActualDays, servicesAndExtensionsTotal, grossTotal, reservationFee, discountAmount, originalQty } = checkoutContextCache;
+                        const formatCurrency = (amount) => `₱${parseFloat(amount || 0).toFixed(2)}`;
+                        
+                        // Calculate initial Net Balance WITHOUT discount (checkbox unchecked by default)
+                        const initialNetBalance = grossTotal - reservationFee;
+                        const initialOverpayment = Math.max(0, totalPaid - initialNetBalance);
+                        
+                        // Function to update Net Balance and Overpayment based on discount checkbox
+                        const updateCheckoutDetails = () => {
+                            const applyDiscountChk = document.getElementById('applyDiscountChk');
+                            const applyDiscount = applyDiscountChk ? applyDiscountChk.checked : false;
+                            
+                            // Calculate net balance: with or without discount
+                            const calculatedNetBalance = grossTotal - reservationFee - (applyDiscount ? discountAmount : 0);
+                            const calculatedOverpayment = Math.max(0, totalPaid - calculatedNetBalance);
+                            
+                            // Update display
+                            const discountDisplay = document.getElementById('discountDisplay');
+                            const netBalanceDisplay = document.getElementById('netBalanceDisplay');
+                            const overpaymentDisplay = document.getElementById('overpaymentDisplay');
+                            const overpaymentWarning = document.getElementById('overpaymentWarning');
+                            const overpaymentWarningText = document.getElementById('overpaymentWarningText');
+                            
+                            if (discountDisplay) {
+                                discountDisplay.textContent = formatCurrency(applyDiscount ? discountAmount : 0);
+                            }
+                            if (netBalanceDisplay) {
+                                netBalanceDisplay.textContent = formatCurrency(calculatedNetBalance);
+                            }
+                            if (overpaymentDisplay) {
+                                overpaymentDisplay.textContent = formatCurrency(calculatedOverpayment);
+                                overpaymentDisplay.style.color = calculatedOverpayment > 0 ? '#dc3545' : '#6c757d';
+                            }
+                            if (overpaymentWarning) {
+                                if (calculatedOverpayment > 0) {
+                                    overpaymentWarning.style.display = 'block';
+                                    if (overpaymentWarningText) {
+                                        overpaymentWarningText.innerHTML = `
+                                            Guest paid ${formatCurrency(totalPaid)} but only owes ${formatCurrency(calculatedNetBalance)}. 
+                                            Overpayment of ${formatCurrency(calculatedOverpayment)} will be applied as penalty unless refund is selected.
+                                        `;
+                                    }
+                                } else {
+                                    overpaymentWarning.style.display = 'none';
+                                }
+                            }
+                            
+                            // Store updated values for preConfirm
+                            window._updatedNetBalance = calculatedNetBalance;
+                            window._updatedOverpayment = calculatedOverpayment;
+                            window._applyDiscount = applyDiscount;
+                        };
+                        
+                        detailsSection.innerHTML = `
+                            <div style="font-weight:600; color:#495057; margin-bottom:10px; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px;">Checkout Details</div>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.875rem;">
+                                <div><span style="color:#6c757d;">Actual Days:</span> <strong>${actualDays}</strong></div>
+                                <div><span style="color:#6c757d;">Room Rate/Day:</span> <strong>${formatCurrency(roomRate)}</strong></div>
+                                <div><span style="color:#6c757d;">Room Amount:</span> <strong>${formatCurrency(roomAmountForActualDays)}</strong></div>
+                                <div><span style="color:#6c757d;">Services:</span> <strong>${formatCurrency(servicesAndExtensionsTotal)}</strong></div>
+                                <div><span style="color:#6c757d;">Discount:</span> <strong id="discountDisplay">${formatCurrency(0)}</strong></div>
+                                <div><span style="color:#6c757d;">Adjusted Total:</span> <strong style="color:#0d6efd;" id="netBalanceDisplay">${formatCurrency(initialNetBalance)}</strong></div>
+                                <div><span style="color:#6c757d;">Overpayment:</span> <strong style="color:${initialOverpayment > 0 ? '#dc3545' : '#6c757d'}" id="overpaymentDisplay">${formatCurrency(initialOverpayment)}</strong></div>
+                            </div>
+                            <div id="overpaymentWarning" style="${initialOverpayment > 0 ? 'display:block' : 'display:none'}; margin-top:10px; padding:8px; background:#fff3cd; border-left:3px solid #ffc107; border-radius:4px; font-size:0.85rem;">
+                                <strong style="color:#856404;">⚠️ Overpayment Detected</strong>
+                                <div style="margin-top:4px; color:#856404;" id="overpaymentWarningText">
+                                    Guest paid ${formatCurrency(totalPaid)} but only owes ${formatCurrency(initialNetBalance)}. 
+                                    Overpayment of ${formatCurrency(initialOverpayment)} will be applied as penalty unless refund is selected.
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Add event listener for discount checkbox if it exists
+                        const applyDiscountChk = document.getElementById('applyDiscountChk');
+                        if (applyDiscountChk) {
+                            applyDiscountChk.addEventListener('change', updateCheckoutDetails);
+                            // Initialize with default (unchecked = discount NOT applied)
+                            window._applyDiscount = false;
+                            window._updatedNetBalance = initialNetBalance;
+                            window._updatedOverpayment = initialOverpayment;
+                        } else {
+                            // No discount option, use original values
+                            window._applyDiscount = false;
+                            window._updatedNetBalance = initialNetBalance;
+                            window._updatedOverpayment = initialOverpayment;
+                        }
+                    }
+                    
+                    const formatInputNumber = (value) => {
+                        if (value === '' || value === null || value === undefined) return '';
+                        const num = parseFloat(value);
+                        if (Number.isNaN(num)) return '';
+                        return Number.isInteger(num) ? num.toString() : num.toFixed(2);
+                    };
+
                     const chk = document.getElementById('withRefundChk');
                     const wrap = document.getElementById('refundAmtWrap');
                     const input = document.getElementById('refundAmountInput');
-                    if (chk && wrap) {
-                        // Check if payments exist for this booking
-                        try {
-                            const paymentsResponse = await fetch(`/payments/get-payments/${bookingId}?_=${Date.now()}`);
-                            const paymentsData = await paymentsResponse.json();
-                            const paymentsArray = (paymentsData && paymentsData.data) ? paymentsData.data : (Array.isArray(paymentsData) ? paymentsData : []);
-                            
-                            // Calculate total paid (exclude reservation_fee and discount)
-                            const totalPaid = (paymentsArray && Array.isArray(paymentsArray)) ? paymentsArray.reduce((sum, payment) => {
-                                if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
-                                    return sum;
-                                }
-                                return sum + parseFloat(payment.AMOUNT_PAID);
-                            }, 0) : 0;
-                            
-                            // Disable checkbox if no payments were made
-                            if (totalPaid <= 0) {
-                                chk.disabled = true;
-                                chk.checked = false;
-                                wrap.style.display = 'none';
+                    const cancellationFeeInput = document.getElementById('cancellationFeeInput');
+                    
+                    const getCurrentOverpaymentPrimary = () => {
+                        return window._updatedOverpayment !== undefined
+                            ? window._updatedOverpayment
+                            : (checkoutContextCache
+                                ? (checkoutContextCache.grossTotal - checkoutContextCache.reservationFee < checkoutContextCache.totalPaid
+                                    ? checkoutContextCache.totalPaid - (checkoutContextCache.grossTotal - checkoutContextCache.reservationFee)
+                                    : 0)
+                                : 0);
+                    };
+                    
+                    let syncingFromRefundPrimary = false;
+                    let syncingFromCancellationPrimary = false;
+
+                    const syncCancellationFeePrimary = () => {
+                        if (!cancellationFeeInput) return;
+                        const currentOverpayment = getCurrentOverpaymentPrimary();
+                        if (chk && chk.checked) {
+                            const refundVal = parseFloat(input && input.value ? input.value : '0') || 0;
+                            const calc = Math.max(0, currentOverpayment - refundVal);
+                            if (!syncingFromCancellationPrimary) {
+                                cancellationFeeInput.value = formatInputNumber(calc);
                             }
-                        } catch (error) {
-                            console.error('Error fetching payments:', error);
-                            // If fetch fails, disable checkbox as a safety measure
+                        } else {
+                            cancellationFeeInput.value = formatInputNumber(currentOverpayment);
+                        }
+                    };
+                    // const setCancellationFeeReadOnlyPrimary = () => {
+                    //     if (!cancellationFeeInput) return;
+                    //     cancellationFeeInput.readOnly = !(chk && chk.checked);
+                    //     const help = document.getElementById('cancellationFeeHelp');
+                    //     if (help) {
+                    //         help.style.display = chk && chk.checked ? 'block' : 'none';
+                    //     }
+                    // };
+                    if (chk && wrap) {
+                        // Use computed context if available, otherwise fetch
+                        let totalPaid = 0;
+                        if (checkoutContextCache) {
+                            totalPaid = checkoutContextCache.totalPaid;
+                        } else {
+                            try {
+                                const paymentsResponse = await fetch(`/payments/get-payments/${bookingId}?_=${Date.now()}`);
+                                const paymentsData = await paymentsResponse.json();
+                                const paymentsArray = (paymentsData && paymentsData.data) ? paymentsData.data : (Array.isArray(paymentsData) ? paymentsData : []);
+                                
+                                totalPaid = (paymentsArray && Array.isArray(paymentsArray)) ? paymentsArray.reduce((sum, payment) => {
+                                    if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
+                                        return sum;
+                                    }
+                                    return sum + parseFloat(payment.AMOUNT_PAID);
+                                }, 0) : 0;
+                            } catch (error) {
+                                console.error('Error fetching payments:', error);
+                            }
+                        }
+                        
+                        // Disable checkbox if no payments were made
+                        if (totalPaid <= 0) {
                             chk.disabled = true;
                             chk.checked = false;
                             wrap.style.display = 'none';
                         }
                         
+                        // Set max refund amount if overpayment exists - use updated overpayment if available
+                        const currentOverpayment = getCurrentOverpaymentPrimary();
+                        if (input && currentOverpayment > 0) {
+                            input.setAttribute('max', currentOverpayment);
+                            const formatCurrency = (amount) => `₱${parseFloat(amount || 0).toFixed(2)}`;
+                            input.setAttribute('placeholder', `Max: ${formatCurrency(currentOverpayment)}`);
+                        }
+                        
                         chk.addEventListener('change', () => {
                             if (!chk.disabled) {
                                 wrap.style.display = chk.checked ? 'block' : 'none';
-                                if (chk.checked && input) setTimeout(() => input.focus(), 0);
+                                if (chk.checked && input) {
+                                    setTimeout(() => input.focus(), 0);
+                                    // Pre-fill with overpayment amount if available - use updated overpayment
+                                    const currentOverpayment = getCurrentOverpaymentPrimary();
+                                    if (currentOverpayment > 0) {
+                                        input.value = formatInputNumber(currentOverpayment);
+                                        input.setAttribute('max', currentOverpayment);
+                                    }
+                                }
+                                syncCancellationFeePrimary();
+                                // setCancellationFeeReadOnlyPrimary();
                             }
                         });
+                        
+                        if (input && cancellationFeeInput) {
+                            input.addEventListener('input', () => {
+                                if (syncingFromCancellationPrimary) return;
+                                const refundVal = parseFloat(input.value || '');
+                                if (!isNaN(refundVal) && refundVal >= 0) {
+                                    syncingFromRefundPrimary = true;
+                                    syncCancellationFeePrimary();
+                                    syncingFromRefundPrimary = false;
+                                }
+                            });
+
+                            cancellationFeeInput.addEventListener('input', () => {
+                                if (syncingFromRefundPrimary) return;
+                                const feeVal = parseFloat(cancellationFeeInput.value || '');
+                                if (!isNaN(feeVal) && feeVal >= 0) {
+                                    const currentOverpayment = getCurrentOverpaymentPrimary();
+                                    const newRefundValue = Math.max(0, currentOverpayment - feeVal);
+                                    syncingFromCancellationPrimary = true;
+                                    input.value = formatInputNumber(newRefundValue);
+                                    syncingFromCancellationPrimary = false;
+                                    syncCancellationFeePrimary();
+                                }
+                            });
+                        }
+                        
+                        // Also update refund input when discount checkbox changes
+                        const applyDiscountChk = document.getElementById('applyDiscountChk');
+                        if (applyDiscountChk && input) {
+                            applyDiscountChk.addEventListener('change', () => {
+                                const currentOverpayment = getCurrentOverpaymentPrimary();
+                                if (currentOverpayment > 0) {
+                                    input.setAttribute('max', currentOverpayment);
+                                    const formatCurrency = (amount) => `₱${parseFloat(amount || 0).toFixed(2)}`;
+                                    input.setAttribute('placeholder', `Max: ${formatCurrency(currentOverpayment)}`);
+                                    // Update value if refund checkbox is checked
+                                    if (chk && chk.checked) {
+                                        input.value = formatInputNumber(currentOverpayment);
+                                    }
+                                }
+                                syncCancellationFeePrimary();
+                                // setCancellationFeeReadOnlyPrimary();
+                            });
+                        }
                     }
+                    
+                    // Pre-fill cancellation fee input with overpayment amount (or zero when fully refunded)
+                    syncCancellationFeePrimary();
+                    // setCancellationFeeReadOnlyPrimary();
+                    
+                    // Store context for preConfirm
+                    window._checkoutContextCache = checkoutContextCache;
                 },
                 preConfirm: async () => {
                     const chk = document.getElementById('withRefundChk');
                     const input = document.getElementById('refundAmountInput');
+                    const cancellationFeeInput = document.getElementById('cancellationFeeInput');
                     const hasRefund = !!(chk && chk.checked);
                     let amount = 0;
                     let penaltyAmount = 0;
                     let computedOverpayment = 0;
                     
-                    // Helper to compute financial context for this checkout
-                    let checkoutContextCache = null;
+                    // Use cached context from didOpen, or compute if not available
+                    let checkoutContextCache = window._checkoutContextCache;
                     const ensureCheckoutContext = async () => {
                         if (checkoutContextCache) return checkoutContextCache;
-                        try {
-                            const [paymentsResponse, billingResponse, bookingResponse] = await Promise.all([
-                                fetch(`/payments/get-payments/${bookingId}?_=${Date.now()}`),
-                                fetch(`/booking/get-billing/${bookingId}?_=${Date.now()}`),
-                                fetch(`/booking/booking_details/${bookingId}?_=${Date.now()}`)
-                            ]);
-                            
-                            const paymentsData = await paymentsResponse.json();
-                            const billingData = await billingResponse.json();
-                            const bookingData = await bookingResponse.json();
-                            
-                            const paymentsArray = (paymentsData && paymentsData.data) ? paymentsData.data : (Array.isArray(paymentsData) ? paymentsData : []);
-                            const totalPaid = (paymentsArray && Array.isArray(paymentsArray)) ? paymentsArray.reduce((sum, payment) => {
-                                if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
-                                    return sum;
-                                }
-                                return sum + parseFloat(payment.AMOUNT_PAID);
-                            }, 0) : 0;
-                            
-                            const reservationFee = parseFloat(billingData.reservationFee) || 0;
-                            const discountAmount = parseFloat(billingData.discountAmount) || 0;
-                            
-                            let roomRate = 0;
-                            let originalQty = 1;
-                            if (billingData.items && billingData.items.length > 0) {
-                                const roomItem = billingData.items[0];
-                                roomRate = parseFloat(roomItem.basePrice) || 0;
-                                originalQty = parseFloat(roomItem.qty) || 1;
-                            }
-                            
-                            let servicesAndExtensionsTotal = 0;
-                            if (billingData.items && billingData.items.length > 1) {
-                                for (let i = 1; i < billingData.items.length; i++) {
-                                    const desc = (billingData.items[i].description || '').toLowerCase();
-                                    if (desc.includes('penalty')) {
-                                        continue;
-                                    }
-                                    servicesAndExtensionsTotal += parseFloat(billingData.items[i].subTotal) || 0;
-                                }
-                            }
-                            
-                            let actualDays = 1;
-                            if (bookingData && bookingData.CHECK_IN_DATE) {
-                                const checkInDate = new Date(bookingData.CHECK_IN_DATE);
-                                const today = new Date();
-                                today.setHours(0, 0, 0, 0);
-                                checkInDate.setHours(0, 0, 0, 0);
-                                const diffTime = today - checkInDate;
-                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                                actualDays = Math.max(1, diffDays);
-                            }
-                            actualDays = Math.min(actualDays, originalQty);
-                            
-                            const roomAmountForActualDays = roomRate * actualDays;
-                            const grossTotal = roomAmountForActualDays + servicesAndExtensionsTotal;
-                            const netBalance = grossTotal - reservationFee - discountAmount;
-                            const overpayment = Math.max(0, totalPaid - netBalance);
-                            
-                            checkoutContextCache = {
-                                totalPaid,
-                                reservationFee,
-                                discountAmount,
-                                roomRate,
-                                actualDays,
-                                grossTotal,
-                                netBalance,
-                                overpayment
-                            };
-                            return checkoutContextCache;
-                        } catch (error) {
-                            console.error('Error computing checkout context:', error);
-                            throw error;
+                        // Fallback: compute if cache not available
+                        checkoutContextCache = await computeCheckoutContext(bookingId);
+                        return checkoutContextCache;
+                    };
+                    
+                    // Use updated net balance and overpayment if available (from discount checkbox)
+                    const finalNetBalance = window._updatedNetBalance !== undefined ? window._updatedNetBalance : (checkoutContextCache ? (checkoutContextCache.grossTotal - checkoutContextCache.reservationFee) : 0);
+                    const finalOverpayment = window._updatedOverpayment !== undefined ? window._updatedOverpayment : (checkoutContextCache ? Math.max(0, checkoutContextCache.totalPaid - finalNetBalance) : 0);
+                    
+                    if (hasRefund) {
+                        amount = parseFloat(input && input.value ? input.value : '');
+                        if (isNaN(amount) || amount < 0) {
+                            Swal.showValidationMessage('Please enter a valid refund amount.');
+                            return false;
                         }
+                        if (amount === 0) {
+                            Swal.showValidationMessage('Please enter a refund amount greater than 0.');
+                            return false;
+                        }
+                        
+                        try {
+                            const context = await ensureCheckoutContext();
+                            if (!context) {
+                                Swal.showValidationMessage('Unable to verify payment amount. Please try again.');
+                                return false;
+                            }
+                            const { totalPaid } = context;
+                            
+                            if (amount > totalPaid) {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'Refund Amount Exceeds Paid Amount',
+                                    html: `
+                                        <p>The refund amount (₱${amount.toFixed(2)}) exceeds the total paid amount (₱${totalPaid.toFixed(2)}).</p>
+                                        <p><strong>You cannot refund more than what was paid.</strong></p>
+                                    `,
+                                    confirmButtonText: 'OK',
+                                    confirmButtonColor: '#0d6efd'
+                                });
+                                return false;
+                            }
+                            
+                            if (amount > finalOverpayment) {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'Refund Amount Exceeds Overpayment',
+                                    html: `
+                                        <p>The refund amount (₱${amount.toFixed(2)}) exceeds the overpayment amount (₱${finalOverpayment.toFixed(2)}).</p>
+                                        <p><strong>You cannot refund more than the overpayment (paid amount minus net amount due).</strong></p>
+                                        <p style="margin-top:8px; font-size:0.9em; color:#6c757d;">
+                                            Net Amount Due: ₱${finalNetBalance.toFixed(2)}<br>
+                                            Total Paid: ₱${totalPaid.toFixed(2)}<br>
+                                            Maximum Refund: ₱${finalOverpayment.toFixed(2)}
+                                        </p>
+                                    `,
+                                    confirmButtonText: 'OK',
+                                    confirmButtonColor: '#0d6efd'
+                                });
+                                return false;
+                            }
+                            
+                            computedOverpayment = finalOverpayment;
+                            penaltyAmount = Math.max(0, finalOverpayment - amount);
+                        } catch (error) {
+                            Swal.showValidationMessage('Unable to verify payment amount. Please try again.');
+                            return false;
+                        }
+                    } else {
+                        computedOverpayment = finalOverpayment;
+                        if (computedOverpayment > 0) {
+                            penaltyAmount = computedOverpayment;
+                        }
+                    }
+                    let scope = 'individual';
+                    const sel = document.querySelector('input[name="checkoutScope"]:checked');
+                    if (sel && (sel.value === 'group' || sel.value === 'individual')) scope = sel.value;
+                    
+                    // Get cancellation fee from input field (manual entry)
+                    let cancellationFee = 0;
+                    if (cancellationFeeInput && cancellationFeeInput.value) {
+                        cancellationFee = parseFloat(cancellationFeeInput.value) || 0;
+                        if (cancellationFee < 0) {
+                            Swal.showValidationMessage('Cancellation fee cannot be negative.');
+                            return false;
+                        }
+                    } else {
+                        // If no input, use calculated penaltyAmount as default
+                        if (!hasRefund && computedOverpayment > 0) {
+                            cancellationFee = computedOverpayment;
+                        } else if (hasRefund) {
+                            cancellationFee = Math.max(0, finalOverpayment - amount);
+                        }
+                    }
+                    
+                    // Get applyDiscount flag (whether to apply discount to early checkout)
+                    const applyDiscount = window._applyDiscount !== undefined ? window._applyDiscount : false;
+                    return { hasRefund, amount, scope, penaltyAmount: cancellationFee, applyDiscount };
+                }
+            }).then((result) => {
+                if (result.isConfirmed && result.value) {
+                    startCheckoutProcess(
+                        bookingId,
+                        result.value.hasRefund,
+                        result.value.amount || 0,
+                        result.value.scope || 'individual',
+                        result.value.penaltyAmount || 0,
+                        result.value.applyDiscount || false
+                    );
+                }
+            });
+        })
+        .catch(async () => {
+            // If group check fails, proceed with individual checkout only
+            const groupHtml = '';
+            
+            // Compute checkout context upfront to display details
+            const checkoutContext = await computeCheckoutContext(bookingId);
+            
+            // Format amounts for display
+            const formatCurrency = (amount) => {
+                return `₱${parseFloat(amount || 0).toFixed(2)}`;
+            };
+
+            // Build details HTML
+            let detailsHtml = '';
+            if (checkoutContext) {
+                const { totalPaid, netBalance, overpayment, actualDays, roomRate, roomAmountForActualDays, servicesAndExtensionsTotal, grossTotal, reservationFee, discountAmount } = checkoutContext;
+                
+                detailsHtml = `
+                    <div id="checkoutDetailsSection" style="margin-top:15px; padding:12px; background:#f8f9fa; border-radius:6px; border:1px solid #dee2e6;">
+                        <div style="font-weight:600; color:#495057; margin-bottom:10px; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px;">Checkout Details</div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.875rem;">
+                            <div><span style="color:#6c757d;">Actual Days:</span> <strong>${actualDays}</strong></div>
+                            <div><span style="color:#6c757d;">Room Rate/Day:</span> <strong>${formatCurrency(roomRate)}</strong></div>
+                            <div><span style="color:#6c757d;">Room Amount:</span> <strong>${formatCurrency(roomAmountForActualDays)}</strong></div>
+                            <div><span style="color:#6c757d;">Services:</span> <strong>${formatCurrency(servicesAndExtensionsTotal)}</strong></div>
+                            <div><span style="color:#6c757d;">Discount:</span> <strong>${formatCurrency(discountAmount)}</strong></div>
+                                <div><span style="color:#6c757d;">Adjusted Total:</span> <strong style="color:#0d6efd;">${formatCurrency(netBalance)}</strong></div>
+                            <div><span style="color:#6c757d;">Overpayment:</span> <strong style="color:${overpayment > 0 ? '#dc3545' : '#6c757d'}">${formatCurrency(overpayment)}</strong></div>
+                        </div>
+                        ${overpayment > 0 ? `
+                            <div style="margin-top:10px; padding:8px; background:#fff3cd; border-left:3px solid #ffc107; border-radius:4px; font-size:0.85rem;">
+                                <strong style="color:#856404;">⚠️ Overpayment Detected</strong>
+                                <div style="margin-top:4px; color:#856404;">
+                                    Guest paid ${formatCurrency(totalPaid)} but only owes ${formatCurrency(netBalance)}. 
+                                    Overpayment of ${formatCurrency(overpayment)} will be applied as penalty unless refund is selected.
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+            
+            Swal.fire({
+                iconHtml: '<i class="fas fa-clipboard-check" style="color:#0d6efd;"></i>',
+                title: 'Confirm Checkout',
+                html: `
+                    <div style=\"text-align:left; margin-bottom:8px; color:#6c757d;\">
+                        <span class=\"section-label\">Summary</span>
+                        Proceed to checkout this booking?
+                        <div style=\"display:flex; gap:12px; margin-top:8px; flex-wrap:wrap; justify-content:center; align-items:center;\">
+                            ${grandTotalText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Grand Total</span><span class=\"balance-pill grand-total-pill\">${grandTotalText}</span></div>` : ''}
+                            ${paidText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Paid</span><span class=\"balance-pill paid-pill\">${paidText}</span></div>` : ''}
+                            ${balanceText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Balance</span><span class=\"balance-pill balance-pill-red\">${balanceText}</span></div>` : ''}
+                        </div>
+                    </div>
+                    ${detailsHtml}
+                    ${groupHtml}
+                    <div class=\"form-check choice-row\" style=\"text-align:left;\">
+                        <input class=\"form-check-input\" type=\"checkbox\" value=\"\" id=\"withRefundChk\">
+                        <label class=\"form-check-label\" for=\"withRefundChk\">With refund</label>
+                    </div>
+                    <div id=\"refundAmtWrap\" style=\"margin-top:10px; display:none; text-align:left;\">
+                        <label for=\"refundAmountInput\" class=\"form-label\" style=\"margin-bottom:4px;\">Refund Amount</label>
+                        <input type=\"number\" min=\"0\" step=\"0.01\" id=\"refundAmountInput\" class=\"swal2-input\" placeholder=\"0.00\" style=\"width:100%; box-sizing:border-box; margin:0;\">
+                        <small class=\"text-muted\" style=\"display:block; margin-top:6px;\">Enter the exact refund to give to the guest.</small>
+                    </div>
+                    <div id=\"cancellationFeeWrap\" style=\"margin-top:10px; text-align:left;\">
+                        <label for=\"cancellationFeeInput\" class=\"form-label\" style=\"margin-bottom:4px;\">Cancellation Fee</label>
+                        <input type=\"number\" min=\"0\" step=\"0.01\" id=\"cancellationFeeInput\" class=\"swal2-input\" placeholder=\"0.00\" style=\"width:100%; box-sizing:border-box; margin:0;\">
+                        <small id=\"cancellationFeeHelp\" class=\"text-muted\" style=\"display:none; margin-top:6px;\">Enter the exact cancellation fee.</small>
+                    </div>
+                    <style>
+                        .swal2-actions {
+                            gap: 5px !important;
+                        }
+                        .swal2-actions button {
+                            margin: 0 !important;
+                        }
+                    </style>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Proceed',
+                cancelButtonText: 'Cancel',
+                customClass: {
+                    popup: 'swal-checkout',
+                    confirmButton: 'btn btn-primary',
+                    cancelButton: 'btn btn-secondary'
+                },
+                buttonsStyling: false,
+                showClass: { popup: 'swal2-show' },
+                hideClass: { popup: 'swal2-hide' },
+                willClose: () => {
+                    // Restore Bootstrap modal focus behavior
+                    if (openBsModal && bsModalInstance && bsModalInstance._config) {
+                        try {
+                            bsModalInstance._config.focus = (prevFocusCfg !== null ? prevFocusCfg : true);
+                            openBsModal.setAttribute('data-bs-focus', String(prevFocusCfg !== false));
+                            if (focustrapDeactivated && bsModalInstance._focustrap && typeof bsModalInstance._focustrap.activate === 'function') {
+                                bsModalInstance._focustrap.activate();
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
+                },
+                focusConfirm: false,
+                didOpen: async () => {
+                    // Store checkout context in modal for use in preConfirm
+                    let checkoutContextCache = checkoutContext;
+                    
+                    // If context wasn't computed yet, compute it now
+                    if (!checkoutContextCache) {
+                        checkoutContextCache = await computeCheckoutContext(bookingId);
+                    }
+                    
+                    // Update details section if it exists and context is available
+                    const detailsSection = document.getElementById('checkoutDetailsSection');
+                    if (detailsSection && checkoutContextCache) {
+                        const { totalPaid, netBalance, overpayment, actualDays, roomRate, roomAmountForActualDays, servicesAndExtensionsTotal, grossTotal, reservationFee, discountAmount, originalQty } = checkoutContextCache;
+                        const formatCurrency = (amount) => `₱${parseFloat(amount || 0).toFixed(2)}`;
+                        
+                        // Calculate initial Net Balance WITHOUT discount (checkbox unchecked by default)
+                        const initialNetBalance = grossTotal - reservationFee;
+                        const initialOverpayment = Math.max(0, totalPaid - initialNetBalance);
+                        
+                        // Function to update Net Balance and Overpayment based on discount checkbox
+                        const updateCheckoutDetails = () => {
+                            const applyDiscountChk = document.getElementById('applyDiscountChk');
+                            const applyDiscount = applyDiscountChk ? applyDiscountChk.checked : false;
+                            
+                            // Calculate net balance: with or without discount
+                            const calculatedNetBalance = grossTotal - reservationFee - (applyDiscount ? discountAmount : 0);
+                            const calculatedOverpayment = Math.max(0, totalPaid - calculatedNetBalance);
+                            
+                            // Update display
+                            const discountDisplay = document.getElementById('discountDisplay');
+                            const netBalanceDisplay = document.getElementById('netBalanceDisplay');
+                            const overpaymentDisplay = document.getElementById('overpaymentDisplay');
+                            const overpaymentWarning = document.getElementById('overpaymentWarning');
+                            const overpaymentWarningText = document.getElementById('overpaymentWarningText');
+                            
+                            if (discountDisplay) {
+                                discountDisplay.textContent = formatCurrency(applyDiscount ? discountAmount : 0);
+                            }
+                            if (netBalanceDisplay) {
+                                netBalanceDisplay.textContent = formatCurrency(calculatedNetBalance);
+                            }
+                            if (overpaymentDisplay) {
+                                overpaymentDisplay.textContent = formatCurrency(calculatedOverpayment);
+                                overpaymentDisplay.style.color = calculatedOverpayment > 0 ? '#dc3545' : '#6c757d';
+                            }
+                            if (overpaymentWarning) {
+                                if (calculatedOverpayment > 0) {
+                                    overpaymentWarning.style.display = 'block';
+                                    if (overpaymentWarningText) {
+                                        overpaymentWarningText.innerHTML = `
+                                            Guest paid ${formatCurrency(totalPaid)} but only owes ${formatCurrency(calculatedNetBalance)}. 
+                                            Overpayment of ${formatCurrency(calculatedOverpayment)} will be applied as penalty unless refund is selected.
+                                        `;
+                                    }
+                                } else {
+                                    overpaymentWarning.style.display = 'none';
+                                }
+                            }
+                            
+                            // Store updated values for preConfirm
+                            window._updatedNetBalance = calculatedNetBalance;
+                            window._updatedOverpayment = calculatedOverpayment;
+                            window._applyDiscount = applyDiscount;
+                        };
+                        
+                        detailsSection.innerHTML = `
+                            <div style="font-weight:600; color:#495057; margin-bottom:10px; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px;">Checkout Details</div>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.875rem;">
+                                <div><span style="color:#6c757d;">Actual Days:</span> <strong>${actualDays}</strong></div>
+                                <div><span style="color:#6c757d;">Room Rate/Day:</span> <strong>${formatCurrency(roomRate)}</strong></div>
+                                <div><span style="color:#6c757d;">Room Amount:</span> <strong>${formatCurrency(roomAmountForActualDays)}</strong></div>
+                                <div><span style="color:#6c757d;">Services:</span> <strong>${formatCurrency(servicesAndExtensionsTotal)}</strong></div>
+                                <div><span style="color:#6c757d;">Discount:</span> <strong id="discountDisplay">${formatCurrency(0)}</strong></div>
+                                <div><span style="color:#6c757d;">Adjusted Total:</span> <strong style="color:#0d6efd;" id="netBalanceDisplay">${formatCurrency(initialNetBalance)}</strong></div>
+                                <div><span style="color:#6c757d;">Overpayment:</span> <strong style="color:${initialOverpayment > 0 ? '#dc3545' : '#6c757d'}" id="overpaymentDisplay">${formatCurrency(initialOverpayment)}</strong></div>
+                            </div>
+                            <div id="overpaymentWarning" style="${initialOverpayment > 0 ? 'display:block' : 'display:none'}; margin-top:10px; padding:8px; background:#fff3cd; border-left:3px solid #ffc107; border-radius:4px; font-size:0.85rem;">
+                                <strong style="color:#856404;">⚠️ Overpayment Detected</strong>
+                                <div style="margin-top:4px; color:#856404;" id="overpaymentWarningText">
+                                    Guest paid ${formatCurrency(totalPaid)} but only owes ${formatCurrency(initialNetBalance)}. 
+                                    Overpayment of ${formatCurrency(initialOverpayment)} will be applied as penalty unless refund is selected.
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Add event listener for discount checkbox if it exists
+                        const applyDiscountChk = document.getElementById('applyDiscountChk');
+                        if (applyDiscountChk) {
+                            applyDiscountChk.addEventListener('change', updateCheckoutDetails);
+                            // Initialize with default (unchecked = discount NOT applied)
+                            window._applyDiscount = false;
+                            window._updatedNetBalance = initialNetBalance;
+                            window._updatedOverpayment = initialOverpayment;
+                        } else {
+                            // No discount option, use original values
+                            window._applyDiscount = false;
+                            window._updatedNetBalance = initialNetBalance;
+                            window._updatedOverpayment = initialOverpayment;
+                        }
+                    }
+                    
+                    {
+                    const chk = document.getElementById('withRefundChk');
+                    const wrap = document.getElementById('refundAmtWrap');
+                    const input = document.getElementById('refundAmountInput');
+                    const cancellationFeeInput = document.getElementById('cancellationFeeInput');
+                    
+                    const getCurrentOverpaymentSecondary = () => {
+                        return window._updatedOverpayment !== undefined
+                            ? window._updatedOverpayment
+                            : (checkoutContextCache
+                                ? (checkoutContextCache.grossTotal - checkoutContextCache.reservationFee < checkoutContextCache.totalPaid
+                                    ? checkoutContextCache.totalPaid - (checkoutContextCache.grossTotal - checkoutContextCache.reservationFee)
+                                    : 0)
+                                : 0);
+                    };
+                    
+                    let syncingFromRefundSecondary = false;
+                    let syncingFromCancellationSecondary = false;
+
+                    const syncCancellationFeeSecondary = () => {
+                        if (!cancellationFeeInput) return;
+                        const currentOverpayment = getCurrentOverpaymentSecondary();
+                        if (chk && chk.checked) {
+                            const refundVal = parseFloat(input && input.value ? input.value : '0') || 0;
+                            const calc = Math.max(0, currentOverpayment - refundVal);
+                            if (!syncingFromCancellationSecondary) {
+                                cancellationFeeInput.value = formatInputNumber(calc);
+                            }
+                        } else {
+                            cancellationFeeInput.value = formatInputNumber(currentOverpayment);
+                        }
+                    };
+
+                    // const setCancellationFeeReadOnlySecondary = () => {
+                    //     if (!cancellationFeeInput) return;
+                    //     cancellationFeeInput.readOnly = !(chk && chk.checked);
+                    //     const help = document.getElementById('cancellationFeeHelp');
+                    //     if (help) {
+                    //         help.style.display = chk && chk.checked ? 'block' : 'none';
+                    //     }
+                    // };
+                    
+                    if (chk && wrap) {
+                        // Use computed context if available, otherwise fetch
+                        let totalPaid = 0;
+                        if (checkoutContextCache) {
+                            totalPaid = checkoutContextCache.totalPaid;
+                        } else {
+                            try {
+                                const paymentsResponse = await fetch(`/payments/get-payments/${bookingId}?_=${Date.now()}`);
+                                const paymentsData = await paymentsResponse.json();
+                                const paymentsArray = (paymentsData && paymentsData.data) ? paymentsData.data : (Array.isArray(paymentsData) ? paymentsData : []);
+                                
+                                totalPaid = (paymentsArray && Array.isArray(paymentsArray)) ? paymentsArray.reduce((sum, payment) => {
+                                    if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
+                                        return sum;
+                                    }
+                                    return sum + parseFloat(payment.AMOUNT_PAID);
+                                }, 0) : 0;
+                            } catch (error) {
+                                console.error('Error fetching payments:', error);
+                            }
+                        }
+                        
+                        // Disable checkbox if no payments were made
+                        if (totalPaid <= 0) {
+                            chk.disabled = true;
+                            chk.checked = false;
+                            wrap.style.display = 'none';
+                        }
+                        
+                        // Set max refund amount if overpayment exists - use updated overpayment if available
+                        const currentOverpayment = getCurrentOverpaymentSecondary();
+                        if (input && currentOverpayment > 0) {
+                            input.setAttribute('max', currentOverpayment);
+                            const formatCurrency = (amount) => `₱${parseFloat(amount || 0).toFixed(2)}`;
+                            input.setAttribute('placeholder', `Max: ${formatCurrency(currentOverpayment)}`);
+                        }
+                        
+                        chk.addEventListener('change', () => {
+                            if (!chk.disabled) {
+                                wrap.style.display = chk.checked ? 'block' : 'none';
+                        if (chk.checked && input) {
+                                    setTimeout(() => input.focus(), 0);
+                                    // Pre-fill with overpayment amount if available - use updated overpayment
+                                    const currentOverpayment = getCurrentOverpaymentSecondary();
+                                    if (currentOverpayment > 0) {
+                                input.value = formatInputNumber(currentOverpayment);
+                                        input.setAttribute('max', currentOverpayment);
+                                    }
+                                }
+                                syncCancellationFeeSecondary();
+                                // setCancellationFeeReadOnlySecondary();
+                            }
+                        });
+                        
+                        // Auto-compute cancellation fee when refund amount changes (default = overpayment - refund)
+                        if (input && cancellationFeeInput) {
+                            input.addEventListener('input', () => {
+                                if (syncingFromCancellationSecondary) return;
+                                const refundVal = parseFloat(input.value || '');
+                                if (!isNaN(refundVal) && refundVal >= 0) {
+                                    syncingFromRefundSecondary = true;
+                                    syncCancellationFeeSecondary();
+                                    syncingFromRefundSecondary = false;
+                                }
+                            });
+
+                            cancellationFeeInput.addEventListener('input', () => {
+                                if (syncingFromRefundSecondary) return;
+                                const feeVal = parseFloat(cancellationFeeInput.value || '');
+                                if (!isNaN(feeVal) && feeVal >= 0) {
+                                    const currentOverpayment = getCurrentOverpaymentSecondary();
+                                    const newRefundValue = Math.max(0, currentOverpayment - feeVal);
+                                    syncingFromCancellationSecondary = true;
+                                    input.value = formatInputNumber(newRefundValue);
+                                    syncingFromCancellationSecondary = false;
+                                    syncCancellationFeeSecondary();
+                                }
+                            });
+                        }
+                        
+                        // Also update refund input when discount checkbox changes
+                        const applyDiscountChk = document.getElementById('applyDiscountChk');
+                        if (applyDiscountChk && input) {
+                            applyDiscountChk.addEventListener('change', () => {
+                                const currentOverpayment = getCurrentOverpaymentSecondary();
+                                if (currentOverpayment > 0) {
+                                    input.setAttribute('max', currentOverpayment);
+                                    const formatCurrency = (amount) => `₱${parseFloat(amount || 0).toFixed(2)}`;
+                                    input.setAttribute('placeholder', `Max: ${formatCurrency(currentOverpayment)}`);
+                                    if (chk && chk.checked) {
+                                        input.value = formatInputNumber(currentOverpayment);
+                                    }
+                                }
+                                syncCancellationFeeSecondary();
+                                // setCancellationFeeReadOnlySecondary();
+                            });
+                        }
+                    }
+                    
+                    // Pre-fill cancellation fee input with overpayment amount
+                    syncCancellationFeeSecondary();
+                    // setCancellationFeeReadOnlySecondary();
+                    }
+                    
+                    // Store context for preConfirm
+                    window._checkoutContextCache = checkoutContextCache;
+                },
+                preConfirm: async () => {
+                    const chk = document.getElementById('withRefundChk');
+                    const input = document.getElementById('refundAmountInput');
+                    const cancellationFeeInput = document.getElementById('cancellationFeeInput');
+                    const hasRefund = !!(chk && chk.checked);
+                    let amount = 0;
+                    let penaltyAmount = 0;
+                    let computedOverpayment = 0;
+                    
+                    // Use cached context from didOpen, or compute if not available
+                    let checkoutContextCache = window._checkoutContextCache;
+                    const ensureCheckoutContext = async () => {
+                        if (checkoutContextCache) return checkoutContextCache;
+                        // Fallback: compute if cache not available
+                        checkoutContextCache = await computeCheckoutContext(bookingId);
+                        return checkoutContextCache;
                     };
                     
                     if (hasRefund) {
@@ -2260,6 +3038,10 @@ function triggerCheckout(bookingId) {
                         
                         try {
                             const context = await ensureCheckoutContext();
+                            if (!context) {
+                                Swal.showValidationMessage('Unable to verify payment amount. Please try again.');
+                                return false;
+                            }
                             const { totalPaid, overpayment, netBalance } = context;
                             
                             if (amount > totalPaid) {
@@ -2304,9 +3086,11 @@ function triggerCheckout(bookingId) {
                     } else {
                         try {
                             const context = await ensureCheckoutContext();
-                            computedOverpayment = context.overpayment;
-                            if (computedOverpayment > 0) {
-                                penaltyAmount = computedOverpayment;
+                            if (context) {
+                                computedOverpayment = context.overpayment;
+                                if (computedOverpayment > 0) {
+                                    penaltyAmount = computedOverpayment;
+                                }
                             }
                         } catch (error) {
                             console.warn('Skipping automatic penalty calculation due to error:', error);
@@ -2315,254 +3099,27 @@ function triggerCheckout(bookingId) {
                     let scope = 'individual';
                     const sel = document.querySelector('input[name="checkoutScope"]:checked');
                     if (sel && (sel.value === 'group' || sel.value === 'individual')) scope = sel.value;
-                    if (!hasRefund && computedOverpayment > 0) {
-                        penaltyAmount = computedOverpayment;
-                    }
-                    return { hasRefund, amount, scope, penaltyAmount };
-                }
-            }).then((result) => {
-                if (result.isConfirmed && result.value) {
-                    startCheckoutProcess(
-                        bookingId,
-                        result.value.hasRefund,
-                        result.value.amount || 0,
-                        result.value.scope || 'individual',
-                        result.value.penaltyAmount || 0
-                    );
-                }
-            });
-        })
-        .catch(() => {
-            // If group check fails, proceed with individual checkout only
-            const groupHtml = '';
-            Swal.fire({
-                iconHtml: '<i class="fas fa-clipboard-check" style="color:#0d6efd;"></i>',
-                title: 'Confirm Checkout',
-                html: `
-                    <div style=\"text-align:left; margin-bottom:8px; color:#6c757d;\">
-                        <span class=\"section-label\">Summary</span>
-                        Proceed to checkout this booking?
-                        <div style=\"display:flex; gap:12px; margin-top:8px; flex-wrap:wrap; justify-content:center; align-items:center;\">
-                            ${grandTotalText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Grand Total</span><span class=\"balance-pill grand-total-pill\">${grandTotalText}</span></div>` : ''}
-                            ${paidText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Paid</span><span class=\"balance-pill paid-pill\">${paidText}</span></div>` : ''}
-                            ${balanceText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Balance</span><span class=\"balance-pill balance-pill-red\">${balanceText}</span></div>` : ''}
-                        </div>
-                    </div>
-                    ${groupHtml}
-                    <div class=\"form-check choice-row\" style=\"text-align:left;\">
-                        <input class=\"form-check-input\" type=\"checkbox\" value=\"\" id=\"withRefundChk\">
-                        <label class=\"form-check-label\" for=\"withRefundChk\">With refund</label>
-                    </div>
-                    <div id=\"refundAmtWrap\" style=\"margin-top:10px; display:none; text-align:left;\">
-                        <label for=\"refundAmountInput\" class=\"form-label\" style=\"margin-bottom:4px;\">Refund Amount</label>
-                        <input type=\"number\" min=\"0\" step=\"0.01\" id=\"refundAmountInput\" class=\"swal2-input\" placeholder=\"0.00\" style=\"width:100%; box-sizing:border-box; margin:0;\">
-                        <small class=\"text-muted\" style=\"display:block; margin-top:6px;\">Enter the exact refund to give to the guest.</small>
-                    </div>
-                    <style>
-                        .swal2-actions {
-                            gap: 5px !important;
-                        }
-                        .swal2-actions button {
-                            margin: 0 !important;
-                        }
-                    </style>
-                `,
-                showCancelButton: true,
-                confirmButtonText: 'Proceed',
-                cancelButtonText: 'Cancel',
-                customClass: {
-                    popup: 'swal-checkout',
-                    confirmButton: 'btn btn-primary',
-                    cancelButton: 'btn btn-secondary'
-                },
-                buttonsStyling: false,
-                showClass: { popup: 'swal2-show' },
-                hideClass: { popup: 'swal2-hide' },
-                willClose: () => {
-                    // Restore Bootstrap modal focus behavior
-                    if (openBsModal && bsModalInstance && bsModalInstance._config) {
-                        try {
-                            bsModalInstance._config.focus = (prevFocusCfg !== null ? prevFocusCfg : true);
-                            openBsModal.setAttribute('data-bs-focus', String(prevFocusCfg !== false));
-                            if (focustrapDeactivated && bsModalInstance._focustrap && typeof bsModalInstance._focustrap.activate === 'function') {
-                                bsModalInstance._focustrap.activate();
-                            }
-                        } catch (e) { /* ignore */ }
-                    }
-                },
-                focusConfirm: false,
-                didOpen: async () => {
-                    const chk = document.getElementById('withRefundChk');
-                    const wrap = document.getElementById('refundAmtWrap');
-                    const input = document.getElementById('refundAmountInput');
-                    if (chk && wrap) {
-                        // Check if payments exist for this booking
-                        try {
-                            const paymentsResponse = await fetch(`/payments/get-payments/${bookingId}?_=${Date.now()}`);
-                            const paymentsData = await paymentsResponse.json();
-                            const paymentsArray = (paymentsData && paymentsData.data) ? paymentsData.data : (Array.isArray(paymentsData) ? paymentsData : []);
-                            
-                            // Calculate total paid (exclude reservation_fee and discount)
-                            const totalPaid = (paymentsArray && Array.isArray(paymentsArray)) ? paymentsArray.reduce((sum, payment) => {
-                                if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
-                                    return sum;
-                                }
-                                return sum + parseFloat(payment.AMOUNT_PAID);
-                            }, 0) : 0;
-                            
-                            // Disable checkbox if no payments were made
-                            if (totalPaid <= 0) {
-                                chk.disabled = true;
-                                chk.checked = false;
-                                wrap.style.display = 'none';
-                            }
-                        } catch (error) {
-                            console.error('Error fetching payments:', error);
-                            // If fetch fails, disable checkbox as a safety measure
-                            chk.disabled = true;
-                            chk.checked = false;
-                            wrap.style.display = 'none';
-                        }
-                        
-                        chk.addEventListener('change', () => {
-                            if (!chk.disabled) {
-                                wrap.style.display = chk.checked ? 'block' : 'none';
-                                if (chk.checked && input) setTimeout(() => input.focus(), 0);
-                            }
-                        });
-                    }
-                },
-                preConfirm: async () => {
-                    const chk = document.getElementById('withRefundChk');
-                    const input = document.getElementById('refundAmountInput');
-                    const hasRefund = !!(chk && chk.checked);
-                    let amount = 0;
-                    let penaltyAmount = 0;
-                    let computedOverpayment = 0;
-                    if (hasRefund) {
-                        amount = parseFloat(input && input.value ? input.value : '');
-                        if (isNaN(amount) || amount < 0) {
-                            Swal.showValidationMessage('Please enter a valid refund amount.');
+                    
+                    // Get cancellation fee from input field (manual entry)
+                    let cancellationFee = 0;
+                    if (cancellationFeeInput && cancellationFeeInput.value) {
+                        cancellationFee = parseFloat(cancellationFeeInput.value) || 0;
+                        if (cancellationFee < 0) {
+                            Swal.showValidationMessage('Cancellation fee cannot be negative.');
                             return false;
                         }
-                        if (amount === 0) {
-                            Swal.showValidationMessage('Please enter a refund amount greater than 0.');
-                            return false;
-                        }
-                        
-                        // Check if refund amount exceeds paid amount and overpayment
-                        try {
-                            // Fetch payments
-                            const paymentsResponse = await fetch(`/payments/get-payments/${bookingId}?_=${Date.now()}`);
-                            const paymentsData = await paymentsResponse.json();
-                            const paymentsArray = (paymentsData && paymentsData.data) ? paymentsData.data : (Array.isArray(paymentsData) ? paymentsData : []);
-                            
-                            // Calculate total paid (exclude reservation_fee and discount)
-                            const totalPaid = (paymentsArray && Array.isArray(paymentsArray)) ? paymentsArray.reduce((sum, payment) => {
-                                if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
-                                    return sum;
-                                }
-                                return sum + parseFloat(payment.AMOUNT_PAID);
-                            }, 0) : 0;
-                            
-                            // Check if refund amount exceeds paid amount
-                            if (amount > totalPaid) {
-                                Swal.fire({
-                                    icon: 'warning',
-                                    title: 'Refund Amount Exceeds Paid Amount',
-                                    html: `
-                                        <p>The refund amount (₱${amount.toFixed(2)}) exceeds the total paid amount (₱${totalPaid.toFixed(2)}).</p>
-                                        <p><strong>You cannot refund more than what was paid.</strong></p>
-                                    `,
-                                    confirmButtonText: 'OK',
-                                    confirmButtonColor: '#0d6efd'
-                                });
-                                return false;
-                            }
-                            
-                            // Fetch billing data to get net balance (what they should pay)
-                            const billingResponse = await fetch(`/booking/get-billing/${bookingId}?_=${Date.now()}`);
-                            const billingData = await billingResponse.json();
-                            
-                            // Fetch booking details to get check-in date for actual days calculation
-                            const bookingResponse = await fetch(`/booking/booking_details/${bookingId}?_=${Date.now()}`);
-                            const bookingData = await bookingResponse.json();
-                            
-                            const reservationFee = parseFloat(billingData.reservationFee) || 0;
-                            const discountAmount = parseFloat(billingData.discountAmount) || 0;
-                            
-                            // Calculate actual days stayed (for early checkout)
-                            let actualDays = 1;
-                            if (bookingData && bookingData.CHECK_IN_DATE) {
-                                const checkInDate = new Date(bookingData.CHECK_IN_DATE);
-                                const today = new Date();
-                                today.setHours(0, 0, 0, 0);
-                                checkInDate.setHours(0, 0, 0, 0);
-                                const diffTime = today - checkInDate;
-                                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                                actualDays = Math.max(1, diffDays);
-                            }
-                            
-                            // Recalculate subtotal based on actual days stayed
-                            // Get room rate from first billing item (room item)
-                            let roomRate = 0;
-                            let servicesAndExtensionsTotal = 0;
-                            
-                            if (billingData.items && billingData.items.length > 0) {
-                                // First item is usually the room
-                                const roomItem = billingData.items[0];
-                                roomRate = parseFloat(roomItem.basePrice) || 0;
-                                            
-                                // Calculate services and extensions (items after the first room item)
-                                // These don't change based on days
-                                for (let i = 1; i < billingData.items.length; i++) {
-                                    servicesAndExtensionsTotal += parseFloat(billingData.items[i].subTotal) || 0;
-                                }
-                            }
-                            
-                            // Calculate net balance based on actual days
-                            // Room amount = roomRate * actualDays
-                            // Plus services/extensions
-                            // Minus reservation fee and discount
-                            const roomAmountForActualDays = roomRate * actualDays;
-                            const grossTotal = roomAmountForActualDays + servicesAndExtensionsTotal;
-                            const netBalance = grossTotal - reservationFee - discountAmount;
-                            
-                            // Calculate overpayment (paid - what they should pay)
-                            const overpayment = Math.max(0, totalPaid - netBalance);
-                            computedOverpayment = overpayment;
-                            
-                            // Check if refund amount exceeds overpayment
-                            if (amount > overpayment) {
-                                Swal.fire({
-                                    icon: 'warning',
-                                    title: 'Refund Amount Exceeds Overpayment',
-                                    html: `
-                                        <p>The refund amount (₱${amount.toFixed(2)}) exceeds the overpayment amount (₱${overpayment.toFixed(2)}).</p>
-                                        <p><strong>You cannot refund more than the overpayment (paid amount minus net amount due).</strong></p>
-                                        <p style="margin-top:8px; font-size:0.9em; color:#6c757d;">
-                                            Net Amount Due: ₱${netBalance.toFixed(2)}<br>
-                                            Total Paid: ₱${totalPaid.toFixed(2)}<br>
-                                            Maximum Refund: ₱${overpayment.toFixed(2)}
-                                        </p>
-                                    `,
-                                    confirmButtonText: 'OK',
-                                    confirmButtonColor: '#0d6efd'
-                                });
-                                return false;
-                            }
-
-                            penaltyAmount = Math.max(0, overpayment - amount);
-                        } catch (error) {
-                            console.error('Error fetching payments or billing:', error);
-                            Swal.showValidationMessage('Unable to verify payment amount. Please try again.');
-                            return false;
+                    } else {
+                        // If no input, use calculated penaltyAmount as default
+                        if (!hasRefund && computedOverpayment > 0) {
+                            cancellationFee = computedOverpayment;
+                        } else if (hasRefund) {
+                            cancellationFee = Math.max(0, finalOverpayment - amount);
                         }
                     }
-                    if (!hasRefund && computedOverpayment > 0) {
-                        penaltyAmount = computedOverpayment;
-                    }
-                    return { hasRefund, amount, penaltyAmount };
+                    
+                    // Get applyDiscount flag (whether to apply discount to early checkout)
+                    const applyDiscount = window._applyDiscount !== undefined ? window._applyDiscount : false;
+                    return { hasRefund, amount, scope, penaltyAmount: cancellationFee, applyDiscount };
                 }
             }).then((result) => {
                 if (result.isConfirmed && result.value) {
@@ -2571,7 +3128,8 @@ function triggerCheckout(bookingId) {
                         result.value.hasRefund,
                         result.value.amount || 0,
                         'individual',
-                        result.value.penaltyAmount || 0
+                        result.value.penaltyAmount || 0,
+                        result.value.applyDiscount || false
                     );
                 }
             });
@@ -2579,7 +3137,7 @@ function triggerCheckout(bookingId) {
 }
 
 // Handle checkout process
-function startCheckoutProcess(bookingId, hasRefund, refundAmount = 0, scope = 'individual', penaltyAmount = 0) {
+function startCheckoutProcess(bookingId, hasRefund, refundAmount = 0, scope = 'individual', penaltyAmount = 0, applyDiscount = false) {
     // Show loading state
     Swal.fire({
         title: 'Processing Checkout...',
@@ -2594,7 +3152,7 @@ function startCheckoutProcess(bookingId, hasRefund, refundAmount = 0, scope = 'i
     fetch('/booking/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId, scope, hasRefund, refundAmount, penaltyAmount })
+        body: JSON.stringify({ bookingId, scope, hasRefund, refundAmount, penaltyAmount, applyDiscount })
     })
     .then(r => {
         if (!r.ok) {
@@ -6705,3 +7263,4 @@ window.updateComplaintRequest = updateComplaintRequest;
 
 
 // Function to load services
+

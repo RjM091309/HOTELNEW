@@ -501,7 +501,7 @@ class BookingModel {
   }
 
   // New: Checkout bookings now (set CHECK_OUT_DATE=NOW, status to check-Out, update room status)
-  static async checkoutBookings({ bookingIds, encodedBy, refundBookingId = null, refundAmount = 0, penaltyAmount = 0 }) {
+  static async checkoutBookings({ bookingIds, encodedBy, refundBookingId = null, refundAmount = 0, penaltyAmount = 0, applyDiscount = false }) {
     if (!bookingIds || bookingIds.length === 0) {
       throw new Error('No bookings to checkout');
     }
@@ -549,6 +549,29 @@ class BookingModel {
       await new Promise((resolve, reject) => {
         connection.query(updateBillingQtySql, [ids], (err, res) => (err ? reject(err) : resolve(res)));
       });
+
+      // Remove discount from billing and payments if applyDiscount is false (early checkout without discount)
+      if (!applyDiscount) {
+        // Remove discount from billing table
+        const removeDiscountBillingSql = `
+          UPDATE billing
+          SET DISCOUNT_AMOUNT = 0,
+              DISCOUNT_APPLIED = 0
+          WHERE BOOKING_ID IN (?) AND ACTIVE = 1
+        `;
+        await new Promise((resolve, reject) => {
+          connection.query(removeDiscountBillingSql, [ids], (err, res) => (err ? reject(err) : resolve(res)));
+        });
+
+        // Delete discount payments from payments table
+        const deleteDiscountPaymentsSql = `
+          DELETE FROM payments
+          WHERE BOOKING_ID IN (?) AND PAYMENT_TYPE = 'discount'
+        `;
+        await new Promise((resolve, reject) => {
+          connection.query(deleteDiscountPaymentsSql, [ids], (err, res) => (err ? reject(err) : resolve(res)));
+        });
+      }
 
       // Optional: Insert refund(s) and update billing.CHECKOUT_REFUND (manual refund amount, no capping)
       const normalizedPenaltyAmount = Math.max(0, parseFloat(penaltyAmount) || 0);

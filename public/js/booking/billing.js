@@ -213,8 +213,9 @@ window.showBilling = async function (bookingID) {
                 // Display Paid Amount - show actual payments made (after refund)
                 setText('totalPaid', totalPaymentsMade.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
                 setText('balanceAmount', balanceToShow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-                // GRAND TOTAL should be the subtotal (before discount)
-                setText('totalPayment', subTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                // Total Amount = SubTotal - Reservation Fee - Discount
+                const totalAmount = subTotal - reservationFee - discountAmount;
+                setText('totalPayment', totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
                 // Calculate Total Room Charges, Total Services, and Total Penalty
                 let totalRoomCharges = 0;
