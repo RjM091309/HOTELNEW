@@ -86,10 +86,25 @@ window.showBilling = async function (bookingID) {
                     console.error('Billing table body not found');
                     return;
                 }
+                
+                // Get cancellation status early (needed in forEach loop)
+                const isCancelled = !!data.isCancelled;
+                // Get discount amount early (needed in forEach loop)
+                const discountAmount = parseFloat(data.discountAmount) || 0;
+                
                 tbody.innerHTML = '';
+                let rowIndex = 0;
+                let discountAppliedToRoom = false; // Track if discount has been applied to a room item
+                let totalSubtotal = 0; // Track total of all subtotals
+                
                 data.items.forEach((item, index) => {
                     const isPaid = item.status === 'paid';
                     const isPartial = item.status === 'partial';
+                    const isPenalty = item.status === 'penalty';
+                    const isRoom = (item.description || '').toLowerCase().includes('bedroom') || 
+                                   (item.description || '').toLowerCase().includes('room') ||
+                                   (item.description || '').toLowerCase().includes('room charge');
+                    
                     let paidTextClass = '';
                     if (isPaid) {
                         paidTextClass = 'text-success';
@@ -97,22 +112,58 @@ window.showBilling = async function (bookingID) {
                         paidTextClass = 'text-warning';
                     }
                     
+                    let displaySubTotal = parseFloat(item.subTotal) || 0;
+                    const displayBasePrice = parseFloat(item.basePrice) || 0;
+                    const displayQty = item.qty || '-';
+                    
+                    // Apply discount to room subtotal if discount exists and hasn't been applied yet
+                    if (isRoom && !isPenalty && discountAmount > 0 && !discountAppliedToRoom) {
+                        displaySubTotal = Math.max(0, displaySubTotal);
+                        discountAppliedToRoom = true; // Mark that discount has been applied
+                    }
+                    
+                    // Check if item is a service or extension (not room, not penalty)
+                    const isService = !isRoom && !isPenalty;
+                    
+                    // Subtotal display (always show numeric value even if cancelled)
+                    let subtotalDisplay = displaySubTotal.toFixed(2);
+                    
+                    // Exclude cancellation fee / penalty items from total row
+                    if (!isPenalty) {
+                        totalSubtotal += displaySubTotal;
+                    }
+                    
+                    rowIndex++;
                     const row = `
                     <tr>
-                    <td class="text-center ${paidTextClass}">${index + 1}</td>
+                    <td class="text-center ${paidTextClass}">${rowIndex}</td>
                     <td class="text-center ${paidTextClass}">${new Date(item.date).toLocaleDateString()}</td>
                     <td class="text-center ${paidTextClass}">${item.description}</td>
-                    <td class="text-center ${paidTextClass}">${parseFloat(item.basePrice).toFixed(2)}</td>
-                    <td class="text-center ${paidTextClass}">${item.qty || '-'}</td>
-                    <td class="text-right ${paidTextClass}">${parseFloat(item.subTotal).toFixed(2)}</td>
+                    <td class="text-center ${paidTextClass}">${displayBasePrice.toFixed(2)}</td>
+                    <td class="text-center ${paidTextClass}">${displayQty}</td>
+                    <td class="text-right ${paidTextClass}">${subtotalDisplay}</td>
                     </tr>`;
                     tbody.insertAdjacentHTML('beforeend', row);
                 });
+                
+                // Add total row at the bottom
+                const totalRow = `
+                    <tr style="background-color: #f8f9fa; font-weight: bold;">
+                        <td colspan="4"></td>
+                        <td class="text-right" style="padding: 12px; white-space: nowrap;"><strong>Total:</strong></td>
+                        <td class="text-right" style="padding: 12px;"><strong>${totalSubtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+                    </tr>`;
+                tbody.insertAdjacentHTML('beforeend', totalRow);
 
-                const subTotal = parseFloat(data.subTotal);
+                const rawSubTotal = parseFloat(data.subTotal) || 0;
+                const effectiveSubTotal = Number.isFinite(parseFloat(data.effectiveSubTotal))
+                    ? parseFloat(data.effectiveSubTotal)
+                    : rawSubTotal;
+                const subTotal = rawSubTotal;
                 const reservationFee = parseFloat(data.reservationFee) || 0;
-                const discountAmount = parseFloat(data.discountAmount) || 0;
+                // discountAmount already parsed above (before forEach loop)
                 const discountApplied = parseInt(data.discountApplied) || 0; // Default to 0 (not applied)
+                const penaltyAmountValue = Number.isFinite(parseFloat(data.penaltyAmount)) ? parseFloat(data.penaltyAmount) : 0;
 
                 // Calculate actual balance considering partial payments
                 // Get total payments made from payments table
@@ -142,27 +193,13 @@ window.showBilling = async function (bookingID) {
                 console.log('Total Payments Made:', totalPaymentsMade);
 
                 // Calculate gross total (before reservation fee and discount)
-                const grossTotal = subTotal;
+                const grossTotal = effectiveSubTotal;
                 
                 // Calculate net balance (after reservation fee and discount)
                 const netBalance = grossTotal - reservationFee - discountAmount;
                 
                 // Calculate remaining balance after payments
-                const remainingBalance = Math.max(0, netBalance - totalPaymentsMade);
-
-                // Debug logging
-                console.log('Billing Debug:', {
-                    subTotal,
-                    grossTotal,
-                    reservationFee,
-                    discountAmount,
-                    netBalance,
-                    totalPaymentsMade,
-                    remainingBalance,
-                    paymentsData
-                });
-
-                const balanceToShow = remainingBalance;
+                let balanceToShow = Math.max(0, netBalance - totalPaymentsMade);
 
                 const setText = (id, value) => {
                     const el = document.getElementById(id);
@@ -175,46 +212,63 @@ window.showBilling = async function (bookingID) {
                 setText('confNumber', data.confNumber || 'N/A');
 
                 // Get refund information from billing data
-                const refundAmount = parseFloat(data.refundAmount) || 0;
-                const totalPaidBeforeRefund = parseFloat(data.totalPaidBeforeRefund) || 0;
+                const refundAmount = Number.isFinite(parseFloat(data.refundAmount)) ? parseFloat(data.refundAmount) : 0;
+                const totalPaidBeforeRefund = Number.isFinite(parseFloat(data.totalPaidBeforeRefund)) ? parseFloat(data.totalPaidBeforeRefund) : 0;
+                const paidAmountAfterRefund = Number.isFinite(parseFloat(data.paidAmountAfterRefund)) ? parseFloat(data.paidAmountAfterRefund) : null;
                 
-                // Display refund information if there's a refund
+                // Display refund information if booking is cancelled or refund exists
                 const refundAmountRow = document.getElementById('refundAmountRow');
                 const totalPaidBeforeRefundRow = document.getElementById('totalPaidBeforeRefundRow');
                 const refundAmountElement = document.getElementById('refundAmount');
                 const totalPaidBeforeRefundElement = document.getElementById('totalPaidBeforeRefund');
+                const shouldShowRefundInfo = isCancelled || refundAmount > 0;
                 
-                if (refundAmount > 0) {
-                    // Show refund rows
-                    if (refundAmountRow) {
-                        refundAmountRow.style.display = 'flex';
-                    }
-                    if (totalPaidBeforeRefundRow) {
-                        totalPaidBeforeRefundRow.style.display = 'flex';
-                    }
-                    
-                    // Set refund values
+                if (refundAmountRow) {
+                    refundAmountRow.style.display = shouldShowRefundInfo ? 'flex' : 'none';
+                }
+                if (totalPaidBeforeRefundRow) {
+                    totalPaidBeforeRefundRow.style.display = shouldShowRefundInfo ? 'flex' : 'none';
+                }
+                if (shouldShowRefundInfo) {
                     if (refundAmountElement) {
                         refundAmountElement.textContent = refundAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                     }
                     if (totalPaidBeforeRefundElement) {
                         totalPaidBeforeRefundElement.textContent = totalPaidBeforeRefund.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                     }
-                } else {
-                    // Hide refund rows if no refund
-                    if (refundAmountRow) {
-                        refundAmountRow.style.display = 'none';
-                    }
-                    if (totalPaidBeforeRefundRow) {
-                        totalPaidBeforeRefundRow.style.display = 'none';
-                    }
                 }
                 
-                // Display Paid Amount - show actual payments made (after refund)
-                setText('totalPaid', totalPaymentsMade.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                // Determine paid amount display values
+                let paidAmountToShow = totalPaymentsMade;
+                if (isCancelled) {
+                    // For cancelled bookings, show the cancellation fee as paid amount
+                    // If there's a refund, show the net amount after refund
+                    if (refundAmount > 0) {
+                        paidAmountToShow = Number.isFinite(paidAmountAfterRefund)
+                            ? paidAmountAfterRefund
+                            : Math.max(0, totalPaidBeforeRefund - refundAmount);
+                    } else {
+                        // No refund: show cancellation fee amount
+                        // This represents what was paid or needs to be paid for cancellation
+                        paidAmountToShow = penaltyAmountValue;
+                    }
+                    balanceToShow = 0;
+                }
+                
+                const paidAmountLabel = document.getElementById('paidAmountLabel');
+                if (paidAmountLabel) {
+                    paidAmountLabel.textContent = isCancelled ? 'Paid Amount (After Cancellation):' : 'Paid Amount:';
+                }
+                
+                // Display Paid Amount & Balance
+                setText('totalPaid', paidAmountToShow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
                 setText('balanceAmount', balanceToShow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-                // Total Amount = SubTotal - Reservation Fee - Discount
-                const totalAmount = subTotal - reservationFee - discountAmount;
+                // Total Amount handling
+                let totalAmount = grossTotal - reservationFee - discountAmount;
+                if (isCancelled) {
+                    // For cancelled bookings, total amount is just the cancellation fee
+                    totalAmount = penaltyAmountValue;
+                }
                 setText('totalPayment', totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
                 // Calculate Total Room Charges, Total Services, and Total Penalty
@@ -225,18 +279,30 @@ window.showBilling = async function (bookingID) {
                 data.items.forEach(item => {
                     const amount = parseFloat(item.subTotal) || 0;
                     const description = (item.description || '').toLowerCase();
+                    const isPenalty = item.status === 'penalty';
+                    const isRoom = description.includes('room') || description.includes('bedroom') || description.includes('room charge');
                     
                     // Check if it's a penalty or cancellation fee
-                    if (description.includes('penalty') || description.includes('cancellation fee')) {
+                    if (description.includes('penalty') || description.includes('cancellation fee') || isPenalty) {
                         totalPenalty += amount;
-                    } else if (description.includes('room') || description.includes('bedroom') || description.includes('room charge')) {
-                        // Room charges
+                    } else if (isRoom) {
                         totalRoomCharges += amount;
                     } else {
                         // Everything else is considered a service
                         totalServices += amount;
                     }
                 });
+                
+                // If booking is cancelled, summary totals for rooms and services should be shown as 0.00
+                if (isCancelled) {
+                    totalRoomCharges = 0;
+                    totalServices = 0;
+                }
+                
+                // Apply discount to Total Room Charges (same as in table display)
+                if (discountAmount > 0 && totalRoomCharges > 0) {
+                    totalRoomCharges = Math.max(0, totalRoomCharges - discountAmount);
+                }
                 
                 // Update Total Room Charges and Total Services
                 setText('totalRoomCharges', totalRoomCharges.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -289,21 +355,31 @@ window.showBilling = async function (bookingID) {
                         } else {
                             row.style.display = 'none';
                         }
-                        // Update label text based on discountApplied flag
+                        // Update label text - always show "Discount:"
                         const labelEl = row.querySelector('.summary-label');
                         if (labelEl) {
-                            const applied = (typeof data.discountApplied !== 'undefined' ? parseInt(data.discountApplied, 10) : 1);
-                            labelEl.textContent = applied === 0 ? 'Discount:' : 'Discount Applied:';
+                            labelEl.textContent = 'Discount:';
                         }
                     }
                 })();
 
                 // Check if fully paid: balance should be 0 or less
                 // Penalty items can have status 'penalty' or 'paid', so we check balance instead of all items being 'paid'
-                const allPaid = balanceToShow <= 0 && totalPaymentsMade > 0;
+                const allPaid = balanceToShow <= 0 && paidAmountToShow > 0;
                 const paidImageOverlay = document.getElementById('paidImageOverlay');
                 const proceedBtn = document.getElementById('proceedToPaymentButton');
-                if (allPaid) {
+                if (isCancelled) {
+                    if (paidImageOverlay) {
+                        paidImageOverlay.style.display = 'none';
+                        paidImageOverlay.classList.remove('show-paid-status');
+                    }
+                    if (proceedBtn) {
+                        proceedBtn.disabled = true;
+                        proceedBtn.textContent = 'Booking Cancelled';
+                        proceedBtn.classList.remove('btn-payment');
+                        proceedBtn.classList.add('btn-secondary');
+                    }
+                } else if (allPaid) {
                     if (paidImageOverlay) {
                         paidImageOverlay.style.display = 'block';
                         paidImageOverlay.classList.add('show-paid-status');

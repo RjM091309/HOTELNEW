@@ -491,7 +491,7 @@ async function createDynamicRoomModal(bookingId, event, options) {
                             <div class="row" id="discount-row-${bookingId}" style="display: none;">
                                 <div class="col-md-6">
                                     <div class="summary-item">
-                                        <label class="text-muted small mb-0" style="color: #28a745;">Discount Applied</label>
+                                        <label class="text-muted small mb-0" style="color: #28a745;">Discount</label>
                                         <div class="summary-value" id="discount-amount-${bookingId}" style="color: #dc3545;">₱0.00</div>
                                     </div>
                                 </div>
@@ -1860,15 +1860,10 @@ async function calculateBalance(bookingId, currentBookingId) {
             const discountAmountElement = document.getElementById(`discount-amount-${bookingId}`);
             if (discountRow && discountAmountElement) {
                 discountRow.style.display = 'block';
-                // Set label based on discount_applied flag from API (default to Applied when unknown)
+                // Set label - always show "Discount"
                 const label = document.querySelector(`#discount-row-${bookingId} .summary-item label`);
                 if (label) {
-                    const discountAppliedFlag = typeof billingData.discountApplied !== 'undefined' ? parseInt(billingData.discountApplied, 10) : 1;
-                    if (discountAppliedFlag === 0) {
-                        label.textContent = 'Discount';
-                    } else {
-                        label.textContent = 'Discount Applied';
-                    }
+                    label.textContent = 'Discount';
                 }
                 discountAmountElement.innerHTML = `<span class="text-danger"><strong>-₱${parseFloat(discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>`;
             } else {
@@ -2415,14 +2410,14 @@ function triggerCheckout(bookingId) {
                             cancellationFeeInput.value = formatInputNumber(currentOverpayment);
                         }
                     };
-                    // const setCancellationFeeReadOnlyPrimary = () => {
-                    //     if (!cancellationFeeInput) return;
-                    //     cancellationFeeInput.readOnly = !(chk && chk.checked);
-                    //     const help = document.getElementById('cancellationFeeHelp');
-                    //     if (help) {
-                    //         help.style.display = chk && chk.checked ? 'block' : 'none';
-                    //     }
-                    // };
+                    const setCancellationFeeReadOnlyPrimary = () => {
+                        if (!cancellationFeeInput) return;
+                        cancellationFeeInput.readOnly = !(chk && chk.checked);
+                        const help = document.getElementById('cancellationFeeHelp');
+                        if (help) {
+                            help.style.display = chk && chk.checked ? 'block' : 'none';
+                        }
+                    };
                     if (chk && wrap) {
                         // Use computed context if available, otherwise fetch
                         let totalPaid = 0;
@@ -2473,7 +2468,7 @@ function triggerCheckout(bookingId) {
                                     }
                                 }
                                 syncCancellationFeePrimary();
-                                // setCancellationFeeReadOnlyPrimary();
+                                setCancellationFeeReadOnlyPrimary();
                             }
                         });
                         
@@ -2517,14 +2512,14 @@ function triggerCheckout(bookingId) {
                                     }
                                 }
                                 syncCancellationFeePrimary();
-                                // setCancellationFeeReadOnlyPrimary();
+                                setCancellationFeeReadOnlyPrimary();
                             });
                         }
                     }
                     
                     // Pre-fill cancellation fee input with overpayment amount (or zero when fully refunded)
                     syncCancellationFeePrimary();
-                    // setCancellationFeeReadOnlyPrimary();
+                    setCancellationFeeReadOnlyPrimary();
                     
                     // Store context for preConfirm
                     window._checkoutContextCache = checkoutContextCache;
@@ -2891,14 +2886,14 @@ function triggerCheckout(bookingId) {
                         }
                     };
 
-                    // const setCancellationFeeReadOnlySecondary = () => {
-                    //     if (!cancellationFeeInput) return;
-                    //     cancellationFeeInput.readOnly = !(chk && chk.checked);
-                    //     const help = document.getElementById('cancellationFeeHelp');
-                    //     if (help) {
-                    //         help.style.display = chk && chk.checked ? 'block' : 'none';
-                    //     }
-                    // };
+                    const setCancellationFeeReadOnlySecondary = () => {
+                        if (!cancellationFeeInput) return;
+                        cancellationFeeInput.readOnly = !(chk && chk.checked);
+                        const help = document.getElementById('cancellationFeeHelp');
+                        if (help) {
+                            help.style.display = chk && chk.checked ? 'block' : 'none';
+                        }
+                    };
                     
                     if (chk && wrap) {
                         // Use computed context if available, otherwise fetch
@@ -2950,7 +2945,7 @@ function triggerCheckout(bookingId) {
                                     }
                                 }
                                 syncCancellationFeeSecondary();
-                                // setCancellationFeeReadOnlySecondary();
+                                setCancellationFeeReadOnlySecondary();
                             }
                         });
                         
@@ -2994,14 +2989,14 @@ function triggerCheckout(bookingId) {
                                     }
                                 }
                                 syncCancellationFeeSecondary();
-                                // setCancellationFeeReadOnlySecondary();
+                                setCancellationFeeReadOnlySecondary();
                             });
                         }
                     }
                     
                     // Pre-fill cancellation fee input with overpayment amount
                     syncCancellationFeeSecondary();
-                    // setCancellationFeeReadOnlySecondary();
+                    setCancellationFeeReadOnlySecondary();
                     }
                     
                     // Store context for preConfirm

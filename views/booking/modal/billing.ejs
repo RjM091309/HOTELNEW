@@ -116,9 +116,9 @@
                                                 <span class="summary-label">Total Paid (Before Cancelled):</span>
                                                 <span class="summary-value paid-before-refund-amount" id="totalPaidBeforeRefund">0.00</span>
                                             </div>
-                                            <div class="summary-row">
-                                                <span class="summary-label">Paid Amount:</span>
-                                                <span class="summary-value paid-amount" id="totalPaid">₹0.00</span>
+                                            <div class="summary-row" id="paidAmountRow">
+                                                <span class="summary-label" id="paidAmountLabel">Paid Amount:</span>
+                                                <span class="summary-value paid-amount" id="totalPaid">0.00</span>
                                             </div>
                                              <!-- Reservation Fee (Conditional) -->
                                              <div class="summary-row" id="reservationFeeRow">
@@ -127,7 +127,7 @@
                                             </div>
                                             <!-- Discount (Conditional) -->
                                             <div class="summary-row" id="discountRow">
-                                                <span class="summary-label">Discount Applied:</span>
+                                                <span class="summary-label">Discount:</span>
                                                 <span class="summary-value discount-amount" id="billingDiscountAmount"></span>
                                             </div>
                                             <!-- Refund Amount (Conditional - only show if there's a refund) -->

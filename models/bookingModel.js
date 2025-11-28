@@ -88,6 +88,7 @@ class BookingModel {
                   - COALESCE(bill.DISCOUNT_AMOUNT, 0)
             END AS TOTAL_COST,
             CASE 
+              WHEN bill.PAYMENT_STATUS = 'cancelled' THEN 'cancelled'
               WHEN bill.PAYMENT_STATUS = 'paid' 
                 AND COALESCE(services_unpaid_count.TOTAL_UNPAID_SERVICES, 0) = 0
                 AND COALESCE(extensions_unpaid_count.TOTAL_UNPAID_EXTENSIONS, 0) = 0
@@ -2299,6 +2300,7 @@ class BookingModel {
           b.CHECK_IN_DATE,
           b.CHECK_OUT_DATE,
           b.CONFIRMATION_NUMBER,
+          b.BOOKING_STATUS,
           bi.ROOM_CHARGE,
           bi.AMENITIES_CHARGE,
           bi.SERVICES_CHARGE,
@@ -2308,6 +2310,7 @@ class BookingModel {
           bi.DISCOUNT_AMOUNT,
           COALESCE(bi.CANCELLATION_PENALTY, 0) AS PENALTY_AMOUNT,
           COALESCE(bi.CHECKOUT_REFUND, 0) AS CHECKOUT_REFUND,
+          COALESCE(bi.REFUNDABLE_AMOUNT, 0) AS REFUNDABLE_AMOUNT,
           bi.DISCOUNT_APPLIED,
           rt.NAME AS ROOM_TYPE
         FROM booking b
@@ -2327,6 +2330,8 @@ class BookingModel {
       const customerId = b.customerId;
       const roomRate = parseFloat(b.ROOM_CHARGE);
       const originalQty = parseInt(b.QTY);
+      const bookingStatus = (b.BOOKING_STATUS || '').toLowerCase();
+      const isCancelled = bookingStatus === 'cancelled';
 
       // Get actual payments made for this booking
       const paymentsQuery = `
@@ -2342,6 +2347,7 @@ class BookingModel {
       const discountAmount = parseFloat(b.DISCOUNT_AMOUNT) || 0;
       const checkoutRefund = parseFloat(b.CHECKOUT_REFUND) || 0;
       const penaltyAmount = parseFloat(b.PENALTY_AMOUNT) || 0;
+      const manualRefundAmount = parseFloat(b.REFUNDABLE_AMOUNT) || 0;
       
       // Calculate total payments made (includes refunds which are negative)
       const totalPaymentsMade = paymentsData.reduce((sum, payment) => {
@@ -2373,8 +2379,12 @@ class BookingModel {
       }, 0);
       
       // Use the larger of checkoutRefund from billing table or calculated refund from payments
-      const refundAmount = Math.max(checkoutRefund, refundAmountFromPayments);
-      const netRoomAmount = roomAmount - reservationFee - discountAmount - checkoutRefund;
+      let refundAmount = Math.max(checkoutRefund, refundAmountFromPayments);
+      if (isCancelled) {
+        refundAmount = manualRefundAmount;
+      }
+
+      const netRoomAmount = roomAmount - reservationFee - discountAmount - (isCancelled ? 0 : checkoutRefund);
       
       let roomStatus = 'unpaid';
       if (totalPaymentsMade >= netRoomAmount) {
@@ -2473,11 +2483,19 @@ class BookingModel {
         status: 'penalty'
       }] : [];
 
-      // Combine all items
-      const allItems = [...roomItems, ...serviceItems, ...transportItems, ...penaltyItems];
+      const baseChargeItems = [...roomItems, ...serviceItems, ...transportItems];
 
-      // Calculate subtotal
+      // Combine all items
+      const allItems = [...baseChargeItems, ...penaltyItems];
+
+      // Calculate subtotals
+      const baseChargeSubTotal = baseChargeItems.reduce((sum, item) => sum + item.subTotal, 0);
       const subTotal = allItems.reduce((sum, item) => sum + item.subTotal, 0);
+      const effectiveSubTotal = isCancelled ? baseChargeSubTotal : subTotal;
+
+      const paidAmountAfterRefund = isCancelled
+        ? Math.max(0, (totalPaidBeforeRefund || 0) - refundAmount)
+        : totalPaymentsMade;
 
       const receiptData = {
         bookingId: b.bookingId,
@@ -2488,13 +2506,16 @@ class BookingModel {
         paymentStatus: b.PAYMENT_STATUS,
         items: allItems,
         subTotal: subTotal,
+        effectiveSubTotal,
         reservationFee: parseFloat(b.RESERVATION_FEE) || 0,
         discountAmount: parseFloat(b.DISCOUNT_AMOUNT) || 0,
         checkoutRefund: checkoutRefund,
         refundAmount: refundAmount,
         totalPaidBeforeRefund: totalPaidBeforeRefund,
         penaltyAmount: penaltyAmount,
-        discountApplied: b.DISCOUNT_APPLIED === 1 ? 1 : 0
+        discountApplied: b.DISCOUNT_APPLIED === 1 ? 1 : 0,
+        isCancelled,
+        paidAmountAfterRefund
       };
 
       return receiptData;
@@ -5085,9 +5106,19 @@ class BookingModel {
 
   // Cancel booking
   static async cancelBooking(params) {
-    const { bookingId, reason, manual, manualRefund, encodedBy } = params;
+    const { bookingId, reason, manualRefund, manualCancellationFee, encodedBy } = params;
     
     try {
+      const refundAmount = parseFloat(manualRefund);
+      if (!Number.isFinite(refundAmount) || refundAmount < 0) {
+        throw new Error('Invalid refund amount.');
+      }
+
+      const cancellationFee = parseFloat(manualCancellationFee);
+      if (!Number.isFinite(cancellationFee) || cancellationFee < 0) {
+        throw new Error('Invalid cancellation fee.');
+      }
+
       // Get connection from pool for transaction
       const connection = await new Promise((resolve, reject) => {
         pool.getConnection((err, conn) => {
@@ -5099,7 +5130,7 @@ class BookingModel {
       try {
         // Fetch booking details
         const fetchBookingQuery = `
-          SELECT CHECK_IN_DATE, CHECK_OUT_DATE 
+          SELECT IDNo 
           FROM booking 
           WHERE IDNo = ?
         `;
@@ -5110,23 +5141,9 @@ class BookingModel {
         throw new Error('Booking not found.');
       }
 
-      const { CHECK_IN_DATE, CHECK_OUT_DATE } = bookingRows[0];
-      const today = new Date();
-      const checkIn = new Date(CHECK_IN_DATE);
-      const checkOut = new Date(CHECK_OUT_DATE);
-
-      const totalNights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
-      const dayDiff = Math.floor((checkIn - today) / (1000 * 60 * 60 * 24));
-
-      // Calculate penalty nights based on policy
-      let penaltyNights = 0;
-      if (dayDiff >= 20) penaltyNights = 1;
-      else if (dayDiff >= 10) penaltyNights = 2;
-      else if (dayDiff < 5) penaltyNights = totalNights;
-
       // Fetch billing details
       const billingQuery = `
-        SELECT ROOM_CHARGE * QTY AS TOTAL_AMOUNT 
+        SELECT COALESCE(SUM(ROOM_CHARGE * QTY), 0) AS TOTAL_AMOUNT 
         FROM billing 
         WHERE BOOKING_ID = ?
       `;
@@ -5137,21 +5154,59 @@ class BookingModel {
         throw new Error('Billing not found.');
       }
 
-      const totalAmount = billRows[0].TOTAL_AMOUNT;
-      const nightlyRate = totalNights > 0 ? totalAmount / totalNights : 0;
-      const penaltyAmount = nightlyRate * penaltyNights;
-
-      // Calculate refund amount
-      let refundAmount = 0;
-      let fullPenalty = 0;
-
-      if (manual === 'true' || manual === true) {
-        refundAmount = parseFloat(manualRefund) || 0;
-        fullPenalty = refundAmount === 0 ? 1 : 0;
-      } else {
-        refundAmount = totalAmount - penaltyAmount;
-        fullPenalty = penaltyNights >= totalNights ? 1 : 0;
+      const totalAmount = billRows[0].TOTAL_AMOUNT || 0;
+      
+      // Get total payments made to determine if anything was paid
+      const paymentsQuery = `
+        SELECT COALESCE(SUM(AMOUNT_PAID), 0) AS TOTAL_PAID
+        FROM payments 
+        WHERE BOOKING_ID = ? 
+        AND PAYMENT_TYPE NOT IN ('reservation_fee', 'discount')
+      `;
+      const paymentRows = await queryDatabasePromise(paymentsQuery, [bookingId], connection);
+      
+      // Handle different result formats
+      let totalPaid = 0;
+      if (paymentRows && paymentRows.length > 0) {
+        const paidValue = paymentRows[0].TOTAL_PAID || paymentRows[0].total_paid || paymentRows[0][0] || 0;
+        totalPaid = parseFloat(paidValue) || 0;
       }
+      
+      // Ensure refund doesn't exceed what was paid
+      if (refundAmount > totalPaid) {
+        connection.release();
+        throw new Error('Refund cannot exceed the amount that was paid.');
+      }
+      
+      // Validate amounts based on payment status
+      // Use a small epsilon for floating point comparison
+      if (totalPaid < 0.01) {
+        // If nothing was paid (or very close to 0), refund must be 0, fee can be any amount up to totalAmount
+        if (Math.abs(refundAmount) > 0.01) {
+          connection.release();
+          throw new Error('Refund must be 0 when no payment was made.');
+        }
+        if (cancellationFee > totalAmount + 0.01) {
+          connection.release();
+          throw new Error('Cancellation fee cannot exceed total amount.');
+        }
+        // Allow fee to be less than totalAmount (difference is written off)
+      } else {
+        // If payment was made, cancellation fee cannot exceed paid amount
+        if (cancellationFee > totalPaid + 0.01) {
+          connection.release();
+          throw new Error('Cancellation fee cannot exceed paid amount.');
+        }
+        // Refund + fee must equal paid amount (not total amount)
+        const sum = refundAmount + cancellationFee;
+        const difference = Math.abs(sum - totalPaid);
+        if (difference > 0.01) { // Allow small floating point differences
+          connection.release();
+          throw new Error('Refund amount and cancellation fee must equal paid amount.');
+        }
+      }
+      
+      const penaltyAmount = cancellationFee;
 
         // Start transaction
         await new Promise((resolve, reject) => {
@@ -5168,20 +5223,37 @@ class BookingModel {
         UPDATE booking
         SET IS_CANCELLED = 1,
             CANCELLED_AT = ?,
-            PENALTY_NIGHTS = ?,
+            PENALTY_NIGHTS = NULL,
             BOOKING_STATUS = 'cancelled'
         WHERE IDNo = ?
       `;
-      await queryDatabasePromise(updateBookingQuery, [now, penaltyNights, bookingId], connection);
+      await queryDatabasePromise(updateBookingQuery, [now, bookingId], connection);
 
-      // Update billing
+      // Update billing - set payment status to 'cancelled' for cancelled bookings
       const updateBillingQuery = `
         UPDATE billing
         SET CANCELLATION_PENALTY = ?,
-            REFUNDABLE_AMOUNT = ?
+            REFUNDABLE_AMOUNT = ?,
+            PAYMENT_STATUS = 'cancelled'
         WHERE BOOKING_ID = ?
       `;
       await queryDatabasePromise(updateBillingQuery, [penaltyAmount, refundAmount, bookingId], connection);
+
+      // Update booking_service status to 'cancelled' for all services
+      const updateServicesQuery = `
+        UPDATE booking_service
+        SET STATUS = 'cancelled'
+        WHERE BOOKING_ID = ? AND ACTIVE = 1
+      `;
+      await queryDatabasePromise(updateServicesQuery, [bookingId], connection);
+
+      // Update booking_extension payment status to 'cancelled' for all extensions
+      const updateExtensionsQuery = `
+        UPDATE booking_extension
+        SET PAYMENT_STATUS = 'cancelled'
+        WHERE BOOKING_ID = ? AND ACTIVE = 1
+      `;
+      await queryDatabasePromise(updateExtensionsQuery, [bookingId], connection);
 
       // Insert cancellation log
       const insertLogQuery = `
@@ -5192,11 +5264,25 @@ class BookingModel {
       await queryDatabasePromise(insertLogQuery, [
         bookingId, 
         reason || '', 
-        penaltyNights, 
+        null, 
         refundAmount, 
-        fullPenalty, 
+        null, 
         encodedBy
       ], connection);
+
+      // Insert remark if reason is provided
+      if (reason && reason.trim() !== '') {
+        const insertRemarkQuery = `
+          INSERT INTO remarks
+          (BOOKING_ID, CATEGORY, REMARK_TEXT, ENCODED_BY, ACTIVE)
+          VALUES (?, 'Cancelled', ?, ?, 1)
+        `;
+        await queryDatabasePromise(insertRemarkQuery, [
+          bookingId,
+          reason.trim(),
+          encodedBy
+        ], connection);
+      }
 
         // Commit the transaction
         await new Promise((resolve, reject) => {
@@ -5343,14 +5429,31 @@ class BookingModel {
             `;
             await queryDatabasePromise(updateBookingQuery, [now, penaltyNights, booking.BOOKING_ID], connection);
 
-            // Update billing for this booking
+            // Update billing for this booking - set payment status to 'cancelled' for cancelled bookings
             const updateBillingQuery = `
               UPDATE billing
               SET CANCELLATION_PENALTY = ?,
-                  REFUNDABLE_AMOUNT = ?
+                  REFUNDABLE_AMOUNT = ?,
+                  PAYMENT_STATUS = 'cancelled'
               WHERE BOOKING_ID = ?
             `;
             await queryDatabasePromise(updateBillingQuery, [penaltyAmount, refundAmount, booking.BOOKING_ID], connection);
+
+            // Update booking_service status to 'cancelled' for all services
+            const updateServicesQuery = `
+              UPDATE booking_service
+              SET STATUS = 'cancelled'
+              WHERE BOOKING_ID = ? AND ACTIVE = 1
+            `;
+            await queryDatabasePromise(updateServicesQuery, [booking.BOOKING_ID], connection);
+
+            // Update booking_extension payment status to 'cancelled' for all extensions
+            const updateExtensionsQuery = `
+              UPDATE booking_extension
+              SET PAYMENT_STATUS = 'cancelled'
+              WHERE BOOKING_ID = ? AND ACTIVE = 1
+            `;
+            await queryDatabasePromise(updateExtensionsQuery, [booking.BOOKING_ID], connection);
 
             // Insert cancellation log for this booking
             const insertLogQuery = `
@@ -5536,6 +5639,7 @@ class BookingModel {
         rt.NAME AS ROOM_TYPE,
         b.CHECK_IN_DATE,
         b.CHECK_OUT_DATE,
+        b.BOOKING_STATUS,
         bill.ROOM_CHARGE AS ROOM_RATE,
 
         COALESCE(bill.QTY) AS ORIGINAL_DAYS,
@@ -5554,6 +5658,8 @@ class BookingModel {
 
         COALESCE(bill.RESERVATION_FEE, 0) AS RESERVATION_FEE,
         COALESCE(bill.DISCOUNT_AMOUNT, 0) AS DISCOUNT,
+        COALESCE(bill.CANCELLATION_PENALTY, 0) AS CANCELLATION_FEE,
+        COALESCE(bill.REFUNDABLE_AMOUNT, 0) AS REFUND_AMOUNT,
 
         (SELECT COALESCE(SUM(bs.TOTAL_COST), 0)
          FROM booking_service bs
@@ -5635,7 +5741,48 @@ class BookingModel {
 
       const data = rows[0];
       data.DISPLAY_NAME = data.AGENCY_ID ? data.AGENCY_NAME : data.CUSTOMER_NAME;
-      data.TOTAL_UNPAID = parseFloat(data.GRAND_TOTAL) - parseFloat(data.TOTAL_PAID);
+      const isCancelled = (data.BOOKING_STATUS || '').toLowerCase() === 'cancelled';
+
+      // Recompute payment figures to match billing logic
+      const paymentsQuery = `
+        SELECT AMOUNT_PAID, PAYMENT_TYPE
+        FROM payments 
+        WHERE BOOKING_ID = ?
+      `;
+      const paymentRows = await queryDatabasePromise(paymentsQuery, [bookingId]);
+
+      const totalPaidBeforeRefund = paymentRows.reduce((sum, payment) => {
+        const amount = parseFloat(payment.AMOUNT_PAID) || 0;
+        if (
+          payment.PAYMENT_TYPE === 'reservation_fee' ||
+          payment.PAYMENT_TYPE === 'discount' ||
+          payment.PAYMENT_TYPE === 'refund'
+        ) {
+          return sum;
+        }
+        return sum + Math.max(0, amount);
+      }, 0);
+
+      const refundAmountFromPayments = paymentRows.reduce((sum, payment) => {
+        const amount = parseFloat(payment.AMOUNT_PAID) || 0;
+        if (payment.PAYMENT_TYPE === 'refund' && amount < 0) {
+          return sum + Math.abs(amount);
+        }
+        return sum;
+      }, 0);
+
+      const effectiveRefundAmount = Math.max(parseFloat(data.REFUND_AMOUNT) || 0, refundAmountFromPayments);
+      const paidAmountAfterCancellation = isCancelled
+        ? Math.max(0, totalPaidBeforeRefund - effectiveRefundAmount)
+        : totalPaidBeforeRefund;
+
+      data.TOTAL_PAID = totalPaidBeforeRefund;
+      data.TOTAL_PAID_BEFORE = totalPaidBeforeRefund;
+      data.PAID_AFTER_CANCELLATION = paidAmountAfterCancellation;
+      data.REFUND_AMOUNT = effectiveRefundAmount;
+      data.TOTAL_UNPAID = isCancelled
+        ? 0
+        : Math.max(0, (parseFloat(data.GRAND_TOTAL) || 0) - totalPaidBeforeRefund);
 
       // Generate invoice number and dates
       const date = new Date();

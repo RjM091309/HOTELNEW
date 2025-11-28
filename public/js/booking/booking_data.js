@@ -21,6 +21,8 @@ $(document).ready(function () {
                             timeZone: 'UTC' // Force UTC to avoid timezone shifts
                         }).format(date);
                     };
+                    const isCancelled = (item.BookingStatus || '').toLowerCase() === 'cancelled' || item.IS_CANCELLED === 1;
+                    
                     return {
                         BookingID: item.BookingID,
                         GroupBookingId: item.GROUP_BOOKING_ID,
@@ -35,6 +37,7 @@ $(document).ready(function () {
                         BookingChannel: item.BOOKING_CHANNEL,
                         Status: getStatusLabel(item.BookingStatus, item.BookingID), // Status label
                         BookingStatus: item.BookingStatus,
+                        IsCancelled: isCancelled,
                         IsDirectReservation: item.IS_DIRECT_RESERVATION,
                         BookingRemarks: item.BookingRemarks || '',
                         RemarksCount: item.RemarksCount || 0
@@ -68,6 +71,51 @@ $(document).ready(function () {
             api.column(1, { page: 'current' }).nodes().each(function (cell, i) {
                 cell.innerHTML = start + i + 1;
             });
+            
+            // Fetch billing data for cancelled bookings to update TOTAL PAYMENT
+            const cancelledBookings = [];
+            api.rows({ page: 'current' }).every(function () {
+                const rowData = this.data();
+                if (rowData.IsCancelled && !rowData._cancellationPenaltyFetched) {
+                    cancelledBookings.push({
+                        bookingId: rowData.BookingID,
+                        row: this
+                    });
+                    rowData._cancellationPenaltyFetched = true;
+                }
+            });
+            
+            // Batch fetch billing data for cancelled bookings
+            if (cancelledBookings.length > 0) {
+                Promise.all(
+                    cancelledBookings.map(item => 
+                        fetch(`/booking/get-billing/${item.bookingId}?_=${Date.now()}`)
+                            .then(response => response.json())
+                            .then(billingData => ({
+                                bookingId: item.bookingId,
+                                row: item.row,
+                                penaltyAmount: parseFloat(billingData.penaltyAmount) || 0
+                            }))
+                            .catch(err => {
+                                console.error(`Error fetching billing for booking ${item.bookingId}:`, err);
+                                return {
+                                    bookingId: item.bookingId,
+                                    row: item.row,
+                                    penaltyAmount: 0
+                                };
+                            })
+                    )
+                ).then(results => {
+                    // Update the table with correct cancellation penalty values
+                    results.forEach(result => {
+                        const rowData = result.row.data();
+                        rowData._cancellationPenalty = result.penaltyAmount;
+                        result.row.data(rowData);
+                    });
+                    // Redraw to update display
+                    api.draw(false);
+                });
+            }
         },
         columns: [  
             { data: 'BookingID', visible: false },
@@ -113,9 +161,18 @@ $(document).ready(function () {
             {
                 data: 'Totalcost',
                 title: 'TOTAL PAYMENT',
-                render: function (data) {
+                render: function (data, type, row) {
+                    // For cancelled bookings, use stored cancellation penalty if available
+                    // Otherwise use the data from backend (will be updated after billing fetch)
+                    let totalCost = parseFloat(data) || 0;
+                    
+                    // If cancelled and we have the cancellation penalty stored, use it
+                    if (row.IsCancelled && row._cancellationPenalty !== undefined) {
+                        totalCost = row._cancellationPenalty;
+                    }
+                    
                     // Format the total cost as currency
-                    return parseFloat(data).toLocaleString('en-US', {
+                    return totalCost.toLocaleString('en-US', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                     });
@@ -124,9 +181,15 @@ $(document).ready(function () {
             {
                 data: 'Balance',
                 title: 'BALANCE',
-                render: function (data) {
+                render: function (data, type, row) {
+                    // For cancelled bookings, balance should always be 0 (as per billing logic)
+                    let balance = parseFloat(data) || 0;
+                    
+                    if (row.IsCancelled) {
+                        balance = 0; // Cancelled bookings always show 0 balance
+                    }
+                    
                     // Format the balance as currency
-                    const balance = parseFloat(data) || 0;
                     const formattedBalance = balance.toLocaleString('en-US', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
@@ -154,7 +217,12 @@ $(document).ready(function () {
                         return data; // Already normalized in dataSrc
                     }
                     
-                    // Calculate actual payment status based on balance
+                    // For cancelled bookings, always show CANCELLED status
+                    if (row.IsCancelled || (data && data.toLowerCase() === 'cancelled')) {
+                        return `<div style="text-align: center;"><span class="label label-sm label-danger">CANCELLED</span></div>`;
+                    }
+                    
+                    // Calculate actual payment status based on balance for non-cancelled bookings
                     const balance = parseFloat(row.Balance) || 0;
                     const totalCost = parseFloat(row.Totalcost) || 0;
                     let labelClass, displayText;
@@ -555,6 +623,146 @@ function getStatusLabel(status, bookingId) {
 function openCancelBookingModal(bookingId) {
     $('#cancelBookingId').val(bookingId);
     $('#cancelReason').val('');
+    $('#manualRefund').val('');
+    $('#manualCancellationFee').val('');
+    
+    // Fetch billing details to show in modal
+    $.ajax({
+        url: `/booking/get-billing/${bookingId}?_=${Date.now()}`,
+        method: 'GET',
+        cache: false,
+        success: async function (data) {
+            // Get payments to calculate paid amount
+            const paymentsResponse = await fetch(`/payments/get-payments/${bookingId}?_=${Date.now()}`);
+            const paymentsData = await paymentsResponse.json();
+            const paymentsArray = (paymentsData && paymentsData.data) ? paymentsData.data : (Array.isArray(paymentsData) ? paymentsData : []);
+            
+            const totalPaymentsMade = paymentsArray.reduce((sum, payment) => {
+                if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
+                    return sum;
+                }
+                return sum + parseFloat(payment.AMOUNT_PAID || 0);
+            }, 0);
+            
+            const effectiveSubTotal = Number.isFinite(parseFloat(data.effectiveSubTotal))
+                ? parseFloat(data.effectiveSubTotal)
+                : parseFloat(data.subTotal || 0);
+            const reservationFee = parseFloat(data.reservationFee || 0);
+            const discountAmount = parseFloat(data.discountAmount || 0);
+            
+            const totalAmount = effectiveSubTotal - reservationFee - discountAmount;
+            const balance = Math.max(0, totalAmount - totalPaymentsMade);
+            const maxRefund = totalPaymentsMade; // Maximum refund is what was paid
+            
+            // Display booking details
+            $('#cancelTotalAmount').text('₱' + totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#cancelPaidAmount').text('₱' + totalPaymentsMade.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#cancelBalance').text('₱' + balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            $('#cancelMaxRefund').text('₱' + maxRefund.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            
+            // Set max attributes on both inputs
+            // Refundable amount: max is what was paid (can't refund more than paid)
+            const maxRefundable = maxRefund;
+            $('#manualRefund').attr('max', maxRefundable);
+            
+            // Cancellation fee: max depends on payment status
+            // If nothing paid, can set up to totalAmount; if paid, max is paid amount
+            const maxCancellationFee = maxRefund === 0 ? totalAmount : maxRefund;
+            $('#manualCancellationFee').attr('max', maxCancellationFee);
+            
+            // Store values in data attributes for easy access
+            $('#manualRefund').data('max-refund', maxRefund);
+            $('#manualRefund').data('paid-amount', maxRefund); // Store paid amount for calculation
+            $('#manualRefund').data('total-amount', totalAmount);
+            $('#manualCancellationFee').data('paid-amount', maxRefund); // Store paid amount for calculation
+            $('#manualCancellationFee').data('total-amount', totalAmount); // Store total amount for when nothing paid
+            $('#manualCancellationFee').data('max-refund', maxRefund); // Store for validation
+            
+            // If nothing was paid, set default values and show note
+            if (maxRefund === 0) {
+                $('#manualRefund').val('0.00');
+                $('#manualRefund').prop('readonly', true); // Lock refund at 0
+                $('#manualCancellationFee').val(totalAmount.toFixed(2)); // Default to full amount
+                $('#refundHelpText').text('No payment made - refund is locked at ₱0.00.');
+                $('#feeHelpText').text('Set the cancellation penalty (can be less than total amount).');
+                $('#noPaymentNote').show();
+            } else {
+                $('#manualRefund').prop('readonly', false);
+                $('#refundHelpText').text('Enter the amount to refund.');
+                $('#feeHelpText').text('Enter the cancellation penalty.');
+                $('#noPaymentNote').hide();
+            }
+            
+            $('#cancelBookingDetails').show();
+            
+            // Add event listeners for mutual calculation
+            let isUpdating = false; // Prevent infinite loop
+            
+            // When refund amount changes, calculate cancellation fee
+            $('#manualRefund').off('input change').on('input change', function() {
+                if (isUpdating) return;
+                isUpdating = true;
+                let refundAmount = parseFloat($(this).val()) || 0;
+                const maxRefundable = parseFloat($(this).attr('max')) || 0;
+                const paidAmount = parseFloat($(this).data('paid-amount')) || 0;
+                
+                // Enforce max limit (can't refund more than what was paid)
+                if (refundAmount > maxRefundable) {
+                    refundAmount = maxRefundable;
+                    $(this).val(refundAmount.toFixed(2));
+                }
+                
+                // Calculate cancellation fee: paidAmount - refundAmount
+                const cancellationFee = Math.max(0, paidAmount - refundAmount);
+                $('#manualCancellationFee').val(cancellationFee.toFixed(2));
+                isUpdating = false;
+            });
+            
+            // When cancellation fee changes, calculate refund amount
+            $('#manualCancellationFee').off('input change').on('input change', function() {
+                if (isUpdating) return;
+                isUpdating = true;
+                let cancellationFee = parseFloat($(this).val()) || 0;
+                const maxCancellationFee = parseFloat($(this).attr('max')) || 0;
+                const paidAmount = parseFloat($(this).data('paid-amount')) || 0;
+                const maxRefund = parseFloat($(this).data('max-refund')) || 0;
+                
+                // Enforce max limit
+                if (cancellationFee > maxCancellationFee) {
+                    cancellationFee = maxCancellationFee;
+                    $(this).val(cancellationFee.toFixed(2));
+                }
+                
+                // Calculate refund: paidAmount - cancellationFee
+                // But refund cannot exceed what was actually paid
+                let refundAmount = Math.max(0, paidAmount - cancellationFee);
+                
+                // If nothing was paid (maxRefund = 0), refund must stay at 0
+                // In this case, fee can be set independently (up to totalAmount)
+                if (maxRefund === 0) {
+                    refundAmount = 0;
+                    $('#manualRefund').val('0.00');
+                } else {
+                    // If something was paid, cap refund at maxRefund
+                    if (refundAmount > maxRefund) {
+                        refundAmount = maxRefund;
+                        // Adjust fee to maintain: refund + fee = paidAmount
+                        cancellationFee = paidAmount - refundAmount;
+                        $(this).val(cancellationFee.toFixed(2));
+                    }
+                    $('#manualRefund').val(refundAmount.toFixed(2));
+                }
+                
+                isUpdating = false;
+            });
+        },
+        error: function (err) {
+            console.error('Failed to fetch billing data:', err);
+            // Still show modal even if billing fetch fails
+            $('#cancelBookingDetails').hide();
+        }
+    });
+    
     $('#modal-cancel-booking').modal('show');
 }
 

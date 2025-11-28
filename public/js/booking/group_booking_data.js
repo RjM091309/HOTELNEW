@@ -637,13 +637,27 @@ function viewGroupBilling(groupId) {
                 return a.ROOM_NUMBER - b.ROOM_NUMBER || a.BOOKING_ID - b.BOOKING_ID;
             });
 
+            // Get discount early (needed in forEach loop)
+            const discount = parseFloat(data.discount || 0);
+            
             let currentRoom = null;
             let roomTotal = 0;
+            let discountAppliedToRoom = false; // Track if discount has been applied to a room item
 
             allBillingData.forEach((bill, index) => {
                 let chargeAmount = parseFloat(bill.charges) || 0;
                 let amount = chargeAmount * (bill.room_qty || bill.service_qty || 1);
                 let paidIcon = (bill.PAYMENT_STATUS === 'paid' || bill.STATUS === 'paid') ? '✅' : '';
+                
+                // Check if this is a room charge
+                const description = (bill.description || '').toLowerCase();
+                const isRoom = description.includes('room') || description.includes('bedroom') || description.includes('room charge');
+                
+                // Apply discount to first room item if discount exists
+                if (isRoom && discount > 0 && !discountAppliedToRoom) {
+                    amount = Math.max(0, amount - discount);
+                    discountAppliedToRoom = true; // Mark that discount has been applied
+                }
 
                 if (currentRoom !== bill.ROOM_NUMBER && currentRoom !== null) {
                     // Insert total row for previous room
@@ -682,9 +696,8 @@ function viewGroupBilling(groupId) {
                 }
             });
 
-            // Get reservation fee and discount from data (already applied in grandTotal)
+            // Get reservation fee from data (discount already parsed above)
             const reservationFee = parseFloat(data.reservationFee || 0);
-            const discount = parseFloat(data.discount || 0);
             
             // Use backend totals directly
             const finalTotal = totalAmount;
@@ -732,9 +745,14 @@ function viewGroupBilling(groupId) {
             });
             
             // Use calculated values or fallback to backend values
-            const groupRoomTotal = calculatedRoomTotal > 0 ? calculatedRoomTotal : parseFloat(data.roomTotal || 0);
+            let groupRoomTotal = calculatedRoomTotal > 0 ? calculatedRoomTotal : parseFloat(data.roomTotal || 0);
             const groupServicesTotal = calculatedServicesTotal > 0 ? calculatedServicesTotal : parseFloat(data.servicesTotal || 0);
             const groupPenaltyTotal = calculatedPenaltyTotal > 0 ? calculatedPenaltyTotal : parseFloat(data.penaltyTotal || 0) || 0;
+            
+            // Apply discount to Total Room Charges (same as in table display)
+            if (discount > 0 && groupRoomTotal > 0) {
+                groupRoomTotal = Math.max(0, groupRoomTotal - discount);
+            }
             
             $('#totalRoomCharges').text(groupRoomTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
             $('#totalServices').text(groupServicesTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));

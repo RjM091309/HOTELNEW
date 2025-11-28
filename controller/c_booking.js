@@ -1828,7 +1828,7 @@ class BookingController {
   // Cancel booking
   static async cancelBooking(req, res) {
     try {
-      const { bookingId, reason, manual, manualRefund } = req.body;
+      const { bookingId, reason, manualRefund, manualCancellationFee } = req.body;
       const encodedBy = req.user.userId;
 
       if (!bookingId || !encodedBy) {
@@ -1838,11 +1838,27 @@ class BookingController {
         });
       }
 
+      const parsedRefund = parseFloat(manualRefund);
+      if (!Number.isFinite(parsedRefund) || parsedRefund < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide a valid refund amount.'
+        });
+      }
+
+      const parsedFee = parseFloat(manualCancellationFee);
+      if (!Number.isFinite(parsedFee) || parsedFee < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please provide a valid cancellation fee.'
+        });
+      }
+
       const result = await BookingModel.cancelBooking({ 
         bookingId, 
         reason, 
-        manual, 
-        manualRefund, 
+        manualRefund: parsedRefund,
+        manualCancellationFee: parsedFee,
         encodedBy 
       });
 

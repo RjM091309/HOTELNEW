@@ -110,6 +110,29 @@
     </div>
   </div>
 
+  <% 
+    const formatCurrency = (value) => Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const bookingStatus = ((BOOKING_STATUS || '').toString().toLowerCase());
+    const isCancelled = bookingStatus === 'cancelled';
+    const cancellationFee = Number(CANCELLATION_FEE || 0);
+    const refundAmount = Number(REFUND_AMOUNT || 0);
+    const reservationFeeValue = Number(RESERVATION_FEE || 0);
+    const discountValue = Number(DISCOUNT || 0);
+    const roomTotalValue = Number(ROOM_TOTAL || 0);
+    const servicesTotalValue = Number(SERVICES_TOTAL || 0);
+    const tableTotalValue = roomTotalValue + servicesTotalValue;
+    const totalPaidBeforeValue = Number(TOTAL_PAID_BEFORE || TOTAL_PAID || 0);
+    const totalPaidValue = totalPaidBeforeValue;
+    const paidAfterCancellationValue = isCancelled ? Number(PAID_AFTER_CANCELLATION || 0) : totalPaidBeforeValue;
+    const roomPaidValue = Number(ROOM_PAID || 0);
+    const extendedPaidValue = Number(EXTENDED_PAID || 0);
+    const servicesPaidValue = Number(SERVICES_PAID || 0);
+    const displayRoomTotal = isCancelled ? 0 : roomTotalValue;
+    const displayServicesTotal = isCancelled ? 0 : servicesTotalValue;
+    const totalChargesValue = isCancelled ? cancellationFee : Number(GRAND_TOTAL || 0);
+    const totalDueValue = isCancelled ? 0 : Math.max(0, totalChargesValue - totalPaidBeforeValue);
+  %>
+
   <div style="display: flex; justify-content: space-between; margin-top: 10px;">
     <div><b>Date:</b> <%= DATE_ISSUED %></div>
     <div><b>Invoice #:</b> <%= INVOICE_NO %></div>
@@ -137,31 +160,30 @@
         <td>ROOM ACCOMMODATION</td>
         <td><%= ROOM_COUNT %> ROOMS (<%= ROOM_TYPE %>)</td>
         <td><%= TOTAL_NIGHTS %> NIGHTS</td>
-        <td>PHP <%= parseFloat(GRAND_TOTAL).toLocaleString() %></td>
+        <td>PHP <%= formatCurrency(tableTotalValue) %></td>
       </tr>
     </tbody>
   </table>
 
   <div class="totals">
     <p class="label"><b>CHARGE SUMMARY:</b></p>
-    <% if (EXTENDED_DAYS > 0) { %>
-      <p class="sub">ROOM & EXTENSION: PHP <%= parseFloat(ROOM_TOTAL).toLocaleString() %></p>
-    <% } else { %>
-      <p class="sub">ROOM: PHP <%= parseFloat(ROOM_TOTAL).toLocaleString() %></p>
-    <% } %>
-    <% if (SERVICES_TOTAL > 0) { %>
-    <p class="sub">SERVICES: PHP <%= parseFloat(SERVICES_TOTAL).toLocaleString() %></p>
+    <% const roomLabel = (!isCancelled && EXTENDED_DAYS > 0) ? 'ROOM & EXTENSION' : 'ROOM'; %>
+    <p class="sub"><%= roomLabel %>: PHP <%= formatCurrency(displayRoomTotal) %></p>
+    <p class="sub">SERVICES: PHP <%= formatCurrency(displayServicesTotal) %></p>
+    
+    <% if (!isCancelled && reservationFeeValue > 0) { %>
+      <p class="sub"  style="color: #28a745;">RESERVATION FEE: -PHP <%= formatCurrency(reservationFeeValue) %></p>
     <% } %>
     
-    <% if (typeof RESERVATION_FEE !== 'undefined' && RESERVATION_FEE && parseFloat(RESERVATION_FEE) > 0) { %>
-    <p class="sub"  style="color: #28a745;">RESERVATION FEE: -PHP <%= parseFloat(RESERVATION_FEE).toLocaleString() %></p>
+    <% if (discountValue > 0) { %>
+      <p class="sub" style="color: #28a745;">DISCOUNT: -PHP <%= formatCurrency(discountValue) %></p>
+    <% } %>
+
+    <% if (isCancelled) { %>
+      <p class="sub" style="color: #d35400;">CANCELLATION FEE: PHP <%= formatCurrency(cancellationFee) %></p>
     <% } %>
     
-    <% if (typeof DISCOUNT !== 'undefined' && DISCOUNT && parseFloat(DISCOUNT) > 0) { %>
-    <p class="sub" style="color: #28a745;">DISCOUNT: -PHP <%= parseFloat(DISCOUNT).toLocaleString() %></p>
-    <% } %>
-    
-    <p class="label"><b>TOTAL CHARGES:</b> PHP <%= parseFloat(GRAND_TOTAL).toLocaleString() %></p>
+    <p class="label"><b>TOTAL CHARGES:</b> PHP <%= formatCurrency(totalChargesValue) %></p>
   </div>
   
   
@@ -175,24 +197,31 @@
       
       <!-- <hr style="margin: 5px 0;"> -->
       <p class="label"><b>TAX:</b> PHP 0</p>
-      <p class="label"><b>PAYMENT:</b> PHP <%= parseFloat(TOTAL_PAID).toLocaleString() %></p>
-      <p class="sub">ROOM PAID: PHP <%= parseFloat(ROOM_PAID).toLocaleString() %></p>
-      <% if (EXTENDED_DAYS > 0) { %>
-        <p class="sub">EXTENSION PAID: PHP <%= parseFloat(EXTENDED_PAID).toLocaleString() %></p>
-      <% } %>
-      <% if (SERVICES_TOTAL > 0) { %>
-      <p class="sub">SERVICES PAID: PHP <%= parseFloat(SERVICES_PAID).toLocaleString() %></p>
+      <p class="label"><b>PAYMENT:</b> PHP <%= formatCurrency(totalPaidBeforeValue) %></p>
+      
+      <% if (isCancelled) { %>
+        <p class="sub">TOTAL PAID (BEFORE CANCELLATION): PHP <%= formatCurrency(totalPaidBeforeValue) %></p>
+        <p class="sub">PAID AMOUNT (AFTER CANCELLATION): PHP <%= formatCurrency(paidAfterCancellationValue) %></p>
+        <% if (refundAmount > 0) { %>
+          <p class="sub">REFUND AMOUNT: PHP <%= formatCurrency(refundAmount) %></p>
+        <% } %>
+      <% } else { %>
+        <p class="sub">ROOM PAID: PHP <%= formatCurrency(roomPaidValue) %></p>
+        <% if (EXTENDED_DAYS > 0) { %>
+          <p class="sub">EXTENSION PAID: PHP <%= formatCurrency(extendedPaidValue) %></p>
+        <% } %>
+        <p class="sub">SERVICES PAID: PHP <%= formatCurrency(servicesPaidValue) %></p>
+        
+        <% if (reservationFeeValue > 0) { %>
+          <p class="sub" style="color: #28a745;">RESERVATION FEE PAID: -PHP <%= formatCurrency(reservationFeeValue) %></p>
+        <% } %>
+        
+        <% if (discountValue > 0) { %>
+          <p class="sub" style="color: #28a745;">DISCOUNT APPLIED: -PHP <%= formatCurrency(discountValue) %></p>
+        <% } %>
       <% } %>
       
-      <% if (typeof RESERVATION_FEE !== 'undefined' && RESERVATION_FEE && parseFloat(RESERVATION_FEE) > 0) { %>
-      <p class="sub" style="color: #28a745;">RESERVATION FEE PAID: -PHP <%= parseFloat(RESERVATION_FEE).toLocaleString() %></p>
-      <% } %>
-      
-      <% if (typeof DISCOUNT !== 'undefined' && DISCOUNT && parseFloat(DISCOUNT) > 0) { %>
-      <p class="sub" style="color: #28a745;">DISCOUNT APPLIED: -PHP <%= parseFloat(DISCOUNT).toLocaleString() %></p>
-      <% } %>
-      
-      <p class="label"><b class="red">TOTAL DUE:</b><span class="red"> PHP <%= parseFloat(TOTAL_UNPAID).toLocaleString() %></span></p>
+      <p class="label"><b class="red">TOTAL DUE:</b><span class="red"> PHP <%= formatCurrency(totalDueValue) %></span></p>
     </div>
   </table>
   
