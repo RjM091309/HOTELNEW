@@ -318,6 +318,8 @@ class TelegramService {
             return { success: true, data: response.data };
         } catch (error) {
             return { 
+
+                
                 success: false, 
                 message: error.response?.data?.description || error.message 
             };
