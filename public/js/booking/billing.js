@@ -105,6 +105,11 @@ window.showBilling = async function (bookingID) {
                                    (item.description || '').toLowerCase().includes('room') ||
                                    (item.description || '').toLowerCase().includes('room charge');
                     
+                    // Check if service is Upgrade (by description or serviceId)
+                    const isUpgrade = (item.description || '').toLowerCase() === 'upgrade' ||
+                                     item.serviceId === 71 ||
+                                     item.SERVICE_ID === 71;
+                    
                     let paidTextClass = '';
                     if (isPaid) {
                         paidTextClass = 'text-success';
@@ -113,8 +118,10 @@ window.showBilling = async function (bookingID) {
                     }
                     
                     let displaySubTotal = parseFloat(item.subTotal) || 0;
-                    const displayBasePrice = parseFloat(item.basePrice) || 0;
-                    const displayQty = item.qty || '-';
+                    // For Upgrade services, display "-" instead of basePrice
+                    const displayBasePrice = isUpgrade ? '-' : (parseFloat(item.basePrice) || 0);
+                    // For Upgrade services, display "-" instead of qty
+                    const displayQty = isUpgrade ? '-' : (item.qty || '-');
                     
                     // Apply discount to room subtotal if discount exists and hasn't been applied yet
                     if (isRoom && !isPenalty && discountAmount > 0 && !discountAppliedToRoom) {
@@ -139,7 +146,7 @@ window.showBilling = async function (bookingID) {
                     <td class="text-center ${paidTextClass}">${rowIndex}</td>
                     <td class="text-center ${paidTextClass}">${new Date(item.date).toLocaleDateString()}</td>
                     <td class="text-center ${paidTextClass}">${item.description}</td>
-                    <td class="text-center ${paidTextClass}">${displayBasePrice.toFixed(2)}</td>
+                    <td class="text-center ${paidTextClass}">${isUpgrade ? '-' : displayBasePrice.toFixed(2)}</td>
                     <td class="text-center ${paidTextClass}">${displayQty}</td>
                     <td class="text-right ${paidTextClass}">${subtotalDisplay}</td>
                     </tr>`;

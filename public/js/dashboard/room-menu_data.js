@@ -23,6 +23,8 @@ window.removeService = removeService;
 window.loadServices = loadServices;
 window.loadExistingServicesForModal = loadExistingServicesForModal;
 window.loadBookingDetails = loadBookingDetails;
+window.handleServiceSelectionChange = handleServiceSelectionChange;
+window.toggleCustomCost = toggleCustomCost;
 window.loadGuestDetails = loadGuestDetails;
 window.loadTransferHistory = loadTransferHistory;
 window.showBilling = showBilling;
@@ -917,19 +919,101 @@ fetch('/booking/get-services')
         serviceSelect.innerHTML = '<option value="" style="background-color: #2a3135; color: #e0e0e0;">Select a service</option>';
         services.forEach(service => {
             const option = document.createElement('option');
+            // Check if service requires manual cost (SERVICE_COST = 0 or specific service IDs)
+            const requiresManualCost = parseFloat(service.SERVICE_COST) === 0 || 
+                                      service.IDNo === 71 || // Upgrade service
+                                      service.SERVICE_NAME?.toLowerCase() === 'upgrade';
+            
             option.value = JSON.stringify({
                 SERVICE_ID: service.IDNo,
                 SERVICE_NAME: service.SERVICE_NAME,
-                SERVICE_COST: service.SERVICE_COST
+                SERVICE_COST: service.SERVICE_COST,
+                REQUIRES_MANUAL_COST: requiresManualCost
             });
             option.textContent = service.SERVICE_NAME;
             serviceSelect.appendChild(option);
+        });
+        
+        // Add event listener for service selection change
+        serviceSelect.addEventListener('change', function() {
+            handleServiceSelectionChange(bookingId);
         });
     })
     .catch(error => {
         console.error('Error fetching services:', error);
         toastError('Error', 'Failed to load services. Please try again.');
     });
+}
+
+// Handle service selection change - auto-enable manual cost for services that require it
+function handleServiceSelectionChange(bookingId) {
+    const serviceSelect = document.getElementById(`extra-service-select-${bookingId}`);
+    const customCostCheckbox = document.getElementById(`custom-cost-checkbox-${bookingId}`);
+    const customCostInput = document.getElementById(`service-cost-${bookingId}`);
+    const quantityInput = document.getElementById(`service-quantity-${bookingId}`);
+    
+    if (!serviceSelect || !serviceSelect.value) {
+        // Reset if no service selected
+        if (customCostCheckbox) customCostCheckbox.checked = false;
+        if (customCostInput) {
+            customCostInput.style.display = 'none';
+            customCostInput.disabled = true;
+            customCostInput.value = '';
+        }
+        if (quantityInput) {
+            quantityInput.disabled = false;
+            quantityInput.value = '1';
+        }
+        return;
+    }
+    
+    try {
+        const service = JSON.parse(serviceSelect.value);
+        const requiresManualCost = service.REQUIRES_MANUAL_COST || 
+                                  parseFloat(service.SERVICE_COST) === 0 ||
+                                  service.SERVICE_ID === 71 ||
+                                  service.SERVICE_NAME?.toLowerCase() === 'upgrade';
+        
+        // Check if it's Upgrade service (disable quantity, set to 1)
+        const isUpgrade = service.SERVICE_ID === 71 || 
+                         service.SERVICE_NAME?.toLowerCase() === 'upgrade';
+        
+        if (isUpgrade && quantityInput) {
+            // Disable quantity and set to 1 for Upgrade service
+            quantityInput.disabled = true;
+            quantityInput.value = '1';
+            quantityInput.style.backgroundColor = '#e9ecef';
+            quantityInput.style.cursor = 'not-allowed';
+        } else if (quantityInput) {
+            // Re-enable quantity for other services
+            quantityInput.disabled = false;
+            quantityInput.style.backgroundColor = '';
+            quantityInput.style.cursor = '';
+        }
+        
+        if (requiresManualCost && customCostCheckbox && customCostInput) {
+            // Auto-enable manual cost for services that require it
+            customCostCheckbox.checked = true;
+            customCostInput.style.display = 'block';
+            customCostInput.disabled = false;
+            customCostInput.required = true;
+            customCostInput.placeholder = 'Enter cost (required)';
+            customCostInput.focus();
+            
+            // Add visual indicator
+            customCostInput.style.borderColor = '#ffc107';
+        } else {
+            // Reset for services that don't require manual cost
+            customCostCheckbox.checked = false;
+            customCostInput.style.display = 'none';
+            customCostInput.disabled = true;
+            customCostInput.required = false;
+            customCostInput.value = '';
+            customCostInput.style.borderColor = '';
+        }
+    } catch (error) {
+        console.error('Error parsing service data:', error);
+    }
 }
 
 // Load booking details
@@ -1333,6 +1417,11 @@ if (roomServices.length === 0) {
         const serviceCost = parseFloat(service.SERVICE_COST) || 0;
         const quantity = parseInt(service.QUANTITY) || 0;
         
+        // Check if service is Upgrade - display "-" instead of quantity
+        const isUpgrade = service.SERVICE_ID === 71 || 
+                         service.SERVICE_NAME?.toLowerCase() === 'upgrade';
+        const quantityDisplay = isUpgrade ? '-' : quantity;
+        
         // Calculate total cost with validation
         const totalCost = serviceCost * quantity;
         
@@ -1381,7 +1470,7 @@ if (roomServices.length === 0) {
                     </div>
                 </div>
                 <div class="col-2 text-center">
-                    <span style="font-weight: 600; color: #333333; font-size: 0.9rem;">${quantity}</span>
+                    <span style="font-weight: 600; color: #333333; font-size: 0.9rem;">${quantityDisplay}</span>
                 </div>
                 <div class="col-2 text-center">
                     <span style="font-weight: 600; color: #28a745; font-size: 0.9rem;">${costDisplay}</span>
@@ -1417,21 +1506,53 @@ if (bookingIdInput) {
 function toggleCustomCost(bookingId) {
     const customCostCheckbox = document.getElementById(`custom-cost-checkbox-${bookingId}`);
     const serviceCostInput = document.getElementById(`service-cost-${bookingId}`);
+    const serviceSelect = document.getElementById(`extra-service-select-${bookingId}`);
     
     if (!customCostCheckbox || !serviceCostInput) {
         console.error(`❌ Custom cost elements not found for booking ${bookingId}`);
         return;
     }
     
+    // Check if current service requires manual cost
+    let requiresManualCost = false;
+    if (serviceSelect && serviceSelect.value) {
+        try {
+            const service = JSON.parse(serviceSelect.value);
+            requiresManualCost = service.REQUIRES_MANUAL_COST || 
+                               parseFloat(service.SERVICE_COST) === 0 ||
+                               service.SERVICE_ID === 71 ||
+                               service.SERVICE_NAME?.toLowerCase() === 'upgrade';
+        } catch (error) {
+            console.error('Error parsing service data:', error);
+        }
+    }
+    
     if (customCostCheckbox.checked) {
         serviceCostInput.style.display = 'block';
         serviceCostInput.disabled = false;
+        if (requiresManualCost) {
+            serviceCostInput.required = true;
+            serviceCostInput.placeholder = 'Enter cost (required)';
+            serviceCostInput.style.borderColor = '#ffc107';
+        } else {
+            serviceCostInput.required = false;
+            serviceCostInput.placeholder = 'Cost';
+            serviceCostInput.style.borderColor = '';
+        }
         serviceCostInput.focus();
     } else {
+        // Prevent unchecking if service requires manual cost
+        if (requiresManualCost) {
+            toastWarning('Validation', 'This service requires manual cost entry. Please enter the cost amount.');
+            customCostCheckbox.checked = true;
+            return;
+        }
         serviceCostInput.style.display = 'none';
         serviceCostInput.disabled = true;
+        serviceCostInput.required = false;
         serviceCostInput.value = '';
-}
+        serviceCostInput.style.borderColor = '';
+    }
 }
 
 // Function to add extra services (local version)
@@ -1450,12 +1571,24 @@ const bookingIdInput = document.getElementById(`bookingID-${bookingId}`);
 if (selectedService) {
     const service = JSON.parse(selectedService);
     const quantity = parseInt(quantityInput.value, 10);
+    
+    // Validate quantity
+    if (isNaN(quantity) || quantity <= 0) {
+        toastWarning('Validation', 'Please enter a valid quantity (must be greater than 0)!');
+        return;
+    }
 
     if (!addedServicesMap[bookingId]) {
         addedServicesMap[bookingId] = [];
     }
 
     let roomServices = addedServicesMap[bookingId];
+    
+    // Check if service requires manual cost
+    const requiresManualCost = service.REQUIRES_MANUAL_COST || 
+                              parseFloat(service.SERVICE_COST) === 0 ||
+                              service.SERVICE_ID === 71 ||
+                              service.SERVICE_NAME?.toLowerCase() === 'upgrade';
     
     // Determine the service cost based on checkboxes
     let serviceCost;
@@ -1469,6 +1602,25 @@ if (selectedService) {
     } else {
         // Use default service cost from database
         serviceCost = parseFloat(service.SERVICE_COST);
+        
+        // Validate service cost
+        if (isNaN(serviceCost) || serviceCost < 0) {
+            toastError('Error', 'Invalid service cost from database. Please contact administrator.');
+            return;
+        }
+        
+        // If service requires manual cost but no custom cost entered
+        if (requiresManualCost) {
+            toastWarning('Validation', 'This service requires manual cost entry. Please enter the cost amount.');
+            if (customCostInput) {
+                customCostInput.focus();
+                customCostInput.style.borderColor = '#dc3545';
+                setTimeout(() => {
+                    if (customCostInput) customCostInput.style.borderColor = '';
+                }, 3000);
+            }
+            return;
+        }
     }
     
     // Check for existing unpaid service with the SAME SERVICE_ID AND SAME COST
@@ -1517,6 +1669,9 @@ if (selectedService) {
     customCostCheckbox.checked = false;
     customCostInput.style.display = 'none';
     customCostInput.disabled = true;
+    customCostInput.required = false;
+    customCostInput.style.borderColor = '';
+    customCostInput.placeholder = 'Cost';
 
     // Show success message
     toastSuccess('Success', 'Service added successfully!');
@@ -5977,13 +6132,22 @@ function loadBillingData(bookingId) {
             if (tableBody && data.items && Array.isArray(data.items)) {
                 tableBody.innerHTML = '';
                 data.items.forEach((item, index) => {
+                    // Check if service is Upgrade (by description or serviceId)
+                    const isUpgrade = (item.description || '').toLowerCase() === 'upgrade' ||
+                                     item.serviceId === 71 ||
+                                     item.SERVICE_ID === 71;
+                    
+                    // For Upgrade services, display "-" instead of basePrice and qty
+                    const displayBasePrice = isUpgrade ? '-' : `₱${parseFloat(item.basePrice || 0).toFixed(2)}`;
+                    const displayQty = isUpgrade ? '-' : (item.qty || '-');
+                    
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td class="text-center">${index + 1}</td>
                         <td class="text-center">${new Date(item.date).toLocaleDateString()}</td>
                         <td class="text-center">${item.description}</td>
-                        <td class="text-center">₱${parseFloat(item.basePrice).toFixed(2)}</td>
-                        <td class="text-center">${item.qty || '-'}</td>
+                        <td class="text-center">${displayBasePrice}</td>
+                        <td class="text-center">${displayQty}</td>
                         <td class="text-right">₱${parseFloat(item.subTotal).toFixed(2)}</td>
                     `;
                     tableBody.appendChild(row);

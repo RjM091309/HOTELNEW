@@ -2461,7 +2461,8 @@ class BookingModel {
         basePrice: parseFloat(service.SERVICE_COST),
         qty: service.QTY,
         subTotal: parseFloat(service.TOTAL_COST),
-        status: service.STATUS
+        status: service.STATUS,
+        serviceId: service.SERVICE_ID || service.IDNo || null // Add serviceId for Upgrade detection
       }));
 
       // Format transport
