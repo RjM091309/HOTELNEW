@@ -2427,7 +2427,9 @@ class BookingController {
         breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
         breakfastKidQty, breakfastKidPrice, breakfastKidId,
         pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
-        discount, lateCheckoutFee
+        discount, lateCheckoutFee,
+        // Frontend already computes paymentStatus (unpaid/partial/paid)
+        paymentStatus
       } = req.body;
 
       const editedBy = req.user.userId; // Use JWT user ID
@@ -2436,21 +2438,9 @@ class BookingController {
         return res.status(400).json({ success: false, message: 'User is not logged in' });
       }
 
-      // Calculate payment status based on paid amount
-      const paidAmountNum = parseFloat(paidAmount) || 0;
-      const roomPriceNum = parseFloat(price) || 0;
-      const discountNum = parseFloat(discount) || 0;
-      
-      const totalAmount = roomPriceNum - discountNum;
-      
-      let paymentStatus;
-      if (paidAmountNum <= 0) {
-        paymentStatus = 'unpaid';
-      } else if (paidAmountNum >= totalAmount) {
-        paymentStatus = 'paid';
-      } else {
-        paymentStatus = 'partial';
-      }
+      // Use paymentStatus coming from frontend (computeEditTotal),
+      // which is based on TOTAL (room + services + late checkout - discount)
+      const finalPaymentStatus = paymentStatus || 'unpaid';
 
       const result = await BookingModel.updateBooking({
         bookingId,
@@ -2460,7 +2450,7 @@ class BookingController {
         daterange,
         maxOccupants,
         paidAmount,
-        paymentStatus,
+        paymentStatus: finalPaymentStatus,
         price,
         diffindays,
         guestType,

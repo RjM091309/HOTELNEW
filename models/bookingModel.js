@@ -6769,64 +6769,165 @@ class BookingModel {
               editedBy, editDate, bookingId
             ]);
 
-            // 4. Delete existing services and re-insert
-            await connection.promise().query('DELETE FROM booking_service WHERE BOOKING_ID = ?', [bookingId]);
+            // 4. Delete ONLY UNPAID services; keep already-paid services intact
+            await connection.promise().query(
+              'DELETE FROM booking_service WHERE BOOKING_ID = ? AND (STATUS IS NULL OR STATUS = ?)',
+              [bookingId, 'unpaid']
+            );
 
-            // 5. Insert updated services
-            const services = [];
-            
+            // 4A. If checkout status is now REGULAR (0) or fee is 0,
+            //     tanggalin lahat ng late checkout services (SERVICE_ID = 72),
+            //     kahit dati pa silang paid – dahil binago na ang status.
+            if (checkOutStatus != 1 || !(parseFloat(lateCheckoutFee) > 0)) {
+              await connection.promise().query(
+                'DELETE FROM booking_service WHERE BOOKING_ID = ? AND SERVICE_ID = 72',
+                [bookingId]
+              );
+            }
+
+            // 4B. Sync BREAKFAST services with the form.
+            //     Kapag walang adult at kids qty (checkbox unchecked),
+            //     burahin lahat ng breakfast-type services for this booking.
+            const adultQtyNum = parseInt(breakfastAdultQty) || 0;
+            const kidQtyNum = parseInt(breakfastKidQty) || 0;
+            if (adultQtyNum === 0 && kidQtyNum === 0) {
+              await connection.promise().query(
+                `DELETE FROM booking_service 
+                 WHERE BOOKING_ID = ? 
+                   AND SERVICE_ID IN (
+                     SELECT IDNo FROM services 
+                     WHERE SERVICE_NAME LIKE '%Breakfast%'
+                   )`,
+                [bookingId]
+              );
+            }
+
+            // 4C. Sync PICK-UP services with the form.
+            //     Kapag walang pickupServiceId (checkbox unchecked),
+            //     burahin lahat ng pick-up services for this booking.
+            if (!pickupServiceId) {
+              await connection.promise().query(
+                `DELETE FROM booking_service 
+                 WHERE BOOKING_ID = ? 
+                   AND SERVICE_ID IN (
+                     SELECT IDNo FROM services 
+                     WHERE LOWER(SERVICE_NAME) LIKE '%pick-up%' 
+                        OR LOWER(SERVICE_NAME) LIKE '%pick up%'
+                   )`,
+                [bookingId]
+              );
+            }
+
+            // 4D. Sync DROPOFF services with the form.
+            //     Kapag walang dropoffServiceId (checkbox unchecked),
+            //     burahin lahat ng drop-off services for this booking.
+            if (!dropoffServiceId) {
+              await connection.promise().query(
+                `DELETE FROM booking_service 
+                 WHERE BOOKING_ID = ? 
+                   AND SERVICE_ID IN (
+                     SELECT IDNo FROM services 
+                     WHERE LOWER(SERVICE_NAME) LIKE '%drop-off%' 
+                        OR LOWER(SERVICE_NAME) LIKE '%drop off%'
+                   )`,
+                [bookingId]
+              );
+            }
+
+            // 5. Insert (or update) services from edit form
+            //    - Kung may existing service na may parehong SERVICE_ID, i-UPDATE lang (walang duplicate row)
+            //    - Kung wala pa, saka lang mag-iINSERT
+            const servicesToInsert = [];
+
+            // Kunin lahat ng existing active services for this booking
+            const [existingServiceRows] = await connection.promise().query(
+              `SELECT IDNo, SERVICE_ID 
+               FROM booking_service 
+               WHERE BOOKING_ID = ? AND ACTIVE = 1`,
+              [bookingId]
+            );
+            const existingByServiceId = new Map();
+            for (const row of existingServiceRows) {
+              existingByServiceId.set(String(row.SERVICE_ID), row.IDNo);
+            }
+
+            // Helper para mag-update o mag-queue for insert
+            async function upsertService(serviceId, qty, totalCost) {
+              const statusValue = paymentStatus === 'paid' ? 'paid' : 'unpaid';
+              const key = String(serviceId);
+              const existingId = existingByServiceId.get(key);
+
+              if (existingId) {
+                // UPDATE existing row (walang bagong row sa booking_service)
+                await connection.promise().query(
+                  `UPDATE booking_service
+                   SET QTY = ?, TOTAL_COST = ?, STATUS = ?, EDITED_BY = ?, EDITED_DT = ?
+                   WHERE IDNo = ?`,
+                  [qty, totalCost, statusValue, editedBy, editDate, existingId]
+                );
+              } else {
+                // Queue for INSERT (bagong service)
+                servicesToInsert.push([
+                  bookingId, serviceId, qty, totalCost,
+                  statusValue, editedBy, editDate, 1
+                ]);
+              }
+            }
+
             if (parseInt(breakfastAdultQty) > 0 && breakfastAdultId) {
               const totalAdult = parseFloat(breakfastAdultQty) * parseFloat(breakfastAdultPrice);
-              services.push([
-                bookingId, breakfastAdultId, breakfastAdultQty, totalAdult,
-                paymentStatus === 'paid' ? 'paid' : 'unpaid', editedBy, editDate, 1
-              ]);
+              await upsertService(breakfastAdultId, parseInt(breakfastAdultQty), totalAdult);
             }
 
             if (parseInt(breakfastKidQty) > 0 && breakfastKidId) {
               const totalKid = parseFloat(breakfastKidQty) * parseFloat(breakfastKidPrice);
-              services.push([
-                bookingId, breakfastKidId, breakfastKidQty, totalKid,
-                paymentStatus === 'paid' ? 'paid' : 'unpaid', editedBy, editDate, 1
-              ]);
+              await upsertService(breakfastKidId, parseInt(breakfastKidQty), totalKid);
             }
 
             if (pickupServiceId && pickupPrice) {
-              services.push([
-                bookingId, pickupServiceId, 1, pickupPrice,
-                paymentStatus === 'paid' ? 'paid' : 'unpaid', editedBy, editDate, 1
-              ]);
+              const pickupTotal = parseFloat(pickupPrice);
+              await upsertService(pickupServiceId, 1, pickupTotal);
             }
 
             if (dropoffServiceId && dropoffPrice) {
-              services.push([
-                bookingId, dropoffServiceId, 1, dropoffPrice,
-                paymentStatus === 'paid' ? 'paid' : 'unpaid', editedBy, editDate, 1
-              ]);
+              const dropoffTotal = parseFloat(dropoffPrice);
+              await upsertService(dropoffServiceId, 1, dropoffTotal);
             }
 
-            if (services.length > 0) {
+            if (servicesToInsert.length > 0) {
               const serviceQuery = `
                 INSERT INTO booking_service 
                 (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE)
                 VALUES ?
               `;
-              await connection.promise().query(serviceQuery, [services]);
+              await connection.promise().query(serviceQuery, [servicesToInsert]);
             }
 
             // 5A. Handle late checkout fee if applicable
             if (checkOutStatus == 1 && parseFloat(lateCheckoutFee) > 0) {
-              console.log('✅ Adding late checkout service to booking_service (EDIT)');
-              const lateCheckoutQuery = `
-                INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE)
-                VALUES (?, 72, 1, ?, ?, ?, NOW(), 1)
-              `;
-              
-              const lateCheckoutStatus = paymentStatus === 'paid' ? 'paid' : 'unpaid';
-              await connection.promise().query(lateCheckoutQuery, [
-                bookingId, lateCheckoutFee, lateCheckoutStatus, editedBy
-              ]);
-              console.log('✅ Late checkout service added successfully');
+              // Huwag mag-duplicate ng late checkout service (SERVICE_ID = 72)
+              const [existingLate] = await connection.promise().query(
+                `SELECT IDNo FROM booking_service 
+                 WHERE BOOKING_ID = ? AND SERVICE_ID = 72 AND ACTIVE = 1 
+                 LIMIT 1`,
+                [bookingId]
+              );
+
+              if (existingLate.length === 0) {
+                console.log('✅ Adding late checkout service to booking_service (EDIT)');
+                const lateCheckoutQuery = `
+                  INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE)
+                  VALUES (?, 72, 1, ?, ?, ?, NOW(), 1)
+                `;
+                
+                const lateCheckoutStatus = paymentStatus === 'paid' ? 'paid' : 'unpaid';
+                await connection.promise().query(lateCheckoutQuery, [
+                  bookingId, lateCheckoutFee, lateCheckoutStatus, editedBy
+                ]);
+                console.log('✅ Late checkout service added successfully');
+              } else {
+                console.log('ℹ️ Late checkout service already exists for booking, skipping insert.');
+              }
             }
 
             // 6. Update payments based on paid amount

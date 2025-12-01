@@ -949,12 +949,13 @@ $(document).ready(function() {
             data: formData,
             success: function (response) {
                 if (response.success) {
-                    // Process payment if paid amount > 0
-                    const paidAmount = parseFloat(formData.paidAmount) || 0;
-                    if (paidAmount > 0) {
-                        processEditBookingPayment(bookingId, paidAmount, 'cash', 'Payment update');
-                    }
-                    
+                    // NOTE:
+                    // Huwag nang tawagin ang /booking/process-payment dito.
+                    // Sa backend (BookingModel.updateBooking) binubura at nirere-create
+                    // na ang mga payments batay sa bagong paidAmount, kaya kung tatawag
+                    // pa tayo ng processEditBookingPayment, mag-i-insert ulit ng
+                    // payments kasama ng mga services.
+
                     $('#modal-editbooking').modal('hide');
                     Swal.fire({
                         title: 'Success!',
