@@ -2805,16 +2805,18 @@ class BookingModel {
         const totalExtensionAmount = extensionRows.reduce((sum, ext) => sum + (parseFloat(ext.QTY) * parseFloat(ext.COST)), 0);
         
         // Get services with remaining balance (exclude fully paid or overpaid services)
+        // Include SERVICE_ID so we can prioritize specific services (e.g. Upgrade, Custom)
         const serviceQuery = `
             SELECT 
               bs.IDNo, 
+              bs.SERVICE_ID,
               bs.TOTAL_COST,
               COALESCE(SUM(p.AMOUNT_PAID), 0) as totalPaid,
               (bs.TOTAL_COST - COALESCE(SUM(p.AMOUNT_PAID), 0)) as remainingAmount
             FROM booking_service bs
             LEFT JOIN payments p ON p.BOOKING_SERVICE_ID = bs.IDNo AND p.PAYMENT_TYPE = 'service'
             WHERE bs.BOOKING_ID = ?
-            GROUP BY bs.IDNo, bs.TOTAL_COST
+            GROUP BY bs.IDNo, bs.SERVICE_ID, bs.TOTAL_COST
             HAVING remainingAmount > 0
         `;
         
@@ -2826,7 +2828,24 @@ class BookingModel {
         });
         
         // Use remaining amount instead of total cost for payment allocation
-        const totalServiceAmount = serviceRows.reduce((sum, service) => sum + parseFloat(service.remainingAmount), 0);
+        // Also, sort services so that:
+        //  1) Custom / Upgrade services (SERVICE_ID = -1, 71) are paid first
+        //  2) Within the same type, smaller remainingAmount are paid first
+        const totalServiceAmount = serviceRows.reduce(
+          (sum, service) => sum + parseFloat(service.remainingAmount),
+          0
+        );
+
+        const priorityServiceIds = [-1, 71]; // -1 = custom, 71 = Upgrade
+        serviceRows.sort((a, b) => {
+          const aSpecial = priorityServiceIds.includes(parseInt(a.SERVICE_ID));
+          const bSpecial = priorityServiceIds.includes(parseInt(b.SERVICE_ID));
+
+          if (aSpecial && !bSpecial) return -1;
+          if (!aSpecial && bSpecial) return 1;
+
+          return parseFloat(a.remainingAmount) - parseFloat(b.remainingAmount);
+        });
         
         // Calculate net balance
         // Note: reservation fee and discount are already deducted from fullRoomAmount in Step 3
