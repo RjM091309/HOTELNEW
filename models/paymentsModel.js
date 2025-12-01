@@ -182,9 +182,23 @@ const paymentsModel = {
     if (!booking) return null;
 
     const [services] = await pool.promise().query(
-      `SELECT s.SERVICE_NAME, bs.QTY, bs.TOTAL_COST, bs.STATUS, bs.ACTIVE, bs.EDITED_DT, bs.EDITED_BY, bs.REMARKS, bs.IDNo AS BOOKING_SERVICE_ID, u.FULLNAME AS EDITED_BY_NAME
+      `SELECT 
+         CASE 
+           WHEN bs.SERVICE_ID = -1 AND bs.CUSTOM_NAME IS NOT NULL
+           THEN bs.CUSTOM_NAME
+           ELSE s.SERVICE_NAME
+         END as SERVICE_NAME,
+         bs.QTY, 
+         bs.TOTAL_COST, 
+         bs.STATUS, 
+         bs.ACTIVE, 
+         bs.EDITED_DT, 
+         bs.EDITED_BY, 
+         bs.REMARKS, 
+         bs.IDNo AS BOOKING_SERVICE_ID, 
+         u.FULLNAME AS EDITED_BY_NAME
        FROM booking_service bs
-       JOIN services s ON bs.SERVICE_ID = s.IDNo
+       LEFT JOIN services s ON bs.SERVICE_ID = s.IDNo
        LEFT JOIN user_info u ON u.IDNo = bs.EDITED_BY
        WHERE bs.BOOKING_ID = ?`, [bookingId]
     );

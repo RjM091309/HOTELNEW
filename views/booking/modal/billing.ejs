@@ -263,8 +263,26 @@
 					if (billingTable) {
 						const rows = billingTable.querySelectorAll('tr');
 						rows.forEach(row => {
-							const description = row.cells[2].textContent.trim();
-							const subTotal = parseFloat(row.cells[5].textContent.replace(/[₹$,]/g, '')) || 0;
+							// Check if row has enough cells before accessing
+							if (!row.cells || row.cells.length < 6) {
+								return; // Skip rows that don't have the expected structure (e.g., total row)
+							}
+							
+							const descriptionCell = row.cells[2];
+							const subTotalCell = row.cells[5];
+							
+							// Check if cells exist and have content
+							if (!descriptionCell || !subTotalCell) {
+								return;
+							}
+							
+							const description = descriptionCell.textContent ? descriptionCell.textContent.trim() : '';
+							const subTotal = parseFloat(subTotalCell.textContent ? subTotalCell.textContent.replace(/[₹$,]/g, '') : '0') || 0;
+							
+							// Skip if description is empty or subTotal is 0
+							if (!description || subTotal === 0) {
+								return;
+							}
 							
 							if (description.toLowerCase().includes('room') || description.toLowerCase().includes('bedroom')) {
 								roomAmount += subTotal;

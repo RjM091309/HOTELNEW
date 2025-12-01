@@ -292,8 +292,17 @@ class BookingModel {
           bs.STATUS,
           bs.ENCODED_DT,
           bs.ACTIVE,
-          COALESCE(s.SERVICE_NAME, 'Unknown Service') as SERVICE_NAME,
-          COALESCE(s.SERVICE_COST, bs.TOTAL_COST) as SERVICE_COST
+          bs.REMARKS,
+          CASE 
+            WHEN bs.SERVICE_ID = -1 AND bs.CUSTOM_NAME IS NOT NULL
+            THEN bs.CUSTOM_NAME
+            ELSE COALESCE(s.SERVICE_NAME, 'Unknown Service')
+          END as SERVICE_NAME,
+          CASE 
+            WHEN bs.SERVICE_ID = -1 
+            THEN bs.TOTAL_COST / NULLIF(bs.QTY, 0) -- Calculate unit cost for custom services
+            ELSE COALESCE(s.SERVICE_COST, bs.TOTAL_COST / NULLIF(bs.QTY, 0))
+          END as SERVICE_COST
         FROM booking_service bs
           LEFT JOIN services s ON bs.SERVICE_ID = s.IDNo
         WHERE bs.BOOKING_ID = ? AND bs.ACTIVE = 1
@@ -1524,6 +1533,106 @@ class BookingModel {
 
         // Process each service
         for (const service of services) {
+          // Handle custom services (SERVICE_ID = -1)
+          if (service.SERVICE_ID === -1 || service.IS_CUSTOM) {
+            // For custom services, create a temporary service entry or handle specially
+            // We'll insert directly into booking_service with SERVICE_ID = -1
+            // and store the custom name in a way we can retrieve it later
+            
+            const customServiceName = service.SERVICE_NAME || 'Custom Service';
+            const costToUse = parseFloat(service.CUSTOM_COST || service.SERVICE_COST || 0);
+            
+            // Check if custom service already exists with same name and cost
+            const checkCustomQuery = `
+              SELECT bs.IDNo, bs.QTY, bs.STATUS, bs.TOTAL_COST, bs.CUSTOM_NAME
+              FROM booking_service bs
+              WHERE bs.BOOKING_ID = ? 
+                AND bs.SERVICE_ID = -1 
+                AND bs.STATUS != 'paid'
+                AND bs.CUSTOM_NAME = ?
+              ORDER BY bs.IDNo DESC
+              LIMIT 1
+            `;
+            
+            const checkCustomResults = await new Promise((resolve, reject) => {
+              connection.query(checkCustomQuery, [bookingId, customServiceName], (err, results) => {
+                if (err) reject(err);
+                else resolve(results);
+              });
+            });
+            
+            // Check if there's an existing unpaid custom service with the EXACT same name and cost
+            let hasUnpaidCustom = false;
+            let existingCustomId = null;
+            let existingCustomQty = 0;
+            
+            if (checkCustomResults.length > 0) {
+              const existing = checkCustomResults[0];
+              const existingTotalCost = parseFloat(existing.TOTAL_COST);
+              const existingQty = parseFloat(existing.QTY);
+              const thisExistingCost = existingQty > 0 ? existingTotalCost / existingQty : 0;
+              
+              // Compare costs with tolerance for floating point differences
+              const costMatches = Math.abs(thisExistingCost - costToUse) < 0.01;
+              
+              if (costMatches) {
+                hasUnpaidCustom = true;
+                existingCustomId = existing.IDNo;
+                existingCustomQty = existingQty;
+              }
+            }
+            
+            if (hasUnpaidCustom && existingCustomId) {
+              // Update existing custom service
+              const updateCustomQuery = `
+                UPDATE booking_service 
+                SET QTY = ?, 
+                    TOTAL_COST = ? * ?, 
+                    EDITED_BY = ?, 
+                    EDITED_DT = NOW(),
+                    ACTIVE = 1
+                WHERE IDNo = ?
+              `;
+              
+              const newQty = existingCustomQty + service.QUANTITY;
+              
+              await new Promise((resolve, reject) => {
+                connection.query(
+                  updateCustomQuery,
+                  [newQty, newQty, costToUse, userId, existingCustomId],
+                  (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                  }
+                );
+              });
+              
+              totalCost += service.QUANTITY * costToUse;
+            } else {
+              // Insert new custom service
+              const insertCustomQuery = `
+                INSERT INTO booking_service 
+                  (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, CUSTOM_NAME)
+                VALUES (?, -1, ?, ?, 'unpaid', ?, ?, ?)
+              `;
+              
+              await new Promise((resolve, reject) => {
+                connection.query(
+                  insertCustomQuery,
+                  [bookingId, service.QUANTITY, service.QUANTITY * costToUse, userId, date, customServiceName],
+                  (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                  }
+                );
+              });
+              
+              totalCost += service.QUANTITY * costToUse;
+            }
+            
+            continue; // Skip to next service
+          }
+          
           // Determine the cost to use for this service
           let costToUse;
           if (service.CUSTOM_COST !== undefined && service.CUSTOM_COST !== null) {
@@ -1541,10 +1650,12 @@ class BookingModel {
           }
 
           // Check if service already exists for this booking with the same cost
+          // Use LEFT JOIN to include custom services (SERVICE_ID = -1)
           const checkQuery = `
-            SELECT bs.IDNo, bs.QTY, bs.STATUS, bs.TOTAL_COST, s.SERVICE_COST 
+            SELECT bs.IDNo, bs.QTY, bs.STATUS, bs.TOTAL_COST, 
+                   COALESCE(s.SERVICE_COST, bs.TOTAL_COST / NULLIF(bs.QTY, 0)) as SERVICE_COST
             FROM booking_service bs
-            INNER JOIN services s ON bs.SERVICE_ID = s.IDNo
+            LEFT JOIN services s ON bs.SERVICE_ID = s.IDNo
             WHERE bs.BOOKING_ID = ? AND bs.SERVICE_ID = ? AND bs.STATUS != 'paid'
             ORDER BY bs.IDNo DESC
           `;
@@ -1901,11 +2012,21 @@ class BookingModel {
   // Get booking services (including extensions and transport)
   static async getBookingServices(bookingId) {
     try {
-      // Get regular services
+      // Get regular services (including custom services)
       const serviceQuery = `
-        SELECT bs.SERVICE_ID, s.SERVICE_NAME, bs.QTY, bs.TOTAL_COST, bs.STATUS, bs.ENCODED_DT
+        SELECT 
+          bs.SERVICE_ID, 
+          CASE 
+            WHEN bs.SERVICE_ID = -1 AND bs.CUSTOM_NAME IS NOT NULL
+            THEN bs.CUSTOM_NAME
+            ELSE s.SERVICE_NAME
+          END as SERVICE_NAME,
+          bs.QTY, 
+          bs.TOTAL_COST, 
+          bs.STATUS, 
+          bs.ENCODED_DT
         FROM booking_service bs
-        JOIN services s ON bs.SERVICE_ID = s.IDNo
+        LEFT JOIN services s ON bs.SERVICE_ID = s.IDNo
         WHERE bs.BOOKING_ID = ? AND bs.ACTIVE = 1
       `;
       const serviceRows = await queryDatabasePromise(serviceQuery, [bookingId]);
@@ -2411,16 +2532,24 @@ class BookingModel {
       `;
       const customerData = await queryDatabasePromise(customerQuery, [customerId]);
 
-      // Fetch services
+      // Fetch services (including custom services)
       const serviceQuery = `
         SELECT 
-          s.SERVICE_NAME,
-          s.SERVICE_COST,
+          CASE 
+            WHEN bs.SERVICE_ID = -1 AND bs.CUSTOM_NAME IS NOT NULL
+            THEN bs.CUSTOM_NAME
+            ELSE s.SERVICE_NAME
+          END as SERVICE_NAME,
+          CASE 
+            WHEN bs.SERVICE_ID = -1 
+            THEN bs.TOTAL_COST / NULLIF(bs.QTY, 0)
+            ELSE s.SERVICE_COST
+          END as SERVICE_COST,
           bs.QTY,
           bs.TOTAL_COST,
           bs.STATUS
         FROM booking_service bs
-        JOIN services s ON bs.SERVICE_ID = s.IDNo
+        LEFT JOIN services s ON bs.SERVICE_ID = s.IDNo
         WHERE bs.ACTIVE = 1 AND bs.BOOKING_ID = ?
       `;
       const serviceData = await queryDatabasePromise(serviceQuery, [bookingId]);
@@ -3548,14 +3677,26 @@ class BookingModel {
           COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) + 
           COALESCE(bill.AMENITIES_CHARGE, 0) + 
           COALESCE(bill.SERVICES_CHARGE, 0) AS TOTAL_COST,
-          -- Join booking_service with services to get SERVICE_NAME
-          COALESCE(GROUP_CONCAT(DISTINCT s.SERVICE_NAME ORDER BY s.SERVICE_NAME SEPARATOR ', '), 'No Services') AS SERVICES_AVAILED
+          -- Join booking_service with services to get SERVICE_NAME (including custom services)
+          COALESCE(GROUP_CONCAT(DISTINCT 
+            CASE 
+              WHEN bs.SERVICE_ID = -1 AND bs.CUSTOM_NAME IS NOT NULL
+              THEN bs.CUSTOM_NAME
+              ELSE s.SERVICE_NAME
+            END
+            ORDER BY 
+            CASE 
+              WHEN bs.SERVICE_ID = -1 AND bs.CUSTOM_NAME IS NOT NULL
+              THEN bs.CUSTOM_NAME
+              ELSE s.SERVICE_NAME
+            END
+            SEPARATOR ', '), 'No Services') AS SERVICES_AVAILED
         FROM booking b
         LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
         JOIN room r ON b.ROOM_ID = r.IDNo
         LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID
         LEFT JOIN booking_service bs ON b.IDNo = bs.BOOKING_ID
-        LEFT JOIN services s ON bs.SERVICE_ID = s.IDNo -- Fetch the correct service name
+        LEFT JOIN services s ON bs.SERVICE_ID = s.IDNo AND bs.SERVICE_ID != -1 -- Fetch the correct service name (exclude custom services from join)
         WHERE b.GROUP_BOOKING_ID = ?
         GROUP BY b.IDNo, c.NAME, r.ROOM_NUMBER, b.CHECK_IN_DATE, b.CHECK_OUT_DATE, b.BOOKING_STATUS
       `;
@@ -3792,17 +3933,21 @@ class BookingModel {
       // Get billing type from database (1 = Master, 0 = Individual)
       const isConsolidatedBilling = groupBooking.BILLING_TYPE === 1;
 
-      // Get services for the group
+      // Get services for the group (including custom services)
       const servicesQuery = `
         SELECT
           bs.BOOKING_ID,
           bs.SERVICE_ID,
-          s.SERVICE_NAME,
+          CASE 
+            WHEN bs.SERVICE_ID = -1 AND bs.CUSTOM_NAME IS NOT NULL
+            THEN bs.CUSTOM_NAME
+            ELSE s.SERVICE_NAME
+          END as SERVICE_NAME,
           bs.QTY,
           bs.TOTAL_COST,
           bs.STATUS
         FROM booking_service bs
-        JOIN services s ON bs.SERVICE_ID = s.IDNo
+        LEFT JOIN services s ON bs.SERVICE_ID = s.IDNo
         JOIN booking b ON bs.BOOKING_ID = b.IDNo
         WHERE b.GROUP_BOOKING_ID = ?
       `;
@@ -4649,10 +4794,16 @@ class BookingModel {
         SELECT 
           b.IDNo AS BOOKING_ID,
           r.ROOM_NUMBER,
-          s.SERVICE_NAME AS description,
           CASE 
-            WHEN LOWER(s.SERVICE_NAME) LIKE '%breakfast%'
-              AND (LOWER(s.SERVICE_NAME) LIKE '%adult%' OR LOWER(s.SERVICE_NAME) LIKE '%kid%')
+            WHEN bs.SERVICE_ID = -1 AND bs.CUSTOM_NAME IS NOT NULL
+            THEN bs.CUSTOM_NAME
+            ELSE s.SERVICE_NAME
+          END AS description,
+          CASE 
+            WHEN bs.SERVICE_ID = -1
+            THEN bs.TOTAL_COST
+            WHEN LOWER(COALESCE(s.SERVICE_NAME, '')) LIKE '%breakfast%'
+              AND (LOWER(COALESCE(s.SERVICE_NAME, '')) LIKE '%adult%' OR LOWER(COALESCE(s.SERVICE_NAME, '')) LIKE '%kid%')
             THEN (bs.TOTAL_COST / NULLIF(bs.QTY, 0))
             ELSE bs.TOTAL_COST
           END AS charges,
@@ -4661,7 +4812,7 @@ class BookingModel {
         FROM booking_service bs
         JOIN booking b ON bs.BOOKING_ID = b.IDNo
         JOIN room r ON b.ROOM_ID = r.IDNo
-        JOIN services s ON bs.SERVICE_ID = s.IDNo
+        LEFT JOIN services s ON bs.SERVICE_ID = s.IDNo
         JOIN group_booking gb ON b.GROUP_BOOKING_ID = gb.IDNo 
         WHERE b.GROUP_BOOKING_ID = ?
         ORDER BY r.ROOM_NUMBER ASC, b.IDNo ASC

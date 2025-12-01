@@ -25,6 +25,7 @@ window.loadExistingServicesForModal = loadExistingServicesForModal;
 window.loadBookingDetails = loadBookingDetails;
 window.handleServiceSelectionChange = handleServiceSelectionChange;
 window.toggleCustomCost = toggleCustomCost;
+window.toggleCustomService = toggleCustomService;
 window.loadGuestDetails = loadGuestDetails;
 window.loadTransferHistory = loadTransferHistory;
 window.showBilling = showBilling;
@@ -418,15 +419,20 @@ async function createDynamicRoomModal(bookingId, event, options) {
                             <h6 class="text-warning mb-2" style="border-bottom: 2px solid #ffc107; padding-bottom: 4px;">
                                 <i class="fas fa-plus-circle me-1"></i>Extra Services
                             </h6>
-                            <div class="d-flex align-items-center mb-2">
+                            <div class="d-flex align-items-center mb-2 flex-wrap">
                                 <select id="extra-service-select-${bookingId}" class="form-select form-select-sm me-2" style="max-width: 180px;">
                                     <option value="">Select a service</option>
                                 </select>
+                                <input type="text" id="custom-service-name-${bookingId}" class="form-control form-select-sm me-2" placeholder="Custom Service Name" style="width: 150px; display: none;">
                                 <input type="number" id="service-quantity-${bookingId}" class="form-control form-select-sm me-2" min="1" value="1" style="width: 60px;">
-                                <input type="number" id="service-cost-${bookingId}" class="form-control form-select-sm me-2" min="0" step="1" placeholder="Cost" style="width: 80px; display: none;">
+                                <input type="number" id="service-cost-${bookingId}" class="form-control form-select-sm me-2" min="0" step="1" placeholder="Cost" style="width: 150px; display: none;">
                                 <div class="form-check me-2">
                                     <input class="form-check-input" type="checkbox" id="custom-cost-checkbox-${bookingId}" onchange="window.toggleCustomCost('${bookingId}')">
                                     <label class="form-check-label" for="custom-cost-checkbox-${bookingId}">Manual Cost</label>
+                                </div>
+                                <div class="form-check me-2">
+                                    <input class="form-check-input" type="checkbox" id="custom-service-checkbox-${bookingId}" onchange="window.toggleCustomService('${bookingId}')">
+                                    <label class="form-check-label" for="custom-service-checkbox-${bookingId}">Custom Service</label>
                                 </div>
                                 <button type="button" class="btn btn-sm btn-success" onclick="window.addService('${bookingId}')">
                                     <i class="fas fa-plus me-1"></i>Add
@@ -697,11 +703,88 @@ modalStyle.textContent = `
     /* Custom Cost Input Styling */
     #dynamicRoomModal_${bookingId} #service-cost-${bookingId} {
         transition: all 0.3s ease;
+        color: #000000 !important;
+        background-color: #ffffff !important;
     }
     
     #dynamicRoomModal_${bookingId} #service-cost-${bookingId}:focus {
         border-color: #28a745;
         box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+        color: #000000 !important;
+        background-color: #ffffff !important;
+    }
+    
+    #dynamicRoomModal_${bookingId} #service-cost-${bookingId}:hover {
+        color: #000000 !important;
+        background-color: #ffffff !important;
+    }
+    
+    #dynamicRoomModal_${bookingId} #service-cost-${bookingId}::placeholder {
+        color: #6c757d !important;
+        opacity: 0.6;
+    }
+    
+    /* Quantity Input Styling */
+    #dynamicRoomModal_${bookingId} #service-quantity-${bookingId} {
+        color: #000000 !important;
+        background-color: #ffffff !important;
+    }
+    
+    #dynamicRoomModal_${bookingId} #service-quantity-${bookingId}:focus {
+        color: #000000 !important;
+        background-color: #ffffff !important;
+    }
+    
+    #dynamicRoomModal_${bookingId} #service-quantity-${bookingId}:hover {
+        color: #000000 !important;
+        background-color: #ffffff !important;
+    }
+    
+    #dynamicRoomModal_${bookingId} #service-quantity-${bookingId}:disabled {
+        color: #000000 !important;
+        background-color: #e9ecef !important;
+    }
+    
+    /* Custom Service Name Input Styling */
+    #dynamicRoomModal_${bookingId} #custom-service-name-${bookingId} {
+        color: #000000 !important;
+        background-color: #ffffff !important;
+    }
+    
+    #dynamicRoomModal_${bookingId} #custom-service-name-${bookingId}:focus {
+        color: #000000 !important;
+        background-color: #ffffff !important;
+    }
+    
+    #dynamicRoomModal_${bookingId} #custom-service-name-${bookingId}:hover {
+        color: #000000 !important;
+        background-color: #ffffff !important;
+    }
+    
+    #dynamicRoomModal_${bookingId} #custom-service-name-${bookingId}::placeholder {
+        color: #6c757d !important;
+        opacity: 0.6;
+    }
+    
+    /* Service Selection Dropdown Styling */
+    #dynamicRoomModal_${bookingId} #extra-service-select-${bookingId} {
+        color: #000000 !important;
+        background-color: #ffffff !important;
+    }
+    
+    #dynamicRoomModal_${bookingId} #extra-service-select-${bookingId}:focus {
+        color: #000000 !important;
+        background-color: #ffffff !important;
+    }
+    
+    #dynamicRoomModal_${bookingId} #extra-service-select-${bookingId}:hover {
+        color: #000000 !important;
+        background-color: #ffffff !important;
+    }
+    
+    #dynamicRoomModal_${bookingId} #extra-service-select-${bookingId} option {
+        color: #000000 !important;
+        background-color: #ffffff !important;
     }
     
     #dynamicRoomModal_${bookingId} .form-check-input:checked {
@@ -991,25 +1074,46 @@ function handleServiceSelectionChange(bookingId) {
             quantityInput.style.cursor = '';
         }
         
-        if (requiresManualCost && customCostCheckbox && customCostInput) {
+        // Always show cost input field when a service is selected
+        if (customCostInput) {
+            customCostInput.style.display = 'block';
+            
+            // Pre-populate with service cost if available
+            const serviceCost = parseFloat(service.SERVICE_COST) || 0;
+            if (serviceCost > 0 && !requiresManualCost) {
+                // Pre-fill with default service cost and make it read-only
+                customCostInput.value = serviceCost;
+                customCostInput.placeholder = `Default: ₱${serviceCost.toLocaleString()}`;
+                customCostInput.style.borderColor = '';
+                customCostInput.required = false;
+                customCostInput.disabled = true; // Make read-only when Manual Cost is not checked
+                customCostInput.style.backgroundColor = '#e9ecef'; // Gray background to indicate read-only
+                customCostInput.style.cursor = 'not-allowed';
+            } else {
+                // Clear for services that require manual cost
+                customCostInput.value = '';
+                customCostInput.placeholder = 'Enter cost';
+                customCostInput.required = true;
+                customCostInput.style.borderColor = '#ffc107';
+                customCostInput.disabled = false; // Enable for manual entry
+                customCostInput.style.backgroundColor = '#ffffff';
+                customCostInput.style.cursor = 'text';
+            }
+        }
+        
+        // Handle manual cost checkbox
+        if (requiresManualCost && customCostCheckbox) {
             // Auto-enable manual cost for services that require it
             customCostCheckbox.checked = true;
-            customCostInput.style.display = 'block';
-            customCostInput.disabled = false;
-            customCostInput.required = true;
-            customCostInput.placeholder = 'Enter cost (required)';
-            customCostInput.focus();
-            
-            // Add visual indicator
-            customCostInput.style.borderColor = '#ffc107';
-        } else {
-            // Reset for services that don't require manual cost
+            if (customCostInput) {
+                customCostInput.disabled = false;
+                customCostInput.style.backgroundColor = '#ffffff';
+                customCostInput.style.cursor = 'text';
+                customCostInput.focus();
+            }
+        } else if (customCostCheckbox) {
+            // Uncheck for services with default cost (user can still check to override)
             customCostCheckbox.checked = false;
-            customCostInput.style.display = 'none';
-            customCostInput.disabled = true;
-            customCostInput.required = false;
-            customCostInput.value = '';
-            customCostInput.style.borderColor = '';
         }
     } catch (error) {
         console.error('Error parsing service data:', error);
@@ -1241,38 +1345,11 @@ fetch(`/booking/get-booking-services/${bookingIdValue}`)
     .then(response => {
         // Handle new response format: { success: true, data: [...] }
         const services = response.data || response;
-        
-        // Add fetched services to addedServicesMap using the same bookingId
-        if (!addedServicesMap[bookingId]) {
-            addedServicesMap[bookingId] = [];
-        }
+        // NOTE:
+        //  - Huwag nang galawin dito ang addedServicesMap.
+        //  - loadExistingServicesForModal na ang naglo-load ng services papunta sa map at sa UI.
+        //  - Dito, gagamitin lang natin ang services para sa ibang UI tasks (late checkout button, totals, etc.).
 
-        services.forEach(service => {
-            // Validate service data before adding
-            // Use correct database field names: QTY and TOTAL_COST
-            const serviceCost = parseFloat(service.TOTAL_COST) || 0;
-            const quantity = parseInt(service.QTY) || 0;
-            
-            // Only add services with valid cost and quantity
-            if (serviceCost > 0 && quantity > 0 && !isNaN(serviceCost) && !isNaN(quantity)) {
-                if (!addedServicesMap[bookingId].some(s => s.SERVICE_ID === service.SERVICE_ID)) {
-                    addedServicesMap[bookingId].push({
-                        SERVICE_ID: service.SERVICE_ID,
-                        SERVICE_NAME: service.SERVICE_NAME,
-                        SERVICE_COST: serviceCost,
-                        QUANTITY: quantity,
-                        STATUS: service.STATUS || "unpaid"
-                    });
-
-                }
-            } else {
-
-            }
-        });
-
-        // Refresh the displayed list using the same bookingId
-        updateAddedServicesList(bookingId);
-        
         // Check if late checkout service exists and update button
         updateLateCheckoutButton(bookingId, services);
         
@@ -1413,6 +1490,10 @@ if (roomServices.length === 0) {
     serviceList.style.display = 'block';
     
     roomServices.forEach((service, index) => {
+        // Skip helper/pending entries that are not meant to be shown in the UI
+        if (service.HIDDEN_FOR_UI) {
+            return;
+        }
         // Validate and ensure proper numeric values
         const serviceCost = parseFloat(service.SERVICE_COST) || 0;
         const quantity = parseInt(service.QUANTITY) || 0;
@@ -1502,14 +1583,85 @@ if (bookingIdInput) {
 }
 }
 
+// Function to toggle custom service mode
+function toggleCustomService(bookingId) {
+    const customServiceCheckbox = document.getElementById(`custom-service-checkbox-${bookingId}`);
+    const customServiceNameInput = document.getElementById(`custom-service-name-${bookingId}`);
+    const serviceSelect = document.getElementById(`extra-service-select-${bookingId}`);
+    const customCostCheckbox = document.getElementById(`custom-cost-checkbox-${bookingId}`);
+    const serviceCostInput = document.getElementById(`service-cost-${bookingId}`);
+    
+    if (!customServiceCheckbox || !customServiceNameInput) {
+        console.error(`❌ Custom service elements not found for booking ${bookingId}`);
+        return;
+    }
+    
+    if (customServiceCheckbox.checked) {
+        // Enable custom service mode
+        customServiceNameInput.style.display = 'block';
+        customServiceNameInput.disabled = false;
+        customServiceNameInput.required = true;
+        customServiceNameInput.placeholder = 'Enter service name (required)';
+        customServiceNameInput.style.borderColor = '#ffc107';
+        
+        // Disable service dropdown
+        if (serviceSelect) {
+            serviceSelect.disabled = true;
+            serviceSelect.value = '';
+        }
+        
+        // Auto-enable manual cost for custom services
+        if (customCostCheckbox) {
+            customCostCheckbox.checked = true;
+            customCostCheckbox.disabled = true; // Prevent unchecking
+        }
+        if (serviceCostInput) {
+            serviceCostInput.style.display = 'block';
+            serviceCostInput.disabled = false;
+            serviceCostInput.required = true;
+            serviceCostInput.placeholder = 'Enter cost';
+            serviceCostInput.style.borderColor = '#ffc107';
+        }
+        
+        customServiceNameInput.focus();
+    } else {
+        // Disable custom service mode
+        customServiceNameInput.style.display = 'none';
+        customServiceNameInput.disabled = true;
+        customServiceNameInput.required = false;
+        customServiceNameInput.value = '';
+        customServiceNameInput.style.borderColor = '';
+        
+        // Re-enable service dropdown
+        if (serviceSelect) {
+            serviceSelect.disabled = false;
+        }
+        
+        // Re-enable manual cost checkbox
+        if (customCostCheckbox) {
+            customCostCheckbox.disabled = false;
+        }
+    }
+}
+
 // Function to toggle custom cost input for services
 function toggleCustomCost(bookingId) {
     const customCostCheckbox = document.getElementById(`custom-cost-checkbox-${bookingId}`);
     const serviceCostInput = document.getElementById(`service-cost-${bookingId}`);
     const serviceSelect = document.getElementById(`extra-service-select-${bookingId}`);
+    const customServiceCheckbox = document.getElementById(`custom-service-checkbox-${bookingId}`);
     
     if (!customCostCheckbox || !serviceCostInput) {
         console.error(`❌ Custom cost elements not found for booking ${bookingId}`);
+        return;
+    }
+    
+    // Don't allow unchecking if custom service mode is enabled
+    if (customServiceCheckbox && customServiceCheckbox.checked) {
+        if (!customCostCheckbox.checked) {
+            toastWarning('Validation', 'Custom services require manual cost entry.');
+            customCostCheckbox.checked = true;
+        }
         return;
     }
     
@@ -1528,17 +1680,14 @@ function toggleCustomCost(bookingId) {
     }
     
     if (customCostCheckbox.checked) {
+        // Manual cost mode - allow user to override default cost
         serviceCostInput.style.display = 'block';
         serviceCostInput.disabled = false;
-        if (requiresManualCost) {
-            serviceCostInput.required = true;
-            serviceCostInput.placeholder = 'Enter cost (required)';
-            serviceCostInput.style.borderColor = '#ffc107';
-        } else {
-            serviceCostInput.required = false;
-            serviceCostInput.placeholder = 'Cost';
-            serviceCostInput.style.borderColor = '';
-        }
+        serviceCostInput.required = true;
+        serviceCostInput.placeholder = 'Enter cost';
+        serviceCostInput.style.borderColor = '#ffc107';
+        serviceCostInput.style.backgroundColor = '#ffffff';
+        serviceCostInput.style.cursor = 'text';
         serviceCostInput.focus();
     } else {
         // Prevent unchecking if service requires manual cost
@@ -1547,11 +1696,50 @@ function toggleCustomCost(bookingId) {
             customCostCheckbox.checked = true;
             return;
         }
-        serviceCostInput.style.display = 'none';
-        serviceCostInput.disabled = true;
-        serviceCostInput.required = false;
-        serviceCostInput.value = '';
-        serviceCostInput.style.borderColor = '';
+        
+        // Restore default service cost when unchecking manual cost and make it read-only
+        if (serviceSelect && serviceSelect.value) {
+            try {
+                const service = JSON.parse(serviceSelect.value);
+                const serviceCost = parseFloat(service.SERVICE_COST) || 0;
+                if (serviceCost > 0) {
+                    serviceCostInput.value = serviceCost;
+                    serviceCostInput.placeholder = `Default: ₱${serviceCost.toLocaleString()}`;
+                    serviceCostInput.style.borderColor = '';
+                    serviceCostInput.required = false;
+                    serviceCostInput.disabled = true; // Make read-only
+                    serviceCostInput.style.backgroundColor = '#e9ecef'; // Gray background
+                    serviceCostInput.style.cursor = 'not-allowed';
+                } else {
+                    serviceCostInput.value = '';
+                    serviceCostInput.placeholder = 'Cost';
+                    serviceCostInput.style.borderColor = '';
+                    serviceCostInput.required = false;
+                    serviceCostInput.disabled = true; // Make read-only
+                    serviceCostInput.style.backgroundColor = '#e9ecef';
+                    serviceCostInput.style.cursor = 'not-allowed';
+                }
+            } catch (e) {
+                serviceCostInput.value = '';
+                serviceCostInput.placeholder = 'Cost';
+                serviceCostInput.style.borderColor = '';
+                serviceCostInput.required = false;
+                serviceCostInput.disabled = true; // Make read-only
+                serviceCostInput.style.backgroundColor = '#e9ecef';
+                serviceCostInput.style.cursor = 'not-allowed';
+            }
+        } else {
+            serviceCostInput.value = '';
+            serviceCostInput.placeholder = 'Cost';
+            serviceCostInput.style.borderColor = '';
+            serviceCostInput.required = false;
+            serviceCostInput.disabled = true; // Make read-only
+            serviceCostInput.style.backgroundColor = '#e9ecef';
+            serviceCostInput.style.cursor = 'not-allowed';
+        }
+        
+        // Keep input visible but disabled
+        serviceCostInput.style.display = 'block';
     }
 }
 
@@ -1566,9 +1754,108 @@ const selectedService = serviceSelect.value;
 const quantityInput = document.getElementById(`service-quantity-${bookingId}`);
 const customCostInput = document.getElementById(`service-cost-${bookingId}`);
 const customCostCheckbox = document.getElementById(`custom-cost-checkbox-${bookingId}`);
+const customServiceCheckbox = document.getElementById(`custom-service-checkbox-${bookingId}`);
+const customServiceNameInput = document.getElementById(`custom-service-name-${bookingId}`);
 const bookingIdInput = document.getElementById(`bookingID-${bookingId}`);
 
-if (selectedService) {
+// Check if custom service mode is enabled
+const isCustomService = customServiceCheckbox && customServiceCheckbox.checked;
+
+if (isCustomService) {
+    // Handle custom service
+    const customServiceName = customServiceNameInput ? customServiceNameInput.value.trim() : '';
+    const quantity = parseInt(quantityInput.value, 10);
+    const customCost = parseFloat(customCostInput.value);
+    
+    // Validate custom service
+    if (!customServiceName || customServiceName === '') {
+        toastWarning('Validation', 'Please enter a custom service name!');
+        if (customServiceNameInput) {
+            customServiceNameInput.focus();
+            customServiceNameInput.style.borderColor = '#dc3545';
+            setTimeout(() => {
+                if (customServiceNameInput) customServiceNameInput.style.borderColor = '#ffc107';
+            }, 3000);
+        }
+        return;
+    }
+    
+    // Validate quantity
+    if (isNaN(quantity) || quantity <= 0) {
+        toastWarning('Validation', 'Please enter a valid quantity (must be greater than 0)!');
+        return;
+    }
+    
+    // Validate cost
+    if (isNaN(customCost) || customCost < 0) {
+        toastWarning('Validation', 'Please enter a valid cost amount!');
+        if (customCostInput) {
+            customCostInput.focus();
+            customCostInput.style.borderColor = '#dc3545';
+            setTimeout(() => {
+                if (customCostInput) customCostInput.style.borderColor = '#ffc107';
+            }, 3000);
+        }
+        return;
+    }
+    
+    if (!addedServicesMap[bookingId]) {
+        addedServicesMap[bookingId] = [];
+    }
+    
+    let roomServices = addedServicesMap[bookingId];
+    
+    // REQUIREMENT: Bawat ADD ng custom service ay hiwalay na row,
+    // kahit same name at same cost pa.
+    // Kaya hindi na tayo nagme-merge/combining dito.
+    roomServices.push({
+        SERVICE_ID: -1, // Use -1 for custom services
+        SERVICE_NAME: customServiceName,
+        SERVICE_COST: customCost,
+        QUANTITY: quantity,
+        STATUS: "unpaid",
+        IS_CUSTOM: true, // Flag to identify custom services
+        ALREADY_SAVED: false // Mark as new, not yet saved
+    });
+    
+    // Refresh the list and recalc totals immediately for UI responsiveness
+    updateAddedServicesList(bookingId);
+    calculateTotalCost(bookingId);
+    
+    // Save the updated services to the backend and then update balance
+    saveServices(bookingId, bookingId).then((result) => {
+        // Update balance after successful save
+        calculateBalance(bookingId, bookingId);
+    }).catch((error) => {
+        console.error('❌ Error saving services:', error);
+        // Still update balance even if save fails, to show current state
+        calculateBalance(bookingId, bookingId);
+    });
+    
+    // Reset the form
+    customServiceNameInput.value = '';
+    quantityInput.value = '1';
+    customCostInput.value = '';
+    customServiceCheckbox.checked = false;
+    customServiceNameInput.style.display = 'none';
+    customServiceNameInput.disabled = true;
+    customServiceNameInput.required = false;
+    customServiceNameInput.style.borderColor = '';
+    if (serviceSelect) serviceSelect.disabled = false;
+    if (customCostCheckbox) {
+        customCostCheckbox.checked = false;
+        customCostCheckbox.disabled = false;
+    }
+    customCostInput.style.display = 'none';
+    customCostInput.disabled = true;
+    customCostInput.required = false;
+    customCostInput.style.borderColor = '';
+    customCostInput.placeholder = 'Cost';
+    
+    // Show success message
+    toastSuccess('Success', 'Custom service added successfully!');
+    
+} else if (selectedService) {
     const service = JSON.parse(selectedService);
     const quantity = parseInt(quantityInput.value, 10);
     
@@ -1624,11 +1911,17 @@ if (selectedService) {
     }
     
     // Check for existing unpaid service with the SAME SERVICE_ID AND SAME COST
+    // For custom services, also check by SERVICE_NAME
     const existingUnpaid = roomServices.find(s => {
         const sameId = s.SERVICE_ID === service.SERVICE_ID;
         const sameStatus = s.STATUS !== 'paid';
         const sameCost = Math.abs(parseFloat(s.SERVICE_COST) - serviceCost) < 0.01;
         
+        // For custom services (SERVICE_ID = -1), also check by name
+        if (service.SERVICE_ID === -1) {
+            const sameName = s.SERVICE_NAME === service.SERVICE_NAME;
+            return sameId && sameStatus && sameCost && sameName;
+        }
         
         return sameId && sameStatus && sameCost;
     });
@@ -1644,7 +1937,8 @@ if (selectedService) {
             SERVICE_NAME: service.SERVICE_NAME,
             SERVICE_COST: serviceCost,
             QUANTITY: quantity,
-            STATUS: "unpaid"
+            STATUS: "unpaid",
+            ALREADY_SAVED: false // Mark as new, not yet saved
         });
     }
 
@@ -1698,7 +1992,15 @@ const ignoredServiceIds = [-999, -101, -102];
 roomServices.forEach(service => {
     if (service.STATUS === 'paid') return;
     if (ignoredServiceIds.includes(parseInt(service.SERVICE_ID))) return;
-
+    
+    // Skip custom services - they will be processed separately
+    if (service.SERVICE_ID === -1 || service.IS_CUSTOM) return;
+    
+    // NOTE: Huwag i-skip ang regular services na ALREADY_SAVED dito.
+    // Backend (saveBookingServices) na ang bahala mag-merge/update ng existing rows
+    // base sa SERVICE_ID at cost. Kung i-skip natin dito, hindi mase-save ang bagong
+    // quantity/cost changes para sa regular services.
+    
     // Validate service cost and quantity
     const serviceCost = parseFloat(service.SERVICE_COST) || 0;
     const quantity = parseInt(service.QUANTITY) || 0;
@@ -1730,6 +2032,52 @@ roomServices.forEach(service => {
     }
 });
 
+// Handle custom services separately - only include NEW custom services that haven't been saved yet
+// We'll check the database to see which custom services already exist
+const customServices = roomServices.filter(service => 
+    (service.SERVICE_ID === -1 || service.IS_CUSTOM) && 
+    service.STATUS !== 'paid'
+);
+
+// Process custom services - create entries with SERVICE_ID = -1 and custom name
+// Only add custom services that are truly new (not already in database)
+customServices.forEach(service => {
+    const serviceCost = parseFloat(service.SERVICE_COST) || 0;
+    const quantity = parseInt(service.QUANTITY) || 0;
+    
+    if (isNaN(serviceCost) || isNaN(quantity) || serviceCost < 0 || quantity < 0) {
+        console.warn('Invalid custom service data:', service);
+        return;
+    }
+    
+    // For custom services, use SERVICE_ID = -1 and include custom name
+    // Only add if it's marked as new (not already saved)
+    // We'll check if it has a flag indicating it's already been saved
+    if (service.ALREADY_SAVED) {
+        // Skip custom services that have already been saved to database
+        return;
+    }
+    
+    const key = `custom-${service.SERVICE_NAME}-${serviceCost}`;
+    const totalCost = serviceCost * quantity;
+    
+    if (!serviceMap.has(key)) {
+        serviceMap.set(key, {
+            SERVICE_ID: -1, // Special ID for custom services
+            SERVICE_NAME: service.SERVICE_NAME, // Store custom name
+            QUANTITY: quantity,
+            TOTAL_COST: totalCost,
+            CUSTOM_COST: serviceCost,
+            IS_CUSTOM: true
+        });
+    } else {
+        const existing = serviceMap.get(key);
+        existing.QUANTITY += quantity;
+        existing.TOTAL_COST = existing.QUANTITY * serviceCost;
+        serviceMap.set(key, existing);
+    }
+});
+
 const servicesData = Array.from(serviceMap.values());
 
 
@@ -1751,7 +2099,53 @@ fetch('/booking/save-booking-services', {
 .then(response => response.json())
 .then(data => {
     // Services saved successfully
-        resolve(data);
+    // Reload services from database to update addedServicesMap with fresh data
+    // This prevents duplicate saves when adding new services
+    if (data.success) {
+        // Reload services to get fresh data from database
+        fetch(`/booking/get-booking-services/${bookingId}`)
+            .then(response => response.json())
+            .then(response => {
+                const services = response.data || response;
+                // Clear and reload services to prevent duplicates
+                if (!addedServicesMap[bookingId]) {
+                    addedServicesMap[bookingId] = [];
+                }
+                // Clear existing services and reload from database
+                addedServicesMap[bookingId] = [];
+                
+                services.forEach(service => {
+                    const totalCost = parseFloat(service.TOTAL_COST) || 0;
+                    const quantity = parseInt(service.QTY) || 0;
+                    
+                    let serviceCost = 0;
+                    if (service.SERVICE_ID === -1 && service.SERVICE_COST) {
+                        serviceCost = parseFloat(service.SERVICE_COST) || 0;
+                    } else {
+                        serviceCost = quantity > 0 ? totalCost / quantity : 0;
+                    }
+                    
+                    if (quantity > 0 && !isNaN(serviceCost) && !isNaN(quantity) && serviceCost >= 0) {
+                        addedServicesMap[bookingId].push({
+                            SERVICE_ID: service.SERVICE_ID,
+                            SERVICE_NAME: service.SERVICE_NAME,
+                            SERVICE_COST: serviceCost,
+                            QUANTITY: quantity,
+                            STATUS: service.STATUS || "unpaid",
+                            IS_CUSTOM: service.SERVICE_ID === -1,
+                            ALREADY_SAVED: true // Mark as already saved to prevent duplicate saves
+                        });
+                    }
+                });
+                
+                // Update the display
+                updateAddedServicesList(bookingId);
+            })
+            .catch(err => {
+                console.error('Error reloading services:', err);
+            });
+    }
+    resolve(data);
 })
 .catch(error => {
         console.error('❌ Error saving services:', error);
@@ -6450,28 +6844,43 @@ function loadExistingServicesForModal(bookingId) {
                     // Calculate unit cost from total cost and quantity
                     const totalCost = parseFloat(service.TOTAL_COST) || 0;
                     const quantity = parseInt(service.QTY) || 1;
-                    const unitCost = quantity > 0 ? totalCost / quantity : 0;
                     
-                    // Check if we can combine with existing service (same service, same status, same unit cost)
-                    const existingService = addedServicesMap[bookingId].find(s => 
-                        s.SERVICE_ID === service.SERVICE_ID && 
-                        s.STATUS === service.STATUS &&
-                        s.SERVICE_COST === unitCost
-                    );
-                    
-                    if (existingService) {
-                        // Combine quantities for identical services
-                        existingService.QUANTITY += quantity;
+                    // For custom services, use SERVICE_COST from query if available
+                    // For regular services, calculate from TOTAL_COST / QTY
+                    let unitCost = 0;
+                    if (service.SERVICE_ID === -1 && service.SERVICE_COST) {
+                        // Custom service - use SERVICE_COST from query (already calculated)
+                        unitCost = parseFloat(service.SERVICE_COST) || 0;
                     } else {
-                        // Add as new service entry
-                        addedServicesMap[bookingId].push({
-                            SERVICE_ID: service.SERVICE_ID,
-                            SERVICE_NAME: service.SERVICE_NAME || 'Unknown Service',
-                            SERVICE_COST: unitCost,
-                            QUANTITY: quantity,
-                            STATUS: service.STATUS || 'unpaid'
-                        });
+                        // Regular service - calculate unit cost
+                        unitCost = quantity > 0 ? totalCost / quantity : 0;
                     }
+                    
+                    // REGULAR SERVICES: merge identical rows (same id/status/cost)
+                    if (service.SERVICE_ID !== -1) {
+                        const existingService = addedServicesMap[bookingId].find(s =>
+                            s.SERVICE_ID === service.SERVICE_ID && 
+                            s.STATUS === service.STATUS &&
+                            Math.abs(s.SERVICE_COST - unitCost) < 0.01
+                        );
+                        
+                        if (existingService) {
+                            existingService.QUANTITY += quantity;
+                            existingService.ALREADY_SAVED = true;
+                            return;
+                        }
+                    }
+
+                    // CUSTOM SERVICES: bawat row sa DB ay hiwalay na entry
+                    addedServicesMap[bookingId].push({
+                        SERVICE_ID: service.SERVICE_ID,
+                        SERVICE_NAME: service.SERVICE_NAME || 'Unknown Service',
+                        SERVICE_COST: unitCost,
+                        QUANTITY: quantity,
+                        STATUS: service.STATUS || 'unpaid',
+                        IS_CUSTOM: service.SERVICE_ID === -1,
+                        ALREADY_SAVED: true // Mark as already saved since it came from database
+                    });
                 });
             }
             
