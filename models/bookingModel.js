@@ -4843,15 +4843,16 @@ class BookingModel {
         queryDatabasePromise(serviceBillingQuery, [groupId])
       ]);
 
-      // Extract unique values for invoice
+      // Extract unique values for invoice (use original results for invoice number and group name)
       const invoiceNumber = roomResults.length > 0 ? roomResults[0].invoiceNumber : "Not Assigned";
       const GroupName = roomResults.length > 0 ? roomResults[0].GROUP_NAME : "Unknown Group";
 
-      // Get group summary data including reservation fee and discount
+      // Get group summary data including reservation fee, discount, and billing type
       const summaryQuery = `
         SELECT 
           COALESCE(gb.GROUP_DISCOUNT, 0) AS group_discount,
-          COALESCE(gb.GROUP_RESERVATION_FEE, 0) AS reservation_fee
+          COALESCE(gb.GROUP_RESERVATION_FEE, 0) AS reservation_fee,
+          COALESCE(gb.BILLING_TYPE, 0) AS billing_type
         FROM group_booking gb
         WHERE gb.IDNo = ?
       `;
@@ -4859,15 +4860,37 @@ class BookingModel {
       const [summaryRow] = await queryDatabasePromise(summaryQuery, [groupId]);
       const reservationFee = parseFloat(summaryRow?.reservation_fee || 0);
       const discount = parseFloat(summaryRow?.group_discount || 0);
-
-      // Compute totals from items
-      const roomTotal = roomResults.reduce((sum, r) => sum + ((parseFloat(r.charges) || 0) * (parseInt(r.room_qty, 10) || 0)), 0);
-      const servicesTotal = serviceResults.reduce((sum, s) => sum + ((parseFloat(s.charges) || 0) * (parseInt(s.service_qty, 10) || 0)), 0);
+      const billingType = parseInt(summaryRow?.billing_type || 0, 10);
       
-      // Build penalty rows from room results
+      // If BILLING_TYPE = 1 (MASTER), get the master booking ID (first booking/lowest ID)
+      let masterBookingId = null;
+      if (billingType === 1) {
+        const masterBookingQuery = `
+          SELECT MIN(b.IDNo) AS master_booking_id
+          FROM booking b
+          WHERE b.GROUP_BOOKING_ID = ? AND b.ACTIVE = 1
+        `;
+        const [masterRow] = await queryDatabasePromise(masterBookingQuery, [groupId]);
+        masterBookingId = masterRow?.master_booking_id || null;
+      }
+
+      // Filter results if BILLING_TYPE = 1 (MASTER) - only show master booking
+      let filteredRoomResults = roomResults;
+      let filteredServiceResults = serviceResults;
+      
+      if (billingType === 1 && masterBookingId) {
+        filteredRoomResults = roomResults.filter(r => r.BOOKING_ID === masterBookingId);
+        filteredServiceResults = serviceResults.filter(s => s.BOOKING_ID === masterBookingId);
+      }
+      
+      // Compute totals from filtered items
+      const roomTotal = filteredRoomResults.reduce((sum, r) => sum + ((parseFloat(r.charges) || 0) * (parseInt(r.room_qty, 10) || 0)), 0);
+      const servicesTotal = filteredServiceResults.reduce((sum, s) => sum + ((parseFloat(s.charges) || 0) * (parseInt(s.service_qty, 10) || 0)), 0);
+      
+      // Build penalty rows from filtered room results
       const penaltyRows = [];
       let penaltyTotal = 0;
-      roomResults.forEach(row => {
+      filteredRoomResults.forEach(row => {
         const penaltyAmount = parseFloat(row.PENALTY_AMOUNT || 0);
         if (penaltyAmount > 0) {
           penaltyTotal += penaltyAmount;
@@ -4953,8 +4976,8 @@ class BookingModel {
       return {
         invoiceNumber: invoiceNumber,
         GroupName,
-        roomBillingDetails: roomResults,  // Room charges
-        serviceBillingDetails: [...serviceResults, ...penaltyRows],  // Service charges + penalties
+        roomBillingDetails: filteredRoomResults,  // Room charges (filtered if MASTER billing)
+        serviceBillingDetails: [...filteredServiceResults, ...penaltyRows],  // Service charges + penalties (filtered if MASTER billing)
         reservationFee: reservationFee,
         discount: discount,
         roomTotal: roomTotal,
@@ -4996,11 +5019,15 @@ class BookingModel {
         });
       });
       (details.serviceBillingDetails || []).forEach(s => {
+        const serviceName = (s.description || '').toLowerCase();
+        const isSpecialService = serviceName === 'upgrade' || serviceName === 'pick-up' || serviceName === 'drop-off';
+        const qtyDisplay = isSpecialService ? '-' : (parseInt(s.service_qty, 10) || 0);
+        
         rows.push({
           ROOM_NUMBER: s.ROOM_NUMBER,
           DESCRIPTION: s.description,
           CHARGES: parseFloat(s.charges) || 0,
-          QTY: parseInt(s.service_qty, 10) || 0
+          QTY: qtyDisplay
         });
       });
 
@@ -5980,6 +6007,24 @@ class BookingModel {
       data.CHECKIN_DATE = formatDDMMYY(data.CHECK_IN_DATE);
       data.CHECKOUT_DATE = formatDDMMYY(data.CHECK_OUT_DATE);
 
+      // Fetch individual services for the invoice
+      const servicesQuery = `
+        SELECT 
+          CASE 
+            WHEN bs.SERVICE_ID = -1 AND bs.CUSTOM_NAME IS NOT NULL
+            THEN bs.CUSTOM_NAME
+            ELSE s.SERVICE_NAME
+          END as SERVICE_NAME,
+          bs.QTY, 
+          bs.TOTAL_COST
+        FROM booking_service bs
+        LEFT JOIN services s ON bs.SERVICE_ID = s.IDNo
+        WHERE bs.BOOKING_ID = ? AND bs.ACTIVE = 1
+        ORDER BY bs.ENCODED_DT ASC
+      `;
+      const servicesRows = await queryDatabasePromise(servicesQuery, [bookingId]);
+      data.SERVICES_LIST = servicesRows || [];
+
       // Add image and user data
       const path = require('path');
       const fs = require('fs');
@@ -6006,7 +6051,7 @@ class BookingModel {
       const pdfBuffer = await page.pdf({
         format: 'A4',
         printBackground: true,
-        margin: { top: '20mm', bottom: '20mm', left: '15mm', right: '15mm' },
+        margin: { top: '0mm', bottom: '0mm', left: '5mm', right: '5mm' },
       });
 
       await browser.close();

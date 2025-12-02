@@ -673,13 +673,18 @@ function viewGroupBilling(groupId) {
                 currentRoom = bill.ROOM_NUMBER;
                 roomTotal += amount;
 
+                // Check if service is Pick-up, Drop-off, or Upgrade - show hyphen for QTY
+                const serviceName = (bill.description || '').toLowerCase();
+                const isSpecialService = serviceName === 'upgrade' || serviceName === 'pick-up' || serviceName === 'drop-off';
+                const qtyDisplay = isSpecialService ? '-' : (bill.room_qty || bill.service_qty || 1);
+
                 let row = `
                     <tr data-booking-id="${bill.BOOKING_ID}">
                         <td class="text-center">${rowNumber++}</td>
                         <td class="text-center">Room - ${bill.ROOM_NUMBER}</td>
                         <td class="text-center">${bill.description} ${paidIcon}</td>
                         <td class="text-center">${chargeAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        <td class="text-center">${bill.room_qty || bill.service_qty || 1}</td>
+                        <td class="text-center">${qtyDisplay}</td>
                         <td class="text-right">${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         <input type="hidden" name="bookingId[]" value="${bill.BOOKING_ID}">
                     </tr>`;

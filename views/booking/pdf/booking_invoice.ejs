@@ -6,12 +6,14 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 20px;
+      margin: 0;
+      padding: 10px 20px;
     }
 
     .header {
       text-align: center;
       margin-bottom: 20px;
+      margin-top: 0;
     }
 
     .header img {
@@ -21,7 +23,7 @@
     .invoice-title {
       font-size: 28px;
       font-weight: bold;
-      margin: 15px 0;
+      
     }
 
     .sub-header {
@@ -40,6 +42,17 @@
       border: 1px solid #f3c200;
       padding: 10px;
       text-align: center;
+    }
+
+    .info-table td:nth-child(1),
+    .info-table td:nth-child(2),
+    .info-table th:nth-child(1),
+    .info-table th:nth-child(2) {
+      word-wrap: break-word;
+      word-break: break-word;
+      white-space: normal;
+      max-width: 150px;
+      vertical-align: middle;
     }
 
     .totals {
@@ -135,7 +148,7 @@
 
   <div style="display: flex; justify-content: space-between; margin-top: 10px;">
     <div><b>Date:</b> <%= DATE_ISSUED %></div>
-    <div><b>Invoice #:</b> <%= INVOICE_NO %></div>
+    <div><b>Invoice #:</b> <%= CONFIRMATION_NUMBER %></div>
   </div>
 
   <div style="margin-top: 10px;">
@@ -148,42 +161,58 @@
         <th>DATE</th>
         <th>GUEST NAME</th>
         <th>DESCRIPTION</th>
-        <th>NO OF ROOMS</th>
-        <th>NO. OF NIGHTS</th>
-        <th>TOTAL</th>
+        <th>QTY</th>
+        <th>AMOUNT</th>
       </tr>
     </thead>
     <tbody>
+      <% 
+        const totalRows = 1 + (isCancelled ? 0 : (SERVICES_LIST && SERVICES_LIST.length > 0 ? SERVICES_LIST.length : 0));
+        const rowspanValue = totalRows;
+      %>
       <tr>
-        <td><%= CHECKIN_DATE %> TO <%= CHECKOUT_DATE %></td>
-        <td><%= CUSTOMER_NAME %></td>
-        <td>ROOM ACCOMMODATION</td>
-        <td><%= ROOM_COUNT %> ROOMS (<%= ROOM_TYPE %>)</td>
+        <td rowspan="<%= rowspanValue %>"><%= CHECKIN_DATE %> TO <%= CHECKOUT_DATE %></td>
+        <td rowspan="<%= rowspanValue %>"><%= CUSTOMER_NAME %></td>
+        <td>ROOM CHARGE</td>
         <td><%= TOTAL_NIGHTS %> NIGHTS</td>
-        <td>PHP <%= formatCurrency(tableTotalValue) %></td>
+        <td><%= formatCurrency(displayRoomTotal) %></td>
       </tr>
+      <% if (!isCancelled && SERVICES_LIST && SERVICES_LIST.length > 0) { %>
+        <% SERVICES_LIST.forEach((service) => { %>
+          <% 
+            const serviceName = (service.SERVICE_NAME || '').toLowerCase();
+            const isSpecialService = serviceName === 'upgrade' || serviceName === 'pick-up' || serviceName === 'drop-off';
+            const qtyDisplay = isSpecialService ? '-' : (service.QTY || 1);
+          %>
+          <tr>
+            <td><%= service.SERVICE_NAME %></td>
+            <td><%= qtyDisplay %></td>
+            <td><%= formatCurrency(service.TOTAL_COST || 0) %></td>
+          </tr>
+        <% }); %>
+      <% } %>
     </tbody>
   </table>
 
   <div class="totals">
     <p class="label"><b>CHARGE SUMMARY:</b></p>
     <% const roomLabel = (!isCancelled && EXTENDED_DAYS > 0) ? 'ROOM & EXTENSION' : 'ROOM'; %>
-    <p class="sub"><%= roomLabel %>: PHP <%= formatCurrency(displayRoomTotal) %></p>
-    <p class="sub">SERVICES: PHP <%= formatCurrency(displayServicesTotal) %></p>
+    <p class="sub"><%= roomLabel %>: <%= formatCurrency(displayRoomTotal) %></p>
+    <p class="sub">SERVICES: <%= formatCurrency(displayServicesTotal) %></p>
     
     <% if (!isCancelled && reservationFeeValue > 0) { %>
-      <p class="sub"  style="color: #28a745;">RESERVATION FEE: -PHP <%= formatCurrency(reservationFeeValue) %></p>
+      <p class="sub"  style="color: #28a745;">RESERVATION FEE: -<%= formatCurrency(reservationFeeValue) %></p>
     <% } %>
     
     <% if (discountValue > 0) { %>
-      <p class="sub" style="color: #28a745;">DISCOUNT: -PHP <%= formatCurrency(discountValue) %></p>
+      <p class="sub" style="color: #28a745;">DISCOUNT: -<%= formatCurrency(discountValue) %></p>
     <% } %>
 
     <% if (isCancelled) { %>
-      <p class="sub" style="color: #d35400;">CANCELLATION FEE: PHP <%= formatCurrency(cancellationFee) %></p>
+      <p class="sub" style="color: #d35400;">CANCELLATION FEE: <%= formatCurrency(cancellationFee) %></p>
     <% } %>
     
-    <p class="label"><b>TOTAL CHARGES:</b> PHP <%= formatCurrency(totalChargesValue) %></p>
+    <p class="label"><b>TOTAL CHARGES:</b> <%= formatCurrency(totalChargesValue) %></p>
   </div>
   
   
@@ -196,32 +225,32 @@
     <div class="totals">
       
       <!-- <hr style="margin: 5px 0;"> -->
-      <p class="label"><b>TAX:</b> PHP 0</p>
-      <p class="label"><b>PAYMENT:</b> PHP <%= formatCurrency(totalPaidBeforeValue) %></p>
+      <p class="label"><b>TAX:</b> 0</p>
+      <p class="label"><b>PAYMENT:</b> <%= formatCurrency(totalPaidBeforeValue) %></p>
       
       <% if (isCancelled) { %>
-        <p class="sub">TOTAL PAID (BEFORE CANCELLATION): PHP <%= formatCurrency(totalPaidBeforeValue) %></p>
-        <p class="sub">PAID AMOUNT (AFTER CANCELLATION): PHP <%= formatCurrency(paidAfterCancellationValue) %></p>
+        <p class="sub">TOTAL PAID (BEFORE CANCELLATION): <%= formatCurrency(totalPaidBeforeValue) %></p>
+        <p class="sub">PAID AMOUNT (AFTER CANCELLATION): <%= formatCurrency(paidAfterCancellationValue) %></p>
         <% if (refundAmount > 0) { %>
-          <p class="sub">REFUND AMOUNT: PHP <%= formatCurrency(refundAmount) %></p>
+          <p class="sub">REFUND AMOUNT: <%= formatCurrency(refundAmount) %></p>
         <% } %>
       <% } else { %>
-        <p class="sub">ROOM PAID: PHP <%= formatCurrency(roomPaidValue) %></p>
+        <p class="sub">ROOM PAID: <%= formatCurrency(roomPaidValue) %></p>
         <% if (EXTENDED_DAYS > 0) { %>
-          <p class="sub">EXTENSION PAID: PHP <%= formatCurrency(extendedPaidValue) %></p>
+          <p class="sub">EXTENSION PAID: <%= formatCurrency(extendedPaidValue) %></p>
         <% } %>
-        <p class="sub">SERVICES PAID: PHP <%= formatCurrency(servicesPaidValue) %></p>
+        <p class="sub">SERVICES PAID: <%= formatCurrency(servicesPaidValue) %></p>
         
         <% if (reservationFeeValue > 0) { %>
-          <p class="sub" style="color: #28a745;">RESERVATION FEE PAID: -PHP <%= formatCurrency(reservationFeeValue) %></p>
+          <p class="sub" style="color: #28a745;">RESERVATION FEE PAID: -<%= formatCurrency(reservationFeeValue) %></p>
         <% } %>
         
         <% if (discountValue > 0) { %>
-          <p class="sub" style="color: #28a745;">DISCOUNT APPLIED: -PHP <%= formatCurrency(discountValue) %></p>
+          <p class="sub" style="color: #28a745;">DISCOUNT APPLIED: -<%= formatCurrency(discountValue) %></p>
         <% } %>
       <% } %>
       
-      <p class="label"><b class="red">TOTAL DUE:</b><span class="red"> PHP <%= formatCurrency(totalDueValue) %></span></p>
+      <p class="label"><b class="red">TOTAL DUE:</b><span class="red"> <%= formatCurrency(totalDueValue) %></span></p>
     </div>
   </table>
   
