@@ -138,10 +138,8 @@ window.showBilling = async function (bookingID) {
                     // Subtotal display (always show numeric value even if cancelled)
                     let subtotalDisplay = displaySubTotal.toFixed(2);
                     
-                    // Exclude cancellation fee / penalty items from total row
-                    if (!isPenalty) {
-                        totalSubtotal += displaySubTotal;
-                    }
+                    // Include all items in total (including cancellation fee / penalty items)
+                    totalSubtotal += displaySubTotal;
                     
                     rowIndex++;
                     const row = `

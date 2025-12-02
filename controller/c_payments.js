@@ -29,14 +29,14 @@ const paymentsController = {
 
   tableData: async (req, res) => {
     try {
-      const { start = 0, length = 10, search = { value: '' }, order = [{ column: 10, dir: 'desc' }], filter = 'today' } = req.query;
+      const { start = 0, length = 10, search = { value: '' }, order = [{ column: 11, dir: 'desc' }], filter = 'today' } = req.query;
       const searchValue = search.value || '';
-      const orderColumn = order[0]?.column || 10;
+      const orderColumn = order[0]?.column || 11;
       const orderDir = order[0]?.dir || 'desc';
 
       const columns = [
         'BOOKING_ID', 'BOOKING_ID', 'GUEST_NAME', 'ROOM_NUMBER', 'CONFIRMATION_NUMBER',
-        'TOTAL_AMOUNT', 'TOTAL_PAID', 'BALANCE', 'PAYMENT_STATUS', 'PAYMENT_METHOD', 'BOOKING_DATE'
+        'TOTAL_AMOUNT', 'TOTAL_PAID', 'DISCOUNT_AMOUNT', 'BALANCE', 'PAYMENT_STATUS', 'PAYMENT_METHOD', 'BOOKING_DATE'
       ];
       const orderBy = columns[orderColumn] || 'BOOKING_DATE';
 

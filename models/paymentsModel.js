@@ -66,17 +66,16 @@ const paymentsModel = {
         (
           COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) +
           COALESCE(bill.AMENITIES_CHARGE, 0) +
-          COALESCE(bill.SERVICES_CHARGE, 0) +
           COALESCE(bill.LATE_CHECKOUT_CHARGE, 0) +
           COALESCE(bill.CANCELLATION_PENALTY, 0) +
           COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0) +
           COALESCE((SELECT SUM(be.COST) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
         ) AS TOTAL_AMOUNT,
+        COALESCE(bill.DISCOUNT_AMOUNT, 0) AS DISCOUNT_AMOUNT,
         COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE != 'discount'), 0) AS TOTAL_PAID,
         (
           COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) +
           COALESCE(bill.AMENITIES_CHARGE, 0) +
-          COALESCE(bill.SERVICES_CHARGE, 0) +
           COALESCE(bill.LATE_CHECKOUT_CHARGE, 0) +
           COALESCE(bill.CANCELLATION_PENALTY, 0) +
           COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0) +
@@ -99,7 +98,6 @@ const paymentsModel = {
   salesSummary: async (todayStr, weekStartStr, monthStartStr) => {
     const sumExpr = `COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) +
       COALESCE(bill.AMENITIES_CHARGE, 0) +
-      COALESCE(bill.SERVICES_CHARGE, 0) +
       COALESCE(bill.LATE_CHECKOUT_CHARGE, 0) +
       COALESCE(bill.CANCELLATION_PENALTY, 0) +
       COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0) +
@@ -153,7 +151,6 @@ const paymentsModel = {
          (
            COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) +
            COALESCE(bill.AMENITIES_CHARGE, 0) +
-           COALESCE(bill.SERVICES_CHARGE, 0) +
            COALESCE(bill.LATE_CHECKOUT_CHARGE, 0) +
            COALESCE(bill.CANCELLATION_PENALTY, 0) +
            COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0) +
@@ -163,7 +160,6 @@ const paymentsModel = {
          (
            COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) +
            COALESCE(bill.AMENITIES_CHARGE, 0) +
-           COALESCE(bill.SERVICES_CHARGE, 0) +
            COALESCE(bill.LATE_CHECKOUT_CHARGE, 0) +
            COALESCE(bill.CANCELLATION_PENALTY, 0) +
            COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0) +
@@ -283,7 +279,6 @@ const paymentsModel = {
          (
            COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) +
            COALESCE(bill.AMENITIES_CHARGE, 0) +
-           COALESCE(bill.SERVICES_CHARGE, 0) +
            COALESCE(bill.LATE_CHECKOUT_CHARGE, 0) +
            COALESCE(bill.CANCELLATION_PENALTY, 0) +
            COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0) +
@@ -293,7 +288,6 @@ const paymentsModel = {
          (
            COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) +
            COALESCE(bill.AMENITIES_CHARGE, 0) +
-           COALESCE(bill.SERVICES_CHARGE, 0) +
            COALESCE(bill.LATE_CHECKOUT_CHARGE, 0) +
            COALESCE(bill.CANCELLATION_PENALTY, 0) +
            COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0) +

@@ -492,11 +492,7 @@ $(document).ready(function () {
         });
     })();
     
-    // Attach click event to set BookingID in modal for status change
-    $('#booking_tbl').on('click', 'span[data-bs-toggle="modal"]', function () {
-        const bookingId = $(this).data('booking-id');
-        $('#change_status').data('booking-id', bookingId);
-    });
+    // Removed: Status column is no longer clickable
 
     // Handle form submission for status change
     $('#change_status').submit(function (e) {
@@ -611,7 +607,7 @@ function getStatusLabel(status, bookingId) {
     }
 
     return `
-    <span class="label label-sm ${labelClass}" data-bs-toggle="modal" data-bs-target="#modal-status" data-booking-id="${bookingId}">
+    <span class="label label-sm ${labelClass}">
         ${labelText}
     </span>
     `;

@@ -2721,14 +2721,15 @@ function triggerCheckout(bookingId) {
                 
                 // Add discount option checkbox if early checkout and has discount
                 // By default, checkbox is UNCHECKED (discount NOT applied to early checkout)
-                if (isEarlyCheckout && hasDiscount) {
-                    discountOptionHtml = `
-                        <div class="form-check choice-row" style="text-align:left; margin-top:10px;">
-                            <input class="form-check-input" type="checkbox" value="" id="applyDiscountChk">
-                            <label class="form-check-label" for="applyDiscountChk">Apply discount to early checkout</label>
-                        </div>
-                    `;
-                }
+                // HIDDEN: Discount option removed - discount will NOT be applied automatically
+                // if (isEarlyCheckout && hasDiscount) {
+                //     discountOptionHtml = `
+                //         <div class="form-check choice-row" style="text-align:left; margin-top:10px;">
+                //             <input class="form-check-input" type="checkbox" value="" id="applyDiscountChk">
+                //             <label class="form-check-label" for="applyDiscountChk">Apply discount to early checkout</label>
+                //         </div>
+                //     `;
+                // }
                 
                 // Calculate initial Net Balance WITHOUT discount (since checkbox is unchecked by default)
                 const initialNetBalance = grossTotal - reservationFee;

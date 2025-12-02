@@ -23,9 +23,9 @@
         <div class="card-box"><div class="card-body">
           <div class="text-center mb-3"><h5 class="text-primary mb-0"><i class="fas fa-calendar-day"></i> Daily Sales</h5></div>
           <div class="row text-center">
-            <div class="col-4"><h6 class="text-warning mb-1" id="daily-total">₱0</h6><small class="text-muted">Total</small></div>
-            <div class="col-4"><h6 class="text-success mb-1" id="daily-paid">₱0</h6><small class="text-muted">Paid</small></div>
-            <div class="col-4"><h6 class="text-danger mb-1" id="daily-unpaid">₱0</h6><small class="text-muted">Unpaid</small></div>
+            <div class="col-4"><h6 class="text-warning mb-1" id="daily-total">0</h6><small class="text-muted">Total</small></div>
+            <div class="col-4"><h6 class="text-success mb-1" id="daily-paid">0</h6><small class="text-muted">Paid</small></div>
+            <div class="col-4"><h6 class="text-danger mb-1" id="daily-unpaid">0</h6><small class="text-muted">Unpaid</small></div>
           </div>
         </div></div>
       </div>
@@ -33,9 +33,9 @@
         <div class="card-box"><div class="card-body">
           <div class="text-center mb-3"><h5 class="text-success mb-0"><i class="fas fa-calendar-week"></i> Weekly Sales</h5></div>
           <div class="row text-center">
-            <div class="col-4"><h6 class="text-warning mb-1" id="weekly-total">₱0</h6><small class="text-muted">Total</small></div>
-            <div class="col-4"><h6 class="text-success mb-1" id="weekly-paid">₱0</h6><small class="text-muted">Paid</small></div>
-            <div class="col-4"><h6 class="text-danger mb-1" id="weekly-unpaid">₱0</h6><small class="text-muted">Unpaid</small></div>
+            <div class="col-4"><h6 class="text-warning mb-1" id="weekly-total">0</h6><small class="text-muted">Total</small></div>
+            <div class="col-4"><h6 class="text-success mb-1" id="weekly-paid">0</h6><small class="text-muted">Paid</small></div>
+            <div class="col-4"><h6 class="text-danger mb-1" id="weekly-unpaid">0</h6><small class="text-muted">Unpaid</small></div>
           </div>
         </div></div>
       </div>
@@ -43,9 +43,9 @@
         <div class="card-box"><div class="card-body">
           <div class="text-center mb-3"><h5 class="text-info mb-0"><i class="fas fa-calendar-alt"></i> Monthly Sales</h5></div>
           <div class="row text-center">
-            <div class="col-4"><h6 class="text-warning mb-1" id="monthly-total">₱0</h6><small class="text-muted">Total</small></div>
-            <div class="col-4"><h6 class="text-success mb-1" id="monthly-paid">₱0</h6><small class="text-muted">Paid</small></div>
-            <div class="col-4"><h6 class="text-danger mb-1" id="monthly-unpaid">₱0</h6><small class="text-muted">Unpaid</small></div>
+            <div class="col-4"><h6 class="text-warning mb-1" id="monthly-total">0</h6><small class="text-muted">Total</small></div>
+            <div class="col-4"><h6 class="text-success mb-1" id="monthly-paid">0</h6><small class="text-muted">Paid</small></div>
+            <div class="col-4"><h6 class="text-danger mb-1" id="monthly-unpaid">0</h6><small class="text-muted">Unpaid</small></div>
           </div>
         </div></div>
       </div>
@@ -56,16 +56,17 @@
         <thead>
           <tr>
             <th style="display:none"></th>
-            <th>#</th>
-            <th>GUEST NAME</th>
-            <th>ROOM NUMBER</th>
-            <th>CONFIRMATION NUMBER</th>
-            <th>TOTAL AMOUNT</th>
-            <th>PAID</th>
-            <th>BALANCE</th>
-            <th>PAYMENT STATUS</th>
-            <th>PAYMENT METHOD</th>
-            <th>BOOKING DATE</th>
+            <th style="text-align: center;">#</th>
+            <th style="text-align: center;">GUEST NAME</th>
+            <th style="text-align: center;">ROOM NUMBER</th>
+            <th style="text-align: center;">CONFIRMATION NUMBER</th>
+            <th style="text-align: center;">TOTAL AMOUNT</th>
+            <th style="text-align: center;">PAID</th>
+            <th style="text-align: center;">DISCOUNT</th>
+            <th style="text-align: center;">BALANCE</th>
+            <th style="text-align: center;">PAYMENT STATUS</th>
+            <th style="text-align: center;">PAYMENT METHOD</th>
+            <th style="text-align: center;">BOOKING DATE</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -111,9 +112,14 @@
             return `<a href="#" class="confirmation-link" data-booking-id="${row.BOOKING_ID}" style="color:#007bff;text-decoration:underline;cursor:pointer;">${data}</a>`;
           }
         },
-        { data: 'TOTAL_AMOUNT', className: 'center', render: d => '₱' + Number(d||0).toLocaleString('en-US', { maximumFractionDigits: 0 }) },
-        { data: 'TOTAL_PAID', className: 'center', render: d => '₱' + Number(d||0).toLocaleString('en-US', { maximumFractionDigits: 0 }) },
-        { data: 'BALANCE', className: 'center', render: d => '₱' + Number(d||0).toLocaleString('en-US', { maximumFractionDigits: 0 }) },
+        { data: 'TOTAL_AMOUNT', className: 'center', render: d => '' + Number(d||0).toLocaleString('en-US', { maximumFractionDigits: 0 }) },
+        { data: 'TOTAL_PAID', className: 'center', render: d => '' + Number(d||0).toLocaleString('en-US', { maximumFractionDigits: 0 }) },
+        { data: 'DISCOUNT_AMOUNT', className: 'center', render: d => {
+            const discount = Number(d||0);
+            return discount > 0 ? '<span style="color:#28a745;">-' + discount.toLocaleString('en-US', { maximumFractionDigits: 0 }) + '</span>' : '0';
+          }
+        },
+        { data: 'BALANCE', className: 'center', render: d => '' + Number(d||0).toLocaleString('en-US', { maximumFractionDigits: 0 }) },
         { data: null, className: 'center', render: function(_d,_t,row){
             const balance = parseFloat(row.BALANCE)||0;
             if (balance <= 0) return '<span class="label label-success">Paid</span>';
@@ -124,7 +130,7 @@
         { data: null, className: 'center', render: function(_d,_t,row){ return row.PAYMENT_METHOD || 'N/A'; } },
         { data: 'BOOKING_DATE', className: 'center', render: d => new Date(d).toLocaleString('en-US') }
       ],
-      order: [[10, 'desc']],
+      order: [[11, 'desc']],
       language: { emptyTable: 'No data available in the table.' }
     });
 
@@ -145,15 +151,15 @@
       .then(r => r.json())
       .then(data => {
         if(!data.success) return;
-        document.getElementById('daily-total').textContent = '₱' + Number(data.dailyTotal||0).toLocaleString('en-US');
-        document.getElementById('daily-paid').textContent = '₱' + Number(data.dailyPaid||0).toLocaleString('en-US');
-        document.getElementById('daily-unpaid').textContent = '₱' + Number(data.dailyUnpaid||0).toLocaleString('en-US');
-        document.getElementById('weekly-total').textContent = '₱' + Number(data.weeklyTotal||0).toLocaleString('en-US');
-        document.getElementById('weekly-paid').textContent = '₱' + Number(data.weeklyPaid||0).toLocaleString('en-US');
-        document.getElementById('weekly-unpaid').textContent = '₱' + Number(data.weeklyUnpaid||0).toLocaleString('en-US');
-        document.getElementById('monthly-total').textContent = '₱' + Number(data.monthlyTotal||0).toLocaleString('en-US');
-        document.getElementById('monthly-paid').textContent = '₱' + Number(data.monthlyPaid||0).toLocaleString('en-US');
-        document.getElementById('monthly-unpaid').textContent = '₱' + Number(data.monthlyUnpaid||0).toLocaleString('en-US');
+        document.getElementById('daily-total').textContent = '' + Number(data.dailyTotal||0).toLocaleString('en-US');
+        document.getElementById('daily-paid').textContent = '' + Number(data.dailyPaid||0).toLocaleString('en-US');
+        document.getElementById('daily-unpaid').textContent = '' + Number(data.dailyUnpaid||0).toLocaleString('en-US');
+        document.getElementById('weekly-total').textContent = '' + Number(data.weeklyTotal||0).toLocaleString('en-US');
+        document.getElementById('weekly-paid').textContent = '' + Number(data.weeklyPaid||0).toLocaleString('en-US');
+        document.getElementById('weekly-unpaid').textContent = '' + Number(data.weeklyUnpaid||0).toLocaleString('en-US');
+        document.getElementById('monthly-total').textContent = '' + Number(data.monthlyTotal||0).toLocaleString('en-US');
+        document.getElementById('monthly-paid').textContent = '' + Number(data.monthlyPaid||0).toLocaleString('en-US');
+        document.getElementById('monthly-unpaid').textContent = '' + Number(data.monthlyUnpaid||0).toLocaleString('en-US');
       })
       .catch(err => console.error('Error loading sales summary:', err));
   }
@@ -196,35 +202,50 @@
           <thead class="table-dark"><tr><th>Item</th><th class="text-right">Amount</th></tr></thead>
           <tbody>
             <tr>
-              <td><strong>Room Charges</strong><br><small class="text-muted">${booking.ROOM_TYPE} × ${booking.QTY} days @ ₱${Number(booking.ROOM_CHARGE||0).toLocaleString()}</small></td>
-              <td class="text-right"><strong>₱${Number(booking.ROOM_TOTAL||0).toLocaleString()}</strong></td>
+              <td><strong>Room Charges</strong><br><small class="text-muted">${booking.ROOM_TYPE} × ${booking.QTY} days @ ${Number(booking.ROOM_CHARGE||0).toLocaleString()}</small></td>
+              <td class="text-right"><strong>${Number(booking.ROOM_TOTAL||0).toLocaleString()}</strong></td>
             </tr>`;
 
-    if (booking.AMENITIES_CHARGE > 0) html += `<tr><td><strong>Amenities Charge</strong></td><td class="text-right">₱${Number(booking.AMENITIES_CHARGE).toLocaleString()}</td></tr>`;
-    if (booking.SERVICES_CHARGE > 0) html += `<tr><td><strong>Services Charge</strong></td><td class="text-right">₱${Number(booking.SERVICES_CHARGE).toLocaleString()}</td></tr>`;
-    if (booking.LATE_CHECKOUT_CHARGE > 0) html += `<tr><td><strong>Late Checkout Charge</strong></td><td class="text-right">₱${Number(booking.LATE_CHECKOUT_CHARGE).toLocaleString()}</td></tr>`;
-    if (booking.CANCELLATION_PENALTY > 0) html += `<tr><td><strong>Cancellation Penalty</strong></td><td class="text-right">₱${Number(booking.CANCELLATION_PENALTY).toLocaleString()}</td></tr>`;
+    if (booking.AMENITIES_CHARGE > 0) html += `<tr><td><strong>Amenities Charge</strong></td><td class="text-right">${Number(booking.AMENITIES_CHARGE).toLocaleString()}</td></tr>`;
+    
+    // Only show SERVICES_CHARGE if there are no services in booking_service table (to avoid double counting)
+    if (booking.SERVICES_CHARGE > 0 && services.length === 0) {
+      html += `<tr><td><strong>Services Charge</strong></td><td class="text-right">${Number(booking.SERVICES_CHARGE).toLocaleString()}</td></tr>`;
+    }
+    
+    if (booking.LATE_CHECKOUT_CHARGE > 0) html += `<tr><td><strong>Late Checkout Charge</strong></td><td class="text-right">${Number(booking.LATE_CHECKOUT_CHARGE).toLocaleString()}</td></tr>`;
+    
+    // Check if there's a cancellation fee service in the services list
+    const hasCancellationFeeService = services.some(s => {
+      const serviceName = (s.SERVICE_NAME || '').toLowerCase();
+      return serviceName.includes('cancellation') || serviceName.includes('cancel');
+    });
+    
+    // Only show CANCELLATION_PENALTY if there's no cancellation fee service already in services
+    if (booking.CANCELLATION_PENALTY > 0 && !hasCancellationFeeService) {
+      html += `<tr><td><strong>Cancellation Penalty</strong></td><td class="text-right">${Number(booking.CANCELLATION_PENALTY).toLocaleString()}</td></tr>`;
+    }
 
     if (services.length > 0) {
       html += `<tr><td colspan="2"><strong>Additional Services:</strong></td></tr>`;
-      services.forEach(s => { html += `<tr><td style="padding-left:30px;"><small>${s.SERVICE_NAME} × ${s.QTY}</small></td><td class="text-right">₱${Number(s.TOTAL_COST).toLocaleString()}</td></tr>`; });
+      services.forEach(s => { html += `<tr><td style="padding-left:30px;"><small>${s.SERVICE_NAME} × ${s.QTY}</small></td><td class="text-right">${Number(s.TOTAL_COST).toLocaleString()}</td></tr>`; });
     }
 
     if (extensions.length > 0) {
       html += `<tr><td colspan="2"><strong>Room Extensions:</strong></td></tr>`;
-      extensions.forEach(x => { html += `<tr><td style="padding-left:30px;"><small>Extension on ${new Date(x.EXTEND_DATE).toLocaleDateString()} × ${x.QTY} days</small></td><td class="text-right">₱${Number(x.COST).toLocaleString()}</td></tr>`; });
+      extensions.forEach(x => { html += `<tr><td style="padding-left:30px;"><small>Extension on ${new Date(x.EXTEND_DATE).toLocaleDateString()} × ${x.QTY} days</small></td><td class="text-right">${Number(x.COST).toLocaleString()}</td></tr>`; });
     }
 
-    html += `<tr class="table-info"><td><strong>SUBTOTAL</strong></td><td class="text-right"><strong>₱${Number(booking.TOTAL_AMOUNT).toLocaleString()}</strong></td></tr>`;
-    if (booking.RESERVATION_FEE > 0) html += `<tr><td><strong>Reservation Fee</strong></td><td class="text-right">₱${Number(booking.RESERVATION_FEE).toLocaleString()}</td></tr>`;
-    if (booking.DISCOUNT_AMOUNT > 0) html += `<tr class="table-success"><td><strong>Discount Applied</strong></td><td class="text-right"><strong>-₱${Number(booking.DISCOUNT_AMOUNT).toLocaleString()}</strong></td></tr>`;
-    html += `<tr class="table-warning"><td><strong>TOTAL PAID</strong></td><td class="text-right"><strong>₱${Number(booking.TOTAL_PAID).toLocaleString()}</strong></td></tr>`;
-    html += `<tr class="table-danger"><td><strong>BALANCE</strong></td><td class="text-right"><strong>₱${Number(booking.BALANCE).toLocaleString()}</strong></td></tr>`;
+    html += `<tr class="table-info"><td><strong>SUBTOTAL</strong></td><td class="text-right"><strong>${Number(booking.TOTAL_AMOUNT).toLocaleString()}</strong></td></tr>`;
+    if (booking.RESERVATION_FEE > 0) html += `<tr><td><strong>Reservation Fee</strong></td><td class="text-right">${Number(booking.RESERVATION_FEE).toLocaleString()}</td></tr>`;
+    if (booking.DISCOUNT_AMOUNT > 0) html += `<tr class="table-success"><td><strong>Discount Applied</strong></td><td class="text-right"><strong>-${Number(booking.DISCOUNT_AMOUNT).toLocaleString()}</strong></td></tr>`;
+    html += `<tr class="table-warning"><td><strong>TOTAL PAID</strong></td><td class="text-right"><strong>${Number(booking.TOTAL_PAID).toLocaleString()}</strong></td></tr>`;
+    html += `<tr class="table-danger"><td><strong>BALANCE</strong></td><td class="text-right"><strong>${Number(booking.BALANCE).toLocaleString()}</strong></td></tr>`;
     html += `</tbody></table></div>`;
 
     if (payments.length > 0) {
       html += `<h6 class="mt-4"><strong>Payment History:</strong></h6><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Date</th><th>Type</th><th>Method</th><th class="text-right">Amount</th></tr></thead><tbody>`;
-      payments.forEach(p => { html += `<tr><td>${new Date(p.PAYMENT_DATE).toLocaleString()}</td><td>${p.PAYMENT_TYPE}</td><td>${p.PAYMENT_METHOD}</td><td class="text-right">₱${Number(p.AMOUNT_PAID).toLocaleString()}</td></tr>`; });
+      payments.forEach(p => { html += `<tr><td>${new Date(p.PAYMENT_DATE).toLocaleString()}</td><td>${p.PAYMENT_TYPE}</td><td>${p.PAYMENT_METHOD}</td><td class="text-right">${Number(p.AMOUNT_PAID).toLocaleString()}</td></tr>`; });
       html += `</tbody></table></div>`;
     }
 
