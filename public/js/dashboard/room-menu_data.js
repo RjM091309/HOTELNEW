@@ -2949,6 +2949,15 @@ function triggerCheckout(bookingId) {
 
                     const syncCancellationFeePrimary = () => {
                         if (!cancellationFeeInput) return;
+                        // Get totalPaid to check if we should allow free input
+                        let totalPaid = 0;
+                        if (checkoutContextCache) {
+                            totalPaid = checkoutContextCache.totalPaid;
+                        }
+                        // If no payment, don't auto-sync - allow user to freely enter cancellation fee
+                        if (totalPaid <= 0) {
+                            return; // Don't override user input when there's no payment
+                        }
                         const currentOverpayment = getCurrentOverpaymentPrimary();
                         if (chk && chk.checked) {
                             const refundVal = parseFloat(input && input.value ? input.value : '0') || 0;
@@ -2962,10 +2971,20 @@ function triggerCheckout(bookingId) {
                     };
                     const setCancellationFeeReadOnlyPrimary = () => {
                         if (!cancellationFeeInput) return;
-                        cancellationFeeInput.readOnly = !(chk && chk.checked);
+                        // Allow editing cancellation fee if no payment was made (totalPaid <= 0)
+                        let totalPaid = 0;
+                        if (checkoutContextCache) {
+                            totalPaid = checkoutContextCache.totalPaid;
+                        }
+                        // If no payment, always allow editing cancellation fee
+                        if (totalPaid <= 0) {
+                            cancellationFeeInput.readOnly = false;
+                        } else {
+                            cancellationFeeInput.readOnly = !(chk && chk.checked);
+                        }
                         const help = document.getElementById('cancellationFeeHelp');
                         if (help) {
-                            help.style.display = chk && chk.checked ? 'block' : 'none';
+                            help.style.display = (chk && chk.checked) || totalPaid <= 0 ? 'block' : 'none';
                         }
                     };
                     if (chk && wrap) {
@@ -3035,6 +3054,15 @@ function triggerCheckout(bookingId) {
 
                             cancellationFeeInput.addEventListener('input', () => {
                                 if (syncingFromRefundPrimary) return;
+                                // Get totalPaid to check if we should allow free input
+                                let totalPaid = 0;
+                                if (checkoutContextCache) {
+                                    totalPaid = checkoutContextCache.totalPaid;
+                                }
+                                // If no payment, allow free input without syncing
+                                if (totalPaid <= 0) {
+                                    return; // Don't interfere with user input when there's no payment
+                                }
                                 const feeVal = parseFloat(cancellationFeeInput.value || '');
                                 if (!isNaN(feeVal) && feeVal >= 0) {
                                     const currentOverpayment = getCurrentOverpaymentPrimary();
@@ -3070,6 +3098,16 @@ function triggerCheckout(bookingId) {
                     // Pre-fill cancellation fee input with overpayment amount (or zero when fully refunded)
                     syncCancellationFeePrimary();
                     setCancellationFeeReadOnlyPrimary();
+                    // Clear cancellation fee input if no payment to allow free input
+                    if (cancellationFeeInput) {
+                        let totalPaid = 0;
+                        if (checkoutContextCache) {
+                            totalPaid = checkoutContextCache.totalPaid;
+                        }
+                        if (totalPaid <= 0) {
+                            cancellationFeeInput.value = '';
+                        }
+                    }
                     
                     // Store context for preConfirm
                     window._checkoutContextCache = checkoutContextCache;
@@ -3424,6 +3462,15 @@ function triggerCheckout(bookingId) {
 
                     const syncCancellationFeeSecondary = () => {
                         if (!cancellationFeeInput) return;
+                        // Get totalPaid to check if we should allow free input
+                        let totalPaid = 0;
+                        if (checkoutContextCache) {
+                            totalPaid = checkoutContextCache.totalPaid;
+                        }
+                        // If no payment, don't auto-sync - allow user to freely enter cancellation fee
+                        if (totalPaid <= 0) {
+                            return; // Don't override user input when there's no payment
+                        }
                         const currentOverpayment = getCurrentOverpaymentSecondary();
                         if (chk && chk.checked) {
                             const refundVal = parseFloat(input && input.value ? input.value : '0') || 0;
@@ -3438,10 +3485,20 @@ function triggerCheckout(bookingId) {
 
                     const setCancellationFeeReadOnlySecondary = () => {
                         if (!cancellationFeeInput) return;
-                        cancellationFeeInput.readOnly = !(chk && chk.checked);
+                        // Allow editing cancellation fee if no payment was made (totalPaid <= 0)
+                        let totalPaid = 0;
+                        if (checkoutContextCache) {
+                            totalPaid = checkoutContextCache.totalPaid;
+                        }
+                        // If no payment, always allow editing cancellation fee
+                        if (totalPaid <= 0) {
+                            cancellationFeeInput.readOnly = false;
+                        } else {
+                            cancellationFeeInput.readOnly = !(chk && chk.checked);
+                        }
                         const help = document.getElementById('cancellationFeeHelp');
                         if (help) {
-                            help.style.display = chk && chk.checked ? 'block' : 'none';
+                            help.style.display = (chk && chk.checked) || totalPaid <= 0 ? 'block' : 'none';
                         }
                     };
                     
@@ -3513,6 +3570,15 @@ function triggerCheckout(bookingId) {
 
                             cancellationFeeInput.addEventListener('input', () => {
                                 if (syncingFromRefundSecondary) return;
+                                // Get totalPaid to check if we should allow free input
+                                let totalPaid = 0;
+                                if (checkoutContextCache) {
+                                    totalPaid = checkoutContextCache.totalPaid;
+                                }
+                                // If no payment, allow free input without syncing
+                                if (totalPaid <= 0) {
+                                    return; // Don't interfere with user input when there's no payment
+                                }
                                 const feeVal = parseFloat(cancellationFeeInput.value || '');
                                 if (!isNaN(feeVal) && feeVal >= 0) {
                                     const currentOverpayment = getCurrentOverpaymentSecondary();
@@ -3547,6 +3613,16 @@ function triggerCheckout(bookingId) {
                     // Pre-fill cancellation fee input with overpayment amount
                     syncCancellationFeeSecondary();
                     setCancellationFeeReadOnlySecondary();
+                    // Clear cancellation fee input if no payment to allow free input
+                    if (cancellationFeeInput) {
+                        let totalPaid = 0;
+                        if (checkoutContextCache) {
+                            totalPaid = checkoutContextCache.totalPaid;
+                        }
+                        if (totalPaid <= 0) {
+                            cancellationFeeInput.value = '';
+                        }
+                    }
                     }
                     
                     // Store context for preConfirm
@@ -3990,6 +4066,57 @@ async function loadPaymentData(bookingId) {
                     });
                 }
 
+                // Add cancellation penalty for all group bookings
+                if (groupData.bookings && groupData.bookings.length > 0) {
+                    groupData.bookings.forEach(booking => {
+                        if (booking.CANCELLATION_PENALTY > 0) {
+                            const cancellationPenalty = parseFloat(booking.CANCELLATION_PENALTY || 0);
+                            
+                            // Find corresponding payment for cancellation fee
+                            let cancellationPayment = null;
+                            if (groupData.payments && groupData.payments.length > 0) {
+                                cancellationPayment = groupData.payments.find(p => 
+                                    (p.PAYMENT_TYPE === 'cancellation_fee') &&
+                                    p.BOOKING_ID === booking.BOOKING_ID
+                                );
+                            }
+                            
+                            // Determine status based on payment
+                            let cancellationStatus = 'unpaid';
+                            if (cancellationPayment) {
+                                const paidAmount = parseFloat(cancellationPayment.AMOUNT_PAID || 0);
+                                if (paidAmount >= cancellationPenalty) {
+                                    cancellationStatus = 'paid';
+                                } else if (paidAmount > 0) {
+                                    cancellationStatus = 'partial';
+                                }
+                            } else {
+                                // If there's no dedicated cancellation_fee payment but the booking balance is zero or less,
+                                // consider the cancellation fee as fully paid (covered by room payments).
+                                const bookingBalance = parseFloat(booking.BALANCE || 0);
+                                if (!isNaN(bookingBalance) && bookingBalance <= 0) {
+                                    cancellationStatus = 'paid';
+                                }
+                            }
+                            
+                            allPaymentItems.push({
+                                type: 'penalty',
+                                item_name: `Cancellation Fee (Room ${booking.ROOM_NUMBER})`,
+                                description: 'Cancellation penalty charge',
+                                amount: cancellationPenalty,
+                                status: cancellationStatus,
+                                payment_date: cancellationPayment ? cancellationPayment.PAYMENT_DATE : null,
+                                icon: 'fa-exclamation-triangle',
+                                processed_by: cancellationPayment ? cancellationPayment.NAME || 'System' : '-',
+                                payment_method: cancellationPayment ? cancellationPayment.PAYMENT_METHOD : '-',
+                                remarks: cancellationPayment ? cancellationPayment.REMARKS : '-',
+                                bookingId: booking.BOOKING_ID,
+                                roomNumber: booking.ROOM_NUMBER
+                            });
+                        }
+                    });
+                }
+
                 // Add payments for all group bookings
                 if (groupData.payments && groupData.payments.length > 0) {
                     groupData.payments.forEach(payment => {
@@ -4004,7 +4131,9 @@ async function loadPaymentData(bookingId) {
                             item_name: `Payment - Room ${payment.ROOM_NUMBER}`,
                             description: payment.REMARKS || payment.PAYMENT_METHOD || 'Payment',
                             amount: parseFloat(payment.AMOUNT_PAID || 0),
-                            status: payment.AMOUNT_PAID > 0 && payment.PAYMENT_DATE ? 'paid' : 'unpaid',
+                            // Mark both positive payments and refunds (negative) as paid
+                            // as long as they have a payment date
+                            status: (parseFloat(payment.AMOUNT_PAID || 0) !== 0 && payment.PAYMENT_DATE) ? 'paid' : 'unpaid',
                             payment_date: payment.PAYMENT_DATE,
                             icon: getPaymentIcon(payment.PAYMENT_TYPE),
                             processed_by: payment.NAME || 'System',
@@ -4055,7 +4184,9 @@ async function loadPaymentData(bookingId) {
                 // Determine payment status more accurately
                 let paymentStatus = 'unpaid';
                 const amountPaid = parseFloat(payment.AMOUNT_PAID || 0);
-                if (amountPaid > 0 && payment.PAYMENT_DATE) {
+                // Treat both positive payments and refunds (negative amounts) as paid entries
+                // as long as they have a payment date
+                if (amountPaid !== 0 && payment.PAYMENT_DATE) {
                     paymentStatus = 'paid';
                 }
                         
@@ -4187,6 +4318,50 @@ async function loadPaymentData(bookingId) {
                                 remarks: isCancelled ? extension.REMARKS : (extensionPayment ? extensionPayment.REMARKS : '-'),
                                 isCancelled: isCancelled // Add flag to identify cancelled extensions
                             });
+                        });
+                    }
+
+                    // Add cancellation penalty from billing table
+                    if (breakdownData.booking && breakdownData.booking.CANCELLATION_PENALTY > 0) {
+                        const cancellationPenalty = parseFloat(breakdownData.booking.CANCELLATION_PENALTY || 0);
+                        
+                        // Find corresponding payment for cancellation fee
+                        let cancellationPayment = null;
+                        if (breakdownData.payments && breakdownData.payments.length > 0) {
+                            cancellationPayment = breakdownData.payments.find(p => 
+                                p.PAYMENT_TYPE === 'cancellation_fee' || p.PAYMENT_TYPE === 'penalty'
+                            );
+                        }
+                        
+                        // Determine status based on payment
+                        let cancellationStatus = 'unpaid';
+                        if (cancellationPayment) {
+                            const paidAmount = parseFloat(cancellationPayment.AMOUNT_PAID || 0);
+                            if (paidAmount >= cancellationPenalty) {
+                                cancellationStatus = 'paid';
+                            } else if (paidAmount > 0) {
+                                cancellationStatus = 'partial';
+                            }
+                        } else if (breakdownData.booking && !isNaN(parseFloat(breakdownData.booking.BALANCE))) {
+                            // If there's no dedicated cancellation_fee payment but the overall booking balance is
+                            // zero or less, treat the cancellation fee as paid (covered by room payments).
+                            const bookingBalance = parseFloat(breakdownData.booking.BALANCE || 0);
+                            if (bookingBalance <= 0) {
+                                cancellationStatus = 'paid';
+                            }
+                        }
+                        
+                        allPaymentItems.push({
+                            type: 'penalty',
+                            item_name: 'Cancellation Fee',
+                            description: 'Cancellation penalty charge',
+                            amount: cancellationPenalty,
+                            status: cancellationStatus,
+                            payment_date: cancellationPayment ? cancellationPayment.PAYMENT_DATE : null,
+                            icon: 'fa-exclamation-triangle',
+                            processed_by: cancellationPayment ? cancellationPayment.NAME || 'System' : '-',
+                            payment_method: cancellationPayment ? cancellationPayment.PAYMENT_METHOD : '-',
+                            remarks: cancellationPayment ? cancellationPayment.REMARKS : '-'
                         });
                     }
                     hasApiData = true;
@@ -4345,6 +4520,7 @@ function getPaymentTypeName(paymentType) {
         case 'room': return 'Room Payment';
         case 'service': return 'Service Payment';
         case 'extension': return 'Extension Payment';
+        case 'cancellation_fee': return 'Cancellation Fee';
         default: return paymentType;
     }
 }
@@ -4357,6 +4533,7 @@ function getPaymentIcon(paymentType) {
         case 'room': return 'fa-bed';
         case 'service': return 'fa-concierge-bell';
         case 'extension': return 'fa-calendar-plus';
+        case 'cancellation_fee': return 'fa-exclamation-triangle';
         default: return 'fa-receipt';
     }
 }
@@ -4393,8 +4570,8 @@ function displayPaymentData(bookingId, payments, options = {}) {
 
     // Sort charges by type and amount
     const sortedCharges = charges.sort((a, b) => {
-        // Sort by type: room first, then services, then extensions
-        const typeOrder = { 'room': 1, 'service': 2, 'extension': 3 };
+        // Sort by type: room first, then services, then extensions, then penalty
+        const typeOrder = { 'room': 1, 'service': 2, 'extension': 3, 'cancellation_fee': 4 };
         const aOrder = typeOrder[a.type] || 5;
         const bOrder = typeOrder[b.type] || 5;
         

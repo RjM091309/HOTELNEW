@@ -2743,7 +2743,7 @@ class BookingModel {
 
         // Step 1: Get billing info
         const billingQuery = `
-          SELECT IDNo, ROOM_CHARGE, QTY, PAYMENT_STATUS, EXTEND_PAYMENT_STATUS, RESERVATION_FEE, DISCOUNT_AMOUNT
+          SELECT IDNo, ROOM_CHARGE, QTY, PAYMENT_STATUS, EXTEND_PAYMENT_STATUS, RESERVATION_FEE, DISCOUNT_AMOUNT, CANCELLATION_PENALTY
           FROM billing 
           WHERE BOOKING_ID = ? AND ACTIVE = 1 LIMIT 1
         `;
@@ -2847,11 +2847,30 @@ class BookingModel {
           return parseFloat(a.remainingAmount) - parseFloat(b.remainingAmount);
         });
         
+        // Get cancellation penalty and check if it's already paid
+        const cancellationPenalty = parseFloat(billing.CANCELLATION_PENALTY) || 0;
+        let unpaidCancellationPenalty = 0;
+        if (cancellationPenalty > 0) {
+          const penaltyPaymentsQuery = `
+            SELECT COALESCE(SUM(AMOUNT_PAID), 0) as totalPenaltyPaid
+            FROM payments 
+            WHERE BOOKING_ID = ? AND PAYMENT_TYPE = 'cancellation_fee'
+          `;
+          const penaltyPaymentsRows = await new Promise((resolve, reject) => {
+            connection.query(penaltyPaymentsQuery, [bookingId], (err, rows) => {
+              if (err) reject(err);
+              else resolve(rows);
+            });
+          });
+          const totalPenaltyPaid = parseFloat(penaltyPaymentsRows[0]?.totalPenaltyPaid) || 0;
+          unpaidCancellationPenalty = Math.max(0, cancellationPenalty - totalPenaltyPaid);
+        }
+        
         // Calculate net balance
         // Note: reservation fee and discount are already deducted from fullRoomAmount in Step 3
         const reservationFee = parseFloat(billing.RESERVATION_FEE) || 0;
         const discountAmount = parseFloat(billing.DISCOUNT_AMOUNT) || 0;
-        const grossTotal = fullRoomAmount + totalExtensionAmount + totalServiceAmount;
+        const grossTotal = fullRoomAmount + totalExtensionAmount + totalServiceAmount + unpaidCancellationPenalty;
         const netBalance = grossTotal; // No need to deduct reservation fee and discount again
         
         // Determine payment amount
@@ -2990,6 +3009,25 @@ class BookingModel {
             
             remainingPayment -= servicePaymentAmount;
           }
+        }
+
+        // 4. Pay cancellation penalty if remaining payment available
+        if (remainingPayment > 0 && unpaidCancellationPenalty > 0) {
+          const penaltyPaymentAmount = Math.min(remainingPayment, unpaidCancellationPenalty);
+
+          await new Promise((resolve, reject) => {
+            connection.query(
+              `INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
+              VALUES (?, ?, ?, ?, 'cancellation_fee', NOW(), ?, ?)`,
+              [bookingId, billingId, penaltyPaymentAmount, paymentMethod, encodedBy, paymentNotes],
+              (err) => {
+                if (err) reject(err);
+                else resolve();
+              }
+            );
+          });
+
+          remainingPayment -= penaltyPaymentAmount;
         }
         
 
