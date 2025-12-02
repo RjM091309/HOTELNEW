@@ -167,6 +167,22 @@
       
             if (pickup && parseFloat(pickup) > 0) lines.push('With Pick-Up');
             if (dropoff && parseFloat(dropoff) > 0) lines.push('With Drop-off');
+            
+            // Add other services from booking_service table
+            if (typeof otherServices !== 'undefined' && Array.isArray(otherServices) && otherServices.length > 0) {
+              otherServices.forEach(service => {
+                if (service && service.name && service.name.trim()) {
+                  const serviceName = service.name.trim();
+                  const serviceQty = parseInt(service.qty) || 1;
+                  // Format: "Service Name" or "Qty x Service Name" if qty > 1
+                  if (serviceQty > 1) {
+                    lines.push(`${serviceQty}x ${serviceName}`);
+                  } else {
+                    lines.push(serviceName);
+                  }
+                }
+              });
+            }
 
           %>
           <%- lines.join('<br>') %>

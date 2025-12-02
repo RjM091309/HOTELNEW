@@ -85,225 +85,71 @@ $(document).ready(function () {
           discount: discountAmount, reservationFee: reservationFeeAmount, lateCheckoutFee
         },
         success: function (response) {
+            console.log('Booking response:', response);
             $('#modal-addbooking').modal('hide');
             
             // Payment processing is now handled automatically in the backend
             // No need for separate payment processing calls
             
             // Auto-download voucher if booking was successful
+            // Trigger IMMEDIATELY before Swal to avoid blocking
             if (response.success && response.bookingId) {
-              // Create a form to trigger voucher download
-              const form = $('<form>', {
-                method: 'POST',
-                action: '/booking/generate-voucher?download=1',
-                target: '_self'
-              });
+              const bookingId = response.bookingId;
+              const confirmationNumber = response.confirmationNumber;
+              console.log('Triggering voucher download for bookingId:', bookingId, 'confirmationNumber:', confirmationNumber);
               
-              // Add booking data to form
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'bookingId',
-                value: response.bookingId
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'voucherNo',
-                value: response.confirmationNumber || voucherNo
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'fullname',
-                value: fullname
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'contactNumber',
-                value: number
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'dateFrom',
-                value: daterange.split(' to ')[0]
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'dateTo',
-                value: daterange.split(' to ')[1].split('(')[0].trim()
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'bedCount',
-                value: $('#bedCount').val()
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'roomNumber',
-                value: $('#addroom option:selected').text()
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'roomView',
-                value: $('#room_type').val()
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'roomType',
-                value: $('#room_type_hidden').val()
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'roomRate',
-                value: $('#price').val()
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'breakfastAdult',
-                value: breakfastAdultQty
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'breakfastAdultPrice',
-                value: breakfastAdultPrice
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'breakfastKid',
-                value: breakfastKidQty
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'breakfastKidPrice',
-                value: breakfastKidPrice
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'pickup',
-                value: $('#includePickup').is(':checked') ? pickupPrice : 0
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'dropoff',
-                value: $('#includeDropoff').is(':checked') ? dropoffPrice : 0
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'remarks',
-                value: bookingRemarks
-              }));
-              
-              // Add balance and paidAmount fields - remove commas first
-              const computedTotalText = $('#computedTotal').text().replace(/,/g, '');
-              const computedBalanceText = $('#computedBalance').text().trim().replace(/,/g, '');
-              const computedPaidAmountText = $('#computedPaidAmount').text().trim().replace(/,/g, '');
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'total',
-                value: computedTotalText
-              }));
-              
-              // Calculate paidAmount value (remove commas)
-              let paidAmountValue = (!computedPaidAmountText || computedPaidAmountText === '0.00') 
-                ? (parseFloat((paidAmount || '0').toString().replace(/,/g, '')) || 0).toFixed(2)
-                : parseFloat(computedPaidAmountText).toFixed(2);
-              
-              // Always recalculate balance from total and paidAmount to ensure accuracy
-              const totalNum = parseFloat(computedTotalText.replace(/,/g, '')) || 0;
-              const paidNum = parseFloat(paidAmountValue.replace(/,/g, '')) || 0;
-              const balanceValue = Math.max(0, totalNum - paidNum).toFixed(2);
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'balance',
-                value: balanceValue
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'paidAmount',
-                value: paidAmountValue
-              }));
-              
-              // Calculate room charges and services total for voucher
-              const priceValue = $('#price').val();
-              const roomRateStr = priceValue ? priceValue.toString().replace(/[,\s₱₹$]/g, '') : '0';
-              const roomRate = parseFloat(roomRateStr) || 0;
-              const nights = parseInt($('#diffindays').val()) || 1;
-              const roomCharges = Math.round((roomRate * nights) * 100) / 100;
-              
-              const breakfastAdultQtyNum = parseInt(breakfastAdultQty) || 0;
-              const breakfastAdultPriceNum = parseFloat(breakfastAdultPrice) || 0;
-              const breakfastKidQtyNum = parseInt(breakfastKidQty) || 0;
-              const breakfastKidPriceNum = parseFloat(breakfastKidPrice) || 0;
-              const breakfastTotal = (breakfastAdultQtyNum * breakfastAdultPriceNum) + (breakfastKidQtyNum * breakfastKidPriceNum);
-              const pickupNum = $('#includePickup').is(':checked') ? (parseFloat(pickupPrice) || 0) : 0;
-              const dropoffNum = $('#includeDropoff').is(':checked') ? (parseFloat(dropoffPrice) || 0) : 0;
-              // Exclude late checkout fee from servicesTotal as it's displayed separately
-              const servicesTotal = parseFloat((breakfastTotal + pickupNum + dropoffNum).toFixed(2));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'roomCharges',
-                value: roomCharges.toFixed(2)
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'servicesTotal',
-                value: servicesTotal.toFixed(2)
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'checkInStatus',
-                value: checkInStatus
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'checkOutStatus',
-                value: $('#checkOutStatus').val()
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'lateCheckoutFee',
-                value: lateCheckoutFee
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'reservationFee',
-                value: $('#includeReservationFee').is(':checked') ? reservationFeeAmount : 0
-              }));
-              
-              form.append($('<input>', {
-                type: 'hidden',
-                name: 'discount',
-                value: $('#includeDiscount').is(':checked') ? discountAmount : 0
-              }));
-              
-              // Submit form to trigger download
-              $('body').append(form);
-              form.submit();
-              form.remove();
+              try {
+                console.log('Triggering voucher download for bookingId:', bookingId);
+                
+                // Method 1: Try using the GET route (simpler, no form needed)
+                const voucherUrl = `/booking/voucher/${bookingId}?download=1`;
+                console.log('Opening voucher URL:', voucherUrl);
+                
+                // Create a temporary link and click it to trigger download
+                const link = document.createElement('a');
+                link.href = voucherUrl;
+                link.download = `voucher-${confirmationNumber || bookingId}.pdf`;
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                console.log('✅ Link clicked, download should start...');
+                
+                // Cleanup
+                setTimeout(() => {
+                  document.body.removeChild(link);
+                  console.log('Link removed from DOM');
+                }, 1000);
+                
+                // Fallback: If GET doesn't work, try POST form
+                setTimeout(() => {
+                  console.log('Fallback: Trying POST form method...');
+                  const form = document.createElement('form');
+                  form.method = 'POST';
+                  form.action = '/booking/generate-voucher?download=1';
+                  form.target = '_blank';
+                  form.style.display = 'none';
+                  
+                  const bookingIdInput = document.createElement('input');
+                  bookingIdInput.type = 'hidden';
+                  bookingIdInput.name = 'bookingId';
+                  bookingIdInput.value = bookingId;
+                  form.appendChild(bookingIdInput);
+                  
+                  document.body.appendChild(form);
+                  form.submit();
+                  
+                  setTimeout(() => {
+                    if (form.parentNode) {
+                      form.remove();
+                    }
+                  }, 2000);
+                }, 500);
+              } catch (error) {
+                console.error('❌ Error in voucher download:', error);
+                console.error('Error details:', error.message, error.stack);
+              }
+            } else {
+              console.error('Booking response missing success or bookingId:', response);
             }
             
             // Check if check-in date is today and add to checked-in-content tab

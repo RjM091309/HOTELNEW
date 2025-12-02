@@ -2037,53 +2037,269 @@ class BookingController {
         // Get voucher number
         const voucherNo = voucherData.confirmationNumber || data.bookingId;
         
-        // Calculate breakfast info
-        const breakfastAdult = voucherData.breakfastAdultQty || 0;
-        const breakfastKid = voucherData.breakfastKidQty || 0;
-        const pickup = voucherData.pickupPrice || 0;
-        const dropoff = voucherData.dropoffPrice || 0;
+        // Get billing data for totals FIRST - we'll get breakfast/pickup/dropoff from here
+        console.log('🔍 [VOUCHER] Fetching billing data for bookingId:', data.bookingId);
+        const billingData = await BookingModel.getBilling(data.bookingId);
+        
+        if (!billingData) {
+          console.error('❌ [VOUCHER] Billing data not found for bookingId:', data.bookingId);
+          return res.status(404).send('Billing data not found');
+        }
+        
+        console.log('📊 [VOUCHER] Billing data received:', {
+          subTotal: billingData.subTotal,
+          reservationFee: billingData.reservationFee,
+          discountAmount: billingData.discountAmount,
+          itemsCount: billingData.items ? billingData.items.length : 0,
+          items: billingData.items ? billingData.items.map(item => ({
+            description: item.description,
+            basePrice: item.basePrice,
+            qty: item.qty,
+            subTotal: item.subTotal,
+            serviceId: item.serviceId
+          })) : []
+        });
+        
+        // Get breakfast, pickup, and dropoff from billingData.items (more reliable than getVoucherData query)
+        let breakfastAdult = 0;
+        let breakfastKid = 0;
+        let pickup = 0;
+        let dropoff = 0;
+        let otherServices = []; // Collect other services for remarks
+        
+        if (billingData && billingData.items && Array.isArray(billingData.items)) {
+          console.log('🍳 [VOUCHER] Processing billing items for services:', billingData.items.map(item => ({
+            description: item.description,
+            basePrice: item.basePrice,
+            qty: item.qty,
+            subTotal: item.subTotal,
+            serviceId: item.serviceId
+          })));
+          
+          // Find breakfast, pickup, dropoff, and other services from items
+          billingData.items.forEach(item => {
+            const desc = (item.description || '').toLowerCase();
+            const serviceId = item.serviceId;
+            const itemDescription = item.description || '';
+            
+            // Breakfast - check description (case insensitive)
+            if (desc.includes('breakfast') && desc.includes('adult')) {
+              breakfastAdult = parseInt(item.qty) || 0;
+              console.log('🍳 Found breakfast adult:', breakfastAdult, 'qty:', item.qty, 'from item:', itemDescription, 'serviceId:', serviceId);
+            }
+            // Check for Kid/Kids breakfast
+            else if (desc.includes('breakfast') && (desc.includes('kid') || desc.includes('kids') || desc.includes('child'))) {
+              breakfastKid = parseInt(item.qty) || 0;
+              console.log('🍳 Found breakfast kid:', breakfastKid, 'qty:', item.qty, 'from item:', itemDescription, 'serviceId:', serviceId);
+            }
+            // Pickup (Service ID 90 or description contains pick-up)
+            else if (serviceId === 90 || desc.includes('pick-up') || desc.includes('pickup') || desc.includes('pick up')) {
+              pickup = parseFloat(item.subTotal) || parseFloat(item.basePrice) || 0;
+            }
+            // Dropoff (Service ID 91 or description contains drop-off)
+            else if (serviceId === 91 || desc.includes('drop-off') || desc.includes('dropoff') || desc.includes('drop off')) {
+              dropoff = parseFloat(item.subTotal) || parseFloat(item.basePrice) || 0;
+            }
+            // Late checkout (Service ID 72) - skip, handled separately
+            else if (serviceId === 72 || desc.includes('late checkout') || desc.includes('late check-out')) {
+              // Skip late checkout - handled separately
+            }
+            // Room items - ONLY if explicitly room-related AND no serviceId
+            // Must match: bedroom, room, suite, or room type names, AND no serviceId
+            else if (!item.serviceId && (
+              desc.includes('bedroom') || 
+              desc.includes('single bedroom') ||
+              desc.includes('double bedroom') ||
+              desc.includes('twin bedroom') ||
+              desc.includes('deluxe bedroom') ||
+              desc.includes('suite') ||
+              (desc.includes('room') && (desc.includes('single') || desc.includes('double') || desc.includes('twin') || desc.includes('deluxe')))
+            )) {
+              // This is a room item - skip (handled in roomCharges)
+              console.log('🏠 [VOUCHER] Skipping room item:', itemDescription);
+            }
+            // Extended stay - skip
+            else if (desc.includes('extended') || desc.includes('extension')) {
+              // Skip extended stay
+            }
+            // Cancellation - skip
+            else if (desc.includes('cancellation')) {
+              // Skip cancellation fee
+            }
+            // Other services - collect for remarks (everything else is a service)
+            else if (itemDescription && itemDescription.trim()) {
+              const serviceName = itemDescription.trim();
+              const serviceQty = parseInt(item.qty) || 1;
+              otherServices.push({
+                name: serviceName,
+                qty: serviceQty
+              });
+              console.log('📦 [VOUCHER] Found other service:', serviceName, 'qty:', serviceQty, 'serviceId:', serviceId);
+            }
+          });
+        }
+        
+        // Fallback: try from voucherData if still 0
+        if (breakfastAdult === 0) {
+          breakfastAdult = parseInt(voucherData.breakfastAdultQty) || 0;
+        }
+        if (breakfastKid === 0) {
+          breakfastKid = parseInt(voucherData.breakfastKidQty) || 0;
+        }
+        if (pickup === 0) {
+          pickup = parseFloat(voucherData.pickupPrice) || 0;
+        }
+        if (dropoff === 0) {
+          dropoff = parseFloat(voucherData.dropoffPrice) || 0;
+        }
+        
         const lateCheckoutFee = parseFloat(voucherData.lateCheckoutFee) || 0;
         
-        // Get billing data for totals
-        const billingData = await BookingModel.getBilling(data.bookingId);
+        console.log('🍳🚗 [VOUCHER] Service values:', {
+          breakfastAdult_from_voucher: voucherData.breakfastAdultQty,
+          breakfastKid_from_voucher: voucherData.breakfastKidQty,
+          breakfastAdult: breakfastAdult,
+          breakfastKid: breakfastKid,
+          pickupPrice_raw: voucherData.pickupPrice,
+          dropoffPrice_raw: voucherData.dropoffPrice,
+          pickup: pickup,
+          dropoff: dropoff,
+          totalPax: breakfastAdult + breakfastKid,
+          willShowBreakfast: (breakfastAdult + breakfastKid) > 0,
+          willShowPickup: pickup > 0,
+          willShowDropoff: dropoff > 0
+        });
         
         // Calculate total from billing data
         const subTotal = billingData.subTotal || 0;
         const reservationFee = billingData.reservationFee || 0;
         const discountAmount = billingData.discountAmount || 0;
         
-        // Use roomCharges if provided, otherwise calculate from billing table
+        // Use roomCharges if provided, otherwise calculate from billingData items
         let roomCharges = 0;
         if (data.roomCharges !== undefined && data.roomCharges !== null && data.roomCharges !== '') {
           roomCharges = parseFloat(data.roomCharges.toString().replace(/[,\s₱₹$]/g, '')) || 0;
+          console.log('💰 [VOUCHER] Using roomCharges from form data:', roomCharges);
         } else {
-          const { queryDatabasePromise } = require('../config/database');
-          const roomChargesQuery = `
-            SELECT COALESCE(SUM(ROOM_CHARGE * QTY), 0) AS roomCharges
-            FROM billing
-            WHERE BOOKING_ID = ?
-          `;
-          const roomChargesResult = await queryDatabasePromise(roomChargesQuery, [data.bookingId]);
-          roomCharges = parseFloat(roomChargesResult?.[0]?.roomCharges || 0);
+          console.log('🔍 [VOUCHER] Calculating roomCharges from billingData items...');
+          // Calculate room charges from billingData items (room items only, excluding extensions)
+          if (billingData.items && Array.isArray(billingData.items)) {
+            // Sum all room items - ONLY items that are explicitly room-related
+            // Must have room-related description AND no serviceId
+            const roomItems = billingData.items.filter(item => {
+              if (!item.description) return false;
+              const desc = item.description.toLowerCase();
+              // Must be room-related AND no serviceId
+              const isRoomItem = !item.serviceId && (
+                desc.includes('bedroom') || 
+                desc.includes('single bedroom') ||
+                desc.includes('double bedroom') ||
+                desc.includes('twin bedroom') ||
+                desc.includes('deluxe bedroom') ||
+                desc.includes('suite') ||
+                (desc.includes('room') && (desc.includes('single') || desc.includes('double') || desc.includes('twin') || desc.includes('deluxe')))
+              );
+              return isRoomItem;
+            });
+            console.log('🏠 [VOUCHER] Filtered room items:', roomItems.map(item => ({
+              description: item.description,
+              basePrice: item.basePrice,
+              qty: item.qty,
+              subTotal: item.subTotal
+            })));
+            roomCharges = roomItems.reduce((sum, item) => sum + (item.subTotal || 0), 0);
+            console.log('💰 [VOUCHER] Room charges from items:', roomCharges);
+            
+            // If still 0, try to get from first room item or calculate from basePrice * qty
+            if (roomCharges === 0 && roomItems.length > 0) {
+              const firstRoom = roomItems[0];
+              roomCharges = (firstRoom.basePrice || 0) * (firstRoom.qty || 0);
+              console.log('💰 [VOUCHER] Calculated from first room item:', roomCharges, '(basePrice:', firstRoom.basePrice, 'x qty:', firstRoom.qty, ')');
+            }
+          }
+          
+          // Fallback: query directly from billing table
+          if (roomCharges === 0) {
+            console.log('🔍 [VOUCHER] Room charges still 0, querying billing table...');
+            const { queryDatabasePromise } = require('../config/database');
+            const roomChargesQuery = `
+              SELECT COALESCE(SUM(ROOM_CHARGE * QTY), 0) AS roomCharges
+              FROM billing
+              WHERE BOOKING_ID = ? AND ACTIVE = 1
+            `;
+            const roomChargesResult = await queryDatabasePromise(roomChargesQuery, [data.bookingId]);
+            roomCharges = parseFloat(roomChargesResult?.[0]?.roomCharges || 0);
+            console.log('💰 [VOUCHER] Room charges from billing table query:', roomCharges);
+            console.log('📊 [VOUCHER] Query result:', roomChargesResult);
+          }
         }
         
-        // Use servicesTotal if provided, otherwise calculate from booking_service table
+        // Use servicesTotal if provided, otherwise calculate from billingData items
         let servicesTotal = 0;
         if (data.servicesTotal !== undefined && data.servicesTotal !== null && data.servicesTotal !== '') {
           servicesTotal = parseFloat(data.servicesTotal.toString().replace(/[,\s₱₹$]/g, '')) || 0;
+          console.log('🛎️ [VOUCHER] Using servicesTotal from form data:', servicesTotal);
         } else {
-          const { queryDatabasePromise } = require('../config/database');
-          // Calculate services total from booking_service table (excluding late checkout - service ID 72)
-          const servicesTotalQuery = `
-            SELECT COALESCE(SUM(TOTAL_COST), 0) AS servicesTotal
-            FROM booking_service
-            WHERE BOOKING_ID = ? 
-              AND ACTIVE = 1
-              AND SERVICE_ID != 72
-          `;
-          const servicesTotalResult = await queryDatabasePromise(servicesTotalQuery, [data.bookingId]);
-          servicesTotal = parseFloat(servicesTotalResult?.[0]?.servicesTotal || 0);
+          console.log('🔍 [VOUCHER] Calculating servicesTotal from billingData items...');
+          // Calculate services total from billingData items
+          // Services = everything that's NOT a room item, extended stay, or cancellation
+          if (billingData.items && Array.isArray(billingData.items)) {
+            const serviceItems = billingData.items.filter(item => {
+              if (!item.description) return false;
+              const desc = (item.description || '').toLowerCase();
+              
+              // Exclude room items (must be explicitly room-related AND no serviceId)
+              const isRoomItem = !item.serviceId && (
+                desc.includes('bedroom') || 
+                desc.includes('single bedroom') ||
+                desc.includes('double bedroom') ||
+                desc.includes('twin bedroom') ||
+                desc.includes('deluxe bedroom') ||
+                desc.includes('suite') ||
+                (desc.includes('room') && (desc.includes('single') || desc.includes('double') || desc.includes('twin') || desc.includes('deluxe')))
+              );
+              
+              // Exclude extended stay and cancellation
+              const isExcluded = desc.includes('extended') || desc.includes('extension') || desc.includes('cancellation');
+              
+              // Everything else is a service
+              return !isRoomItem && !isExcluded;
+            });
+            console.log('🛎️ [VOUCHER] Filtered service items:', serviceItems.map(item => ({
+              description: item.description,
+              serviceId: item.serviceId,
+              subTotal: item.subTotal
+            })));
+            servicesTotal = serviceItems.reduce((sum, item) => sum + (item.subTotal || 0), 0);
+            console.log('🛎️ [VOUCHER] Services total from items:', servicesTotal);
+          }
+          
+          // Fallback: query directly from booking_service table
+          if (servicesTotal === 0) {
+            console.log('🔍 [VOUCHER] Services total still 0, querying booking_service table...');
+            const { queryDatabasePromise } = require('../config/database');
+            const servicesTotalQuery = `
+              SELECT COALESCE(SUM(TOTAL_COST), 0) AS servicesTotal
+              FROM booking_service
+              WHERE BOOKING_ID = ? 
+                AND ACTIVE = 1
+                AND SERVICE_ID != 72
+            `;
+            const servicesTotalResult = await queryDatabasePromise(servicesTotalQuery, [data.bookingId]);
+            servicesTotal = parseFloat(servicesTotalResult?.[0]?.servicesTotal || 0);
+            console.log('🛎️ [VOUCHER] Services total from booking_service table query:', servicesTotal);
+            console.log('📊 [VOUCHER] Query result:', servicesTotalResult);
+          }
         }
+        
+        console.log('✅ [VOUCHER] Final values:', {
+          roomCharges,
+          servicesTotal,
+          subTotal,
+          reservationFee,
+          discountAmount,
+          total: subTotal + reservationFee - discountAmount
+        });
         
         // Total amount
         const total = subTotal + reservationFee - discountAmount;
@@ -2099,6 +2315,45 @@ class BookingController {
         // Calculate balance
         const balance = Math.max(0, total - paidAmount);
 
+        // Format remarks - template will automatically add:
+        // - "Room Accommodation" (if not already in remarks)
+        // - Breakfast info (if breakfastAdult + breakfastKid > 0)
+        // - "With Pick-Up" (if pickup > 0)
+        // - "With Drop-off" (if dropoff > 0)
+        // So we just pass the remarks from database as-is
+        const formattedRemarks = voucherData.remarks || '';
+        
+        console.log('📝 [VOUCHER] Remarks and Services:', {
+          original: voucherData.remarks,
+          formatted: formattedRemarks,
+          breakfastAdult,
+          breakfastKid,
+          pickup,
+          dropoff,
+          otherServices: otherServices.map(s => `${s.qty}x ${s.name}`),
+          pickupPrice: voucherData.pickupPrice,
+          dropoffPrice: voucherData.dropoffPrice,
+          willShowBreakfast: (breakfastAdult + breakfastKid) > 0,
+          willShowPickup: pickup > 0,
+          willShowDropoff: dropoff > 0,
+          otherServicesCount: otherServices.length
+        });
+
+        // Load logo as base64 for Playwright
+        const logoPath = path.join(__dirname, '../public/img/Logo-Black.JPG');
+        let imageUrl = '';
+        try {
+          if (require('fs').existsSync(logoPath)) {
+            const imageBase64 = require('fs').readFileSync(logoPath, 'base64');
+            imageUrl = `data:image/jpeg;base64,${imageBase64}`;
+            console.log('✅ [VOUCHER] Logo loaded as base64');
+          } else {
+            console.error('❌ [VOUCHER] Logo file not found:', logoPath);
+          }
+        } catch (error) {
+          console.error('❌ [VOUCHER] Error loading logo:', error);
+        }
+
         // Render the HTML
         const html = await ejs.render(templateContent, {
           voucherNo,
@@ -2107,11 +2362,12 @@ class BookingController {
           dateTo: voucherData.dateTo,
           roomNumber: voucherData.roomNumber || 'Unassigned',
           roomType: voucherData.roomType || 'Unassigned',
-          remarks: voucherData.remarks || 'Room Accommodation',
+          remarks: formattedRemarks, // ✅ Pass formatted remarks (template will add Room Accommodation, Pick-up, Drop-off)
           breakfastAdult,
           breakfastKid,
           pickup,
           dropoff,
+          otherServices, // ✅ Pass other services array for template to display
           reservationFee: voucherData.reservationFee || 0,
           discount: voucherData.discount || 0,
           checkOutStatus: voucherData.checkOutStatus,
@@ -2122,7 +2378,7 @@ class BookingController {
           roomCharges,
           servicesTotal,
           encodedBy: user.FULLNAME,
-          imageUrl: `file://${path.join(__dirname, '../public/img/logo.png')}`
+          imageUrl: imageUrl
         });
 
         // Generate PDF with playwright
@@ -2814,20 +3070,240 @@ class BookingController {
       // Get voucher number
       const voucherNo = voucherData.confirmationNumber || bookingId;
       
-      // Calculate breakfast info
-      const breakfastAdult = voucherData.breakfastAdultQty || 0;
-      const breakfastKid = voucherData.breakfastKidQty || 0;
-      const pickup = voucherData.pickupPrice || 0;
-      const dropoff = voucherData.dropoffPrice || 0;
+      // Get billing data for totals FIRST - we'll get pickup/dropoff/breakfast from here
+      console.log('🔍 [VOUCHER PDF] Fetching billing data for bookingId:', bookingId);
+      const billingData = await BookingModel.getBilling(bookingId);
+      
+        // Get breakfast, pickup, and dropoff from billingData.items (more reliable than getVoucherData query)
+        let breakfastAdult = 0;
+        let breakfastKid = 0;
+        let pickup = 0;
+        let dropoff = 0;
+        let otherServices = []; // Collect other services for remarks
+        
+        if (billingData && billingData.items && Array.isArray(billingData.items)) {
+          console.log('🍳 [VOUCHER PDF] Processing billing items for services:', billingData.items.map(item => ({
+            description: item.description,
+            basePrice: item.basePrice,
+            qty: item.qty,
+            subTotal: item.subTotal,
+            serviceId: item.serviceId
+          })));
+          
+          // Find breakfast, pickup, dropoff, and other services from items
+          billingData.items.forEach(item => {
+            const desc = (item.description || '').toLowerCase();
+            const serviceId = item.serviceId;
+            const itemDescription = item.description || '';
+            
+            // Breakfast - check description (case insensitive)
+            if (desc.includes('breakfast') && desc.includes('adult')) {
+              breakfastAdult = parseInt(item.qty) || 0;
+              console.log('🍳 Found breakfast adult:', breakfastAdult, 'qty:', item.qty, 'from item:', itemDescription, 'serviceId:', serviceId);
+            }
+            // Check for Kid/Kids breakfast
+            else if (desc.includes('breakfast') && (desc.includes('kid') || desc.includes('kids') || desc.includes('child'))) {
+              breakfastKid = parseInt(item.qty) || 0;
+              console.log('🍳 Found breakfast kid:', breakfastKid, 'qty:', item.qty, 'from item:', itemDescription, 'serviceId:', serviceId);
+            }
+            // Pickup (Service ID 90 or description contains pick-up)
+            else if (serviceId === 90 || desc.includes('pick-up') || desc.includes('pickup') || desc.includes('pick up')) {
+              pickup = parseFloat(item.subTotal) || parseFloat(item.basePrice) || 0;
+            }
+            // Dropoff (Service ID 91 or description contains drop-off)
+            else if (serviceId === 91 || desc.includes('drop-off') || desc.includes('dropoff') || desc.includes('drop off')) {
+              dropoff = parseFloat(item.subTotal) || parseFloat(item.basePrice) || 0;
+            }
+            // Late checkout (Service ID 72) - skip, handled separately
+            else if (serviceId === 72 || desc.includes('late checkout') || desc.includes('late check-out')) {
+              // Skip late checkout - handled separately
+            }
+            // Room items - ONLY if explicitly room-related AND no serviceId
+            // Must match: bedroom, room, suite, or room type names, AND no serviceId
+            else if (!item.serviceId && (
+              desc.includes('bedroom') || 
+              desc.includes('single bedroom') ||
+              desc.includes('double bedroom') ||
+              desc.includes('twin bedroom') ||
+              desc.includes('deluxe bedroom') ||
+              desc.includes('suite') ||
+              (desc.includes('room') && (desc.includes('single') || desc.includes('double') || desc.includes('twin') || desc.includes('deluxe')))
+            )) {
+              // This is a room item - skip (handled in roomCharges)
+              console.log('🏠 [VOUCHER PDF] Skipping room item:', itemDescription);
+            }
+            // Extended stay - skip
+            else if (desc.includes('extended') || desc.includes('extension')) {
+              // Skip extended stay
+            }
+            // Cancellation - skip
+            else if (desc.includes('cancellation')) {
+              // Skip cancellation fee
+            }
+            // Other services - collect for remarks (everything else is a service)
+            else if (itemDescription && itemDescription.trim()) {
+              const serviceName = itemDescription.trim();
+              const serviceQty = parseInt(item.qty) || 1;
+              otherServices.push({
+                name: serviceName,
+                qty: serviceQty
+              });
+              console.log('📦 [VOUCHER PDF] Found other service:', serviceName, 'qty:', serviceQty, 'serviceId:', serviceId);
+            }
+          });
+        }
+      
+      // Fallback: try from voucherData if still 0
+      if (breakfastAdult === 0) {
+        breakfastAdult = parseInt(voucherData.breakfastAdultQty) || 0;
+      }
+      if (breakfastKid === 0) {
+        breakfastKid = parseInt(voucherData.breakfastKidQty) || 0;
+      }
+      if (pickup === 0) {
+        pickup = parseFloat(voucherData.pickupPrice) || 0;
+      }
+      if (dropoff === 0) {
+        dropoff = parseFloat(voucherData.dropoffPrice) || 0;
+      }
+      
       const lateCheckoutFee = parseFloat(voucherData.lateCheckoutFee) || 0;
       
-      // Get billing data for totals
-      const billingData = await BookingModel.getBilling(bookingId);
+      console.log('🍳🚗 [VOUCHER PDF] Service values:', {
+        breakfastAdult_from_voucher: voucherData.breakfastAdultQty,
+        breakfastKid_from_voucher: voucherData.breakfastKidQty,
+        breakfastAdult: breakfastAdult,
+        breakfastKid: breakfastKid,
+        pickupPrice_raw: voucherData.pickupPrice,
+        dropoffPrice_raw: voucherData.dropoffPrice,
+        pickup: pickup,
+        dropoff: dropoff,
+        totalPax: breakfastAdult + breakfastKid,
+        willShowBreakfast: (breakfastAdult + breakfastKid) > 0,
+        willShowPickup: pickup > 0,
+        willShowDropoff: dropoff > 0
+      });
+      
+      if (!billingData) {
+        console.error('❌ [VOUCHER PDF] Billing data not found for bookingId:', bookingId);
+        return res.status(404).json({
+          success: false,
+          message: 'Billing data not found'
+        });
+      }
+      
+      console.log('📊 [VOUCHER PDF] Billing data received:', {
+        subTotal: billingData.subTotal,
+        reservationFee: billingData.reservationFee,
+        discountAmount: billingData.discountAmount,
+        itemsCount: billingData.items ? billingData.items.length : 0
+      });
       
       // Calculate total from billing data
       const subTotal = billingData.subTotal || 0;
       const reservationFee = billingData.reservationFee || 0;
       const discountAmount = billingData.discountAmount || 0;
+      
+      // Calculate roomCharges from billingData items
+      let roomCharges = 0;
+      if (billingData.items && Array.isArray(billingData.items)) {
+        // Sum all room items - ONLY items that are explicitly room-related
+        // Must have room-related description AND no serviceId
+        const roomItems = billingData.items.filter(item => {
+          if (!item.description) return false;
+          const desc = item.description.toLowerCase();
+          // Must be room-related AND no serviceId
+          const isRoomItem = !item.serviceId && (
+            desc.includes('bedroom') || 
+            desc.includes('single bedroom') ||
+            desc.includes('double bedroom') ||
+            desc.includes('twin bedroom') ||
+            desc.includes('deluxe bedroom') ||
+            desc.includes('suite') ||
+            (desc.includes('room') && (desc.includes('single') || desc.includes('double') || desc.includes('twin') || desc.includes('deluxe')))
+          );
+          return isRoomItem;
+        });
+        console.log('🏠 [VOUCHER PDF] Filtered room items:', roomItems.map(item => ({
+          description: item.description,
+          serviceId: item.serviceId,
+          subTotal: item.subTotal
+        })));
+        roomCharges = roomItems.reduce((sum, item) => sum + (item.subTotal || 0), 0);
+        
+        // If still 0, try to get from first room item
+        if (roomCharges === 0 && roomItems.length > 0) {
+          const firstRoom = roomItems[0];
+          roomCharges = (firstRoom.basePrice || 0) * (firstRoom.qty || 0);
+        }
+      }
+      
+      // Fallback: query directly from billing table
+      if (roomCharges === 0) {
+        const { queryDatabasePromise } = require('../config/database');
+        const roomChargesQuery = `
+          SELECT COALESCE(SUM(ROOM_CHARGE * QTY), 0) AS roomCharges
+          FROM billing
+          WHERE BOOKING_ID = ? AND ACTIVE = 1
+        `;
+        const roomChargesResult = await queryDatabasePromise(roomChargesQuery, [bookingId]);
+        roomCharges = parseFloat(roomChargesResult?.[0]?.roomCharges || 0);
+      }
+      
+      // Calculate servicesTotal from billingData items
+      // Services = everything that's NOT a room item, extended stay, or cancellation
+      let servicesTotal = 0;
+      if (billingData.items && Array.isArray(billingData.items)) {
+        const serviceItems = billingData.items.filter(item => {
+          if (!item.description) return false;
+          const desc = (item.description || '').toLowerCase();
+          
+          // Exclude room items (must be explicitly room-related AND no serviceId)
+          const isRoomItem = !item.serviceId && (
+            desc.includes('bedroom') || 
+            desc.includes('single bedroom') ||
+            desc.includes('double bedroom') ||
+            desc.includes('twin bedroom') ||
+            desc.includes('deluxe bedroom') ||
+            desc.includes('suite') ||
+            (desc.includes('room') && (desc.includes('single') || desc.includes('double') || desc.includes('twin') || desc.includes('deluxe')))
+          );
+          
+          // Exclude extended stay and cancellation
+          const isExcluded = desc.includes('extended') || desc.includes('extension') || desc.includes('cancellation');
+          
+          // Everything else is a service
+          return !isRoomItem && !isExcluded;
+        });
+        console.log('🛎️ [VOUCHER PDF] Filtered service items:', serviceItems.map(item => ({
+          description: item.description,
+          serviceId: item.serviceId,
+          subTotal: item.subTotal
+        })));
+        servicesTotal = serviceItems.reduce((sum, item) => sum + (item.subTotal || 0), 0);
+      }
+      
+      // Fallback: query directly from booking_service table
+      if (servicesTotal === 0) {
+        const { queryDatabasePromise } = require('../config/database');
+        const servicesTotalQuery = `
+          SELECT COALESCE(SUM(TOTAL_COST), 0) AS servicesTotal
+          FROM booking_service
+          WHERE BOOKING_ID = ? 
+            AND ACTIVE = 1
+            AND SERVICE_ID != 72
+        `;
+        const servicesTotalResult = await queryDatabasePromise(servicesTotalQuery, [bookingId]);
+        servicesTotal = parseFloat(servicesTotalResult?.[0]?.servicesTotal || 0);
+      }
+      
+      console.log('✅ [VOUCHER PDF] Final values:', {
+        roomCharges,
+        servicesTotal,
+        subTotal,
+        reservationFee,
+        discountAmount
+      });
       
       // Total amount
       const total = subTotal + reservationFee - discountAmount;
@@ -2835,6 +3311,43 @@ class BookingController {
       // Get paid amount and balance from voucher data (already calculated in query)
       const paidAmount = parseFloat(voucherData.paidAmount) || 0;
       const balance = total - paidAmount;
+
+      // Format remarks - template will automatically add:
+      // - "Room Accommodation" (if not already in remarks)
+      // - Breakfast info (if breakfastAdult + breakfastKid > 0)
+      // - "With Pick-Up" (if pickup > 0)
+      // - "With Drop-off" (if dropoff > 0)
+      // So we just pass the remarks from database as-is
+      const formattedRemarks = voucherData.remarks || '';
+      
+      console.log('📝 [VOUCHER PDF] Remarks and Services:', {
+        original: voucherData.remarks,
+        formatted: formattedRemarks,
+        breakfastAdult,
+        breakfastKid,
+        pickup,
+        dropoff,
+        otherServices: otherServices.map(s => `${s.qty}x ${s.name}`),
+        willShowBreakfast: (breakfastAdult + breakfastKid) > 0,
+        willShowPickup: pickup > 0,
+        willShowDropoff: dropoff > 0,
+        otherServicesCount: otherServices.length
+      });
+
+      // Load logo as base64 for Playwright
+      const logoPath = path.join(__dirname, '../public/img/Logo-Black.JPG');
+      let imageUrl = '';
+      try {
+        if (require('fs').existsSync(logoPath)) {
+          const imageBase64 = require('fs').readFileSync(logoPath, 'base64');
+          imageUrl = `data:image/jpeg;base64,${imageBase64}`;
+          console.log('✅ [VOUCHER PDF] Logo loaded as base64');
+        } else {
+          console.error('❌ [VOUCHER PDF] Logo file not found:', logoPath);
+        }
+      } catch (error) {
+        console.error('❌ [VOUCHER PDF] Error loading logo:', error);
+      }
 
       // Render the HTML - pass raw dates and let template format them
       const html = await ejs.render(templateContent, {
@@ -2844,11 +3357,12 @@ class BookingController {
         dateTo: voucherData.dateTo,
         roomNumber: voucherData.roomNumber || 'Unassigned',
         roomType: voucherData.roomType || 'Unassigned',
-        remarks: voucherData.remarks || 'Room Accommodation',
+        remarks: formattedRemarks, // ✅ Pass formatted remarks (template will add Room Accommodation, Pick-up, Drop-off)
         breakfastAdult,
         breakfastKid,
         pickup,
         dropoff,
+        otherServices, // ✅ Pass other services array for template to display
         reservationFee: voucherData.reservationFee || 0,
         discount: voucherData.discount || 0,
         checkOutStatus: voucherData.checkOutStatus,
@@ -2856,8 +3370,10 @@ class BookingController {
         total,
         paidAmount,
         balance,
+        roomCharges, // ✅ Add roomCharges
+        servicesTotal, // ✅ Add servicesTotal
         encodedBy: user.FULLNAME,
-        imageUrl: `file://${path.join(__dirname, '../public/img/logo.png')}`
+        imageUrl: imageUrl
       });
 
       // Generate PDF with playwright
