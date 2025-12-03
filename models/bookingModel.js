@@ -4905,50 +4905,123 @@ class BookingModel {
             const roomTargetBudget = Math.max(totalBillingAmount - discountTotal, 0);
             
             if (remainingPayment > 0 && totalBillingAmount > 0 && roomTargetBudget > 0) {
-              // Pay rooms proportionally up to the discounted cap
-              for (const billing of allBillings) {
-                if (remainingPayment <= 0) break;
+              // Check if individual billing - if so, pay each booking sequentially (not proportionally)
+              const isIndividualBilling = !consolidatedBilling;
+              
+              if (isIndividualBilling) {
+                // For individual billing, sort billings so main booking (firstBookingId) comes first when paid
+                let sortedBillings = [...allBillings];
+                if (paymentStatus === 'paid' && firstBookingId) {
+                  // Sort: main booking first, then others
+                  sortedBillings.sort((a, b) => {
+                    if (a.BOOKING_ID === firstBookingId) return -1;
+                    if (b.BOOKING_ID === firstBookingId) return 1;
+                    return a.BOOKING_ID - b.BOOKING_ID;
+                  });
+                }
                 
-                const billingAmount = billing.ROOM_CHARGE * billing.QTY;
-                const proportion = billingAmount / totalBillingAmount;
-                // Discount share for this billing
-                const billingDiscount = discountTotal * proportion;
-                // Max we intend to pay for this billing (cap after discount)
-                const billingPayCap = Math.max(billingAmount - billingDiscount, 0);
-                // Budget share for this billing from remaining room budget
-                const billingBudgetShare = Math.min(remainingPayment, roomTargetBudget) * proportion;
-                const roomPaymentAmount = Math.min(billingBudgetShare, billingPayCap);
-                
-                if (roomPaymentAmount > 0) {
-                  const roomPaymentQuery = `
-                    INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
-                    VALUES (?, ?, ?, ?, 'room', ?, ?)
-                  `;
-                  await connection.promise().query(roomPaymentQuery, [
-                    billing.BOOKING_ID,
-                    billing.IDNo,
-                    roomPaymentAmount,
-                    'cash',
-                    date,
-                    encodedBy
-                  ]);
+                // For individual billing (both paid and partial), pay each booking sequentially
+                // For paid status: Main booking gets priority (paid fully first), then other bookings
+                // For partial status: Sequential payment until payment runs out
+                for (const billing of sortedBillings) {
+                  if (remainingPayment <= 0) break;
                   
-                  // Update billing payment status
-                  let newStatus;
-                  if (roomPaymentAmount >= billingPayCap && billingPayCap > 0) {
-                    newStatus = 'paid';
-                  } else if (roomPaymentAmount > 0) {
-                    newStatus = 'partial';
+                  const billingAmount = billing.ROOM_CHARGE * billing.QTY;
+                  // For individual billing, discount is group-level, so apply proportionally
+                  const proportion = totalBillingAmount > 0 ? billingAmount / totalBillingAmount : 0;
+                  const billingDiscount = discountTotal * proportion;
+                  const billingPayCap = Math.max(billingAmount - billingDiscount, 0);
+                  
+                  // For paid status with main booking: pay full amount first
+                  // For partial or other bookings: pay as much as possible
+                  let roomPaymentAmount;
+                  if (paymentStatus === 'paid' && billing.BOOKING_ID === firstBookingId) {
+                    // Main booking gets full payment priority
+                    roomPaymentAmount = Math.min(remainingPayment, billingPayCap);
                   } else {
-                    newStatus = 'unpaid';
+                    // Other bookings or partial status: pay as much as possible
+                    roomPaymentAmount = Math.min(remainingPayment, billingPayCap);
                   }
-                  await connection.promise().query(
-                    'UPDATE billing SET PAYMENT_STATUS = ? WHERE IDNo = ?',
-                    [newStatus, billing.IDNo]
-                  );
                   
-                  remainingPayment -= roomPaymentAmount;
-                  console.log(`✅ Room payment of ₱${roomPaymentAmount} recorded for booking ${billing.BOOKING_ID}`);
+                  if (roomPaymentAmount > 0) {
+                    const roomPaymentQuery = `
+                      INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
+                      VALUES (?, ?, ?, ?, 'room', ?, ?)
+                    `;
+                    await connection.promise().query(roomPaymentQuery, [
+                      billing.BOOKING_ID,
+                      billing.IDNo,
+                      roomPaymentAmount,
+                      'cash',
+                      date,
+                      encodedBy
+                    ]);
+                    
+                    // Update billing payment status
+                    let newStatus;
+                    if (roomPaymentAmount >= billingPayCap && billingPayCap > 0) {
+                      newStatus = 'paid';
+                    } else if (roomPaymentAmount > 0) {
+                      newStatus = 'partial';
+                    } else {
+                      newStatus = 'unpaid';
+                    }
+                    await connection.promise().query(
+                      'UPDATE billing SET PAYMENT_STATUS = ? WHERE IDNo = ?',
+                      [newStatus, billing.IDNo]
+                    );
+                    
+                    remainingPayment -= roomPaymentAmount;
+                    const isMain = billing.BOOKING_ID === firstBookingId ? ' (MAIN)' : '';
+                    console.log(`✅ Room payment of ₱${roomPaymentAmount} (cap: ₱${billingPayCap}) recorded for booking ${billing.BOOKING_ID}${isMain} - Status: ${newStatus}`);
+                  }
+                }
+              } else {
+                // For consolidated billing or partial payment, use proportional distribution
+                for (const billing of allBillings) {
+                  if (remainingPayment <= 0) break;
+                  
+                  const billingAmount = billing.ROOM_CHARGE * billing.QTY;
+                  const proportion = billingAmount / totalBillingAmount;
+                  // Discount share for this billing
+                  const billingDiscount = discountTotal * proportion;
+                  // Max we intend to pay for this billing (cap after discount)
+                  const billingPayCap = Math.max(billingAmount - billingDiscount, 0);
+                  // Budget share for this billing from remaining room budget
+                  const billingBudgetShare = Math.min(remainingPayment, roomTargetBudget) * proportion;
+                  const roomPaymentAmount = Math.min(billingBudgetShare, billingPayCap);
+                  
+                  if (roomPaymentAmount > 0) {
+                    const roomPaymentQuery = `
+                      INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
+                      VALUES (?, ?, ?, ?, 'room', ?, ?)
+                    `;
+                    await connection.promise().query(roomPaymentQuery, [
+                      billing.BOOKING_ID,
+                      billing.IDNo,
+                      roomPaymentAmount,
+                      'cash',
+                      date,
+                      encodedBy
+                    ]);
+                    
+                    // Update billing payment status
+                    let newStatus;
+                    if (roomPaymentAmount >= billingPayCap && billingPayCap > 0) {
+                      newStatus = 'paid';
+                    } else if (roomPaymentAmount > 0) {
+                      newStatus = 'partial';
+                    } else {
+                      newStatus = 'unpaid';
+                    }
+                    await connection.promise().query(
+                      'UPDATE billing SET PAYMENT_STATUS = ? WHERE IDNo = ?',
+                      [newStatus, billing.IDNo]
+                    );
+                    
+                    remainingPayment -= roomPaymentAmount;
+                    console.log(`✅ Room payment of ₱${roomPaymentAmount} recorded for booking ${billing.BOOKING_ID}`);
+                  }
                 }
               }
             }
