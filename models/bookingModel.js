@@ -4587,7 +4587,7 @@ class BookingModel {
             let roomChargeForBilling, reservationFeeForBilling, discountForBilling;
 
             if (consolidatedBilling && index === 0) {
-              // Main booking in consolidated billing gets all charges
+              // Main booking in consolidated billing gets all charges (including full group discount)
               roomChargeForBilling = newRoomPrices.reduce((sum, price) => sum + price, 0); // Total of all rooms
               reservationFeeForBilling = 0; // Reservation fee removed
               discountForBilling = parseFloat(discount) || 0;
@@ -4599,14 +4599,17 @@ class BookingModel {
               discountForBilling = 0;
               console.log(`🔄 Room ${index + 1}: CONSOLIDATED - Room Charge: ₱0, Fee: ₱0, Discount: ₱0`);
             } else {
-              // Regular billing - each booking gets its own charges
+              // Individual billing - each booking gets its own room charge
+              // Group discount should still be visible on the main booking's billing row
               roomChargeForBilling = roomPrice;
-              reservationFeeForBilling = 0; // Reservation fee and discount are group-level, not per booking
-              discountForBilling = 0;
-              console.log(`🔄 Room ${index + 1}: INDIVIDUAL - Room Charge: ₱${roomChargeForBilling}, Fee: ₱0, Discount: ₱0`);
+              reservationFeeForBilling = 0; // Reservation fee removed
+              discountForBilling = index === 0 ? (parseFloat(discount) || 0) : 0;
+              console.log(`🔄 Room ${index + 1}: INDIVIDUAL - Room Charge: ₱${roomChargeForBilling}, Fee: ₱0, Discount: ₱${discountForBilling}`);
             }
 
             // Update billing
+            // NOTE: We continue to store DISCOUNT_AMOUNT in billing for reporting & summary screens.
+            //       Discount is also represented in the payments table as negative rows.
             await connection.promise().query(`
               UPDATE billing
               SET ROOM_CHARGE = ?, QTY = ?, PAYMENT_STATUS = ?, RESERVATION_FEE = ?, DISCOUNT_AMOUNT = ?, ENCODED_BY = ?, ENCODED_DT = ?
@@ -4675,7 +4678,7 @@ class BookingModel {
           let roomChargeForBilling, reservationFeeForBilling, discountForBilling;
 
           if (consolidatedBilling && index === 0) {
-            // Main booking in consolidated billing gets all charges
+            // Main booking in consolidated billing gets all charges (including full group discount)
             roomChargeForBilling = newRoomPrices.reduce((sum, price) => sum + price, 0); // Total of all rooms
             reservationFeeForBilling = 0; // Reservation fee removed
             discountForBilling = parseFloat(discount) || 0;
@@ -4687,11 +4690,12 @@ class BookingModel {
             discountForBilling = 0;
             console.log(`🆕 New Room ${index + 1}: CONSOLIDATED - Room Charge: ₱0, Fee: ₱0, Discount: ₱0`);
           } else {
-            // Regular billing - each booking gets its own charges
+            // Individual billing - each booking gets its own room charge
+            // Group discount should still be visible on the main booking's billing row
             roomChargeForBilling = roomPrice;
-            reservationFeeForBilling = 0; // Reservation fee and discount are group-level, not per booking
-            discountForBilling = 0;
-            console.log(`🆕 New Room ${index + 1}: INDIVIDUAL - Room Charge: ₱${roomChargeForBilling}, Fee: ₱0, Discount: ₱0`);
+            reservationFeeForBilling = 0; // Reservation fee removed
+            discountForBilling = index === 0 ? (parseFloat(discount) || 0) : 0;
+            console.log(`🆕 New Room ${index + 1}: INDIVIDUAL - Room Charge: ₱${roomChargeForBilling}, Fee: ₱0, Discount: ₱${discountForBilling}`);
           }
 
           // Insert billing
@@ -4783,8 +4787,12 @@ class BookingModel {
 
       // Handle payments for reservation fees and discounts
       if (firstBookingId) {
+        // Get current bookings in the group (after updates/additions/removals)
+        const currentBookingsQuery = `SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ?`;
+        const [currentBookings] = await connection.promise().query(currentBookingsQuery, [groupBookingId]);
+        const allBookingIds = currentBookings.map(b => b.IDNo);
+        
         // Delete existing reservation fee and discount payments for all bookings in the group
-        const allBookingIds = existingBookings.map(b => b.IDNo);
         if (allBookingIds.length > 0) {
           const placeholders = allBookingIds.map(() => '?').join(',');
           await connection.promise().query(`DELETE FROM payments WHERE BOOKING_ID IN (${placeholders}) AND PAYMENT_TYPE IN (?, ?)`, [...allBookingIds, 'reservation_fee', 'discount']);
@@ -4823,13 +4831,12 @@ class BookingModel {
             ]);
           }
         } else {
-          // Individual billing: apply fees/discounts to each booking
-          for (let index = 0; index < newRoomIds.length; index++) {
-            const bookingId = existingBookings.find(b => b.ROOM_ID === parseInt(newRoomIds[index]))?.IDNo;
-            if (bookingId) {
+          // Individual billing: apply fees/discounts only to main booking (group-level discount)
+          // Don't apply to each booking - that would multiply the discount incorrectly
+          if (firstBookingId) {
               if (parseFloat(reservationFee) > 0) {
                 additionalPayments.push([
-                  bookingId,
+                firstBookingId,
                   null,
                   parseFloat(reservationFee),
                   'cash',
@@ -4841,7 +4848,7 @@ class BookingModel {
               
               if (parseFloat(discount) > 0) {
                 additionalPayments.push([
-                  bookingId,
+                firstBookingId,
                   null,
                   -parseFloat(discount),
                   'cash',
@@ -4849,7 +4856,6 @@ class BookingModel {
                   date,
                   encodedBy
                 ]);
-              }
             }
           }
         }
@@ -4898,6 +4904,9 @@ class BookingModel {
             
             let remainingPayment = paidAmount;
             
+            // Check if individual billing - ONLY for room charges, NOT for services
+            const isIndividualBilling = !consolidatedBilling;
+            
             // Priority 1: Pay room charges first (apply discount to rooms)
             const totalBillingAmount = allBillings.reduce((sum, b) => sum + (b.ROOM_CHARGE * b.QTY), 0);
             const discountTotal = parseFloat(discount) || 0;
@@ -4905,8 +4914,6 @@ class BookingModel {
             const roomTargetBudget = Math.max(totalBillingAmount - discountTotal, 0);
             
             if (remainingPayment > 0 && totalBillingAmount > 0 && roomTargetBudget > 0) {
-              // Check if individual billing - if so, pay each booking sequentially (not proportionally)
-              const isIndividualBilling = !consolidatedBilling;
               
               if (isIndividualBilling) {
                 // For individual billing, sort billings so main booking (firstBookingId) comes first when paid
@@ -4927,21 +4934,14 @@ class BookingModel {
                   if (remainingPayment <= 0) break;
                   
                   const billingAmount = billing.ROOM_CHARGE * billing.QTY;
-                  // For individual billing, discount is group-level, so apply proportionally
-                  const proportion = totalBillingAmount > 0 ? billingAmount / totalBillingAmount : 0;
-                  const billingDiscount = discountTotal * proportion;
+                  // For individual billing, discount is group-level and applied ONLY to main booking
+                  // Main booking gets full discount, other bookings get no discount
+                  const billingDiscount = (billing.BOOKING_ID === firstBookingId) ? discountTotal : 0;
                   const billingPayCap = Math.max(billingAmount - billingDiscount, 0);
                   
-                  // For paid status with main booking: pay full amount first
-                  // For partial or other bookings: pay as much as possible
-                  let roomPaymentAmount;
-                  if (paymentStatus === 'paid' && billing.BOOKING_ID === firstBookingId) {
-                    // Main booking gets full payment priority
-                    roomPaymentAmount = Math.min(remainingPayment, billingPayCap);
-                  } else {
-                    // Other bookings or partial status: pay as much as possible
-                    roomPaymentAmount = Math.min(remainingPayment, billingPayCap);
-                  }
+                  // Pay as much as possible for this booking (up to the cap, or remaining payment)
+                  // Main booking gets priority because it's sorted first when paid status
+                  const roomPaymentAmount = Math.min(remainingPayment, billingPayCap);
                   
                   if (roomPaymentAmount > 0) {
                     const roomPaymentQuery = `
@@ -4982,7 +4982,8 @@ class BookingModel {
                   if (remainingPayment <= 0) break;
                   
                   const billingAmount = billing.ROOM_CHARGE * billing.QTY;
-                  const proportion = billingAmount / totalBillingAmount;
+                  // Safety check for division by zero (defensive programming)
+                  const proportion = totalBillingAmount > 0 ? (billingAmount / totalBillingAmount) : 0;
                   // Discount share for this billing
                   const billingDiscount = discountTotal * proportion;
                   // Max we intend to pay for this billing (cap after discount)
@@ -5000,8 +5001,8 @@ class BookingModel {
                       billing.BOOKING_ID,
                       billing.IDNo,
                       roomPaymentAmount,
-                      'cash',
-                      date,
+              'cash',
+              date,
                       encodedBy
                     ]);
                     
@@ -5027,8 +5028,21 @@ class BookingModel {
             }
             
             // Priority 2: Pay services with remaining payment
+            // Note: Individual billing is ONLY for room charges, NOT for services
+            // Services: Pickup/Dropoff always on main booking, Breakfast has separate individual checkbox
             if (remainingPayment > 0 && allServices.length > 0) {
-              for (const service of allServices) {
+              // For paid status, prioritize main booking services first (Pickup/Dropoff are always on main)
+              let sortedServices = [...allServices];
+              if (paymentStatus === 'paid' && firstBookingId) {
+                // Sort: main booking services first, then others
+                sortedServices.sort((a, b) => {
+                  if (a.BOOKING_ID === firstBookingId && b.BOOKING_ID !== firstBookingId) return -1;
+                  if (b.BOOKING_ID === firstBookingId && a.BOOKING_ID !== firstBookingId) return 1;
+                  return a.BOOKING_ID - b.BOOKING_ID;
+                });
+              }
+              
+              for (const service of sortedServices) {
                 if (remainingPayment <= 0) break;
                 
                 const servicePaymentAmount = Math.min(remainingPayment, service.TOTAL_COST);
@@ -5062,7 +5076,8 @@ class BookingModel {
                   );
                   
                   remainingPayment -= servicePaymentAmount;
-                  console.log(`✅ Service payment of ₱${servicePaymentAmount} recorded for booking ${service.BOOKING_ID}, service ${service.IDNo}`);
+                  const isMain = service.BOOKING_ID === firstBookingId ? ' (MAIN)' : '';
+                  console.log(`✅ Service payment of ₱${servicePaymentAmount} recorded for booking ${service.BOOKING_ID}, service ${service.IDNo}${isMain} - Status: ${newStatus}`);
                 }
               }
             }
@@ -5181,16 +5196,18 @@ class BookingModel {
         masterBookingId = masterRow?.master_booking_id || null;
       }
 
-      // Filter results if BILLING_TYPE = 1 (MASTER) - only show master booking
+      // Filter results if BILLING_TYPE = 1 (MASTER)
+      // - Room charges: only show master booking (to avoid duplicate room lines)
+      // - Service charges: always show ALL services for the group (so individual breakfasts, etc. all appear)
       let filteredRoomResults = roomResults;
       let filteredServiceResults = serviceResults;
       
       if (billingType === 1 && masterBookingId) {
         filteredRoomResults = roomResults.filter(r => r.BOOKING_ID === masterBookingId);
-        filteredServiceResults = serviceResults.filter(s => s.BOOKING_ID === masterBookingId);
+        // Keep all serviceResults so that services from all group members are visible on the group invoice
       }
       
-      // Compute totals from filtered items
+      // Compute totals
       const roomTotal = filteredRoomResults.reduce((sum, r) => sum + ((parseFloat(r.charges) || 0) * (parseInt(r.room_qty, 10) || 0)), 0);
       const servicesTotal = filteredServiceResults.reduce((sum, s) => sum + ((parseFloat(s.charges) || 0) * (parseInt(s.service_qty, 10) || 0)), 0);
       
