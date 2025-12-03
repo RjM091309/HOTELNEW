@@ -1520,9 +1520,16 @@ if (roomServices.length === 0) {
             statusDisplay = `<span class="badge bg-secondary">${service.STATUS}</span>`;
         }
 
-        const isDeletable = service.STATUS !== 'paid';
+        // Allow deletion if unpaid OR if it's Late Checkout (SERVICE_ID = 72) even if paid
+        const isLateCheckout = service.SERVICE_ID === 72;
+        const isDeletable = service.STATUS !== 'paid' || isLateCheckout;
+        const deleteButtonTitle = isLateCheckout && service.STATUS === 'paid' 
+            ? 'Remove Late Checkout (refund will be processed)' 
+            : isDeletable 
+                ? 'Remove Order' 
+                : 'Paid item cannot be removed';
         const deleteButton = isDeletable
-            ? `<button class="btn btn-sm" onclick="removeService(${index}, '${bookingId}')" title="Remove Order" style="background-color: #f96332; border: none; border-radius: 50%; width: 28px; height: 28px; padding: 0; color: #fff; box-shadow: 0px 2px 8px rgba(249, 99, 50, 0.3); display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;">
+            ? `<button class="btn btn-sm" onclick="removeService(${index}, '${bookingId}')" title="${deleteButtonTitle}" style="background-color: #f96332; border: none; border-radius: 50%; width: 28px; height: 28px; padding: 0; color: #fff; box-shadow: 0px 2px 8px rgba(249, 99, 50, 0.3); display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;">
                 <i class="fa fa-trash-alt" style="font-size: 10px;"></i>
                </button>`
             : `<button class="btn btn-sm" disabled title="Paid item cannot be removed" style="background-color: #6c757d; border: none; border-radius: 50%; width: 28px; height: 28px; padding: 0; color: #fff; opacity: 0.6; cursor: not-allowed; display: flex; align-items: center; justify-content: center;">

@@ -2331,14 +2331,14 @@ class BookingModel {
 
         } else {
           // Handle booking_service logic
-          const fetchTotalCostQuery = `
-            SELECT TOTAL_COST 
+          const fetchServiceQuery = `
+            SELECT TOTAL_COST, STATUS 
             FROM booking_service
             WHERE BOOKING_ID = ? AND SERVICE_ID = ? AND ACTIVE = 1
           `;
 
           const results = await new Promise((resolve, reject) => {
-            connection.query(fetchTotalCostQuery, [bookingId, serviceId], (err, results) => {
+            connection.query(fetchServiceQuery, [bookingId, serviceId], (err, results) => {
               if (err) reject(err);
               else resolve(results);
             });
@@ -2349,6 +2349,15 @@ class BookingModel {
           }
 
           const totalCost = results[0].TOTAL_COST;
+          const serviceStatus = results[0].STATUS || 'unpaid';
+          const isPaid = serviceStatus === 'paid';
+          const isLateCheckout = serviceId === 72;
+          let refundProcessed = false;
+
+          // Prevent deletion of paid services, except Late Checkout (SERVICE_ID = 72)
+          if (isPaid && !isLateCheckout) {
+            throw new Error('Paid services cannot be removed. Only Late Checkout can be removed even when paid.');
+          }
 
           console.log('BookingModel.removeService - userId:', userId, 'removalReason:', removalReason);
 
@@ -2378,6 +2387,75 @@ class BookingModel {
             });
           });
 
+          // If deleting Late Checkout service (SERVICE_ID = 72), update LATE_CHECKOUT = 0 in booking table
+          if (serviceId === 72) {
+            const updateLateCheckoutQuery = `
+              UPDATE booking
+              SET LATE_CHECKOUT = 0
+              WHERE IDNo = ?
+            `;
+
+            await new Promise((resolve, reject) => {
+              connection.query(updateLateCheckoutQuery, [bookingId], (err) => {
+                if (err) reject(err);
+                else resolve();
+              });
+            });
+
+            // If Late Checkout was paid, create refund entry
+            if (isPaid && totalCost > 0) {
+              // Get billing_id
+              const getBillingIdQuery = `
+                SELECT IDNo FROM billing
+                WHERE BOOKING_ID = ? AND ACTIVE = 1
+                LIMIT 1
+              `;
+
+              const billingResult = await new Promise((resolve, reject) => {
+                connection.query(getBillingIdQuery, [bookingId], (err, result) => {
+                  if (err) reject(err);
+                  else resolve(result);
+                });
+              });
+
+              const billingId = billingResult.length > 0 ? billingResult[0].IDNo : null;
+
+              // Update billing CHECKOUT_REFUND
+              const updateRefundQuery = `
+                UPDATE billing
+                SET CHECKOUT_REFUND = COALESCE(CHECKOUT_REFUND, 0) + ?
+                WHERE BOOKING_ID = ? AND ACTIVE = 1
+              `;
+
+              await new Promise((resolve, reject) => {
+                connection.query(updateRefundQuery, [totalCost, bookingId], (err) => {
+                  if (err) reject(err);
+                  else resolve();
+                });
+              });
+
+              // Insert refund payment record (negative amount)
+              const refundSql = billingId
+                ? `INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
+                   VALUES (?, ?, ?, 'cash', 'refund', NOW(), ?, 'Late Checkout service refund')`
+                : `INSERT INTO payments (BOOKING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
+                   VALUES (?, ?, 'cash', 'refund', NOW(), ?, 'Late Checkout service refund')`;
+
+              const refundParams = billingId
+                ? [bookingId, billingId, -totalCost, userId || 'system']
+                : [bookingId, -totalCost, userId || 'system'];
+
+              await new Promise((resolve, reject) => {
+                connection.query(refundSql, refundParams, (err) => {
+                  if (err) reject(err);
+                  else resolve();
+                });
+              });
+
+              refundProcessed = true;
+            }
+          }
+
           // Commit the transaction
           await new Promise((resolve, reject) => {
             connection.commit(err => {
@@ -2388,10 +2466,16 @@ class BookingModel {
 
           connection.release();
 
+          let message = 'Service removed and billing updated successfully!';
+          if (refundProcessed) {
+            message = `Late Checkout service removed successfully! Refund of ₱${totalCost.toFixed(2)} has been processed.`;
+          }
+
           return {
             success: true,
-            message: 'Service removed and billing updated successfully!',
-            totalCost
+            message: message,
+            totalCost,
+            refundProcessed: refundProcessed
           };
         }
 
