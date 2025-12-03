@@ -4503,13 +4503,17 @@ class BookingModel {
 
         if (removeBookingIds.length > 0) {
           // Delete payments first
-          await connection.promise().query('DELETE FROM payments WHERE BOOKING_ID IN (?)', [removeBookingIds]);
+          const paymentPlaceholders = removeBookingIds.map(() => '?').join(',');
+          await connection.promise().query(`DELETE FROM payments WHERE BOOKING_ID IN (${paymentPlaceholders})`, removeBookingIds);
           // Delete booking services
-          await connection.promise().query('DELETE FROM booking_service WHERE BOOKING_ID IN (?)', [removeBookingIds]);
+          const servicePlaceholders = removeBookingIds.map(() => '?').join(',');
+          await connection.promise().query(`DELETE FROM booking_service WHERE BOOKING_ID IN (${servicePlaceholders})`, removeBookingIds);
           // Delete billing records
-          await connection.promise().query('DELETE FROM billing WHERE BOOKING_ID IN (?)', [removeBookingIds]);
+          const billingPlaceholders = removeBookingIds.map(() => '?').join(',');
+          await connection.promise().query(`DELETE FROM billing WHERE BOOKING_ID IN (${billingPlaceholders})`, removeBookingIds);
           // Delete bookings
-          await connection.promise().query('DELETE FROM booking WHERE IDNo IN (?)', [removeBookingIds]);
+          const bookingPlaceholders = removeBookingIds.map(() => '?').join(',');
+          await connection.promise().query(`DELETE FROM booking WHERE IDNo IN (${bookingPlaceholders})`, removeBookingIds);
           // Delete customers (if not used elsewhere)
           const customerIds = existingBookings
             .filter(b => roomsToRemove.includes(b.ROOM_ID))
@@ -4860,30 +4864,138 @@ class BookingModel {
         }
       }
 
-      // Insert payment record for the paid amount if payment status is 'paid' or 'partial'
+      // Payment Distribution Logic - Separate room and service payments
       if (paymentStatus === 'paid' || paymentStatus === 'partial') {
         const paidAmount = parseFloat(data.paidAmount) || 0;
         
         if (paidAmount > 0 && firstBookingId) {
-          const paymentQuery = `
-            INSERT INTO payments 
-            (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-          `;
+          // Get all booking IDs for this group
+          const allBookingIdsQuery = `SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ? ORDER BY IDNo`;
+          const [allBookingsResult] = await connection.promise().query(allBookingIdsQuery, [groupBookingId]);
+          const allBookingIds = allBookingsResult.map(b => b.IDNo);
           
-          const paymentValues = [
-            firstBookingId,
-            null, // No specific service ID for room payment
-              paidAmount,
-              'cash',
-              'room', // Payment type for group room charges
-              date,
-              encodedBy,
-            'Initial payment for group booking'
-          ];
-          
-          await connection.promise().query(paymentQuery, paymentValues);
-          console.log(`✅ Group room payment of ₱${paidAmount} recorded for group booking ${firstBookingId}`);
+          if (allBookingIds.length > 0) {
+            // Delete existing room and service payments for all bookings in the group to avoid duplicates
+            const paymentPlaceholders = allBookingIds.map(() => '?').join(',');
+            await connection.promise().query(
+              `DELETE FROM payments WHERE BOOKING_ID IN (${paymentPlaceholders}) AND PAYMENT_TYPE IN (?, ?)`,
+              [...allBookingIds, 'room', 'service']
+            );
+            
+            // Get all billing records for this group
+            const billingPlaceholders = allBookingIds.map(() => '?').join(',');
+            const [allBillings] = await connection.promise().query(
+              `SELECT IDNo, BOOKING_ID, ROOM_CHARGE, QTY, PAYMENT_STATUS FROM billing WHERE BOOKING_ID IN (${billingPlaceholders})`,
+              allBookingIds
+            );
+            
+            // Get all service records for this group
+            const servicePlaceholders = allBookingIds.map(() => '?').join(',');
+            const [allServices] = await connection.promise().query(
+              `SELECT IDNo, BOOKING_ID, TOTAL_COST, STATUS FROM booking_service WHERE BOOKING_ID IN (${servicePlaceholders})`,
+              allBookingIds
+            );
+            
+            let remainingPayment = paidAmount;
+            
+            // Priority 1: Pay room charges first (apply discount to rooms)
+            const totalBillingAmount = allBillings.reduce((sum, b) => sum + (b.ROOM_CHARGE * b.QTY), 0);
+            const discountTotal = parseFloat(discount) || 0;
+            // Budget for room after discount
+            const roomTargetBudget = Math.max(totalBillingAmount - discountTotal, 0);
+            
+            if (remainingPayment > 0 && totalBillingAmount > 0 && roomTargetBudget > 0) {
+              // Pay rooms proportionally up to the discounted cap
+              for (const billing of allBillings) {
+                if (remainingPayment <= 0) break;
+                
+                const billingAmount = billing.ROOM_CHARGE * billing.QTY;
+                const proportion = billingAmount / totalBillingAmount;
+                // Discount share for this billing
+                const billingDiscount = discountTotal * proportion;
+                // Max we intend to pay for this billing (cap after discount)
+                const billingPayCap = Math.max(billingAmount - billingDiscount, 0);
+                // Budget share for this billing from remaining room budget
+                const billingBudgetShare = Math.min(remainingPayment, roomTargetBudget) * proportion;
+                const roomPaymentAmount = Math.min(billingBudgetShare, billingPayCap);
+                
+                if (roomPaymentAmount > 0) {
+                  const roomPaymentQuery = `
+                    INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
+                    VALUES (?, ?, ?, ?, 'room', ?, ?)
+                  `;
+                  await connection.promise().query(roomPaymentQuery, [
+                    billing.BOOKING_ID,
+                    billing.IDNo,
+                    roomPaymentAmount,
+                    'cash',
+                    date,
+                    encodedBy
+                  ]);
+                  
+                  // Update billing payment status
+                  let newStatus;
+                  if (roomPaymentAmount >= billingPayCap && billingPayCap > 0) {
+                    newStatus = 'paid';
+                  } else if (roomPaymentAmount > 0) {
+                    newStatus = 'partial';
+                  } else {
+                    newStatus = 'unpaid';
+                  }
+                  await connection.promise().query(
+                    'UPDATE billing SET PAYMENT_STATUS = ? WHERE IDNo = ?',
+                    [newStatus, billing.IDNo]
+                  );
+                  
+                  remainingPayment -= roomPaymentAmount;
+                  console.log(`✅ Room payment of ₱${roomPaymentAmount} recorded for booking ${billing.BOOKING_ID}`);
+                }
+              }
+            }
+            
+            // Priority 2: Pay services with remaining payment
+            if (remainingPayment > 0 && allServices.length > 0) {
+              for (const service of allServices) {
+                if (remainingPayment <= 0) break;
+                
+                const servicePaymentAmount = Math.min(remainingPayment, service.TOTAL_COST);
+                
+                if (servicePaymentAmount > 0) {
+                  const servicePaymentQuery = `
+                    INSERT INTO payments (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
+                    VALUES (?, ?, ?, ?, 'service', ?, ?)
+                  `;
+                  await connection.promise().query(servicePaymentQuery, [
+                    service.BOOKING_ID,
+                    service.IDNo,
+                    servicePaymentAmount,
+                    'cash',
+                    date,
+                    encodedBy
+                  ]);
+                  
+                  // Update service payment status
+                  let newStatus;
+                  if (servicePaymentAmount >= service.TOTAL_COST) {
+                    newStatus = 'paid';
+                  } else if (servicePaymentAmount > 0) {
+                    newStatus = 'partial';
+                  } else {
+                    newStatus = 'unpaid';
+                  }
+                  await connection.promise().query(
+                    'UPDATE booking_service SET STATUS = ? WHERE IDNo = ?',
+                    [newStatus, service.IDNo]
+                  );
+                  
+                  remainingPayment -= servicePaymentAmount;
+                  console.log(`✅ Service payment of ₱${servicePaymentAmount} recorded for booking ${service.BOOKING_ID}, service ${service.IDNo}`);
+                }
+              }
+            }
+            
+            console.log(`✅ Payment distribution completed. Total paid: ₱${paidAmount}, Remaining: ₱${remainingPayment}`);
+          }
         }
       }
 
