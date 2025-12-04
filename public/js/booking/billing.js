@@ -25,11 +25,7 @@ function printDiv(divId) {
     location.reload(); // Reload page to restore modal functionality
 }
 
-// Ensure the modal is reset properly when closed
-document.getElementById('modal-billing').addEventListener('hidden.bs.modal', function () {
-    const modalElement = document.getElementById('modal-billing');
-    modalElement.innerHTML = modalElement.innerHTML; // Reset modal content
-});
+
 
 // Note: The proceedToPaymentButton event handler is now handled in billing.ejs
 // This ensures proper Payment Summary Card updates
