@@ -448,7 +448,8 @@ function confirmRoomAssignment(roomId, roomNumber, roomFloor, bookingId) {
       'breakfastAdultQty',      // Breakfast Adult Quantity
       'breakfastKidQty',        // Breakfast Kids Quantity
       'manualPriceToggle',      // Enter Price Manually checkbox
-      'bookingRemarks'          // Additional Remarks
+      'bookingRemarks',         // Additional Remarks
+      'paidAmount'              // Paid Amount
     ];
     
     // Add highlight styling to enabled fields
@@ -893,7 +894,7 @@ function confirmRoomAssignment(roomId, roomNumber, roomFloor, bookingId) {
             // Disable all other input fields
             const allInputs = addBookingModalElement.querySelectorAll('input, select, textarea');
             allInputs.forEach(input => {
-              if (!input.id || !['addroom', 'addFloor', 'room_type', 'bedCount', 'price', 'txtFullNameAdd', 'txtNumber', 'txtAddress', 'daterange', 'diffindays', 'checkInStatus', 'paymentStatus', 'bookingRoute', 'agencySelect', 'manualPriceToggle', 'includeBreakfast', 'breakfastAdultQty', 'breakfastAdultPrice', 'breakfastKidQty', 'breakfastKidPrice', 'bookingRemarks', 'guestType', 'guestLevel'].includes(input.id)) {
+              if (!input.id || !['addroom', 'addFloor', 'room_type', 'bedCount', 'price', 'txtFullNameAdd', 'txtNumber', 'txtAddress', 'daterange', 'diffindays', 'checkInStatus', 'paymentStatus', 'bookingRoute', 'agencySelect', 'manualPriceToggle', 'includeBreakfast', 'breakfastAdultQty', 'breakfastAdultPrice', 'breakfastKidQty', 'breakfastKidPrice', 'bookingRemarks', 'guestType', 'guestLevel', 'paidAmount'].includes(input.id)) {
                 input.disabled = true;
               }
             });
