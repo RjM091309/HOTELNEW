@@ -7,7 +7,8 @@
       </div>
       <div style="display:flex; align-items:center; justify-content: center; width:100%; margin-bottom: 12px;">
         <div class="filter-btn-group">
-          <button type="button" class="filter-btn active" data-filter="today">Today</button>
+          <button type="button" class="filter-btn active" data-filter="all">All</button>
+          <button type="button" class="filter-btn" data-filter="today">Today</button>
           <button type="button" class="filter-btn" data-filter="last3days">Last 3 Days</button>
           <button type="button" class="filter-btn" data-filter="thisWeek">This Week</button>
           <button type="button" class="filter-btn" data-filter="thisMonth">This Month</button>
@@ -93,7 +94,7 @@
 
 <script>
   $(document).ready(function () {
-    let currentFilter = 'today';
+    let currentFilter = 'all';
     let table = $('#payments_tbl').DataTable({
       rowId: 'BOOKING_ID',
       processing: true,
