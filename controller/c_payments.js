@@ -36,9 +36,9 @@ const paymentsController = {
 
       const columns = [
         'BOOKING_ID', 'BOOKING_ID', 'GUEST_NAME', 'ROOM_NUMBER', 'CONFIRMATION_NUMBER',
-        'TOTAL_AMOUNT', 'TOTAL_PAID', 'DISCOUNT_AMOUNT', 'BALANCE', 'PAYMENT_STATUS', 'PAYMENT_METHOD', 'BOOKING_DATE'
+        'TOTAL_AMOUNT', 'TOTAL_PAID', 'DISCOUNT_AMOUNT', 'BALANCE', 'PAYMENT_STATUS', 'PAYMENT_METHOD', 'LAST_PAYMENT_DATE'
       ];
-      const orderBy = columns[orderColumn] || 'BOOKING_DATE';
+      const orderBy = columns[orderColumn] || 'LAST_PAYMENT_DATE';
 
       let searchCondition = '';
       let searchParams = [];

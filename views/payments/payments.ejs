@@ -129,7 +129,11 @@
           }
         },
         { data: null, className: 'center', render: function(_d,_t,row){ return row.PAYMENT_METHOD || 'N/A'; } },
-        { data: 'BOOKING_DATE', className: 'center', render: d => new Date(d).toLocaleString('en-US') }
+        { 
+          data: 'LAST_PAYMENT_DATE', 
+          className: 'center', 
+          render: d => d ? new Date(d).toLocaleString('en-US') : '' 
+        }
       ],
       order: [[11, 'desc']],
       language: { emptyTable: 'No data available in the table.' }

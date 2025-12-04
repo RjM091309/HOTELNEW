@@ -63,6 +63,7 @@ const paymentsModel = {
         r.ROOM_NUMBER,
         bill.PAYMENT_STATUS,
         bill.PAYMENT_METHOD,
+        lp.LAST_PAYMENT_DATE,
         (
           COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) +
           COALESCE(bill.AMENITIES_CHARGE, 0) +
@@ -86,6 +87,11 @@ const paymentsModel = {
       LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
       LEFT JOIN room r ON r.IDNo = b.ROOM_ID
       LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
+      LEFT JOIN (
+        SELECT BOOKING_ID, MAX(PAYMENT_DATE) AS LAST_PAYMENT_DATE
+        FROM payments
+        GROUP BY BOOKING_ID
+      ) lp ON lp.BOOKING_ID = b.IDNo
       WHERE b.ACTIVE = 1 ${searchCondition}
       ORDER BY ${orderBy} ${orderDir}
       LIMIT ? OFFSET ?
