@@ -16,6 +16,7 @@
           <input type="hidden" id="groupSelectedRoomNumbers" name="groupSelectedRoomNumbers">
           <input type="hidden" id="groupNights" name="groupNights" value="0">
           <input type="hidden" id="groupPaidAmountHidden" name="groupPaidAmountHidden" value="0">
+          <input type="hidden" id="groupLateCheckoutFee" name="groupLateCheckoutFee" value="0">
 
           <div class="row">
             <div class="col-lg-6">
@@ -70,6 +71,16 @@
                   <option value="agency">Agency</option>
                   <option value="booking-channel">Booking Channel</option>
                 </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Late Checkout Fee Display - appears below when visible -->
+          <div id="groupLateCheckoutFeeDisplay" class="row p-t-20" style="display: none;">
+            <div class="col-lg-3">
+              <div class="form-group">
+                <label class="form-label">Late Checkout Fee</label>
+                <input class="form-control" type="number" id="groupLateCheckoutFeeInput" name="groupLateCheckoutFeeInput" placeholder="0.00" step="0.01" min="0">
               </div>
             </div>
           </div>
@@ -1321,11 +1332,16 @@
 
     const servicesTotal = breakfastTotalWithIndividual + pickupPrice + dropoffPrice;
 
+    // Get late check-out fee (PER ROOM - multiply by number of rooms)
+    const lateCheckoutFeePerRoom = parseFloat($('#groupLateCheckoutFee').val()) || 0;
+    // Reuse numRooms variable already declared above
+    const lateCheckoutFeeTotal = lateCheckoutFeePerRoom * numRooms;
+
     // Check if individual billing is enabled (inverted logic)
     const isConsolidated = !$('#groupIndividualBilling').is(':checked');
 
     // Always calculate the full total in frontend for user visibility
-    const subtotal = roomSubtotal + servicesTotal;
+    const subtotal = roomSubtotal + servicesTotal + lateCheckoutFeeTotal;
     let finalBalance = subtotal - discount;
 
     // Get paid amount and validate it doesn't exceed total
@@ -2427,6 +2443,54 @@
     });
 
 
+    // Function to calculate late check-out fee for group booking
+    function calculateGroupLateCheckoutFee() {
+      const checkOutStatus = $('#groupCheckOutStatus').val();
+      
+      // Only calculate if we have valid data
+      if (!checkOutStatus) {
+        $('#groupLateCheckoutFee').val(0);
+        $('#groupLateCheckoutFeeDisplay').hide();
+        return;
+      }
+      
+      let lateCheckoutFee = 0;
+      
+      if (checkOutStatus == 1) { // Late Check Out
+        lateCheckoutFee = 2000; // ₱2,000 fee for Late Check Out
+        $('#groupLateCheckoutFeeDisplay').show();
+      } else {
+        // Regular Check Out - no fee
+        $('#groupLateCheckoutFeeDisplay').hide();
+      }
+      
+      $('#groupLateCheckoutFee').val(lateCheckoutFee);
+      $('#groupLateCheckoutFeeInput').val(lateCheckoutFee);
+      
+      // Recalculate total to include late check-out fee
+      computeGroupTotal();
+    }
+
+    // Calculate late check-out fee when check-out status changes
+    $('#groupCheckOutStatus').on('change', function() {
+      calculateGroupLateCheckoutFee();
+    });
+
+    // Calculate late check-out fee when modal opens
+    $(document).on('shown.bs.modal', '#modal-add-group-booking', function() {
+      // Calculate late check-out fee after modal is fully shown
+      setTimeout(() => {
+        calculateGroupLateCheckoutFee();
+      }, 100);
+    });
+
+    // Sync late checkout fee input with hidden field
+    $(document).on('input', '#groupLateCheckoutFeeInput', function() {
+      const value = parseFloat($(this).val()) || 0;
+      $('#groupLateCheckoutFee').val(value);
+      computeGroupTotal();
+    });
+
     // Clear selected rooms when Check-in/Check-out status changes
     $('#groupCheckInStatus, #groupCheckOutStatus, #groupBookingRoute').on('change', function() {
       // Uncheck any selected block radios or manual checkboxes
@@ -2609,7 +2673,7 @@
         paidAmount: numericPaid,
         balance: numericBalance,
         checkOutStatus: $('#groupCheckOutStatus').val() || 0,
-        lateCheckoutFee: 0,
+        lateCheckoutFee: parseFloat($('#groupLateCheckoutFee').val()) || 0,
         discount: $('#groupIncludeDiscount').is(':checked') ? (parseFloat($('#groupDiscount').val()) || 0) : 0,
         reservationFee: 0, // Default to 0 for group bookings
         roomCharges: roomCharges.toFixed(2),

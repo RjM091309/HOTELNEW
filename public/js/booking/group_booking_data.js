@@ -927,11 +927,16 @@ function computeEditGroupTotal() {
 
     const servicesTotal = breakfastTotalWithIndividual + pickupPrice + dropoffPrice;
 
+    // Get late check-out fee (PER ROOM - multiply by number of rooms)
+    // Reuse numRooms variable already declared above
+    const lateCheckoutFeePerRoom = parseFloat($('#editGroupLateCheckoutFee').val()) || 0;
+    const lateCheckoutFeeTotal = lateCheckoutFeePerRoom * numRooms;
+
     // Check if individual billing is enabled (inverted logic)
     const isConsolidated = !$('#editGroupIndividualBilling').is(':checked');
 
     // Always calculate the full total in frontend for user visibility
-    const subtotal = roomSubtotal + servicesTotal;
+    const subtotal = roomSubtotal + servicesTotal + lateCheckoutFeeTotal;
     let finalBalance = subtotal - discount;
 
     // Get paid amount and validate it doesn't exceed total
@@ -1147,6 +1152,18 @@ function populateEditGroupForm(booking) {
     $('#editGroupCheckInStatus').val(booking.checkInStatus);
     $('#editGroupCheckOutStatus').val(booking.checkOutStatus);
     $('#editGroupRemarks').val(booking.remarks);
+    
+    // Set late checkout fee
+    const lateCheckoutFee = parseFloat(booking.lateCheckoutFee) || 0;
+    $('#editGroupLateCheckoutFee').val(lateCheckoutFee);
+    $('#editGroupLateCheckoutFeeInput').val(lateCheckoutFee);
+    
+    // Show/hide late checkout fee display based on checkOutStatus
+    if (booking.checkOutStatus == 1 && lateCheckoutFee > 0) {
+        $('#editGroupLateCheckoutFeeDisplay').show();
+    } else {
+        $('#editGroupLateCheckoutFeeDisplay').hide();
+    }
     $('#editGroupAgencySelect').val(booking.agencyId);
 
     // Initialize Paid Amount like single edit: prefer paidAmount, then totalPaid, else 0

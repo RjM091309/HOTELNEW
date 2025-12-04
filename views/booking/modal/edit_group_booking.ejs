@@ -16,6 +16,7 @@
           <input type="hidden" id="editGroupSelectedRoomPrices" name="groupSelectedRoomPrices">
           <input type="hidden" id="editGroupSelectedRoomNumbers" name="groupSelectedRoomNumbers">
           <input type="hidden" id="editGroupNights" name="groupNights" value="0">
+          <input type="hidden" id="editGroupLateCheckoutFee" name="groupLateCheckoutFee" value="0">
 
           <div class="row">
             <div class="col-lg-6">
@@ -70,6 +71,16 @@
                   <option value="agency">Agency</option>
                   <option value="booking-channel">Booking Channel</option>
                 </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Late Checkout Fee Display - appears below when visible -->
+          <div id="editGroupLateCheckoutFeeDisplay" class="row p-t-20" style="display: none;">
+            <div class="col-lg-3">
+              <div class="form-group">
+                <label class="form-label">Late Checkout Fee</label>
+                <input class="form-control" type="number" id="editGroupLateCheckoutFeeInput" name="groupLateCheckoutFeeInput" placeholder="0.00" step="0.01" min="0">
               </div>
             </div>
           </div>
@@ -1392,9 +1403,29 @@ window.editGroupManualSelectedRooms = [];
       dropoffServiceId: $('#editGroupDropoffServiceId').val(),
       dropoffPrice: $('#editGroupDropoffPrice').val(),
       discount: $('#editGroupDiscount').val(),
-      individualBilling: $('#editGroupIndividualBilling').is(':checked') ? 'on' : '' // Inverted logic
+      individualBilling: $('#editGroupIndividualBilling').is(':checked') ? 'on' : '', // Inverted logic
+      lateCheckoutFee: parseFloat($('#editGroupLateCheckoutFee').val()) || 0
     };
 
+    // Validate that number of rooms needed matches selected rooms count
+    const selectedRooms = formData.selectedRooms;
+    const numberOfRooms = parseInt(formData.numberOfRooms, 10) || 0;
+
+    if (selectedRooms) {
+      const selectedRoomsArray = selectedRooms.split(',').filter(Boolean);
+      const selectedRoomsCount = selectedRoomsArray.length;
+
+      if (selectedRoomsCount !== numberOfRooms) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Room Count Mismatch',
+          html: `Number of Rooms Needed (${numberOfRooms}) does not match the number of selected rooms (${selectedRoomsCount}).<br><br>Please select exactly ${numberOfRooms} room(s) or update the "Number of Rooms Needed" field.`,
+          confirmButtonText: 'OK',
+          width: '600px'
+        });
+        return;
+      }
+    }
 
     $.ajax({
       url: '/booking/update_group_booking',
@@ -1603,15 +1634,62 @@ window.editGroupManualSelectedRooms = [];
       updateEditRoomFilterAndCount();
     });
 
-    // Auto-search when status changes
+    // Function to calculate late check-out fee for edit group booking
+  function calculateEditGroupLateCheckoutFee() {
+    const checkOutStatus = $('#editGroupCheckOutStatus').val();
+    
+    // Only calculate if we have valid data
+    if (!checkOutStatus) {
+      $('#editGroupLateCheckoutFee').val(0);
+      $('#editGroupLateCheckoutFeeDisplay').hide();
+      return;
+    }
+    
+    let lateCheckoutFee = 0;
+    
+    if (checkOutStatus == 1) { // Late Check Out
+      lateCheckoutFee = 2000; // ₱2,000 fee for Late Check Out
+      $('#editGroupLateCheckoutFeeDisplay').show();
+    } else {
+      // Regular Check Out - no fee
+      $('#editGroupLateCheckoutFeeDisplay').hide();
+    }
+    
+    $('#editGroupLateCheckoutFee').val(lateCheckoutFee);
+    $('#editGroupLateCheckoutFeeInput').val(lateCheckoutFee);
+    
+    // Recalculate total to include late check-out fee
+    if (typeof computeEditGroupTotal === 'function') {
+      computeEditGroupTotal();
+    }
+  }
+
+  // Calculate late check-out fee when check-out status changes
+  $('#editGroupCheckOutStatus').on('change', function() {
+    calculateEditGroupLateCheckoutFee();
+  });
+
+  // Calculate late check-out fee when modal opens
+  $(document).on('shown.bs.modal', '#modal-edit-group-booking', function() {
+    // Calculate late check-out fee after modal is fully shown
+    setTimeout(() => {
+      calculateEditGroupLateCheckoutFee();
+    }, 100);
+  });
+
+  // Sync late checkout fee input with hidden field
+  $(document).on('input', '#editGroupLateCheckoutFeeInput', function() {
+    const value = parseFloat($(this).val()) || 0;
+    $('#editGroupLateCheckoutFee').val(value);
+    if (typeof computeEditGroupTotal === 'function') {
+      computeEditGroupTotal();
+    }
+  });
+
+  // Auto-search when status changes (but keep selected rooms)
     $('#editGroupCheckInStatus, #editGroupCheckOutStatus').on('change', function() {
-      // Clear selected rooms when status changes
-      window.editGroupManualSelectedRooms = [];
-      $('#editGroupSelectedRooms').val('');
-      $('#editGroupSelectedRoomPrices').val('');
-      $('#editGroupRoomBreakdown').empty();
-      
-      // Refresh room selection state
+      // DON'T clear selected rooms when status changes - keep them selected
+      // Only refresh room selection state to update availability display
       refreshEditManualSelectionDisabledState();
       
       const daterange = $('#editGroupDaterange').val();
@@ -1621,6 +1699,7 @@ window.editGroupManualSelectedRooms = [];
       const checkOutStatus = $('#editGroupCheckOutStatus').val();
       
       // Only auto-search if all required fields are filled
+      // This will refresh the available rooms list but won't clear selected rooms
       if (daterange && numberOfRooms && bookingRoute && checkInStatus && checkOutStatus) {
         $('#editGroupSearchRooms').click();
       }
@@ -1821,7 +1900,7 @@ window.editGroupManualSelectedRooms = [];
         paidAmount: numericPaid,
         balance: numericBalance,
         checkOutStatus: $('#editGroupCheckOutStatus').val() || 0,
-        lateCheckoutFee: 0,
+        lateCheckoutFee: parseFloat($('#editGroupLateCheckoutFee').val()) || 0,
         discount: $('#editGroupIncludeDiscount').is(':checked') ? (parseFloat($('#editGroupDiscount').val()) || 0) : 0,
         reservationFee: 0, // Default to 0 for group bookings
         roomCharges: roomCharges.toFixed(2),

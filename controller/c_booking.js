@@ -1577,7 +1577,8 @@ class BookingController {
         dropoffServiceId,
         dropoffPrice,
         discount,
-        individualBilling: individualBillingValue
+        individualBilling: individualBillingValue,
+        lateCheckoutFee = 0
       } = req.body;
 
       if (!groupBookingId) {
@@ -1607,7 +1608,8 @@ class BookingController {
         + (parseFloat(breakfastKidQty) * parseFloat(breakfastKidPrice) || 0)
         + (parseFloat(pickupPrice) || 0)
         + (parseFloat(dropoffPrice) || 0);
-      const totalAmount = totalRoomPrice + servicesTotal - discountNum;
+      const lateCheckoutFeeNum = parseFloat(lateCheckoutFee) || 0;
+      const totalAmount = totalRoomPrice + servicesTotal + lateCheckoutFeeNum - discountNum;
       let paymentStatus;
       if (paidAmountNum <= 0) paymentStatus = 'unpaid';
       else if (paidAmountNum >= totalAmount) paymentStatus = 'paid';
@@ -1646,6 +1648,7 @@ class BookingController {
         dropoffPrice,
         discount,
         consolidatedBilling: individualBillingValue !== 'on', // Inverted logic: unchecked = consolidated
+        lateCheckoutFee: lateCheckoutFeeNum,
         encodedBy,
         date
       });

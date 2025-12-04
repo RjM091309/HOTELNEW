@@ -18,6 +18,7 @@ $(document).ready(function () {
     const checkOutStatus = $('#groupCheckOutStatus').val();
     const checkInStatus = $('#groupCheckInStatus').val();
     const remarks = $('#groupRemarks').val();
+    const lateCheckoutFee = parseFloat($('#groupLateCheckoutFee').val()) || 0;
 
     const breakfastAdultQty = $('#groupBreakfastAdultQty').val();
     const breakfastAdultPrice = $('#groupBreakfastAdultPrice').val();
@@ -47,6 +48,22 @@ $(document).ready(function () {
         icon: 'warning',
         title: 'No Rooms Selected',
         text: 'Please select a room block for this group booking.',
+      });
+      return;
+    }
+
+    // Validate that number of rooms needed matches selected rooms count
+    const selectedRoomsArray = selectedRooms.split(',').filter(Boolean);
+    const selectedRoomsCount = selectedRoomsArray.length;
+    const numberOfRoomsNeeded = parseInt(numberOfRooms, 10) || 0;
+
+    if (selectedRoomsCount !== numberOfRoomsNeeded) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Room Count Mismatch',
+        html: `Number of Rooms Needed (${numberOfRoomsNeeded}) does not match the number of selected rooms (${selectedRoomsCount}).<br><br>Please select exactly ${numberOfRoomsNeeded} room(s) or update the "Number of Rooms Needed" field.`,
+        confirmButtonText: 'OK',
+        width: '600px'
       });
       return;
     }
@@ -113,7 +130,8 @@ $(document).ready(function () {
       paidAmount,
       discount,
       individualBilling: individualBilling ? 'on' : '', // Inverted logic
-      perRoomDiscounts
+      perRoomDiscounts,
+      lateCheckoutFee
     };
 
     console.log('🔄 Frontend - Sending AJAX Data:', {
@@ -207,7 +225,7 @@ $(document).ready(function () {
           paidAmount: numericPaid,
           balance: numericBalance,
           checkOutStatus: $('#groupCheckOutStatus').val() || 0,
-          lateCheckoutFee: 0,
+          lateCheckoutFee: parseFloat($('#groupLateCheckoutFee').val()) || 0,
           discount: $('#groupIncludeDiscount').is(':checked') ? (parseFloat($('#groupDiscount').val()) || 0) : 0,
           reservationFee: 0,
           roomCharges: roomCharges.toFixed(2),

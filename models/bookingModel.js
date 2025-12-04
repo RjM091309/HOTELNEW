@@ -4421,6 +4421,7 @@ class BookingModel {
       reservationFee = 0,
       discount = 0,
       consolidatedBilling = true, // Default: Master Billing (changed from false to true)
+      lateCheckoutFee = 0,
       encodedBy,
       date
     } = data;
@@ -4771,6 +4772,23 @@ class BookingModel {
         if (dropoffServiceId && dropoffPrice) {
           const serviceStatus = 'unpaid'; // Will be updated based on payment distribution
           groupServices.push([targetBookingIds[0], dropoffServiceId, 1, parseFloat(dropoffPrice), serviceStatus, encodedBy, date, 1]);
+          // Payment distribution logic will handle service payments
+        }
+
+        // Late Checkout Fee (PER ROOM, but handling differs by billing type)
+        if (checkOutStatus == 1 && parseFloat(lateCheckoutFee) > 0 && targetBookingIds.length > 0) {
+          const serviceStatus = 'unpaid'; // Will be updated based on payment distribution
+          
+          if (consolidatedBilling) {
+            // Consolidated Billing: Total fee (fee × numRooms) goes to main booking only
+            const totalLateCheckoutFee = parseFloat(lateCheckoutFee) * targetBookingIds.length;
+            groupServices.push([targetBookingIds[0], 72, 1, totalLateCheckoutFee, serviceStatus, encodedBy, date, 1]);
+          } else {
+            // Individual Billing: Each room gets the fee
+            for (const bookingId of targetBookingIds) {
+              groupServices.push([bookingId, 72, 1, parseFloat(lateCheckoutFee), serviceStatus, encodedBy, date, 1]);
+            }
+          }
           // Payment distribution logic will handle service payments
         }
 
@@ -8343,15 +8361,29 @@ class BookingModel {
         // console.log(`💰 Final Billing - Room ${index + 1}: ₱${finalAmount.toLocaleString()} (Room: ₱${roomChargeForBilling}, Fee: ₱${reservationFeeForBilling}, Discount: -₱${discountForBilling})`);
 
         // Process late check-out fee if applicable
+        // Late checkout fee is PER ROOM, but handling differs by billing type:
+        // - Consolidated Billing: Total fee (fee × numRooms) goes to main booking only
+        // - Individual Billing: Each room gets the fee
         if (checkOutStatus == 1 && parseFloat(lateCheckoutFee) > 0) {
-          const lateCheckoutQuery = `
-            INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT)
-            VALUES (?, 72, 1, ?, ?, ?, NOW())
-          `;
-
-          const status = 'unpaid'; // Will be updated by payment distribution logic
-          await connection.promise().query(lateCheckoutQuery, [bookingId, lateCheckoutFee, status, encodedBy]);
-
+          if (consolidatedBilling && index === 0) {
+            // Consolidated: Add total late checkout fee (fee × number of rooms) to main booking only
+            const totalLateCheckoutFee = parseFloat(lateCheckoutFee) * roomIds.length;
+            const lateCheckoutQuery = `
+              INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT)
+              VALUES (?, 72, 1, ?, ?, ?, NOW())
+            `;
+            const status = 'unpaid'; // Will be updated by payment distribution logic
+            await connection.promise().query(lateCheckoutQuery, [bookingId, totalLateCheckoutFee, status, encodedBy]);
+          } else if (!consolidatedBilling) {
+            // Individual: Add fee to each room
+            const lateCheckoutQuery = `
+              INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT)
+              VALUES (?, 72, 1, ?, ?, ?, NOW())
+            `;
+            const status = 'unpaid'; // Will be updated by payment distribution logic
+            await connection.promise().query(lateCheckoutQuery, [bookingId, lateCheckoutFee, status, encodedBy]);
+          }
+          // For consolidated billing and index > 0, skip (fee already added to main booking)
         }
 
         // Always insert payment records for reservation fee and discount (paid or unpaid)
