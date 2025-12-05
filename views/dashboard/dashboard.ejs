@@ -38,6 +38,7 @@ function calculateCardVariables(booking) {
 	checkOutDate.setHours(0, 0, 0, 0); // Remove time
 	
 	const today = new Date();
+	today.setHours(0, 0, 0, 0); // Remove time for accurate comparison
 	const totalDays = Math.max(1, Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24))); // Total days of booking
 	
 	// Fix: Ensure check-in day shows only one bar for occupied rooms
@@ -50,6 +51,9 @@ function calculateCardVariables(booking) {
 	const visibleStayed = Math.min(daysStayed, visibleBars); // Stayed bars to display
 	const visibleRemaining = visibleBars - visibleStayed; // Remaining bars to display
 	const extraDays = Math.max(0, daysRemaining - visibleRemaining); // Calculate extra days
+
+	// Check if overdue: status is 'check-In' but checkout date has passed
+	const isOverdue = booking.BookingStatus === 'check-In' && checkOutDate < today;
 
 	// Determine the card class based on the ROOM_FLOOR
 	const cardClass = getFloorColorClass(booking.ROOM_FLOOR);
@@ -71,7 +75,8 @@ function calculateCardVariables(booking) {
 		visibleRemaining,
 		extraDays,
 		cardClass,
-		memoClass
+		memoClass,
+		isOverdue
 	};
 }
 %>
