@@ -600,8 +600,8 @@ function viewGroupBooking(groupId) {
                             <td>${booking.SERVICES_AVAILED}</td>
                             <td class="text-center">
                                 ${bookingId ? `
-                                    <button class="btn btn-sm btn-primary" onclick="viewSingleBooking(${bookingId})" title="View as Single Booking">
-                                        <i class="fa fa-eye"></i> View
+                                    <button class="btn btn-sm btn-primary" onclick="viewSingleBooking(${bookingId})" title="View Details" style="width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center;">
+                                        <i class="fa fa-eye"></i>
                                     </button>
                                 ` : '-'}
                             </td>
