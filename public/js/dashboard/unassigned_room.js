@@ -262,6 +262,7 @@ function confirmRoomAssignment(roomId, roomNumber, roomFloor, bookingId) {
   const manualPriceChecked = document.querySelector('#manualPriceToggle')?.checked || false;
   const roomPrice = document.querySelector('#price')?.value || '0';
   const remarks = document.querySelector('#bookingRemarks')?.value || '';
+  const paidAmount = document.querySelector('#paidAmountHidden')?.value || document.querySelector('#paidAmount')?.value || '0';
   
   // Show confirmation dialog
   Swal.fire({
@@ -352,6 +353,7 @@ function confirmRoomAssignment(roomId, roomNumber, roomFloor, bookingId) {
         manualPriceChecked,
         roomPrice,
         remarks,
+        paidAmount,
         breakfastAdultQty: document.querySelector('#breakfastAdultQty')?.value || '',
         breakfastKidQty: document.querySelector('#breakfastKidQty')?.value || '',
         breakfastAdultPrice: document.querySelector('#breakfastAdultPrice')?.value || '500.00',
@@ -388,6 +390,7 @@ function confirmRoomAssignment(roomId, roomNumber, roomFloor, bookingId) {
         roomPrice: formData.roomPrice,
         bookingRoute: formData.bookingRoute,
         paymentStatus: formData.paymentStatus,
+        paidAmount: formData.paidAmount,
         breakfastChecked: formData.breakfastChecked,
         breakfastAdultQty: formData.breakfastAdultQty,
         breakfastAdultPrice: formData.breakfastAdultPrice,
@@ -846,6 +849,23 @@ function confirmRoomAssignment(roomId, roomNumber, roomFloor, bookingId) {
                   computeTotal();
                 }
               });
+            }
+            
+            // Handle paid amount - populate from booking details
+            const paidAmountField = addBookingModalElement.querySelector('#paidAmount');
+            const paidAmountHiddenField = addBookingModalElement.querySelector('#paidAmountHidden');
+            if (paidAmountField && bookingDetails.paidAmount) {
+              const paidAmount = parseFloat(bookingDetails.paidAmount) || 0;
+              paidAmountField.value = paidAmount.toFixed(2);
+              if (paidAmountHiddenField) {
+                paidAmountHiddenField.value = paidAmount.toFixed(2);
+              }
+              // Recalculate total after setting paid amount
+              if (typeof computeTotal === 'function') {
+                setTimeout(() => {
+                  computeTotal();
+                }, 100);
+              }
             }
             
             // Handle booking remarks

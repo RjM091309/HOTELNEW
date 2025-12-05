@@ -539,7 +539,7 @@ $(document).ready(function() {
             mode: "range",
             dateFormat: "M d, Y",
             showMonths: 2, // Display two months side by side
-            minDate: "today",
+            // minDate removed to allow past dates in edit booking modal
             onClose: function(selectedDates, dateStr, instance) {
                 if (selectedDates.length === 2) {
                     var startDate = selectedDates[0];
@@ -553,8 +553,12 @@ $(document).ready(function() {
                     computeEditTotal();
                     
                     // Auto-refresh room selection if floor is already selected
+                    // Preserve the currently selected room if it's still available
                     const selectedFloor = $('#edit_addFloor').val();
+                    const currentlySelectedRoom = $('#edit_addroom').val(); // Save current selection
                     if (selectedFloor) {
+                        // Store the selected room to restore it after refresh
+                        $('#edit_addFloor').data('preserve-room', currentlySelectedRoom);
                         $('#edit_addFloor').trigger('change');
                     }
                 }
@@ -646,14 +650,25 @@ $(document).ready(function() {
                 },
                 success: function (data) {
                     const roomDropdown = $('#edit_addroom');
-                    roomDropdown.empty().append('<option value="" disabled selected>Select Room</option>');
+                    const preserveRoomId = $('#edit_addFloor').data('preserve-room'); // Get room to preserve
+                    $('#edit_addFloor').removeData('preserve-room'); // Clear the data after use
+                    
+                    roomDropdown.empty().append('<option value="" disabled>Select Room</option>');
                     
                     if (data.length === 0) {
                         roomDropdown.append('<option value="" disabled>No available rooms for selected dates</option>');
                     } else {
+                        let foundPreservedRoom = false;
                         data.forEach(room => {
-                            roomDropdown.append(`<option value="${room.room_id}">${room.ROOM_NUMBER}</option>`);
+                            const isSelected = preserveRoomId && preserveRoomId == room.room_id ? 'selected' : '';
+                            if (isSelected) foundPreservedRoom = true;
+                            roomDropdown.append(`<option value="${room.room_id}" ${isSelected}>${room.ROOM_NUMBER}</option>`);
                         });
+                        
+                        // If preserved room was found and selected, trigger change to update room details
+                        if (foundPreservedRoom && preserveRoomId) {
+                            roomDropdown.val(preserveRoomId).trigger('change');
+                        }
                     }
                 },
                 error: function (err) {

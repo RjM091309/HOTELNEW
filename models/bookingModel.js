@@ -1161,42 +1161,42 @@ class BookingModel {
           });
         }
 
-        // Insert payment record for the paid amount only for PARTIAL payments
-        // When fully paid, a consolidated room payment is inserted later from billing
-        if (paymentStatus === 'partial') {
-          // Calculate the paid amount from the controller
-          const paidAmount = parseFloat(bookingData.paidAmount) || 0;
+        // Insert payment record for the paid amount.
+        // For regular bookings we still follow the old rule (only when PARTIAL),
+        // but for direct reservations (unassigned room) we ALWAYS record the paid amount
+        // so that the initial cash/payment is visible in the payments table.
+        const paidAmount = parseFloat(bookingData.paidAmount) || 0;
+        if (paidAmount > 0 && (paymentStatus === 'partial' || isDirectReservation)) {
+          const paymentQuery = `
+            INSERT INTO payments 
+            (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `;
           
-          if (paidAmount > 0) {
-            const paymentQuery = `
-              INSERT INTO payments 
-              (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            `;
-            
-            const paymentValues = [
-              bookingId,
-              null, // No specific service ID for room payment
-                paidAmount,
-                'cash',
-                'room', // Payment type for room charges
-                date,
-                encodedBy,
-              'Initial payment for booking'
-            ];
-            
-            await new Promise((resolve, reject) => {
-              connection.query(paymentQuery, paymentValues, (err) => {
-                if (err) {
-                  console.error('❌ Failed to insert room payment:', err);
-                  reject(err);
-                } else {
-                  console.log(`✅ Room payment of ₱${paidAmount} recorded for booking ${bookingId}`);
-                  resolve();
-                }
-              });
+          const paymentValues = [
+            bookingId,
+            null, // No specific service ID for room payment
+            paidAmount,
+            'cash',
+            'room', // Payment type for room charges
+            date,
+            encodedBy,
+            isDirectReservation
+              ? 'Initial payment for direct reservation (unassigned room)'
+              : 'Initial payment for booking'
+          ];
+          
+          await new Promise((resolve, reject) => {
+            connection.query(paymentQuery, paymentValues, (err) => {
+              if (err) {
+                console.error('❌ Failed to insert room payment:', err);
+                reject(err);
+              } else {
+                console.log(`✅ Room payment of ₱${paidAmount} recorded for booking ${bookingId}`);
+                resolve();
+              }
             });
-          }
+          });
         }
 
         // Insert breakfast services if provided
@@ -1393,8 +1393,12 @@ class BookingModel {
           });
         }
 
-        // If paymentStatus is 'paid', insert into payments table
-        if (paymentStatus === 'paid') {
+        // If paymentStatus is 'paid', insert into payments table.
+        // For DIRECT RESERVATIONS (unassigned room) we SKIP this block because
+        // there is no room charge yet (ROOM_CHARGE is 0) and it would create a
+        // duplicate 0.00 payment row. The real initial cash for direct reservations
+        // is handled separately in the paidAmount logic above.
+        if (paymentStatus === 'paid' && !isDirectReservation) {
           const getBillingIdQuery = `SELECT IDNo, ROOM_CHARGE, QTY, RESERVATION_FEE, DISCOUNT_AMOUNT FROM billing WHERE BOOKING_ID = ? LIMIT 1`;
           const billingRows = await new Promise((resolve, reject) => {
             connection.query(getBillingIdQuery, [bookingId], (err, rows) => {
@@ -2099,7 +2103,13 @@ class BookingModel {
           bill.RESERVATION_FEE as reservationFee,
           bill.DISCOUNT_AMOUNT as discountAmount,
           gl.TYPE as guestLevel,
-          gt.TYPE as guestType
+          gt.TYPE as guestType,
+          COALESCE((
+            SELECT SUM(p.AMOUNT_PAID) 
+            FROM payments p 
+            WHERE (p.BILLING_ID = bill.IDNo OR p.BOOKING_ID = b.IDNo) 
+            AND p.PAYMENT_TYPE != 'discount'
+          ), 0) as paidAmount
         FROM booking b
         LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
         LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
@@ -3290,6 +3300,79 @@ class BookingModel {
           });
         }
 
+        // Step 7: If this booking is part of a group with Master Billing, 
+        // sync payment_status for all group members to match the current booking's status
+        // Get GROUP_BOOKING_ID from the booking
+        const groupIdQuery = `
+          SELECT b.GROUP_BOOKING_ID, gb.BILLING_TYPE
+          FROM booking b
+          LEFT JOIN group_booking gb ON b.GROUP_BOOKING_ID = gb.IDNo
+          WHERE b.IDNo = ? AND b.ACTIVE = 1 
+          LIMIT 1
+        `;
+        const groupIdRows = await new Promise((resolve, reject) => {
+          connection.query(groupIdQuery, [bookingId], (err, rows) => {
+            if (err) reject(err);
+            else resolve(rows);
+          });
+        });
+        
+        // Only sync if it's Master Billing (BILLING_TYPE = 1)
+        if (groupIdRows && groupIdRows.length > 0 && groupIdRows[0].GROUP_BOOKING_ID && groupIdRows[0].BILLING_TYPE === 1) {
+          const groupBookingId = groupIdRows[0].GROUP_BOOKING_ID;
+          
+          // Get the payment_status of the CURRENT booking's billing record (the one that was just paid)
+          const currentBillingQuery = `
+            SELECT PAYMENT_STATUS, PAYMENT_METHOD 
+            FROM billing 
+            WHERE BOOKING_ID = ? 
+            ORDER BY IDNo DESC 
+            LIMIT 1
+          `;
+          const currentBillingRows = await new Promise((resolve, reject) => {
+            connection.query(currentBillingQuery, [bookingId], (err, rows) => {
+              if (err) reject(err);
+              else resolve(rows);
+            });
+          });
+          
+          if (currentBillingRows && currentBillingRows.length > 0) {
+            const currentPaymentStatus = currentBillingRows[0].PAYMENT_STATUS;
+            const currentPaymentMethod = currentBillingRows[0].PAYMENT_METHOD;
+            
+            // Get all booking IDs in the same group
+            const allGroupBookingsQuery = `
+              SELECT IDNo 
+              FROM booking 
+              WHERE GROUP_BOOKING_ID = ? AND ACTIVE = 1
+            `;
+            const allGroupBookingsRows = await new Promise((resolve, reject) => {
+              connection.query(allGroupBookingsQuery, [groupBookingId], (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows);
+              });
+            });
+            const allGroupBookingIds = allGroupBookingsRows.map(b => b.IDNo);
+            
+            // Update all billing records for all bookings in the group to match current booking's payment_status
+            // This ensures all group members have the same payment_status for Master Billing
+            if (allGroupBookingIds.length > 0) {
+              await new Promise((resolve, reject) => {
+                connection.query(
+                  `UPDATE billing 
+                   SET PAYMENT_STATUS = ?, PAYMENT_METHOD = ? 
+                   WHERE BOOKING_ID IN (?)`,
+                  [currentPaymentStatus, currentPaymentMethod, allGroupBookingIds],
+                  (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                  }
+                );
+              });
+            }
+          }
+        }
+
         // Commit the transaction
         await new Promise((resolve, reject) => {
           connection.commit(err => {
@@ -3644,6 +3727,43 @@ class BookingModel {
 
       const result = await queryDatabasePromise(query, [status, bookingId]);
 
+      // If this booking is part of a group with Master Billing, 
+      // sync payment_status for all group members to match the current booking's status
+      // Get GROUP_BOOKING_ID and BILLING_TYPE from the booking
+      const groupIdQuery = `
+        SELECT b.GROUP_BOOKING_ID, gb.BILLING_TYPE
+        FROM booking b
+        LEFT JOIN group_booking gb ON b.GROUP_BOOKING_ID = gb.IDNo
+        WHERE b.IDNo = ? AND b.ACTIVE = 1 
+        LIMIT 1
+      `;
+      const groupIdResult = await queryDatabasePromise(groupIdQuery, [bookingId]);
+      
+      // Only sync if it's Master Billing (BILLING_TYPE = 1)
+      if (groupIdResult && groupIdResult.length > 0 && groupIdResult[0].GROUP_BOOKING_ID && groupIdResult[0].BILLING_TYPE === 1) {
+        const groupBookingId = groupIdResult[0].GROUP_BOOKING_ID;
+        
+        // Get all booking IDs in the same group
+        const allGroupBookingsQuery = `
+          SELECT IDNo 
+          FROM booking 
+          WHERE GROUP_BOOKING_ID = ? AND ACTIVE = 1
+        `;
+        const allGroupBookings = await queryDatabasePromise(allGroupBookingsQuery, [groupBookingId]);
+        const allGroupBookingIds = allGroupBookings.map(b => b.IDNo);
+        
+        // Update all billing records for all bookings in the group to match current booking's payment_status
+        // This ensures all group members have the same payment_status for Master Billing
+        if (allGroupBookingIds.length > 0) {
+          const updateGroupBillingQuery = `
+            UPDATE billing 
+            SET PAYMENT_STATUS = ? 
+            WHERE BOOKING_ID IN (?)
+          `;
+          await queryDatabasePromise(updateGroupBillingQuery, [status, allGroupBookingIds]);
+        }
+      }
+
       return result;
 
     } catch (error) {
@@ -3673,7 +3793,7 @@ class BookingModel {
   }
 
   // Get group booking data
-  static async getGroupBookingData(filter, dateFrom, dateTo) {
+  static async getGroupBookingData(filter, dateFrom, dateTo, groupId = null) {
     try {
       let dateCondition = '';
       
@@ -3690,6 +3810,12 @@ class BookingModel {
         } else if (filter === 'thismonth') {
           dateCondition = 'AND YEAR(b.ENCODED_DT) = YEAR(CURDATE()) AND MONTH(b.ENCODED_DT) = MONTH(CURDATE())';
         }
+      }
+
+      // Add group ID filter if provided
+      let groupIdCondition = '';
+      if (groupId && String(groupId) !== '0' && String(groupId) !== '') {
+        groupIdCondition = `AND gb.IDNo = ${parseInt(groupId)}`;
       }
 
       const query = `
@@ -3790,6 +3916,7 @@ class BookingModel {
         LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID
         WHERE b.GROUP_BOOKING_ID IS NOT NULL
           ${dateCondition}
+          ${groupIdCondition}
         GROUP BY gb.IDNo
         ORDER BY gb.IDNo DESC
       `;
@@ -5536,6 +5663,60 @@ class BookingModel {
         await queryDatabasePromise(remarksInsertQuery, [mainBookingId, paymentNotes.trim(), encodedBy], connection);
       }
 
+      // Update payment_status for all group members when main booking payment_status is updated
+      // Only for Master Billing (BILLING_TYPE = 1)
+      // Get the main booking ID (first booking in the array)
+      const mainBookingId = bookingIDs[0];
+      
+      // Get GROUP_BOOKING_ID and BILLING_TYPE from the main booking
+      const groupIdQuery = `
+        SELECT b.GROUP_BOOKING_ID, gb.BILLING_TYPE
+        FROM booking b
+        LEFT JOIN group_booking gb ON b.GROUP_BOOKING_ID = gb.IDNo
+        WHERE b.IDNo = ? AND b.ACTIVE = 1 
+        LIMIT 1
+      `;
+      const groupIdResult = await queryDatabasePromise(groupIdQuery, [mainBookingId], connection);
+      
+      // Only sync if it's Master Billing (BILLING_TYPE = 1)
+      if (groupIdResult && groupIdResult.length > 0 && groupIdResult[0].GROUP_BOOKING_ID && groupIdResult[0].BILLING_TYPE === 1) {
+        const groupBookingId = groupIdResult[0].GROUP_BOOKING_ID;
+        
+        // Get all booking IDs in the same group
+        const allGroupBookingsQuery = `
+          SELECT IDNo 
+          FROM booking 
+          WHERE GROUP_BOOKING_ID = ? AND ACTIVE = 1
+        `;
+        const allGroupBookings = await queryDatabasePromise(allGroupBookingsQuery, [groupBookingId], connection);
+        const allGroupBookingIds = allGroupBookings.map(b => b.IDNo);
+        
+        // Get the payment_status of the main booking's billing record
+        const mainBillingQuery = `
+          SELECT PAYMENT_STATUS, PAYMENT_METHOD 
+          FROM billing 
+          WHERE BOOKING_ID = ? 
+          ORDER BY IDNo DESC 
+          LIMIT 1
+        `;
+        const mainBillingResult = await queryDatabasePromise(mainBillingQuery, [mainBookingId], connection);
+        
+        if (mainBillingResult && mainBillingResult.length > 0) {
+          const mainPaymentStatus = mainBillingResult[0].PAYMENT_STATUS;
+          const mainPaymentMethod = mainBillingResult[0].PAYMENT_METHOD;
+          
+          // Update all billing records for all bookings in the group to match main booking's payment_status
+          if (allGroupBookingIds.length > 0) {
+            const updateGroupBillingQuery = `
+              UPDATE billing 
+              SET PAYMENT_STATUS = ?, PAYMENT_METHOD = ? 
+              WHERE BOOKING_ID IN (?)
+            `;
+            await queryDatabasePromise(updateGroupBillingQuery, [mainPaymentStatus, mainPaymentMethod, allGroupBookingIds], connection);
+          }
+        }
+      }
+
         // Commit the transaction
         await new Promise((resolve, reject) => {
           connection.commit(err => {
@@ -6437,6 +6618,12 @@ class BookingModel {
       
       const templateData = {
         ...data,
+        // Ensure checkOutStatus is always defined for the EJS template
+        checkOutStatus: data.checkOutStatus !== undefined && data.checkOutStatus !== null
+          ? data.checkOutStatus
+          : (data.LATE_CHECKOUT !== undefined && data.LATE_CHECKOUT !== null
+              ? data.LATE_CHECKOUT
+              : 0),
         encodedBy: user.FULLNAME,
         reservationFee: data.reservationFee !== undefined ? data.reservationFee : 0,
         roomCharges: data.roomCharges !== undefined ? data.roomCharges : 0,
@@ -6669,7 +6856,7 @@ class BookingModel {
 
   // Assign room to direct reservation
   static async assignRoomToDirectReservation(params) {
-    const { bookingId, roomId, roomNumber, roomType, bedCount, price, floor } = params;
+  const { bookingId, roomId, roomNumber, roomType, bedCount, price, floor, paymentStatus, paidAmount, encodedBy } = params;
     
     try {
       // Start transaction
@@ -6680,12 +6867,12 @@ class BookingModel {
         UPDATE booking 
         SET ROOM_ID = ?, 
             IS_DIRECT_RESERVATION = 0,
-            EDITED_BY = 'System',
+            EDITED_BY = ?,
             EDITED_DT = NOW()
         WHERE IDNo = ? AND ACTIVE = 1
       `;
       
-      const bookingResult = await queryDatabasePromise(updateBookingQuery, [roomId, bookingId]);
+      const bookingResult = await queryDatabasePromise(updateBookingQuery, [roomId, encodedBy || 'system', bookingId]);
       
       if (bookingResult.affectedRows === 0) {
         await queryDatabasePromise('ROLLBACK');
@@ -6712,6 +6899,46 @@ class BookingModel {
       `;
       
       await queryDatabasePromise(updateBillingQuery, [price, bookingId]);
+
+      // If a paidAmount is provided from the Room Assignment modal, make sure
+      // payments table reflects it (especially for direct reservations that had
+      // an initial downpayment before room was assigned).
+      const targetPaid = parseFloat(paidAmount || 0);
+      if (!Number.isNaN(targetPaid) && targetPaid > 0) {
+        // Get current total paid (excluding discount entries)
+        const paidRows = await queryDatabasePromise(
+          `SELECT COALESCE(SUM(AMOUNT_PAID),0) AS totalPaid
+           FROM payments
+           WHERE BOOKING_ID = ? AND PAYMENT_TYPE != 'discount'`,
+          [bookingId]
+        );
+        const alreadyPaid = parseFloat(paidRows[0]?.totalPaid || 0);
+        const diff = targetPaid - alreadyPaid;
+
+        // Only insert additional payment if the target is greater than what we already have
+        if (diff > 0.009) {
+          const insertPaymentQuery = `
+            INSERT INTO payments 
+              (BOOKING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
+            VALUES (?, ?, 'cash', 'room', NOW(), ?, 'Additional payment on room assignment')
+          `;
+          await queryDatabasePromise(insertPaymentQuery, [bookingId, diff, encodedBy || 'system']);
+        }
+      }
+
+      // Optionally sync billing payment status if frontend marked as paid/partial
+      if (paymentStatus) {
+        let mappedStatus = paymentStatus;
+        if (paymentStatus === 'partial') {
+          mappedStatus = 'partial_paid';
+        }
+        const updateStatusQuery = `
+          UPDATE billing
+          SET PAYMENT_STATUS = ?
+          WHERE BOOKING_ID = ? AND ACTIVE = 1
+        `;
+        await queryDatabasePromise(updateStatusQuery, [mappedStatus, bookingId]);
+      }
 
       // Commit transaction
       await queryDatabasePromise('COMMIT');

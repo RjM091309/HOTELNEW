@@ -1671,8 +1671,9 @@ class BookingController {
       const filter = req.query.filter || 'all';
       const dateFrom = req.query.dateFrom;
       const dateTo = req.query.dateTo;
+      const groupId = req.query.groupId || req.query.highlight || null;
 
-      const groupBookingData = await BookingModel.getGroupBookingData(filter, dateFrom, dateTo);
+      const groupBookingData = await BookingModel.getGroupBookingData(filter, dateFrom, dateTo, groupId);
 
       res.json(groupBookingData);
 
@@ -2555,7 +2556,8 @@ class BookingController {
   // Assign room to direct reservation
   static async assignRoomToDirectReservation(req, res) {
     try {
-      const { bookingId, roomId, roomNumber, roomType, bedCount, price, floor } = req.body;
+      const { bookingId, roomId, roomNumber, roomType, bedCount, price, floor, paymentStatus, paidAmount } = req.body;
+      const encodedBy = req.user?.userId || null;
       
       if (!bookingId || !roomId || !roomNumber) {
         return res.status(400).json({
@@ -2571,7 +2573,10 @@ class BookingController {
         roomType,
         bedCount,
         price,
-        floor
+        floor,
+        paymentStatus,
+        paidAmount,
+        encodedBy
       });
 
       if (result.success) {

@@ -2246,6 +2246,8 @@ function initializeAddBookingHandler() {
             daterange: $('#daterange').val(),
             maxOccupants: isDirectReservation ? 1 : $('#maxOccupants').val(), // Default to 1 for direct reservations
             paymentStatus: $('#paymentStatus').val(),
+            // Use hidden paidAmount value when available to ensure exact amount is sent to backend
+            paidAmount: $('#paidAmountHidden').val() || $('#paidAmount').val() || '0.00',
             price: isDirectReservation ? '0.00' : $('#baseprice').val(), // Default to 0.00 for direct reservations
             diffindays: $('#diffindays').val(),
             guestType: $('#guestType').val(),

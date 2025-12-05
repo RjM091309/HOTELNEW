@@ -1,7 +1,17 @@
 $(document).ready(function () {
+    // Check for highlight parameter in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const highlightGroupId = urlParams.get('highlight');
+    
+    // Build initial URL with highlight parameter if present
+    let initialUrl = '/booking/group_booking_data?filter=all';
+    if (highlightGroupId && String(highlightGroupId) !== '0' && String(highlightGroupId) !== '') {
+        initialUrl += `&groupId=${highlightGroupId}`;
+    }
+    
     let groupTable = $('#group_booking_tbl').DataTable({
         ajax: {
-            url: '/booking/group_booking_data?filter=all',
+            url: initialUrl,
             type: 'GET',
             dataSrc: function (json) {
                 return json.map(item => {
@@ -263,8 +273,14 @@ $(document).ready(function () {
         // Get the filter value
         let filter = $(this).data('filter');
         
+        // Build URL with highlight parameter if present
+        let url = `/booking/group_booking_data?filter=${filter}`;
+        if (highlightGroupId && String(highlightGroupId) !== '0' && String(highlightGroupId) !== '') {
+            url += `&groupId=${highlightGroupId}`;
+        }
+        
         // Update the DataTable's AJAX URL
-        groupTable.ajax.url(`/booking/group_booking_data?filter=${filter}`).load();
+        groupTable.ajax.url(url).load();
     });
     
     // When a group booking tab is clicked, update the DataTable AJAX URL accordingly.
@@ -273,7 +289,14 @@ $(document).ready(function () {
         let href = $(e.target).attr('href');
         // Remove the '#' and convert to lowercase, e.g., "grouptoday"
         let filter = href.replace('#', '').toLowerCase();
-        groupTable.ajax.url(`/booking/group_booking_data?filter=${filter}`).load();
+        
+        // Build URL with highlight parameter if present
+        let url = `/booking/group_booking_data?filter=${filter}`;
+        if (highlightGroupId && String(highlightGroupId) !== '0' && String(highlightGroupId) !== '') {
+            url += `&groupId=${highlightGroupId}`;
+        }
+        
+        groupTable.ajax.url(url).load();
     });
 });
 

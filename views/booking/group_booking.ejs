@@ -434,6 +434,10 @@
         // Determine scope for Group page
         const scope = 'group';
         
+        // Check for highlight parameter in URL (for filtering to specific group)
+        const urlParams = new URLSearchParams(window.location.search);
+        const highlightGroupId = urlParams.get('highlight');
+        
         // Initialize Flatpickr for date range picker
         let dateRangePicker = flatpickr("#dateRangePicker", {
             mode: "range",
@@ -494,8 +498,14 @@
                     // Remove active class from all predefined filter buttons
                     $('.filter-btn').removeClass('active');
                     
+                    // Build URL with highlight parameter if present
+                    let url = `/booking/group_booking_data?filter=custom&scope=${scope}&dateFrom=${dateFrom}&dateTo=${dateTo}`;
+                    if (highlightGroupId && String(highlightGroupId) !== '0' && String(highlightGroupId) !== '') {
+                        url += `&groupId=${highlightGroupId}`;
+                    }
+                    
                     // Update the DataTable's AJAX URL with custom date range
-                    $('#group_booking_tbl').DataTable().ajax.url(`/booking/group_booking_data?filter=custom&scope=${scope}&dateFrom=${dateFrom}&dateTo=${dateTo}`).load();
+                    $('#group_booking_tbl').DataTable().ajax.url(url).load();
                     
                     // Close the calendar after applying filter with a small delay
                     setTimeout(() => {
@@ -513,7 +523,7 @@
                 }
             }
         });
-
+        
         // Handle filter button clicks
         $('.filter-btn').on('click', function() {
             // Remove active class from all filter buttons
@@ -527,8 +537,14 @@
             // Get the filter value
             let filter = $(this).data('filter');
             
+            // Build URL with highlight parameter if present
+            let url = `/booking/group_booking_data?filter=${filter}&scope=${scope}`;
+            if (highlightGroupId && String(highlightGroupId) !== '0' && String(highlightGroupId) !== '') {
+                url += `&groupId=${highlightGroupId}`;
+            }
+            
             // Update the DataTable's AJAX URL
-            $('#group_booking_tbl').DataTable().ajax.url(`/booking/group_booking_data?filter=${filter}&scope=${scope}`).load();
+            $('#group_booking_tbl').DataTable().ajax.url(url).load();
         });
         
         // Handle clear date filter
@@ -539,8 +555,14 @@
             $('.filter-btn').removeClass('active');
             $('.filter-btn[data-filter="all"]').addClass('active');
             
+            // Build URL with highlight parameter if present
+            let url = `/booking/group_booking_data?filter=all&scope=${scope}`;
+            if (highlightGroupId && String(highlightGroupId) !== '0' && String(highlightGroupId) !== '') {
+                url += `&groupId=${highlightGroupId}`;
+            }
+            
             // Update the DataTable's AJAX URL
-            $('#group_booking_tbl').DataTable().ajax.url(`/booking/group_booking_data?filter=all&scope=${scope}`).load();
+            $('#group_booking_tbl').DataTable().ajax.url(url).load();
         });
     });
 </script>
