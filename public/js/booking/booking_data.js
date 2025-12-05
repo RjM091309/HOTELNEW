@@ -2,13 +2,23 @@ $(document).ready(function () {
     // Determine scope based on current path: single pages exclude grouped bookings; 'all' includes everything
     const isAllPage = window.location.pathname.endsWith('/booking/all');
     const scope = isAllPage ? 'all' : 'single';
+    
+    // Check for highlight parameter in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const highlightBookingId = urlParams.get('highlight');
+    
+    // Build initial URL with highlight parameter if present
+    let initialUrl = `/booking/booking_data?filter=all&scope=${scope}`;
+    if (highlightBookingId && String(highlightBookingId) !== '0' && String(highlightBookingId) !== '') {
+        initialUrl += `&highlight=${highlightBookingId}`;
+    }
 
     let table = $('#booking_tbl').DataTable({
         rowId: 'BookingID',
         processing: true,
         serverSide: false,
         ajax: {
-            url: `/booking/booking_data?filter=all&scope=${scope}`,
+            url: initialUrl,
             type: 'GET',
             dataSrc: function (json) {
                 return json.data.map(item => {

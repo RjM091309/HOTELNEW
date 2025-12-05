@@ -563,6 +563,12 @@ $('#change_status').submit(function (e) {
     });
 });
 
+// VIEW SINGLE BOOKING FROM GROUP BOOKING
+function viewSingleBooking(bookingId) {
+    // Navigate to single booking page with highlight parameter
+    window.open(`/booking?highlight=${bookingId}`, '_blank');
+}
+
 // SHOW GROUP BOOKING DETAILS MODAL
 function viewGroupBooking(groupId) {
     $.ajax({
@@ -580,6 +586,9 @@ function viewGroupBooking(groupId) {
                     else if (booking.BOOKING_STATUS.toLowerCase() === "pending") statusClass = "label-info";
                     else if (booking.BOOKING_STATUS.toLowerCase() === "cancelled") statusClass = "label-danger";
 
+                    // Get booking_id (can be booking_id or bookingId depending on response)
+                    const bookingId = booking.booking_id || booking.bookingId || booking.IDNo;
+                    
                     let row = `
                         <tr>
                             <td>${booking.CUSTOMER_NAME || '-'}</td>
@@ -589,11 +598,18 @@ function viewGroupBooking(groupId) {
                             <td><span class="label label-sm ${statusClass}">${booking.BOOKING_STATUS}</span></td>
                             <td>${parseFloat(booking.TOTAL_COST).toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
                             <td>${booking.SERVICES_AVAILED}</td>
+                            <td class="text-center">
+                                ${bookingId ? `
+                                    <button class="btn btn-sm btn-primary" onclick="viewSingleBooking(${bookingId})" title="View as Single Booking">
+                                        <i class="fa fa-eye"></i> View
+                                    </button>
+                                ` : '-'}
+                            </td>
                         </tr>`;
                     bookingTable.append(row);
                 });
             } else {
-                bookingTable.append(`<tr><td colspan="7" class="text-center">No individual bookings found.</td></tr>`);
+                bookingTable.append(`<tr><td colspan="8" class="text-center">No individual bookings found.</td></tr>`);
             }
 
             // Fill summary table (separate table) if available

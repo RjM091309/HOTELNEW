@@ -208,10 +208,26 @@ class BookingController {
         }
       }
 
+      // Check if there's a highlight parameter (specific booking ID to show)
+      const highlightBookingId = req.query.highlight;
+      // Flag to indicate if we should use individual calculation for group bookings
+      const useIndividualCalculation = scope === 'single' && highlightBookingId && highlightBookingId !== '0' && highlightBookingId !== '';
+      
       // Apply grouping scope rules
       if (scope === 'single') {
         // Single tab: only standalone bookings
-        groupCondition = `AND b.GROUP_BOOKING_ID IS NULL`;
+        // BUT: if highlightBookingId is provided, allow that specific booking even if it's part of a group
+        if (highlightBookingId && highlightBookingId !== '0' && highlightBookingId !== '') {
+          // Validate and sanitize the booking ID (must be a positive integer)
+          const bookingIdInt = parseInt(highlightBookingId, 10);
+          if (!isNaN(bookingIdInt) && bookingIdInt > 0) {
+            groupCondition = `AND (b.GROUP_BOOKING_ID IS NULL OR b.IDNo = ${bookingIdInt})`;
+          } else {
+            groupCondition = `AND b.GROUP_BOOKING_ID IS NULL`;
+          }
+        } else {
+          groupCondition = `AND b.GROUP_BOOKING_ID IS NULL`;
+        }
       } else if (scope === 'all') {
         // All tab: show non-group bookings plus one representative row per group
         groupCondition = `AND (b.GROUP_BOOKING_ID IS NULL OR b.IDNo = (
@@ -240,7 +256,8 @@ class BookingController {
         orderDirection,
         dateCondition,
         channelCondition,
-        groupCondition
+        groupCondition,
+        useIndividualCalculation // Pass flag to use individual calculation for group bookings in single view
       });
 
 

@@ -12,7 +12,8 @@ class BookingModel {
           orderDirection,
           dateCondition,
           channelCondition,
-          groupCondition
+          groupCondition,
+          useIndividualCalculation = false // Flag to use individual calculation for group bookings
         } = params;
   
         // ---- COUNT QUERY ----
@@ -52,6 +53,15 @@ class BookingModel {
             (SELECT COUNT(*) FROM remarks rm WHERE rm.BOOKING_ID = b.IDNo AND rm.ACTIVE = 1) AS RemarksCount,
             bill.QTY,
             b.IS_CANCELLED,
+            ${useIndividualCalculation ? `
+            -- Use individual calculation for all bookings (including group bookings shown individually)
+            COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+              + COALESCE(all_services_total.TOTAL_SERVICES_COST, 0)
+              + COALESCE(all_extensions_total.TOTAL_EXTENSIONS_COST, 0)
+              + COALESCE(bill.CANCELLATION_PENALTY, 0)
+              - COALESCE(bill.RESERVATION_FEE, 0)
+              - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+            ` : `
             CASE 
               WHEN b.GROUP_BOOKING_ID IS NOT NULL THEN
                 -- For group bookings, calculate group total
@@ -79,14 +89,15 @@ class BookingModel {
                   WHERE b2.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID AND b2.ACTIVE = 1
                 )
               ELSE
-                -- For individual bookings, use existing calculation
+                -- For individual bookings, use individual calculation
                 COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
                   + COALESCE(all_services_total.TOTAL_SERVICES_COST, 0)
                   + COALESCE(all_extensions_total.TOTAL_EXTENSIONS_COST, 0)
                   + COALESCE(bill.CANCELLATION_PENALTY, 0)
                   - COALESCE(bill.RESERVATION_FEE, 0)
                   - COALESCE(bill.DISCOUNT_AMOUNT, 0)
-            END AS TOTAL_COST,
+            END
+            `} AS TOTAL_COST,
             CASE 
               WHEN bill.PAYMENT_STATUS = 'cancelled' THEN 'cancelled'
               WHEN bill.PAYMENT_STATUS = 'paid' 
@@ -95,47 +106,58 @@ class BookingModel {
               THEN 'paid'
               ELSE 'unpaid'
             END AS PAYMENT_STATUS,
+            ${useIndividualCalculation ? `
+            -- Use individual balance calculation for all bookings (including group bookings shown individually)
+            ROUND(GREATEST(0, 
+              COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+              + COALESCE(all_services_total.TOTAL_SERVICES_COST, 0)
+              + COALESCE(all_extensions_total.TOTAL_EXTENSIONS_COST, 0)
+              + COALESCE(bill.CANCELLATION_PENALTY, 0)
+              - COALESCE(bill.RESERVATION_FEE, 0)
+              - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+              - COALESCE(actual_payments.TOTAL_PAYMENTS_MADE, 0)
+            ), 2)
+            ` : `
             CASE 
               WHEN b.GROUP_BOOKING_ID IS NOT NULL THEN
-            -- Group balance = max(0, Group Grand Total - Actual Payments (room + service))
-            GREATEST(0,
-              (
-                -- Group Grand Total
-                SELECT 
-                COALESCE(SUM(
-                    (bill2.ROOM_CHARGE * (CASE WHEN COALESCE(bill2.CHECKOUT_REFUND,0) > 0 THEN bill2.QTY ELSE COALESCE(bill2.ORIGINAL_QTY, bill2.QTY) END)) + 
-                    COALESCE((
-                      SELECT SUM(bs.TOTAL_COST) 
-                      FROM booking_service bs 
-                      WHERE bs.BOOKING_ID = b2.IDNo AND bs.ACTIVE = 1
-                    ), 0) +
-                    COALESCE((
-                      SELECT SUM(be.COST * be.QTY) 
-                      FROM booking_extension be 
-                      WHERE be.BOOKING_ID = b2.IDNo AND be.ACTIVE = 1
-                    ), 0) +
-                    COALESCE(bill2.CANCELLATION_PENALTY, 0)
-                  ), 0)
-                  - COALESCE(gb.GROUP_DISCOUNT, 0)
-                  - COALESCE(gb.GROUP_RESERVATION_FEE, 0)
-                FROM booking b2
-                LEFT JOIN billing bill2 ON b2.IDNo = bill2.BOOKING_ID
-                LEFT JOIN group_booking gb ON b2.GROUP_BOOKING_ID = gb.IDNo
-                WHERE b2.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID AND b2.ACTIVE = 1
-              )
-              -
-              (
-                -- Actual payments made for the whole group (room + service)
-                SELECT COALESCE(SUM(p.AMOUNT_PAID), 0)
-                FROM payments p
-                JOIN booking b3 ON p.BOOKING_ID = b3.IDNo
-                WHERE b3.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID
-                  AND p.PAYMENT_TYPE IN ('room','service')
-              )
-            )
+                -- Group balance = max(0, Group Grand Total - Actual Payments (room + service))
+                GREATEST(0,
+                  (
+                    -- Group Grand Total
+                    SELECT 
+                    COALESCE(SUM(
+                        (bill2.ROOM_CHARGE * (CASE WHEN COALESCE(bill2.CHECKOUT_REFUND,0) > 0 THEN bill2.QTY ELSE COALESCE(bill2.ORIGINAL_QTY, bill2.QTY) END)) + 
+                        COALESCE((
+                          SELECT SUM(bs.TOTAL_COST) 
+                          FROM booking_service bs 
+                          WHERE bs.BOOKING_ID = b2.IDNo AND bs.ACTIVE = 1
+                        ), 0) +
+                        COALESCE((
+                          SELECT SUM(be.COST * be.QTY) 
+                          FROM booking_extension be 
+                          WHERE be.BOOKING_ID = b2.IDNo AND be.ACTIVE = 1
+                        ), 0) +
+                        COALESCE(bill2.CANCELLATION_PENALTY, 0)
+                      ), 0)
+                      - COALESCE(gb.GROUP_DISCOUNT, 0)
+                      - COALESCE(gb.GROUP_RESERVATION_FEE, 0)
+                    FROM booking b2
+                    LEFT JOIN billing bill2 ON b2.IDNo = bill2.BOOKING_ID
+                    LEFT JOIN group_booking gb ON b2.GROUP_BOOKING_ID = gb.IDNo
+                    WHERE b2.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID AND b2.ACTIVE = 1
+                  )
+                  -
+                  (
+                    -- Actual payments made for the whole group (room + service)
+                    SELECT COALESCE(SUM(p.AMOUNT_PAID), 0)
+                    FROM payments p
+                    JOIN booking b3 ON p.BOOKING_ID = b3.IDNo
+                    WHERE b3.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID
+                      AND p.PAYMENT_TYPE IN ('room','service')
+                  )
+                )
               ELSE
-                -- For individual bookings, always calculate balance considering actual payments made
-                -- (regardless of PAYMENT_STATUS to ensure accurate balance)
+                -- For individual bookings, calculate individual balance
                 ROUND(GREATEST(0, 
                   COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
                   + COALESCE(all_services_total.TOTAL_SERVICES_COST, 0)
@@ -145,7 +167,8 @@ class BookingModel {
                   - COALESCE(bill.DISCOUNT_AMOUNT, 0)
                   - COALESCE(actual_payments.TOTAL_PAYMENTS_MADE, 0)
                 ), 2)
-            END AS BALANCE,
+            END
+            `} AS BALANCE,
             -- Debug logging fields
             COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) AS DEBUG_ROOM_COST,
             COALESCE(all_services_total.TOTAL_SERVICES_COST, 0) AS DEBUG_SERVICES_COST,

@@ -7052,13 +7052,22 @@ function viewFullBookingDetails(bookingId) {
         .then(function(resp){
             var isGroup = !!(resp && (resp.success || resp.isGroup) && resp.isGroup);
             var groupId = isGroup ? (resp.groupId || resp.GROUP_ID || resp.group_id) : null;
+            
+            // If it's a group booking, show as individual booking in single booking page
+            // This will use individual calculation for TOTAL_PAYMENT and BALANCE
+            // The highlight parameter will trigger useIndividualCalculation flag in backend
             if (isGroup && groupId && String(groupId) !== '0') {
-                window.open(`/booking/group?highlight=${groupId}`, '_blank');
+                // Option 1: View as single booking with individual amounts
+                window.open(`/booking?highlight=${bookingId}`, '_blank');
+                // Option 2: If you want to view group booking page instead, uncomment below:
+                // window.open(`/booking/group?highlight=${groupId}`, '_blank');
                 return;
             }
+            // For non-group bookings, view as single booking
             window.open(`/booking?highlight=${bookingId}`, '_blank');
         })
         .catch(function(){
+            // On error, still try to view as single booking
             window.open(`/booking?highlight=${bookingId}`, '_blank');
         });
 }
