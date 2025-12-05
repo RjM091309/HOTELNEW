@@ -177,8 +177,10 @@ class DashboardModel {
           WHERE ACTIVE = 1 
           GROUP BY BOOKING_ID
         ) rm ON b.IDNo = rm.BOOKING_ID
-        WHERE DATE(b.CHECK_IN_DATE) <= CURDATE()
-        AND b.ACTIVE = 1 AND c.IS_GROUP = 1
+       WHERE b.ACTIVE = 1 
+  AND r.ROOM_STATUS = 2 
+  AND b.BOOKING_STATUS = 'check-In' 
+  AND b.IS_OCCUPIED = 1   AND c.IS_GROUP = 1
         ORDER BY b.GROUP_BOOKING_ID ASC, r.ROOM_NUMBER ASC
       `);
       return details;
