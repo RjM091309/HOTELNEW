@@ -178,9 +178,17 @@ class DashboardModel {
           GROUP BY BOOKING_ID
         ) rm ON b.IDNo = rm.BOOKING_ID
        WHERE b.ACTIVE = 1 
-  AND r.ROOM_STATUS = 2 
-  AND b.BOOKING_STATUS = 'check-In' 
-  AND b.IS_OCCUPIED = 1   AND c.IS_GROUP = 1
+         AND r.ROOM_STATUS IN (2, 4)  -- Include Occupied (2) and Cleaning (4) rooms
+         AND (
+           -- Show all bookings that are still checked in (haven't checked out yet)
+           b.BOOKING_STATUS = 'check-In'
+           OR 
+           -- OR show only check-out bookings from TODAY
+           (b.BOOKING_STATUS = 'check-Out' AND DATE(b.CHECK_OUT_DATE) = CURRENT_DATE())
+         )
+         AND b.IS_OCCUPIED = 1   
+         AND c.IS_GROUP = 1
+         AND r.ROOM_STATUS != 1  -- Exclude rooms that are already cleaned (Available = 1)
         ORDER BY b.GROUP_BOOKING_ID ASC, r.ROOM_NUMBER ASC
       `);
       return details;
