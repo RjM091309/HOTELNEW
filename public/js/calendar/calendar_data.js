@@ -27,6 +27,8 @@ window.eventElements = {};
 // Fine-tune centering biases (positive moves right/down, negative moves left/up)
 const H_CENTER_BIAS_PX = 100;
 const V_CENTER_BIAS_PX = 88;
+// Days offset for today's position (positions today after X days from start)
+const TODAY_OFFSET_DAYS = 10;
 
 // Date utility functions
 function getLastDayOfMonth(year, monthIndex) {
@@ -167,8 +169,19 @@ function scrollToToday(bodyScroller, top) {
   const todayMs = todayDate.getTime();
   const diffDays = (todayMs - startMs) / msPerDay;
 
-  // LEFT-ALIGN today
-  bodyScroller.scrollLeft = diffDays * dayWidth;
+  // Calculate today's position
+  const todayPosition = diffDays * dayWidth;
+  
+  // Position scroll to show previous X days before today
+  // This makes today appear on the right side with previous days visible on the left
+  // Example: If today is December 5, show November 25 to December 5 (10 days before)
+  let scrollPosition = todayPosition - (TODAY_OFFSET_DAYS * dayWidth);
+  
+  // Ensure scroll position is within valid bounds
+  const maxScroll = Math.max(0, bodyScroller.scrollWidth - bodyScroller.clientWidth);
+  scrollPosition = Math.max(0, Math.min(scrollPosition, maxScroll));
+  
+  bodyScroller.scrollLeft = scrollPosition;
   top.scrollLeft = bodyScroller.scrollLeft;
 }
 
