@@ -322,17 +322,18 @@ async function handleEventResize(info) {
   
   // Use the existing extend modal with pre-calculated days
   if (typeof openExtendModal === 'function') {
-    // Store the resize info for later use
+    // Store the resize info for later use (including revert function)
     window.pendingResizeInfo = {
       info: info,
       newEnd: newEnd,
       roomResource: roomResource,
       bookingId: bookingId,
-      extensionDays: extensionDays
+      extensionDays: extensionDays,
+      originalEnd: originalEndDate
     };
     
-         // Open the extend modal with pre-filled days
-     openExtendModal(roomResource.id, originalEndDate.toISOString(), bookingId);
+    // Open the extend modal with pre-filled days
+    openExtendModal(roomResource.id, originalEndDate.toISOString(), bookingId);
     
     // Pre-fill the extension days input
     setTimeout(() => {
@@ -343,6 +344,9 @@ async function handleEventResize(info) {
         extensionDaysInput.dispatchEvent(new Event('change'));
       }
     }, 100);
+    
+    // IMPORTANT: Don't call info.revert() here - let the modal handle it when cancelled
+    // The event will stay visually resized until the user confirms or cancels
     
   } else {
     // Fallback to simple confirmation if extend modal not available

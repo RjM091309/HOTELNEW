@@ -4976,6 +4976,33 @@ function openExtendModal(roomId, checkoutDate, bookingId) {
   // Clean up when modal is hidden
   const modalElement = document.getElementById(`extendStayModal_${bookingId}`);
   modalElement.addEventListener('hidden.bs.modal', function() {
+    // Check if this was opened from a resize operation (drag and drop)
+    if (window.pendingResizeInfo && window.pendingResizeInfo.bookingId === bookingId) {
+      // Get the resize info
+      const resizeInfo = window.pendingResizeInfo.info;
+      
+      // Revert the event back to original end date
+      if (resizeInfo && typeof resizeInfo.revert === 'function') {
+        resizeInfo.revert();
+      } else {
+        // Fallback: restore from original data
+        const calendar = window.calendar;
+        if (calendar) {
+          const event = calendar.getEventById(bookingId);
+          if (event && window.calendarOriginalData) {
+            const originalData = window.calendarOriginalData.get(bookingId);
+            if (originalData) {
+              // Restore original end date
+              event.setEnd(originalData.end);
+            }
+          }
+        }
+      }
+      
+      // Clear the pending resize info
+      window.pendingResizeInfo = null;
+    }
+    
     modalElement.remove();
   });
 }
@@ -5190,6 +5217,29 @@ function confirmExtension(roomId, checkoutDate, bookingId) {
         window.selectedExtensionRoomId,
         costPerDay
       );
+      
+      // Clear pending resize info after successful confirmation
+      if (window.pendingResizeInfo && window.pendingResizeInfo.bookingId === bookingId) {
+        window.pendingResizeInfo = null;
+      }
+    } else {
+      // User cancelled the confirmation - revert the resize
+      if (window.pendingResizeInfo && window.pendingResizeInfo.bookingId === bookingId) {
+        const resizeInfo = window.pendingResizeInfo.info;
+        if (resizeInfo && typeof resizeInfo.revert === 'function') {
+          resizeInfo.revert();
+        } else {
+          // Fallback: restore from original data
+          const calendar = window.calendar;
+          if (calendar) {
+            const event = calendar.getEventById(bookingId);
+            if (event && window.pendingResizeInfo.originalEnd) {
+              event.setEnd(window.pendingResizeInfo.originalEnd);
+            }
+          }
+        }
+        window.pendingResizeInfo = null;
+      }
     }
   });
 }
