@@ -1028,6 +1028,33 @@ const findHeader = setInterval(() => {
     select: function(info) {
       const modal = $('#modal-addbooking');
       
+      // Check if selected date is in the past
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Reset time to start of day for comparison
+      
+      const selectedStartDate = new Date(info.start);
+      selectedStartDate.setHours(0, 0, 0, 0); // Reset time to start of day for comparison
+      
+      // If selected start date is before today, prevent modal from opening
+      if (selectedStartDate < today) {
+        // Show error message
+        if (typeof Swal !== 'undefined') {
+          Swal.fire({
+            title: 'Past Date Selected',
+            text: 'Cannot create booking for past dates. Please select today or a future date.',
+            icon: 'warning',
+            confirmButtonText: 'OK',
+            background: '#2a3135',
+            color: '#ffffff'
+          });
+        } else {
+          alert('Cannot create booking for past dates. Please select today or a future date.');
+        }
+        
+        calendar.unselect();
+        return; // Exit early, don't show modal
+      }
+      
       // Check if this selection is from a highlighted area (URL params)
       const params = new URLSearchParams(window.location.search);
       const hlRoomId = params.get('hlRoomId');
@@ -1041,6 +1068,28 @@ const findHeader = setInterval(() => {
         // Parse the original highlight dates
         const originalStartDate = new Date(hlStart);
         const originalEndDate = new Date(hlEnd);
+        
+        // Also check if highlight start date is in the past
+        const highlightStartDateOnly = new Date(originalStartDate);
+        highlightStartDateOnly.setHours(0, 0, 0, 0);
+        
+        if (highlightStartDateOnly < today) {
+          if (typeof Swal !== 'undefined') {
+            Swal.fire({
+              title: 'Past Date Selected',
+              text: 'Cannot create booking for past dates. Please select today or a future date.',
+              icon: 'warning',
+              confirmButtonText: 'OK',
+              background: '#2a3135',
+              color: '#ffffff'
+            });
+          } else {
+            alert('Cannot create booking for past dates. Please select today or a future date.');
+          }
+          
+          calendar.unselect();
+          return; // Exit early, don't show modal
+        }
         
         // Set check-in time to 2 PM (14:00) - PM cell
         originalStartDate.setHours(14, 0, 0, 0);
