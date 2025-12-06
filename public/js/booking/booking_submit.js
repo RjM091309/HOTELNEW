@@ -221,12 +221,15 @@ $(document).ready(function () {
                 text: 'Your booking has been added successfully. Voucher is downloading...',
                 icon: 'success',
                 confirmButtonText: 'OK'
+              }).then(() => {
+                // Don't redirect if we're on dashboard - socket/direct add will update it
+                // If on calendar page, redirect to clean URL without query params
+                if (window.location.pathname.includes('/calendar')) {
+                  window.location.replace('/calendar');
+                } else if (!window.location.pathname.includes('/dashboard')) {
+                  window.location.reload();
+                }
               });
-              // Don't reload if we're on dashboard - socket/direct add will update it
-              // Only reload if we're not on the dashboard page
-              if (!window.location.pathname.includes('/dashboard')) {
-                window.location.reload();
-              }
             }, 400);
           },
           error: function (err) {

@@ -2364,11 +2364,11 @@ function initializeAddBookingHandler() {
 
         setTimeout(() => {
       Swal.close();
-      window.location.href = '/calendar';
+      window.location.replace('/calendar');
     }, 10000);
     }
                     }).then(() => {
-                      window.location.href = '/calendar';
+                      window.location.replace('/calendar');
                     });
                 } else {
                     Swal.fire({
