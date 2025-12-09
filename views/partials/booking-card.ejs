@@ -60,8 +60,8 @@
                     <%= booking.BED_COUNT %> Bed<%= (booking.BED_COUNT && booking.BED_COUNT > 1) ? 's' : '' %>
                 </p>
             <% } else { %>
-                <!-- Show Total Cost for Regular Bookings -->
-                <p style="margin: 0;"><%= Number(booking.TotalCost).toLocaleString('en-US') %></p>
+                <!-- Show Balance for Regular Bookings -->
+                <p style="margin: 0;"><%= Number(booking.Balance || booking.TotalCost || 0).toLocaleString('en-US') %></p>
             <% } %>
             <% if (typeof showBadges !== 'undefined' && showBadges) { %>
                 <% if (booking.LATE_CHECKOUT === 1) { %>

@@ -104,7 +104,48 @@ class DashboardModel {
           b.CHECK_IN_STATUS,
           b.LATE_CHECKOUT,
           bill.QTY,
-          COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) + COALESCE(bill.AMENITIES_CHARGE, 0) + COALESCE(bill.SERVICES_CHARGE, 0) AS TotalCost,
+          (
+            COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+            + COALESCE(bill.AMENITIES_CHARGE, 0)
+            + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
+            + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
+            + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
+            - COALESCE(bill.RESERVATION_FEE, 0)
+            - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+          ) AS TotalCost,
+          COALESCE((
+            SELECT SUM(p.AMOUNT_PAID)
+            FROM payments p
+            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+              AND (
+                p.BOOKING_ID = b.IDNo
+                OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
+                OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
+                OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
+              )
+          ), 0) AS TotalPaid,
+          GREATEST(0, 
+            (
+              COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+              + COALESCE(bill.AMENITIES_CHARGE, 0)
+              + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
+              + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
+              + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
+              - COALESCE(bill.RESERVATION_FEE, 0)
+              - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+            )
+            - COALESCE((
+              SELECT SUM(p.AMOUNT_PAID)
+              FROM payments p
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+                AND (
+                  p.BOOKING_ID = b.IDNo
+                  OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
+                  OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
+                  OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
+                )
+            ), 0)
+          ) AS Balance,
           COALESCE(bill.PAYMENT_STATUS, 'Not Paid') AS PaymentStatus,
           gt.TYPE AS CUSTOMER_TYPE,
           gl.TYPE AS CUSTOMER_LEVEL,
@@ -159,7 +200,48 @@ class DashboardModel {
           b.GROUP_BOOKING_ID,
           b.REMARKS,
           bill.QTY,
-          COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) + COALESCE(bill.AMENITIES_CHARGE, 0) + COALESCE(bill.SERVICES_CHARGE, 0) AS TotalCost,
+          (
+            COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+            + COALESCE(bill.AMENITIES_CHARGE, 0)
+            + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
+            + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
+            + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
+            - COALESCE(bill.RESERVATION_FEE, 0)
+            - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+          ) AS TotalCost,
+          COALESCE((
+            SELECT SUM(p.AMOUNT_PAID)
+            FROM payments p
+            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+              AND (
+                p.BOOKING_ID = b.IDNo
+                OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
+                OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
+                OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
+              )
+          ), 0) AS TotalPaid,
+          GREATEST(0, 
+            (
+              COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+              + COALESCE(bill.AMENITIES_CHARGE, 0)
+              + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
+              + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
+              + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
+              - COALESCE(bill.RESERVATION_FEE, 0)
+              - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+            )
+            - COALESCE((
+              SELECT SUM(p.AMOUNT_PAID)
+              FROM payments p
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+                AND (
+                  p.BOOKING_ID = b.IDNo
+                  OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
+                  OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
+                  OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
+                )
+            ), 0)
+          ) AS Balance,
           COALESCE(bill.PAYMENT_STATUS, 'Not Paid') AS PaymentStatus,
           gt.TYPE AS CUSTOMER_TYPE,
           gl.TYPE AS CUSTOMER_LEVEL,
@@ -262,7 +344,48 @@ class DashboardModel {
           b.LATE_CHECKOUT,
           b.REMARKS,
           bill.QTY,
-          COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) + COALESCE(bill.AMENITIES_CHARGE, 0) + COALESCE(bill.SERVICES_CHARGE, 0) AS TotalCost,
+          (
+            COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+            + COALESCE(bill.AMENITIES_CHARGE, 0)
+            + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
+            + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
+            + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
+            - COALESCE(bill.RESERVATION_FEE, 0)
+            - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+          ) AS TotalCost,
+          COALESCE((
+            SELECT SUM(p.AMOUNT_PAID)
+            FROM payments p
+            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+              AND (
+                p.BOOKING_ID = b.IDNo
+                OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
+                OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
+                OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
+              )
+          ), 0) AS TotalPaid,
+          GREATEST(0, 
+            (
+              COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+              + COALESCE(bill.AMENITIES_CHARGE, 0)
+              + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
+              + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
+              + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
+              - COALESCE(bill.RESERVATION_FEE, 0)
+              - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+            )
+            - COALESCE((
+              SELECT SUM(p.AMOUNT_PAID)
+              FROM payments p
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+                AND (
+                  p.BOOKING_ID = b.IDNo
+                  OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
+                  OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
+                  OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
+                )
+            ), 0)
+          ) AS Balance,
           COALESCE(bill.PAYMENT_STATUS, 'Not Paid') AS PaymentStatus,
           gt.TYPE AS CUSTOMER_TYPE,
           gl.TYPE AS CUSTOMER_LEVEL,
@@ -318,10 +441,50 @@ class DashboardModel {
           b.TRANSFER,
           b.LATE_CHECKOUT,
           b.EXTENDED,
-          bill.LATE_CHECKOUT_CHARGE,
           bill.QTY,
           bill.PAYMENT_STATUS,
-          COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) + COALESCE(bill.AMENITIES_CHARGE, 0) + COALESCE(bill.SERVICES_CHARGE, 0) AS TotalCost,
+          (
+            COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+            + COALESCE(bill.AMENITIES_CHARGE, 0)
+            + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
+            + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
+            + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
+            - COALESCE(bill.RESERVATION_FEE, 0)
+            - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+          ) AS TotalCost,
+          COALESCE((
+            SELECT SUM(p.AMOUNT_PAID)
+            FROM payments p
+            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+              AND (
+                p.BOOKING_ID = b.IDNo
+                OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
+                OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
+                OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
+              )
+          ), 0) AS TotalPaid,
+          GREATEST(0, 
+            (
+              COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+              + COALESCE(bill.AMENITIES_CHARGE, 0)
+              + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
+              + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
+              + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
+              - COALESCE(bill.RESERVATION_FEE, 0)
+              - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+            )
+            - COALESCE((
+              SELECT SUM(p.AMOUNT_PAID)
+              FROM payments p
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+                AND (
+                  p.BOOKING_ID = b.IDNo
+                  OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
+                  OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
+                  OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
+                )
+            ), 0)
+          ) AS Balance,
           COALESCE(bill.PAYMENT_STATUS, 'Not Paid') AS PaymentStatus,
           gt.TYPE AS CUSTOMER_TYPE,
           gl.TYPE AS CUSTOMER_LEVEL,
@@ -373,7 +536,48 @@ class DashboardModel {
           b.TRANSFER_FROM,
           b.LATE_CHECKOUT,
           bill.QTY,
-          COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) + COALESCE(bill.AMENITIES_CHARGE, 0) + COALESCE(bill.SERVICES_CHARGE, 0) AS TotalCost,
+          (
+            COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+            + COALESCE(bill.AMENITIES_CHARGE, 0)
+            + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
+            + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
+            + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
+            - COALESCE(bill.RESERVATION_FEE, 0)
+            - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+          ) AS TotalCost,
+          COALESCE((
+            SELECT SUM(p.AMOUNT_PAID)
+            FROM payments p
+            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+              AND (
+                p.BOOKING_ID = b.IDNo
+                OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
+                OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
+                OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
+              )
+          ), 0) AS TotalPaid,
+          GREATEST(0, 
+            (
+              COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+              + COALESCE(bill.AMENITIES_CHARGE, 0)
+              + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
+              + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
+              + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
+              - COALESCE(bill.RESERVATION_FEE, 0)
+              - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+            )
+            - COALESCE((
+              SELECT SUM(p.AMOUNT_PAID)
+              FROM payments p
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+                AND (
+                  p.BOOKING_ID = b.IDNo
+                  OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
+                  OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
+                  OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
+                )
+            ), 0)
+          ) AS Balance,
           COALESCE(bill.PAYMENT_STATUS, 'Not Paid') AS PaymentStatus,
           gt.TYPE AS CUSTOMER_TYPE,
           gl.TYPE AS CUSTOMER_LEVEL,
@@ -462,7 +666,7 @@ class DashboardModel {
             AND ACTIVE = 1
         `,
         totalSales: `
-          SELECT SUM((ROOM_CHARGE * QTY) + AMENITIES_CHARGE + SERVICES_CHARGE) AS totalSales
+          SELECT SUM((ROOM_CHARGE * QTY) + AMENITIES_CHARGE) AS totalSales
           FROM billing
           WHERE PAYMENT_STATUS = 'paid'
         `,
@@ -615,13 +819,53 @@ class DashboardModel {
             b.TRANSFER,
             b.TRANSFER_FROM,
             b.LATE_CHECKOUT,
-            bill.LATE_CHECKOUT_CHARGE,
             bill.QTY,
             b.IS_OCCUPIED,
             bill.PAYMENT_STATUS,
             b.EXTENDED_DAYS,
             b.EXTENDED,
-            COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) + COALESCE(bill.AMENITIES_CHARGE, 0) + COALESCE(bill.SERVICES_CHARGE, 0) AS TotalCost,
+            (
+              COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+              + COALESCE(bill.AMENITIES_CHARGE, 0)
+              + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
+              + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
+              + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
+              - COALESCE(bill.RESERVATION_FEE, 0)
+              - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+            ) AS TotalCost,
+            COALESCE((
+              SELECT SUM(p.AMOUNT_PAID)
+              FROM payments p
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+                AND (
+                  p.BOOKING_ID = b.IDNo
+                  OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
+                  OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
+                  OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
+                )
+            ), 0) AS TotalPaid,
+            GREATEST(0, 
+              (
+                COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+                + COALESCE(bill.AMENITIES_CHARGE, 0)
+                + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
+                + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
+                + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
+                - COALESCE(bill.RESERVATION_FEE, 0)
+                - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+              )
+              - COALESCE((
+                SELECT SUM(p.AMOUNT_PAID)
+                FROM payments p
+                WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+                  AND (
+                    p.BOOKING_ID = b.IDNo
+                    OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
+                    OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
+                    OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
+                  )
+              ), 0)
+            ) AS Balance,
             COALESCE(bill.PAYMENT_STATUS, 'Not Paid') AS PaymentStatus,
             COALESCE(rm.remarks_count, 0) AS RemarksCount
           FROM booking b
@@ -664,7 +908,48 @@ class DashboardModel {
             b.TRANSFER,
             b.TRANSFER_FROM,
             bill.QTY,
-            COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) + COALESCE(bill.AMENITIES_CHARGE, 0) + COALESCE(bill.SERVICES_CHARGE, 0) AS TotalCost,
+            (
+              COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+              + COALESCE(bill.AMENITIES_CHARGE, 0)
+              + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
+              + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
+              + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
+              - COALESCE(bill.RESERVATION_FEE, 0)
+              - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+            ) AS TotalCost,
+            COALESCE((
+              SELECT SUM(p.AMOUNT_PAID)
+              FROM payments p
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+                AND (
+                  p.BOOKING_ID = b.IDNo
+                  OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
+                  OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
+                  OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
+                )
+            ), 0) AS TotalPaid,
+            GREATEST(0, 
+              (
+                COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+                + COALESCE(bill.AMENITIES_CHARGE, 0)
+                + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
+                + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
+                + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
+                - COALESCE(bill.RESERVATION_FEE, 0)
+                - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+              )
+              - COALESCE((
+                SELECT SUM(p.AMOUNT_PAID)
+                FROM payments p
+                WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+                  AND (
+                    p.BOOKING_ID = b.IDNo
+                    OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
+                    OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
+                    OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
+                  )
+              ), 0)
+            ) AS Balance,
             COALESCE(bill.PAYMENT_STATUS, 'Not Paid') AS PaymentStatus,
             gt.TYPE AS CUSTOMER_TYPE,
             gl.TYPE AS CUSTOMER_LEVEL,
