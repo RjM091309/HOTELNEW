@@ -184,6 +184,21 @@
                             </div>
                         </div>
 
+                        <!-- EXTRA SERVICES SECTION -->
+                        <hr class="my-4" id="edit_extra-services-hr" style="display: none;">
+                        <div class="row p-t-10" id="edit_extra-services-wrapper" style="display: none;">
+                            <div class="col-lg-12">
+                                <div class="extra-services-section mb-2" style="background: #41474c !important; border-radius: 6px; padding: 15px; border: 1px solid #5a6268; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                                    <h6 class="text-warning mb-3" style="border-bottom: 2px solid #ffc107; padding-bottom: 6px; color: #ffc107 !important;">
+                                        <i class="fas fa-list me-1"></i>Extra Services
+                                    </h6>
+                                    <div id="edit_added-services-list">
+                                        <!-- Populated dynamically -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <hr class="my-4">
                         
                         <!-- PAYMENT AND STATUS SECTION -->
@@ -526,6 +541,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+// Global variable for extra services in edit form
+let editAddedServicesMap = {}; // Store added services for edit form
+
 $(document).ready(function() {
     // Initialize flatpickr for edit form
     let editFlatpickrInstance = null;
@@ -895,6 +913,48 @@ $(document).ready(function() {
     $('#edit_discountAmount, #edit_paidAmount, #edit_breakfastAdultQty, #edit_breakfastKidQty, #edit_breakfastAdultPrice, #edit_breakfastKidPrice, #edit_pickupPrice, #edit_dropoffPrice').on('input', function() {
         computeEditTotal();
     });
+
+    // ================================
+    // EXTRA SERVICES FUNCTIONALITY (READ-ONLY LIST)
+    // ================================
+    // editAddedServicesMap is now global (defined above)
+
+    // Load existing services on modal open (only if not already loaded)
+    $(document).on('shown.bs.modal', '#modal-editbooking', function() {
+        const bookingId = $('#edit_bookingId').val();
+        if (bookingId) {
+            // Only load if services haven't been loaded yet
+            if (!editAddedServicesMap[bookingId] || editAddedServicesMap[bookingId].length === 0) {
+                loadEditExistingServices(bookingId);
+            } else {
+                // Services already loaded, just update the display
+                updateEditAddedServicesList(bookingId);
+                computeEditTotal();
+            }
+        }
+    });
+
+    // Reset services map and form fields when modal is hidden
+    $(document).on('hidden.bs.modal', '#modal-editbooking', function() {
+        const bookingId = $('#edit_bookingId').val();
+        if (bookingId && editAddedServicesMap[bookingId]) {
+            // Keep the data but clear the UI
+            $('#edit_added-services-list').empty().hide();
+        }
+        
+        // Reset all form fields to prevent values from carrying over
+        $('#edit_includeBreakfast').prop('checked', false);
+        $('#edit_breakfastInputs').hide();
+        $('#edit_includePickup').prop('checked', false);
+        $('#edit_pickupWrapper').hide();
+        $('#edit_includeDropoff').prop('checked', false);
+        $('#edit_dropoffWrapper').hide();
+        $('#edit_includeDiscount').prop('checked', false);
+        $('#edit_discountWrapper').hide();
+        $('#edit_discountAmount').val('');
+        $('#edit_extra-services-wrapper').hide();
+        $('#edit_extra-services-hr').hide();
+    });
     
     // Additional specific event listener for paid amount to ensure it triggers
     $('#edit_paidAmount').on('input change keyup', function() {
@@ -964,13 +1024,6 @@ $(document).ready(function() {
             data: formData,
             success: function (response) {
                 if (response.success) {
-                    // NOTE:
-                    // Huwag nang tawagin ang /booking/process-payment dito.
-                    // Sa backend (BookingModel.updateBooking) binubura at nirere-create
-                    // na ang mga payments batay sa bagong paidAmount, kaya kung tatawag
-                    // pa tayo ng processEditBookingPayment, mag-i-insert ulit ng
-                    // payments kasama ng mga services.
-
                     $('#modal-editbooking').modal('hide');
                     Swal.fire({
                         title: 'Success!',
@@ -1111,6 +1164,156 @@ $(document).ready(function() {
         form.remove();
     });
 });
+
+// ================================
+// GLOBAL FUNCTIONS FOR EXTRA SERVICES
+// ================================
+
+// Update added services list (global function)
+function updateEditAddedServicesList(bookingId) {
+    const serviceList = $('#edit_added-services-list');
+    if (!serviceList.length) return;
+
+    serviceList.empty();
+
+    const roomServices = editAddedServicesMap[bookingId] || [];
+    
+    // Filter out hidden services
+    const visibleServices = roomServices.filter(service => !service.HIDDEN_FOR_UI);
+
+    if (visibleServices.length === 0) {
+        // Hide entire Extra Services section when no services
+        $('#edit_extra-services-wrapper').hide();
+        $('#edit_extra-services-hr').hide();
+        serviceList.hide();
+        return;
+    }
+
+    // Show Extra Services section when there are services
+    $('#edit_extra-services-wrapper').show();
+    $('#edit_extra-services-hr').show();
+    serviceList.show();
+
+    visibleServices.forEach((service, index) => {
+
+        const serviceCost = parseFloat(service.SERVICE_COST) || 0;
+        const quantity = parseInt(service.QUANTITY) || 0;
+        const isUpgrade = service.SERVICE_ID === 71 || 
+                         service.SERVICE_NAME?.toLowerCase() === 'upgrade';
+        const quantityDisplay = isUpgrade ? '-' : quantity;
+        const totalCost = serviceCost * quantity;
+        const costDisplay = (isNaN(totalCost) || totalCost === 0)
+            ? '<span class="badge bg-success">FREE</span>'
+            : `₱${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+        let statusDisplay;
+        if (service.STATUS === 'unpaid') {
+            statusDisplay = '<span class="badge bg-warning">UNPAID</span>';
+        } else if (service.STATUS === 'paid') {
+            statusDisplay = '<span class="badge bg-success">PAID</span>';
+        } else {
+            statusDisplay = `<span class="badge bg-secondary">${service.STATUS}</span>`;
+        }
+
+        const serviceItem = $(`
+            <div class="mb-2" style="background-color: #2a3135; border-radius: 6px; border: 1px solid #5a6268; padding: 10px;">
+                <div class="row align-items-center">
+                    <div class="col-4">
+                        <span style="font-weight: 600; color: #ffffff; font-size: 0.9rem;">${service.SERVICE_NAME}</span>
+                    </div>
+                    <div class="col-2 text-center">
+                        <span style="font-weight: 500; color: #bbbbbb; font-size: 0.9rem;">Qty: ${quantityDisplay}</span>
+                    </div>
+                    <div class="col-3 text-center">
+                        <span style="font-weight: 600; color: #ffc107; font-size: 0.9rem;">${costDisplay}</span>
+                    </div>
+                    <div class="col-3 text-center">
+                        ${statusDisplay}
+                    </div>
+                </div>
+            </div>
+        `);
+
+        serviceList.append(serviceItem);
+    });
+}
+
+// Load existing services for edit form (global function)
+function loadEditExistingServices(bookingId) {
+    if (!bookingId) {
+        console.log('loadEditExistingServices: No bookingId provided');
+        return;
+    }
+    
+    console.log('loadEditExistingServices: Loading services for bookingId:', bookingId);
+    
+    fetch(`/booking/get-booking-services/${bookingId}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(responseData => {
+            console.log('loadEditExistingServices: Response data:', responseData);
+            
+            if (responseData.success && responseData.data && Array.isArray(responseData.data)) {
+                // Filter to show only extra services (exclude extensions, transport, and form-managed services)
+                // Exclude: 
+                // -999 (Extended Stay), -101 (Pick-up), -102 (Drop-off) - from old system
+                // 72 (Late Checkout), 74 (Breakfast Adult), 75 (Breakfast Kid), 76 (Pick-up), 77 (Drop-off) - managed by checkboxes
+                const excludedServiceIds = [-101, -102, 72, 74, 75, 76, 77];
+                
+                const extraServicesOnly = responseData.data.filter(service => {
+                    const serviceId = parseInt(service.SERVICE_ID);
+                    return !excludedServiceIds.includes(serviceId);
+                });
+                
+                console.log('loadEditExistingServices: Filtered extra services:', extraServicesOnly);
+                
+                editAddedServicesMap[bookingId] = extraServicesOnly.map(service => {
+                    const quantity = parseInt(service.QTY || service.QUANTITY || 1);
+                    const totalCost = parseFloat(service.TOTAL_COST || 0);
+                    
+                    // For Extended Stay (SERVICE_ID = -999), the TOTAL_COST from backend is actually cost per unit
+                    // For other services, TOTAL_COST is the total, so we need to divide by quantity
+                    let costPerUnit;
+                    if (service.SERVICE_ID === -999) {
+                        // Extended Stay: TOTAL_COST is already cost per unit (cost per day)
+                        costPerUnit = totalCost;
+                    } else {
+                        // Other services: Calculate cost per unit (total cost divided by quantity)
+                        costPerUnit = quantity > 0 ? totalCost / quantity : totalCost;
+                    }
+                    
+                    return {
+                        SERVICE_ID: service.SERVICE_ID,
+                        SERVICE_NAME: service.SERVICE_NAME,
+                        SERVICE_COST: costPerUnit,
+                        QUANTITY: quantity,
+                        STATUS: (service.STATUS || 'unpaid').toLowerCase(),
+                        IS_CUSTOM: service.SERVICE_ID === -1,
+                        ALREADY_SAVED: true
+                    };
+                });
+                
+                console.log('loadEditExistingServices: Mapped services:', editAddedServicesMap[bookingId]);
+                updateEditAddedServicesList(bookingId);
+                computeEditTotal();
+            } else {
+                console.log('loadEditExistingServices: No services found or invalid response format');
+                // Initialize empty array if no services found
+                editAddedServicesMap[bookingId] = [];
+                updateEditAddedServicesList(bookingId);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading existing services:', error);
+            // Initialize empty array on error
+            editAddedServicesMap[bookingId] = [];
+            updateEditAddedServicesList(bookingId);
+        });
+}
 
 // ================================
 // STATUS ADJACENCY VALIDATION
@@ -1320,10 +1523,23 @@ function computeEditTotal() {
     // Get late check-out fee
     const lateCheckoutFee = parseFloat($('#edit_lateCheckoutFee').val()) || 0;
     
+    // Calculate extra services total
+    const bookingId = $('#edit_bookingId').val();
+    let extraServicesTotal = 0;
+    if (bookingId && editAddedServicesMap[bookingId]) {
+        editAddedServicesMap[bookingId].forEach(service => {
+            if (!service.HIDDEN_FOR_UI) {
+                const serviceCost = parseFloat(service.SERVICE_COST) || 0;
+                const quantity = parseInt(service.QUANTITY) || 0;
+                extraServicesTotal += serviceCost * quantity;
+            }
+        });
+    }
+    
     // Get paid amount and validate it doesn't exceed total
     let paidAmount = parseFloat($('#edit_paidAmount').val()) || 0;
     
-    const subtotal = (roomRate * nights) + (adultQty * adultPrice) + (kidQty * kidPrice) + pickupPrice + dropoffPrice + lateCheckoutFee;
+    const subtotal = (roomRate * nights) + (adultQty * adultPrice) + (kidQty * kidPrice) + pickupPrice + dropoffPrice + lateCheckoutFee + extraServicesTotal;
     const finalBalance = subtotal - discount;
     
     console.log('Paid Amount:', paidAmount, 'Final Balance:', finalBalance);
@@ -1382,6 +1598,36 @@ function computeEditTotal() {
 
 // Function to populate edit form (called from parent page)
 function populateEditForm(booking) {
+    // Reset all form fields first to avoid carrying over previous values
+    // Reset checkboxes and their wrappers
+    $('#edit_includeBreakfast').prop('checked', false);
+    $('#edit_breakfastInputs').hide();
+    $('#edit_breakfastAdultQty').val('');
+    $('#edit_breakfastAdultPrice').val('');
+    $('#edit_breakfastAdultId').val('');
+    $('#edit_breakfastKidQty').val('');
+    $('#edit_breakfastKidPrice').val('');
+    $('#edit_breakfastKidId').val('');
+    
+    $('#edit_includePickup').prop('checked', false);
+    $('#edit_pickupWrapper').hide();
+    $('#edit_pickupPrice').val('');
+    $('#edit_pickupServiceId').val('');
+    
+    $('#edit_includeDropoff').prop('checked', false);
+    $('#edit_dropoffWrapper').hide();
+    $('#edit_dropoffPrice').val('');
+    $('#edit_dropoffServiceId').val('');
+    
+    $('#edit_includeDiscount').prop('checked', false);
+    $('#edit_discountWrapper').hide();
+    $('#edit_discountAmount').val('');
+    
+    // Reset late checkout fee
+    $('#edit_lateCheckoutFee').val(0);
+    $('#edit_lateCheckoutFeeInput').val(0);
+    $('#edit_lateCheckoutFeeDisplay').hide();
+    
     // Set hidden fields
     $('#edit_bookingId').val(booking.bookingId);
     $('#edit_guestID').val(booking.CUSTOMER_ID);
@@ -1429,19 +1675,30 @@ function populateEditForm(booking) {
     $('#edit_room_type').val(booking.ROOM_VIEW === 1 ? 'Condo View' : booking.ROOM_VIEW === 2 ? 'Mountain View' : 'N/A');
     $('#edit_room_type_hidden').val(booking.ROOM_TYPE);
     
-    // Set services
+    // Set services (only if they exist)
     if (parseInt(booking.breakfastAdultQty) > 0) {
         $('#edit_includeBreakfast').prop('checked', true);
         $('#edit_breakfastInputs').show();
         $('#edit_breakfastAdultQty').val(booking.breakfastAdultQty);
         $('#edit_breakfastAdultPrice').val(booking.breakfastAdultPrice);
         $('#edit_breakfastAdultId').val(booking.breakfastAdultId);
+    } else {
+        // Explicitly reset if no breakfast
+        $('#edit_includeBreakfast').prop('checked', false);
+        $('#edit_breakfastInputs').hide();
+        $('#edit_breakfastAdultQty').val('');
+        $('#edit_breakfastAdultPrice').val('');
+        $('#edit_breakfastAdultId').val('');
     }
     
     if (parseInt(booking.breakfastKidQty) > 0) {
         $('#edit_breakfastKidQty').val(booking.breakfastKidQty);
         $('#edit_breakfastKidPrice').val(booking.breakfastKidPrice);
         $('#edit_breakfastKidId').val(booking.breakfastKidId);
+    } else {
+        $('#edit_breakfastKidQty').val('');
+        $('#edit_breakfastKidPrice').val('');
+        $('#edit_breakfastKidId').val('');
     }
     
     if (parseFloat(booking.pickupPrice) > 0) {
@@ -1449,6 +1706,12 @@ function populateEditForm(booking) {
         $('#edit_pickupWrapper').show();
         $('#edit_pickupPrice').val(booking.pickupPrice);
         $('#edit_pickupServiceId').val(booking.pickupServiceId);
+    } else {
+        // Explicitly reset if no pickup
+        $('#edit_includePickup').prop('checked', false);
+        $('#edit_pickupWrapper').hide();
+        $('#edit_pickupPrice').val('');
+        $('#edit_pickupServiceId').val('');
     }
     
     if (parseFloat(booking.dropoffPrice) > 0) {
@@ -1456,9 +1719,19 @@ function populateEditForm(booking) {
         $('#edit_dropoffWrapper').show();
         $('#edit_dropoffPrice').val(booking.dropoffPrice);
         $('#edit_dropoffServiceId').val(booking.dropoffServiceId);
+    } else {
+        // Explicitly reset if no dropoff
+        $('#edit_includeDropoff').prop('checked', false);
+        $('#edit_dropoffWrapper').hide();
+        $('#edit_dropoffPrice').val('');
+        $('#edit_dropoffServiceId').val('');
     }
     
-    // Set discount
+    // Set discount (always reset first, then set if exists)
+    $('#edit_includeDiscount').prop('checked', false);
+    $('#edit_discountWrapper').hide();
+    $('#edit_discountAmount').val('');
+    
     if (parseFloat(booking.DISCOUNT_AMOUNT) > 0) {
         $('#edit_includeDiscount').prop('checked', true);
         $('#edit_discountWrapper').show();
@@ -1470,8 +1743,13 @@ function populateEditForm(booking) {
         populateEditRoomSelection(booking.ROOM_ID, booking.ROOM_FLOOR);
     }
     
-    // Recompute total
-    computeEditTotal();
+    // Load existing extra services (will call computeEditTotal internally)
+    if (booking.bookingId) {
+        loadEditExistingServices(booking.bookingId);
+    } else {
+        // If no bookingId, just compute total without services
+        computeEditTotal();
+    }
 }
 
 // Function to populate room selection in edit form

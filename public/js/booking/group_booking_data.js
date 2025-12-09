@@ -971,11 +971,24 @@ function computeEditGroupTotal() {
     const lateCheckoutFeePerRoom = parseFloat($('#editGroupLateCheckoutFee').val()) || 0;
     const lateCheckoutFeeTotal = lateCheckoutFeePerRoom * numRooms;
 
+    // Calculate extra services total
+    const groupBookingId = $('#editGroupBookingId').val();
+    let extraServicesTotal = 0;
+    if (groupBookingId && window.editGroupAddedServicesMap && window.editGroupAddedServicesMap[groupBookingId]) {
+        window.editGroupAddedServicesMap[groupBookingId].forEach(service => {
+            if (!service.HIDDEN_FOR_UI) {
+                const serviceCost = parseFloat(service.SERVICE_COST) || 0;
+                const quantity = parseInt(service.QUANTITY) || 0;
+                extraServicesTotal += serviceCost * quantity;
+            }
+        });
+    }
+
     // Check if individual billing is enabled (inverted logic)
     const isConsolidated = !$('#editGroupIndividualBilling').is(':checked');
 
     // Always calculate the full total in frontend for user visibility
-    const subtotal = roomSubtotal + servicesTotal + lateCheckoutFeeTotal;
+    const subtotal = roomSubtotal + servicesTotal + lateCheckoutFeeTotal + extraServicesTotal;
     let finalBalance = subtotal - discount;
 
     // Get paid amount and validate it doesn't exceed total
@@ -1308,6 +1321,13 @@ function populateEditGroupForm(booking) {
         $('#editGroupAgencyWrapper').show();
     } else {
         $('#editGroupAgencyWrapper').hide();
+    }
+
+    // Load extra services for the group booking
+    if (booking.groupBookingId) {
+        if (typeof loadEditGroupExistingServices === 'function') {
+            loadEditGroupExistingServices(booking.groupBookingId);
+        }
     }
 
     // Auto-search for rooms after populating form data

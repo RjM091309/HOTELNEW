@@ -148,12 +148,12 @@ class BookingModel {
                   )
                   -
                   (
-                    -- Actual payments made for the whole group (room + service)
+                    -- Actual payments made for the whole group (room + service + extended)
                     SELECT COALESCE(SUM(p.AMOUNT_PAID), 0)
                     FROM payments p
                     JOIN booking b3 ON p.BOOKING_ID = b3.IDNo
                     WHERE b3.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID
-                      AND p.PAYMENT_TYPE IN ('room','service')
+                      AND p.PAYMENT_TYPE IN ('room','service','extended')
                   )
                 )
               ELSE
@@ -3883,7 +3883,7 @@ class BookingModel {
             FROM payments p
             JOIN booking b2 ON p.BOOKING_ID = b2.IDNo
             WHERE b2.GROUP_BOOKING_ID = gb.IDNo
-              AND p.PAYMENT_TYPE IN ('room','service')
+              AND p.PAYMENT_TYPE IN ('room','service','extended')
           ) AS TOTAL_PAID,
           -- Get all statuses in a group
           GROUP_CONCAT(DISTINCT b.BOOKING_STATUS ORDER BY b.BOOKING_STATUS SEPARATOR ', ') AS all_statuses,
@@ -4860,16 +4860,34 @@ class BookingModel {
         }
       }
 
-      // Handle services update (delete existing and add new)
+      // Handle services update (delete existing form-managed services and add new)
       // Get all booking IDs for this group
       const allBookingIdsQuery = `SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ? ORDER BY IDNo`;
       const [allBookings] = await connection.promise().query(allBookingIdsQuery, [groupBookingId]);
       const targetBookingIds = allBookings.map(b => b.IDNo);
 
-      // Delete existing services for all bookings and their payments
+      // Delete only form-managed services (breakfast, pickup, dropoff, late checkout)
+      // Preserve other extra services (like Car Rentals, Extended Stay, etc.)
       for (const bookingId of targetBookingIds) {
-        await connection.promise().query('DELETE FROM payments WHERE BOOKING_ID = ? AND PAYMENT_TYPE = ?', [bookingId, 'service']);
-        await connection.promise().query('DELETE FROM booking_service WHERE BOOKING_ID = ?', [bookingId]);
+        // Delete service payments for form-managed services only
+        await connection.promise().query(
+          `DELETE FROM payments 
+           WHERE BOOKING_ID = ? 
+             AND PAYMENT_TYPE = 'service' 
+             AND BOOKING_SERVICE_ID IN (
+               SELECT IDNo FROM booking_service 
+               WHERE BOOKING_ID = ? 
+                 AND SERVICE_ID IN (72, 74, 75, 76, 77)
+             )`,
+          [bookingId, bookingId]
+        );
+        
+        // Delete only form-managed services (72, 74, 75, 76, 77)
+        // 72 = Late Checkout, 74 = Breakfast Adult, 75 = Breakfast Kid, 76 = Pick-up, 77 = Drop-off
+        await connection.promise().query(
+          'DELETE FROM booking_service WHERE BOOKING_ID = ? AND SERVICE_ID IN (72, 74, 75, 76, 77)',
+          [bookingId]
+        );
       }
 
       if (targetBookingIds.length > 0) {
@@ -5049,11 +5067,11 @@ class BookingModel {
           const allBookingIds = allBookingsResult.map(b => b.IDNo);
           
           if (allBookingIds.length > 0) {
-            // Delete existing room and service payments for all bookings in the group to avoid duplicates
+            // Delete existing room, service, and extension payments for all bookings in the group to avoid duplicates
             const paymentPlaceholders = allBookingIds.map(() => '?').join(',');
             await connection.promise().query(
-              `DELETE FROM payments WHERE BOOKING_ID IN (${paymentPlaceholders}) AND PAYMENT_TYPE IN (?, ?)`,
-              [...allBookingIds, 'room', 'service']
+              `DELETE FROM payments WHERE BOOKING_ID IN (${paymentPlaceholders}) AND PAYMENT_TYPE IN (?, ?, ?)`,
+              [...allBookingIds, 'room', 'service', 'extended']
             );
             
             // Get all billing records for this group
@@ -5067,6 +5085,12 @@ class BookingModel {
             const servicePlaceholders = allBookingIds.map(() => '?').join(',');
             const [allServices] = await connection.promise().query(
               `SELECT IDNo, BOOKING_ID, TOTAL_COST, STATUS FROM booking_service WHERE BOOKING_ID IN (${servicePlaceholders})`,
+              allBookingIds
+            );
+            
+            // Get all extension records (Extended Stay) for this group
+            const [allExtensions] = await connection.promise().query(
+              `SELECT IDNo, BOOKING_ID, COST, QTY, PAYMENT_STATUS FROM booking_extension WHERE BOOKING_ID IN (${servicePlaceholders}) AND ACTIVE = 1`,
               allBookingIds
             );
             
@@ -5248,7 +5272,183 @@ class BookingModel {
               }
             }
             
+            // Priority 3: Pay Extended Stay (booking_extension) with remaining payment
+            if (remainingPayment > 0 && allExtensions.length > 0) {
+              // For paid status, prioritize main booking extensions first
+              let sortedExtensions = [...allExtensions];
+              if (paymentStatus === 'paid' && firstBookingId) {
+                // Sort: main booking extensions first, then others
+                sortedExtensions.sort((a, b) => {
+                  if (a.BOOKING_ID === firstBookingId && b.BOOKING_ID !== firstBookingId) return -1;
+                  if (b.BOOKING_ID === firstBookingId && a.BOOKING_ID !== firstBookingId) return 1;
+                  return a.BOOKING_ID - b.BOOKING_ID;
+                });
+              }
+              
+              for (const extension of sortedExtensions) {
+                if (remainingPayment <= 0) break;
+                
+                const extensionTotalCost = parseFloat(extension.COST || 0) * parseInt(extension.QTY || 1);
+                const extensionPaymentAmount = Math.min(remainingPayment, extensionTotalCost);
+                
+                if (extensionPaymentAmount > 0) {
+                  const extensionPaymentQuery = `
+                    INSERT INTO payments (BOOKING_ID, BOOKING_EXTENSION_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
+                    VALUES (?, ?, ?, ?, 'extended', ?, ?)
+                  `;
+                  await connection.promise().query(extensionPaymentQuery, [
+                    extension.BOOKING_ID,
+                    extension.IDNo,
+                    extensionPaymentAmount,
+                    'cash',
+                    date,
+                    encodedBy
+                  ]);
+                  
+                  // Update extension payment status
+                  let newStatus;
+                  if (extensionPaymentAmount >= extensionTotalCost) {
+                    newStatus = 'paid';
+                  } else if (extensionPaymentAmount > 0) {
+                    newStatus = 'partial';
+                  } else {
+                    newStatus = 'unpaid';
+                  }
+                  await connection.promise().query(
+                    'UPDATE booking_extension SET PAYMENT_STATUS = ? WHERE IDNo = ?',
+                    [newStatus, extension.IDNo]
+                  );
+                  
+                  remainingPayment -= extensionPaymentAmount;
+                  const isMain = extension.BOOKING_ID === firstBookingId ? ' (MAIN)' : '';
+                  console.log(`✅ Extended Stay payment of ₱${extensionPaymentAmount} recorded for booking ${extension.BOOKING_ID}, extension ${extension.IDNo}${isMain} - Status: ${newStatus}`);
+                }
+              }
+            }
+            
             console.log(`✅ Payment distribution completed. Total paid: ₱${paidAmount}, Remaining: ₱${remainingPayment}`);
+          }
+        }
+      }
+
+      // Update extra services and Extended Stay payment status based on payment status
+      // If payment status is 'paid', mark all unpaid extra services and extensions as 'paid'
+      if (paymentStatus === 'paid' && targetBookingIds.length > 0) {
+        const bookingPlaceholders = targetBookingIds.map(() => '?').join(',');
+        
+        // Update booking_service (extra services) - exclude form-managed services (72, 74, 75, 76, 77)
+        await connection.promise().query(
+          `UPDATE booking_service 
+           SET STATUS = 'paid', EDITED_BY = ?, EDITED_DT = ?
+           WHERE BOOKING_ID IN (${bookingPlaceholders}) 
+             AND STATUS != 'paid' 
+             AND ACTIVE = 1
+             AND SERVICE_ID NOT IN (72, 74, 75, 76, 77)`,
+          [encodedBy, date, ...targetBookingIds]
+        );
+        
+        // Update booking_extension (Extended Stay)
+        await connection.promise().query(
+          `UPDATE booking_extension 
+           SET PAYMENT_STATUS = 'paid', EDITED_BY = ?, EDITED_DT = ?
+           WHERE BOOKING_ID IN (${bookingPlaceholders}) 
+             AND PAYMENT_STATUS != 'paid' 
+             AND ACTIVE = 1`,
+          [encodedBy, date, ...targetBookingIds]
+        );
+      } else if (paymentStatus === 'partial' && targetBookingIds.length > 0) {
+        // For partial payment, check if paid amount covers all extra services and extensions
+        const bookingPlaceholders = targetBookingIds.map(() => '?').join(',');
+        
+        // Get total cost of unpaid extra services
+        const [unpaidServicesResult] = await connection.promise().query(
+          `SELECT SUM(TOTAL_COST) as totalUnpaid
+           FROM booking_service 
+           WHERE BOOKING_ID IN (${bookingPlaceholders}) 
+             AND STATUS != 'paid' 
+             AND ACTIVE = 1
+             AND SERVICE_ID NOT IN (72, 74, 75, 76, 77)`,
+          targetBookingIds
+        );
+        
+        // Get total cost of unpaid extensions
+        const [unpaidExtensionsResult] = await connection.promise().query(
+          `SELECT SUM(COST * QTY) as totalUnpaid
+           FROM booking_extension 
+           WHERE BOOKING_ID IN (${bookingPlaceholders}) 
+             AND PAYMENT_STATUS != 'paid' 
+             AND ACTIVE = 1`,
+          targetBookingIds
+        );
+        
+        const totalUnpaidExtraServices = parseFloat(unpaidServicesResult[0]?.totalUnpaid || 0);
+        const totalUnpaidExtensions = parseFloat(unpaidExtensionsResult[0]?.totalUnpaid || 0);
+        const paidAmountNum = parseFloat(data.paidAmount) || 0;
+        
+        // Get total booking cost to determine allocation
+        const [billingDataResult] = await connection.promise().query(
+          `SELECT 
+             SUM(ROOM_CHARGE * QTY) as roomCost,
+             COALESCE((SELECT SUM(TOTAL_COST) FROM booking_service WHERE BOOKING_ID IN (${bookingPlaceholders}) AND ACTIVE = 1 AND SERVICE_ID IN (72, 74, 75, 76, 77)), 0) as formServicesCost,
+             COALESCE(SUM(LATE_CHECKOUT_CHARGE), 0) as lateCheckoutCharge,
+             COALESCE(SUM(DISCOUNT_AMOUNT), 0) as discount
+           FROM billing 
+           WHERE BOOKING_ID IN (${bookingPlaceholders}) AND ACTIVE = 1`,
+          [...targetBookingIds, ...targetBookingIds, ...targetBookingIds]
+        );
+        
+        const roomCost = parseFloat(billingDataResult[0]?.roomCost || 0);
+        const formServicesCost = parseFloat(billingDataResult[0]?.formServicesCost || 0);
+        const lateCheckoutCharge = parseFloat(billingDataResult[0]?.lateCheckoutCharge || 0);
+        const discount = parseFloat(billingDataResult[0]?.discount || 0);
+        
+        const totalBookingCost = roomCost + formServicesCost + lateCheckoutCharge + totalUnpaidExtraServices + totalUnpaidExtensions - discount;
+        
+        // If paid amount covers or exceeds the total, mark all services and extensions as paid
+        if (paidAmountNum >= totalBookingCost) {
+          await connection.promise().query(
+            `UPDATE booking_service 
+             SET STATUS = 'paid', EDITED_BY = ?, EDITED_DT = ?
+             WHERE BOOKING_ID IN (${bookingPlaceholders}) 
+               AND STATUS != 'paid' 
+               AND ACTIVE = 1
+               AND SERVICE_ID NOT IN (72, 74, 75, 76, 77)`,
+            [encodedBy, date, ...targetBookingIds]
+          );
+          
+          await connection.promise().query(
+            `UPDATE booking_extension 
+             SET PAYMENT_STATUS = 'paid', EDITED_BY = ?, EDITED_DT = ?
+             WHERE BOOKING_ID IN (${bookingPlaceholders}) 
+               AND PAYMENT_STATUS != 'paid' 
+               AND ACTIVE = 1`,
+            [encodedBy, date, ...targetBookingIds]
+          );
+        } else {
+          // Calculate how much is left after paying for room and form services
+          const remainingAfterRoomAndForm = paidAmountNum - (roomCost + formServicesCost + lateCheckoutCharge - discount);
+          const totalUnpaidExtraAndExtensions = totalUnpaidExtraServices + totalUnpaidExtensions;
+          
+          // If remaining amount covers all extra services and extensions, mark them as paid
+          if (remainingAfterRoomAndForm >= totalUnpaidExtraAndExtensions && totalUnpaidExtraAndExtensions > 0) {
+            await connection.promise().query(
+              `UPDATE booking_service 
+               SET STATUS = 'paid', EDITED_BY = ?, EDITED_DT = ?
+               WHERE BOOKING_ID IN (${bookingPlaceholders}) 
+                 AND STATUS != 'paid' 
+                 AND ACTIVE = 1
+                 AND SERVICE_ID NOT IN (72, 74, 75, 76, 77)`,
+              [encodedBy, date, ...targetBookingIds]
+            );
+            
+            await connection.promise().query(
+              `UPDATE booking_extension 
+               SET PAYMENT_STATUS = 'paid', EDITED_BY = ?, EDITED_DT = ?
+               WHERE BOOKING_ID IN (${bookingPlaceholders}) 
+                 AND PAYMENT_STATUS != 'paid' 
+                 AND ACTIVE = 1`,
+              [encodedBy, date, ...targetBookingIds]
+            );
           }
         }
       }
@@ -7423,11 +7623,9 @@ class BookingModel {
               editedBy, editDate, bookingId
             ]);
 
-            // 4. Delete ONLY UNPAID services; keep already-paid services intact
-            await connection.promise().query(
-              'DELETE FROM booking_service WHERE BOOKING_ID = ? AND (STATUS IS NULL OR STATUS = ?)',
-              [bookingId, 'unpaid']
-            );
+            // 4. DO NOT DELETE ALL UNPAID SERVICES - only delete specific form-managed services
+            //    Extra services (like Car Rentals) should be preserved and not deleted
+            //    We'll only delete breakfast, pickup, dropoff, and late checkout services below
 
             // 4A. If checkout status is now REGULAR (0) or fee is 0,
             //     tanggalin lahat ng late checkout services (SERVICE_ID = 72),
@@ -7600,6 +7798,125 @@ class BookingModel {
                 await connection.promise().query(paymentQuery, [
                   bookingId, null, paidAmountNum, 'cash', 'room', editDate, editedBy
                 ]);
+              }
+            }
+
+            // 6A. Update extra services status based on payment status
+            // If payment status is 'paid', mark all unpaid extra services as 'paid'
+            // Exclude form-managed services (72, 74, 75, 76, 77) as they're handled separately
+            if (paymentStatus === 'paid') {
+              // Update booking_service (extra services)
+              await connection.promise().query(
+                `UPDATE booking_service 
+                 SET STATUS = 'paid', EDITED_BY = ?, EDITED_DT = ?
+                 WHERE BOOKING_ID = ? 
+                   AND STATUS != 'paid' 
+                   AND ACTIVE = 1
+                   AND SERVICE_ID NOT IN (72, 74, 75, 76, 77)`,
+                [editedBy, editDate, bookingId]
+              );
+              
+              // Update booking_extension (Extended Stay)
+              await connection.promise().query(
+                `UPDATE booking_extension 
+                 SET PAYMENT_STATUS = 'paid', EDITED_BY = ?, EDITED_DT = ?
+                 WHERE BOOKING_ID = ? 
+                   AND PAYMENT_STATUS != 'paid' 
+                   AND ACTIVE = 1`,
+                [editedBy, editDate, bookingId]
+              );
+            } else if (paymentStatus === 'partial') {
+              // For partial payment, we need to check if the paid amount covers the extra services
+              // Get total cost of unpaid extra services
+              const [unpaidServices] = await connection.promise().query(
+                `SELECT SUM(TOTAL_COST) as totalUnpaid
+                 FROM booking_service 
+                 WHERE BOOKING_ID = ? 
+                   AND STATUS != 'paid' 
+                   AND ACTIVE = 1
+                   AND SERVICE_ID NOT IN (72, 74, 75, 76, 77)`,
+                [bookingId]
+              );
+              
+              // Get total cost of unpaid extensions
+              const [unpaidExtensions] = await connection.promise().query(
+                `SELECT SUM(COST * QTY) as totalUnpaid
+                 FROM booking_extension 
+                 WHERE BOOKING_ID = ? 
+                   AND PAYMENT_STATUS != 'paid' 
+                   AND ACTIVE = 1`,
+                [bookingId]
+              );
+              
+              const totalUnpaidExtraServices = parseFloat(unpaidServices[0]?.totalUnpaid || 0);
+              const totalUnpaidExtensions = parseFloat(unpaidExtensions[0]?.totalUnpaid || 0);
+              const paidAmountNum = parseFloat(paidAmount) || 0;
+              
+              // Get total booking cost to determine allocation
+              const [billingData] = await connection.promise().query(
+                `SELECT 
+                   (ROOM_CHARGE * QTY) as roomCost,
+                   COALESCE((SELECT SUM(TOTAL_COST) FROM booking_service WHERE BOOKING_ID = ? AND ACTIVE = 1 AND SERVICE_ID IN (72, 74, 75, 76, 77)), 0) as formServicesCost,
+                   COALESCE(LATE_CHECKOUT_CHARGE, 0) as lateCheckoutCharge,
+                   COALESCE(DISCOUNT_AMOUNT, 0) as discount
+                 FROM billing 
+                 WHERE BOOKING_ID = ? AND ACTIVE = 1`,
+                [bookingId, bookingId]
+              );
+              
+              const roomCost = parseFloat(billingData[0]?.roomCost || 0);
+              const formServicesCost = parseFloat(billingData[0]?.formServicesCost || 0);
+              const lateCheckoutCharge = parseFloat(billingData[0]?.lateCheckoutCharge || 0);
+              const discount = parseFloat(billingData[0]?.discount || 0);
+              
+              const totalBookingCost = roomCost + formServicesCost + lateCheckoutCharge + totalUnpaidExtraServices + totalUnpaidExtensions - discount;
+              
+              // If paid amount covers or exceeds the total, mark all services and extensions as paid
+              if (paidAmountNum >= totalBookingCost) {
+                await connection.promise().query(
+                  `UPDATE booking_service 
+                   SET STATUS = 'paid', EDITED_BY = ?, EDITED_DT = ?
+                   WHERE BOOKING_ID = ? 
+                     AND STATUS != 'paid' 
+                     AND ACTIVE = 1
+                     AND SERVICE_ID NOT IN (72, 74, 75, 76, 77)`,
+                  [editedBy, editDate, bookingId]
+                );
+                
+                await connection.promise().query(
+                  `UPDATE booking_extension 
+                   SET PAYMENT_STATUS = 'paid', EDITED_BY = ?, EDITED_DT = ?
+                   WHERE BOOKING_ID = ? 
+                     AND PAYMENT_STATUS != 'paid' 
+                     AND ACTIVE = 1`,
+                  [editedBy, editDate, bookingId]
+                );
+              } else {
+                // Calculate how much is left after paying for room and form services
+                const remainingAfterRoomAndForm = paidAmountNum - (roomCost + formServicesCost + lateCheckoutCharge - discount);
+                const totalUnpaidExtraAndExtensions = totalUnpaidExtraServices + totalUnpaidExtensions;
+                
+                // If remaining amount covers all extra services and extensions, mark them as paid
+                if (remainingAfterRoomAndForm >= totalUnpaidExtraAndExtensions && totalUnpaidExtraAndExtensions > 0) {
+                  await connection.promise().query(
+                    `UPDATE booking_service 
+                     SET STATUS = 'paid', EDITED_BY = ?, EDITED_DT = ?
+                     WHERE BOOKING_ID = ? 
+                       AND STATUS != 'paid' 
+                       AND ACTIVE = 1
+                       AND SERVICE_ID NOT IN (72, 74, 75, 76, 77)`,
+                    [editedBy, editDate, bookingId]
+                  );
+                  
+                  await connection.promise().query(
+                    `UPDATE booking_extension 
+                     SET PAYMENT_STATUS = 'paid', EDITED_BY = ?, EDITED_DT = ?
+                     WHERE BOOKING_ID = ? 
+                       AND PAYMENT_STATUS != 'paid' 
+                       AND ACTIVE = 1`,
+                    [editedBy, editDate, bookingId]
+                  );
+                }
               }
             }
 

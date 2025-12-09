@@ -7090,11 +7090,15 @@ function loadExistingServicesForModal(bookingId) {
                     const quantity = parseInt(service.QTY) || 1;
                     
                     // For custom services, use SERVICE_COST from query if available
-                    // For regular services, calculate from TOTAL_COST / QTY
+                    // For Extended Stay (SERVICE_ID = -999), TOTAL_COST is already cost per unit (cost per day)
+                    // For other regular services, calculate from TOTAL_COST / QTY
                     let unitCost = 0;
                     if (service.SERVICE_ID === -1 && service.SERVICE_COST) {
                         // Custom service - use SERVICE_COST from query (already calculated)
                         unitCost = parseFloat(service.SERVICE_COST) || 0;
+                    } else if (service.SERVICE_ID === -999) {
+                        // Extended Stay: TOTAL_COST is already cost per unit (cost per day)
+                        unitCost = totalCost;
                     } else {
                         // Regular service - calculate unit cost
                         unitCost = quantity > 0 ? totalCost / quantity : 0;
