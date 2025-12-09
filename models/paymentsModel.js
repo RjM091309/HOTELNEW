@@ -202,7 +202,7 @@ const paymentsModel = {
        FROM booking_service bs
        LEFT JOIN services s ON bs.SERVICE_ID = s.IDNo
        LEFT JOIN user_info u ON u.IDNo = bs.EDITED_BY
-       WHERE bs.BOOKING_ID = ?`, [bookingId]
+       WHERE bs.BOOKING_ID = ? AND bs.ACTIVE = 1`, [bookingId]
     );
 
     const [extensions] = await pool.promise().query(

@@ -2923,6 +2923,7 @@ class BookingModel {
         
         // Get services with remaining balance (exclude fully paid or overpaid services)
         // Include SERVICE_ID so we can prioritize specific services (e.g. Upgrade, Custom)
+        // Only include ACTIVE = 1 services
         const serviceQuery = `
             SELECT 
               bs.IDNo, 
@@ -2932,7 +2933,7 @@ class BookingModel {
               (bs.TOTAL_COST - COALESCE(SUM(p.AMOUNT_PAID), 0)) as remainingAmount
             FROM booking_service bs
             LEFT JOIN payments p ON p.BOOKING_SERVICE_ID = bs.IDNo AND p.PAYMENT_TYPE = 'service'
-            WHERE bs.BOOKING_ID = ?
+            WHERE bs.BOOKING_ID = ? AND bs.ACTIVE = 1
             GROUP BY bs.IDNo, bs.SERVICE_ID, bs.TOTAL_COST
             HAVING remainingAmount > 0
         `;
@@ -3070,7 +3071,7 @@ class BookingModel {
 
           await new Promise((resolve, reject) => {
             connection.query(
-                `UPDATE booking_extension SET PAYMENT_STATUS = ? WHERE IDNo = ?`,
+                `UPDATE booking_extension SET PAYMENT_STATUS = ? WHERE IDNo = ? AND ACTIVE = 1`,
                 [newExtensionStatus, ext.IDNo],
               (err) => {
                 if (err) reject(err);
@@ -3115,7 +3116,7 @@ class BookingModel {
 
           await new Promise((resolve, reject) => {
             connection.query(
-                `UPDATE booking_service SET STATUS = ? WHERE IDNo = ?`,
+                `UPDATE booking_service SET STATUS = ? WHERE IDNo = ? AND ACTIVE = 1`,
                 [newServiceStatus, service.IDNo],
               (err) => {
                 if (err) reject(err);
@@ -3244,10 +3245,10 @@ class BookingModel {
           });
           }
 
-          // Mark all extensions as paid
+          // Mark all extensions as paid (only ACTIVE = 1)
           await new Promise((resolve, reject) => {
             connection.query(
-              `UPDATE booking_extension SET PAYMENT_STATUS = 'paid' WHERE BOOKING_ID = ? AND PAYMENT_STATUS != 'paid'`,
+              `UPDATE booking_extension SET PAYMENT_STATUS = 'paid' WHERE BOOKING_ID = ? AND PAYMENT_STATUS != 'paid' AND ACTIVE = 1`,
               [bookingId],
               (err) => {
                 if (err) reject(err);
@@ -3259,7 +3260,7 @@ class BookingModel {
           // Mark all services as paid
           await new Promise((resolve, reject) => {
             connection.query(
-              `UPDATE booking_service SET STATUS = 'paid' WHERE BOOKING_ID = ? AND STATUS != 'paid'`,
+              `UPDATE booking_service SET STATUS = 'paid' WHERE BOOKING_ID = ? AND STATUS != 'paid' AND ACTIVE = 1`,
               [bookingId],
               (err) => {
                 if (err) reject(err);
@@ -5084,7 +5085,7 @@ class BookingModel {
             // Get all service records for this group
             const servicePlaceholders = allBookingIds.map(() => '?').join(',');
             const [allServices] = await connection.promise().query(
-              `SELECT IDNo, BOOKING_ID, TOTAL_COST, STATUS FROM booking_service WHERE BOOKING_ID IN (${servicePlaceholders})`,
+              `SELECT IDNo, BOOKING_ID, TOTAL_COST, STATUS FROM booking_service WHERE BOOKING_ID IN (${servicePlaceholders}) AND ACTIVE = 1`,
               allBookingIds
             );
             
@@ -5261,7 +5262,7 @@ class BookingModel {
                     newStatus = 'unpaid';
                   }
                   await connection.promise().query(
-                    'UPDATE booking_service SET STATUS = ? WHERE IDNo = ?',
+                    'UPDATE booking_service SET STATUS = ? WHERE IDNo = ? AND ACTIVE = 1',
                     [newStatus, service.IDNo]
                   );
                   
@@ -5315,7 +5316,7 @@ class BookingModel {
                     newStatus = 'unpaid';
                   }
                   await connection.promise().query(
-                    'UPDATE booking_extension SET PAYMENT_STATUS = ? WHERE IDNo = ?',
+                    'UPDATE booking_extension SET PAYMENT_STATUS = ? WHERE IDNo = ? AND ACTIVE = 1',
                     [newStatus, extension.IDNo]
                   );
                   
@@ -5871,7 +5872,7 @@ class BookingModel {
 
         // Mark service as paid
         const serviceUpdateQuery = `
-          UPDATE booking_service SET STATUS = 'paid' WHERE IDNo = ?
+          UPDATE booking_service SET STATUS = 'paid' WHERE IDNo = ? AND ACTIVE = 1
         `;
         await queryDatabasePromise(serviceUpdateQuery, [service.IDNo], connection);
       }
@@ -9150,9 +9151,9 @@ class BookingModel {
           [allBookingIds.length > 0 ? allBookingIds : targetBookingIds]
         );
 
-        // Get all service IDs for this group  
+        // Get all service IDs for this group (only ACTIVE = 1)
         const [allServices] = await connection.promise().query(
-          'SELECT IDNo, BOOKING_ID, TOTAL_COST, STATUS FROM booking_service WHERE BOOKING_ID IN (?)',
+          'SELECT IDNo, BOOKING_ID, TOTAL_COST, STATUS FROM booking_service WHERE BOOKING_ID IN (?) AND ACTIVE = 1',
           [allBookingIds.length > 0 ? allBookingIds : targetBookingIds]
         );
 
@@ -9320,7 +9321,7 @@ class BookingModel {
                 newStatus = 'unpaid';
               }
               await connection.promise().query(
-                'UPDATE booking_service SET STATUS = ? WHERE IDNo = ?',
+                'UPDATE booking_service SET STATUS = ? WHERE IDNo = ? AND ACTIVE = 1',
                 [newStatus, service.IDNo]
               );
               
