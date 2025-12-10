@@ -223,6 +223,35 @@ async function createDynamicRoomModal(bookingId, event, options) {
     customerLevel = '';
     totalCost = '₱0.00';
     lateCheckout = '0';
+    
+    // Check if checkout date is today
+    // event.end is set to checkout date at 11:00 AM, not the next day
+    let actualCheckOutDate;
+    
+    // Try to get checkout date from event extendedProps first (more reliable)
+    if (event && event.extendedProps && event.extendedProps.checkOutDate) {
+      actualCheckOutDate = new Date(event.extendedProps.checkOutDate);
+    } else {
+      // Fallback: use event.end directly (it's already the checkout date at 11:00 AM)
+      actualCheckOutDate = new Date(checkOutDate);
+    }
+    
+    // Normalize dates to compare only the date part (ignore time)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const checkoutDateOnly = new Date(actualCheckOutDate);
+    checkoutDateOnly.setHours(0, 0, 0, 0);
+    
+    // Disable checkout button if checkout date is today (same as dashboard "Today Check Out" tab behavior)
+    // Compare using local date strings (YYYY-MM-DD) to avoid timezone issues
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const checkoutStr = `${checkoutDateOnly.getFullYear()}-${String(checkoutDateOnly.getMonth() + 1).padStart(2, '0')}-${String(checkoutDateOnly.getDate()).padStart(2, '0')}`;
+    const isCheckoutToday = checkoutStr === todayStr;
+    
+    // Also disable checkout button if booking status is pending
+    const isPending = event && event.extendedProps && event.extendedProps.bookingStatus === 'pending';
+    
+    shouldDisableCheckout = isCheckoutToday || isPending;
   } else {
     // Find the room card to get booking data using the BookingID (dashboard context)
     const roomCard = document.querySelector(`[data-booking-id="${bookingId}"]`);

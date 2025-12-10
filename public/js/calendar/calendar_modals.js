@@ -248,22 +248,68 @@ function showLateCheckInModal(event) {
     if (checkInBtn && canCheckIn) {
       checkInBtn.addEventListener('click', () => {
         Swal.close();
-        // Show confirmation dialog
-        Swal.fire({
-          title: 'Confirm Check-In',
-          text: 'Are you sure you want to check-in this guest?',
-          icon: 'question',
-          showCancelButton: true,
-          confirmButtonText: 'Yes, Check-In',
-          cancelButtonText: 'Cancel',
-          confirmButtonColor: '#28a745', // Green for check-in
-          cancelButtonColor: '#6c757d',
-          background: '#2a3135',
-          color: '#ffffff'
-        }).then((confirmResult) => {
-          if (confirmResult.isConfirmed) {
-            // Process the check-in
-            checkInReservation(bookingId, event);
+        
+        // Check if room is occupied or under cleaning before showing confirmation
+        $.ajax({
+          url: '/dashboard/booking/check_room_occupied',
+          type: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({
+            BookingID: bookingId
+          }),
+          success: (response) => {
+            if (response.success && response.isCleaning) {
+              // Room is under cleaning, show error popup
+              Swal.fire({
+                title: "Cannot Check-In!",
+                text: `Cannot check-in to Room ${roomNumber} because it is currently under cleaning. Please wait until cleaning is completed.`,
+                icon: "error",
+                confirmButtonColor: "#dc3545",
+                confirmButtonText: "OK",
+                allowOutsideClick: false,
+                background: '#2a3135',
+                color: '#ffffff'
+              });
+              return;
+            }
+            
+            if (response.success && response.isOccupied) {
+              // Room is occupied, show error popup
+              Swal.fire({
+                title: "Cannot Check-In!",
+                html: `Cannot check-in to Room ${roomNumber} because it is still occupied.${response.data ? ` Currently checked in: <strong>${response.data.CustomerName || 'another guest'}</strong>.` : ''}`,
+                icon: "error",
+                confirmButtonColor: "#dc3545",
+                confirmButtonText: "OK",
+                allowOutsideClick: false,
+                background: '#2a3135',
+                color: '#ffffff'
+              });
+              return;
+            }
+            
+            // Room is available, proceed with confirmation dialog
+            Swal.fire({
+              title: 'Confirm Check-In',
+              text: 'Are you sure you want to check-in this guest?',
+              icon: 'question',
+              showCancelButton: true,
+              confirmButtonText: 'Yes, Check-In',
+              cancelButtonText: 'Cancel',
+              confirmButtonColor: '#28a745', // Green for check-in
+              cancelButtonColor: '#6c757d',
+              background: '#2a3135',
+              color: '#ffffff'
+            }).then((confirmResult) => {
+              if (confirmResult.isConfirmed) {
+                // Process the check-in
+                checkInReservation(bookingId, event);
+              }
+            });
+          },
+          error: (xhr, status, error) => {
+            PMSCore.handleError(error, 'Check room occupied AJAX error');
+            PMSCore.showError('Error!', 'An error occurred while checking room status.');
           }
         });
       });
@@ -419,22 +465,68 @@ function showPendingModal(event) {
     if (checkInBtn && canCheckIn) {
       checkInBtn.addEventListener('click', () => {
         Swal.close();
-        // Show confirmation dialog
-        Swal.fire({
-          title: 'Confirm Check-In',
-          text: 'Are you sure you want to check-in this guest?',
-          icon: 'question',
-          showCancelButton: true,
-          confirmButtonText: 'Yes, Check-In',
-          cancelButtonText: 'Cancel',
-          confirmButtonColor: '#28a745', // Green for check-in
-          cancelButtonColor: '#6c757d',
-          background: '#2a3135',
-          color: '#ffffff'
-        }).then((confirmResult) => {
-          if (confirmResult.isConfirmed) {
-            // Process the check-in
-            checkInReservation(bookingId, event);
+        
+        // Check if room is occupied or under cleaning before showing confirmation
+        $.ajax({
+          url: '/dashboard/booking/check_room_occupied',
+          type: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({
+            BookingID: bookingId
+          }),
+          success: (response) => {
+            if (response.success && response.isCleaning) {
+              // Room is under cleaning, show error popup
+              Swal.fire({
+                title: "Cannot Check-In!",
+                text: `Cannot check-in to Room ${roomNumber} because it is currently under cleaning. Please wait until cleaning is completed.`,
+                icon: "error",
+                confirmButtonColor: "#dc3545",
+                confirmButtonText: "OK",
+                allowOutsideClick: false,
+                background: '#2a3135',
+                color: '#ffffff'
+              });
+              return;
+            }
+            
+            if (response.success && response.isOccupied) {
+              // Room is occupied, show error popup
+              Swal.fire({
+                title: "Cannot Check-In!",
+                html: `Cannot check-in to Room ${roomNumber} because it is still occupied.${response.data ? ` Currently checked in: <strong>${response.data.CustomerName || 'another guest'}</strong>.` : ''}`,
+                icon: "error",
+                confirmButtonColor: "#dc3545",
+                confirmButtonText: "OK",
+                allowOutsideClick: false,
+                background: '#2a3135',
+                color: '#ffffff'
+              });
+              return;
+            }
+            
+            // Room is available, proceed with confirmation dialog
+            Swal.fire({
+              title: 'Confirm Check-In',
+              text: 'Are you sure you want to check-in this guest?',
+              icon: 'question',
+              showCancelButton: true,
+              confirmButtonText: 'Yes, Check-In',
+              cancelButtonText: 'Cancel',
+              confirmButtonColor: '#28a745', // Green for check-in
+              cancelButtonColor: '#6c757d',
+              background: '#2a3135',
+              color: '#ffffff'
+            }).then((confirmResult) => {
+              if (confirmResult.isConfirmed) {
+                // Process the check-in
+                checkInReservation(bookingId, event);
+              }
+            });
+          },
+          error: (xhr, status, error) => {
+            PMSCore.handleError(error, 'Check room occupied AJAX error');
+            PMSCore.showError('Error!', 'An error occurred while checking room status.');
           }
         });
       });

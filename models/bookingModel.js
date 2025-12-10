@@ -470,11 +470,31 @@ class BookingModel {
       if (roomResult.length === 0) {
         return { 
           isOccupied: false, 
+          isCleaning: false,
           message: 'Booking not found' 
         };
       }
 
       const roomId = roomResult[0].ROOM_ID;
+
+      // Check if room is under cleaning (ROOM_STATUS = 4)
+      const checkCleaningQuery = `
+        SELECT ROOM_NUMBER, ROOM_STATUS
+        FROM room
+        WHERE IDNo = ? AND ACTIVE = 1 AND ROOM_STATUS = 4
+        LIMIT 1
+      `;
+      
+      const cleaningResult = await queryDatabasePromise(checkCleaningQuery, [roomId]);
+      
+      if (cleaningResult.length > 0) {
+        return {
+          isOccupied: false,
+          isCleaning: true,
+          roomNumber: cleaningResult[0].ROOM_NUMBER,
+          message: `Room ${cleaningResult[0].ROOM_NUMBER} is currently under cleaning`
+        };
+      }
 
       // Get current booking dates to check for overlap
       const getCurrentBookingQuery = `
@@ -518,6 +538,7 @@ class BookingModel {
       if (occupiedResult.length > 0) {
         return {
           isOccupied: true,
+          isCleaning: false,
           occupiedBooking: occupiedResult[0],
           message: `Room is currently occupied by ${occupiedResult[0].CustomerName || 'another guest'}`
         };
@@ -525,6 +546,7 @@ class BookingModel {
 
       return {
         isOccupied: false,
+        isCleaning: false,
         message: 'Room is available'
       };
     } catch (error) {

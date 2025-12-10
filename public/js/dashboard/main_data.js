@@ -1036,9 +1036,9 @@ $(document).ready(function() {
         // Get the room number from the card header
         const roomNumber = $toggle.closest('.card').find('.card-head header').text().trim();
 
-        // If checking in, first check if room is occupied
+        // If checking in, first check if room is occupied or under cleaning
         if (isChecked) {
-            // Check if room is occupied
+            // Check if room is occupied or under cleaning
             $.ajax({
                 url: '/dashboard/booking/check_room_occupied',
                 type: 'POST',
@@ -1047,11 +1047,25 @@ $(document).ready(function() {
                     BookingID: bookingId
                 }),
                 success: (response) => {
+                    if (response.success && response.isCleaning) {
+                        // Room is under cleaning, show error popup
+                        Swal.fire({
+                            title: "Cannot Check In!",
+                            text: `Cannot check-in to Room ${roomNumber} because it is currently under cleaning. Please wait until cleaning is completed.`,
+                            icon: "error",
+                            confirmButtonColor: "#dc3545",
+                            confirmButtonText: "OK",
+                            allowOutsideClick: false
+                        });
+                        // Toggle already reverted at start, no need to change
+                        return;
+                    }
+                    
                     if (response.success && response.isOccupied) {
                         // Room is occupied, show error popup
                         Swal.fire({
                             title: "Cannot Check In!",
-                            text: `Cannot check in to Room ${roomNumber} because it is still occupied.${response.data ? ` Currently checked in: ${response.data.CustomerName || 'another guest'}.` : ''}`,
+                            html: `Cannot check-in to Room ${roomNumber} because it is still occupied.${response.data ? ` Currently checked in: <strong>${response.data.CustomerName || 'another guest'}</strong>.` : ''}`,
                             icon: "error",
                             confirmButtonColor: "#dc3545",
                             confirmButtonText: "OK",

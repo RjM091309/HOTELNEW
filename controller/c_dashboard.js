@@ -267,9 +267,11 @@ class DashboardController {
       
       res.json({
         success: true,
-        isOccupied: result.isOccupied,
+        isOccupied: result.isOccupied || false,
+        isCleaning: result.isCleaning || false,
         message: result.message,
-        data: result.occupiedBooking || null
+        data: result.occupiedBooking || null,
+        roomNumber: result.roomNumber || null
       });
     } catch (error) {
       console.error('Error checking room occupancy:', error);
