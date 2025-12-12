@@ -193,6 +193,9 @@ function showLateCheckInModal(event) {
         <button id="btn-edit-details" class="swal2-styled" style="background-color: #007bff; border: none; padding: 10px 20px; border-radius: 4px; color: white; cursor: pointer; font-weight: 500;">
           Edit Details
         </button>
+        <button id="btn-close" class="swal2-styled" style="background-color: #6c757d; border: none; padding: 10px 20px; border-radius: 4px; color: white; cursor: pointer; font-weight: 500;">
+          Close
+        </button>
       </div>
     `
   };
@@ -207,8 +210,11 @@ function showLateCheckInModal(event) {
         <button id="btn-edit-details" class="swal2-styled" style="background-color: #007bff; border: none; padding: 10px 20px; border-radius: 4px; color: white; cursor: pointer; font-weight: 500;">
           Edit Details
         </button>
-        <button id="btn-checkin" class="swal2-styled" style="background-color: #b8a600; border: none; padding: 10px 20px; border-radius: 4px; color: white; cursor: pointer; font-weight: 500;">
+        <!-- <button id="btn-checkin" class="swal2-styled" style="background-color: #b8a600; border: none; padding: 10px 20px; border-radius: 4px; color: white; cursor: pointer; font-weight: 500;">
           Check-In Now
+        </button> -->
+        <button id="btn-close" class="swal2-styled" style="background-color: #6c757d; border: none; padding: 10px 20px; border-radius: 4px; color: white; cursor: pointer; font-weight: 500;">
+          Close
         </button>
       </div>
     `;
@@ -240,6 +246,14 @@ function showLateCheckInModal(event) {
       editDetailsBtn.addEventListener('click', () => {
         Swal.close();
         editBookingFromCalendar(bookingId);
+      });
+    }
+
+    // Close button
+    const closeBtn = document.getElementById('btn-close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        Swal.close();
       });
     }
 
@@ -410,6 +424,9 @@ function showPendingModal(event) {
         <button id="btn-edit-details" class="swal2-styled" style="background-color: #007bff; border: none; padding: 10px 20px; border-radius: 4px; color: white; cursor: pointer; font-weight: 500;">
           Edit Details
         </button>
+        <button id="btn-close" class="swal2-styled" style="background-color: #6c757d; border: none; padding: 10px 20px; border-radius: 4px; color: white; cursor: pointer; font-weight: 500;">
+          Close
+        </button>
       </div>
     `
   };
@@ -424,8 +441,11 @@ function showPendingModal(event) {
         <button id="btn-edit-details" class="swal2-styled" style="background-color: #007bff; border: none; padding: 10px 20px; border-radius: 4px; color: white; cursor: pointer; font-weight: 500;">
           Edit Details
         </button>
-        <button id="btn-checkin" class="swal2-styled" style="background-color: #e53935; border: none; padding: 10px 20px; border-radius: 4px; color: white; cursor: pointer; font-weight: 500;">
+        <!-- <button id="btn-checkin" class="swal2-styled" style="background-color: #e53935; border: none; padding: 10px 20px; border-radius: 4px; color: white; cursor: pointer; font-weight: 500;">
           Check-In Now
+        </button> -->
+        <button id="btn-close" class="swal2-styled" style="background-color: #6c757d; border: none; padding: 10px 20px; border-radius: 4px; color: white; cursor: pointer; font-weight: 500;">
+          Close
         </button>
       </div>
     `;
@@ -457,6 +477,14 @@ function showPendingModal(event) {
       editDetailsBtn.addEventListener('click', () => {
         Swal.close();
         editBookingFromCalendar(bookingId);
+      });
+    }
+
+    // Close button
+    const closeBtn = document.getElementById('btn-close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        Swal.close();
       });
     }
 
