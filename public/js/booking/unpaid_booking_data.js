@@ -1,3 +1,15 @@
+// Fallback for editDirect function if not yet loaded from modal
+if (typeof window.editDirect === 'undefined') {
+    window.editDirect = function(bookingId) {
+        // If editBooking is available, use it (edit form handles direct reservations)
+        if (typeof window.editBooking === 'function') {
+            window.editBooking(bookingId);
+        } else {
+            console.error('editBooking function is not available');
+        }
+    };
+}
+
 // Local status label renderer (same behavior as All/Single views)
 function getStatusLabel(status, bookingId) {
     let labelClass, labelText;
@@ -186,17 +198,11 @@ $(document).ready(function () {
                     const bookingStatus = row.BookingStatus?.toLowerCase();
                     const isDirect = String(row.IsDirectReservation) === '1';
                     let html = `<div style="text-align: center;">`;
-                    if (isDirect) {
-                        html += `
-                        <span class="label label-sm label-default" title="Disabled for Direct Reservation" style="opacity:.6; cursor:not-allowed; margin:0 2px; display:inline-block;">
-                            <i class="fa fa-credit-card"></i>
-                        </span>`;
-                    } else {
-                        html += `
+                    // Billing action - enabled for all bookings including direct reservations
+                    html += `
                         <span class="label label-sm label-billing" onclick="showBilling(${row.BookingID})" title="Billing" style="cursor:pointer; margin:0 2px; display:inline-block;">
                             <i class="fa fa-credit-card"></i>
                         </span>`;
-                    }
                     html += `
                     <span class="label label-sm label-warning ms-1" onclick="${isDirect ? `editDirect(${row.BookingID})` : `editBooking(${row.BookingID})`}" title="Edit Booking" style="cursor:pointer; margin:0 2px; display:inline-block;">
                         <i class="fa fa-edit"></i>

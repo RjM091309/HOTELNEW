@@ -2572,11 +2572,11 @@ class BookingModel {
           COALESCE(bi.CHECKOUT_REFUND, 0) AS CHECKOUT_REFUND,
           COALESCE(bi.REFUNDABLE_AMOUNT, 0) AS REFUNDABLE_AMOUNT,
           bi.DISCOUNT_APPLIED,
-          rt.NAME AS ROOM_TYPE
+          COALESCE(rt.NAME, 'Unassigned Room') AS ROOM_TYPE
         FROM booking b
         JOIN billing bi ON b.IDNo = bi.BOOKING_ID
-        JOIN room r ON b.ROOM_ID = r.IDNo
-        JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
+        LEFT JOIN room r ON b.ROOM_ID = r.IDNo
+        LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
         WHERE b.IDNo = ?
       `;
 

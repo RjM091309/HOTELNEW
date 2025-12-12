@@ -24,6 +24,60 @@ $(document).ready(function () {
   });
 });
 
+// Function to open side panel with unassigned rooms for a specific date
+function openUnassignedRoomsPanel(date) {
+  const formattedDate = new Date(date).toLocaleDateString('en-US', { 
+    month: 'long', 
+    day: 'numeric', 
+    year: 'numeric' 
+  });
+
+  // Open the side panel and show loading message
+  $('.side-panel').toggleClass('opened');
+  
+  $('.side-panel .content').html(`<p>Loading Unassigned Room details...</p>`);
+
+  // Fetch detailed Unassigned Room for the clicked date
+  fetch(`/calendar/api/unassigned-rooms/details?date=${date}`)
+    .then((response) => response.json())
+    .then((data) => {
+
+      if (!data.success || data.bookings.length === 0) {
+        $('.side-panel .content').html(`
+          <div style="margin-top: 50px;">
+            <h3>Unassigned Rooms Lists - ${formattedDate}</h3>
+            <p style="color: #fff;">No unassigned room reservations available for this date.</p>
+          </div>
+        `);
+        return;
+      }
+
+      // Fetch available rooms for the dropdown
+      populateAvailableRooms().then((rooms) => {
+        // Render Unassigned Room details
+        const reservationDetails = data.bookings
+          .map((booking, index) => renderDirectReservationDetails(booking, index, rooms))
+          .join("");
+
+        $('.side-panel .content').html(`
+          <div style="margin-top: 50px;">
+            <h3>Unassigned Rooms Lists - ${formattedDate}</h3>
+            ${reservationDetails}
+          </div>
+        `);
+      });
+    })
+    .catch((err) => {
+      console.error('Error fetching unassigned room reservation details:', err);
+      $('.side-panel .content').html(`
+        <div style="margin-top: 50px;">
+          <h2>Unassigned Rooms Lists - ${date}</h2>
+          <p>Error loading unassigned room reservation details.</p>
+        </div>
+      `);
+    });
+}
+
 function initCalendar() {
   var calendarEl = $("#calendar").get(0);
   calendar = new FullCalendar.Calendar(calendarEl, {
@@ -37,61 +91,36 @@ function initCalendar() {
 
     dateClick: function (info) {
       const date = info.dateStr;
-      const formattedDate = new Date(date).toLocaleDateString('en-US', { 
-        month: 'long', 
-        day: 'numeric', 
-        year: 'numeric' 
-      });
-
-
-      // Open the side panel and show loading message
-      $('.side-panel').toggleClass('opened');
-      
-      
-      $('.side-panel .content').html(`<p>Loading Unassigned Room details...</p>`);
-
-      // Fetch detailed Unassigned Room for the clicked date
-      fetch(`/calendar/api/unassigned-rooms/details?date=${date}`)
-        .then((response) => response.json())
-        .then((data) => {
-
-          if (!data.success || data.bookings.length === 0) {
-            $('.side-panel .content').html(`
-              <div style="margin-top: 50px;">
-                <h3>Unassigned Rooms Lists - ${formattedDate}</h3>
-                <p style="color: #fff;">No unassigned room reservations available for this date.</p>
-              </div>
-            `);
-            return;
-          }
-
-          // Fetch available rooms for the dropdown
-          populateAvailableRooms().then((rooms) => {
-            // Render Unassigned Room details
-            const reservationDetails = data.bookings
-              .map((booking, index) => renderDirectReservationDetails(booking, index, rooms))
-              .join("");
-
-            $('.side-panel .content').html(`
-              <div style="margin-top: 50px;">
-                <h3>Unassigned Rooms Lists - ${formattedDate}</h3>
-                ${reservationDetails}
-              </div>
-            `);
-          });
-        })
-        .catch((err) => {
-          console.error('Error fetching unassigned room reservation details:', err);
-          $('.side-panel .content').html(`
-            <div style="margin-top: 50px;">
-              <h2>Unassigned Rooms Lists - ${date}</h2>
-              <p>Error loading unassigned room reservation details.</p>
-            </div>
-          `);
-        });
+      openUnassignedRoomsPanel(date);
     },
 
-    eventClick: null, // Disable event clicks
+    eventClick: function (info) {
+      // Prevent default behavior
+      info.jsEvent.preventDefault();
+      info.jsEvent.stopPropagation();
+      
+      // Get the date from the event
+      const eventDate = info.event.start;
+      let dateStr;
+      
+      // Handle different date formats
+      if (eventDate instanceof Date) {
+        // Format as YYYY-MM-DD
+        const year = eventDate.getFullYear();
+        const month = String(eventDate.getMonth() + 1).padStart(2, '0');
+        const day = String(eventDate.getDate()).padStart(2, '0');
+        dateStr = `${year}-${month}-${day}`;
+      } else if (typeof eventDate === 'string') {
+        // If it's already a string, use it directly
+        dateStr = eventDate.split('T')[0]; // Remove time if present
+      } else {
+        // Fallback: try to convert
+        dateStr = new Date(eventDate).toISOString().split('T')[0];
+      }
+      
+      // Open the side panel with unassigned rooms for this date
+      openUnassignedRoomsPanel(dateStr);
+    },
   });
 
   calendar.render();

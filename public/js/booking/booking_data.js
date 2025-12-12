@@ -1,3 +1,15 @@
+// Fallback for editDirect function if not yet loaded from modal
+if (typeof window.editDirect === 'undefined') {
+    window.editDirect = function(bookingId) {
+        // If editBooking is available, use it (edit form handles direct reservations)
+        if (typeof window.editBooking === 'function') {
+            window.editBooking(bookingId);
+        } else {
+            console.error('editBooking function is not available');
+        }
+    };
+}
+
 $(document).ready(function () {
     // Determine scope based on current path: single pages exclude grouped bookings; 'all' includes everything
     const isAllPage = window.location.pathname.endsWith('/booking/all');
@@ -274,18 +286,11 @@ $(document).ready(function () {
 
                 let html = `<div style="text-align: center;">`;
 
-                // Billing action
-                if (isDirect) {
-                    html += `
-                        <span class="label label-sm label-default" title="Disabled for Direct Reservation" style="opacity:.6; cursor:not-allowed; margin:0 2px; display:inline-block;">
-                            <i class="fa fa-credit-card"></i>
-                        </span>`;
-                } else {
-                    html += `
-                        <span class="label label-sm label-billing" onclick="showBilling(${row.BookingID})" title="Billing" style="cursor:pointer; margin:0 2px; display:inline-block;">
-                            <i class="fa fa-credit-card"></i>
-                        </span>`;
-                }
+                // Billing action - enabled for all bookings including direct reservations
+                html += `
+                    <span class="label label-sm label-billing" onclick="showBilling(${row.BookingID})" title="Billing" style="cursor:pointer; margin:0 2px; display:inline-block;">
+                        <i class="fa fa-credit-card"></i>
+                    </span>`;
 
                 // Edit action
                 html += `

@@ -204,7 +204,7 @@
                         <!-- PAYMENT AND STATUS SECTION -->
                          <div id="edit_divpaidAmount" class="col-lg-3">
                              <div class="form-group">
-                                 <label class="form-label">Paid</label>
+                                 <label class="form-label">Paid Amount</label>
                                  <input class="form-control" type="number" id="edit_paidAmount" name="paidAmount" placeholder="Enter paid amount" step="0.01" min="0" max="999999" onblur="formatEditPaidAmount(this)">
                              </div>
                          </div>
@@ -311,7 +311,7 @@
                         <button type="button" class="btn btn-primary" id="edit_btnGenerateVoucherPreview">
                             Voucher
                         </button>
-                        <button type="submit" class="btn btn-primary">Update Booking</button>
+                        <button type="submit" class="btn btn-primary">Save changes</button>
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" >Close</button>
                     </div>
                 </form>
@@ -942,6 +942,39 @@ $(document).ready(function() {
             $('#edit_added-services-list').empty().hide();
         }
         
+        // Reset modal title
+        const modalTitle = $('#modal-editbooking').find('.modal-title');
+        if (modalTitle.length) {
+            modalTitle.text('Edit Booking');
+        }
+        
+        // Reset layout - show all fields
+        const fieldsToShow = ['#edit_divaddFloor', '#edit_divaddroom', '#edit_divroom_type', '#edit_divbedCount', '#edit_divprice', '#edit_bookingRouteSinglePlaceholder'];
+        fieldsToShow.forEach(selector => {
+            const div = $(selector);
+            if (div.length) {
+                div.css('display', '');
+            }
+        });
+        
+        // Reset Bed Count back to input if it was converted to select
+        const bedCountDiv = $('#edit_divbedCount');
+        if (bedCountDiv.length) {
+            const bedCountField = bedCountDiv.find('#edit_bedCount');
+            if (bedCountField.length && bedCountField.is('select')) {
+                const currentValue = bedCountField.val() || '';
+                const input = $('<input>', {
+                    type: 'text',
+                    id: 'edit_bedCount',
+                    name: 'bedCount',
+                    class: 'form-control',
+                    readonly: true,
+                    value: currentValue
+                });
+                bedCountField.replaceWith(input);
+            }
+        }
+        
         // Reset all form fields to prevent values from carrying over
         $('#edit_includeBreakfast').prop('checked', false);
         $('#edit_breakfastInputs').hide();
@@ -1544,8 +1577,23 @@ function computeEditTotal() {
     
     console.log('Paid Amount:', paidAmount, 'Final Balance:', finalBalance);
     
-    // Prevent paid amount from exceeding total
-    if (paidAmount > finalBalance) {
+    // Check if this is a direct reservation / unassigned-room scenario
+    // (check booking data or case where subtotal is 0 / no room rate yet)
+    let isDirectReservation = false;
+    
+    // Check if booking is marked as direct reservation by checking if room_id is empty
+    const roomId = $('#edit_addroom').val();
+    if (!roomId || roomId === '' || roomId === '0') {
+        isDirectReservation = true;
+    }
+    
+    // Also consider it direct reservation if subtotal is 0 (no room rate yet)
+    if (subtotal === 0) {
+        isDirectReservation = true;
+    }
+    
+    // Prevent paid amount from exceeding total (skip validation for direct reservation/unassigned room)
+    if (!isDirectReservation && paidAmount > finalBalance) {
         paidAmount = finalBalance;
         $('#edit_paidAmount').val(paidAmount.toFixed(2));
     }
@@ -1743,6 +1791,114 @@ function populateEditForm(booking) {
         populateEditRoomSelection(booking.ROOM_ID, booking.ROOM_FLOOR);
     }
     
+    // Handle direct reservation layout (same as add modal)
+    if (booking.IS_DIRECT_RESERVATION) {
+        const editBookingModalElement = document.getElementById('modal-editbooking');
+        
+        // Hide only specific room selection fields, not entire rows
+        const fieldsToHide = [
+            '#edit_addFloor', '#edit_addroom', '#edit_room_type', '#edit_room_type_hidden', 
+            '#edit_bedCount', '#edit_price', '#edit_divprice'
+        ];
+        
+        fieldsToHide.forEach(selector => {
+            const field = editBookingModalElement.querySelector(selector);
+            if (field) {
+                field.style.display = 'none';
+            }
+        });
+        
+        // Hide specific div containers but keep their parent rows
+        const divsToHide = ['#edit_divaddFloor', '#edit_divaddroom', '#edit_divroom_type', '#edit_divbedCount', '#edit_divprice'];
+        divsToHide.forEach(selector => {
+            const div = editBookingModalElement.querySelector(selector);
+            if (div) {
+                div.style.display = 'none';
+            }
+        });
+        
+        // Change modal title
+        const modalTitle = editBookingModalElement.querySelector('.modal-title');
+        if (modalTitle) {
+            modalTitle.innerHTML = 'Reservation - No Room Assigned';
+        }
+        
+        // Set Bed Count and Booking Resources to col-lg-3 and arrange in same row as Date
+        setTimeout(() => {
+            const dateRow = editBookingModalElement.querySelector('#edit_daterange')?.closest('.row');
+            if (dateRow) {
+                // Convert Bed Count to dropdown for direct reservations
+                let bedCountDiv = editBookingModalElement.querySelector('#edit_divbedCount');
+                if (bedCountDiv) {
+                    bedCountDiv.className = 'col-lg-3';
+                    bedCountDiv.style.display = 'block';
+                    
+                    // Convert readonly input to select dropdown
+                    const bedCountInput = bedCountDiv.querySelector('#edit_bedCount');
+                    if (bedCountInput && bedCountInput.tagName === 'INPUT') {
+                        const currentValue = bedCountInput.value || '';
+                        const bedCountSelect = document.createElement('select');
+                        bedCountSelect.id = 'edit_bedCount';
+                        bedCountSelect.name = 'bedCount';
+                        bedCountSelect.className = 'form-control';
+                        bedCountSelect.required = true;
+                        
+                        // Add options
+                        const bedOptions = [
+                            { value: '', text: 'Select Options', selected: currentValue === '', disabled: true },
+                            { value: '1', text: '1 Bed', selected: currentValue === '1' },
+                            { value: '2', text: '2 Beds', selected: currentValue === '2' }
+                        ];
+                        
+                        bedOptions.forEach(option => {
+                            const optionElement = document.createElement('option');
+                            optionElement.value = option.value;
+                            optionElement.textContent = option.text;
+                            if (option.selected) optionElement.selected = true;
+                            if (option.disabled) optionElement.disabled = true;
+                            bedCountSelect.appendChild(optionElement);
+                        });
+                        
+                        // Replace input with select
+                        bedCountInput.replaceWith(bedCountSelect);
+                    }
+                    
+                    // Move to date row if not already there
+                    if (!dateRow.contains(bedCountDiv)) {
+                        dateRow.appendChild(bedCountDiv);
+                    }
+                }
+                
+                // Set Booking Resources to col-lg-3 and move to same row
+                const bookingRoutePlaceholder = editBookingModalElement.querySelector('#edit_bookingRouteSinglePlaceholder');
+                if (bookingRoutePlaceholder) {
+                    bookingRoutePlaceholder.className = 'col-lg-3';
+                    bookingRoutePlaceholder.style.display = 'block';
+                    // Move to date row if not already there
+                    if (!dateRow.contains(bookingRoutePlaceholder)) {
+                        dateRow.appendChild(bookingRoutePlaceholder);
+                    }
+                }
+            }
+        }, 100);
+    } else {
+        // For regular bookings, ensure fields are visible
+        const editBookingModalElement = document.getElementById('modal-editbooking');
+        const modalTitle = editBookingModalElement.querySelector('.modal-title');
+        if (modalTitle) {
+            modalTitle.innerHTML = 'Edit Booking';
+        }
+        
+        // Show room selection fields
+        const fieldsToShow = ['#edit_divaddFloor', '#edit_divaddroom', '#edit_divroom_type', '#edit_divbedCount', '#edit_divprice'];
+        fieldsToShow.forEach(selector => {
+            const div = editBookingModalElement.querySelector(selector);
+            if (div) {
+                div.style.display = '';
+            }
+        });
+    }
+    
     // Load existing extra services (will call computeEditTotal internally)
     if (booking.bookingId) {
         loadEditExistingServices(booking.bookingId);
@@ -1843,6 +1999,19 @@ function editBooking(bookingId) {
                 confirmButtonText: 'OK'
             });
         });
+}
+
+// Function to open edit booking modal for direct reservations (same as editBooking)
+function editDirect(bookingId) {
+    console.log('Editing direct reservation ID:', bookingId);
+    // Direct reservations use the same edit form, which already handles them
+    editBooking(bookingId);
+}
+
+// Make functions globally accessible
+if (typeof window !== 'undefined') {
+    window.editBooking = editBooking;
+    window.editDirect = editDirect;
 }
 
 // Guest search functionality for edit form

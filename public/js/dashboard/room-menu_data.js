@@ -208,6 +208,7 @@ async function updateRemarksButtonColor(bookingId) {
 async function createDynamicRoomModal(bookingId, event, options) {
   let roomNumber, roomId, guestName, checkInDate, checkOutDate, daysDiff, roomType, customerType, customerLevel, totalCost, lateCheckout;
   let shouldDisableCheckout = false;
+  let isCheckedOut = false;
   
   // Check if data is coming from calendar event
   if (options && options.isFromCalendar) {
@@ -248,10 +249,12 @@ async function createDynamicRoomModal(bookingId, event, options) {
     const checkoutStr = `${checkoutDateOnly.getFullYear()}-${String(checkoutDateOnly.getMonth() + 1).padStart(2, '0')}-${String(checkoutDateOnly.getDate()).padStart(2, '0')}`;
     const isCheckoutToday = checkoutStr === todayStr;
     
-    // Also disable checkout button if booking status is pending
-    const isPending = event && event.extendedProps && event.extendedProps.bookingStatus === 'pending';
+    // Also disable checkout button if booking status is pending or already checked-out
+    const bookingStatus = event?.extendedProps?.bookingStatus;
+    const isPending = bookingStatus === 'pending';
+    isCheckedOut = bookingStatus === 'check-Out';
     
-    shouldDisableCheckout = isCheckoutToday || isPending;
+    shouldDisableCheckout = isCheckoutToday || isPending || isCheckedOut;
   } else {
     // Find the room card to get booking data using the BookingID (dashboard context)
     const roomCard = document.querySelector(`[data-booking-id="${bookingId}"]`);
@@ -272,6 +275,13 @@ async function createDynamicRoomModal(bookingId, event, options) {
     const isInCheckedInTab = !!roomCard.closest('#checked-in-content');
     const isInCheckoutTab = !!roomCard.closest('#checkout-content');
     shouldDisableCheckout = isInCheckedInTab || isInCheckoutTab;
+    
+    // Check booking status from room card attribute
+    const bookingStatus = roomCard.getAttribute('data-booking-status');
+    isCheckedOut = bookingStatus === 'check-Out';
+    if (isCheckedOut) {
+      shouldDisableCheckout = true;
+    }
 
     // Get guest info from the card content - improved data extraction
     const cardBody = roomCard.querySelector('.card-body');
@@ -302,6 +312,13 @@ async function createDynamicRoomModal(bookingId, event, options) {
   const checkoutButtonStyle = shouldDisableCheckout
     ? 'transition: none; opacity: 0.6 !important; cursor: not-allowed; pointer-events: none;'
     : 'transition: none; opacity: 1 !important;';
+  
+  // Disable Transfer, Late Check-Out, and Extend buttons if checked out
+  const actionButtonsDisabled = isCheckedOut;
+  const actionButtonAttributes = actionButtonsDisabled ? 'disabled aria-disabled="true" tabindex="-1"' : '';
+  const actionButtonStyle = actionButtonsDisabled
+    ? 'transition: none; opacity: 0.6 !important; cursor: not-allowed; pointer-events: none;'
+    : 'transition: none; opacity: 1 !important;';
 
   // Create modal HTML
   const modalHTML = `
@@ -323,16 +340,18 @@ async function createDynamicRoomModal(bookingId, event, options) {
                 </h6>
                 
                 <div class="d-flex gap-1">
-                    <button class="btn btn-sm btn-primary" onclick="triggerTransferFromMenu('${roomId}')">
+                    <button class="btn btn-sm btn-primary" ${actionButtonAttributes} onclick="triggerTransferFromMenu('${roomId}')" style="${actionButtonStyle}">
                         <i class="fas fa-exchange-alt"></i> Transfer
                     </button>
                     
                     <!-- Late Checkout Button - will be updated dynamically after services load -->
-                    <button class="btn btn-sm btn-secondary" id="lateCheckoutBtn-${bookingId}" onclick="openLateCheckoutModal('${roomId}', '${checkOutDate}', '${bookingId}')">Late Check-Out</button>
+                    <button class="btn btn-sm btn-secondary" id="lateCheckoutBtn-${bookingId}" ${actionButtonAttributes} onclick="openLateCheckoutModal('${roomId}', '${checkOutDate}', '${bookingId}')" style="${actionButtonStyle}" data-checked-out="${isCheckedOut}">Late Check-Out</button>
                     
                     <button class="btn btn-sm btn-success" 
                             id="btnExtend" 
-                            onclick="openExtendModal('${roomId}', '${checkOutDate}', '${bookingId}')">
+                            ${actionButtonAttributes}
+                            onclick="openExtendModal('${roomId}', '${checkOutDate}', '${bookingId}')"
+                            style="${actionButtonStyle}">
                         <i class="fas fa-plus-circle"></i> Extend
                     </button>
                     
@@ -463,7 +482,7 @@ async function createDynamicRoomModal(bookingId, event, options) {
                                     <input class="form-check-input" type="checkbox" id="custom-service-checkbox-${bookingId}" onchange="window.toggleCustomService('${bookingId}')">
                                     <label class="form-check-label" for="custom-service-checkbox-${bookingId}">Custom Service</label>
                                 </div>
-                                <button type="button" class="btn btn-sm btn-success" onclick="window.addService('${bookingId}')">
+                                <button type="button" class="btn btn-sm btn-success" ${actionButtonAttributes} onclick="window.addService('${bookingId}')" style="${actionButtonStyle}" data-checked-out="${isCheckedOut}">
                                     <i class="fas fa-plus me-1"></i>Add
                                 </button>
                             </div>
@@ -1396,6 +1415,26 @@ function updateLateCheckoutButton(bookingId, services) {
     const lateCheckoutBtn = document.getElementById(`lateCheckoutBtn-${bookingId}`);
     if (!lateCheckoutBtn) return;
     
+    // First check if button was initially disabled due to checked out status (from data attribute)
+    const isCheckedOutFromData = lateCheckoutBtn.getAttribute('data-checked-out') === 'true';
+    
+    // Also check if booking is checked out from room card
+    const roomCard = document.querySelector(`[data-booking-id="${bookingId}"]`);
+    const bookingStatus = roomCard ? roomCard.getAttribute('data-booking-status') : null;
+    const isCheckedOutFromCard = bookingStatus === 'check-Out';
+    
+    // If checked out (from either source), keep button disabled
+    const isCheckedOut = isCheckedOutFromData || isCheckedOutFromCard;
+    if (isCheckedOut) {
+        lateCheckoutBtn.disabled = true;
+        lateCheckoutBtn.style.opacity = '0.6';
+        lateCheckoutBtn.style.cursor = 'not-allowed';
+        lateCheckoutBtn.style.pointerEvents = 'none';
+        lateCheckoutBtn.setAttribute('aria-disabled', 'true');
+        lateCheckoutBtn.setAttribute('tabindex', '-1');
+        return;
+    }
+    
     // Check if service ID 72 (Late Checkout) exists in services
     const hasLateCheckout = services.some(service => service.SERVICE_ID === 72);
     
@@ -1409,6 +1448,9 @@ function updateLateCheckoutButton(bookingId, services) {
         lateCheckoutBtn.disabled = false;
         lateCheckoutBtn.textContent = 'Late Check-Out';
         lateCheckoutBtn.removeAttribute('title');
+        lateCheckoutBtn.style.opacity = '1';
+        lateCheckoutBtn.style.cursor = 'pointer';
+        lateCheckoutBtn.style.pointerEvents = 'auto';
     }
 }
 
@@ -1783,6 +1825,22 @@ function toggleCustomCost(bookingId) {
 function addServiceLocal(bookingId) {
     if (!bookingId) {
         console.error('❌ No bookingId provided to addServiceLocal');
+        return;
+    }
+    
+    // Check if booking is checked out - prevent adding services
+    // First check button data attribute
+    const addButton = document.querySelector(`button[onclick*="window.addService('${bookingId}')"]`);
+    const isCheckedOutFromButton = addButton ? addButton.getAttribute('data-checked-out') === 'true' : false;
+    
+    // Also check room card
+    const roomCard = document.querySelector(`[data-booking-id="${bookingId}"]`);
+    const bookingStatus = roomCard ? roomCard.getAttribute('data-booking-status') : null;
+    const isCheckedOutFromCard = bookingStatus === 'check-Out';
+    
+    const isCheckedOut = isCheckedOutFromButton || isCheckedOutFromCard;
+    if (isCheckedOut) {
+        toastError('Error', 'Cannot add services to a checked-out booking.');
         return;
     }
 const serviceSelect = document.getElementById(`extra-service-select-${bookingId}`);
@@ -6464,7 +6522,7 @@ function openCheckoutBacktrackModal(bookingId, event) {
     const modalHTML = `
        
         <div class="modal fade" id="checkoutBacktrackModal_${bookingId}" tabindex="-1" role="dialog" aria-labelledby="checkoutBacktrackModalLabel" aria-hidden="true" data-keyboard="false" data-bs-backdrop="static" style="z-index: 1060 !important;">
-            <div class="modal-dialog modal-lg">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
                 <div class="modal-content" style="background-color: #ffffff; border: 4px solid #6c757d; border-radius: 8px;">
                     <div class="modal-header" style="background-color: #6c757d; border-bottom: 1px solid #6c757d;">
                         <h5 class="modal-title" id="checkoutBacktrackModalLabel_${bookingId}" style="color: #ffffff;">
@@ -6594,7 +6652,10 @@ function openCheckoutBacktrackModal(bookingId, event) {
                         </div>
                     </div>
                     <div class="modal-footer" style="background-color: #6c757d; border-top: 1px solid #6c757d;">
-                       
+                        <button type="button" class="btn btn-secondary" id="generalInfoBtn_${bookingId}">
+                            <i class="fas fa-info-circle me-2"></i>General Info
+                        </button>
+
                         <button type="button" class="btn btn-secondary" id="billingBtn_${bookingId}" data-booking-id="${bookingId}" onclick="window.showBilling('${bookingId}')">
                             <i class="fas fa-credit-card me-2"></i>Billing
                         </button>
@@ -6603,7 +6664,7 @@ function openCheckoutBacktrackModal(bookingId, event) {
                             <i class="fas fa-file-alt me-2"></i>View Details
                         </button>
 
-                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" >
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" >
                             <i class="fas fa-times me-2"></i>Close
                         </button>
                     </div>
@@ -6625,12 +6686,51 @@ function openCheckoutBacktrackModal(bookingId, event) {
     const modal = new bootstrap.Modal(document.getElementById(`checkoutBacktrackModal_${bookingId}`));
     modal.show();
     
-    // Add event listener for billing button
+    // Add event listeners for footer buttons
     setTimeout(() => {
         const billingBtn = document.getElementById(`billingBtn_${bookingId}`);
         if (billingBtn) {
             billingBtn.addEventListener('click', function() {
                 showBilling(bookingId);
+            });
+        }
+
+        const generalInfoBtn = document.getElementById(`generalInfoBtn_${bookingId}`);
+        if (generalInfoBtn) {
+            generalInfoBtn.addEventListener('click', () => {
+                // Hide checkout backtrack modal while viewing general info
+                const checkoutModalEl = document.getElementById(`checkoutBacktrackModal_${bookingId}`);
+                if (checkoutModalEl) {
+                    bootstrap.Modal.getOrCreateInstance(checkoutModalEl).hide();
+                }
+
+                // When General Info closes, bring the checkout modal back
+                const attachRestoreListener = () => {
+                    const dynamicModal = document.getElementById(`dynamicRoomModal_${bookingId}`);
+                    if (dynamicModal) {
+                        const restoreCheckout = () => {
+                            const checkoutEl = document.getElementById(`checkoutBacktrackModal_${bookingId}`);
+                            if (checkoutEl) {
+                                bootstrap.Modal.getOrCreateInstance(checkoutEl).show();
+                            }
+                        };
+                        dynamicModal.addEventListener('hidden.bs.modal', restoreCheckout, { once: true });
+                        return true;
+                    }
+                    return false;
+                };
+
+                // Try immediately, then once more shortly after in case modal is still rendering
+                if (!attachRestoreListener()) {
+                    setTimeout(attachRestoreListener, 200);
+                }
+
+                // Mirror calendar modal behavior: open the room menu modal for general info
+                if (typeof openRoomMenuModal === 'function') {
+                    openRoomMenuModal(bookingId, event);
+                } else {
+                    console.error('openRoomMenuModal function not found');
+                }
             });
         }
     }, 100);

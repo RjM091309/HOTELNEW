@@ -177,6 +177,17 @@
 <!-- Include room-menu_data.js for remarks functionality -->
 <script src="/js/dashboard/room-menu_data.js"></script>
 <script>
+// Fallback for editDirect function if not yet loaded from modal
+if (typeof window.editDirect === 'undefined') {
+    window.editDirect = function(bookingId) {
+        // If editBooking is available, use it (edit form handles direct reservations)
+        if (typeof window.editBooking === 'function') {
+            window.editBooking(bookingId);
+        } else {
+            console.error('editBooking function is not available');
+        }
+    };
+}
     // Expose the openRemarksModal function globally
     window.openRemarksModal = openRemarksModal;
     
@@ -415,17 +426,11 @@ $(document).ready(function () {
             const isDirect = String(row.IsDirectReservation) === '1';
 
             let html = `<div style="text-align: center;">`;
-            if (isDirect) {
-                html += `
-                <button class="btn btn-sm btn-secondary" disabled title="Disabled for Direct Reservation" style="opacity: .6; cursor: not-allowed; width: 35px; height: 35px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px;">
-                    <i class="fa fa-credit-card"></i>
-                </button>`;
-            } else {
-                html += `
+            // Billing action - enabled for all bookings including direct reservations
+            html += `
                 <button class="btn btn-sm ${buttonClass}" onclick="showBilling(${row.BookingID})" title="Billing" style="width: 35px; height: 35px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px;">
                     <i class="fa fa-credit-card"></i>
                 </button>`;
-            }
 
             html += `
                 <button class="btn btn-sm btn-warning ms-1" onclick="${isDirect ? `editDirect(${row.BookingID})` : `editBooking(${row.BookingID})`}" title="Edit Booking" style="width: 35px; height: 35px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px;">

@@ -1039,7 +1039,7 @@ function openDirectReservationModal(formattedDateRange, nights) {
             // Hide only specific room selection fields, not entire rows
             const fieldsToHide = [
                 '#addFloor', '#addroom', '#room_type', '#room_type_hidden', 
-                '#bedCount', '#bookingRoute', '#price', '#divprice'
+                '#bedCount', '#price', '#divprice'
             ];
             
             fieldsToHide.forEach(selector => {
@@ -1050,7 +1050,7 @@ function openDirectReservationModal(formattedDateRange, nights) {
             });
             
             // Hide specific div containers but keep their parent rows
-            const divsToHide = ['#divaddFloor', '#divaddroom', '#divroom_type', '#divbedCount', '#bookingRouteSinglePlaceholder', '#divprice'];
+            const divsToHide = ['#divaddFloor', '#divaddroom', '#divroom_type', '#divbedCount', '#divprice'];
             divsToHide.forEach(selector => {
                 const div = document.querySelector(selector);
                 if (div) {
@@ -1058,37 +1058,8 @@ function openDirectReservationModal(formattedDateRange, nights) {
                 }
             });
             
-            // Hide breakfast-related fields completely (including labels and containers)
-            const breakfastFieldsToHide = [
-                '#includeBreakfast', '#breakfastInputs'
-            ];
-            
-            breakfastFieldsToHide.forEach(selector => {
-                const field = document.querySelector(selector);
-                if (field) {
-                    field.style.display = 'none';
-                }
-            });
-            
-            // Hide breakfast label and container more aggressively
-            const breakfastLabels = document.querySelectorAll('label, span, div');
-            breakfastLabels.forEach(element => {
-                const text = element.textContent || '';
-                if (text.toLowerCase().includes('breakfast') && 
-                    !text.toLowerCase().includes('pick') && 
-                    !text.toLowerCase().includes('drop')) {
-                    element.style.display = 'none';
-                }
-            });
-            
-            // Also hide any parent containers that might contain breakfast
-            const breakfastContainers = document.querySelectorAll('.form-group, .form-check, .checkbox-group');
-            breakfastContainers.forEach(container => {
-                const hasBreakfast = container.querySelector('#includeBreakfast, #breakfastInputs');
-                if (hasBreakfast) {
-                    container.style.display = 'none';
-                }
-            });
+            // Breakfast fields are now visible for direct reservations
+            // (Previously hidden code removed to allow breakfast selection)
             
             // Ensure the modal body is visible
             const modalBody = addBookingModalElement.querySelector('.modal-body');
@@ -1148,9 +1119,8 @@ function openDirectReservationModal(formattedDateRange, nights) {
 
             // Ensure backend-required fields have safe defaults for direct reservations
             try {
-                // Mark booking route explicitly
-                const bookingRouteField = addBookingModalElement.querySelector('#bookingRoute');
-                if (bookingRouteField) bookingRouteField.value = 'direct-reservation';
+                // Booking route is now visible and user-selectable
+                // (Previously auto-set to 'direct-reservation', now removed)
 
                 // Price-related defaults
                 const basePriceField = addBookingModalElement.querySelector('#baseprice');
@@ -1200,9 +1170,9 @@ function openDirectReservationModal(formattedDateRange, nights) {
                         contactColumn.className = 'col-lg-6';
                     }
                     
-                     // Create bed count column (col-lg-6 for proper alignment)
+                     // Create bed count column (col-lg-3 for proper alignment)
                     const bedCountColumn = document.createElement('div');
-                    bedCountColumn.className = 'col-lg-6';
+                    bedCountColumn.className = 'col-lg-3';
                     bedCountColumn.id = 'divBedCount';
                     
                     // Create bed count container
@@ -1266,6 +1236,16 @@ function openDirectReservationModal(formattedDateRange, nights) {
                     
                     // Add the new column to the same row
                     targetRow.appendChild(bedCountColumn);
+                    
+                    // Set Booking Resources to col-lg-3 and move to same row as Date and Bed Count
+                    const bookingRoutePlaceholder = addBookingModalElement.querySelector('#bookingRouteSinglePlaceholder');
+                    if (bookingRoutePlaceholder) {
+                        bookingRoutePlaceholder.className = 'col-lg-3';
+                        // Move Booking Resources to the same row as Date and Bed Count
+                        if (!targetRow.contains(bookingRoutePlaceholder)) {
+                            targetRow.appendChild(bookingRoutePlaceholder);
+                        }
+                    }
                     
                     // Add event listener to capture Bed Count value when form is submitted
                     const bedCountSelectElement = document.getElementById('bedCountDirect');
