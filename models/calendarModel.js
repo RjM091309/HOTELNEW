@@ -1441,12 +1441,22 @@ class CalendarModel {
           b.CHECK_IN_DATE AS checkInDate,
           b.CHECK_OUT_DATE AS checkOutDate,
           COALESCE(r.ROOM_NUMBER, 'Unassigned') AS roomNumber,
-          c.NAME AS customerName
+          c.NAME AS customerName,
+          b.IS_DIRECT_RESERVATION AS isDirectReservation,
+          b.EDITED_DT AS editedDt,
+          b.ENCODED_DT AS encodedDt
         FROM booking b
         LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
         LEFT JOIN room r ON b.ROOM_ID = r.IDNo AND r.ACTIVE = 1
         WHERE b.ACTIVE = 1
-          AND b.IS_DIRECT_RESERVATION = 1
+          AND b.BED_COUNT IN (1, 2)
+          AND (
+            -- Currently unassigned direct reservations
+            b.IS_DIRECT_RESERVATION = 1
+            OR
+            -- Previously unassigned but now assigned (was edited/assigned later)
+            (b.IS_DIRECT_RESERVATION = 0 AND b.EDITED_DT IS NOT NULL AND b.EDITED_DT > b.ENCODED_DT)
+          )
           AND (b.CHECK_IN_DATE <= ? AND b.CHECK_OUT_DATE >= ?)
       `;
 
@@ -1460,13 +1470,13 @@ class CalendarModel {
       
       results.forEach((booking) => {
         const checkInDate = new Date(booking.checkInDate);
-        const isUnassigned = booking.roomNumber === 'Unassigned';
+        const isUnassigned = booking.roomNumber === 'Unassigned' || booking.isDirectReservation === 1;
 
         // Only show event on check-in date for monitoring purposes
         const formattedDate = checkInDate.toISOString().split('T')[0];
         dateCounts[formattedDate] = (dateCounts[formattedDate] || 0) + 1;
         
-        // Track if any reservation on this date is unassigned
+        // Track if any reservation on this date is unassigned (currently or was previously)
         if (isUnassigned) {
           dateUnassigned[formattedDate] = true;
         }
@@ -1511,13 +1521,21 @@ class CalendarModel {
           DATE_FORMAT(b.ENCODED_DT, '%Y-%m-%d %H:%i:%s') AS booking_time,
           b.BOOKING_STATUS AS booking_status,
           COALESCE(billing.PAYMENT_STATUS, 'Unknown') AS payment_status,
-          b.BED_COUNT AS bedCount
+          b.BED_COUNT AS bedCount,
+          b.IS_DIRECT_RESERVATION AS isDirectReservation
         FROM booking b
         LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
         LEFT JOIN room r ON b.ROOM_ID = r.IDNo AND r.ACTIVE = 1
         LEFT JOIN billing ON b.IDNo = billing.BOOKING_ID AND billing.ACTIVE = 1
         WHERE b.ACTIVE = 1
-          AND b.IS_DIRECT_RESERVATION = 1
+          AND b.BED_COUNT IN (1, 2)
+          AND (
+            -- Currently unassigned direct reservations
+            b.IS_DIRECT_RESERVATION = 1
+            OR
+            -- Previously unassigned but now assigned (was edited/assigned later)
+            (b.IS_DIRECT_RESERVATION = 0 AND b.EDITED_DT IS NOT NULL AND b.EDITED_DT > b.ENCODED_DT)
+          )
           AND DATE(b.CHECK_IN_DATE) = ?
         ORDER BY b.ENCODED_DT DESC
       `;

@@ -146,8 +146,8 @@ function fetchUnassignedRoomEvents(fetchInfo, successCallback, failureCallback) 
           start: event.start,
           title: event.title,
           allDay: true,
-          backgroundColor: hasUnassigned ? '#16da43' : '#ffc107', // Yellow for unassigned, Light Green for assigned
-          borderColor: hasUnassigned ? '#16da43' : '#ffc107',
+          backgroundColor: hasUnassigned ? '#16da43' : '#6c757d', // Gray for previously unassigned but now assigned, Green for currently unassigned
+          borderColor: hasUnassigned ? '#16da43' : '#6c757d',
           extendedProps: event.extendedProps || {}
         };
       });
@@ -209,10 +209,12 @@ function renderDirectReservationDetails(booking, index, rooms) {
         </div>
       </div>
       
-      <!-- Assign Room Button - Enhanced Design -->
+      <!-- Assign Room Button - Only show if room is unassigned -->
+      ${booking.roomNumber === 'Unassigned' ? `
       <button type="button" class="btn btn-success btn-sm assign-room-btn">
         <i class="fa fa-bed" style="margin-right: 6px;"></i> Assign Room
       </button>
+      ` : ''}
     </div>
   </div>
 </div>
