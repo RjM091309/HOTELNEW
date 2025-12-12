@@ -1140,25 +1140,85 @@ function openDirectReservationModal(formattedDateRange, nights) {
             }
             
             // Add Bed Count field in the same row as Date fields
-            const contactNumberField = addBookingModalElement.querySelector('#txtNumber');
-            if (contactNumberField) {
-                // Look for the row that contains Date fields (Select Date From/To)
-                // We want Bed Count to be in the same row as the date selection
-                let targetRow = null;
+            // First, check if Bed Count already exists in the correct position
+            const existingBedCount = addBookingModalElement.querySelector('#bedCountDirect');
+            const existingBedCountDiv = addBookingModalElement.querySelector('#divBedCount');
+            
+            // Find the target row first to check if Bed Count is already in the correct position
+            const dateFromField = addBookingModalElement.querySelector('#daterange');
+            let targetRow = null;
+            if (dateFromField) {
+                let dateColumn = dateFromField.parentNode.parentNode; // Go up to col-lg-6 or col-lg-4
+                let dateRow = dateColumn.parentNode; // Go up to the row
                 
-                // Find the date fields to locate their row
-                const dateFromField = addBookingModalElement.querySelector('#daterange');
-                if (dateFromField) {
-                    let dateColumn = dateFromField.parentNode.parentNode; // Go up to col-lg-6 or col-lg-4
-                    let dateRow = dateColumn.parentNode; // Go up to the row
-                    
-                    // Check if this row contains date-related fields
-                    if (dateRow && (dateRow.querySelector('#daterange') || dateRow.querySelector('#diffindays'))) {
-                        targetRow = dateRow;
+                // Check if this row contains date-related fields
+                if (dateRow && (dateRow.querySelector('#daterange') || dateRow.querySelector('#diffindays'))) {
+                    targetRow = dateRow;
+                }
+            }
+            
+            // Check if Bed Count already exists in the correct position (inside targetRow)
+            const bedCountInCorrectPosition = existingBedCountDiv && targetRow && targetRow.contains(existingBedCountDiv);
+            
+            // Only remove if it exists but is NOT in the correct position, or if we can't find targetRow
+            if (existingBedCount && !bedCountInCorrectPosition) {
+                // If it's inside a form-group (fallback case), remove the whole form-group
+                const parentFormGroup = existingBedCount.closest('.form-group');
+                if (parentFormGroup) {
+                    parentFormGroup.remove();
+                } else {
+                    existingBedCount.remove();
+                }
+            }
+            if (existingBedCountDiv && !bedCountInCorrectPosition) {
+                existingBedCountDiv.remove();
+            }
+            
+            // If Bed Count already exists in correct position, just update it and skip recreation
+            if (bedCountInCorrectPosition && existingBedCount && targetRow) {
+                // Ensure column classes are still correct
+                const guestColumn = addBookingModalElement.querySelector('#divtxtFullNameAdd');
+                const contactColumn = addBookingModalElement.querySelector('#divtxtNumber');
+                if (guestColumn) {
+                    guestColumn.className = 'col-lg-6';
+                }
+                if (contactColumn) {
+                    contactColumn.className = 'col-lg-6';
+                }
+                
+                // Ensure Booking Resources is in the correct position
+                const bookingRoutePlaceholder = addBookingModalElement.querySelector('#bookingRouteSinglePlaceholder');
+                if (bookingRoutePlaceholder) {
+                    bookingRoutePlaceholder.className = 'col-lg-3';
+                    if (!targetRow.contains(bookingRoutePlaceholder)) {
+                        targetRow.appendChild(bookingRoutePlaceholder);
                     }
                 }
                 
-                if (targetRow && targetRow.classList.contains('row')) {
+                // Update the options if needed (refresh disabled states)
+                try {
+                    const map = window.fullyReservedBedTypes || {};
+                    const opt1 = Array.from(existingBedCount.options).find(o => o.value === '1');
+                    const opt2 = Array.from(existingBedCount.options).find(o => o.value === '2');
+                    if (opt1) opt1.disabled = !!map['1'];
+                    if (opt2) opt2.disabled = !!map['2'];
+                } catch (e) { /* no-op */ }
+                
+                // Ensure event listener is attached (remove old one first to prevent duplicates)
+                const oldHandler = existingBedCount._bedCountHandler;
+                if (oldHandler) {
+                    existingBedCount.removeEventListener('change', oldHandler);
+                }
+                const newHandler = function() {
+                    window.selectedBedCount = this.value;
+                };
+                existingBedCount._bedCountHandler = newHandler;
+                existingBedCount.addEventListener('change', newHandler);
+            } else {
+                // Create new Bed Count if it doesn't exist or is in wrong position
+                const contactNumberField = addBookingModalElement.querySelector('#txtNumber');
+                if (contactNumberField) {
+                    if (targetRow && targetRow.classList.contains('row')) {
                     // First, update Guest and Contact Number columns to col-lg-6
                     const guestColumn = addBookingModalElement.querySelector('#divtxtFullNameAdd');
                     const contactColumn = addBookingModalElement.querySelector('#divtxtNumber');
@@ -1312,6 +1372,7 @@ function openDirectReservationModal(formattedDateRange, nights) {
                             // Store the selected bed count value for later use
                             window.selectedBedCount = this.value;
                         });
+                    }
                     }
                 }
             }
