@@ -19,6 +19,7 @@ const bookingChannelRoutes = require('./r_booking_channel');
 const paymentsRoutes = require('./r_payments');
 const telegramRoutes = require('./r_telegram');
 const apiRoutes = require('./r_api');
+const updatesRoutes = require('./r_updates');
 
 // Auth middleware
 const AuthMiddleware = require('../middleware/m_auth');
@@ -26,6 +27,7 @@ const AuthMiddleware = require('../middleware/m_auth');
 // Public routes (no authentication required)
 router.use('/', loginRoutes);
 router.use('/api', apiRoutes);
+router.use('/updates', updatesRoutes);
 
 // Telegram webhook endpoint (public - Telegram needs to access this)
 const TelegramController = require('../controller/c_telegram');

@@ -30,7 +30,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
     cors: {
-        origin: ['http://localhost:6000', 'http://localhost:4173', 'http://localhost:5002', 'http://45.32.103.210:5002'],
+        origin: ['http://localhost:6000', 'http://localhost:4173', 'http://localhost:5002', 'http://45.32.103.210:5002', 'http:localhost'],
         methods: ['GET', 'POST']
     }
 });
@@ -38,7 +38,7 @@ const PORT = process.env.PORT || 5001;
 
 // CORS middleware for API access from frontend
 app.use(cors({
-    origin: ['http://localhost:6000', 'http://localhost:4173', 'http://localhost:5002', 'http://45.32.103.210:5002'],
+    origin: ['http://localhost:6000', 'http://localhost:4173', 'http://localhost:5002', 'http://45.32.103.210:5002' , 'http://localhost'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']

@@ -6,12 +6,14 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 20px;
+      margin: 0;
+      padding: 10px 20px;
     }
 
     .header {
       text-align: center;
       margin-bottom: 20px;
+      margin-top: 0;
     }
 
     .header img {
@@ -21,7 +23,7 @@
     .invoice-title {
       font-size: 28px;
       font-weight: bold;
-      margin: 15px 0;
+      
     }
 
     .sub-header {
@@ -40,6 +42,17 @@
       border: 1px solid #f3c200;
       padding: 10px;
       text-align: center;
+    }
+
+    .info-table td:nth-child(1),
+    .info-table td:nth-child(2),
+    .info-table th:nth-child(1),
+    .info-table th:nth-child(2) {
+      word-wrap: break-word;
+      word-break: break-word;
+      white-space: normal;
+      max-width: 150px;
+      vertical-align: middle;
     }
 
     .totals {
@@ -110,13 +123,15 @@
     </div>
   </div>
 
+  
+
   <div style="display: flex; justify-content: space-between; margin-top: 10px;">
-    <div><b>Date:</b> Oct 20, 2025</div>
-    <div><b>Invoice #:</b> 10204973</div>
+    <div><b>Date:</b> Dec 12, 2025</div>
+    <div><b>Invoice #:</b> 20251212UR1512</div>
   </div>
 
   <div style="margin-top: 10px;">
-    <b>Billed to:</b> SOJU TRAVEL
+    <b>Billed to:</b> test
   </div>
 
   <table class="info-table">
@@ -125,37 +140,36 @@
         <th>DATE</th>
         <th>GUEST NAME</th>
         <th>DESCRIPTION</th>
-        <th>NO OF ROOMS</th>
-        <th>NO. OF NIGHTS</th>
-        <th>TOTAL</th>
+        <th>QTY</th>
+        <th>AMOUNT</th>
       </tr>
     </thead>
     <tbody>
+      
       <tr>
-        <td>10/20/25 TO 10/22/25</td>
-        <td>SOJU TRAVEL</td>
-        <td>ROOM ACCOMMODATION</td>
-        <td>1 ROOMS (Single Bedroom)</td>
-        <td>2 NIGHTS</td>
-        <td>PHP 7,400</td>
+        <td rowspan="1">12/12/25 TO 12/15/25</td>
+        <td rowspan="1">test</td>
+        <td>ROOM CHARGE</td>
+        <td>3 NIGHTS</td>
+        <td>11,400.00</td>
       </tr>
+      
     </tbody>
   </table>
 
   <div class="totals">
     <p class="label"><b>CHARGE SUMMARY:</b></p>
     
-      <p class="sub">ROOM: PHP 5,400</p>
-    
-    
-    <p class="sub">SERVICES: PHP 2,000</p>
-    
+    <p class="sub">ROOM: 11,400.00</p>
+    <p class="sub">SERVICES: 0.00</p>
     
     
     
     
+
     
-    <p class="label"><b>TOTAL CHARGES:</b> PHP 7,400</p>
+    
+    <p class="label"><b>TOTAL CHARGES:</b> 11,400.00</p>
   </div>
   
   
@@ -168,19 +182,20 @@
     <div class="totals">
       
       <!-- <hr style="margin: 5px 0;"> -->
-      <p class="label"><b>TAX:</b> PHP 0</p>
-      <p class="label"><b>PAYMENT:</b> PHP 7,400</p>
-      <p class="sub">ROOM PAID: PHP 5,400</p>
+      <p class="label"><b>TAX:</b> 0</p>
+      <p class="label"><b>PAYMENT:</b> 0.00</p>
       
       
-      <p class="sub">SERVICES PAID: PHP 2,000</p>
+        <p class="sub">ROOM PAID: 0.00</p>
+        
+        <p class="sub">SERVICES PAID: 0.00</p>
+        
+        
+        
+        
       
       
-      
-      
-      
-      
-      <p class="label"><b class="red">TOTAL DUE:</b><span class="red"> PHP 0</span></p>
+      <p class="label"><b class="red">TOTAL DUE:</b><span class="red"> 11,400.00</span></p>
     </div>
   </table>
   
