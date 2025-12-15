@@ -222,7 +222,15 @@ $(document).ready(function () {
                 icon: 'success',
                 confirmButtonText: 'OK'
               }).then(() => {
-                // Don't redirect if we're on dashboard - socket/direct add will update it
+                // Check if this is an unassigned room booking (roomId is empty, 0, or null)
+                const isUnassignedRoom = !roomId || roomId === '' || roomId === '0' || roomId === 0;
+                
+                // Don't redirect if unassigned room or if we're on dashboard - socket/direct add will update it
+                if (isUnassignedRoom) {
+                  // For unassigned rooms, just stay on current page
+                  return;
+                }
+                
                 // If on calendar page, redirect to clean URL without query params
                 if (window.location.pathname.includes('/calendar')) {
                   window.location.replace('/calendar');

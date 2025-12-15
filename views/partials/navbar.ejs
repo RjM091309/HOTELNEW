@@ -956,6 +956,203 @@ if (!cleanDateRange || !cleanDateRange.includes(" to ")) {
 
 
 
+// Function to update price based on bed count for unassigned rooms
+function updatePriceForBedCount(bedCount) {
+    if (!bedCount || bedCount === '') {
+        // Reset price if no bed count selected
+        const priceField = document.querySelector('#price');
+        const basePriceField = document.querySelector('#baseprice');
+        if (priceField) priceField.value = '0.00';
+        if (basePriceField) basePriceField.value = '0.00';
+        
+        // Recalculate total
+        if (typeof computeTotal === 'function') {
+            computeTotal();
+        }
+        return;
+    }
+    
+    try {
+        // Get booking type from booking route select
+        const bookingRouteField = document.querySelector('#bookingRoute');
+        const bookingType = bookingRouteField ? bookingRouteField.value : 'walk-in';
+        
+        // Get check-in date from date range field
+        const dateRangeField = document.querySelector('#daterange');
+        if (!dateRangeField || !dateRangeField.value) {
+            console.warn('Date range not available');
+            return;
+        }
+        
+        const dateRange = dateRangeField.value;
+        const [startDateStr] = dateRange.split(' to ');
+        const startDate = new Date(startDateStr.trim());
+        
+        if (isNaN(startDate.getTime())) {
+            console.warn('Invalid check-in date');
+            return;
+        }
+        
+        // Get available rooms data (already loaded from modal)
+        const availableRooms = window.currentRoomsData ? (window.currentRoomsData.rooms || []) : [];
+        
+        // Find a room with matching bed count to get seasonal prices
+        let matchingRoom = availableRooms.find(room => String(room.ROOM_BED) === String(bedCount));
+        
+        // If no room found or no seasonal prices, fetch from API
+        if (!matchingRoom || !matchingRoom.SEASONAL_PRICES || matchingRoom.SEASONAL_PRICES.length === 0) {
+            // Try to get room details from API using first available room with matching bed count
+            const anyRoomWithBedCount = availableRooms.find(room => String(room.ROOM_BED) === String(bedCount));
+            
+            if (anyRoomWithBedCount && anyRoomWithBedCount.IDNo) {
+                // Fetch room details with seasonal prices from API
+                fetch('/booking/get-room-details', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roomId: anyRoomWithBedCount.IDNo })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.roomDetails) {
+                        // Use the fetched room details
+                        matchingRoom = {
+                            ...anyRoomWithBedCount,
+                            SEASONAL_PRICES: data.roomDetails.SEASONAL_PRICES || [],
+                            ROOM_PRICE: data.roomDetails.ROOM_PRICE
+                        };
+                        calculateAndUpdatePrice(matchingRoom, bedCount, bookingType, startDate);
+                    } else {
+                        // Fallback to default price
+                        useDefaultPrice(anyRoomWithBedCount);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching room details:', error);
+                    // Fallback to default price
+                    if (anyRoomWithBedCount) {
+                        useDefaultPrice(anyRoomWithBedCount);
+                    }
+                });
+                return; // Exit early, will continue in fetch callback
+            } else {
+                // No room found, use default or zero
+                const priceField = document.querySelector('#price');
+                const basePriceField = document.querySelector('#baseprice');
+                if (priceField) priceField.value = '0.00';
+                if (basePriceField) basePriceField.value = '0.00';
+                if (typeof computeTotal === 'function') computeTotal();
+                return;
+            }
+        }
+        
+        // If we have matching room with seasonal prices, calculate price
+        calculateAndUpdatePrice(matchingRoom, bedCount, bookingType, startDate);
+    } catch (error) {
+        console.error('Error updating price for bed count:', error);
+    }
+}
+
+// Helper function to calculate and update price
+function calculateAndUpdatePrice(matchingRoom, bedCount, bookingType, startDate) {
+    try {
+        const seasonalPrices = matchingRoom.SEASONAL_PRICES || [];
+        
+        if (seasonalPrices.length === 0) {
+            // Use default room price
+            useDefaultPrice(matchingRoom);
+            return;
+        }
+        
+        // Function to get season ID for check-in date
+        function getSeasonIdForDate(checkInDate, seasonalPrices) {
+            const checkIn = new Date(checkInDate);
+            const mmdd = (checkIn.getMonth() + 1).toString().padStart(2, '0') + checkIn.getDate().toString().padStart(2, '0');
+            
+            const seen = new Set();
+            for (const p of seasonalPrices) {
+                if (!p.startDate || !p.endDate || seen.has(p.seasonId)) continue;
+                seen.add(p.seasonId);
+                
+                const start = new Date(p.startDate);
+                const end = new Date(p.endDate);
+                
+                const startMMDD = (start.getMonth() + 1).toString().padStart(2, '0') + start.getDate().toString().padStart(2, '0');
+                const endMMDD = (end.getMonth() + 1).toString().padStart(2, '0') + end.getDate().toString().padStart(2, '0');
+                
+                if (startMMDD <= endMMDD) {
+                    if (mmdd >= startMMDD && mmdd <= endMMDD) return p.seasonId;
+                } else {
+                    if (mmdd >= startMMDD || mmdd <= endMMDD) return p.seasonId;
+                }
+            }
+            return null;
+        }
+        
+        // Find matching seasonal price
+        const currentSeasonId = getSeasonIdForDate(startDate, seasonalPrices);
+        const match = seasonalPrices.find(p =>
+            parseInt(p.bedCount) === parseInt(bedCount) &&
+            p.bookingType === bookingType &&
+            parseInt(p.seasonId) === parseInt(currentSeasonId)
+        );
+        
+        let pricePerNight = 0;
+        
+        if (match) {
+            pricePerNight = parseFloat(match.price) || 0;
+        } else {
+            // Fallback: try to find price with same bed count and booking type (any season)
+            const fallbackMatch = seasonalPrices.find(p =>
+                parseInt(p.bedCount) === parseInt(bedCount) &&
+                p.bookingType === bookingType
+            );
+            
+            if (fallbackMatch) {
+                pricePerNight = parseFloat(fallbackMatch.price) || 0;
+            } else {
+                // Last fallback: use room default price
+                pricePerNight = parseFloat(matchingRoom.ROOM_PRICE) || 0;
+                console.warn('Using default room price as fallback');
+            }
+        }
+        
+        // Update price fields
+        const priceField = document.querySelector('#price');
+        const basePriceField = document.querySelector('#baseprice');
+        
+        if (priceField) {
+            priceField.value = pricePerNight.toFixed(2);
+        }
+        if (basePriceField) {
+            basePriceField.value = pricePerNight.toFixed(2);
+        }
+        
+        // Recalculate total
+        if (typeof computeTotal === 'function') {
+            computeTotal();
+        }
+        
+        console.log('Price updated for bed count:', bedCount, 'Price:', pricePerNight);
+    } catch (error) {
+        console.error('Error calculating price:', error);
+        useDefaultPrice(matchingRoom);
+    }
+}
+
+// Helper function to use default room price
+function useDefaultPrice(room) {
+    const priceField = document.querySelector('#price');
+    const basePriceField = document.querySelector('#baseprice');
+    const defaultPrice = parseFloat(room.ROOM_PRICE) || 0;
+    
+    if (priceField) priceField.value = defaultPrice.toFixed(2);
+    if (basePriceField) basePriceField.value = defaultPrice.toFixed(2);
+    
+    if (typeof computeTotal === 'function') {
+        computeTotal();
+    }
+}
+
 // Function to open direct reservation modal without room selection
 function openDirectReservationModal(formattedDateRange, nights) {
     // Close the current SweetAlert modal first
@@ -1211,6 +1408,8 @@ function openDirectReservationModal(formattedDateRange, nights) {
                 }
                 const newHandler = function() {
                     window.selectedBedCount = this.value;
+                    // Update price based on selected bed count
+                    updatePriceForBedCount(this.value);
                 };
                 existingBedCount._bedCountHandler = newHandler;
                 existingBedCount.addEventListener('change', newHandler);
@@ -1307,12 +1506,15 @@ function openDirectReservationModal(formattedDateRange, nights) {
                         }
                     }
                     
-                    // Add event listener to capture Bed Count value when form is submitted
+                    // Add event listener to capture Bed Count value and update price
                     const bedCountSelectElement = document.getElementById('bedCountDirect');
                     if (bedCountSelectElement) {
                         bedCountSelectElement.addEventListener('change', function() {
                             // Store the selected bed count value for later use
                             window.selectedBedCount = this.value;
+                            
+                            // Update price based on selected bed count
+                            updatePriceForBedCount(this.value);
                         });
                     }
                 } else {
@@ -1365,18 +1567,32 @@ function openDirectReservationModal(formattedDateRange, nights) {
                     // Insert after contact number
                     contactNumberField.parentNode.insertBefore(bedCountContainer, contactNumberField.nextSibling);
                     
-                    // Add event listener to capture Bed Count value for fallback case
+                    // Add event listener to capture Bed Count value and update price for fallback case
                     const bedCountSelectFallback = document.getElementById('bedCountDirect');
                     if (bedCountSelectFallback) {
                         bedCountSelectFallback.addEventListener('change', function() {
                             // Store the selected bed count value for later use
                             window.selectedBedCount = this.value;
+                            
+                            // Update price based on selected bed count
+                            updatePriceForBedCount(this.value);
                         });
                     }
                     }
                 }
             }
 
+            // Add event listener to booking route to update price when booking type changes
+            const bookingRouteField = addBookingModalElement.querySelector('#bookingRoute');
+            if (bookingRouteField) {
+                bookingRouteField.addEventListener('change', function() {
+                    const bedCountField = addBookingModalElement.querySelector('#bedCountDirect');
+                    if (bedCountField && bedCountField.value) {
+                        updatePriceForBedCount(bedCountField.value);
+                    }
+                });
+            }
+            
             // Re-bind AJAX submit handler to guarantee interception for this flow
             try {
                 initializeAddBookingHandler();
@@ -2289,7 +2505,7 @@ function initializeAddBookingHandler() {
             paymentStatus: $('#paymentStatus').val(),
             // Use hidden paidAmount value when available to ensure exact amount is sent to backend
             paidAmount: $('#paidAmountHidden').val() || $('#paidAmount').val() || '0.00',
-            price: isDirectReservation ? '0.00' : $('#baseprice').val(), // Default to 0.00 for direct reservations
+            price: isDirectReservation ? ($('#baseprice').val() || $('#price').val() || '0.00') : $('#baseprice').val(), // Use calculated price for direct reservations based on bed count
             diffindays: $('#diffindays').val(),
             guestType: $('#guestType').val(),
             guestLevel: $('#guestLevel').val(),
@@ -2341,6 +2557,30 @@ function initializeAddBookingHandler() {
                 });
                 return;
             }
+            
+            // Validate bed count is selected
+            const bedCountValue = window.selectedBedCount || $('#bedCountDirect').val();
+            if (!bedCountValue || bedCountValue === '') {
+                Swal.fire({
+                    title: 'Bed Count Required',
+                    text: 'Please select a Bed Count to calculate the room price.',
+                    icon: 'warning',
+                    confirmButtonText: 'OK'
+                });
+                return;
+            }
+            
+            // Validate price is set (not 0.00)
+            const priceValue = parseFloat($('#baseprice').val() || $('#price').val() || '0.00');
+            if (priceValue <= 0) {
+                Swal.fire({
+                    title: 'Price Not Set',
+                    text: 'Please select a Bed Count to automatically calculate the room price.',
+                    icon: 'warning',
+                    confirmButtonText: 'OK'
+                });
+                return;
+            }
         }
 
         // Perform AJAX request to save booking
@@ -2365,15 +2605,55 @@ function initializeAddBookingHandler() {
                             // target: '_blank'
                         });
 
+        // Check if this is a direct reservation for voucher formatting
+        const isDirectReservationForVoucher = isDirectReservation;
+        
+        // Calculate room charges and services for voucher
+        const priceValue = formData.price || '0.00';
+        const roomRateStr = priceValue ? priceValue.toString().replace(/[,\s₱₹$]/g, '') : '0';
+        const roomRate = parseFloat(roomRateStr) || 0;
+        const nights = parseInt(formData.diffindays) || 1;
+        const roomCharges = Math.round((roomRate * nights) * 100) / 100; // Round to 2 decimals
+        
+        const breakfastAdultQty = parseInt(formData.breakfastAdultQty) || 0;
+        const breakfastAdultPrice = parseFloat(formData.breakfastAdultPrice || 0);
+        const breakfastKidQty = parseInt(formData.breakfastKidQty) || 0;
+        const breakfastKidPrice = parseFloat(formData.breakfastKidPrice || 0);
+        const breakfastTotal = parseFloat(((breakfastAdultQty * breakfastAdultPrice) + (breakfastKidQty * breakfastKidPrice)).toFixed(2));
+        
+        const pickup = parseFloat(formData.pickupPrice || 0);
+        const dropoff = parseFloat(formData.dropoffPrice || 0);
+        const lateCheckoutFee = parseFloat(formData.lateCheckoutFee || 0);
+        const servicesTotal = parseFloat((breakfastTotal + pickup + dropoff).toFixed(2));
+        
+        // Get computed values (remove commas)
+        let computedTotalRaw = $('#computedTotal').text().trim().replace(/,/g, '');
+        let computedBalanceRaw = $('#computedBalance').text().trim().replace(/,/g, '');
+        let computedPaidAmountRaw = $('#computedPaidAmount').text().trim().replace(/,/g, '');
+        
+        // Fallback if values are empty
+        if (!computedPaidAmountRaw || computedPaidAmountRaw === '0.00') {
+            computedPaidAmountRaw = parseFloat(formData.paidAmount || 0).toFixed(2);
+        }
+        if (!computedTotalRaw || computedTotalRaw === '0.00') {
+            computedTotalRaw = (roomCharges + servicesTotal + lateCheckoutFee + parseFloat(formData.reservationFee || 0) - parseFloat(formData.discount || 0)).toFixed(2);
+        }
+        
+        // Recalculate balance
+        const totalValue = parseFloat(computedTotalRaw.replace(/,/g, '')) || 0;
+        const paidValue = parseFloat(computedPaidAmountRaw.replace(/,/g, '')) || 0;
+        computedBalanceRaw = Math.max(0, (totalValue - paidValue)).toFixed(2);
+        
         const voucherData = {
-          voucherNo: formData.voucherNo, // ✅ Gamitin dito
+          voucherNo: response.confirmationNumber, // ✅ Use the actual confirmation number from database
             fullname: formData.fullname,
             dateFrom: formData.daterange.split(' to ')[0],
             dateTo: formData.daterange.split(' to ')[1].split('(')[0].trim(),
             bedCount: formData.bedCount || formData.bedCountDirect || window.selectedBedCount || 1,
-            roomNumber: $('#addroom option:selected').text(),
-            roomType: $('#room_type_hidden').val(),
-            roomView: $('#room_type').val(),
+            // Use "NO ROOM ASSIGNED" for direct reservations, same as voucher button
+            roomNumber: isDirectReservationForVoucher ? 'NO ROOM ASSIGNED' : ($('#addroom option:selected').text() || ''),
+            roomType: isDirectReservationForVoucher ? 'NO ROOM ASSIGNED' : ($('#room_type_hidden').val() || ''),
+            roomView: isDirectReservationForVoucher ? 'N/A' : ($('#room_type').val() || ''),
             roomRate: formData.price,
             breakfastAdult: formData.breakfastAdultQty,
             breakfastAdultPrice: formData.breakfastAdultPrice,
@@ -2384,11 +2664,15 @@ function initializeAddBookingHandler() {
             reservationFee: formData.reservationFee || 0,
             discount: formData.discount || 0,
             remarks: formData.bookingRemarks,
-            total: $('#computedTotal').text(),
+            total: computedTotalRaw,
+            balance: computedBalanceRaw,
+            paidAmount: computedPaidAmountRaw,
             checkInStatus: formData.checkInStatus,
             checkOutStatus: formData.checkOutStatus,
             lateCheckoutFee: formData.lateCheckoutFee,
-            directReservationFlag: ($('#directReservationFlag').val() === 'true') ? 'true' : 'false'
+            roomCharges: roomCharges.toFixed(2),
+            servicesTotal: servicesTotal.toFixed(2),
+            directReservationFlag: isDirectReservationForVoucher ? 'true' : 'false'
         };
 
         for (let key in voucherData) {
@@ -2403,13 +2687,25 @@ function initializeAddBookingHandler() {
         form.submit();
         form.remove();
 
-        setTimeout(() => {
-      Swal.close();
-      window.location.replace('/calendar');
-    }, 10000);
+        // Only redirect to calendar if NOT a direct reservation (unassigned room)
+        if (!isDirectReservation) {
+          setTimeout(() => {
+            Swal.close();
+            window.location.replace('/calendar');
+          }, 10000);
+        } else {
+          // For unassigned rooms, just close the modal and stay on current page
+          setTimeout(() => {
+            Swal.close();
+          }, 10000);
+        }
     }
                     }).then(() => {
-                      window.location.replace('/calendar');
+                      // Only redirect to calendar if NOT a direct reservation (unassigned room)
+                      if (!isDirectReservation) {
+                        window.location.replace('/calendar');
+                      }
+                      // For unassigned rooms, just close the modal and stay on current page
                     });
                 } else {
                     Swal.fire({

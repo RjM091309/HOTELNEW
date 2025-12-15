@@ -9385,6 +9385,8 @@ class BookingModel {
           c.NAME AS fullname,
           r.ROOM_NUMBER AS roomNumber,
           rt.NAME AS roomType,
+          b.IS_DIRECT_RESERVATION AS isDirectReservation,
+          b.BED_COUNT AS bedCount,
           b.CHECK_IN_DATE AS dateFrom,
           b.CHECK_OUT_DATE AS dateTo,
           b.REMARKS AS remarks,

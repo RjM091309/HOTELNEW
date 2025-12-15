@@ -2139,6 +2139,11 @@ class BookingController {
               // This is a room item - skip (handled in roomCharges)
               console.log('🏠 [VOUCHER] Skipping room item:', itemDescription);
             }
+            // Skip "Unassigned Room" - this is not a service, just room status
+            else if (desc.includes('unassigned room') || desc.includes('unassigned') || desc === 'no room assigned') {
+              // Skip unassigned room - this is just room status, not a service
+              console.log('🏠 [VOUCHER] Skipping unassigned room status:', itemDescription);
+            }
             // Extended stay - skip
             else if (desc.includes('extended') || desc.includes('extension')) {
               // Skip extended stay
@@ -2280,11 +2285,14 @@ class BookingController {
                 (desc.includes('room') && (desc.includes('single') || desc.includes('double') || desc.includes('twin') || desc.includes('deluxe')))
               );
               
+              // Exclude "Unassigned Room" - this is not a service, just room status
+              const isUnassignedRoom = desc.includes('unassigned room') || desc.includes('unassigned') || desc === 'no room assigned';
+              
               // Exclude extended stay and cancellation
               const isExcluded = desc.includes('extended') || desc.includes('extension') || desc.includes('cancellation');
               
               // Everything else is a service
-              return !isRoomItem && !isExcluded;
+              return !isRoomItem && !isUnassignedRoom && !isExcluded;
             });
             console.log('🛎️ [VOUCHER] Filtered service items:', serviceItems.map(item => ({
               description: item.description,
@@ -2375,14 +2383,18 @@ class BookingController {
           console.error('❌ [VOUCHER] Error loading logo:', error);
         }
 
+        // Check if this is a direct reservation (unassigned room)
+        const isDirectReservation = voucherData.isDirectReservation === 1 || voucherData.isDirectReservation === '1' || !voucherData.roomNumber;
+        
         // Render the HTML
         const html = await ejs.render(templateContent, {
           voucherNo,
           fullname: voucherData.fullname,
           dateFrom: voucherData.dateFrom,
           dateTo: voucherData.dateTo,
-          roomNumber: voucherData.roomNumber || 'Unassigned',
-          roomType: voucherData.roomType || 'Unassigned',
+          // Use "NO ROOM ASSIGNED" format for unassigned rooms (same as form voucher button)
+          roomNumber: isDirectReservation ? 'NO ROOM ASSIGNED' : (voucherData.roomNumber || 'Unassigned'),
+          roomType: isDirectReservation ? 'NO ROOM ASSIGNED' : (voucherData.roomType || 'Unassigned'),
           remarks: formattedRemarks, // ✅ Pass formatted remarks (template will add Room Accommodation, Pick-up, Drop-off)
           breakfastAdult,
           breakfastKid,
@@ -2414,6 +2426,7 @@ class BookingController {
         await browser.close();
 
         // Send PDF
+        // Use confirmation number directly as filename (already contains "UR" for unassigned rooms)
         const filename = `voucher-${voucherNo}.pdf`;
         const download = req.query.download === '1';
         res.set({
@@ -2433,10 +2446,13 @@ class BookingController {
 
       const voucherData = await BookingModel.generateVoucher({ data, user });
       
+      // Use confirmation number directly as filename (already contains "UR" for unassigned rooms)
+      const filename = `voucher-${data.voucherNo}.pdf`;
+      
       const download = req.query.download === '1';
       res.set({
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `${download ? 'attachment' : 'inline'}; filename="voucher-${data.voucherNo}.pdf"`,
+        'Content-Disposition': `${download ? 'attachment' : 'inline'}; filename="${filename}"`,
         'Content-Length': voucherData.pdfBuffer.length
       });
       res.send(voucherData.pdfBuffer);
@@ -3294,11 +3310,14 @@ class BookingController {
             (desc.includes('room') && (desc.includes('single') || desc.includes('double') || desc.includes('twin') || desc.includes('deluxe')))
           );
           
+          // Exclude "Unassigned Room" - this is not a service, just room status
+          const isUnassignedRoom = desc.includes('unassigned room') || desc.includes('unassigned') || desc === 'no room assigned';
+          
           // Exclude extended stay and cancellation
           const isExcluded = desc.includes('extended') || desc.includes('extension') || desc.includes('cancellation');
           
           // Everything else is a service
-          return !isRoomItem && !isExcluded;
+          return !isRoomItem && !isUnassignedRoom && !isExcluded;
         });
         console.log('🛎️ [VOUCHER PDF] Filtered service items:', serviceItems.map(item => ({
           description: item.description,
@@ -3374,14 +3393,18 @@ class BookingController {
         console.error('❌ [VOUCHER PDF] Error loading logo:', error);
       }
 
+      // Check if this is a direct reservation (unassigned room)
+      const isDirectReservation = voucherData.isDirectReservation === 1 || voucherData.isDirectReservation === '1' || !voucherData.roomNumber;
+      
       // Render the HTML - pass raw dates and let template format them
       const html = await ejs.render(templateContent, {
         voucherNo,
         fullname: voucherData.fullname,
         dateFrom: voucherData.dateFrom,
         dateTo: voucherData.dateTo,
-        roomNumber: voucherData.roomNumber || 'Unassigned',
-        roomType: voucherData.roomType || 'Unassigned',
+        // Use "NO ROOM ASSIGNED" format for unassigned rooms (same as form voucher button)
+        roomNumber: isDirectReservation ? 'NO ROOM ASSIGNED' : (voucherData.roomNumber || 'Unassigned'),
+        roomType: isDirectReservation ? 'NO ROOM ASSIGNED' : (voucherData.roomType || 'Unassigned'),
         remarks: formattedRemarks, // ✅ Pass formatted remarks (template will add Room Accommodation, Pick-up, Drop-off)
         breakfastAdult,
         breakfastKid,
@@ -3413,6 +3436,7 @@ class BookingController {
       await browser.close();
 
       // Send PDF
+      // Use confirmation number directly as filename (already contains "UR" for unassigned rooms)
       const filename = `voucher-${voucherNo}.pdf`;
       res.set({
         'Content-Type': 'application/pdf',
