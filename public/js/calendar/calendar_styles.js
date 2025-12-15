@@ -17,13 +17,23 @@ function injectDragStyles() {
   const style = document.createElement('style');
   style.id = 'calendar-drag-styles';
   style.textContent = `
-    /* Group booking highlight border */
+    /* Group booking highlight border - allow dynamic colors via inline styles */
     .fc-event.group-booking {
-      border: 2px solid #2196F3 !important;
+      /* Border color will be set dynamically via inline style with !important */
       box-shadow: 0 0 0 1px rgba(33,150,243,0.25) inset;
       height: 24px !important;
       min-height: 24px !important;
       margin-top: -4px !important;
+    }
+    
+    /* Override .fc-v-event border:none for group bookings */
+    .fc-v-event.group-booking {
+      border: inherit !important;
+    }
+    
+    /* Dynamic group color box-shadow based on data attribute */
+    .fc-event.group-booking[data-group-color] {
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.1) inset, 0 0 8px rgba(0,0,0,0.15);
     }
 
     .event-being-dragged {

@@ -5,6 +5,65 @@
 // This module contains event handlers for the calendar system
 
 // =============================================================================
+// GROUP BOOKING COLOR ASSIGNMENT
+// =============================================================================
+
+// Color palette for different group bookings (neon/vibrant colors that don't match booking status colors)
+// Avoid: Green (#43a047), Yellow (#fff700), Red (#e53935), Gray, Black
+const GROUP_COLORS = [
+  '#00FFFF', // Neon Cyan / Aqua
+  '#FF00FF', // Neon Magenta / Fuchsia
+  '#FF1493', // Deep Pink / Neon Pink
+  '#1E90FF', // Dodger Blue
+  '#00FFCC', // Neon Turquoise
+  '#AA00FF', // Neon Purple
+  '#FFAA00', // Neon Orange
+  '#FF00CC', // Neon Magenta-Pink
+  '#8800FF', // Neon Violet
+  '#FF0088', // Neon Rose
+  '#00FF88', // Neon Green-Cyan
+  '#FF8800', // Neon Orange-Red
+  '#AA00AA', // Neon Violet-Magenta
+  '#0088FF', // Neon Sky Blue
+  '#FF00AA', // Neon Pink
+  '#00AAFF', // Bright Neon Blue
+  '#FF00DD', // Neon Pink-Magenta
+  '#00DDFF', // Bright Neon Cyan
+  '#DD00FF'  // Bright Neon Purple
+];
+
+// Cache to store groupBookingId -> color mapping (consistent across all events)
+const groupColorCache = {};
+
+/**
+ * Get a consistent color for a group booking based on its ID
+ * @param {number|string} groupBookingId - The group booking ID
+ * @returns {string} - Hex color code
+ */
+function getGroupBookingColor(groupBookingId) {
+  if (!groupBookingId || groupBookingId === 0 || groupBookingId === '') {
+    return '#2196F3'; // Default blue if invalid
+  }
+  
+  const id = String(groupBookingId);
+  
+  // Return cached color if exists
+  if (groupColorCache[id]) {
+    return groupColorCache[id];
+  }
+  
+  // Assign color based on groupBookingId (consistent hash)
+  const numericId = parseInt(id, 10) || id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const colorIndex = numericId % GROUP_COLORS.length;
+  const assignedColor = GROUP_COLORS[colorIndex];
+  
+  // Cache the color for this group
+  groupColorCache[id] = assignedColor;
+  
+  return assignedColor;
+}
+
+// =============================================================================
 // EVENT HANDLERS
 // =============================================================================
 
@@ -75,7 +134,9 @@ function handleEventClick(info) {
 function applyCompositeStatusStyles(event, el) {
   try {
     const bookingStatus = event.extendedProps?.bookingStatus;
-    const isGroupBooking = event.extendedProps?.groupBookingId && event.extendedProps.groupBookingId !== null && event.extendedProps.groupBookingId !== undefined;
+    // More robust check: groupBookingId must exist, not be null, not be 0, and not be empty string
+    const groupBookingId = event.extendedProps?.groupBookingId;
+    const isGroupBooking = groupBookingId != null && groupBookingId !== 0 && groupBookingId !== '' && String(groupBookingId).trim() !== '';
 
     // Colors - Keep original background colors
     const red = '#e53935';      // regular (keep original red)
@@ -116,6 +177,9 @@ function applyCompositeStatusStyles(event, el) {
       coNorm = 'regular';
     }
 
+    // Get group color if this is a group booking
+    const groupColor = isGroupBooking ? getGroupBookingColor(groupBookingId) : null;
+
     // Decide behavior by booking status
     if (bookingStatus === 'pending') {
       // Determine each side for pending
@@ -126,7 +190,10 @@ function applyCompositeStatusStyles(event, el) {
       el.style.color = isGroupBooking ? '#ffffff !important' : '#fff';
       if (isGroupBooking) {
         el.classList.add('group-booking');
-        el.style.border = '2px solid #2196F3';
+        // Use dynamic group color for border - use !important to override CSS
+        const borderColor = groupColor || '#2196F3';
+        el.style.setProperty('border', `4px solid ${borderColor}`, 'important');
+        el.setAttribute('data-group-color', borderColor);
         el.style.height = '24px';
         el.style.minHeight = '24px';
         el.style.marginTop = '-4px';
@@ -160,7 +227,10 @@ function applyCompositeStatusStyles(event, el) {
       el.style.color = isGroupBooking ? '#ffffff !important' : '#fff';
       if (isGroupBooking) {
         el.classList.add('group-booking');
-        el.style.border = '2px solid #2196F3';
+        // Use dynamic group color for border - use !important to override CSS
+        const borderColor = groupColor || '#2196F3';
+        el.style.setProperty('border', `4px solid ${borderColor}`, 'important');
+        el.setAttribute('data-group-color', borderColor);
         el.style.height = '24px';
         el.style.minHeight = '24px';
         el.style.marginTop = '-4px';
@@ -195,8 +265,10 @@ function applyCompositeStatusStyles(event, el) {
     if (isGroupBooking) {
       el.style.color = '#ffffff !important';
       el.classList.add('group-booking');
-      // Border highlight to distinguish group bookings
-      el.style.border = '2px solid #2196F3';
+      // Border highlight to distinguish group bookings - use dynamic group color with !important
+      const borderColor = groupColor || '#2196F3';
+      el.style.setProperty('border', `4px solid ${borderColor}`, 'important');
+      el.setAttribute('data-group-color', borderColor);
       el.style.height = '24px';
       el.style.minHeight = '24px';
       el.style.marginTop = '-4px';
@@ -482,3 +554,4 @@ window.handleEventDidMount = handleEventDidMount;
 window.handleDatesSet = handleDatesSet;
 window.updateEventStatusInstantly = updateEventStatusInstantly;
 window.updateEventStatus = updateEventStatus;
+window.getGroupBookingColor = getGroupBookingColor;
