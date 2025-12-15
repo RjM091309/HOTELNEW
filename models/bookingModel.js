@@ -1120,7 +1120,25 @@ class BookingModel {
         `;
         const directReservationFlag = isDirectReservation ? 1 : 0;
         // Handle empty agencyID - set to NULL if empty
-        const processedAgencyID = (finalBookingRoute === 'agency' && agencyID && agencyID.trim() !== '') ? agencyID : null;
+        let processedAgencyID = null;
+        
+        // Validate agency if booking route is agency
+        if (finalBookingRoute === 'agency' && agencyID && agencyID.trim() !== '') {
+          // Validate that agency exists and is active
+          const agencyCheckQuery = 'SELECT IDNo FROM agency WHERE IDNo = ? AND ACTIVE = 1';
+          const [agencyCheck] = await new Promise((resolve, reject) => {
+            connection.query(agencyCheckQuery, [agencyID], (err, result) => {
+              if (err) reject(err);
+              else resolve(result);
+            });
+          });
+          
+          if (agencyCheck.length === 0) {
+            throw new Error('Invalid agency selected. Agency does not exist or is inactive.');
+          }
+          
+          processedAgencyID = agencyID;
+        }
         
         const bookingValues = [
           customerId, room_id, checkInDate, checkOutDate, 'pending', finalBookingRoute,
@@ -7624,7 +7642,25 @@ class BookingModel {
               WHERE IDNo = ?
             `;
             // Handle empty agencyID and bedCount - set to NULL if empty
-            const processedAgencyID = (bookingRoute === 'agency' && agencyID && agencyID.trim() !== '') ? agencyID : null;
+            let processedAgencyID = null;
+            
+            // Validate agency if booking route is agency
+            if (bookingRoute === 'agency' && agencyID && agencyID.trim() !== '') {
+              // Validate that agency exists and is active
+              const [agencyCheck] = await connection.promise().query(
+                'SELECT IDNo FROM agency WHERE IDNo = ? AND ACTIVE = 1',
+                [agencyID]
+              );
+              
+              if (agencyCheck.length === 0) {
+                connection.rollback();
+                connection.release();
+                return reject(new Error('Invalid agency selected. Agency does not exist or is inactive.'));
+              }
+              
+              processedAgencyID = agencyID;
+            }
+            
             const processedBedCount = (bedCount && bedCount.trim() !== '') ? bedCount : null;
             
             await connection.promise().query(bookingUpdateQuery, [

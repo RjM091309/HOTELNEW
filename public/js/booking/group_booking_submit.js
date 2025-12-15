@@ -91,6 +91,25 @@ $(document).ready(function () {
 
     // Get agency ID if booking route is agency
     const agencyId = bookingRoute === 'agency' ? $('#groupAgencySelect').val() || null : null;
+    
+    // Validate agency selection if booking route is agency
+    if (bookingRoute === 'agency' && (!agencyId || agencyId.trim() === '')) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Agency Required',
+        text: 'Please select an agency for agency bookings.',
+      });
+      // Highlight the agency select field
+      const agencyWrapper = $('#groupAgencySelectWrapper, #editGroupAgencySelectWrapper');
+      if (agencyWrapper.length) {
+        agencyWrapper.css('border', '2px solid #e53935');
+        agencyWrapper.css('border-radius', '4px');
+        setTimeout(() => {
+          agencyWrapper.css('border', '');
+        }, 3000);
+      }
+      return;
+    }
 
     const perRoomDiscounts = [];
     const selectedRoomIds = selectedRooms.split(',');

@@ -2540,6 +2540,24 @@ function initializeAddBookingHandler() {
             // Add direct reservation flag
             directReservationFlag: isDirectReservation ? 'true' : 'false'
         };
+        
+        // Validate agency selection if booking route is agency (for both regular and unassigned room bookings)
+        // Check the actual booking route from the form, not the processed one
+        const actualBookingRoute = $('#bookingRoute').val();
+        if (actualBookingRoute === 'agency' && (!formData.agencyID || formData.agencyID.trim() === '')) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Agency Required',
+                text: 'Please select an agency for agency bookings.',
+            });
+            // Highlight the agency select field
+            $('#agencySelectWrapper').css('border', '2px solid #e53935');
+            $('#agencySelectWrapper').css('border-radius', '4px');
+            setTimeout(() => {
+                $('#agencySelectWrapper').css('border', '');
+            }, 3000);
+            return;
+        }
 
         console.log('Form data being sent (manual):', formData);
         if (isDirectReservation) {

@@ -63,6 +63,22 @@ $(document).ready(function () {
       const lateCheckoutFee = $('#lateCheckoutFee').val();
       console.log('DEBUG Single Booking: lateCheckoutFee =', lateCheckoutFee, 'checkOutStatus =', $('#checkOutStatus').val());
 
+      // Validate agency selection if booking route is agency
+      if (bookingRoute === 'agency' && (!agencyID || agencyID.trim() === '')) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Agency Required',
+          text: 'Please select an agency for agency bookings.',
+        });
+        // Highlight the agency select field
+        $('#agencySelectWrapper').css('border', '2px solid #e53935');
+        $('#agencySelectWrapper').css('border-radius', '4px');
+        setTimeout(() => {
+          $('#agencySelectWrapper').css('border', '');
+        }, 3000);
+        return;
+      }
+      
       if (!roomId || !daterange || !fullname || !guestsCount || !paymentStatus || !roomPrice || !guestType || !guestLevel) {
         Swal.fire({
           icon: 'error',

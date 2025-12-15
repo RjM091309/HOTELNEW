@@ -1728,7 +1728,40 @@ function populateEditForm(booking) {
         console.log('DEBUG: After setTimeout, dropdown value:', $('#edit_checkOutStatus').val());
     }, 300); // Increased delay to ensure form is fully populated
     $('#edit_bookingRemarks').val(booking.REMARKS);
-    $('#edit_agencySelect').val(booking.agencyID);
+    
+    // Handle agency selection - load agencies first if booking route is agency
+    const bookingRoute = booking.BOOKING_CHANNEL;
+    if (bookingRoute === 'agency') {
+        // Show agency wrapper
+        $('#edit_agencySelectWrapper').show();
+        
+        // Load agencies first, then set the value
+        fetch('/booking/get-agency')
+            .then(res => res.json())
+            .then(agencies => {
+                const agencySelect = $('#edit_agencySelect');
+                agencySelect.empty().append(`<option value="" disabled selected>Select Agency</option>`);
+                agencies.forEach(a => {
+                    agencySelect.append(`<option value="${a.IDNo}">${a.NAME}</option>`);
+                });
+                
+                // Now set the agency value after dropdown is populated
+                if (booking.agencyID) {
+                    agencySelect.val(booking.agencyID);
+                }
+            })
+            .catch(error => {
+                console.error('Error loading agencies:', error);
+                // Still try to set the value even if loading fails
+                if (booking.agencyID) {
+                    $('#edit_agencySelect').val(booking.agencyID);
+                }
+            });
+    } else {
+        // Hide agency wrapper and clear value if not agency
+        $('#edit_agencySelectWrapper').hide();
+        $('#edit_agencySelect').val('');
+    }
     $('#edit_bedCount').val(booking.ROOM_BED === 1 ? '1' : booking.ROOM_BED === 2 ? '2' : 'N/A');
     $('#edit_room_type').val(booking.ROOM_VIEW === 1 ? 'Condo View' : booking.ROOM_VIEW === 2 ? 'Mountain View' : 'N/A');
     $('#edit_room_type_hidden').val(booking.ROOM_TYPE);
