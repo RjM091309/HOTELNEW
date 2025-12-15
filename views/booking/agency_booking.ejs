@@ -47,22 +47,23 @@
             </div>
             <div class="dashboard-card-body">
                 <div class="table-scrollable">
-                    <table id="agency_booking_tbl" class="table table-hover table-bordered full-width">
+    <table id="agency_booking_tbl" class="table table-hover table-bordered full-width">
                         <thead>
                         <tr>
                             <th style="display:none"></th>
-                            <th>#</th>
-                            <th>GUEST NAME</th>
-                            <th>AGENCY NAME</th>
-                            <th>ROOM NUMBER</th>
-                            <th>CONFIRMATION NUMBER</th>
-                            <th>CHECK IN</th>
-                            <th>CHECK OUT</th>
-                            <th>TOTAL PAYMENT</th>
-                            <th>BOOKING CHANNEL</th>
-                            <th>PAYMENT STATUS</th>
-                            <th>BOOKING STATUS</th>
-                            <th>ACTION</th>
+                            <th class="text-center">#</th>
+                            <th class="text-center">GUEST NAME</th>
+                            <th class="text-center">AGENCY NAME</th>
+                            <th class="text-center">ROOM NUMBER</th>
+                            <th class="text-center">CONFIRMATION NUMBER</th>
+                            <th class="text-center">CHECK IN</th>
+                            <th class="text-center">CHECK OUT</th>
+                            <th class="text-center">TOTAL PAYMENT</th>
+                            <th class="text-center">BALANCE</th>
+                            <th class="text-center">BOOKING CHANNEL</th>
+                            <th class="text-center">PAYMENT STATUS</th>
+                            <th class="text-center">BOOKING STATUS</th>
+                            <th class="text-center">ACTION</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -338,7 +339,8 @@ $(document).ready(function () {
                         Checkin: formatDate(item.CHECK_IN_DATE),
                         Checkout: formatDate(item.CHECK_OUT_DATE),
                         Totalcost: item.TOTAL_COST,
-                        Paymentstatus: item.PAYMENT_STATUS,
+                        Balance: item.BALANCE || 0,
+                        Paymentstatus: item.PAYMENT_STATUS || 'unpaid',
                         BookingChannel: item.BOOKING_CHANNEL,
                         Status: getStatusLabel(item.BookingStatus, item.BookingID),
                         BookingStatus: item.BookingStatus,
@@ -347,6 +349,12 @@ $(document).ready(function () {
                 });
             },
         },
+        columnDefs: [
+            // Center-aligned columns
+            { targets: [1,3,4,5,6,7,10,11,12,13], className: 'text-center' },
+            // Right-align money columns
+            { targets: [8,9], className: 'text-end' }
+        ],
         columns: [  
         { data: 'BookingID', visible: false },
         {
@@ -395,15 +403,33 @@ $(document).ready(function () {
                 });
             }
         },
+        {
+            data: 'Balance',
+            title: 'BALANCE',
+            render: function (data) {
+                const balance = parseFloat(data) || 0;
+                const formatted = balance.toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+                if (balance > 0) {
+                    return `<span style="color: #d9534f; font-weight: bold;">₱${formatted}</span>`;
+                }
+                return `<span>₱${formatted}</span>`;
+            }
+        },
         { data: 'BookingChannel', title: 'BOOKING CHANNEL' },
         {
             data: 'Paymentstatus',
             title: 'PAYMENT STATUS',
             className: 'text-center',
             render: function (data) {
-                const paymentStatus = data.toLowerCase().trim();
-                const labelClass = paymentStatus === 'paid' ? 'label-success' : 'label-danger';
-                return `<div style="text-align: center;"><span class="label label-sm ${labelClass}">${data}</span></div>`;
+                const paymentStatus = (data || '').toLowerCase().trim();
+                let labelClass = 'label-danger';
+                let text = data || 'unpaid';
+                if (paymentStatus === 'paid') { labelClass = 'label-success'; text = 'paid'; }
+                else if (paymentStatus === 'partial') { labelClass = 'label-warning'; text = 'partial'; }
+                return `<div style="text-align: center;"><span class="label label-sm ${labelClass}">${text}</span></div>`;
             }
         },
         {
@@ -418,49 +444,64 @@ $(document).ready(function () {
         {
             className: 'text-center',
             render: function (data, type, row) {
-            const paymentStatus = row.Paymentstatus.toLowerCase();
-            const bookingStatus = row.BookingStatus?.toLowerCase();
+                const paymentStatus = row.Paymentstatus.toLowerCase();
+                const bookingStatus = row.BookingStatus?.toLowerCase(); // safe check
+                const isDirect = String(row.IsDirectReservation) === '1';
 
-            const buttonClass = paymentStatus === 'paid' ? 'btn-primary' : 'btn-primary';
+                let html = `<div style="text-align: center;">`;
 
-            const isDirect = String(row.IsDirectReservation) === '1';
-
-            let html = `<div style="text-align: center;">`;
-            // Billing action - enabled for all bookings including direct reservations
-            html += `
-                <button class="btn btn-sm ${buttonClass}" onclick="showBilling(${row.BookingID})" title="Billing" style="width: 35px; height: 35px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px;">
-                    <i class="fa fa-credit-card"></i>
-                </button>`;
-
-            html += `
-                <button class="btn btn-sm btn-warning ms-1" onclick="${isDirect ? `editDirect(${row.BookingID})` : `editBooking(${row.BookingID})`}" title="Edit Booking" style="width: 35px; height: 35px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px;">
-                    <i class="fa fa-edit"></i>
-                </button>`;
-
-            html += `
-                <button class="btn btn-sm btn-info ms-1" onclick="downloadVoucher(${row.BookingID})" title="Download Voucher" style="width: 35px; height: 35px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px;">
-                    <i class="fa fa-download"></i>
-                </button>`;
-
-            if (bookingStatus === 'pending') {
+                // Billing
                 html += `
-                    <button class="btn btn-sm btn-danger ms-1" onclick="openCancelBookingModal(${row.BookingID})" title="Cancel Booking" style="width: 35px; height: 35px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px;">
-                        <i class="fa fa-times"></i>
-                    </button>`;
-            } else if (bookingStatus === 'cancelled') {
+                    <span class="label label-sm label-billing" onclick="showBilling(${row.BookingID})" title="Billing" style="cursor:pointer; margin:0 2px; display:inline-block;">
+                        <i class="fa fa-credit-card"></i>
+                    </span>`;
+
+                // Edit
                 html += `
-                    <button class="btn btn-sm btn-danger ms-1" disabled title="Cancelled" style="width: 35px; height: 35px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px;">
-                        <i class="fa fa-ban"></i>
-                    </button>`;
+                    <span class="label label-sm label-warning ms-1" onclick="${isDirect ? `editDirect(${row.BookingID})` : `editBooking(${row.BookingID})`}" title="Edit Booking" style="cursor:pointer; margin:0 2px; display:inline-block;">
+                        <i class="fa fa-edit"></i>
+                    </span>`;
+
+                // Remarks (highlight if exists)
+                const hasRemarks = (row.BookingRemarks && row.BookingRemarks.trim() !== '') || (row.RemarksCount && row.RemarksCount > 0);
+                if (hasRemarks) {
+                    html += `
+                        <span class="label label-sm label-success ms-1" onclick="openRemarksModal(${row.BookingID})" title="Remarks" style="cursor:pointer; margin:0 2px; display:inline-block;">
+                            <i class="fa fa-comment-dots"></i>
+                        </span>`;
+                } else {
+                    html += `
+                        <span class="label label-sm label-muted ms-1" onclick="openRemarksModal(${row.BookingID})" title="Remarks" style="cursor:pointer; margin:0 2px; display:inline-block;">
+                            <i class="fa fa-comment-dots"></i>
+                        </span>`;
+                }
+
+                // Download voucher
+                html += `
+                    <span class="label label-sm label-download ms-1" onclick="downloadVoucher(${row.BookingID})" title="Download Voucher" style="cursor:pointer; margin:0 2px; display:inline-block;">
+                        <i class="fa fa-download"></i>
+                    </span>`;
+
+                // Cancel
+                if (bookingStatus === 'pending') {
+                    html += `
+                        <span class="label label-sm label-danger ms-1" onclick="openCancelBookingModal(${row.BookingID})" title="Cancel Booking" style="cursor:pointer; margin:0 2px; display:inline-block;">
+                            <i class="fa fa-times"></i>
+                        </span>`;
+                } else if (bookingStatus === 'cancelled') {
+                    html += `
+                        <span class="label label-sm label-danger ms-1" title="Cancelled" style="opacity:.6; cursor:not-allowed; margin:0 2px; display:inline-block;">
+                            <i class="fa fa-ban"></i>
+                        </span>`;
+                }
+
+                html += `</div>`;
+                return html;
             }
-
-            html += `</div>`;
-            return html;
-        }
 
         }
     ],
-    order: [[9, 'desc']],
+    order: [[0, 'desc']],
     language: {
         emptyTable: "No agency bookings available in the table."
     }

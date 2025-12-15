@@ -1,0 +1,50 @@
+<!-- ======================================== -->
+<!-- AGENCY MANAGEMENT PAGE -->
+<!-- ======================================== -->
+
+<!-- Main Content Area -->
+<div class="row">
+    <div class="col-xl-12 col-md-12 col-12">
+        <div class="dashboard-card">
+            <div class="dashboard-card-header">
+                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                    <div class="tab-bar">
+                        <a class="tab-item is-active" href="/agency">All Agencies</a>
+                    </div>        
+                    
+                    <div style="flex: 0 0 auto;">
+                        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#new-agency-modal">
+                            <i class="fa fa-plus"></i> Add Agency
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="dashboard-card-body">
+                <div class="table-scrollable">
+                    <table id="agencies_tbl" class="table table-hover table-bordered full-width">
+                        <thead>
+                            <tr>
+                                <th>Agency Name</th>
+                            <th>Contact Number</th>
+                            <th>Bookings</th>
+                            <th>Balance</th>
+                            <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data will be loaded via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('modal/new_agency') %>
+<%- include('modal/edit_agency') %>
+<%- include('modal/agency_bookings') %>
+
+<!-- Include external JavaScript file -->
+<script src="/js/agency/agency.js"></script>
+

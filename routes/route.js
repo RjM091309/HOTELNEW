@@ -18,6 +18,7 @@ const roomClearanceRoutes = require('./r_room_clearance');
 const bookingChannelRoutes = require('./r_booking_channel');
 const paymentsRoutes = require('./r_payments');
 const telegramRoutes = require('./r_telegram');
+const agencyRoutes = require('./r_agency');
 const apiRoutes = require('./r_api');
 const updatesRoutes = require('./r_updates');
 
@@ -50,6 +51,7 @@ router.use('/booking_channel', AuthMiddleware.requireAuth, bookingChannelRoutes)
 router.use('/payments', AuthMiddleware.requireAuth, paymentsRoutes);
 router.use('/room_clearance', AuthMiddleware.requireAuth, roomClearanceRoutes);
 router.use('/telegram', AuthMiddleware.requireAuth, telegramRoutes);
+router.use('/agency', AuthMiddleware.requireAuth, agencyRoutes);
 
 // Redirect root to dashboard if authenticated, otherwise to login
 router.get('/', AuthMiddleware.redirectIfAuthenticated, (req, res) => {

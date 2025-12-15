@@ -1,0 +1,47 @@
+<div class="modal fade" id="agency-bookings-modal" tabindex="-1" aria-labelledby="agency-bookings-modal-label" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable" style="max-width: 75vw; width: 75vw;">
+    <div class="modal-content" style="max-height: 90vh;">
+      <style>
+        /* Remove hover effect on Total/Balance cells */
+        #agency-bookings-table td.booking-total:hover,
+        #agency-bookings-table td.booking-balance:hover {
+          background-color: inherit !important;
+        }
+      </style>
+      <div class="modal-header">
+        <h5 class="modal-title" id="agency-bookings-modal-label">Agency Bookings</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2">
+          <strong id="agency-bookings-agency-name"></strong>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-bordered" id="agency-bookings-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Guest</th>
+                <th>Room</th>
+                <th>Confirmation #</th>
+                <th>Check-in</th>
+                <th>Check-out</th>
+                <th>Total Payment</th>
+                <th>Balance</th>
+                <th>Payment Status</th>
+                <th>Booking Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Filled by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+

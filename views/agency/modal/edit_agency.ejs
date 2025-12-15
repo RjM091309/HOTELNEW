@@ -1,0 +1,39 @@
+<div class="modal fade" id="edit-agency-modal" tabindex="-1" aria-labelledby="edit-agency-modal-label" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <form id="edit-agency-form">
+          <div class="modal-header">
+            <h5 class="modal-title" id="edit-agency-modal-label">Edit Agency</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <!-- Hidden Field for Agency ID -->
+            <input type="hidden" id="edit-agency-id" name="id">
+  
+            <!-- Agency Name -->
+            <div class="col-lg-12 p-t-15">
+              <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                <input class="mdl-textfield__input" type="text" id="edit-agency-name" name="name" required>
+                <label class="mdl-textfield__label">Agency Name <span style="color: red;">*</span></label>
+              </div>
+            </div>
+  
+            <!-- Contact Number -->
+            <div class="col-lg-12 p-t-15">
+              <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                <input class="mdl-textfield__input" type="text" id="edit-agency-contact-number" name="contactNumber">
+                <label class="mdl-textfield__label">Contact Number</label>
+              </div>
+            </div>
+          </div>
+  
+          <!-- Modal Footer -->
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
