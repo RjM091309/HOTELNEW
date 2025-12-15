@@ -942,8 +942,13 @@ $(document).ready(function() {
             $('#edit_added-services-list').empty().hide();
         }
         
-        // Reset modal title
+        // Check if this is an unassigned room (no room number)
+        const roomId = $('#edit_addroom').val();
         const modalTitle = $('#modal-editbooking').find('.modal-title');
+        const isUnassignedRoom = !roomId || roomId === '' || roomId === '0' || 
+                                 (modalTitle.length && modalTitle.text().includes('No Room Assigned'));
+        
+        // Reset modal title
         if (modalTitle.length) {
             modalTitle.text('Edit Booking');
         }
@@ -987,6 +992,11 @@ $(document).ready(function() {
         $('#edit_discountAmount').val('');
         $('#edit_extra-services-wrapper').hide();
         $('#edit_extra-services-hr').hide();
+        
+        // Reload page if unassigned room, don't reload if assigned room
+        if (isUnassignedRoom) {
+            window.location.reload();
+        }
     });
     
     // Additional specific event listener for paid amount to ensure it triggers
