@@ -183,6 +183,143 @@ class AgencyModel {
       throw error;
     }
   }
+
+  // Get data for agency-wide voucher / statement
+  static async getAgencyVoucherData(agencyId, filterType, fromDate, toDate) {
+    try {
+      const useCheckIn = (filterType || '').toLowerCase() === 'checkin';
+      const dateColumn = useCheckIn ? 'DATE(b.CHECK_IN_DATE)' : 'DATE(b.ENCODED_DT)';
+
+      const query = `
+        SELECT
+          a.NAME AS agencyName,
+          b.IDNo AS bookingId,
+          c.NAME AS guest,
+          r.ROOM_NUMBER AS room,
+          b.CONFIRMATION_NUMBER AS confirmationNumber,
+          DATE_FORMAT(b.CHECK_IN_DATE, '%b %e, %Y') AS checkIn,
+          DATE_FORMAT(b.CHECK_OUT_DATE, '%b %e, %Y') AS checkOut,
+          b.BOOKING_STATUS AS bookingStatus,
+          bill.PAYMENT_STATUS AS paymentStatus,
+          COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) AS roomTotal,
+          COALESCE(services_total.TOTAL_SERVICES_COST, 0) AS servicesTotal,
+          COALESCE(extensions_total.TOTAL_EXTENSIONS_COST, 0) AS extensionsTotal,
+          COALESCE(bill.CANCELLATION_PENALTY, 0) AS penalty,
+          COALESCE(bill.RESERVATION_FEE, 0) AS reservationFee,
+          COALESCE(bill.DISCOUNT_AMOUNT, 0) AS discountAmount,
+          COALESCE(payments_total.TOTAL_PAID, 0) AS paidAmount
+        FROM booking b
+        INNER JOIN agency a ON a.IDNo = b.AGENCY_ID
+        LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+        LEFT JOIN room r ON b.ROOM_ID = r.IDNo
+        LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
+        LEFT JOIN (
+          SELECT 
+            bs.BOOKING_ID,
+            SUM(bs.TOTAL_COST) AS TOTAL_SERVICES_COST
+          FROM booking_service bs
+          WHERE bs.ACTIVE = 1
+          GROUP BY bs.BOOKING_ID
+        ) services_total ON services_total.BOOKING_ID = b.IDNo
+        LEFT JOIN (
+          SELECT 
+            be.BOOKING_ID,
+            SUM(be.QTY * be.COST) AS TOTAL_EXTENSIONS_COST
+          FROM booking_extension be
+          WHERE be.ACTIVE = 1
+          GROUP BY be.BOOKING_ID
+        ) extensions_total ON extensions_total.BOOKING_ID = b.IDNo
+        LEFT JOIN (
+          SELECT 
+            p.BOOKING_ID,
+            SUM(CASE WHEN p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount') THEN p.AMOUNT_PAID ELSE 0 END) AS TOTAL_PAID
+          FROM payments p
+          WHERE p.BOOKING_ID IS NOT NULL
+          GROUP BY p.BOOKING_ID
+        ) payments_total ON payments_total.BOOKING_ID = b.IDNo
+        WHERE 
+          b.ACTIVE = 1
+          AND b.AGENCY_ID = ?
+          AND ${dateColumn} BETWEEN ? AND ?
+        ORDER BY b.CHECK_IN_DATE ASC, b.IDNo ASC
+      `;
+
+      const rows = await queryDatabasePromise(query, [agencyId, fromDate, toDate]);
+
+      if (!rows || rows.length === 0) {
+        return {
+          agencyName: '',
+          bookings: [],
+          totals: {
+            totalAmount: 0,
+            totalPaid: 0,
+            totalBalance: 0
+          }
+        };
+      }
+
+      let grandTotalAmount = 0;
+      let grandTotalPaid = 0;
+      let grandTotalBalance = 0;
+
+      const bookings = rows.map((row) => {
+        const roomTotal = parseFloat(row.roomTotal || 0);
+        const servicesTotal = parseFloat(row.servicesTotal || 0);
+        const extensionsTotal = parseFloat(row.extensionsTotal || 0);
+        const penalty = parseFloat(row.penalty || 0);
+        const reservationFee = parseFloat(row.reservationFee || 0);
+        const discountAmount = parseFloat(row.discountAmount || 0);
+        const paidAmount = parseFloat(row.paidAmount || 0);
+        const isCancelled = (row.bookingStatus || '').toLowerCase() === 'cancelled';
+
+        // Calculate effectiveSubTotal (same logic as getBilling)
+        const baseChargeSubTotal = roomTotal + servicesTotal + extensionsTotal;
+        const subTotal = baseChargeSubTotal + penalty;
+        const effectiveSubTotal = isCancelled ? baseChargeSubTotal : subTotal;
+
+        // If cancelled with penalty, treat penalty as total and balance 0
+        let bookingTotal, balance;
+        if (penalty > 0) {
+          bookingTotal = penalty;
+          balance = 0;
+        } else {
+          // Same calculation as fetchBillingAndPayments
+          bookingTotal = Math.max(0, effectiveSubTotal - reservationFee - discountAmount);
+          balance = Math.max(0, bookingTotal - paidAmount);
+        }
+
+        grandTotalAmount += bookingTotal;
+        grandTotalPaid += paidAmount;
+        grandTotalBalance += balance;
+
+        return {
+          guest: row.guest || '-',
+          room: row.room || '-',
+          confirmation: row.confirmationNumber || '-',
+          checkIn: row.checkIn || '-',
+          checkOut: row.checkOut || '-',
+          total: bookingTotal,
+          paid: paidAmount,
+          balance,
+          paymentStatus: row.paymentStatus || '-',
+          bookingStatus: row.bookingStatus || '-'
+        };
+      });
+
+      return {
+        agencyName: rows[0]?.agencyName || '',
+        bookings,
+        totals: {
+          totalAmount: grandTotalAmount,
+          totalPaid: grandTotalPaid,
+          totalBalance: grandTotalBalance
+        }
+      };
+    } catch (error) {
+      console.error('Error in getAgencyVoucherData:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = AgencyModel;

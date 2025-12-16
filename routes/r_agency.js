@@ -11,6 +11,9 @@ router.get('/data', AgencyController.getAgenciesData);
 // Get bookings for an agency
 router.get('/bookings/:id', AgencyController.getAgencyBookings);
 
+// Agency-wide voucher (PDF)
+router.get('/voucher/:id', AgencyController.generateAgencyVoucherPDF);
+
 // Add a new agency
 router.post('/add', AgencyController.addAgency);
 

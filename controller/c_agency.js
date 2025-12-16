@@ -189,6 +189,111 @@ class AgencyController {
       });
     }
   }
+
+  // Generate agency-wide voucher PDF (all bookings within date range)
+  static async generateAgencyVoucherPDF(req, res) {
+    try {
+      const { id } = req.params;
+      const { filterType = 'reservation', from, to, download } = req.query;
+
+      if (!id) {
+        return res.status(400).json({ success: false, message: 'Agency ID is required' });
+      }
+      if (!from || !to) {
+        return res.status(400).json({ success: false, message: 'Date range (from/to) is required' });
+      }
+
+      const { chromium } = require('playwright');
+      const path = require('path');
+      const ejs = require('ejs');
+      const fs = require('fs').promises;
+
+      const user = req.user ? { FULLNAME: req.user.FULLNAME } : { FULLNAME: 'System User' };
+
+      // Get voucher data for this agency and date range
+      const voucherData = await AgencyModel.getAgencyVoucherData(id, filterType, from, to);
+
+      const templatePath = path.join(__dirname, '../views/agency/pdf/agency_voucher.ejs');
+      const templateContent = await fs.readFile(templatePath, 'utf-8');
+
+      // Load logo as base64 for Playwright
+      const logoPath = path.join(__dirname, '../public/img/Logo-Black.JPG');
+      let imageUrl = '';
+      try {
+        if (require('fs').existsSync(logoPath)) {
+          const imageBase64 = require('fs').readFileSync(logoPath, 'base64');
+          imageUrl = `data:image/jpeg;base64,${imageBase64}`;
+        } else {
+          console.error('❌ [AGENCY VOUCHER PDF] Logo file not found:', logoPath);
+        }
+      } catch (error) {
+        console.error('❌ [AGENCY VOUCHER PDF] Error loading logo:', error);
+      }
+
+      // Generate unique voucher number (current date + time only)
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      
+      // Format: AGY-{YYYYMMDD}-{HHmmss}
+      // Example: AGY-20251216-140613
+      const voucherNo = `AGY-${year}${month}${day}-${hours}${minutes}${seconds}`;
+
+      const templateData = {
+        voucherNo,
+        imageUrl,
+        agencyName: voucherData.agencyName || 'Agency',
+        filterType,
+        fromDate: from,
+        toDate: to,
+        generatedBy: user.FULLNAME,
+        bookings: voucherData.bookings || [],
+        totals: voucherData.totals || { totalAmount: 0, totalPaid: 0, totalBalance: 0 }
+      };
+
+      const html = ejs.render(templateContent, templateData);
+
+      const browser = await chromium.launch();
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle' });
+
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '5mm', right: '5mm', bottom: '5mm', left: '5mm' }
+      });
+
+      await browser.close();
+
+      // Build readable filename:
+      // - voucher-AgencyName_YYYY-MM-DD          (if from == to)
+      // - voucher-AgencyName_YYYY-MM-DD_to_YYYY-MM-DD (if range)
+      const safeAgencyName = (voucherData.agencyName || 'Agency')
+        .toString()
+        .trim()
+        .replace(/\s+/g, '_')
+        .replace(/[^A-Za-z0-9_\-]/g, '');
+      const fromPart = from;
+      const toPart = to;
+      const datePart = (fromPart === toPart)
+        ? fromPart
+        : `${fromPart}_to_${toPart}`;
+      const filename = `voucher-${safeAgencyName}_${datePart}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `${download === '1' ? 'attachment' : 'inline'}; filename="${filename}"`
+      );
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('Error generating agency voucher PDF:', error);
+      res.status(500).json({ success: false, message: 'Error generating agency voucher PDF' });
+    }
+  }
 }
 
 module.exports = AgencyController;

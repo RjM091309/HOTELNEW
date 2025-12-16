@@ -373,10 +373,13 @@ function updateAgencyInTable(agency) {
 function createActionButtons(agencyId) {
     return `
         <div class="text-center">
-            <button class="btn btn-tbl-edit btn-xs" onclick="editAgency('${agencyId}')">
+            <button class="btn btn-tbl-edit btn-xs" onclick="editAgency('${agencyId}')" title="Edit Agency">
                 <i class="fa fa-pencil"></i>
             </button>
-            <a href="#" class="btn btn-tbl-delete btn-xs delete-link" data-id="${agencyId}">
+            <button class="btn btn-primary btn-xs" onclick="openAgencyVoucherModal('${agencyId}')" title="Generate Voucher">
+                <i class="fa fa-file-pdf-o"></i>
+            </button>
+            <a href="#" class="btn btn-tbl-delete btn-xs delete-link" data-id="${agencyId}" title="Delete Agency">
                 <i class="fa fa-trash-o"></i>
             </a>
         </div>
@@ -732,5 +735,201 @@ function formatNumberPlain(num) {
     if (isNaN(n)) return '-';
     // No peso sign, no trailing .00 if whole number
     return n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+// ========================================
+// AGENCY VOUCHER (AGENCY-WIDE)
+// ========================================
+
+window.openAgencyVoucherModal = function (agencyId) {
+    if (!agencyId) return;
+
+    const agencyRow = document.querySelector(`#agencies_tbl tbody tr[data-id="${agencyId}"]`);
+    const nameCell = agencyRow ? agencyRow.querySelector('td:nth-child(1)') : null;
+    const agencyName = nameCell ? nameCell.textContent.trim() : 'Agency';
+
+    const modalId = 'agency-voucher-modal';
+    let modalEl = document.getElementById(modalId);
+
+    if (!modalEl) {
+        const modalHtml = `
+        <div class="modal fade" id="${modalId}" tabindex="-1" aria-labelledby="${modalId}-label" aria-hidden="true" data-bs-backdrop="static">
+          <div class="modal-dialog modal-md modal-dialog-centered">
+            <div class="modal-content">
+              <style>
+                /* Force black text for flatpickr input inside this modal */
+                #agency-voucher-modal .flatpickr-input {
+                  color: #000 !important;
+                }
+              </style>
+              <div class="modal-header">
+                <h5 class="modal-title" id="${modalId}-label">Generate Agency Voucher</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                <input type="hidden" id="agency-voucher-agency-id">
+                <div class="mb-3">
+                
+                  <div><strong id="agency-voucher-agency-name"></strong></div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label d-block">Filter by</label>
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="agencyVoucherFilterType" id="agency-voucher-filter-reservation" value="reservation" checked>
+                    <label class="form-check-label" for="agency-voucher-filter-reservation">Reservation Date</label>
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="agencyVoucherFilterType" id="agency-voucher-filter-checkin" value="checkin">
+                    <label class="form-check-label" for="agency-voucher-filter-checkin">Check-in Date</label>
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Date Range</label>
+                  <input type="text" id="agency-voucher-daterange" class="form-control" placeholder="Select date range" style="color: #000 !important;">
+                
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="agency-voucher-generate-btn">
+                  <i class="fa fa-file-pdf-o"></i> Generate Voucher
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        modalEl = document.getElementById(modalId);
+
+        // Initialize date range picker if flatpickr is available
+        if (window.flatpickr) {
+            window.flatpickr('#agency-voucher-daterange', {
+                mode: 'range',
+                // VALUE sent to backend (YYYY-MM-DD) para sakto sa MySQL DATE(...)
+                dateFormat: 'Y-m-d',
+                // DISPLAY format sa input (e.g. Dec 16, 2025) na readable
+                altInput: true,
+                altFormat: 'M d, Y',
+                onReady: function (selectedDates, dateStr, instance) {
+                    if (instance.altInput) {
+                        instance.altInput.style.setProperty('color', '#000', 'important');
+                        instance.altInput.style.setProperty('-webkit-text-fill-color', '#000', 'important');
+                        instance.altInput.style.setProperty('opacity', '1', 'important');
+                    }
+                },
+                onChange: function (selectedDates, dateStr, instance) {
+                    if (instance.altInput) {
+                        instance.altInput.style.setProperty('color', '#000', 'important');
+                        instance.altInput.style.setProperty('-webkit-text-fill-color', '#000', 'important');
+                        instance.altInput.style.setProperty('opacity', '1', 'important');
+                    }
+                }
+            });
+            // siguraduhin na black din ang hidden input kung sakali makita
+            const drEl = document.getElementById('agency-voucher-daterange');
+            if (drEl) {
+                drEl.style.color = '#000';
+            }
+        }
+
+        // Reset fields when modal is closed
+        $('#agency-voucher-modal').on('hidden.bs.modal', function () {
+            const idInput = document.getElementById('agency-voucher-agency-id');
+            const nameEl = document.getElementById('agency-voucher-agency-name');
+            const rangeEl = document.getElementById('agency-voucher-daterange');
+
+            if (idInput) idInput.value = '';
+            if (nameEl) nameEl.textContent = '';
+
+            if (rangeEl) {
+                // Clear flatpickr selection if attached
+                if (rangeEl._flatpickr) {
+                    rangeEl._flatpickr.clear();
+                    if (rangeEl._flatpickr.altInput) {
+                        rangeEl._flatpickr.altInput.value = '';
+                    }
+                } else {
+                    rangeEl.value = '';
+                }
+            }
+
+            // Reset filter type to default (Reservation Date)
+            const reservationRadio = document.getElementById('agency-voucher-filter-reservation');
+            if (reservationRadio) {
+                reservationRadio.checked = true;
+            }
+        });
+
+        document.getElementById('agency-voucher-generate-btn').addEventListener('click', generateAgencyVoucher);
+    }
+
+    document.getElementById('agency-voucher-agency-id').value = agencyId;
+    document.getElementById('agency-voucher-agency-name').textContent = agencyName;
+
+    $('#agency-voucher-modal').modal('show');
+};
+
+function generateAgencyVoucher() {
+    const agencyId = document.getElementById('agency-voucher-agency-id').value;
+    const filterType = document.querySelector('input[name="agencyVoucherFilterType"]:checked')?.value || 'reservation';
+    const rangeInput = document.getElementById('agency-voucher-daterange').value.trim();
+
+    if (!agencyId) {
+        showError('No agency selected.');
+        return;
+    }
+
+    if (!rangeInput) {
+        showError('Please select a date range.');
+        return;
+    }
+
+    let from = null;
+    let to = null;
+    if (rangeInput.includes(' to ')) {
+        const parts = rangeInput.split(' to ');
+        from = parts[0];
+        to = parts[1] || parts[0];
+    } else if (rangeInput.includes(' - ')) {
+        const parts = rangeInput.split(' - ');
+        from = parts[0];
+        to = parts[1] || parts[0];
+    } else {
+        from = rangeInput;
+        to = rangeInput;
+    }
+
+    if (!from || !to) {
+        showError('Invalid date range.');
+        return;
+    }
+
+    const url = `/agency/voucher/${agencyId}?filterType=${encodeURIComponent(filterType)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&download=1`;
+
+    Swal.fire({
+        title: 'Generating Voucher...',
+        text: 'Please wait while we prepare the agency voucher.',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    // Trigger download via opening the URL; then close loader after a short delay
+    window.open(url, '_blank');
+
+    setTimeout(() => {
+        Swal.close();
+        Swal.fire({
+            icon: 'success',
+            title: 'Voucher generated!',
+            text: 'Agency voucher PDF has been downloaded.',
+            timer: 2000,
+            showConfirmButton: false
+        });
+    }, 2000);
+
+    $('#agency-voucher-modal').modal('hide');
 }
 

@@ -11,11 +11,13 @@
                     <div class="tab-bar">
                         <a class="tab-item is-active" href="/agency">All Agencies</a>
                     </div>        
-                    
+
                     <div style="flex: 0 0 auto;">
-                        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#new-agency-modal">
-                            <i class="fa fa-plus"></i> Add Agency
-                        </button>
+                        <div class="btn-group" role="group" aria-label="Agency actions">
+                            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#new-agency-modal">
+                                <i class="fa fa-plus"></i> Add Agency
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -24,7 +26,7 @@
                     <table id="agencies_tbl" class="table table-hover table-bordered full-width">
                         <thead>
                             <tr>
-                                <th>Agency Name</th>
+                            <th>Agency Name</th>
                             <th>Contact Number</th>
                             <th>Bookings</th>
                             <th>Balance</th>
@@ -44,6 +46,23 @@
 <%- include('modal/new_agency') %>
 <%- include('modal/edit_agency') %>
 <%- include('modal/agency_bookings') %>
+
+<!-- Style for circular action buttons -->
+<style>
+  #agencies_tbl .btn-xs {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 2px;
+  }
+  #agencies_tbl .btn-xs i {
+    margin: 0;
+  }
+</style>
 
 <!-- Include external JavaScript file -->
 <script src="/js/agency/agency.js"></script>
