@@ -51,7 +51,6 @@
     .bookings-table td {
       border: 1px solid #000;
       padding: 4px 3px;
-      text-align: left;
       word-wrap: break-word;
       overflow: hidden;
     }
@@ -67,15 +66,15 @@
     .bookings-table th:nth-child(1),
     .bookings-table td:nth-child(1) { width: 3%; } /* # */
     .bookings-table th:nth-child(2),
-    .bookings-table td:nth-child(2) { width: 12%; } /* Guest */
+    .bookings-table td:nth-child(2) { width: 14%; } /* Guest */
     .bookings-table th:nth-child(3),
-    .bookings-table td:nth-child(3) { width: 6%; } /* Room */
+    .bookings-table td:nth-child(3) { width: 5%; } /* Room */
     .bookings-table th:nth-child(4),
-    .bookings-table td:nth-child(4) { width: 10%; } /* Confirmation # */
+    .bookings-table td:nth-child(4) { width: 12%; } /* Reservation Date */
     .bookings-table th:nth-child(5),
-    .bookings-table td:nth-child(5) { width: 8%; } /* Check-in */
+    .bookings-table td:nth-child(5) { width: 12%; } /* Check-in */
     .bookings-table th:nth-child(6),
-    .bookings-table td:nth-child(6) { width: 8%; } /* Check-out */
+    .bookings-table td:nth-child(6) { width: 12%; } /* Check-out */
     .bookings-table th:nth-child(7),
     .bookings-table td:nth-child(7) { width: 8%; } /* Total */
     .bookings-table th:nth-child(8),
@@ -83,11 +82,11 @@
     .bookings-table th:nth-child(9),
     .bookings-table td:nth-child(9) { width: 8%; } /* Balance */
     .bookings-table th:nth-child(10),
-    .bookings-table td:nth-child(10) { width: 10%; } /* Payment Status */
-    .bookings-table th:nth-child(11),
-    .bookings-table td:nth-child(11) { width: 11%; } /* Booking Status */
-    .text-right { text-align: right; }
-    .text-center { text-align: center; }
+    .bookings-table td:nth-child(10) { width: 8%; } /* Payment Status */
+    .text-right { text-align: right !important; }
+    .text-center { text-align: center !important; }
+    .bookings-table .text-center { text-align: center !important; }
+    .bookings-table .text-right { text-align: right !important; }
     .totals-row {
       font-weight: bold;
       background: #d9d9d9;
@@ -172,14 +171,13 @@
           <th class="text-center">#</th>
           <th>Guest</th>
           <th class="text-center">Room</th>
-          <th class="text-center">Confirmation #</th>
+          <th class="text-center">Reservation Date</th>
           <th class="text-center">Check-in</th>
           <th class="text-center">Check-out</th>
           <th class="text-right">Total</th>
           <th class="text-right">Paid</th>
           <th class="text-right">Balance</th>
           <th class="text-center">Payment Status</th>
-          <th class="text-center">Booking Status</th>
         </tr>
       </thead>
       <tbody>
@@ -189,37 +187,45 @@
               <td class="text-center"><%= index + 1 %></td>
               <td><%= b.guest || '-' %></td>
               <td class="text-center"><%= b.room || '-' %></td>
-              <td class="text-center"><%= b.confirmation || '-' %></td>
+              <td class="text-center"><%= b.reservationDate || '-' %></td>
               <td class="text-center"><%= b.checkIn || '-' %></td>
               <td class="text-center"><%= b.checkOut || '-' %></td>
               <td class="text-right"><%= (b.total != null ? parseFloat(b.total).toLocaleString() : '-') %></td>
               <td class="text-right"><%= (b.paid != null ? parseFloat(b.paid).toLocaleString() : '-') %></td>
               <td class="text-right"><%= (b.balance != null ? parseFloat(b.balance).toLocaleString() : '-') %></td>
               <td class="text-center"><%= b.paymentStatus || '-' %></td>
-              <td class="text-center"><%= b.bookingStatus || '-' %></td>
             </tr>
           <% }); %>
         <% } else { %>
           <tr>
-            <td colspan="11" class="text-center">No bookings found for this agency and date range.</td>
+            <td colspan="10" class="text-center">No bookings found for this agency and date range.</td>
           </tr>
         <% } %>
       </tbody>
-      <tfoot>
-        <tr class="totals-row" style="background: #d9d9d9; border-top: 2px solid #000; border-bottom: 2px solid #000;">
-          <td colspan="6" class="text-right" style="padding: 6px 3px; font-weight: bold; font-size: 11px;">TOTALS:</td>
-          <td class="text-right" style="padding: 6px 3px; font-weight: bold; font-size: 11px;"><%= (totals && totals.totalAmount != null ? parseFloat(totals.totalAmount).toLocaleString() : '0') %></td>
-          <td class="text-right" style="padding: 6px 3px; font-weight: bold; font-size: 11px;"><%= (totals && totals.totalPaid != null ? parseFloat(totals.totalPaid).toLocaleString() : '0') %></td>
-          <td class="text-right" style="padding: 6px 3px; font-weight: bold; font-size: 11px;"><%= (totals && totals.totalBalance != null ? parseFloat(totals.totalBalance).toLocaleString() : '0') %></td>
-          <td colspan="2"></td>
+      </tfoot>
+    </table>
+
+    <table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-weight: bold; font-size: 14px;">
+        <tr style="background: #d9d9d9; border-top: 2px solid #000; border-bottom: 2px solid #000;">
+          <td style="padding: 10px; width: 30%; text-align: left;">
+            <strong>TOTAL AMOUNT:</strong><br>
+            <span style="font-size: 16px;"><%= (totals && totals.totalAmount != null ? parseFloat(totals.totalAmount).toLocaleString() : '0') %></span>
+          </td>
+          <td style="padding: 10px; width: 40%; text-align: center;">
+            <strong>PAID AMOUNT:</strong><br>
+            <span style="font-size: 16px;"><%= (totals && totals.totalPaid != null ? parseFloat(totals.totalPaid).toLocaleString() : '0') %></span>
+          </td>
+          <td style="padding: 10px; width: 30%; text-align: right;">
+            <strong>BALANCE:</strong><br>
+            <span style="font-size: 16px;"><%= (totals && totals.totalBalance != null ? parseFloat(totals.totalBalance).toLocaleString() : '0') %></span>
+          </td>
         </tr>
         <tr>
-          <td colspan="11" style="padding: 4px 3px; text-align: center; font-size: 9px;">
+          <td colspan="3" style="padding: 8px; text-align: center;">
             PREPARED BY: <%= generatedBy || 'System User' %>
           </td>
         </tr>
-      </tfoot>
-    </table>
+      </table>
 
     <div class="policy">
       <div class="policy-title">Cancellation Refund Policy</div>
