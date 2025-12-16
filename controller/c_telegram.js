@@ -725,15 +725,35 @@ class TelegramController {
 
     /**
      * Initiate KakaoTalk OAuth login
+     * @param {number} accountId - Optional IDNo of existing account to update, or null to add new account
+     * @param {string} restApiKey - REST API Key (required if adding new account)
      */
     static async kakaoLogin(req, res) {
         try {
-            const config = await KakaoTalkModel.getConfig();
+            const { accountId, restApiKey } = req.body || {};
+            
+            let config;
+            if (accountId) {
+                // Update existing account
+                config = await KakaoTalkModel.getConfigById(accountId);
+                if (!config) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'KakaoTalk account not found.'
+                    });
+                }
+            } else if (restApiKey) {
+                // Add new account - use provided REST API Key
+                config = { REST_API_KEY: restApiKey };
+            } else {
+                // Default behavior - use most recent config
+                config = await KakaoTalkModel.getConfig();
+            }
             
             if (!config || !config.REST_API_KEY) {
                 return res.status(400).json({
                     success: false,
-                    message: 'KakaoTalk REST API Key not configured. Please configure it in settings first.'
+                    message: 'KakaoTalk REST API Key not configured. Please provide REST API Key or configure it in settings first.'
                 });
             }
 
@@ -742,9 +762,14 @@ class TelegramController {
             const scope = 'talk_message';
             const kakaoAuthURL = `https://kauth.kakao.com/oauth/authorize?response_type=code&client_id=${config.REST_API_KEY}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}`;
 
+            // Store accountId in session or pass as state parameter
+            // Using state parameter to pass accountId
+            const state = accountId ? `accountId=${accountId}` : (restApiKey ? `restApiKey=${encodeURIComponent(restApiKey)}` : 'new');
+            const finalAuthURL = `${kakaoAuthURL}&state=${encodeURIComponent(state)}`;
+
             res.json({
                 success: true,
-                authUrl: kakaoAuthURL
+                authUrl: finalAuthURL
             });
         } catch (error) {
             console.error('Error initiating KakaoTalk login:', error);
@@ -760,13 +785,37 @@ class TelegramController {
      */
     static async kakaoCallback(req, res) {
         try {
-            const { code } = req.query;
+            const { code, state } = req.query;
             
             if (!code) {
                 return res.redirect('/telegram/settings?error=no_code');
             }
 
-            const config = await KakaoTalkModel.getConfig();
+            // Parse state to get accountId or restApiKey
+            let accountId = null;
+            let restApiKey = null;
+            if (state) {
+                if (state.startsWith('accountId=')) {
+                    accountId = parseInt(state.replace('accountId=', ''));
+                } else if (state.startsWith('restApiKey=')) {
+                    restApiKey = decodeURIComponent(state.replace('restApiKey=', ''));
+                }
+            }
+
+            let config;
+            if (accountId) {
+                // Update existing account
+                config = await KakaoTalkModel.getConfigById(accountId);
+                if (!config) {
+                    return res.redirect('/telegram/settings?error=account_not_found');
+                }
+            } else if (restApiKey) {
+                // Add new account with provided REST API Key
+                config = { REST_API_KEY: restApiKey };
+            } else {
+                // Default behavior - use most recent config
+                config = await KakaoTalkModel.getConfig();
+            }
             
             if (!config || !config.REST_API_KEY) {
                 return res.redirect('/telegram/settings?error=no_api_key');
@@ -804,21 +853,47 @@ class TelegramController {
                 }
             );
 
-            // Save access token
-            await KakaoTalkModel.updateAccessToken(
-                access_token,
-                refresh_token,
-                req.user?.userId || null
-            );
-
-            // Update user info if needed
-            await KakaoTalkModel.saveConfig(
-                config.REST_API_KEY,
-                access_token,
-                refresh_token,
-                userInfoResponse.data,
-                req.user?.userId || null
-            );
+            if (accountId) {
+                // Update existing account
+                await KakaoTalkModel.updateAccessTokenById(
+                    accountId,
+                    access_token,
+                    refresh_token,
+                    req.user?.userId || null
+                );
+                await KakaoTalkModel.saveConfig(
+                    config.REST_API_KEY,
+                    access_token,
+                    refresh_token,
+                    userInfoResponse.data,
+                    req.user?.userId || null,
+                    accountId,
+                    null // keep existing NAME
+                );
+            } else if (restApiKey) {
+                // Add new account
+                await KakaoTalkModel.addNewConfig(
+                    restApiKey,
+                    access_token,
+                    refresh_token,
+                    userInfoResponse.data,
+                    req.user?.userId || null
+                );
+            } else {
+                // Default behavior - update most recent config
+                await KakaoTalkModel.updateAccessToken(
+                    access_token,
+                    refresh_token,
+                    req.user?.userId || null
+                );
+                await KakaoTalkModel.saveConfig(
+                    config.REST_API_KEY,
+                    access_token,
+                    refresh_token,
+                    userInfoResponse.data,
+                    req.user?.userId || null
+                );
+            }
 
             res.redirect('/telegram/settings?kakao_success=true');
         } catch (error) {
@@ -828,7 +903,7 @@ class TelegramController {
     }
 
     /**
-     * Get KakaoTalk config
+     * Get KakaoTalk config (most recent)
      */
     static async getKakaoConfig(req, res) {
         try {
@@ -856,6 +931,7 @@ class TelegramController {
             res.json({
                 success: true,
                 data: {
+                    IDNo: config.IDNo,
                     REST_API_KEY: config.REST_API_KEY,
                     hasAccessToken: !!config.ACCESS_TOKEN,
                     hasRefreshToken: !!config.REFRESH_TOKEN,
@@ -874,11 +950,59 @@ class TelegramController {
     }
 
     /**
-     * Save KakaoTalk REST API Key
+     * Get all KakaoTalk configs
+     */
+    static async getAllKakaoConfigs(req, res) {
+        try {
+            const configs = await KakaoTalkModel.getAllConfigs();
+            
+            // Format configs for response (don't send access tokens)
+            const formattedConfigs = configs.map(config => {
+                const lastUpdateDate = config.EDITED_DT || config.ENCODED_DT;
+                let daysSinceLastAuth = null;
+                let shouldShowReauth = false;
+                
+                if (lastUpdateDate && config.ACCESS_TOKEN) {
+                    const lastUpdate = new Date(lastUpdateDate);
+                    const now = new Date();
+                    const diffTime = Math.abs(now - lastUpdate);
+                    daysSinceLastAuth = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                    shouldShowReauth = daysSinceLastAuth >= 25;
+                }
+                
+                return {
+                    IDNo: config.IDNo,
+                    REST_API_KEY: config.REST_API_KEY,
+                    NAME: config.NAME || null,
+                    hasAccessToken: !!config.ACCESS_TOKEN,
+                    hasRefreshToken: !!config.REFRESH_TOKEN,
+                    USER_INFO: config.USER_INFO ? JSON.parse(config.USER_INFO) : null,
+                    ENCODED_DT: config.ENCODED_DT,
+                    EDITED_DT: config.EDITED_DT,
+                    daysSinceLastAuth: daysSinceLastAuth,
+                    shouldShowReauth: shouldShowReauth
+                };
+            });
+            
+            res.json({
+                success: true,
+                data: formattedConfigs
+            });
+        } catch (error) {
+            console.error('Error getting all KakaoTalk configs:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to get KakaoTalk configs: ' + (error.message || 'Unknown error')
+            });
+        }
+    }
+
+    /**
+     * Save KakaoTalk REST API Key (for existing account or new account)
      */
     static async saveKakaoConfig(req, res) {
         try {
-            const { restApiKey } = req.body;
+            const { restApiKey, accountId, name } = req.body;
             
             if (!restApiKey) {
                 return res.status(400).json({
@@ -887,41 +1011,67 @@ class TelegramController {
                 });
             }
 
-            const existing = await KakaoTalkModel.getConfig();
-            
-            // Check if REST API Key has changed
-            const apiKeyChanged = existing && existing.REST_API_KEY && existing.REST_API_KEY !== restApiKey;
-            
-            // If API key changed, clear access token and refresh token (user needs to re-authenticate)
-            let accessToken = null;
-            let refreshToken = null;
-            let userInfo = null;
-            
-            if (!apiKeyChanged && existing) {
-                // API key not changed, keep existing tokens
-                accessToken = existing.ACCESS_TOKEN || null;
-                refreshToken = existing.REFRESH_TOKEN || null;
-                userInfo = existing.USER_INFO ? JSON.parse(existing.USER_INFO) : null;
+            if (accountId) {
+                // Update existing account
+                const existing = await KakaoTalkModel.getConfigById(accountId);
+                if (!existing) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'KakaoTalk account not found'
+                    });
+                }
+                
+                // Check if REST API Key has changed
+                const apiKeyChanged = existing.REST_API_KEY && existing.REST_API_KEY !== restApiKey;
+                
+                let accessToken = null;
+                let refreshToken = null;
+                let userInfo = null;
+                
+                if (!apiKeyChanged) {
+                    // API key not changed, keep existing tokens
+                    accessToken = existing.ACCESS_TOKEN || null;
+                    refreshToken = existing.REFRESH_TOKEN || null;
+                    userInfo = existing.USER_INFO ? JSON.parse(existing.USER_INFO) : null;
+                }
+                
+                // Update the specific account
+                await KakaoTalkModel.saveConfig(
+                    restApiKey,
+                    accessToken,
+                    refreshToken,
+                    userInfo,
+                    req.user?.userId || null,
+                    accountId,
+                    name || existing.NAME || null
+                );
+                
+                const message = apiKeyChanged 
+                    ? 'KakaoTalk REST API Key updated successfully. Please log in again with the new API key.'
+                    : 'KakaoTalk REST API Key updated successfully';
+
+                res.json({
+                    success: true,
+                    message: message,
+                    apiKeyChanged: apiKeyChanged
+                });
+            } else {
+                // Add new account - just save REST API Key, user needs to authenticate
+                const newId = await KakaoTalkModel.addNewConfig(
+                    restApiKey,
+                    null, // No access token yet
+                    null, // No refresh token yet
+                    null, // No user info yet
+                    req.user?.userId || null,
+                    name || null
+                );
+
+                res.json({
+                    success: true,
+                    message: 'KakaoTalk account added successfully. Please click "Login with Kakao" to authenticate.',
+                    accountId: newId
+                });
             }
-            // If API key changed, tokens will be null (cleared)
-
-            await KakaoTalkModel.saveConfig(
-                restApiKey,
-                accessToken,
-                refreshToken,
-                userInfo,
-                req.user?.userId || null
-            );
-
-            const message = apiKeyChanged 
-                ? 'KakaoTalk REST API Key saved successfully. Please log in again with the new API key.'
-                : 'KakaoTalk REST API Key saved successfully';
-
-            res.json({
-                success: true,
-                message: message,
-                apiKeyChanged: apiKeyChanged
-            });
         } catch (error) {
             console.error('Error saving KakaoTalk config:', error);
             res.status(500).json({
@@ -933,27 +1083,77 @@ class TelegramController {
 
     /**
      * Send settlement report via KakaoTalk
+     * @param {string} section - Optional section to send
+     * @param {number} configId - Optional specific account ID to send to
+     * @param {Array<number>} configIds - Optional array of account IDs to send to (if not provided, sends to all)
      */
     static async sendSettlementKakaoTalk(req, res) {
         try {
-            const config = await KakaoTalkModel.getConfig();
-            
-            if (!config || !config.ACCESS_TOKEN) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'KakaoTalk not configured. Please complete OAuth authentication first.'
+            const { section, configId, configIds } = req.body || {};
+
+            // If specific configId provided, send to that account only
+            if (configId) {
+                const config = await KakaoTalkModel.getConfigById(configId);
+                
+                if (!config || !config.ACCESS_TOKEN) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'KakaoTalk account not configured or not authenticated. Please complete OAuth authentication first.'
+                    });
+                }
+
+                const result = await DailySettlementService.sendReportKakaoTalk(section, configId);
+                
+                return res.json({
+                    success: true,
+                    message: 'Daily settlement report sent successfully to KakaoTalk',
+                    data: result.data
                 });
             }
 
-            // Get section from request body
-            const section = req.body?.section || null;
+            // If configIds array provided, send to those specific accounts
+            if (configIds && Array.isArray(configIds) && configIds.length > 0) {
+                const results = [];
+                for (const id of configIds) {
+                    try {
+                        const config = await KakaoTalkModel.getConfigById(id);
+                        if (config && config.ACCESS_TOKEN) {
+                            const result = await DailySettlementService.sendReportKakaoTalk(section, id);
+                            results.push({
+                                configId: id,
+                                success: result.success,
+                                message: result.message || 'Sent successfully'
+                            });
+                        } else {
+                            results.push({
+                                configId: id,
+                                success: false,
+                                message: 'Account not configured or not authenticated'
+                            });
+                        }
+                    } catch (error) {
+                        results.push({
+                            configId: id,
+                            success: false,
+                            message: error.message || 'Failed to send'
+                        });
+                    }
+                }
+                
+                return res.json({
+                    success: true,
+                    message: 'Daily settlement report sent to selected KakaoTalk accounts',
+                    results: results
+                });
+            }
 
-            const result = await DailySettlementService.sendReportKakaoTalk(section);
+            // Default: send to all accounts
+            const result = await DailySettlementService.sendReportKakaoTalkToAll(section);
             
             res.json({
                 success: true,
-                message: 'Daily settlement report sent successfully to KakaoTalk',
-                data: result.data
+                message: `Daily settlement report sent to ${result.successful} out of ${result.totalConfigs} KakaoTalk account(s)`,
+                data: result
             });
         } catch (error) {
             console.error('Error sending daily settlement via KakaoTalk:', error);
@@ -1032,16 +1232,30 @@ class TelegramController {
     }
 
     /**
-     * Delete KakaoTalk configuration
+     * Delete KakaoTalk configuration (all or specific)
      */
     static async deleteKakaoConfig(req, res) {
         try {
-            const deleted = await KakaoTalkModel.deleteConfig(req.user?.userId || null);
+            const { accountId } = req.body || {};
             
-            if (deleted) {
-                res.json({ success: true, message: 'KakaoTalk configuration deleted successfully' });
+            if (accountId) {
+                // Delete specific account
+                const deleted = await KakaoTalkModel.deleteConfigById(accountId, req.user?.userId || null);
+                
+                if (deleted) {
+                    res.json({ success: true, message: 'KakaoTalk account deleted successfully' });
+                } else {
+                    res.status(404).json({ success: false, message: 'KakaoTalk account not found' });
+                }
             } else {
-                res.status(404).json({ success: false, message: 'No KakaoTalk configuration found to delete' });
+                // Delete all (default behavior for backward compatibility)
+                const deleted = await KakaoTalkModel.deleteConfig(req.user?.userId || null);
+                
+                if (deleted) {
+                    res.json({ success: true, message: 'All KakaoTalk configurations deleted successfully' });
+                } else {
+                    res.status(404).json({ success: false, message: 'No KakaoTalk configuration found to delete' });
+                }
             }
         } catch (error) {
             console.error('Error deleting KakaoTalk config:', error);

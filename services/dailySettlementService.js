@@ -367,11 +367,17 @@ class DailySettlementService {
     /**
      * Send daily settlement report via KakaoTalk (to yourself)
      * @param {string} section - Optional section to send (booking, expected, availability, sales)
+     * @param {number} configId - Optional IDNo of specific config to use. If not provided, uses the most recent config.
      */
-    static async sendReportKakaoTalk(section = null) {
+    static async sendReportKakaoTalk(section = null, configId = null) {
         try {
             // Get KakaoTalk configuration
-            const config = await KakaoTalkModel.getConfig();
+            let config;
+            if (configId) {
+                config = await KakaoTalkModel.getConfigById(configId);
+            } else {
+                config = await KakaoTalkModel.getConfig();
+            }
             
             if (!config || !config.ACCESS_TOKEN) {
                 throw new Error('KakaoTalk not configured. Please complete OAuth authentication first.');
@@ -390,12 +396,21 @@ class DailySettlementService {
             
             // If token was refreshed, save the new tokens to database
             if (result.tokenRefreshed && result.newAccessToken) {
-                await KakaoTalkModel.updateAccessToken(
-                    result.newAccessToken,
-                    result.newRefreshToken || config.REFRESH_TOKEN,
-                    null
-                );
-                console.log('KakaoTalk access token refreshed and saved to database');
+                if (configId) {
+                    await KakaoTalkModel.updateAccessTokenById(
+                        configId,
+                        result.newAccessToken,
+                        result.newRefreshToken || config.REFRESH_TOKEN,
+                        null
+                    );
+                } else {
+                    await KakaoTalkModel.updateAccessToken(
+                        result.newAccessToken,
+                        result.newRefreshToken || config.REFRESH_TOKEN,
+                        null
+                    );
+                }
+                console.log(`KakaoTalk access token refreshed and saved to database${configId ? ` (IDNo: ${configId})` : ''}`);
             }
             
             if (!result.success) {
@@ -405,10 +420,100 @@ class DailySettlementService {
             return {
                 success: true,
                 message: 'Daily settlement report sent successfully to KakaoTalk',
-                data: result.data
+                data: result.data,
+                configId: config.IDNo
             };
         } catch (error) {
             console.error('Error sending daily settlement report via KakaoTalk:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * Send daily settlement report via KakaoTalk to all active configs
+     * @param {string} section - Optional section to send (booking, expected, availability, sales)
+     */
+    static async sendReportKakaoTalkToAll(section = null) {
+        try {
+            // Get all active KakaoTalk configurations
+            const configs = await KakaoTalkModel.getAllConfigs();
+            
+            if (!configs || configs.length === 0) {
+                throw new Error('No active KakaoTalk configurations found. Please complete OAuth authentication first.');
+            }
+            
+            // Generate report with section (only once)
+            const report = await this.generateReport(section);
+            
+            // Send via KakaoTalk to all configs
+            const results = [];
+            
+            for (const config of configs) {
+                try {
+                    if (!config.ACCESS_TOKEN) {
+                        results.push({
+                            success: false,
+                            configId: config.IDNo,
+                            message: 'Access token not found. Please complete OAuth authentication.',
+                            errorCode: 'NO_ACCESS_TOKEN'
+                        });
+                        continue;
+                    }
+                    
+                    // Send via KakaoTalk (to yourself) with automatic token refresh
+                    const kakaoTalkService = new KakaoTalkService(
+                        config.ACCESS_TOKEN,
+                        config.REFRESH_TOKEN,
+                        config.REST_API_KEY
+                    );
+                    const result = await kakaoTalkService.sendMessageToSelfWithRefresh(report);
+                    
+                    // If token was refreshed, save the new tokens to database
+                    if (result.tokenRefreshed && result.newAccessToken) {
+                        await KakaoTalkModel.updateAccessTokenById(
+                            config.IDNo,
+                            result.newAccessToken,
+                            result.newRefreshToken || config.REFRESH_TOKEN,
+                            null
+                        );
+                        console.log(`KakaoTalk access token refreshed and saved to database (IDNo: ${config.IDNo})`);
+                    }
+                    
+                    if (!result.success) {
+                        results.push({
+                            success: false,
+                            configId: config.IDNo,
+                            message: result.message || 'Failed to send report',
+                            errorCode: 'SEND_FAILED'
+                        });
+                    } else {
+                        results.push({
+                            success: true,
+                            configId: config.IDNo,
+                            message: 'Daily settlement report sent successfully to KakaoTalk',
+                            data: result.data
+                        });
+                    }
+                } catch (error) {
+                    console.error(`Error sending report to KakaoTalk config IDNo ${config.IDNo}:`, error);
+                    results.push({
+                        success: false,
+                        configId: config.IDNo,
+                        message: error.message || 'Failed to send report',
+                        errorCode: 'EXCEPTION'
+                    });
+                }
+            }
+            
+            return {
+                success: true,
+                results: results,
+                totalConfigs: configs.length,
+                successful: results.filter(r => r.success).length,
+                failed: results.filter(r => !r.success).length
+            };
+        } catch (error) {
+            console.error('Error sending daily settlement report via KakaoTalk to all configs:', error);
             throw error;
         }
     }
