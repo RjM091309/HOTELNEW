@@ -119,49 +119,27 @@ $(document).ready(function () {
               try {
                 console.log('Triggering voucher download for bookingId:', bookingId);
                 
-                // Method 1: Try using the GET route (simpler, no form needed)
-                const voucherUrl = `/booking/voucher/${bookingId}?download=1`;
-                console.log('Opening voucher URL:', voucherUrl);
+                // Use POST form (single download only)
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/booking/generate-voucher?download=1';
+                form.target = '_blank';
+                form.style.display = 'none';
                 
-                // Create a temporary link and click it to trigger download
-                const link = document.createElement('a');
-                link.href = voucherUrl;
-                link.download = `voucher-${confirmationNumber || bookingId}.pdf`;
-                link.style.display = 'none';
-                document.body.appendChild(link);
-                link.click();
-                console.log('✅ Link clicked, download should start...');
+                const bookingIdInput = document.createElement('input');
+                bookingIdInput.type = 'hidden';
+                bookingIdInput.name = 'bookingId';
+                bookingIdInput.value = bookingId;
+                form.appendChild(bookingIdInput);
                 
-                // Cleanup
+                document.body.appendChild(form);
+                form.submit();
+                
                 setTimeout(() => {
-                  document.body.removeChild(link);
-                  console.log('Link removed from DOM');
-                }, 1000);
-                
-                // Fallback: If GET doesn't work, try POST form
-                setTimeout(() => {
-                  console.log('Fallback: Trying POST form method...');
-                  const form = document.createElement('form');
-                  form.method = 'POST';
-                  form.action = '/booking/generate-voucher?download=1';
-                  form.target = '_blank';
-                  form.style.display = 'none';
-                  
-                  const bookingIdInput = document.createElement('input');
-                  bookingIdInput.type = 'hidden';
-                  bookingIdInput.name = 'bookingId';
-                  bookingIdInput.value = bookingId;
-                  form.appendChild(bookingIdInput);
-                  
-                  document.body.appendChild(form);
-                  form.submit();
-                  
-                  setTimeout(() => {
-                    if (form.parentNode) {
-                      form.remove();
-                    }
-                  }, 2000);
-                }, 500);
+                  if (form.parentNode) {
+                    form.remove();
+                  }
+                }, 2000);
               } catch (error) {
                 console.error('❌ Error in voucher download:', error);
                 console.error('Error details:', error.message, error.stack);
