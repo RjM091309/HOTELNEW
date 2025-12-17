@@ -19,6 +19,7 @@
                     <input type="hidden" id="edit_room_type_hidden" name="room_type_hidden">
                     <input type="hidden" id="edit_lateCheckoutFee" name="lateCheckoutFee" value="0">
                     <input type="hidden" id="edit_paidAmountHidden" name="paidAmountHidden" value="0">
+                    <input type="hidden" id="edit_seniorPwdDiscount" name="seniorPwdDiscount" value="0">
 
                     <div class="row">
                         <!-- BEGIN DATE AND ROOM SELECTION SECTION -->
@@ -280,8 +281,21 @@
                         <div class="row p-t-20">
                             <div class="col-lg-6">
                                 <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="edit_includeSeniorPwdDiscount">
+                                    <label class="form-check-label" for="edit_includeSeniorPwdDiscount">Senior/PWD Discount</label>
+                                </div>
+                                <div id="edit_seniorPwdDiscountDisplay" class="mt-2" style="display: none;">
+                                    <div class="d-flex gap-2 align-items-center">
+                                      <input type="number" class="form-control" id="edit_seniorPwdDiscountPercent" name="seniorPwdDiscountPercent" placeholder="%" min="0" max="100" step="1" value="20" style="max-width: 80px;" oninput="if(this.value > 100) this.value = 100; if(this.value < 0) this.value = 0;">
+                                      <label class="form-label mb-0" style="font-size: 12px;">%</label>
+                                      <input type="text" class="form-control" id="edit_seniorPwdDiscountAmount" name="seniorPwdDiscountAmount" placeholder="Auto-calculated" readonly style="background-color: #2a3135; color: #6f9c40; font-weight: bold; flex: 1;">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-6">
+                                <div class="form-check mb-2">
                                     <input class="form-check-input" type="checkbox" id="edit_includeDiscount">
-                                    <label class="form-check-label" for="edit_includeDiscount">Discount</label>
+                                    <label class="form-check-label" for="edit_includeDiscount">Additional Discount</label>
                                 </div>
                                 <div id="edit_discountWrapper" class="mt-2" style="display: none;">
                                     <input type="number" class="form-control" id="edit_discountAmount" name="discountAmount" placeholder="Enter Discount Amount" step="1" min="0">
@@ -866,6 +880,17 @@ $(document).ready(function() {
     });
 
 
+    $('#edit_includeSeniorPwdDiscount').on('change', function () {
+        computeEditTotal();
+    });
+
+    // Recalculate when percentage changes
+    $('#edit_seniorPwdDiscountPercent').on('input change', function () {
+        if ($('#edit_includeSeniorPwdDiscount').prop('checked')) {
+            computeEditTotal();
+        }
+    });
+
     $('#edit_includeDiscount').on('change', function () {
         $('#edit_discountWrapper').toggle(this.checked);
         if (!this.checked) {
@@ -1057,6 +1082,8 @@ $(document).ready(function() {
             dropoffPrice: $('#edit_includeDropoff').prop('checked') ? $('#edit_dropoffPrice').val() : '0',
             
             // Fees
+            seniorPwdDiscount: $('#edit_includeSeniorPwdDiscount').prop('checked') ? parseFloat($('#edit_seniorPwdDiscount').val()) || 0 : 0,
+            seniorPwdDiscountPercent: $('#edit_includeSeniorPwdDiscount').prop('checked') ? parseFloat($('#edit_seniorPwdDiscountPercent').val()) || 0 : 0,
             discount: $('#edit_includeDiscount').prop('checked') ? $('#edit_discountAmount').val() : '0.00'
         };
         
@@ -1182,6 +1209,7 @@ $(document).ready(function() {
             checkOutStatus: $('#edit_checkOutStatus').val(),
             lateCheckoutFee: $('#edit_lateCheckoutFee').val() || '0',
             reservationFee: '0', // Edit form doesn't have reservation fee
+            seniorPwdDiscount: $('#edit_includeSeniorPwdDiscount').is(':checked') ? parseFloat($('#edit_seniorPwdDiscount').val()) || 0 : 0,
             discount: $('#edit_includeDiscount').is(':checked') ? $('#edit_discountAmount').val() : 0,
             roomCharges: roomCharges.toFixed(2),
             servicesTotal: servicesTotal.toFixed(2),
@@ -1561,8 +1589,6 @@ function computeEditTotal() {
     const pickupPrice = $('#edit_includePickup').prop('checked') ? parseFloat($('#edit_pickupPrice').val()) || 0 : 0;
     const dropoffPrice = $('#edit_includeDropoff').prop('checked') ? parseFloat($('#edit_dropoffPrice').val()) || 0 : 0;
     
-    const discount = $('#edit_includeDiscount').prop('checked') ? parseFloat($('#edit_discountAmount').val()) || 0 : 0;
-    
     // Get late check-out fee
     const lateCheckoutFee = parseFloat($('#edit_lateCheckoutFee').val()) || 0;
     
@@ -1579,11 +1605,87 @@ function computeEditTotal() {
         });
     }
     
+    // Calculate room charges only (for Senior/PWD discount)
+    const roomCharges = roomRate * nights;
+    
+    // Calculate subtotal (before discounts)
+    const subtotal = roomCharges + (adultQty * adultPrice) + (kidQty * kidPrice) + pickupPrice + dropoffPrice + lateCheckoutFee + extraServicesTotal;
+    
+    // Senior/PWD Discount (percentage-based)
+    const seniorPwdDiscountChecked = $('#edit_includeSeniorPwdDiscount').prop('checked');
+    let seniorPwdDiscountAmount = 0;
+    
+    // Calculate Senior/PWD discount (percentage of ROOM CHARGES ONLY, not services)
+    if (seniorPwdDiscountChecked && roomCharges > 0) {
+        let discountPercent = parseFloat($('#edit_seniorPwdDiscountPercent').val()) || 20; // Default to 20%
+        // Enforce maximum of 100%
+        if (discountPercent > 100) {
+            discountPercent = 100;
+            $('#edit_seniorPwdDiscountPercent').val(100);
+        }
+        if (discountPercent < 0) {
+            discountPercent = 0;
+            $('#edit_seniorPwdDiscountPercent').val(0);
+        }
+        const discountDecimal = discountPercent / 100; // Convert percentage to decimal
+        seniorPwdDiscountAmount = roomCharges * discountDecimal; // Apply only to room charges
+        $('#edit_seniorPwdDiscount').val(seniorPwdDiscountAmount.toFixed(2));
+        $('#edit_seniorPwdDiscountAmount').val('₱' + seniorPwdDiscountAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+        $('#edit_seniorPwdDiscountDisplay').show();
+        
+        // If Senior/PWD discount is 100%, automatically disable Additional Discount
+        if (discountPercent >= 100) {
+            $('#edit_includeDiscount').prop('checked', false);
+            $('#edit_discountWrapper').hide();
+            $('#edit_discountAmount').val('0');
+        }
+    } else {
+        $('#edit_seniorPwdDiscount').val(0);
+        $('#edit_seniorPwdDiscountAmount').val('');
+        $('#edit_seniorPwdDiscountDisplay').hide();
+    }
+    
+    // Separate Additional discount from total discount if loading from saved booking
+    let discount = 0;
+    if (window.editBookingTotalDiscount !== undefined && window.editBookingTotalDiscount > 0) {
+        // We're loading from a saved booking - separate the discounts
+        const totalDiscount = window.editBookingTotalDiscount;
+        if (seniorPwdDiscountChecked && seniorPwdDiscountAmount > 0) {
+            // Calculate Additional discount as the difference
+            discount = Math.max(0, totalDiscount - seniorPwdDiscountAmount);
+            if (discount > 0) {
+                $('#edit_includeDiscount').prop('checked', true);
+                $('#edit_discountWrapper').show();
+                $('#edit_discountAmount').val(discount.toFixed(2));
+            } else {
+                $('#edit_includeDiscount').prop('checked', false);
+                $('#edit_discountWrapper').hide();
+                $('#edit_discountAmount').val('');
+            }
+        } else {
+            // No Senior/PWD discount, all goes to Additional
+            discount = totalDiscount;
+            $('#edit_includeDiscount').prop('checked', true);
+            $('#edit_discountWrapper').show();
+            $('#edit_discountAmount').val(discount.toFixed(2));
+        }
+        // Clear the flag after first use
+        window.editBookingTotalDiscount = undefined;
+    } else {
+        // Normal calculation - use value from input
+        discount = $('#edit_includeDiscount').prop('checked') ? parseFloat($('#edit_discountAmount').val()) || 0 : 0;
+    }
+    
+    // Calculate final balance (subtotal - senior/pwd discount - additional discount)
+    let finalBalance = subtotal - seniorPwdDiscountAmount - discount;
+    
+    // Ensure finalBalance is not negative
+    if (finalBalance < 0) {
+        finalBalance = 0;
+    }
+    
     // Get paid amount and validate it doesn't exceed total
     let paidAmount = parseFloat($('#edit_paidAmount').val()) || 0;
-    
-    const subtotal = (roomRate * nights) + (adultQty * adultPrice) + (kidQty * kidPrice) + pickupPrice + dropoffPrice + lateCheckoutFee + extraServicesTotal;
-    const finalBalance = subtotal - discount;
     
     console.log('Paid Amount:', paidAmount, 'Final Balance:', finalBalance);
     
@@ -1602,10 +1704,17 @@ function computeEditTotal() {
         isDirectReservation = true;
     }
     
-    // Prevent paid amount from exceeding total (skip validation for direct reservation/unassigned room)
-    if (!isDirectReservation && paidAmount > finalBalance) {
-        paidAmount = finalBalance;
-        $('#edit_paidAmount').val(paidAmount.toFixed(2));
+    // Prevent paid amount from exceeding total and ensure it's not negative
+    if (!isDirectReservation) {
+        if (paidAmount > finalBalance) {
+            paidAmount = finalBalance;
+            $('#edit_paidAmount').val(paidAmount.toFixed(2));
+        }
+        // Ensure paid amount is not negative
+        if (paidAmount < 0) {
+            paidAmount = 0;
+            $('#edit_paidAmount').val('0.00');
+        }
     }
     
     // Calculate balance (total - paid amount)
@@ -1823,10 +1932,36 @@ function populateEditForm(booking) {
     $('#edit_discountWrapper').hide();
     $('#edit_discountAmount').val('');
     
-    if (parseFloat(booking.DISCOUNT_AMOUNT) > 0) {
+    // Reset Senior/PWD discount
+    $('#edit_includeSeniorPwdDiscount').prop('checked', false);
+    $('#edit_seniorPwdDiscountDisplay').hide();
+    $('#edit_seniorPwdDiscountPercent').val('20'); // Default to 20%
+    $('#edit_seniorPwdDiscountAmount').val('');
+    $('#edit_seniorPwdDiscount').val('0');
+    
+    // Separate Senior/PWD discount from Additional discount
+    const totalDiscountAmount = parseFloat(booking.DISCOUNT_AMOUNT) || 0;
+    const seniorPwdDiscountPercent = parseFloat(booking.SENIOR_PWD_DISCOUNT_PERCENT) || 0;
+    
+    // Store total discount amount for later separation
+    window.editBookingTotalDiscount = totalDiscountAmount;
+    
+    if (seniorPwdDiscountPercent > 0) {
+        // Set Senior/PWD discount percentage first
+        $('#edit_includeSeniorPwdDiscount').prop('checked', true);
+        $('#edit_seniorPwdDiscountDisplay').show();
+        $('#edit_seniorPwdDiscountPercent').val(seniorPwdDiscountPercent);
+        
+        // The actual Senior/PWD discount amount will be calculated by computeEditTotal
+        // After computeEditTotal runs, we'll separate the Additional discount
+    }
+    
+    // Temporarily set all discount to Additional (will be corrected after computeEditTotal)
+    if (totalDiscountAmount > 0 && seniorPwdDiscountPercent === 0) {
+        // No Senior/PWD discount, all goes to Additional discount
         $('#edit_includeDiscount').prop('checked', true);
         $('#edit_discountWrapper').show();
-        $('#edit_discountAmount').val(booking.DISCOUNT_AMOUNT);
+        $('#edit_discountAmount').val(totalDiscountAmount.toFixed(2));
     }
     
     // Set room selection if not direct reservation

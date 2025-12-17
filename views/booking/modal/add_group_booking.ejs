@@ -17,6 +17,7 @@
           <input type="hidden" id="groupNights" name="groupNights" value="0">
           <input type="hidden" id="groupPaidAmountHidden" name="groupPaidAmountHidden" value="0">
           <input type="hidden" id="groupLateCheckoutFee" name="groupLateCheckoutFee" value="0">
+          <input type="hidden" id="groupSeniorPwdDiscount" name="groupSeniorPwdDiscount" value="0">
 
           <div class="row">
             <div class="col-lg-6">
@@ -273,8 +274,26 @@
           <div class="row p-t-20">
             <div class="col-lg-4">
               <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="groupIncludeSeniorPwdDiscount">
+                <label class="form-check-label" for="groupIncludeSeniorPwdDiscount">Senior/PWD Discount</label>
+              </div>
+              <div id="groupSeniorPwdDiscountDisplay" class="mt-2" style="display: none;">
+                <div class="mb-2">
+                  <label class="form-label mb-1" style="font-size: 12px;">Number of Senior/PWD Rooms:</label>
+                  <input type="number" class="form-control" id="groupSeniorPwdRoomCount" name="groupSeniorPwdRoomCount" placeholder="0" min="0" step="1" value="0" style="max-width: 120px;">
+                  <small class="text-muted" style="font-size: 11px;">Out of <span id="groupTotalRoomsDisplay">0</span> total rooms</small>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                  <input type="number" class="form-control" id="groupSeniorPwdDiscountPercent" name="groupSeniorPwdDiscountPercent" placeholder="%" min="0" max="100" step="1" value="20" style="max-width: 80px;" oninput="if(this.value > 100) this.value = 100; if(this.value < 0) this.value = 0;">
+                  <label class="form-label mb-0" style="font-size: 12px;">%</label>
+                  <input type="text" class="form-control" id="groupSeniorPwdDiscountAmount" name="groupSeniorPwdDiscountAmount" placeholder="Auto-calculated" readonly style="background-color: #2a3135; color: #6f9c40; font-weight: bold; flex: 1;">
+                </div>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="form-check mb-2">
                 <input class="form-check-input" type="checkbox" id="groupIncludeDiscount">
-                <label class="form-check-label" for="groupIncludeDiscount">Discount</label>
+                <label class="form-check-label" for="groupIncludeDiscount">Additional Discount</label>
               </div>
               <div id="groupDiscountWrapper" class="mt-2" style="display: none;">
                 <input type="number" class="form-control" id="groupDiscount" name="groupDiscount" min="0" value="0">
@@ -1018,6 +1037,11 @@
     $('#groupPickupServiceId, #groupDropoffServiceId').val('');
     $('#groupRoomBreakdown').removeClass('d-none');
     $('.consolidated-indicator').remove();
+    $('#groupIncludeSeniorPwdDiscount').prop('checked', false);
+    $('#groupSeniorPwdDiscountDisplay').hide();
+    $('#groupSeniorPwdDiscountPercent').val('20'); // Reset to default 20%
+    $('#groupSeniorPwdDiscountAmount').val('');
+    $('#groupSeniorPwdDiscount').val('0');
     
     applyGroupBreakfastDefaults();
   }
@@ -1312,8 +1336,6 @@
     const baseSubtotal = prices.reduce((sum, price) => sum + price, 0);
     const roomSubtotal = baseSubtotal * nights;
 
-    const discount = $('#groupIncludeDiscount').prop('checked') ? (parseFloat($('#groupDiscount').val()) || 0) : 0;
-
     const adultQty = $('#groupIncludeBreakfast').is(':checked') ? (parseInt($('#groupBreakfastAdultQty').val(), 10) || 0) : 0;
     const adultPrice = parseFloat($('#groupBreakfastAdultPrice').val()) || 0;
     const kidQty = $('#groupIncludeBreakfast').is(':checked') ? (parseInt($('#groupBreakfastKidQty').val(), 10) || 0) : 0;
@@ -1342,16 +1364,89 @@
 
     // Always calculate the full total in frontend for user visibility
     const subtotal = roomSubtotal + servicesTotal + lateCheckoutFeeTotal;
-    let finalBalance = subtotal - discount;
+    
+    // Senior/PWD Discount (percentage-based)
+    const seniorPwdDiscountChecked = $('#groupIncludeSeniorPwdDiscount').prop('checked');
+    let seniorPwdDiscountAmount = 0;
+    
+    // Update total rooms display
+    $('#groupTotalRoomsDisplay').text(numRooms);
+    
+    // Calculate Senior/PWD discount (percentage of ROOM CHARGES ONLY, not services)
+    if (seniorPwdDiscountChecked && roomSubtotal > 0 && numRooms > 0) {
+        let discountPercent = parseFloat($('#groupSeniorPwdDiscountPercent').val()) || 20; // Default to 20%
+        let seniorPwdRoomCount = parseInt($('#groupSeniorPwdRoomCount').val()) || 0;
+        
+        // Enforce maximum of 100%
+        if (discountPercent > 100) {
+            discountPercent = 100;
+            $('#groupSeniorPwdDiscountPercent').val(100);
+        }
+        if (discountPercent < 0) {
+            discountPercent = 0;
+            $('#groupSeniorPwdDiscountPercent').val(0);
+        }
+        
+        // Ensure Senior/PWD room count doesn't exceed total rooms
+        if (seniorPwdRoomCount > numRooms) {
+            seniorPwdRoomCount = numRooms;
+            $('#groupSeniorPwdRoomCount').val(numRooms);
+        }
+        if (seniorPwdRoomCount < 0) {
+            seniorPwdRoomCount = 0;
+            $('#groupSeniorPwdRoomCount').val(0);
+        }
+        
+        // Calculate discount only for Senior/PWD rooms
+        // Since room prices can differ (1-bed vs 2-bed), we apply discount to the most expensive rooms first
+        // Sort prices from highest to lowest and apply discount to top N rooms (where N = seniorPwdRoomCount)
+        const sortedPrices = [...prices].sort((a, b) => b - a); // Sort descending (highest first)
+        const seniorPwdPrices = sortedPrices.slice(0, seniorPwdRoomCount); // Get top N most expensive rooms
+        const seniorPwdRoomChargesPerNight = seniorPwdPrices.reduce((sum, price) => sum + price, 0);
+        const seniorPwdRoomCharges = seniorPwdRoomChargesPerNight * nights; // Total charges for Senior/PWD rooms
+        const discountDecimal = discountPercent / 100; // Convert percentage to decimal
+        seniorPwdDiscountAmount = seniorPwdRoomCharges * discountDecimal; // Apply only to Senior/PWD room charges
+        
+        $('#groupSeniorPwdDiscount').val(seniorPwdDiscountAmount.toFixed(2));
+        $('#groupSeniorPwdDiscountAmount').val('₱' + seniorPwdDiscountAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+        $('#groupSeniorPwdDiscountDisplay').show();
+        
+        // If Senior/PWD discount is 100%, automatically disable Additional Discount
+        if (discountPercent >= 100) {
+            $('#groupIncludeDiscount').prop('checked', false);
+            $('#groupDiscountWrapper').hide();
+            $('#groupDiscount').val('0');
+        }
+    } else {
+        $('#groupSeniorPwdDiscount').val(0);
+        $('#groupSeniorPwdDiscountAmount').val('');
+        $('#groupSeniorPwdDiscountDisplay').hide();
+    }
+    
+    // Read discount AFTER Senior/PWD discount check (so it reflects the auto-disable if 100%)
+    const discount = $('#groupIncludeDiscount').prop('checked') ? (parseFloat($('#groupDiscount').val()) || 0) : 0;
+    
+    let finalBalance = subtotal - seniorPwdDiscountAmount - discount;
+    
+    // Ensure finalBalance is not negative
+    if (finalBalance < 0) {
+        finalBalance = 0;
+    }
 
     // Get paid amount and validate it doesn't exceed total
     let paidAmount = parseFloat($('#groupPaidAmount').val()) || 0;
     
-    // Prevent paid amount from exceeding total
+    // Prevent paid amount from exceeding total and ensure it's not negative
     if (paidAmount > finalBalance) {
       paidAmount = finalBalance;
       $('#groupPaidAmount').val(paidAmount.toFixed(2));
       $('#groupPaidAmountHidden').val(paidAmount.toFixed(2));
+    }
+    // Ensure paid amount is not negative
+    if (paidAmount < 0) {
+      paidAmount = 0;
+      $('#groupPaidAmount').val('0.00');
+      $('#groupPaidAmountHidden').val('0.00');
     }
     
     // Calculate balance (total - paid amount)
@@ -2392,6 +2487,11 @@
     handleSearchRooms();
 
     $('#groupBookingForm').on('input change', computeGroupTotal);
+    
+    // Senior/PWD discount change handler
+    $('#groupIncludeSeniorPwdDiscount').on('change', function() {
+      computeGroupTotal();
+    });
 
     // Paid amount formatting and update handler
     $('#groupPaidAmount').on('blur', function() {
@@ -2407,6 +2507,24 @@
     });
 
     // Toggle wrappers and recalc
+    $('#groupIncludeSeniorPwdDiscount').on('change', function() {
+      computeGroupTotal();
+    });
+
+    // Recalculate when percentage changes
+    $('#groupSeniorPwdDiscountPercent').on('input change', function() {
+      if ($('#groupIncludeSeniorPwdDiscount').prop('checked')) {
+        computeGroupTotal();
+      }
+    });
+    
+    // Recalculate when number of Senior/PWD rooms changes
+    $('#groupSeniorPwdRoomCount').on('input change', function() {
+      if ($('#groupIncludeSeniorPwdDiscount').prop('checked')) {
+        computeGroupTotal();
+      }
+    });
+
     $('#groupIncludeDiscount').on('change', function() {
       $('#groupDiscountWrapper').toggle(this.checked);
       if (!this.checked) { $('#groupDiscount').val('0'); }
@@ -2674,6 +2792,7 @@
         balance: numericBalance,
         checkOutStatus: $('#groupCheckOutStatus').val() || 0,
         lateCheckoutFee: parseFloat($('#groupLateCheckoutFee').val()) || 0,
+        seniorPwdDiscount: $('#groupIncludeSeniorPwdDiscount').is(':checked') ? parseFloat($('#groupSeniorPwdDiscount').val()) || 0 : 0,
         discount: $('#groupIncludeDiscount').is(':checked') ? (parseFloat($('#groupDiscount').val()) || 0) : 0,
         reservationFee: 0, // Default to 0 for group bookings
         roomCharges: roomCharges.toFixed(2),

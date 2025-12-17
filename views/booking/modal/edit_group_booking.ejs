@@ -17,6 +17,7 @@
           <input type="hidden" id="editGroupSelectedRoomNumbers" name="groupSelectedRoomNumbers">
           <input type="hidden" id="editGroupNights" name="groupNights" value="0">
           <input type="hidden" id="editGroupLateCheckoutFee" name="groupLateCheckoutFee" value="0">
+          <input type="hidden" id="editGroupSeniorPwdDiscount" name="groupSeniorPwdDiscount" value="0">
 
           <div class="row">
             <div class="col-lg-6">
@@ -259,8 +260,26 @@
           <div class="row p-t-20">
             <div class="col-lg-4">
               <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="editGroupIncludeSeniorPwdDiscount">
+                <label class="form-check-label" for="editGroupIncludeSeniorPwdDiscount">Senior/PWD Discount</label>
+              </div>
+              <div id="editGroupSeniorPwdDiscountDisplay" class="mt-2" style="display: none;">
+                <div class="mb-2">
+                  <label class="form-label mb-1" style="font-size: 12px;">Number of Senior/PWD Rooms:</label>
+                  <input type="number" class="form-control" id="editGroupSeniorPwdRoomCount" name="groupSeniorPwdRoomCount" placeholder="0" min="0" step="1" value="0" style="max-width: 120px;">
+                  <small class="text-muted" style="font-size: 11px;">Out of <span id="editGroupTotalRoomsDisplay">0</span> total rooms</small>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                  <input type="number" class="form-control" id="editGroupSeniorPwdDiscountPercent" name="groupSeniorPwdDiscountPercent" placeholder="%" min="0" max="100" step="1" value="20" style="max-width: 80px;" oninput="if(this.value > 100) this.value = 100; if(this.value < 0) this.value = 0;">
+                  <label class="form-label mb-0" style="font-size: 12px;">%</label>
+                  <input type="text" class="form-control" id="editGroupSeniorPwdDiscountAmount" name="groupSeniorPwdDiscountAmount" placeholder="Auto-calculated" readonly style="background-color: #2a3135; color: #6f9c40; font-weight: bold; flex: 1;">
+                </div>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="form-check mb-2">
                 <input class="form-check-input" type="checkbox" id="editGroupIncludeDiscount">
-                <label class="form-check-label" for="editGroupIncludeDiscount">Discount (Group)</label>
+                <label class="form-check-label" for="editGroupIncludeDiscount">Additional Discount</label>
               </div>
               <div id="editGroupDiscountWrapper" class="mt-2" style="display: none;">
                 <input type="number" class="form-control" id="editGroupDiscount" name="groupDiscount" min="0" value="0">
@@ -817,6 +836,11 @@ window.editGroupAddedServicesMap = {};
     $('#editGroupPickupPrice, #editGroupDropoffPrice, #editGroupDiscount').val('');
     $('#editGroupRoomBreakdown').removeClass('d-none');
     $('.consolidated-indicator').remove();
+    $('#editGroupIncludeSeniorPwdDiscount').prop('checked', false);
+    $('#editGroupSeniorPwdDiscountDisplay').hide();
+    $('#editGroupSeniorPwdDiscountPercent').val('20'); // Reset to default 20%
+    $('#editGroupSeniorPwdDiscountAmount').val('');
+    $('#editGroupSeniorPwdDiscount').val('0');
     // Reset service base variables
     editGroupPickupBasePrice = '';
     editGroupPickupBaseId = '';
@@ -1399,6 +1423,24 @@ window.editGroupAddedServicesMap = {};
   // Fee toggles
   // Reservation fee removed in edit flow
 
+  $('#editGroupIncludeSeniorPwdDiscount').on('change', function() {
+    computeEditGroupTotal();
+  });
+
+  // Recalculate when percentage changes
+  $('#editGroupSeniorPwdDiscountPercent').on('input change', function() {
+    if ($('#editGroupIncludeSeniorPwdDiscount').prop('checked')) {
+      computeEditGroupTotal();
+    }
+  });
+  
+  // Recalculate when number of Senior/PWD rooms changes
+  $('#editGroupSeniorPwdRoomCount').on('input change', function() {
+    if ($('#editGroupIncludeSeniorPwdDiscount').prop('checked')) {
+      computeEditGroupTotal();
+    }
+  });
+
   $('#editGroupIncludeDiscount').on('change', function() {
     $('#editGroupDiscountWrapper').toggle(this.checked);
     if (!this.checked) { $('#editGroupDiscount').val('0'); }
@@ -1408,6 +1450,24 @@ window.editGroupAddedServicesMap = {};
   // Form submission
   $('#editGroupBookingForm').on('submit', function(e) {
     e.preventDefault();
+
+    // Compute per-room discounts for Senior/PWD (aligned to room order)
+    const computeSeniorPerRoomDiscounts = (pricesRaw, nights, percent, roomCount) => {
+      const prices = pricesRaw
+        ? pricesRaw.split(',').map(p => parseFloat(p) || 0)
+        : [];
+      const nNights = parseInt(nights, 10) || 0;
+      const discountDecimal = (parseFloat(percent) || 0) / 100;
+      const count = parseInt(roomCount, 10) || 0;
+      const discounts = prices.map(() => 0);
+      if (count <= 0 || discountDecimal <= 0 || nNights <= 0 || prices.length === 0) return discounts;
+      const sorted = prices.map((price, idx) => ({ price, idx })).sort((a, b) => b.price - a.price);
+      for (let i = 0; i < Math.min(count, sorted.length); i++) {
+        const { price, idx } = sorted[i];
+        discounts[idx] = price * nNights * discountDecimal;
+      }
+      return discounts;
+    };
 
     const formData = {
       groupBookingId: $('#editGroupBookingId').val(),
@@ -1437,6 +1497,15 @@ window.editGroupAddedServicesMap = {};
       pickupPrice: $('#editGroupPickupPrice').val(),
       dropoffServiceId: $('#editGroupDropoffServiceId').val(),
       dropoffPrice: $('#editGroupDropoffPrice').val(),
+      seniorPwdDiscount: $('#editGroupIncludeSeniorPwdDiscount').is(':checked') ? parseFloat($('#editGroupSeniorPwdDiscount').val()) || 0 : 0,
+      seniorPwdDiscountPercent: $('#editGroupIncludeSeniorPwdDiscount').is(':checked') ? parseFloat($('#editGroupSeniorPwdDiscountPercent').val()) || 0 : 0,
+      seniorPwdRoomCount: $('#editGroupIncludeSeniorPwdDiscount').is(':checked') ? parseInt($('#editGroupSeniorPwdRoomCount').val()) || 0 : 0,
+      perRoomDiscounts: computeSeniorPerRoomDiscounts(
+        $('#editGroupSelectedRoomPrices').val(),
+        $('#editGroupNights').val(),
+        $('#editGroupSeniorPwdDiscountPercent').val(),
+        $('#editGroupSeniorPwdRoomCount').val()
+      ),
       discount: $('#editGroupDiscount').val(),
       individualBilling: $('#editGroupIndividualBilling').is(':checked') ? 'on' : '', // Inverted logic
       lateCheckoutFee: parseFloat($('#editGroupLateCheckoutFee').val()) || 0
@@ -1944,6 +2013,7 @@ window.editGroupAddedServicesMap = {};
         balance: numericBalance,
         checkOutStatus: $('#editGroupCheckOutStatus').val() || 0,
         lateCheckoutFee: parseFloat($('#editGroupLateCheckoutFee').val()) || 0,
+        seniorPwdDiscount: $('#editGroupIncludeSeniorPwdDiscount').is(':checked') ? parseFloat($('#editGroupSeniorPwdDiscount').val()) || 0 : 0,
         discount: $('#editGroupIncludeDiscount').is(':checked') ? (parseFloat($('#editGroupDiscount').val()) || 0) : 0,
         reservationFee: 0, // Default to 0 for group bookings
         roomCharges: roomCharges.toFixed(2),

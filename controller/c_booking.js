@@ -513,6 +513,8 @@ class BookingController {
       directReservationFlag,
       reservationFee,
       discount,
+      seniorPwdDiscount = 0, // Senior/PWD discount amount
+      seniorPwdDiscountPercent = 0, // Senior/PWD discount percentage
       lateCheckoutFee
     } = req.body;
 
@@ -527,7 +529,9 @@ class BookingController {
       const paidAmountNum = parseFloat(paidAmount) || 0;
       const roomPriceNum = parseFloat(price) || 0;
       const reservationFeeNum = parseFloat(reservationFee) || 0;
+      const seniorPwdDiscountNum = parseFloat(seniorPwdDiscount) || 0;
       const discountNum = parseFloat(discount) || 0;
+      const totalDiscountNum = seniorPwdDiscountNum + discountNum; // Combine both discounts
       const lateCheckoutFeeNum = parseFloat(lateCheckoutFee) || 0;
       
       // Calculate services costs
@@ -540,7 +544,7 @@ class BookingController {
       const roomTotal = roomPriceNum * parseInt(diffindays) || 1;
       const servicesTotal = breakfastAdultCost + breakfastKidCost + pickupCost + dropoffCost;
       const subtotal = roomTotal + servicesTotal + lateCheckoutFeeNum;
-      const totalAmount = subtotal + reservationFeeNum - discountNum;
+      const totalAmount = subtotal + reservationFeeNum - totalDiscountNum; // Use combined discount
       
       // Determine payment status
       let paymentStatus;
@@ -655,7 +659,8 @@ class BookingController {
         bedCount,
         isDirectReservation,
         reservationFee,
-        discount,
+        discount: totalDiscountNum, // Pass combined discount (seniorPwdDiscount + discount)
+        seniorPwdDiscountPercent, // Pass percentage for storage
         lateCheckoutFee
       });
 
@@ -1431,6 +1436,9 @@ class BookingController {
         dropoffServiceId,
         dropoffPrice,
         discount,
+        seniorPwdDiscount = 0, // Senior/PWD discount (computed amount)
+        seniorPwdDiscountPercent = 0, // Senior/PWD discount percentage
+        seniorPwdRoomCount = 0, // Number of rooms with Senior/PWD discount
         individualBilling: individualBillingValue,
         perRoomDiscounts,
         directReservationFlag,
@@ -1453,7 +1461,9 @@ class BookingController {
 
       // Calculate payment status based on paid amount for group booking
       const paidAmountNum = parseFloat(paidAmount) || 0;
+      const seniorPwdDiscountNum = parseFloat(seniorPwdDiscount) || 0;
       const discountNum = parseFloat(discount) || 0;
+      const totalDiscountNum = seniorPwdDiscountNum + discountNum; // Combine both discounts
       
       // For group booking, we need to calculate total from room prices
       const roomPrices = selectedRoomPrice.split(',').map(p => parseFloat(p) || 0);
@@ -1466,8 +1476,8 @@ class BookingController {
       const dropoffTotal = parseFloat(dropoffPrice) || 0;
       const servicesTotal = breakfastAdultTotal + breakfastKidTotal + pickupTotal + dropoffTotal;
       
-      // Calculate total amount (rooms + services - discount)
-      const totalAmount = totalRoomPrice + servicesTotal - discountNum;
+      // Calculate total amount (rooms + services - combined discount)
+      const totalAmount = totalRoomPrice + servicesTotal - totalDiscountNum;
       
       // Determine payment status
       let paymentStatus;
@@ -1511,7 +1521,9 @@ class BookingController {
         pickupPrice,
         dropoffServiceId,
         dropoffPrice,
-        discount,
+        discount: totalDiscountNum, // Pass combined discount (seniorPwdDiscount + discount)
+        seniorPwdDiscountPercent, // Pass percentage for storage
+        seniorPwdRoomCount,       // Number of rooms with Senior/PWD discount
         consolidatedBilling,
         perRoomDiscounts,
         lateCheckoutFee,
@@ -1594,7 +1606,11 @@ class BookingController {
         dropoffServiceId,
         dropoffPrice,
         discount,
+        seniorPwdDiscount = 0, // Senior/PWD discount amount
+        seniorPwdDiscountPercent = 0, // Senior/PWD discount percentage
+        seniorPwdRoomCount = 0, // Number of rooms with Senior/PWD discount
         individualBilling: individualBillingValue,
+        perRoomDiscounts,
         lateCheckoutFee = 0
       } = req.body;
 
@@ -1618,7 +1634,9 @@ class BookingController {
 
       // Compute payment status based on paidAmount and recomputed total (rooms + services - discount)
       const paidAmountNum = parseFloat(paidAmount) || 0;
+      const seniorPwdDiscountNum = parseFloat(seniorPwdDiscount) || 0;
       const discountNum = parseFloat(discount) || 0;
+      const totalDiscountNum = seniorPwdDiscountNum + discountNum; // Combine both discounts
       const roomPrices = (selectedRoomPrice || '').split(',').map(p => parseFloat(p) || 0);
       const totalRoomPrice = roomPrices.reduce((sum, price) => sum + price, 0) * (parseInt(qty, 10) || 0);
       const servicesTotal = (parseFloat(breakfastAdultQty) * parseFloat(breakfastAdultPrice) || 0)
@@ -1626,7 +1644,7 @@ class BookingController {
         + (parseFloat(pickupPrice) || 0)
         + (parseFloat(dropoffPrice) || 0);
       const lateCheckoutFeeNum = parseFloat(lateCheckoutFee) || 0;
-      const totalAmount = totalRoomPrice + servicesTotal + lateCheckoutFeeNum - discountNum;
+      const totalAmount = totalRoomPrice + servicesTotal + lateCheckoutFeeNum - totalDiscountNum;
       let paymentStatus;
       if (paidAmountNum <= 0) paymentStatus = 'unpaid';
       else if (paidAmountNum >= totalAmount) paymentStatus = 'paid';
@@ -1663,7 +1681,10 @@ class BookingController {
         pickupPrice,
         dropoffServiceId,
         dropoffPrice,
-        discount,
+        discount: totalDiscountNum, // Pass combined discount (seniorPwdDiscount + discount)
+        seniorPwdDiscountPercent, // Pass percentage for storage
+        seniorPwdRoomCount,       // Number of rooms with Senior/PWD discount
+        perRoomDiscounts,
         consolidatedBilling: individualBillingValue !== 'on', // Inverted logic: unchecked = consolidated
         lateCheckoutFee: lateCheckoutFeeNum,
         encodedBy,
@@ -2724,7 +2745,9 @@ class BookingController {
         breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
         breakfastKidQty, breakfastKidPrice, breakfastKidId,
         pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
-        discount, lateCheckoutFee,
+        discount, seniorPwdDiscount = 0, // Senior/PWD discount amount
+        seniorPwdDiscountPercent = 0, // Senior/PWD discount percentage
+        lateCheckoutFee,
         // Frontend already computes paymentStatus (unpaid/partial/paid)
         paymentStatus
       } = req.body;
@@ -2738,6 +2761,11 @@ class BookingController {
       // Use paymentStatus coming from frontend (computeEditTotal),
       // which is based on TOTAL (room + services + late checkout - discount)
       const finalPaymentStatus = paymentStatus || 'unpaid';
+
+      // Combine Senior/PWD discount with regular discount
+      const seniorPwdDiscountNum = parseFloat(seniorPwdDiscount) || 0;
+      const discountNum = parseFloat(discount) || 0;
+      const totalDiscountNum = seniorPwdDiscountNum + discountNum; // Combine both discounts
 
       const result = await BookingModel.updateBooking({
         bookingId,
@@ -2768,7 +2796,8 @@ class BookingController {
         pickupPrice,
         dropoffServiceId,
         dropoffPrice,
-        discount,
+        discount: totalDiscountNum, // Pass combined discount (seniorPwdDiscount + discount)
+        seniorPwdDiscountPercent, // Pass percentage for storage
         lateCheckoutFee,
         editedBy
       });

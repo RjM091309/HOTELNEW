@@ -1044,6 +1044,7 @@ class BookingModel {
       isDirectReservation,
       reservationFee,
       discount,
+      seniorPwdDiscountPercent = 0, // Senior/PWD discount percentage
       lateCheckoutFee
     } = bookingData;
 
@@ -1158,12 +1159,13 @@ class BookingModel {
         // Create billing
         const billingQuery = `
           INSERT INTO billing 
-          (BOOKING_ID, ROOM_CHARGE, AMENITIES_CHARGE, SERVICES_CHARGE, LATE_CHECKOUT_CHARGE, QTY, PAYMENT_STATUS, PAYMENT_METHOD, REMARKS, ENCODED_BY, ENCODED_DT, ACTIVE, RESERVATION_FEE, DISCOUNT_AMOUNT, DISCOUNT_APPLIED) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (BOOKING_ID, ROOM_CHARGE, AMENITIES_CHARGE, SERVICES_CHARGE, LATE_CHECKOUT_CHARGE, QTY, PAYMENT_STATUS, PAYMENT_METHOD, REMARKS, ENCODED_BY, ENCODED_DT, ACTIVE, RESERVATION_FEE, DISCOUNT_AMOUNT, DISCOUNT_APPLIED, SENIOR_PWD_DISCOUNT_PERCENT) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const billingValues = [
           bookingId, numericRoomPrice, 0.00, 0.00, 0.00, diffindays, paymentStatus, 'cash', '', encodedBy, date, 1,
-          parseFloat(reservationFee) || 0.00, parseFloat(discount) || 0.00, paymentStatus === 'paid' ? 1 : 0
+          parseFloat(reservationFee) || 0.00, parseFloat(discount) || 0.00, paymentStatus === 'paid' ? 1 : 0,
+          parseFloat(seniorPwdDiscountPercent) || 0.00
         ];
 
         await new Promise((resolve, reject) => {
@@ -4196,7 +4198,9 @@ class BookingModel {
           gb.REMARKS,
           gb.ENCODED_BY,
           gb.ENCODED_DT,
-          gb.BILLING_TYPE
+          gb.BILLING_TYPE,
+          gb.SENIOR_PWD_DISCOUNT_PERCENT,
+          gb.SENIOR_PWD_ROOM_COUNT
         FROM group_booking gb
         WHERE gb.IDNo = ?
       `;
@@ -4403,6 +4407,8 @@ class BookingModel {
         numberOfRooms: groupBooking.NUMBER_OF_ROOMS,
         reservationFee: groupBooking.GROUP_RESERVATION_FEE,
         discount: groupBooking.GROUP_DISCOUNT,
+        seniorPwdDiscountPercent: groupBooking.SENIOR_PWD_DISCOUNT_PERCENT || 0,
+      seniorPwdRoomCount: groupBooking.SENIOR_PWD_ROOM_COUNT || 0,
         remarks: groupBooking.REMARKS,
         selectedRooms,
         selectedRoomPrice: selectedRoomPrices,
@@ -4614,7 +4620,10 @@ class BookingModel {
       consolidatedBilling = true, // Default: Master Billing (changed from false to true)
       lateCheckoutFee = 0,
       encodedBy,
-      date
+      date,
+      seniorPwdDiscountPercent = 0,
+      seniorPwdRoomCount = 0,
+      perRoomDiscounts = []
     } = data;
 
 
@@ -4647,7 +4656,7 @@ class BookingModel {
       // Update group_booking table
       const updateGroupQuery = `
         UPDATE group_booking
-        SET GROUP_NAME = ?, CONTACT_NO = ?, NUMBER_OF_ROOMS = ?, GROUP_RESERVATION_FEE = ?, GROUP_DISCOUNT = ?, REMARKS = ?, ENCODED_BY = ?, BILLING_TYPE = ?
+        SET GROUP_NAME = ?, CONTACT_NO = ?, NUMBER_OF_ROOMS = ?, GROUP_RESERVATION_FEE = ?, GROUP_DISCOUNT = ?, REMARKS = ?, ENCODED_BY = ?, BILLING_TYPE = ?, SENIOR_PWD_DISCOUNT_PERCENT = ?, SENIOR_PWD_ROOM_COUNT = ?
         WHERE IDNo = ?
       `;
 
@@ -4660,7 +4669,8 @@ class BookingModel {
         remarks || '',
         encodedBy,
         consolidatedBilling ? 1 : 0, // 1 = Master, 0 = Individual
-        
+        parseFloat(seniorPwdDiscountPercent) || 0.00,
+        parseInt(seniorPwdRoomCount, 10) || 0,
         groupBookingId
       ]);
 
@@ -4674,6 +4684,9 @@ class BookingModel {
       // Parse new selected rooms - ensure consistent data types
       const newRoomIds = (selectedRooms || '').split(',').filter(Boolean).map(id => parseInt(id.trim()));
       const newRoomPrices = (selectedRoomPrice || '').split(',').filter(Boolean).map(p => parseFloat(p));
+      const perRoomDiscountsArray = Array.isArray(perRoomDiscounts)
+        ? perRoomDiscounts
+        : (typeof perRoomDiscounts === 'string' ? perRoomDiscounts.split(',').map(d => parseFloat(d) || 0) : []);
 
       // Handle room additions/removals - now comparing integers with integers
       const roomsToAdd = newRoomIds.filter(id => !existingRoomIds.includes(id));
@@ -7484,6 +7497,7 @@ class BookingModel {
           bill.PAYMENT_STATUS,
           bill.RESERVATION_FEE,
           bill.DISCOUNT_AMOUNT,
+          bill.SENIOR_PWD_DISCOUNT_PERCENT,
           
           bs_adult.QTY as breakfastAdultQty,
           bs_adult.TOTAL_COST as breakfastAdultPrice,
@@ -7574,7 +7588,7 @@ class BookingModel {
         breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
         breakfastKidQty, breakfastKidPrice, breakfastKidId,
         pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
-        discount, lateCheckoutFee, editedBy
+        discount, seniorPwdDiscountPercent = 0, lateCheckoutFee, editedBy
       } = params;
 
       const editDate = new Date();
@@ -7673,12 +7687,13 @@ class BookingModel {
             const billingUpdateQuery = `
               UPDATE billing 
               SET ROOM_CHARGE = ?, QTY = ?, PAYMENT_STATUS = ?, 
-                  DISCOUNT_AMOUNT = ?, EDITED_BY = ?, EDITED_DT = ?
+                  DISCOUNT_AMOUNT = ?, SENIOR_PWD_DISCOUNT_PERCENT = ?, EDITED_BY = ?, EDITED_DT = ?
               WHERE BOOKING_ID = ?
             `;
             await connection.promise().query(billingUpdateQuery, [
               numericRoomPrice, diffindays, paymentStatus, 
               parseFloat(discount) || 0.00,
+              parseFloat(seniorPwdDiscountPercent) || 0.00,
               editedBy, editDate, bookingId
             ]);
 
@@ -8739,7 +8754,9 @@ class BookingModel {
       // Meta
       encodedBy,
       date,
-      isDirectReservation
+      isDirectReservation,
+      seniorPwdDiscountPercent = 0,
+      seniorPwdRoomCount = 0
     } = data;
 
     // Helper: parse daterange "MMM DD, YYYY to MMM DD, YYYY (..optional..)"
@@ -8806,8 +8823,19 @@ class BookingModel {
 
       // Insert into group_booking
       const groupBookingQuery = `
-        INSERT INTO group_booking (GROUP_NAME, CONTACT_NO, NUMBER_OF_ROOMS, ENCODED_BY, GROUP_RESERVATION_FEE, GROUP_DISCOUNT, REMARKS, BILLING_TYPE)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO group_booking (
+          GROUP_NAME,
+          CONTACT_NO,
+          NUMBER_OF_ROOMS,
+          ENCODED_BY,
+          GROUP_RESERVATION_FEE,
+          GROUP_DISCOUNT,
+          REMARKS,
+          BILLING_TYPE,
+          SENIOR_PWD_DISCOUNT_PERCENT,
+          SENIOR_PWD_ROOM_COUNT
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
       const [groupResult] = await connection.promise().query(groupBookingQuery, [
         groupName,
@@ -8817,7 +8845,9 @@ class BookingModel {
         0, // GROUP_RESERVATION_FEE removed - always set to 0
         parseFloat(discount) || 0,
         remarks || '',
-        consolidatedBilling ? 1 : 0 // 1 = Master, 0 = Individual
+        consolidatedBilling ? 1 : 0, // 1 = Master, 0 = Individual
+        parseFloat(seniorPwdDiscountPercent) || 0.00,
+        parseInt(seniorPwdRoomCount, 10) || 0
       ]);
       const groupBookingId = groupResult.insertId;
 

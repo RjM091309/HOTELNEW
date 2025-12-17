@@ -930,8 +930,6 @@ function computeEditGroupTotal() {
     const baseSubtotal = prices.reduce((sum, price) => sum + price, 0);
     const roomSubtotal = baseSubtotal * nights;
 
-    const discount = $('#editGroupIncludeDiscount').prop('checked') ? (parseFloat($('#editGroupDiscount').val()) || 0) : 0;
-
     const adultQty = $('#editGroupIncludeBreakfast').is(':checked') ? (parseInt($('#editGroupBreakfastAdultQty').val(), 10) || 0) : 0;
     const adultPrice = parseFloat($('#editGroupBreakfastAdultPrice').val()) || 0;
     const kidQty = $('#editGroupIncludeBreakfast').is(':checked') ? (parseInt($('#editGroupBreakfastKidQty').val(), 10) || 0) : 0;
@@ -973,15 +971,90 @@ function computeEditGroupTotal() {
 
     // Always calculate the full total in frontend for user visibility
     const subtotal = roomSubtotal + servicesTotal + lateCheckoutFeeTotal + extraServicesTotal;
-    let finalBalance = subtotal - discount;
+    
+    // Senior/PWD Discount (percentage-based)
+    const seniorPwdDiscountChecked = $('#editGroupIncludeSeniorPwdDiscount').prop('checked');
+    let seniorPwdDiscountAmount = 0;
+    
+    // Get number of rooms (reuse existing variables if already declared)
+    const editSelectedRooms = $('#editGroupSelectedRooms').val();
+    const editNumRooms = editSelectedRooms ? editSelectedRooms.split(',').length : 1;
+    
+    // Update total rooms display
+    $('#editGroupTotalRoomsDisplay').text(editNumRooms);
+    
+    // Calculate Senior/PWD discount (percentage of ROOM CHARGES ONLY, not services)
+    if (seniorPwdDiscountChecked && roomSubtotal > 0 && editNumRooms > 0) {
+        let discountPercent = parseFloat($('#editGroupSeniorPwdDiscountPercent').val()) || 20; // Default to 20%
+        let seniorPwdRoomCount = parseInt($('#editGroupSeniorPwdRoomCount').val()) || 0;
+        
+        // Enforce maximum of 100%
+        if (discountPercent > 100) {
+            discountPercent = 100;
+            $('#editGroupSeniorPwdDiscountPercent').val(100);
+        }
+        if (discountPercent < 0) {
+            discountPercent = 0;
+            $('#editGroupSeniorPwdDiscountPercent').val(0);
+        }
+        
+        // Ensure Senior/PWD room count doesn't exceed total rooms
+        if (seniorPwdRoomCount > editNumRooms) {
+            seniorPwdRoomCount = editNumRooms;
+            $('#editGroupSeniorPwdRoomCount').val(editNumRooms);
+        }
+        if (seniorPwdRoomCount < 0) {
+            seniorPwdRoomCount = 0;
+            $('#editGroupSeniorPwdRoomCount').val(0);
+        }
+        
+        // Calculate discount only for Senior/PWD rooms
+        // Since room prices can differ (1-bed vs 2-bed), we apply discount to the most expensive rooms first
+        // Sort prices from highest to lowest and apply discount to top N rooms (where N = seniorPwdRoomCount)
+        const sortedPrices = [...prices].sort((a, b) => b - a); // Sort descending (highest first)
+        const seniorPwdPrices = sortedPrices.slice(0, seniorPwdRoomCount); // Get top N most expensive rooms
+        const seniorPwdRoomChargesPerNight = seniorPwdPrices.reduce((sum, price) => sum + price, 0);
+        const seniorPwdRoomCharges = seniorPwdRoomChargesPerNight * nights; // Total charges for Senior/PWD rooms
+        const discountDecimal = discountPercent / 100; // Convert percentage to decimal
+        seniorPwdDiscountAmount = seniorPwdRoomCharges * discountDecimal; // Apply only to Senior/PWD room charges
+        
+        $('#editGroupSeniorPwdDiscount').val(seniorPwdDiscountAmount.toFixed(2));
+        $('#editGroupSeniorPwdDiscountAmount').val('₱' + seniorPwdDiscountAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+        $('#editGroupSeniorPwdDiscountDisplay').show();
+        
+        // If Senior/PWD discount is 100%, automatically disable Additional Discount
+        if (discountPercent >= 100) {
+            $('#editGroupIncludeDiscount').prop('checked', false);
+            $('#editGroupDiscountWrapper').hide();
+            $('#editGroupDiscount').val('0');
+        }
+    } else {
+        $('#editGroupSeniorPwdDiscount').val(0);
+        $('#editGroupSeniorPwdDiscountAmount').val('');
+        $('#editGroupSeniorPwdDiscountDisplay').hide();
+    }
+    
+    const discount = $('#editGroupIncludeDiscount').prop('checked') ? (parseFloat($('#editGroupDiscount').val()) || 0) : 0;
+    
+    let finalBalance = subtotal - seniorPwdDiscountAmount - discount;
+    
+    // Ensure finalBalance is not negative
+    if (finalBalance < 0) {
+        finalBalance = 0;
+    }
 
     // Get paid amount and validate it doesn't exceed total
     let paidAmount = parseFloat($('#editGroupPaidAmount').val()) || 0;
     
-    // Prevent paid amount from exceeding total
+    // Prevent paid amount from exceeding total and ensure it's not negative
     if (paidAmount > finalBalance) {
         paidAmount = finalBalance;
         $('#editGroupPaidAmount').val(paidAmount.toFixed(2));
+    }
+    // Ensure paid amount is not negative
+    if (paidAmount < 0) {
+        paidAmount = 0;
+        $('#editGroupPaidAmount').val('0.00');
     }
     
     // Calculate balance (total - paid amount)
@@ -1202,6 +1275,26 @@ function populateEditGroupForm(booking) {
     }
     $('#editGroupAgencySelect').val(booking.agencyId);
 
+    // ================= SENIOR/PWD DISCOUNT (EDIT) =================
+    // If there is a stored Senior/PWD discount percentage on the group,
+    // enable the Senior/PWD section and prefill the percentage.
+    const seniorPercent = parseFloat(booking.seniorPwdDiscountPercent) || 0;
+    const seniorCountFromDb = parseInt(booking.seniorPwdRoomCount, 10) || 0;
+
+    if (seniorPercent > 0) {
+        $('#editGroupIncludeSeniorPwdDiscount').prop('checked', true);
+        $('#editGroupSeniorPwdDiscountDisplay').show();
+        $('#editGroupSeniorPwdDiscountPercent').val(seniorPercent);
+        // Use stored room count; default to 1 if somehow 0
+        $('#editGroupSeniorPwdRoomCount').val(seniorCountFromDb > 0 ? seniorCountFromDb : 1);
+    } else {
+        $('#editGroupIncludeSeniorPwdDiscount').prop('checked', false);
+        $('#editGroupSeniorPwdDiscountDisplay').hide();
+        $('#editGroupSeniorPwdDiscountPercent').val(20);
+        $('#editGroupSeniorPwdDiscountAmount').val('');
+        $('#editGroupSeniorPwdDiscount').val('0');
+    }
+
     // Initialize Paid Amount like single edit: prefer paidAmount, then totalPaid, else 0
     if (booking.paidAmount !== undefined && booking.paidAmount !== null && booking.paidAmount !== '') {
         const initPaid = parseFloat(booking.paidAmount) || 0;
@@ -1217,7 +1310,7 @@ function populateEditGroupForm(booking) {
         console.log('[EditGroup] No paid amount value provided in response; leaving field unchanged');
     }
     
-    // Trigger computation after setting paid amount
+    // Trigger computation after setting paid amount and senior fields
     setTimeout(() => {
         computeEditGroupTotal();
     }, 100);
@@ -1233,7 +1326,10 @@ function populateEditGroupForm(booking) {
         $('#editGroupReservationFee').val('0');
     }
 
-    if (parseFloat(booking.discount) > 0) {
+    // Additional discount:
+    // If we have a Senior/PWD percentage stored, assume GROUP_DISCOUNT
+    // came from Senior/PWD and default Additional Discount to 0.
+    if (seniorPercent <= 0 && parseFloat(booking.discount) > 0) {
         $('#editGroupIncludeDiscount').prop('checked', true);
         $('#editGroupDiscountWrapper').show();
         $('#editGroupDiscount').val(booking.discount);

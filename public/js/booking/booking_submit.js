@@ -58,6 +58,8 @@ $(document).ready(function () {
       const dropoffPrice = $('#dropoffPrice').val();
       
       // Discount and fees
+      const seniorPwdDiscount = $('#includeSeniorPwdDiscount').is(':checked') ? parseFloat($('#seniorPwdDiscount').val()) || 0 : 0;
+      const seniorPwdDiscountPercent = $('#includeSeniorPwdDiscount').is(':checked') ? parseFloat($('#seniorPwdDiscountPercent').val()) || 20 : 0;
       const discountAmount = $('#includeDiscount').is(':checked') ? $('#discountAmount').val() : 0;
       const reservationFeeAmount = $('#includeReservationFee').is(':checked') ? $('#reservationFeeAmount').val() : 0;
       const lateCheckoutFee = $('#lateCheckoutFee').val();
@@ -98,7 +100,7 @@ $(document).ready(function () {
           breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
           breakfastKidQty, breakfastKidPrice, breakfastKidId,
           pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
-          discount: discountAmount, reservationFee: reservationFeeAmount, lateCheckoutFee
+          discount: discountAmount, seniorPwdDiscount, seniorPwdDiscountPercent, reservationFee: reservationFeeAmount, lateCheckoutFee
         },
         success: function (response) {
             console.log('Booking response:', response);
