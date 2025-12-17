@@ -39,10 +39,6 @@
                         data-bs-target="#modal-add-group-booking"><i class="fa fa-users"></i> Add
                            Group Booking
                         </button>
-                        <!-- <button type="button" class="btn btn-success" data-bs-toggle="modal"
-                        data-bs-target="#modal-addbooking"><i class="fa fa-plus"></i> Add
-                            Booking
-                        </button> -->
                     </div>
                 </div>
             </div>
@@ -439,8 +435,10 @@
         const urlParams = new URLSearchParams(window.location.search);
         const highlightGroupId = urlParams.get('highlight');
         
-        // Initialize Flatpickr for date range picker
-        let dateRangePicker = flatpickr("#dateRangePicker", {
+        // Initialize Flatpickr for date range picker with error handling
+        let dateRangePicker;
+        try {
+            dateRangePicker = flatpickr("#dateRangePicker", {
             mode: "range",
             dateFormat: "Y-m-d",
             allowInput: false,
@@ -506,7 +504,10 @@
                     }
                     
                     // Update the DataTable's AJAX URL with custom date range
-                    $('#group_booking_tbl').DataTable().ajax.url(url).load();
+                    const table = $('#group_booking_tbl').DataTable();
+                    if (table) {
+                        table.ajax.url(url).load();
+                    }
                     
                     // Close the calendar after applying filter with a small delay
                     setTimeout(() => {
@@ -523,17 +524,28 @@
                     });
                 }
             }
-        });
+            });
+        } catch (error) {
+            console.error('Failed to initialize date range picker:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Date Picker Error',
+                text: 'Failed to initialize date range picker. Please refresh the page.',
+                confirmButtonText: 'OK'
+            });
+        }
         
-        // Handle filter button clicks
+        // Handle filter button clicks (works independently of dateRangePicker)
         $('.filter-btn').on('click', function() {
             // Remove active class from all filter buttons
             $('.filter-btn').removeClass('active');
             // Add active class to clicked button
             $(this).addClass('active');
             
-            // Clear custom date picker when using predefined filters
-            dateRangePicker.clear();
+            // Clear custom date picker when using predefined filters (only if initialized)
+            if (dateRangePicker) {
+                dateRangePicker.clear();
+            }
             
             // Get the filter value
             let filter = $(this).data('filter');
@@ -545,12 +557,18 @@
             }
             
             // Update the DataTable's AJAX URL
-            $('#group_booking_tbl').DataTable().ajax.url(url).load();
+            const table = $('#group_booking_tbl').DataTable();
+            if (table) {
+                table.ajax.url(url).load();
+            }
         });
         
-        // Handle clear date filter
+        // Handle clear date filter (works independently of dateRangePicker)
         $('#clearDateFilter').on('click', function() {
-            dateRangePicker.clear();
+            // Clear date picker if initialized
+            if (dateRangePicker) {
+                dateRangePicker.clear();
+            }
             
             // Reset to "All" filter (default for Group page)
             $('.filter-btn').removeClass('active');
@@ -563,9 +581,12 @@
             }
             
             // Update the DataTable's AJAX URL
-            $('#group_booking_tbl').DataTable().ajax.url(url).load();
+            const table = $('#group_booking_tbl').DataTable();
+            if (table) {
+                table.ajax.url(url).load();
+            }
         });
     });
 </script>
 
-<script src="https://cdn.jsdelivr.net/npm/moment@2.29.1/moment.min.js"></script> 
+<!-- Moment.js removed - using native Date API instead --> 

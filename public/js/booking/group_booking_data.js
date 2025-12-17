@@ -263,25 +263,9 @@ $(document).ready(function () {
         }
     });
     
-    // Handle filter button clicks - Fixed with proper event delegation
-    $(document).on('click', '.filter-btn', function() {
-        // Remove active class from all filter buttons
-        $('.filter-btn').removeClass('active');
-        // Add active class to clicked button
-        $(this).addClass('is-active');
-        
-        // Get the filter value
-        let filter = $(this).data('filter');
-        
-        // Build URL with highlight parameter if present
-        let url = `/booking/group_booking_data?filter=${filter}`;
-        if (highlightGroupId && String(highlightGroupId) !== '0' && String(highlightGroupId) !== '') {
-            url += `&groupId=${highlightGroupId}`;
-        }
-        
-        // Update the DataTable's AJAX URL
-        groupTable.ajax.url(url).load();
-    });
+    // Note: Filter button clicks are handled in group_booking.ejs to have access to dateRangePicker
+    // This handler is kept for backward compatibility but should not conflict
+    // The main handler in group_booking.ejs clears dateRangePicker and includes scope parameter
     
     // When a group booking tab is clicked, update the DataTable AJAX URL accordingly.
     $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
