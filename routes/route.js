@@ -21,6 +21,7 @@ const telegramRoutes = require('./r_telegram');
 const agencyRoutes = require('./r_agency');
 const apiRoutes = require('./r_api');
 const updatesRoutes = require('./r_updates');
+const mapsRoutes = require('./r_maps');
 
 // Auth middleware
 const AuthMiddleware = require('../middleware/m_auth');
@@ -28,6 +29,7 @@ const AuthMiddleware = require('../middleware/m_auth');
 // Public routes (no authentication required)
 router.use('/', loginRoutes);
 router.use('/api', apiRoutes);
+router.use('/api/maps', mapsRoutes);
 router.use('/updates', updatesRoutes);
 
 // Telegram webhook endpoint (public - Telegram needs to access this)

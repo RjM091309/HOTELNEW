@@ -33,7 +33,7 @@ router.get('/check', (req, res) => {
         // For now, we'll return the current version
         const response = {
             version: CURRENT_VERSION,
-            url: `http://45.32.103.210:5001/updates/download/${CURRENT_VERSION}`,
+            url: `https://pms.3core21.com/updates/download/${CURRENT_VERSION}`,
             mandatory: false, // Set to true for critical updates
             available: distExists,
             timestamp: new Date().toISOString()
@@ -101,7 +101,7 @@ router.get('/download/:version', (req, res) => {
             // This allows the app to download individual files or use as a static server
             res.status(200).json({
                 message: 'Static file serving',
-                baseUrl: `http://45.32.103.210:5001/updates/static/${version}`,
+                baseUrl: `https://pms.3core21.com/updates/static/${version}`,
                 note: 'Use /updates/static/:version/* to access individual files'
             });
         }

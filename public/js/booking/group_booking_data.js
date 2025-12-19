@@ -151,7 +151,11 @@ $(document).ready(function () {
                     // Check if group booking can be cancelled (all bookings are pending)
                     // Since group status is determined by individual booking statuses
                     const canCancel = row.Status === 'ALL PENDING';
-                    const isCancelled = row.Status.includes('CANCELLED');
+                    const isCancelled = row.Status && row.Status.includes('CANCELLED');
+
+                    // Disable "Join Group" when group is checked-out or cancelled
+                    const isAllCheckout = row.Status && row.Status.includes('CHECK-OUT');
+                    const disableJoin = isAllCheckout || isCancelled;
                     
                     let cancelButton = '';
                     if (canCancel) {
@@ -166,6 +170,17 @@ $(document).ready(function () {
                             </button>`;
                     }
 
+                    // Join group button: disabled when group is checked-out or cancelled
+                    const joinGroupButton = disableJoin
+                        ? `
+                            <button class="label label-sm label-info ms-1" title="Join Group not allowed for checked-out or cancelled bookings" style="width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px; background-color: #17a2b8 !important; border-color: #17a2b8 !important; opacity: 0.6; cursor: not-allowed;">
+                                <i class="fa fa-user-plus"></i>
+                            </button>`
+                        : `
+                            <button class="label label-sm label-info ms-1" onclick="joinExistingGroup(${row.GroupID})" title="Join Group (Add booking to this group)" style="width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px; background-color: #17a2b8 !important; border-color: #17a2b8 !important;">
+                                <i class="fa fa-user-plus"></i>
+                            </button>`;
+
                     return `
                         <div style="text-align: center;">
                             <button id="${buttonId}" class="label label-sm label-billing" onclick="viewGroupBilling(${row.GroupID})" title="Billing" style="width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px;">
@@ -174,9 +189,7 @@ $(document).ready(function () {
                             <button class="label label-sm label-warning ms-1" onclick="editGroupBooking(${row.GroupID})" title="Edit Group Booking" style="width: 30px; height: 30px;  padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px;">
                                 <i class="fa fa-edit"></i>
                             </button>
-                            <button class="label label-sm label-info ms-1" onclick="joinExistingGroup(${row.GroupID})" title="Join Group (Add booking to this group)" style="width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px; background-color: #17a2b8 !important; border-color: #17a2b8 !important;">
-                                <i class="fa fa-user-plus"></i>
-                            </button>
+                            ${joinGroupButton}
                             <button id="${remarksBtnId}" class="label label-sm label-success ms-1" onclick="openGroupRemarksModal(${row.GroupID})" title="Remarks" style="width: 30px; height: 30px;  padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px; background-color: ${baseRemarksColor} !important; border-color: ${baseRemarksColor} !important;">
                                 <i class="fa fa-comment-dots"></i>
                             </button>

@@ -30,7 +30,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
     cors: {
-        origin: ['http://localhost:6000', 'http://localhost:4173', 'http://localhost:5002', 'http://45.32.103.210:5002', 'http:localhost'],
+        origin: ['http://localhost:6000', 'http://localhost:4173', 'http://localhost:5002', 'http://45.32.103.210:5002', 'http:localhost', 'https://pmsapp.3core21.com', 'https://pms.3core21.com'],
         methods: ['GET', 'POST']
     }
 });
@@ -38,7 +38,7 @@ const PORT = process.env.PORT || 5001;
 
 // CORS middleware for API access from frontend
 app.use(cors({
-    origin: ['http://localhost:6000', 'http://localhost:4173', 'http://localhost:5002', 'http://45.32.103.210:5002' , 'http://localhost'],
+    origin: ['http://localhost:6000', 'http://localhost:4173', 'http://localhost:5002', 'http://45.32.103.210:5002' , 'http://localhost', 'https://pmsapp.3core21.com', 'https://pms.3core21.com'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
@@ -100,7 +100,7 @@ app.use((err, req, res, next) => {
 
 // Start server
 server.listen(PORT, () => {
-    console.log(`🚀 Server is running on http://45.32.103.210:${PORT}`);
+    console.log(`🚀 Server is running on https://pms.3core21.com (port ${PORT})`);
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`📁 Static files served from: ${path.join(__dirname, 'public')}`);
     console.log(`📊 Database: ${process.env.DATABASE_NAME || 'Not configured'}`);
