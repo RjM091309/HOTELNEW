@@ -22,8 +22,9 @@
           <div class="row">
             <div class="col-lg-6">
               <div class="form-group">
-                <label class="form-label">Select Date From To</label>
+                <label class="form-label">Select Date From To (Main Booking)</label>
                 <input type="text" class="form-control flatpickr-input" id="editGroupDaterange" name="groupDaterange" required>
+                <small class="text-muted" style="font-size: 11px;">This is the date range for the main booking. Individual booking dates are shown below if different.</small>
               </div>
             </div>
             <div class="col-lg-3">
@@ -38,6 +39,18 @@
                 <select class="form-select" id="editGroupFloorSelect" name="groupFloorSelect">
                   <option value="" selected>Select Floor</option>
                 </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Individual Booking Dates Section (shown when bookings have different dates) -->
+          <div class="row p-t-20" id="editGroupIndividualDatesSection" style="display: none;">
+            <div class="col-lg-12">
+              <div class="alert alert-info" style="background-color: rgba(23, 162, 184, 0.2); border: 1px solid #17a2b8; color: #17a2b8; margin-bottom: 15px;">
+                <i class="fa fa-info-circle"></i> <strong>Note:</strong> Some bookings in this group have different check-in/check-out dates. You can edit individual dates below.
+              </div>
+              <div id="editGroupIndividualDatesList">
+                <!-- Populated dynamically with individual booking dates -->
               </div>
             </div>
           </div>
@@ -1511,6 +1524,31 @@ window.editGroupAddedServicesMap = {};
       lateCheckoutFee: parseFloat($('#editGroupLateCheckoutFee').val()) || 0
     };
 
+    // Collect individual booking dates if they exist
+    const individualBookingDates = {};
+    $('.edit-individual-checkin').each(function() {
+      const bookingId = $(this).data('booking-id');
+      const checkInInput = $(`.edit-individual-checkin[data-booking-id="${bookingId}"]`);
+      const checkOutInput = $(`.edit-individual-checkout[data-booking-id="${bookingId}"]`);
+      
+      if (bookingId && checkInInput.length && checkOutInput.length) {
+        const checkIn = checkInInput.val();
+        const checkOut = checkOutInput.val();
+        
+        if (checkIn && checkOut) {
+          individualBookingDates[bookingId] = {
+            checkIn: checkIn,
+            checkOut: checkOut
+          };
+        }
+      }
+    });
+    
+    // Add individual booking dates to formData if any exist
+    if (Object.keys(individualBookingDates).length > 0) {
+      formData.individualBookingDates = individualBookingDates;
+    }
+
     // Validate that number of rooms needed matches selected rooms count
     const selectedRooms = formData.selectedRooms;
     const numberOfRooms = parseInt(formData.numberOfRooms, 10) || 0;
@@ -1713,12 +1751,33 @@ window.editGroupAddedServicesMap = {};
       return;
     }
 
-    const nights = parseInt($('#editGroupNights').val(), 10) || 0;
+    // Get main nights (for bookings without individual dates)
+    const mainNights = parseInt($('#editGroupNights').val(), 10) || 0;
+    
+    // Get individual booking dates and map to room numbers
+    // Map: roomNumber -> nights
+    const individualNightsMap = {};
+    $('.edit-individual-nights').each(function() {
+      const roomNumber = $(this).data('room-number');
+      const nights = parseInt($(this).val(), 10) || 0;
+      if (roomNumber && nights > 0) {
+        individualNightsMap[roomNumber] = nights;
+      }
+    });
+    
     let html = '<div class="group-room-breakdown"><b>Selected Room Prices:</b><ul>';
     selectedRooms.forEach((room, idx) => {
       const price = computedPrices[idx] || 0;
+      const roomNumber = room.ROOM_NUMBER || room.roomNumber;
+      
+      // Use individual nights if available, otherwise use main nights
+      const nights = individualNightsMap[roomNumber] || mainNights;
       const total = nights > 0 ? price * nights : price;
-      html += `<li>Room ${room.ROOM_NUMBER}: ₱${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per night ${nights > 0 ? `(${formatCurrency(total)} total)` : ''}</li>`;
+      
+      // Add indicator if using individual nights
+      const nightsLabel = individualNightsMap[roomNumber] ? ` (${nights} nights - different dates)` : ` (${nights} nights)`;
+      
+      html += `<li>Room ${roomNumber}: ₱${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per night ${nights > 0 ? `(₱${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total${nightsLabel})` : ''}</li>`;
     });
     html += '</ul></div>';
     container.html(html);

@@ -149,6 +149,10 @@ $(document).ready(function () {
       seniorPwdRoomCount
     );
 
+    // Check if joining existing group
+    const existingGroupId = $('#groupBookingId').val();
+    const isJoiningGroup = $('#groupJoinExistingGroup').val() === 'true' && existingGroupId;
+    
     const ajaxData = {
       selectedRooms,
       selectedRoomPrice,
@@ -183,7 +187,8 @@ $(document).ready(function () {
       discount,
       individualBilling: individualBilling ? 'on' : '', // Inverted logic
       perRoomDiscounts,
-      lateCheckoutFee
+      lateCheckoutFee,
+      existingGroupId: isJoiningGroup ? existingGroupId : null // Include existing group ID if joining
     };
 
     console.log('🔄 Frontend - Sending AJAX Data:', {

@@ -4448,6 +4448,32 @@ class BookingModel {
     }
   }
 
+  // Get group info for joining existing group
+  static async getGroupInfo(groupId) {
+    try {
+      const query = `
+        SELECT
+          IDNo,
+          GROUP_NAME as groupName,
+          CONTACT_NO as groupContact,
+          NUMBER_OF_ROOMS as numberOfRooms
+        FROM group_booking
+        WHERE IDNo = ?
+      `;
+
+      const result = await queryDatabasePromise(query, [groupId]);
+
+      if (!result || result.length === 0) {
+        return null;
+      }
+
+      return result[0];
+    } catch (error) {
+      console.error('Error in getGroupInfo:', error);
+      throw error;
+    }
+  }
+
   // Get group voucher data
   static async getGroupVoucherData(groupId) {
     try {
@@ -4623,7 +4649,8 @@ class BookingModel {
       date,
       seniorPwdDiscountPercent = 0,
       seniorPwdRoomCount = 0,
-      perRoomDiscounts = []
+      perRoomDiscounts = [],
+      individualBookingDates = null // Individual booking dates if they differ from main date range
     } = data;
 
 
@@ -4675,7 +4702,7 @@ class BookingModel {
       ]);
 
       // Get existing bookings for this group
-      const existingBookingsQuery = `SELECT IDNo, ROOM_ID FROM booking WHERE GROUP_BOOKING_ID = ?`;
+      const existingBookingsQuery = `SELECT IDNo, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE FROM booking WHERE GROUP_BOOKING_ID = ?`;
       const [existingBookings] = await connection.promise().query(existingBookingsQuery, [groupBookingId]);
       const existingRoomIds = existingBookings.map(b => b.ROOM_ID);
       // Use the earliest/first booking in the group as the anchor booking for consolidated entries
@@ -4739,22 +4766,70 @@ class BookingModel {
           // Update existing booking
           const existingBooking = existingBookings.find(b => b.ROOM_ID === parseInt(roomId));
           if (existingBooking) {
-            // Generate new confirmation number for updated booking
+            // Check if this booking has individual dates (different from main date range)
+            const individualDates = data.individualBookingDates && data.individualBookingDates[existingBooking.IDNo];
+            
+            // IMPORTANT: Check if booking originally had different dates (joined booking)
+            // Even if not in individualBookingDates, preserve original dates if different from main
+            const mainBooking = existingBookings[0];
+            const mainCheckIn = mainBooking ? moment(mainBooking.CHECK_IN_DATE) : moment(checkInDate);
+            const mainCheckOut = mainBooking ? moment(mainBooking.CHECK_OUT_DATE) : moment(checkOutDate);
+            const existingCheckIn = moment(existingBooking.CHECK_IN_DATE);
+            const existingCheckOut = moment(existingBooking.CHECK_OUT_DATE);
+            
+            const originallyHadDifferentDates = (
+              existingCheckIn.format('YYYY-MM-DD') !== mainCheckIn.format('YYYY-MM-DD') ||
+              existingCheckOut.format('YYYY-MM-DD') !== mainCheckOut.format('YYYY-MM-DD')
+            );
+            
+            // Use individual dates if provided, otherwise preserve original dates if different from main
+            let finalCheckInDate = checkInDate;
+            let finalCheckOutDate = checkOutDate;
+            
+            if (individualDates) {
+              // Use dates from form
+              finalCheckInDate = individualDates.checkIn;
+              finalCheckOutDate = individualDates.checkOut;
+              console.log(`🔄 Using individual dates from form for booking ${existingBooking.IDNo} (Room ${roomId}): ${finalCheckInDate} to ${finalCheckOutDate}`);
+            } else if (originallyHadDifferentDates) {
+              // Preserve original dates (joined booking)
+              finalCheckInDate = existingBooking.CHECK_IN_DATE;
+              finalCheckOutDate = existingBooking.CHECK_OUT_DATE;
+              console.log(`🔄 Preserving original dates for joined booking ${existingBooking.IDNo} (Room ${roomId}): ${finalCheckInDate} to ${finalCheckOutDate}`);
+            }
+            
+            // Preserve original time component (hours/min/sec) from existing booking
+            const preserveTimeFromExisting = (newDateStr, existingDateTime) => {
+              const newMoment = moment(newDateStr);
+              const existingMoment = moment(existingDateTime);
+              if (!newMoment.isValid() || !existingMoment.isValid()) return newDateStr;
+              return newMoment
+                .hour(existingMoment.hour())
+                .minute(existingMoment.minute())
+                .second(existingMoment.second())
+                .millisecond(0)
+                .format('YYYY-MM-DD HH:mm:ss');
+            };
+
+            const finalCheckInWithTime = preserveTimeFromExisting(finalCheckInDate, existingBooking.CHECK_IN_DATE);
+            const finalCheckOutWithTime = preserveTimeFromExisting(finalCheckOutDate, existingBooking.CHECK_OUT_DATE);
+
+            // Generate new confirmation number for updated booking (use final check-in date)
             const roomQuery = 'SELECT ROOM_NUMBER FROM room WHERE IDNo = ?';
             const [roomResult] = await connection.promise().query(roomQuery, [roomId]);
             const roomNumber = roomResult[0]?.ROOM_NUMBER || '';
             
             // Generate confirmation number in format: YYYYMMDD0ROOMNUMBER
-            const datePart = moment(checkInDate).format('YYYYMMDD');
+            const datePart = moment(finalCheckInWithTime).format('YYYYMMDD');
             const confirmationNumber = `${datePart}0${roomNumber}`;
 
-            // Update booking
+            // Update booking (use final dates)
             await connection.promise().query(`
               UPDATE booking
               SET CHECK_IN_DATE = ?, CHECK_OUT_DATE = ?, BOOKING_CHANNEL = ?, CHECK_IN_STATUS = ?, LATE_CHECKOUT = ?, REMARKS = ?, CONFIRMATION_NUMBER = ?, EDITED_BY = ?, EDITED_DT = ?
               WHERE IDNo = ?
             `, [
-              checkInDate, checkOutDate, bookingRoute, checkInStatus, checkOutStatus,
+              finalCheckInWithTime, finalCheckOutWithTime, bookingRoute, checkInStatus, checkOutStatus,
               index === 0 ? remarks : '', confirmationNumber, encodedBy, date, existingBooking.IDNo
             ]);
 
@@ -4789,38 +4864,222 @@ class BookingModel {
             }
 
             // Calculate billing amounts based on consolidated billing
+            // IMPORTANT: For bookings with different dates, calculate QTY based on actual nights
+            // Reuse individualDates and originallyHadDifferentDates variables already declared above
+            let finalQty = qty; // Default to main qty
+            
+            if (individualDates) {
+              // Calculate actual nights from form dates
+              const checkInMoment = moment(individualDates.checkIn);
+              const checkOutMoment = moment(individualDates.checkOut);
+              finalQty = checkOutMoment.diff(checkInMoment, 'days');
+              console.log(`   Booking ${existingBooking.IDNo} has ${finalQty} nights (from form, different from main ${qty} nights)`);
+            } else if (originallyHadDifferentDates) {
+              // Calculate actual nights from original dates (joined booking)
+              // Re-calculate from existing booking dates to ensure accuracy
+              const existingCheckInMoment = moment(existingBooking.CHECK_IN_DATE);
+              const existingCheckOutMoment = moment(existingBooking.CHECK_OUT_DATE);
+              finalQty = existingCheckOutMoment.diff(existingCheckInMoment, 'days');
+              console.log(`   Booking ${existingBooking.IDNo} has ${finalQty} nights (from original dates, different from main ${qty} nights)`);
+            }
+            
+            // Ensure finalQty is at least 1 (safety check)
+            // IMPORTANT: For joined bookings, we must preserve their QTY
+            if (finalQty <= 0) {
+              console.warn(`⚠️ Warning: Booking ${existingBooking.IDNo} has invalid QTY (${finalQty})`);
+              
+              // Try to get original QTY from billing first
+              const [billingCheck] = await connection.promise().query(
+                'SELECT QTY FROM billing WHERE BOOKING_ID = ? AND ACTIVE = 1 LIMIT 1',
+                [existingBooking.IDNo]
+              );
+              
+              if (billingCheck && billingCheck.length > 0 && billingCheck[0].QTY > 0) {
+                finalQty = billingCheck[0].QTY;
+                console.log(`   Using original QTY from billing: ${finalQty}`);
+              } else if (originallyHadDifferentDates) {
+                // For joined bookings, calculate from dates again as fallback
+                const existingCheckInMoment = moment(existingBooking.CHECK_IN_DATE);
+                const existingCheckOutMoment = moment(existingBooking.CHECK_OUT_DATE);
+                const calculatedQty = existingCheckOutMoment.diff(existingCheckInMoment, 'days');
+                if (calculatedQty > 0) {
+                  finalQty = calculatedQty;
+                  console.log(`   Recalculated QTY from dates: ${finalQty}`);
+                } else {
+                  finalQty = qty; // Last resort fallback
+                  console.log(`   Fallback to main QTY: ${finalQty}`);
+                }
+              } else {
+                finalQty = qty; // Fallback to main qty
+                console.log(`   Fallback to main QTY: ${finalQty}`);
+              }
+            }
+            
             let roomChargeForBilling, reservationFeeForBilling, discountForBilling;
 
             if (consolidatedBilling && index === 0) {
-              // Main booking in consolidated billing gets all charges (including full group discount)
-              roomChargeForBilling = newRoomPrices.reduce((sum, price) => sum + price, 0); // Total of all rooms
+              // Main booking in consolidated billing
+              // IMPORTANT: Main booking should only include its OWN charge plus other bookings with SAME dates
+              // Joined bookings (different dates) should be EXCLUDED from main total
+              
+              // Get main booking dates for comparison
+              const mainBooking = existingBookings[0];
+              const mainCheckIn = moment(mainBooking ? mainBooking.CHECK_IN_DATE : checkInDate);
+              const mainCheckOut = moment(mainBooking ? mainBooking.CHECK_OUT_DATE : checkOutDate);
+              
+              // Calculate total room charges - ONLY include bookings with same dates as main
+              // EXCLUDE joined bookings (those with different dates)
+              let totalRoomCharges = 0;
+              
+              // IMPORTANT: Only process bookings that have the same dates as the main booking
+              // The main booking itself (index === 0) should be included, plus any other bookings with same dates
+              // BUT: We should only include bookings that are NOT joined bookings (different dates)
+              for (let i = 0; i < newRoomIds.length; i++) {
+                const otherBooking = existingBookings.find(b => b.ROOM_ID === parseInt(newRoomIds[i]));
+                if (otherBooking) {
+                  // Check if this booking has individual dates (joined booking)
+                  const otherIndividualDates = data.individualBookingDates && data.individualBookingDates[otherBooking.IDNo];
+                  
+                  // If has individual dates, it's a joined booking - SKIP it (has separate billing)
+                  if (otherIndividualDates) {
+                    console.log(`   Room ${i + 1} (${newRoomIds[i]}, Booking ${otherBooking.IDNo}): SKIPPED - Joined booking with separate billing`);
+                    continue; // Skip joined bookings
+                  }
+                  
+                  // Check if booking has different dates from main (even without individualDates in form)
+                  const otherCheckIn = moment(otherBooking.CHECK_IN_DATE);
+                  const otherCheckOut = moment(otherBooking.CHECK_OUT_DATE);
+                  const hasDifferentDates = (
+                    otherCheckIn.format('YYYY-MM-DD') !== mainCheckIn.format('YYYY-MM-DD') ||
+                    otherCheckOut.format('YYYY-MM-DD') !== mainCheckOut.format('YYYY-MM-DD')
+                  );
+                  
+                  if (hasDifferentDates) {
+                    console.log(`   Room ${i + 1} (${newRoomIds[i]}, Booking ${otherBooking.IDNo}): SKIPPED - Different dates (joined booking with separate billing)`);
+                    continue; // Skip joined bookings
+                  }
+                  
+                  // Same dates as main - include in consolidated total
+                  // IMPORTANT: newRoomPrices[i] is TOTAL price (ROOM_CHARGE from billing), so we need to divide by QTY to get per-night price
+                  const otherNights = qty; // Use main qty (same dates)
+                  
+                  // Get the original QTY from billing to calculate per-night price
+                  const [billingCheck] = await connection.promise().query(
+                    'SELECT ROOM_CHARGE, QTY FROM billing WHERE BOOKING_ID = ? AND ACTIVE = 1 LIMIT 1',
+                    [otherBooking.IDNo]
+                  );
+                  
+                  let perNightPrice = newRoomPrices[i] || 0;
+                  
+                  if (billingCheck && billingCheck.length > 0 && billingCheck[0].QTY > 0) {
+                    // newRoomPrices[i] is total price (ROOM_CHARGE), divide by QTY to get per night
+                    const originalQty = billingCheck[0].QTY;
+                    const totalPrice = newRoomPrices[i] || 0;
+                    
+                    if (originalQty > 0) {
+                      perNightPrice = totalPrice / originalQty;
+                      console.log(`   Room ${i + 1}: Total price ₱${totalPrice} ÷ QTY ${originalQty} = ₱${perNightPrice} per night`);
+                    }
+                  }
+                  
+                  // Now multiply per-night price by the new nights (qty)
+                  const roomCharge = perNightPrice * otherNights;
+                  totalRoomCharges += roomCharge;
+                  console.log(`   Room ${i + 1} (${newRoomIds[i]}, Booking ${otherBooking.IDNo}): ₱${perNightPrice} per night × ${otherNights} nights = ₱${roomCharge} (included in main)`);
+                } else {
+                  // New booking - include it (assumes same dates as main)
+                  // For new bookings, price should be per night (not total)
+                  const perNightPrice = newRoomPrices[i] || 0;
+                  const roomCharge = perNightPrice * qty;
+                  totalRoomCharges += roomCharge;
+                  console.log(`   Room ${i + 1} (${newRoomIds[i]}): ₱${perNightPrice} per night × ${qty} nights = ₱${roomCharge} (new, included)`);
+                }
+              }
+              
+              roomChargeForBilling = totalRoomCharges;
+              console.log(`🔄 CONSOLIDATED - Total Room Charge (excluding joined bookings): ₱${totalRoomCharges}`);
               reservationFeeForBilling = 0; // Reservation fee removed
               discountForBilling = parseFloat(discount) || 0;
-              console.log(`🔄 Room ${index + 1} (Main): CONSOLIDATED - Room Charge: ₱${roomChargeForBilling}, Fee: ₱${reservationFeeForBilling}, Discount: ₱${discountForBilling}`);
+              console.log(`🔄 Room ${index + 1} (Main Booking ${existingBooking.IDNo}): CONSOLIDATED - Room Charge: ₱${roomChargeForBilling}, Fee: ₱${reservationFeeForBilling}, Discount: ₱${discountForBilling}`);
             } else if (consolidatedBilling) {
-              // Other bookings in consolidated billing get zero charges
-              roomChargeForBilling = 0;
-              reservationFeeForBilling = 0;
-              discountForBilling = 0;
-              console.log(`🔄 Room ${index + 1}: CONSOLIDATED - Room Charge: ₱0, Fee: ₱0, Discount: ₱0`);
+              // Other bookings in consolidated billing
+              // IMPORTANT: Joined bookings (with different dates) should keep their separate billing
+              if (individualDates || originallyHadDifferentDates) {
+                // Joined booking - keep separate billing with actual charges
+                // IMPORTANT: roomPrice is per night, so multiply by finalQty (actual nights)
+                // If finalQty is still 0, use original billing QTY as fallback
+                let nightsToUse = finalQty;
+                if (nightsToUse <= 0) {
+                  // Get original QTY from billing as fallback
+                  const [billingQtyCheck] = await connection.promise().query(
+                    'SELECT QTY FROM billing WHERE BOOKING_ID = ? AND ACTIVE = 1 LIMIT 1',
+                    [existingBooking.IDNo]
+                  );
+                  if (billingQtyCheck && billingQtyCheck.length > 0 && billingQtyCheck[0].QTY > 0) {
+                    nightsToUse = billingQtyCheck[0].QTY;
+                    finalQty = nightsToUse; // Update finalQty for billing update
+                    console.log(`   Using original billing QTY: ${nightsToUse}`);
+                  } else {
+                    // Calculate from dates as last resort
+                    const existingCheckInMoment = moment(existingBooking.CHECK_IN_DATE);
+                    const existingCheckOutMoment = moment(existingBooking.CHECK_OUT_DATE);
+                    nightsToUse = existingCheckOutMoment.diff(existingCheckInMoment, 'days');
+                    finalQty = nightsToUse; // Update finalQty for billing update
+                    console.log(`   Calculated QTY from dates: ${nightsToUse}`);
+                  }
+                }
+                
+                roomChargeForBilling = roomPrice * nightsToUse; // Use actual nights
+                reservationFeeForBilling = 0;
+                discountForBilling = parseFloat(perRoomDiscountsArray[index]) || 0;
+                console.log(`🔄 Room ${index + 1} (Booking ${existingBooking.IDNo}): CONSOLIDATED (Joined - Separate Billing)`);
+                console.log(`   Room Price: ₱${roomPrice}, Nights: ${nightsToUse}, Total: ₱${roomChargeForBilling}`);
+                console.log(`   Discount: ₱${discountForBilling}`);
+              } else {
+                // Regular booking in consolidated billing - gets zero charges
+                roomChargeForBilling = 0;
+                reservationFeeForBilling = 0;
+                discountForBilling = 0;
+                console.log(`🔄 Room ${index + 1}: CONSOLIDATED - Room Charge: ₱0, Fee: ₱0, Discount: ₱0`);
+              }
             } else {
               // Individual billing - each booking gets its own room charge
-              // Group discount should still be visible on the main booking's billing row
-              roomChargeForBilling = roomPrice;
+              // Calculate based on actual nights if booking has different dates
+              if (individualDates) {
+                roomChargeForBilling = roomPrice * finalQty; // Multiply by actual nights
+              } else {
+                roomChargeForBilling = roomPrice; // Use room price (will be multiplied by qty in billing)
+              }
               reservationFeeForBilling = 0; // Reservation fee removed
               discountForBilling = index === 0 ? (parseFloat(discount) || 0) : 0;
-              console.log(`🔄 Room ${index + 1}: INDIVIDUAL - Room Charge: ₱${roomChargeForBilling}, Fee: ₱0, Discount: ₱${discountForBilling}`);
+              console.log(`🔄 Room ${index + 1}: INDIVIDUAL - Room Charge: ₱${roomChargeForBilling}, Fee: ₱0, Discount: ₱${discountForBilling}, Nights: ${finalQty}`);
             }
 
             // Update billing
+            // IMPORTANT: Preserve original ROOM_CHARGE - only update QTY and dates
+            // Get original ROOM_CHARGE from billing to preserve it
+            const [originalBilling] = await connection.promise().query(
+              'SELECT ROOM_CHARGE FROM billing WHERE BOOKING_ID = ? AND ACTIVE = 1 LIMIT 1',
+              [existingBooking.IDNo]
+            );
+            
+            // Use original ROOM_CHARGE if it exists, otherwise use calculated value
+            const preservedRoomCharge = (originalBilling && originalBilling.length > 0 && originalBilling[0].ROOM_CHARGE > 0) 
+              ? originalBilling[0].ROOM_CHARGE 
+              : roomChargeForBilling;
+            
+            console.log(`   Preserving original ROOM_CHARGE: ₱${preservedRoomCharge} (calculated was: ₱${roomChargeForBilling})`);
+            
             // NOTE: We continue to store DISCOUNT_AMOUNT in billing for reporting & summary screens.
             //       Discount is also represented in the payments table as negative rows.
+            // IMPORTANT: Use finalQty (actual nights) for bookings with different dates
+            // IMPORTANT: Preserve original ROOM_CHARGE - only update QTY
             await connection.promise().query(`
               UPDATE billing
-              SET ROOM_CHARGE = ?, QTY = ?, PAYMENT_STATUS = ?, RESERVATION_FEE = ?, DISCOUNT_AMOUNT = ?, ENCODED_BY = ?, ENCODED_DT = ?
+              SET QTY = ?, PAYMENT_STATUS = ?, RESERVATION_FEE = ?, DISCOUNT_AMOUNT = ?, ENCODED_BY = ?, ENCODED_DT = ?
               WHERE BOOKING_ID = ?
             `, [
-              roomChargeForBilling, qty, paymentStatus, reservationFeeForBilling, discountForBilling, encodedBy, date, existingBooking.IDNo
+              finalQty, paymentStatus, reservationFeeForBilling, discountForBilling, encodedBy, date, existingBooking.IDNo
             ]);
 
             // Update customer info for all bookings in the group
@@ -5529,6 +5788,7 @@ class BookingModel {
   static async getGroupBillingDetails(groupId) {
     try {
       // Query for Room Charges ONLY (prevents duplication)
+      // For Master Billing, we'll consolidate later, so get all room numbers
       const roomBillingQuery = `
         SELECT 
           b.IDNo AS BOOKING_ID,
@@ -5540,13 +5800,14 @@ class BookingModel {
           bill.ROOM_CHARGE AS charges,
           bill.QTY AS room_qty,
           bill.PAYMENT_STATUS,
-          COALESCE(bill.CANCELLATION_PENALTY, 0) AS PENALTY_AMOUNT
+          COALESCE(bill.CANCELLATION_PENALTY, 0) AS PENALTY_AMOUNT,
+          gb.BILLING_TYPE
         FROM billing bill
         JOIN booking b ON bill.BOOKING_ID = b.IDNo
         JOIN group_booking gb ON b.GROUP_BOOKING_ID = gb.IDNo  
         JOIN room r ON b.ROOM_ID = r.IDNo  
-        WHERE b.GROUP_BOOKING_ID = ?
-        GROUP BY bill.BOOKING_ID, gb.GROUP_NAME, r.ROOM_NUMBER, bill.ROOM_CHARGE, bill.QTY, bill.PAYMENT_STATUS
+        WHERE b.GROUP_BOOKING_ID = ? AND bill.ACTIVE = 1
+        GROUP BY bill.BOOKING_ID, gb.GROUP_NAME, r.ROOM_NUMBER, bill.ROOM_CHARGE, bill.QTY, bill.PAYMENT_STATUS, gb.BILLING_TYPE
         ORDER BY r.ROOM_NUMBER ASC, bill.BOOKING_ID ASC
       `;
 
@@ -5617,13 +5878,18 @@ class BookingModel {
       }
 
       // Filter results if BILLING_TYPE = 1 (MASTER)
-      // - Room charges: only show master booking (to avoid duplicate room lines)
+      // - Room charges: consolidate into single line for master booking
       // - Service charges: always show ALL services for the group (so individual breakfasts, etc. all appear)
       let filteredRoomResults = roomResults;
       let filteredServiceResults = serviceResults;
       
       if (billingType === 1 && masterBookingId) {
-        filteredRoomResults = roomResults.filter(r => r.BOOKING_ID === masterBookingId);
+        // For Master Billing: Show ALL bookings separately (each has its own billing record)
+        // Even though charges are synced to master, we show individual bookings for tracking
+        // This allows users to see which booking has which charges
+        filteredRoomResults = roomResults; // Show all bookings, not just master
+        
+        console.log(`✅ Master Billing: Showing all ${roomResults.length} bookings separately (charges synced to master booking ${masterBookingId})`);
         // Keep all serviceResults so that services from all group members are visible on the group invoice
       }
       
@@ -8748,7 +9014,7 @@ class BookingModel {
       dropoffServiceId,
       dropoffPrice,
       discount = 0,
-      consolidatedBilling = true, // Default: Master Billing (changed from false to true)
+      consolidatedBilling: consolidatedBillingParam = true, // Default: Master Billing (changed from false to true)
       perRoomDiscounts = [],
       lateCheckoutFee = 0,
       // Meta
@@ -8756,8 +9022,12 @@ class BookingModel {
       date,
       isDirectReservation,
       seniorPwdDiscountPercent = 0,
-      seniorPwdRoomCount = 0
+      seniorPwdRoomCount = 0,
+      existingGroupId = null // ID of existing group to join
     } = data;
+
+    // Use let so we can override when joining existing group
+    let consolidatedBilling = consolidatedBillingParam;
 
     // Helper: parse daterange "MMM DD, YYYY to MMM DD, YYYY (..optional..)"
     const moment = require('moment');
@@ -8821,35 +9091,83 @@ class BookingModel {
         confirmationNumber = checkInDateFormatted + '0' + roomNumber;
       }
 
-      // Insert into group_booking
-      const groupBookingQuery = `
-        INSERT INTO group_booking (
-          GROUP_NAME,
-          CONTACT_NO,
-          NUMBER_OF_ROOMS,
-          ENCODED_BY,
-          GROUP_RESERVATION_FEE,
-          GROUP_DISCOUNT,
-          REMARKS,
-          BILLING_TYPE,
-          SENIOR_PWD_DISCOUNT_PERCENT,
-          SENIOR_PWD_ROOM_COUNT
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `;
-      const [groupResult] = await connection.promise().query(groupBookingQuery, [
-        groupName,
-        groupContact,
-        numberOfRooms,
-        encodedBy,
-        0, // GROUP_RESERVATION_FEE removed - always set to 0
-        parseFloat(discount) || 0,
-        remarks || '',
-        consolidatedBilling ? 1 : 0, // 1 = Master, 0 = Individual
-        parseFloat(seniorPwdDiscountPercent) || 0.00,
-        parseInt(seniorPwdRoomCount, 10) || 0
-      ]);
-      const groupBookingId = groupResult.insertId;
+      // Check if joining existing group or creating new one
+      let groupBookingId;
+      let existingMasterBookingId = null; // For Master Billing when joining
+      
+      if (existingGroupId) {
+        // Joining existing group - use existing group ID
+        groupBookingId = existingGroupId;
+        
+        // Verify the group exists and get its billing type
+        const [existingGroup] = await connection.promise().query(
+          'SELECT IDNo, NUMBER_OF_ROOMS, BILLING_TYPE FROM group_booking WHERE IDNo = ?',
+          [existingGroupId]
+        );
+        
+        if (!existingGroup || existingGroup.length === 0) {
+          throw new Error('Existing group not found');
+        }
+        
+        // IMPORTANT: Override consolidatedBilling with existing group's billing type
+        // BILLING_TYPE: 1 = Master/Consolidated, 0 = Individual
+        const existingBillingType = existingGroup[0].BILLING_TYPE;
+        consolidatedBilling = (existingBillingType === 1);
+        
+        // If Master Billing, get the master booking ID (first booking in the group)
+        if (consolidatedBilling) {
+          const [masterBooking] = await connection.promise().query(
+            'SELECT MIN(IDNo) AS master_booking_id FROM booking WHERE GROUP_BOOKING_ID = ? AND ACTIVE = 1',
+            [existingGroupId]
+          );
+          existingMasterBookingId = masterBooking[0]?.master_booking_id || null;
+          console.log(`📋 Master Billing: Found master booking ID: ${existingMasterBookingId}`);
+        }
+        
+        console.log(`✅ Joining existing group ${existingGroupId}`);
+        console.log(`📋 Existing Group Billing Type: ${existingBillingType === 1 ? 'MASTER/CONSOLIDATED' : 'INDIVIDUAL'}`);
+        console.log(`📋 Overriding consolidatedBilling to: ${consolidatedBilling}`);
+        
+        // Update number of rooms in existing group
+        const newRoomCount = existingGroup[0].NUMBER_OF_ROOMS + parseInt(numberOfRooms, 10);
+        await connection.promise().query(
+          'UPDATE group_booking SET NUMBER_OF_ROOMS = ? WHERE IDNo = ?',
+          [newRoomCount, existingGroupId]
+        );
+        
+        console.log(`✅ Updated room count to ${newRoomCount}`);
+      } else {
+        // Creating new group - insert new group_booking record
+        const groupBookingQuery = `
+          INSERT INTO group_booking (
+            GROUP_NAME,
+            CONTACT_NO,
+            NUMBER_OF_ROOMS,
+            ENCODED_BY,
+            GROUP_RESERVATION_FEE,
+            GROUP_DISCOUNT,
+            REMARKS,
+            BILLING_TYPE,
+            SENIOR_PWD_DISCOUNT_PERCENT,
+            SENIOR_PWD_ROOM_COUNT
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+        const [groupResult] = await connection.promise().query(groupBookingQuery, [
+          groupName,
+          groupContact,
+          numberOfRooms,
+          encodedBy,
+          0, // GROUP_RESERVATION_FEE removed - always set to 0
+          parseFloat(discount) || 0,
+          remarks || '',
+          consolidatedBilling ? 1 : 0, // 1 = Master, 0 = Individual
+          parseFloat(seniorPwdDiscountPercent) || 0.00,
+          parseInt(seniorPwdRoomCount, 10) || 0
+        ]);
+        groupBookingId = groupResult.insertId;
+        console.log(`✅ Created new group ${groupBookingId}`);
+      }
 
       // Prepare per-room arrays
       const roomBasePrices = (selectedRoomPrice || '').split(',').map(p => parseFloat(p));
@@ -8866,11 +9184,34 @@ class BookingModel {
 
       let firstBookingId = null;
       let totalGroupRoomCharges = 0;
+      const newBookingIdsInTransaction = []; // Track all booking IDs created in this transaction
+
+      // Get existing booking count if joining existing group
+      let existingBookingCount = 0;
+      if (existingGroupId) {
+        const [existingBookings] = await connection.promise().query(
+          'SELECT COUNT(*) AS count FROM booking WHERE GROUP_BOOKING_ID = ? AND ACTIVE = 1',
+          [groupBookingId]
+        );
+        existingBookingCount = existingBookings[0]?.count || 0;
+        console.log(`📊 Existing bookings in group: ${existingBookingCount}`);
+      }
 
       // Insert each room booking
       for (let index = 0; index < roomIds.length; index++) {
         const roomId = roomIds[index];
-        const guestFullName = index === 0 ? `${groupName}-Main-1` : `${groupName}-${index + 1}`;
+        // Calculate customer name: if joining, continue numbering from existing count
+        // First booking in new group: "TEST-Main-1", others: "TEST-2", "TEST-3", etc.
+        // When joining: continue from existing count (e.g., if 5 exist, new ones: "TEST-6", "TEST-7", etc.)
+        let guestFullName;
+        if (existingGroupId) {
+          // Joining existing group: continue numbering
+          const bookingNumber = existingBookingCount + index + 1;
+          guestFullName = `${groupName}-${bookingNumber}`;
+        } else {
+          // New group: first is "Main-1", others are numbered
+          guestFullName = index === 0 ? `${groupName}-Main-1` : `${groupName}-${index + 1}`;
+        }
         const bookingRemarksForThisRow = index === 0 ? (remarks || '') : '';
         const baseRoomPrice = roomBasePrices[index];
         const totalRoomCharge = baseRoomPrice * nightsCount;
@@ -8945,6 +9286,7 @@ class BookingModel {
         const [bookResult] = await connection.promise().query(bookingQuery, bookingValues);
         const bookingId = bookResult.insertId;
         if (!firstBookingId) firstBookingId = bookingId;
+        newBookingIdsInTransaction.push(bookingId); // Track this booking ID
 
         // If this booking row has remarks, mirror to remarks table (like addBooking)
         if (bookingRemarksForThisRow && bookingRemarksForThisRow.trim() !== '') {
@@ -8963,8 +9305,25 @@ class BookingModel {
 
         let roomChargeForBilling, reservationFeeForBilling, discountForBilling, roomRatePerNight, quantityForBilling;
 
-        if (consolidatedBilling && index === 0) {
-          // Main booking in consolidated billing gets all charges
+        // Special handling when joining existing group with Master Billing
+        // IMPORTANT: Even with Master Billing, new bookings should have their own billing records
+        // The charges will be synced to master booking separately, but keep individual records for tracking
+        if (existingGroupId && consolidatedBilling && existingMasterBookingId) {
+          // Joining existing group with Master Billing
+          // Keep individual billing records but with actual charges (not 0)
+          // This allows proper tracking while still syncing to master
+          console.log(`🔄 Backend - Room ${index + 1}: JOINING GROUP WITH MASTER BILLING`);
+          console.log(`   Individual billing record will be created with actual charges`);
+          console.log(`   Charges will also be synced to master booking ${existingMasterBookingId}`);
+          
+          // Create individual billing record with actual charges (for tracking)
+          roomChargeForBilling = totalRoomCharge; // Actual room charge for this booking
+          reservationFeeForBilling = 0;
+          discountForBilling = parseFloat(perRoomDiscountsArray[index]) || 0;
+          roomRatePerNight = baseRoomPrice; // Room rate per night
+          quantityForBilling = nightsCount; // Number of nights for this booking
+        } else if (consolidatedBilling && index === 0) {
+          // Main booking in consolidated billing gets all charges (new group)
           console.log(`🔄 Backend - Room ${index + 1}: CONSOLIDATED BILLING (Main Booking)`);
           roomChargeForBilling = adjustedRoomCharge; // Total of all rooms
           reservationFeeForBilling = 0; // Reservation fee removed
@@ -8975,7 +9334,7 @@ class BookingModel {
           roomRatePerNight = totalRoomsBase; // Sum of all room rates per night
           quantityForBilling = nightsCount; // Number of nights
         } else if (consolidatedBilling) {
-          // Other bookings in consolidated billing have no charges
+          // Other bookings in consolidated billing have no charges (new group)
           console.log(`🔄 Backend - Room ${index + 1}: CONSOLIDATED BILLING (Other Booking - ₱0.00)`);
           roomChargeForBilling = 0;
           reservationFeeForBilling = 0;
@@ -9020,8 +9379,18 @@ class BookingModel {
         // Late checkout fee is PER ROOM, but handling differs by billing type:
         // - Consolidated Billing: Total fee (fee × numRooms) goes to main booking only
         // - Individual Billing: Each room gets the fee
+        // - When joining existing group with Master Billing: Each booking gets its own fee (separate billing)
         if (checkOutStatus == 1 && parseFloat(lateCheckoutFee) > 0) {
-          if (consolidatedBilling && index === 0) {
+          if (existingGroupId && consolidatedBilling && existingMasterBookingId) {
+            // Joining existing group with Master Billing: Add late checkout fee to current booking (separate billing)
+            const lateCheckoutQuery = `
+              INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT)
+              VALUES (?, 72, 1, ?, ?, ?, NOW())
+            `;
+            const status = 'unpaid'; // Will be updated by payment distribution logic
+            await connection.promise().query(lateCheckoutQuery, [bookingId, lateCheckoutFee, status, encodedBy]);
+            console.log(`✅ Added late checkout fee (${lateCheckoutFee}) to booking ${bookingId} (separate billing)`);
+          } else if (consolidatedBilling && index === 0) {
             // Consolidated: Add total late checkout fee (fee × number of rooms) to main booking only
             const totalLateCheckoutFee = parseFloat(lateCheckoutFee) * roomIds.length;
             const lateCheckoutQuery = `
@@ -9126,21 +9495,22 @@ class BookingModel {
       }
 
       // Insert group-level services
-      // Get all booking IDs for this group
-      const allBookingIds = [];
-      for (let index = 0; index < roomIds.length; index++) {
-        const roomId = roomIds[index];
-        const [existingBooking] = await connection.promise().query(
-          'SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ? AND ROOM_ID = ? ORDER BY IDNo ASC LIMIT 1',
-          [groupBookingId, roomId]
-        );
-        if (existingBooking && existingBooking.length > 0) {
-          allBookingIds.push(existingBooking[0].IDNo);
-        }
-      }
+      // For new group: use all bookings created in this transaction
+      // For joining existing group: use only the new bookings created in this transaction (separate billing)
+      let targetBookingIds = [];
       
-      // If no bookings found yet, use firstBookingId as fallback
-      const targetBookingIds = allBookingIds.length > 0 ? allBookingIds : (firstBookingId ? [firstBookingId] : []);
+      if (existingGroupId && consolidatedBilling && existingMasterBookingId) {
+        // Joining existing group: Use only NEW bookings created in this transaction
+        targetBookingIds = newBookingIdsInTransaction.length > 0 ? newBookingIdsInTransaction : (firstBookingId ? [firstBookingId] : []);
+        
+        console.log(`🔄 Joining with Master Billing: Each booking will have separate billing records`);
+        console.log(`   Master booking: ${existingMasterBookingId}`);
+        console.log(`   New bookings (${targetBookingIds.length}): ${targetBookingIds.join(', ')}`);
+        console.log(`   Services will be added to each new booking separately (not consolidated to master)`);
+      } else {
+        // New group: Use all bookings created in this transaction
+        targetBookingIds = newBookingIdsInTransaction.length > 0 ? newBookingIdsInTransaction : (firstBookingId ? [firstBookingId] : []);
+      }
       
       if (targetBookingIds.length > 0) {
         const groupServices = [];
@@ -9233,16 +9603,16 @@ class BookingModel {
       const paidAmountNum = parseFloat(paidAmount) || 0;
       
       if ((paymentStatus === 'paid' || paymentStatus === 'partial') && paidAmountNum > 0) {
-        // Get all billing IDs for this group
+        // Get all billing IDs for this group (use targetBookingIds which contains the relevant booking IDs)
         const [allBillings] = await connection.promise().query(
           'SELECT IDNo, BOOKING_ID, ROOM_CHARGE, QTY, PAYMENT_STATUS FROM billing WHERE BOOKING_ID IN (?)',
-          [allBookingIds.length > 0 ? allBookingIds : targetBookingIds]
+          [targetBookingIds.length > 0 ? targetBookingIds : (firstBookingId ? [firstBookingId] : [])]
         );
 
         // Get all service IDs for this group (only ACTIVE = 1)
         const [allServices] = await connection.promise().query(
           'SELECT IDNo, BOOKING_ID, TOTAL_COST, STATUS FROM booking_service WHERE BOOKING_ID IN (?) AND ACTIVE = 1',
-          [allBookingIds.length > 0 ? allBookingIds : targetBookingIds]
+          [targetBookingIds.length > 0 ? targetBookingIds : (firstBookingId ? [firstBookingId] : [])]
         );
 
         let remainingPayment = paidAmountNum;

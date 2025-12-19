@@ -11,6 +11,7 @@
         <form id="groupBookingForm" autocomplete="off">
           <input type="hidden" id="groupVoucherNo" name="groupVoucherNo">
           <input type="hidden" id="groupBookingId" name="groupBookingId">
+          <input type="hidden" id="groupJoinExistingGroup" name="groupJoinExistingGroup" value="false">
           <input type="hidden" id="groupSelectedRooms" name="groupSelectedRooms">
           <input type="hidden" id="groupSelectedRoomPrices" name="groupSelectedRoomPrices">
           <input type="hidden" id="groupSelectedRoomNumbers" name="groupSelectedRoomNumbers">
@@ -1003,6 +1004,8 @@
     $('#groupSelectedRooms').val('');
     $('#groupSelectedRoomPrices').val('');
     $('#groupNights').val('0');
+    $('#groupBookingId').val(''); // Clear existing group ID
+    $('#groupJoinExistingGroup').val('false'); // Reset join flag
     groupBlocks = [];
     groupNonConsecutiveBlocks = [];
     groupAvailableRooms = [];
@@ -1042,6 +1045,16 @@
     $('#groupSeniorPwdDiscountPercent').val('20'); // Reset to default 20%
     $('#groupSeniorPwdDiscountAmount').val('');
     $('#groupSeniorPwdDiscount').val('0');
+    
+    // Reset group name and contact fields (remove readonly and restore styling)
+    $('#groupName').prop('readonly', false).css('background-color', '');
+    $('#groupContact').prop('readonly', false).css('background-color', '');
+    
+    // Reset modal title
+    $('#modalAddGroupBookingLabel').text('Add Group Booking');
+    
+    // Remove join group info message if exists
+    $('#joinGroupInfo').remove();
     
     applyGroupBreakfastDefaults();
   }
@@ -2471,6 +2484,7 @@
   }
 
   window.getGroupBookingState = getGroupBookingState;
+  window.resetGroupForm = resetGroupForm; // Make resetGroupForm globally accessible
 
   $(document).ready(function() {
     initializeGroupFlatpickr();

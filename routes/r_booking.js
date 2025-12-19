@@ -143,4 +143,7 @@ router.get('/get-voucher-data/:bookingId', BookingController.getVoucherData);
 router.get('/get-group-voucher-data/:groupId', BookingController.getGroupVoucherData);
 router.get('/voucher/:bookingId', BookingController.generateVoucherPDF);
 
+// Group info route (for joining existing group)
+router.get('/get_group_info/:groupId', BookingController.getGroupInfo);
+
 module.exports = router;

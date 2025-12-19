@@ -1442,7 +1442,8 @@ class BookingController {
         individualBilling: individualBillingValue,
         perRoomDiscounts,
         directReservationFlag,
-        lateCheckoutFee = 0
+        lateCheckoutFee = 0,
+        existingGroupId = null // ID of existing group to join (if joining)
       } = req.body;
 
       // Convert individualBilling checkbox value to boolean (inverted logic)
@@ -1529,13 +1530,48 @@ class BookingController {
         lateCheckoutFee,
         encodedBy,
         date,
-        isDirectReservation: directReservationFlag === 'true'
+        isDirectReservation: directReservationFlag === 'true',
+        existingGroupId: existingGroupId ? parseInt(existingGroupId, 10) : null // Pass existing group ID if joining
       });
 
       return res.json(result);
     } catch (error) {
       console.error('❌ Error in addGroupBooking:', error);
       return res.status(500).json({ success: false, message: error.message || 'Error inserting group booking' });
+    }
+  }
+
+  // Get group info for joining existing group
+  static async getGroupInfo(req, res) {
+    try {
+      const { groupId } = req.params;
+
+      if (!groupId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Group ID is required'
+        });
+      }
+
+      const groupInfo = await BookingModel.getGroupInfo(groupId);
+
+      if (!groupInfo) {
+        return res.status(404).json({
+          success: false,
+          message: 'Group not found'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: groupInfo
+      });
+    } catch (error) {
+      console.error('Error fetching group info:', error);
+      return res.status(500).json({
+        success: false,
+        message: error.message || 'Error fetching group information'
+      });
     }
   }
 
@@ -1611,7 +1647,8 @@ class BookingController {
         seniorPwdRoomCount = 0, // Number of rooms with Senior/PWD discount
         individualBilling: individualBillingValue,
         perRoomDiscounts,
-        lateCheckoutFee = 0
+        lateCheckoutFee = 0,
+        individualBookingDates = null // Individual booking dates if they differ from main date range
       } = req.body;
 
       if (!groupBookingId) {
@@ -1658,6 +1695,7 @@ class BookingController {
         selectedRoomPrice,
         qty,
         daterange,
+        individualBookingDates,
         groupName,
         groupContact,
         numberOfRooms,

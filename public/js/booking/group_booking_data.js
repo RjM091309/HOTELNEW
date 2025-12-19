@@ -174,6 +174,9 @@ $(document).ready(function () {
                             <button class="label label-sm label-warning ms-1" onclick="editGroupBooking(${row.GroupID})" title="Edit Group Booking" style="width: 30px; height: 30px;  padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px;">
                                 <i class="fa fa-edit"></i>
                             </button>
+                            <button class="label label-sm label-info ms-1" onclick="joinExistingGroup(${row.GroupID})" title="Join Group (Add booking to this group)" style="width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px; background-color: #17a2b8 !important; border-color: #17a2b8 !important;">
+                                <i class="fa fa-user-plus"></i>
+                            </button>
                             <button id="${remarksBtnId}" class="label label-sm label-success ms-1" onclick="openGroupRemarksModal(${row.GroupID})" title="Remarks" style="width: 30px; height: 30px;  padding: 0; display: inline-flex; align-items: center; justify-content: center; margin: 0 2px; font-size: 12px; background-color: ${baseRemarksColor} !important; border-color: ${baseRemarksColor} !important;">
                                 <i class="fa fa-comment-dots"></i>
                             </button>
@@ -655,7 +658,8 @@ function viewGroupBilling(groupId) {
             let rowNumber = 1;
 
             let allBillingData = [...data.roomBillingDetails, ...data.serviceBillingDetails];
-            // Sort the data
+            
+            // Sort the data by room number and booking ID
             allBillingData.sort((a, b) => {
                 return a.ROOM_NUMBER - b.ROOM_NUMBER || a.BOOKING_ID - b.BOOKING_ID;
             });
@@ -682,6 +686,7 @@ function viewGroupBilling(groupId) {
                     discountAppliedToRoom = true; // Mark that discount has been applied
                 }
 
+                // Show room totals when room changes
                 if (currentRoom !== bill.ROOM_NUMBER && currentRoom !== null) {
                     // Insert total row for previous room
                     let totalRow = `
@@ -917,6 +922,47 @@ function formatCurrency(value) {
     return `₱${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+// Populate Selected Room Prices breakdown (exposed for reuse)
+// Mirrors the logic from the edit modal script to ensure availability here
+function populateEditBreakdown(selectedRooms, computedPrices) {
+  const container = $('#editGroupRoomBreakdown');
+  container.empty();
+  if (!selectedRooms || !selectedRooms.length) {
+    return;
+  }
+
+  const mainNights = parseInt($('#editGroupNights').val(), 10) || 0;
+
+  // Map: roomNumber -> nights from individual date inputs
+  const individualNightsMap = {};
+  $('.edit-individual-nights').each(function() {
+    const roomNumber = $(this).data('room-number');
+    const nights = parseInt($(this).val(), 10) || 0;
+    if (roomNumber && nights > 0) {
+      individualNightsMap[roomNumber] = nights;
+    }
+  });
+
+  let html = '<div class="group-room-breakdown"><b>Selected Room Prices:</b><ul>';
+  selectedRooms.forEach((room, idx) => {
+    const price = computedPrices[idx] || 0;
+    const roomNumber = room.ROOM_NUMBER || room.roomNumber;
+
+    // Use individual nights if available, otherwise use main nights
+    const nights = individualNightsMap[roomNumber] || mainNights;
+    const total = nights > 0 ? price * nights : price;
+
+    // Add indicator if using individual nights
+    const nightsLabel = individualNightsMap[roomNumber]
+      ? ` (${nights} nights - different dates)`
+      : ` (${nights} nights)`;
+
+    html += `<li>Room ${roomNumber}: ₱${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per night ${nights > 0 ? `(₱${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total${nightsLabel})` : ''}</li>`;
+  });
+  html += '</ul></div>';
+  container.html(html);
+}
+
 function formatPaidAmount(input) {
     const value = parseFloat(input.value) || 0;
     input.value = value.toFixed(2);
@@ -924,11 +970,64 @@ function formatPaidAmount(input) {
 
 // Compute total for edit group booking form
 function computeEditGroupTotal() {
-    const nights = parseInt($('#editGroupNights').val(), 10) || 0;
+    // Get main nights (for bookings without individual dates)
+    const mainNights = parseInt($('#editGroupNights').val(), 10) || 0;
     const pricesRaw = $('#editGroupSelectedRoomPrices').val();
     const prices = pricesRaw ? pricesRaw.split(',').map(p => parseFloat(p) || 0) : [];
-    const baseSubtotal = prices.reduce((sum, price) => sum + price, 0);
-    const roomSubtotal = baseSubtotal * nights;
+    
+    // Get individual booking dates and map to room numbers
+    // Map: roomNumber -> nights
+    const individualNightsMap = {};
+    $('.edit-individual-nights').each(function() {
+      const roomNumber = $(this).data('room-number');
+      const nights = parseInt($(this).val(), 10) || 0;
+      if (roomNumber && nights > 0) {
+        individualNightsMap[roomNumber] = nights;
+      }
+    });
+    
+    // Get selected room IDs and map to room numbers
+    const selectedRoomIds = $('#editGroupSelectedRooms').val();
+    const selectedRoomIdsArray = selectedRoomIds ? selectedRoomIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id)) : [];
+    
+    // Create map: roomId -> roomNumber from bookings data (most reliable)
+    const roomIdToNumberMap = {};
+    if (window.editGroupBookingsData && window.editGroupBookingsData.length > 0) {
+      window.editGroupBookingsData.forEach(b => {
+        const roomId = b.ROOM_ID || b.roomId;
+        const roomNumber = b.ROOM_NUMBER || b.roomNumber;
+        if (roomId && roomNumber) {
+          roomIdToNumberMap[roomId] = roomNumber;
+        }
+      });
+    }
+    
+    // Fallback: Try to get room numbers from the breakdown HTML if bookings data not available
+    if (Object.keys(roomIdToNumberMap).length === 0) {
+      const breakdownHtml = $('#editGroupRoomBreakdown').html() || '';
+      if (breakdownHtml) {
+        const roomMatches = breakdownHtml.match(/Room\s+(\d+):/g);
+        if (roomMatches) {
+          roomMatches.forEach((match, idx) => {
+            const roomNumMatch = match.match(/Room\s+(\d+)/);
+            if (roomNumMatch && selectedRoomIdsArray[idx]) {
+              roomIdToNumberMap[selectedRoomIdsArray[idx]] = roomNumMatch[1];
+            }
+          });
+        }
+      }
+    }
+    
+    // Calculate room subtotal per room (using individual nights if available)
+    let roomSubtotal = 0;
+    prices.forEach((price, idx) => {
+      const roomId = selectedRoomIdsArray[idx];
+      const roomNumber = roomId ? roomIdToNumberMap[roomId] : null;
+      
+      // Use individual nights if available for this room, otherwise use main nights
+      const nights = (roomNumber && individualNightsMap[roomNumber]) ? individualNightsMap[roomNumber] : mainNights;
+      roomSubtotal += price * nights;
+    });
 
     const adultQty = $('#editGroupIncludeBreakfast').is(':checked') ? (parseInt($('#editGroupBreakfastAdultQty').val(), 10) || 0) : 0;
     const adultPrice = parseFloat($('#editGroupBreakfastAdultPrice').val()) || 0;
@@ -1197,22 +1296,13 @@ function ensureGuestDataLoaded() {
     });
 }
 
+// Store bookings data globally for total calculation
+window.editGroupBookingsData = null;
+
 // Function to populate edit group form
 function populateEditGroupForm(booking) {
-    // Debug: Log booking data received
-    console.log('🔍 Booking data received:', booking);
-    console.log('🔍 Service data:', {
-        breakfastAdultQty: booking.breakfastAdultQty,
-        breakfastAdultPrice: booking.breakfastAdultPrice,
-        breakfastAdultId: booking.breakfastAdultId,
-        breakfastKidQty: booking.breakfastKidQty,
-        breakfastKidPrice: booking.breakfastKidPrice,
-        breakfastKidId: booking.breakfastKidId,
-        pickupPrice: booking.pickupPrice,
-        pickupServiceId: booking.pickupServiceId,
-        dropoffPrice: booking.dropoffPrice,
-        dropoffServiceId: booking.dropoffServiceId
-    });
+    // Store bookings data globally for total calculation
+    window.editGroupBookingsData = booking.bookings || [];
     
     // Set hidden fields
     $('#editGroupBookingId').val(booking.groupBookingId);
@@ -1237,6 +1327,43 @@ function populateEditGroupForm(booking) {
     $('#editGroupNumberOfRooms').val(booking.numberOfRooms);
     $('#editGroupPaymentStatus').val(booking.paymentStatus);
     $('#editGroupBookingRoute').val(booking.bookingRoute);
+
+    // Handle individual booking dates if they differ from main date range
+    if (booking.bookings && booking.bookings.length > 0) {
+        // Use moment to avoid timezone shifts (treat dates as local dates)
+        const formatDate = (d) => moment(d).format('YYYY-MM-DD');
+        const mainCheckInStr = formatDate(booking.bookings[0].CHECK_IN_DATE);
+        const mainCheckOutStr = formatDate(booking.bookings[0].CHECK_OUT_DATE);
+        const bookingsWithDifferentDates = [];
+        
+        // Check if any booking has different dates
+        booking.bookings.forEach((b, index) => {
+            const bookingCheckInStr = formatDate(b.CHECK_IN_DATE);
+            const bookingCheckOutStr = formatDate(b.CHECK_OUT_DATE);
+            
+            if (index > 0 && (
+                bookingCheckInStr !== mainCheckInStr ||
+                bookingCheckOutStr !== mainCheckOutStr
+            )) {
+                bookingsWithDifferentDates.push({
+                    bookingId: b.BOOKING_ID || b.bookingId,
+                    roomNumber: b.ROOM_NUMBER || b.roomNumber,
+                    checkIn: bookingCheckInStr,
+                    checkOut: bookingCheckOutStr,
+                    index: index
+                });
+            }
+        });
+        
+        // Show individual dates section if there are different dates
+        if (bookingsWithDifferentDates.length > 0) {
+            displayIndividualBookingDates(bookingsWithDifferentDates);
+        } else {
+            $('#editGroupIndividualDatesSection').hide();
+        }
+    } else {
+        $('#editGroupIndividualDatesSection').hide();
+    }
 
     // Set bed requirements derived from selected rooms
     if (booking.bedRequirements) {
@@ -1298,16 +1425,12 @@ function populateEditGroupForm(booking) {
     // Initialize Paid Amount like single edit: prefer paidAmount, then totalPaid, else 0
     if (booking.paidAmount !== undefined && booking.paidAmount !== null && booking.paidAmount !== '') {
         const initPaid = parseFloat(booking.paidAmount) || 0;
-        console.log('[EditGroup] Using booking.paidAmount for initial paid:', booking.paidAmount, '→', initPaid);
         $('#editGroupPaidAmount').val(initPaid.toFixed(2));
-        console.log('[EditGroup] #editGroupPaidAmount set to:', $('#editGroupPaidAmount').val());
     } else if (booking.totalPaid !== undefined && booking.totalPaid !== null && booking.totalPaid !== '') {
         const initPaid = parseFloat(booking.totalPaid) || 0;
-        console.log('[EditGroup] Using booking.totalPaid for initial paid:', booking.totalPaid, '→', initPaid);
         $('#editGroupPaidAmount').val(initPaid.toFixed(2));
-        console.log('[EditGroup] #editGroupPaidAmount set to:', $('#editGroupPaidAmount').val());
     } else {
-        console.log('[EditGroup] No paid amount value provided in response; leaving field unchanged');
+        // leave as default
     }
     
     // Trigger computation after setting paid amount and senior fields
@@ -1403,6 +1526,41 @@ function populateEditGroupForm(booking) {
         $('#editGroupAgencyWrapper').hide();
     }
 
+    // Handle individual booking dates if they differ from main date range
+    if (booking.bookings && booking.bookings.length > 0) {
+        const mainCheckIn = new Date(booking.bookings[0].CHECK_IN_DATE);
+        const mainCheckOut = new Date(booking.bookings[0].CHECK_OUT_DATE);
+        const bookingsWithDifferentDates = [];
+        
+        // Check if any booking has different dates
+        booking.bookings.forEach((b, index) => {
+            const bookingCheckIn = new Date(b.CHECK_IN_DATE);
+            const bookingCheckOut = new Date(b.CHECK_OUT_DATE);
+            
+            if (index > 0 && (
+                bookingCheckIn.getTime() !== mainCheckIn.getTime() ||
+                bookingCheckOut.getTime() !== mainCheckOut.getTime()
+            )) {
+                bookingsWithDifferentDates.push({
+                    bookingId: b.BOOKING_ID || b.bookingId,
+                    roomNumber: b.ROOM_NUMBER || b.roomNumber,
+                    checkIn: b.CHECK_IN_DATE,
+                    checkOut: b.CHECK_OUT_DATE,
+                    index: index
+                });
+            }
+        });
+        
+        // Show individual dates section if there are different dates
+        if (bookingsWithDifferentDates.length > 0) {
+            displayIndividualBookingDates(bookingsWithDifferentDates);
+        } else {
+            $('#editGroupIndividualDatesSection').hide();
+        }
+    } else {
+        $('#editGroupIndividualDatesSection').hide();
+    }
+
     // Load extra services for the group booking
     if (booking.groupBookingId) {
         if (typeof loadEditGroupExistingServices === 'function') {
@@ -1412,6 +1570,99 @@ function populateEditGroupForm(booking) {
 
     // Auto-search for rooms after populating form data
     setTimeout(() => {
+        if ($('#editGroupDaterange').val() && $('#editGroupNumberOfRooms').val() && 
+            $('#editGroupBookingRoute').val() && $('#editGroupCheckInStatus').val() && 
+            $('#editGroupCheckOutStatus').val()) {
+            $('#editGroupSearchRooms').click();
+        }
+    }, 500);
+}
+
+// Function to display individual booking dates that differ from main date range
+function displayIndividualBookingDates(bookingsWithDifferentDates) {
+    const container = $('#editGroupIndividualDatesList');
+    container.empty();
+    
+    const toDateStr = (d) => moment(d).format('YYYY-MM-DD');
+    const diffNights = (inStr, outStr) => moment(outStr, 'YYYY-MM-DD').diff(moment(inStr, 'YYYY-MM-DD'), 'days');
+    
+    bookingsWithDifferentDates.forEach(booking => {
+        const checkInStr = toDateStr(booking.checkIn);
+        const checkOutStr = toDateStr(booking.checkOut);
+        const nights = diffNights(checkInStr, checkOutStr);
+        
+        const dateRow = $(`
+            <div class="mb-3" style="background-color: #1f262a; border-radius: 6px; padding: 12px; border: 1px solid rgba(255, 255, 255, 0.08);">
+                <div class="row align-items-center">
+                    <div class="col-lg-3">
+                        <label class="form-label mb-1" style="font-size: 12px; color: #9fe073; font-weight: 600;">
+                            <i class="fa fa-door-open me-1"></i>Room ${booking.roomNumber}
+                        </label>
+                    </div>
+                    <div class="col-lg-4">
+                        <label class="form-label mb-1" style="font-size: 11px;">Check-In Date</label>
+                        <input type="date" class="form-control edit-individual-checkin" 
+                               data-booking-id="${booking.bookingId}" 
+                               value="${checkInStr}" 
+                               style="background-color: #41474c; color: #ffffff; border: 1px solid #41474c;">
+                    </div>
+                    <div class="col-lg-4">
+                        <label class="form-label mb-1" style="font-size: 11px;">Check-Out Date</label>
+                        <input type="date" class="form-control edit-individual-checkout" 
+                               data-booking-id="${booking.bookingId}" 
+                               value="${checkOutStr}" 
+                               style="background-color: #41474c; color: #ffffff; border: 1px solid #41474c;">
+                    </div>
+                    <div class="col-lg-1">
+                        <label class="form-label mb-1" style="font-size: 11px;">Nights</label>
+                        <input type="text" class="form-control edit-individual-nights" 
+                               data-booking-id="${booking.bookingId}" 
+                               data-room-number="${booking.roomNumber}"
+                               value="${nights}" 
+                               readonly 
+                               style="background-color: #2a3135; color: #6f9c40; font-weight: bold; text-align: center;">
+                    </div>
+                </div>
+            </div>
+        `);
+        
+        container.append(dateRow);
+    });
+    
+    // Show the section
+    $('#editGroupIndividualDatesSection').show();
+    
+    // Update nights when dates change and refresh breakdown/total
+    // Use event delegation to handle dynamically added elements
+    $(document).off('change', '.edit-individual-checkin, .edit-individual-checkout'); // Remove old handlers
+    $(document).on('change', '.edit-individual-checkin, .edit-individual-checkout', function() {
+        const bookingId = $(this).data('booking-id');
+        const checkInInput = $(`.edit-individual-checkin[data-booking-id="${bookingId}"]`);
+        const checkOutInput = $(`.edit-individual-checkout[data-booking-id="${bookingId}"]`);
+        const nightsInput = $(`.edit-individual-nights[data-booking-id="${bookingId}"]`);
+        
+        const checkInStr = checkInInput.val();
+        const checkOutStr = checkOutInput.val();
+        
+        if (checkInStr && checkOutStr) {
+            const nights = diffNights(checkInStr, checkOutStr);
+            nightsInput.val(nights);
+        } else {
+            nightsInput.val('0');
+        }
+        
+        // Recompute totals and refresh room breakdown immediately
+        computeEditGroupTotal();
+        
+        // Refresh breakdown using current bookings data + prices
+        if (Array.isArray(window.editGroupBookingsData)) {
+          const pricesRaw = $('#editGroupSelectedRoomPrices').val();
+          const computedPrices = pricesRaw ? pricesRaw.split(',').map(p => parseFloat(p) || 0) : [];
+          populateEditBreakdown(window.editGroupBookingsData, computedPrices);
+        }
+    });
+
+    (() => {
         // Only search if we have the required data
         const daterange = $('#editGroupDaterange').val();
         const numberOfRooms = $('#editGroupNumberOfRooms').val();
@@ -1548,6 +1799,77 @@ function downloadGroupVoucher(groupId) {
                 icon: 'error',
                 title: 'Error',
                 text: 'An error occurred while fetching group voucher data.',
+                confirmButtonText: 'OK'
+            });
+        }
+    });
+}
+
+// JOIN EXISTING GROUP - Open add group booking modal with existing group info pre-filled
+function joinExistingGroup(groupId) {
+    // Fetch group booking details
+    $.ajax({
+        url: `/booking/get_group_info/${groupId}`,
+        type: 'GET',
+        success: function(response) {
+            if (response.success && response.data) {
+                const groupData = response.data;
+                
+                // Store group data for use after modal opens
+                window.joinGroupData = {
+                    groupId: groupId,
+                    groupName: groupData.groupName || '',
+                    groupContact: groupData.groupContact || ''
+                };
+                
+                // Open the modal first - it will reset, then we'll set our values
+                $('#modal-add-group-booking').modal('show');
+                
+                // Set values after modal is fully shown (using setTimeout to ensure modal reset is done)
+                setTimeout(function() {
+                    // Set hidden field to indicate this is a join operation
+                    $('#groupBookingId').val(groupId);
+                    $('#groupJoinExistingGroup').val('true');
+                    
+                    // Pre-fill group information (read-only or editable based on preference)
+                    $('#groupName').val(groupData.groupName || '');
+                    $('#groupContact').val(groupData.groupContact || '');
+                    
+                    // Make group name and contact read-only since they should match the existing group
+                    $('#groupName').prop('readonly', true).css('background-color', '#2a3135');
+                    $('#groupContact').prop('readonly', true).css('background-color', '#2a3135');
+                    
+                    // Update modal title to indicate joining
+                    $('#modalAddGroupBookingLabel').text('Join Group - Add Booking to Existing Group');
+                    
+                    // Show info message
+                    if (!$('#joinGroupInfo').length) {
+                        $('#groupBookingForm').prepend(`
+                            <div id="joinGroupInfo" class="alert alert-info mb-3" style="background-color: rgba(23, 162, 184, 0.2); border: 1px solid #17a2b8; color: #17a2b8;">
+                                <i class="fa fa-info-circle"></i> <strong>Joining Existing Group:</strong> ${groupData.groupName || 'Group'} (${groupData.groupContact || 'N/A'})<br>
+                                <small>You can select different check-in/check-out dates. The booking will be added to this existing group.</small>
+                            </div>
+                        `);
+                    }
+                    
+                    // Clear the stored data
+                    window.joinGroupData = null;
+                }, 300); // Wait for modal reset to complete
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: response.message || 'Failed to fetch group information.',
+                    confirmButtonText: 'OK'
+                });
+            }
+        },
+        error: function(error) {
+            console.error('Error fetching group info:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'An error occurred while fetching group information.',
                 confirmButtonText: 'OK'
             });
         }
