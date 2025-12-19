@@ -28,11 +28,19 @@ const routes = require('./routes/route');
 
 const app = express();
 const server = http.createServer(app);
+
+// Trust proxy - Important for reverse proxy (Nginx) setup
+// This allows Express to trust X-Forwarded-* headers from the proxy
+app.set('trust proxy', true);
+
 const io = socketIo(server, {
     cors: {
         origin: ['http://localhost:6000', 'http://localhost:4173', 'http://localhost:5002', 'http://45.32.103.210:5002', 'http:localhost', 'https://pmsapp.3core21.com', 'https://pms.3core21.com'],
         methods: ['GET', 'POST']
-    }
+    },
+    // Allow Socket.IO to work through reverse proxy
+    allowEIO3: true,
+    transports: ['websocket', 'polling']
 });
 const PORT = process.env.PORT || 5001;
 
