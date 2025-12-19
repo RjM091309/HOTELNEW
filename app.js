@@ -35,7 +35,16 @@ app.set('trust proxy', true);
 
 const io = socketIo(server, {
     cors: {
-        origin: ['http://localhost:6000', 'http://localhost:4173', 'http://localhost:5002', 'http://45.32.103.210:5002', 'http:localhost', 'https://pmsapp.3core21.com', 'https://pms.3core21.com'],
+        origin: [
+            'http://localhost:6000', 
+            'http://localhost:4173', 
+            'http://localhost:5002', 
+            'http://45.32.103.210:5002', 
+            'http://localhost', 
+            'https://localhost',  // Capacitor Android WebView origin
+            'https://pmsapp.3core21.com', 
+            'https://pms.3core21.com'
+        ],
         methods: ['GET', 'POST']
     },
     // Allow Socket.IO to work through reverse proxy
@@ -46,7 +55,17 @@ const PORT = process.env.PORT || 5001;
 
 // CORS middleware for API access from frontend
 app.use(cors({
-    origin: ['http://localhost:6000', 'http://localhost:4173', 'http://localhost:5002', 'http://45.32.103.210:5002' , 'http://localhost', 'https://pmsapp.3core21.com', 'https://pms.3core21.com'],
+    origin: [
+        'http://localhost:6000', 
+        'http://localhost:4173', 
+        'http://localhost:5002', 
+        'http://45.32.103.210:5002', 
+        'http://localhost', 
+        'https://localhost',  // Capacitor Android WebView origin (for APK)
+        'capacitor://localhost',  // Alternative Capacitor origin
+        'https://pmsapp.3core21.com', 
+        'https://pms.3core21.com'
+    ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
