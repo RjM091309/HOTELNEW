@@ -13,7 +13,10 @@ module.exports = {
         DATABASE_USER: 'root',
       DATABASE_PASS: '2024.3core21',
       DATABASE_NAME: 'hotel',
-      DATABASE_PORT: 3306
+      DATABASE_PORT: 3306,
+      // Google Maps API Key - Get from https://console.cloud.google.com/
+      // VITE_GOOGLE_MAPS_API_KEY: 'YOUR_GOOGLE_MAPS_API_KEY_HERE',
+      // GOOGLE_MAPS_API_KEY: 'YOUR_GOOGLE_MAPS_API_KEY_HERE'
     },
     env_production: {
       NODE_ENV: 'production',
@@ -22,7 +25,10 @@ module.exports = {
       DATABASE_USER: 'root',
       DATABASE_PASS: '2024.3core21',
       DATABASE_NAME: 'hotel',
-      DATABASE_PORT: 3306
+      DATABASE_PORT: 3306,
+      // Google Maps API Key - Get from https://console.cloud.google.com/
+      // VITE_GOOGLE_MAPS_API_KEY: 'YOUR_GOOGLE_MAPS_API_KEY_HERE',
+      // GOOGLE_MAPS_API_KEY: 'YOUR_GOOGLE_MAPS_API_KEY_HERE'
     },
     error_file: './logs/err.log',
     out_file: './logs/out.log',

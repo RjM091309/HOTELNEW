@@ -35,10 +35,16 @@ router.post('/room-control/emergency', RoomController.emergencyRoomControl);
 // Housekeeping integration (no authentication required)
 router.get('/housekeeping/cleaning-status', RoomController.getAllRoomsCleaningStatus);
 router.post('/housekeeping/mark-cleaned', RoomController.markRoomCleaned);
+router.get('/housekeeping/summary', DashboardController.getHousekeepingSummary);
 
 // Booking endpoints (no authentication required - for guest use)
 router.get('/booking/booking_data', BookingController.getBookingDataEnhanced);
 router.post('/booking/get-room-details', BookingController.getRoomDetails);
 router.get('/booking/get-booking-services/:bookingId', BookingController.getBookingServices);
+
+// Dashboard endpoints for housekeeping app (no authentication required)
+router.get('/dashboard/today-checkout', DashboardController.getTodayCheckoutDetails);
+router.get('/dashboard/occupied-rooms-list', DashboardController.getOccupiedRoomsAPI);
+router.get('/dashboard/cleaning-rooms', DashboardController.getCleaningRoomsAPI);
 
 module.exports = router;

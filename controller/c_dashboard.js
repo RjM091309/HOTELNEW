@@ -681,6 +681,111 @@ class DashboardController {
   }
 
   // Get occupied rooms for guest app
+  // Get today checkout details (API endpoint)
+  static async getTodayCheckoutDetails(req, res) {
+    try {
+      const todayCheckedOutDetails = await DashboardModel.getTodayCheckedOutDetails();
+      res.json({
+        success: true,
+        data: todayCheckedOutDetails,
+        message: 'Today checkout details retrieved successfully'
+      });
+    } catch (error) {
+      console.error('Error fetching today checkout details:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch today checkout details',
+        error: error.message
+      });
+    }
+  }
+
+  // Get occupied rooms (API endpoint)
+  static async getOccupiedRoomsAPI(req, res) {
+    try {
+      const roomDetails = await DashboardModel.getRoomDetails();
+      const occupiedRooms = roomDetails.occupied || [];
+      res.json({
+        success: true,
+        data: occupiedRooms,
+        message: 'Occupied rooms retrieved successfully'
+      });
+    } catch (error) {
+      console.error('Error fetching occupied rooms:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch occupied rooms',
+        error: error.message
+      });
+    }
+  }
+
+  // Get cleaning rooms (API endpoint)
+  static async getCleaningRoomsAPI(req, res) {
+    try {
+      const roomDetails = await DashboardModel.getRoomDetails();
+      const cleaningRooms = roomDetails.cleaning || [];
+      res.json({
+        success: true,
+        data: cleaningRooms,
+        message: 'Cleaning rooms retrieved successfully'
+      });
+    } catch (error) {
+      console.error('Error fetching cleaning rooms:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch cleaning rooms',
+        error: error.message
+      });
+    }
+  }
+
+  // Get housekeeping summary (for housekeeping app)
+  static async getHousekeepingSummary(req, res) {
+    try {
+      // Get all required data in parallel
+      const [
+        todayCheckedOutDetails,
+        roomDetails,
+        complaintRequestSummary
+      ] = await Promise.all([
+        DashboardModel.getTodayCheckedOutDetails(),
+        DashboardModel.getRoomDetails(),
+        DashboardModel.getComplaintRequestSummary().catch(() => ({ complaintsPending: 0, requestsPending: 0 }))
+      ]);
+
+      // Count today checkout
+      const todayCheckout = todayCheckedOutDetails ? todayCheckedOutDetails.length : 0;
+
+      // Count occupied rooms
+      const occupied = roomDetails.occupied ? roomDetails.occupied.length : 0;
+
+      // Count cleaning rooms (need cleaning)
+      const needCleaning = roomDetails.cleaning ? roomDetails.cleaning.length : 0;
+
+      // Count special requests (pending complaints + pending requests)
+      const specialRequest = (complaintRequestSummary.complaintsPending || 0) + (complaintRequestSummary.requestsPending || 0);
+
+      res.json({
+        success: true,
+        data: {
+          todayCheckout,
+          occupied,
+          needCleaning,
+          specialRequest
+        },
+        message: 'Housekeeping summary retrieved successfully'
+      });
+    } catch (error) {
+      console.error('Error fetching housekeeping summary:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch housekeeping summary',
+        error: error.message
+      });
+    }
+  }
+
   static async getOccupiedRooms(req, res) {
     try {
       const roomDetails = await DashboardModel.getRoomDetails();

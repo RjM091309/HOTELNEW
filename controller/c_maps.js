@@ -10,16 +10,22 @@ class MapsController {
             const apiKey = process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
             
             if (!apiKey) {
+                console.warn('Google Maps API key is not configured. Set VITE_GOOGLE_MAPS_API_KEY or GOOGLE_MAPS_API_KEY in environment variables.');
                 return res.status(500).json({
                     success: false,
-                    message: 'Google Maps API key is not configured'
+                    message: 'Google Maps API key is not configured. Please set VITE_GOOGLE_MAPS_API_KEY or GOOGLE_MAPS_API_KEY in your environment variables.',
+                    apiKey: null
                 });
             }
 
+            // Return in multiple formats for compatibility
             res.status(200).json({
                 success: true,
+                apiKey: apiKey, // Root level for easier access
+                key: apiKey, // Alternative key name
                 data: {
-                    apiKey: apiKey
+                    apiKey: apiKey,
+                    key: apiKey
                 },
                 message: 'API key retrieved successfully'
             });
@@ -28,7 +34,8 @@ class MapsController {
             res.status(500).json({
                 success: false,
                 message: 'Failed to retrieve API key',
-                error: error.message
+                error: error.message,
+                apiKey: null
             });
         }
     }
