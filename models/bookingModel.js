@@ -1,4 +1,5 @@
 const { queryDatabasePromise, pool } = require('../config/database');
+const CalendarModel = require('./calendarModel');
 
 class BookingModel {
 
@@ -4345,44 +4346,33 @@ class BookingModel {
           
           // Use service ID matching as primary method, with name fallback
           if (service.SERVICE_ID === 74 || (serviceName.includes('adult') && serviceName.includes('breakfast'))) {
-            console.log('✅ Found breakfast adult service');
+            // console.log('✅ Found breakfast adult service');
             groupServices.breakfastAdult = {
               qty: service.QTY,
               price: service.TOTAL_COST,
               id: service.SERVICE_ID
             };
           } else if (service.SERVICE_ID === 75 || (serviceName.includes('kid') && serviceName.includes('breakfast'))) {
-            console.log('✅ Found breakfast kid service');
+            // console.log('✅ Found breakfast kid service');
             groupServices.breakfastKid = {
               qty: service.QTY,
               price: service.TOTAL_COST,
               id: service.SERVICE_ID
             };
           } else if (service.SERVICE_ID === 76 || serviceName.includes('pick')) {
-            console.log('✅ Found pickup service');
+            // console.log('✅ Found pickup service');
             groupServices.pickup = {
               price: service.TOTAL_COST,
               id: service.SERVICE_ID
             };
           } else if (service.SERVICE_ID === 77 || serviceName.includes('drop')) {
-            console.log('✅ Found dropoff service');
+            // console.log('✅ Found dropoff service');
             groupServices.dropoff = {
               price: service.TOTAL_COST,
               id: service.SERVICE_ID
             };
-            console.log('🔍 Set dropoff service:', groupServices.dropoff);
-          } else {
-            console.log('❌ Service not categorized:', serviceName, 'ID:', service.SERVICE_ID);
           }
         }
-      });
-
-      // Debug: Log final group services
-      console.log('🔍 Final group services:', {
-        breakfastAdult: groupServices.breakfastAdult,
-        breakfastKid: groupServices.breakfastKid,
-        pickup: groupServices.pickup,
-        dropoff: groupServices.dropoff
       });
 
       // Detect if breakfast is applied individually
@@ -4453,12 +4443,21 @@ class BookingModel {
     try {
       const query = `
         SELECT
-          IDNo,
-          GROUP_NAME as groupName,
-          CONTACT_NO as groupContact,
-          NUMBER_OF_ROOMS as numberOfRooms
-        FROM group_booking
-        WHERE IDNo = ?
+          gb.IDNo,
+          gb.GROUP_NAME as groupName,
+          gb.CONTACT_NO as groupContact,
+          gb.NUMBER_OF_ROOMS as numberOfRooms,
+          gb.BILLING_TYPE as billingType,
+          gb.REMARKS as remarks,
+          MIN(b.CHECK_IN_DATE) as earliestCheckIn,
+          MAX(b.CHECK_OUT_DATE) as latestCheckOut,
+          COUNT(DISTINCT b.IDNo) as existingBookingCount,
+          GROUP_CONCAT(DISTINCT r.ROOM_NUMBER ORDER BY r.ROOM_NUMBER SEPARATOR ', ') as existingRooms
+        FROM group_booking gb
+        LEFT JOIN booking b ON gb.IDNo = b.GROUP_BOOKING_ID AND b.ACTIVE = 1
+        LEFT JOIN room r ON b.ROOM_ID = r.IDNo
+        WHERE gb.IDNo = ?
+        GROUP BY gb.IDNo, gb.GROUP_NAME, gb.CONTACT_NO, gb.NUMBER_OF_ROOMS, gb.BILLING_TYPE, gb.REMARKS
       `;
 
       const result = await queryDatabasePromise(query, [groupId]);
@@ -4702,10 +4701,11 @@ class BookingModel {
       ]);
 
       // Get existing bookings for this group
-      const existingBookingsQuery = `SELECT IDNo, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE FROM booking WHERE GROUP_BOOKING_ID = ?`;
+      const existingBookingsQuery = `SELECT IDNo, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE FROM booking WHERE GROUP_BOOKING_ID = ? ORDER BY IDNo ASC`;
       const [existingBookings] = await connection.promise().query(existingBookingsQuery, [groupBookingId]);
       const existingRoomIds = existingBookings.map(b => b.ROOM_ID);
-      // Use the earliest/first booking in the group as the anchor booking for consolidated entries
+      // IMPORTANT: Use the ORIGINAL first booking (lowest ID) as the main booking for consolidated entries
+      // This ensures that joined bookings don't become the main booking
       const firstBookingId = existingBookings && existingBookings.length > 0 ? existingBookings[0].IDNo : null;
 
       // Parse new selected rooms - ensure consistent data types
@@ -4719,13 +4719,6 @@ class BookingModel {
       const roomsToAdd = newRoomIds.filter(id => !existingRoomIds.includes(id));
       const roomsToRemove = existingRoomIds.filter(id => !newRoomIds.includes(id));
       const roomsToUpdate = newRoomIds.filter(id => existingRoomIds.includes(id));
-
-      console.log('Room comparison debug:');
-      console.log('Existing room IDs:', existingRoomIds);
-      console.log('New room IDs:', newRoomIds);
-      console.log('Rooms to add:', roomsToAdd);
-      console.log('Rooms to remove:', roomsToRemove);
-      console.log('Rooms to update:', roomsToUpdate);
 
       // Remove bookings for rooms no longer in the group
       if (roomsToRemove.length > 0) {
@@ -4766,6 +4759,9 @@ class BookingModel {
           // Update existing booking
           const existingBooking = existingBookings.find(b => b.ROOM_ID === parseInt(roomId));
           if (existingBooking) {
+            // IMPORTANT: Check if this is the MAIN booking (lowest ID), not just index === 0
+            // The main booking should always be the original first booking (lowest ID), not a joined booking
+            const isMainBooking = existingBooking.IDNo === firstBookingId;
             // Check if this booking has individual dates (different from main date range)
             const individualDates = data.individualBookingDates && data.individualBookingDates[existingBooking.IDNo];
             
@@ -4790,12 +4786,10 @@ class BookingModel {
               // Use dates from form
               finalCheckInDate = individualDates.checkIn;
               finalCheckOutDate = individualDates.checkOut;
-              console.log(`🔄 Using individual dates from form for booking ${existingBooking.IDNo} (Room ${roomId}): ${finalCheckInDate} to ${finalCheckOutDate}`);
             } else if (originallyHadDifferentDates) {
               // Preserve original dates (joined booking)
               finalCheckInDate = existingBooking.CHECK_IN_DATE;
               finalCheckOutDate = existingBooking.CHECK_OUT_DATE;
-              console.log(`🔄 Preserving original dates for joined booking ${existingBooking.IDNo} (Room ${roomId}): ${finalCheckInDate} to ${finalCheckOutDate}`);
             }
             
             // Preserve original time component (hours/min/sec) from existing booking
@@ -4823,6 +4817,9 @@ class BookingModel {
             const datePart = moment(finalCheckInWithTime).format('YYYYMMDD');
             const confirmationNumber = `${datePart}0${roomNumber}`;
 
+            // IMPORTANT: Only main booking (lowest ID) should have remarks
+            // (isMainBooking already declared above)
+            
             // Update booking (use final dates)
             await connection.promise().query(`
               UPDATE booking
@@ -4830,11 +4827,11 @@ class BookingModel {
               WHERE IDNo = ?
             `, [
               finalCheckInWithTime, finalCheckOutWithTime, bookingRoute, checkInStatus, checkOutStatus,
-              index === 0 ? remarks : '', confirmationNumber, encodedBy, date, existingBooking.IDNo
+              isMainBooking ? remarks : '', confirmationNumber, encodedBy, date, existingBooking.IDNo
             ]);
 
-            // Sync remarks to remarks table for the main booking row
-            if (index === 0) {
+            // Sync remarks to remarks table for the main booking row (lowest ID booking)
+            if (isMainBooking) {
               const trimmed = (remarks || '').trim();
               if (trimmed !== '') {
                 // Upsert: if a Booking-category remark exists, update it; otherwise insert
@@ -4873,7 +4870,6 @@ class BookingModel {
               const checkInMoment = moment(individualDates.checkIn);
               const checkOutMoment = moment(individualDates.checkOut);
               finalQty = checkOutMoment.diff(checkInMoment, 'days');
-              console.log(`   Booking ${existingBooking.IDNo} has ${finalQty} nights (from form, different from main ${qty} nights)`);
             } else if (originallyHadDifferentDates) {
               // Calculate actual nights from original dates (joined booking)
               // Re-calculate from existing booking dates to ensure accuracy
@@ -4917,13 +4913,15 @@ class BookingModel {
             
             let roomChargeForBilling, reservationFeeForBilling, discountForBilling;
 
-            if (consolidatedBilling && index === 0) {
-              // Main booking in consolidated billing
+            // IMPORTANT: Use isMainBooking (already declared above) to determine main booking
+            // The main booking should always be the original first booking (lowest ID), not a joined booking
+            if (consolidatedBilling && isMainBooking) {
+              // Main booking in consolidated billing (lowest ID booking)
               // IMPORTANT: Main booking should only include its OWN charge plus other bookings with SAME dates
               // Joined bookings (different dates) should be EXCLUDED from main total
               
               // Get main booking dates for comparison
-              const mainBooking = existingBookings[0];
+              const mainBooking = existingBookings.find(b => b.IDNo === firstBookingId) || existingBookings[0];
               const mainCheckIn = moment(mainBooking ? mainBooking.CHECK_IN_DATE : checkInDate);
               const mainCheckOut = moment(mainBooking ? mainBooking.CHECK_OUT_DATE : checkOutDate);
               
@@ -4942,7 +4940,6 @@ class BookingModel {
                   
                   // If has individual dates, it's a joined booking - SKIP it (has separate billing)
                   if (otherIndividualDates) {
-                    console.log(`   Room ${i + 1} (${newRoomIds[i]}, Booking ${otherBooking.IDNo}): SKIPPED - Joined booking with separate billing`);
                     continue; // Skip joined bookings
                   }
                   
@@ -4955,7 +4952,6 @@ class BookingModel {
                   );
                   
                   if (hasDifferentDates) {
-                    console.log(`   Room ${i + 1} (${newRoomIds[i]}, Booking ${otherBooking.IDNo}): SKIPPED - Different dates (joined booking with separate billing)`);
                     continue; // Skip joined bookings
                   }
                   
@@ -4978,29 +4974,24 @@ class BookingModel {
                     
                     if (originalQty > 0) {
                       perNightPrice = totalPrice / originalQty;
-                      console.log(`   Room ${i + 1}: Total price ₱${totalPrice} ÷ QTY ${originalQty} = ₱${perNightPrice} per night`);
                     }
                   }
                   
                   // Now multiply per-night price by the new nights (qty)
                   const roomCharge = perNightPrice * otherNights;
                   totalRoomCharges += roomCharge;
-                  console.log(`   Room ${i + 1} (${newRoomIds[i]}, Booking ${otherBooking.IDNo}): ₱${perNightPrice} per night × ${otherNights} nights = ₱${roomCharge} (included in main)`);
                 } else {
                   // New booking - include it (assumes same dates as main)
                   // For new bookings, price should be per night (not total)
                   const perNightPrice = newRoomPrices[i] || 0;
                   const roomCharge = perNightPrice * qty;
                   totalRoomCharges += roomCharge;
-                  console.log(`   Room ${i + 1} (${newRoomIds[i]}): ₱${perNightPrice} per night × ${qty} nights = ₱${roomCharge} (new, included)`);
                 }
               }
               
               roomChargeForBilling = totalRoomCharges;
-              console.log(`🔄 CONSOLIDATED - Total Room Charge (excluding joined bookings): ₱${totalRoomCharges}`);
               reservationFeeForBilling = 0; // Reservation fee removed
               discountForBilling = parseFloat(discount) || 0;
-              console.log(`🔄 Room ${index + 1} (Main Booking ${existingBooking.IDNo}): CONSOLIDATED - Room Charge: ₱${roomChargeForBilling}, Fee: ₱${reservationFeeForBilling}, Discount: ₱${discountForBilling}`);
             } else if (consolidatedBilling) {
               // Other bookings in consolidated billing
               // IMPORTANT: Joined bookings (with different dates) should keep their separate billing
@@ -5032,15 +5023,11 @@ class BookingModel {
                 roomChargeForBilling = roomPrice * nightsToUse; // Use actual nights
                 reservationFeeForBilling = 0;
                 discountForBilling = parseFloat(perRoomDiscountsArray[index]) || 0;
-                console.log(`🔄 Room ${index + 1} (Booking ${existingBooking.IDNo}): CONSOLIDATED (Joined - Separate Billing)`);
-                console.log(`   Room Price: ₱${roomPrice}, Nights: ${nightsToUse}, Total: ₱${roomChargeForBilling}`);
-                console.log(`   Discount: ₱${discountForBilling}`);
               } else {
                 // Regular booking in consolidated billing - gets zero charges
                 roomChargeForBilling = 0;
                 reservationFeeForBilling = 0;
                 discountForBilling = 0;
-                console.log(`🔄 Room ${index + 1}: CONSOLIDATED - Room Charge: ₱0, Fee: ₱0, Discount: ₱0`);
               }
             } else {
               // Individual billing - each booking gets its own room charge
@@ -5068,8 +5055,6 @@ class BookingModel {
               ? originalBilling[0].ROOM_CHARGE 
               : roomChargeForBilling;
             
-            console.log(`   Preserving original ROOM_CHARGE: ₱${preservedRoomCharge} (calculated was: ₱${roomChargeForBilling})`);
-            
             // NOTE: We continue to store DISCOUNT_AMOUNT in billing for reporting & summary screens.
             //       Discount is also represented in the payments table as negative rows.
             // IMPORTANT: Use finalQty (actual nights) for bookings with different dates
@@ -5083,7 +5068,18 @@ class BookingModel {
             ]);
 
             // Update customer info for all bookings in the group
-            const guestFullName = index === 0 ? `${groupName}-1-Main` : `${groupName}-${index + 1}`;
+            // IMPORTANT: Only the main booking (lowest ID) should have "-Main" suffix
+            // Joined bookings should keep their original numbering or get sequential numbers
+            // Get the position of this booking in the sorted list to determine numbering
+            const sortedBookings = [...existingBookings].sort((a, b) => a.IDNo - b.IDNo);
+            const bookingPosition = sortedBookings.findIndex(b => b.IDNo === existingBooking.IDNo);
+            
+            // Main booking (lowest ID) gets "-Main" suffix, others get sequential numbers
+            const guestFullName = isMainBooking 
+              ? `${groupName}-Main-1` 
+              : `${groupName}-${bookingPosition + 1}`;
+            
+            
             await connection.promise().query(`
               UPDATE customer
               SET NAME = ?, CONTACTNo = ?, TYPE = ?, LEVEL = ?, ENCODED_BY = ?, ENCODED_DT = ?
@@ -5480,20 +5476,19 @@ class BookingModel {
                 }, 0);
                 remainingPayment -= totalDistributed;
               } else {
-                // For consolidated billing or partial payment, use proportional distribution
-                for (const billing of allBillings) {
-                  if (remainingPayment <= 0) break;
+                // For consolidated billing: ALL payment goes to MAIN booking only
+                // IMPORTANT: In consolidated billing, only the main booking (lowest ID) should receive payments
+                // Joined bookings with separate billing should NOT receive payments
+                const mainBilling = allBillings.find(b => b.BOOKING_ID === firstBookingId);
+                
+                if (mainBilling) {
+                  // IMPORTANT: In consolidated billing, the main booking should accept payment for ALL bookings
+                  // The totalBillingAmount already includes all bookings (main + joined), so use that as the cap
+                  // Main booking gets full discount applied to the total
+                  const mainBillingPayCap = roomTargetBudget; // This already includes all bookings minus discount
                   
-                  const billingAmount = billing.ROOM_CHARGE * billing.QTY;
-                  // Safety check for division by zero (defensive programming)
-                  const proportion = totalBillingAmount > 0 ? (billingAmount / totalBillingAmount) : 0;
-                  // Discount share for this billing
-                  const billingDiscount = discountTotal * proportion;
-                  // Max we intend to pay for this billing (cap after discount)
-                  const billingPayCap = Math.max(billingAmount - billingDiscount, 0);
-                  // Budget share for this billing from remaining room budget
-                  const billingBudgetShare = Math.min(remainingPayment, roomTargetBudget) * proportion;
-                  const roomPaymentAmount = Math.min(billingBudgetShare, billingPayCap);
+                  // Apply all remaining payment to main booking (up to the cap which includes all bookings)
+                  const roomPaymentAmount = Math.min(remainingPayment, mainBillingPayCap);
                   
                   if (roomPaymentAmount > 0) {
                     const roomPaymentQuery = `
@@ -5501,17 +5496,17 @@ class BookingModel {
                       VALUES (?, ?, ?, ?, 'room', ?, ?)
                     `;
                     await connection.promise().query(roomPaymentQuery, [
-                      billing.BOOKING_ID,
-                      billing.IDNo,
+                      mainBilling.BOOKING_ID,
+                      mainBilling.IDNo,
                       roomPaymentAmount,
-              'cash',
-              date,
+                      'cash',
+                      date,
                       encodedBy
                     ]);
                     
                     // Update billing payment status
                     let newStatus;
-                    if (roomPaymentAmount >= billingPayCap && billingPayCap > 0) {
+                    if (roomPaymentAmount >= mainBillingPayCap && mainBillingPayCap > 0) {
                       newStatus = 'paid';
                     } else if (roomPaymentAmount > 0) {
                       newStatus = 'partial';
@@ -5520,12 +5515,20 @@ class BookingModel {
                     }
                     await connection.promise().query(
                       'UPDATE billing SET PAYMENT_STATUS = ? WHERE IDNo = ?',
-                      [newStatus, billing.IDNo]
+                      [newStatus, mainBilling.IDNo]
                     );
                     
                     remainingPayment -= roomPaymentAmount;
-                    console.log(`✅ Room payment of ₱${roomPaymentAmount} recorded for booking ${billing.BOOKING_ID}`);
+                    
+                    // IMPORTANT: For consolidated billing, we'll update all statuses (billing, services, extensions) 
+                    // AFTER all payment distribution is complete (see below after services and extensions)
+                    // The main booking status is already updated above, final status will be updated at the end if fully paid
                   }
+                  
+                  // IMPORTANT: For consolidated billing, joined bookings with separate billing should NOT receive payments
+                  // Their billing records exist for tracking, but payments go to main booking only
+                } else {
+                  console.warn(`⚠️ Warning: Main billing record not found for booking ${firstBookingId}`);
                 }
               }
             }
@@ -5579,8 +5582,6 @@ class BookingModel {
                   );
                   
                   remainingPayment -= servicePaymentAmount;
-                  const isMain = service.BOOKING_ID === firstBookingId ? ' (MAIN)' : '';
-                  console.log(`✅ Service payment of ₱${servicePaymentAmount} recorded for booking ${service.BOOKING_ID}, service ${service.IDNo}${isMain} - Status: ${newStatus}`);
                 }
               }
             }
@@ -5633,13 +5634,134 @@ class BookingModel {
                   );
                   
                   remainingPayment -= extensionPaymentAmount;
-                  const isMain = extension.BOOKING_ID === firstBookingId ? ' (MAIN)' : '';
-                  console.log(`✅ Extended Stay payment of ₱${extensionPaymentAmount} recorded for booking ${extension.BOOKING_ID}, extension ${extension.IDNo}${isMain} - Status: ${newStatus}`);
                 }
               }
             }
             
-            console.log(`✅ Payment distribution completed. Total paid: ₱${paidAmount}, Remaining: ₱${remainingPayment}`);
+            // IMPORTANT: For consolidated billing, apply SAME LOGIC to all (billing, services, extensions)
+            // If fully paid (payment >= total of all bookings), mark ALL as "paid"
+            // Otherwise, keep individual statuses
+            if (!isIndividualBilling && paidAmount > 0) {
+              // Calculate total amount (rooms + services + extensions)
+              const totalServicesAmount = allServices.reduce((sum, s) => sum + parseFloat(s.TOTAL_COST || 0), 0);
+              const totalExtensionsAmount = allExtensions.reduce((sum, e) => sum + (parseFloat(e.COST || 0) * parseInt(e.QTY || 1)), 0);
+              const grandTotal = totalBillingAmount + totalServicesAmount + totalExtensionsAmount - discountTotal;
+              
+              // Check if fully paid
+              const isFullyPaidTotal = paidAmount >= grandTotal;
+              
+              if (isFullyPaidTotal) {
+                // SAME LOGIC: Update ALL billing records (main + joined) to "paid"
+                const allBillingIds = allBillings.map(b => b.IDNo);
+                if (allBillingIds.length > 0) {
+                  const billingPlaceholders = allBillingIds.map(() => '?').join(',');
+                  await connection.promise().query(
+                    `UPDATE billing SET PAYMENT_STATUS = 'paid' WHERE IDNo IN (${billingPlaceholders})`,
+                    allBillingIds
+                  );
+                }
+                
+                // SAME LOGIC: Update ALL services to "paid" (all bookings in group)
+                if (allServices.length > 0) {
+                  const serviceIds = allServices.map(s => s.IDNo);
+                  const servicePlaceholders = serviceIds.map(() => '?').join(',');
+                  await connection.promise().query(
+                    `UPDATE booking_service SET STATUS = 'paid' WHERE IDNo IN (${servicePlaceholders}) AND ACTIVE = 1`,
+                    serviceIds
+                  );
+                }
+                
+                // SAME LOGIC: Update ALL extensions to "paid" (all bookings in group)
+                if (allExtensions.length > 0) {
+                  const extensionIds = allExtensions.map(e => e.IDNo);
+                  const extensionPlaceholders = extensionIds.map(() => '?').join(',');
+                  await connection.promise().query(
+                    `UPDATE booking_extension SET PAYMENT_STATUS = 'paid' WHERE IDNo IN (${extensionPlaceholders}) AND ACTIVE = 1`,
+                    extensionIds
+                  );
+                }
+              } else {
+                // If partial payment, joined bookings remain unpaid (payments go to main booking only)
+                // SAME LOGIC: Update joined bookings' billing, services, and extensions to "unpaid"
+                const joinedBookings = allBookingIds.filter(id => id !== firstBookingId);
+                
+                if (joinedBookings.length > 0) {
+                  const joinedPlaceholders = joinedBookings.map(() => '?').join(',');
+                  
+                  // Update joined bookings' billing to "unpaid"
+                  const joinedBillings = allBillings.filter(b => b.BOOKING_ID !== firstBookingId);
+                  if (joinedBillings.length > 0) {
+                    const joinedBillingIds = joinedBillings.map(b => b.IDNo);
+                    const billingPlaceholders = joinedBillingIds.map(() => '?').join(',');
+                    await connection.promise().query(
+                      `UPDATE billing SET PAYMENT_STATUS = 'unpaid' WHERE IDNo IN (${billingPlaceholders})`,
+                      joinedBillingIds
+                    );
+                  }
+                  
+                  // Update joined bookings' services to "unpaid" (SAME LOGIC)
+                  // IMPORTANT: Only update services that are truly unpaid (not partially paid during distribution)
+                  // Check payment records to see if any payment was made to these services
+                  const joinedServices = allServices.filter(s => s.BOOKING_ID !== firstBookingId);
+                  if (joinedServices.length > 0) {
+                    // Check which services actually received payment during distribution
+                    const [servicePayments] = await connection.promise().query(
+                      `SELECT BOOKING_SERVICE_ID, SUM(AMOUNT_PAID) as total_paid 
+                       FROM payments 
+                       WHERE BOOKING_SERVICE_ID IN (?) 
+                       AND PAYMENT_TYPE = 'service' 
+                       GROUP BY BOOKING_SERVICE_ID`,
+                      [joinedServices.map(s => s.IDNo)]
+                    );
+                    
+                    const paidServiceIds = new Set(servicePayments.map(p => p.BOOKING_SERVICE_ID));
+                    
+                    // Only update services that didn't receive any payment
+                    const unpaidServiceIds = joinedServices
+                      .filter(s => !paidServiceIds.has(s.IDNo))
+                      .map(s => s.IDNo);
+                    
+                    if (unpaidServiceIds.length > 0) {
+                      const servicePlaceholders = unpaidServiceIds.map(() => '?').join(',');
+                      await connection.promise().query(
+                        `UPDATE booking_service SET STATUS = 'unpaid' WHERE IDNo IN (${servicePlaceholders}) AND ACTIVE = 1`,
+                        unpaidServiceIds
+                      );
+                    }
+                  }
+                  
+                  // Update joined bookings' extensions to "unpaid" (SAME LOGIC)
+                  // IMPORTANT: Only update extensions that are truly unpaid (not partially paid during distribution)
+                  const joinedExtensions = allExtensions.filter(e => e.BOOKING_ID !== firstBookingId);
+                  if (joinedExtensions.length > 0) {
+                    // Check which extensions actually received payment during distribution
+                    const [extensionPayments] = await connection.promise().query(
+                      `SELECT BOOKING_EXTENSION_ID, SUM(AMOUNT_PAID) as total_paid 
+                       FROM payments 
+                       WHERE BOOKING_EXTENSION_ID IN (?) 
+                       AND PAYMENT_TYPE = 'extended' 
+                       GROUP BY BOOKING_EXTENSION_ID`,
+                      [joinedExtensions.map(e => e.IDNo)]
+                    );
+                    
+                    const paidExtensionIds = new Set(extensionPayments.map(p => p.BOOKING_EXTENSION_ID));
+                    
+                    // Only update extensions that didn't receive any payment
+                    const unpaidExtensionIds = joinedExtensions
+                      .filter(e => !paidExtensionIds.has(e.IDNo))
+                      .map(e => e.IDNo);
+                    
+                    if (unpaidExtensionIds.length > 0) {
+                      const extensionPlaceholders = unpaidExtensionIds.map(() => '?').join(',');
+                      await connection.promise().query(
+                        `UPDATE booking_extension SET PAYMENT_STATUS = 'unpaid' WHERE IDNo IN (${extensionPlaceholders}) AND ACTIVE = 1`,
+                        unpaidExtensionIds
+                      );
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -9101,17 +9223,28 @@ class BookingModel {
         
         // Verify the group exists and get its billing type
         const [existingGroup] = await connection.promise().query(
-          'SELECT IDNo, NUMBER_OF_ROOMS, BILLING_TYPE FROM group_booking WHERE IDNo = ?',
+          'SELECT IDNo, NUMBER_OF_ROOMS, BILLING_TYPE, GROUP_NAME, CONTACT_NO FROM group_booking WHERE IDNo = ?',
           [existingGroupId]
         );
         
         if (!existingGroup || existingGroup.length === 0) {
-          throw new Error('Existing group not found');
+          throw new Error(`Existing group not found (ID: ${existingGroupId})`);
+        }
+        
+        const existingGroupData = existingGroup[0];
+        
+        // Validate group name and contact match (IMPROVEMENT #3)
+        if (existingGroupData.GROUP_NAME !== groupName) {
+          throw new Error(`Group name mismatch. Expected: "${existingGroupData.GROUP_NAME}", Got: "${groupName}". Please ensure you're joining the correct group.`);
+        }
+        
+        if (existingGroupData.CONTACT_NO !== groupContact) {
+          throw new Error(`Group contact mismatch. Expected: "${existingGroupData.CONTACT_NO}", Got: "${groupContact}". Please ensure you're joining the correct group.`);
         }
         
         // IMPORTANT: Override consolidatedBilling with existing group's billing type
         // BILLING_TYPE: 1 = Master/Consolidated, 0 = Individual
-        const existingBillingType = existingGroup[0].BILLING_TYPE;
+        const existingBillingType = existingGroupData.BILLING_TYPE;
         consolidatedBilling = (existingBillingType === 1);
         
         // If Master Billing, get the master booking ID (first booking in the group)
@@ -9128,14 +9261,7 @@ class BookingModel {
         console.log(`📋 Existing Group Billing Type: ${existingBillingType === 1 ? 'MASTER/CONSOLIDATED' : 'INDIVIDUAL'}`);
         console.log(`📋 Overriding consolidatedBilling to: ${consolidatedBilling}`);
         
-        // Update number of rooms in existing group
-        const newRoomCount = existingGroup[0].NUMBER_OF_ROOMS + parseInt(numberOfRooms, 10);
-        await connection.promise().query(
-          'UPDATE group_booking SET NUMBER_OF_ROOMS = ? WHERE IDNo = ?',
-          [newRoomCount, existingGroupId]
-        );
-        
-        console.log(`✅ Updated room count to ${newRoomCount}`);
+        // NOTE: Room count update moved to AFTER successful booking creation (IMPROVEMENT #2)
       } else {
         // Creating new group - insert new group_booking record
         const groupBookingQuery = `
@@ -9195,6 +9321,80 @@ class BookingModel {
         );
         existingBookingCount = existingBookings[0]?.count || 0;
         console.log(`📊 Existing bookings in group: ${existingBookingCount}`);
+        
+        // IMPROVEMENT #1 & #4: Validate room availability and check for duplicates
+        console.log('🔍 Validating room availability and checking for duplicates...');
+        for (let i = 0; i < roomIds.length; i++) {
+          const roomId = roomIds[i];
+          
+          // Check for duplicate room in same group with overlapping dates (IMPROVEMENT #4)
+          const [duplicateCheck] = await connection.promise().query(
+            `SELECT b.IDNo, b.CHECK_IN_DATE, b.CHECK_OUT_DATE, r.ROOM_NUMBER
+             FROM booking b
+             JOIN room r ON b.ROOM_ID = r.IDNo
+             WHERE b.GROUP_BOOKING_ID = ? 
+               AND b.ROOM_ID = ? 
+               AND b.ACTIVE = 1
+               AND (
+                 (b.CHECK_IN_DATE <= ? AND b.CHECK_OUT_DATE >= ?) OR
+                 (b.CHECK_IN_DATE <= ? AND b.CHECK_OUT_DATE >= ?) OR
+                 (b.CHECK_IN_DATE >= ? AND b.CHECK_OUT_DATE <= ?)
+               )`,
+            [existingGroupId, roomId, checkOutDate, checkInDate, checkInDate, checkOutDate, checkInDate, checkOutDate]
+          );
+          
+          if (duplicateCheck && duplicateCheck.length > 0) {
+            const conflict = duplicateCheck[0];
+            throw new Error(`Duplicate room booking detected: Room ${conflict.ROOM_NUMBER} (ID: ${roomId}) already has a booking in this group (Booking ID: ${conflict.IDNo}) for the selected dates (${checkInDate} to ${checkOutDate}).`);
+          }
+          
+          // Check for room availability conflicts with other bookings (IMPROVEMENT #1)
+          try {
+            const overlaps = await CalendarModel.checkBookingOverlaps(roomId, checkInDate, checkOutDate);
+            
+            if (overlaps && overlaps.length > 0) {
+              // Filter out bookings from the same group (those are handled by duplicate check)
+              const externalConflicts = overlaps.filter(o => {
+                // Check if this booking is from the same group
+                return true; // We'll check this in the query
+              });
+              
+              // Get room number for better error message
+              const [roomInfo] = await connection.promise().query(
+                'SELECT ROOM_NUMBER FROM room WHERE IDNo = ?',
+                [roomId]
+              );
+              const roomNumber = roomInfo && roomInfo.length > 0 ? roomInfo[0].ROOM_NUMBER : `Room ID ${roomId}`;
+              
+              // Check each overlap to see if it's from the same group
+              const conflictDetails = [];
+              for (const overlap of overlaps) {
+                const [bookingGroup] = await connection.promise().query(
+                  'SELECT GROUP_BOOKING_ID FROM booking WHERE IDNo = ?',
+                  [overlap.IDNo]
+                );
+                
+                // Only report conflicts from different groups
+                if (!bookingGroup || bookingGroup.length === 0 || bookingGroup[0].GROUP_BOOKING_ID !== existingGroupId) {
+                  conflictDetails.push(`Booking ${overlap.IDNo} (${overlap.CUSTOMER_NAME})`);
+                }
+              }
+              
+              if (conflictDetails.length > 0) {
+                throw new Error(`Room ${roomNumber} (ID: ${roomId}) is not available for the selected dates (${checkInDate} to ${checkOutDate}). Conflicts with: ${conflictDetails.join(', ')}`);
+              }
+            }
+          } catch (error) {
+            // If it's our custom error, throw it as-is
+            if (error.message.includes('Room') && error.message.includes('not available')) {
+              throw error;
+            }
+            // Otherwise, log and rethrow
+            console.error('Error checking room availability:', error);
+            throw new Error(`Failed to validate room availability for room ${roomId}: ${error.message}`);
+          }
+        }
+        console.log('✅ Room availability validation passed');
       }
 
       // Insert each room booking
@@ -9687,29 +9887,28 @@ class BookingModel {
             }, 0);
             remainingPayment -= totalDistributed;
           } else {
-            // For consolidated billing, use proportional distribution
-            for (const billing of allBillings) {
-              if (remainingPayment <= 0) break;
-
-              const billingAmount = billing.ROOM_CHARGE * billing.QTY;
-              // Safety check for division by zero (defensive programming)
-              const proportion = totalBillingAmount > 0 ? (billingAmount / totalBillingAmount) : 0;
-              // Discount share for this billing
-              const billingDiscount = discountTotal * proportion;
-              // Max we intend to pay for this billing (cap after discount)
-              const billingPayCap = Math.max(billingAmount - billingDiscount, 0);
-              // Budget share for this billing from remaining room budget
-              const billingBudgetShare = Math.min(remainingPayment, roomTargetBudget) * proportion;
-              const roomPaymentAmount = Math.min(billingBudgetShare, billingPayCap);
-
+            // For consolidated billing: ALL payment goes to MAIN booking only
+            // IMPORTANT: In consolidated billing, only the main booking (lowest ID) should receive payments
+            // Other bookings in consolidated billing should NOT receive payments
+            const mainBilling = allBillings.find(b => b.BOOKING_ID === firstBookingId);
+            
+            if (mainBilling) {
+              // IMPORTANT: In consolidated billing, the main booking should accept payment for ALL bookings
+              // The totalBillingAmount already includes all bookings (main + others), so use that as the cap
+              // Main booking gets full discount applied to the total
+              const mainBillingPayCap = roomTargetBudget; // This already includes all bookings minus discount
+              
+              // Apply all remaining payment to main booking (up to the cap which includes all bookings)
+              const roomPaymentAmount = Math.min(remainingPayment, mainBillingPayCap);
+              
               if (roomPaymentAmount > 0) {
                 const roomPaymentQuery = `
                   INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
                   VALUES (?, ?, ?, ?, 'room', NOW(), ?)
                 `;
                 await connection.promise().query(roomPaymentQuery, [
-                  billing.BOOKING_ID,
-                  billing.IDNo,
+                  mainBilling.BOOKING_ID,
+                  mainBilling.IDNo,
                   roomPaymentAmount,
                   'cash',
                   encodedBy
@@ -9717,7 +9916,7 @@ class BookingModel {
                 
                 // Update billing payment status
                 let newStatus;
-                if (roomPaymentAmount >= billingPayCap && billingPayCap > 0) {
+                if (roomPaymentAmount >= mainBillingPayCap && mainBillingPayCap > 0) {
                   newStatus = 'paid';
                 } else if (roomPaymentAmount > 0) {
                   newStatus = 'partial';
@@ -9726,12 +9925,16 @@ class BookingModel {
                 }
                 await connection.promise().query(
                   'UPDATE billing SET PAYMENT_STATUS = ? WHERE IDNo = ?',
-                  [newStatus, billing.IDNo]
+                  [newStatus, mainBilling.IDNo]
                 );
                 
                 remainingPayment -= roomPaymentAmount;
-                console.log(`✅ Room payment of ₱${roomPaymentAmount} recorded for booking ${billing.BOOKING_ID}`);
               }
+              
+              // IMPORTANT: For consolidated billing, other bookings should NOT receive payments
+              // Their billing records exist for tracking, but payments go to main booking only
+            } else {
+              console.warn(`⚠️ Warning: Main billing record not found for booking ${firstBookingId}`);
             }
           }
         }
@@ -9784,13 +9987,153 @@ class BookingModel {
               );
               
               remainingPayment -= servicePaymentAmount;
-              const isMain = service.BOOKING_ID === firstBookingId ? ' (MAIN)' : '';
-              console.log(`✅ Service payment of ₱${servicePaymentAmount} recorded for booking ${service.BOOKING_ID}, service ${service.IDNo}${isMain} - Status: ${newStatus}`);
             }
           }
         }
         
-        console.log(`✅ Payment distribution completed. Total paid: ₱${paidAmountNum}, Remaining: ₱${remainingPayment}`);
+        // IMPORTANT: For consolidated billing, apply SAME LOGIC to all (billing, services, extensions)
+        // If fully paid (payment >= total of all bookings), mark ALL as "paid"
+        // Otherwise, keep individual statuses
+        if (!isIndividualBilling && paidAmountNum > 0) {
+          // Get all extensions for this group (if any)
+          const [allExtensions] = await connection.promise().query(
+            `SELECT IDNo, BOOKING_ID, COST, QTY, PAYMENT_STATUS FROM booking_extension WHERE BOOKING_ID IN (?) AND ACTIVE = 1`,
+            [targetBookingIds.length > 0 ? targetBookingIds : (firstBookingId ? [firstBookingId] : [])]
+          );
+          
+          // Calculate total amount (rooms + services + extensions)
+          const totalServicesAmount = allServices.reduce((sum, s) => sum + parseFloat(s.TOTAL_COST || 0), 0);
+          const totalExtensionsAmount = allExtensions.reduce((sum, e) => sum + (parseFloat(e.COST || 0) * parseInt(e.QTY || 1)), 0);
+          const grandTotal = totalBillingAmount + totalServicesAmount + totalExtensionsAmount - discountTotal;
+          
+          // Check if fully paid
+          const isFullyPaidTotal = paidAmountNum >= grandTotal;
+          
+          if (isFullyPaidTotal) {
+            // SAME LOGIC: Update ALL billing records (main + others) to "paid"
+            const allBillingIds = allBillings.map(b => b.IDNo);
+            if (allBillingIds.length > 0) {
+              const billingPlaceholders = allBillingIds.map(() => '?').join(',');
+                  await connection.promise().query(
+                    `UPDATE billing SET PAYMENT_STATUS = 'paid' WHERE IDNo IN (${billingPlaceholders})`,
+                    allBillingIds
+                  );
+                }
+                
+                // SAME LOGIC: Update ALL services to "paid" (all bookings in group)
+                if (allServices.length > 0) {
+                  const serviceIds = allServices.map(s => s.IDNo);
+                  const servicePlaceholders = serviceIds.map(() => '?').join(',');
+                  await connection.promise().query(
+                    `UPDATE booking_service SET STATUS = 'paid' WHERE IDNo IN (${servicePlaceholders}) AND ACTIVE = 1`,
+                    serviceIds
+                  );
+                }
+                
+                // SAME LOGIC: Update ALL extensions to "paid" (all bookings in group)
+                if (allExtensions.length > 0) {
+                  const extensionIds = allExtensions.map(e => e.IDNo);
+                  const extensionPlaceholders = extensionIds.map(() => '?').join(',');
+                  await connection.promise().query(
+                    `UPDATE booking_extension SET PAYMENT_STATUS = 'paid' WHERE IDNo IN (${extensionPlaceholders}) AND ACTIVE = 1`,
+                    extensionIds
+                  );
+                }
+          } else {
+            // If partial payment, other bookings remain unpaid (payments go to main booking only)
+            // SAME LOGIC: Update other bookings' billing, services, and extensions to "unpaid"
+            const otherBookings = targetBookingIds.filter(id => id !== firstBookingId);
+            
+            if (otherBookings.length > 0) {
+              // Update other bookings' billing to "unpaid"
+              const otherBillings = allBillings.filter(b => b.BOOKING_ID !== firstBookingId);
+              if (otherBillings.length > 0) {
+                const otherBillingIds = otherBillings.map(b => b.IDNo);
+                const billingPlaceholders = otherBillingIds.map(() => '?').join(',');
+                    await connection.promise().query(
+                      `UPDATE billing SET PAYMENT_STATUS = 'unpaid' WHERE IDNo IN (${billingPlaceholders})`,
+                      otherBillingIds
+                    );
+                  }
+                  
+                  // Update other bookings' services to "unpaid" (SAME LOGIC)
+              // IMPORTANT: Only update services that are truly unpaid (not partially paid during distribution)
+              const otherServices = allServices.filter(s => s.BOOKING_ID !== firstBookingId);
+              if (otherServices.length > 0) {
+                // Check which services actually received payment during distribution
+                const [servicePayments] = await connection.promise().query(
+                  `SELECT BOOKING_SERVICE_ID, SUM(AMOUNT_PAID) as total_paid 
+                   FROM payments 
+                   WHERE BOOKING_SERVICE_ID IN (?) 
+                   AND PAYMENT_TYPE = 'service' 
+                   GROUP BY BOOKING_SERVICE_ID`,
+                  [otherServices.map(s => s.IDNo)]
+                );
+                
+                const paidServiceIds = new Set(servicePayments.map(p => p.BOOKING_SERVICE_ID));
+                
+                // Only update services that didn't receive any payment
+                const unpaidServiceIds = otherServices
+                  .filter(s => !paidServiceIds.has(s.IDNo))
+                  .map(s => s.IDNo);
+                
+                if (unpaidServiceIds.length > 0) {
+                  const servicePlaceholders = unpaidServiceIds.map(() => '?').join(',');
+                      await connection.promise().query(
+                        `UPDATE booking_service SET STATUS = 'unpaid' WHERE IDNo IN (${servicePlaceholders}) AND ACTIVE = 1`,
+                        unpaidServiceIds
+                      );
+                    }
+                  }
+                  
+                  // Update other bookings' extensions to "unpaid" (SAME LOGIC)
+              const otherExtensions = allExtensions.filter(e => e.BOOKING_ID !== firstBookingId);
+              if (otherExtensions.length > 0) {
+                // Check which extensions actually received payment during distribution
+                const [extensionPayments] = await connection.promise().query(
+                  `SELECT BOOKING_EXTENSION_ID, SUM(AMOUNT_PAID) as total_paid 
+                   FROM payments 
+                   WHERE BOOKING_EXTENSION_ID IN (?) 
+                   AND PAYMENT_TYPE = 'extended' 
+                   GROUP BY BOOKING_EXTENSION_ID`,
+                  [otherExtensions.map(e => e.IDNo)]
+                );
+                
+                const paidExtensionIds = new Set(extensionPayments.map(p => p.BOOKING_EXTENSION_ID));
+                
+                // Only update extensions that didn't receive any payment
+                const unpaidExtensionIds = otherExtensions
+                  .filter(e => !paidExtensionIds.has(e.IDNo))
+                  .map(e => e.IDNo);
+                
+                if (unpaidExtensionIds.length > 0) {
+                  const extensionPlaceholders = unpaidExtensionIds.map(() => '?').join(',');
+                      await connection.promise().query(
+                        `UPDATE booking_extension SET PAYMENT_STATUS = 'unpaid' WHERE IDNo IN (${extensionPlaceholders}) AND ACTIVE = 1`,
+                        unpaidExtensionIds
+                      );
+                    }
+                  }
+            }
+          }
+        }
+      }
+
+      // IMPROVEMENT #2: Update room count AFTER successful booking creation
+      if (existingGroupId && newBookingIdsInTransaction.length > 0) {
+        const [currentGroup] = await connection.promise().query(
+          'SELECT NUMBER_OF_ROOMS FROM group_booking WHERE IDNo = ?',
+          [existingGroupId]
+        );
+        
+        if (currentGroup && currentGroup.length > 0) {
+          const newRoomCount = currentGroup[0].NUMBER_OF_ROOMS + newBookingIdsInTransaction.length;
+          await connection.promise().query(
+            'UPDATE group_booking SET NUMBER_OF_ROOMS = ? WHERE IDNo = ?',
+            [newRoomCount, existingGroupId]
+          );
+          console.log(`✅ Updated room count to ${newRoomCount} (added ${newBookingIdsInTransaction.length} new booking(s))`);
+        }
       }
 
       // Commit
@@ -9805,7 +10148,22 @@ class BookingModel {
     } catch (err) {
       await new Promise(resolve => connection.rollback(() => resolve()));
       connection.release();
-      throw err;
+      
+      // IMPROVEMENT #7: Better error messages
+      if (err.message.includes('Group name mismatch') || err.message.includes('Group contact mismatch')) {
+        throw err; // Keep specific validation errors as-is
+      } else if (err.message.includes('Duplicate room booking') || err.message.includes('already has a booking')) {
+        throw new Error(`Duplicate booking detected: ${err.message}`);
+      } else if (err.message.includes('not available') || err.message.includes('Conflicts with')) {
+        throw new Error(`Room availability conflict: ${err.message}`);
+      } else if (err.message.includes('validate room availability')) {
+        throw err; // Keep validation errors as-is
+      } else if (err.message.includes('Existing group not found')) {
+        throw err; // Keep as-is
+      } else {
+        console.error('❌ Group booking error:', err);
+        throw new Error(`Failed to ${existingGroupId ? 'join group' : 'create group'} booking: ${err.message || 'Unknown error occurred'}`);
+      }
     }
   }
 

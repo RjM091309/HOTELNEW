@@ -1852,18 +1852,55 @@ function joinExistingGroup(groupId) {
                     $('#groupName').prop('readonly', true).css('background-color', '#2a3135');
                     $('#groupContact').prop('readonly', true).css('background-color', '#2a3135');
                     
+                    // IMPROVEMENT #6: Disable billing type checkbox and show warning
+                    const groupBillingType = groupData.billingType === 1 ? 'Master/Consolidated' : 'Individual';
+                    const billingCheckbox = $('#groupIndividualBilling');
+                    if (billingCheckbox.length) {
+                        // Set checkbox to match group's billing type and disable it
+                        billingCheckbox.prop('checked', groupData.billingType === 0); // 0 = Individual
+                        billingCheckbox.prop('disabled', true);
+                        billingCheckbox.closest('.form-check').css('opacity', '0.6');
+                        
+                        // Add tooltip or note
+                        if (!billingCheckbox.closest('.form-check').find('.billing-type-note').length) {
+                            billingCheckbox.closest('.form-check').append(
+                                `<small class="text-muted d-block mt-1" style="font-size: 0.85em;">
+                                    <i class="fa fa-info-circle"></i> Group uses ${groupBillingType} billing (cannot be changed)
+                                </small>`
+                            );
+                        }
+                    }
+                    
                     // Update modal title to indicate joining
                     $('#modalAddGroupBookingLabel').text('Join Group - Add Booking to Existing Group');
                     
-                    // Show info message
-                    if (!$('#joinGroupInfo').length) {
-                        $('#groupBookingForm').prepend(`
-                            <div id="joinGroupInfo" class="alert alert-info mb-3" style="background-color: rgba(23, 162, 184, 0.2); border: 1px solid #17a2b8; color: #17a2b8;">
-                                <i class="fa fa-info-circle"></i> <strong>Joining Existing Group:</strong> ${groupData.groupName || 'Group'} (${groupData.groupContact || 'N/A'})<br>
-                                <small>You can select different check-in/check-out dates. The booking will be added to this existing group.</small>
+                // Show comprehensive info message (IMPROVEMENT #5)
+                if (!$('#joinGroupInfo').length) {
+                    const billingTypeText = groupData.billingType === 1 ? 'Master/Consolidated' : 'Individual';
+                    const billingTypeIcon = groupData.billingType === 1 ? '📋' : '📝';
+                    const dateRange = groupData.earliestCheckIn && groupData.latestCheckOut 
+                        ? `${new Date(groupData.earliestCheckIn).toLocaleDateString()} - ${new Date(groupData.latestCheckOut).toLocaleDateString()}`
+                        : 'Various dates';
+                    
+                    $('#groupBookingForm').prepend(`
+                        <div id="joinGroupInfo" class="alert alert-info mb-3" style="background-color: rgba(23, 162, 184, 0.2); border: 1px solid #17a2b8; color: #17a2b8;">
+                            <i class="fa fa-info-circle"></i> <strong>Joining Existing Group:</strong> ${groupData.groupName || 'Group'}<br>
+                            <div style="margin-top: 10px; font-size: 0.9em;">
+                                <strong>Group Details:</strong><br>
+                                • Contact: ${groupData.groupContact || 'N/A'}<br>
+                                • Billing Type: ${billingTypeIcon} ${billingTypeText}<br>
+                                • Existing Rooms: ${groupData.numberOfRooms || 0} (${groupData.existingRooms || 'N/A'})<br>
+                                • Existing Bookings: ${groupData.existingBookingCount || 0}<br>
+                                • Date Range: ${dateRange}<br>
+                                ${groupData.remarks ? `• Remarks: ${groupData.remarks}<br>` : ''}
                             </div>
-                        `);
-                    }
+                            <small style="display: block; margin-top: 10px; font-style: italic;">
+                                <i class="fa fa-exclamation-triangle"></i> Your booking will use the group's billing type (${billingTypeText}) automatically. 
+                                You can select different check-in/check-out dates.
+                            </small>
+                        </div>
+                    `);
+                }
                     
                     // Clear the stored data
                     window.joinGroupData = null;

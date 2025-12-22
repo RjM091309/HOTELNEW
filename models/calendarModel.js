@@ -1568,7 +1568,9 @@ class CalendarModel {
   static async checkBookingOverlaps(roomId, checkIn, checkOut, excludeBookingId = null) {
     try {
       const whereClause = excludeBookingId ? 'AND b.IDNo != ?' : '';
-      const params = excludeBookingId ? [roomId, checkIn, checkOut, excludeBookingId] : [roomId, checkIn, checkOut];
+      // Overlap logic: existing booking overlaps if it starts before new booking ends AND ends after new booking starts
+      // So: b.CHECK_IN_DATE < checkOut AND b.CHECK_OUT_DATE > checkIn
+      const params = excludeBookingId ? [roomId, checkOut, checkIn, excludeBookingId] : [roomId, checkOut, checkIn];
       
       const overlaps = await queryDatabasePromise(`
         SELECT 
@@ -1582,7 +1584,6 @@ class CalendarModel {
         WHERE b.ROOM_ID = ?
           AND b.ACTIVE = 1
           AND (
-            (b.CHECK_IN_DATE < ? AND b.CHECK_OUT_DATE > ?) OR
             (b.CHECK_IN_DATE < ? AND b.CHECK_OUT_DATE > ?)
           )
           ${whereClause}
