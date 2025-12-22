@@ -106,7 +106,8 @@ $(document).ready(function () {
             { targets: 10, width: '70px', className: 'text-center' },
             { targets: 11, width: '70px', className: 'text-center' },
             { targets: 12, width: '100px', className: 'text-center' }, // Created By
-            { targets: 13, width: '120px', className: 'text-center' }  // Action
+            { targets: 13, width: '100px', className: 'text-center' }, // Edited By
+            { targets: 14, width: '120px', className: 'text-center' }  // Action
         ],
         initComplete: function () {
             $('#booking_tbl thead th').addClass('text-center');
@@ -199,16 +200,16 @@ $(document).ready(function () {
                 data: 'CreatedBy',
                 title: 'CREATED BY',
                 className: 'text-center',
-                render: function (data, type, row) {
-                    const createdBy = data || 'System';
-                    const editedBy = row.EditedBy;
-                    
-                    // If booking was edited, show "CREATOR | EDITOR"
-                    if (editedBy && editedBy !== 'System') {
-                        return `${createdBy} | ${editedBy}`;
-                    }
-                    // Otherwise, just show creator
-                    return createdBy;
+                render: function (data) {
+                    return data || 'System';
+                }
+            },
+            {
+                data: 'EditedBy',
+                title: 'EDITED BY',
+                className: 'text-center',
+                render: function (data) {
+                    return data || '-';
                 }
             },
             {

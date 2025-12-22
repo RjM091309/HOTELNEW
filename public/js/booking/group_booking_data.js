@@ -135,16 +135,16 @@ $(document).ready(function () {
                 data: 'CreatedBy',
                 title: 'CREATED BY',
                 className: 'text-center',
-                render: function (data, type, row) {
-                    const createdBy = data || 'System';
-                    const editedBy = row.EditedBy;
-                    
-                    // If group booking was edited, show "CREATOR | EDITOR"
-                    if (editedBy && editedBy !== 'System') {
-                        return `${createdBy} | ${editedBy}`;
-                    }
-                    // Otherwise, just show creator
-                    return createdBy;
+                render: function (data) {
+                    return data || 'System';
+                }
+            },
+            {
+                data: 'EditedBy',
+                title: 'EDITED BY',
+                className: 'text-center',
+                render: function (data) {
+                    return data || '-';
                 }
             },
             {
@@ -276,7 +276,12 @@ $(document).ready(function () {
                 className: 'text-center'
             },
             {
-                targets: 11, // ACTION
+                targets: 11, // EDITED BY
+                width: '100px',
+                className: 'text-center'
+            },
+            {
+                targets: 12, // ACTION
                 width: '100px',
                 className: 'text-center'
             }
