@@ -62,7 +62,9 @@ $(document).ready(function () {
                         IsCancelled: isCancelled,
                         IsDirectReservation: item.IS_DIRECT_RESERVATION,
                         BookingRemarks: item.BookingRemarks || '',
-                        RemarksCount: item.RemarksCount || 0
+                        RemarksCount: item.RemarksCount || 0,
+                        CreatedBy: item.ENCODED_BY_NAME || 'System',
+                        EditedBy: item.EDITED_BY_NAME || null
                     };
                 });
             },
@@ -81,7 +83,8 @@ $(document).ready(function () {
             { targets: 9,  width: '70px', className: 'text-center' },                    // Booking Channel
             { targets: 10, width: '70px', className: 'text-center' }, // Payment Status
             { targets: 11, width: '70px', className: 'text-center' }, // Booking Status
-            { targets: 12, width: '120px', className: 'text-center' }  // Action
+            { targets: 12, width: '100px', className: 'text-center' }, // Created By
+            { targets: 13, width: '120px', className: 'text-center' }  // Action
         ],
         initComplete: function () {
             $('#booking_tbl thead th').addClass('text-center');
@@ -277,7 +280,25 @@ $(document).ready(function () {
                 }
             },
             {
+                data: 'CreatedBy',
+                title: 'CREATED BY',
                 className: 'text-center',
+                render: function (data, type, row) {
+                    const createdBy = data || 'System';
+                    const editedBy = row.EditedBy;
+                    
+                    // If booking was edited, show "CREATOR | EDITOR"
+                    if (editedBy && editedBy !== 'System') {
+                        return `${createdBy} | ${editedBy}`;
+                    }
+                    // Otherwise, just show creator
+                    return createdBy;
+                }
+            },
+            {
+                title: 'ACTION',
+                className: 'text-center',
+                orderable: false,
                 render: function (data, type, row) {
                 const paymentStatus = row.Paymentstatus.toLowerCase();
                 const bookingStatus = row.BookingStatus?.toLowerCase(); // safe check

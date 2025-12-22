@@ -63,6 +63,7 @@
                             <th class="text-center">BOOKING CHANNEL</th>
                             <th class="text-center">PAYMENT STATUS</th>
                             <th class="text-center">BOOKING STATUS</th>
+                            <th class="text-center">CREATED BY</th>
                             <th class="text-center">ACTION</th>
                         </tr>
                         </thead>
@@ -344,14 +345,16 @@ $(document).ready(function () {
                         BookingChannel: item.BOOKING_CHANNEL,
                         Status: getStatusLabel(item.BookingStatus, item.BookingID),
                         BookingStatus: item.BookingStatus,
-                        IsDirectReservation: item.IS_DIRECT_RESERVATION
+                        IsDirectReservation: item.IS_DIRECT_RESERVATION,
+                        CreatedBy: item.ENCODED_BY_NAME || 'System',
+                        EditedBy: item.EDITED_BY_NAME || null
                     };
                 });
             },
         },
         columnDefs: [
             // Center-aligned columns
-            { targets: [1,3,4,5,6,7,10,11,12,13], className: 'text-center' },
+            { targets: [1,3,4,5,6,7,10,11,12,13,14], className: 'text-center' },
             // Right-align money columns
             { targets: [8,9], className: 'text-end' }
         ],
@@ -442,7 +445,25 @@ $(document).ready(function () {
             }
         },
         {
+            data: 'CreatedBy',
+            title: 'CREATED BY',
             className: 'text-center',
+            render: function (data, type, row) {
+                const createdBy = data || 'System';
+                const editedBy = row.EditedBy;
+                
+                // If booking was edited, show "CREATOR | EDITOR"
+                if (editedBy && editedBy !== 'System') {
+                    return `${createdBy} | ${editedBy}`;
+                }
+                // Otherwise, just show creator
+                return createdBy;
+            }
+        },
+        {
+            title: 'ACTION',
+            className: 'text-center',
+            orderable: false,
             render: function (data, type, row) {
                 const paymentStatus = row.Paymentstatus.toLowerCase();
                 const bookingStatus = row.BookingStatus?.toLowerCase(); // safe check

@@ -83,7 +83,9 @@ $(document).ready(function () {
                         BookingStatus: item.BookingStatus,
                         IsDirectReservation: item.IS_DIRECT_RESERVATION,
                         BookingRemarks: item.BookingRemarks || '',
-                        RemarksCount: item.RemarksCount || 0
+                        RemarksCount: item.RemarksCount || 0,
+                        CreatedBy: item.ENCODED_BY_NAME || 'System',
+                        EditedBy: item.EDITED_BY_NAME || null
                     };
                 });
                 return mapped.filter(row => (parseFloat(row.Balance) || 0) > 0);
@@ -103,7 +105,8 @@ $(document).ready(function () {
             { targets: 9,  width: '70px', className: 'text-center' },
             { targets: 10, width: '70px', className: 'text-center' },
             { targets: 11, width: '70px', className: 'text-center' },
-            { targets: 12, width: '120px', className: 'text-center' }
+            { targets: 12, width: '100px', className: 'text-center' }, // Created By
+            { targets: 13, width: '120px', className: 'text-center' }  // Action
         ],
         initComplete: function () {
             $('#booking_tbl thead th').addClass('text-center');
@@ -193,7 +196,25 @@ $(document).ready(function () {
                 render: function (data) { return data; }
             },
             {
+                data: 'CreatedBy',
+                title: 'CREATED BY',
                 className: 'text-center',
+                render: function (data, type, row) {
+                    const createdBy = data || 'System';
+                    const editedBy = row.EditedBy;
+                    
+                    // If booking was edited, show "CREATOR | EDITOR"
+                    if (editedBy && editedBy !== 'System') {
+                        return `${createdBy} | ${editedBy}`;
+                    }
+                    // Otherwise, just show creator
+                    return createdBy;
+                }
+            },
+            {
+                title: 'ACTION',
+                className: 'text-center',
+                orderable: false,
                 render: function (data, type, row) {
                     const bookingStatus = row.BookingStatus?.toLowerCase();
                     const isDirect = String(row.IsDirectReservation) === '1';

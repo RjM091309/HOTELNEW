@@ -67,7 +67,8 @@
             <th style="text-align: center;">BALANCE</th>
             <th style="text-align: center;">PAYMENT STATUS</th>
             <th style="text-align: center;">PAYMENT METHOD</th>
-            <th style="text-align: center;">BOOKING DATE</th>
+            <th style="text-align: center;">PAYMENT DATE</th>
+            <th style="text-align: center;">PROCESSED BY</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -133,6 +134,11 @@
           data: 'LAST_PAYMENT_DATE', 
           className: 'center', 
           render: d => d ? new Date(d).toLocaleString('en-US') : '' 
+        },
+        { 
+          data: 'PROCESSED_BY_NAME', 
+          className: 'center',
+          render: d => d || ''
         }
       ],
       order: [[11, 'desc']],

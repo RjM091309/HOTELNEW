@@ -28,7 +28,9 @@ $(document).ready(function () {
                         Status: item.STATUS_OVERVIEW,
                         TotalPayment: item.TOTAL_PAYMENT,
                         TotalPaid: item.TOTAL_PAID,
-                        PaymentStatus: item.PAYMENT_STATUS
+                        PaymentStatus: item.PAYMENT_STATUS,
+                        CreatedBy: item.ENCODED_BY_NAME || 'System',
+                        EditedBy: item.EDITED_BY_NAME || null
                     };
                 });
             },
@@ -130,7 +132,22 @@ $(document).ready(function () {
                 }
             },
             {
-                data: '',
+                data: 'CreatedBy',
+                title: 'CREATED BY',
+                className: 'text-center',
+                render: function (data, type, row) {
+                    const createdBy = data || 'System';
+                    const editedBy = row.EditedBy;
+                    
+                    // If group booking was edited, show "CREATOR | EDITOR"
+                    if (editedBy && editedBy !== 'System') {
+                        return `${createdBy} | ${editedBy}`;
+                    }
+                    // Otherwise, just show creator
+                    return createdBy;
+                }
+            },
+            {
                 title: 'ACTION',
                 orderable: false,
                 render: function (data, type, row) {
@@ -254,7 +271,12 @@ $(document).ready(function () {
                 className: 'text-center'
             },
             {
-                targets: 10, // ACTION
+                targets: 10, // CREATED BY
+                width: '100px',
+                className: 'text-center'
+            },
+            {
+                targets: 11, // ACTION
                 width: '100px',
                 className: 'text-center'
             }
