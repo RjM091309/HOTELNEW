@@ -356,8 +356,48 @@ document.addEventListener('DOMContentLoaded', function() {
         removeBtn.className = 'btn btn-sm btn-danger btn-remove-chat-id';
         removeBtn.innerHTML = '<i class="material-icons" style="vertical-align: middle; font-size: 16px;">delete</i>';
         removeBtn.onclick = function() {
-            chatIdDiv.remove();
-            updateChatIdRequired();
+            // Check if there's at least one Chat ID remaining
+            const remainingInputs = document.querySelectorAll('.chat-id-input');
+            if (remainingInputs.length <= 1) {
+                showError('At least one Chat ID is required');
+                return;
+            }
+            
+            // Get the Chat ID value for confirmation message
+            const chatIdValue = input.value.trim() || 'this Chat ID';
+            
+            // Show SweetAlert confirmation
+            Swal.fire({
+                title: 'Delete Chat ID?',
+                html: `Are you sure you want to delete Chat ID: <strong>${chatIdValue}</strong>?<br><br>This action cannot be undone.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, delete it!',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Remove from DOM
+                    chatIdDiv.remove();
+                    updateChatIdRequired();
+                    
+                    // Auto-save if bot token exists
+                    const botToken = document.getElementById('botToken').value.trim();
+                    if (botToken) {
+                        autoSaveChatIds();
+                    }
+                    
+                    // Show success message
+                    Swal.fire({
+                        title: 'Deleted!',
+                        text: 'Chat ID has been deleted.',
+                        icon: 'success',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                }
+            });
         };
         
         chatIdDiv.appendChild(input);
@@ -405,6 +445,49 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('btnAddChatId').addEventListener('click', function() {
         addChatIdInput();
     });
+
+    // Auto-save Chat IDs when deleted (silent save)
+    function autoSaveChatIds() {
+        const botToken = document.getElementById('botToken').value.trim();
+        const chatIds = getAllChatIds();
+
+        if (!botToken) {
+            // Can't save without bot token, but that's okay - user will save manually
+            return;
+        }
+
+        if (chatIds.length === 0) {
+            // Shouldn't happen due to validation, but just in case
+            return;
+        }
+
+        // Save silently without showing loading state
+        fetch('/telegram/config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                botToken: botToken,
+                chatIds: chatIds
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Successfully saved - reload config to ensure sync
+                loadCurrentConfig();
+            } else {
+                console.error('Failed to auto-save Chat IDs:', data.message);
+                // Don't show error to user, they can manually save if needed
+            }
+        })
+        .catch(error => {
+            console.error('Error auto-saving Chat IDs:', error);
+            // Don't show error to user, they can manually save if needed
+        });
+    }
 
     function saveConfiguration() {
         const botToken = document.getElementById('botToken').value.trim();

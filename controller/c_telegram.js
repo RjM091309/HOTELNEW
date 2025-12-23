@@ -304,6 +304,13 @@ class TelegramController {
             }
 
             const telegramService = new TelegramService(config.BOT_TOKEN);
+            
+            // Stop polling if it's running (webhook and polling can't work together)
+            if (isPolling) {
+                stopPolling();
+                console.log('Stopped polling because webhook is being set');
+            }
+            
             const result = await telegramService.setWebhook(webhookUrl);
             
             // Webhook is set via Telegram API, no need to save in database
@@ -336,6 +343,13 @@ class TelegramController {
             const result = await telegramService.deleteWebhook();
             
             // Webhook deleted via Telegram API, no need to update database
+            
+            // Start polling if webhook is deleted (for testing without webhook)
+            if (result.success && !isPolling) {
+                startPolling().catch(err => {
+                    console.error('Failed to start polling after webhook deletion:', err);
+                });
+            }
 
             res.json({ 
                 success: result.success, 
@@ -438,6 +452,27 @@ class TelegramController {
             if (!config || !config.BOT_TOKEN) {
                 console.error('Telegram bot not configured');
                 return;
+            }
+
+            // Prevent duplicate processing by checking message ID
+            let messageId = null;
+            if (update.message) {
+                messageId = `msg_${update.message.message_id}_${update.message.chat.id}`;
+            } else if (update.callback_query) {
+                messageId = `cb_${update.callback_query.id}`;
+            } else if (update.edited_message) {
+                messageId = `edit_${update.edited_message.message_id}_${update.edited_message.chat.id}`;
+            }
+
+            // Skip if already processed
+            if (messageId && processedMessageIds.has(messageId)) {
+                console.log(`Skipping duplicate update: ${messageId}`);
+                return;
+            }
+
+            // Mark as processed
+            if (messageId) {
+                processedMessageIds.add(messageId);
             }
 
             const telegramService = new TelegramService(config.BOT_TOKEN);
@@ -1277,6 +1312,17 @@ let pollingInterval = null;
 let lastUpdateId = 0;
 let isPolling = false;
 
+// Track processed message IDs to prevent duplicate processing
+const processedMessageIds = new Set();
+const MESSAGE_ID_CLEANUP_INTERVAL = 60000; // Clean up after 1 minute
+
+// Clean up old message IDs periodically
+setInterval(() => {
+    if (processedMessageIds.size > 1000) {
+        processedMessageIds.clear();
+    }
+}, MESSAGE_ID_CLEANUP_INTERVAL);
+
 /**
  * Start polling for Telegram updates (for testing without webhook)
  */
@@ -1291,9 +1337,16 @@ async function startPolling() {
             return;
         }
 
-        isPolling = true;
-
         const telegramService = new TelegramService(config.BOT_TOKEN);
+        
+        // Check if webhook is already set - if yes, don't start polling
+        const webhookInfo = await telegramService.getWebhookInfo();
+        if (webhookInfo.success && webhookInfo.data && webhookInfo.data.url) {
+            console.log('Webhook is already set, skipping polling to avoid duplicate messages');
+            return;
+        }
+
+        isPolling = true;
 
         // Delete any existing webhook first (polling and webhook can't work together)
         await telegramService.deleteWebhook();
