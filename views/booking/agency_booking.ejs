@@ -259,8 +259,16 @@ if (typeof window.editDirect === 'undefined') {
                     // Remove active class from all predefined filter buttons
                     $('.filter-btn').removeClass('active');
                     
+                    // Build URL with highlight parameter if present
+                    let customUrl = `/booking/booking_data?filter=custom&scope=${scope}&dateFrom=${dateFrom}&dateTo=${dateTo}`;
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const highlightId = urlParams.get('highlight');
+                    if (highlightId && String(highlightId) !== '0' && String(highlightId) !== '') {
+                        customUrl += `&highlight=${highlightId}`;
+                    }
+                    
                     // Update the DataTable's AJAX URL with custom date range
-                    $('#agency_booking_tbl').DataTable().ajax.url(`/booking/booking_data?filter=custom&scope=${scope}&dateFrom=${dateFrom}&dateTo=${dateTo}`).load();
+                    $('#agency_booking_tbl').DataTable().ajax.url(customUrl).load();
                     
                     // Close the calendar after applying filter with a small delay
                     setTimeout(() => {
@@ -292,8 +300,16 @@ if (typeof window.editDirect === 'undefined') {
             // Get the filter value
             let filter = $(this).data('filter');
             
+            // Build URL with highlight parameter if present
+            const urlParams = new URLSearchParams(window.location.search);
+            const highlightId = urlParams.get('highlight');
+            let filterUrl = `/booking/booking_data?filter=${filter}&scope=${scope}`;
+            if (highlightId && String(highlightId) !== '0' && String(highlightId) !== '') {
+                filterUrl += `&highlight=${highlightId}`;
+            }
+            
             // Update the DataTable's AJAX URL
-            $('#agency_booking_tbl').DataTable().ajax.url(`/booking/booking_data?filter=${filter}&scope=${scope}`).load();
+            $('#agency_booking_tbl').DataTable().ajax.url(filterUrl).load();
         });
         
         // Handle clear date filter
@@ -304,8 +320,16 @@ if (typeof window.editDirect === 'undefined') {
             $('.filter-btn').removeClass('active');
             $('.filter-btn[data-filter="agency_all"]').addClass('active');
             
+            // Build URL with highlight parameter if present
+            const urlParams = new URLSearchParams(window.location.search);
+            const highlightId = urlParams.get('highlight');
+            let clearUrl = `/booking/booking_data?filter=agency_all&scope=${scope}`;
+            if (highlightId && String(highlightId) !== '0' && String(highlightId) !== '') {
+                clearUrl += `&highlight=${highlightId}`;
+            }
+            
             // Update the DataTable's AJAX URL
-            $('#agency_booking_tbl').DataTable().ajax.url(`/booking/booking_data?filter=agency_all&scope=${scope}`).load();
+            $('#agency_booking_tbl').DataTable().ajax.url(clearUrl).load();
         });
     });
 </script>
@@ -314,12 +338,22 @@ if (typeof window.editDirect === 'undefined') {
 
 <script>
 $(document).ready(function () {
+    // Get highlight parameter from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const highlightId = urlParams.get('highlight');
+    
+    // Build initial URL with highlight parameter if present
+    let initialUrl = '/booking/booking_data?filter=agency_all&scope=agency';
+    if (highlightId && String(highlightId) !== '0' && String(highlightId) !== '') {
+        initialUrl += `&highlight=${highlightId}`;
+    }
+    
     let table = $('#agency_booking_tbl').DataTable({
         rowId: 'BookingID',
         processing: true,
         serverSide: true,
         ajax: {
-            url: '/booking/booking_data?filter=agency_all',
+            url: initialUrl,
             type: 'GET',
             dataSrc: function (json) {
                 return json.data.map(item => {
@@ -536,21 +570,37 @@ $('.filter-btn').on('click', function () {
     
     let filter = $(this).data('filter');
     
-    table.ajax.url(`/booking/booking_data?filter=${filter}`).load();
+    // Build URL with highlight parameter if present
+    let url = `/booking/booking_data?filter=${filter}&scope=agency`;
+    if (highlightId && String(highlightId) !== '0' && String(highlightId) !== '') {
+        url += `&highlight=${highlightId}`;
+    }
+    
+    table.ajax.url(url).load();
 });
 
-// Handle URL highlight parameter
+// Handle URL highlight parameter - highlight the row when table is drawn
 ;(function(){
     const params = new URLSearchParams(window.location.search);
     const highlightId = params.get('highlight');
     if (!highlightId) return;
 
-    table.search(highlightId).draw(false);
-
+    // Highlight the row when table is drawn (server-side filtering already applied)
     table.on('draw', () => {
         const row = table.row('#' + highlightId).node();
-        if (row) $(row).addClass('highlight-checkout');
+        if (row) {
+            $(row).addClass('highlight-checkout');
+            // Scroll to the highlighted row
+            $('html, body').animate({
+                scrollTop: $(row).offset().top - 100
+            }, 500);
+        }
     });
+    
+    // Trigger initial highlight after table loads
+    setTimeout(() => {
+        table.draw(false);
+    }, 100);
 })();
 
 });
@@ -662,11 +712,26 @@ function showVoucherDetails(bookingID) {
                     discountAmountRow.style.display = 'none';
                 }
                 
-                const totalBalance = data.totalBalance || 0;
-                document.getElementById('voucher-total-balance').textContent = `PHP ${parseFloat(totalBalance).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
-
+                // Set total amount
                 const grandTotal = (parseFloat(data.total || 0));
-                document.getElementById('voucher-grand-total').textContent = `PHP ${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                const totalAmountEl = document.getElementById('voucher-total-amount');
+                if (totalAmountEl) {
+                    totalAmountEl.textContent = `PHP ${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                }
+                
+                // Set paid amount
+                const totalPaid = (parseFloat(data.totalPaid || 0));
+                const paidAmountEl = document.getElementById('voucher-paid-amount');
+                if (paidAmountEl) {
+                    paidAmountEl.textContent = `PHP ${totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                }
+                
+                // Set balance
+                const totalBalance = data.totalBalance || data.balance || 0;
+                const balanceEl = document.getElementById('voucher-balance');
+                if (balanceEl) {
+                    balanceEl.textContent = `PHP ${parseFloat(totalBalance).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                }
 
                 document.getElementById('modal-voucher-details').setAttribute('data-booking-id', bookingID);
                 

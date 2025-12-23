@@ -229,16 +229,29 @@ class BookingController {
           groupCondition = `AND b.GROUP_BOOKING_ID IS NULL`;
         }
       } else if (scope === 'all') {
-        // All tab: show non-group bookings plus one representative row per group
-        groupCondition = `AND (b.GROUP_BOOKING_ID IS NULL OR b.IDNo = (
-          SELECT MIN(b2.IDNo)
-          FROM booking b2
-          WHERE b2.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID
-        ))`;
+        // All tab: show ALL individual bookings (both non-group and all bookings in groups)
+        // No group filtering - show all individual bookings
+        groupCondition = '';
       } else if (scope === 'agency') {
-        // Agency tab: only agency bookings
-        groupCondition = `AND b.GROUP_BOOKING_ID IS NULL`;
+        // Agency tab: only agency bookings (including group agency bookings)
+        // Show ALL individual bookings (both non-group and all bookings in groups)
         channelCondition = `AND b.BOOKING_CHANNEL = 'agency'`;
+        
+        // If highlight parameter is provided, filter to show only that specific booking
+        if (highlightBookingId && highlightBookingId !== '0' && highlightBookingId !== '') {
+          const bookingIdInt = parseInt(highlightBookingId, 10);
+          if (!isNaN(bookingIdInt) && bookingIdInt > 0) {
+            // Show only this specific booking (even if it's part of a group)
+            groupCondition = `AND b.IDNo = ${bookingIdInt}`;
+          } else {
+            // Default: show all bookings (no group filtering - show all individual bookings)
+            groupCondition = '';
+          }
+        } else {
+          // Default: show all bookings (no group filtering - show all individual bookings)
+          // This means all agency bookings will show, including all individual bookings in groups
+          groupCondition = '';
+        }
       } else {
         groupCondition = '';
       }

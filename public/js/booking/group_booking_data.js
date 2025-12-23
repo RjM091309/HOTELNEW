@@ -592,8 +592,23 @@ $('#change_status').submit(function (e) {
 
 // VIEW SINGLE BOOKING FROM GROUP BOOKING
 function viewSingleBooking(bookingId) {
-    // Navigate to single booking page with highlight parameter
-    window.open(`/booking?highlight=${bookingId}`, '_blank');
+    // Check if booking is agency booking first
+    fetch(`/booking/booking_details/${bookingId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data && data.BOOKING_CHANNEL === 'agency') {
+                // Navigate to agency booking page if it's an agency booking
+                window.open(`/booking/agency?highlight=${bookingId}`, '_blank');
+            } else {
+                // Navigate to single booking page for non-agency bookings
+                window.open(`/booking?highlight=${bookingId}`, '_blank');
+            }
+        })
+        .catch(error => {
+            console.error('Error checking booking channel:', error);
+            // On error, default to single booking page
+            window.open(`/booking?highlight=${bookingId}`, '_blank');
+        });
 }
 
 // SHOW GROUP BOOKING DETAILS MODAL

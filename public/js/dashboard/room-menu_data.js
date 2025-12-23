@@ -7173,31 +7173,67 @@ function updateBillingPaymentStatus(bookingId) {
 
 // Function to view full booking details (redirect to booking page)
 function viewFullBookingDetails(bookingId) {
-    // Detect if this booking belongs to a group; prefer payments group-breakdown for accurate groupId
-    fetch(`/payments/group-breakdown/${bookingId}`)
+    // First check if booking is an agency booking
+    fetch(`/booking/booking_details/${bookingId}`)
         .then(function(res){
             return res && res.ok ? res.json() : null;
         })
-        .then(function(resp){
-            var isGroup = !!(resp && (resp.success || resp.isGroup) && resp.isGroup);
-            var groupId = isGroup ? (resp.groupId || resp.GROUP_ID || resp.group_id) : null;
-            
-            // If it's a group booking, show as individual booking in single booking page
-            // This will use individual calculation for TOTAL_PAYMENT and BALANCE
-            // The highlight parameter will trigger useIndividualCalculation flag in backend
-            if (isGroup && groupId && String(groupId) !== '0') {
-                // Option 1: View as single booking with individual amounts
-                window.open(`/booking?highlight=${bookingId}`, '_blank');
-                // Option 2: If you want to view group booking page instead, uncomment below:
-                // window.open(`/booking/group?highlight=${groupId}`, '_blank');
+        .then(function(bookingData){
+            // Check if it's an agency booking
+            if (bookingData && bookingData.BOOKING_CHANNEL === 'agency') {
+                // Navigate to agency booking page if it's an agency booking
+                window.open(`/booking/agency?highlight=${bookingId}`, '_blank');
                 return;
             }
-            // For non-group bookings, view as single booking
-            window.open(`/booking?highlight=${bookingId}`, '_blank');
+            
+            // If not agency, check if it's a group booking
+            fetch(`/payments/group-breakdown/${bookingId}`)
+                .then(function(res){
+                    return res && res.ok ? res.json() : null;
+                })
+                .then(function(resp){
+                    var isGroup = !!(resp && (resp.success || resp.isGroup) && resp.isGroup);
+                    var groupId = isGroup ? (resp.groupId || resp.GROUP_ID || resp.group_id) : null;
+                    
+                    // If it's a group booking, show as individual booking in single booking page
+                    // This will use individual calculation for TOTAL_PAYMENT and BALANCE
+                    // The highlight parameter will trigger useIndividualCalculation flag in backend
+                    if (isGroup && groupId && String(groupId) !== '0') {
+                        // Option 1: View as single booking with individual amounts
+                        window.open(`/booking?highlight=${bookingId}`, '_blank');
+                        // Option 2: If you want to view group booking page instead, uncomment below:
+                        // window.open(`/booking/group?highlight=${groupId}`, '_blank');
+                        return;
+                    }
+                    // For non-group bookings, view as single booking
+                    window.open(`/booking?highlight=${bookingId}`, '_blank');
+                })
+                .catch(function(){
+                    // On error, still try to view as single booking
+                    window.open(`/booking?highlight=${bookingId}`, '_blank');
+                });
         })
-        .catch(function(){
-            // On error, still try to view as single booking
-            window.open(`/booking?highlight=${bookingId}`, '_blank');
+        .catch(function(error){
+            console.error('Error checking booking channel:', error);
+            // On error, check for group booking as fallback
+            fetch(`/payments/group-breakdown/${bookingId}`)
+                .then(function(res){
+                    return res && res.ok ? res.json() : null;
+                })
+                .then(function(resp){
+                    var isGroup = !!(resp && (resp.success || resp.isGroup) && resp.isGroup);
+                    var groupId = isGroup ? (resp.groupId || resp.GROUP_ID || resp.group_id) : null;
+                    
+                    if (isGroup && groupId && String(groupId) !== '0') {
+                        window.open(`/booking?highlight=${bookingId}`, '_blank');
+                        return;
+                    }
+                    window.open(`/booking?highlight=${bookingId}`, '_blank');
+                })
+                .catch(function(){
+                    // Final fallback: try to view as single booking
+                    window.open(`/booking?highlight=${bookingId}`, '_blank');
+                });
         });
 }
 
