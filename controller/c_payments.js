@@ -89,16 +89,29 @@ const paymentsController = {
 
   salesSummary: async (req, res) => {
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const startOfWeek = new Date();
+      // Use local dates (hindi UTC) para tama ang Daily/Weekly/Monthly
+      const todayDate = new Date();
+
+      const formatDate = (d) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${dd}`;
+      };
+
+      const todayStr = formatDate(todayDate);
+
+      const startOfWeek = new Date(todayDate);
       startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
+      const weekStartStr = formatDate(startOfWeek);
+
+      const startOfMonth = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1);
+      const monthStartStr = formatDate(startOfMonth);
 
       const { daily, weekly, monthly } = await paymentsModel.salesSummary(
-        today,
-        startOfWeek.toISOString().split('T')[0],
-        startOfMonth.toISOString().split('T')[0]
+        todayStr,
+        weekStartStr,
+        monthStartStr
       );
 
       res.json({
