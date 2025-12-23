@@ -48,7 +48,9 @@ const paymentsModel = {
       LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
       LEFT JOIN room r ON r.IDNo = b.ROOM_ID
       LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
-      WHERE b.ACTIVE = 1 ${searchCondition}
+      WHERE b.ACTIVE = 1 
+      AND (SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE != 'discount') > 0
+      ${searchCondition}
     `;
     const [countResult] = await pool.promise().query(countQuery, searchParams);
     return countResult[0].total;
@@ -98,7 +100,9 @@ const paymentsModel = {
         ) latest ON p.IDNo = latest.MAX_ID
       ) lp ON lp.BOOKING_ID = b.IDNo
       LEFT JOIN user_info u ON u.IDNo = lp.ENCODED_BY
-      WHERE b.ACTIVE = 1 ${searchCondition}
+      WHERE b.ACTIVE = 1 
+      AND (SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE != 'discount') > 0
+      ${searchCondition}
       ORDER BY ${orderBy} ${orderDir}
       LIMIT ? OFFSET ?
     `;
@@ -120,17 +124,20 @@ const paymentsModel = {
     const [daily] = await pool.promise().query(
       `SELECT SUM(${sumExpr}) AS dailyTotal, SUM(COALESCE(${paidExpr}, 0)) AS dailyPaid
        FROM booking b LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
-       WHERE DATE(b.ENCODED_DT) = ? AND b.ACTIVE = 1`, [todayStr]);
+       WHERE DATE(b.ENCODED_DT) = ? AND b.ACTIVE = 1 
+       AND (SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE != 'discount') > 0`, [todayStr]);
 
     const [weekly] = await pool.promise().query(
       `SELECT SUM(${sumExpr}) AS weeklyTotal, SUM(COALESCE(${paidExpr}, 0)) AS weeklyPaid
        FROM booking b LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
-       WHERE DATE(b.ENCODED_DT) >= ? AND b.ACTIVE = 1`, [weekStartStr]);
+       WHERE DATE(b.ENCODED_DT) >= ? AND b.ACTIVE = 1 
+       AND (SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE != 'discount') > 0`, [weekStartStr]);
 
     const [monthly] = await pool.promise().query(
       `SELECT SUM(${sumExpr}) AS monthlyTotal, SUM(COALESCE(${paidExpr}, 0)) AS monthlyPaid
        FROM booking b LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
-       WHERE DATE(b.ENCODED_DT) >= ? AND b.ACTIVE = 1`, [monthStartStr]);
+       WHERE DATE(b.ENCODED_DT) >= ? AND b.ACTIVE = 1 
+       AND (SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE != 'discount') > 0`, [monthStartStr]);
 
     return {
       daily: daily[0] || {},
