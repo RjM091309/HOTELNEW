@@ -3460,6 +3460,7 @@ class BookingModel {
 
         // Step 7: If this booking is part of a group with Master Billing, 
         // sync payment_status for all group members to match the current booking's status
+        // IMPORTANT: Exclude joined bookings with separate billing (different dates)
         // Get GROUP_BOOKING_ID from the booking
         const groupIdQuery = `
           SELECT b.GROUP_BOOKING_ID, gb.BILLING_TYPE
@@ -3498,11 +3499,12 @@ class BookingModel {
             const currentPaymentStatus = currentBillingRows[0].PAYMENT_STATUS;
             const currentPaymentMethod = currentBillingRows[0].PAYMENT_METHOD;
             
-            // Get all booking IDs in the same group
+            // Get all bookings in the same group with their dates to identify joined bookings
             const allGroupBookingsQuery = `
-              SELECT IDNo 
+              SELECT IDNo, CHECK_IN_DATE, CHECK_OUT_DATE
               FROM booking 
               WHERE GROUP_BOOKING_ID = ? AND ACTIVE = 1
+              ORDER BY IDNo ASC
             `;
             const allGroupBookingsRows = await new Promise((resolve, reject) => {
               connection.query(allGroupBookingsQuery, [groupBookingId], (err, rows) => {
@@ -3510,23 +3512,59 @@ class BookingModel {
                 else resolve(rows);
               });
             });
-            const allGroupBookingIds = allGroupBookingsRows.map(b => b.IDNo);
             
-            // Update all billing records for all bookings in the group to match current booking's payment_status
-            // This ensures all group members have the same payment_status for Master Billing
-            if (allGroupBookingIds.length > 0) {
-              await new Promise((resolve, reject) => {
-                connection.query(
-                  `UPDATE billing 
-                   SET PAYMENT_STATUS = ?, PAYMENT_METHOD = ? 
-                   WHERE BOOKING_ID IN (?)`,
-                  [currentPaymentStatus, currentPaymentMethod, allGroupBookingIds],
-                  (err) => {
-                    if (err) reject(err);
-                    else resolve();
-                  }
+            if (allGroupBookingsRows && allGroupBookingsRows.length > 0) {
+              // Get main booking (first booking - lowest ID)
+              const mainBooking = allGroupBookingsRows[0];
+              const mainCheckIn = mainBooking.CHECK_IN_DATE ? new Date(mainBooking.CHECK_IN_DATE).toISOString().split('T')[0] : null;
+              const mainCheckOut = mainBooking.CHECK_OUT_DATE ? new Date(mainBooking.CHECK_OUT_DATE).toISOString().split('T')[0] : null;
+              
+              // Check if current booking is a joined booking with SEPARATE BILLING (different dates from main)
+              // IMPORTANT: If joined booking has SAME dates as main, it should SYNC (not separate billing)
+              const currentBookingRow = allGroupBookingsRows.find(b => b.IDNo === bookingId);
+              
+              if (!currentBookingRow) {
+                // Current booking not found in group - skip sync
+              } else {
+                const currentCheckIn = currentBookingRow.CHECK_IN_DATE ? new Date(currentBookingRow.CHECK_IN_DATE).toISOString().split('T')[0] : null;
+                const currentCheckOut = currentBookingRow.CHECK_OUT_DATE ? new Date(currentBookingRow.CHECK_OUT_DATE).toISOString().split('T')[0] : null;
+                const isCurrentBookingJoinedWithSeparateBilling = (
+                  currentCheckIn !== mainCheckIn || currentCheckOut !== mainCheckOut
                 );
-              });
+                
+                // If current booking is a joined booking with DIFFERENT dates (separate billing), DON'T sync
+                // If current booking has SAME dates as main (even if joined later), it SHOULD sync
+                if (isCurrentBookingJoinedWithSeparateBilling) {
+                  // Joined booking with separate billing - don't sync
+                } else {
+                // Current booking is main or has same dates as main - sync to all bookings with same dates
+                // This includes: main booking + any joined bookings with same dates
+                // Filter out only joined bookings with DIFFERENT dates (separate billing)
+                const bookingsToSync = allGroupBookingsRows.filter(b => {
+                  const bookingCheckIn = b.CHECK_IN_DATE ? new Date(b.CHECK_IN_DATE).toISOString().split('T')[0] : null;
+                  const bookingCheckOut = b.CHECK_OUT_DATE ? new Date(b.CHECK_OUT_DATE).toISOString().split('T')[0] : null;
+                  return bookingCheckIn === mainCheckIn && bookingCheckOut === mainCheckOut;
+                });
+                
+                const bookingIdsToSync = bookingsToSync.map(b => b.IDNo);
+                
+                // Update billing records only for bookings with same dates (exclude joined bookings)
+                if (bookingIdsToSync.length > 0) {
+                  await new Promise((resolve, reject) => {
+                    connection.query(
+                      `UPDATE billing 
+                       SET PAYMENT_STATUS = ?, PAYMENT_METHOD = ? 
+                       WHERE BOOKING_ID IN (?)`,
+                      [currentPaymentStatus, currentPaymentMethod, bookingIdsToSync],
+                      (err) => {
+                        if (err) reject(err);
+                        else resolve();
+                      }
+                    );
+                  });
+                }
+              }
+              }
             }
           }
         }
@@ -3887,6 +3925,7 @@ class BookingModel {
 
       // If this booking is part of a group with Master Billing, 
       // sync payment_status for all group members to match the current booking's status
+      // IMPORTANT: Exclude joined bookings with separate billing (different dates)
       // Get GROUP_BOOKING_ID and BILLING_TYPE from the booking
       const groupIdQuery = `
         SELECT b.GROUP_BOOKING_ID, gb.BILLING_TYPE
@@ -3901,24 +3940,61 @@ class BookingModel {
       if (groupIdResult && groupIdResult.length > 0 && groupIdResult[0].GROUP_BOOKING_ID && groupIdResult[0].BILLING_TYPE === 1) {
         const groupBookingId = groupIdResult[0].GROUP_BOOKING_ID;
         
-        // Get all booking IDs in the same group
+        // Get all bookings in the same group with their dates to identify joined bookings
         const allGroupBookingsQuery = `
-          SELECT IDNo 
+          SELECT IDNo, CHECK_IN_DATE, CHECK_OUT_DATE
           FROM booking 
           WHERE GROUP_BOOKING_ID = ? AND ACTIVE = 1
+          ORDER BY IDNo ASC
         `;
         const allGroupBookings = await queryDatabasePromise(allGroupBookingsQuery, [groupBookingId]);
-        const allGroupBookingIds = allGroupBookings.map(b => b.IDNo);
         
-        // Update all billing records for all bookings in the group to match current booking's payment_status
-        // This ensures all group members have the same payment_status for Master Billing
-        if (allGroupBookingIds.length > 0) {
-          const updateGroupBillingQuery = `
-            UPDATE billing 
-            SET PAYMENT_STATUS = ? 
-            WHERE BOOKING_ID IN (?)
-          `;
-          await queryDatabasePromise(updateGroupBillingQuery, [status, allGroupBookingIds]);
+        if (allGroupBookings && allGroupBookings.length > 0) {
+          // Get main booking (first booking - lowest ID)
+          const mainBooking = allGroupBookings[0];
+          const mainCheckIn = mainBooking.CHECK_IN_DATE ? new Date(mainBooking.CHECK_IN_DATE).toISOString().split('T')[0] : null;
+          const mainCheckOut = mainBooking.CHECK_OUT_DATE ? new Date(mainBooking.CHECK_OUT_DATE).toISOString().split('T')[0] : null;
+          
+          // Check if current booking is a joined booking with SEPARATE BILLING (different dates from main)
+          // IMPORTANT: If joined booking has SAME dates as main, it should SYNC (not separate billing)
+          const currentBookingRow = allGroupBookings.find(b => b.IDNo === bookingId);
+          
+          if (!currentBookingRow) {
+            // Current booking not found in group - skip sync
+          } else {
+            const currentCheckIn = currentBookingRow.CHECK_IN_DATE ? new Date(currentBookingRow.CHECK_IN_DATE).toISOString().split('T')[0] : null;
+            const currentCheckOut = currentBookingRow.CHECK_OUT_DATE ? new Date(currentBookingRow.CHECK_OUT_DATE).toISOString().split('T')[0] : null;
+            const isCurrentBookingJoinedWithSeparateBilling = (
+              currentCheckIn !== mainCheckIn || currentCheckOut !== mainCheckOut
+            );
+            
+            // If current booking is a joined booking with DIFFERENT dates (separate billing), DON'T sync
+            // If current booking has SAME dates as main (even if joined later), it SHOULD sync
+            if (isCurrentBookingJoinedWithSeparateBilling) {
+              // Joined booking with separate billing - don't sync
+            } else {
+            // Current booking is main or has same dates as main - sync to all bookings with same dates
+            // This includes: main booking + any joined bookings with same dates
+            // Filter out only joined bookings with DIFFERENT dates (separate billing)
+            const bookingsToSync = allGroupBookings.filter(b => {
+              const bookingCheckIn = b.CHECK_IN_DATE ? new Date(b.CHECK_IN_DATE).toISOString().split('T')[0] : null;
+              const bookingCheckOut = b.CHECK_OUT_DATE ? new Date(b.CHECK_OUT_DATE).toISOString().split('T')[0] : null;
+              return bookingCheckIn === mainCheckIn && bookingCheckOut === mainCheckOut;
+            });
+            
+            const bookingIdsToSync = bookingsToSync.map(b => b.IDNo);
+            
+            // Update billing records only for bookings with same dates (exclude joined bookings)
+            if (bookingIdsToSync.length > 0) {
+              const updateGroupBillingQuery = `
+                UPDATE billing 
+                SET PAYMENT_STATUS = ? 
+                WHERE BOOKING_ID IN (?)
+              `;
+              await queryDatabasePromise(updateGroupBillingQuery, [status, bookingIdsToSync]);
+            }
+            }
+          }
         }
       }
 
@@ -6409,6 +6485,7 @@ class BookingModel {
 
       // Update payment_status for all group members when main booking payment_status is updated
       // Only for Master Billing (BILLING_TYPE = 1)
+      // IMPORTANT: Exclude joined bookings with separate billing (different dates)
       // Get the main booking ID (first booking in the array)
       const mainBookingId = bookingIDs[0];
       
@@ -6426,37 +6503,71 @@ class BookingModel {
       if (groupIdResult && groupIdResult.length > 0 && groupIdResult[0].GROUP_BOOKING_ID && groupIdResult[0].BILLING_TYPE === 1) {
         const groupBookingId = groupIdResult[0].GROUP_BOOKING_ID;
         
-        // Get all booking IDs in the same group
+        // Get all bookings in the same group with their dates to identify joined bookings
         const allGroupBookingsQuery = `
-          SELECT IDNo 
+          SELECT IDNo, CHECK_IN_DATE, CHECK_OUT_DATE
           FROM booking 
           WHERE GROUP_BOOKING_ID = ? AND ACTIVE = 1
+          ORDER BY IDNo ASC
         `;
         const allGroupBookings = await queryDatabasePromise(allGroupBookingsQuery, [groupBookingId], connection);
-        const allGroupBookingIds = allGroupBookings.map(b => b.IDNo);
         
-        // Get the payment_status of the main booking's billing record
-        const mainBillingQuery = `
-          SELECT PAYMENT_STATUS, PAYMENT_METHOD 
-          FROM billing 
-          WHERE BOOKING_ID = ? 
-          ORDER BY IDNo DESC 
-          LIMIT 1
-        `;
-        const mainBillingResult = await queryDatabasePromise(mainBillingQuery, [mainBookingId], connection);
-        
-        if (mainBillingResult && mainBillingResult.length > 0) {
-          const mainPaymentStatus = mainBillingResult[0].PAYMENT_STATUS;
-          const mainPaymentMethod = mainBillingResult[0].PAYMENT_METHOD;
+        if (allGroupBookings && allGroupBookings.length > 0) {
+          // Get main booking (first booking - lowest ID)
+          const mainBooking = allGroupBookings[0];
+          const mainCheckIn = mainBooking.CHECK_IN_DATE ? new Date(mainBooking.CHECK_IN_DATE).toISOString().split('T')[0] : null;
+          const mainCheckOut = mainBooking.CHECK_OUT_DATE ? new Date(mainBooking.CHECK_OUT_DATE).toISOString().split('T')[0] : null;
           
-          // Update all billing records for all bookings in the group to match main booking's payment_status
-          if (allGroupBookingIds.length > 0) {
-            const updateGroupBillingQuery = `
-              UPDATE billing 
-              SET PAYMENT_STATUS = ?, PAYMENT_METHOD = ? 
-              WHERE BOOKING_ID IN (?)
+          // Check if any of the bookings being paid are joined bookings with SEPARATE BILLING (different dates from main)
+          // IMPORTANT: If joined booking has SAME dates as main, it should SYNC (not separate billing)
+          const paidBookingsHaveSeparateBilling = bookingIDs.some(paidBookingId => {
+            const paidBookingRow = allGroupBookings.find(b => b.IDNo === paidBookingId);
+            if (!paidBookingRow) return false;
+            const paidCheckIn = paidBookingRow.CHECK_IN_DATE ? new Date(paidBookingRow.CHECK_IN_DATE).toISOString().split('T')[0] : null;
+            const paidCheckOut = paidBookingRow.CHECK_OUT_DATE ? new Date(paidBookingRow.CHECK_OUT_DATE).toISOString().split('T')[0] : null;
+            return paidCheckIn !== mainCheckIn || paidCheckOut !== mainCheckOut;
+          });
+          
+          // If any paid booking has DIFFERENT dates (separate billing), DON'T sync to main and other bookings
+          // If all paid bookings have SAME dates as main (even if joined later), they SHOULD sync
+          if (paidBookingsHaveSeparateBilling) {
+            // Joined booking(s) with separate billing - don't sync
+          } else {
+            // All paid bookings have same dates as main - sync to all bookings with same dates
+            // This includes: main booking + any joined bookings with same dates
+            // Filter out only joined bookings with DIFFERENT dates (separate billing)
+            const bookingsToSync = allGroupBookings.filter(b => {
+              const bookingCheckIn = b.CHECK_IN_DATE ? new Date(b.CHECK_IN_DATE).toISOString().split('T')[0] : null;
+              const bookingCheckOut = b.CHECK_OUT_DATE ? new Date(b.CHECK_OUT_DATE).toISOString().split('T')[0] : null;
+              return bookingCheckIn === mainCheckIn && bookingCheckOut === mainCheckOut;
+            });
+            
+            const bookingIdsToSync = bookingsToSync.map(b => b.IDNo);
+            
+            // Get the payment_status of the main booking's billing record
+            const mainBillingQuery = `
+              SELECT PAYMENT_STATUS, PAYMENT_METHOD 
+              FROM billing 
+              WHERE BOOKING_ID = ? 
+              ORDER BY IDNo DESC 
+              LIMIT 1
             `;
-            await queryDatabasePromise(updateGroupBillingQuery, [mainPaymentStatus, mainPaymentMethod, allGroupBookingIds], connection);
+            const mainBillingResult = await queryDatabasePromise(mainBillingQuery, [mainBookingId], connection);
+            
+            if (mainBillingResult && mainBillingResult.length > 0) {
+              const mainPaymentStatus = mainBillingResult[0].PAYMENT_STATUS;
+              const mainPaymentMethod = mainBillingResult[0].PAYMENT_METHOD;
+              
+              // Update billing records only for bookings with same dates (exclude joined bookings)
+              if (bookingIdsToSync.length > 0) {
+                const updateGroupBillingQuery = `
+                  UPDATE billing 
+                  SET PAYMENT_STATUS = ?, PAYMENT_METHOD = ? 
+                  WHERE BOOKING_ID IN (?)
+                `;
+                await queryDatabasePromise(updateGroupBillingQuery, [mainPaymentStatus, mainPaymentMethod, bookingIdsToSync], connection);
+              }
+            }
           }
         }
       }
