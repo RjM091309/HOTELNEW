@@ -166,6 +166,31 @@ function setupSocketEvents(io) {
         });
         
         // ========================================
+        // GPS TRACKER EVENTS
+        // ========================================
+        
+        // Join GPS tracking room for a specific device
+        socket.on('join-gps-tracking', (data) => {
+            const deviceId = data.deviceId;
+            if (deviceId) {
+                socket.join(`gps-device-${deviceId}`);
+                console.log(`📍 Client ${socket.id} joined GPS tracking for device ${deviceId}`);
+            }
+        });
+        
+        // Leave GPS tracking room
+        socket.on('leave-gps-tracking', (data) => {
+            const deviceId = data.deviceId;
+            if (deviceId) {
+                socket.leave(`gps-device-${deviceId}`);
+                console.log(`📍 Client ${socket.id} left GPS tracking for device ${deviceId}`);
+            }
+        });
+        
+        // Listen for GPS location updates (broadcasted from controller)
+        // This is handled automatically when GPS tracker sends data to the endpoint
+        
+        // ========================================
         // DISCONNECTION HANDLER
         // ========================================
         

@@ -22,6 +22,7 @@ const agencyRoutes = require('./r_agency');
 const apiRoutes = require('./r_api');
 const updatesRoutes = require('./r_updates');
 const mapsRoutes = require('./r_maps');
+const gpsTrackerRoutes = require('./r_gps_tracker');
 
 // Auth middleware
 const AuthMiddleware = require('../middleware/m_auth');
@@ -30,6 +31,7 @@ const AuthMiddleware = require('../middleware/m_auth');
 router.use('/', loginRoutes);
 router.use('/api', apiRoutes);
 router.use('/api/maps', mapsRoutes);
+router.use('/api/gps-tracker', gpsTrackerRoutes);
 router.use('/updates', updatesRoutes);
 
 // Telegram webhook endpoint (public - Telegram needs to access this)

@@ -130,7 +130,7 @@ class VehicleController {
       }
 
       try {
-        const { modelName, vehicleType, color, plateNumber, fuelType, remarks } = req.body;
+        const { modelName, vehicleType, color, plateNumber, fuelType, remarks, gpsDeviceId } = req.body;
         
         if (!modelName || !vehicleType || !color || !plateNumber || !fuelType) {
           return res.status(400).json({
@@ -149,6 +149,7 @@ class VehicleController {
           plateNumber,
           fuelType,
           remarks,
+          gpsDeviceId: gpsDeviceId || null,
           vehiclePhoto,
           encodedBy: req.user ? req.user.userId : req.session.userId
         };
@@ -189,7 +190,7 @@ class VehicleController {
       }
 
       try {
-        const { vehicleId, modelName, vehicleType, color, plateNumber, fuelType, remarks } = req.body;
+        const { vehicleId, modelName, vehicleType, color, plateNumber, fuelType, remarks, gpsDeviceId } = req.body;
         
         if (!vehicleId || !modelName || !vehicleType || !color || !plateNumber || !fuelType) {
           return res.status(400).json({
@@ -217,6 +218,7 @@ class VehicleController {
           plateNumber,
           fuelType,
           remarks,
+          gpsDeviceId: gpsDeviceId || null,
           vehiclePhoto,
           editedBy: req.user ? req.user.userId : req.session.userId
         };

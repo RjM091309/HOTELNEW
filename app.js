@@ -109,6 +109,15 @@ setupSocketEvents(io);
 // Make io available to routes
 app.set('io', io);
 
+// ========================================
+// GPS TRACKER TCP SERVER
+// ========================================
+// TCP Socket is more accurate and reliable for GPS trackers
+// ST903 devices work better with TCP for real-time tracking
+const { startGpsTrackerTcpServer } = require('./services/gpsTrackerTcpServer');
+const GPS_TRACKER_TCP_PORT = process.env.GPS_TRACKER_TCP_PORT || 8090;
+startGpsTrackerTcpServer(io, GPS_TRACKER_TCP_PORT);
+
 // Error handling middleware
 app.use((req, res, next) => {
     res.status(404).render('error/404', {

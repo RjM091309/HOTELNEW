@@ -1,0 +1,110 @@
+<!-- ======================================== -->
+<!-- VEHICLE MONITORING PAGE -->
+<!-- ======================================== -->
+
+<!-- Main Content Area -->
+<div class="row">
+    <div class="col-xl-12 col-md-12 col-12">
+        <div class="dashboard-card">
+            <div class="dashboard-card-header">
+                <header>Vehicle Monitoring - Real-time GPS Tracking</header>
+                <div class="tools">
+                    <button type="button" class="btn btn-primary-10 btn-sm" id="refreshBtn">
+                        <i class="fa fa-refresh"></i> Refresh
+                    </button>
+                    <button type="button" class="btn btn-success btn-sm" id="autoRefreshBtn">
+                        <i class="fa fa-play"></i> Auto Refresh
+                    </button>
+                </div>
+            </div>
+            <div class="dashboard-card-body">
+                
+                <!-- Vehicle List Sidebar -->
+                <div class="row">
+                    <div class="col-lg-4 col-md-12">
+                        <div class="dashboard-card">
+                            <div class="dashboard-card-header">
+                                <header>Vehicles</header>
+                            </div>
+                            <div class="dashboard-card-body" style="max-height: 600px; overflow-y: auto;">
+                                <div id="vehicleList">
+                                    <p class="text-center text-muted">Loading vehicles...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Map Container -->
+                    <div class="col-lg-8 col-md-12">
+                        <div class="dashboard-card">
+                            <div class="dashboard-card-header">
+                                <header>Map View</header>
+                            </div>
+                            <div class="dashboard-card-body">
+                                <div id="map" style="width: 100%; height: 600px; border-radius: 4px; display: flex; align-items: center; justify-content: center;">
+                                    <div class="text-center">
+                                        <i class="fa fa-spinner fa-spin fa-3x text-primary"></i>
+                                        <p class="mt-3">Loading map...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Vehicle Info Modal -->
+<div class="modal fade" id="vehicleInfoModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">Vehicle Information</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="vehicleInfoContent">
+                <!-- Vehicle info will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="viewHistoryBtn">View History</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Load vehicle monitoring script and initialize
+document.addEventListener('DOMContentLoaded', function() {
+    // Load the script first
+    var monitoringScript = document.createElement('script');
+    monitoringScript.src = '/js/vehicle/vehicle-monitoring.js';
+    monitoringScript.onload = function() {
+        // Wait a bit for script to fully initialize
+        setTimeout(function() {
+            if (typeof initMap === 'function') {
+                console.log('Initializing map...');
+                initMap();
+            } else {
+                console.error('initMap function not found');
+                var mapDiv = document.getElementById('map');
+                if (mapDiv) {
+                    mapDiv.innerHTML = '<div class="alert alert-danger">Error: Map initialization function not found. Please check browser console for errors.</div>';
+                }
+            }
+        }, 300);
+    };
+    monitoringScript.onerror = function() {
+        console.error('Failed to load vehicle-monitoring.js');
+        var mapDiv = document.getElementById('map');
+        if (mapDiv) {
+            mapDiv.innerHTML = '<div class="alert alert-danger">Error: Failed to load map script. Please refresh the page.</div>';
+        }
+    };
+    document.body.appendChild(monitoringScript);
+});
+</script>
+

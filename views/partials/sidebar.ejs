@@ -166,12 +166,27 @@
 					</a>
 				</li>
 				
-				<li class="nav-item <%= activePage === 'vehicle' ? 'active' : '' %>">
-					<a href="/vehicle" class="nav-link ">
-						<span class="title">Vehicle </span>
+				<li class="nav-item <%= activePage === 'vehicle' ? 'open' : '' %>">
+					<a class="nav-link nav-toggle nav-main-link-submenu" data-toggle="submenu" aria-haspopup="true"
+						aria-expanded="<%= activePage === 'vehicle' ? 'true' : 'false' %>" href="#">
 						<i class="material-icons">directions_car</i>
-						<span class="selected"></span>
+						<span class="title">Vehicle</span>
+						<span class="arrow <%= activePage === 'vehicle' ? 'open' : '' %>"></span>
 					</a>
+					<ul class="sub-menu <%= activePage === 'vehicle' ? 'show' : '' %>" <% if (activePage === 'vehicle') { %>style="display: block;"<% } %>>
+						<li class="nav-item">
+							<a class="nav-link" href="/vehicle">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Vehicle Management</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link" href="/vehicle/monitoring">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Vehicle Monitoring</span>
+							</a>
+						</li>
+					</ul>
 				</li>
 				
 				<li class="nav-item <%= activePage === 'agency' ? 'active' : '' %>">
