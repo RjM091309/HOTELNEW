@@ -8,6 +8,7 @@ let vehicleData = {};
 let gpsDevicesData = {};
 let isFirstMapLoad = true; // Track if this is the first time loading markers
 let currentInfoWindow = null; // Track the currently open InfoWindow
+let infoWindows = {}; // Store InfoWindow instances for each marker
 
 // Format date to Philippines timezone (Asia/Manila, UTC+8)
 // Note: The `timestamp` field from GPS device is in UTC
@@ -618,7 +619,7 @@ function updateMapMarkers() {
                 // Update existing marker position smoothly
                 markers[vehicle.id].setPosition(position);
                 markers[vehicle.id].setIcon({
-                    url: '/img/gpsmarker.png',
+                    url: vehicle.isOnline ? '/img/gpsmarker-1.png' : '/img/gpsmarker.png',
                     scaledSize: new google.maps.Size(48, 48),
                     labelOrigin: new google.maps.Point(24, 60)
                 });
@@ -645,60 +646,16 @@ function updateMapMarkers() {
                     className: 'vehicle-marker-label'
                 },
                 icon: {
-                    url: '/img/gpsmarker.png',
+                    url: vehicle.isOnline ? '/img/gpsmarker-1.png' : '/img/gpsmarker.png',
                     scaledSize: new google.maps.Size(48, 48),
                     labelOrigin: new google.maps.Point(24, 60) // Position label below marker
                 },
                 animation: useDropAnimation ? google.maps.Animation.DROP : null
             });
             
-            // Create info window with improved layout
-            const infoWindowId = `infoWindow_${vehicle.id}`;
+            // Create info window using helper function
             const infoWindow = new google.maps.InfoWindow({
-                content: `
-                    <div id="${infoWindowId}" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 280px; max-width: 320px; border: none; box-shadow: none;">
-                        <div style="background: #ffffff; padding: 14px 16px; margin: -8px -8px 0 -8px; border-radius: 8px 8px 0 0;">
-                            <h4 style="margin: 0; color: #000; font-size: 17px; font-weight: 600; letter-spacing: 0.3px;">${vehicle.modelName}</h4>
-                        </div>
-                        <div style="padding: 12px 16px; background: #fff;">
-                            <div style="display: flex; align-items: center; padding: 10px 0;">
-                                <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Plate Number:</span>
-                                <span style="font-weight: 600; color: #111827; font-size: 14px;">${vehicle.plateNumber}</span>
-                            </div>
-                            <div style="display: flex; align-items: center; padding: 10px 0;">
-                                <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Vehicle Type:</span>
-                                <span style="color: #111827; font-size: 14px;">${vehicle.vehicleType}</span>
-                            </div>
-                            <div style="display: flex; align-items: center; padding: 10px 0;">
-                                <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">GPS Device:</span>
-                                <span style="color: #111827; font-size: 13px; font-family: 'Courier New', monospace; background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${vehicle.gpsDeviceId || 'Not assigned'}</span>
-                            </div>
-                            <div style="display: flex; align-items: center; padding: 10px 0;">
-                                <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Status:</span>
-                                <span style="color: ${vehicle.isOnline ? '#10b981' : '#f59e0b'}; font-weight: 600; font-size: 14px;">${vehicle.isOnline ? '● Online' : '● Offline'}</span>
-                            </div>
-                            ${vehicle.location.speed ? `
-                            <div style="display: flex; align-items: center; padding: 10px 0;">
-                                <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Speed:</span>
-                                <span style="color: #111827; font-size: 14px;">${vehicle.location.speed} km/h</span>
-                            </div>
-                            ` : ''}
-                            ${vehicle.location.battery ? `
-                            <div style="display: flex; align-items: center; padding: 10px 0;">
-                                <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Battery:</span>
-                                <span style="color: #111827; font-size: 14px;">${vehicle.location.battery}%</span>
-                            </div>
-                            ` : ''}
-                            <div style="display: flex; align-items: center; padding: 10px 0;">
-                                <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Last Update:</span>
-                                <span style="color: #111827; font-size: 12px;">${formatDateFullPH(vehicle.location.lastUpdate)}</span>
-                            </div>
-                        </div>
-                        <div style="padding: 12px 16px; background: #f9fafb; border-radius: 0 0 8px 8px; margin: 0 -8px -8px -8px;">
-                            <button onclick="showVehicleInfo(${vehicle.id})" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3); transition: all 0.2s;">View Details</button>
-                        </div>
-                    </div>
-                `
+                content: generateVehicleInfoWindowContent(vehicle)
             });
             
             // Listen for InfoWindow close event
@@ -717,6 +674,8 @@ function updateMapMarkers() {
                 infoWindow.open(map, marker);
             });
             
+            // Store InfoWindow for this vehicle
+            infoWindows[vehicle.id] = infoWindow;
             markers[vehicle.id] = marker;
         }
     });
@@ -732,7 +691,7 @@ function updateMapMarkers() {
                 // Update existing marker position smoothly
                 markers[markerKey].setPosition(position);
                 markers[markerKey].setIcon({
-                    url: '/img/gpsmarker.png',
+                    url: device.isOnline ? '/img/gpsmarker-1.png' : '/img/gpsmarker.png',
                     scaledSize: new google.maps.Size(40, 40),
                     labelOrigin: new google.maps.Point(20, 55)
                 });
@@ -759,7 +718,7 @@ function updateMapMarkers() {
                     className: 'gps-marker-label'
                 },
                 icon: {
-                    url: '/img/gpsmarker.png',
+                    url: device.isOnline ? '/img/gpsmarker-1.png' : '/img/gpsmarker.png',
                     scaledSize: new google.maps.Size(40, 40),
                     labelOrigin: new google.maps.Point(20, 55) // Position label below marker
                 },
@@ -944,38 +903,64 @@ let gpsTrackingSocket = null;
 
 // Initialize Socket.IO connection for GPS tracking
 function initGpsTrackingSocket() {
+    // Check if Socket.IO is available, if not, retry after a delay
     if (typeof io === 'undefined') {
-        console.warn('Socket.IO not available');
+        console.warn('Socket.IO not available, retrying in 1 second...');
+        setTimeout(() => {
+            initGpsTrackingSocket();
+        }, 1000);
         return;
     }
     
-    gpsTrackingSocket = io({
-        transports: ['websocket', 'polling'],
-        upgrade: true,
-        rememberUpgrade: true,
-        timeout: 20000
-    });
+    // If already connected, don't reconnect
+    if (gpsTrackingSocket && gpsTrackingSocket.connected) {
+        console.log('📍 GPS Tracking Socket.IO already connected');
+        return;
+    }
     
-    gpsTrackingSocket.on('connect', () => {
-        console.log('📍 GPS Tracking connected to Socket.IO server');
-    });
-    
-    gpsTrackingSocket.on('disconnect', () => {
-        console.log('📍 GPS Tracking disconnected from Socket.IO server');
-    });
-    
-    gpsTrackingSocket.on('connect_error', (error) => {
-        console.error('❌ GPS Tracking Socket.IO connection error:', error);
-    });
-    
-    // Listen for real-time GPS location updates
-    gpsTrackingSocket.on('driver-location-updated', async (data) => {
-        console.log('📍 Received GPS location update:', data);
+    try {
+        gpsTrackingSocket = io({
+            transports: ['websocket', 'polling'],
+            upgrade: true,
+            rememberUpgrade: true,
+            timeout: 20000,
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000,
+            reconnectionAttempts: Infinity
+        });
         
-        if (data && data.deviceId && data.location) {
-            await updateVehicleLocationFromSocket(data.deviceId, data.location);
-        }
-    });
+        gpsTrackingSocket.on('connect', () => {
+            console.log('📍 GPS Tracking connected to Socket.IO server');
+        });
+        
+        gpsTrackingSocket.on('disconnect', (reason) => {
+            console.log('📍 GPS Tracking disconnected from Socket.IO server:', reason);
+        });
+        
+        gpsTrackingSocket.on('connect_error', (error) => {
+            console.error('❌ GPS Tracking Socket.IO connection error:', error);
+        });
+        
+        gpsTrackingSocket.on('reconnect', (attemptNumber) => {
+            console.log(`📍 GPS Tracking reconnected after ${attemptNumber} attempts`);
+        });
+        
+        // Listen for real-time GPS location updates
+        gpsTrackingSocket.on('driver-location-updated', async (data) => {
+            console.log('📍 Received GPS location update:', data);
+            
+            if (data && data.deviceId && data.location) {
+                await updateVehicleLocationFromSocket(data.deviceId, data.location);
+            }
+        });
+    } catch (error) {
+        console.error('❌ Error initializing GPS Tracking Socket.IO:', error);
+        // Retry after 2 seconds
+        setTimeout(() => {
+            initGpsTrackingSocket();
+        }, 2000);
+    }
 }
 
 // Update vehicle location from Socket.IO event
@@ -1043,6 +1028,54 @@ async function updateVehicleLocationFromSocket(deviceId, locationData) {
     }
 }
 
+// Generate InfoWindow content for a vehicle
+function generateVehicleInfoWindowContent(vehicle) {
+    return `
+        <div id="infoWindow_${vehicle.id}" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 280px; max-width: 320px; border: none; box-shadow: none;">
+            <div style="background: #ffffff; padding: 14px 16px; margin: -8px -8px 0 -8px; border-radius: 8px 8px 0 0;">
+                <h4 style="margin: 0; color: #000; font-size: 17px; font-weight: 600; letter-spacing: 0.3px;">${vehicle.modelName}</h4>
+            </div>
+            <div style="padding: 12px 16px; background: #fff;">
+                <div style="display: flex; align-items: center; padding: 10px 0;">
+                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Plate Number:</span>
+                    <span style="font-weight: 600; color: #111827; font-size: 14px;">${vehicle.plateNumber}</span>
+                </div>
+                <div style="display: flex; align-items: center; padding: 10px 0;">
+                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Vehicle Type:</span>
+                    <span style="color: #111827; font-size: 14px;">${vehicle.vehicleType}</span>
+                </div>
+                <div style="display: flex; align-items: center; padding: 10px 0;">
+                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">GPS Device:</span>
+                    <span style="color: #111827; font-size: 13px; font-family: 'Courier New', monospace; background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${vehicle.gpsDeviceId || 'Not assigned'}</span>
+                </div>
+                <div style="display: flex; align-items: center; padding: 10px 0;">
+                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Status:</span>
+                    <span style="color: ${vehicle.isOnline ? '#10b981' : '#f59e0b'}; font-weight: 600; font-size: 14px;">${vehicle.isOnline ? '● Online' : '● Offline'}</span>
+                </div>
+                ${vehicle.location && vehicle.location.speed ? `
+                <div style="display: flex; align-items: center; padding: 10px 0;">
+                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Speed:</span>
+                    <span style="color: #111827; font-size: 14px;">${vehicle.location.speed} km/h</span>
+                </div>
+                ` : ''}
+                ${vehicle.location && vehicle.location.battery ? `
+                <div style="display: flex; align-items: center; padding: 10px 0;">
+                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Battery:</span>
+                    <span style="color: #111827; font-size: 14px;">${vehicle.location.battery}%</span>
+                </div>
+                ` : ''}
+                <div style="display: flex; align-items: center; padding: 10px 0;">
+                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Last Update:</span>
+                    <span style="color: #111827; font-size: 12px;">${formatDateFullPH(vehicle.location ? vehicle.location.lastUpdate : '')}</span>
+                </div>
+            </div>
+            <div style="padding: 12px 16px; background: #f9fafb; border-radius: 0 0 8px 8px; margin: 0 -8px -8px -8px;">
+                <button onclick="showVehicleInfo(${vehicle.id})" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3); transition: all 0.2s;">View Details</button>
+            </div>
+        </div>
+    `;
+}
+
 // Update marker for a specific vehicle
 function updateMarkerForVehicle(vehicleId, vehicle) {
     if (!map || !vehicle.location) return;
@@ -1050,10 +1083,26 @@ function updateMarkerForVehicle(vehicleId, vehicle) {
     const position = { lat: vehicle.location.lat, lng: vehicle.location.lng };
     
     if (markers[vehicleId]) {
-        // Update existing marker position
+        // Get current position to check if it changed
+        const currentPos = markers[vehicleId].getPosition();
+        const positionChanged = !currentPos || 
+            Math.abs(currentPos.lat() - position.lat) > 0.0001 || 
+            Math.abs(currentPos.lng() - position.lng) > 0.0001;
+        
+        // Update marker position (smoothly if position changed)
+        if (positionChanged) {
+            // Add bounce animation briefly when position updates
+            markers[vehicleId].setAnimation(google.maps.Animation.BOUNCE);
+            setTimeout(() => {
+                if (markers[vehicleId]) {
+                    markers[vehicleId].setAnimation(null);
+                }
+            }, 750);
+        }
+        
         markers[vehicleId].setPosition(position);
         markers[vehicleId].setIcon({
-            url: '/img/gpsmarker.png',
+            url: vehicle.isOnline ? '/img/gpsmarker-1.png' : '/img/gpsmarker.png',
             scaledSize: new google.maps.Size(48, 48),
             labelOrigin: new google.maps.Point(24, 60) // Position label below marker
         });
@@ -1065,6 +1114,12 @@ function updateMarkerForVehicle(vehicleId, vehicle) {
             fontWeight: 'bold',
             className: 'vehicle-marker-label'
         });
+        
+        // Update InfoWindow content if it exists and is open
+        if (infoWindows[vehicleId]) {
+            const newContent = generateVehicleInfoWindowContent(vehicle);
+            infoWindows[vehicleId].setContent(newContent);
+        }
     } else {
         // Create new marker with label below
         const marker = new google.maps.Marker({
@@ -1079,60 +1134,16 @@ function updateMarkerForVehicle(vehicleId, vehicle) {
                 className: 'vehicle-marker-label'
             },
             icon: {
-                url: '/img/gpsmarker.png',
+                url: vehicle.isOnline ? '/img/gpsmarker-1.png' : '/img/gpsmarker.png',
                 scaledSize: new google.maps.Size(48, 48),
                 labelOrigin: new google.maps.Point(24, 60) // Position label below marker
             },
             animation: google.maps.Animation.DROP
         });
         
-        // Create info window
-        const infoWindowId = `infoWindow_${vehicleId}`;
+        // Create info window using helper function
         const infoWindow = new google.maps.InfoWindow({
-            content: `
-                <div id="${infoWindowId}" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 280px; max-width: 320px; border: none; box-shadow: none;">
-                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 14px 16px; margin: -8px -8px 0 -8px; border-radius: 8px 8px 0 0;">
-                        <h4 style="margin: 0; color: #fff; font-size: 17px; font-weight: 600; letter-spacing: 0.3px;">${vehicle.modelName}</h4>
-                    </div>
-                    <div style="padding: 12px 16px; background: #fff;">
-                        <div style="display: flex; align-items: center; padding: 10px 0;">
-                            <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Plate Number:</span>
-                            <span style="font-weight: 600; color: #111827; font-size: 14px;">${vehicle.plateNumber}</span>
-                        </div>
-                        <div style="display: flex; align-items: center; padding: 10px 0;">
-                            <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Vehicle Type:</span>
-                            <span style="color: #111827; font-size: 14px;">${vehicle.vehicleType}</span>
-                        </div>
-                        <div style="display: flex; align-items: center; padding: 10px 0;">
-                            <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">GPS Device:</span>
-                            <span style="color: #111827; font-size: 13px; font-family: 'Courier New', monospace; background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${vehicle.gpsDeviceId || 'Not assigned'}</span>
-                        </div>
-                        <div style="display: flex; align-items: center; padding: 10px 0;">
-                            <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Status:</span>
-                            <span style="color: ${vehicle.isOnline ? '#10b981' : '#f59e0b'}; font-weight: 600; font-size: 14px;">${vehicle.isOnline ? '● Online' : '● Offline'}</span>
-                        </div>
-                        ${vehicle.location.speed ? `
-                        <div style="display: flex; align-items: center; padding: 10px 0;">
-                            <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Speed:</span>
-                            <span style="color: #111827; font-size: 14px;">${vehicle.location.speed} km/h</span>
-                        </div>
-                        ` : ''}
-                        ${vehicle.location.battery ? `
-                        <div style="display: flex; align-items: center; padding: 10px 0;">
-                            <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Battery:</span>
-                            <span style="color: #111827; font-size: 14px;">${vehicle.location.battery}%</span>
-                        </div>
-                        ` : ''}
-                        <div style="display: flex; align-items: center; padding: 10px 0;">
-                            <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Last Update:</span>
-                            <span style="color: #111827; font-size: 12px;">${formatDateFullPH(vehicle.location.lastUpdate)}</span>
-                        </div>
-                    </div>
-                    <div style="padding: 12px 16px; background: #f9fafb; border-radius: 0 0 8px 8px; margin: 0 -8px -8px -8px;">
-                        <button onclick="showVehicleInfo(${vehicleId})" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3); transition: all 0.2s;">View Details</button>
-                    </div>
-                </div>
-            `
+            content: generateVehicleInfoWindowContent(vehicle)
         });
         
         marker.addListener('click', () => {
@@ -1151,10 +1162,26 @@ function updateMarkerForGpsDevice(deviceId, device) {
     const markerKey = `gps_${deviceId}`;
     
     if (markers[markerKey]) {
-        // Update existing marker position
+        // Get current position to check if it changed
+        const currentPos = markers[markerKey].getPosition();
+        const positionChanged = !currentPos || 
+            Math.abs(currentPos.lat() - position.lat) > 0.0001 || 
+            Math.abs(currentPos.lng() - position.lng) > 0.0001;
+        
+        // Update marker position (smoothly if position changed)
+        if (positionChanged) {
+            // Add bounce animation briefly when position updates
+            markers[markerKey].setAnimation(google.maps.Animation.BOUNCE);
+            setTimeout(() => {
+                if (markers[markerKey]) {
+                    markers[markerKey].setAnimation(null);
+                }
+            }, 750);
+        }
+        
         markers[markerKey].setPosition(position);
         markers[markerKey].setIcon({
-            url: '/img/gpsmarker.png',
+            url: device.isOnline ? '/img/gpsmarker-1.png' : '/img/gpsmarker.png',
             scaledSize: new google.maps.Size(40, 40),
             labelOrigin: new google.maps.Point(20, 55) // Position label below marker
         });
@@ -1180,7 +1207,7 @@ function updateMarkerForGpsDevice(deviceId, device) {
                 className: 'gps-marker-label'
             },
             icon: {
-                url: '/img/gpsmarker.png',
+                url: device.isOnline ? '/img/gpsmarker-1.png' : '/img/gpsmarker.png',
                 scaledSize: new google.maps.Size(40, 40),
                 labelOrigin: new google.maps.Point(20, 55) // Position label below marker
             },
