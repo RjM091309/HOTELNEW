@@ -5,6 +5,7 @@
 const GpsTrackerModel = require('../models/gpsTrackerModel');
 const MapsController = require('./c_maps');
 const querystring = require('querystring');
+const { forwardToSinotrack } = require('../services/gpsForwarder');
 
 class GpsTrackerController {
   
@@ -160,8 +161,15 @@ class GpsTrackerController {
       
       console.log(`📍 GPS Location received: Device ${deviceId} at (${lat}, ${lng})`);
       
-      // ST-903 expects "OK" response
+      // ST-903 expects "OK" response - Send FIRST
       res.status(200).send('OK');
+      
+      // Forward to pro.sinotrack.com (if configured) - NON-BLOCKING
+      // Don't await - let it run in background so it doesn't delay the response
+      forwardToSinotrack(bodyText, locationData).catch(error => {
+        // Error already logged in forwardToSinotrack, just catch to prevent unhandled rejection
+        console.error('⚠️ Forwarding error (non-blocking):', error.message);
+      });
     } catch (error) {
       console.error('GPS Tracker Error:', error);
       res.status(500).send('ERROR');

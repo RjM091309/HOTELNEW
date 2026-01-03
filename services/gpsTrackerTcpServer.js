@@ -7,6 +7,7 @@
 
 const net = require('net');
 const GpsTrackerModel = require('../models/gpsTrackerModel');
+const { forwardToSinotrack } = require('./gpsForwarder');
 
 let tcpServer = null;
 
@@ -21,13 +22,11 @@ function startGpsTrackerTcpServer(io, port = 8090) {
     const connectionTime = new Date().toISOString();
     const logMsg = `📍 GPS Tracker TCP connection from: ${clientAddress} at ${connectionTime}`;
     console.log(logMsg);
-    console.error(logMsg); // Also log to stderr for PM2 visibility
     
     // Log when socket is ready
     socket.on('ready', () => {
       const readyMsg = `✅ Socket ready for ${clientAddress}`;
       console.log(readyMsg);
-      console.error(readyMsg);
     });
     
     let buffer = '';
@@ -63,7 +62,6 @@ function startGpsTrackerTcpServer(io, port = 8090) {
   tcpServer.listen(port, '0.0.0.0', () => {
     const logMessage = `📍 GPS Tracker TCP Server listening on port ${port} - Ready to receive GPS data`;
     console.log(logMessage);
-    console.error(logMessage); // Also log to stderr so it appears in PM2 logs
   });
   
   tcpServer.on('error', (error) => {
@@ -81,7 +79,6 @@ async function processGpsMessage(message, socket, io) {
   try {
     const logMsg = `📍 Received GPS data: ${message}`;
     console.log(logMsg);
-    console.error(logMsg); // Also log to stderr for PM2 visibility
     
     // Parse ST-903 data format
     // Format: *HQ,IMEI,lat,lng,speed,heading,date,time#
@@ -149,7 +146,6 @@ async function processGpsMessage(message, socket, io) {
       };
       const parsedMsg = `✅ Parsed ST903 format: Device ${imei} at latitude ${lat}, longitude ${lng}`;
       console.log(parsedMsg);
-      console.error(parsedMsg); // Also log to stderr for PM2 visibility
     } else {
       // Try NMEA format: *HQ,IMEI,V8,HHMMSS,STATUS,DDMM.MMMM,N/S,DDDMM.MMMM,E/W,speed,heading,DDMMYY,...
       // Format: *HQ,7026270832,V8,060246,A,1511.9440,N,12031.5149,E,0.00,154,030126,...
@@ -199,7 +195,6 @@ async function processGpsMessage(message, socket, io) {
         
         const nmeaMsg = `✅ Parsed NMEA format: Device ${imei} at latitude ${lat.toFixed(6)}, longitude ${lng.toFixed(6)} (GPS Status: ${gpsStatus})`;
         console.log(nmeaMsg);
-        console.error(nmeaMsg);
       } else {
         // Try custom format: *IMEI,lat,lng,speed,heading,timestamp#
       const customMatch = message.match(/\*(\d+),([\d.\-]+),([\d.\-]+),?([\d.]*),?([\d.]*),?([\d]*)#?/);
@@ -285,15 +280,22 @@ async function processGpsMessage(message, socket, io) {
     
     const savedMsg = `📍 GPS Location saved: Device ${locationData.deviceId} at (${lat}, ${lng})`;
     console.log(savedMsg);
-    console.error(savedMsg); // Also log to stderr for PM2 visibility
     
-    // Send acknowledgment
+    // Send acknowledgment FIRST (don't wait for forwarding)
     socket.write('OK\r\n');
+    
+    // Forward to pro.sinotrack.com (if configured) - NON-BLOCKING
+    // Don't await - let it run in background so it doesn't delay the response
+    forwardToSinotrack(message, locationData).catch(error => {
+      // Error already logged in forwardToSinotrack, just catch to prevent unhandled rejection
+      console.error('⚠️ Forwarding error (non-blocking):', error.message);
+    });
   } catch (error) {
     console.error('GPS Message Processing Error:', error);
     socket.write('ERROR\r\n');
   }
 }
+
 
 function stopGpsTrackerTcpServer() {
   if (tcpServer) {
