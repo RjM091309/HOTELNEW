@@ -7,6 +7,7 @@ let markers = {};
 let vehicleData = {};
 let gpsDevicesData = {};
 let isFirstMapLoad = true; // Track if this is the first time loading markers
+let currentInfoWindow = null; // Track the currently open InfoWindow
 
 // Format date to Philippines timezone (Asia/Manila, UTC+8)
 // Note: The `timestamp` field from GPS device is in UTC
@@ -270,6 +271,14 @@ async function initMap() {
                     // Listen for map type changes to update label colors
                     google.maps.event.addListener(map, 'maptypeid_changed', () => {
                         updateMarkerLabelColors();
+                    });
+                    
+                    // Close InfoWindow when clicking on the map
+                    google.maps.event.addListener(map, 'click', () => {
+                        if (currentInfoWindow) {
+                            currentInfoWindow.close();
+                            currentInfoWindow = null;
+                        }
                     });
                     
                     console.log('Map initialized successfully');
@@ -692,7 +701,19 @@ function updateMapMarkers() {
                 `
             });
             
+            // Listen for InfoWindow close event
+            google.maps.event.addListener(infoWindow, 'closeclick', () => {
+                if (currentInfoWindow === infoWindow) {
+                    currentInfoWindow = null;
+                }
+            });
+            
             marker.addListener('click', () => {
+                // Close any previously open InfoWindow
+                if (currentInfoWindow) {
+                    currentInfoWindow.close();
+                }
+                currentInfoWindow = infoWindow;
                 infoWindow.open(map, marker);
             });
             
@@ -790,7 +811,19 @@ function updateMapMarkers() {
                 `
             });
             
+            // Listen for InfoWindow close event
+            google.maps.event.addListener(infoWindow, 'closeclick', () => {
+                if (currentInfoWindow === infoWindow) {
+                    currentInfoWindow = null;
+                }
+            });
+            
             marker.addListener('click', () => {
+                // Close any previously open InfoWindow
+                if (currentInfoWindow) {
+                    currentInfoWindow.close();
+                }
+                currentInfoWindow = infoWindow;
                 infoWindow.open(map, marker);
             });
             
