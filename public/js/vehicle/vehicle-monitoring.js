@@ -200,7 +200,7 @@ async function initMap() {
         script.defer = true;
         script.onload = () => {
             // Wait a bit to ensure google.maps is fully loaded
-            setTimeout(() => {
+            setTimeout(async () => {
                 // Check if google.maps is available
                 if (typeof google === 'undefined' || typeof google.maps === 'undefined' || typeof google.maps.Map === 'undefined') {
                     console.error('Google Maps API not loaded properly');
@@ -229,10 +229,37 @@ async function initMap() {
                     mapDiv.style.width = '100%';
                     mapDiv.style.height = '600px';
                     
-                    // Initialize map after script loads
+                    // Load vehicles first to calculate proper center
+                    await loadVehiclesForMapInit();
+                    
+                    // Calculate center from vehicle locations, or use default
+                    let mapCenter = { lat: 14.5995, lng: 120.9842 }; // Default to Manila
+                    let mapZoom = 9;
+                    
+                    // If we have vehicles with locations, calculate center from them
+                    const allLocations = [];
+                    Object.values(vehicleData).forEach(vehicle => {
+                        if (vehicle.location && vehicle.location.lat && vehicle.location.lng) {
+                            allLocations.push({ lat: vehicle.location.lat, lng: vehicle.location.lng });
+                        }
+                    });
+                    Object.values(gpsDevicesData).forEach(device => {
+                        if (!device.isAssigned && device.location && device.location.lat && device.location.lng) {
+                            allLocations.push({ lat: device.location.lat, lng: device.location.lng });
+                        }
+                    });
+                    
+                    if (allLocations.length > 0) {
+                        // Calculate center from all locations
+                        const avgLat = allLocations.reduce((sum, loc) => sum + loc.lat, 0) / allLocations.length;
+                        const avgLng = allLocations.reduce((sum, loc) => sum + loc.lng, 0) / allLocations.length;
+                        mapCenter = { lat: avgLat, lng: avgLng };
+                    }
+                    
+                    // Initialize map after script loads with calculated center
                     map = new google.maps.Map(mapDiv, {
-                        center: { lat: 14.5995, lng: 120.9842 }, // Default to Manila
-                        zoom: 12,
+                        center: mapCenter,
+                        zoom: mapZoom,
                         mapTypeId: 'roadmap',
                         fullscreenControl: true,
                         mapTypeControl: true,
@@ -247,8 +274,9 @@ async function initMap() {
                     
                     console.log('Map initialized successfully');
                     
-                    // Load vehicles
-                    loadVehicles();
+                    // Update vehicle list and map with markers (vehicles already loaded)
+                    updateVehicleList();
+                    updateMapMarkers();
                 } catch (error) {
                     console.error('Error creating map:', error);
                     const mapDiv = document.getElementById('map');
@@ -270,6 +298,35 @@ async function initMap() {
     } catch (error) {
         console.error('Error initializing map:', error);
         document.getElementById('map').innerHTML = '<div class="alert alert-danger">Error loading map. Please check your Google Maps API key.</div>';
+    }
+}
+
+// Load vehicles data for map initialization (without updating UI)
+async function loadVehiclesForMapInit() {
+    try {
+        // Load vehicles with GPS
+        const vehiclesResponse = await fetch('/vehicle/api/monitoring/vehicles');
+        const vehiclesData = await vehiclesResponse.json();
+        
+        // Load all GPS devices (including unassigned) - get all devices that have ever sent data
+        const gpsResponse = await fetch('/vehicle/api/monitoring/gps-devices');
+        const gpsData = await gpsResponse.json();
+        
+        if (vehiclesData.success) {
+            vehicleData = {};
+            vehiclesData.data.forEach(vehicle => {
+                vehicleData[vehicle.id] = vehicle;
+            });
+        }
+        
+        if (gpsData.success) {
+            gpsDevicesData = {};
+            gpsData.data.forEach(device => {
+                gpsDevicesData[device.deviceId] = device;
+            });
+        }
+    } catch (error) {
+        console.error('Error loading vehicles for map init:', error);
     }
 }
 
@@ -552,9 +609,9 @@ function updateMapMarkers() {
                 // Update existing marker position smoothly
                 markers[vehicle.id].setPosition(position);
                 markers[vehicle.id].setIcon({
-                    url: vehicle.isOnline ? 'https://maps.google.com/mapfiles/ms/icons/green-dot.png' : 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
-                    scaledSize: new google.maps.Size(32, 32),
-                    labelOrigin: new google.maps.Point(16, 45)
+                    url: '/img/gpsmarker.png',
+                    scaledSize: new google.maps.Size(48, 48),
+                    labelOrigin: new google.maps.Point(24, 60)
                 });
                 markers[vehicle.id].setLabel({
                     text: vehicle.plateNumber || vehicle.modelName.substring(0, 8),
@@ -579,9 +636,9 @@ function updateMapMarkers() {
                     className: 'vehicle-marker-label'
                 },
                 icon: {
-                    url: vehicle.isOnline ? 'https://maps.google.com/mapfiles/ms/icons/green-dot.png' : 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
-                    scaledSize: new google.maps.Size(32, 32),
-                    labelOrigin: new google.maps.Point(16, 45) // Position label below marker
+                    url: '/img/gpsmarker.png',
+                    scaledSize: new google.maps.Size(48, 48),
+                    labelOrigin: new google.maps.Point(24, 60) // Position label below marker
                 },
                 animation: useDropAnimation ? google.maps.Animation.DROP : null
             });
@@ -654,9 +711,9 @@ function updateMapMarkers() {
                 // Update existing marker position smoothly
                 markers[markerKey].setPosition(position);
                 markers[markerKey].setIcon({
-                    url: device.isOnline ? 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png' : 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png',
-                    scaledSize: new google.maps.Size(28, 28),
-                    labelOrigin: new google.maps.Point(14, 40)
+                    url: '/img/gpsmarker.png',
+                    scaledSize: new google.maps.Size(40, 40),
+                    labelOrigin: new google.maps.Point(20, 55)
                 });
                 markers[markerKey].setLabel({
                     text: device.deviceId.substring(device.deviceId.length - 4) || 'GPS',
@@ -681,9 +738,9 @@ function updateMapMarkers() {
                     className: 'gps-marker-label'
                 },
                 icon: {
-                    url: device.isOnline ? 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png' : 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png',
-                    scaledSize: new google.maps.Size(28, 28),
-                    labelOrigin: new google.maps.Point(14, 40) // Position label below marker
+                    url: '/img/gpsmarker.png',
+                    scaledSize: new google.maps.Size(40, 40),
+                    labelOrigin: new google.maps.Point(20, 55) // Position label below marker
                 },
                 animation: useDropAnimation ? google.maps.Animation.DROP : null
             });
@@ -747,7 +804,16 @@ function updateMapMarkers() {
         Object.values(markers).forEach(marker => {
             bounds.extend(marker.getPosition());
         });
-        map.fitBounds(bounds);
+        // Add moderate padding to show area around markers (top, right, bottom, left in pixels)
+        map.fitBounds(bounds, { top: 120, right: 120, bottom: 120, left: 120 });
+        
+        // Set maximum zoom level to prevent too much zoom in
+        google.maps.event.addListenerOnce(map, 'bounds_changed', () => {
+            if (map.getZoom() > 17) {
+                map.setZoom(17);
+            }
+        });
+        
         isFirstMapLoad = false; // Mark that first load is complete
     }
 }
@@ -954,9 +1020,9 @@ function updateMarkerForVehicle(vehicleId, vehicle) {
         // Update existing marker position
         markers[vehicleId].setPosition(position);
         markers[vehicleId].setIcon({
-            url: vehicle.isOnline ? 'https://maps.google.com/mapfiles/ms/icons/green-dot.png' : 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
-            scaledSize: new google.maps.Size(32, 32),
-            labelOrigin: new google.maps.Point(16, 45) // Position label below marker
+            url: '/img/gpsmarker.png',
+            scaledSize: new google.maps.Size(48, 48),
+            labelOrigin: new google.maps.Point(24, 60) // Position label below marker
         });
         // Update label text
         markers[vehicleId].setLabel({
@@ -980,9 +1046,9 @@ function updateMarkerForVehicle(vehicleId, vehicle) {
                 className: 'vehicle-marker-label'
             },
             icon: {
-                url: vehicle.isOnline ? 'https://maps.google.com/mapfiles/ms/icons/green-dot.png' : 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
-                scaledSize: new google.maps.Size(32, 32),
-                labelOrigin: new google.maps.Point(16, 45) // Position label below marker
+                url: '/img/gpsmarker.png',
+                scaledSize: new google.maps.Size(48, 48),
+                labelOrigin: new google.maps.Point(24, 60) // Position label below marker
             },
             animation: google.maps.Animation.DROP
         });
@@ -1055,9 +1121,9 @@ function updateMarkerForGpsDevice(deviceId, device) {
         // Update existing marker position
         markers[markerKey].setPosition(position);
         markers[markerKey].setIcon({
-            url: device.isOnline ? 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png' : 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png',
-            scaledSize: new google.maps.Size(28, 28),
-            labelOrigin: new google.maps.Point(14, 40) // Position label below marker
+            url: '/img/gpsmarker.png',
+            scaledSize: new google.maps.Size(40, 40),
+            labelOrigin: new google.maps.Point(20, 55) // Position label below marker
         });
         // Update label text
         markers[markerKey].setLabel({
@@ -1081,9 +1147,9 @@ function updateMarkerForGpsDevice(deviceId, device) {
                 className: 'gps-marker-label'
             },
             icon: {
-                url: device.isOnline ? 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png' : 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png',
-                scaledSize: new google.maps.Size(28, 28),
-                labelOrigin: new google.maps.Point(14, 40) // Position label below marker
+                url: '/img/gpsmarker.png',
+                scaledSize: new google.maps.Size(40, 40),
+                labelOrigin: new google.maps.Point(20, 55) // Position label below marker
             },
             animation: google.maps.Animation.DROP
         });

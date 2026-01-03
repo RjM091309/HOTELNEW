@@ -190,6 +190,12 @@ function initializeDataTable() {
             { data: 'COLOR' },
             { data: 'PLATE_NUMBER' },
             { data: 'FUEL_TYPE' },
+            { 
+                data: 'GPS_DEVICE_ID',
+                render: function(data, type, row) {
+                    return data ? `<span class="badge bg-info">${data}</span>` : '<span class="text-muted">Not assigned</span>';
+                }
+            },
             { data: 'REMARKS' },
             {
                 data: 'IDNo',
@@ -207,8 +213,8 @@ function initializeDataTable() {
             }
         ],
         columnDefs: [
-            { className: 'text-center', targets: [0, 7] },
-            { targets: [7], width: '15%', orderable: false, searchable: false }
+            { className: 'text-center', targets: [0, 8] },
+            { targets: [8], width: '15%', orderable: false, searchable: false }
         ],
         pageLength: 10,
         lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
@@ -353,6 +359,7 @@ function openEditModal(vehicleId) {
                 $('#editColor').val(vehicle.COLOR);
                 $('#editPlateNumber').val(vehicle.PLATE_NUMBER);
                 $('#editFuelType').val(vehicle.FUEL_TYPE);
+                $('#editGpsDeviceId').val(vehicle.GPS_DEVICE_ID || '');
                 $('#editRemarks').val(vehicle.REMARKS);
                 
                 // Store the actual values for form submission
