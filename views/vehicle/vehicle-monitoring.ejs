@@ -2,49 +2,416 @@
 <!-- VEHICLE MONITORING PAGE -->
 <!-- ======================================== -->
 
+<style>
+/* Vehicle Monitoring UI Styles */
+.vehicle-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 8px 0;
+}
+
+.vehicle-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.vehicle-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(180deg, #4CAF50, #8BC34A);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.vehicle-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.vehicle-card:hover::before {
+    opacity: 1;
+}
+
+.vehicle-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.vehicle-title-section {
+    flex: 1;
+}
+
+.vehicle-name {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    color: #fff;
+    line-height: 1.3;
+}
+
+.vehicle-plate {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 500;
+    color: #a0a0a0;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+}
+
+.vehicle-status-badge {
+    display: flex;
+    align-items: center;
+}
+
+/* Online status text styling */
+.badge.status-online {
+    color: #28a745 !important;
+    background-color: transparent !important;
+    border: 1px solid #28a745;
+    font-weight: 600;
+}
+
+.badge.bg-success.status-online {
+    background-color: rgba(40, 167, 69, 0.1) !important;
+    border-color: #28a745;
+    color: #28a745 !important;
+}
+
+.vehicle-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.vehicle-info-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: #d0d0d0;
+}
+
+.vehicle-info-row i {
+    width: 16px;
+    text-align: center;
+    font-size: 14px;
+}
+
+.vehicle-type {
+    font-weight: 500;
+}
+
+.gps-info {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+}
+
+.location-info {
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.location-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.location-time {
+    font-size: 12px;
+    color: #fff;
+    font-weight: 500;
+}
+
+.location-ago {
+    font-size: 11px;
+    color: #a0a0a0;
+}
+
+.vehicle-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1rem;
+    text-align: center;
+}
+
+/* White Theme Support */
+body.white-sidebar-color .vehicle-card,
+[data-theme="white"] .vehicle-card {
+    background: rgba(0, 0, 0, 0.02);
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+body.white-sidebar-color .vehicle-card:hover,
+[data-theme="white"] .vehicle-card:hover {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.15);
+}
+
+body.white-sidebar-color .vehicle-name,
+[data-theme="white"] .vehicle-name {
+    color: #1f2937;
+}
+
+body.white-sidebar-color .vehicle-plate,
+[data-theme="white"] .vehicle-plate {
+    color: #4b5563;
+    background: rgba(0, 0, 0, 0.05);
+}
+
+body.white-sidebar-color .vehicle-card-header,
+[data-theme="white"] .vehicle-card-header {
+    border-bottom-color: rgba(0, 0, 0, 0.1);
+}
+
+body.white-sidebar-color .vehicle-info-row,
+[data-theme="white"] .vehicle-info-row {
+    color: #4b5563;
+}
+
+body.white-sidebar-color .location-time,
+[data-theme="white"] .location-time {
+    color: #1f2937;
+}
+
+body.white-sidebar-color .location-ago,
+[data-theme="white"] .location-ago {
+    color: #6b7280;
+}
+
+body.white-sidebar-color .location-info,
+[data-theme="white"] .location-info {
+    border-top-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .vehicle-card {
+        padding: 12px;
+    }
+    
+    .vehicle-name {
+        font-size: 14px;
+    }
+    
+    .vehicle-card-header {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .vehicle-status-badge {
+        align-self: flex-start;
+    }
+}
+
+/* Scrollbar Styling for Vehicle List */
+.dashboard-card-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.dashboard-card-body::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+.dashboard-card-body::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+.dashboard-card-body::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.vehicle-loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1rem;
+    text-align: center;
+}
+
+/* Improve button styling */
+.tools .btn {
+    transition: all 0.3s ease;
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.tools .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.tools .btn:active {
+    transform: translateY(0);
+}
+
+/* Map container improvements */
+#map {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body.white-sidebar-color #map,
+[data-theme="white"] #map {
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive improvements */
+@media (max-width: 991px) {
+    .row[style*="gap"] {
+        flex-direction: column;
+    }
+    
+    .col-lg-3, .col-lg-9 {
+        margin-bottom: 20px;
+    }
+    
+    #map {
+        height: 500px !important;
+    }
+    
+    .dashboard-card-body[style*="max-height"] {
+        max-height: 500px !important;
+    }
+}
+
+/* Vehicle list width optimization */
+@media (min-width: 992px) {
+    .col-lg-3 {
+        max-width: 320px;
+        flex: 0 0 320px;
+    }
+    
+    .col-lg-9 {
+        flex: 1;
+        min-width: 0;
+    }
+}
+
+/* Google Maps InfoWindow styling - remove black borders */
+.gm-style .gm-style-iw-c {
+    border: none !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    padding: 0 !important;
+}
+
+.gm-style .gm-style-iw-d {
+    overflow: hidden !important;
+}
+
+.gm-style .gm-style-iw-t::after {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.gm-style-iw {
+    padding: 0 !important;
+}
+
+/* Make Google Maps default close button visible and elegant */
+.gm-style .gm-ui-hover-effect {
+    opacity: 1 !important;
+    visibility: visible !important;
+    top: 8px !important;
+    right: 8px !important;
+    width: 28px !important;
+    height: 28px !important;
+}
+
+.gm-style .gm-ui-hover-effect > span {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border-radius: 50% !important;
+    width: 28px !important;
+    height: 28px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #6b7280 !important;
+    font-size: 20px !important;
+    font-weight: 300 !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+    border: 1px solid rgba(0, 0, 0, 0.08) !important;
+    transition: all 0.2s ease !important;
+    line-height: 1 !important;
+}
+
+.gm-style .gm-ui-hover-effect:hover > span {
+    background: #fff !important;
+    color: #ef4444 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+    transform: scale(1.1) !important;
+}
+
+.gm-style button[aria-label="Close"] {
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: block !important;
+}
+</style>
+
 <!-- Main Content Area -->
 <div class="row">
     <div class="col-xl-12 col-md-12 col-12">
         <div class="dashboard-card">
             <div class="dashboard-card-header">
                 <header>Vehicle Monitoring - Real-time GPS Tracking</header>
-                <div class="tools">
-                    <button type="button" class="btn btn-primary-10 btn-sm" id="refreshBtn">
-                        <i class="fa fa-refresh"></i> Refresh
-                    </button>
-                    <button type="button" class="btn btn-success btn-sm" id="autoRefreshBtn">
-                        <i class="fa fa-play"></i> Auto Refresh
-                    </button>
-                </div>
             </div>
             <div class="dashboard-card-body">
                 
                 <!-- Vehicle List Sidebar -->
-                <div class="row">
-                    <div class="col-lg-4 col-md-12">
-                        <div class="dashboard-card">
+                <div class="row" style="margin: 0; gap: 20px;">
+                    <div class="col-lg-3 col-md-12" style="padding: 0;">
+                        <div class="dashboard-card" style="height: 100%;">
                             <div class="dashboard-card-header">
-                                <header>Vehicles</header>
+                                <header><i class="fa fa-car"></i> Vehicles</header>
                             </div>
-                            <div class="dashboard-card-body" style="max-height: 600px; overflow-y: auto;">
+                            <div class="dashboard-card-body" style="max-height: 650px; overflow-y: auto; padding: 16px;">
                                 <div id="vehicleList">
-                                    <p class="text-center text-muted">Loading vehicles...</p>
+                                    <div class="vehicle-loading-state">
+                                        <i class="fa fa-spinner fa-spin fa-2x text-primary"></i>
+                                        <p class="text-center text-muted mt-2">Loading vehicles...</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
                     <!-- Map Container -->
-                    <div class="col-lg-8 col-md-12">
-                        <div class="dashboard-card">
+                    <div class="col-lg-9 col-md-12" style="padding: 0;">
+                        <div class="dashboard-card" style="height: 100%;">
                             <div class="dashboard-card-header">
-                                <header>Map View</header>
+                                <header><i class="fa fa-map"></i> Map View</header>
                             </div>
-                            <div class="dashboard-card-body">
-                                <div id="map" style="width: 100%; height: 600px; border-radius: 4px; display: flex; align-items: center; justify-content: center;">
-                                    <div class="text-center">
+                            <div class="dashboard-card-body" style="padding: 16px;">
+                                <div id="map" style="width: 100%; height: 650px; border-radius: 8px; position: relative; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <div id="mapLoading" class="text-center" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1; background: rgba(0,0,0,0.7); padding: 20px; border-radius: 8px;">
                                         <i class="fa fa-spinner fa-spin fa-3x text-primary"></i>
-                                        <p class="mt-3">Loading map...</p>
+                                        <p class="mt-3 text-white">Loading map...</p>
                                     </div>
                                 </div>
                             </div>

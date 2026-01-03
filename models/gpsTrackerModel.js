@@ -105,6 +105,21 @@ class GpsTrackerModel {
     return await queryDatabasePromise(query, [hoursAgo]);
   }
 
+  // Get all devices that have ever sent location data
+  static async getAllDevices() {
+    const query = `
+      SELECT 
+        device_id,
+        MAX(timestamp) as last_update,
+        MAX(created_at) as last_created,
+        COUNT(*) as total_updates
+      FROM gps_locations 
+      GROUP BY device_id
+      ORDER BY last_update DESC
+    `;
+    return await queryDatabasePromise(query);
+  }
+
   // Get location by ID
   static async getLocationById(id) {
     const query = `

@@ -129,7 +129,7 @@ class VehicleModel {
         gl.timestamp as last_location_time,
         gl.battery,
         gl.created_at as last_location_created,
-        TIMESTAMPDIFF(MINUTE, gl.timestamp, NOW()) as minutes_since_update
+        TIMESTAMPDIFF(MINUTE, gl.created_at, NOW()) as minutes_since_update
       FROM vehicle v
       LEFT JOIN (
         SELECT 
@@ -141,7 +141,7 @@ class VehicleModel {
           timestamp,
           battery,
           created_at,
-          ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY timestamp DESC, created_at DESC) as rn
+          ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY created_at DESC, timestamp DESC) as rn
         FROM gps_locations
       ) gl ON v.GPS_DEVICE_ID COLLATE utf8mb4_unicode_ci = gl.device_id COLLATE utf8mb4_unicode_ci AND gl.rn = 1
       WHERE v.ACTIVE = 1
@@ -170,7 +170,7 @@ class VehicleModel {
         gl.timestamp as last_location_time,
         gl.battery,
         gl.created_at as last_location_created,
-        TIMESTAMPDIFF(MINUTE, gl.timestamp, NOW()) as minutes_since_update
+        TIMESTAMPDIFF(MINUTE, gl.created_at, NOW()) as minutes_since_update
       FROM vehicle v
       LEFT JOIN (
         SELECT 
@@ -182,7 +182,7 @@ class VehicleModel {
           timestamp,
           battery,
           created_at,
-          ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY timestamp DESC, created_at DESC) as rn
+          ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY created_at DESC, timestamp DESC) as rn
         FROM gps_locations
       ) gl ON v.GPS_DEVICE_ID COLLATE utf8mb4_unicode_ci = gl.device_id COLLATE utf8mb4_unicode_ci AND gl.rn = 1
       WHERE v.IDNo = ? AND v.ACTIVE = 1`;

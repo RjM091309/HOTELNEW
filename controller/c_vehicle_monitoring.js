@@ -190,10 +190,13 @@ class VehicleMonitoringController {
   // Get all GPS devices with locations (including devices not assigned to vehicles)
   static async getAllGpsDevices(req, res) {
     try {
-      const hoursAgo = parseInt(req.query.hours) || 24;
+      const hoursParam = req.query.hours;
+      const hoursAgo = hoursParam ? parseInt(hoursParam) : null;
       
-      // Get all active GPS devices
-      const activeDevices = await GpsTrackerModel.getActiveDevices(hoursAgo);
+      // Get all GPS devices (if hoursAgo is specified, use active devices, otherwise get all devices)
+      const activeDevices = hoursAgo ? 
+        await GpsTrackerModel.getActiveDevices(hoursAgo) : 
+        await GpsTrackerModel.getAllDevices();
       
       // Get all vehicles to map device IDs
       const vehicles = await VehicleModel.getAllVehicles();
@@ -231,8 +234,8 @@ class VehicleMonitoringController {
             lastUpdate: device.last_update,
             totalUpdates: device.total_updates,
             isAssigned: !!vehicle,
-            isOnline: location && location.timestamp ? 
-              (new Date() - new Date(location.timestamp)) < 10 * 60 * 1000 : false // Online if updated within 10 minutes
+            isOnline: location && location.created_at ? 
+              (new Date() - new Date(location.created_at)) < 10 * 60 * 1000 : false // Online if updated within 10 minutes (use created_at - server receive time)
           };
         })
       );

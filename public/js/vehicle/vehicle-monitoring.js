@@ -6,8 +6,172 @@ let map;
 let markers = {};
 let vehicleData = {};
 let gpsDevicesData = {};
-let autoRefreshInterval = null;
-let isAutoRefresh = false;
+let isFirstMapLoad = true; // Track if this is the first time loading markers
+
+// Format date to Philippines timezone (Asia/Manila, UTC+8)
+// Note: The `timestamp` field from GPS device is in UTC
+function formatDatePH(dateInput) {
+    if (!dateInput) return 'N/A';
+    try {
+        let date;
+        let dateString = dateInput;
+        
+        // If it's already a Date object, convert to string first
+        if (dateInput instanceof Date) {
+            // If it's a Date object, get the UTC components
+            const year = dateInput.getUTCFullYear();
+            const month = dateInput.getUTCMonth() + 1;
+            const day = dateInput.getUTCDate();
+            const hours = dateInput.getUTCHours();
+            const minutes = dateInput.getUTCMinutes();
+            const seconds = dateInput.getUTCSeconds();
+            
+            // Create UTC date from these components
+            date = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds));
+        }
+        // Handle string formats
+        else if (typeof dateInput === 'string') {
+            // ISO format with Z (UTC): '2026-01-03T00:08:19.000Z' - already UTC, parse directly
+            if (dateString.includes('T') && dateString.includes('Z')) {
+                date = new Date(dateString);
+            }
+            // MySQL datetime format: 'YYYY-MM-DD HH:mm:ss' - this is UTC from GPS device
+            else if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateString)) {
+                // Parse the date components manually and create UTC date
+                const [datePart, timePart] = dateString.split(' ');
+                const [year, month, day] = datePart.split('-').map(Number);
+                const [hours, minutes, seconds] = timePart.split(':').map(Number);
+                
+                // Create UTC date using Date.UTC()
+                date = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds || 0));
+            }
+            // ISO format without timezone: 'YYYY-MM-DDTHH:mm:ss' - treat as UTC
+            else if (dateString.includes('T') && !dateString.match(/[+-]\d{2}:\d{2}$/)) {
+                date = new Date(dateString + 'Z');
+            }
+            // ISO format with timezone offset
+            else if (dateString.includes('T') && dateString.match(/[+-]\d{2}:\d{2}$/)) {
+                date = new Date(dateString);
+            }
+            // Other string formats - try to parse
+            else {
+                date = new Date(dateString);
+            }
+        }
+        // Other types - try to convert
+        else {
+            date = new Date(dateInput);
+        }
+        
+        // Check if date is valid
+        if (isNaN(date.getTime())) {
+            console.error('Invalid date:', dateInput, typeof dateInput);
+            return 'N/A';
+        }
+        
+        // Format to Philippines timezone using timeZone option
+        const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Manila',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        });
+        
+        const formatted = formatter.format(date);
+        
+        // Debug logging to see what's happening
+        console.log('[formatDatePH] Input:', dateInput, 'Type:', typeof dateInput, '-> Parsed UTC Date:', date.toISOString(), '-> PH Time:', formatted);
+        
+        return formatted;
+    } catch (error) {
+        console.error('Error formatting date:', error, dateInput);
+        return 'N/A';
+    }
+}
+
+// Format date to Philippines timezone (full format)
+function formatDateFullPH(dateInput) {
+    if (!dateInput) return 'N/A';
+    try {
+        let date;
+        
+        // If it's already a Date object, convert to string first
+        if (dateInput instanceof Date) {
+            // If it's a Date object, get the UTC components
+            const year = dateInput.getUTCFullYear();
+            const month = dateInput.getUTCMonth() + 1;
+            const day = dateInput.getUTCDate();
+            const hours = dateInput.getUTCHours();
+            const minutes = dateInput.getUTCMinutes();
+            const seconds = dateInput.getUTCSeconds();
+            
+            // Create UTC date from these components
+            date = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds));
+        }
+        // Handle string formats
+        else if (typeof dateInput === 'string') {
+            // MySQL datetime format: 'YYYY-MM-DD HH:mm:ss' - this is UTC from GPS device
+            if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateInput)) {
+                // Parse the date components manually and create UTC date
+                const [datePart, timePart] = dateInput.split(' ');
+                const [year, month, day] = datePart.split('-').map(Number);
+                const [hours, minutes, seconds] = timePart.split(':').map(Number);
+                
+                // Create UTC date using Date.UTC()
+                date = new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds || 0));
+            }
+            // ISO format: try to parse as UTC
+            else if (dateInput.includes('T')) {
+                if (dateInput.includes('Z')) {
+                    date = new Date(dateInput);
+                } else if (!dateInput.match(/[+-]\d{2}:\d{2}$/)) {
+                    date = new Date(dateInput + 'Z');
+                } else {
+                    date = new Date(dateInput);
+                }
+            }
+            // Other string formats
+            else {
+                date = new Date(dateInput);
+            }
+        }
+        // Other types
+        else {
+            date = new Date(dateInput);
+        }
+        
+        // Check if date is valid
+        if (isNaN(date.getTime())) {
+            console.error('Invalid date:', dateInput);
+            return 'N/A';
+        }
+        
+        // Format to Philippines timezone using timeZone option - include date and time
+        const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Manila',
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+        });
+        
+        const formatted = formatter.format(date);
+        
+        // Debug logging to see what's happening
+        console.log('[formatDateFullPH] Input:', dateInput, 'Type:', typeof dateInput, '-> Parsed UTC Date:', date.toISOString(), '-> PH Time:', formatted);
+        
+        return formatted;
+    } catch (error) {
+        console.error('Error formatting date:', error, dateInput);
+        return 'N/A';
+    }
+}
 
 // Initialize Google Maps
 async function initMap() {
@@ -18,7 +182,14 @@ async function initMap() {
         
         if (!apiKeyData.success || !apiKeyData.apiKey) {
             console.error('Google Maps API key not found');
-            document.getElementById('map').innerHTML = '<div class="alert alert-danger">Google Maps API key is not configured. Please set VITE_GOOGLE_MAPS_API_KEY in environment variables.</div>';
+            const mapDiv = document.getElementById('map');
+            if (mapDiv) {
+                const loadingDiv = document.getElementById('mapLoading');
+                if (loadingDiv) {
+                    loadingDiv.remove();
+                }
+                mapDiv.innerHTML = '<div class="alert alert-danger">Google Maps API key is not configured. Please set VITE_GOOGLE_MAPS_API_KEY in environment variables.</div>';
+            }
             return;
         }
         
@@ -48,18 +219,30 @@ async function initMap() {
                 }
                 
                 try {
-                    // Clear loading message
-                    mapDiv.innerHTML = '';
-                    mapDiv.style.backgroundColor = '';
-                    mapDiv.style.display = '';
-                    mapDiv.style.alignItems = '';
-                    mapDiv.style.justifyContent = '';
+                    // Remove loading message
+                    const loadingDiv = document.getElementById('mapLoading');
+                    if (loadingDiv) {
+                        loadingDiv.remove();
+                    }
+                    
+                    // Ensure map div is properly styled for Google Maps
+                    mapDiv.style.width = '100%';
+                    mapDiv.style.height = '600px';
                     
                     // Initialize map after script loads
                     map = new google.maps.Map(mapDiv, {
                         center: { lat: 14.5995, lng: 120.9842 }, // Default to Manila
                         zoom: 12,
-                        mapTypeId: 'roadmap'
+                        mapTypeId: 'roadmap',
+                        fullscreenControl: true,
+                        mapTypeControl: true,
+                        streetViewControl: true,
+                        zoomControl: true
+                    });
+                    
+                    // Listen for map type changes to update label colors
+                    google.maps.event.addListener(map, 'maptypeid_changed', () => {
+                        updateMarkerLabelColors();
                     });
                     
                     console.log('Map initialized successfully');
@@ -97,7 +280,7 @@ async function loadVehicles() {
         const vehiclesResponse = await fetch('/vehicle/api/monitoring/vehicles');
         const vehiclesData = await vehiclesResponse.json();
         
-        // Load all GPS devices (including unassigned)
+        // Load all GPS devices (including unassigned) - get all devices that have ever sent data
         const gpsResponse = await fetch('/vehicle/api/monitoring/gps-devices');
         const gpsData = await gpsResponse.json();
         
@@ -126,42 +309,104 @@ async function loadVehicles() {
 // Update vehicle list
 function updateVehicleList() {
     const vehicleList = document.getElementById('vehicleList');
-    const vehicles = Object.values(vehicleData);
-    const gpsDevices = Object.values(gpsDevicesData);
+    let vehicles = Object.values(vehicleData);
+    let gpsDevices = Object.values(gpsDevicesData);
     
     if (vehicles.length === 0 && gpsDevices.length === 0) {
-        vehicleList.innerHTML = '<p class="text-center text-muted">No vehicles or GPS devices found</p>';
+        vehicleList.innerHTML = `
+            <div class="vehicle-empty-state">
+                <i class="fa fa-car" style="font-size: 3rem; opacity: 0.3; margin-bottom: 1rem; display: block;"></i>
+                <p class="text-center text-muted" style="margin: 0;">No vehicles or GPS devices found</p>
+            </div>
+        `;
         return;
     }
     
-    // Use table format like vehicle management page for dark mode compatibility
-    let html = '<table class="table table-hover table-bordered" style="margin-bottom: 0;">';
-    html += '<thead><tr><th>Vehicle / GPS Device</th><th>Status</th></tr></thead><tbody>';
+    // Sort vehicles: Online first, then Offline, then No GPS
+    vehicles.sort((a, b) => {
+        const aHasLocation = a.location !== null;
+        const bHasLocation = b.location !== null;
+        
+        // Online vehicles first
+        if (a.isOnline && !b.isOnline) return -1;
+        if (!a.isOnline && b.isOnline) return 1;
+        
+        // If both online or both offline, sort by online status
+        if (a.isOnline === b.isOnline) {
+            // If both online, sort by last update time (most recent first)
+            if (a.isOnline && b.isOnline) {
+                const aTime = a.location?.lastUpdate ? new Date(a.location.lastUpdate).getTime() : 0;
+                const bTime = b.location?.lastUpdate ? new Date(b.location.lastUpdate).getTime() : 0;
+                return bTime - aTime;
+            }
+            // If both offline, offline with location comes before no location
+            if (aHasLocation && !bHasLocation) return -1;
+            if (!aHasLocation && bHasLocation) return 1;
+        }
+        
+        // Default: maintain original order
+        return 0;
+    });
+    
+    // Sort GPS devices: Online first, then Offline
+    gpsDevices.sort((a, b) => {
+        if (a.isOnline && !b.isOnline) return -1;
+        if (!a.isOnline && b.isOnline) return 1;
+        return 0;
+    });
+    
+    // Modern card-based design
+    let html = '<div class="vehicle-list-container">';
     
     // Show vehicles with GPS
     vehicles.forEach(vehicle => {
         const hasLocation = vehicle.location !== null;
         const statusClass = vehicle.isOnline ? 'success' : (hasLocation ? 'warning' : 'secondary');
         const statusText = vehicle.isOnline ? 'Online' : (hasLocation ? 'Offline' : 'No GPS');
+        const statusIcon = vehicle.isOnline ? 'fa-circle' : (hasLocation ? 'fa-circle-o' : 'fa-times-circle');
+        const statusColor = vehicle.isOnline ? '#28a745' : (hasLocation ? '#ffc107' : '#6c757d');
         
         html += `
-            <tr class="vehicle-item" data-vehicle-id="${vehicle.id}" data-type="vehicle" style="cursor: pointer;">
-                <td>
-                    <strong>${vehicle.modelName}</strong><br>
-                    <small class="text-muted">Plate: ${vehicle.plateNumber} | Type: ${vehicle.vehicleType}</small><br>
-                    <small class="text-info">GPS: ${vehicle.gpsDeviceId || 'Not assigned'}</small><br>
+            <div class="vehicle-card vehicle-item" data-vehicle-id="${vehicle.id}" data-type="vehicle">
+                <div class="vehicle-card-header">
+                    <div class="vehicle-title-section">
+                        <h6 class="vehicle-name">${vehicle.modelName}</h6>
+                        <span class="vehicle-plate">${vehicle.plateNumber}</span>
+                    </div>
+                    <div class="vehicle-status-badge">
+                        <span class="badge bg-${statusClass} ${vehicle.isOnline ? 'status-online' : ''}">${statusText}</span>
+                    </div>
+                </div>
+                <div class="vehicle-card-body">
+                    <div class="vehicle-info-row">
+                        <i class="fa fa-car"></i>
+                        <span class="vehicle-type">${vehicle.vehicleType}</span>
+                    </div>
+                    <div class="vehicle-info-row">
+                        <i class="fa fa-satellite"></i>
+                        <span class="gps-info">${vehicle.gpsDeviceId || 'Not assigned'}</span>
+                    </div>
                     ${hasLocation ? `
-                        <small class="text-muted">
-                            <i class="fa fa-map-marker"></i> 
-                            ${vehicle.location.lastUpdate ? new Date(vehicle.location.lastUpdate).toLocaleString() : 'N/A'}
-                            ${vehicle.location.minutesSinceUpdate !== null ? `(${vehicle.location.minutesSinceUpdate} min ago)` : ''}
-                        </small>
-                    ` : vehicle.hasGps ? '<small class="text-warning">Waiting for GPS data...</small>' : '<small class="text-muted">No GPS device assigned</small>'}
-                </td>
-                <td class="text-center">
-                    <span class="badge bg-${statusClass}">${statusText}</span>
-                </td>
-            </tr>
+                        <div class="vehicle-info-row location-info">
+                            <i class="fa fa-map-marker text-primary"></i>
+                            <div class="location-details">
+                                <span class="location-time">${formatDatePH(vehicle.location.lastUpdate)}</span>
+                                ${vehicle.location.minutesSinceUpdate !== null ? `<span class="location-ago">${vehicle.location.minutesSinceUpdate} min ago</span>` : ''}
+                            </div>
+                        </div>
+                    ` : vehicle.hasGps ? `
+                        <div class="vehicle-info-row">
+                            <i class="fa fa-clock-o text-warning"></i>
+                            <span class="text-warning">Waiting for GPS data...</span>
+                        </div>
+                    ` : `
+                        <div class="vehicle-info-row">
+                            <i class="fa fa-exclamation-triangle text-muted"></i>
+                            <span class="text-muted">No GPS device assigned</span>
+                        </div>
+                    `}
+                </div>
+            </div>
         `;
     });
     
@@ -170,29 +415,45 @@ function updateVehicleList() {
         if (!device.isAssigned && device.location) {
             const statusClass = device.isOnline ? 'success' : 'warning';
             const statusText = device.isOnline ? 'Online' : 'Offline';
+            const statusColor = device.isOnline ? '#28a745' : '#ffc107';
             
             html += `
-                <tr class="gps-device-item" data-device-id="${device.deviceId}" data-type="gps" style="cursor: pointer;">
-                    <td>
-                        <strong><i class="fa fa-map-marker"></i> GPS Device</strong><br>
-                        <small class="text-muted">Device ID: ${device.deviceId}</small><br>
-                        <small class="text-warning">Not assigned to vehicle</small><br>
+                <div class="vehicle-card gps-device-item" data-device-id="${device.deviceId}" data-type="gps">
+                    <div class="vehicle-card-header">
+                        <div class="vehicle-title-section">
+                            <h6 class="vehicle-name"><i class="fa fa-map-marker"></i> GPS Device</h6>
+                            <span class="vehicle-plate">${device.deviceId}</span>
+                        </div>
+                        <div class="vehicle-status-badge">
+                            <span class="status-indicator" style="background-color: ${statusColor};"></span>
+                            <span class="badge bg-${statusClass}">${statusText}</span>
+                        </div>
+                    </div>
+                    <div class="vehicle-card-body">
+                        <div class="vehicle-info-row">
+                            <i class="fa fa-exclamation-triangle text-warning"></i>
+                            <span class="text-warning">Not assigned to vehicle</span>
+                        </div>
                         ${device.location ? `
-                            <small class="text-muted">
-                                <i class="fa fa-map-marker"></i> 
-                                ${device.location.timestamp ? new Date(device.location.timestamp).toLocaleString() : 'N/A'}
-                            </small>
-                        ` : '<small class="text-muted">No location data</small>'}
-                    </td>
-                    <td class="text-center">
-                        <span class="badge bg-${statusClass}">${statusText}</span>
-                    </td>
-                </tr>
+                            <div class="vehicle-info-row location-info">
+                                <i class="fa fa-map-marker text-primary"></i>
+                                <div class="location-details">
+                                    <span class="location-time">${formatDatePH(device.location.timestamp)}</span>
+                                </div>
+                            </div>
+                        ` : `
+                            <div class="vehicle-info-row">
+                                <i class="fa fa-times-circle text-muted"></i>
+                                <span class="text-muted">No location data</span>
+                            </div>
+                        `}
+                    </div>
+                </div>
             `;
         }
     });
     
-    html += '</tbody></table>';
+    html += '</div>';
     vehicleList.innerHTML = html;
     
     // Add click handlers for vehicles
@@ -232,45 +493,144 @@ function updateVehicleList() {
     });
 }
 
+// Get label color based on map type
+function getLabelColor() {
+    if (!map) return '#333333';
+    const mapType = map.getMapTypeId();
+    // White text for satellite and hybrid views
+    if (mapType === 'satellite' || mapType === 'hybrid') {
+        return '#ffffff';
+    }
+    // Black text for roadmap and terrain views
+    return '#333333';
+}
+
+// Update all marker label colors based on current map type
+function updateMarkerLabelColors() {
+    if (!map) return;
+    const labelColor = getLabelColor();
+    
+    // Update all markers
+    Object.keys(markers).forEach(markerKey => {
+        const marker = markers[markerKey];
+        if (!marker) return;
+        
+        const currentLabel = marker.getLabel();
+        if (currentLabel && typeof currentLabel === 'object') {
+            // Preserve all label properties, only update color
+            marker.setLabel({
+                text: currentLabel.text || '',
+                color: labelColor,
+                fontSize: currentLabel.fontSize || '11px',
+                fontWeight: currentLabel.fontWeight || 'bold',
+                className: currentLabel.className || ''
+            });
+        }
+    });
+}
+
 // Update map markers
 function updateMapMarkers() {
     if (!map) return;
     
-    // Remove old markers
-    Object.values(markers).forEach(marker => marker.setMap(null));
-    markers = {};
+    // Only use DROP animation on first load
+    const useDropAnimation = isFirstMapLoad;
+    
+    // Remove old markers only if this is a full refresh
+    if (isFirstMapLoad) {
+        Object.values(markers).forEach(marker => marker.setMap(null));
+        markers = {};
+    }
     
     // Add vehicle markers
     Object.values(vehicleData).forEach(vehicle => {
         if (vehicle.location && vehicle.location.lat && vehicle.location.lng) {
             const position = { lat: vehicle.location.lat, lng: vehicle.location.lng };
             
-            // Create marker
+            // Check if marker already exists
+            if (markers[vehicle.id]) {
+                // Update existing marker position smoothly
+                markers[vehicle.id].setPosition(position);
+                markers[vehicle.id].setIcon({
+                    url: vehicle.isOnline ? 'https://maps.google.com/mapfiles/ms/icons/green-dot.png' : 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
+                    scaledSize: new google.maps.Size(32, 32),
+                    labelOrigin: new google.maps.Point(16, 45)
+                });
+                markers[vehicle.id].setLabel({
+                    text: vehicle.plateNumber || vehicle.modelName.substring(0, 8),
+                    color: getLabelColor(),
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    className: 'vehicle-marker-label'
+                });
+                return; // Skip creating new marker
+            }
+            
+            // Create marker with label below (only for new markers)
             const marker = new google.maps.Marker({
                 position: position,
                 map: map,
                 title: `${vehicle.modelName} - ${vehicle.plateNumber}`,
-                icon: {
-                    url: vehicle.isOnline ? 'http://maps.google.com/mapfiles/ms/icons/green-dot.png' : 'http://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
-                    scaledSize: new google.maps.Size(32, 32)
+                label: {
+                    text: vehicle.plateNumber || vehicle.modelName.substring(0, 8),
+                    color: getLabelColor(),
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    className: 'vehicle-marker-label'
                 },
-                animation: google.maps.Animation.DROP
+                icon: {
+                    url: vehicle.isOnline ? 'https://maps.google.com/mapfiles/ms/icons/green-dot.png' : 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
+                    scaledSize: new google.maps.Size(32, 32),
+                    labelOrigin: new google.maps.Point(16, 45) // Position label below marker
+                },
+                animation: useDropAnimation ? google.maps.Animation.DROP : null
             });
             
-            // Create info window
+            // Create info window with improved layout
+            const infoWindowId = `infoWindow_${vehicle.id}`;
             const infoWindow = new google.maps.InfoWindow({
                 content: `
-                    <div style="padding: 10px; min-width: 200px;">
-                        <h6 style="margin-bottom: 10px;">${vehicle.modelName}</h6>
-                        <p style="margin-bottom: 5px;"><strong>Plate:</strong> ${vehicle.plateNumber}<br>
-                        <strong>Type:</strong> ${vehicle.vehicleType}<br>
-                        <strong>GPS Device:</strong> ${vehicle.gpsDeviceId || 'Not assigned'}<br>
-                        <strong>Status:</strong> <span style="color: ${vehicle.isOnline ? '#28a745' : '#ffc107'};">${vehicle.isOnline ? 'Online' : 'Offline'}</span><br>
-                        ${vehicle.location.speed ? `<strong>Speed:</strong> ${vehicle.location.speed} km/h<br>` : ''}
-                        ${vehicle.location.battery ? `<strong>Battery:</strong> ${vehicle.location.battery}%<br>` : ''}
-                        <strong>Last Update:</strong> ${vehicle.location.lastUpdate ? new Date(vehicle.location.lastUpdate).toLocaleString() : 'N/A'}
-                        </p>
-                        <button class="btn btn-sm btn-primary" onclick="showVehicleInfo(${vehicle.id})" style="margin-top: 5px;">View Details</button>
+                    <div id="${infoWindowId}" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 280px; max-width: 320px; border: none; box-shadow: none;">
+                        <div style="background: #ffffff; padding: 14px 16px; margin: -8px -8px 0 -8px; border-radius: 8px 8px 0 0;">
+                            <h4 style="margin: 0; color: #000; font-size: 17px; font-weight: 600; letter-spacing: 0.3px;">${vehicle.modelName}</h4>
+                        </div>
+                        <div style="padding: 12px 16px; background: #fff;">
+                            <div style="display: flex; align-items: center; padding: 10px 0;">
+                                <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Plate Number:</span>
+                                <span style="font-weight: 600; color: #111827; font-size: 14px;">${vehicle.plateNumber}</span>
+                            </div>
+                            <div style="display: flex; align-items: center; padding: 10px 0;">
+                                <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Vehicle Type:</span>
+                                <span style="color: #111827; font-size: 14px;">${vehicle.vehicleType}</span>
+                            </div>
+                            <div style="display: flex; align-items: center; padding: 10px 0;">
+                                <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">GPS Device:</span>
+                                <span style="color: #111827; font-size: 13px; font-family: 'Courier New', monospace; background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${vehicle.gpsDeviceId || 'Not assigned'}</span>
+                            </div>
+                            <div style="display: flex; align-items: center; padding: 10px 0;">
+                                <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Status:</span>
+                                <span style="color: ${vehicle.isOnline ? '#10b981' : '#f59e0b'}; font-weight: 600; font-size: 14px;">${vehicle.isOnline ? '● Online' : '● Offline'}</span>
+                            </div>
+                            ${vehicle.location.speed ? `
+                            <div style="display: flex; align-items: center; padding: 10px 0;">
+                                <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Speed:</span>
+                                <span style="color: #111827; font-size: 14px;">${vehicle.location.speed} km/h</span>
+                            </div>
+                            ` : ''}
+                            ${vehicle.location.battery ? `
+                            <div style="display: flex; align-items: center; padding: 10px 0;">
+                                <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Battery:</span>
+                                <span style="color: #111827; font-size: 14px;">${vehicle.location.battery}%</span>
+                            </div>
+                            ` : ''}
+                            <div style="display: flex; align-items: center; padding: 10px 0;">
+                                <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Last Update:</span>
+                                <span style="color: #111827; font-size: 12px;">${formatDateFullPH(vehicle.location.lastUpdate)}</span>
+                            </div>
+                        </div>
+                        <div style="padding: 12px 16px; background: #f9fafb; border-radius: 0 0 8px 8px; margin: 0 -8px -8px -8px;">
+                            <button onclick="showVehicleInfo(${vehicle.id})" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3); transition: all 0.2s;">View Details</button>
+                        </div>
                     </div>
                 `
             });
@@ -287,32 +647,88 @@ function updateMapMarkers() {
     Object.values(gpsDevicesData).forEach(device => {
         if (!device.isAssigned && device.location && device.location.lat && device.location.lng) {
             const position = { lat: device.location.lat, lng: device.location.lng };
+            const markerKey = `gps_${device.deviceId}`;
             
-            // Create marker for unassigned GPS device
+            // Check if marker already exists
+            if (markers[markerKey]) {
+                // Update existing marker position smoothly
+                markers[markerKey].setPosition(position);
+                markers[markerKey].setIcon({
+                    url: device.isOnline ? 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png' : 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png',
+                    scaledSize: new google.maps.Size(28, 28),
+                    labelOrigin: new google.maps.Point(14, 40)
+                });
+                markers[markerKey].setLabel({
+                    text: device.deviceId.substring(device.deviceId.length - 4) || 'GPS',
+                    color: getLabelColor(),
+                    fontSize: '10px',
+                    fontWeight: 'bold',
+                    className: 'gps-marker-label'
+                });
+                return; // Skip creating new marker
+            }
+            
+            // Create marker for unassigned GPS device with label below (only for new markers)
             const marker = new google.maps.Marker({
                 position: position,
                 map: map,
                 title: `GPS Device ${device.deviceId} (Unassigned)`,
-                icon: {
-                    url: device.isOnline ? 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png' : 'http://maps.google.com/mapfiles/ms/icons/purple-dot.png',
-                    scaledSize: new google.maps.Size(28, 28)
+                label: {
+                    text: device.deviceId.substring(device.deviceId.length - 4) || 'GPS',
+                    color: getLabelColor(),
+                    fontSize: '10px',
+                    fontWeight: 'bold',
+                    className: 'gps-marker-label'
                 },
-                animation: google.maps.Animation.DROP
+                icon: {
+                    url: device.isOnline ? 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png' : 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png',
+                    scaledSize: new google.maps.Size(28, 28),
+                    labelOrigin: new google.maps.Point(14, 40) // Position label below marker
+                },
+                animation: useDropAnimation ? google.maps.Animation.DROP : null
             });
             
             // Create info window
+            const infoWindowId = `infoWindow_gps_${device.deviceId}`;
             const infoWindow = new google.maps.InfoWindow({
                 content: `
-                    <div style="padding: 10px; min-width: 200px;">
-                        <h6 style="margin-bottom: 10px;"><i class="fa fa-map-marker"></i> GPS Device</h6>
-                        <p style="margin-bottom: 5px;"><strong>Device ID:</strong> ${device.deviceId}<br>
-                        <strong>Status:</strong> <span class="badge bg-warning">Not Assigned</span><br>
-                        <strong>GPS Status:</strong> <span style="color: ${device.isOnline ? '#28a745' : '#ffc107'};">${device.isOnline ? 'Online' : 'Offline'}</span><br>
-                        ${device.location.speed ? `<strong>Speed:</strong> ${device.location.speed} km/h<br>` : ''}
-                        ${device.location.battery ? `<strong>Battery:</strong> ${device.location.battery}%<br>` : ''}
-                        <strong>Last Update:</strong> ${device.location.timestamp ? new Date(device.location.timestamp).toLocaleString() : 'N/A'}
-                        </p>
-                        <button class="btn btn-sm btn-primary" onclick="showGpsDeviceInfo('${device.deviceId}')" style="margin-top: 5px;">View Details</button>
+                    <div id="${infoWindowId}" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 280px; max-width: 320px; border: none; box-shadow: none;">
+                        <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 14px 16px; margin: -8px -8px 0 -8px; border-radius: 8px 8px 0 0;">
+                            <h4 style="margin: 0; color: #fff; font-size: 17px; font-weight: 600; letter-spacing: 0.3px;">📍 GPS Device</h4>
+                        </div>
+                        <div style="padding: 12px 16px; background: #fff;">
+                            <div style="display: flex; align-items: center; padding: 10px 0;">
+                                <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Device ID:</span>
+                                <span style="color: #111827; font-size: 13px; font-family: 'Courier New', monospace; background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-weight: 600;">${device.deviceId}</span>
+                            </div>
+                            <div style="display: flex; align-items: center; padding: 10px 0;">
+                                <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Status:</span>
+                                <span style="background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600;">Not Assigned</span>
+                            </div>
+                            <div style="display: flex; align-items: center; padding: 10px 0;">
+                                <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">GPS Status:</span>
+                                <span style="color: ${device.isOnline ? '#10b981' : '#f59e0b'}; font-weight: 600; font-size: 14px;">${device.isOnline ? '● Online' : '● Offline'}</span>
+                            </div>
+                            ${device.location.speed ? `
+                            <div style="display: flex; align-items: center; padding: 10px 0;">
+                                <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Speed:</span>
+                                <span style="color: #111827; font-size: 14px;">${device.location.speed} km/h</span>
+                            </div>
+                            ` : ''}
+                            ${device.location.battery ? `
+                            <div style="display: flex; align-items: center; padding: 10px 0;">
+                                <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Battery:</span>
+                                <span style="color: #111827; font-size: 14px;">${device.location.battery}%</span>
+                            </div>
+                            ` : ''}
+                            <div style="display: flex; align-items: center; padding: 10px 0;">
+                                <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Last Update:</span>
+                                <span style="color: #111827; font-size: 12px;">${formatDateFullPH(device.location.timestamp)}</span>
+                            </div>
+                        </div>
+                        <div style="padding: 12px 16px; background: #f9fafb; border-radius: 0 0 8px 8px; margin: 0 -8px -8px -8px;">
+                            <button onclick="showGpsDeviceInfo('${device.deviceId}')" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3); transition: all 0.2s;">View Details</button>
+                        </div>
                     </div>
                 `
             });
@@ -325,13 +741,14 @@ function updateMapMarkers() {
         }
     });
     
-    // Fit map to show all markers
-    if (Object.keys(markers).length > 0) {
+    // Fit map to show all markers (only on first load to avoid jumping)
+    if (isFirstMapLoad && Object.keys(markers).length > 0) {
         const bounds = new google.maps.LatLngBounds();
         Object.values(markers).forEach(marker => {
             bounds.extend(marker.getPosition());
         });
         map.fitBounds(bounds);
+        isFirstMapLoad = false; // Mark that first load is complete
     }
 }
 
@@ -359,7 +776,7 @@ function showVehicleInfo(vehicleId) {
                     ${vehicle.location.speed ? `<p><strong>Speed:</strong> ${vehicle.location.speed} km/h</p>` : ''}
                     ${vehicle.location.heading ? `<p><strong>Heading:</strong> ${vehicle.location.heading}°</p>` : ''}
                     ${vehicle.location.battery ? `<p><strong>Battery:</strong> ${vehicle.location.battery}%</p>` : ''}
-                    <p><strong>Last Update:</strong> ${vehicle.location.lastUpdate ? new Date(vehicle.location.lastUpdate).toLocaleString() : 'N/A'}</p>
+                    <p><strong>Last Update:</strong> ${formatDateFullPH(vehicle.location.lastUpdate)}</p>
                     <p><strong>Minutes Since Update:</strong> ${vehicle.location.minutesSinceUpdate !== null ? vehicle.location.minutesSinceUpdate : 'N/A'}</p>
                 ` : '<p class="text-muted">No location data available</p>'}
             </div>
@@ -400,7 +817,7 @@ function showGpsDeviceInfo(deviceId) {
                     ${device.location.speed ? `<p><strong>Speed:</strong> ${device.location.speed} km/h</p>` : ''}
                     ${device.location.heading ? `<p><strong>Heading:</strong> ${device.location.heading}°</p>` : ''}
                     ${device.location.battery ? `<p><strong>Battery:</strong> ${device.location.battery}%</p>` : ''}
-                    <p><strong>Last Update:</strong> ${device.location.timestamp ? new Date(device.location.timestamp).toLocaleString() : 'N/A'}</p>
+                    <p><strong>Last Update:</strong> ${formatDateFullPH(device.location.timestamp)}</p>
                 ` : '<p class="text-muted">No location data available</p>'}
             </div>
         </div>
@@ -419,34 +836,320 @@ function showGpsDeviceInfo(deviceId) {
     modal.show();
 }
 
-// Refresh button
-document.getElementById('refreshBtn').addEventListener('click', () => {
-    loadVehicles();
-});
 
-// Auto refresh toggle
-document.getElementById('autoRefreshBtn').addEventListener('click', function() {
-    if (isAutoRefresh) {
-        // Stop auto refresh
-        if (autoRefreshInterval) {
-            clearInterval(autoRefreshInterval);
-            autoRefreshInterval = null;
-        }
-        isAutoRefresh = false;
-        this.innerHTML = '<i class="fa fa-play"></i> Auto Refresh';
-        this.classList.remove('btn-danger');
-        this.classList.add('btn-success');
-    } else {
-        // Start auto refresh
-        autoRefreshInterval = setInterval(() => {
-            loadVehicles();
-        }, 30000); // Refresh every 30 seconds
-        isAutoRefresh = true;
-        this.innerHTML = '<i class="fa fa-stop"></i> Stop Auto Refresh';
-        this.classList.remove('btn-success');
-        this.classList.add('btn-danger');
+// ========================================
+// SOCKET.IO REAL-TIME GPS UPDATES
+// ========================================
+
+let gpsTrackingSocket = null;
+
+// Initialize Socket.IO connection for GPS tracking
+function initGpsTrackingSocket() {
+    if (typeof io === 'undefined') {
+        console.warn('Socket.IO not available');
+        return;
     }
-});
+    
+    gpsTrackingSocket = io({
+        transports: ['websocket', 'polling'],
+        upgrade: true,
+        rememberUpgrade: true,
+        timeout: 20000
+    });
+    
+    gpsTrackingSocket.on('connect', () => {
+        console.log('📍 GPS Tracking connected to Socket.IO server');
+    });
+    
+    gpsTrackingSocket.on('disconnect', () => {
+        console.log('📍 GPS Tracking disconnected from Socket.IO server');
+    });
+    
+    gpsTrackingSocket.on('connect_error', (error) => {
+        console.error('❌ GPS Tracking Socket.IO connection error:', error);
+    });
+    
+    // Listen for real-time GPS location updates
+    gpsTrackingSocket.on('driver-location-updated', async (data) => {
+        console.log('📍 Received GPS location update:', data);
+        
+        if (data && data.deviceId && data.location) {
+            await updateVehicleLocationFromSocket(data.deviceId, data.location);
+        }
+    });
+}
+
+// Update vehicle location from Socket.IO event
+async function updateVehicleLocationFromSocket(deviceId, locationData) {
+    try {
+        // Find vehicle with this GPS device ID
+        let vehicleId = null;
+        for (const [id, vehicle] of Object.entries(vehicleData)) {
+            if (vehicle.gpsDeviceId === deviceId) {
+                vehicleId = id;
+                break;
+            }
+        }
+        
+        // Calculate minutes since update
+        const now = new Date();
+        const updateTime = new Date(locationData.timestamp);
+        const minutesSinceUpdate = Math.floor((now - updateTime) / (1000 * 60));
+        const isOnline = minutesSinceUpdate < 10;
+        
+        if (vehicleId && vehicleData[vehicleId]) {
+            // Update vehicle location
+            vehicleData[vehicleId].location = {
+                lat: locationData.lat,
+                lng: locationData.lng,
+                speed: locationData.speed || null,
+                heading: locationData.heading || null,
+                battery: locationData.battery || null,
+                lastUpdate: locationData.timestamp,
+                minutesSinceUpdate: minutesSinceUpdate
+            };
+            vehicleData[vehicleId].isOnline = isOnline;
+            
+            // Update marker on map
+            updateMarkerForVehicle(vehicleId, vehicleData[vehicleId]);
+            
+            // Update vehicle list
+            updateVehicleList();
+        } else {
+            // Check if it's an unassigned GPS device
+            if (gpsDevicesData[deviceId]) {
+                gpsDevicesData[deviceId].location = {
+                    lat: locationData.lat,
+                    lng: locationData.lng,
+                    speed: locationData.speed || null,
+                    heading: locationData.heading || null,
+                    battery: locationData.battery || null,
+                    timestamp: locationData.timestamp
+                };
+                gpsDevicesData[deviceId].isOnline = isOnline;
+                
+                // Update marker for unassigned device
+                updateMarkerForGpsDevice(deviceId, gpsDevicesData[deviceId]);
+                
+                // Update vehicle list
+                updateVehicleList();
+            } else {
+                // Device not found in our data, reload all vehicles to get updated data
+                console.log(`📍 Device ${deviceId} not found in current data, reloading vehicles...`);
+                await loadVehicles();
+            }
+        }
+    } catch (error) {
+        console.error('Error updating vehicle location from socket:', error);
+    }
+}
+
+// Update marker for a specific vehicle
+function updateMarkerForVehicle(vehicleId, vehicle) {
+    if (!map || !vehicle.location) return;
+    
+    const position = { lat: vehicle.location.lat, lng: vehicle.location.lng };
+    
+    if (markers[vehicleId]) {
+        // Update existing marker position
+        markers[vehicleId].setPosition(position);
+        markers[vehicleId].setIcon({
+            url: vehicle.isOnline ? 'https://maps.google.com/mapfiles/ms/icons/green-dot.png' : 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
+            scaledSize: new google.maps.Size(32, 32),
+            labelOrigin: new google.maps.Point(16, 45) // Position label below marker
+        });
+        // Update label text
+        markers[vehicleId].setLabel({
+            text: vehicle.plateNumber || vehicle.modelName.substring(0, 8),
+            color: getLabelColor(),
+            fontSize: '11px',
+            fontWeight: 'bold',
+            className: 'vehicle-marker-label'
+        });
+    } else {
+        // Create new marker with label below
+        const marker = new google.maps.Marker({
+            position: position,
+            map: map,
+            title: `${vehicle.modelName} - ${vehicle.plateNumber}`,
+            label: {
+                text: vehicle.plateNumber || vehicle.modelName.substring(0, 8),
+                color: getLabelColor(),
+                fontSize: '11px',
+                fontWeight: 'bold',
+                className: 'vehicle-marker-label'
+            },
+            icon: {
+                url: vehicle.isOnline ? 'https://maps.google.com/mapfiles/ms/icons/green-dot.png' : 'https://maps.google.com/mapfiles/ms/icons/yellow-dot.png',
+                scaledSize: new google.maps.Size(32, 32),
+                labelOrigin: new google.maps.Point(16, 45) // Position label below marker
+            },
+            animation: google.maps.Animation.DROP
+        });
+        
+        // Create info window
+        const infoWindowId = `infoWindow_${vehicleId}`;
+        const infoWindow = new google.maps.InfoWindow({
+            content: `
+                <div id="${infoWindowId}" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 280px; max-width: 320px; border: none; box-shadow: none;">
+                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 14px 16px; margin: -8px -8px 0 -8px; border-radius: 8px 8px 0 0;">
+                        <h4 style="margin: 0; color: #fff; font-size: 17px; font-weight: 600; letter-spacing: 0.3px;">${vehicle.modelName}</h4>
+                    </div>
+                    <div style="padding: 12px 16px; background: #fff;">
+                        <div style="display: flex; align-items: center; padding: 10px 0;">
+                            <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Plate Number:</span>
+                            <span style="font-weight: 600; color: #111827; font-size: 14px;">${vehicle.plateNumber}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; padding: 10px 0;">
+                            <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Vehicle Type:</span>
+                            <span style="color: #111827; font-size: 14px;">${vehicle.vehicleType}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; padding: 10px 0;">
+                            <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">GPS Device:</span>
+                            <span style="color: #111827; font-size: 13px; font-family: 'Courier New', monospace; background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${vehicle.gpsDeviceId || 'Not assigned'}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; padding: 10px 0;">
+                            <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Status:</span>
+                            <span style="color: ${vehicle.isOnline ? '#10b981' : '#f59e0b'}; font-weight: 600; font-size: 14px;">${vehicle.isOnline ? '● Online' : '● Offline'}</span>
+                        </div>
+                        ${vehicle.location.speed ? `
+                        <div style="display: flex; align-items: center; padding: 10px 0;">
+                            <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Speed:</span>
+                            <span style="color: #111827; font-size: 14px;">${vehicle.location.speed} km/h</span>
+                        </div>
+                        ` : ''}
+                        ${vehicle.location.battery ? `
+                        <div style="display: flex; align-items: center; padding: 10px 0;">
+                            <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Battery:</span>
+                            <span style="color: #111827; font-size: 14px;">${vehicle.location.battery}%</span>
+                        </div>
+                        ` : ''}
+                        <div style="display: flex; align-items: center; padding: 10px 0;">
+                            <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Last Update:</span>
+                            <span style="color: #111827; font-size: 12px;">${formatDateFullPH(vehicle.location.lastUpdate)}</span>
+                        </div>
+                    </div>
+                    <div style="padding: 12px 16px; background: #f9fafb; border-radius: 0 0 8px 8px; margin: 0 -8px -8px -8px;">
+                        <button onclick="showVehicleInfo(${vehicleId})" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3); transition: all 0.2s;">View Details</button>
+                    </div>
+                </div>
+            `
+        });
+        
+        marker.addListener('click', () => {
+            infoWindow.open(map, marker);
+        });
+        
+        markers[vehicleId] = marker;
+    }
+}
+
+// Update marker for an unassigned GPS device
+function updateMarkerForGpsDevice(deviceId, device) {
+    if (!map || !device.location) return;
+    
+    const position = { lat: device.location.lat, lng: device.location.lng };
+    const markerKey = `gps_${deviceId}`;
+    
+    if (markers[markerKey]) {
+        // Update existing marker position
+        markers[markerKey].setPosition(position);
+        markers[markerKey].setIcon({
+            url: device.isOnline ? 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png' : 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png',
+            scaledSize: new google.maps.Size(28, 28),
+            labelOrigin: new google.maps.Point(14, 40) // Position label below marker
+        });
+        // Update label text
+        markers[markerKey].setLabel({
+            text: deviceId.substring(deviceId.length - 4) || 'GPS',
+            color: getLabelColor(),
+            fontSize: '10px',
+            fontWeight: 'bold',
+            className: 'gps-marker-label'
+        });
+    } else if (!device.isAssigned) {
+        // Create new marker for unassigned device with label below
+        const marker = new google.maps.Marker({
+            position: position,
+            map: map,
+            title: `GPS Device ${deviceId} (Unassigned)`,
+            label: {
+                text: deviceId.substring(deviceId.length - 4) || 'GPS',
+                color: getLabelColor(),
+                fontSize: '10px',
+                fontWeight: 'bold',
+                className: 'gps-marker-label'
+            },
+            icon: {
+                url: device.isOnline ? 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png' : 'https://maps.google.com/mapfiles/ms/icons/purple-dot.png',
+                scaledSize: new google.maps.Size(28, 28),
+                labelOrigin: new google.maps.Point(14, 40) // Position label below marker
+            },
+            animation: google.maps.Animation.DROP
+        });
+        
+        // Create info window
+        const infoWindowId = `infoWindow_gps_${deviceId}`;
+        const infoWindow = new google.maps.InfoWindow({
+            content: `
+                <div id="${infoWindowId}" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 280px; max-width: 320px; border: none; box-shadow: none;">
+                    <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 14px 16px; margin: -8px -8px 0 -8px; border-radius: 8px 8px 0 0;">
+                        <h4 style="margin: 0; color: #fff; font-size: 17px; font-weight: 600; letter-spacing: 0.3px;">📍 GPS Device</h4>
+                    </div>
+                    <div style="padding: 12px 16px; background: #fff;">
+                        <div style="display: flex; align-items: center; padding: 10px 0;">
+                            <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Device ID:</span>
+                            <span style="color: #111827; font-size: 13px; font-family: 'Courier New', monospace; background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-weight: 600;">${deviceId}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; padding: 10px 0;">
+                            <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Status:</span>
+                            <span style="background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600;">Not Assigned</span>
+                        </div>
+                        <div style="display: flex; align-items: center; padding: 10px 0;">
+                            <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">GPS Status:</span>
+                            <span style="color: ${device.isOnline ? '#10b981' : '#f59e0b'}; font-weight: 600; font-size: 14px;">${device.isOnline ? '● Online' : '● Offline'}</span>
+                        </div>
+                        ${device.location.speed ? `
+                        <div style="display: flex; align-items: center; padding: 10px 0;">
+                            <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Speed:</span>
+                            <span style="color: #111827; font-size: 14px;">${device.location.speed} km/h</span>
+                        </div>
+                        ` : ''}
+                        ${device.location.battery ? `
+                        <div style="display: flex; align-items: center; padding: 10px 0;">
+                            <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Battery:</span>
+                            <span style="color: #111827; font-size: 14px;">${device.location.battery}%</span>
+                        </div>
+                        ` : ''}
+                        <div style="display: flex; align-items: center; padding: 10px 0;">
+                            <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Last Update:</span>
+                            <span style="color: #111827; font-size: 12px;">${formatDateFullPH(device.location.timestamp)}</span>
+                        </div>
+                    </div>
+                    <div style="padding: 12px 16px; background: #f9fafb; border-radius: 0 0 8px 8px; margin: 0 -8px -8px -8px;">
+                        <button onclick="showGpsDeviceInfo('${deviceId}')" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3); transition: all 0.2s;">View Details</button>
+                    </div>
+                </div>
+            `
+        });
+        
+        marker.addListener('click', () => {
+            infoWindow.open(map, marker);
+        });
+        
+        markers[markerKey] = marker;
+    }
+}
+
+// Initialize Socket.IO when DOM is ready
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize Socket.IO after a short delay to ensure io is available
+        setTimeout(() => {
+            initGpsTrackingSocket();
+        }, 500);
+    });
+}
 
 // Note: initMap() is called from the EJS template after script loads
 

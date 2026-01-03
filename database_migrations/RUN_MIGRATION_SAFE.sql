@@ -30,12 +30,6 @@ INNER JOIN (
   AND g1.timestamp = g2.max_timestamp
   AND g1.created_at = g2.max_created_at;
 
-ALTER TABLE `vehicle` 
-ADD COLUMN `GPS_DEVICE_ID` VARCHAR(50) NULL DEFAULT NULL COLLATE utf8mb4_unicode_ci COMMENT 'GPS Tracker Device ID (IMEI) - Links vehicle to GPS tracker' 
-AFTER `REMARKS`;
-
-CREATE INDEX `idx_gps_device_id` ON `vehicle` (`GPS_DEVICE_ID`);
-
 CREATE OR REPLACE VIEW `v_vehicles_with_location` AS
 SELECT 
   v.IDNo,
@@ -70,3 +64,4 @@ LEFT JOIN (
   FROM `gps_locations`
 ) gl ON v.GPS_DEVICE_ID COLLATE utf8mb4_unicode_ci = gl.device_id COLLATE utf8mb4_unicode_ci AND gl.rn = 1
 WHERE v.ACTIVE = 1;
+
