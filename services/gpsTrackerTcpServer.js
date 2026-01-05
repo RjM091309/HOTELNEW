@@ -302,19 +302,46 @@ async function processGpsMessage(message, originalMessage, socket, io) {
     let distanceMeters = 0;
     
     if (latestLocation) {
-      distanceMeters = calculateDistance(
-        latestLocation.latitude,
-        latestLocation.longitude,
-        lat,
-        lng
-      );
+      // Round coordinates to 6 decimal places (~0.1m precision) to avoid floating point issues
+      const roundCoord = (coord) => Math.round(parseFloat(coord) * 1000000) / 1000000;
+      const roundedLatestLat = roundCoord(latestLocation.latitude);
+      const roundedLatestLng = roundCoord(latestLocation.longitude);
+      const roundedNewLat = roundCoord(lat);
+      const roundedNewLng = roundCoord(lng);
       
-      if (distanceMeters < distanceThreshold) {
+      // Check if timestamp is the same (indicates duplicate message from GPS device)
+      const latestTimestamp = latestLocation.timestamp ? new Date(latestLocation.timestamp).getTime() : null;
+      const newTimestamp = locationData.timestamp ? new Date(locationData.timestamp).getTime() : null;
+      
+      // First check: Same timestamp AND same coordinates = duplicate message
+      if (latestTimestamp && newTimestamp && latestTimestamp === newTimestamp) {
+        if (roundedLatestLat === roundedNewLat && roundedLatestLng === roundedNewLng) {
+          shouldSave = false;
+          console.log(`⏭️ Location not saved: Device ${locationData.deviceId} - duplicate message (same timestamp and coordinates)`);
+        }
+      }
+      
+      // Second check: Are coordinates exactly the same (within 0.1m precision)?
+      // This catches exact duplicates even if distance calculation has issues
+      if (shouldSave && roundedLatestLat === roundedNewLat && roundedLatestLng === roundedNewLng) {
         shouldSave = false;
-        // Don't save duplicate location, but still forward and emit Socket.IO
-        console.log(`⏭️ Location not saved: Device ${locationData.deviceId} moved only ${distanceMeters.toFixed(2)}m (threshold: ${distanceThreshold}m)`);
-      } else {
-        console.log(`📍 Location changed: Device ${locationData.deviceId} moved ${distanceMeters.toFixed(2)}m (threshold: ${distanceThreshold}m)`);
+        console.log(`⏭️ Location not saved: Device ${locationData.deviceId} - exact same coordinates (${roundedNewLat}, ${roundedNewLng})`);
+      } else if (shouldSave) {
+        // Third check: Calculate distance using rounded coordinates
+        distanceMeters = calculateDistance(
+          roundedLatestLat,
+          roundedLatestLng,
+          roundedNewLat,
+          roundedNewLng
+        );
+        
+        if (distanceMeters < distanceThreshold) {
+          shouldSave = false;
+          // Don't save duplicate location, but still forward and emit Socket.IO
+          console.log(`⏭️ Location not saved: Device ${locationData.deviceId} moved only ${distanceMeters.toFixed(2)}m (threshold: ${distanceThreshold}m)`);
+        } else {
+          console.log(`📍 Location changed: Device ${locationData.deviceId} moved ${distanceMeters.toFixed(2)}m (threshold: ${distanceThreshold}m)`);
+        }
       }
     }
     
@@ -343,7 +370,15 @@ async function processGpsMessage(message, originalMessage, socket, io) {
       }
     } else {
       // DO NOT emit Socket.IO if location not saved - all functions should depend on database
-      console.log(`⏭️ GPS Location received (not saved - no movement): Device ${locationData.deviceId} at (${lat}, ${lng})`);
+      // DO NOT update created_at timestamp - it should only update when actual new location is saved
+      // The created_at represents "last time actual movement was saved", not "last time data was received"
+      // BUT update timestamp field (GPS device timestamp) to show device is still sending data (for online status)
+      try {
+        await GpsTrackerModel.updateLocationHeartbeat(locationData.deviceId, locationData.timestamp);
+        console.log(`⏭️ GPS Location received (not saved - no movement): Device ${locationData.deviceId} at (${lat}, ${lng}) - Updated heartbeat timestamp for online status`);
+      } catch (error) {
+        console.error(`⚠️ Error updating heartbeat timestamp for device ${locationData.deviceId}:`, error);
+      }
     }
     
     // Always forward to Sinotrack (even if not saved locally)

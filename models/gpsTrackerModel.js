@@ -140,20 +140,24 @@ class GpsTrackerModel {
     return results[0] || null;
   }
 
-  // Update created_at timestamp of the latest location (for heartbeat/keepalive)
-  static async updateLocationTimestamp(deviceId) {
+  // Update timestamp field of the latest location (for heartbeat/keepalive - shows device is still sending data)
+  // Note: created_at is NOT updated - it represents "last time actual movement was saved"
+  // timestamp is updated to show "last time data was received" for online status check
+  static async updateLocationHeartbeat(deviceId, newTimestamp) {
     // Get the latest location ID first
     const latestLocation = await this.getLatestLocation(deviceId);
     if (!latestLocation || !latestLocation.id) {
       return false;
     }
     
+    // Update timestamp field (GPS device timestamp) to show device is still sending data
+    // But keep created_at unchanged (represents last actual movement)
     const query = `
       UPDATE gps_locations 
-      SET created_at = NOW()
+      SET timestamp = ?
       WHERE id = ?
     `;
-    const result = await queryDatabasePromise(query, [latestLocation.id]);
+    const result = await queryDatabasePromise(query, [newTimestamp, latestLocation.id]);
     return result.affectedRows > 0;
   }
 

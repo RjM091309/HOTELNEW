@@ -65,7 +65,11 @@ class VehicleMonitoringController {
           minutesSinceUpdate: vehicle.minutes_since_update
         } : null,
         hasGps: !!vehicle.GPS_DEVICE_ID,
-        isOnline: vehicle.minutes_since_update !== null && vehicle.minutes_since_update < 10 // Online if updated within 10 minutes
+        // Online status: Check if timestamp (GPS device timestamp) is recent (within 10 minutes)
+        // This shows if device is still sending data, even if location hasn't changed
+        // created_at is used for "x min ago" display (shows standby time since last actual movement)
+        isOnline: vehicle.last_location_time ? 
+          (new Date() - new Date(vehicle.last_location_time)) < 10 * 60 * 1000 : false
       }));
       
       res.json({
@@ -114,7 +118,11 @@ class VehicleMonitoringController {
           minutesSinceUpdate: vehicle.minutes_since_update
         } : null,
         hasGps: !!vehicle.GPS_DEVICE_ID,
-        isOnline: vehicle.minutes_since_update !== null && vehicle.minutes_since_update < 10
+        // Online status: Check if timestamp (GPS device timestamp) is recent (within 10 minutes)
+        // This shows if device is still sending data, even if location hasn't changed
+        // created_at is used for "x min ago" display (shows standby time since last actual movement)
+        isOnline: vehicle.last_location_time ? 
+          (new Date() - new Date(vehicle.last_location_time)) < 10 * 60 * 1000 : false
       };
       
       res.json({
@@ -237,8 +245,11 @@ class VehicleMonitoringController {
             lastUpdate: device.last_update,
             totalUpdates: device.total_updates,
             isAssigned: !!vehicle,
-            isOnline: location && location.created_at ? 
-              (new Date() - new Date(location.created_at)) < 10 * 60 * 1000 : false // Online if updated within 10 minutes (use created_at - server receive time)
+            // Online status: Check if timestamp (GPS device timestamp) is recent (within 10 minutes)
+            // This shows if device is still sending data, even if location hasn't changed
+            // created_at is used for "x min ago" display (shows standby time since last actual movement)
+            isOnline: location && location.timestamp ? 
+              (new Date() - new Date(location.timestamp)) < 10 * 60 * 1000 : false
           };
         })
       );
