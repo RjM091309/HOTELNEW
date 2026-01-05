@@ -76,6 +76,7 @@ export function createMapTypeToggle() {
             satelliteButton.style.background = 'white';
             satelliteButton.style.color = '#6b7280';
         } else {
+            // Satellite or hybrid mode
             mapButton.style.background = 'white';
             mapButton.style.color = '#6b7280';
             satelliteButton.style.background = '#3b82f6';
@@ -92,9 +93,9 @@ export function createMapTypeToggle() {
         updateToggleState();
     });
     
-    // Satellite button click handler
+    // Satellite button click handler - use 'hybrid' to show labels/place names
     satelliteButton.addEventListener('click', () => {
-        map.setMapTypeId('satellite');
+        map.setMapTypeId('hybrid'); // Hybrid shows satellite imagery with labels
         updateToggleState();
     });
     

@@ -673,8 +673,8 @@ export function updateMapMarkers() {
         
         // Set maximum zoom level to prevent too much zoom in
         google.maps.event.addListenerOnce(map, 'bounds_changed', () => {
-            if (map.getZoom() > 13) {
-                map.setZoom(13);
+            if (map.getZoom() > 15) {
+                map.setZoom(15);
             }
         });
         

@@ -36,6 +36,22 @@ export function createTraceToggleContainer() {
     return traceContainer;
 }
 
+// Hide trace toggle container (e.g., when Street View is open)
+export function hideTraceToggleContainer() {
+    const traceContainer = document.getElementById('traceToggleContainer');
+    if (traceContainer) {
+        traceContainer.style.display = 'none';
+    }
+}
+
+// Show trace toggle container (e.g., when Street View is closed)
+export function showTraceToggleContainer() {
+    const traceContainer = document.getElementById('traceToggleContainer');
+    if (traceContainer) {
+        traceContainer.style.display = 'flex';
+    }
+}
+
 // Create or update trace toggle for a specific device/vehicle
 export function createTraceToggleForDevice(deviceKey, deviceName, deviceId) {
     if (!map) return;
@@ -199,7 +215,7 @@ export function createTraceToggleForDevice(deviceKey, deviceName, deviceId) {
             
             // Set zoom level smoothly
             setTimeout(() => {
-                map.setZoom(13);
+                map.setZoom(15);
             }, 300);
             
             // Bounce animation on marker if it exists

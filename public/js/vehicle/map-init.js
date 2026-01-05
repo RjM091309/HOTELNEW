@@ -13,7 +13,7 @@ import {
 } from './state.js';
 import { loadVehiclesForMapInit } from './data-loader.js';
 import { createMapTypeToggle, createFullscreenButton } from './map-controls.js';
-import { createTraceToggleContainer } from './trace-toggle.js';
+import { createTraceToggleContainer, hideTraceToggleContainer, showTraceToggleContainer } from './trace-toggle.js';
 import { updateMarkerLabelColors } from './markers.js';
 import { updateVehicleList } from './vehicle-list.js';
 import { updateMapMarkers } from './markers.js';
@@ -137,6 +137,21 @@ export async function initMap() {
                             setCurrentInfoWindow(null);
                         }
                     });
+                    
+                    // Hide/show trace toggle when Street View opens/closes
+                    const streetView = newMap.getStreetView();
+                    if (streetView) {
+                        // Listen for Street View visibility changes
+                        google.maps.event.addListener(streetView, 'visible_changed', () => {
+                            if (streetView.getVisible()) {
+                                // Street View is open - hide trace toggle
+                                hideTraceToggleContainer();
+                            } else {
+                                // Street View is closed - show trace toggle
+                                showTraceToggleContainer();
+                            }
+                        });
+                    }
                     
                     // Update vehicle list and map with markers (vehicles already loaded)
                     updateVehicleList();
