@@ -249,23 +249,34 @@ export function applyLabelBackground(marker, isMoving, isOnline) {
         
         if (isOnline) {
             if (isMoving) {
-                bgColor = '#00CC00'; // Green when moving
-                borderColor = '#00CC00'; // Same as background
-                shadowColor = '#00CC00'; // Same as background
+                // Moving - Apply Sinotrack Button3D gradient and green shadow
+                labelContainer.style.backgroundImage = 'linear-gradient(to bottom, rgba(255, 255, 255, 0.2) 0, rgba(100, 100, 100, 0.1) 40%, rgba(75, 75, 75, 0.1) 50%, rgba(50, 50, 50, 0.1) 60%, rgba(50, 50, 50, 0.2) 100%)';
+                labelContainer.style.backgroundColor = '#00CC00'; // Base green color
+                labelContainer.style.border = '1px solid #00CC00';
+                labelContainer.style.borderRadius = '3px';
+                labelContainer.style.padding = '2px 6px';
+                labelContainer.style.display = 'inline-block';
+                labelContainer.style.filter = 'drop-shadow(0 0 0 #00cc00) drop-shadow(0 4px 8px rgba(0, 204, 0, 0.3)) drop-shadow(0 6px 16px rgba(0, 204, 0, 0.1))';
             } else {
-                bgColor = '#0076FF'; // Blue when standby
-                borderColor = '#0076FF'; // Same as background
-                shadowColor = '#0076FF'; // Same as background
+                // Standby - Apply Sinotrack Button3D gradient and FShadow_Blue
+                labelContainer.style.backgroundImage = 'linear-gradient(to bottom, rgba(255, 255, 255, 0.2) 0, rgba(100, 100, 100, 0.1) 40%, rgba(75, 75, 75, 0.1) 50%, rgba(50, 50, 50, 0.1) 60%, rgba(50, 50, 50, 0.2) 100%)';
+                labelContainer.style.backgroundColor = '#0076FF'; // Base blue color
+                labelContainer.style.border = '1px solid #0076FF';
+                labelContainer.style.borderRadius = '3px';
+                labelContainer.style.padding = '2px 6px';
+                labelContainer.style.display = 'inline-block';
+                labelContainer.style.filter = 'drop-shadow(0 0 0 #0076ff) drop-shadow(0 4px 8px rgba(45, 140, 240, 0.3)) drop-shadow(0 6px 16px rgba(45, 140, 240, 0.1))';
             }
+        } else {
+            // Offline - Apply Sinotrack Button3D gradient with gray/dark color
+            labelContainer.style.backgroundImage = 'linear-gradient(to bottom, rgba(255, 255, 255, 0.2) 0, rgba(100, 100, 100, 0.1) 40%, rgba(75, 75, 75, 0.1) 50%, rgba(50, 50, 50, 0.1) 60%, rgba(50, 50, 50, 0.2) 100%)';
+            labelContainer.style.backgroundColor = '#666666'; // Gray for offline
+            labelContainer.style.border = '1px solid #666666';
+            labelContainer.style.borderRadius = '3px';
+            labelContainer.style.padding = '2px 6px';
+            labelContainer.style.display = 'inline-block';
+            labelContainer.style.filter = 'drop-shadow(0 0 0 #666666) drop-shadow(0 4px 8px rgba(102, 102, 102, 0.3)) drop-shadow(0 6px 16px rgba(102, 102, 102, 0.1))';
         }
-        
-        // Apply styles
-        labelContainer.style.backgroundColor = bgColor;
-        labelContainer.style.border = `1px solid ${borderColor}`;
-        labelContainer.style.borderRadius = '3px';
-        labelContainer.style.padding = '2px 6px';
-        labelContainer.style.display = 'inline-block';
-        labelContainer.style.boxShadow = `0 1px 3px rgba(${hexToRgb(shadowColor)}, 0.3)`;
     }
 }
 
@@ -393,14 +404,15 @@ export function updateMapMarkers() {
                     const iconUrl = getMarkerIconUrl(vehicle.isOnline, vehicle.isMoving || false);
                     markers[vehicle.id].setIcon({
                         url: iconUrl,
-                        scaledSize: new google.maps.Size(48, 48),
-                        labelOrigin: new google.maps.Point(24, 60)
+                        scaledSize: new google.maps.Size(36, 36),
+                        labelOrigin: new google.maps.Point(18, 50)
                     });
                     markers[vehicle.id].setLabel({
-                        text: vehicle.plateNumber || vehicle.modelName.substring(0, 8),
+                        text: vehicle.modelName || vehicle.plateNumber.substring(0, 8),
                         color: '#FFFFFF', // White text
-                        fontSize: '11px',
-                        fontWeight: 'bold',
+                        fontSize: '14px',
+                        fontFamily: 'Arial, sans-serif',
+                        fontWeight: 'normal',
                         className: getLabelClassName('vehicle-marker-label', vehicle.isMoving || false, vehicle.isOnline)
                     });
                     
@@ -416,16 +428,17 @@ export function updateMapMarkers() {
                 map: map,
                 title: `${vehicle.modelName} - ${vehicle.plateNumber}`,
                 label: {
-                    text: vehicle.plateNumber || vehicle.modelName.substring(0, 8),
+                    text: vehicle.modelName || vehicle.plateNumber.substring(0, 8),
                     color: '#FFFFFF', // White text
-                    fontSize: '11px',
-                    fontWeight: 'bold',
+                    fontSize: '14px',
+                    fontFamily: 'Arial, sans-serif',
+                    fontWeight: 'normal',
                     className: getLabelClassName('vehicle-marker-label', vehicle.isMoving || false, vehicle.isOnline)
                 },
                 icon: {
                     url: getMarkerIconUrl(vehicle.isOnline, vehicle.isMoving || false),
-                    scaledSize: new google.maps.Size(48, 48),
-                    labelOrigin: new google.maps.Point(24, 60) // Position label below marker
+                    scaledSize: new google.maps.Size(36, 36),
+                    labelOrigin: new google.maps.Point(18, 50) // Position label below marker
                 },
                 animation: useDropAnimation ? google.maps.Animation.DROP : null
             });

@@ -275,7 +275,7 @@ export function updateTraceToggles() {
     Object.values(vehicleData).forEach(vehicle => {
         if (vehicle.location && vehicle.location.lat && vehicle.location.lng) {
             const deviceKey = String(vehicle.id);
-            const deviceName = vehicle.plateNumber || vehicle.modelName || `Vehicle ${vehicle.id}`;
+            const deviceName = vehicle.modelName || vehicle.plateNumber || `Vehicle ${vehicle.id}`;
             createTraceToggleForDevice(deviceKey, deviceName, vehicle.gpsDeviceId);
         }
     });

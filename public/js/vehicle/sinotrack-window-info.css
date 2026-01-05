@@ -1,0 +1,617 @@
+/* Sinotrack Window Info Styles - Extracted from sino.css */
+
+/* Hide Google Maps InfoWindow default close button only */
+.gm-style-iw-chr {
+    display: none !important;
+}
+
+/* Adjust Google Maps InfoWindow container */
+.gm-style-iw-c {
+    padding: 0 !important;
+}
+
+.gm-style-iw-d {
+    overflow: visible !important;
+}
+
+/* Main Map Position Tip Container */
+.MapPosTip {
+    position: absolute;
+    width: 15em;
+    min-height: 6em;
+    margin: auto;
+    left: -7.5em;
+    bottom: 40px;
+    background-color: #fff;
+    border-radius: .8em;
+    cursor: default !important
+}
+
+.MapPosTip .Arrow {
+    position: absolute;
+    bottom: -0.75em;
+    left: 6.9em;
+    width: 0;
+    height: 0;
+    border-right: .6em solid transparent;
+    border-left: .6em solid transparent;
+    border-top: .8em solid #f6f6fc
+}
+
+.MapPosTip .TopBar {
+    height: 30px !important
+}
+
+.MapPosTip .Content {
+    position: relative;
+    padding: .3em .5em .5em .3em;
+    line-height: 1.23em;
+    line-height: 20px
+}
+
+.MapPosTip .HLine {
+    margin: 0 .5em;
+    width: calc(100% - 1em)
+}
+
+.MapPosTip .Content table {
+    position: relative;
+    width: 100%;
+    height: 100%
+}
+
+.MapPosTip .Content table tr {
+    width: 100%
+}
+
+.MapPosTip .Content table th {
+    width: 20px;
+    min-width: 20px;
+    white-space: nowrap;
+    text-align: left;
+    vertical-align: top;
+    color: #0076ff;
+    font-size: .8em;
+    font-weight: bolder;
+    padding-left: .5em;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    text-shadow: none;
+    font-family: Arial
+}
+
+.MapPosTip .Content table td {
+    width: auto;
+    text-align: left;
+    vertical-align: middle;
+    color: #555;
+    font-size: .8em;
+    padding-left: .2em;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    text-shadow: none;
+    vertical-align: middle
+}
+
+.MapPosTip .Content .Split {
+    width: 100%;
+    height: 1px;
+    border-top: solid .7px #ccc;
+    margin-top: .15em;
+    margin-bottom: .15em
+}
+
+.MapPosTip .Content .Text {
+    font-size: 1em
+}
+
+.MapPosTip .Content table th .Icon {
+    width: 16px;
+    height: 16px;
+    background-color: #0076ff;
+    background-color: rgba(45,140,240,0);
+    border-radius: 4px;
+    margin-top: 2px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column
+}
+
+.MapPosTip .Content table th .Icon img {
+    width: 100%;
+    height: 100%
+}
+
+.MapPosTip .Content table td .Icon {
+    width: 1.1em
+}
+
+.MapPosTip .Content table td .Icon img {
+    width: 1.1em
+}
+
+.MapPosTip .Content .TimeIcon {
+    justify-content: center;
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 0
+}
+
+.MapPosTip .Content .TimeIcon img {
+    width: 12px;
+    height: 12px;
+    margin-left: .2em
+}
+
+.MapPosTip .Content .TimeValue {
+    font-weight: bold;
+    padding-left: .1em;
+    padding-right: 5px;
+    color: #555 !important
+}
+
+.MapPosTip .Content .GSMValue {
+    width: 50%
+}
+
+.MapPosTip .Content .NetValue {
+    width: 50%
+}
+
+.MapPosTip .Content .NetValue td {
+    padding-left: 0;
+    padding-right: .5em
+}
+
+.MapPosTip .Content .SportValue {
+    font-weight: bold;
+    padding-right: .6em
+}
+
+.MapPosTip .Content .ModeValue {
+    white-space: normal !important;
+    word-break: break-all !important;
+    overflow: auto !important
+}
+
+.MapPosTip .Content .HLine {
+    margin-top: 2px;
+    margin-bottom: 2px
+}
+
+.MapPosTip .Content .AlarmValue {
+    color: #ff3824 !important;
+    padding-left: .2em;
+    overflow: hidden;
+    white-space: normal !important;
+    word-break: break-all !important
+}
+
+.MapPosTip .Content .MoveState {
+    float: right;
+    font-size: .9em;
+    color: #fff;
+    border-radius: .5em;
+    display: table-cell;
+    vertical-align: middle;
+    text-align: center;
+    padding: .1em;
+    padding-left: .5em;
+    padding-right: .5em
+}
+
+.MapPosTip .Power {
+    position: relative;
+    height: 16px;
+    width: 2.5em;
+    border-radius: 3px;
+    border: solid .1em #999;
+    box-sizing: border-box;
+    padding: .5px;
+    margin-left: .2em
+}
+
+.MapPosTip .Power .Rate {
+    height: 100%;
+    background-color: #59ea4f;
+    border-radius: 2.4px
+}
+
+.MapPosTip .Power .Label {
+    position: relative;
+    top: -14px;
+    line-height: 16px;
+    width: 6em;
+    line-height: 1em;
+    font-size: 10px;
+    display: table-cell;
+    vertical-align: middle;
+    text-align: center;
+    color: #fff
+}
+
+.MapPosTip .Power .Label img {
+    height: 1em;
+    filter: drop-shadow(1px 0 0 #fff)
+}
+
+.MapPosTip .Power .Tip {
+    position: absolute;
+    top: 3.5px;
+    right: -3.5px;
+    width: 0;
+    height: 6px;
+    border: solid 1px #999;
+    background-color: #999;
+    border-radius: 0 2px 2px 0
+}
+
+.MapPosTip .HightPower .Label {
+    color: #fff
+}
+
+.MapPosTip .MidPower .Label {
+    color: #f2f2f6;
+    text-shadow: .5px .5px 1px #666
+}
+
+.MapPosTip .LowPower .Rate {
+    background-color: #f90 !important
+}
+
+.MapPosTip .LowPower .Label {
+    color: #f2f2f6;
+    text-shadow: .5px .5px 1px #666
+}
+
+.MapPosTip .PowerOff .Rate {
+    background-color: #f90 !important
+}
+
+.MapPosTip .PowerOff .Label {
+    color: #f90 !important
+}
+
+.MapPosTip .Content .AddressValue {
+    overflow: auto;
+    white-space: normal !important;
+    text-overflow: ellipsis;
+    padding-top: 5px;
+    margin-left: 5px;
+    width: auto;
+    text-align: left;
+    vertical-align: middle;
+    color: #555;
+    font-size: .8em;
+    padding-left: .2em;
+    line-height: 18px
+}
+
+/* Map App Pure Position Tip */
+.MapAppPurePosTip {
+    width: 18em;
+    width: 300px;
+    min-width: 300px;
+    font-size: medium;
+    position: relative;
+    background-color: #fff;
+    border-radius: .8em;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    overflow: hidden;
+}
+
+.MapAppPurePosTip .Arrow {
+    position: absolute;
+    bottom: -0.75em;
+    left: calc((100% - 16px) / 2);
+    width: 0;
+    height: 0;
+    border-right: .6em solid transparent;
+    border-left: .6em solid transparent;
+    border-top: .8em solid #f6f6fc
+}
+
+.MapAppPurePosTip .Content {
+    position: relative;
+    padding: 12px 14px;
+    line-height: 1.4;
+}
+
+.MapAppPurePosTip .Content table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.MapAppPurePosTip .Content table tr {
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.MapAppPurePosTip .Content table tr:last-child {
+    border-bottom: none;
+}
+
+.MapAppPurePosTip .Content table th {
+    width: auto;
+    min-width: 80px;
+    text-align: left;
+    vertical-align: middle;
+    color: #0076ff;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 8px 8px 8px 0;
+    white-space: nowrap;
+    font-family: Arial, sans-serif;
+}
+
+.MapAppPurePosTip .Content table td {
+    text-align: left;
+    vertical-align: middle;
+    color: #555555;
+    font-size: 13px;
+    padding: 8px 0;
+    white-space: normal;
+    word-break: break-word;
+    font-family: Arial, sans-serif;
+}
+
+.MapAppPurePosTip .Content .TimeValue {
+    font-size: 16px;
+    font-family: Arial, sans-serif;
+    font-weight: bold;
+    color: #111827;
+    margin: 0;
+    padding: 0;
+}
+
+.MapAppPurePosTip .Content .TopSignalPower {
+    padding: 8px 0;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.MapAppPurePosTip .Content .TopSignalPower img {
+    height: 1.1em
+}
+
+.MapAppPurePosTip .Content .TopSignalPower label {
+    margin-left: 1px;
+    margin-top: -5px;
+    color: #999;
+    font-size: 12px;
+    font-family: Arial;
+    font-weight: bold
+}
+
+.MapAppPurePosTip .Content .TopSignalPower .GPS {
+    margin-right: 8px
+}
+
+.MapAppPurePosTip .Content .TopSignalPower .LBS {
+    padding-top: 3px;
+    margin-right: 8px
+}
+
+.MapAppPurePosTip .Content .TopSignalPower .LBS img {
+    filter: brightness(115%)
+}
+
+.MapAppPurePosTip .Content .TopSignalPower .WIFI {
+    padding-top: 3px;
+    margin-right: 8px
+}
+
+.MapAppPurePosTip .Content .TopSignalPower .WIFI img {
+    height: 1em;
+    filter: brightness(120%)
+}
+
+.MapAppPurePosTip .Content .TopSignalPower .GSM {
+    margin-right: 0
+}
+
+.MapAppPurePosTip .Content .TopSignalPower .GSM img {
+    margin-bottom: 1px;
+    filter: brightness(120%)
+}
+
+.MapAppPurePosTip .Power {
+    position: relative;
+    height: 16px;
+    width: 2.5em;
+    border-radius: 3px;
+    border: solid 1px #bbb;
+    box-sizing: border-box;
+    padding: .5px;
+    margin-left: .2em;
+    color: #fff
+}
+
+.MapAppPurePosTip .Power .Rate {
+    height: 100%;
+    background-color: #59ea4f;
+    border-radius: 2.4px
+}
+
+.MapAppPurePosTip .Power .Label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    line-height: 1;
+    font-size: 11px;
+    font-family: Arial, sans-serif;
+    font-weight: bold;
+    text-align: center;
+    color: #fff;
+    z-index: 2;
+    white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.Style_Map_Div .MapAppPurePosTip .Power .Label {
+    top: -15px !important
+}
+
+.MapPanel .MapAppPurePosTip .Power .Label {
+    top: -15px !important
+}
+
+.MapAppPurePosTip .Power .Tip {
+    position: absolute;
+    top: 3.5px;
+    right: -3.5px;
+    width: 0;
+    height: 6px;
+    border: solid 1px #bbb;
+    background-color: #bbb;
+    border-radius: 0 2px 2px 0
+}
+
+.MapAppPurePosTip .HightPower .Label {
+    color: #fff
+}
+
+.MapAppPurePosTip .MidPower .Label {
+    color: #f2f2f6;
+    text-shadow: .5px .5px 1px #666
+}
+
+.MapAppPurePosTip .LowPower .Rate {
+    background-color: #f90 !important
+}
+
+.MapAppPurePosTip .LowPower .Label {
+    color: #f2f2f6;
+    text-shadow: .5px .5px 1px #666
+}
+
+.MapAppPurePosTip .PowerOff .Rate {
+    background-color: #f90 !important
+}
+
+.MapAppPurePosTip .PowerOff .Label {
+    color: #f90 !important
+}
+
+.MapAppPurePosTip .Content .StateValue {
+    overflow: auto !important;
+    white-space: normal !important;
+    text-overflow: ellipsis !important;
+    white-space: normal !important;
+    word-break: break-all !important;
+    color: #555555;
+    font-family: Arial, sans-serif;
+}
+
+.MapAppPurePosTip .Content .AlarmValue {
+    overflow: auto !important;
+    white-space: normal !important;
+    text-overflow: ellipsis !important;
+    white-space: normal !important;
+    word-break: break-all !important;
+    color: #555555;
+    font-family: Arial, sans-serif;
+}
+
+.MapAppPurePosTip .Content .AddressValue {
+    overflow: auto;
+    white-space: normal !important;
+    text-overflow: ellipsis;
+    padding-top: 5px;
+    margin-left: 5px;
+    width: auto;
+    text-align: left;
+    vertical-align: middle;
+    color: #555555;
+    font-size: 13px;
+    padding-left: 0.2em;
+    line-height: 18px;
+    font-family: Arial, sans-serif;
+}
+
+.MapAppPurePosTip .Content .SportValue {
+    color: #555555;
+    font-family: Arial, sans-serif;
+}
+
+.MapAppPurePosTip .Content table .TimeValue {
+    color: #555555;
+    font-family: Arial, sans-serif;
+}
+
+.MapAppPurePosTip .Operation {
+    position: relative;
+    width: 100%;
+    border-radius: 0 0 .8em .8em;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+    background-color: #f6f6fc;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1) inset;
+    border-top: 1px solid #e5e7eb;
+    margin-top: 4px;
+    display: flex;
+}
+
+.MapAppPurePosTip .Operation .Button {
+    color: #0076ff;
+    flex: 1;
+    font-size: 14px;
+    font-weight: bold;
+    padding: 12px 0;
+    border: none;
+    border-right: 1px solid #ddd;
+    cursor: pointer;
+    overflow: hidden;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    background: transparent;
+    text-align: center;
+}
+
+.MapAppPurePosTip .Operation .Button:last-child {
+    border-right: 0
+}
+
+/* Offline State Styles */
+.Offline .Power {
+    border: solid 1px #f90 !important
+}
+
+.Offline .Power .Rate {
+    background-color: #ffc107 !important;
+    background-color: #fc3 !important
+}
+
+.Offline .Power .Tip {
+    border: solid 1px #f90 !important;
+    background-color: #f90 !important
+}
+
+.Offline .NetValue {
+    font-weight: bold
+}
+
+/* Hide Battery Character */
+.HideBatteryChar .Power .Label {
+    display: none
+}
+
+/* Position Link Icon */
+.PosLinkIcon {
+    width: 1.1em !important
+}
+
+.PosLinkIcon img {
+    margin-top: 3px;
+    height: 1.1em !important;
+    width: 1.1em !important
+}
+

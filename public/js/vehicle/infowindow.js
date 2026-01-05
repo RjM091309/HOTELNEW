@@ -6,68 +6,112 @@ import { vehicleData, gpsDevicesData, currentInfoWindow, infoWindows } from './s
 import { getStatusInfo } from './status.js';
 import { formatDateFullPH, getAddressFromCoordinates } from './utils.js';
 
+// Generate satellite icon HTML (Sinotrack style)
+function generateSatelliteIcon(satelliteCount) {
+    if (satelliteCount === null || satelliteCount === undefined || satelliteCount === 0) return '';
+    return `
+        <div class="GPS" style="display: inline-flex; align-items: center; gap: 4px;">
+            <img src="/img/Satellite.png" alt="Satellite" style="width: 16px; height: 16px; object-fit: contain;">
+            <span style="color: #999999; font-size: 13px; font-weight: 600;">${satelliteCount}</span>
+        </div>
+    `;
+}
+
+// Generate GSM signal icon HTML (Sinotrack style)
+function generateGsmSignalIcon(gsmSignal) {
+    if (gsmSignal === null || gsmSignal === undefined || gsmSignal === '') return '';
+    return `
+        <div class="GSM" style="display: inline-flex; align-items: center; gap: 4px;">
+            <img src="/img/GSM.png" alt="GSM Signal" style="width: 16px; height: 16px; object-fit: contain;">
+            <span style="color: #999999; font-size: 13px; font-weight: 600;">${gsmSignal}</span>
+        </div>
+    `;
+}
+
+// Generate battery icon HTML (Sinotrack style)
+function generateBatteryIcon(batteryPercent) {
+    if (batteryPercent === null || batteryPercent === undefined) return '';
+    
+    // Determine power class based on battery level
+    let powerClass = 'HightPower';
+    if (batteryPercent < 20) {
+        powerClass = 'PowerOff';
+    } else if (batteryPercent < 50) {
+        powerClass = 'LowPower';
+    } else if (batteryPercent < 80) {
+        powerClass = 'MidPower';
+    }
+    
+    // Calculate fill width (percentage of battery)
+    const fillWidth = Math.min(100, Math.max(0, batteryPercent));
+    
+    return `
+        <div class="Power ${powerClass}">
+            <div class="Rate" style="width: ${fillWidth}%;"></div>
+            <div class="Label">${batteryPercent}%</div>
+            <div class="Tip"></div>
+        </div>
+    `;
+}
+
 // Generate InfoWindow content for a vehicle
 export function generateVehicleInfoWindowContent(vehicle, address = null) {
+    const statusInfo = getStatusInfo(vehicle.isOnline, vehicle.isMoving || false);
+    const timeValue = vehicle.location && vehicle.location.lastUpdate 
+        ? formatDateFullPH(vehicle.location.lastUpdate) 
+        : 'N/A';
+    
     return `
-        <div id="infoWindow_${vehicle.id}" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 280px; max-width: 320px; border: none; box-shadow: none;">
-            <div style="background: #ffffff; padding: 14px 16px; margin: -8px -8px 0 -8px; border-radius: 8px 8px 0 0;">
-                <h4 style="margin: 0; color: #000; font-size: 17px; font-weight: 600; letter-spacing: 0.3px;">${vehicle.modelName}</h4>
+        <div id="infoWindow_${vehicle.id}" class="MapAppPurePosTip">
+            <div class="Arrow"></div>
+            <div class="Content">
+                <div class="TopSignalPower">
+                    <span class="TimeValue">${vehicle.modelName}</span>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        ${vehicle.location && (vehicle.location.satelliteCount !== null && vehicle.location.satelliteCount !== undefined && vehicle.location.satelliteCount !== 0) ? generateSatelliteIcon(vehicle.location.satelliteCount) : ''}
+                        ${vehicle.location && (vehicle.location.gsmSignal !== null && vehicle.location.gsmSignal !== undefined && vehicle.location.gsmSignal !== '') ? generateGsmSignalIcon(vehicle.location.gsmSignal) : ''}
+                        ${vehicle.location && (vehicle.location.battery !== null && vehicle.location.battery !== undefined) ? generateBatteryIcon(vehicle.location.battery) : ''}
+                    </div>
+                </div>
+                <table>
+                    <tr>
+                        <th>Plate:</th>
+                        <td>${vehicle.plateNumber}</td>
+                    </tr>
+                    <tr>
+                        <th>Type:</th>
+                        <td>${vehicle.vehicleType}</td>
+                    </tr>
+                    <tr>
+                        <th>GPS Device:</th>
+                        <td style="font-family: 'Courier New', monospace;">${vehicle.gpsDeviceId || 'Not assigned'}</td>
+                    </tr>
+                    <tr>
+                        <th>Status:</th>
+                        <td><span style="color: ${statusInfo.dotColor}; font-weight: 600;">● ${statusInfo.text}</span></td>
+                    </tr>
+                    ${vehicle.location ? `
+                    <tr>
+                        <th>Speed:</th>
+                        <td class="SportValue">${(vehicle.isMoving && vehicle.location.speed) ? vehicle.location.speed : '0'} km/h</td>
+                    </tr>
+                    ` : ''}
+                    ${vehicle.location && address ? `
+                    <tr>
+                        <th>Location:</th>
+                        <td class="AddressValue" id="address_${vehicle.id}">${address}</td>
+                    </tr>
+                    ` : vehicle.location ? `
+                    <tr>
+                        <th>Location:</th>
+                        <td class="AddressValue" id="address_${vehicle.id}">Loading address...</td>
+                    </tr>
+                    ` : ''}
+                </table>
             </div>
-            <div style="padding: 12px 16px; background: #fff;">
-                <div style="display: flex; align-items: center; padding: 10px 0;">
-                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Plate Number:</span>
-                    <span style="font-weight: 600; color: #111827; font-size: 14px;">${vehicle.plateNumber}</span>
-                </div>
-                <div style="display: flex; align-items: center; padding: 10px 0;">
-                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Vehicle Type:</span>
-                    <span style="color: #111827; font-size: 14px;">${vehicle.vehicleType}</span>
-                </div>
-                <div style="display: flex; align-items: center; padding: 10px 0;">
-                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">GPS Device:</span>
-                    <span style="color: #111827; font-size: 13px; font-family: 'Courier New', monospace; background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${vehicle.gpsDeviceId || 'Not assigned'}</span>
-                </div>
-                <div style="display: flex; align-items: center; padding: 10px 0;">
-                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Status:</span>
-                    ${(() => {
-                        const statusInfo = getStatusInfo(vehicle.isOnline, vehicle.isMoving || false);
-                        return `<span style="color: ${statusInfo.dotColor}; font-weight: 600; font-size: 14px;">● ${statusInfo.text}</span>`;
-                    })()}
-                </div>
-                ${vehicle.location ? `
-                <div style="display: flex; align-items: center; padding: 10px 0;">
-                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Speed:</span>
-                    <span style="color: #111827; font-size: 14px;">${(vehicle.isMoving && vehicle.location.speed) ? vehicle.location.speed : '0'} km/h</span>
-                </div>
-                ` : ''}
-                ${vehicle.location && (vehicle.location.battery !== null && vehicle.location.battery !== undefined) ? `
-                <div style="display: flex; align-items: center; padding: 10px 0;">
-                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Battery:</span>
-                    <span style="color: #111827; font-size: 14px;">${vehicle.location.battery}%</span>
-                </div>
-                ` : ''}
-                ${vehicle.location && (vehicle.location.satelliteCount !== null && vehicle.location.satelliteCount !== undefined && vehicle.location.satelliteCount !== 0) ? `
-                <div style="display: flex; align-items: center; padding: 10px 0;">
-                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Satellites:</span>
-                    <span style="color: #111827; font-size: 14px; font-weight: 600;">${vehicle.location.satelliteCount}</span>
-                    <i class="fa fa-satellite" style="color: #3b82f6; margin-left: 6px; font-size: 14px;"></i>
-                </div>
-                ` : ''}
-                ${vehicle.location && (vehicle.location.gsmSignal !== null && vehicle.location.gsmSignal !== undefined && vehicle.location.gsmSignal !== '') ? `
-                <div style="display: flex; align-items: center; padding: 10px 0;">
-                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">GSM Signal:</span>
-                    <span style="color: #111827; font-size: 14px; font-weight: 600;">${vehicle.location.gsmSignal}</span>
-                    <i class="fa fa-signal" style="color: #3b82f6; margin-left: 6px; font-size: 14px;"></i>
-                </div>
-                ` : ''}
-                ${vehicle.location ? `
-                <div style="display: flex; align-items: flex-start; padding: 10px 0; border-top: 1px solid #e5e7eb; margin-top: 8px; padding-top: 12px;">
-                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500; margin-top: 2px;">Location:</span>
-                    <span id="address_${vehicle.id}" style="color: #111827; font-size: 13px; line-height: 1.4; flex: 1;">${address || 'Loading address...'}</span>
-                </div>
-                ` : ''}
-            </div>
-            <div style="padding: 12px 16px; background: #f9fafb; border-radius: 0 0 8px 8px; margin: 0 -8px -8px -8px;">
-                <button onclick="showVehicleInfo(${vehicle.id})" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3); transition: all 0.2s;">View Details</button>
+            <div class="Operation">
+                <div class="Button" onclick="showVehicleInfo(${vehicle.id})">View Details</div>
+                <div class="Button">Replay</div>
             </div>
         </div>
     `;
@@ -75,62 +119,58 @@ export function generateVehicleInfoWindowContent(vehicle, address = null) {
 
 // Generate InfoWindow content for GPS device
 export function generateGpsDeviceInfoWindowContent(device, address = null) {
+    const statusInfo = getStatusInfo(device.isOnline, device.isMoving || false);
+    const timeValue = device.location && (device.location.lastUpdate || device.location.createdAt)
+        ? formatDateFullPH(device.location.lastUpdate || device.location.createdAt)
+        : 'N/A';
+    
     return `
-        <div id="infoWindow_gps_${device.deviceId}" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 280px; max-width: 320px; border: none; box-shadow: none;">
-            <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 14px 16px; margin: -8px -8px 0 -8px; border-radius: 8px 8px 0 0;">
-                <h4 style="margin: 0; color: #fff; font-size: 17px; font-weight: 600; letter-spacing: 0.3px;">📍 GPS Device</h4>
+        <div id="infoWindow_gps_${device.deviceId}" class="MapAppPurePosTip">
+            <div class="Arrow"></div>
+            <div class="Content">
+                <div class="TopSignalPower">
+                    <span class="TimeValue">📍 GPS Device</span>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        ${device.location && device.location.satelliteCount !== null && device.location.satelliteCount !== undefined ? generateSatelliteIcon(device.location.satelliteCount) : ''}
+                        ${device.location && (device.location.gsmSignal !== null && device.location.gsmSignal !== undefined && device.location.gsmSignal !== '') ? generateGsmSignalIcon(device.location.gsmSignal) : ''}
+                        ${device.location && device.location.battery ? generateBatteryIcon(device.location.battery) : ''}
+                    </div>
+                </div>
+                <table>
+                    <tr>
+                        <th>Device ID:</th>
+                        <td style="font-family: 'Courier New', monospace; font-weight: 600;">${device.deviceId}</td>
+                    </tr>
+                    <tr>
+                        <th>Status:</th>
+                        <td><span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Not Assigned</span></td>
+                    </tr>
+                    <tr>
+                        <th>GPS Status:</th>
+                        <td><span style="color: ${statusInfo.dotColor}; font-weight: 600;">● ${statusInfo.text}</span></td>
+                    </tr>
+                    ${device.location ? `
+                    <tr>
+                        <th>Speed:</th>
+                        <td class="SportValue">${(device.isMoving && device.location.speed) ? device.location.speed : '0'} km/h</td>
+                    </tr>
+                    ` : ''}
+                    ${device.location && address ? `
+                    <tr>
+                        <th>Location:</th>
+                        <td class="AddressValue" id="address_gps_${device.deviceId}">${address}</td>
+                    </tr>
+                    ` : device.location ? `
+                    <tr>
+                        <th>Location:</th>
+                        <td class="AddressValue" id="address_gps_${device.deviceId}">Loading address...</td>
+                    </tr>
+                    ` : ''}
+                </table>
             </div>
-            <div style="padding: 12px 16px; background: #fff;">
-                <div style="display: flex; align-items: center; padding: 10px 0;">
-                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Device ID:</span>
-                    <span style="color: #111827; font-size: 13px; font-family: 'Courier New', monospace; background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-weight: 600;">${device.deviceId}</span>
-                </div>
-                <div style="display: flex; align-items: center; padding: 10px 0;">
-                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Status:</span>
-                    <span style="background: #fef3c7; color: #92400e; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600;">Not Assigned</span>
-                </div>
-                <div style="display: flex; align-items: center; padding: 10px 0;">
-                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">GPS Status:</span>
-                    ${(() => {
-                        const statusInfo = getStatusInfo(device.isOnline, device.isMoving || false);
-                        return `<span style="color: ${statusInfo.dotColor}; font-weight: 600; font-size: 14px;">● ${statusInfo.text}</span>`;
-                    })()}
-                </div>
-                ${device.location ? `
-                <div style="display: flex; align-items: center; padding: 10px 0;">
-                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Speed:</span>
-                    <span style="color: #111827; font-size: 14px;">${(device.isMoving && device.location.speed) ? device.location.speed : '0'} km/h</span>
-                </div>
-                ` : ''}
-                ${device.location && device.location.battery ? `
-                <div style="display: flex; align-items: center; padding: 10px 0;">
-                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Battery:</span>
-                    <span style="color: #111827; font-size: 14px;">${device.location.battery}%</span>
-                </div>
-                ` : ''}
-                ${device.location && device.location.satelliteCount !== null && device.location.satelliteCount !== undefined ? `
-                <div style="display: flex; align-items: center; padding: 10px 0;">
-                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Satellites:</span>
-                    <span style="color: #111827; font-size: 14px; font-weight: 600;">${device.location.satelliteCount}</span>
-                    <i class="fa fa-satellite" style="color: #3b82f6; margin-left: 6px; font-size: 14px;"></i>
-                </div>
-                ` : ''}
-                ${device.location && (device.location.gsmSignal !== null && device.location.gsmSignal !== undefined && device.location.gsmSignal !== '') ? `
-                <div style="display: flex; align-items: center; padding: 10px 0;">
-                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">GSM Signal:</span>
-                    <span style="color: #111827; font-size: 14px; font-weight: 600;">${device.location.gsmSignal}</span>
-                    <i class="fa fa-signal" style="color: #3b82f6; margin-left: 6px; font-size: 14px;"></i>
-                </div>
-                ` : ''}
-                ${device.location ? `
-                <div style="display: flex; align-items: flex-start; padding: 10px 0; border-top: 1px solid #e5e7eb; margin-top: 8px; padding-top: 12px;">
-                    <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500; margin-top: 2px;">Location:</span>
-                    <span id="address_gps_${device.deviceId}" style="color: #111827; font-size: 13px; line-height: 1.4; flex: 1;">${address || 'Loading address...'}</span>
-                </div>
-                ` : ''}
-            </div>
-            <div style="padding: 12px 16px; background: #f9fafb; border-radius: 0 0 8px 8px; margin: 0 -8px -8px -8px;">
-                <button onclick="showGpsDeviceInfo('${device.deviceId}')" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3); transition: all 0.2s;">View Details</button>
+            <div class="Operation">
+                <div class="Button" onclick="showGpsDeviceInfo('${device.deviceId}')">View Details</div>
+                <div class="Button">Replay</div>
             </div>
         </div>
     `;
