@@ -372,6 +372,49 @@ body.white-sidebar-color #map,
     visibility: visible !important;
     display: block !important;
 }
+
+/* Marker Label Background Colors - Proper rectangle background with border */
+.gm-style div[class*="label-standby"] {
+    background-color: #0076FF !important;
+    border: 1px solid #0056CC !important;
+    border-radius: 3px !important;
+    padding: 2px 6px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+}
+
+.gm-style div[class*="label-moving"] {
+    background-color: #00CC00 !important;
+    border: 1px solid #00AA00 !important;
+    border-radius: 3px !important;
+    padding: 2px 6px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+}
+
+.gm-style div[class*="label-offline"] {
+    background-color: transparent !important;
+    border: none !important;
+    padding: 2px 6px !important;
+}
+
+/* Target the label container divs */
+.gm-style .gm-style-iw + div[class*="label-standby"],
+.gm-style div[class*="vehicle-marker-label"].label-standby,
+.gm-style div[class*="gps-marker-label"].label-standby {
+    background-color: #0076FF !important;
+    border: 1px solid #0056CC !important;
+    border-radius: 3px !important;
+    padding: 2px 6px !important;
+    display: inline-block !important;
+}
+
+.gm-style div[class*="vehicle-marker-label"].label-moving,
+.gm-style div[class*="gps-marker-label"].label-moving {
+    background-color: #00CC00 !important;
+    border: 1px solid #00AA00 !important;
+    border-radius: 3px !important;
+    padding: 2px 6px !important;
+    display: inline-block !important;
+}
 </style>
 
 <!-- Main Content Area -->
@@ -443,9 +486,20 @@ body.white-sidebar-color #map,
     </div>
 </div>
 
+<!-- Socket.IO Client Library - MUST be loaded before vehicle-monitoring.js -->
+<script src="/socket.io/socket.io.js"></script>
+
 <script>
 // Load vehicle monitoring script and initialize
 document.addEventListener('DOMContentLoaded', function() {
+    // Verify Socket.IO is loaded
+    if (typeof io === 'undefined') {
+        console.error('❌ Socket.IO library not loaded! Real-time updates will not work.');
+        console.error('Please ensure /socket.io/socket.io.js is accessible.');
+    } else {
+        console.log('✅ Socket.IO library loaded successfully');
+    }
+    
     // Load the script first
     var monitoringScript = document.createElement('script');
     monitoringScript.src = '/js/vehicle/vehicle-monitoring.js';

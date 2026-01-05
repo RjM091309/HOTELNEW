@@ -199,14 +199,26 @@ class VehicleController {
           });
         }
 
+        // Get existing vehicle to check if GPS Device ID changed
+        const existingVehicle = await VehicleModel.getVehicleById(vehicleId);
+        if (!existingVehicle) {
+          return res.status(404).json({
+            success: false,
+            message: 'Vehicle not found'
+          });
+        }
+
+        const oldGpsDeviceId = existingVehicle.GPS_DEVICE_ID || null;
+        const newGpsDeviceId = gpsDeviceId || null;
+        const gpsDeviceIdChanged = oldGpsDeviceId !== newGpsDeviceId;
+
         // Get image filename if uploaded
         const newPhoto = req.file ? req.file.filename : null;
 
         let vehiclePhoto = newPhoto;
         
-        // If no new photo uploaded, get existing photo
+        // If no new photo uploaded, use existing photo
         if (!newPhoto) {
-          const existingVehicle = await VehicleModel.getVehicleById(vehicleId);
           vehiclePhoto = existingVehicle.VEHICLE_PHOTO || 'car-default.jpeg';
         }
 
@@ -218,7 +230,7 @@ class VehicleController {
           plateNumber,
           fuelType,
           remarks,
-          gpsDeviceId: gpsDeviceId || null,
+          gpsDeviceId: newGpsDeviceId,
           vehiclePhoto,
           editedBy: req.user ? req.user.userId : req.session.userId
         };
@@ -226,6 +238,40 @@ class VehicleController {
         const result = await VehicleModel.updateVehicle(vehicleData);
         
         if (result) {
+          // Emit Socket.IO event to notify monitoring pages about vehicle update
+          const io = req.app.get('io');
+          if (io) {
+            // Convert vehicleId to string for consistency
+            const vehicleIdStr = String(vehicleId);
+            
+            // Emit general vehicle update event
+            const updateEvent = {
+              vehicleId: vehicleIdStr,
+              gpsDeviceIdChanged: gpsDeviceIdChanged,
+              oldGpsDeviceId: oldGpsDeviceId,
+              newGpsDeviceId: newGpsDeviceId,
+              timestamp: new Date().toISOString()
+            };
+            
+            console.log(`📍 Emitting vehicle-updated event:`, updateEvent);
+            io.emit('vehicle-updated', updateEvent);
+            
+            // If GPS Device ID changed, emit specific event
+            if (gpsDeviceIdChanged) {
+              console.log(`📍 Vehicle ${vehicleIdStr} GPS Device ID changed: ${oldGpsDeviceId} → ${newGpsDeviceId}`);
+              const gpsChangeEvent = {
+                vehicleId: vehicleIdStr,
+                oldGpsDeviceId: oldGpsDeviceId,
+                newGpsDeviceId: newGpsDeviceId,
+                timestamp: new Date().toISOString()
+              };
+              console.log(`📍 Emitting vehicle-gps-device-changed event:`, gpsChangeEvent);
+              io.emit('vehicle-gps-device-changed', gpsChangeEvent);
+            }
+          } else {
+            console.warn('⚠️ Socket.IO not available - cannot emit vehicle update event');
+          }
+          
           res.json({
             success: true,
             message: 'Vehicle updated successfully'

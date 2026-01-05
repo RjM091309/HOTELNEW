@@ -51,8 +51,13 @@ async function forwardViaTcp(host, port, message) {
     client.connect(port, host, () => {
       console.log(`📤 Forwarding GPS data to ${host}:${port} via TCP`);
       
-      // Send the original message
-      client.write(message + '\r\n');
+      // Send the original message exactly as received (preserve format)
+      // Don't add \r\n if message already ends with it or #
+      let messageToSend = message;
+      if (!message.endsWith('\r\n') && !message.endsWith('#')) {
+        messageToSend = message + '\r\n';
+      }
+      client.write(messageToSend);
       
       // Wait for response (if any)
       client.once('data', (data) => {

@@ -11,6 +11,19 @@ const { forwardToSinotrack } = require('./gpsForwarder');
 
 let tcpServer = null;
 
+// Calculate distance between two coordinates using Haversine formula (in meters)
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371000; // Earth radius in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in meters
+}
+
 function startGpsTrackerTcpServer(io, port = 8090) {
   if (tcpServer) {
     console.log('⚠️ GPS Tracker TCP Server is already running');
@@ -36,13 +49,32 @@ function startGpsTrackerTcpServer(io, port = 8090) {
         buffer += data.toString();
         
         // Process complete messages (ending with \r\n or #)
-        const messages = buffer.split(/\r\n|#/);
-        buffer = messages.pop() || ''; // Keep incomplete message in buffer
+        // Preserve original message format exactly as received for forwarding to Sinotrack
+        const messages = [];
+        let lastIndex = 0;
         
-        for (const message of messages) {
-          if (message.trim()) {
-            await processGpsMessage(message.trim(), socket, io);
+        // Find all message delimiters while preserving exact format
+        const delimiterRegex = /(\r\n|#)/g;
+        let match;
+        while ((match = delimiterRegex.exec(buffer)) !== null) {
+          const messageContent = buffer.substring(lastIndex, match.index);
+          const delimiter = match[0];
+          if (messageContent.trim()) {
+            // Store trimmed content for parsing, but preserve original with delimiter for forwarding
+            // This ensures Sinotrack receives the exact format it expects
+            messages.push({
+              content: messageContent.trim(),
+              original: messageContent + delimiter  // Preserve original format including delimiter
+            });
           }
+          lastIndex = match.index + match[0].length;
+        }
+        
+        // Keep remaining buffer
+        buffer = buffer.substring(lastIndex);
+        
+        for (const msg of messages) {
+          await processGpsMessage(msg.content, msg.original, socket, io);
         }
       } catch (error) {
         console.error('GPS Tracker TCP Error:', error);
@@ -75,7 +107,7 @@ function startGpsTrackerTcpServer(io, port = 8090) {
   return tcpServer;
 }
 
-async function processGpsMessage(message, socket, io) {
+async function processGpsMessage(message, originalMessage, socket, io) {
   try {
     const logMsg = `📍 Received GPS data: ${message}`;
     console.log(logMsg);
@@ -250,7 +282,7 @@ async function processGpsMessage(message, socket, io) {
       console.log(`⚠️ Coordinates are outside typical Philippines range: ${lat}, ${lng} (expected: lat 4-21, lng 116-127)`);
     }
     
-    // Store in database
+    // Prepare location data
     const locationData = {
       deviceId: String(data.deviceId),
       latitude: lat,
@@ -261,32 +293,69 @@ async function processGpsMessage(message, socket, io) {
       battery: null
     };
     
-    await GpsTrackerModel.createLocation(locationData);
+    // Check if location has changed significantly before saving
+    // Get distance threshold from environment variable (default: 10 meters)
+    const distanceThreshold = parseFloat(process.env.GPS_MIN_DISTANCE_METERS || '10');
     
-    // Broadcast via Socket.IO
-    if (io) {
-      io.emit('driver-location-updated', {
-        deviceId: locationData.deviceId,
-        location: {
-          lat: locationData.latitude,
-          lng: locationData.longitude,
-          speed: locationData.speed,
-          heading: locationData.heading,
-          battery: locationData.battery,
-          timestamp: locationData.timestamp
-        }
-      });
+    const latestLocation = await GpsTrackerModel.getLatestLocation(locationData.deviceId);
+    let shouldSave = true;
+    let distanceMeters = 0;
+    
+    if (latestLocation) {
+      distanceMeters = calculateDistance(
+        latestLocation.latitude,
+        latestLocation.longitude,
+        lat,
+        lng
+      );
+      
+      if (distanceMeters < distanceThreshold) {
+        shouldSave = false;
+        // Don't save duplicate location, but still forward and emit Socket.IO
+        console.log(`⏭️ Location not saved: Device ${locationData.deviceId} moved only ${distanceMeters.toFixed(2)}m (threshold: ${distanceThreshold}m)`);
+      } else {
+        console.log(`📍 Location changed: Device ${locationData.deviceId} moved ${distanceMeters.toFixed(2)}m (threshold: ${distanceThreshold}m)`);
+      }
     }
     
-    const savedMsg = `📍 GPS Location saved: Device ${locationData.deviceId} at (${lat}, ${lng})`;
-    console.log(savedMsg);
+    // Store in database only if location changed significantly
+    if (shouldSave) {
+      await GpsTrackerModel.createLocation(locationData);
+      
+      const savedMsg = `📍 GPS Location saved: Device ${locationData.deviceId} at (${lat}, ${lng})`;
+      console.log(savedMsg);
+      
+      // Only broadcast via Socket.IO AFTER saving to database
+      // Get the saved location from database to ensure we emit database data, not GPS device data
+      const dbLocation = await GpsTrackerModel.getLatestLocation(locationData.deviceId);
+      if (dbLocation && io) {
+        io.emit('driver-location-updated', {
+          deviceId: dbLocation.device_id,
+          location: {
+            lat: parseFloat(dbLocation.latitude),
+            lng: parseFloat(dbLocation.longitude),
+            speed: dbLocation.speed ? parseFloat(dbLocation.speed) : null,
+            heading: dbLocation.heading ? parseFloat(dbLocation.heading) : null,
+            battery: dbLocation.battery ? parseFloat(dbLocation.battery) : null,
+            timestamp: dbLocation.timestamp
+          }
+        });
+      }
+    } else {
+      // DO NOT emit Socket.IO if location not saved - all functions should depend on database
+      console.log(`⏭️ GPS Location received (not saved - no movement): Device ${locationData.deviceId} at (${lat}, ${lng})`);
+    }
+    
+    // Always forward to Sinotrack (even if not saved locally)
+    // This ensures Sinotrack gets all data
     
     // Send acknowledgment FIRST (don't wait for forwarding)
     socket.write('OK\r\n');
     
     // Forward to pro.sinotrack.com (if configured) - NON-BLOCKING
-    // Don't await - let it run in background so it doesn't delay the response
-    forwardToSinotrack(message, locationData).catch(error => {
+    // Use original message format (with delimiter) for forwarding to preserve format
+    const messageToForward = originalMessage || message;
+    forwardToSinotrack(messageToForward, locationData).catch(error => {
       // Error already logged in forwardToSinotrack, just catch to prevent unhandled rejection
       console.error('⚠️ Forwarding error (non-blocking):', error.message);
     });

@@ -7,6 +7,19 @@ const MapsController = require('./c_maps');
 const querystring = require('querystring');
 const { forwardToSinotrack } = require('../services/gpsForwarder');
 
+// Calculate distance between two coordinates using Haversine formula (in meters)
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371000; // Earth radius in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; // Distance in meters
+}
+
 class GpsTrackerController {
   
   // ========================================
@@ -139,27 +152,60 @@ class GpsTrackerController {
         battery: battery ? parseFloat(battery) : null
       };
       
-      // Store in database
-      const result = await GpsTrackerModel.createLocation(locationData);
+      // Check if location has changed significantly before saving
+      // Get distance threshold from environment variable (default: 10 meters)
+      const distanceThreshold = parseFloat(process.env.GPS_MIN_DISTANCE_METERS || '10');
       
-      // Get io instance from app
-      const io = req.app.get('io');
-      if (io) {
-        // Broadcast location update via Socket.IO
-        io.emit('driver-location-updated', {
-          deviceId: locationData.deviceId,
-          location: {
-            lat: locationData.latitude,
-            lng: locationData.longitude,
-            speed: locationData.speed,
-            heading: locationData.heading,
-            battery: locationData.battery,
-            timestamp: locationData.timestamp
-          }
-        });
+      const latestLocation = await GpsTrackerModel.getLatestLocation(locationData.deviceId);
+      let shouldSave = true;
+      let distanceMeters = 0;
+      
+      if (latestLocation) {
+        distanceMeters = calculateDistance(
+          latestLocation.latitude,
+          latestLocation.longitude,
+          lat,
+          lng
+        );
+        
+        if (distanceMeters < distanceThreshold) {
+          shouldSave = false;
+          // Don't save duplicate location, but still forward and emit Socket.IO
+          console.log(`⏭️ Location not saved: Device ${locationData.deviceId} moved only ${distanceMeters.toFixed(2)}m (threshold: ${distanceThreshold}m)`);
+        } else {
+          console.log(`📍 Location changed: Device ${locationData.deviceId} moved ${distanceMeters.toFixed(2)}m (threshold: ${distanceThreshold}m)`);
+        }
       }
       
-      console.log(`📍 GPS Location received: Device ${deviceId} at (${lat}, ${lng})`);
+      // Store in database only if location changed significantly
+      let savedLocation = null;
+      if (shouldSave) {
+        savedLocation = await GpsTrackerModel.createLocation(locationData);
+        console.log(`📍 GPS Location saved: Device ${deviceId} at (${lat}, ${lng})`);
+        
+        // Only broadcast via Socket.IO AFTER saving to database
+        // Get the saved location from database to ensure we emit database data, not GPS device data
+        const dbLocation = await GpsTrackerModel.getLatestLocation(locationData.deviceId);
+        if (dbLocation) {
+          const io = req.app.get('io');
+          if (io) {
+            io.emit('driver-location-updated', {
+              deviceId: dbLocation.device_id,
+              location: {
+                lat: parseFloat(dbLocation.latitude),
+                lng: parseFloat(dbLocation.longitude),
+                speed: dbLocation.speed ? parseFloat(dbLocation.speed) : null,
+                heading: dbLocation.heading ? parseFloat(dbLocation.heading) : null,
+                battery: dbLocation.battery ? parseFloat(dbLocation.battery) : null,
+                timestamp: dbLocation.timestamp
+              }
+            });
+          }
+        }
+      } else {
+        console.log(`⏭️ GPS Location received (not saved - no movement): Device ${deviceId} at (${lat}, ${lng})`);
+        // DO NOT emit Socket.IO if location not saved - all functions should depend on database
+      }
       
       // ST-903 expects "OK" response - Send FIRST
       res.status(200).send('OK');

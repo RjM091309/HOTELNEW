@@ -61,7 +61,7 @@ class VehicleMonitoringController {
           speed: vehicle.speed ? parseFloat(vehicle.speed) : null,
           heading: vehicle.heading ? parseFloat(vehicle.heading) : null,
           battery: vehicle.battery ? parseFloat(vehicle.battery) : null,
-          lastUpdate: vehicle.last_location_time,
+          lastUpdate: vehicle.last_location_created, // Use created_at (DB save time) for display
           minutesSinceUpdate: vehicle.minutes_since_update
         } : null,
         hasGps: !!vehicle.GPS_DEVICE_ID,
@@ -110,7 +110,7 @@ class VehicleMonitoringController {
           speed: vehicle.speed ? parseFloat(vehicle.speed) : null,
           heading: vehicle.heading ? parseFloat(vehicle.heading) : null,
           battery: vehicle.battery ? parseFloat(vehicle.battery) : null,
-          lastUpdate: vehicle.last_location_time,
+          lastUpdate: vehicle.last_location_created, // Use created_at (DB save time) for display
           minutesSinceUpdate: vehicle.minutes_since_update
         } : null,
         hasGps: !!vehicle.GPS_DEVICE_ID,
@@ -229,7 +229,10 @@ class VehicleMonitoringController {
               heading: location.heading ? parseFloat(location.heading) : null,
               battery: location.battery ? parseFloat(location.battery) : null,
               timestamp: location.timestamp,
-              createdAt: location.created_at
+              createdAt: location.created_at,
+              lastUpdate: location.created_at, // Use created_at for display (DB save time)
+              minutesSinceUpdate: location.created_at ? 
+                Math.floor((new Date() - new Date(location.created_at)) / (1000 * 60)) : null
             } : null,
             lastUpdate: device.last_update,
             totalUpdates: device.total_updates,

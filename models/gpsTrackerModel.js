@@ -140,6 +140,23 @@ class GpsTrackerModel {
     return results[0] || null;
   }
 
+  // Update created_at timestamp of the latest location (for heartbeat/keepalive)
+  static async updateLocationTimestamp(deviceId) {
+    // Get the latest location ID first
+    const latestLocation = await this.getLatestLocation(deviceId);
+    if (!latestLocation || !latestLocation.id) {
+      return false;
+    }
+    
+    const query = `
+      UPDATE gps_locations 
+      SET created_at = NOW()
+      WHERE id = ?
+    `;
+    const result = await queryDatabasePromise(query, [latestLocation.id]);
+    return result.affectedRows > 0;
+  }
+
   // Delete old locations (cleanup)
   static async deleteOldLocations(daysOld = 30) {
     const query = `

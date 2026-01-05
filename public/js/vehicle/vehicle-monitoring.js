@@ -9,6 +9,12 @@ let gpsDevicesData = {};
 let isFirstMapLoad = true; // Track if this is the first time loading markers
 let currentInfoWindow = null; // Track the currently open InfoWindow
 let infoWindows = {}; // Store InfoWindow instances for each marker
+let previousGpsDeviceIds = {}; // Track previous GPS Device IDs to detect changes
+let lastSavedLocations = {}; // Track last saved location from database for each vehicle (for Socket.IO comparison)
+let lastMovementTime = {}; // Track when each vehicle last moved (for auto-stop detection)
+let markerAnimations = {}; // Track active marker animations to avoid conflicts
+let polylines = {}; // Store polyline objects for each vehicle/device path
+let vehiclePaths = {}; // Store path history for each vehicle/device (array of {lat, lng})
 
 // Format date to Philippines timezone (Asia/Manila, UTC+8)
 // Note: The `timestamp` field from GPS device is in UTC
@@ -83,9 +89,6 @@ function formatDatePH(dateInput) {
         });
         
         const formatted = formatter.format(date);
-        
-        // Debug logging to see what's happening
-        console.log('[formatDatePH] Input:', dateInput, 'Type:', typeof dateInput, '-> Parsed UTC Date:', date.toISOString(), '-> PH Time:', formatted);
         
         return formatted;
     } catch (error) {
@@ -164,9 +167,6 @@ function formatDateFullPH(dateInput) {
         });
         
         const formatted = formatter.format(date);
-        
-        // Debug logging to see what's happening
-        console.log('[formatDateFullPH] Input:', dateInput, 'Type:', typeof dateInput, '-> Parsed UTC Date:', date.toISOString(), '-> PH Time:', formatted);
         
         return formatted;
     } catch (error) {
@@ -282,8 +282,6 @@ async function initMap() {
                         }
                     });
                     
-                    console.log('Map initialized successfully');
-                    
                     // Update vehicle list and map with markers (vehicles already loaded)
                     updateVehicleList();
                     updateMapMarkers();
@@ -323,6 +321,13 @@ async function loadVehiclesForMapInit() {
         const gpsData = await gpsResponse.json();
         
         if (vehiclesData.success) {
+            // Initialize previous GPS Device IDs on first load
+            if (Object.keys(previousGpsDeviceIds).length === 0) {
+                vehiclesData.data.forEach(vehicle => {
+                    previousGpsDeviceIds[String(vehicle.id)] = vehicle.gpsDeviceId || null;
+                });
+            }
+            
             vehicleData = {};
             vehiclesData.data.forEach(vehicle => {
                 vehicleData[vehicle.id] = vehicle;
@@ -352,8 +357,101 @@ async function loadVehicles() {
         const gpsData = await gpsResponse.json();
         
         if (vehiclesData.success) {
+            // Check for GPS Device ID changes before updating
+            vehiclesData.data.forEach(vehicle => {
+                const vehicleId = String(vehicle.id);
+                const currentGpsId = vehicle.gpsDeviceId || null;
+                const previousGpsId = previousGpsDeviceIds[vehicleId];
+                
+                // If GPS Device ID changed, clear old location data
+                if (previousGpsId !== undefined && previousGpsId !== currentGpsId) {
+                    // Clear old location data immediately if vehicle exists
+                    if (vehicleData[vehicleId]) {
+                        // Clear old path when GPS device changes
+                        clearVehiclePath(vehicleId);
+                        
+                        vehicle.location = null; // Clear location for new device
+                        vehicle.isOnline = false; // Mark as offline until new device sends data
+                    }
+                }
+                
+                // Update previous GPS Device ID
+                previousGpsDeviceIds[vehicleId] = currentGpsId;
+            });
+            
+            // Update vehicleData with fresh data and determine isMoving based on position changes
             vehicleData = {};
             vehiclesData.data.forEach(vehicle => {
+                // Compare new database position with previous lastSavedLocation to determine if moving
+                const newLocation = vehicle.location && vehicle.location.lat && vehicle.location.lng ? {
+                    lat: vehicle.location.lat,
+                    lng: vehicle.location.lng
+                } : null;
+                
+                const previousLocation = lastSavedLocations[vehicle.id];
+                
+                if (newLocation) {
+                    if (!previousLocation) {
+                        // First time seeing this location - not moving (just initialized)
+                        vehicle.isMoving = false;
+                    } else {
+                        // Round coordinates to 6 decimal places (~0.1m precision) to avoid floating point issues
+                        const roundCoord = (coord) => Math.round(coord * 1000000) / 1000000;
+                        const roundedPrevLat = roundCoord(previousLocation.lat);
+                        const roundedPrevLng = roundCoord(previousLocation.lng);
+                        const roundedNewLat = roundCoord(newLocation.lat);
+                        const roundedNewLng = roundCoord(newLocation.lng);
+                        
+                        // Calculate distance from previous saved location (from last database load)
+                        const distanceMeters = calculateDistanceMeters(
+                            roundedPrevLat,
+                            roundedPrevLng,
+                            roundedNewLat,
+                            roundedNewLng
+                        );
+                        
+                        const distanceThreshold = 10; // Same as server threshold (10 meters)
+                        
+                        // Only mark as moving if distance is clearly >= 10m (new saved location)
+                        // If distance < 10m, database location is the same (server didn't save, vehicle not moving)
+                        vehicle.isMoving = distanceMeters >= distanceThreshold;
+                        
+                        // Track movement time - if vehicle moved, update timestamp
+                        if (vehicle.isMoving) {
+                            lastMovementTime[vehicle.id] = Date.now();
+                        } else {
+                            // If not moving, check if enough time has passed since last movement
+                            // Auto-stop after 30 seconds of no new movement
+                            const lastMove = lastMovementTime[vehicle.id];
+                            if (lastMove) {
+                                const timeSinceLastMove = Date.now() - lastMove;
+                                const autoStopDelay = 30000; // 30 seconds
+                                if (timeSinceLastMove > autoStopDelay) {
+                                    vehicle.isMoving = false;
+                                    delete lastMovementTime[vehicle.id];
+                                }
+                            }
+                        }
+                        
+                        // Debug logging
+                        if (distanceMeters > 0.1) {
+                            console.log(`📍 Vehicle ${vehicle.id || vehicle.plateNumber || 'unknown'}: Distance from DB = ${distanceMeters.toFixed(2)}m, isMoving = ${vehicle.isMoving}`);
+                        } else if (distanceMeters > 0) {
+                            // Log small movements that don't trigger save (for debugging)
+                            console.log(`📍 Vehicle ${vehicle.id || vehicle.plateNumber || 'unknown'}: Small movement ${distanceMeters.toFixed(2)}m (< 10m threshold) - NOT saved to DB, marker stays still`);
+                        }
+                    }
+                    // Always update lastSavedLocations to current database location (for next comparison)
+                    // Round coordinates to avoid floating point precision issues
+                    lastSavedLocations[vehicle.id] = {
+                        lat: Math.round(newLocation.lat * 1000000) / 1000000,
+                        lng: Math.round(newLocation.lng * 1000000) / 1000000
+                    };
+                } else {
+                    // No location - not moving
+                    vehicle.isMoving = false;
+                }
+                
                 vehicleData[vehicle.id] = vehicle;
             });
         }
@@ -505,7 +603,8 @@ function updateVehicleList() {
                             <div class="vehicle-info-row location-info">
                                 <i class="fa fa-map-marker text-primary"></i>
                                 <div class="location-details">
-                                    <span class="location-time">${formatDatePH(device.location.timestamp)}</span>
+                                    <span class="location-time">${formatDatePH(device.location.lastUpdate || device.location.createdAt)}</span>
+                                    ${device.location.minutesSinceUpdate !== null && device.location.minutesSinceUpdate !== undefined ? `<span class="location-ago">${device.location.minutesSinceUpdate} min ago</span>` : ''}
                                 </div>
                             </div>
                         ` : `
@@ -560,16 +659,304 @@ function updateVehicleList() {
     });
 }
 
+// Calculate distance in meters between two lat/lng coordinates using Haversine formula
+function calculateDistanceMeters(lat1, lng1, lat2, lng2) {
+    const R = 6371000; // Earth's radius in meters
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+// Easing function for smooth animation (ease-out cubic)
+function easeOutCubic(t) {
+    return 1 - Math.pow(1 - t, 3);
+}
+
+// Generate a consistent color for a vehicle/device based on ID
+function getPathColor(id) {
+    const colors = [
+        '#FF6B6B', // Red
+        '#4ECDC4', // Teal
+        '#45B7D1', // Blue
+        '#FFA07A', // Light Salmon
+        '#98D8C8', // Mint
+        '#F7DC6F', // Yellow
+        '#BB8FCE', // Purple
+        '#85C1E2', // Sky Blue
+        '#F8B739', // Orange
+        '#52BE80', // Green
+        '#E74C3C', // Dark Red
+        '#3498DB', // Bright Blue
+        '#9B59B6', // Dark Purple
+        '#1ABC9C', // Turquoise
+        '#F39C12', // Dark Orange
+    ];
+    // Use ID to get consistent color for same vehicle
+    const colorIndex = parseInt(id) % colors.length;
+    return colors[colorIndex];
+}
+
+// Add point to vehicle path and update polyline
+function updateVehiclePath(markerKey, position) {
+    if (!map || !position || !position.lat || !position.lng) return;
+    
+    // Initialize path array if it doesn't exist
+    if (!vehiclePaths[markerKey]) {
+        vehiclePaths[markerKey] = [];
+    }
+    
+    const path = vehiclePaths[markerKey];
+    const pathLength = path.length;
+    
+    // Add new point to path history if it's far enough from last point (at least 5 meters to avoid too many points)
+    let shouldAddToPath = true;
+    if (pathLength > 0) {
+        const lastPoint = path[pathLength - 1];
+        const distance = calculateDistanceMeters(
+            lastPoint.lat,
+            lastPoint.lng,
+            position.lat,
+            position.lng
+        );
+        
+        // Only add point to path history if it's at least 5 meters away
+        if (distance < 5) {
+            shouldAddToPath = false; // Too close, skip adding to path history
+        }
+    }
+    
+    // Add new point to path history if distance is sufficient
+    if (shouldAddToPath) {
+        path.push({ lat: position.lat, lng: position.lng });
+        
+        // Limit path to last 1000 points to avoid performance issues
+        const maxPoints = 1000;
+        if (path.length > maxPoints) {
+            path.shift(); // Remove oldest point
+        }
+    }
+    
+    // Create or update polyline - always ensure last point is exactly at current marker position
+    const pathArray = path.map(p => new google.maps.LatLng(p.lat, p.lng));
+    
+    // Always add current position as the last point to ensure polyline reaches marker
+    // This ensures the line is always connected to the marker
+    const currentLatLng = new google.maps.LatLng(position.lat, position.lng);
+    pathArray.push(currentLatLng);
+    
+    if (polylines[markerKey]) {
+        // Update existing polyline - ensure it's green and path reaches marker
+        polylines[markerKey].setPath(pathArray);
+        polylines[markerKey].setOptions({
+            strokeColor: '#00CC00', // Green color
+            strokeOpacity: 0.8
+        });
+    } else {
+        // Create new polyline with green color
+        polylines[markerKey] = new google.maps.Polyline({
+            path: pathArray,
+            geodesic: true,
+            strokeColor: '#00CC00', // Green color
+            strokeOpacity: 0.8,
+            strokeWeight: 3,
+            map: map,
+            zIndex: 1 // Below markers
+        });
+    }
+}
+
+// Clear path for a vehicle/device
+function clearVehiclePath(markerKey) {
+    if (polylines[markerKey]) {
+        polylines[markerKey].setMap(null);
+        delete polylines[markerKey];
+    }
+    if (vehiclePaths[markerKey]) {
+        delete vehiclePaths[markerKey];
+    }
+}
+
+// Smoothly animate marker from current position to new position
+function animateMarkerPosition(marker, newPosition, markerKey = null, duration = 1500) {
+    if (!marker || !map) return;
+    
+    // Find markerKey if not provided
+    if (!markerKey) {
+        markerKey = Object.keys(markers).find(key => markers[key] === marker);
+    }
+    
+    // Use a fallback key if still not found (shouldn't happen in normal operation)
+    if (!markerKey) {
+        markerKey = 'unknown_' + Date.now() + '_' + Math.random();
+    }
+    
+    // Cancel any existing animation for this marker
+    if (markerAnimations[markerKey]) {
+        cancelAnimationFrame(markerAnimations[markerKey].animationId);
+        delete markerAnimations[markerKey];
+    }
+    
+    const currentPos = marker.getPosition();
+    if (!currentPos) {
+        // No current position, just set directly
+        marker.setPosition(newPosition);
+        return;
+    }
+    
+    const startLat = currentPos.lat();
+    const startLng = currentPos.lng();
+    const endLat = newPosition.lat;
+    const endLng = newPosition.lng;
+    
+    // Calculate distance to determine duration (longer distance = longer animation, but cap at max)
+    const distanceMeters = calculateDistanceMeters(startLat, startLng, endLat, endLng);
+    // Adjust duration based on distance: 100m = 1s, 1000m = 2s, but min 0.8s, max 2.5s
+    const adjustedDuration = Math.min(Math.max(distanceMeters / 100 * 1000, 800), 2500);
+    
+    const startTime = performance.now();
+    const animationDuration = Math.min(adjustedDuration, duration);
+    
+    // Store animation state
+    const animationState = {
+        startTime: startTime,
+        duration: animationDuration,
+        startLat: startLat,
+        startLng: startLng,
+        endLat: endLat,
+        endLng: endLng,
+        animationId: null
+    };
+    
+    markerAnimations[markerKey] = animationState;
+    
+    function animate(currentTime) {
+        if (!markerAnimations[markerKey]) {
+            // Animation was cancelled
+            return;
+        }
+        
+        const elapsed = currentTime - animationState.startTime;
+        const progress = Math.min(elapsed / animationState.duration, 1);
+        
+        // Apply easing
+        const easedProgress = easeOutCubic(progress);
+        
+        // Interpolate position
+        const currentLat = startLat + (endLat - startLat) * easedProgress;
+        const currentLng = startLng + (endLng - startLng) * easedProgress;
+        
+        // Update marker position
+        marker.setPosition({ lat: currentLat, lng: currentLng });
+        
+        if (progress < 1) {
+            // Continue animation
+            animationState.animationId = requestAnimationFrame(animate);
+        } else {
+            // Animation complete - ensure final position is exact
+            marker.setPosition(newPosition);
+            delete markerAnimations[markerKey];
+            
+            // Update path after animation completes
+            updateVehiclePath(markerKey, newPosition);
+        }
+    }
+    
+    // Start animation
+    animationState.animationId = requestAnimationFrame(animate);
+}
+
+// Get marker icon URL based on status (moving, standby, offline)
+function getMarkerIconUrl(isOnline, isMoving) {
+    if (!isOnline) {
+        return '/img/gpsmarker.png'; // Offline
+    }
+    if (isMoving) {
+        return '/img/gpsmarker-2.png'; // Moving
+    }
+    return '/img/gpsmarker-1.png'; // Standby (online but not moving)
+}
+
 // Get label color based on map type
 function getLabelColor() {
-    if (!map) return '#333333';
+    if (!map) return '#ffffff';
     const mapType = map.getMapTypeId();
-    // White text for satellite and hybrid views
-    if (mapType === 'satellite' || mapType === 'hybrid') {
-        return '#ffffff';
+    // White text for all map types (since we have background colors)
+    return '#ffffff';
+}
+
+// Get label background color based on vehicle/device status
+function getLabelBackgroundColor(isMoving, isOnline) {
+    if (!isOnline) {
+        return 'transparent'; // No background for offline
     }
-    // Black text for roadmap and terrain views
-    return '#333333';
+    if (isMoving) {
+        return '#00CC00'; // Green when moving
+    }
+    return '#0076FF'; // Blue when standby
+}
+
+// Get label className based on status
+function getLabelClassName(baseClassName, isMoving, isOnline) {
+    let className = baseClassName || 'vehicle-marker-label';
+    if (!isOnline) {
+        className += ' label-offline';
+    } else if (isMoving) {
+        className += ' label-moving';
+    } else {
+        className += ' label-standby';
+    }
+    return className;
+}
+
+// Apply background styling to marker label
+function applyLabelBackground(marker, isMoving, isOnline) {
+    if (!marker) return;
+    
+    // Get the marker's DOM element
+    const markerDiv = marker.getDiv ? marker.getDiv() : null;
+    if (!markerDiv) return;
+    
+    // Find label container - Google Maps labels are in a div with the className
+    const labelContainer = markerDiv.querySelector('div[class*="vehicle-marker-label"], div[class*="gps-marker-label"]');
+    if (labelContainer) {
+        // Determine background color - border and shadow match background color
+        let bgColor = 'transparent';
+        let borderColor = 'transparent';
+        let shadowColor = 'transparent';
+        
+        if (isOnline) {
+            if (isMoving) {
+                bgColor = '#00CC00'; // Green when moving
+                borderColor = '#00CC00'; // Same as background
+                shadowColor = '#00CC00'; // Same as background
+            } else {
+                bgColor = '#0076FF'; // Blue when standby
+                borderColor = '#0076FF'; // Same as background
+                shadowColor = '#0076FF'; // Same as background
+            }
+        }
+        
+        // Apply styles
+        labelContainer.style.backgroundColor = bgColor;
+        labelContainer.style.border = `1px solid ${borderColor}`;
+        labelContainer.style.borderRadius = '3px';
+        labelContainer.style.padding = '2px 6px';
+        labelContainer.style.display = 'inline-block';
+        labelContainer.style.boxShadow = `0 1px 3px rgba(${hexToRgb(shadowColor)}, 0.3)`;
+    }
+}
+
+// Helper function to convert hex to rgb for box-shadow
+function hexToRgb(hex) {
+    if (hex === 'transparent') return '0, 0, 0';
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? 
+        `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : 
+        '0, 0, 0';
 }
 
 // Update all marker label colors based on current map type
@@ -605,6 +992,23 @@ function updateMapMarkers() {
     
     // Remove old markers only if this is a full refresh
     if (isFirstMapLoad) {
+        // Cancel all active animations
+        Object.keys(markerAnimations).forEach(key => {
+            if (markerAnimations[key] && markerAnimations[key].animationId) {
+                cancelAnimationFrame(markerAnimations[key].animationId);
+            }
+        });
+        markerAnimations = {};
+        
+        // Clear all polylines
+        Object.keys(polylines).forEach(key => {
+            if (polylines[key]) {
+                polylines[key].setMap(null);
+            }
+        });
+        polylines = {};
+        vehiclePaths = {};
+        
         Object.values(markers).forEach(marker => marker.setMap(null));
         markers = {};
     }
@@ -616,20 +1020,80 @@ function updateMapMarkers() {
             
             // Check if marker already exists
             if (markers[vehicle.id]) {
-                // Update existing marker position smoothly
-                markers[vehicle.id].setPosition(position);
-                markers[vehicle.id].setIcon({
-                    url: vehicle.isOnline ? '/img/gpsmarker-1.png' : '/img/gpsmarker.png',
-                    scaledSize: new google.maps.Size(48, 48),
-                    labelOrigin: new google.maps.Point(24, 60)
-                });
-                markers[vehicle.id].setLabel({
-                    text: vehicle.plateNumber || vehicle.modelName.substring(0, 8),
-                    color: getLabelColor(),
-                    fontSize: '11px',
-                    fontWeight: 'bold',
-                    className: 'vehicle-marker-label'
-                });
+                // isMoving is already determined in loadVehicles() by comparing with previous lastSavedLocations
+                // IMPORTANT: Only update marker position if vehicle.isMoving is true (database location actually changed)
+                // Don't compare marker position vs database position - rely on isMoving flag from database comparison
+                // This ensures marker only moves when database location actually changed (saved to database)
+                
+                // Only update marker position if vehicle is moving (database location changed >= 10m)
+                // If isMoving is false, database location is the same (server didn't save, vehicle not moving)
+                if (vehicle.isMoving) {
+                    // Double-check: compare with marker's current position to avoid unnecessary updates
+                    const currentPos = markers[vehicle.id].getPosition();
+                    let shouldUpdatePosition = false;
+                    
+                    if (!currentPos) {
+                        shouldUpdatePosition = true;
+                    } else {
+                        // Round coordinates to 6 decimal places (~0.1m precision) to avoid floating point issues
+                        const roundCoord = (coord) => Math.round(coord * 1000000) / 1000000;
+                        const roundedCurrentLat = roundCoord(currentPos.lat());
+                        const roundedCurrentLng = roundCoord(currentPos.lng());
+                        const roundedNewLat = roundCoord(position.lat);
+                        const roundedNewLng = roundCoord(position.lng);
+                        
+                        // Only update if coordinates are actually different (accounting for floating point precision)
+                        if (roundedCurrentLat !== roundedNewLat || roundedCurrentLng !== roundedNewLng) {
+                            const distanceMeters = calculateDistanceMeters(
+                                roundedCurrentLat,
+                                roundedCurrentLng,
+                                roundedNewLat,
+                                roundedNewLng
+                            );
+                            const distanceThreshold = 5; // 5 meters - only update if actually moved
+                            shouldUpdatePosition = distanceMeters >= distanceThreshold;
+                        }
+                    }
+                    
+                    // Only animate marker if position actually changed AND vehicle is moving
+                    if (shouldUpdatePosition) {
+                        console.log(`📍 Moving marker for vehicle ${vehicle.id || vehicle.plateNumber || 'unknown'}: isMoving = ${vehicle.isMoving}, position changed`);
+                        animateMarkerPosition(markers[vehicle.id], position, vehicle.id);
+                        // Path will be updated when animation completes
+                    } else if (vehicle.isMoving) {
+                        console.log(`📍 Vehicle ${vehicle.id || vehicle.plateNumber || 'unknown'}: isMoving = true but marker position didn't change (already at correct position)`);
+                    }
+                } else {
+                    // vehicle.isMoving = false means no actual movement in database (device didn't move >= 10m)
+                    // Marker correctly stays still - this is expected behavior
+                    // No need to log every refresh - only log if there's confusion
+                }
+                
+                // Always update icon based on isMoving status (to show correct icon even if position didn't change)
+                const currentIconUrl = markers[vehicle.id].getIcon()?.url || '';
+                const newIconUrl = getMarkerIconUrl(vehicle.isOnline, vehicle.isMoving || false);
+                const iconChanged = currentIconUrl !== newIconUrl;
+                
+                // Always update icon/label if status changed (to reflect isMoving change)
+                // Update icon/label if moving status changed, but don't move marker if not actually moving
+                if (iconChanged) {
+                    const iconUrl = getMarkerIconUrl(vehicle.isOnline, vehicle.isMoving || false);
+                    markers[vehicle.id].setIcon({
+                        url: iconUrl,
+                        scaledSize: new google.maps.Size(48, 48),
+                        labelOrigin: new google.maps.Point(24, 60)
+                    });
+                    markers[vehicle.id].setLabel({
+                        text: vehicle.plateNumber || vehicle.modelName.substring(0, 8),
+                        color: '#FFFFFF', // White text
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        className: getLabelClassName('vehicle-marker-label', vehicle.isMoving || false, vehicle.isOnline)
+                    });
+                    
+                    // Apply background styling
+                    applyLabelBackground(markers[vehicle.id], vehicle.isMoving || false, vehicle.isOnline);
+                }
                 return; // Skip creating new marker
             }
             
@@ -640,18 +1104,23 @@ function updateMapMarkers() {
                 title: `${vehicle.modelName} - ${vehicle.plateNumber}`,
                 label: {
                     text: vehicle.plateNumber || vehicle.modelName.substring(0, 8),
-                    color: getLabelColor(),
+                    color: '#FFFFFF', // White text
                     fontSize: '11px',
                     fontWeight: 'bold',
-                    className: 'vehicle-marker-label'
+                    className: getLabelClassName('vehicle-marker-label', vehicle.isMoving || false, vehicle.isOnline)
                 },
                 icon: {
-                    url: vehicle.isOnline ? '/img/gpsmarker-1.png' : '/img/gpsmarker.png',
+                    url: getMarkerIconUrl(vehicle.isOnline, vehicle.isMoving || false),
                     scaledSize: new google.maps.Size(48, 48),
                     labelOrigin: new google.maps.Point(24, 60) // Position label below marker
                 },
                 animation: useDropAnimation ? google.maps.Animation.DROP : null
             });
+            
+            // Add background styling to label after marker is created
+            setTimeout(() => {
+                applyLabelBackground(marker, vehicle.isMoving || false, vehicle.isOnline);
+            }, 100);
             
             // Create info window using helper function
             const infoWindow = new google.maps.InfoWindow({
@@ -677,10 +1146,48 @@ function updateMapMarkers() {
             // Store InfoWindow for this vehicle
             infoWindows[vehicle.id] = infoWindow;
             markers[vehicle.id] = marker;
+            
+            // Apply background styling to label
+            setTimeout(() => {
+                applyLabelBackground(marker, vehicle.isMoving || false, vehicle.isOnline);
+            }, 100);
+            
+            // Initialize path with current position if it doesn't exist
+            if (!vehiclePaths[vehicle.id]) {
+                updateVehiclePath(vehicle.id, position);
+            }
         }
     });
     
-    // Add GPS device markers (unassigned devices)
+    // Remove GPS device markers that are now assigned to vehicles
+    Object.keys(markers).forEach(markerKey => {
+        if (markerKey.startsWith('gps_')) {
+            const deviceId = markerKey.replace('gps_', '');
+            // Check if this device is now assigned to a vehicle
+            const isAssignedToVehicle = Object.values(vehicleData).some(vehicle => 
+                vehicle.gpsDeviceId === deviceId
+            );
+            if (isAssignedToVehicle) {
+                // Cancel animation for this marker if active
+                if (markerAnimations[markerKey] && markerAnimations[markerKey].animationId) {
+                    cancelAnimationFrame(markerAnimations[markerKey].animationId);
+                    delete markerAnimations[markerKey];
+                }
+                
+                // Clear path for GPS device (it's now tracked as vehicle)
+                clearVehiclePath(markerKey);
+                
+                // Remove GPS device marker - it's now shown as vehicle marker
+                markers[markerKey].setMap(null);
+                delete markers[markerKey];
+                if (infoWindows[markerKey]) {
+                    delete infoWindows[markerKey];
+                }
+            }
+        }
+    });
+    
+    // Add GPS device markers (unassigned devices only)
     Object.values(gpsDevicesData).forEach(device => {
         if (!device.isAssigned && device.location && device.location.lat && device.location.lng) {
             const position = { lat: device.location.lat, lng: device.location.lng };
@@ -688,20 +1195,71 @@ function updateMapMarkers() {
             
             // Check if marker already exists
             if (markers[markerKey]) {
-                // Update existing marker position smoothly
-                markers[markerKey].setPosition(position);
-                markers[markerKey].setIcon({
-                    url: device.isOnline ? '/img/gpsmarker-1.png' : '/img/gpsmarker.png',
-                    scaledSize: new google.maps.Size(40, 40),
-                    labelOrigin: new google.maps.Point(20, 55)
-                });
-                markers[markerKey].setLabel({
-                    text: device.deviceId.substring(device.deviceId.length - 4) || 'GPS',
-                    color: getLabelColor(),
-                    fontSize: '10px',
-                    fontWeight: 'bold',
-                    className: 'gps-marker-label'
-                });
+                // IMPORTANT: Only update marker position if position actually changed significantly (>= 10m)
+                // Round coordinates to 6 decimal places (~0.1m precision) to avoid floating point issues
+                const roundCoord = (coord) => Math.round(coord * 1000000) / 1000000;
+                
+                const currentPos = markers[markerKey].getPosition();
+                let positionChanged = false;
+                
+                if (!currentPos) {
+                    positionChanged = true;
+                } else {
+                    // Round coordinates to avoid floating point precision issues
+                    const roundedCurrentLat = roundCoord(currentPos.lat());
+                    const roundedCurrentLng = roundCoord(currentPos.lng());
+                    const roundedNewLat = roundCoord(position.lat);
+                    const roundedNewLng = roundCoord(position.lng);
+                    
+                    // Only update if coordinates are actually different (accounting for floating point precision)
+                    if (roundedCurrentLat !== roundedNewLat || roundedCurrentLng !== roundedNewLng) {
+                        const deviceDistanceMeters = calculateDistanceMeters(
+                            roundedCurrentLat,
+                            roundedCurrentLng,
+                            roundedNewLat,
+                            roundedNewLng
+                        );
+                        const deviceDistanceThreshold = 10; // Same as server threshold (10 meters)
+                        // Only update if movement is >= 10m (actual movement in database)
+                        positionChanged = deviceDistanceMeters >= deviceDistanceThreshold;
+                    } else {
+                        // Coordinates are the same (within floating point precision) - no change
+                        positionChanged = false;
+                    }
+                }
+                
+                // Only update marker position if it actually changed significantly (>= 10m)
+                // This ensures marker only moves when database location actually changed (saved to database)
+                if (positionChanged) {
+                    animateMarkerPosition(markers[markerKey], position, markerKey);
+                    // Path will be updated when animation completes
+                }
+                
+                // Check if icon/status changed (for non-position updates)
+                const wasDeviceOnline = markers[markerKey].getIcon()?.url?.includes('gpsmarker-1.png') || false;
+                const deviceIconChanged = wasDeviceOnline !== device.isOnline;
+                
+                // Only update icon/label if position changed OR status changed
+                if (positionChanged || deviceIconChanged) {
+                    const iconUrl = getMarkerIconUrl(device.isOnline, device.isMoving || false);
+                    markers[markerKey].setIcon({
+                        url: iconUrl,
+                        scaledSize: new google.maps.Size(40, 40),
+                        labelOrigin: new google.maps.Point(20, 55)
+                    });
+                    markers[markerKey].setLabel({
+                        text: device.deviceId.substring(device.deviceId.length - 4) || 'GPS',
+                        color: '#FFFFFF', // White text
+                        fontSize: '10px',
+                        fontWeight: 'bold',
+                        className: getLabelClassName('gps-marker-label', device.isMoving || false, device.isOnline)
+                    });
+                    
+                    // Apply background styling
+                    setTimeout(() => {
+                        applyLabelBackground(markers[markerKey], device.isMoving || false, device.isOnline);
+                    }, 50);
+                }
                 return; // Skip creating new marker
             }
             
@@ -712,10 +1270,10 @@ function updateMapMarkers() {
                 title: `GPS Device ${device.deviceId} (Unassigned)`,
                 label: {
                     text: device.deviceId.substring(device.deviceId.length - 4) || 'GPS',
-                    color: getLabelColor(),
+                    color: '#FFFFFF', // White text
                     fontSize: '10px',
                     fontWeight: 'bold',
-                    className: 'gps-marker-label'
+                    className: getLabelClassName('gps-marker-label', device.isMoving || false, device.isOnline)
                 },
                 icon: {
                     url: device.isOnline ? '/img/gpsmarker-1.png' : '/img/gpsmarker.png',
@@ -760,7 +1318,7 @@ function updateMapMarkers() {
                             ` : ''}
                             <div style="display: flex; align-items: center; padding: 10px 0;">
                                 <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Last Update:</span>
-                                <span style="color: #111827; font-size: 12px;">${formatDateFullPH(device.location.timestamp)}</span>
+                                <span style="color: #111827; font-size: 12px;">${formatDateFullPH(device.location.lastUpdate || device.location.createdAt)}</span>
                             </div>
                         </div>
                         <div style="padding: 12px 16px; background: #f9fafb; border-radius: 0 0 8px 8px; margin: 0 -8px -8px -8px;">
@@ -787,6 +1345,16 @@ function updateMapMarkers() {
             });
             
             markers[`gps_${device.deviceId}`] = marker;
+            
+            // Apply background styling to label
+            setTimeout(() => {
+                applyLabelBackground(marker, device.isMoving || false, device.isOnline);
+            }, 100);
+            
+            // Initialize path with current position if it doesn't exist
+            if (!vehiclePaths[markerKey]) {
+                updateVehiclePath(markerKey, position);
+            }
         }
     });
     
@@ -875,7 +1443,8 @@ function showGpsDeviceInfo(deviceId) {
                     ${device.location.speed ? `<p><strong>Speed:</strong> ${device.location.speed} km/h</p>` : ''}
                     ${device.location.heading ? `<p><strong>Heading:</strong> ${device.location.heading}°</p>` : ''}
                     ${device.location.battery ? `<p><strong>Battery:</strong> ${device.location.battery}%</p>` : ''}
-                    <p><strong>Last Update:</strong> ${formatDateFullPH(device.location.timestamp)}</p>
+                    <p><strong>Last Update:</strong> ${formatDateFullPH(device.location.lastUpdate || device.location.createdAt)}</p>
+                    ${device.location.minutesSinceUpdate !== null && device.location.minutesSinceUpdate !== undefined ? `<p><strong>Minutes Since Update:</strong> ${device.location.minutesSinceUpdate}</p>` : ''}
                 ` : '<p class="text-muted">No location data available</p>'}
             </div>
         </div>
@@ -900,25 +1469,123 @@ function showGpsDeviceInfo(deviceId) {
 // ========================================
 
 let gpsTrackingSocket = null;
+let pollingInterval = null;
+let isPollingActive = false;
+
+// Setup event listeners for Socket.IO
+function setupSocketEventListeners() {
+    if (!gpsTrackingSocket) {
+        return;
+    }
+    
+    if (!gpsTrackingSocket.connected) {
+        return;
+    }
+    
+    // Remove existing listeners to avoid duplicates
+    gpsTrackingSocket.off('driver-location-updated');
+    gpsTrackingSocket.off('vehicle-updated');
+    gpsTrackingSocket.off('vehicle-gps-device-changed');
+    
+    // Listen for real-time GPS location updates
+    gpsTrackingSocket.on('driver-location-updated', async (data) => {
+        if (data && data.deviceId && data.location) {
+            await updateVehicleLocationFromSocket(data.deviceId, data.location);
+        }
+    });
+    
+    // Listen for vehicle updates (including GPS Device ID changes)
+    gpsTrackingSocket.on('vehicle-updated', async (data) => {
+        if (data && data.vehicleId) {
+            // Convert vehicleId to string for consistency
+            const vehicleId = String(data.vehicleId);
+            
+            // If GPS Device ID changed, clear old location immediately
+            if (data.gpsDeviceIdChanged && vehicleData[vehicleId]) {
+                // Clear old path when GPS device changes
+                clearVehiclePath(vehicleId);
+                
+                vehicleData[vehicleId].location = null;
+                vehicleData[vehicleId].isOnline = false;
+                vehicleData[vehicleId].gpsDeviceId = data.newGpsDeviceId;
+                
+                // Update UI immediately
+                updateVehicleList();
+                updateMapMarkers();
+            }
+            
+            // Reload vehicles to get updated GPS Device ID and location data
+            await loadVehicles();
+        }
+    });
+    
+    // Listen specifically for GPS Device ID changes
+    gpsTrackingSocket.on('vehicle-gps-device-changed', async (data) => {
+        if (data && data.vehicleId) {
+            // Convert vehicleId to string for consistency
+            const vehicleId = String(data.vehicleId);
+            const oldDeviceId = data.oldGpsDeviceId;
+            const newDeviceId = data.newGpsDeviceId;
+            
+            // Update previous GPS Device ID tracking
+            previousGpsDeviceIds[vehicleId] = newDeviceId;
+            
+            // If vehicle exists in current data, clear old location immediately
+            if (vehicleData[vehicleId]) {
+                vehicleData[vehicleId].location = null;
+                vehicleData[vehicleId].isOnline = false;
+                vehicleData[vehicleId].gpsDeviceId = newDeviceId;
+                
+                // Clear old path when GPS device changes
+                clearVehiclePath(vehicleId);
+                
+                // Remove old marker if it exists
+                if (markers[vehicleId]) {
+                    // Cancel animation for this marker if active
+                    if (markerAnimations[vehicleId] && markerAnimations[vehicleId].animationId) {
+                        cancelAnimationFrame(markerAnimations[vehicleId].animationId);
+                        delete markerAnimations[vehicleId];
+                    }
+                    
+                    markers[vehicleId].setMap(null);
+                    delete markers[vehicleId];
+                }
+                
+                // Update UI immediately
+                updateVehicleList();
+                updateMapMarkers();
+            }
+            
+            // Reload vehicles to get updated GPS Device ID and location data
+            await loadVehicles();
+        }
+    });
+}
 
 // Initialize Socket.IO connection for GPS tracking
 function initGpsTrackingSocket() {
     // Check if Socket.IO is available, if not, retry after a delay
     if (typeof io === 'undefined') {
-        console.warn('Socket.IO not available, retrying in 1 second...');
+        console.error('Socket.IO library not available, retrying in 1 second...');
         setTimeout(() => {
             initGpsTrackingSocket();
         }, 1000);
         return;
     }
     
-    // If already connected, don't reconnect
+    // If already connected, just ensure listeners are set up
     if (gpsTrackingSocket && gpsTrackingSocket.connected) {
-        console.log('📍 GPS Tracking Socket.IO already connected');
+        setupSocketEventListeners();
         return;
     }
     
     try {
+        // If socket exists but not connected, remove old listeners
+        if (gpsTrackingSocket) {
+            gpsTrackingSocket.removeAllListeners();
+            gpsTrackingSocket.disconnect();
+        }
+        
         gpsTrackingSocket = io({
             transports: ['websocket', 'polling'],
             upgrade: true,
@@ -931,31 +1598,51 @@ function initGpsTrackingSocket() {
         });
         
         gpsTrackingSocket.on('connect', () => {
-            console.log('📍 GPS Tracking connected to Socket.IO server');
+            setupSocketEventListeners();
+            
+            // Stop polling if socket is connected
+            if (isPollingActive) {
+                stopPollingFallback();
+            }
         });
         
         gpsTrackingSocket.on('disconnect', (reason) => {
-            console.log('📍 GPS Tracking disconnected from Socket.IO server:', reason);
+            // Start polling fallback when disconnected
+            if (!isPollingActive) {
+                startPollingFallback();
+            }
         });
         
         gpsTrackingSocket.on('connect_error', (error) => {
-            console.error('❌ GPS Tracking Socket.IO connection error:', error);
+            console.error('GPS Tracking Socket.IO connection error:', error);
+            // Start polling fallback on connection error
+            if (!isPollingActive) {
+                startPollingFallback();
+            }
         });
         
         gpsTrackingSocket.on('reconnect', (attemptNumber) => {
-            console.log(`📍 GPS Tracking reconnected after ${attemptNumber} attempts`);
-        });
-        
-        // Listen for real-time GPS location updates
-        gpsTrackingSocket.on('driver-location-updated', async (data) => {
-            console.log('📍 Received GPS location update:', data);
-            
-            if (data && data.deviceId && data.location) {
-                await updateVehicleLocationFromSocket(data.deviceId, data.location);
+            setupSocketEventListeners();
+            // Stop polling if socket reconnected
+            if (isPollingActive) {
+                stopPollingFallback();
             }
         });
+        
+        gpsTrackingSocket.on('reconnect_failed', () => {
+            console.error('GPS Tracking Socket.IO reconnection failed');
+            // Start polling fallback if reconnection fails
+            if (!isPollingActive) {
+                startPollingFallback();
+            }
+        });
+        
     } catch (error) {
-        console.error('❌ Error initializing GPS Tracking Socket.IO:', error);
+        console.error('Error initializing GPS Tracking Socket.IO:', error);
+        // Start polling fallback on error
+        if (!isPollingActive) {
+            startPollingFallback();
+        }
         // Retry after 2 seconds
         setTimeout(() => {
             initGpsTrackingSocket();
@@ -963,68 +1650,58 @@ function initGpsTrackingSocket() {
     }
 }
 
+// Start periodic polling as fallback when Socket.IO is not available
+function startPollingFallback() {
+    if (isPollingActive) return;
+    
+    isPollingActive = true;
+    
+    // Poll immediately, then every 10 seconds
+    loadVehicles();
+    
+    pollingInterval = setInterval(() => {
+        loadVehicles();
+    }, 10000); // Poll every 10 seconds
+}
+
+// Stop polling fallback
+function stopPollingFallback() {
+    if (!isPollingActive) return;
+    
+    isPollingActive = false;
+    
+    if (pollingInterval) {
+        clearInterval(pollingInterval);
+        pollingInterval = null;
+    }
+}
+
 // Update vehicle location from Socket.IO event
+// IMPORTANT: All functions and logic depend on database, NOT GPS device directly
+// Socket.IO event is just a notification that new data was saved to database
+// We reload from database to ensure consistency
 async function updateVehicleLocationFromSocket(deviceId, locationData) {
     try {
-        // Find vehicle with this GPS device ID
-        let vehicleId = null;
-        for (const [id, vehicle] of Object.entries(vehicleData)) {
-            if (vehicle.gpsDeviceId === deviceId) {
-                vehicleId = id;
-                break;
-            }
+        if (!deviceId || !locationData) {
+            console.warn('📍 Invalid socket data received:', { deviceId, locationData });
+            return;
         }
         
-        // Calculate minutes since update
-        const now = new Date();
-        const updateTime = new Date(locationData.timestamp);
-        const minutesSinceUpdate = Math.floor((now - updateTime) / (1000 * 60));
-        const isOnline = minutesSinceUpdate < 10;
+        // IMPORTANT: Socket.IO event means data was saved to database
+        // Reload from database to ensure all logic depends on database, not GPS device directly
+        console.log(`📍 Socket.IO notification: Device ${deviceId} location updated in database, reloading from database...`);
         
-        if (vehicleId && vehicleData[vehicleId]) {
-            // Update vehicle location
-            vehicleData[vehicleId].location = {
-                lat: locationData.lat,
-                lng: locationData.lng,
-                speed: locationData.speed || null,
-                heading: locationData.heading || null,
-                battery: locationData.battery || null,
-                lastUpdate: locationData.timestamp,
-                minutesSinceUpdate: minutesSinceUpdate
-            };
-            vehicleData[vehicleId].isOnline = isOnline;
-            
-            // Update marker on map
-            updateMarkerForVehicle(vehicleId, vehicleData[vehicleId]);
-            
-            // Update vehicle list
-            updateVehicleList();
-        } else {
-            // Check if it's an unassigned GPS device
-            if (gpsDevicesData[deviceId]) {
-                gpsDevicesData[deviceId].location = {
-                    lat: locationData.lat,
-                    lng: locationData.lng,
-                    speed: locationData.speed || null,
-                    heading: locationData.heading || null,
-                    battery: locationData.battery || null,
-                    timestamp: locationData.timestamp
-                };
-                gpsDevicesData[deviceId].isOnline = isOnline;
-                
-                // Update marker for unassigned device
-                updateMarkerForGpsDevice(deviceId, gpsDevicesData[deviceId]);
-                
-                // Update vehicle list
-                updateVehicleList();
-            } else {
-                // Device not found in our data, reload all vehicles to get updated data
-                console.log(`📍 Device ${deviceId} not found in current data, reloading vehicles...`);
-                await loadVehicles();
-            }
-        }
+        // Reload vehicles and GPS devices from database
+        // This ensures all data comes from database, not from Socket.IO directly
+        await loadVehicles();
     } catch (error) {
-        console.error('Error updating vehicle location from socket:', error);
+        console.error('❌ Error handling socket notification:', error);
+        // On error, try to reload vehicles as fallback
+        try {
+            await loadVehicles();
+        } catch (reloadError) {
+            console.error('❌ Error reloading vehicles:', reloadError);
+        }
     }
 }
 
@@ -1083,42 +1760,59 @@ function updateMarkerForVehicle(vehicleId, vehicle) {
     const position = { lat: vehicle.location.lat, lng: vehicle.location.lng };
     
     if (markers[vehicleId]) {
-        // Get current position to check if it changed
+        // Get current position to check if it changed (use 10-meter threshold, same as server)
         const currentPos = markers[vehicleId].getPosition();
-        const positionChanged = !currentPos || 
-            Math.abs(currentPos.lat() - position.lat) > 0.0001 || 
-            Math.abs(currentPos.lng() - position.lng) > 0.0001;
-        
-        // Update marker position (smoothly if position changed)
-        if (positionChanged) {
-            // Add bounce animation briefly when position updates
-            markers[vehicleId].setAnimation(google.maps.Animation.BOUNCE);
-            setTimeout(() => {
-                if (markers[vehicleId]) {
-                    markers[vehicleId].setAnimation(null);
-                }
-            }, 750);
+        let positionChanged = false;
+        if (!currentPos) {
+            positionChanged = true;
+        } else {
+            const distanceMeters = calculateDistanceMeters(
+                currentPos.lat(),
+                currentPos.lng(),
+                position.lat,
+                position.lng
+            );
+            const distanceThreshold = 10; // Same as server threshold (10 meters)
+            positionChanged = distanceMeters >= distanceThreshold;
         }
         
-        markers[vehicleId].setPosition(position);
-        markers[vehicleId].setIcon({
-            url: vehicle.isOnline ? '/img/gpsmarker-1.png' : '/img/gpsmarker.png',
-            scaledSize: new google.maps.Size(48, 48),
-            labelOrigin: new google.maps.Point(24, 60) // Position label below marker
-        });
-        // Update label text
-        markers[vehicleId].setLabel({
-            text: vehicle.plateNumber || vehicle.modelName.substring(0, 8),
-            color: getLabelColor(),
-            fontSize: '11px',
-            fontWeight: 'bold',
-            className: 'vehicle-marker-label'
-        });
+        // Check if icon changed (compare current icon URL with new icon URL)
+        const currentIconUrl = markers[vehicleId].getIcon()?.url || '';
+        const newIconUrl = getMarkerIconUrl(vehicle.isOnline, vehicle.isMoving || false);
+        const iconChanged = currentIconUrl !== newIconUrl;
         
-        // Update InfoWindow content if it exists and is open
-        if (infoWindows[vehicleId]) {
-            const newContent = generateVehicleInfoWindowContent(vehicle);
-            infoWindows[vehicleId].setContent(newContent);
+        // Only update marker position if it actually changed
+        if (positionChanged) {
+            animateMarkerPosition(markers[vehicleId], position, vehicleId);
+        }
+        
+        // Only update icon/label/infowindow if position changed OR status changed
+        if (positionChanged || iconChanged) {
+            const iconUrl = getMarkerIconUrl(vehicle.isOnline, vehicle.isMoving || false);
+            markers[vehicleId].setIcon({
+                url: iconUrl,
+                scaledSize: new google.maps.Size(48, 48),
+                labelOrigin: new google.maps.Point(24, 60) // Position label below marker
+            });
+            // Update label text
+            markers[vehicleId].setLabel({
+                text: vehicle.plateNumber || vehicle.modelName.substring(0, 8),
+                color: '#FFFFFF', // White text
+                fontSize: '11px',
+                fontWeight: 'bold',
+                className: getLabelClassName('vehicle-marker-label', vehicle.isMoving || false, vehicle.isOnline)
+            });
+            
+            // Apply background styling
+            setTimeout(() => {
+                applyLabelBackground(markers[vehicleId], vehicle.isMoving || false, vehicle.isOnline);
+            }, 50);
+            
+            // Update InfoWindow content if it exists and is open
+            if (infoWindows[vehicleId]) {
+                const newContent = generateVehicleInfoWindowContent(vehicle);
+                infoWindows[vehicleId].setContent(newContent);
+            }
         }
     } else {
         // Create new marker with label below
@@ -1128,13 +1822,13 @@ function updateMarkerForVehicle(vehicleId, vehicle) {
             title: `${vehicle.modelName} - ${vehicle.plateNumber}`,
             label: {
                 text: vehicle.plateNumber || vehicle.modelName.substring(0, 8),
-                color: getLabelColor(),
+                color: '#FFFFFF', // White text
                 fontSize: '11px',
                 fontWeight: 'bold',
-                className: 'vehicle-marker-label'
+                className: getLabelClassName('vehicle-marker-label', vehicle.isMoving || false, vehicle.isOnline)
             },
             icon: {
-                url: vehicle.isOnline ? '/img/gpsmarker-1.png' : '/img/gpsmarker.png',
+                url: getMarkerIconUrl(vehicle.isOnline, vehicle.isMoving || false),
                 scaledSize: new google.maps.Size(48, 48),
                 labelOrigin: new google.maps.Point(24, 60) // Position label below marker
             },
@@ -1151,6 +1845,11 @@ function updateMarkerForVehicle(vehicleId, vehicle) {
         });
         
         markers[vehicleId] = marker;
+        
+        // Apply background styling to label
+        setTimeout(() => {
+            applyLabelBackground(marker, vehicle.isMoving || false, vehicle.isOnline);
+        }, 100);
     }
 }
 
@@ -1162,37 +1861,54 @@ function updateMarkerForGpsDevice(deviceId, device) {
     const markerKey = `gps_${deviceId}`;
     
     if (markers[markerKey]) {
-        // Get current position to check if it changed
+        // Get current position to check if it changed (use 10-meter threshold, same as server)
         const currentPos = markers[markerKey].getPosition();
-        const positionChanged = !currentPos || 
-            Math.abs(currentPos.lat() - position.lat) > 0.0001 || 
-            Math.abs(currentPos.lng() - position.lng) > 0.0001;
-        
-        // Update marker position (smoothly if position changed)
-        if (positionChanged) {
-            // Add bounce animation briefly when position updates
-            markers[markerKey].setAnimation(google.maps.Animation.BOUNCE);
-            setTimeout(() => {
-                if (markers[markerKey]) {
-                    markers[markerKey].setAnimation(null);
-                }
-            }, 750);
+        let devicePositionChanged = false;
+        if (!currentPos) {
+            devicePositionChanged = true;
+        } else {
+            const deviceDistanceMeters = calculateDistanceMeters(
+                currentPos.lat(),
+                currentPos.lng(),
+                position.lat,
+                position.lng
+            );
+            const deviceDistanceThreshold = 10; // Same as server threshold (10 meters)
+            devicePositionChanged = deviceDistanceMeters >= deviceDistanceThreshold;
         }
         
-        markers[markerKey].setPosition(position);
-        markers[markerKey].setIcon({
-            url: device.isOnline ? '/img/gpsmarker-1.png' : '/img/gpsmarker.png',
-            scaledSize: new google.maps.Size(40, 40),
-            labelOrigin: new google.maps.Point(20, 55) // Position label below marker
-        });
-        // Update label text
-        markers[markerKey].setLabel({
-            text: deviceId.substring(deviceId.length - 4) || 'GPS',
-            color: getLabelColor(),
-            fontSize: '10px',
-            fontWeight: 'bold',
-            className: 'gps-marker-label'
-        });
+        // Check if icon changed (compare current icon URL with new icon URL)
+        const currentDeviceIconUrl = markers[markerKey].getIcon()?.url || '';
+        const newDeviceIconUrl = getMarkerIconUrl(device.isOnline, device.isMoving || false);
+        const deviceIconChanged = currentDeviceIconUrl !== newDeviceIconUrl;
+        
+        // Only update marker position if it actually changed
+        if (devicePositionChanged) {
+            animateMarkerPosition(markers[markerKey], position, markerKey);
+        }
+        
+        // Only update icon/label if position changed OR status changed
+        if (devicePositionChanged || deviceIconChanged) {
+            const iconUrl = getMarkerIconUrl(device.isOnline, device.isMoving || false);
+            markers[markerKey].setIcon({
+                url: iconUrl,
+                scaledSize: new google.maps.Size(40, 40),
+                labelOrigin: new google.maps.Point(20, 55) // Position label below marker
+            });
+            // Update label text
+            markers[markerKey].setLabel({
+                text: deviceId.substring(deviceId.length - 4) || 'GPS',
+                color: '#FFFFFF', // White text
+                fontSize: '10px',
+                fontWeight: 'bold',
+                className: getLabelClassName('gps-marker-label', device.isMoving || false, device.isOnline)
+            });
+            
+            // Apply background styling
+            setTimeout(() => {
+                applyLabelBackground(markers[markerKey], device.isMoving || false, device.isOnline);
+            }, 50);
+        }
     } else if (!device.isAssigned) {
         // Create new marker for unassigned device with label below
         const marker = new google.maps.Marker({
@@ -1201,13 +1917,13 @@ function updateMarkerForGpsDevice(deviceId, device) {
             title: `GPS Device ${deviceId} (Unassigned)`,
             label: {
                 text: deviceId.substring(deviceId.length - 4) || 'GPS',
-                color: getLabelColor(),
+                color: '#FFFFFF', // White text
                 fontSize: '10px',
                 fontWeight: 'bold',
-                className: 'gps-marker-label'
+                className: getLabelClassName('gps-marker-label', device.isMoving || false, device.isOnline)
             },
             icon: {
-                url: device.isOnline ? '/img/gpsmarker-1.png' : '/img/gpsmarker.png',
+                url: getMarkerIconUrl(device.isOnline, device.isMoving || false),
                 scaledSize: new google.maps.Size(40, 40),
                 labelOrigin: new google.maps.Point(20, 55) // Position label below marker
             },
@@ -1249,7 +1965,7 @@ function updateMarkerForGpsDevice(deviceId, device) {
                         ` : ''}
                         <div style="display: flex; align-items: center; padding: 10px 0;">
                             <span style="color: #6b7280; font-size: 12px; min-width: 100px; display: inline-block; font-weight: 500;">Last Update:</span>
-                            <span style="color: #111827; font-size: 12px;">${formatDateFullPH(device.location.timestamp)}</span>
+                            <span style="color: #111827; font-size: 12px;">${formatDateFullPH(device.location.lastUpdate || device.location.createdAt)}</span>
                         </div>
                     </div>
                     <div style="padding: 12px 16px; background: #f9fafb; border-radius: 0 0 8px 8px; margin: 0 -8px -8px -8px;">
@@ -1264,16 +1980,153 @@ function updateMarkerForGpsDevice(deviceId, device) {
         });
         
         markers[markerKey] = marker;
+        
+        // Apply background styling to label
+        setTimeout(() => {
+            applyLabelBackground(marker, device.isMoving || false, device.isOnline);
+        }, 100);
     }
 }
 
-// Initialize Socket.IO when DOM is ready
-if (typeof document !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', function() {
-        // Initialize Socket.IO after a short delay to ensure io is available
+// Periodic refresh interval (as backup, even when socket is connected)
+let periodicRefreshInterval = null;
+
+// Start periodic refresh (every 30 seconds as backup)
+function startPeriodicRefresh() {
+    // Clear existing interval if any
+    if (periodicRefreshInterval) {
+        clearInterval(periodicRefreshInterval);
+    }
+    
+    // Refresh every 15 seconds as a backup (faster detection of GPS Device ID changes)
+    periodicRefreshInterval = setInterval(() => {
+        // Always refresh as backup to detect GPS Device ID changes even if socket fails
+        loadVehicles();
+    }, 15000); // Every 15 seconds - faster detection
+}
+
+// Test socket connection and log status (for debugging)
+function testSocketConnection() {
+    if (gpsTrackingSocket) {
+        return {
+            exists: !!gpsTrackingSocket,
+            connected: gpsTrackingSocket.connected,
+            id: gpsTrackingSocket.id
+        };
+    }
+    return null;
+}
+
+// Global function for testing - can be called from browser console
+window.testVehicleMonitoring = function() {
+    const status = {
+        socket: testSocketConnection(),
+        vehicles: Object.keys(vehicleData).length,
+        gpsDevices: Object.keys(gpsDevicesData).length,
+        pollingActive: isPollingActive
+    };
+    console.log('Vehicle Monitoring Status:', status);
+    return status;
+};
+
+// Test function to manually trigger vehicle update event (for testing)
+window.testVehicleUpdateEvent = function(vehicleId = '38') {
+    console.log('🧪 [TEST] Simulating vehicle-updated event for vehicle:', vehicleId);
+    
+    if (!gpsTrackingSocket || !gpsTrackingSocket.connected) {
+        console.error('❌ [TEST] Socket is not connected!');
+        return;
+    }
+    
+    // Simulate the event data
+    const testEvent = {
+        vehicleId: String(vehicleId),
+        gpsDeviceIdChanged: true,
+        oldGpsDeviceId: '7026270831',
+        newGpsDeviceId: '7026270832',
+        timestamp: new Date().toISOString()
+    };
+    
+    console.log('🧪 [TEST] Simulating event:', testEvent);
+    
+    // Manually trigger the event handler
+    if (gpsTrackingSocket && gpsTrackingSocket.connected) {
+        // Emit a test event to see if it's received
+        console.log('🧪 [TEST] Emitting test-vehicle-updated event...');
+        gpsTrackingSocket.emit('test-vehicle-updated', testEvent);
+        
+        // Also manually call the handler to test
+        console.log('🧪 [TEST] Manually calling vehicle-updated handler...');
+        const handler = gpsTrackingSocket._callbacks?.['$vehicle-updated'];
+        if (handler) {
+            handler.forEach(cb => cb(testEvent));
+        } else {
+            console.log('🧪 [TEST] Handler not found in _callbacks, trying direct call...');
+            // Try to find and call the handler directly
+            console.log('🧪 [TEST] Note: This is just for testing. Real events should come from server.');
+        }
+    }
+};
+
+// Initialize Socket.IO - try multiple ways to ensure it runs
+function initializeSocketIO() {
+    // Check if Socket.IO is available
+    if (typeof io === 'undefined') {
+        console.error('Socket.IO library not available, retrying in 1 second...');
         setTimeout(() => {
-            initGpsTrackingSocket();
+            initializeSocketIO();
+        }, 1000);
+        return;
+    }
+    
+    // Initialize Socket.IO connection
+    initGpsTrackingSocket();
+    
+    // Start periodic refresh as backup (even when socket is connected)
+    startPeriodicRefresh();
+    
+    // Check socket connection after 2 seconds
+    setTimeout(() => {
+        if (!gpsTrackingSocket || !gpsTrackingSocket.connected) {
+            startPollingFallback();
+        }
+    }, 2000);
+}
+
+// Initialize Socket.IO when DOM is ready or immediately if already loaded
+if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+        // DOM is still loading, wait for DOMContentLoaded
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                initializeSocketIO();
+            }, 500);
+        });
+    } else {
+        // DOM is already loaded, initialize immediately
+        setTimeout(() => {
+            initializeSocketIO();
         }, 500);
+    }
+} else {
+    // No document object, try to initialize anyway after a delay
+    setTimeout(() => {
+        initializeSocketIO();
+    }, 1000);
+}
+
+// Cleanup on page unload
+if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', () => {
+        if (pollingInterval) {
+            clearInterval(pollingInterval);
+        }
+        if (periodicRefreshInterval) {
+            clearInterval(periodicRefreshInterval);
+        }
+        if (gpsTrackingSocket) {
+            gpsTrackingSocket.disconnect();
+        }
     });
 }
 
