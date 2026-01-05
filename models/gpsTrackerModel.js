@@ -15,7 +15,9 @@ class GpsTrackerModel {
       speed, 
       heading, 
       timestamp, 
-      battery 
+      battery,
+      satelliteCount,
+      gsmSignal
     } = locationData;
 
     const query = `
@@ -26,10 +28,12 @@ class GpsTrackerModel {
         speed, 
         heading, 
         timestamp, 
-        battery, 
+        battery,
+        satellite_count,
+        gsm_signal,
         created_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     `;
 
     const values = [
@@ -39,7 +43,9 @@ class GpsTrackerModel {
       speed ? parseFloat(speed) : null,
       heading ? parseFloat(heading) : null,
       timestamp ? new Date(timestamp) : new Date(),
-      battery ? parseFloat(battery) : null
+      battery ? parseFloat(battery) : null,
+      satelliteCount ? parseInt(satelliteCount) : null,
+      gsmSignal ? parseInt(gsmSignal) : null
     ];
 
     const result = await queryDatabasePromise(query, values);
@@ -58,6 +64,8 @@ class GpsTrackerModel {
         heading,
         timestamp,
         battery,
+        satellite_count,
+        gsm_signal,
         created_at
       FROM gps_locations 
       WHERE device_id = ?
@@ -105,17 +113,29 @@ class GpsTrackerModel {
     return await queryDatabasePromise(query, [hoursAgo]);
   }
 
-  // Get all devices that have ever sent location data
+  // Get all devices that have ever sent location data with latest location details
   static async getAllDevices() {
     const query = `
       SELECT 
-        device_id,
-        MAX(timestamp) as last_update,
-        MAX(created_at) as last_created,
-        COUNT(*) as total_updates
-      FROM gps_locations 
-      GROUP BY device_id
-      ORDER BY last_update DESC
+        gl.device_id,
+        gl.latitude,
+        gl.longitude,
+        gl.speed,
+        gl.heading,
+        gl.timestamp as last_update,
+        gl.battery,
+        gl.satellite_count,
+        gl.created_at as last_created,
+        (SELECT COUNT(*) FROM gps_locations WHERE device_id = gl.device_id) as total_updates
+      FROM gps_locations gl
+      INNER JOIN (
+        SELECT device_id, MAX(created_at) as max_created_at, MAX(timestamp) as max_timestamp
+        FROM gps_locations
+        GROUP BY device_id
+      ) latest ON gl.device_id = latest.device_id 
+        AND gl.created_at = latest.max_created_at
+        AND gl.timestamp = latest.max_timestamp
+      ORDER BY gl.timestamp DESC
     `;
     return await queryDatabasePromise(query);
   }
@@ -158,6 +178,58 @@ class GpsTrackerModel {
       WHERE id = ?
     `;
     const result = await queryDatabasePromise(query, [newTimestamp, latestLocation.id]);
+    return result.affectedRows > 0;
+  }
+
+  // Update battery, satellite count, and GSM signal without changing location (for stationary devices)
+  // This allows updating device status even when location hasn't changed
+  static async updateDeviceStatus(deviceId, battery, satelliteCount, gsmSignal, newTimestamp) {
+    // Get the latest location ID first
+    const latestLocation = await this.getLatestLocation(deviceId);
+    if (!latestLocation || !latestLocation.id) {
+      return false;
+    }
+    
+    // Build update query with only fields that have values
+    const updates = [];
+    const values = [];
+    
+    if (newTimestamp) {
+      updates.push('timestamp = ?');
+      values.push(newTimestamp);
+    }
+    
+    if (battery !== null && battery !== undefined) {
+      updates.push('battery = ?');
+      values.push(parseFloat(battery));
+    }
+    
+    if (satelliteCount !== null && satelliteCount !== undefined && satelliteCount !== '') {
+      updates.push('satellite_count = ?');
+      values.push(parseInt(satelliteCount));
+    }
+    
+    if (gsmSignal !== null && gsmSignal !== undefined) {
+      updates.push('gsm_signal = ?');
+      values.push(parseInt(gsmSignal));
+    }
+    
+    if (updates.length === 0) {
+      return false; // Nothing to update
+    }
+    
+    values.push(latestLocation.id);
+    
+    const query = `
+      UPDATE gps_locations 
+      SET ${updates.join(', ')}
+      WHERE id = ?
+    `;
+    
+    const result = await queryDatabasePromise(query, values);
+    if (result.affectedRows > 0) {
+      console.log(`✅ Updated device status for location ID ${latestLocation.id}: ${updates.join(', ')}`);
+    }
     return result.affectedRows > 0;
   }
 

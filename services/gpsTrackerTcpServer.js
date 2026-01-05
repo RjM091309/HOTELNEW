@@ -120,11 +120,57 @@ async function processGpsMessage(message, originalMessage, socket, io) {
     let data = {};
     
     // Try Sinotrack ST903 format first: *HQ,IMEI,lat,lng,speed,heading,date,time#
-    // Format: *HQ,7026270832,14.5994,121.0333,0,0,240101,120000#
+    // Extended format may include: battery,satellite_count,gsm_signal,etc
+    // Format: *HQ,7026270832,14.5994,121.0333,0,0,240101,120000,battery,satellite_count,gsm_signal#
     // NOTE: Some devices might send lng,lat instead of lat,lng
+    // Try extended format first (with more fields)
+    const st903ExtendedMatch = message.match(/\*(HQ|ST),(\d+),([\d.\-]+),([\d.\-]+),?([\d.]*),?([\d.]*),?(\d{6})?,?(\d{6})?,?([\d.]*),?(\d+)?,?(\d+)?#?/);
     const st903Match = message.match(/\*(HQ|ST),(\d+),([\d.\-]+),([\d.\-]+),?([\d.]*),?([\d.]*),?(\d{6})?,?(\d{6})?#?/);
     
-    if (st903Match) {
+    if (st903ExtendedMatch) {
+      // Extended format with battery, satellite count, GSM signal
+      const [, command, imei, coord1, coord2, speed, heading, date, time, battery, satelliteCount, gsmSignal] = st903ExtendedMatch;
+      let timestamp = new Date();
+      
+      // Determine which is lat and which is lng
+      let lat, lng;
+      const coord1Num = parseFloat(coord1);
+      const coord2Num = parseFloat(coord2);
+      
+      if (Math.abs(coord1Num) <= 90 && Math.abs(coord2Num) > 90) {
+        lat = coord1;
+        lng = coord2;
+      } else if (Math.abs(coord1Num) > 90 && Math.abs(coord2Num) <= 90) {
+        lat = coord2;
+        lng = coord1;
+      } else {
+        lat = coord1;
+        lng = coord2;
+      }
+      
+      if (date && time) {
+        const year = 2000 + parseInt(date.substring(0, 2));
+        const month = parseInt(date.substring(2, 4)) - 1;
+        const day = parseInt(date.substring(4, 6));
+        const hour = parseInt(time.substring(0, 2));
+        const minute = parseInt(time.substring(2, 4));
+        const second = parseInt(time.substring(4, 6));
+        timestamp = new Date(Date.UTC(year, month, day, hour, minute, second));
+      }
+      
+      data = {
+        deviceId: imei,
+        latitude: lat,
+        longitude: lng,
+        speed: speed || null,
+        heading: heading || null,
+        timestamp: timestamp,
+        battery: battery || null,
+        satelliteCount: (satelliteCount !== null && satelliteCount !== undefined && satelliteCount !== '') ? parseInt(satelliteCount) : null
+      };
+      const parsedMsg = `✅ Parsed ST903 extended format: Device ${imei} at (${lat}, ${lng}), Battery: ${battery || 'N/A'}, Satellites: ${satelliteCount || 'N/A'}`;
+      console.log(parsedMsg);
+    } else if (st903Match) {
       const [, command, imei, coord1, coord2, speed, heading, date, time] = st903Match;
       let timestamp = new Date();
       
@@ -180,12 +226,20 @@ async function processGpsMessage(message, originalMessage, socket, io) {
       console.log(parsedMsg);
     } else {
       // Try NMEA format: *HQ,IMEI,V8,HHMMSS,STATUS,DDMM.MMMM,N/S,DDDMM.MMMM,E/W,speed,heading,DDMMYY,...
-      // Format: *HQ,7026270832,V8,060246,A,1511.9440,N,12031.5149,E,0.00,154,030126,...
+      // Extended NMEA format: *HQ,7026270832,V8,100928,A,1503.5872,N,12042.0863,E,0.00,0,050126,fbfffbff,515,02,24519,43379,28,15,39,91
+      // Fields breakdown: *HQ,IMEI,V8,time,status,lat,latDir,lng,lngDir,speed,heading,date,hex1,hex2,hex3,hex4,hex5,GSM_SIGNAL,SATELLITE_COUNT,BATTERY,unknown
+      // Position 18 (index 17): GSM signal strength = 15
+      // Position 19 (index 18): Satellite count = 39
+      // Position 20 (index 19): Battery = 91
       // Coordinates are in degrees.minutes format (DDMM.MMMM)
-      const nmeaMatch = message.match(/\*(HQ|ST),(\d+),V\d+,(\d{6}),(A|V),([\d.]+),([NS]),([\d.]+),([EW]),([\d.]+),([\d.]+),(\d{6}),/);
+      // Try extended NMEA format first (with more fields including satellite count)
+      const nmeaExtendedMatch = message.match(/\*(HQ|ST),(\d+),V\d+,(\d{6}),(A|V),([\d.]+),([NS]),([\d.]+),([EW]),([\d.]+),([\d.]+),(\d{6}),([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),(\d+),(\d+),(\d+),([^,]*)/);
       
-      if (nmeaMatch) {
-        const [, command, imei, timeStr, gpsStatus, latDm, latDir, lngDm, lngDir, speed, heading, dateStr] = nmeaMatch;
+      if (nmeaExtendedMatch) {
+        // Extended NMEA format with GSM signal, satellite count, and battery
+        // Match indices: [17]=Satellite count (29), [18]=GSM signal (17), [19]=unknown (38), [20]=Battery (81)
+        // Fields: [1]=command, [2]=imei, [3]=time, [4]=status, [5]=lat, [6]=latDir, [7]=lng, [8]=lngDir, [9]=speed, [10]=heading, [11]=date, [12-16]=5 skips, [17]=Satellite, [18]=GSM, [19]=unknown, [20]=Battery
+        const [, command, imei, timeStr, gpsStatus, latDm, latDir, lngDm, lngDir, speed, heading, dateStr, , , , , , satelliteCount, gsmSignal, , battery] = nmeaExtendedMatch;
         
         // Convert NMEA format (DDMM.MMMM) to decimal degrees
         // Latitude: 1511.9440,N = 15°11.9440' = 15 + (11.9440/60) = 15.199067
@@ -222,10 +276,13 @@ async function processGpsMessage(message, originalMessage, socket, io) {
           longitude: lng.toString(),
           speed: speed || null,
           heading: heading || null,
-          timestamp: timestamp
+          timestamp: timestamp,
+          battery: battery !== null && battery !== undefined && battery !== '' ? parseFloat(battery) : null,
+          satelliteCount: satelliteCount !== null && satelliteCount !== undefined && satelliteCount !== '' ? parseInt(satelliteCount) : null,
+          gsmSignal: gsmSignal !== null && gsmSignal !== undefined && gsmSignal !== '' ? parseInt(gsmSignal) : null
         };
         
-        const nmeaMsg = `✅ Parsed NMEA format: Device ${imei} at latitude ${lat.toFixed(6)}, longitude ${lng.toFixed(6)} (GPS Status: ${gpsStatus})`;
+        const nmeaMsg = `✅ Parsed NMEA extended format: Device ${imei} at (${lat.toFixed(6)}, ${lng.toFixed(6)}), GSM Signal: ${gsmSignal || 'N/A'}, Satellites: ${satelliteCount || 'N/A'}, Battery: ${battery || 'N/A'}`;
         console.log(nmeaMsg);
       } else {
         // Try custom format: *IMEI,lat,lng,speed,heading,timestamp#
@@ -290,7 +347,9 @@ async function processGpsMessage(message, originalMessage, socket, io) {
       speed: data.speed ? parseFloat(data.speed) : null,
       heading: data.heading ? parseFloat(data.heading) : null,
       timestamp: data.timestamp,
-      battery: null
+      battery: data.battery || null,
+      satelliteCount: data.satelliteCount || null,
+      gsmSignal: data.gsmSignal || null
     };
     
     // Check if location has changed significantly before saving
@@ -372,12 +431,19 @@ async function processGpsMessage(message, originalMessage, socket, io) {
       // DO NOT emit Socket.IO if location not saved - all functions should depend on database
       // DO NOT update created_at timestamp - it should only update when actual new location is saved
       // The created_at represents "last time actual movement was saved", not "last time data was received"
-      // BUT update timestamp field (GPS device timestamp) to show device is still sending data (for online status)
+      // BUT update timestamp, battery, satellite count, and GSM signal even when location doesn't change
+      // This ensures device status fields are always up-to-date
       try {
-        await GpsTrackerModel.updateLocationHeartbeat(locationData.deviceId, locationData.timestamp);
-        console.log(`⏭️ GPS Location received (not saved - no movement): Device ${locationData.deviceId} at (${lat}, ${lng}) - Updated heartbeat timestamp for online status`);
+        await GpsTrackerModel.updateDeviceStatus(
+          locationData.deviceId, 
+          locationData.battery, 
+          locationData.satelliteCount, 
+          locationData.gsmSignal, 
+          locationData.timestamp
+        );
+        console.log(`⏭️ GPS Location received (not saved - no movement): Device ${locationData.deviceId} at (${lat}, ${lng}) - Updated status fields (Battery: ${locationData.battery !== null && locationData.battery !== undefined ? locationData.battery : 'N/A'}, Satellites: ${locationData.satelliteCount !== null && locationData.satelliteCount !== undefined ? locationData.satelliteCount : 'N/A'}, GSM: ${locationData.gsmSignal !== null && locationData.gsmSignal !== undefined ? locationData.gsmSignal : 'N/A'})`);
       } catch (error) {
-        console.error(`⚠️ Error updating heartbeat timestamp for device ${locationData.deviceId}:`, error);
+        console.error(`⚠️ Error updating device status for device ${locationData.deviceId}:`, error);
       }
     }
     

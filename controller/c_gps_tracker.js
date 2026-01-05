@@ -141,6 +141,9 @@ class GpsTrackerController {
         return res.status(400).send('INVALID');
       }
       
+      // Try to extract satellite count from data if available
+      const satelliteCount = data.satelliteCount || data.satellite_count || data.satellites || data.sat || null;
+      
       // Prepare location data
       const locationData = {
         deviceId: String(deviceId),
@@ -149,7 +152,8 @@ class GpsTrackerController {
         speed: speed ? parseFloat(speed) : null,
         heading: heading ? parseFloat(heading) : null,
         timestamp: timestamp ? new Date(timestamp) : new Date(),
-        battery: battery ? parseFloat(battery) : null
+        battery: battery ? parseFloat(battery) : null,
+        satelliteCount: satelliteCount ? parseInt(satelliteCount) : null
       };
       
       // Check if location has changed significantly before saving
@@ -234,12 +238,19 @@ class GpsTrackerController {
         // DO NOT emit Socket.IO if location not saved - all functions should depend on database
         // DO NOT update created_at timestamp - it should only update when actual new location is saved
         // The created_at represents "last time actual movement was saved", not "last time data was received"
-        // BUT update timestamp field (GPS device timestamp) to show device is still sending data (for online status)
+        // BUT update timestamp, battery, satellite count, and GSM signal even when location doesn't change
+        // This ensures device status fields are always up-to-date
         try {
-          await GpsTrackerModel.updateLocationHeartbeat(locationData.deviceId, locationData.timestamp);
-          console.log(`⏭️ Updated heartbeat timestamp for device ${deviceId} - Device is online`);
+          await GpsTrackerModel.updateDeviceStatus(
+            locationData.deviceId, 
+            locationData.battery, 
+            locationData.satelliteCount, 
+            locationData.gsmSignal, 
+            locationData.timestamp
+          );
+          console.log(`⏭️ Updated device status for device ${deviceId} - Battery: ${locationData.battery || 'N/A'}, Satellites: ${locationData.satelliteCount || 'N/A'}, GSM: ${locationData.gsmSignal || 'N/A'}`);
         } catch (error) {
-          console.error(`⚠️ Error updating heartbeat timestamp for device ${deviceId}:`, error);
+          console.error(`⚠️ Error updating device status for device ${deviceId}:`, error);
         }
       }
       

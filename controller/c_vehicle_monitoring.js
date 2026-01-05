@@ -23,7 +23,7 @@ class VehicleMonitoringController {
         subTitle: 'Real-time Vehicle Tracking',
         page: 'vehicle-monitoring',
         activePage: 'vehicle',
-        hideBreadcrumb: false,
+        hideBreadcrumb: true,
         user,
         userId,
         tabOrder
@@ -61,6 +61,8 @@ class VehicleMonitoringController {
           speed: vehicle.speed ? parseFloat(vehicle.speed) : null,
           heading: vehicle.heading ? parseFloat(vehicle.heading) : null,
           battery: vehicle.battery ? parseFloat(vehicle.battery) : null,
+          satelliteCount: vehicle.satellite_count ? parseInt(vehicle.satellite_count) : null,
+          gsmSignal: vehicle.gsm_signal ? parseInt(vehicle.gsm_signal) : null,
           lastUpdate: vehicle.last_location_created, // Use created_at (DB save time) for display
           minutesSinceUpdate: vehicle.minutes_since_update
         } : null,
@@ -114,6 +116,8 @@ class VehicleMonitoringController {
           speed: vehicle.speed ? parseFloat(vehicle.speed) : null,
           heading: vehicle.heading ? parseFloat(vehicle.heading) : null,
           battery: vehicle.battery ? parseFloat(vehicle.battery) : null,
+          satelliteCount: vehicle.satellite_count ? parseInt(vehicle.satellite_count) : null,
+          gsmSignal: vehicle.gsm_signal ? parseInt(vehicle.gsm_signal) : null,
           lastUpdate: vehicle.last_location_created, // Use created_at (DB save time) for display
           minutesSinceUpdate: vehicle.minutes_since_update
         } : null,
@@ -236,6 +240,8 @@ class VehicleMonitoringController {
               speed: location.speed ? parseFloat(location.speed) : null,
               heading: location.heading ? parseFloat(location.heading) : null,
               battery: location.battery ? parseFloat(location.battery) : null,
+              satelliteCount: location.satellite_count ? parseInt(location.satellite_count) : null,
+              gsmSignal: location.gsm_signal ? parseInt(location.gsm_signal) : null,
               timestamp: location.timestamp,
               createdAt: location.created_at,
               lastUpdate: location.created_at, // Use created_at for display (DB save time)
