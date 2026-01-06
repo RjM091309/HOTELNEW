@@ -62,7 +62,12 @@ export function createTraceToggleForDevice(deviceKey, deviceName, deviceId) {
     // Check if toggle already exists
     let traceToggle = traceToggles[deviceKey];
     if (traceToggle && traceToggle.parentNode) {
-        // Toggle already exists, just update it
+        // Toggle already exists; refresh label/data then update state
+        const traceLabel = traceToggle.querySelector('.traceLabel');
+        if (traceLabel) {
+            traceLabel.textContent = deviceName || deviceId || 'Trace';
+        }
+        traceToggle.dataset.deviceKey = deviceKey;
         updateTraceToggleState(deviceKey);
         return;
     }
@@ -120,7 +125,7 @@ export function createTraceToggleForDevice(deviceKey, deviceName, deviceId) {
         border-radius: 50%;
         position: absolute;
         top: 2px;
-        left: ${traceEnabled[deviceKey] ? '22px' : '2px'};
+        left: 2px;
         transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         will-change: transform;
@@ -291,21 +296,39 @@ export function updateTraceToggles() {
     
     // Remove toggles for devices that no longer exist
     Object.keys(traceToggles).forEach(deviceKey => {
+        const toggle = traceToggles[deviceKey];
+        if (!toggle) return;
+
         const isVehicle = !deviceKey.startsWith('gps_');
-        let exists = false;
-        
+        let dataExists = false;
+        let hasLocation = false;
+        let keepToggle = true;
+
         if (isVehicle) {
-            exists = vehicleData[deviceKey] && vehicleData[deviceKey].location;
+            const vehicle = vehicleData[deviceKey];
+            dataExists = !!vehicle;
+            hasLocation = !!(vehicle && vehicle.location);
+            // Vehicles always keep toggle if they exist
         } else {
             const deviceId = deviceKey.replace('gps_', '');
-            exists = gpsDevicesData[deviceId] && !gpsDevicesData[deviceId].isAssigned && gpsDevicesData[deviceId].location;
+            const device = gpsDevicesData[deviceId];
+            dataExists = !!device;
+            hasLocation = !!(device && device.location);
+            // Only keep unassigned GPS device toggles; assigned ones are removed
+            keepToggle = dataExists && device && !device.isAssigned;
         }
-        
-        if (!exists && traceToggles[deviceKey]) {
-            traceToggles[deviceKey].remove();
+
+        if (!dataExists || !keepToggle) {
+            toggle.remove();
             delete traceToggles[deviceKey];
             delete traceEnabled[deviceKey];
+            return;
         }
+
+        // Keep toggle but disable interaction when location is missing
+        const disabled = !hasLocation;
+        toggle.style.opacity = disabled ? '0.5' : '1';
+        toggle.style.pointerEvents = disabled ? 'none' : 'auto';
     });
 }
 

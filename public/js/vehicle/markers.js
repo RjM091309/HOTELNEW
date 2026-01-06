@@ -21,6 +21,19 @@ import { calculateDistanceMeters, easeOutCubic, getAddressFromCoordinates, hexTo
 import { getMarkerIconUrl, getStatusInfo } from './status.js';
 import { generateVehicleInfoWindowContent, generateGpsDeviceInfoWindowContent } from './infowindow.js';
 
+// Keep map centered on a target when trace is enabled
+function followTraceTarget(markerKey, position, distanceThresholdMeters = 30) {
+    if (!map || !position || position.lat === undefined || position.lng === undefined) return;
+    const key = String(markerKey);
+    if (traceEnabled[key] !== true) return;
+    const center = map.getCenter();
+    if (!center) return;
+    const dist = calculateDistanceMeters(center.lat(), center.lng(), position.lat, position.lng);
+    if (dist >= distanceThresholdMeters) {
+        map.panTo({ lat: position.lat, lng: position.lng });
+    }
+}
+
 // Add point to vehicle path and update polyline
 export function updateVehiclePath(markerKey, position) {
     if (!map || !position || !position.lat || !position.lng) return;
@@ -123,6 +136,8 @@ export function animateMarkerPosition(marker, newPosition, markerKey = null, dur
     if (!markerKey) {
         markerKey = 'unknown_' + Date.now() + '_' + Math.random();
     }
+    // Use string form for lookups (traceEnabled keys are strings)
+    const followKey = String(markerKey);
     
     // Cancel any existing animation for this marker
     if (markerAnimations[markerKey]) {
@@ -141,6 +156,12 @@ export function animateMarkerPosition(marker, newPosition, markerKey = null, dur
     const startLng = currentPos.lng();
     const endLat = newPosition.lat;
     const endLng = newPosition.lng;
+    const shouldFollow = traceEnabled[followKey] === true;
+    const followPosition = () => {
+        if (!shouldFollow) return;
+        if (typeof endLat !== 'number' || typeof endLng !== 'number') return;
+        map.panTo({ lat: endLat, lng: endLng });
+    };
     
     // Calculate distance to determine duration (longer distance = longer animation, but cap at max)
     const distanceMeters = calculateDistanceMeters(startLat, startLng, endLat, endLng);
@@ -162,6 +183,9 @@ export function animateMarkerPosition(marker, newPosition, markerKey = null, dur
     };
     
     markerAnimations[markerKey] = animationState;
+    
+    // Immediately pan/center to keep view following when trace is enabled
+    followPosition();
     
     function animate(currentTime) {
         if (!markerAnimations[markerKey]) {
@@ -419,6 +443,9 @@ export function updateMapMarkers() {
                     // Apply background styling
                     applyLabelBackground(markers[vehicle.id], vehicle.isMoving || false, vehicle.isOnline);
                 }
+                
+                // Auto-follow even if marker didn't move (user may have panned away)
+                followTraceTarget(vehicle.id, position);
                 return; // Skip creating new marker
             }
             
@@ -497,6 +524,9 @@ export function updateMapMarkers() {
             if (!vehiclePaths[vehicle.id]) {
                 updateVehiclePath(vehicle.id, position);
             }
+            
+            // Auto-follow on creation when trace is enabled
+            followTraceTarget(vehicle.id, position);
         }
     });
     
@@ -601,6 +631,9 @@ export function updateMapMarkers() {
                         applyLabelBackground(markers[markerKey], device.isMoving || false, device.isOnline);
                     }, 50);
                 }
+                
+                // Auto-follow even if marker didn't move (user may have panned away)
+                followTraceTarget(markerKey, position);
                 return; // Skip creating new marker
             }
             
@@ -672,6 +705,9 @@ export function updateMapMarkers() {
             if (!vehiclePaths[markerKey]) {
                 updateVehiclePath(markerKey, position);
             }
+            
+            // Auto-follow on creation when trace is enabled
+            followTraceTarget(markerKey, position);
         }
     });
     

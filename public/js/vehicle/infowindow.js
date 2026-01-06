@@ -8,28 +8,28 @@ import { formatDateFullPH, getAddressFromCoordinates } from './utils.js';
 
 // Generate satellite icon HTML (Sinotrack style)
 function generateSatelliteIcon(satelliteCount) {
-    if (satelliteCount === null || satelliteCount === undefined || satelliteCount === 0) return '';
+    const safeCount = (satelliteCount === null || satelliteCount === undefined) ? 0 : satelliteCount;
     return `
         <div class="GPS" style="display: inline-flex; align-items: center; gap: 4px;">
             <img src="/img/Satellite.png" alt="Satellite" style="width: 16px; height: 16px; object-fit: contain;">
-            <span style="color: #999999; font-size: 13px; font-weight: 600;">${satelliteCount}</span>
+            <span style="color: #999999; font-size: 13px; font-weight: 600;">${safeCount}</span>
         </div>
     `;
 }
 
 // Generate GSM signal icon HTML (Sinotrack style)
 function generateGsmSignalIcon(gsmSignal) {
-    if (gsmSignal === null || gsmSignal === undefined || gsmSignal === '') return '';
+    const safeSignal = (gsmSignal === null || gsmSignal === undefined || gsmSignal === '') ? 0 : gsmSignal;
     return `
         <div class="GSM" style="display: inline-flex; align-items: center; gap: 4px;">
             <img src="/img/GSM.png" alt="GSM Signal" style="width: 16px; height: 16px; object-fit: contain;">
-            <span style="color: #999999; font-size: 13px; font-weight: 600;">${gsmSignal}</span>
+            <span style="color: #999999; font-size: 13px; font-weight: 600;">${safeSignal}</span>
         </div>
     `;
 }
 
-// Generate battery icon HTML (Sinotrack style)
-function generateBatteryIcon(batteryPercent) {
+// Generate battery icon HTML (Sinotrack style) with optional charging animation
+function generateBatteryIcon(batteryPercent, isCharging = false) {
     if (batteryPercent === null || batteryPercent === undefined) return '';
     
     // Determine power class based on battery level
@@ -46,8 +46,9 @@ function generateBatteryIcon(batteryPercent) {
     const fillWidth = Math.min(100, Math.max(0, batteryPercent));
     
     return `
-        <div class="Power ${powerClass}">
-            <div class="Rate" style="width: ${fillWidth}%;"></div>
+        <div class="Power ${powerClass} ${isCharging ? 'is-charging' : ''}" style="position: relative; height: 18px;" title="${isCharging ? `Charging - ${batteryPercent}%` : `${batteryPercent}%`}">
+            <div class="ChargeAnim"></div>
+            <div class="Rate" style="width: ${fillWidth}%; height: 100%;"></div>
             <div class="Label">${batteryPercent}%</div>
             <div class="Tip"></div>
         </div>
@@ -68,9 +69,9 @@ export function generateVehicleInfoWindowContent(vehicle, address = null) {
                 <div class="TopSignalPower">
                     <span class="TimeValue">${vehicle.modelName}</span>
                     <div style="display: flex; align-items: center; gap: 6px;">
-                        ${vehicle.location && (vehicle.location.satelliteCount !== null && vehicle.location.satelliteCount !== undefined && vehicle.location.satelliteCount !== 0) ? generateSatelliteIcon(vehicle.location.satelliteCount) : ''}
-                        ${vehicle.location && (vehicle.location.gsmSignal !== null && vehicle.location.gsmSignal !== undefined && vehicle.location.gsmSignal !== '') ? generateGsmSignalIcon(vehicle.location.gsmSignal) : ''}
-                        ${vehicle.location && (vehicle.location.battery !== null && vehicle.location.battery !== undefined) ? generateBatteryIcon(vehicle.location.battery) : ''}
+                        ${vehicle.location ? generateSatelliteIcon(vehicle.location.satelliteCount) : ''}
+                        ${vehicle.location ? generateGsmSignalIcon(vehicle.location.gsmSignal) : ''}
+                        ${vehicle.location && (vehicle.location.battery !== null && vehicle.location.battery !== undefined) ? generateBatteryIcon(vehicle.location.battery, vehicle.location.isCharging) : ''}
                     </div>
                 </div>
                 <table>
@@ -131,9 +132,9 @@ export function generateGpsDeviceInfoWindowContent(device, address = null) {
                 <div class="TopSignalPower">
                     <span class="TimeValue">📍 GPS Device</span>
                     <div style="display: flex; align-items: center; gap: 6px;">
-                        ${device.location && device.location.satelliteCount !== null && device.location.satelliteCount !== undefined ? generateSatelliteIcon(device.location.satelliteCount) : ''}
-                        ${device.location && (device.location.gsmSignal !== null && device.location.gsmSignal !== undefined && device.location.gsmSignal !== '') ? generateGsmSignalIcon(device.location.gsmSignal) : ''}
-                        ${device.location && device.location.battery ? generateBatteryIcon(device.location.battery) : ''}
+                        ${device.location ? generateSatelliteIcon(device.location.satelliteCount) : ''}
+                        ${device.location ? generateGsmSignalIcon(device.location.gsmSignal) : ''}
+                        ${device.location && device.location.battery ? generateBatteryIcon(device.location.battery, device.location.isCharging) : ''}
                     </div>
                 </div>
                 <table>
@@ -202,7 +203,7 @@ export function showVehicleInfo(vehicleId) {
                     <p><strong>Coordinates:</strong> ${vehicle.location.lat.toFixed(6)}, ${vehicle.location.lng.toFixed(6)}</p>
                     ${vehicle.location.speed ? `<p><strong>Speed:</strong> ${vehicle.location.speed} km/h</p>` : ''}
                     ${vehicle.location.heading ? `<p><strong>Heading:</strong> ${vehicle.location.heading}°</p>` : ''}
-                    ${vehicle.location.battery ? `<p><strong>Battery:</strong> ${vehicle.location.battery}%</p>` : ''}
+                    ${vehicle.location.battery ? `<p><strong>Battery:</strong> ${vehicle.location.battery}%${vehicle.location.isCharging ? ' (Charging)' : ''}</p>` : ''}
                     ${vehicle.location.satelliteCount !== null && vehicle.location.satelliteCount !== undefined ? `<p><strong>Satellites:</strong> ${vehicle.location.satelliteCount} <i class="fa fa-satellite" style="color: #3b82f6;"></i></p>` : ''}
                     ${vehicle.location.gsmSignal !== null && vehicle.location.gsmSignal !== undefined ? `<p><strong>GSM Signal:</strong> ${vehicle.location.gsmSignal} <i class="fa fa-signal" style="color: #3b82f6;"></i></p>` : ''}
                     <p><strong>Last Update:</strong> ${formatDateFullPH(vehicle.location.lastUpdate)}</p>
@@ -248,7 +249,7 @@ export function showGpsDeviceInfo(deviceId) {
                     <p><strong>Coordinates:</strong> ${device.location.lat.toFixed(6)}, ${device.location.lng.toFixed(6)}</p>
                     ${device.location.speed ? `<p><strong>Speed:</strong> ${device.location.speed} km/h</p>` : ''}
                     ${device.location.heading ? `<p><strong>Heading:</strong> ${device.location.heading}°</p>` : ''}
-                    ${device.location.battery ? `<p><strong>Battery:</strong> ${device.location.battery}%</p>` : ''}
+                    ${device.location.battery ? `<p><strong>Battery:</strong> ${device.location.battery}%${device.location.isCharging ? ' (Charging)' : ''}</p>` : ''}
                     ${device.location.satelliteCount !== null && device.location.satelliteCount !== undefined ? `<p><strong>Satellites:</strong> ${device.location.satelliteCount} <i class="fa fa-satellite" style="color: #3b82f6;"></i></p>` : ''}
                     ${device.location.gsmSignal !== null && device.location.gsmSignal !== undefined ? `<p><strong>GSM Signal:</strong> ${device.location.gsmSignal} <i class="fa fa-signal" style="color: #3b82f6;"></i></p>` : ''}
                     <p><strong>Last Update:</strong> ${formatDateFullPH(device.location.lastUpdate || device.location.createdAt)}</p>

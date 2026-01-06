@@ -7,7 +7,11 @@ import {
     gpsDevicesData, 
     previousGpsDeviceIds, 
     lastSavedLocations, 
-    lastMovementTime 
+    lastMovementTime,
+    lastVehicleBatteryLevels,
+    lastGpsBatteryLevels,
+    lastVehicleChargingState,
+    lastGpsChargingState
 } from './state.js';
 import { calculateDistanceMeters } from './utils.js';
 import { clearVehiclePath } from './markers.js';
@@ -32,6 +36,10 @@ export async function loadVehiclesForMapInit() {
             if (Object.keys(previousGpsDeviceIds).length === 0) {
                 vehiclesData.data.forEach(vehicle => {
                     previousGpsDeviceIds[String(vehicle.id)] = vehicle.gpsDeviceId || null;
+                    // Seed battery baseline for charging detection
+                    if (vehicle.location && vehicle.location.battery !== null && vehicle.location.battery !== undefined) {
+                        lastVehicleBatteryLevels[vehicle.id] = Number(vehicle.location.battery);
+                    }
                 });
             }
             
@@ -46,6 +54,9 @@ export async function loadVehiclesForMapInit() {
             // Clear and populate gpsDevicesData
             Object.keys(gpsDevicesData).forEach(key => delete gpsDevicesData[key]);
             gpsData.data.forEach(device => {
+                if (device.location && device.location.battery !== null && device.location.battery !== undefined) {
+                    lastGpsBatteryLevels[device.deviceId] = Number(device.location.battery);
+                }
                 gpsDevicesData[device.deviceId] = device;
             });
         }
@@ -98,6 +109,29 @@ export async function loadVehicles() {
                     lat: vehicle.location.lat,
                     lng: vehicle.location.lng
                 } : null;
+                // Charging detection (vehicle)
+                const newBattery = vehicle.location && vehicle.location.battery !== null && vehicle.location.battery !== undefined
+                    ? Number(vehicle.location.battery)
+                    : null;
+                const prevBattery = lastVehicleBatteryLevels[vehicle.id];
+                let isCharging = false;
+                if (prevBattery !== undefined && newBattery !== null) {
+                    if (newBattery > prevBattery) {
+                        isCharging = true; // rising => charging
+                    } else if (newBattery === prevBattery) {
+                        // preserve prior charging state when level stays the same
+                        isCharging = !!lastVehicleChargingState[vehicle.id];
+                    } else {
+                        isCharging = false; // dropped => stop charging
+                    }
+                }
+                if (vehicle.location) {
+                    vehicle.location.isCharging = !!isCharging;
+                }
+                if (newBattery !== null) {
+                    lastVehicleBatteryLevels[vehicle.id] = newBattery;
+                    lastVehicleChargingState[vehicle.id] = isCharging;
+                }
                 
                 const previousLocation = lastSavedLocations[vehicle.id];
                 
@@ -171,6 +205,28 @@ export async function loadVehicles() {
             // Clear and populate gpsDevicesData
             Object.keys(gpsDevicesData).forEach(key => delete gpsDevicesData[key]);
             gpsData.data.forEach(device => {
+                // Charging detection (unassigned GPS device)
+                const newBattery = device.location && device.location.battery !== null && device.location.battery !== undefined
+                    ? Number(device.location.battery)
+                    : null;
+                const prevBattery = lastGpsBatteryLevels[device.deviceId];
+                let isCharging = false;
+                if (prevBattery !== undefined && newBattery !== null) {
+                    if (newBattery > prevBattery) {
+                        isCharging = true;
+                    } else if (newBattery === prevBattery) {
+                        isCharging = !!lastGpsChargingState[device.deviceId];
+                    } else {
+                        isCharging = false;
+                    }
+                }
+                if (device.location) {
+                    device.location.isCharging = !!isCharging;
+                }
+                if (newBattery !== null) {
+                    lastGpsBatteryLevels[device.deviceId] = newBattery;
+                    lastGpsChargingState[device.deviceId] = isCharging;
+                }
                 gpsDevicesData[device.deviceId] = device;
             });
         }

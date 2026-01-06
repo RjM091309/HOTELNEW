@@ -453,7 +453,69 @@
     color: #fff;
     z-index: 2;
     white-space: nowrap;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    text-shadow:
+        0 1px 0 rgba(0,0,0,0.35),
+        0 2px 2px rgba(0,0,0,0.3),
+        0 3px 4px rgba(0,0,0,0.2);
+}
+
+.MapAppPurePosTip .Power .ChargeAnim {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, #72f779, #22c55e, #72f779);
+    opacity: 0.55;
+    z-index: 1;
+}
+
+.MapAppPurePosTip .Power.is-charging {
+    overflow: hidden;
+}
+
+.MapAppPurePosTip .Power.is-charging .ChargeAnim {
+    display: block;
+    animation: batteryFillLoop 1.1s ease-in-out infinite;
+}
+
+.MapAppPurePosTip .Power.is-charging .Rate {
+    position: relative;
+    overflow: hidden;
+    background-color: #22c55e !important;
+}
+
+.MapAppPurePosTip .Power.is-charging .Rate::after {
+    display: none; /* superseded by ChargeAnim */
+}
+
+@keyframes batteryFillLoop {
+    0% { width: 0%; opacity: 0.4; }
+    70% { width: 100%; opacity: 0.75; }
+    100% { width: 0%; opacity: 0; }
+}
+
+.MapAppPurePosTip .Power.is-charging .Rate {
+    position: relative;
+    overflow: hidden;
+    background-color: #22c55e !important;
+}
+
+.MapAppPurePosTip .Power.is-charging .Rate::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -40%;
+    width: 40%;
+    height: 100%;
+    background: linear-gradient(90deg, rgba(255,255,255,0.35), rgba(255,255,255,0.05), rgba(255,255,255,0.35));
+    animation: batteryChargeSweep 1.1s linear infinite;
+}
+
+@keyframes batteryChargeSweep {
+    0% { left: -40%; }
+    100% { left: 110%; }
 }
 
 .Style_Map_Div .MapAppPurePosTip .Power .Label {
@@ -469,7 +531,7 @@
     top: 3.5px;
     right: -3.5px;
     width: 0;
-    height: 6px;
+    height: 8px;
     border: solid 1px #bbb;
     background-color: #bbb;
     border-radius: 0 2px 2px 0
