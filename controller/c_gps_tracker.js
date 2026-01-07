@@ -157,25 +157,40 @@ class GpsTrackerController {
       };
       
       // Check if location has changed significantly before saving
-      // Get distance threshold from environment variable (default: 10 meters)
-      const distanceThreshold = parseFloat(process.env.GPS_MIN_DISTANCE_METERS || '10');
+      // Get distance threshold from environment variable (default: 30 meters to reduce jitter)
+      const distanceThreshold = parseFloat(process.env.GPS_MIN_DISTANCE_METERS || '30');
+      const minSpeedKph = parseFloat(process.env.GPS_MIN_SPEED_KPH || '3'); // require small speed if provided
       
       const latestLocation = await GpsTrackerModel.getLatestLocation(locationData.deviceId);
       // Derive charging flag if device didn't send explicit flag
       const deriveChargingFlag = () => {
-        if (locationData.battery === null || locationData.battery === undefined || isNaN(locationData.battery)) {
-          return latestLocation && latestLocation.is_charging !== undefined ? latestLocation.is_charging : null;
-        }
+        // Default: not charging unless explicitly inferred
+        let flag = false;
         const prevBattery = latestLocation && latestLocation.battery !== null && latestLocation.battery !== undefined
           ? parseFloat(latestLocation.battery)
           : null;
         const prevFlag = latestLocation && latestLocation.is_charging !== undefined ? latestLocation.is_charging : null;
-        if (prevBattery !== null && !isNaN(prevBattery)) {
-          if (locationData.battery > prevBattery) return true;    // rising -> charging
-          if (locationData.battery < prevBattery) return false;   // dropping -> not charging
-          if (prevFlag !== null && prevFlag !== undefined) return !!prevFlag; // same level, keep last known
+
+        // If device explicitly sends is_charging in payload (future-proof), honor it
+        if (data.is_charging !== undefined && data.is_charging !== null) {
+          return !!data.is_charging;
         }
-        return prevFlag !== null && prevFlag !== undefined ? !!prevFlag : null;
+
+        // If no battery reading, fall back to previous flag (if any), else false
+        if (locationData.battery === null || locationData.battery === undefined || isNaN(locationData.battery)) {
+          return prevFlag !== null && prevFlag !== undefined ? !!prevFlag : flag;
+        }
+
+        // If we have previous battery, compare delta
+        if (prevBattery !== null && !isNaN(prevBattery)) {
+          if (locationData.battery > prevBattery) return true;  // rising -> charging
+          if (locationData.battery < prevBattery) return false; // dropping -> not charging
+          // same level: keep previous flag if it existed
+          return prevFlag !== null && prevFlag !== undefined ? !!prevFlag : flag;
+        }
+
+        // No previous battery; assume not charging
+        return flag;
       };
       locationData.isCharging = deriveChargingFlag();
       let shouldSave = true;
@@ -215,12 +230,14 @@ class GpsTrackerController {
             roundedNewLng
           );
           
-          if (distanceMeters < distanceThreshold) {
+          const hasSpeed = locationData.speed !== null && locationData.speed !== undefined && !isNaN(locationData.speed);
+          const distanceGate = hasSpeed ? distanceMeters >= distanceThreshold : distanceMeters >= distanceThreshold * 2;
+          const speedGate = hasSpeed ? locationData.speed >= minSpeedKph : true;
+          if (!distanceGate || !speedGate) {
             shouldSave = false;
-            // Don't save duplicate location, but still forward and emit Socket.IO
-            console.log(`⏭️ Location not saved: Device ${locationData.deviceId} moved only ${distanceMeters.toFixed(2)}m (threshold: ${distanceThreshold}m)`);
+            console.log(`⏭️ Location not saved: Device ${locationData.deviceId} jitter (distance ${distanceMeters.toFixed(2)}m, speed ${hasSpeed ? locationData.speed : 'N/A'}; thresholds distance ${distanceThreshold}m${hasSpeed ? `, speed ${minSpeedKph}km/h` : ''})`);
           } else {
-            console.log(`📍 Location changed: Device ${locationData.deviceId} moved ${distanceMeters.toFixed(2)}m (threshold: ${distanceThreshold}m)`);
+            console.log(`📍 Location changed: Device ${locationData.deviceId} moved ${distanceMeters.toFixed(2)}m (threshold: ${distanceThreshold}m${hasSpeed ? `, speed ${locationData.speed}km/h` : ''})`);
           }
         }
       }

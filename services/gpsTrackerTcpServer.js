@@ -353,24 +353,35 @@ async function processGpsMessage(message, originalMessage, socket, io) {
     };
     
     // Check if location has changed significantly before saving
-    // Get distance threshold from environment variable (default: 10 meters)
-    const distanceThreshold = parseFloat(process.env.GPS_MIN_DISTANCE_METERS || '10');
+    // Get distance threshold from environment variable (default: 30 meters to reduce jitter)
+    const distanceThreshold = parseFloat(process.env.GPS_MIN_DISTANCE_METERS || '30');
+    const minSpeedKph = parseFloat(process.env.GPS_MIN_SPEED_KPH || '3'); // require small speed if provided
     
-  const latestLocation = await GpsTrackerModel.getLatestLocation(locationData.deviceId);
+    const latestLocation = await GpsTrackerModel.getLatestLocation(locationData.deviceId);
   const deriveChargingFlag = () => {
-    if (locationData.battery === null || locationData.battery === undefined || isNaN(locationData.battery)) {
-      return latestLocation && latestLocation.is_charging !== undefined ? latestLocation.is_charging : null;
-    }
+    // Default to not charging unless inferred
+    let flag = false;
     const prevBattery = latestLocation && latestLocation.battery !== null && latestLocation.battery !== undefined
       ? parseFloat(latestLocation.battery)
       : null;
     const prevFlag = latestLocation && latestLocation.is_charging !== undefined ? latestLocation.is_charging : null;
+
+    // If device sends is_charging explicitly (future-proof), honor it
+    if (data.is_charging !== undefined && data.is_charging !== null) {
+      return !!data.is_charging;
+    }
+
+    if (locationData.battery === null || locationData.battery === undefined || isNaN(locationData.battery)) {
+      return prevFlag !== null && prevFlag !== undefined ? !!prevFlag : flag;
+    }
+
     if (prevBattery !== null && !isNaN(prevBattery)) {
       if (locationData.battery > prevBattery) return true;
       if (locationData.battery < prevBattery) return false;
-      if (prevFlag !== null && prevFlag !== undefined) return !!prevFlag;
+      return prevFlag !== null && prevFlag !== undefined ? !!prevFlag : flag;
     }
-    return prevFlag !== null && prevFlag !== undefined ? !!prevFlag : null;
+
+    return flag;
   };
   locationData.isCharging = deriveChargingFlag();
     let shouldSave = true;
@@ -410,12 +421,15 @@ async function processGpsMessage(message, originalMessage, socket, io) {
           roundedNewLng
         );
         
-        if (distanceMeters < distanceThreshold) {
+        const hasSpeed = locationData.speed !== null && locationData.speed !== undefined && !isNaN(locationData.speed);
+        const distanceGate = hasSpeed ? distanceMeters >= distanceThreshold : distanceMeters >= distanceThreshold * 2;
+        const speedGate = hasSpeed ? locationData.speed >= minSpeedKph : true;
+        if (!distanceGate || !speedGate) {
           shouldSave = false;
-          // Don't save duplicate location, but still forward and emit Socket.IO
-          console.log(`⏭️ Location not saved: Device ${locationData.deviceId} moved only ${distanceMeters.toFixed(2)}m (threshold: ${distanceThreshold}m)`);
+          // Don't save duplicate/jitter location, but still forward and emit Socket.IO
+          console.log(`⏭️ Location not saved: Device ${locationData.deviceId} jitter (distance ${distanceMeters.toFixed(2)}m, speed ${hasSpeed ? locationData.speed : 'N/A'}; thresholds distance ${distanceThreshold}m${hasSpeed ? `, speed ${minSpeedKph}km/h` : ''})`);
         } else {
-          console.log(`📍 Location changed: Device ${locationData.deviceId} moved ${distanceMeters.toFixed(2)}m (threshold: ${distanceThreshold}m)`);
+          console.log(`📍 Location changed: Device ${locationData.deviceId} moved ${distanceMeters.toFixed(2)}m (threshold: ${distanceThreshold}m${hasSpeed ? `, speed ${locationData.speed}km/h` : ''})`);
         }
       }
     }

@@ -21,6 +21,19 @@ import { calculateDistanceMeters, easeOutCubic, getAddressFromCoordinates, hexTo
 import { getMarkerIconUrl, getStatusInfo } from './status.js';
 import { generateVehicleInfoWindowContent, generateGpsDeviceInfoWindowContent } from './infowindow.js';
 
+// Rotate PNG marker icon based on heading (degrees). Assumes icon points north by default.
+function applyMarkerRotation(marker, heading) {
+    if (!marker) return;
+    if (heading === null || heading === undefined || isNaN(heading)) return;
+    const markerDiv = marker.getDiv ? marker.getDiv() : null;
+    if (!markerDiv) return;
+    const imgEl = markerDiv.querySelector('img');
+    if (imgEl) {
+        imgEl.style.transform = `rotate(${heading}deg)`;
+        imgEl.style.transformOrigin = '50% 50%';
+    }
+}
+
 // Keep map centered on a target when trace is enabled
 function followTraceTarget(markerKey, position, distanceThresholdMeters = 30) {
     if (!map || !position || position.lat === undefined || position.lng === undefined) return;
@@ -443,6 +456,11 @@ export function updateMapMarkers() {
                     // Apply background styling
                     applyLabelBackground(markers[vehicle.id], vehicle.isMoving || false, vehicle.isOnline);
                 }
+
+                // Apply heading-based rotation (PNG) if heading available (always re-apply)
+                if (vehicle.location && vehicle.location.heading !== null && vehicle.location.heading !== undefined) {
+                    applyMarkerRotation(markers[vehicle.id], vehicle.location.heading);
+                }
                 
                 // Auto-follow even if marker didn't move (user may have panned away)
                 followTraceTarget(vehicle.id, position);
@@ -473,6 +491,9 @@ export function updateMapMarkers() {
             // Add background styling to label after marker is created
             setTimeout(() => {
                 applyLabelBackground(marker, vehicle.isMoving || false, vehicle.isOnline);
+                if (vehicle.location && vehicle.location.heading !== null && vehicle.location.heading !== undefined) {
+                    applyMarkerRotation(marker, vehicle.location.heading);
+                }
             }, 100);
             
             // Create info window using helper function
