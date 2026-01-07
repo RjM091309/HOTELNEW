@@ -259,44 +259,126 @@ async function updateVehicleLocationFromSocket(deviceId, locationData) {
             }
         }
         
-        // If marker exists, smoothly animate to new position immediately
+        // Update vehicle/device location data in memory for real-time InfoWindow updates
+        // IMPORTANT: Don't update isMoving here - it should be determined by database location changes only
+        // Socket.IO is for real-time position updates, but isMoving should come from database comparison
+        if (foundVehicle && foundVehicle.location) {
+            foundVehicle.location.lat = newPosition.lat;
+            foundVehicle.location.lng = newPosition.lng;
+            if (locationData.speed !== null && locationData.speed !== undefined) {
+                foundVehicle.location.speed = parseFloat(locationData.speed);
+            }
+            if (locationData.heading !== null && locationData.heading !== undefined) {
+                foundVehicle.location.heading = parseFloat(locationData.heading);
+            }
+            if (locationData.battery !== null && locationData.battery !== undefined) {
+                foundVehicle.location.battery = parseFloat(locationData.battery);
+            }
+            if (locationData.isCharging !== null && locationData.isCharging !== undefined) {
+                foundVehicle.location.isCharging = !!locationData.isCharging;
+            }
+            if (locationData.satelliteCount !== null && locationData.satelliteCount !== undefined) {
+                foundVehicle.location.satelliteCount = parseInt(locationData.satelliteCount);
+            }
+            if (locationData.gsmSignal !== null && locationData.gsmSignal !== undefined) {
+                foundVehicle.location.gsmSignal = parseInt(locationData.gsmSignal);
+            }
+            foundVehicle.location.lastUpdate = locationData.timestamp || new Date();
+            
+            // Don't update isMoving from Socket.IO - it should only be determined by database location changes
+            // Socket.IO may have GPS jitter, so rely on database saves (which filter jitter) for isMoving status
+        } else if (foundDevice && foundDevice.location) {
+            foundDevice.location.lat = newPosition.lat;
+            foundDevice.location.lng = newPosition.lng;
+            if (locationData.speed !== null && locationData.speed !== undefined) {
+                foundDevice.location.speed = parseFloat(locationData.speed);
+            }
+            if (locationData.heading !== null && locationData.heading !== undefined) {
+                foundDevice.location.heading = parseFloat(locationData.heading);
+            }
+            if (locationData.battery !== null && locationData.battery !== undefined) {
+                foundDevice.location.battery = parseFloat(locationData.battery);
+            }
+            if (locationData.isCharging !== null && locationData.isCharging !== undefined) {
+                foundDevice.location.isCharging = !!locationData.isCharging;
+            }
+            if (locationData.satelliteCount !== null && locationData.satelliteCount !== undefined) {
+                foundDevice.location.satelliteCount = parseInt(locationData.satelliteCount);
+            }
+            if (locationData.gsmSignal !== null && locationData.gsmSignal !== undefined) {
+                foundDevice.location.gsmSignal = parseInt(locationData.gsmSignal);
+            }
+            foundDevice.location.lastUpdate = locationData.timestamp || new Date();
+            
+            // Don't update isMoving from Socket.IO - it should only be determined by database location changes
+        }
+        
+        // 🔁 CORRECT LOGIC: Only update marker position if vehicle/device is actually moving
+        // CRITICAL: Check isMoving status from database comparison (not Socket.IO speed)
+        // If isMoving = false (standby), ignore Socket.IO position updates (GPS jitter)
+        // If isMoving = true (in-transit), animate marker smoothly
         if (markerKey && markers[markerKey]) {
             const marker = markers[markerKey];
             const currentPos = marker.getPosition();
             
-            if (currentPos) {
-                const distanceMeters = calculateDistanceMeters(
-                    currentPos.lat(),
-                    currentPos.lng(),
-                    newPosition.lat,
-                    newPosition.lng
-                );
+            // Get isMoving status from vehicle/device data (determined by database location changes)
+            const isMoving = foundVehicle ? (foundVehicle.isMoving || false) : (foundDevice ? (foundDevice.isMoving || false) : false);
+            
+            // Only update marker position if actually moving (database confirmed movement)
+            // If standby, ignore Socket.IO position updates to prevent GPS jitter from moving marker
+            if (isMoving) {
+                // IN-TRANSIT: Update marker position smoothly
+                const speed = locationData.speed ? parseFloat(locationData.speed) : 0;
                 
-                // Only animate if moved at least 1 meter (to avoid micro-movements)
-                if (distanceMeters >= 1) {
-                    // Calculate duration based on speed if available, otherwise use distance
-                    let duration = 2000; // Default 2 seconds
-                    if (locationData.speed && locationData.speed > 0) {
-                        // Duration = distance / speed (convert speed from km/h to m/s)
-                        const speedMps = locationData.speed / 3.6; // km/h to m/s
-                        duration = Math.min(Math.max((distanceMeters / speedMps) * 1000, 800), 3000);
-                    } else {
-                        // Use distance-based duration: 50m = 1s, 500m = 2s, but min 0.8s, max 3s
-                        duration = Math.min(Math.max(distanceMeters / 50 * 1000, 800), 3000);
-                    }
+                if (currentPos) {
+                    const distanceMeters = calculateDistanceMeters(
+                        currentPos.lat(),
+                        currentPos.lng(),
+                        newPosition.lat,
+                        newPosition.lng
+                    );
                     
-                    // Smoothly animate marker to new position with heading for rotation
-                    animateMarkerPosition(marker, newPosition, markerKey, duration, locationData.heading);
+                    // 🚗 IN-TRANSIT: Animate marker smoothly (only when isMoving = true)
+                    if (speed > 0 && distanceMeters >= 0.5) {
+                        // Calculate duration based on speed
+                        let duration = 2000; // Default 2 seconds
+                        const speedMps = speed / 3.6; // km/h to m/s
+                        duration = Math.min(Math.max((distanceMeters / speedMps) * 1000, 800), 3000);
+                        
+                        // Smoothly animate marker to new position with heading for rotation
+                        animateMarkerPosition(marker, newPosition, markerKey, duration, locationData.heading);
+                    } else if (distanceMeters >= 0.1) {
+                        // Small movement but still in-transit - update position without animation
+                        marker.setPosition(newPosition);
+                        if (locationData.heading !== null && locationData.heading !== undefined) {
+                            applyMarkerRotation(marker, locationData.heading);
+                        }
+                    }
+                } else {
+                    // No current position, set directly (first time)
+                    marker.setPosition(newPosition);
+                    if (locationData.heading !== null && locationData.heading !== undefined) {
+                        applyMarkerRotation(marker, locationData.heading);
+                    }
                 }
             } else {
-                // No current position, set directly
-                marker.setPosition(newPosition);
+                // STANDBY: Don't update marker position (ignore GPS jitter from Socket.IO)
+                // But still update heading rotation if available (for direction changes even when stationary)
+                if (locationData.heading !== null && locationData.heading !== undefined) {
+                    applyMarkerRotation(marker, locationData.heading);
+                }
             }
+            // Marker stays at last known position from database when standby
+            // Other data (battery, signal, etc.) is still updated above for InfoWindow
         }
         
-        // After smooth animation, reload from database to ensure data consistency
-        // This updates vehicleData/gpsDevicesData with latest DB state
-        await loadVehicles();
+        // Update open InfoWindow with real-time data if it's open for this vehicle/device
+        // This updates battery, signal, etc. even when marker position doesn't change (standby)
+        const { updateOpenInfoWindow } = await import('./infowindow.js');
+        updateOpenInfoWindow().catch(err => console.warn('InfoWindow update error:', err));
+        
+        // Don't reload from database immediately - Socket.IO is the source of truth for live movement
+        // Database is just for history. Only reload periodically or on page refresh
     } catch (error) {
         console.error('❌ Error handling socket notification:', error);
         // On error, try to reload vehicles as fallback

@@ -24,22 +24,83 @@ import { generateVehicleInfoWindowContent, generateGpsDeviceInfoWindowContent } 
 // Store marker DOM element references using WeakMap
 const markerDomCache = new WeakMap();
 
+// Store current heading for each marker (for smooth rotation interpolation)
+const markerCurrentHeading = new WeakMap();
+
 // Clear cache for a marker (call when icon changes)
 export function clearMarkerRotationCache(marker) {
     if (marker) {
         markerDomCache.delete(marker);
+        markerCurrentHeading.delete(marker); // Also clear heading cache
     }
 }
 
 // Rotate PNG marker icon based on heading (degrees). Assumes icon points north by default.
 // Matches Sinotrack implementation: transform:rotate(deg) translateZ(0)
-export function applyMarkerRotation(marker, heading) {
+export function applyMarkerRotation(marker, heading, smooth = true) {
     if (!marker) {
         return;
     }
     // Allow heading 0 (north) - it's a valid heading
     if (heading === null || heading === undefined || (typeof heading !== 'number' && isNaN(heading))) {
         return;
+    }
+    
+    // Normalize heading to 0-360 range (handle negative values or values > 360)
+    heading = heading % 360;
+    if (heading < 0) heading += 360;
+    
+    // Get current heading for smooth interpolation
+    let currentHeading = markerCurrentHeading.get(marker);
+    if (currentHeading === undefined || currentHeading === null) {
+        currentHeading = heading; // First time, use target heading directly
+        markerCurrentHeading.set(marker, heading);
+    }
+    
+    // Check if heading actually changed (within 0.1 degree tolerance to avoid floating point issues)
+    const headingDiff = Math.abs(heading - currentHeading);
+    const normalizedDiff = Math.min(headingDiff, 360 - headingDiff); // Handle wrap-around
+    
+    // If heading hasn't changed significantly, don't apply rotation
+    if (normalizedDiff < 0.1) {
+        return; // No change, skip rotation
+    }
+    
+    // Smooth heading interpolation to avoid jittery rotation
+    // Only smooth if difference is significant (more than 1 degree)
+    if (smooth) {
+        // Calculate shortest rotation path (handle 360/0 wrap-around)
+        let diff = heading - currentHeading;
+        if (diff > 180) {
+            diff -= 360;
+        } else if (diff < -180) {
+            diff += 360;
+        }
+        
+        // Only apply smoothing if difference is significant
+        if (Math.abs(diff) > 1) {
+            // Smooth interpolation: move 20% towards target each frame
+            // Lower value = smoother rotation, less jittery
+            // This creates gradual rotation instead of instant snapping
+            const smoothingFactor = 0.2;
+            currentHeading += diff * smoothingFactor;
+            
+            // Normalize to 0-360
+            if (currentHeading < 0) currentHeading += 360;
+            if (currentHeading >= 360) currentHeading -= 360;
+            
+            // Store current heading for next frame
+            markerCurrentHeading.set(marker, currentHeading);
+            
+            // Use interpolated heading for rotation
+            heading = currentHeading;
+        } else {
+            // Very small difference, snap to target to avoid micro-movements
+            markerCurrentHeading.set(marker, heading);
+        }
+    } else {
+        // No smoothing - use heading directly
+        markerCurrentHeading.set(marker, heading);
     }
     
     // Check if we have cached DOM element

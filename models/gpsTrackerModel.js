@@ -18,7 +18,8 @@ class GpsTrackerModel {
       battery,
       isCharging,
       satelliteCount,
-      gsmSignal
+      gsmSignal,
+      isMoving
     } = locationData;
 
     const query = `
@@ -33,9 +34,10 @@ class GpsTrackerModel {
         is_charging,
         satellite_count,
         gsm_signal,
+        is_moving,
         created_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     `;
 
     const values = [
@@ -48,7 +50,8 @@ class GpsTrackerModel {
       battery ? parseFloat(battery) : null,
       isCharging === undefined || isCharging === null ? null : !!isCharging,
       satelliteCount ? parseInt(satelliteCount) : null,
-      gsmSignal ? parseInt(gsmSignal) : null
+      gsmSignal ? parseInt(gsmSignal) : null,
+      isMoving !== undefined && isMoving !== null ? (!!isMoving ? 1 : 0) : 0
     ];
 
     const result = await queryDatabasePromise(query, values);
@@ -70,6 +73,7 @@ class GpsTrackerModel {
         is_charging,
         satellite_count,
         gsm_signal,
+        is_moving,
         created_at
       FROM gps_locations 
       WHERE device_id = ?
@@ -131,6 +135,8 @@ class GpsTrackerModel {
         gl.battery,
         gl.is_charging,
         gl.satellite_count,
+        gl.gsm_signal,
+        gl.is_moving,
         gl.created_at as last_created,
         (SELECT COUNT(*) FROM gps_locations WHERE device_id = gl.device_id) as total_updates
       FROM gps_locations gl

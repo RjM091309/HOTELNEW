@@ -20,6 +20,10 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   return R * c; // Distance in meters
 }
 
+// Track last save time per device for time-based throttling
+// DB saving strategy: speed > 0 every 5-10 sec, speed = 0 every 30-60 sec
+const deviceLastSaveTime = new Map();
+
 class GpsTrackerController {
   
   // ========================================
@@ -158,13 +162,26 @@ class GpsTrackerController {
       // Try to extract satellite count from data if available
       const satelliteCount = data.satelliteCount || data.satellite_count || data.satellites || data.sat || null;
       
+      // Normalize and validate heading (0-360 degrees)
+      let normalizedHeading = null;
+      if (heading !== null && heading !== undefined && heading !== '') {
+        normalizedHeading = parseFloat(heading);
+        if (!isNaN(normalizedHeading)) {
+          // Normalize heading to 0-360 range
+          normalizedHeading = normalizedHeading % 360;
+          if (normalizedHeading < 0) normalizedHeading += 360;
+        } else {
+          normalizedHeading = null;
+        }
+      }
+      
       // Prepare location data
       const locationData = {
         deviceId: String(deviceId),
         latitude: lat,
         longitude: lng,
         speed: speed ? parseFloat(speed) : null,
-        heading: heading ? parseFloat(heading) : null,
+        heading: normalizedHeading,
         timestamp: timestamp ? new Date(timestamp) : new Date(),
         battery: battery ? parseFloat(battery) : null,
         satelliteCount: satelliteCount ? parseInt(satelliteCount) : null
@@ -256,38 +273,52 @@ class GpsTrackerController {
         }
       }
       
-      // Store in database only if location changed significantly
+      // 🗄️ Time-based DB saving throttling
+      // speed > 0: every 5-10 sec, speed = 0: every 30-60 sec
+      const hasSpeed = locationData.speed !== null && locationData.speed !== undefined && !isNaN(locationData.speed) && locationData.speed > 0;
+      const lastSaveTime = deviceLastSaveTime.get(locationData.deviceId);
+      const now = Date.now();
+      const timeSinceLastSave = lastSaveTime ? now - lastSaveTime : Infinity;
+      
+      // Throttle: moving vehicles save every 5-10 sec, standby every 30-60 sec
+      const minSaveInterval = hasSpeed ? 5000 : 30000; // 5 sec for moving, 30 sec for standby
+      const shouldThrottle = lastSaveTime && timeSinceLastSave < minSaveInterval;
+      
+      if (shouldSave && shouldThrottle) {
+        shouldSave = false;
+        console.log(`⏭️ Location save throttled: Device ${locationData.deviceId} - Last save ${(timeSinceLastSave / 1000).toFixed(1)}s ago (min: ${minSaveInterval / 1000}s)`);
+      }
+      
+      // 🔁 CORRECT FLOW: GPS Device → Socket.IO (IMMEDIATE) → Google Map → Database (history)
+      // Socket.IO = live movement, Database = memory/history
+      // Emit Socket.IO IMMEDIATELY from GPS data (before DB save)
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('driver-location-updated', {
+          deviceId: locationData.deviceId,
+          location: {
+            lat: locationData.latitude,
+            lng: locationData.longitude,
+            speed: locationData.speed ? parseFloat(locationData.speed) : null,
+            heading: locationData.heading ? parseFloat(locationData.heading) : null,
+            battery: locationData.battery !== null && locationData.battery !== undefined ? parseFloat(locationData.battery) : null,
+            isCharging: locationData.isCharging !== null && locationData.isCharging !== undefined ? !!locationData.isCharging : null,
+            satelliteCount: locationData.satelliteCount !== null && locationData.satelliteCount !== undefined ? parseInt(locationData.satelliteCount) : null,
+            gsmSignal: locationData.gsmSignal !== null && locationData.gsmSignal !== undefined ? parseInt(locationData.gsmSignal) : null,
+            timestamp: locationData.timestamp
+          }
+        });
+      }
+      
+      // Store in database only if location changed significantly (throttled saving)
       let savedLocation = null;
       if (shouldSave) {
         savedLocation = await GpsTrackerModel.createLocation(locationData);
+        deviceLastSaveTime.set(locationData.deviceId, now); // Track save time
         console.log(`📍 GPS Location saved: Device ${deviceId} at (${lat.toFixed(6)}, ${lng.toFixed(6)}) - Battery: ${locationData.battery !== null ? locationData.battery : 'N/A'}%, Satellites: ${locationData.satelliteCount !== null ? locationData.satelliteCount : 'N/A'}, GSM: ${locationData.gsmSignal !== null ? locationData.gsmSignal : 'N/A'}`);
-        
-        // Only broadcast via Socket.IO AFTER saving to database
-        // Get the saved location from database to ensure we emit database data, not GPS device data
-        const dbLocation = await GpsTrackerModel.getLatestLocation(locationData.deviceId);
-        if (dbLocation) {
-          const io = req.app.get('io');
-          if (io) {
-            io.emit('driver-location-updated', {
-              deviceId: dbLocation.device_id,
-              location: {
-                lat: parseFloat(dbLocation.latitude),
-                lng: parseFloat(dbLocation.longitude),
-                speed: dbLocation.speed ? parseFloat(dbLocation.speed) : null,
-                heading: dbLocation.heading ? parseFloat(dbLocation.heading) : null,
-                battery: dbLocation.battery ? parseFloat(dbLocation.battery) : null,
-                isCharging: dbLocation.is_charging !== null && dbLocation.is_charging !== undefined ? !!dbLocation.is_charging : null,
-                timestamp: dbLocation.timestamp
-              }
-            });
-          }
-        }
       } else {
         console.log(`⏭️ GPS Location received (not saved - no movement): Device ${deviceId} at (${lat}, ${lng})`);
-        // DO NOT update created_at timestamp - it should only update when actual new location is saved
-        // The created_at represents "last time actual movement was saved", not "last time data was received"
-        // BUT update timestamp, battery, satellite count, GSM signal, and coordinates even when location doesn't change
-        // This ensures device status fields and position are always up-to-date in the database
+        // Update device status (battery, coordinates, etc.) even when not saving new location
         try {
           await GpsTrackerModel.updateDeviceStatus(
             locationData.deviceId, 
@@ -299,26 +330,6 @@ class GpsTrackerController {
             locationData.latitude,
             locationData.longitude
           );
-          
-          // Emit Socket.IO after updating database so frontend gets latest position
-          const dbLocation = await GpsTrackerModel.getLatestLocation(locationData.deviceId);
-          if (dbLocation) {
-            const io = req.app.get('io');
-            if (io) {
-              io.emit('driver-location-updated', {
-                deviceId: dbLocation.device_id,
-                location: {
-                  lat: parseFloat(dbLocation.latitude),
-                  lng: parseFloat(dbLocation.longitude),
-                  speed: dbLocation.speed ? parseFloat(dbLocation.speed) : null,
-                  heading: dbLocation.heading ? parseFloat(dbLocation.heading) : null,
-                  battery: dbLocation.battery ? parseFloat(dbLocation.battery) : null,
-                  isCharging: dbLocation.is_charging !== null && dbLocation.is_charging !== undefined ? !!dbLocation.is_charging : null,
-                  timestamp: dbLocation.timestamp
-                }
-              });
-            }
-          }
           
           console.log(`⏭️ GPS Location received (not saved - no movement): Device ${deviceId} at (${lat.toFixed(6)}, ${lng.toFixed(6)}) - Updated: Battery=${locationData.battery !== null && locationData.battery !== undefined ? locationData.battery : 'N/A'}%, Satellites=${locationData.satelliteCount !== null && locationData.satelliteCount !== undefined ? locationData.satelliteCount : 'N/A'}, GSM=${locationData.gsmSignal !== null && locationData.gsmSignal !== undefined ? locationData.gsmSignal : 'N/A'}, Charging=${locationData.isCharging ? 'Yes' : 'No'}`);
         } catch (error) {

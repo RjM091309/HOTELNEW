@@ -64,10 +64,12 @@ class VehicleMonitoringController {
           isCharging: vehicle.is_charging === null || vehicle.is_charging === undefined ? null : !!vehicle.is_charging,
           satelliteCount: vehicle.satellite_count ? parseInt(vehicle.satellite_count) : null,
           gsmSignal: vehicle.gsm_signal ? parseInt(vehicle.gsm_signal) : null,
+          isMoving: vehicle.is_moving !== null && vehicle.is_moving !== undefined ? !!vehicle.is_moving : false,
           lastUpdate: vehicle.last_location_created, // Use created_at (DB save time) for display
           minutesSinceUpdate: vehicle.minutes_since_update
         } : null,
         hasGps: !!vehicle.GPS_DEVICE_ID,
+        isMoving: vehicle.is_moving !== null && vehicle.is_moving !== undefined ? !!vehicle.is_moving : false,
         // Online status: Check if timestamp (GPS device timestamp) is recent (within 10 minutes)
         // This shows if device is still sending data, even if location hasn't changed
         // created_at is used for "x min ago" display (shows standby time since last actual movement)
@@ -120,10 +122,12 @@ class VehicleMonitoringController {
           isCharging: vehicle.is_charging === null || vehicle.is_charging === undefined ? null : !!vehicle.is_charging,
           satelliteCount: vehicle.satellite_count ? parseInt(vehicle.satellite_count) : null,
           gsmSignal: vehicle.gsm_signal ? parseInt(vehicle.gsm_signal) : null,
+          isMoving: vehicle.is_moving !== null && vehicle.is_moving !== undefined ? !!vehicle.is_moving : false,
           lastUpdate: vehicle.last_location_created, // Use created_at (DB save time) for display
           minutesSinceUpdate: vehicle.minutes_since_update
         } : null,
         hasGps: !!vehicle.GPS_DEVICE_ID,
+        isMoving: vehicle.is_moving !== null && vehicle.is_moving !== undefined ? !!vehicle.is_moving : false,
         // Online status: Check if timestamp (GPS device timestamp) is recent (within 10 minutes)
         // This shows if device is still sending data, even if location hasn't changed
         // created_at is used for "x min ago" display (shows standby time since last actual movement)
@@ -241,9 +245,11 @@ class VehicleMonitoringController {
               lng: parseFloat(location.longitude),
               speed: location.speed ? parseFloat(location.speed) : null,
               heading: location.heading ? parseFloat(location.heading) : null,
-              battery: location.battery ? parseFloat(location.battery) : null,
+              battery: location.battery !== null && location.battery !== undefined ? parseFloat(location.battery) : null,
+              isCharging: location.is_charging === null || location.is_charging === undefined ? null : !!location.is_charging,
               satelliteCount: location.satellite_count ? parseInt(location.satellite_count) : null,
               gsmSignal: location.gsm_signal ? parseInt(location.gsm_signal) : null,
+              isMoving: location.is_moving !== null && location.is_moving !== undefined ? !!location.is_moving : false,
               timestamp: location.timestamp,
               createdAt: location.created_at,
               lastUpdate: location.created_at, // Use created_at for display (DB save time)

@@ -131,6 +131,7 @@ class VehicleModel {
         gl.is_charging,
         gl.satellite_count,
         gl.gsm_signal,
+        gl.is_moving,
         gl.created_at as last_location_created,
         TIMESTAMPDIFF(MINUTE, gl.created_at, NOW()) as minutes_since_update
       FROM vehicle v
@@ -146,6 +147,7 @@ class VehicleModel {
           is_charging,
           satellite_count,
           gsm_signal,
+          is_moving,
           created_at,
           ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY created_at DESC, timestamp DESC) as rn
         FROM gps_locations
@@ -178,6 +180,7 @@ class VehicleModel {
         gl.is_charging,
         gl.satellite_count,
         gl.gsm_signal,
+        gl.is_moving,
         gl.created_at as last_location_created,
         TIMESTAMPDIFF(MINUTE, gl.created_at, NOW()) as minutes_since_update
       FROM vehicle v
@@ -193,6 +196,7 @@ class VehicleModel {
           is_charging,
           satellite_count,
           gsm_signal,
+          is_moving,
           created_at,
           ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY created_at DESC, timestamp DESC) as rn
         FROM gps_locations

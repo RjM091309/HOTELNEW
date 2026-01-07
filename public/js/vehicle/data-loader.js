@@ -149,73 +149,17 @@ export async function loadVehicles() {
                     lastVehicleChargingState[vehicle.id] = !!apiChargingFlag;
                 }
                 
-                const previousLocation = lastSavedLocations[vehicle.id];
+                // isMoving is now calculated in database and returned from API
+                // Just use the isMoving value from the API response
+                // If not provided, default to false
+                vehicle.isMoving = vehicle.isMoving !== null && vehicle.isMoving !== undefined ? !!vehicle.isMoving : false;
                 
+                // Track last saved location for reference (no longer used for isMoving calculation)
                 if (newLocation) {
-                    if (!previousLocation) {
-                        // First time seeing this location - not moving (just initialized)
-                        vehicle.isMoving = false;
-                    } else {
-                        // Round coordinates to 6 decimal places (~0.1m precision) to avoid floating point issues
-                        const roundCoord = (coord) => Math.round(coord * 1000000) / 1000000;
-                        const roundedPrevLat = roundCoord(previousLocation.lat);
-                        const roundedPrevLng = roundCoord(previousLocation.lng);
-                        const roundedNewLat = roundCoord(newLocation.lat);
-                        const roundedNewLng = roundCoord(newLocation.lng);
-                        
-                        // Calculate distance from previous saved location (from last database load)
-                        const distanceMeters = calculateDistanceMeters(
-                            roundedPrevLat,
-                            roundedPrevLng,
-                            roundedNewLat,
-                            roundedNewLng
-                        );
-                        
-                        // Movement heuristic:
-                        // - require distance >= threshold (default 30m to avoid jitter)
-                        // - if speed is present, require speed >= minSpeedKph
-                        // - if no speed field, allow movement only for larger jumps (2x threshold)
-                        const hasSpeed = vehicle.location && vehicle.location.speed !== null && vehicle.location.speed !== undefined;
-                        if (hasSpeed) {
-                            vehicle.isMoving = distanceMeters >= MOVEMENT_DISTANCE_METERS && vehicle.location.speed >= MOVEMENT_MIN_SPEED_KPH;
-                        } else {
-                            vehicle.isMoving = distanceMeters >= MOVEMENT_DISTANCE_METERS * 2;
-                        }
-                        
-                        // Track movement time - if vehicle moved, update timestamp
-                        if (vehicle.isMoving) {
-                            lastMovementTime[vehicle.id] = Date.now();
-                        } else {
-                            // If not moving, check if enough time has passed since last movement
-                            // Auto-stop after 30 seconds of no new movement
-                            const lastMove = lastMovementTime[vehicle.id];
-                            if (lastMove) {
-                                const timeSinceLastMove = Date.now() - lastMove;
-                                const autoStopDelay = 30000; // 30 seconds
-                                if (timeSinceLastMove > autoStopDelay) {
-                                    vehicle.isMoving = false;
-                                    delete lastMovementTime[vehicle.id];
-                                }
-                            }
-                        }
-                        
-                        // Debug logging
-                        if (distanceMeters > 0.1) {
-                            console.log(`📍 Vehicle ${vehicle.id || vehicle.plateNumber || 'unknown'}: Distance from DB = ${distanceMeters.toFixed(2)}m, isMoving = ${vehicle.isMoving}`);
-                        } else if (distanceMeters > 0) {
-                            // Log small movements that don't trigger save (for debugging)
-                            console.log(`📍 Vehicle ${vehicle.id || vehicle.plateNumber || 'unknown'}: Small movement ${distanceMeters.toFixed(2)}m (< 10m threshold) - NOT saved to DB, marker stays still`);
-                        }
-                    }
-                    // Always update lastSavedLocations to current database location (for next comparison)
-                    // Round coordinates to avoid floating point precision issues
                     lastSavedLocations[vehicle.id] = {
                         lat: Math.round(newLocation.lat * 1000000) / 1000000,
                         lng: Math.round(newLocation.lng * 1000000) / 1000000
                     };
-                } else {
-                    // No location - not moving
-                    vehicle.isMoving = false;
                 }
                 
                 vehicleData[vehicle.id] = vehicle;
@@ -225,6 +169,11 @@ export async function loadVehicles() {
         if (gpsData.success) {
             // Clear and populate gpsDevicesData
             Object.keys(gpsDevicesData).forEach(key => delete gpsDevicesData[key]);
+            
+            // Track last saved locations for GPS devices (similar to vehicles)
+            const lastSavedGpsLocations = window.lastSavedGpsLocations || {};
+            window.lastSavedGpsLocations = lastSavedGpsLocations;
+            
             gpsData.data.forEach(device => {
                 // Charging detection (unassigned GPS device)
                 const newBattery = device.location && device.location.battery !== null && device.location.battery !== undefined
@@ -253,6 +202,25 @@ export async function loadVehicles() {
                 } else if (apiChargingFlag !== undefined && apiChargingFlag !== null) {
                     lastGpsChargingState[device.deviceId] = !!apiChargingFlag;
                 }
+                
+                // isMoving is now calculated in database and returned from API
+                // Just use the isMoving value from the API response
+                // If not provided, default to false
+                device.isMoving = device.isMoving !== null && device.isMoving !== undefined ? !!device.isMoving : false;
+                
+                // Track last saved location for reference (no longer used for isMoving calculation)
+                const newLocation = device.location && device.location.lat && device.location.lng ? {
+                    lat: device.location.lat,
+                    lng: device.location.lng
+                } : null;
+                
+                if (newLocation) {
+                    lastSavedGpsLocations[device.deviceId] = {
+                        lat: Math.round(newLocation.lat * 1000000) / 1000000,
+                        lng: Math.round(newLocation.lng * 1000000) / 1000000
+                    };
+                }
+                
                 gpsDevicesData[device.deviceId] = device;
             });
         }

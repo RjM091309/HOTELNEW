@@ -32,6 +32,9 @@ function generateGsmSignalIcon(gsmSignal) {
 function generateBatteryIcon(batteryPercent, isCharging = false) {
     if (batteryPercent === null || batteryPercent === undefined) return '';
     
+    // Ensure isCharging is a boolean (handle null and undefined)
+    const charging = (isCharging === null || isCharging === undefined) ? false : !!isCharging;
+    
     // Determine power class based on battery level
     let powerClass = 'HightPower';
     if (batteryPercent < 20) {
@@ -46,7 +49,7 @@ function generateBatteryIcon(batteryPercent, isCharging = false) {
     const fillWidth = Math.min(100, Math.max(0, batteryPercent));
     
     return `
-        <div class="Power ${powerClass} ${isCharging ? 'is-charging' : ''}" style="position: relative; height: 18px;" title="${isCharging ? `Charging - ${batteryPercent}%` : `${batteryPercent}%`}">
+        <div class="Power ${powerClass} ${charging ? 'is-charging' : ''}" style="position: relative; height: 18px;" title="${charging ? `Charging - ${batteryPercent}%` : `${batteryPercent}%`}">
             <div class="ChargeAnim"></div>
             <div class="Rate" style="width: ${fillWidth}%; height: 100%;"></div>
             <div class="Label">${batteryPercent}%</div>
@@ -134,7 +137,7 @@ export function generateGpsDeviceInfoWindowContent(device, address = null) {
                     <div style="display: flex; align-items: center; gap: 6px;">
                         ${device.location ? generateSatelliteIcon(device.location.satelliteCount) : ''}
                         ${device.location ? generateGsmSignalIcon(device.location.gsmSignal) : ''}
-                        ${device.location && device.location.battery ? generateBatteryIcon(device.location.battery, device.location.isCharging) : ''}
+                        ${device.location && (device.location.battery !== null && device.location.battery !== undefined) ? generateBatteryIcon(device.location.battery, device.location.isCharging) : ''}
                     </div>
                 </div>
                 <table>
