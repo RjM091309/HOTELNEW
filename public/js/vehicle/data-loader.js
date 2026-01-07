@@ -20,6 +20,10 @@ import { updateMapMarkers } from './markers.js';
 import { updateTraceToggles } from './trace-toggle.js';
 import { updateOpenInfoWindow } from './infowindow.js';
 
+// Movement thresholds to reduce GPS jitter on frontend
+const MOVEMENT_DISTANCE_METERS = 30; // meters
+const MOVEMENT_MIN_SPEED_KPH = 3;    // km/h
+
 // Load vehicles data for map initialization (without updating UI)
 export async function loadVehiclesForMapInit() {
     try {
@@ -167,11 +171,16 @@ export async function loadVehicles() {
                             roundedNewLng
                         );
                         
-                        const distanceThreshold = 10; // Same as server threshold (10 meters)
-                        
-                        // Only mark as moving if distance is clearly >= 10m (new saved location)
-                        // If distance < 10m, database location is the same (server didn't save, vehicle not moving)
-                        vehicle.isMoving = distanceMeters >= distanceThreshold;
+                        // Movement heuristic:
+                        // - require distance >= threshold (default 30m to avoid jitter)
+                        // - if speed is present, require speed >= minSpeedKph
+                        // - if no speed field, allow movement only for larger jumps (2x threshold)
+                        const hasSpeed = vehicle.location && vehicle.location.speed !== null && vehicle.location.speed !== undefined;
+                        if (hasSpeed) {
+                            vehicle.isMoving = distanceMeters >= MOVEMENT_DISTANCE_METERS && vehicle.location.speed >= MOVEMENT_MIN_SPEED_KPH;
+                        } else {
+                            vehicle.isMoving = distanceMeters >= MOVEMENT_DISTANCE_METERS * 2;
+                        }
                         
                         // Track movement time - if vehicle moved, update timestamp
                         if (vehicle.isMoving) {
