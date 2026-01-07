@@ -21,16 +21,190 @@ import { calculateDistanceMeters, easeOutCubic, getAddressFromCoordinates, hexTo
 import { getMarkerIconUrl, getStatusInfo } from './status.js';
 import { generateVehicleInfoWindowContent, generateGpsDeviceInfoWindowContent } from './infowindow.js';
 
+// Store marker DOM element references using WeakMap
+const markerDomCache = new WeakMap();
+
+// Clear cache for a marker (call when icon changes)
+export function clearMarkerRotationCache(marker) {
+    if (marker) {
+        markerDomCache.delete(marker);
+    }
+}
+
 // Rotate PNG marker icon based on heading (degrees). Assumes icon points north by default.
-function applyMarkerRotation(marker, heading) {
-    if (!marker) return;
-    if (heading === null || heading === undefined || isNaN(heading)) return;
-    const markerDiv = marker.getDiv ? marker.getDiv() : null;
-    if (!markerDiv) return;
-    const imgEl = markerDiv.querySelector('img');
-    if (imgEl) {
-        imgEl.style.transform = `rotate(${heading}deg)`;
-        imgEl.style.transformOrigin = '50% 50%';
+// Matches Sinotrack implementation: transform:rotate(deg) translateZ(0)
+export function applyMarkerRotation(marker, heading) {
+    if (!marker) {
+        return;
+    }
+    // Allow heading 0 (north) - it's a valid heading
+    if (heading === null || heading === undefined || (typeof heading !== 'number' && isNaN(heading))) {
+        return;
+    }
+    
+    // Check if we have cached DOM element
+    let targetEl = markerDomCache.get(marker);
+    
+    if (!targetEl) {
+        // Try to find marker DOM element
+        try {
+            // Get marker's title to identify it
+            const markerTitle = marker.getTitle();
+            
+            // Find the map container element
+            const mapContainer = document.getElementById('map');
+            if (!mapContainer) {
+                // Map not ready, retry
+                setTimeout(() => applyMarkerRotation(marker, heading), 100);
+                return;
+            }
+            
+            // Search for marker by title in the map container
+            if (markerTitle) {
+                // Try to find element with matching title
+                const allElements = mapContainer.querySelectorAll('[title]');
+                for (let el of allElements) {
+                    if (el.getAttribute('title') === markerTitle) {
+                        // Found element with matching title
+                        // Strategy 1: Look for img elements (skip transparent.png)
+                        // Find the actual marker icon - it should be the largest visible image
+                        const allImgs = el.querySelectorAll('img');
+                        let candidateImg = null;
+                        let maxSize = 0;
+                        
+                        for (let img of allImgs) {
+                            // Skip transparent placeholder
+                            if (img.src && img.src.includes('transparent.png')) {
+                                continue;
+                            }
+                            
+                            // Check if it's our marker icon
+                            if (img.src && (img.src.includes('gpsmarker') || img.src.includes('/img/gpsmarker'))) {
+                                // Get image dimensions to find the actual marker (not a small icon)
+                                const width = img.width || img.offsetWidth || parseInt(window.getComputedStyle(img).width) || 0;
+                                const height = img.height || img.offsetHeight || parseInt(window.getComputedStyle(img).height) || 0;
+                                const size = width * height;
+                                
+                                // Prefer larger images (actual marker icons are usually 36x36 or larger)
+                                if (size > maxSize && size >= 100) { // At least 10x10 pixels
+                                    maxSize = size;
+                                    candidateImg = img;
+                                }
+                            }
+                        }
+                        
+                        if (candidateImg) {
+                            targetEl = candidateImg;
+                            markerDomCache.set(marker, targetEl);
+                        }
+                        
+                        // Strategy 2: Check if the element itself or its children have background-image with marker icon
+                        if (!targetEl) {
+                            const computedStyle = window.getComputedStyle(el);
+                            const bgImage = computedStyle.backgroundImage;
+                            if (bgImage && bgImage !== 'none' && (bgImage.includes('gpsmarker') || bgImage.includes('/img/'))) {
+                                targetEl = el;
+                                markerDomCache.set(marker, targetEl);
+                                break;
+                            }
+                            
+                            // Check children for background-image
+                            const children = el.children;
+                            for (let child of children) {
+                                const childStyle = window.getComputedStyle(child);
+                                const childBgImage = childStyle.backgroundImage;
+                                if (childBgImage && childBgImage !== 'none' && (childBgImage.includes('gpsmarker') || childBgImage.includes('/img/'))) {
+                                    targetEl = child;
+                                    markerDomCache.set(marker, targetEl);
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // Strategy 3: Check parent and siblings
+                        if (!targetEl) {
+                            const parent = el.parentElement;
+                            if (parent) {
+                                const parentImgs = parent.querySelectorAll('img');
+                                for (let img of parentImgs) {
+                                    if (img.src && !img.src.includes('transparent.png')) {
+                                        if (img.src.includes('gpsmarker') || img.src.includes('/img/')) {
+                                            targetEl = img;
+                                            markerDomCache.set(marker, targetEl);
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // Check siblings
+                            if (!targetEl && el.parentElement) {
+                                const siblings = Array.from(el.parentElement.children);
+                                for (let sibling of siblings) {
+                                    if (sibling !== el) {
+                                        const siblingImgs = sibling.querySelectorAll('img');
+                                        for (let img of siblingImgs) {
+                                            if (img.src && !img.src.includes('transparent.png')) {
+                                                if (img.src.includes('gpsmarker') || img.src.includes('/img/')) {
+                                                    targetEl = img;
+                                                    markerDomCache.set(marker, targetEl);
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        if (targetEl) break;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (targetEl) break;
+                    }
+                }
+            }
+            
+            // Strategy 4: If still not found, search all images in map container
+            if (!targetEl) {
+                const allImages = mapContainer.querySelectorAll('img');
+                for (let img of allImages) {
+                    if (img.src && !img.src.includes('transparent.png')) {
+                        if (img.src.includes('gpsmarker') || img.src.includes('/img/gpsmarker')) {
+                            targetEl = img;
+                            markerDomCache.set(marker, targetEl);
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.warn('Error finding marker DOM:', error);
+        }
+    }
+    
+    // Apply rotation if we found the target element
+    if (targetEl) {
+        // Apply rotation to the image element
+        targetEl.style.setProperty('transform', `rotate(${heading}deg) translateZ(0)`, 'important');
+        targetEl.style.setProperty('transform-origin', '50% 50%', 'important');
+        targetEl.style.setProperty('will-change', 'transform', 'important');
+        
+        // Also set directly as fallback
+        targetEl.style.transform = `rotate(${heading}deg) translateZ(0)`;
+        targetEl.style.transformOrigin = '50% 50%';
+        targetEl.style.willChange = 'transform';
+        
+        // Also try rotating the parent container (Google Maps might render differently)
+        const parent = targetEl.parentElement;
+        const mapContainerEl = document.getElementById('map');
+        if (parent && parent !== mapContainerEl) {
+            parent.style.setProperty('transform', `rotate(${heading}deg) translateZ(0)`, 'important');
+            parent.style.setProperty('transform-origin', '50% 50%', 'important');
+        }
+        
+        // Rotation successfully applied
+    } else {
+        // Not found yet, retry after delay (marker might not be rendered yet)
+        setTimeout(() => applyMarkerRotation(marker, heading), 200);
     }
 }
 
@@ -145,7 +319,8 @@ export function clearVehiclePath(markerKey) {
 }
 
 // Smoothly animate marker from current position to new position
-export function animateMarkerPosition(marker, newPosition, markerKey = null, duration = 1500) {
+// Uses linear interpolation for smooth continuous movement (like Grab/Foodpanda)
+export function animateMarkerPosition(marker, newPosition, markerKey = null, duration = 1500, heading = null) {
     if (!marker || !map) return;
     
     // Find markerKey if not provided
@@ -160,21 +335,35 @@ export function animateMarkerPosition(marker, newPosition, markerKey = null, dur
     // Use string form for lookups (traceEnabled keys are strings)
     const followKey = String(markerKey);
     
-    // Cancel any existing animation for this marker
+    // If there's an existing animation, smoothly transition from current animated position
+    let startLat, startLng;
     if (markerAnimations[markerKey]) {
+        // Get current animated position (not marker position, which might be stale)
+        const animState = markerAnimations[markerKey];
+        const elapsed = performance.now() - animState.startTime;
+        const progress = Math.min(elapsed / animState.duration, 1);
+        
+        // Calculate current animated position
+        const currentAnimLat = animState.startLat + (animState.endLat - animState.startLat) * progress;
+        const currentAnimLng = animState.startLng + (animState.endLng - animState.startLng) * progress;
+        
+        startLat = currentAnimLat;
+        startLng = currentAnimLng;
+        
+        // Cancel existing animation
         cancelAnimationFrame(markerAnimations[markerKey].animationId);
-        delete markerAnimations[markerKey];
+    } else {
+        // No existing animation, use marker's current position
+        const currentPos = marker.getPosition();
+        if (!currentPos) {
+            // No current position, just set directly
+            marker.setPosition(newPosition);
+            return;
+        }
+        startLat = currentPos.lat();
+        startLng = currentPos.lng();
     }
     
-    const currentPos = marker.getPosition();
-    if (!currentPos) {
-        // No current position, just set directly
-        marker.setPosition(newPosition);
-        return;
-    }
-    
-    const startLat = currentPos.lat();
-    const startLng = currentPos.lng();
     const endLat = newPosition.lat;
     const endLng = newPosition.lng;
     const shouldFollow = traceEnabled[followKey] === true;
@@ -184,13 +373,19 @@ export function animateMarkerPosition(marker, newPosition, markerKey = null, dur
         map.panTo({ lat: endLat, lng: endLng });
     };
     
-    // Calculate distance to determine duration (longer distance = longer animation, but cap at max)
+    // Calculate distance to determine duration
     const distanceMeters = calculateDistanceMeters(startLat, startLng, endLat, endLng);
-    // Adjust duration based on distance: 100m = 1s, 1000m = 2s, but min 0.8s, max 2.5s
-    const adjustedDuration = Math.min(Math.max(distanceMeters / 100 * 1000, 800), 2500);
+    
+    // If duration was provided, use it; otherwise calculate based on distance
+    // For smooth movement: use provided duration, or calculate from distance
+    let animationDuration = duration;
+    if (duration === 1500) {
+        // Default duration - calculate based on distance
+        // 50m = 1s, 500m = 2s, but min 0.8s, max 3s
+        animationDuration = Math.min(Math.max(distanceMeters / 50 * 1000, 800), 3000);
+    }
     
     const startTime = performance.now();
-    const animationDuration = Math.min(adjustedDuration, duration);
     
     // Store animation state
     const animationState = {
@@ -217,18 +412,27 @@ export function animateMarkerPosition(marker, newPosition, markerKey = null, dur
         const elapsed = currentTime - animationState.startTime;
         const progress = Math.min(elapsed / animationState.duration, 1);
         
-        // Apply easing
-        const easedProgress = easeOutCubic(progress);
-        
-        // Interpolate position
-        const currentLat = startLat + (endLat - startLat) * easedProgress;
-        const currentLng = startLng + (endLng - startLng) * easedProgress;
+        // Use LINEAR interpolation for smooth continuous movement (like Grab/Foodpanda)
+        // No easing - linear movement looks more natural for vehicles
+        const currentLat = startLat + (endLat - startLat) * progress;
+        const currentLng = startLng + (endLng - startLng) * progress;
         
         // Update marker position
         marker.setPosition({ lat: currentLat, lng: currentLng });
         
-        // Update polyline during animation to keep it connected to marker
-        updateVehiclePath(markerKey, { lat: currentLat, lng: currentLng });
+        // Apply rotation if heading is available (for smooth rotation during movement)
+        // Apply on every frame for smooth rotation
+        if (heading !== null && heading !== undefined && !isNaN(heading)) {
+            applyMarkerRotation(marker, heading);
+        }
+        
+        // Update polyline visually during animation (without adding to path history)
+        if (polylines[markerKey] && vehiclePaths[markerKey]) {
+            const pathArray = vehiclePaths[markerKey].map(p => new google.maps.LatLng(p.lat, p.lng));
+            // Add current animated position as last point for visual connection
+            pathArray.push(new google.maps.LatLng(currentLat, currentLng));
+            polylines[markerKey].setPath(pathArray);
+        }
         
         if (progress < 1) {
             // Continue animation
@@ -238,7 +442,7 @@ export function animateMarkerPosition(marker, newPosition, markerKey = null, dur
             marker.setPosition(newPosition);
             delete markerAnimations[markerKey];
             
-            // Final path update to ensure exact connection
+            // Final path update to ensure exact connection (only add final position to history)
             updateVehiclePath(markerKey, newPosition);
         }
     }
@@ -392,6 +596,25 @@ export function updateMapMarkers() {
             
             // Check if marker already exists
             if (markers[vehicle.id]) {
+                // Get current marker position
+                const currentPos = markers[vehicle.id].getPosition();
+                
+                // On first load, always sync marker position with database (even if not moving)
+                // This ensures markers are in correct position after page refresh
+                if (isFirstMapLoad && currentPos) {
+                    const roundCoord = (coord) => Math.round(coord * 1000000) / 1000000;
+                    const roundedCurrentLat = roundCoord(currentPos.lat());
+                    const roundedCurrentLng = roundCoord(currentPos.lng());
+                    const roundedNewLat = roundCoord(position.lat);
+                    const roundedNewLng = roundCoord(position.lng);
+                    
+                    // If position differs, update it (first load sync)
+                    if (roundedCurrentLat !== roundedNewLat || roundedCurrentLng !== roundedNewLng) {
+                        markers[vehicle.id].setPosition(position);
+                        console.log(`📍 First load: Synced marker position for vehicle ${vehicle.id || vehicle.plateNumber || 'unknown'}`);
+                    }
+                }
+                
                 // isMoving is already determined in loadVehicles() by comparing with previous lastSavedLocations
                 // IMPORTANT: Only update marker position if vehicle.isMoving is true (database location actually changed)
                 // Don't compare marker position vs database position - rely on isMoving flag from database comparison
@@ -401,7 +624,6 @@ export function updateMapMarkers() {
                 // If isMoving is false, database location is the same (server didn't save, vehicle not moving)
                 if (vehicle.isMoving) {
                     // Double-check: compare with marker's current position to avoid unnecessary updates
-                    const currentPos = markers[vehicle.id].getPosition();
                     let shouldUpdatePosition = false;
                     
                     if (!currentPos) {
@@ -422,23 +644,34 @@ export function updateMapMarkers() {
                                 roundedNewLat,
                                 roundedNewLng
                             );
-                            const distanceThreshold = 5; // 5 meters - only update if actually moved
+                            // Lower threshold for smooth movement: 1 meter (instead of 5m)
+                            // This allows smoother animation even for smaller movements
+                            const distanceThreshold = 1; // 1 meter - smooth movement threshold
                             shouldUpdatePosition = distanceMeters >= distanceThreshold;
                         }
                     }
                     
                     // Only animate marker if position actually changed AND vehicle is moving
                     if (shouldUpdatePosition) {
-                        console.log(`📍 Moving marker for vehicle ${vehicle.id || vehicle.plateNumber || 'unknown'}: isMoving = ${vehicle.isMoving}, position changed`);
-                        animateMarkerPosition(markers[vehicle.id], position, vehicle.id);
+                        // Calculate duration based on speed if available
+                        let duration = 2000; // Default 2 seconds
+                        if (vehicle.location && vehicle.location.speed && vehicle.location.speed > 0) {
+                            const distanceMeters = calculateDistanceMeters(
+                                currentPos ? currentPos.lat() : position.lat,
+                                currentPos ? currentPos.lng() : position.lng,
+                                position.lat,
+                                position.lng
+                            );
+                            const speedMps = vehicle.location.speed / 3.6; // km/h to m/s
+                            duration = Math.min(Math.max((distanceMeters / speedMps) * 1000, 800), 3000);
+                        }
+                        
+                        animateMarkerPosition(markers[vehicle.id], position, vehicle.id, duration, vehicle.location?.heading);
                         // Path will be updated when animation completes
-                    } else if (vehicle.isMoving) {
-                        console.log(`📍 Vehicle ${vehicle.id || vehicle.plateNumber || 'unknown'}: isMoving = true but marker position didn't change (already at correct position)`);
                     }
                 } else {
                     // vehicle.isMoving = false means no actual movement in database (device didn't move >= 10m)
                     // Marker correctly stays still - this is expected behavior
-                    // No need to log every refresh - only log if there's confusion
                 }
                 
                 // Always update icon based on isMoving status (to show correct icon even if position didn't change)
@@ -449,6 +682,9 @@ export function updateMapMarkers() {
                 // Always update icon/label if status changed (to reflect isMoving change)
                 // Update icon/label if moving status changed, but don't move marker if not actually moving
                 if (iconChanged) {
+                    // Clear rotation cache when icon changes (DOM element will be recreated)
+                    clearMarkerRotationCache(markers[vehicle.id]);
+                    
                     const iconUrl = getMarkerIconUrl(vehicle.isOnline, vehicle.isMoving || false);
                     markers[vehicle.id].setIcon({
                         url: iconUrl,
@@ -468,10 +704,11 @@ export function updateMapMarkers() {
                     applyLabelBackground(markers[vehicle.id], vehicle.isMoving || false, vehicle.isOnline);
                     
                     // Re-apply rotation after icon change (icon change recreates DOM element)
+                    // Use longer delay to ensure DOM is ready
                     if (vehicle.location && vehicle.location.heading !== null && vehicle.location.heading !== undefined) {
                         setTimeout(() => {
                             applyMarkerRotation(markers[vehicle.id], vehicle.location.heading);
-                        }, 50);
+                        }, 150);
                     }
                 }
 
@@ -629,8 +866,8 @@ export function updateMapMarkers() {
                             roundedNewLat,
                             roundedNewLng
                         );
-                        const deviceDistanceThreshold = 10; // Same as server threshold (10 meters)
-                        // Only update if movement is >= 10m (actual movement in database)
+                        const deviceDistanceThreshold = 1; // Lower threshold for smooth movement (1 meter)
+                        // Update if movement is >= 1m for smooth animation
                         positionChanged = deviceDistanceMeters >= deviceDistanceThreshold;
                     } else {
                         // Coordinates are the same (within floating point precision) - no change
@@ -638,10 +875,22 @@ export function updateMapMarkers() {
                     }
                 }
                 
-                // Only update marker position if it actually changed significantly (>= 10m)
-                // This ensures marker only moves when database location actually changed (saved to database)
+                // Only update marker position if it actually changed (>= 1m for smooth movement)
                 if (positionChanged) {
-                    animateMarkerPosition(markers[markerKey], position, markerKey);
+                    // Calculate duration based on speed if available
+                    let duration = 2000; // Default 2 seconds
+                    if (device.location && device.location.speed && device.location.speed > 0) {
+                        const distanceMeters = calculateDistanceMeters(
+                            currentPos ? currentPos.lat() : position.lat,
+                            currentPos ? currentPos.lng() : position.lng,
+                            position.lat,
+                            position.lng
+                        );
+                        const speedMps = device.location.speed / 3.6; // km/h to m/s
+                        duration = Math.min(Math.max((distanceMeters / speedMps) * 1000, 800), 3000);
+                    }
+                    
+                    animateMarkerPosition(markers[markerKey], position, markerKey, duration, device.location?.heading);
                     // Path will be updated when animation completes
                 }
                 
@@ -651,6 +900,11 @@ export function updateMapMarkers() {
                 
                 // Only update icon/label if position changed OR status changed
                 if (positionChanged || deviceIconChanged) {
+                    // Clear rotation cache when icon changes (DOM element will be recreated)
+                    if (deviceIconChanged) {
+                        clearMarkerRotationCache(markers[markerKey]);
+                    }
+                    
                     const iconUrl = getMarkerIconUrl(device.isOnline, device.isMoving || false);
                     markers[markerKey].setIcon({
                         url: iconUrl,
@@ -668,11 +922,11 @@ export function updateMapMarkers() {
                     // Apply background styling
                     setTimeout(() => {
                         applyLabelBackground(markers[markerKey], device.isMoving || false, device.isOnline);
-                        // Re-apply rotation after icon change
+                        // Re-apply rotation after icon change (use longer delay to ensure DOM is ready)
                         if (device.location && device.location.heading !== null && device.location.heading !== undefined) {
                             applyMarkerRotation(markers[markerKey], device.location.heading);
                         }
-                    }, 50);
+                    }, 150);
                 }
                 
                 // Apply heading-based rotation (PNG) if heading available (always re-apply)

@@ -226,3 +226,39 @@ export async function getAddressFromCoordinates(lat, lng) {
     }
 }
 
+// Format minutes into "Xhr Ymins" format
+// Examples: 69 minutes = "1hr 9mins", 125 minutes = "2hrs 5mins", 45 minutes = "45mins"
+export function formatMinutesAgo(minutes) {
+    if (minutes === null || minutes === undefined || isNaN(minutes)) {
+        return '';
+    }
+    
+    const totalMinutes = Math.floor(minutes);
+    
+    if (totalMinutes < 1) {
+        return 'just now';
+    }
+    
+    if (totalMinutes < 60) {
+        return `${totalMinutes}min${totalMinutes !== 1 ? 's' : ''} ago`;
+    }
+    
+    const hours = Math.floor(totalMinutes / 60);
+    const remainingMinutes = totalMinutes % 60;
+    
+    let result = '';
+    if (hours > 0) {
+        result = `${hours}hr${hours !== 1 ? 's' : ''}`;
+    }
+    
+    if (remainingMinutes > 0) {
+        if (result) {
+            result += ` ${remainingMinutes}min${remainingMinutes !== 1 ? 's' : ''}`;
+        } else {
+            result = `${remainingMinutes}min${remainingMinutes !== 1 ? 's' : ''}`;
+        }
+    }
+    
+    return result + ' ago';
+}
+

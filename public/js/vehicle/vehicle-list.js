@@ -3,7 +3,7 @@
 // ========================================
 
 import { map, markers, vehicleData, gpsDevicesData } from './state.js';
-import { formatDatePH } from './utils.js';
+import { formatDatePH, formatMinutesAgo } from './utils.js';
 import { getStatusInfo } from './status.js';
 import { showVehicleInfo, showGpsDeviceInfo } from './infowindow.js';
 
@@ -93,7 +93,7 @@ export function updateVehicleList() {
                             <i class="fa fa-map-marker text-primary"></i>
                             <div class="location-details">
                                 <span class="location-time">${formatDatePH(vehicle.location.lastUpdate)}</span>
-                                ${vehicle.location.minutesSinceUpdate !== null ? `<span class="location-ago">${vehicle.location.minutesSinceUpdate} min ago</span>` : ''}
+                                ${vehicle.location.minutesSinceUpdate !== null ? `<span class="location-ago">${formatMinutesAgo(vehicle.location.minutesSinceUpdate)}</span>` : ''}
                             </div>
                         </div>
                     ` : vehicle.hasGps ? `
@@ -141,7 +141,7 @@ export function updateVehicleList() {
                                 <i class="fa fa-map-marker text-primary"></i>
                                 <div class="location-details">
                                     <span class="location-time">${formatDatePH(device.location.lastUpdate || device.location.createdAt)}</span>
-                                    ${device.location.minutesSinceUpdate !== null && device.location.minutesSinceUpdate !== undefined ? `<span class="location-ago">${device.location.minutesSinceUpdate} min ago</span>` : ''}
+                                    ${device.location.minutesSinceUpdate !== null && device.location.minutesSinceUpdate !== undefined ? `<span class="location-ago">${formatMinutesAgo(device.location.minutesSinceUpdate)}</span>` : ''}
                                 </div>
                             </div>
                         ` : `

@@ -188,9 +188,9 @@ class GpsTrackerModel {
     return result.affectedRows > 0;
   }
 
-  // Update battery, satellite count, and GSM signal without changing location (for stationary devices)
-  // This allows updating device status even when location hasn't changed
-  static async updateDeviceStatus(deviceId, battery, satelliteCount, gsmSignal, newTimestamp, isCharging) {
+  // Update battery, satellite count, GSM signal, and location coordinates (for stationary devices or minor movements)
+  // This allows updating device status and position even when location hasn't changed significantly
+  static async updateDeviceStatus(deviceId, battery, satelliteCount, gsmSignal, newTimestamp, isCharging, latitude = null, longitude = null) {
     // Get the latest location ID first
     const latestLocation = await this.getLatestLocation(deviceId);
     if (!latestLocation || !latestLocation.id) {
@@ -204,6 +204,14 @@ class GpsTrackerModel {
     if (newTimestamp) {
       updates.push('timestamp = ?');
       values.push(newTimestamp);
+    }
+    
+    // Always update coordinates if provided (ensures marker shows latest position even if no new row created)
+    if (latitude !== null && latitude !== undefined && longitude !== null && longitude !== undefined) {
+      updates.push('latitude = ?');
+      updates.push('longitude = ?');
+      values.push(parseFloat(latitude));
+      values.push(parseFloat(longitude));
     }
     
     if (battery !== null && battery !== undefined) {
@@ -240,7 +248,24 @@ class GpsTrackerModel {
     
     const result = await queryDatabasePromise(query, values);
     if (result.affectedRows > 0) {
-      console.log(`✅ Updated device status for location ID ${latestLocation.id}: ${updates.join(', ')}`);
+      // Build readable log message with actual values
+      const logParts = [];
+      let valueIndex = 0;
+      updates.forEach(update => {
+        const field = update.split(' = ')[0];
+        const value = values[valueIndex];
+        if (field === 'timestamp') {
+          logParts.push(`${field}=${value ? new Date(value).toISOString() : 'null'}`);
+        } else if (field === 'latitude' || field === 'longitude') {
+          logParts.push(`${field}=${value !== null && value !== undefined ? value.toFixed(6) : 'null'}`);
+        } else if (field === 'is_charging') {
+          logParts.push(`${field}=${value ? 'true' : 'false'}`);
+        } else {
+          logParts.push(`${field}=${value !== null && value !== undefined ? value : 'null'}`);
+        }
+        valueIndex++;
+      });
+      console.log(`✅ Updated device status for location ID ${latestLocation.id}: ${logParts.join(', ')}`);
     }
     return result.affectedRows > 0;
   }

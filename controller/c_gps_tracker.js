@@ -133,12 +133,26 @@ class GpsTrackerController {
       }
       
       // Validate coordinates
-      const lat = parseFloat(latitude);
-      const lng = parseFloat(longitude);
+      let lat = parseFloat(latitude);
+      let lng = parseFloat(longitude);
       
       if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
         console.error('Invalid coordinates:', { lat, lng });
         return res.status(400).send('INVALID');
+      }
+      
+      // Check for swapped coordinates (Philippines: lat 4-21, lng 116-127)
+      if (!(lat >= 4 && lat <= 21 && lng >= 116 && lng <= 127)) {
+        // Check if coordinates might be swapped
+        if (lng >= 4 && lng <= 21 && lat >= 116 && lat <= 127) {
+          console.log(`🔄 WARNING: Coordinates appear to be SWAPPED! Auto-correcting: lat=${lng}, lng=${lat}`);
+          const temp = lat;
+          lat = lng;
+          lng = temp;
+          console.log(`✅ Using corrected coordinates: ${lat}, ${lng}`);
+        } else {
+          console.log(`⚠️ Coordinates outside Philippines range: ${lat}, ${lng} (expected: lat 4-21, lng 116-127)`);
+        }
       }
       
       // Try to extract satellite count from data if available
@@ -235,9 +249,9 @@ class GpsTrackerController {
           const speedGate = hasSpeed ? locationData.speed >= minSpeedKph : true;
           if (!distanceGate || !speedGate) {
             shouldSave = false;
-            console.log(`⏭️ Location not saved: Device ${locationData.deviceId} jitter (distance ${distanceMeters.toFixed(2)}m, speed ${hasSpeed ? locationData.speed : 'N/A'}; thresholds distance ${distanceThreshold}m${hasSpeed ? `, speed ${minSpeedKph}km/h` : ''})`);
+            console.log(`⏭️ Location not saved (jitter): Device ${locationData.deviceId} - Distance: ${distanceMeters.toFixed(2)}m (threshold: ${distanceThreshold}m), Speed: ${hasSpeed ? `${locationData.speed}km/h` : 'N/A'} (threshold: ${hasSpeed ? `${minSpeedKph}km/h` : 'N/A'})`);
           } else {
-            console.log(`📍 Location changed: Device ${locationData.deviceId} moved ${distanceMeters.toFixed(2)}m (threshold: ${distanceThreshold}m${hasSpeed ? `, speed ${locationData.speed}km/h` : ''})`);
+            console.log(`📍 Location changed: Device ${locationData.deviceId} moved ${distanceMeters.toFixed(2)}m (threshold: ${distanceThreshold}m), Speed: ${hasSpeed ? `${locationData.speed}km/h` : 'N/A'}`);
           }
         }
       }
@@ -246,7 +260,7 @@ class GpsTrackerController {
       let savedLocation = null;
       if (shouldSave) {
         savedLocation = await GpsTrackerModel.createLocation(locationData);
-        console.log(`📍 GPS Location saved: Device ${deviceId} at (${lat}, ${lng})`);
+        console.log(`📍 GPS Location saved: Device ${deviceId} at (${lat.toFixed(6)}, ${lng.toFixed(6)}) - Battery: ${locationData.battery !== null ? locationData.battery : 'N/A'}%, Satellites: ${locationData.satelliteCount !== null ? locationData.satelliteCount : 'N/A'}, GSM: ${locationData.gsmSignal !== null ? locationData.gsmSignal : 'N/A'}`);
         
         // Only broadcast via Socket.IO AFTER saving to database
         // Get the saved location from database to ensure we emit database data, not GPS device data
@@ -270,11 +284,10 @@ class GpsTrackerController {
         }
       } else {
         console.log(`⏭️ GPS Location received (not saved - no movement): Device ${deviceId} at (${lat}, ${lng})`);
-        // DO NOT emit Socket.IO if location not saved - all functions should depend on database
         // DO NOT update created_at timestamp - it should only update when actual new location is saved
         // The created_at represents "last time actual movement was saved", not "last time data was received"
-        // BUT update timestamp, battery, satellite count, and GSM signal even when location doesn't change
-        // This ensures device status fields are always up-to-date
+        // BUT update timestamp, battery, satellite count, GSM signal, and coordinates even when location doesn't change
+        // This ensures device status fields and position are always up-to-date in the database
         try {
           await GpsTrackerModel.updateDeviceStatus(
             locationData.deviceId, 
@@ -282,9 +295,32 @@ class GpsTrackerController {
             locationData.satelliteCount, 
             locationData.gsmSignal, 
             locationData.timestamp,
-            locationData.isCharging
+            locationData.isCharging,
+            locationData.latitude,
+            locationData.longitude
           );
-          console.log(`⏭️ Updated device status for device ${deviceId} - Battery: ${locationData.battery || 'N/A'}, Satellites: ${locationData.satelliteCount || 'N/A'}, GSM: ${locationData.gsmSignal || 'N/A'}, Charging: ${locationData.isCharging}`);
+          
+          // Emit Socket.IO after updating database so frontend gets latest position
+          const dbLocation = await GpsTrackerModel.getLatestLocation(locationData.deviceId);
+          if (dbLocation) {
+            const io = req.app.get('io');
+            if (io) {
+              io.emit('driver-location-updated', {
+                deviceId: dbLocation.device_id,
+                location: {
+                  lat: parseFloat(dbLocation.latitude),
+                  lng: parseFloat(dbLocation.longitude),
+                  speed: dbLocation.speed ? parseFloat(dbLocation.speed) : null,
+                  heading: dbLocation.heading ? parseFloat(dbLocation.heading) : null,
+                  battery: dbLocation.battery ? parseFloat(dbLocation.battery) : null,
+                  isCharging: dbLocation.is_charging !== null && dbLocation.is_charging !== undefined ? !!dbLocation.is_charging : null,
+                  timestamp: dbLocation.timestamp
+                }
+              });
+            }
+          }
+          
+          console.log(`⏭️ GPS Location received (not saved - no movement): Device ${deviceId} at (${lat.toFixed(6)}, ${lng.toFixed(6)}) - Updated: Battery=${locationData.battery !== null && locationData.battery !== undefined ? locationData.battery : 'N/A'}%, Satellites=${locationData.satelliteCount !== null && locationData.satelliteCount !== undefined ? locationData.satelliteCount : 'N/A'}, GSM=${locationData.gsmSignal !== null && locationData.gsmSignal !== undefined ? locationData.gsmSignal : 'N/A'}, Charging=${locationData.isCharging ? 'Yes' : 'No'}`);
         } catch (error) {
           console.error(`⚠️ Error updating device status for device ${deviceId}:`, error);
         }

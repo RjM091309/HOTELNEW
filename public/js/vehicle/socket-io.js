@@ -2,13 +2,14 @@
 // SOCKET.IO - Vehicle Monitoring
 // ========================================
 
-import { vehicleData, previousGpsDeviceIds } from './state.js';
+import { vehicleData, previousGpsDeviceIds, gpsDevicesData } from './state.js';
 import { loadVehicles } from './data-loader.js';
 import { updateVehicleList } from './vehicle-list.js';
-import { updateMapMarkers } from './markers.js';
+import { updateMapMarkers, animateMarkerPosition, applyMarkerRotation } from './markers.js';
 import { updateTraceToggles } from './trace-toggle.js';
 import { clearVehiclePath } from './markers.js';
 import { markers, markerAnimations } from './state.js';
+import { calculateDistanceMeters } from './utils.js';
 
 let gpsTrackingSocket = null;
 let pollingInterval = null;
@@ -222,22 +223,79 @@ function stopPollingFallback() {
 }
 
 // Update vehicle location from Socket.IO event
-// IMPORTANT: All functions and logic depend on database, NOT GPS device directly
-// Socket.IO event is just a notification that new data was saved to database
-// We reload from database to ensure consistency
+// For smooth movement: Use Socket.IO data directly for immediate marker animation
+// Then reload from database to ensure data consistency
 async function updateVehicleLocationFromSocket(deviceId, locationData) {
     try {
-        if (!deviceId || !locationData) {
+        if (!deviceId || !locationData || !locationData.lat || !locationData.lng) {
             console.warn('📍 Invalid socket data received:', { deviceId, locationData });
             return;
         }
         
-        // IMPORTANT: Socket.IO event means data was saved to database
-        // Reload from database to ensure all logic depends on database, not GPS device directly
-        console.log(`📍 Socket.IO notification: Device ${deviceId} location updated in database, reloading from database...`);
+        const newPosition = { lat: locationData.lat, lng: locationData.lng };
         
-        // Reload vehicles and GPS devices from database
-        // This ensures all data comes from database, not from Socket.IO directly
+        // Find vehicle or GPS device that uses this deviceId
+        let markerKey = null;
+        let foundVehicle = null;
+        let foundDevice = null;
+        
+        // Check vehicles first
+        for (const [vehicleId, vehicle] of Object.entries(vehicleData)) {
+            if (vehicle.gpsDeviceId === deviceId) {
+                markerKey = vehicleId;
+                foundVehicle = vehicle;
+                break;
+            }
+        }
+        
+        // If not found in vehicles, check GPS devices
+        if (!markerKey) {
+            for (const [deviceIdKey, device] of Object.entries(gpsDevicesData)) {
+                if (device.deviceId === deviceId) {
+                    markerKey = `gps_${deviceId}`;
+                    foundDevice = device;
+                    break;
+                }
+            }
+        }
+        
+        // If marker exists, smoothly animate to new position immediately
+        if (markerKey && markers[markerKey]) {
+            const marker = markers[markerKey];
+            const currentPos = marker.getPosition();
+            
+            if (currentPos) {
+                const distanceMeters = calculateDistanceMeters(
+                    currentPos.lat(),
+                    currentPos.lng(),
+                    newPosition.lat,
+                    newPosition.lng
+                );
+                
+                // Only animate if moved at least 1 meter (to avoid micro-movements)
+                if (distanceMeters >= 1) {
+                    // Calculate duration based on speed if available, otherwise use distance
+                    let duration = 2000; // Default 2 seconds
+                    if (locationData.speed && locationData.speed > 0) {
+                        // Duration = distance / speed (convert speed from km/h to m/s)
+                        const speedMps = locationData.speed / 3.6; // km/h to m/s
+                        duration = Math.min(Math.max((distanceMeters / speedMps) * 1000, 800), 3000);
+                    } else {
+                        // Use distance-based duration: 50m = 1s, 500m = 2s, but min 0.8s, max 3s
+                        duration = Math.min(Math.max(distanceMeters / 50 * 1000, 800), 3000);
+                    }
+                    
+                    // Smoothly animate marker to new position with heading for rotation
+                    animateMarkerPosition(marker, newPosition, markerKey, duration, locationData.heading);
+                }
+            } else {
+                // No current position, set directly
+                marker.setPosition(newPosition);
+            }
+        }
+        
+        // After smooth animation, reload from database to ensure data consistency
+        // This updates vehicleData/gpsDevicesData with latest DB state
         await loadVehicles();
     } catch (error) {
         console.error('❌ Error handling socket notification:', error);
