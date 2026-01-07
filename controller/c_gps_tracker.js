@@ -161,6 +161,23 @@ class GpsTrackerController {
       const distanceThreshold = parseFloat(process.env.GPS_MIN_DISTANCE_METERS || '10');
       
       const latestLocation = await GpsTrackerModel.getLatestLocation(locationData.deviceId);
+      // Derive charging flag if device didn't send explicit flag
+      const deriveChargingFlag = () => {
+        if (locationData.battery === null || locationData.battery === undefined || isNaN(locationData.battery)) {
+          return latestLocation && latestLocation.is_charging !== undefined ? latestLocation.is_charging : null;
+        }
+        const prevBattery = latestLocation && latestLocation.battery !== null && latestLocation.battery !== undefined
+          ? parseFloat(latestLocation.battery)
+          : null;
+        const prevFlag = latestLocation && latestLocation.is_charging !== undefined ? latestLocation.is_charging : null;
+        if (prevBattery !== null && !isNaN(prevBattery)) {
+          if (locationData.battery > prevBattery) return true;    // rising -> charging
+          if (locationData.battery < prevBattery) return false;   // dropping -> not charging
+          if (prevFlag !== null && prevFlag !== undefined) return !!prevFlag; // same level, keep last known
+        }
+        return prevFlag !== null && prevFlag !== undefined ? !!prevFlag : null;
+      };
+      locationData.isCharging = deriveChargingFlag();
       let shouldSave = true;
       let distanceMeters = 0;
       
@@ -228,6 +245,7 @@ class GpsTrackerController {
                 speed: dbLocation.speed ? parseFloat(dbLocation.speed) : null,
                 heading: dbLocation.heading ? parseFloat(dbLocation.heading) : null,
                 battery: dbLocation.battery ? parseFloat(dbLocation.battery) : null,
+                isCharging: dbLocation.is_charging !== null && dbLocation.is_charging !== undefined ? !!dbLocation.is_charging : null,
                 timestamp: dbLocation.timestamp
               }
             });
@@ -246,9 +264,10 @@ class GpsTrackerController {
             locationData.battery, 
             locationData.satelliteCount, 
             locationData.gsmSignal, 
-            locationData.timestamp
+            locationData.timestamp,
+            locationData.isCharging
           );
-          console.log(`⏭️ Updated device status for device ${deviceId} - Battery: ${locationData.battery || 'N/A'}, Satellites: ${locationData.satelliteCount || 'N/A'}, GSM: ${locationData.gsmSignal || 'N/A'}`);
+          console.log(`⏭️ Updated device status for device ${deviceId} - Battery: ${locationData.battery || 'N/A'}, Satellites: ${locationData.satelliteCount || 'N/A'}, GSM: ${locationData.gsmSignal || 'N/A'}, Charging: ${locationData.isCharging}`);
         } catch (error) {
           console.error(`⚠️ Error updating device status for device ${deviceId}:`, error);
         }

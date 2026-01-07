@@ -36,9 +36,12 @@ export async function loadVehiclesForMapInit() {
             if (Object.keys(previousGpsDeviceIds).length === 0) {
                 vehiclesData.data.forEach(vehicle => {
                     previousGpsDeviceIds[String(vehicle.id)] = vehicle.gpsDeviceId || null;
-                    // Seed battery baseline for charging detection
+                    // Seed battery baseline and charging state so the UI has data on first load
                     if (vehicle.location && vehicle.location.battery !== null && vehicle.location.battery !== undefined) {
                         lastVehicleBatteryLevels[vehicle.id] = Number(vehicle.location.battery);
+                        if (vehicle.location.isCharging !== undefined && vehicle.location.isCharging !== null) {
+                            lastVehicleChargingState[vehicle.id] = !!vehicle.location.isCharging;
+                        }
                     }
                 });
             }
@@ -56,6 +59,9 @@ export async function loadVehiclesForMapInit() {
             gpsData.data.forEach(device => {
                 if (device.location && device.location.battery !== null && device.location.battery !== undefined) {
                     lastGpsBatteryLevels[device.deviceId] = Number(device.location.battery);
+                    if (device.location.isCharging !== undefined && device.location.isCharging !== null) {
+                        lastGpsChargingState[device.deviceId] = !!device.location.isCharging;
+                    }
                 }
                 gpsDevicesData[device.deviceId] = device;
             });
@@ -114,6 +120,7 @@ export async function loadVehicles() {
                     ? Number(vehicle.location.battery)
                     : null;
                 const prevBattery = lastVehicleBatteryLevels[vehicle.id];
+                const apiChargingFlag = vehicle.location && vehicle.location.isCharging;
                 let isCharging = false;
                 if (prevBattery !== undefined && newBattery !== null) {
                     if (newBattery > prevBattery) {
@@ -124,6 +131,9 @@ export async function loadVehicles() {
                     } else {
                         isCharging = false; // dropped => stop charging
                     }
+                } else if (apiChargingFlag !== undefined && apiChargingFlag !== null) {
+                    // No baseline yet (e.g., page refresh) - trust backend flag
+                    isCharging = !!apiChargingFlag;
                 }
                 if (vehicle.location) {
                     vehicle.location.isCharging = !!isCharging;
@@ -131,6 +141,8 @@ export async function loadVehicles() {
                 if (newBattery !== null) {
                     lastVehicleBatteryLevels[vehicle.id] = newBattery;
                     lastVehicleChargingState[vehicle.id] = isCharging;
+                } else if (apiChargingFlag !== undefined && apiChargingFlag !== null) {
+                    lastVehicleChargingState[vehicle.id] = !!apiChargingFlag;
                 }
                 
                 const previousLocation = lastSavedLocations[vehicle.id];
@@ -210,6 +222,7 @@ export async function loadVehicles() {
                     ? Number(device.location.battery)
                     : null;
                 const prevBattery = lastGpsBatteryLevels[device.deviceId];
+                const apiChargingFlag = device.location && device.location.isCharging;
                 let isCharging = false;
                 if (prevBattery !== undefined && newBattery !== null) {
                     if (newBattery > prevBattery) {
@@ -219,6 +232,8 @@ export async function loadVehicles() {
                     } else {
                         isCharging = false;
                     }
+                } else if (apiChargingFlag !== undefined && apiChargingFlag !== null) {
+                    isCharging = !!apiChargingFlag;
                 }
                 if (device.location) {
                     device.location.isCharging = !!isCharging;
@@ -226,6 +241,8 @@ export async function loadVehicles() {
                 if (newBattery !== null) {
                     lastGpsBatteryLevels[device.deviceId] = newBattery;
                     lastGpsChargingState[device.deviceId] = isCharging;
+                } else if (apiChargingFlag !== undefined && apiChargingFlag !== null) {
+                    lastGpsChargingState[device.deviceId] = !!apiChargingFlag;
                 }
                 gpsDevicesData[device.deviceId] = device;
             });

@@ -4,6 +4,7 @@
 
 import { map, setMap } from './state.js';
 import { updateMarkerLabelColors } from './markers.js';
+import { toggleRouteSearchContainer } from './route-search.js';
 
 // Create custom map type toggle button (Sinotrack style)
 export function createMapTypeToggle() {
@@ -210,5 +211,61 @@ export function createFullscreenButton() {
     
     // Initial state
     updateFullscreenIcon();
+}
+
+// Create route search button
+export function createRouteSearchButton() {
+    if (!map) return;
+    
+    // Create route search button
+    const routeSearchButton = document.createElement('button');
+    routeSearchButton.id = 'routeSearchBtn';
+    routeSearchButton.innerHTML = '<i class="fa fa-route"></i>';
+    routeSearchButton.title = 'Search Location';
+    routeSearchButton.style.cssText = `
+        position: absolute;
+        top: 106px;
+        right: 10px;
+        z-index: 1000;
+        width: 40px;
+        height: 40px;
+        border: none;
+        background: white;
+        color: #6b7280;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        outline: none;
+        border-radius: 6px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    `;
+    
+    // Add hover effect
+    routeSearchButton.addEventListener('mouseenter', function() {
+        this.style.background = '#f3f4f6';
+        this.style.color = '#111827';
+        this.style.transform = 'scale(1.05)';
+    });
+    
+    routeSearchButton.addEventListener('mouseleave', function() {
+        this.style.background = 'white';
+        this.style.color = '#6b7280';
+        this.style.transform = 'scale(1)';
+    });
+    
+    // Add to map container
+    const mapDiv = document.getElementById('map');
+    if (mapDiv) {
+        mapDiv.appendChild(routeSearchButton);
+    }
+    
+    // Click handler
+    routeSearchButton.addEventListener('click', () => {
+        toggleRouteSearchContainer();
+    });
 }
 

@@ -303,7 +303,7 @@ export function updateTraceToggles() {
         let dataExists = false;
         let hasLocation = false;
         let keepToggle = true;
-
+        
         if (isVehicle) {
             const vehicle = vehicleData[deviceKey];
             dataExists = !!vehicle;
@@ -317,7 +317,7 @@ export function updateTraceToggles() {
             // Only keep unassigned GPS device toggles; assigned ones are removed
             keepToggle = dataExists && device && !device.isAssigned;
         }
-
+        
         if (!dataExists || !keepToggle) {
             toggle.remove();
             delete traceToggles[deviceKey];

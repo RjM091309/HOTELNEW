@@ -16,6 +16,7 @@ class GpsTrackerModel {
       heading, 
       timestamp, 
       battery,
+      isCharging,
       satelliteCount,
       gsmSignal
     } = locationData;
@@ -29,11 +30,12 @@ class GpsTrackerModel {
         heading, 
         timestamp, 
         battery,
+        is_charging,
         satellite_count,
         gsm_signal,
         created_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     `;
 
     const values = [
@@ -44,6 +46,7 @@ class GpsTrackerModel {
       heading ? parseFloat(heading) : null,
       timestamp ? new Date(timestamp) : new Date(),
       battery ? parseFloat(battery) : null,
+      isCharging === undefined || isCharging === null ? null : !!isCharging,
       satelliteCount ? parseInt(satelliteCount) : null,
       gsmSignal ? parseInt(gsmSignal) : null
     ];
@@ -64,6 +67,7 @@ class GpsTrackerModel {
         heading,
         timestamp,
         battery,
+        is_charging,
         satellite_count,
         gsm_signal,
         created_at
@@ -88,6 +92,7 @@ class GpsTrackerModel {
         heading,
         timestamp,
         battery,
+        is_charging,
         created_at
       FROM gps_locations 
       WHERE device_id = ?
@@ -124,6 +129,7 @@ class GpsTrackerModel {
         gl.heading,
         gl.timestamp as last_update,
         gl.battery,
+        gl.is_charging,
         gl.satellite_count,
         gl.created_at as last_created,
         (SELECT COUNT(*) FROM gps_locations WHERE device_id = gl.device_id) as total_updates
@@ -152,6 +158,7 @@ class GpsTrackerModel {
         heading,
         timestamp,
         battery,
+        is_charging,
         created_at
       FROM gps_locations 
       WHERE id = ?
@@ -183,7 +190,7 @@ class GpsTrackerModel {
 
   // Update battery, satellite count, and GSM signal without changing location (for stationary devices)
   // This allows updating device status even when location hasn't changed
-  static async updateDeviceStatus(deviceId, battery, satelliteCount, gsmSignal, newTimestamp) {
+  static async updateDeviceStatus(deviceId, battery, satelliteCount, gsmSignal, newTimestamp, isCharging) {
     // Get the latest location ID first
     const latestLocation = await this.getLatestLocation(deviceId);
     if (!latestLocation || !latestLocation.id) {
@@ -202,6 +209,11 @@ class GpsTrackerModel {
     if (battery !== null && battery !== undefined) {
       updates.push('battery = ?');
       values.push(parseFloat(battery));
+    }
+
+    if (isCharging !== null && isCharging !== undefined) {
+      updates.push('is_charging = ?');
+      values.push(!!isCharging);
     }
     
     if (satelliteCount !== null && satelliteCount !== undefined && satelliteCount !== '') {

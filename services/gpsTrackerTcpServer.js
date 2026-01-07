@@ -347,16 +347,32 @@ async function processGpsMessage(message, originalMessage, socket, io) {
       speed: data.speed ? parseFloat(data.speed) : null,
       heading: data.heading ? parseFloat(data.heading) : null,
       timestamp: data.timestamp,
-      battery: data.battery || null,
-      satelliteCount: data.satelliteCount || null,
-      gsmSignal: data.gsmSignal || null
+    battery: data.battery !== undefined && data.battery !== null ? parseFloat(data.battery) : null,
+    satelliteCount: data.satelliteCount ? parseInt(data.satelliteCount) : null,
+    gsmSignal: data.gsmSignal !== undefined && data.gsmSignal !== null ? parseInt(data.gsmSignal) : null
     };
     
     // Check if location has changed significantly before saving
     // Get distance threshold from environment variable (default: 10 meters)
     const distanceThreshold = parseFloat(process.env.GPS_MIN_DISTANCE_METERS || '10');
     
-    const latestLocation = await GpsTrackerModel.getLatestLocation(locationData.deviceId);
+  const latestLocation = await GpsTrackerModel.getLatestLocation(locationData.deviceId);
+  const deriveChargingFlag = () => {
+    if (locationData.battery === null || locationData.battery === undefined || isNaN(locationData.battery)) {
+      return latestLocation && latestLocation.is_charging !== undefined ? latestLocation.is_charging : null;
+    }
+    const prevBattery = latestLocation && latestLocation.battery !== null && latestLocation.battery !== undefined
+      ? parseFloat(latestLocation.battery)
+      : null;
+    const prevFlag = latestLocation && latestLocation.is_charging !== undefined ? latestLocation.is_charging : null;
+    if (prevBattery !== null && !isNaN(prevBattery)) {
+      if (locationData.battery > prevBattery) return true;
+      if (locationData.battery < prevBattery) return false;
+      if (prevFlag !== null && prevFlag !== undefined) return !!prevFlag;
+    }
+    return prevFlag !== null && prevFlag !== undefined ? !!prevFlag : null;
+  };
+  locationData.isCharging = deriveChargingFlag();
     let shouldSave = true;
     let distanceMeters = 0;
     
@@ -423,6 +439,7 @@ async function processGpsMessage(message, originalMessage, socket, io) {
             speed: dbLocation.speed ? parseFloat(dbLocation.speed) : null,
             heading: dbLocation.heading ? parseFloat(dbLocation.heading) : null,
             battery: dbLocation.battery ? parseFloat(dbLocation.battery) : null,
+            isCharging: dbLocation.is_charging !== null && dbLocation.is_charging !== undefined ? !!dbLocation.is_charging : null,
             timestamp: dbLocation.timestamp
           }
         });
@@ -439,7 +456,8 @@ async function processGpsMessage(message, originalMessage, socket, io) {
           locationData.battery, 
           locationData.satelliteCount, 
           locationData.gsmSignal, 
-          locationData.timestamp
+        locationData.timestamp,
+        locationData.isCharging
         );
         console.log(`⏭️ GPS Location received (not saved - no movement): Device ${locationData.deviceId} at (${lat}, ${lng}) - Updated status fields (Battery: ${locationData.battery !== null && locationData.battery !== undefined ? locationData.battery : 'N/A'}, Satellites: ${locationData.satelliteCount !== null && locationData.satelliteCount !== undefined ? locationData.satelliteCount : 'N/A'}, GSM: ${locationData.gsmSignal !== null && locationData.gsmSignal !== undefined ? locationData.gsmSignal : 'N/A'})`);
       } catch (error) {

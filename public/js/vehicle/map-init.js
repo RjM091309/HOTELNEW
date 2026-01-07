@@ -12,7 +12,7 @@ import {
     setIsFirstMapLoad
 } from './state.js';
 import { loadVehiclesForMapInit } from './data-loader.js';
-import { createMapTypeToggle, createFullscreenButton } from './map-controls.js';
+import { createMapTypeToggle, createFullscreenButton, createRouteSearchButton } from './map-controls.js';
 import { createTraceToggleContainer, hideTraceToggleContainer, showTraceToggleContainer } from './trace-toggle.js';
 import { updateMarkerLabelColors } from './markers.js';
 import { updateVehicleList } from './vehicle-list.js';
@@ -41,6 +41,7 @@ export async function initMap() {
         
         // Load Google Maps script
         const script = document.createElement('script');
+        // Directions API is part of core; remove from libraries to avoid "unknown library" warning
         script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKeyData.apiKey}&libraries=places&loading=async`;
         script.async = true;
         script.defer = true;
@@ -121,6 +122,9 @@ export async function initMap() {
                     
                     // Create custom fullscreen button
                     createFullscreenButton();
+                    
+                    // Create route search button
+                    createRouteSearchButton();
                     
                     // Create trace toggle container (will be populated dynamically)
                     createTraceToggleContainer();

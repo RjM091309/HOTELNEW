@@ -61,6 +61,7 @@ class VehicleMonitoringController {
           speed: vehicle.speed ? parseFloat(vehicle.speed) : null,
           heading: vehicle.heading ? parseFloat(vehicle.heading) : null,
           battery: vehicle.battery ? parseFloat(vehicle.battery) : null,
+          isCharging: vehicle.is_charging === null || vehicle.is_charging === undefined ? null : !!vehicle.is_charging,
           satelliteCount: vehicle.satellite_count ? parseInt(vehicle.satellite_count) : null,
           gsmSignal: vehicle.gsm_signal ? parseInt(vehicle.gsm_signal) : null,
           lastUpdate: vehicle.last_location_created, // Use created_at (DB save time) for display
@@ -116,6 +117,7 @@ class VehicleMonitoringController {
           speed: vehicle.speed ? parseFloat(vehicle.speed) : null,
           heading: vehicle.heading ? parseFloat(vehicle.heading) : null,
           battery: vehicle.battery ? parseFloat(vehicle.battery) : null,
+          isCharging: vehicle.is_charging === null || vehicle.is_charging === undefined ? null : !!vehicle.is_charging,
           satelliteCount: vehicle.satellite_count ? parseInt(vehicle.satellite_count) : null,
           gsmSignal: vehicle.gsm_signal ? parseInt(vehicle.gsm_signal) : null,
           lastUpdate: vehicle.last_location_created, // Use created_at (DB save time) for display
