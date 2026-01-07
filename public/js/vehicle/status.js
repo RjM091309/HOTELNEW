@@ -34,7 +34,7 @@ export function getStatusInfo(isOnline, isMoving) {
     return {
         text: 'Standby',
         color: '#3b82f6', // Blue
-        badgeClass: 'info',
+        badgeClass: 'primary',
         dotColor: '#3b82f6'
     };
 }

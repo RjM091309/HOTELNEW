@@ -76,7 +76,7 @@ export function updateVehicleList() {
                         <span class="vehicle-plate">${vehicle.plateNumber}</span>
                     </div>
                     <div class="vehicle-status-badge">
-                        <span class="badge bg-${statusClass} ${vehicle.isOnline ? 'status-online' : ''}">${statusText}</span>
+                        <span class="badge bg-${statusClass} ${vehicle.isOnline ? 'status-online' : ''}" style="background-color: ${statusColor} !important; color: white;">${statusText}</span>
                     </div>
                 </div>
                 <div class="vehicle-card-body">

@@ -7,6 +7,7 @@ import { map } from './state.js';
 let routeSearchContainer = null;
 let fromAutocomplete = null;
 let toAutocomplete = null;
+let locationSearchAutocomplete = null;
 let directionsService = null;
 let directionsRenderer = null;
 let routeMarkers = [];
@@ -55,6 +56,92 @@ export function createRouteSearchContainer() {
     title.textContent = 'Search Location';
     title.style.cssText = 'margin: 0; font-size: 16px; font-weight: 600; color: #111827;';
     
+    // Add tabs for Search Location vs Route
+    const tabsContainer = document.createElement('div');
+    tabsContainer.style.cssText = 'display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb;';
+    
+    const searchLocationTab = document.createElement('button');
+    searchLocationTab.type = 'button';
+    searchLocationTab.textContent = 'Search';
+    searchLocationTab.id = 'searchLocationTab';
+    searchLocationTab.style.cssText = `
+        flex: 1;
+        padding: 8px;
+        border: none;
+        background: #3b82f6;
+        color: white;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        border-radius: 4px 4px 0 0;
+        transition: all 0.2s;
+    `;
+    
+    const routeTab = document.createElement('button');
+    routeTab.type = 'button';
+    routeTab.textContent = 'Route';
+    routeTab.id = 'routeTab';
+    routeTab.style.cssText = `
+        flex: 1;
+        padding: 8px;
+        border: none;
+        background: transparent;
+        color: #6b7280;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        border-radius: 4px 4px 0 0;
+        transition: all 0.2s;
+    `;
+    
+    // Location search input (shown by default)
+    const locationSearchGroup = document.createElement('div');
+    locationSearchGroup.id = 'locationSearchGroup';
+    locationSearchGroup.style.cssText = 'display: flex; flex-direction: column; gap: 8px;';
+    
+    const locationSearchInput = document.createElement('input');
+    locationSearchInput.id = 'locationSearchInput';
+    locationSearchInput.type = 'text';
+    locationSearchInput.placeholder = 'Search for a place...';
+    locationSearchInput.style.cssText = `
+        padding: 10px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 14px;
+        outline: none;
+        transition: border-color 0.2s;
+        background: #ffffff;
+        color: #111827;
+    `;
+    locationSearchInput.onfocus = () => locationSearchInput.style.borderColor = '#3b82f6';
+    locationSearchInput.onblur = () => locationSearchInput.style.borderColor = '#d1d5db';
+    
+    const searchLocationBtn = document.createElement('button');
+    searchLocationBtn.type = 'button';
+    searchLocationBtn.textContent = 'Go';
+    searchLocationBtn.style.cssText = `
+        padding: 10px 16px;
+        background: #3b82f6;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+    `;
+    searchLocationBtn.onmouseenter = () => searchLocationBtn.style.background = '#2563eb';
+    searchLocationBtn.onmouseleave = () => searchLocationBtn.style.background = '#3b82f6';
+    searchLocationBtn.onclick = () => searchLocation();
+    
+    locationSearchGroup.appendChild(locationSearchInput);
+    locationSearchGroup.appendChild(searchLocationBtn);
+    
+    // Route form (hidden by default)
+    const routeForm = document.createElement('form');
+    routeForm.id = 'routeForm';
+    routeForm.style.cssText = 'display: none; flex-direction: column; gap: 12px;';
+    
     const closeBtn = document.createElement('button');
     closeBtn.innerHTML = '×';
     closeBtn.style.cssText = `
@@ -81,7 +168,7 @@ export function createRouteSearchContainer() {
     // Create form
     const form = document.createElement('form');
     form.style.cssText = 'display: flex; flex-direction: column; gap: 12px;';
-    form.onsubmit = (e) => {
+    routeForm.onsubmit = (e) => {
         e.preventDefault();
         calculateRoute();
     };
@@ -241,9 +328,9 @@ export function createRouteSearchContainer() {
     buttonGroup.appendChild(searchBtn);
     buttonGroup.appendChild(clearBtn);
     
-    form.appendChild(fromGroup);
-    form.appendChild(toGroup);
-    form.appendChild(buttonGroup);
+    routeForm.appendChild(fromGroup);
+    routeForm.appendChild(toGroup);
+    routeForm.appendChild(buttonGroup);
     
     // Summary
     routeSummaryEl = document.createElement('div');
@@ -251,8 +338,35 @@ export function createRouteSearchContainer() {
     routeSummaryEl.style.cssText = 'margin-top: 10px; font-size: 13px; color: #374151; min-height: 18px;';
     routeSummaryEl.textContent = '';
     
+    // Tab switching
+    let locationSearchAutocomplete = null;
+    searchLocationTab.onclick = () => {
+        searchLocationTab.style.background = '#3b82f6';
+        searchLocationTab.style.color = 'white';
+        routeTab.style.background = 'transparent';
+        routeTab.style.color = '#6b7280';
+        locationSearchGroup.style.display = 'flex';
+        routeForm.style.display = 'none';
+        routeSummaryEl.textContent = '';
+        clearRoute();
+    };
+    
+    routeTab.onclick = () => {
+        routeTab.style.background = '#3b82f6';
+        routeTab.style.color = 'white';
+        searchLocationTab.style.background = 'transparent';
+        searchLocationTab.style.color = '#6b7280';
+        locationSearchGroup.style.display = 'none';
+        routeForm.style.display = 'flex';
+    };
+    
+    tabsContainer.appendChild(searchLocationTab);
+    tabsContainer.appendChild(routeTab);
+    
     routeSearchContainer.appendChild(header);
-    routeSearchContainer.appendChild(form);
+    routeSearchContainer.appendChild(tabsContainer);
+    routeSearchContainer.appendChild(locationSearchGroup);
+    routeSearchContainer.appendChild(routeForm);
     routeSearchContainer.appendChild(routeSummaryEl);
     
     // Add to map
@@ -276,8 +390,27 @@ function initializeAutocomplete() {
     
     const fromInput = document.getElementById('routeFromInput');
     const toInput = document.getElementById('routeToInput');
+    const locationSearchInput = document.getElementById('locationSearchInput');
     
     if (!fromInput || !toInput) return;
+    
+    // Create autocomplete for location search
+    if (locationSearchInput) {
+        if (!locationSearchAutocomplete) {
+            locationSearchAutocomplete = new google.maps.places.Autocomplete(locationSearchInput, {
+                types: ['geocode', 'establishment'],
+                componentRestrictions: { country: 'ph' } // Restrict to Philippines
+            });
+            
+            // Allow Enter key to search
+            locationSearchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    searchLocation();
+                }
+            });
+        }
+    }
     
     // Create autocomplete for "From" field
     fromAutocomplete = new google.maps.places.Autocomplete(fromInput, {
@@ -292,6 +425,59 @@ function initializeAutocomplete() {
     });
     
     console.log('✅ Route search autocomplete initialized');
+}
+
+// Search for a location and center map on it
+function searchLocation() {
+    if (!map || !locationSearchAutocomplete) {
+        console.error('Location search: Map or autocomplete not initialized');
+        return;
+    }
+    
+    const place = locationSearchAutocomplete.getPlace();
+    if (!place || !place.geometry) {
+        alert('Please select a valid location from the suggestions.');
+        return;
+    }
+    
+    // Center map on the selected location
+    if (place.geometry.viewport) {
+        map.fitBounds(place.geometry.viewport);
+    } else {
+        map.setCenter(place.geometry.location);
+        map.setZoom(15);
+    }
+    
+    // Add a marker at the searched location
+    if (routeMarkers.length > 0) {
+        routeMarkers.forEach(marker => marker.setMap(null));
+        routeMarkers = [];
+    }
+    
+    const marker = new google.maps.Marker({
+        position: place.geometry.location,
+        map: map,
+        title: place.name || place.formatted_address,
+        icon: {
+            url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png',
+            scaledSize: new google.maps.Size(32, 32)
+        }
+    });
+    
+    routeMarkers.push(marker);
+    
+    // Show info window with location details
+    const infoWindow = new google.maps.InfoWindow({
+        content: `
+            <div style="padding: 8px;">
+                <strong>${place.name || 'Location'}</strong><br>
+                <span style="color: #666; font-size: 12px;">${place.formatted_address || ''}</span>
+            </div>
+        `
+    });
+    infoWindow.open(map, marker);
+    
+    console.log('✅ Location searched:', place.name || place.formatted_address);
 }
 
 // Calculate and display route
@@ -424,9 +610,11 @@ function clearRoute() {
     
     const fromInput = document.getElementById('routeFromInput');
     const toInput = document.getElementById('routeToInput');
+    const locationSearchInput = document.getElementById('locationSearchInput');
     
     if (fromInput) fromInput.value = '';
     if (toInput) toInput.value = '';
+    if (locationSearchInput) locationSearchInput.value = '';
     currentFromLatLng = null;
     if (routeSummaryEl) routeSummaryEl.textContent = '';
     

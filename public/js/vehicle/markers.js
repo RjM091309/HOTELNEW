@@ -92,8 +92,16 @@ export function updateVehiclePath(markerKey, position) {
     
     // Always add current position as the last point to ensure polyline reaches marker
     // This ensures the line is always connected to the marker
+    // Only add if it's different from the last point to avoid duplicates
     const currentLatLng = new google.maps.LatLng(position.lat, position.lng);
-    pathArray.push(currentLatLng);
+    if (pathArray.length === 0 || 
+        pathArray[pathArray.length - 1].lat() !== position.lat || 
+        pathArray[pathArray.length - 1].lng() !== position.lng) {
+        pathArray.push(currentLatLng);
+    } else {
+        // Update last point to exact current position
+        pathArray[pathArray.length - 1] = currentLatLng;
+    }
     
     if (polylines[markerKey]) {
         // Update existing polyline - ensure it's green and path reaches marker
@@ -219,6 +227,9 @@ export function animateMarkerPosition(marker, newPosition, markerKey = null, dur
         // Update marker position
         marker.setPosition({ lat: currentLat, lng: currentLng });
         
+        // Update polyline during animation to keep it connected to marker
+        updateVehiclePath(markerKey, { lat: currentLat, lng: currentLng });
+        
         if (progress < 1) {
             // Continue animation
             animationState.animationId = requestAnimationFrame(animate);
@@ -227,7 +238,7 @@ export function animateMarkerPosition(marker, newPosition, markerKey = null, dur
             marker.setPosition(newPosition);
             delete markerAnimations[markerKey];
             
-            // Update path after animation completes
+            // Final path update to ensure exact connection
             updateVehiclePath(markerKey, newPosition);
         }
     }
@@ -455,6 +466,13 @@ export function updateMapMarkers() {
                     
                     // Apply background styling
                     applyLabelBackground(markers[vehicle.id], vehicle.isMoving || false, vehicle.isOnline);
+                    
+                    // Re-apply rotation after icon change (icon change recreates DOM element)
+                    if (vehicle.location && vehicle.location.heading !== null && vehicle.location.heading !== undefined) {
+                        setTimeout(() => {
+                            applyMarkerRotation(markers[vehicle.id], vehicle.location.heading);
+                        }, 50);
+                    }
                 }
 
                 // Apply heading-based rotation (PNG) if heading available (always re-apply)
@@ -650,7 +668,16 @@ export function updateMapMarkers() {
                     // Apply background styling
                     setTimeout(() => {
                         applyLabelBackground(markers[markerKey], device.isMoving || false, device.isOnline);
+                        // Re-apply rotation after icon change
+                        if (device.location && device.location.heading !== null && device.location.heading !== undefined) {
+                            applyMarkerRotation(markers[markerKey], device.location.heading);
+                        }
                     }, 50);
+                }
+                
+                // Apply heading-based rotation (PNG) if heading available (always re-apply)
+                if (device.location && device.location.heading !== null && device.location.heading !== undefined) {
+                    applyMarkerRotation(markers[markerKey], device.location.heading);
                 }
                 
                 // Auto-follow even if marker didn't move (user may have panned away)
@@ -720,6 +747,9 @@ export function updateMapMarkers() {
             // Apply background styling to label
             setTimeout(() => {
                 applyLabelBackground(marker, device.isMoving || false, device.isOnline);
+                if (device.location && device.location.heading !== null && device.location.heading !== undefined) {
+                    applyMarkerRotation(marker, device.location.heading);
+                }
             }, 100);
             
             // Initialize path with current position if it doesn't exist

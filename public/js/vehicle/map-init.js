@@ -12,7 +12,7 @@ import {
     setIsFirstMapLoad
 } from './state.js';
 import { loadVehiclesForMapInit } from './data-loader.js';
-import { createMapTypeToggle, createFullscreenButton, createRouteSearchButton } from './map-controls.js';
+import { createLocationSearchBox, createMapTypeToggle, createFullscreenButton, createRouteSearchButton } from './map-controls.js';
 import { createTraceToggleContainer, hideTraceToggleContainer, showTraceToggleContainer } from './trace-toggle.js';
 import { updateMarkerLabelColors } from './markers.js';
 import { updateVehicleList } from './vehicle-list.js';
@@ -116,6 +116,9 @@ export async function initMap() {
                     
                     // Set map in state
                     setMap(newMap);
+                    
+                    // Create location search box (always visible)
+                    createLocationSearchBox();
                     
                     // Create custom map type toggle button (Sinotrack style)
                     createMapTypeToggle();
