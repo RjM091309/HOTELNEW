@@ -5,6 +5,15 @@
 import { vehicleData, gpsDevicesData, currentInfoWindow, infoWindows } from './state.js';
 import { getStatusInfo } from './status.js';
 import { formatDateFullPH, getAddressFromCoordinates } from './utils.js';
+import {
+    BATTERY_LOW_THRESHOLD,
+    BATTERY_MID_THRESHOLD,
+    BATTERY_HIGH_THRESHOLD,
+    INFO_WINDOW_ADDRESS_DELAY_MS
+} from './constants.js';
+
+// Lock to prevent concurrent InfoWindow updates
+let isUpdatingInfoWindow = false;
 
 // Generate satellite icon HTML (Sinotrack style)
 function generateSatelliteIcon(satelliteCount) {
@@ -37,11 +46,11 @@ function generateBatteryIcon(batteryPercent, isCharging = false) {
     
     // Determine power class based on battery level
     let powerClass = 'HightPower';
-    if (batteryPercent < 20) {
+    if (batteryPercent < BATTERY_LOW_THRESHOLD) {
         powerClass = 'PowerOff';
-    } else if (batteryPercent < 50) {
+    } else if (batteryPercent < BATTERY_MID_THRESHOLD) {
         powerClass = 'LowPower';
-    } else if (batteryPercent < 80) {
+    } else if (batteryPercent < BATTERY_HIGH_THRESHOLD) {
         powerClass = 'MidPower';
     }
     
@@ -277,8 +286,18 @@ export function showGpsDeviceInfo(deviceId) {
 
 // Update open InfoWindow with latest data (real-time update)
 export async function updateOpenInfoWindow() {
+    // Prevent concurrent updates (race condition protection)
+    if (isUpdatingInfoWindow) {
+        return; // Skip if update is already in progress
+    }
+    
     try {
-        if (!currentInfoWindow) return; // No InfoWindow is open
+        isUpdatingInfoWindow = true;
+        
+        if (!currentInfoWindow) {
+            isUpdatingInfoWindow = false;
+            return; // No InfoWindow is open
+        }
         
         // Find which vehicle or device this InfoWindow belongs to
         let vehicleId = null;
@@ -292,7 +311,7 @@ export async function updateOpenInfoWindow() {
                 if (key.startsWith('gps_')) {
                     deviceId = key.replace('gps_', '');
                 } else {
-                    vehicleId = parseInt(key);
+                    vehicleId = key; // Use string ID directly (no parseInt)
                 }
                 break;
             }
@@ -302,12 +321,12 @@ export async function updateOpenInfoWindow() {
         
         // Update vehicle InfoWindow
         if (vehicleId !== null) {
-            const vehicle = vehicleData[vehicleId];
+            const vehicle = vehicleData[vehicleId]; // vehicleId is already a string
             if (!vehicle) return; // Vehicle not found
             
             // Get current address from DOM if available
             const addressElement = document.getElementById(`address_${vehicleId}`);
-            let currentAddress = addressElement ? addressElement.textContent : null;
+            let currentAddress = (addressElement && addressElement.textContent) ? addressElement.textContent : null;
             
             // If address is "Loading address..." or empty, fetch it
             if (!currentAddress || currentAddress === 'Loading address...') {
@@ -326,12 +345,12 @@ export async function updateOpenInfoWindow() {
                     const addressElement = document.getElementById(`address_${vehicleId}`);
                     if (addressElement && addressElement.textContent === 'Loading address...') {
                         const address = await getAddressFromCoordinates(vehicle.location.lat, vehicle.location.lng);
-                        if (address) {
-                            addressElement.textContent = address;
-                        }
+                    if (address) {
+                        addressElement.textContent = address;
                     }
-                }, 100);
-            }
+                }
+            }, INFO_WINDOW_ADDRESS_DELAY_MS);
+        }
         }
         // Update GPS device InfoWindow
         else if (deviceId !== null) {
@@ -340,7 +359,7 @@ export async function updateOpenInfoWindow() {
             
             // Get current address from DOM if available
             const addressElement = document.getElementById(`address_gps_${deviceId}`);
-            let currentAddress = addressElement ? addressElement.textContent : null;
+            let currentAddress = (addressElement && addressElement.textContent) ? addressElement.textContent : null;
             
             // If address is "Loading address..." or empty, fetch it
             if (!currentAddress || currentAddress === 'Loading address...') {
@@ -359,16 +378,19 @@ export async function updateOpenInfoWindow() {
                     const addressElement = document.getElementById(`address_gps_${deviceId}`);
                     if (addressElement && addressElement.textContent === 'Loading address...') {
                         const address = await getAddressFromCoordinates(device.location.lat, device.location.lng);
-                        if (address) {
-                            addressElement.textContent = address;
-                        }
+                    if (address) {
+                        addressElement.textContent = address;
                     }
-                }, 100);
-            }
+                }
+            }, INFO_WINDOW_ADDRESS_DELAY_MS);
+        }
         }
     } catch (error) {
         // Silently handle errors to prevent breaking the update flow
-        console.warn('⚠️ Error updating InfoWindow:', error);
+        logWarn('Error updating InfoWindow', error, 'InfoWindow');
+    } finally {
+        // Always release lock, even on error
+        isUpdatingInfoWindow = false;
     }
 }
 

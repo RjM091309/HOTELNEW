@@ -2,6 +2,13 @@
 // UTILITY FUNCTIONS - Vehicle Monitoring
 // ========================================
 
+import { logError, logWarn, logDebug } from './logger.js';
+import {
+    ADDRESS_CACHE_EXPIRY_MS,
+    ADDRESS_COORDINATE_PRECISION,
+    ADDRESS_CACHE_CLEANUP_INTERVAL_MS
+} from './constants.js';
+
 // Format date to Philippines timezone (Asia/Manila, UTC+8)
 // Note: The `timestamp` field from GPS device is in UTC
 export function formatDatePH(dateInput) {
@@ -59,7 +66,7 @@ export function formatDatePH(dateInput) {
         
         // Check if date is valid
         if (isNaN(date.getTime())) {
-            console.error('Invalid date:', dateInput, typeof dateInput);
+            logError('Invalid date', { dateInput, type: typeof dateInput }, 'Utils');
             return 'N/A';
         }
         
@@ -78,7 +85,7 @@ export function formatDatePH(dateInput) {
         
         return formatted;
     } catch (error) {
-        console.error('Error formatting date:', error, dateInput);
+        logError('Error formatting date', { error, dateInput }, 'Utils');
         return 'N/A';
     }
 }
@@ -136,7 +143,7 @@ export function formatDateFullPH(dateInput) {
         
         // Check if date is valid
         if (isNaN(date.getTime())) {
-            console.error('Invalid date:', dateInput);
+            logError('Invalid date', { dateInput }, 'Utils');
             return 'N/A';
         }
         
@@ -156,7 +163,7 @@ export function formatDateFullPH(dateInput) {
         
         return formatted;
     } catch (error) {
-        console.error('Error formatting date:', error, dateInput);
+        logError('Error formatting date', { error, dateInput }, 'Utils');
         return 'N/A';
     }
 }
@@ -211,19 +218,124 @@ export function hexToRgb(hex) {
         '0, 0, 0';
 }
 
-// Fetch address from coordinates using reverse geocoding
-export async function getAddressFromCoordinates(lat, lng) {
+// Address cache to avoid redundant API calls
+// Key format: "lat_lng" (rounded to configured precision)
+const addressCache = new Map();
+
+// Load cache from localStorage on initialization
+function loadAddressCacheFromStorage() {
     try {
-        const response = await fetch(`/api/maps/reverse-geocode?lat=${lat}&lng=${lng}`);
-        const data = await response.json();
-        if (data.success && data.data && data.data.address) {
-            return data.data.address;
+        const stored = localStorage.getItem('vehicle_address_cache');
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            const now = Date.now();
+            // Only load non-expired entries
+            for (const [key, value] of Object.entries(parsed)) {
+                if (value.expiry > now) {
+                    addressCache.set(key, value);
+                }
+            }
         }
-        return null;
     } catch (error) {
-        console.error('Error fetching address:', error);
+        logWarn('Failed to load address cache from storage', error, 'Utils');
+    }
+}
+
+// Save cache to localStorage
+function saveAddressCacheToStorage() {
+    try {
+        const toStore = {};
+        for (const [key, value] of addressCache.entries()) {
+            toStore[key] = value;
+        }
+        localStorage.setItem('vehicle_address_cache', JSON.stringify(toStore));
+    } catch (error) {
+        // localStorage might be full or disabled, ignore
+        logWarn('Failed to save address cache to storage', error, 'Utils');
+    }
+}
+
+// Initialize cache on module load
+if (typeof window !== 'undefined') {
+    loadAddressCacheFromStorage();
+}
+
+// Fetch address from coordinates using reverse geocoding with caching
+export async function getAddressFromCoordinates(lat, lng) {
+    if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+        console.warn('Invalid coordinates for address lookup:', { lat, lng });
         return null;
     }
+    
+    try {
+        // Create cache key (rounded to configured precision)
+        const cacheKey = `${lat.toFixed(ADDRESS_COORDINATE_PRECISION)}_${lng.toFixed(ADDRESS_COORDINATE_PRECISION)}`;
+        
+        // Check cache first
+        const cached = addressCache.get(cacheKey);
+        if (cached && cached.expiry > Date.now()) {
+            return cached.address; // Return cached address
+        }
+        
+        // Cache miss or expired - fetch from API
+        const response = await fetch(`/api/maps/reverse-geocode?lat=${lat}&lng=${lng}`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        if (data.success && data.data && data.data.address) {
+            const address = data.data.address;
+            
+            // Cache the result
+            addressCache.set(cacheKey, {
+                address: address,
+                expiry: Date.now() + ADDRESS_CACHE_EXPIRY_MS
+            });
+            
+            // Save to localStorage (async, don't block)
+            setTimeout(() => saveAddressCacheToStorage(), 0);
+            
+            return address;
+        }
+        
+        return null;
+    } catch (error) {
+        logError('Error fetching address', error, 'Utils');
+        return null;
+    }
+}
+
+// Clear expired cache entries (call periodically)
+export function cleanupAddressCache() {
+    const now = Date.now();
+    let cleaned = 0;
+    for (const [key, value] of addressCache.entries()) {
+        if (value.expiry <= now) {
+            addressCache.delete(key);
+            cleaned++;
+        }
+    }
+    if (cleaned > 0) {
+        saveAddressCacheToStorage();
+        logDebug(`Cleaned ${cleaned} expired address cache entries`, null, 'Utils');
+    }
+}
+
+// Clear all cache (for testing or manual cleanup)
+export function clearAddressCache() {
+    addressCache.clear();
+    try {
+        localStorage.removeItem('vehicle_address_cache');
+    } catch (error) {
+        logWarn('Failed to clear address cache from storage', error, 'Utils');
+    }
+}
+
+// Run cleanup at configured interval
+if (typeof window !== 'undefined') {
+    setInterval(cleanupAddressCache, ADDRESS_CACHE_CLEANUP_INTERVAL_MS);
 }
 
 // Format minutes into "Xhr Ymins" format

@@ -18,6 +18,13 @@ import { updateMarkerLabelColors } from './markers.js';
 import { updateVehicleList } from './vehicle-list.js';
 import { updateMapMarkers } from './markers.js';
 import { updateTraceToggles } from './trace-toggle.js';
+import {
+    MAP_CENTER_LAT,
+    MAP_CENTER_LNG,
+    DEFAULT_MAP_ZOOM,
+    MAP_BOUNDS_PADDING
+} from './constants.js';
+import { logError } from './logger.js';
 
 // Initialize Google Maps
 export async function initMap() {
@@ -27,7 +34,7 @@ export async function initMap() {
         const apiKeyData = await apiKeyResponse.json();
         
         if (!apiKeyData.success || !apiKeyData.apiKey) {
-            console.error('Google Maps API key not found');
+            logError('Google Maps API key not found', null, 'MapInit');
             const mapDiv = document.getElementById('map');
             if (mapDiv) {
                 const loadingDiv = document.getElementById('mapLoading');
@@ -50,7 +57,7 @@ export async function initMap() {
             setTimeout(async () => {
                 // Check if google.maps is available
                 if (typeof google === 'undefined' || typeof google.maps === 'undefined' || typeof google.maps.Map === 'undefined') {
-                    console.error('Google Maps API not loaded properly');
+                    logError('Google Maps API not loaded properly', null, 'MapInit');
                     const mapDiv = document.getElementById('map');
                     if (mapDiv) {
                         mapDiv.innerHTML = '<div class="alert alert-danger">Google Maps API failed to load. Please refresh the page.</div>';
@@ -61,7 +68,7 @@ export async function initMap() {
                 // Check if map div exists
                 const mapDiv = document.getElementById('map');
                 if (!mapDiv) {
-                    console.error('Map div not found');
+                    logError('Map div not found', null, 'MapInit');
                     return;
                 }
                 
@@ -77,11 +84,16 @@ export async function initMap() {
                     mapDiv.style.height = '850px';
                     
                     // Load vehicles first to calculate proper center
-                    await loadVehiclesForMapInit();
+                    try {
+                        await loadVehiclesForMapInit();
+                    } catch (loadError) {
+                        logError('Failed to load vehicles for map initialization', loadError, 'MapInit');
+                        // Continue with default center if loading fails
+                    }
                     
                     // Calculate center from vehicle locations, or use default
-                    let mapCenter = { lat: 14.5995, lng: 120.9842 }; // Default to Manila
-                    let mapZoom = 9;
+                    let mapCenter = { lat: MAP_CENTER_LAT, lng: MAP_CENTER_LNG }; // Default to Manila
+                    let mapZoom = DEFAULT_MAP_ZOOM;
                     
                     // If we have vehicles with locations, calculate center from them
                     const allLocations = [];
@@ -165,7 +177,7 @@ export async function initMap() {
                     updateMapMarkers();
                     updateTraceToggles(); // Update trace toggles for all devices
                 } catch (error) {
-                    console.error('Error creating map:', error);
+                    logError('Error creating map', error, 'MapInit');
                     const mapDiv = document.getElementById('map');
                     if (mapDiv) {
                         mapDiv.innerHTML = '<div class="alert alert-danger">Error creating map: ' + error.message + '</div>';
@@ -175,7 +187,7 @@ export async function initMap() {
         };
         
         script.onerror = () => {
-            console.error('Failed to load Google Maps script');
+            logError('Failed to load Google Maps script', null, 'MapInit');
             const mapDiv = document.getElementById('map');
             if (mapDiv) {
                 mapDiv.innerHTML = '<div class="alert alert-danger">Failed to load Google Maps. Please check your internet connection and API key.</div>';
@@ -183,7 +195,7 @@ export async function initMap() {
         };
         document.head.appendChild(script);
     } catch (error) {
-        console.error('Error initializing map:', error);
+        logError('Error initializing map', error, 'MapInit');
         const mapDiv = document.getElementById('map');
         if (mapDiv) {
             mapDiv.innerHTML = '<div class="alert alert-danger">Error loading map. Please check your Google Maps API key.</div>';

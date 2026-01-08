@@ -6,6 +6,10 @@ import { map, markers, vehicleData, gpsDevicesData } from './state.js';
 import { formatDatePH, formatMinutesAgo } from './utils.js';
 import { getStatusInfo } from './status.js';
 import { showVehicleInfo, showGpsDeviceInfo } from './infowindow.js';
+import {
+    MAX_MAP_ZOOM,
+    BOUNCE_ANIMATION_DURATION_MS
+} from './constants.js';
 
 // Update vehicle list
 export function updateVehicleList() {
@@ -69,7 +73,7 @@ export function updateVehicleList() {
         const statusColor = hasLocation ? statusInfo.color : '#6c757d';
         
         html += `
-            <div class="vehicle-card vehicle-item" data-vehicle-id="${vehicle.id}" data-type="vehicle">
+            <div class="vehicle-card vehicle-item" data-vehicle-id="${String(vehicle.id)}" data-type="vehicle">
                 <div class="vehicle-card-header">
                     <div class="vehicle-title-section">
                         <h6 class="vehicle-name">${vehicle.modelName}</h6>
@@ -159,40 +163,61 @@ export function updateVehicleList() {
     html += '</div>';
     vehicleList.innerHTML = html;
     
-    // Add click handlers for vehicles
-    document.querySelectorAll('.vehicle-item').forEach(item => {
-        item.addEventListener('click', function() {
-            const vehicleId = this.dataset.vehicleId;
-            showVehicleInfo(vehicleId);
-            if (map && markers[vehicleId]) {
-                map.setCenter(markers[vehicleId].getPosition());
-                map.setZoom(15);
-                markers[vehicleId].setAnimation(google.maps.Animation.BOUNCE);
-                setTimeout(() => {
-                    if (markers[vehicleId]) {
-                        markers[vehicleId].setAnimation(null);
+    // Use event delegation to prevent memory leaks from duplicate listeners
+    // Remove old listeners if they exist (only one listener on container)
+    const container = vehicleList.querySelector('.vehicle-list-container');
+    if (container) {
+        // Remove existing listeners by cloning (removes all event listeners)
+        const newContainer = container.cloneNode(true);
+        container.replaceWith(newContainer);
+        
+        // Add single event listener on container (event delegation)
+        newContainer.addEventListener('click', function(event) {
+            // Find the closest vehicle-item or gps-device-item
+            const vehicleItem = event.target.closest('.vehicle-item');
+            const gpsDeviceItem = event.target.closest('.gps-device-item');
+            
+            if (vehicleItem) {
+                const vehicleId = vehicleItem.dataset.vehicleId;
+                if (!vehicleId) return;
+                
+                showVehicleInfo(vehicleId);
+                if (map && markers[vehicleId]) {
+                    const marker = markers[vehicleId];
+                    const position = marker.getPosition();
+                    if (position) {
+                        map.setCenter(position);
+                        map.setZoom(MAX_MAP_ZOOM);
+                        marker.setAnimation(google.maps.Animation.BOUNCE);
+                        setTimeout(() => {
+                            if (markers[vehicleId]) {
+                                markers[vehicleId].setAnimation(null);
+                            }
+                        }, BOUNCE_ANIMATION_DURATION_MS);
                     }
-                }, 2000);
+                }
+            } else if (gpsDeviceItem) {
+                const deviceId = gpsDeviceItem.dataset.deviceId;
+                if (!deviceId) return;
+                
+                showGpsDeviceInfo(deviceId);
+                const markerKey = `gps_${deviceId}`;
+                if (map && markers[markerKey]) {
+                    const marker = markers[markerKey];
+                    const position = marker.getPosition();
+                    if (position) {
+                        map.setCenter(position);
+                        map.setZoom(MAX_MAP_ZOOM);
+                        marker.setAnimation(google.maps.Animation.BOUNCE);
+                        setTimeout(() => {
+                            if (markers[markerKey]) {
+                                markers[markerKey].setAnimation(null);
+                            }
+                        }, BOUNCE_ANIMATION_DURATION_MS);
+                    }
+                }
             }
         });
-    });
-    
-    // Add click handlers for GPS devices
-    document.querySelectorAll('.gps-device-item').forEach(item => {
-        item.addEventListener('click', function() {
-            const deviceId = this.dataset.deviceId;
-            showGpsDeviceInfo(deviceId);
-            if (map && markers[`gps_${deviceId}`]) {
-                map.setCenter(markers[`gps_${deviceId}`].getPosition());
-                map.setZoom(15);
-                markers[`gps_${deviceId}`].setAnimation(google.maps.Animation.BOUNCE);
-                setTimeout(() => {
-                    if (markers[`gps_${deviceId}`]) {
-                        markers[`gps_${deviceId}`].setAnimation(null);
-                    }
-                }, 2000);
-            }
-        });
-    });
+    }
 }
 

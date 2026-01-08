@@ -10,11 +10,24 @@ import { updateTraceToggles } from './trace-toggle.js';
 import { clearVehiclePath } from './markers.js';
 import { markers, markerAnimations } from './state.js';
 import { calculateDistanceMeters } from './utils.js';
+import {
+    DEBOUNCE_DELAY_MS,
+    POLLING_INTERVAL_MS,
+    PERIODIC_REFRESH_INTERVAL_MS,
+    SOCKET_RETRY_DELAY_MS,
+    SOCKET_INIT_DELAY_MS,
+    SOCKET_FALLBACK_DELAY_MS
+} from './constants.js';
+import { logError, logWarn, logDebug, logInfo } from './logger.js';
 
 let gpsTrackingSocket = null;
 let pollingInterval = null;
 let isPollingActive = false;
 let periodicRefreshInterval = null;
+
+// Debounce queue for socket updates to prevent race conditions
+const updateQueue = new Map();
+const updateTimers = new Map();
 
 // Setup event listeners for Socket.IO
 function setupSocketEventListeners() {
@@ -34,7 +47,8 @@ function setupSocketEventListeners() {
     // Listen for real-time GPS location updates
     gpsTrackingSocket.on('driver-location-updated', async (data) => {
         if (data && data.deviceId && data.location) {
-            await updateVehicleLocationFromSocket(data.deviceId, data.location);
+            // Use debounced update to prevent race conditions
+            queueSocketUpdate(data.deviceId, data.location);
         }
     });
     
@@ -112,10 +126,10 @@ function setupSocketEventListeners() {
 function initGpsTrackingSocket() {
     // Check if Socket.IO is available, if not, retry after a delay
     if (typeof io === 'undefined') {
-        console.error('Socket.IO library not available, retrying in 1 second...');
+        logError('Socket.IO library not available, retrying...', null, 'Socket.IO');
         setTimeout(() => {
             initGpsTrackingSocket();
-        }, 1000);
+        }, SOCKET_RETRY_DELAY_MS);
         return;
     }
     
@@ -160,7 +174,7 @@ function initGpsTrackingSocket() {
         });
         
         gpsTrackingSocket.on('connect_error', (error) => {
-            console.error('GPS Tracking Socket.IO connection error:', error);
+            logError('GPS Tracking Socket.IO connection error', error, 'Socket.IO');
             // Start polling fallback on connection error
             if (!isPollingActive) {
                 startPollingFallback();
@@ -168,6 +182,7 @@ function initGpsTrackingSocket() {
         });
         
         gpsTrackingSocket.on('reconnect', (attemptNumber) => {
+            logInfo(`Socket.IO reconnected (attempt ${attemptNumber})`, null, 'Socket.IO');
             setupSocketEventListeners();
             // Stop polling if socket reconnected
             if (isPollingActive) {
@@ -176,7 +191,7 @@ function initGpsTrackingSocket() {
         });
         
         gpsTrackingSocket.on('reconnect_failed', () => {
-            console.error('GPS Tracking Socket.IO reconnection failed');
+            logError('GPS Tracking Socket.IO reconnection failed', null, 'Socket.IO');
             // Start polling fallback if reconnection fails
             if (!isPollingActive) {
                 startPollingFallback();
@@ -184,15 +199,15 @@ function initGpsTrackingSocket() {
         });
         
     } catch (error) {
-        console.error('Error initializing GPS Tracking Socket.IO:', error);
+        logError('Error initializing GPS Tracking Socket.IO', error, 'Socket.IO');
         // Start polling fallback on error
         if (!isPollingActive) {
             startPollingFallback();
         }
-        // Retry after 2 seconds
+        // Retry after configured delay
         setTimeout(() => {
             initGpsTrackingSocket();
-        }, 2000);
+        }, SOCKET_FALLBACK_DELAY_MS);
     }
 }
 
@@ -202,12 +217,12 @@ function startPollingFallback() {
     
     isPollingActive = true;
     
-    // Poll immediately, then every 10 seconds
+    // Poll immediately, then every configured interval
     loadVehicles();
     
     pollingInterval = setInterval(() => {
         loadVehicles();
-    }, 10000); // Poll every 10 seconds
+    }, POLLING_INTERVAL_MS);
 }
 
 // Stop polling fallback
@@ -222,13 +237,39 @@ function stopPollingFallback() {
     }
 }
 
+// Queue socket update with debouncing to prevent race conditions
+function queueSocketUpdate(deviceId, locationData) {
+    // Clear existing timer for this device
+    if (updateTimers.has(deviceId)) {
+        clearTimeout(updateTimers.get(deviceId));
+    }
+    
+    // Store latest location data (overwrites previous queued data)
+    updateQueue.set(deviceId, locationData);
+    
+    // Set debounce timer
+    const timer = setTimeout(() => {
+        const queuedData = updateQueue.get(deviceId);
+        if (queuedData) {
+            updateQueue.delete(deviceId);
+            updateTimers.delete(deviceId);
+            // Process the update
+            updateVehicleLocationFromSocket(deviceId, queuedData).catch(err => {
+                logError('Error processing queued socket update', err, 'Socket.IO');
+            });
+        }
+    }, DEBOUNCE_DELAY_MS);
+    
+    updateTimers.set(deviceId, timer);
+}
+
 // Update vehicle location from Socket.IO event
 // For smooth movement: Use Socket.IO data directly for immediate marker animation
 // Then reload from database to ensure data consistency
 async function updateVehicleLocationFromSocket(deviceId, locationData) {
     try {
         if (!deviceId || !locationData || !locationData.lat || !locationData.lng) {
-            console.warn('📍 Invalid socket data received:', { deviceId, locationData });
+            logWarn('Invalid socket data received', { deviceId, locationData }, 'Socket.IO');
             return;
         }
         
@@ -319,7 +360,10 @@ async function updateVehicleLocationFromSocket(deviceId, locationData) {
         // If isMoving = true (in-transit), animate marker smoothly
         if (markerKey && markers[markerKey]) {
             const marker = markers[markerKey];
+            if (!marker) return; // Null safety check
+            
             const currentPos = marker.getPosition();
+            if (!currentPos && !newPosition) return; // Need at least one position
             
             // Get isMoving status from vehicle/device data (determined by database location changes)
             const isMoving = foundVehicle ? (foundVehicle.isMoving || false) : (foundDevice ? (foundDevice.isMoving || false) : false);
@@ -375,17 +419,17 @@ async function updateVehicleLocationFromSocket(deviceId, locationData) {
         // Update open InfoWindow with real-time data if it's open for this vehicle/device
         // This updates battery, signal, etc. even when marker position doesn't change (standby)
         const { updateOpenInfoWindow } = await import('./infowindow.js');
-        updateOpenInfoWindow().catch(err => console.warn('InfoWindow update error:', err));
+        updateOpenInfoWindow().catch(err => logWarn('InfoWindow update error', err, 'Socket.IO'));
         
         // Don't reload from database immediately - Socket.IO is the source of truth for live movement
         // Database is just for history. Only reload periodically or on page refresh
     } catch (error) {
-        console.error('❌ Error handling socket notification:', error);
+        logError('Error handling socket notification', error, 'Socket.IO');
         // On error, try to reload vehicles as fallback
         try {
             await loadVehicles();
         } catch (reloadError) {
-            console.error('❌ Error reloading vehicles:', reloadError);
+            logError('Error reloading vehicles', reloadError, 'Socket.IO');
         }
     }
 }
@@ -397,11 +441,11 @@ export function startPeriodicRefresh() {
         clearInterval(periodicRefreshInterval);
     }
     
-    // Refresh every 15 seconds as a backup (faster detection of GPS Device ID changes)
+    // Refresh every configured interval as a backup (faster detection of GPS Device ID changes)
     periodicRefreshInterval = setInterval(() => {
         // Always refresh as backup to detect GPS Device ID changes even if socket fails
         loadVehicles();
-    }, 15000); // Every 15 seconds - faster detection
+    }, PERIODIC_REFRESH_INTERVAL_MS);
 }
 
 // Test socket connection and log status (for debugging)
@@ -425,16 +469,16 @@ window.testVehicleMonitoring = async function() {
         gpsDevices: Object.keys(gpsDevicesData).length,
         pollingActive: isPollingActive
     };
-    console.log('Vehicle Monitoring Status:', status);
+    logInfo('Vehicle Monitoring Status', status, 'Test');
     return status;
 };
 
 // Test function to manually trigger vehicle update event (for testing)
 window.testVehicleUpdateEvent = function(vehicleId = '38') {
-    console.log('🧪 [TEST] Simulating vehicle-updated event for vehicle:', vehicleId);
+    logDebug('Simulating vehicle-updated event for vehicle', { vehicleId }, 'Test');
     
     if (!gpsTrackingSocket || !gpsTrackingSocket.connected) {
-        console.error('❌ [TEST] Socket is not connected!');
+        logError('Socket is not connected', null, 'Test');
         return;
     }
     
@@ -447,18 +491,18 @@ window.testVehicleUpdateEvent = function(vehicleId = '38') {
         timestamp: new Date().toISOString()
     };
     
-    console.log('🧪 [TEST] Simulating event:', testEvent);
-    console.log('🧪 [TEST] Note: This is just for testing. Real events should come from server.');
+    logDebug('Simulating event', testEvent, 'Test');
+    logDebug('Note: This is just for testing. Real events should come from server.', null, 'Test');
 };
 
 // Initialize Socket.IO - try multiple ways to ensure it runs
 export function initializeSocketIO() {
     // Check if Socket.IO is available
     if (typeof io === 'undefined') {
-        console.error('Socket.IO library not available, retrying in 1 second...');
+        logError('Socket.IO library not available, retrying...', null, 'Socket.IO');
         setTimeout(() => {
             initializeSocketIO();
-        }, 1000);
+        }, SOCKET_RETRY_DELAY_MS);
         return;
     }
     
@@ -485,6 +529,10 @@ if (typeof window !== 'undefined') {
         if (periodicRefreshInterval) {
             clearInterval(periodicRefreshInterval);
         }
+        // Clear all debounce timers
+        updateTimers.forEach(timer => clearTimeout(timer));
+        updateTimers.clear();
+        updateQueue.clear();
         if (gpsTrackingSocket) {
             gpsTrackingSocket.disconnect();
         }
