@@ -7,26 +7,12 @@
 import { setMap, setIsFirstMapLoad } from './state.js';
 import { initMap } from './map-init.js';
 import { initializeSocketIO } from './socket-io.js';
-import { SOCKET_INIT_DELAY_MS, SOCKET_FALLBACK_DELAY_MS } from './constants.js';
-import { logSuccess } from './logger.js';
 
 // Import functions that need to be global
 import { showVehicleInfo, showGpsDeviceInfo } from './infowindow.js';
 
-// Expose initMap globally for EJS template (must be available immediately)
-// This allows the EJS template to call initMap() after Google Maps script loads
-if (typeof window !== 'undefined') {
-    // Set immediately and also ensure it's available
-    window.initMap = initMap;
-    
-    // Also set it after a small delay to ensure module is fully loaded
-    // This handles cases where the module loads but assignment happens too early
-    setTimeout(() => {
-        if (!window.initMap) {
-            window.initMap = initMap;
-        }
-    }, 0);
-}
+// Expose initMap globally for EJS template
+window.initMap = initMap;
 
 // Expose showVehicleInfo and showGpsDeviceInfo globally for InfoWindow buttons
 window.showVehicleInfo = showVehicleInfo;
@@ -39,19 +25,19 @@ if (typeof document !== 'undefined') {
         document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => {
                 initializeSocketIO();
-            }, SOCKET_INIT_DELAY_MS);
+            }, 500);
         });
     } else {
         // DOM is already loaded, initialize immediately
         setTimeout(() => {
             initializeSocketIO();
-        }, SOCKET_INIT_DELAY_MS);
+        }, 500);
     }
 } else {
     // No document object, try to initialize anyway after a delay
     setTimeout(() => {
         initializeSocketIO();
-    }, SOCKET_FALLBACK_DELAY_MS);
+    }, 1000);
 }
 
-logSuccess('Modular vehicle-monitoring.js loaded', null, 'VehicleMonitoring');
+console.log('✅ Modular vehicle-monitoring.js loaded');

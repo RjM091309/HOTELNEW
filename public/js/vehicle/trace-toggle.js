@@ -3,12 +3,6 @@
 // ========================================
 
 import { map, markers, vehicleData, gpsDevicesData, traceEnabled, traceToggles, polylines } from './state.js';
-import {
-    MAX_MAP_ZOOM,
-    BOUNCE_ANIMATION_DURATION_MS,
-    TRACE_PAN_DELAY_MS
-} from './constants.js';
-import { logWarn, logError, logDebug } from './logger.js';
 
 // Create trace toggle container (wrapper for all device toggles)
 export function createTraceToggleContainer() {
@@ -188,62 +182,62 @@ export function createTraceToggleForDevice(deviceKey, deviceName, deviceId) {
         traceEnabled[deviceKey] = !traceEnabled[deviceKey];
         updateState();
         
-            // Smoothly pan map to this device - get position from data, not marker
-            let position = null;
-            const isVehicle = !deviceKey.startsWith('gps_');
-            
-            if (isVehicle) {
-                // Get position from vehicle data (use string ID)
-                const vehicleId = String(deviceKey); // Ensure string ID
-                const vehicle = vehicleData[vehicleId];
-                if (vehicle && vehicle.location && vehicle.location.lat && vehicle.location.lng) {
-                    position = { lat: vehicle.location.lat, lng: vehicle.location.lng };
-                    logDebug(`Trace toggle: Panning to vehicle ${vehicleId}`, position, 'TraceToggle');
-                } else {
-                    logWarn(`Vehicle ${vehicleId} not found in vehicleData`, null, 'TraceToggle');
-                }
+        // Smoothly pan map to this device - get position from data, not marker
+        let position = null;
+        const isVehicle = !deviceKey.startsWith('gps_');
+        
+        if (isVehicle) {
+            // Get position from vehicle data - try both string and number key
+            const vehicleId = deviceKey;
+            const vehicle = vehicleData[vehicleId] || vehicleData[Number(vehicleId)] || vehicleData[String(vehicleId)];
+            if (vehicle && vehicle.location && vehicle.location.lat && vehicle.location.lng) {
+                position = { lat: vehicle.location.lat, lng: vehicle.location.lng };
+                console.log(`📍 Trace toggle: Panning to vehicle ${vehicleId} at (${position.lat}, ${position.lng})`);
             } else {
-                // Get position from GPS device data
-                const deviceId = deviceKey.replace('gps_', '');
-                const device = gpsDevicesData[deviceId];
-                if (device && device.location && device.location.lat && device.location.lng) {
-                    position = { lat: device.location.lat, lng: device.location.lng };
-                    logDebug(`Trace toggle: Panning to GPS device ${deviceId}`, position, 'TraceToggle');
-                } else {
-                    logWarn(`GPS device ${deviceId} not found in gpsDevicesData`, null, 'TraceToggle');
-                }
+                console.warn(`⚠️ Trace toggle: Vehicle ${vehicleId} not found in vehicleData`);
+            }
+        } else {
+            // Get position from GPS device data
+            const deviceId = deviceKey.replace('gps_', '');
+            const device = gpsDevicesData[deviceId];
+            if (device && device.location && device.location.lat && device.location.lng) {
+                position = { lat: device.location.lat, lng: device.location.lng };
+                console.log(`📍 Trace toggle: Panning to GPS device ${deviceId} at (${position.lat}, ${position.lng})`);
+            } else {
+                console.warn(`⚠️ Trace toggle: GPS device ${deviceId} not found in gpsDevicesData`);
+            }
+        }
+        
+        if (position) {
+            // Verify position is valid
+            if (isNaN(position.lat) || isNaN(position.lng) || position.lat === 0 || position.lng === 0) {
+                console.error(`❌ Trace toggle: Invalid position (${position.lat}, ${position.lng})`);
+                return;
             }
             
-            if (position) {
-                // Verify position is valid
-                if (isNaN(position.lat) || isNaN(position.lng) || position.lat === 0 || position.lng === 0) {
-                    logError(`Invalid position`, position, 'TraceToggle');
-                    return;
-                }
-                
-                // Smooth pan animation using actual data position
-                map.panTo(position);
-                
-                // Set zoom level smoothly
+            // Smooth pan animation using actual data position
+            map.panTo(position);
+            
+            // Set zoom level smoothly
+            setTimeout(() => {
+                map.setZoom(15);
+            }, 300);
+            
+            // Bounce animation on marker if it exists
+            const marker = markers[deviceKey];
+            if (marker) {
+                marker.setAnimation(google.maps.Animation.BOUNCE);
                 setTimeout(() => {
-                    map.setZoom(MAX_MAP_ZOOM);
-                }, TRACE_PAN_DELAY_MS);
-                
-                // Bounce animation on marker if it exists
-                const marker = markers[deviceKey];
-                if (marker) {
-                    marker.setAnimation(google.maps.Animation.BOUNCE);
-                    setTimeout(() => {
-                        if (marker) {
-                            marker.setAnimation(null);
-                        }
-                    }, BOUNCE_ANIMATION_DURATION_MS);
-                } else {
-                    logWarn(`Marker not found for deviceKey ${deviceKey}`, null, 'TraceToggle');
-                }
+                    if (marker) {
+                        marker.setAnimation(null);
+                    }
+                }, 2000);
             } else {
-                logError(`No position found for deviceKey ${deviceKey}`, null, 'TraceToggle');
+                console.warn(`⚠️ Trace toggle: Marker not found for deviceKey ${deviceKey}`);
             }
+        } else {
+            console.error(`❌ Trace toggle: No position found for deviceKey ${deviceKey}`);
+        }
     });
     
     // Initial state

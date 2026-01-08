@@ -14,29 +14,28 @@ export function getMarkerIconUrl(isOnline, isMoving) {
 }
 
 // Get status text and color based on online and moving status
-// Colors match marker label colors for consistency
 export function getStatusInfo(isOnline, isMoving) {
     if (!isOnline) {
         return {
             text: 'Offline',
-            color: '#666666', // Gray - matches marker label offline color
-            badgeClass: 'secondary',
-            dotColor: '#666666'
+            color: '#f59e0b', // Orange
+            badgeClass: 'warning',
+            dotColor: '#f59e0b'
         };
     }
     if (isMoving) {
         return {
             text: 'In Transit',
-            color: '#00CC00', // Green - matches marker label moving color
+            color: '#10b981', // Green
             badgeClass: 'success',
-            dotColor: '#00CC00'
+            dotColor: '#10b981'
         };
     }
     return {
         text: 'Standby',
-        color: '#0076FF', // Blue - matches marker label standby color
+        color: '#3b82f6', // Blue
         badgeClass: 'primary',
-        dotColor: '#0076FF'
+        dotColor: '#3b82f6'
     };
 }
 
