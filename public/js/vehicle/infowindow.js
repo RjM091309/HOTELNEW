@@ -32,27 +32,34 @@ function generateGsmSignalIcon(gsmSignal) {
 function generateBatteryIcon(batteryPercent, isCharging = false) {
     if (batteryPercent === null || batteryPercent === undefined) return '';
     
+    // Validate and clamp battery value to 0-100 range
+    const batteryNum = Number(batteryPercent);
+    if (isNaN(batteryNum)) return ''; // Invalid battery value
+    
+    // Clamp battery to valid range (0-100)
+    const clampedBattery = Math.min(100, Math.max(0, batteryNum));
+    
     // Ensure isCharging is a boolean (handle null and undefined)
     const charging = (isCharging === null || isCharging === undefined) ? false : !!isCharging;
     
-    // Determine power class based on battery level
+    // Determine power class based on clamped battery level
     let powerClass = 'HightPower';
-    if (batteryPercent < 20) {
+    if (clampedBattery < 20) {
         powerClass = 'PowerOff';
-    } else if (batteryPercent < 50) {
+    } else if (clampedBattery < 50) {
         powerClass = 'LowPower';
-    } else if (batteryPercent < 80) {
+    } else if (clampedBattery < 80) {
         powerClass = 'MidPower';
     }
     
-    // Calculate fill width (percentage of battery)
-    const fillWidth = Math.min(100, Math.max(0, batteryPercent));
+    // Calculate fill width (percentage of battery) - already clamped
+    const fillWidth = clampedBattery;
     
     return `
-        <div class="Power ${powerClass} ${charging ? 'is-charging' : ''}" style="position: relative; height: 18px;" title="${charging ? `Charging - ${batteryPercent}%` : `${batteryPercent}%`}">
+        <div class="Power ${powerClass} ${charging ? 'is-charging' : ''}" style="position: relative; height: 18px;" title="${charging ? `Charging - ${clampedBattery}%` : `${clampedBattery}%`}">
             <div class="ChargeAnim"></div>
             <div class="Rate" style="width: ${fillWidth}%; height: 100%;"></div>
-            <div class="Label">${batteryPercent}%</div>
+            <div class="Label">${clampedBattery}%</div>
             <div class="Tip"></div>
         </div>
     `;

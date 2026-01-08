@@ -272,7 +272,9 @@ async function updateVehicleLocationFromSocket(deviceId, locationData) {
                 foundVehicle.location.heading = parseFloat(locationData.heading);
             }
             if (locationData.battery !== null && locationData.battery !== undefined) {
-                foundVehicle.location.battery = parseFloat(locationData.battery);
+                const batteryVal = parseFloat(locationData.battery);
+                // Validate and clamp battery to 0-100 range
+                foundVehicle.location.battery = (!isNaN(batteryVal)) ? Math.min(100, Math.max(0, batteryVal)) : null;
             }
             if (locationData.isCharging !== null && locationData.isCharging !== undefined) {
                 foundVehicle.location.isCharging = !!locationData.isCharging;
@@ -297,7 +299,9 @@ async function updateVehicleLocationFromSocket(deviceId, locationData) {
                 foundDevice.location.heading = parseFloat(locationData.heading);
             }
             if (locationData.battery !== null && locationData.battery !== undefined) {
-                foundDevice.location.battery = parseFloat(locationData.battery);
+                const batteryVal = parseFloat(locationData.battery);
+                // Validate and clamp battery to 0-100 range
+                foundDevice.location.battery = (!isNaN(batteryVal)) ? Math.min(100, Math.max(0, batteryVal)) : null;
             }
             if (locationData.isCharging !== null && locationData.isCharging !== undefined) {
                 foundDevice.location.isCharging = !!locationData.isCharging;

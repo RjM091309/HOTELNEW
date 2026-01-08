@@ -26,9 +26,9 @@ export function getStatusInfo(isOnline, isMoving) {
     if (isMoving) {
         return {
             text: 'In Transit',
-            color: '#10b981', // Green
+            color: '#00CC00', // Green - matches marker label background color
             badgeClass: 'success',
-            dotColor: '#10b981'
+            dotColor: '#00CC00'
         };
     }
     return {

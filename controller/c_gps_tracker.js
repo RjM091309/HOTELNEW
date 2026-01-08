@@ -176,6 +176,15 @@ class GpsTrackerController {
       }
       
       // Prepare location data
+      // Validate and clamp battery value to 0-100 range
+      let batteryValue = null;
+      if (battery) {
+        const parsedBattery = parseFloat(battery);
+        if (!isNaN(parsedBattery)) {
+          batteryValue = Math.min(100, Math.max(0, parsedBattery));
+        }
+      }
+      
       const locationData = {
         deviceId: String(deviceId),
         latitude: lat,
@@ -183,7 +192,7 @@ class GpsTrackerController {
         speed: speed ? parseFloat(speed) : null,
         heading: normalizedHeading,
         timestamp: timestamp ? new Date(timestamp) : new Date(),
-        battery: battery ? parseFloat(battery) : null,
+        battery: batteryValue,
         satelliteCount: satelliteCount ? parseInt(satelliteCount) : null
       };
       
@@ -197,8 +206,12 @@ class GpsTrackerController {
       const deriveChargingFlag = () => {
         // Default: not charging unless explicitly inferred
         let flag = false;
-        const prevBattery = latestLocation && latestLocation.battery !== null && latestLocation.battery !== undefined
+        const prevBatteryRaw = latestLocation && latestLocation.battery !== null && latestLocation.battery !== undefined
           ? parseFloat(latestLocation.battery)
+          : null;
+        // Clamp prevBattery to 0-100 range for consistent comparison
+        const prevBattery = (prevBatteryRaw !== null && !isNaN(prevBatteryRaw))
+          ? Math.min(100, Math.max(0, prevBatteryRaw))
           : null;
         const prevFlag = latestLocation && latestLocation.is_charging !== undefined ? latestLocation.is_charging : null;
 
@@ -216,7 +229,7 @@ class GpsTrackerController {
         if (prevBattery !== null && !isNaN(prevBattery)) {
           if (locationData.battery > prevBattery) return true;  // rising -> charging
           if (locationData.battery < prevBattery) return false; // dropping -> not charging
-          // same level: keep previous flag if it existed
+          // Same level: preserve previous charging state (handles edge cases: 100% while charging, 0% while not charging)
           return prevFlag !== null && prevFlag !== undefined ? !!prevFlag : flag;
         }
 

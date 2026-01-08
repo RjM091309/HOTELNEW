@@ -40,6 +40,15 @@ class GpsTrackerModel {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     `;
 
+    // Validate and clamp battery value to 0-100 range
+    let batteryValue = null;
+    if (battery !== null && battery !== undefined) {
+      const parsedBattery = parseFloat(battery);
+      if (!isNaN(parsedBattery)) {
+        batteryValue = Math.min(100, Math.max(0, parsedBattery));
+      }
+    }
+    
     const values = [
       deviceId,
       parseFloat(latitude),
@@ -47,7 +56,7 @@ class GpsTrackerModel {
       speed ? parseFloat(speed) : null,
       heading ? parseFloat(heading) : null,
       timestamp ? new Date(timestamp) : new Date(),
-      battery ? parseFloat(battery) : null,
+      batteryValue,
       isCharging === undefined || isCharging === null ? null : !!isCharging,
       satelliteCount ? parseInt(satelliteCount) : null,
       gsmSignal ? parseInt(gsmSignal) : null,
@@ -221,8 +230,12 @@ class GpsTrackerModel {
     }
     
     if (battery !== null && battery !== undefined) {
-      updates.push('battery = ?');
-      values.push(parseFloat(battery));
+      const parsedBattery = parseFloat(battery);
+      if (!isNaN(parsedBattery)) {
+        updates.push('battery = ?');
+        // Clamp battery to 0-100 range
+        values.push(Math.min(100, Math.max(0, parsedBattery)));
+      }
     }
 
     if (isCharging !== null && isCharging !== undefined) {

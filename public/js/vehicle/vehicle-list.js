@@ -2,10 +2,10 @@
 // VEHICLE LIST - Vehicle Monitoring
 // ========================================
 
-import { map, markers, vehicleData, gpsDevicesData } from './state.js';
-import { formatDatePH, formatMinutesAgo } from './utils.js';
+import { map, markers, vehicleData, gpsDevicesData, infoWindows, currentInfoWindow, setCurrentInfoWindow } from './state.js';
+import { formatDatePH, formatMinutesAgo, getAddressFromCoordinates } from './utils.js';
 import { getStatusInfo } from './status.js';
-import { showVehicleInfo, showGpsDeviceInfo } from './infowindow.js';
+import { generateVehicleInfoWindowContent, generateGpsDeviceInfoWindowContent } from './infowindow.js';
 
 // Update vehicle list
 export function updateVehicleList() {
@@ -161,36 +161,133 @@ export function updateVehicleList() {
     
     // Add click handlers for vehicles
     document.querySelectorAll('.vehicle-item').forEach(item => {
-        item.addEventListener('click', function() {
-            const vehicleId = this.dataset.vehicleId;
-            showVehicleInfo(vehicleId);
-            if (map && markers[vehicleId]) {
-                map.setCenter(markers[vehicleId].getPosition());
-                map.setZoom(15);
-                markers[vehicleId].setAnimation(google.maps.Animation.BOUNCE);
-                setTimeout(() => {
-                    if (markers[vehicleId]) {
-                        markers[vehicleId].setAnimation(null);
+        item.addEventListener('click', async function() {
+            const vehicleId = parseInt(this.dataset.vehicleId);
+            const vehicle = vehicleData[vehicleId];
+            
+            if (!vehicle || !map || !markers[vehicleId]) return;
+            
+            // Center map on vehicle and zoom in
+            map.setCenter(markers[vehicleId].getPosition());
+            map.setZoom(15);
+            
+            // Bounce animation
+            markers[vehicleId].setAnimation(google.maps.Animation.BOUNCE);
+            setTimeout(() => {
+                if (markers[vehicleId]) {
+                    markers[vehicleId].setAnimation(null);
+                }
+            }, 2000);
+            
+            // Open InfoWindow instead of modal
+            let infoWindow = infoWindows[vehicleId];
+            
+            // If InfoWindow doesn't exist, create it
+            if (!infoWindow) {
+                infoWindow = new google.maps.InfoWindow({
+                    content: generateVehicleInfoWindowContent(vehicle)
+                });
+                
+                // Listen for InfoWindow close event
+                google.maps.event.addListener(infoWindow, 'closeclick', () => {
+                    if (currentInfoWindow === infoWindow) {
+                        setCurrentInfoWindow(null);
                     }
-                }, 2000);
+                });
+                
+                // Store InfoWindow for future use
+                infoWindows[vehicleId] = infoWindow;
+            }
+            
+            // Close any previously open InfoWindow
+            if (currentInfoWindow) {
+                currentInfoWindow.close();
+            }
+            
+            // Set and open InfoWindow
+            setCurrentInfoWindow(infoWindow);
+            infoWindow.open(map, markers[vehicleId]);
+            
+            // Fetch address if location is available
+            if (vehicle.location && vehicle.location.lat && vehicle.location.lng) {
+                const address = await getAddressFromCoordinates(vehicle.location.lat, vehicle.location.lng);
+                if (address) {
+                    // Update InfoWindow content with address
+                    const addressElement = document.getElementById(`address_${vehicleId}`);
+                    if (addressElement) {
+                        addressElement.textContent = address;
+                    } else {
+                        // If element doesn't exist yet, regenerate content
+                        infoWindow.setContent(generateVehicleInfoWindowContent(vehicle, address));
+                    }
+                }
             }
         });
     });
     
     // Add click handlers for GPS devices
     document.querySelectorAll('.gps-device-item').forEach(item => {
-        item.addEventListener('click', function() {
+        item.addEventListener('click', async function() {
             const deviceId = this.dataset.deviceId;
-            showGpsDeviceInfo(deviceId);
-            if (map && markers[`gps_${deviceId}`]) {
-                map.setCenter(markers[`gps_${deviceId}`].getPosition());
-                map.setZoom(15);
-                markers[`gps_${deviceId}`].setAnimation(google.maps.Animation.BOUNCE);
-                setTimeout(() => {
-                    if (markers[`gps_${deviceId}`]) {
-                        markers[`gps_${deviceId}`].setAnimation(null);
+            const device = gpsDevicesData[deviceId];
+            const markerKey = `gps_${deviceId}`;
+            
+            if (!device || !map || !markers[markerKey]) return;
+            
+            // Center map on device and zoom in
+            map.setCenter(markers[markerKey].getPosition());
+            map.setZoom(15);
+            
+            // Bounce animation
+            markers[markerKey].setAnimation(google.maps.Animation.BOUNCE);
+            setTimeout(() => {
+                if (markers[markerKey]) {
+                    markers[markerKey].setAnimation(null);
+                }
+            }, 2000);
+            
+            // Open InfoWindow instead of modal
+            let infoWindow = infoWindows[markerKey];
+            
+            // If InfoWindow doesn't exist, create it
+            if (!infoWindow) {
+                infoWindow = new google.maps.InfoWindow({
+                    content: generateGpsDeviceInfoWindowContent(device)
+                });
+                
+                // Listen for InfoWindow close event
+                google.maps.event.addListener(infoWindow, 'closeclick', () => {
+                    if (currentInfoWindow === infoWindow) {
+                        setCurrentInfoWindow(null);
                     }
-                }, 2000);
+                });
+                
+                // Store InfoWindow for future use
+                infoWindows[markerKey] = infoWindow;
+            }
+            
+            // Close any previously open InfoWindow
+            if (currentInfoWindow) {
+                currentInfoWindow.close();
+            }
+            
+            // Set and open InfoWindow
+            setCurrentInfoWindow(infoWindow);
+            infoWindow.open(map, markers[markerKey]);
+            
+            // Fetch address if location is available
+            if (device.location && device.location.lat && device.location.lng) {
+                const address = await getAddressFromCoordinates(device.location.lat, device.location.lng);
+                if (address) {
+                    // Update InfoWindow content with address
+                    const addressElement = document.getElementById(`address_gps_${deviceId}`);
+                    if (addressElement) {
+                        addressElement.textContent = address;
+                    } else {
+                        // If element doesn't exist yet, regenerate content
+                        infoWindow.setContent(generateGpsDeviceInfoWindowContent(device, address));
+                    }
+                }
             }
         });
     });

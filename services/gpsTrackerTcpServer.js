@@ -162,6 +162,15 @@ async function processGpsMessage(message, originalMessage, socket, io) {
         timestamp = new Date(Date.UTC(year, month, day, hour, minute, second));
       }
       
+      // Validate and clamp battery value to 0-100 range
+      let batteryValue = null;
+      if (battery !== null && battery !== undefined && battery !== '') {
+        const parsedBattery = parseFloat(battery);
+        if (!isNaN(parsedBattery)) {
+          batteryValue = Math.min(100, Math.max(0, parsedBattery));
+        }
+      }
+      
       data = {
         deviceId: imei,
         latitude: lat,
@@ -169,7 +178,7 @@ async function processGpsMessage(message, originalMessage, socket, io) {
         speed: speed || null,
         heading: heading || null,
         timestamp: timestamp,
-        battery: battery || null,
+        battery: batteryValue,
         satelliteCount: (satelliteCount !== null && satelliteCount !== undefined && satelliteCount !== '') ? parseInt(satelliteCount) : null
       };
       const parsedMsg = `✅ Parsed ST903 extended format: Device ${imei} at (${lat}, ${lng}), Battery: ${battery || 'N/A'}, Satellites: ${satelliteCount || 'N/A'}`;
@@ -281,7 +290,15 @@ async function processGpsMessage(message, originalMessage, socket, io) {
           speed: speed || null,
           heading: heading || null,
           timestamp: timestamp,
-          battery: battery !== null && battery !== undefined && battery !== '' ? parseFloat(battery) : null,
+          battery: (() => {
+            if (battery !== null && battery !== undefined && battery !== '') {
+              const parsedBattery = parseFloat(battery);
+              if (!isNaN(parsedBattery)) {
+                return Math.min(100, Math.max(0, parsedBattery));
+              }
+            }
+            return null;
+          })(),
           satelliteCount: satelliteCount !== null && satelliteCount !== undefined && satelliteCount !== '' ? parseInt(satelliteCount) : null,
           gsmSignal: gsmSignal !== null && gsmSignal !== undefined && gsmSignal !== '' ? parseInt(gsmSignal) : null
         };
@@ -366,6 +383,15 @@ async function processGpsMessage(message, originalMessage, socket, io) {
       }
     }
     
+    // Validate and clamp battery value to 0-100 range
+    let batteryValue = null;
+    if (data.battery !== undefined && data.battery !== null) {
+      const parsedBattery = parseFloat(data.battery);
+      if (!isNaN(parsedBattery)) {
+        batteryValue = Math.min(100, Math.max(0, parsedBattery));
+      }
+    }
+    
     // Prepare location data
     const locationData = {
       deviceId: String(data.deviceId),
@@ -374,9 +400,9 @@ async function processGpsMessage(message, originalMessage, socket, io) {
       speed: data.speed ? parseFloat(data.speed) : null,
       heading: heading,
       timestamp: data.timestamp,
-    battery: data.battery !== undefined && data.battery !== null ? parseFloat(data.battery) : null,
-    satelliteCount: data.satelliteCount ? parseInt(data.satelliteCount) : null,
-    gsmSignal: data.gsmSignal !== undefined && data.gsmSignal !== null ? parseInt(data.gsmSignal) : null
+      battery: batteryValue,
+      satelliteCount: data.satelliteCount ? parseInt(data.satelliteCount) : null,
+      gsmSignal: data.gsmSignal !== undefined && data.gsmSignal !== null ? parseInt(data.gsmSignal) : null
     };
     
     // Check if location has changed significantly before saving
@@ -388,8 +414,12 @@ async function processGpsMessage(message, originalMessage, socket, io) {
   const deriveChargingFlag = () => {
     // Default to not charging unless inferred
     let flag = false;
-    const prevBattery = latestLocation && latestLocation.battery !== null && latestLocation.battery !== undefined
+    const prevBatteryRaw = latestLocation && latestLocation.battery !== null && latestLocation.battery !== undefined
       ? parseFloat(latestLocation.battery)
+      : null;
+    // Clamp prevBattery to 0-100 range for consistent comparison
+    const prevBattery = (prevBatteryRaw !== null && !isNaN(prevBatteryRaw))
+      ? Math.min(100, Math.max(0, prevBatteryRaw))
       : null;
     const prevFlag = latestLocation && latestLocation.is_charging !== undefined ? latestLocation.is_charging : null;
 
@@ -403,8 +433,9 @@ async function processGpsMessage(message, originalMessage, socket, io) {
     }
 
     if (prevBattery !== null && !isNaN(prevBattery)) {
-      if (locationData.battery > prevBattery) return true;
-      if (locationData.battery < prevBattery) return false;
+      if (locationData.battery > prevBattery) return true;  // rising -> charging
+      if (locationData.battery < prevBattery) return false; // dropping -> not charging
+      // Same level: preserve previous charging state (handles edge cases: 100% while charging, 0% while not charging)
       return prevFlag !== null && prevFlag !== undefined ? !!prevFlag : flag;
     }
 
