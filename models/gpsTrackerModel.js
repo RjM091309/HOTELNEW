@@ -194,9 +194,9 @@ class GpsTrackerModel {
     return result.affectedRows > 0;
   }
 
-  // Update battery, satellite count, GSM signal, and location coordinates (for stationary devices or minor movements)
+  // Update battery, satellite count, GSM signal, location coordinates, and is_moving status (for stationary devices or minor movements)
   // This allows updating device status and position even when location hasn't changed significantly
-  static async updateDeviceStatus(deviceId, battery, satelliteCount, gsmSignal, newTimestamp, isCharging, latitude = null, longitude = null) {
+  static async updateDeviceStatus(deviceId, battery, satelliteCount, gsmSignal, newTimestamp, isCharging, latitude = null, longitude = null, isMoving = null) {
     // Get the latest location ID first
     const latestLocation = await this.getLatestLocation(deviceId);
     if (!latestLocation || !latestLocation.id) {
@@ -238,6 +238,12 @@ class GpsTrackerModel {
     if (gsmSignal !== null && gsmSignal !== undefined) {
       updates.push('gsm_signal = ?');
       values.push(parseInt(gsmSignal));
+    }
+    
+    // Update is_moving status if provided (important for standby detection)
+    if (isMoving !== null && isMoving !== undefined) {
+      updates.push('is_moving = ?');
+      values.push(!!isMoving ? 1 : 0);
     }
     
     if (updates.length === 0) {

@@ -251,6 +251,7 @@ class GpsTrackerController {
         // This catches exact duplicates even if distance calculation has issues
         if (shouldSave && roundedLatestLat === roundedNewLat && roundedLatestLng === roundedNewLng) {
           shouldSave = false;
+          distanceMeters = 0; // No movement
           console.log(`⏭️ Location not saved: Device ${locationData.deviceId} - exact same coordinates (${roundedNewLat}, ${roundedNewLng})`);
         } else if (shouldSave) {
           // Third check: Calculate distance using rounded coordinates
@@ -270,8 +271,34 @@ class GpsTrackerController {
           } else {
             console.log(`📍 Location changed: Device ${locationData.deviceId} moved ${distanceMeters.toFixed(2)}m (threshold: ${distanceThreshold}m), Speed: ${hasSpeed ? `${locationData.speed}km/h` : 'N/A'}`);
           }
+        } else if (latestLocation) {
+          // Calculate distance even if not saving (for isMoving calculation)
+          distanceMeters = calculateDistance(
+            roundedLatestLat,
+            roundedLatestLng,
+            roundedNewLat,
+            roundedNewLng
+          );
         }
       }
+      
+      // Calculate isMoving status before saving to database
+      // isMoving = true if: distance >= 30m AND speed > 0 AND speed >= 3 km/h
+      // This ensures consistent calculation stored in database
+      // Note: Calculate isMoving based on actual movement, not just whether we're saving
+      const hasSpeedForMoving = locationData.speed !== null && locationData.speed !== undefined && !isNaN(locationData.speed) && locationData.speed > 0;
+      const speedForMoving = hasSpeedForMoving ? parseFloat(locationData.speed) : 0;
+      const MOVEMENT_DISTANCE_METERS = parseFloat(process.env.GPS_MIN_DISTANCE_METERS || '30');
+      const MOVEMENT_MIN_SPEED_KPH = parseFloat(process.env.GPS_MIN_SPEED_KPH || '3');
+      
+      let isMoving = false;
+      if (hasSpeedForMoving && speedForMoving > 0 && distanceMeters >= MOVEMENT_DISTANCE_METERS) {
+        // Mark as moving if distance >= threshold AND speed >= threshold
+        isMoving = speedForMoving >= MOVEMENT_MIN_SPEED_KPH;
+      }
+      // If distance < threshold or speed < threshold, device is not moving (standby)
+      
+      locationData.isMoving = isMoving;
       
       // 🗄️ Time-based DB saving throttling
       // speed > 0: every 5-10 sec, speed = 0: every 30-60 sec
@@ -315,10 +342,11 @@ class GpsTrackerController {
       if (shouldSave) {
         savedLocation = await GpsTrackerModel.createLocation(locationData);
         deviceLastSaveTime.set(locationData.deviceId, now); // Track save time
-        console.log(`📍 GPS Location saved: Device ${deviceId} at (${lat.toFixed(6)}, ${lng.toFixed(6)}) - Battery: ${locationData.battery !== null ? locationData.battery : 'N/A'}%, Satellites: ${locationData.satelliteCount !== null ? locationData.satelliteCount : 'N/A'}, GSM: ${locationData.gsmSignal !== null ? locationData.gsmSignal : 'N/A'}`);
+        console.log(`📍 GPS Location saved: Device ${deviceId} at (${lat.toFixed(6)}, ${lng.toFixed(6)}) - Battery: ${locationData.battery !== null ? locationData.battery : 'N/A'}%, Satellites: ${locationData.satelliteCount !== null ? locationData.satelliteCount : 'N/A'}, GSM: ${locationData.gsmSignal !== null ? locationData.gsmSignal : 'N/A'}, Moving: ${isMoving ? 'Yes' : 'No'}`);
       } else {
         console.log(`⏭️ GPS Location received (not saved - no movement): Device ${deviceId} at (${lat}, ${lng})`);
         // Update device status (battery, coordinates, etc.) even when not saving new location
+        // IMPORTANT: Also update is_moving to false (standby) when device is not moving
         try {
           await GpsTrackerModel.updateDeviceStatus(
             locationData.deviceId, 
@@ -328,10 +356,11 @@ class GpsTrackerController {
             locationData.timestamp,
             locationData.isCharging,
             locationData.latitude,
-            locationData.longitude
+            locationData.longitude,
+            isMoving // Pass isMoving=false to update database status to standby
           );
           
-          console.log(`⏭️ GPS Location received (not saved - no movement): Device ${deviceId} at (${lat.toFixed(6)}, ${lng.toFixed(6)}) - Updated: Battery=${locationData.battery !== null && locationData.battery !== undefined ? locationData.battery : 'N/A'}%, Satellites=${locationData.satelliteCount !== null && locationData.satelliteCount !== undefined ? locationData.satelliteCount : 'N/A'}, GSM=${locationData.gsmSignal !== null && locationData.gsmSignal !== undefined ? locationData.gsmSignal : 'N/A'}, Charging=${locationData.isCharging ? 'Yes' : 'No'}`);
+          console.log(`⏭️ GPS Location received (not saved - no movement): Device ${deviceId} at (${lat.toFixed(6)}, ${lng.toFixed(6)}) - Updated: Battery=${locationData.battery !== null && locationData.battery !== undefined ? locationData.battery : 'N/A'}%, Satellites=${locationData.satelliteCount !== null && locationData.satelliteCount !== undefined ? locationData.satelliteCount : 'N/A'}, GSM=${locationData.gsmSignal !== null && locationData.gsmSignal !== undefined ? locationData.gsmSignal : 'N/A'}, Charging=${locationData.isCharging ? 'Yes' : 'No'}, Status=${isMoving ? 'In Transit' : 'Standby'}`);
         } catch (error) {
           console.error(`⚠️ Error updating device status for device ${deviceId}:`, error);
         }

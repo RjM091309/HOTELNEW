@@ -521,6 +521,7 @@ async function processGpsMessage(message, originalMessage, socket, io) {
       console.log(`📍 GPS Location saved: Device ${locationData.deviceId} at (${lat.toFixed(6)}, ${lng.toFixed(6)}) - Battery: ${locationData.battery !== null ? locationData.battery : 'N/A'}%, Satellites: ${locationData.satelliteCount !== null ? locationData.satelliteCount : 'N/A'}, GSM: ${locationData.gsmSignal !== null ? locationData.gsmSignal : 'N/A'}, Moving: ${isMoving ? 'Yes' : 'No'}`);
     } else {
       // Update device status (battery, coordinates, etc.) even when not saving new location
+      // IMPORTANT: Also update is_moving to false (standby) when device is not moving
       try {
         await GpsTrackerModel.updateDeviceStatus(
           locationData.deviceId, 
@@ -530,10 +531,11 @@ async function processGpsMessage(message, originalMessage, socket, io) {
           locationData.timestamp,
           locationData.isCharging,
           locationData.latitude,
-          locationData.longitude
+          locationData.longitude,
+          isMoving // Pass isMoving=false to update database status to standby
         );
         
-        console.log(`⏭️ GPS Location received (not saved - no movement): Device ${locationData.deviceId} at (${lat.toFixed(6)}, ${lng.toFixed(6)}) - Updated: Battery=${locationData.battery !== null && locationData.battery !== undefined ? locationData.battery : 'N/A'}%, Satellites=${locationData.satelliteCount !== null && locationData.satelliteCount !== undefined ? locationData.satelliteCount : 'N/A'}, GSM=${locationData.gsmSignal !== null && locationData.gsmSignal !== undefined ? locationData.gsmSignal : 'N/A'}, Charging=${locationData.isCharging ? 'Yes' : 'No'}`);
+        console.log(`⏭️ GPS Location received (not saved - no movement): Device ${locationData.deviceId} at (${lat.toFixed(6)}, ${lng.toFixed(6)}) - Updated: Battery=${locationData.battery !== null && locationData.battery !== undefined ? locationData.battery : 'N/A'}%, Satellites=${locationData.satelliteCount !== null && locationData.satelliteCount !== undefined ? locationData.satelliteCount : 'N/A'}, GSM=${locationData.gsmSignal !== null && locationData.gsmSignal !== undefined ? locationData.gsmSignal : 'N/A'}, Charging=${locationData.isCharging ? 'Yes' : 'No'}, Status=${isMoving ? 'In Transit' : 'Standby'}`);
       } catch (error) {
         console.error(`⚠️ Error updating device status for device ${locationData.deviceId}:`, error);
       }
