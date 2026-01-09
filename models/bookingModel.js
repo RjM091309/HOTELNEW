@@ -6890,7 +6890,7 @@ class BookingModel {
 
   // Cancel group booking
   static async cancelGroupBooking(params) {
-    const { groupId, reason, manual, manualRefund, encodedBy } = params;
+    const { groupId, reason, manual, manualRefund, encodedBy, bookingIds } = params;
     
     try {
       // Get connection from pool for transaction
@@ -6917,8 +6917,16 @@ class BookingModel {
           throw new Error('Group booking not found.');
         }
 
-        // Check if any bookings are already checked in or checked out
-        const activeBookings = groupRows.filter(row => 
+        const selectedIds = Array.isArray(bookingIds) ? bookingIds : [];
+        const selectedRows = groupRows.filter(row => row.BOOKING_ID && selectedIds.includes(row.BOOKING_ID));
+
+        if (!selectedRows.length) {
+          connection.release();
+          throw new Error('Selected bookings not found.');
+        }
+
+        // Only evaluate the selected bookings for active/check-in/out restrictions
+        const activeBookings = selectedRows.filter(row => 
           row.BOOKING_STATUS && 
           (row.BOOKING_STATUS.toLowerCase() === 'check-in' || 
            row.BOOKING_STATUS.toLowerCase() === 'check-out')
@@ -6926,7 +6934,14 @@ class BookingModel {
 
         if (activeBookings.length > 0) {
           connection.release();
-          throw new Error('Group has active bookings.');
+          throw new Error('Selected bookings have active check-ins.');
+        }
+
+        // Ensure all selected bookings are pending
+        const nonPending = selectedRows.filter(row => !row.BOOKING_STATUS || row.BOOKING_STATUS.toLowerCase() !== 'pending');
+        if (nonPending.length > 0) {
+          connection.release();
+          throw new Error('Only pending bookings can be cancelled.');
         }
 
         // Start transaction
@@ -6940,9 +6955,24 @@ class BookingModel {
         const now = new Date();
         let totalRefundAmount = 0;
         let totalPenaltyAmount = 0;
+        let totalSelectedAmount = 0;
+
+        // First pass: get total amounts per selected booking for proportional manual refund
+        const bookingAmountMap = new Map();
+        for (const booking of selectedRows) {
+          const billingQuery = `
+            SELECT SUM(ROOM_CHARGE * QTY) AS TOTAL_AMOUNT 
+            FROM billing 
+            WHERE BOOKING_ID = ?
+          `;
+          const billRows = await queryDatabasePromise(billingQuery, [booking.BOOKING_ID], connection);
+          const totalAmount = billRows[0] && billRows[0].TOTAL_AMOUNT ? billRows[0].TOTAL_AMOUNT : 0;
+          bookingAmountMap.set(booking.BOOKING_ID, totalAmount);
+          totalSelectedAmount += totalAmount;
+        }
 
         // Process each individual booking in the group
-        for (const booking of groupRows) {
+        for (const booking of selectedRows) {
           if (!booking.BOOKING_ID) continue; // Skip if no individual booking
 
           const { CHECK_IN_DATE, CHECK_OUT_DATE } = booking;
@@ -6959,92 +6989,74 @@ class BookingModel {
           else if (dayDiff >= 10) penaltyNights = 2;
           else if (dayDiff < 5) penaltyNights = totalNights;
 
-          // Fetch billing details for this booking
-          const billingQuery = `
-            SELECT ROOM_CHARGE * QTY AS TOTAL_AMOUNT 
-            FROM billing 
+          const totalAmount = bookingAmountMap.get(booking.BOOKING_ID) || 0;
+          const nightlyRate = totalNights > 0 ? totalAmount / totalNights : 0;
+          const penaltyAmount = nightlyRate * penaltyNights;
+
+          // Calculate refund amount for this booking
+          let refundAmount = 0;
+          if (manual === 'true' || manual === true) {
+            const proportion = totalSelectedAmount > 0 ? (totalAmount / totalSelectedAmount) : 0;
+            refundAmount = parseFloat(manualRefund) * proportion || 0;
+          } else {
+            refundAmount = totalAmount - penaltyAmount;
+          }
+
+          totalRefundAmount += refundAmount;
+          totalPenaltyAmount += penaltyAmount;
+
+          // Update individual booking
+          const updateBookingQuery = `
+            UPDATE booking
+            SET IS_CANCELLED = 1,
+                CANCELLED_AT = ?,
+                PENALTY_NIGHTS = ?,
+                BOOKING_STATUS = 'cancelled'
+            WHERE IDNo = ?
+          `;
+          await queryDatabasePromise(updateBookingQuery, [now, penaltyNights, booking.BOOKING_ID], connection);
+
+          // Update billing for this booking - set payment status to 'cancelled' for cancelled bookings
+          const updateBillingQuery = `
+            UPDATE billing
+            SET CANCELLATION_PENALTY = ?,
+                REFUNDABLE_AMOUNT = ?,
+                PAYMENT_STATUS = 'cancelled'
             WHERE BOOKING_ID = ?
           `;
-          const billRows = await queryDatabasePromise(billingQuery, [booking.BOOKING_ID], connection);
+          await queryDatabasePromise(updateBillingQuery, [penaltyAmount, refundAmount, booking.BOOKING_ID], connection);
 
-          if (billRows.length > 0) {
-            const totalAmount = billRows[0].TOTAL_AMOUNT;
-            const nightlyRate = totalNights > 0 ? totalAmount / totalNights : 0;
-            const penaltyAmount = nightlyRate * penaltyNights;
+          // Update booking_service status to 'cancelled' for all services
+          const updateServicesQuery = `
+            UPDATE booking_service
+            SET STATUS = 'cancelled'
+            WHERE BOOKING_ID = ? AND ACTIVE = 1
+          `;
+          await queryDatabasePromise(updateServicesQuery, [booking.BOOKING_ID], connection);
 
-            // Calculate refund amount for this booking
-            let refundAmount = 0;
-            if (manual === 'true' || manual === true) {
-              // For manual override, distribute the manual refund proportionally
-              const bookingProportion = totalAmount / groupRows.reduce((sum, b) => {
-                if (b.BOOKING_ID) {
-                  const billQuery = `SELECT ROOM_CHARGE * QTY AS AMOUNT FROM billing WHERE BOOKING_ID = ?`;
-                  // This is simplified - in real implementation, you'd need to fetch all amounts first
-                  return sum + totalAmount; // Placeholder
-                }
-                return sum;
-              }, 0);
-              refundAmount = parseFloat(manualRefund) * bookingProportion || 0;
-            } else {
-              refundAmount = totalAmount - penaltyAmount;
-            }
+          // Update booking_extension payment status to 'cancelled' for all extensions
+          const updateExtensionsQuery = `
+            UPDATE booking_extension
+            SET PAYMENT_STATUS = 'cancelled'
+            WHERE BOOKING_ID = ? AND ACTIVE = 1
+          `;
+          await queryDatabasePromise(updateExtensionsQuery, [booking.BOOKING_ID], connection);
 
-            totalRefundAmount += refundAmount;
-            totalPenaltyAmount += penaltyAmount;
-
-            // Update individual booking
-            const updateBookingQuery = `
-              UPDATE booking
-              SET IS_CANCELLED = 1,
-                  CANCELLED_AT = ?,
-                  PENALTY_NIGHTS = ?,
-                  BOOKING_STATUS = 'cancelled'
-              WHERE IDNo = ?
-            `;
-            await queryDatabasePromise(updateBookingQuery, [now, penaltyNights, booking.BOOKING_ID], connection);
-
-            // Update billing for this booking - set payment status to 'cancelled' for cancelled bookings
-            const updateBillingQuery = `
-              UPDATE billing
-              SET CANCELLATION_PENALTY = ?,
-                  REFUNDABLE_AMOUNT = ?,
-                  PAYMENT_STATUS = 'cancelled'
-              WHERE BOOKING_ID = ?
-            `;
-            await queryDatabasePromise(updateBillingQuery, [penaltyAmount, refundAmount, booking.BOOKING_ID], connection);
-
-            // Update booking_service status to 'cancelled' for all services
-            const updateServicesQuery = `
-              UPDATE booking_service
-              SET STATUS = 'cancelled'
-              WHERE BOOKING_ID = ? AND ACTIVE = 1
-            `;
-            await queryDatabasePromise(updateServicesQuery, [booking.BOOKING_ID], connection);
-
-            // Update booking_extension payment status to 'cancelled' for all extensions
-            const updateExtensionsQuery = `
-              UPDATE booking_extension
-              SET PAYMENT_STATUS = 'cancelled'
-              WHERE BOOKING_ID = ? AND ACTIVE = 1
-            `;
-            await queryDatabasePromise(updateExtensionsQuery, [booking.BOOKING_ID], connection);
-
-            // Insert cancellation log for this booking
-            const insertLogQuery = `
-              INSERT INTO booking_cancellation
-              (BOOKING_ID, CANCELLATION_REASON, PENALTY_NIGHTS, REFUND_AMOUNT, FULL_PENALTY, ENCODED_BY)
-              VALUES (?, ?, ?, ?, ?, ?)
-            `;
-            const fullPenalty = penaltyNights >= totalNights ? 1 : 0;
-            await queryDatabasePromise(insertLogQuery, [
-              booking.BOOKING_ID, 
-              reason || '', 
-              penaltyNights, 
-              refundAmount, 
-              fullPenalty, 
-              encodedBy
-            ], connection);
-          }
+          // Insert cancellation log for this booking
+          const insertLogQuery = `
+            INSERT INTO booking_cancellation
+            (BOOKING_ID, CANCELLATION_REASON, PENALTY_NIGHTS, REFUND_AMOUNT, FULL_PENALTY, ENCODED_BY)
+            VALUES (?, ?, ?, ?, ?, ?)
+          `;
+          const fullPenalty = penaltyNights >= totalNights ? 1 : 0;
+          await queryDatabasePromise(insertLogQuery, [
+            booking.BOOKING_ID, 
+            reason || '', 
+            penaltyNights, 
+            refundAmount, 
+            fullPenalty, 
+            encodedBy
+          ], connection);
         }
 
         // No need to update group_booking table since there's no STATUS column

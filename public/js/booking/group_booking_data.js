@@ -165,13 +165,14 @@ $(document).ready(function () {
                     const hasAny = (row.RemarksCount && row.RemarksCount > 0) || (row.Remarks && String(row.Remarks).trim() !== '');
                     const baseRemarksColor = hasAny ? 'rgba(39, 164, 176, 0.3)' : 'rgba(149, 165, 166, 0.28)';
 
-                    // Check if group booking can be cancelled (all bookings are pending)
-                    // Since group status is determined by individual booking statuses
-                    const canCancel = row.Status === 'ALL PENDING';
-                    const isCancelled = row.Status && row.Status.includes('CANCELLED');
+                    // Allow cancel unless everything is already cancelled
+                    const normalizedStatus = (row.Status || '').toUpperCase();
+                    const isAllCancelled = normalizedStatus.includes('ALL CANCELLED');
+                    const canCancel = !isAllCancelled;
+                    const isCancelled = isAllCancelled;
 
                     // Disable "Join Group" when group is checked-out or cancelled
-                    const isAllCheckout = row.Status && row.Status.includes('CHECK-OUT');
+                    const isAllCheckout = normalizedStatus.includes('CHECK-OUT');
                     const disableJoin = isAllCheckout || isCancelled;
                     
                     let cancelButton = '';
@@ -1741,12 +1742,18 @@ function displayIndividualBookingDates(bookingsWithDifferentDates) {
 
 // OPEN GROUP CANCEL BOOKING MODAL
 function openGroupCancelBookingModal(groupId) {
-    // Set the group ID and show the cancel modal
+    // Reset form
     $('#cancelGroupBookingId').val(groupId);
     $('#groupCancelReason').val('');
     $('#groupManualRefund').val('');
     $('#groupManualOverrideToggle').prop('checked', false);
     $('#groupManualFields').hide();
+    $('#groupCancelSelectAll').prop('checked', false);
+
+    // Load bookings to cancel (none pre-checked)
+    if (typeof loadGroupCancelList === 'function') {
+        loadGroupCancelList(groupId);
+    }
     
     $('#modal-cancel-group-booking').modal('show');
 }

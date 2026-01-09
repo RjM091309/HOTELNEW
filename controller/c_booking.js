@@ -1990,12 +1990,20 @@ class BookingController {
   static async cancelGroupBooking(req, res) {
     try {
       const { groupId, reason, manual, manualRefund } = req.body;
+      let bookingIds = [];
+      if (Array.isArray(req.body.bookingIds)) {
+        bookingIds = req.body.bookingIds;
+      } else if (req.body.bookingIds) {
+        bookingIds = [req.body.bookingIds];
+      }
+      bookingIds = bookingIds.map(id => parseInt(id, 10)).filter(id => !Number.isNaN(id));
+
       const encodedBy = req.user.userId;
 
-      if (!groupId || !encodedBy) {
+      if (!groupId || !encodedBy || !bookingIds.length) {
         return res.status(400).json({ 
           success: false, 
-          message: 'Missing group ID or user session.' 
+          message: 'Missing group ID, selected bookings, or user session.' 
         });
       }
 
@@ -2004,12 +2012,13 @@ class BookingController {
         reason, 
         manual, 
         manualRefund, 
-        encodedBy 
+        encodedBy,
+        bookingIds
       });
 
       res.json({ 
         success: true, 
-        message: 'Group booking cancelled successfully.' 
+        message: 'Selected bookings cancelled successfully.' 
       });
 
     } catch (error) {
