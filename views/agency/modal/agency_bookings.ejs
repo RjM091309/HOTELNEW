@@ -16,10 +16,93 @@
         <div class="mb-2">
           <strong id="agency-bookings-agency-name"></strong>
         </div>
+
+        <!-- Bulk payment card (styled similar to booking payment) -->
+        <div class="bulk-payment-card mb-3" id="agency-bulk-controls">
+          <div class="bulk-summary">
+            <h6 class="d-flex align-items-center gap-2 mb-3">
+              <i class="fa fa-receipt text-primary"></i> Bulk Payment Summary
+            </h6>
+            <div class="summary-grid">
+              <div class="summary-item">
+                <div class="summary-label">Total Unpaid</div>
+                <div class="summary-value text-primary" id="agency-bulk-total-unpaid">0.00</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Selected Count</div>
+                <div class="summary-value" id="agency-bulk-selected-count">0</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Selected Unpaid</div>
+                <div class="summary-value text-warning" id="agency-bulk-selected-unpaid">0.00</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="divider my-3"></div>
+
+          <div class="row g-3 align-items-start">
+            <div class="col-lg-4 col-md-6 col-sm-12">
+              <label class="form-label fw-semibold">Amount to Pay</label>
+              <div class="input-group">
+                <input type="number" step="1" min="0" class="form-control" id="agency-bulk-amount" placeholder="0">
+              </div>
+              <small class="text-muted">Defaults to selected unpaid total.</small>
+            </div>
+
+            <div class="col-lg-5 col-md-6 col-sm-12">
+              <label class="form-label fw-semibold">Payment Method</label>
+              <div class="d-flex gap-2 flex-wrap" id="agency-bulk-method-group">
+                <div class="pay-option" data-method="cash">
+                  <div class="option-icon"><i class="fa fa-money"></i></div>
+                  <div class="option-body">
+                    <div class="option-title">Cash</div>
+                    <div class="option-desc">Pay with cash</div>
+                  </div>
+                  <div class="option-radio">
+                    <input type="radio" name="agencyBulkMethod" id="agency-bulk-method-cash" value="cash">
+                    <label for="agency-bulk-method-cash"></label>
+                  </div>
+                </div>
+                <div class="pay-option" data-method="card">
+                  <div class="option-icon"><i class="fa fa-credit-card"></i></div>
+                  <div class="option-body">
+                    <div class="option-title">Credit Card</div>
+                    <div class="option-desc">Visa, Mastercard, etc.</div>
+                  </div>
+                  <div class="option-radio">
+                    <input type="radio" name="agencyBulkMethod" id="agency-bulk-method-card" value="card">
+                    <label for="agency-bulk-method-card"></label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-lg-3 col-md-12 col-sm-12">
+              <label class="form-label fw-semibold">Payment Notes (Optional)</label>
+              <textarea class="form-control" id="agency-bulk-remarks" rows="2" placeholder="Add notes..."></textarea>
+            </div>
+          </div>
+
+          <div class="d-flex flex-wrap justify-content-end gap-2 mt-3">
+            <button class="btn btn-primary btn-sm" id="agency-bulk-pay-selected">Pay selected</button>
+            <button class="btn btn-success btn-sm" id="agency-bulk-pay-all">Pay all unpaid</button>
+          </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 mb-2 flex-wrap" id="agency-status-tabs-container">
+          <div class="tab-bar">
+            <a class="tab-item is-active agency-status-tab" data-status="all" href="javascript:void(0)">All</a>
+            <a class="tab-item agency-status-tab" data-status="paid" href="javascript:void(0)">Paid</a>
+            <a class="tab-item agency-status-tab" data-status="unpaid" href="javascript:void(0)">Unpaid</a>
+          </div>
+        </div>
+
         <div class="table-responsive">
           <table class="table table-bordered" id="agency-bookings-table">
             <thead>
               <tr>
+                <th><input type="checkbox" id="agency-bulk-check-all"></th>
                 <th>#</th>
                 <th>Guest</th>
                 <th>Room</th>
@@ -44,4 +127,150 @@
     </div>
   </div>
 </div>
+
+<style>
+#agency-bookings-modal .bulk-payment-card {
+  background: #484b50;
+  border-radius: 12px;
+  border: 1px solid #e0e6ed;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+  padding: 18px 20px;
+}
+#agency-bookings-modal .summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+#agency-bookings-modal .summary-item {
+  background: #f8f9fa;
+  border-radius: 10px;
+  border: 1px solid #e9ecef;
+  padding: 10px 12px;
+}
+#agency-bookings-modal .summary-label {
+  font-size: 0.85rem;
+  color: #6c757d;
+}
+#agency-bookings-modal .summary-value {
+  font-weight: 700;
+  font-size: 1rem;
+}
+#agency-bookings-modal .divider {
+  height: 1px;
+  background: #e9ecef;
+}
+#agency-bookings-modal .pay-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 2px solid #e9ecef;
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  min-width: 200px;
+  position: relative;
+  transition: all 0.2s ease;
+  background: #fff;
+  flex: 1 1 200px;
+}
+#agency-bookings-modal .pay-option:hover {
+  border-color: #0d6efd;
+  box-shadow: 0 4px 12px rgba(13,110,253,0.15);
+}
+#agency-bookings-modal .pay-option .option-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0d6efd, #0b5ed7);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#agency-bookings-modal .pay-option .option-title {
+  font-weight: 600;
+  color: #212529;
+  font-size: 0.95rem;
+}
+#agency-bookings-modal .pay-option .option-desc {
+  font-size: 0.9rem;
+  color: #6c757d;
+}
+#agency-bookings-modal .pay-option input[type="radio"] {
+  opacity: 0;
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+#agency-bookings-modal .pay-option .option-radio label {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #ced4da;
+  border-radius: 50%;
+  display: block;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+#agency-bookings-modal .pay-option input[type="radio"]:checked + label {
+  border-color: #0d6efd;
+  background: #0d6efd;
+}
+#agency-bookings-modal .pay-option input[type="radio"]:checked + label::after {
+  display: none;
+}
+#agency-bookings-modal .pay-option.active {
+  border-color: #0d6efd;
+  background: rgba(13,110,253,0.05);
+}
+#agency-bookings-modal .tab-bar {
+  display: inline-flex;
+  gap: 6px;
+}
+#agency-bookings-modal .tab-item {
+  padding: 6px 12px;
+  border: 1px solid #3B3B3B;
+  border-radius: 6px;
+  color: #e0e0e0;
+  text-decoration: none;
+  font-size: 0.9rem;
+  background: #2a3135;
+  transition: all 0.2s ease;
+}
+#agency-bookings-modal .tab-item:hover {
+  border-color: #0c2a42;
+  color: #ffffff;
+  background: #0c2a42;
+}
+#agency-bookings-modal .tab-item.is-active {
+  background: #0c2a42;
+  color: #ffffff;
+  border-color: #0c2a42;
+}
+#agency-bookings-modal .table th:first-child,
+#agency-bookings-modal .table td:first-child {
+  width: 4px;
+  text-align: center;
+}
+#agency-bookings-modal .table td:first-child input[type="checkbox"],
+#agency-bookings-modal .table th:first-child input[type="checkbox"] {
+  width: 12px;
+  height: 12px;
+  cursor: pointer;
+  accent-color: #0d6efd;
+  appearance: auto;
+  -webkit-appearance: checkbox;
+  -moz-appearance: checkbox;
+}
+#agency-bookings-modal input,
+#agency-bookings-modal select,
+#agency-bookings-modal textarea {
+  color: #000 !important;
+  background-color: #fff !important;
+}
+#agency-bookings-modal input::placeholder,
+#agency-bookings-modal textarea::placeholder {
+  color: #666 !important;
+}
+</style>
 

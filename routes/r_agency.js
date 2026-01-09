@@ -26,5 +26,11 @@ router.post('/edit_agency/:id', AgencyController.updateAgency);
 // Soft delete an agency
 router.delete('/delete/:id', AgencyController.deleteAgency);
 
+// Bulk payment receipt
+router.get('/:id/bulk-payment/receipt', AgencyController.downloadBulkPaymentReceipt);
+
+// Bulk payment across agency bookings
+router.post('/:id/bulk-payment', AgencyController.bulkPayment);
+
 module.exports = router;
 

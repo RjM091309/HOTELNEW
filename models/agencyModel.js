@@ -1,4 +1,4 @@
-const { queryDatabasePromise } = require('../config/database');
+const { queryDatabasePromise, pool } = require('../config/database');
 
 class AgencyModel {
   // Get all active agencies with booking counts
@@ -321,6 +321,208 @@ class AgencyModel {
       console.error('Error in getAgencyVoucherData:', error);
       throw error;
     }
+  }
+
+  // Bulk pay multiple bookings for an agency in one transaction
+  static async bulkPay({ agencyId, bookingIds = [], amount, paymentMethod, remarks, encodedBy }) {
+    const conn = await pool.promise().getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const reference = `AGYBP-${Date.now()}-${agencyId}`;
+      const paymentType = 'room'; // use allowed payment type to ensure column is populated
+
+      // Validate agency
+      const [agencyRows] = await conn.query(
+        'SELECT IDNo FROM agency WHERE IDNo = ? AND ACTIVE = 1 LIMIT 1',
+        [agencyId]
+      );
+      if (agencyRows.length === 0) {
+        throw new Error('Agency not found or inactive.');
+      }
+
+      // Build booking filter
+      let bookingFilterSql = '';
+      const params = [agencyId];
+      if (bookingIds && bookingIds.length > 0) {
+        bookingFilterSql = ' AND b.IDNo IN (?)';
+        params.push(bookingIds);
+      }
+
+      // Fetch unpaid bookings with balances
+      const [rows] = await conn.query(
+        `
+        SELECT
+          b.IDNo AS bookingId,
+          bill.IDNo AS billingId,
+          COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) AS roomTotal,
+          COALESCE(svc.total_services, 0) AS servicesTotal,
+          COALESCE(ext.total_extensions, 0) AS extensionsTotal,
+          COALESCE(bill.CANCELLATION_PENALTY, 0) AS penalty,
+          COALESCE(bill.RESERVATION_FEE, 0) AS reservationFee,
+          COALESCE(bill.DISCOUNT_AMOUNT, 0) AS discountAmount,
+          COALESCE(pay.total_paid, 0) AS totalPaid
+        FROM booking b
+        JOIN billing bill ON bill.BOOKING_ID = b.IDNo AND bill.ACTIVE = 1
+        LEFT JOIN (
+          SELECT BOOKING_ID, SUM(TOTAL_COST) AS total_services
+          FROM booking_service
+          WHERE ACTIVE = 1
+          GROUP BY BOOKING_ID
+        ) svc ON svc.BOOKING_ID = b.IDNo
+        LEFT JOIN (
+          SELECT BOOKING_ID, SUM(QTY * COST) AS total_extensions
+          FROM booking_extension
+          WHERE ACTIVE = 1
+          GROUP BY BOOKING_ID
+        ) ext ON ext.BOOKING_ID = b.IDNo
+        LEFT JOIN (
+          SELECT BOOKING_ID, SUM(CASE WHEN PAYMENT_TYPE NOT IN ('reservation_fee','discount') THEN AMOUNT_PAID ELSE 0 END) AS total_paid
+          FROM payments
+          GROUP BY BOOKING_ID
+        ) pay ON pay.BOOKING_ID = b.IDNo
+        WHERE b.ACTIVE = 1
+          AND b.AGENCY_ID = ?
+          ${bookingFilterSql}
+        ORDER BY b.CHECK_IN_DATE ASC, b.IDNo ASC
+        `,
+        params
+      );
+
+      // Compute balances and filter unpaid
+      const bookings = rows
+        .map((row) => {
+          const totalAmount =
+            (parseFloat(row.roomTotal) || 0) +
+            (parseFloat(row.servicesTotal) || 0) +
+            (parseFloat(row.extensionsTotal) || 0) +
+            (parseFloat(row.penalty) || 0) -
+            (parseFloat(row.reservationFee) || 0) -
+            (parseFloat(row.discountAmount) || 0);
+          const totalPaid = parseFloat(row.totalPaid) || 0;
+          const balance = Math.max(0, totalAmount - totalPaid);
+          return {
+            bookingId: row.bookingId,
+            billingId: row.billingId,
+            totalAmount,
+            totalPaid,
+            balance
+          };
+        })
+        .filter((b) => b.balance > 0);
+
+      if (bookings.length === 0) {
+        throw new Error('No unpaid bookings found for this agency.');
+      }
+
+      const totalBalance = bookings.reduce((s, b) => s + b.balance, 0);
+      const amountToAllocate = Math.min(amount, totalBalance);
+      let remaining = amountToAllocate;
+
+      const summaries = [];
+
+      for (const booking of bookings) {
+        if (remaining <= 0) break;
+        const applyAmount = Math.min(booking.balance, remaining);
+        if (applyAmount <= 0) continue;
+
+        // Insert payment entry
+        await conn.query(
+          `INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
+           VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)`,
+          [booking.bookingId, booking.billingId, applyAmount, paymentMethod, paymentType, encodedBy, remarks]
+        );
+
+        const newPaid = booking.totalPaid + applyAmount;
+        const newBalance = Math.max(0, booking.totalAmount - newPaid);
+        const newStatus = newBalance <= 0 ? 'paid' : newPaid > 0 ? 'partial' : 'unpaid';
+
+        // Update billing payment status
+        await conn.query(
+          'UPDATE billing SET PAYMENT_STATUS = ? WHERE IDNo = ?',
+          [newStatus, booking.billingId]
+        );
+
+        // If fully paid, mark services and extensions as paid
+        if (newBalance <= 0) {
+          await conn.query(
+            'UPDATE booking_service SET STATUS = \'paid\' WHERE BOOKING_ID = ? AND ACTIVE = 1 AND STATUS != \'paid\'',
+            [booking.bookingId]
+          );
+          await conn.query(
+            'UPDATE booking_extension SET PAYMENT_STATUS = \'paid\' WHERE BOOKING_ID = ? AND ACTIVE = 1 AND PAYMENT_STATUS != \'paid\'',
+            [booking.bookingId]
+          );
+        }
+
+        summaries.push({
+          bookingId: booking.bookingId,
+          applied: applyAmount,
+          previousBalance: booking.balance,
+          remainingBalance: newBalance,
+          paymentStatus: newStatus
+        });
+
+        remaining -= applyAmount;
+      }
+
+      await conn.commit();
+
+      return {
+        appliedTotal: amountToAllocate - remaining,
+        unallocatedAmount: remaining,
+        bookings: summaries,
+        reference,
+        paymentMethod,
+        remarks
+      };
+    } catch (err) {
+      try { await conn.rollback(); } catch (e) { /* ignore rollback errors */ }
+      throw err;
+    } finally {
+      conn.release();
+    }
+  }
+
+  // Data for bulk payment receipt
+  static async getBulkPaymentReceiptData(agencyId, bookingIds = []) {
+    if (!bookingIds.length) return [];
+    const [rows] = await pool.promise().query(
+      `
+      SELECT
+        b.IDNo AS bookingId,
+        b.BOOKING_STATUS,
+        b.BOOKING_CHANNEL,
+        b.ENCODED_DT AS BOOKING_DATE,
+        b.CONFIRMATION_NUMBER,
+        c.NAME AS guestName,
+        r.ROOM_NUMBER,
+        a.NAME AS AGENCY_NAME,
+        bill.PAYMENT_STATUS,
+        COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) AS roomTotal,
+        COALESCE(bill.DISCOUNT_AMOUNT, 0) AS discountAmount,
+        COALESCE(bill.RESERVATION_FEE, 0) AS reservationFee,
+        COALESCE((
+          SELECT SUM(AMOUNT_PAID) FROM payments p
+          WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE != 'discount'
+        ), 0) AS totalPaid,
+        COALESCE((
+          SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1
+        ), 0) AS servicesTotal,
+        COALESCE((
+          SELECT SUM(be.QTY * be.COST) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1
+        ), 0) AS extensionsTotal,
+        COALESCE(bill.CANCELLATION_PENALTY, 0) AS penalty
+      FROM booking b
+      INNER JOIN agency a ON a.IDNo = b.AGENCY_ID
+      LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
+      LEFT JOIN room r ON r.IDNo = b.ROOM_ID
+      LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
+      WHERE b.AGENCY_ID = ? AND b.IDNo IN (?)
+      `,
+      [agencyId, bookingIds]
+    );
+    return rows;
   }
 }
 

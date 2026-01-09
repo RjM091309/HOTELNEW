@@ -1,4 +1,8 @@
 const AgencyModel = require('../models/agencyModel');
+const { chromium } = require('playwright');
+const path = require('path');
+const ejs = require('ejs');
+const fs = require('fs').promises;
 
 class AgencyController {
   // Render agency management page
@@ -187,6 +191,128 @@ class AgencyController {
         success: false,
         message: 'Error deleting agency' 
       });
+    }
+  }
+
+  // Bulk payment for an agency across multiple bookings
+  static async bulkPayment(req, res) {
+    try {
+      const agencyId = req.params.id;
+      const { bookingIds = [], amount, paymentMethod, remarks = '' } = req.body;
+      const encodedBy = req.user ? req.user.userId : null;
+
+      const parsedAmount = parseFloat(amount);
+      if (!agencyId) {
+        return res.status(400).json({ success: false, message: 'Agency ID is required.' });
+      }
+      if (!paymentMethod || !paymentMethod.trim()) {
+        return res.status(400).json({ success: false, message: 'Payment method is required.' });
+      }
+      if (!parsedAmount || parsedAmount <= 0) {
+        return res.status(400).json({ success: false, message: 'Amount must be greater than zero.' });
+      }
+
+      // Normalize bookingIds to an integer array (optional input)
+      let bookingIdList = [];
+      if (Array.isArray(bookingIds)) {
+        bookingIdList = bookingIds
+          .map((id) => parseInt(id, 10))
+          .filter((id) => Number.isInteger(id) && id > 0);
+      }
+
+      const result = await AgencyModel.bulkPay({
+        agencyId: parseInt(agencyId, 10),
+        bookingIds: bookingIdList,
+        amount: parsedAmount,
+        paymentMethod: paymentMethod.trim(),
+        remarks: remarks || '',
+        encodedBy
+      });
+
+      res.json({
+        success: true,
+        appliedTotal: result.appliedTotal,
+        unallocatedAmount: result.unallocatedAmount,
+        bookings: result.bookings,
+        reference: result.reference
+      });
+    } catch (error) {
+      console.error('Error processing agency bulk payment:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error processing agency bulk payment.'
+      });
+    }
+  }
+
+  // Download bulk payment receipt (PDF)
+  static async downloadBulkPaymentReceipt(req, res) {
+    try {
+      const agencyId = req.params.id;
+      const bookingIdsParam = req.query.bookingIds || '';
+      const reference = req.query.reference || '';
+      const method = req.query.method || '';
+      const remarks = req.query.remarks || '';
+      const totalPaid = req.query.total || 0;
+      const processedBy = req.user?.FULLNAME || 'N/A';
+
+      const bookingIds = bookingIdsParam
+        .split(',')
+        .map(id => parseInt(id, 10))
+        .filter(n => Number.isInteger(n) && n > 0);
+
+      if (!bookingIds.length) {
+        return res.status(400).json({ success: false, message: 'No bookingIds provided' });
+      }
+
+      const rows = await AgencyModel.getBulkPaymentReceiptData(agencyId, bookingIds);
+      const agencyName = rows?.[0]?.AGENCY_NAME || 'Agency';
+
+      // Attempt to load logo from public assets (optional)
+      let logoUrl = '';
+      try {
+        const logoPath = path.join(__dirname, '../public/img/Logo-Black.JPG');
+        const logoBuf = await fs.readFile(logoPath);
+        logoUrl = `data:image/jpeg;base64,${logoBuf.toString('base64')}`;
+      } catch (_) {
+        logoUrl = '';
+      }
+
+      const templatePath = path.join(__dirname, '../views/agency/pdf/bulk_payment_receipt.ejs');
+      const templateContent = await fs.readFile(templatePath, 'utf-8');
+
+      const templateData = {
+        agencyName,
+        reference,
+        method,
+        remarks,
+        totalPaid,
+        bookings: rows,
+        generatedAt: new Date().toISOString(),
+        processedBy,
+        logoUrl
+      };
+
+      const html = ejs.render(templateContent, templateData);
+
+      const browser = await chromium.launch({ headless: true });
+      const page = await browser.newPage({ viewport: { width: 1200, height: 1600 } });
+      await page.setContent(html, { waitUntil: 'networkidle' });
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' }
+      });
+      await browser.close();
+
+      const filename = `bulk-payment-receipt-${reference || 'ref'}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      // Inline to allow viewing in new tab; frontend separately triggers a download.
+      res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('Error generating bulk payment receipt:', error);
+      res.status(500).json({ success: false, message: 'Error generating receipt' });
     }
   }
 

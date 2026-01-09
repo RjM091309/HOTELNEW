@@ -3,6 +3,7 @@
 // ========================================
 
 let currentAgencyId = null;
+let currentAgencyName = null;
 let agenciesDataTable = null;
 let agencyBookingsTable = null;
 const agencyBookingTotalsCache = {};
@@ -477,6 +478,9 @@ function fetchAgencyBookings(agencyId, agencyName) {
 
     $('#agency-bookings-modal').modal('show');
     document.getElementById('agency-bookings-agency-name').textContent = agencyName;
+    currentAgencyId = agencyId;
+    currentAgencyName = agencyName;
+    initializeBulkControls();
 
     const tbody = document.querySelector('#agency-bookings-table tbody');
     if (tbody) {
@@ -533,7 +537,10 @@ function renderAgencyBookings(bookings) {
             const room = b.ROOM_NUMBER || '-';
             const conf = b.CONFIRMATION_NUMBER || '-';
             return `
-                <tr data-booking-id="${b.bookingId}">
+                <tr data-booking-id="${b.bookingId}" data-payment-status="${(b.PAYMENT_STATUS || '').toLowerCase()}">
+                    <td class="text-center">
+                      <input type="checkbox" class="form-check-input booking-select" data-booking-id="${b.bookingId}">
+                    </td>
                     <td>${idx + 1}</td>
                     <td>${guest}</td>
                     <td>${room}</td>
@@ -558,17 +565,20 @@ function renderAgencyBookings(bookings) {
         searching: true,
         ordering: true,
         info: true,
-        order: [[4, 'desc']], // by Check-in desc
+        order: [[5, 'desc']], // by Check-in desc (index shifted)
         columnDefs: [
-            { targets: [0,1,2,3,4,5,8,9], className: 'text-center' },
-            { targets: [6,7], className: 'text-end' },
-            // Disable ordering for the # column (index 0)
-            { targets: [0], orderable: false }
+            { targets: [0,1,2,3,4,5,9,10], className: 'text-center' },
+            { targets: [7,8], className: 'text-end' },
+            // Disable ordering for checkbox and # column
+            { targets: [0,1], orderable: false }
         ]
     });
 
     // Re-apply cached totals/balances on every draw (for paginated rows)
     tableEl.on('draw.dt', applyCachedTotalsToTable);
+
+    // Hook payment status filter tabs
+    initStatusTabs();
 
     // After rendering, fetch billing/payments to fill totals & balances
     enrichAgencyBookingsWithBilling(hasData ? bookings : []);
@@ -611,16 +621,27 @@ function enrichAgencyBookingsWithBilling(bookings) {
             if (!row) return;
             const totalCell = row.querySelector('.booking-total');
             const balanceCell = row.querySelector('.booking-balance');
+            row.dataset.balance = balance != null ? balance : '';
+            const paymentStatusText = (row.dataset.paymentStatus || '').toLowerCase();
             if (totalCell) totalCell.textContent = total != null ? formatNumberPlain(total) : '-';
             if (balanceCell) {
                 if (balance != null) {
                     balanceCell.textContent = formatNumberPlain(balance);
                     balanceCell.classList.toggle('text-danger', balance > 0.0001);
+                    const checkbox = row.querySelector('.booking-select');
+                    if (checkbox) {
+                        const shouldDisable = balance <= 0.0001 || paymentStatusText === 'paid';
+                        checkbox.disabled = shouldDisable;
+                        if (shouldDisable) {
+                            checkbox.checked = false;
+                        }
+                    }
                 } else {
                     balanceCell.textContent = '-';
                 }
             }
         });
+        updateBulkSummary();
     });
 }
 
@@ -632,14 +653,351 @@ function applyCachedTotalsToTable() {
         if (!cached) return;
         const totalCell = row.querySelector('.booking-total');
         const balanceCell = row.querySelector('.booking-balance');
+        row.dataset.balance = cached.balance != null ? cached.balance : '';
+        const paymentStatusText = (row.dataset.paymentStatus || '').toLowerCase();
         if (totalCell) totalCell.textContent = cached.total != null ? formatNumberPlain(cached.total) : '-';
         if (balanceCell) {
             if (cached.balance != null) {
                 balanceCell.textContent = formatNumberPlain(cached.balance);
                 balanceCell.classList.toggle('text-danger', cached.balance > 0.0001);
+                const checkbox = row.querySelector('.booking-select');
+                if (checkbox) {
+                    const shouldDisable = cached.balance <= 0.0001 || paymentStatusText === 'paid';
+                    checkbox.disabled = shouldDisable;
+                    if (shouldDisable) {
+                        checkbox.checked = false;
+                    }
+                }
             } else {
                 balanceCell.textContent = '-';
             }
+        }
+    });
+    updateBulkSummary();
+}
+
+// ========================================
+// BULK PAYMENT HELPERS
+// ========================================
+
+function initializeBulkControls() {
+    const checkAll = document.getElementById('agency-bulk-check-all');
+    const selectUnpaidBtn = document.getElementById('agency-bulk-select-unpaid');
+    const paySelectedBtn = document.getElementById('agency-bulk-pay-selected');
+    const payAllBtn = document.getElementById('agency-bulk-pay-all');
+    const tableEl = document.getElementById('agency-bookings-table');
+
+    if (checkAll) {
+        checkAll.checked = false;
+        checkAll.addEventListener('change', () => {
+            const rows = document.querySelectorAll('#agency-bookings-table tbody tr[data-booking-id]');
+            rows.forEach(row => {
+                const cb = row.querySelector('.booking-select');
+                const bal = parseFloat(row.dataset.balance || '0');
+                if (cb && !cb.disabled) {
+                    cb.checked = checkAll.checked && bal > 0.0001;
+                }
+            });
+            updateBulkSummary();
+        });
+    }
+
+    if (tableEl) {
+        tableEl.addEventListener('change', (e) => {
+            if (e.target && e.target.classList.contains('booking-select')) {
+                updateBulkSummary();
+                // sync check-all state
+                const allBoxes = Array.from(document.querySelectorAll('#agency-bookings-table tbody .booking-select'));
+                const enabled = allBoxes.filter(cb => !cb.disabled);
+                const allChecked = enabled.length > 0 && enabled.every(cb => cb.checked);
+                const checkAll = document.getElementById('agency-bulk-check-all');
+                if (checkAll) checkAll.checked = allChecked;
+            }
+        });
+    }
+
+    if (paySelectedBtn) {
+        paySelectedBtn.onclick = (e) => {
+            e.preventDefault();
+            const ids = getSelectedBookingIds();
+            if (!ids.length) {
+                showError('Select at least one booking before paying.');
+                return;
+            }
+            confirmBulkPayment(ids, true);
+        };
+    }
+
+    if (payAllBtn) {
+        payAllBtn.onclick = (e) => {
+            e.preventDefault();
+            const ids = getUnpaidBookingIds();
+            if (!ids.length) {
+                showError('No unpaid bookings to pay.');
+                return;
+            }
+            confirmBulkPayment(ids, false);
+        };
+    }
+
+    // Clear form fields when modal opens
+    const amountInput = document.getElementById('agency-bulk-amount');
+    const remarksInput = document.getElementById('agency-bulk-remarks');
+    if (amountInput) amountInput.value = '';
+    if (remarksInput) remarksInput.value = '';
+    if (amountInput) {
+        amountInput.addEventListener('input', updateBulkSummary);
+    }
+
+    // Payment method cards
+    document.querySelectorAll('#agency-bulk-method-group .pay-option').forEach(card => {
+        card.classList.toggle('active', card.querySelector('input[type="radio"]')?.checked);
+        card.addEventListener('click', () => {
+            const radio = card.querySelector('input[type="radio"]');
+            if (radio) {
+                radio.checked = true;
+                document.querySelectorAll('#agency-bulk-method-group .pay-option').forEach(c => c.classList.remove('active'));
+                card.classList.add('active');
+            }
+        });
+    });
+
+    updateBulkSummary();
+}
+
+function getSelectedBookingIds() {
+    const ids = [];
+    document.querySelectorAll('#agency-bookings-table tbody tr[data-booking-id]').forEach(row => {
+        const cb = row.querySelector('.booking-select');
+        if (cb && cb.checked) {
+            const bookingId = parseInt(row.getAttribute('data-booking-id'), 10);
+            if (Number.isInteger(bookingId)) ids.push(bookingId);
+        }
+    });
+    return ids;
+}
+
+function getUnpaidBookingIds() {
+    const ids = [];
+    document.querySelectorAll('#agency-bookings-table tbody tr[data-booking-id]').forEach(row => {
+        const bal = parseFloat(row.dataset.balance || '0');
+        if (bal > 0.0001) {
+            const bookingId = parseInt(row.getAttribute('data-booking-id'), 10);
+            if (Number.isInteger(bookingId)) ids.push(bookingId);
+        }
+    });
+    return ids;
+}
+
+function getSelectedBulkMethod() {
+    const checked = document.querySelector('input[name="agencyBulkMethod"]:checked');
+    return checked?.value || null;
+}
+
+function confirmBulkPayment(targetIds, requireSelection) {
+    const method = getSelectedBulkMethod();
+    if (!method) {
+        showError('Select a payment method.');
+        return;
+    }
+
+    const amountInput = document.getElementById('agency-bulk-amount');
+    const enteredAmount = parseFloat(amountInput?.value || '0') || 0;
+    const totalSelectedBalance = targetIds.reduce((sum, id) => {
+        const cached = agencyBookingTotalsCache[id];
+        const bal = cached?.balance != null ? parseFloat(cached.balance) : parseFloat(document.querySelector(`#agency-bookings-table tr[data-booking-id="${id}"]`)?.dataset.balance || '0');
+        return sum + (bal || 0);
+    }, 0);
+    const plannedAmount = enteredAmount > 0 ? enteredAmount : totalSelectedBalance;
+
+    if (!plannedAmount || plannedAmount <= 0) {
+        showError('Enter a valid amount.');
+        return;
+    }
+
+    Swal.fire({
+        title: 'Confirm Payment',
+        text: `Pay ${formatNumberPlain(plannedAmount)} to ${targetIds.length} booking(s)?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, pay now',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            submitBulkPayment(targetIds, requireSelection);
+        }
+    });
+}
+
+function updateBulkSummary() {
+    const summaryEl = document.getElementById('agency-bulk-summary');
+    const totalUnpaidEl = document.getElementById('agency-bulk-total-unpaid');
+    const selectedCountEl = document.getElementById('agency-bulk-selected-count');
+    const selectedUnpaidEl = document.getElementById('agency-bulk-selected-unpaid');
+    const amountInput = document.getElementById('agency-bulk-amount');
+
+    let selected = 0;
+    let selectedBalance = 0;
+    let totalUnpaid = 0;
+
+    document.querySelectorAll('#agency-bookings-table tbody tr[data-booking-id]').forEach(row => {
+        const bal = parseFloat(row.dataset.balance || '0') || 0;
+        totalUnpaid += bal;
+        const cb = row.querySelector('.booking-select');
+        if (cb && cb.checked) {
+            selected += 1;
+            selectedBalance += bal;
+        }
+    });
+
+    if (summaryEl) summaryEl.textContent = `Selected: ${selected} | Selected Unpaid: ${formatNumberPlain(selectedBalance)} | Total Unpaid: ${formatNumberPlain(totalUnpaid)}`;
+    if (totalUnpaidEl) totalUnpaidEl.textContent = formatNumberPlain(totalUnpaid);
+    if (selectedCountEl) selectedCountEl.textContent = selected;
+    if (selectedUnpaidEl) selectedUnpaidEl.textContent = formatNumberPlain(selectedBalance);
+    // Keep amount in sync with selected unpaid (auto-set on every selection change, no decimals)
+    if (amountInput) {
+        const newVal = selectedBalance ? Math.round(selectedBalance) : '';
+        amountInput.value = newVal;
+        amountInput.setAttribute('step', '1');
+        amountInput.setAttribute('placeholder', '0');
+    }
+}
+
+function applyBookingStatusFilter(value) {
+    if (!agencyBookingsTable) return;
+    // Payment Status column index 9
+    let regex = '';
+    if (value === 'paid') regex = '^PAID$';
+    else if (value === 'unpaid') regex = '^(UNPAID|PARTIAL)$';
+    else regex = '';
+    agencyBookingsTable.column(9).search(regex, true, false).draw();
+}
+
+function initStatusTabs() {
+    const tabs = document.querySelectorAll('.agency-status-tab');
+    if (!tabs || tabs.length === 0) return;
+    tabs.forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            e.preventDefault();
+            tabs.forEach(t => t.classList.remove('is-active'));
+            tab.classList.add('is-active');
+            applyBookingStatusFilter(tab.dataset.status || 'all');
+        });
+    });
+}
+
+function submitBulkPayment(bookingIds, requireSelection = false) {
+    if (!currentAgencyId) {
+        showError('No agency selected.');
+        return;
+    }
+
+    const amountInput = document.getElementById('agency-bulk-amount');
+    const remarksInput = document.getElementById('agency-bulk-remarks');
+    const method = getSelectedBulkMethod();
+    if (!method) {
+        showError('Select a payment method.');
+        return;
+    }
+
+    const enteredAmount = parseFloat(amountInput?.value || '0');
+    const remarks = remarksInput?.value || '';
+
+    const targetIds = bookingIds && bookingIds.length > 0 ? bookingIds : [];
+    if (requireSelection && targetIds.length === 0) {
+        showError('Select at least one booking before paying.');
+        return;
+    }
+    if (!targetIds.length) {
+        showError('No bookings selected or unpaid.');
+        return;
+    }
+
+    // If amount not provided or <=0, default to total selected balance
+    const defaultTotal = targetIds.reduce((sum, id) => {
+        const cached = agencyBookingTotalsCache[id];
+        const bal = cached?.balance != null ? parseFloat(cached.balance) : parseFloat(document.querySelector(`#agency-bookings-table tr[data-booking-id="${id}"]`)?.dataset.balance || '0');
+        return sum + (bal || 0);
+    }, 0);
+    const amount = (enteredAmount > 0 ? enteredAmount : defaultTotal);
+
+    if (amount > defaultTotal + 0.0001) {
+        showError(`Amount exceeds selected unpaid total (max ${formatNumberPlain(defaultTotal)}).`);
+        return;
+    }
+
+    if (!amount || amount <= 0) {
+        showError('Enter a valid amount.');
+        return;
+    }
+
+    Swal.fire({
+        title: 'Processing payment...',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+    });
+
+    $.ajax({
+        url: `/agency/${currentAgencyId}/bulk-payment`,
+        type: 'POST',
+        contentType: 'application/json',
+        dataType: 'json',
+        data: JSON.stringify({
+          bookingIds: targetIds,
+          amount,
+          paymentMethod: method,
+          remarks
+        }),
+        success: function(resp) {
+          Swal.close();
+          if (resp.success) {
+            const applied = formatNumberPlain(resp.appliedTotal || 0);
+            const bookingsCount = (resp.bookings && resp.bookings.length) ? resp.bookings.length : targetIds.length;
+            const reference = resp.reference || '';
+            const ids = targetIds.join(',');
+            const receiptUrl = `/agency/${currentAgencyId}/bulk-payment/receipt?bookingIds=${encodeURIComponent(ids)}&reference=${encodeURIComponent(reference)}&method=${encodeURIComponent(method)}&remarks=${encodeURIComponent(remarks)}&total=${resp.appliedTotal || 0}`;
+            const downloadName = `bulk-payment-${reference || 'receipt'}.pdf`;
+
+            Swal.fire({
+              icon: 'success',
+              title: 'Payment applied',
+              html: `Applied: <strong>${applied}</strong><br/>Bookings paid: <strong>${bookingsCount}</strong>`,
+              showCancelButton: true,
+              confirmButtonText: 'Download receipt',
+              cancelButtonText: 'Close'
+            }).then(result => {
+              if (result.isConfirmed) {
+                // Open in new tab
+                window.open(receiptUrl, '_blank');
+                // Trigger download programmatically
+                fetch(receiptUrl)
+                  .then(res => res.blob())
+                  .then(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = downloadName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    setTimeout(() => URL.revokeObjectURL(url), 5000);
+                  })
+                  .catch(() => {
+                    // swallow download errors; at least the new tab opened
+                  });
+              }
+            });
+
+            // Refresh bookings to reflect new balances
+            fetchAgencyBookings(currentAgencyId, currentAgencyName || 'Agency');
+          } else {
+            showError(resp.message || 'Bulk payment failed.');
+          }
+        },
+        error: function(xhr) {
+          Swal.close();
+          const err = xhr.responseJSON?.message || 'Bulk payment failed.';
+          showError(err);
         }
     });
 }

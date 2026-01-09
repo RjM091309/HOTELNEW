@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Bulk Payment Receipt</title>
+  <style>
+    :root {
+      --border: #f3c200;
+      --muted: #515a6a;
+      --text: #1f2937;
+      --accent: #0c2a42;
+      --bg-alt: #fdfaf3;
+    }
+    body { font-family: Arial, sans-serif; color: var(--text); margin: 0; padding: 24px 32px; background: #fff; }
+    .header { text-align: center; margin-bottom: 18px; border-bottom: 2px solid var(--border); padding-bottom: 12px; }
+    .logo { height: 80px; object-fit: contain; }
+    .title { font-size: 26px; font-weight: 700; color: var(--accent); margin: 6px 0 2px 0; letter-spacing: 0.5px; }
+    .sub { font-size: 12px; color: var(--muted); }
+    .info-row { display: flex; justify-content: space-between; font-size: 12px; margin: 6px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+    th, td { border: 1px solid var(--border); padding: 8px 10px; font-size: 12px; }
+    th { background: #fffaf0; text-align: center; color: var(--text); font-weight: 700; }
+    td { text-align: center; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .row-alt { background: #fffcf5; }
+    .summary-box { margin-top: 14px; border: 1px solid var(--border); padding: 10px; background: #fffef9; font-size: 12px; line-height: 1.5; }
+    .summary-box b { color: var(--accent); }
+    .totals { margin-top: 10px; font-size: 14px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <% if (logoUrl) { %>
+      <img class="logo" src="<%= logoUrl %>" alt="logo">
+    <% } %>
+    <div class="title">RECEIPT</div>
+   
+    <div class="sub">Clark Terrace Building, Lot 2 Block 1, The Villages Prince Balagtas Avenue,</div>
+    <div class="sub">Clark Freeport Zone, Pampanga, 2023</div>
+    <div class="sub">(GLOBE) 0945 146 7000 (SMART) 0969 049 7000</div>
+  </div>
+
+  <table style="margin: 0 auto; width: 100%; table-layout: fixed;">
+    <colgroup>
+      <col style="width:20%;">
+      <col style="width:30%;">
+      <col style="width:20%;">
+      <col style="width:30%;">
+    </colgroup>
+    <tr>
+      <th style="text-align:left; background-color: #ffffff;">Agency:</th>
+      <td style="text-align:left;"><%= agencyName || 'N/A' %></td>
+      <th style="text-align:left; background-color: #ffffff;">Total Paid:</th>
+      <td style="text-align:right;"><%= Number(totalPaid || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) %></td>
+    </tr>
+    <tr>
+      <th style="text-align:left; background-color: #ffffff;">Reference:</th>
+      <td style="text-align:left;"><%= reference || 'N/A' %></td>
+      <th style="text-align:left; background-color: #ffffff;">Processed By:</th>
+      <td style="text-align:right;"><%= processedBy || 'N/A' %></td>
+    </tr>
+    <tr>
+      <th style="text-align:left; background-color: #ffffff;">Payment Method:</th>
+      <td style="text-align:left;"><%= method || 'N/A' %></td>
+      <th style="text-align:left; background-color: #ffffff;">Generated:</th>
+      <td style="text-align:right;"><%= generatedAt ? new Date(generatedAt).toLocaleString() : '-' %></td>
+    </tr>
+  </table>
+  <br>
+  <table>
+    <thead>
+      <tr>
+        <th>DATE</th>
+        <th>GUEST</th>
+        <th>ROOM</th>
+        <th>CONFIRMATION #</th>
+        <th>STATUS</th>
+        <th>AMOUNT</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% bookings.forEach(b => { 
+           const roomTotal = Number(b.roomTotal) || 0;
+           const servicesTotal = Number(b.servicesTotal) || 0;
+           const extensionsTotal = Number(b.extensionsTotal) || 0;
+           const penalty = Number(b.penalty) || 0;
+           const reservationFee = Number(b.reservationFee) || 0;
+           const discountAmount = Number(b.discountAmount) || 0;
+           const totalPaid = Number(b.totalPaid) || 0;
+           const effectiveTotal = roomTotal + servicesTotal + extensionsTotal + penalty - reservationFee - discountAmount;
+           const balance = Math.max(0, effectiveTotal - totalPaid);
+           const appliedNow = effectiveTotal - balance; // total paid so far
+      %>
+        <tr class="<%= (b.bookingId % 2 === 0) ? 'row-alt' : '' %>">
+          <td><%= b.BOOKING_DATE ? new Date(b.BOOKING_DATE).toLocaleDateString() : '-' %></td>
+          <td><%= b.guestName || '-' %></td>
+          <td><%= b.ROOM_NUMBER || '-' %></td>
+          <td><%= b.CONFIRMATION_NUMBER || '-' %></td>
+          <td><%= b.BOOKING_STATUS || '-' %></td>
+      <td class="num"><%= Number(appliedNow || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+
+  <%
+    let sumRoom = 0, sumSvc = 0, sumExt = 0, sumPen = 0, sumDisc = 0, sumRes = 0;
+    bookings.forEach(b => {
+      sumRoom += Number(b.roomTotal) || 0;
+      sumSvc += Number(b.servicesTotal) || 0;
+      sumExt += Number(b.extensionsTotal) || 0;
+      sumPen += Number(b.penalty) || 0;
+      sumDisc += Number(b.discountAmount) || 0;
+      sumRes += Number(b.reservationFee) || 0;
+    });
+  %>
+<br>
+<br>
+  <div class="totals">
+    <span></span>
+    <span>Total Paid: <%= Number(totalPaid || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) %></span>
+  </div>
+</body>
+</html>
+
