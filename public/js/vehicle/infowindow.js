@@ -8,7 +8,15 @@ import { formatDateFullPH, getAddressFromCoordinates } from './utils.js';
 
 // Generate satellite icon HTML (Sinotrack style)
 function generateSatelliteIcon(satelliteCount) {
-    const safeCount = (satelliteCount === null || satelliteCount === undefined) ? 0 : satelliteCount;
+    // Handle null, undefined, empty string, "N/A", or invalid values - convert to 0
+    let safeCount = 0;
+    if (satelliteCount !== null && satelliteCount !== undefined && satelliteCount !== '') {
+        const countStr = String(satelliteCount).trim().toUpperCase();
+        if (countStr !== 'N/A' && countStr !== 'NA') {
+            const countNum = Number(satelliteCount);
+            safeCount = isNaN(countNum) ? 0 : Math.max(0, countNum);
+        }
+    }
     return `
         <div class="GPS" style="display: inline-flex; align-items: center; gap: 4px;">
             <img src="/img/Satellite.png" alt="Satellite" style="width: 16px; height: 16px; object-fit: contain;">
@@ -122,7 +130,7 @@ export function generateVehicleInfoWindowContent(vehicle, address = null) {
             </div>
             <div class="Operation">
                 <div class="Button" onclick="showVehicleInfo(${vehicle.id})">View Details</div>
-                <div class="Button">Replay</div>
+                <div class="Button" onclick="showReplayForVehicle(${vehicle.id})">Replay</div>
             </div>
         </div>
     `;
@@ -181,7 +189,7 @@ export function generateGpsDeviceInfoWindowContent(device, address = null) {
             </div>
             <div class="Operation">
                 <div class="Button" onclick="showGpsDeviceInfo('${device.deviceId}')">View Details</div>
-                <div class="Button">Replay</div>
+                <div class="Button" onclick="showReplayForDevice('${device.deviceId}')">Replay</div>
             </div>
         </div>
     `;
@@ -214,7 +222,14 @@ export function showVehicleInfo(vehicleId) {
                     ${vehicle.location.speed ? `<p><strong>Speed:</strong> ${vehicle.location.speed} km/h</p>` : ''}
                     ${vehicle.location.heading ? `<p><strong>Heading:</strong> ${vehicle.location.heading}°</p>` : ''}
                     ${vehicle.location.battery ? `<p><strong>Battery:</strong> ${vehicle.location.battery}%${vehicle.location.isCharging ? ' (Charging)' : ''}</p>` : ''}
-                    ${vehicle.location.satelliteCount !== null && vehicle.location.satelliteCount !== undefined ? `<p><strong>Satellites:</strong> ${vehicle.location.satelliteCount} <i class="fa fa-satellite" style="color: #3b82f6;"></i></p>` : ''}
+                    ${vehicle.location.satelliteCount !== null && vehicle.location.satelliteCount !== undefined ? `<p><strong>Satellites:</strong> ${(() => {
+                        const count = vehicle.location.satelliteCount;
+                        if (count === null || count === undefined || count === '') return '0';
+                        const countStr = String(count).trim().toUpperCase();
+                        if (countStr === 'N/A' || countStr === 'NA') return '0';
+                        const countNum = Number(count);
+                        return isNaN(countNum) ? '0' : Math.max(0, countNum);
+                    })()} <i class="fa fa-satellite" style="color: #3b82f6;"></i></p>` : ''}
                     ${vehicle.location.gsmSignal !== null && vehicle.location.gsmSignal !== undefined ? `<p><strong>GSM Signal:</strong> ${vehicle.location.gsmSignal} <i class="fa fa-signal" style="color: #3b82f6;"></i></p>` : ''}
                     <p><strong>Last Update:</strong> ${formatDateFullPH(vehicle.location.lastUpdate)}</p>
                     <p><strong>Minutes Since Update:</strong> ${vehicle.location.minutesSinceUpdate !== null ? vehicle.location.minutesSinceUpdate : 'N/A'}</p>
@@ -260,7 +275,14 @@ export function showGpsDeviceInfo(deviceId) {
                     ${device.location.speed ? `<p><strong>Speed:</strong> ${device.location.speed} km/h</p>` : ''}
                     ${device.location.heading ? `<p><strong>Heading:</strong> ${device.location.heading}°</p>` : ''}
                     ${device.location.battery ? `<p><strong>Battery:</strong> ${device.location.battery}%${device.location.isCharging ? ' (Charging)' : ''}</p>` : ''}
-                    ${device.location.satelliteCount !== null && device.location.satelliteCount !== undefined ? `<p><strong>Satellites:</strong> ${device.location.satelliteCount} <i class="fa fa-satellite" style="color: #3b82f6;"></i></p>` : ''}
+                    ${device.location.satelliteCount !== null && device.location.satelliteCount !== undefined ? `<p><strong>Satellites:</strong> ${(() => {
+                        const count = device.location.satelliteCount;
+                        if (count === null || count === undefined || count === '') return '0';
+                        const countStr = String(count).trim().toUpperCase();
+                        if (countStr === 'N/A' || countStr === 'NA') return '0';
+                        const countNum = Number(count);
+                        return isNaN(countNum) ? '0' : Math.max(0, countNum);
+                    })()} <i class="fa fa-satellite" style="color: #3b82f6;"></i></p>` : ''}
                     ${device.location.gsmSignal !== null && device.location.gsmSignal !== undefined ? `<p><strong>GSM Signal:</strong> ${device.location.gsmSignal} <i class="fa fa-signal" style="color: #3b82f6;"></i></p>` : ''}
                     <p><strong>Last Update:</strong> ${formatDateFullPH(device.location.lastUpdate || device.location.createdAt)}</p>
                     ${device.location.minutesSinceUpdate !== null && device.location.minutesSinceUpdate !== undefined ? `<p><strong>Minutes Since Update:</strong> ${device.location.minutesSinceUpdate}</p>` : ''}

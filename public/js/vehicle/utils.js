@@ -173,6 +173,25 @@ export function calculateDistanceMeters(lat1, lng1, lat2, lng2) {
     return R * c;
 }
 
+// Calculate bearing/heading from two coordinates (in degrees, 0-360)
+// Returns heading from point1 to point2
+export function calculateBearing(lat1, lng1, lat2, lng2) {
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const lat1Rad = lat1 * Math.PI / 180;
+    const lat2Rad = lat2 * Math.PI / 180;
+    
+    const y = Math.sin(dLng) * Math.cos(lat2Rad);
+    const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - 
+              Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
+    
+    let bearing = Math.atan2(y, x) * 180 / Math.PI;
+    
+    // Normalize to 0-360
+    bearing = (bearing + 360) % 360;
+    
+    return bearing;
+}
+
 // Easing function for smooth animation (ease-out cubic)
 export function easeOutCubic(t) {
     return 1 - Math.pow(1 - t, 3);
@@ -260,5 +279,75 @@ export function formatMinutesAgo(minutes) {
     }
     
     return result + ' ago';
+}
+
+// Snap GPS coordinates to nearest road using Google Roads API
+// Returns snapped coordinates or original if snapping fails
+export async function snapToRoad(lat, lng) {
+    try {
+        const response = await fetch('/api/maps/snap-to-roads', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                lat: lat,
+                lng: lng
+            })
+        });
+
+        const data = await response.json();
+        
+        if (data.success && data.data && data.data.snappedPoints && data.data.snappedPoints.length > 0) {
+            const snappedPoint = data.data.snappedPoints[0];
+            return {
+                lat: snappedPoint.location.latitude,
+                lng: snappedPoint.location.longitude
+            };
+        }
+        
+        // If snapping failed, return original coordinates
+        return { lat, lng };
+    } catch (error) {
+        console.warn('Snap to road error:', error);
+        // Return original coordinates on error
+        return { lat, lng };
+    }
+}
+
+// Snap multiple GPS coordinates to roads (batch)
+// Returns array of snapped coordinates
+export async function snapToRoadsBatch(points) {
+    try {
+        if (!points || points.length === 0) {
+            return points;
+        }
+
+        const response = await fetch('/api/maps/snap-to-roads', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                points: points
+            })
+        });
+
+        const data = await response.json();
+        
+        if (data.success && data.data && data.data.snappedPoints && data.data.snappedPoints.length > 0) {
+            return data.data.snappedPoints.map(point => ({
+                lat: point.location.latitude,
+                lng: point.location.longitude
+            }));
+        }
+        
+        // If snapping failed, return original coordinates
+        return points;
+    } catch (error) {
+        console.warn('Snap to roads batch error:', error);
+        // Return original coordinates on error
+        return points;
+    }
 }
 

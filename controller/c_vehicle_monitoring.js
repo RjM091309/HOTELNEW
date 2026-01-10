@@ -62,7 +62,13 @@ class VehicleMonitoringController {
           heading: vehicle.heading ? parseFloat(vehicle.heading) : null,
           battery: vehicle.battery ? parseFloat(vehicle.battery) : null,
           isCharging: vehicle.is_charging === null || vehicle.is_charging === undefined ? null : !!vehicle.is_charging,
-          satelliteCount: vehicle.satellite_count ? parseInt(vehicle.satellite_count) : null,
+          satelliteCount: (() => {
+            if (!vehicle.satellite_count || vehicle.satellite_count === null || vehicle.satellite_count === undefined) return null;
+            const satCountStr = String(vehicle.satellite_count).trim().toUpperCase();
+            if (satCountStr === 'N/A' || satCountStr === 'NA' || satCountStr === '') return null;
+            const satCountNum = parseInt(vehicle.satellite_count);
+            return isNaN(satCountNum) ? null : satCountNum;
+          })(),
           gsmSignal: vehicle.gsm_signal ? parseInt(vehicle.gsm_signal) : null,
           isMoving: vehicle.is_moving !== null && vehicle.is_moving !== undefined ? !!vehicle.is_moving : false,
           lastUpdate: vehicle.last_location_created, // Use created_at (DB save time) for display
@@ -120,7 +126,13 @@ class VehicleMonitoringController {
           heading: vehicle.heading ? parseFloat(vehicle.heading) : null,
           battery: vehicle.battery ? parseFloat(vehicle.battery) : null,
           isCharging: vehicle.is_charging === null || vehicle.is_charging === undefined ? null : !!vehicle.is_charging,
-          satelliteCount: vehicle.satellite_count ? parseInt(vehicle.satellite_count) : null,
+          satelliteCount: (() => {
+            if (!vehicle.satellite_count || vehicle.satellite_count === null || vehicle.satellite_count === undefined) return null;
+            const satCountStr = String(vehicle.satellite_count).trim().toUpperCase();
+            if (satCountStr === 'N/A' || satCountStr === 'NA' || satCountStr === '') return null;
+            const satCountNum = parseInt(vehicle.satellite_count);
+            return isNaN(satCountNum) ? null : satCountNum;
+          })(),
           gsmSignal: vehicle.gsm_signal ? parseInt(vehicle.gsm_signal) : null,
           isMoving: vehicle.is_moving !== null && vehicle.is_moving !== undefined ? !!vehicle.is_moving : false,
           lastUpdate: vehicle.last_location_created, // Use created_at (DB save time) for display
@@ -247,7 +259,13 @@ class VehicleMonitoringController {
               heading: location.heading ? parseFloat(location.heading) : null,
               battery: location.battery !== null && location.battery !== undefined ? parseFloat(location.battery) : null,
               isCharging: location.is_charging === null || location.is_charging === undefined ? null : !!location.is_charging,
-              satelliteCount: location.satellite_count ? parseInt(location.satellite_count) : null,
+              satelliteCount: (() => {
+                if (!location.satellite_count || location.satellite_count === null || location.satellite_count === undefined) return null;
+                const satCountStr = String(location.satellite_count).trim().toUpperCase();
+                if (satCountStr === 'N/A' || satCountStr === 'NA' || satCountStr === '') return null;
+                const satCountNum = parseInt(location.satellite_count);
+                return isNaN(satCountNum) ? null : satCountNum;
+              })(),
               gsmSignal: location.gsm_signal ? parseInt(location.gsm_signal) : null,
               isMoving: location.is_moving !== null && location.is_moving !== undefined ? !!location.is_moving : false,
               timestamp: location.timestamp,

@@ -549,6 +549,129 @@ class MapsController {
             });
         }
     }
+
+    /**
+     * Snap to Roads - Snap GPS coordinates to nearest roads
+     * POST /api/maps/snap-to-roads
+     * Body: { points: [{lat, lng}, ...] } or { lat, lng } for single point
+     */
+    async snapToRoads(req, res) {
+        try {
+            const apiKey = process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
+
+            if (!apiKey) {
+                return res.status(500).json({
+                    success: false,
+                    message: 'Google Maps API key is not configured'
+                });
+            }
+
+            let points = [];
+            
+            // Handle both single point and array of points
+            if (req.body.points && Array.isArray(req.body.points)) {
+                points = req.body.points;
+            } else if (req.body.lat && req.body.lng) {
+                // Single point
+                points = [{ lat: req.body.lat, lng: req.body.lng }];
+            } else {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid request. Provide either {points: [{lat, lng}, ...]} or {lat, lng}'
+                });
+            }
+
+            if (points.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'At least one point is required'
+                });
+            }
+
+            // Google Roads API allows up to 100 points per request
+            if (points.length > 100) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Maximum 100 points allowed per request'
+                });
+            }
+
+            // Format points as "lat,lng|lat,lng|..."
+            const path = points.map(p => `${p.lat},${p.lng}`).join('|');
+
+            const response = await axios.get('https://roads.googleapis.com/v1/snapToRoads', {
+                params: {
+                    path: path,
+                    interpolate: true, // Interpolate points to include all points in the path
+                    key: apiKey
+                }
+            });
+
+            if (response.data && response.data.snappedPoints) {
+                const snappedPoints = response.data.snappedPoints.map(point => ({
+                    location: {
+                        latitude: point.location.latitude,
+                        longitude: point.location.longitude
+                    },
+                    originalIndex: point.originalIndex,
+                    placeId: point.placeId
+                }));
+
+                res.status(200).json({
+                    success: true,
+                    data: {
+                        snappedPoints: snappedPoints,
+                        total: snappedPoints.length
+                    },
+                    message: 'Coordinates snapped to roads successfully'
+                });
+            } else {
+                // No roads found - return original points
+                res.status(200).json({
+                    success: true,
+                    data: {
+                        snappedPoints: points.map((p, index) => ({
+                            location: {
+                                latitude: p.lat,
+                                longitude: p.lng
+                            },
+                            originalIndex: index,
+                            placeId: null
+                        })),
+                        total: points.length
+                    },
+                    message: 'No roads found, returning original coordinates'
+                });
+            }
+        } catch (error) {
+            console.error('Snap to roads error:', error);
+            
+            // If API error, return original points as fallback
+            let points = [];
+            if (req.body.points && Array.isArray(req.body.points)) {
+                points = req.body.points;
+            } else if (req.body.lat && req.body.lng) {
+                points = [{ lat: req.body.lat, lng: req.body.lng }];
+            }
+
+            res.status(200).json({
+                success: true,
+                data: {
+                    snappedPoints: points.map((p, index) => ({
+                        location: {
+                            latitude: p.lat,
+                            longitude: p.lng
+                        },
+                        originalIndex: index,
+                        placeId: null
+                    })),
+                    total: points.length
+                },
+                message: 'Snap to roads failed, returning original coordinates',
+                warning: error.response?.data?.error?.message || error.message
+            });
+        }
+    }
 }
 
 module.exports = new MapsController();

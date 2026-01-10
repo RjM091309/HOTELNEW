@@ -179,7 +179,13 @@ async function processGpsMessage(message, originalMessage, socket, io) {
         heading: heading || null,
         timestamp: timestamp,
         battery: batteryValue,
-        satelliteCount: (satelliteCount !== null && satelliteCount !== undefined && satelliteCount !== '') ? parseInt(satelliteCount) : null
+        satelliteCount: (() => {
+          if (satelliteCount === null || satelliteCount === undefined || satelliteCount === '') return null;
+          const satCountStr = String(satelliteCount).trim().toUpperCase();
+          if (satCountStr === 'N/A' || satCountStr === 'NA') return null;
+          const satCountNum = parseInt(satelliteCount);
+          return isNaN(satCountNum) ? null : satCountNum;
+        })()
       };
       const parsedMsg = `✅ Parsed ST903 extended format: Device ${imei} at (${lat}, ${lng}), Battery: ${battery || 'N/A'}, Satellites: ${satelliteCount || 'N/A'}`;
       console.log(parsedMsg);
@@ -299,7 +305,13 @@ async function processGpsMessage(message, originalMessage, socket, io) {
             }
             return null;
           })(),
-          satelliteCount: satelliteCount !== null && satelliteCount !== undefined && satelliteCount !== '' ? parseInt(satelliteCount) : null,
+          satelliteCount: (() => {
+            if (satelliteCount === null || satelliteCount === undefined || satelliteCount === '') return null;
+            const satCountStr = String(satelliteCount).trim().toUpperCase();
+            if (satCountStr === 'N/A' || satCountStr === 'NA') return null;
+            const satCountNum = parseInt(satelliteCount);
+            return isNaN(satCountNum) ? null : satCountNum;
+          })(),
           gsmSignal: gsmSignal !== null && gsmSignal !== undefined && gsmSignal !== '' ? parseInt(gsmSignal) : null
         };
         
@@ -393,6 +405,16 @@ async function processGpsMessage(message, originalMessage, socket, io) {
     }
     
     // Prepare location data
+    // Handle satelliteCount properly - check for null/undefined, not falsy (0 is valid!)
+    let satelliteCountValue = null;
+    if (data.satelliteCount !== null && data.satelliteCount !== undefined && data.satelliteCount !== '') {
+      const satCountStr = String(data.satelliteCount).trim().toUpperCase();
+      if (satCountStr !== 'N/A' && satCountStr !== 'NA') {
+        const satCountNum = parseInt(data.satelliteCount);
+        satelliteCountValue = isNaN(satCountNum) ? null : satCountNum;
+      }
+    }
+    
     const locationData = {
       deviceId: String(data.deviceId),
       latitude: lat,
@@ -401,7 +423,7 @@ async function processGpsMessage(message, originalMessage, socket, io) {
       heading: heading,
       timestamp: data.timestamp,
       battery: batteryValue,
-      satelliteCount: data.satelliteCount ? parseInt(data.satelliteCount) : null,
+      satelliteCount: satelliteCountValue,
       gsmSignal: data.gsmSignal !== undefined && data.gsmSignal !== null ? parseInt(data.gsmSignal) : null
     };
     
@@ -521,7 +543,13 @@ async function processGpsMessage(message, originalMessage, socket, io) {
             heading: locationData.heading ? parseFloat(locationData.heading) : null,
             battery: locationData.battery !== null && locationData.battery !== undefined ? parseFloat(locationData.battery) : null,
             isCharging: locationData.isCharging !== null && locationData.isCharging !== undefined ? !!locationData.isCharging : null,
-            satelliteCount: locationData.satelliteCount !== null && locationData.satelliteCount !== undefined ? parseInt(locationData.satelliteCount) : null,
+            satelliteCount: (() => {
+              if (locationData.satelliteCount === null || locationData.satelliteCount === undefined) return null;
+              const satCountStr = String(locationData.satelliteCount).trim().toUpperCase();
+              if (satCountStr === 'N/A' || satCountStr === 'NA' || satCountStr === '') return null;
+              const satCountNum = parseInt(locationData.satelliteCount);
+              return isNaN(satCountNum) ? null : satCountNum;
+            })(),
             gsmSignal: locationData.gsmSignal !== null && locationData.gsmSignal !== undefined ? parseInt(locationData.gsmSignal) : null,
             timestamp: locationData.timestamp
           }

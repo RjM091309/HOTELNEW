@@ -9,7 +9,7 @@ import { updateMapMarkers, animateMarkerPosition, applyMarkerRotation } from './
 import { updateTraceToggles } from './trace-toggle.js';
 import { clearVehiclePath } from './markers.js';
 import { markers, markerAnimations } from './state.js';
-import { calculateDistanceMeters } from './utils.js';
+import { calculateDistanceMeters, snapToRoad } from './utils.js';
 
 let gpsTrackingSocket = null;
 let pollingInterval = null;
@@ -232,8 +232,6 @@ async function updateVehicleLocationFromSocket(deviceId, locationData) {
             return;
         }
         
-        const newPosition = { lat: locationData.lat, lng: locationData.lng };
-        
         // Find vehicle or GPS device that uses this deviceId
         let markerKey = null;
         let foundVehicle = null;
@@ -259,6 +257,22 @@ async function updateVehicleLocationFromSocket(deviceId, locationData) {
             }
         }
         
+        // Snap GPS coordinates to nearest road for accurate positioning
+        let newPosition = { lat: locationData.lat, lng: locationData.lng };
+        
+        // Only snap to road if vehicle is moving (to avoid unnecessary API calls when stationary)
+        const isMoving = foundVehicle ? (foundVehicle.isMoving || false) : (foundDevice ? (foundDevice.isMoving || false) : false);
+        
+        if (isMoving) {
+            try {
+                const snappedPosition = await snapToRoad(locationData.lat, locationData.lng);
+                newPosition = snappedPosition;
+            } catch (error) {
+                console.warn('Failed to snap to road, using original coordinates:', error);
+                // Use original coordinates if snapping fails
+            }
+        }
+        
         // Update vehicle/device location data in memory for real-time InfoWindow updates
         // IMPORTANT: Don't update isMoving here - it should be determined by database location changes only
         // Socket.IO is for real-time position updates, but isMoving should come from database comparison
@@ -280,7 +294,14 @@ async function updateVehicleLocationFromSocket(deviceId, locationData) {
                 foundVehicle.location.isCharging = !!locationData.isCharging;
             }
             if (locationData.satelliteCount !== null && locationData.satelliteCount !== undefined) {
-                foundVehicle.location.satelliteCount = parseInt(locationData.satelliteCount);
+                // Handle "N/A" string values - convert to null so display shows 0
+                const satCountStr = String(locationData.satelliteCount).trim().toUpperCase();
+                if (satCountStr === 'N/A' || satCountStr === 'NA' || satCountStr === '') {
+                    foundVehicle.location.satelliteCount = null;
+                } else {
+                    const satCountNum = parseInt(locationData.satelliteCount);
+                    foundVehicle.location.satelliteCount = isNaN(satCountNum) ? null : satCountNum;
+                }
             }
             if (locationData.gsmSignal !== null && locationData.gsmSignal !== undefined) {
                 foundVehicle.location.gsmSignal = parseInt(locationData.gsmSignal);
@@ -307,7 +328,14 @@ async function updateVehicleLocationFromSocket(deviceId, locationData) {
                 foundDevice.location.isCharging = !!locationData.isCharging;
             }
             if (locationData.satelliteCount !== null && locationData.satelliteCount !== undefined) {
-                foundDevice.location.satelliteCount = parseInt(locationData.satelliteCount);
+                // Handle "N/A" string values - convert to null so display shows 0
+                const satCountStr = String(locationData.satelliteCount).trim().toUpperCase();
+                if (satCountStr === 'N/A' || satCountStr === 'NA' || satCountStr === '') {
+                    foundDevice.location.satelliteCount = null;
+                } else {
+                    const satCountNum = parseInt(locationData.satelliteCount);
+                    foundDevice.location.satelliteCount = isNaN(satCountNum) ? null : satCountNum;
+                }
             }
             if (locationData.gsmSignal !== null && locationData.gsmSignal !== undefined) {
                 foundDevice.location.gsmSignal = parseInt(locationData.gsmSignal);

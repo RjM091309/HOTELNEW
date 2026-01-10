@@ -26,5 +26,8 @@ router.get('/distance-matrix', MapsController.getDistanceMatrix);
 // Autocomplete - Place autocomplete suggestions
 router.get('/autocomplete', MapsController.autocomplete);
 
+// Snap to Roads - Snap GPS coordinates to nearest roads
+router.post('/snap-to-roads', MapsController.snapToRoads);
+
 module.exports = router;
 

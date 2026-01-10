@@ -10,6 +10,7 @@ import { initializeSocketIO } from './socket-io.js';
 
 // Import functions that need to be global
 import { showVehicleInfo, showGpsDeviceInfo } from './infowindow.js';
+import { initReplayModal } from './replay.js';
 
 // Expose initMap globally for EJS template
 window.initMap = initMap;
@@ -17,6 +18,17 @@ window.initMap = initMap;
 // Expose showVehicleInfo and showGpsDeviceInfo globally for InfoWindow buttons
 window.showVehicleInfo = showVehicleInfo;
 window.showGpsDeviceInfo = showGpsDeviceInfo;
+
+// Initialize replay modal when DOM is ready
+if (typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            initReplayModal();
+        });
+    } else {
+        initReplayModal();
+    }
+}
 
 // Initialize Socket.IO when DOM is ready or immediately if already loaded
 if (typeof document !== 'undefined') {

@@ -49,6 +49,16 @@ class GpsTrackerModel {
       }
     }
     
+    // Handle satelliteCount "N/A" values - convert to null
+    let satelliteCountValue = null;
+    if (satelliteCount !== null && satelliteCount !== undefined) {
+      const satCountStr = String(satelliteCount).trim().toUpperCase();
+      if (satCountStr !== 'N/A' && satCountStr !== 'NA' && satCountStr !== '') {
+        const satCountNum = parseInt(satelliteCount);
+        satelliteCountValue = isNaN(satCountNum) ? null : satCountNum;
+      }
+    }
+    
     const values = [
       deviceId,
       parseFloat(latitude),
@@ -58,7 +68,7 @@ class GpsTrackerModel {
       timestamp ? new Date(timestamp) : new Date(),
       batteryValue,
       isCharging === undefined || isCharging === null ? null : !!isCharging,
-      satelliteCount ? parseInt(satelliteCount) : null,
+      satelliteCountValue,
       gsmSignal ? parseInt(gsmSignal) : null,
       isMoving !== undefined && isMoving !== null ? (!!isMoving ? 1 : 0) : 0
     ];
@@ -243,10 +253,20 @@ class GpsTrackerModel {
       values.push(!!isCharging);
     }
     
+    // Handle satelliteCount - allow 0 as valid value, but convert "N/A" to null
+    // Check if satelliteCount is explicitly set (including 0 which is valid)
     if (satelliteCount !== null && satelliteCount !== undefined && satelliteCount !== '') {
-      updates.push('satellite_count = ?');
-      values.push(parseInt(satelliteCount));
+      const satCountStr = String(satelliteCount).trim().toUpperCase();
+      if (satCountStr !== 'N/A' && satCountStr !== 'NA') {
+        const satCountNum = parseInt(satelliteCount);
+        if (!isNaN(satCountNum)) {
+          updates.push('satellite_count = ?');
+          values.push(satCountNum);
+        }
+      }
     }
+    // Note: If satelliteCount is 0 (number), it will be handled by the above condition
+    // because 0 !== null && 0 !== undefined && 0 !== '' is all true
     
     if (gsmSignal !== null && gsmSignal !== undefined) {
       updates.push('gsm_signal = ?');
