@@ -672,6 +672,442 @@ class MapsController {
             });
         }
     }
+
+    /**
+     * ========================================
+     * ANDROID API ENDPOINTS - Driver App Map SDK
+     * ========================================
+     * PUBLIC ROUTES - NO AUTHENTICATION REQUIRED
+     * These endpoints are for Android driver app (walang login requirement pa)
+     * Simplified, optimized format for Android Map SDK
+     */
+
+    /**
+     * Get directions/route for Android driver app
+     * GET /api/maps/android/directions?origin=lat,lng&destination=lat,lng&mode=driving
+     * PUBLIC: No login/authentication required
+     * Returns: Simplified route data optimized for Android Map SDK
+     */
+    async getDirectionsForAndroid(req, res) {
+        try {
+            const { origin, destination, mode = 'driving', waypoints, alternatives = false } = req.query;
+            const apiKey = process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
+
+            if (!apiKey) {
+                return res.status(500).json({
+                    success: false,
+                    message: 'Google Maps API key is not configured'
+                });
+            }
+
+            if (!origin || !destination) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Origin and destination parameters are required. Format: origin=lat,lng&destination=lat,lng'
+                });
+            }
+
+            const params = {
+                origin: origin,
+                destination: destination,
+                mode: mode,
+                key: apiKey
+            };
+
+            if (waypoints) {
+                params.waypoints = waypoints;
+            }
+
+            if (alternatives === 'true') {
+                params.alternatives = true;
+            }
+
+            const response = await axios.get('https://maps.googleapis.com/maps/api/directions/json', {
+                params: params
+            });
+
+            if (response.data.status === 'OK') {
+                // Format for Android Map SDK - simplified structure
+                const routes = response.data.routes.map((route, index) => {
+                    const legs = route.legs || [];
+                    const totalDistance = legs.reduce((sum, leg) => sum + (leg.distance?.value || 0), 0);
+                    const totalDuration = legs.reduce((sum, leg) => sum + (leg.duration?.value || 0), 0);
+                    
+                    // Extract polyline points for route drawing
+                    const overviewPolyline = route.overview_polyline?.points || '';
+                    
+                    // Extract steps for turn-by-turn navigation
+                    const steps = legs.flatMap(leg => 
+                        (leg.steps || []).map(step => ({
+                            instruction: step.html_instructions,
+                            instructionText: step.html_instructions?.replace(/<[^>]*>/g, '') || '', // Plain text
+                            distance: step.distance?.text || '',
+                            distanceMeters: step.distance?.value || 0,
+                            duration: step.duration?.text || '',
+                            durationSeconds: step.duration?.value || 0,
+                            startLocation: {
+                                lat: step.start_location?.lat || 0,
+                                lng: step.start_location?.lng || 0
+                            },
+                            endLocation: {
+                                lat: step.end_location?.lat || 0,
+                                lng: step.end_location?.lng || 0
+                            },
+                            polyline: step.polyline?.points || '',
+                            maneuver: step.maneuver || null
+                        }))
+                    );
+
+                    return {
+                        routeIndex: index,
+                        summary: route.summary || '',
+                        distance: {
+                            text: legs[0]?.distance?.text || '',
+                            meters: totalDistance
+                        },
+                        duration: {
+                            text: legs[0]?.duration?.text || '',
+                            seconds: totalDuration
+                        },
+                        overviewPolyline: overviewPolyline,
+                        steps: steps,
+                        bounds: route.bounds ? {
+                            northeast: {
+                                lat: route.bounds.northeast?.lat || 0,
+                                lng: route.bounds.northeast?.lng || 0
+                            },
+                            southwest: {
+                                lat: route.bounds.southwest?.lat || 0,
+                                lng: route.bounds.southwest?.lng || 0
+                            }
+                        } : null,
+                        startAddress: legs[0]?.start_address || '',
+                        endAddress: legs[legs.length - 1]?.end_address || ''
+                    };
+                });
+
+                res.json({
+                    success: true,
+                    data: {
+                        routes: routes,
+                        selectedRoute: routes[0] || null, // Default to first route
+                        totalRoutes: routes.length
+                    },
+                    message: 'Directions retrieved successfully for Android Map SDK'
+                });
+            } else {
+                res.status(404).json({
+                    success: false,
+                    message: 'Directions not found',
+                    status: response.data.status,
+                    errorMessage: response.data.error_message || 'No route found'
+                });
+            }
+        } catch (error) {
+            console.error('Get directions for Android error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to get directions',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Search places for Android driver app
+     * GET /api/maps/android/places/search?query=address&location=lat,lng&radius=5000
+     */
+    async searchPlacesForAndroid(req, res) {
+        try {
+            const { query, location, radius = 5000, type } = req.query;
+            const apiKey = process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
+
+            if (!apiKey) {
+                return res.status(500).json({
+                    success: false,
+                    message: 'Google Maps API key is not configured'
+                });
+            }
+
+            if (!query) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Query parameter is required'
+                });
+            }
+
+            const params = {
+                query: query,
+                key: apiKey
+            };
+
+            if (location) {
+                params.location = location;
+                params.radius = radius;
+            }
+
+            if (type) {
+                params.type = type;
+            }
+
+            const response = await axios.get('https://maps.googleapis.com/maps/api/place/textsearch/json', {
+                params: params
+            });
+
+            if (response.data.status === 'OK') {
+                // Format for Android Map SDK - simplified structure
+                const places = response.data.results.map(place => ({
+                    placeId: place.place_id,
+                    name: place.name || '',
+                    address: place.formatted_address || '',
+                    location: {
+                        lat: place.geometry?.location?.lat || 0,
+                        lng: place.geometry?.location?.lng || 0
+                    },
+                    rating: place.rating || null,
+                    userRatingsTotal: place.user_ratings_total || 0,
+                    types: place.types || [],
+                    photoReference: place.photos?.[0]?.photo_reference || null
+                }));
+
+                res.json({
+                    success: true,
+                    data: {
+                        places: places,
+                        count: places.length
+                    },
+                    message: 'Places search successful for Android Map SDK'
+                });
+            } else {
+                res.status(404).json({
+                    success: false,
+                    message: 'No places found',
+                    status: response.data.status,
+                    errorMessage: response.data.error_message || 'No results'
+                });
+            }
+        } catch (error) {
+            console.error('Search places for Android error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to search places',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Get place details for Android driver app
+     * GET /api/maps/android/places/details?placeId=xxx
+     */
+    async getPlaceDetailsForAndroid(req, res) {
+        try {
+            const { placeId } = req.query;
+            const apiKey = process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
+
+            if (!apiKey) {
+                return res.status(500).json({
+                    success: false,
+                    message: 'Google Maps API key is not configured'
+                });
+            }
+
+            if (!placeId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Place ID parameter is required'
+                });
+            }
+
+            const response = await axios.get('https://maps.googleapis.com/maps/api/place/details/json', {
+                params: {
+                    place_id: placeId,
+                    fields: 'name,formatted_address,geometry,rating,user_ratings_total,formatted_phone_number,opening_hours,photos,types,website,url',
+                    key: apiKey
+                }
+            });
+
+            if (response.data.status === 'OK') {
+                const place = response.data.result;
+                
+                // Format for Android Map SDK
+                const formattedPlace = {
+                    placeId: place.place_id || placeId,
+                    name: place.name || '',
+                    address: place.formatted_address || '',
+                    location: {
+                        lat: place.geometry?.location?.lat || 0,
+                        lng: place.geometry?.location?.lng || 0
+                    },
+                    rating: place.rating || null,
+                    userRatingsTotal: place.user_ratings_total || 0,
+                    phoneNumber: place.formatted_phone_number || null,
+                    openingHours: place.opening_hours || null,
+                    types: place.types || [],
+                    website: place.website || null,
+                    photoReferences: place.photos ? place.photos.map(p => p.photo_reference) : []
+                };
+
+                res.json({
+                    success: true,
+                    data: formattedPlace,
+                    message: 'Place details retrieved successfully for Android Map SDK'
+                });
+            } else {
+                res.status(404).json({
+                    success: false,
+                    message: 'Place not found',
+                    status: response.data.status,
+                    errorMessage: response.data.error_message || 'Place not found'
+                });
+            }
+        } catch (error) {
+            console.error('Get place details for Android error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to get place details',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Reverse geocode for Android driver app
+     * GET /api/maps/android/reverse-geocode?lat=xxx&lng=xxx
+     */
+    async reverseGeocodeForAndroid(req, res) {
+        try {
+            const { lat, lng } = req.query;
+            const apiKey = process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
+
+            if (!apiKey) {
+                return res.status(500).json({
+                    success: false,
+                    message: 'Google Maps API key is not configured'
+                });
+            }
+
+            if (!lat || !lng) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Latitude and longitude parameters are required. Format: lat=xxx&lng=xxx'
+                });
+            }
+
+            const response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
+                params: {
+                    latlng: `${lat},${lng}`,
+                    key: apiKey
+                }
+            });
+
+            if (response.data.status === 'OK' && response.data.results.length > 0) {
+                const result = response.data.results[0];
+                
+                // Format for Android Map SDK
+                const addressData = {
+                    address: result.formatted_address || '',
+                    location: {
+                        lat: parseFloat(lat),
+                        lng: parseFloat(lng)
+                    },
+                    placeId: result.place_id || null,
+                    components: result.address_components?.map(comp => ({
+                        longName: comp.long_name || '',
+                        shortName: comp.short_name || '',
+                        types: comp.types || []
+                    })) || []
+                };
+
+                res.json({
+                    success: true,
+                    data: addressData,
+                    message: 'Reverse geocoding successful for Android Map SDK'
+                });
+            } else {
+                res.status(404).json({
+                    success: false,
+                    message: 'Location not found',
+                    status: response.data.status,
+                    errorMessage: response.data.error_message || 'No address found'
+                });
+            }
+        } catch (error) {
+            console.error('Reverse geocode for Android error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to reverse geocode coordinates',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Geocode for Android driver app
+     * GET /api/maps/android/geocode?address=xxx
+     */
+    async geocodeForAndroid(req, res) {
+        try {
+            const { address } = req.query;
+            const apiKey = process.env.VITE_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
+
+            if (!apiKey) {
+                return res.status(500).json({
+                    success: false,
+                    message: 'Google Maps API key is not configured'
+                });
+            }
+
+            if (!address) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Address parameter is required'
+                });
+            }
+
+            const response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
+                params: {
+                    address: address,
+                    key: apiKey
+                }
+            });
+
+            if (response.data.status === 'OK' && response.data.results.length > 0) {
+                const result = response.data.results[0];
+                
+                // Format for Android Map SDK
+                const locationData = {
+                    address: result.formatted_address || address,
+                    location: {
+                        lat: result.geometry?.location?.lat || 0,
+                        lng: result.geometry?.location?.lng || 0
+                    },
+                    placeId: result.place_id || null,
+                    types: result.types || []
+                };
+
+                res.json({
+                    success: true,
+                    data: locationData,
+                    message: 'Geocoding successful for Android Map SDK'
+                });
+            } else {
+                res.status(404).json({
+                    success: false,
+                    message: 'Address not found',
+                    status: response.data.status,
+                    errorMessage: response.data.error_message || 'No location found'
+                });
+            }
+        } catch (error) {
+            console.error('Geocode for Android error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to geocode address',
+                error: error.message
+            });
+        }
+    }
 }
 
 module.exports = new MapsController();

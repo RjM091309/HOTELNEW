@@ -341,7 +341,7 @@ class GpsTrackerController {
       
       // 🔁 CORRECT FLOW: GPS Device → Socket.IO (IMMEDIATE) → Google Map → Database (history)
       // Socket.IO = live movement, Database = memory/history
-      // Emit Socket.IO IMMEDIATELY from GPS data (before DB save)
+      // Emit Socket.IO IMMEDIATELY from GPS data (before DB save) WITH isMoving status
       const io = req.app.get('io');
       if (io) {
         io.emit('driver-location-updated', {
@@ -353,6 +353,7 @@ class GpsTrackerController {
             heading: locationData.heading ? parseFloat(locationData.heading) : null,
             battery: locationData.battery !== null && locationData.battery !== undefined ? parseFloat(locationData.battery) : null,
             isCharging: locationData.isCharging !== null && locationData.isCharging !== undefined ? !!locationData.isCharging : null,
+            isMoving: isMoving, // Include isMoving status for real-time marker animation
             satelliteCount: (() => {
               if (locationData.satelliteCount === null || locationData.satelliteCount === undefined) return null;
               const satCountStr = String(locationData.satelliteCount).trim().toUpperCase();
@@ -373,9 +374,10 @@ class GpsTrackerController {
         deviceLastSaveTime.set(locationData.deviceId, now); // Track save time
         console.log(`📍 GPS Location saved: Device ${deviceId} at (${lat.toFixed(6)}, ${lng.toFixed(6)}) - Battery: ${locationData.battery !== null ? locationData.battery : 'N/A'}%, Satellites: ${locationData.satelliteCount !== null ? locationData.satelliteCount : 'N/A'}, GSM: ${locationData.gsmSignal !== null ? locationData.gsmSignal : 'N/A'}, Moving: ${isMoving ? 'Yes' : 'No'}`);
       } else {
-        console.log(`⏭️ GPS Location received (not saved - no movement): Device ${deviceId} at (${lat}, ${lng})`);
+        console.log(`⏭️ GPS Location received (not saved - throttled/no movement): Device ${deviceId} at (${lat}, ${lng})`);
         // Update device status (battery, coordinates, etc.) even when not saving new location
-        // IMPORTANT: Also update is_moving to false (standby) when device is not moving
+        // IMPORTANT: Update is_moving status based on actual movement (calculated from speed + distance)
+        // isMoving can be true even when not saving (due to throttling), so we need to update it correctly
         try {
           await GpsTrackerModel.updateDeviceStatus(
             locationData.deviceId, 
@@ -386,7 +388,7 @@ class GpsTrackerController {
             locationData.isCharging,
             locationData.latitude,
             locationData.longitude,
-            isMoving // Pass isMoving=false to update database status to standby
+            isMoving // Pass calculated isMoving status (true if moving, false if standby)
           );
           
           console.log(`⏭️ GPS Location received (not saved - no movement): Device ${deviceId} at (${lat.toFixed(6)}, ${lng.toFixed(6)}) - Updated: Battery=${locationData.battery !== null && locationData.battery !== undefined ? locationData.battery : 'N/A'}%, Satellites=${locationData.satelliteCount !== null && locationData.satelliteCount !== undefined ? locationData.satelliteCount : 'N/A'}, GSM=${locationData.gsmSignal !== null && locationData.gsmSignal !== undefined ? locationData.gsmSignal : 'N/A'}, Charging=${locationData.isCharging ? 'Yes' : 'No'}, Status=${isMoving ? 'In Transit' : 'Standby'}`);

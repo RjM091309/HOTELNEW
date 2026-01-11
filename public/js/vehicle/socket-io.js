@@ -257,13 +257,19 @@ async function updateVehicleLocationFromSocket(deviceId, locationData) {
             }
         }
         
+        // Get isMoving status from Socket.IO data FIRST (before updating other data)
+        // Server calculates isMoving correctly based on speed >= 3km/h AND distance >= 30m
+        // Fallback to vehicle/device data if Socket.IO doesn't have it yet
+        const isMovingFromSocket = locationData.isMoving !== null && locationData.isMoving !== undefined 
+            ? !!locationData.isMoving 
+            : (foundVehicle ? (foundVehicle.isMoving || false) : (foundDevice ? (foundDevice.isMoving || false) : false));
+        
         // Snap GPS coordinates to nearest road for accurate positioning
         let newPosition = { lat: locationData.lat, lng: locationData.lng };
         
         // Only snap to road if vehicle is moving (to avoid unnecessary API calls when stationary)
-        const isMoving = foundVehicle ? (foundVehicle.isMoving || false) : (foundDevice ? (foundDevice.isMoving || false) : false);
-        
-        if (isMoving) {
+        // Use the NEW isMoving status from Socket.IO for accurate decision
+        if (isMovingFromSocket) {
             try {
                 const snappedPosition = await snapToRoad(locationData.lat, locationData.lng);
                 newPosition = snappedPosition;
@@ -274,8 +280,8 @@ async function updateVehicleLocationFromSocket(deviceId, locationData) {
         }
         
         // Update vehicle/device location data in memory for real-time InfoWindow updates
-        // IMPORTANT: Don't update isMoving here - it should be determined by database location changes only
-        // Socket.IO is for real-time position updates, but isMoving should come from database comparison
+        // IMPORTANT: Update isMoving from Socket.IO data (server calculates it based on speed + distance)
+        // Server already filters GPS jitter before calculating isMoving, so we can trust it
         if (foundVehicle && foundVehicle.location) {
             foundVehicle.location.lat = newPosition.lat;
             foundVehicle.location.lng = newPosition.lng;
@@ -293,6 +299,10 @@ async function updateVehicleLocationFromSocket(deviceId, locationData) {
             if (locationData.isCharging !== null && locationData.isCharging !== undefined) {
                 foundVehicle.location.isCharging = !!locationData.isCharging;
             }
+            if (locationData.isMoving !== null && locationData.isMoving !== undefined) {
+                // Update isMoving from Socket.IO data (server calculates it correctly based on speed + distance)
+                foundVehicle.isMoving = !!locationData.isMoving;
+            }
             if (locationData.satelliteCount !== null && locationData.satelliteCount !== undefined) {
                 // Handle "N/A" string values - convert to null so display shows 0
                 const satCountStr = String(locationData.satelliteCount).trim().toUpperCase();
@@ -307,9 +317,6 @@ async function updateVehicleLocationFromSocket(deviceId, locationData) {
                 foundVehicle.location.gsmSignal = parseInt(locationData.gsmSignal);
             }
             foundVehicle.location.lastUpdate = locationData.timestamp || new Date();
-            
-            // Don't update isMoving from Socket.IO - it should only be determined by database location changes
-            // Socket.IO may have GPS jitter, so rely on database saves (which filter jitter) for isMoving status
         } else if (foundDevice && foundDevice.location) {
             foundDevice.location.lat = newPosition.lat;
             foundDevice.location.lng = newPosition.lng;
@@ -327,6 +334,10 @@ async function updateVehicleLocationFromSocket(deviceId, locationData) {
             if (locationData.isCharging !== null && locationData.isCharging !== undefined) {
                 foundDevice.location.isCharging = !!locationData.isCharging;
             }
+            if (locationData.isMoving !== null && locationData.isMoving !== undefined) {
+                // Update isMoving from Socket.IO data (server calculates it correctly based on speed + distance)
+                foundDevice.isMoving = !!locationData.isMoving;
+            }
             if (locationData.satelliteCount !== null && locationData.satelliteCount !== undefined) {
                 // Handle "N/A" string values - convert to null so display shows 0
                 const satCountStr = String(locationData.satelliteCount).trim().toUpperCase();
@@ -341,24 +352,22 @@ async function updateVehicleLocationFromSocket(deviceId, locationData) {
                 foundDevice.location.gsmSignal = parseInt(locationData.gsmSignal);
             }
             foundDevice.location.lastUpdate = locationData.timestamp || new Date();
-            
-            // Don't update isMoving from Socket.IO - it should only be determined by database location changes
         }
         
-        // 🔁 CORRECT LOGIC: Only update marker position if vehicle/device is actually moving
-        // CRITICAL: Check isMoving status from database comparison (not Socket.IO speed)
+        // 🔁 CORRECT LOGIC: Update marker position based on isMoving status from Socket.IO
+        // Server calculates isMoving correctly based on speed >= 3km/h AND distance >= 30m
         // If isMoving = false (standby), ignore Socket.IO position updates (GPS jitter)
-        // If isMoving = true (in-transit), animate marker smoothly
+        // If isMoving = true (in-transit), animate marker smoothly in real-time
         if (markerKey && markers[markerKey]) {
             const marker = markers[markerKey];
             const currentPos = marker.getPosition();
             
-            // Get isMoving status from vehicle/device data (determined by database location changes)
-            const isMoving = foundVehicle ? (foundVehicle.isMoving || false) : (foundDevice ? (foundDevice.isMoving || false) : false);
+            // Use the isMoving status we already got from Socket.IO (calculated above)
+            // Server already filtered GPS jitter before calculating isMoving
             
-            // Only update marker position if actually moving (database confirmed movement)
+            // Only update marker position if actually moving (confirmed by server)
             // If standby, ignore Socket.IO position updates to prevent GPS jitter from moving marker
-            if (isMoving) {
+            if (isMovingFromSocket) {
                 // IN-TRANSIT: Update marker position smoothly
                 const speed = locationData.speed ? parseFloat(locationData.speed) : 0;
                 

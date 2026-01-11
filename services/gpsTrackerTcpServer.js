@@ -463,10 +463,11 @@ async function processGpsMessage(message, originalMessage, socket, io) {
 
     return flag;
   };
-  locationData.isCharging = deriveChargingFlag();
+    locationData.isCharging = deriveChargingFlag();
     let shouldSave = true;
     let distanceMeters = 0;
     
+    // Calculate distance FIRST (needed for both isMoving determination and save decision)
     if (latestLocation) {
       // Round coordinates to 6 decimal places (~0.1m precision) to avoid floating point issues
       const roundCoord = (coord) => Math.round(parseFloat(coord) * 1000000) / 1000000;
@@ -483,95 +484,108 @@ async function processGpsMessage(message, originalMessage, socket, io) {
       if (latestTimestamp && newTimestamp && latestTimestamp === newTimestamp) {
         if (roundedLatestLat === roundedNewLat && roundedLatestLng === roundedNewLng) {
           shouldSave = false;
+          distanceMeters = 0; // Same location = 0 distance
           console.log(`⏭️ Location not saved: Device ${locationData.deviceId} - duplicate message (same timestamp and coordinates)`);
         }
       }
       
-      // Second check: Are coordinates exactly the same (within 0.1m precision)?
-      // This catches exact duplicates even if distance calculation has issues
-      if (shouldSave && roundedLatestLat === roundedNewLat && roundedLatestLng === roundedNewLng) {
-        shouldSave = false;
-        console.log(`⏭️ Location not saved: Device ${locationData.deviceId} - exact same coordinates (${roundedNewLat}, ${roundedNewLng})`);
-      } else if (shouldSave) {
-        // Third check: Calculate distance using rounded coordinates
+      // Calculate distance ALWAYS (needed for isMoving determination even if not saving)
+      if (shouldSave || (roundedLatestLat !== roundedNewLat || roundedLatestLng !== roundedNewLng)) {
         distanceMeters = calculateDistance(
           roundedLatestLat,
           roundedLatestLng,
           roundedNewLat,
           roundedNewLng
         );
-        
-          const hasSpeed = locationData.speed !== null && locationData.speed !== undefined && !isNaN(locationData.speed);
-          const distanceGate = hasSpeed ? distanceMeters >= distanceThreshold : distanceMeters >= distanceThreshold * 2;
-          const speedGate = hasSpeed ? locationData.speed >= minSpeedKph : true;
-          if (!distanceGate || !speedGate) {
-            shouldSave = false;
-            // Don't save duplicate/jitter location, but still forward and emit Socket.IO
-            console.log(`⏭️ Location not saved (jitter): Device ${locationData.deviceId} - Distance: ${distanceMeters.toFixed(2)}m (threshold: ${distanceThreshold}m), Speed: ${hasSpeed ? `${locationData.speed}km/h` : 'N/A'} (threshold: ${hasSpeed ? `${minSpeedKph}km/h` : 'N/A'})`);
-          } else {
-            console.log(`📍 Location changed: Device ${locationData.deviceId} moved ${distanceMeters.toFixed(2)}m (threshold: ${distanceThreshold}m), Speed: ${hasSpeed ? `${locationData.speed}km/h` : 'N/A'}`);
-          }
+      }
+      
+      // Second check: Are coordinates exactly the same (within 0.1m precision)?
+      // This catches exact duplicates even if distance calculation has issues
+      if (shouldSave && roundedLatestLat === roundedNewLat && roundedLatestLng === roundedNewLng) {
+        shouldSave = false;
+        distanceMeters = 0; // Same location = 0 distance
+        console.log(`⏭️ Location not saved: Device ${locationData.deviceId} - exact same coordinates (${roundedNewLat}, ${roundedNewLng})`);
+      } else if (shouldSave) {
+        // Third check: Distance and speed thresholds for saving
+        const hasSpeed = locationData.speed !== null && locationData.speed !== undefined && !isNaN(locationData.speed);
+        const distanceGate = hasSpeed ? distanceMeters >= distanceThreshold : distanceMeters >= distanceThreshold * 2;
+        const speedGate = hasSpeed ? locationData.speed >= minSpeedKph : true;
+        if (!distanceGate || !speedGate) {
+          shouldSave = false;
+          // Don't save duplicate/jitter location, but still forward and emit Socket.IO
+          console.log(`⏭️ Location not saved (jitter): Device ${locationData.deviceId} - Distance: ${distanceMeters.toFixed(2)}m (threshold: ${distanceThreshold}m), Speed: ${hasSpeed ? `${locationData.speed}km/h` : 'N/A'} (threshold: ${hasSpeed ? `${minSpeedKph}km/h` : 'N/A'})`);
+        } else {
+          console.log(`📍 Location changed: Device ${locationData.deviceId} moved ${distanceMeters.toFixed(2)}m (threshold: ${distanceThreshold}m), Speed: ${hasSpeed ? `${locationData.speed}km/h` : 'N/A'}`);
         }
       }
-      
-      // 🗄️ Time-based DB saving throttling
-      // speed > 0: every 5-10 sec, speed = 0: every 30-60 sec
-      const hasSpeed = locationData.speed !== null && locationData.speed !== undefined && !isNaN(locationData.speed) && locationData.speed > 0;
-      const lastSaveTime = deviceLastSaveTime.get(locationData.deviceId);
-      const now = Date.now();
-      const timeSinceLastSave = lastSaveTime ? now - lastSaveTime : Infinity;
-      
-      // Throttle: moving vehicles save every 5-10 sec, standby every 30-60 sec
-      const minSaveInterval = hasSpeed ? 5000 : 30000; // 5 sec for moving, 30 sec for standby
-      const shouldThrottle = lastSaveTime && timeSinceLastSave < minSaveInterval;
-      
-      if (shouldSave && shouldThrottle) {
-        shouldSave = false;
-        console.log(`⏭️ Location save throttled: Device ${locationData.deviceId} - Last save ${(timeSinceLastSave / 1000).toFixed(1)}s ago (min: ${minSaveInterval / 1000}s)`);
+    }
+    
+    // 🗄️ Time-based DB saving throttling
+    // speed > 0: every 5-10 sec, speed = 0: every 30-60 sec
+    const hasSpeed = locationData.speed !== null && locationData.speed !== undefined && !isNaN(locationData.speed) && locationData.speed > 0;
+    const lastSaveTime = deviceLastSaveTime.get(locationData.deviceId);
+    const now = Date.now();
+    const timeSinceLastSave = lastSaveTime ? now - lastSaveTime : Infinity;
+    
+    // Throttle: moving vehicles save every 5-10 sec, standby every 30-60 sec
+    const minSaveInterval = hasSpeed ? 5000 : 30000; // 5 sec for moving, 30 sec for standby
+    const shouldThrottle = lastSaveTime && timeSinceLastSave < minSaveInterval;
+    
+    if (shouldSave && shouldThrottle) {
+      shouldSave = false;
+      console.log(`⏭️ Location save throttled: Device ${locationData.deviceId} - Last save ${(timeSinceLastSave / 1000).toFixed(1)}s ago (min: ${minSaveInterval / 1000}s)`);
+    }
+    
+    // Calculate isMoving status INDEPENDENTLY of shouldSave
+    // isMoving = true if: distance >= 30m AND speed > 0 AND speed >= 3 km/h
+    // This must be calculated BEFORE Socket.IO emit so it can be included
+    const hasSpeedForMoving = locationData.speed !== null && locationData.speed !== undefined && !isNaN(locationData.speed) && locationData.speed > 0;
+    const speedForMoving = hasSpeedForMoving ? parseFloat(locationData.speed) : 0;
+    const MOVEMENT_DISTANCE_METERS = parseFloat(process.env.GPS_MIN_DISTANCE_METERS || '30');
+    const MOVEMENT_MIN_SPEED_KPH = parseFloat(process.env.GPS_MIN_SPEED_KPH || '3');
+    
+    // Calculate isMoving based on actual GPS data, not on shouldSave status
+    // Device is moving if: has valid speed > threshold AND distance >= threshold
+    let isMoving = false;
+    if (hasSpeedForMoving && speedForMoving >= MOVEMENT_MIN_SPEED_KPH) {
+      // Check distance - use latestLocation if available, otherwise assume moving if speed is high enough
+      if (latestLocation && distanceMeters >= MOVEMENT_DISTANCE_METERS) {
+        isMoving = true;
+      } else if (!latestLocation) {
+        // No previous location, but device has speed - assume moving
+        isMoving = true;
       }
-      
-      // 🔁 CORRECT FLOW: GPS Device → Socket.IO (IMMEDIATE) → Google Map → Database (history)
-      // Socket.IO = live movement, Database = memory/history
-      // Emit Socket.IO IMMEDIATELY from GPS data (before DB save)
-      if (io) {
-        io.emit('driver-location-updated', {
-          deviceId: locationData.deviceId,
-          location: {
-            lat: locationData.latitude,
-            lng: locationData.longitude,
-            speed: locationData.speed ? parseFloat(locationData.speed) : null,
-            heading: locationData.heading ? parseFloat(locationData.heading) : null,
-            battery: locationData.battery !== null && locationData.battery !== undefined ? parseFloat(locationData.battery) : null,
-            isCharging: locationData.isCharging !== null && locationData.isCharging !== undefined ? !!locationData.isCharging : null,
-            satelliteCount: (() => {
-              if (locationData.satelliteCount === null || locationData.satelliteCount === undefined) return null;
-              const satCountStr = String(locationData.satelliteCount).trim().toUpperCase();
-              if (satCountStr === 'N/A' || satCountStr === 'NA' || satCountStr === '') return null;
-              const satCountNum = parseInt(locationData.satelliteCount);
-              return isNaN(satCountNum) ? null : satCountNum;
-            })(),
-            gsmSignal: locationData.gsmSignal !== null && locationData.gsmSignal !== undefined ? parseInt(locationData.gsmSignal) : null,
-            timestamp: locationData.timestamp
-          }
-        });
-      }
-      
-      // Calculate isMoving status before saving to database
-      // isMoving = true if: distance >= 30m AND speed > 0 AND speed >= 3 km/h
-      // This ensures consistent calculation stored in database
-      const hasSpeedForMoving = locationData.speed !== null && locationData.speed !== undefined && !isNaN(locationData.speed) && locationData.speed > 0;
-      const speedForMoving = hasSpeedForMoving ? parseFloat(locationData.speed) : 0;
-      const MOVEMENT_DISTANCE_METERS = parseFloat(process.env.GPS_MIN_DISTANCE_METERS || '30');
-      const MOVEMENT_MIN_SPEED_KPH = parseFloat(process.env.GPS_MIN_SPEED_KPH || '3');
-      
-      let isMoving = false;
-      if (shouldSave && hasSpeedForMoving && speedForMoving > 0) {
-        // Only mark as moving if distance >= threshold AND speed >= threshold
-        isMoving = distanceMeters >= MOVEMENT_DISTANCE_METERS && speedForMoving >= MOVEMENT_MIN_SPEED_KPH;
-      }
-      // If not saving (shouldSave = false), device is not moving (standby)
-      
-      locationData.isMoving = isMoving;
+    }
+    // If speed is 0 or below threshold, or distance is below threshold, device is not moving
+    
+    locationData.isMoving = isMoving;
+    
+    // 🔁 CORRECT FLOW: GPS Device → Socket.IO (IMMEDIATE) → Google Map → Database (history)
+    // Socket.IO = live movement, Database = memory/history
+    // Emit Socket.IO IMMEDIATELY from GPS data (before DB save) WITH isMoving status
+    if (io) {
+      io.emit('driver-location-updated', {
+        deviceId: locationData.deviceId,
+        location: {
+          lat: locationData.latitude,
+          lng: locationData.longitude,
+          speed: locationData.speed ? parseFloat(locationData.speed) : null,
+          heading: locationData.heading ? parseFloat(locationData.heading) : null,
+          battery: locationData.battery !== null && locationData.battery !== undefined ? parseFloat(locationData.battery) : null,
+          isCharging: locationData.isCharging !== null && locationData.isCharging !== undefined ? !!locationData.isCharging : null,
+          isMoving: isMoving, // Include isMoving status for real-time marker animation
+          satelliteCount: (() => {
+            if (locationData.satelliteCount === null || locationData.satelliteCount === undefined) return null;
+            const satCountStr = String(locationData.satelliteCount).trim().toUpperCase();
+            if (satCountStr === 'N/A' || satCountStr === 'NA' || satCountStr === '') return null;
+            const satCountNum = parseInt(locationData.satelliteCount);
+            return isNaN(satCountNum) ? null : satCountNum;
+          })(),
+          gsmSignal: locationData.gsmSignal !== null && locationData.gsmSignal !== undefined ? parseInt(locationData.gsmSignal) : null,
+          timestamp: locationData.timestamp
+        }
+      });
+    }
       
       // Store in database only if location changed significantly (throttled saving)
       if (shouldSave) {
@@ -580,7 +594,8 @@ async function processGpsMessage(message, originalMessage, socket, io) {
       console.log(`📍 GPS Location saved: Device ${locationData.deviceId} at (${lat.toFixed(6)}, ${lng.toFixed(6)}) - Battery: ${locationData.battery !== null ? locationData.battery : 'N/A'}%, Satellites: ${locationData.satelliteCount !== null ? locationData.satelliteCount : 'N/A'}, GSM: ${locationData.gsmSignal !== null ? locationData.gsmSignal : 'N/A'}, Moving: ${isMoving ? 'Yes' : 'No'}`);
     } else {
       // Update device status (battery, coordinates, etc.) even when not saving new location
-      // IMPORTANT: Also update is_moving to false (standby) when device is not moving
+      // IMPORTANT: Update is_moving status based on actual movement (calculated from speed + distance)
+      // isMoving can be true even when not saving (due to throttling), so we need to update it correctly
       try {
         await GpsTrackerModel.updateDeviceStatus(
           locationData.deviceId, 
@@ -591,7 +606,7 @@ async function processGpsMessage(message, originalMessage, socket, io) {
           locationData.isCharging,
           locationData.latitude,
           locationData.longitude,
-          isMoving // Pass isMoving=false to update database status to standby
+          isMoving // Pass calculated isMoving status (true if moving, false if standby)
         );
         
         console.log(`⏭️ GPS Location received (not saved - no movement): Device ${locationData.deviceId} at (${lat.toFixed(6)}, ${lng.toFixed(6)}) - Updated: Battery=${locationData.battery !== null && locationData.battery !== undefined ? locationData.battery : 'N/A'}%, Satellites=${locationData.satelliteCount !== null && locationData.satelliteCount !== undefined ? locationData.satelliteCount : 'N/A'}, GSM=${locationData.gsmSignal !== null && locationData.gsmSignal !== undefined ? locationData.gsmSignal : 'N/A'}, Charging=${locationData.isCharging ? 'Yes' : 'No'}, Status=${isMoving ? 'In Transit' : 'Standby'}`);
