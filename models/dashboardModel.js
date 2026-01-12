@@ -109,7 +109,6 @@ class DashboardModel {
             + COALESCE(bill.AMENITIES_CHARGE, 0)
             + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
             + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
-            + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
             - COALESCE(bill.RESERVATION_FEE, 0)
             - COALESCE(bill.DISCOUNT_AMOUNT, 0)
           ) AS TotalCost,
@@ -121,7 +120,6 @@ class DashboardModel {
                 p.BOOKING_ID = b.IDNo
                 OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
                 OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
-                OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
               )
           ), 0) AS TotalPaid,
           GREATEST(0, 
@@ -130,7 +128,6 @@ class DashboardModel {
               + COALESCE(bill.AMENITIES_CHARGE, 0)
               + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
               + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
-              + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
               - COALESCE(bill.RESERVATION_FEE, 0)
               - COALESCE(bill.DISCOUNT_AMOUNT, 0)
             )
@@ -142,7 +139,6 @@ class DashboardModel {
                   p.BOOKING_ID = b.IDNo
                   OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
                   OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
-                  OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
                 )
             ), 0)
           ) AS Balance,
@@ -205,7 +201,6 @@ class DashboardModel {
             + COALESCE(bill.AMENITIES_CHARGE, 0)
             + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
             + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
-            + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
             - COALESCE(bill.RESERVATION_FEE, 0)
             - COALESCE(bill.DISCOUNT_AMOUNT, 0)
           ) AS TotalCost,
@@ -217,7 +212,6 @@ class DashboardModel {
                 p.BOOKING_ID = b.IDNo
                 OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
                 OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
-                OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
               )
           ), 0) AS TotalPaid,
           GREATEST(0, 
@@ -226,7 +220,6 @@ class DashboardModel {
               + COALESCE(bill.AMENITIES_CHARGE, 0)
               + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
               + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
-              + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
               - COALESCE(bill.RESERVATION_FEE, 0)
               - COALESCE(bill.DISCOUNT_AMOUNT, 0)
             )
@@ -238,7 +231,6 @@ class DashboardModel {
                   p.BOOKING_ID = b.IDNo
                   OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
                   OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
-                  OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
                 )
             ), 0)
           ) AS Balance,
@@ -349,7 +341,6 @@ class DashboardModel {
             + COALESCE(bill.AMENITIES_CHARGE, 0)
             + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
             + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
-            + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
             - COALESCE(bill.RESERVATION_FEE, 0)
             - COALESCE(bill.DISCOUNT_AMOUNT, 0)
           ) AS TotalCost,
@@ -361,7 +352,6 @@ class DashboardModel {
                 p.BOOKING_ID = b.IDNo
                 OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
                 OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
-                OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
               )
           ), 0) AS TotalPaid,
           GREATEST(0, 
@@ -370,7 +360,6 @@ class DashboardModel {
               + COALESCE(bill.AMENITIES_CHARGE, 0)
               + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
               + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
-              + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
               - COALESCE(bill.RESERVATION_FEE, 0)
               - COALESCE(bill.DISCOUNT_AMOUNT, 0)
             )
@@ -382,7 +371,6 @@ class DashboardModel {
                   p.BOOKING_ID = b.IDNo
                   OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
                   OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
-                  OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
                 )
             ), 0)
           ) AS Balance,
@@ -448,7 +436,6 @@ class DashboardModel {
             + COALESCE(bill.AMENITIES_CHARGE, 0)
             + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
             + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
-            + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
             - COALESCE(bill.RESERVATION_FEE, 0)
             - COALESCE(bill.DISCOUNT_AMOUNT, 0)
           ) AS TotalCost,
@@ -460,7 +447,6 @@ class DashboardModel {
                 p.BOOKING_ID = b.IDNo
                 OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
                 OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
-                OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
               )
           ), 0) AS TotalPaid,
           GREATEST(0, 
@@ -469,7 +455,6 @@ class DashboardModel {
               + COALESCE(bill.AMENITIES_CHARGE, 0)
               + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
               + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
-              + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
               - COALESCE(bill.RESERVATION_FEE, 0)
               - COALESCE(bill.DISCOUNT_AMOUNT, 0)
             )
@@ -481,7 +466,6 @@ class DashboardModel {
                   p.BOOKING_ID = b.IDNo
                   OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
                   OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
-                  OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
                 )
             ), 0)
           ) AS Balance,
@@ -541,7 +525,6 @@ class DashboardModel {
             + COALESCE(bill.AMENITIES_CHARGE, 0)
             + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
             + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
-            + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
             - COALESCE(bill.RESERVATION_FEE, 0)
             - COALESCE(bill.DISCOUNT_AMOUNT, 0)
           ) AS TotalCost,
@@ -553,7 +536,6 @@ class DashboardModel {
                 p.BOOKING_ID = b.IDNo
                 OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
                 OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
-                OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
               )
           ), 0) AS TotalPaid,
           GREATEST(0, 
@@ -562,7 +544,6 @@ class DashboardModel {
               + COALESCE(bill.AMENITIES_CHARGE, 0)
               + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
               + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
-              + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
               - COALESCE(bill.RESERVATION_FEE, 0)
               - COALESCE(bill.DISCOUNT_AMOUNT, 0)
             )
@@ -574,7 +555,6 @@ class DashboardModel {
                   p.BOOKING_ID = b.IDNo
                   OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
                   OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
-                  OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
                 )
             ), 0)
           ) AS Balance,
@@ -829,7 +809,6 @@ class DashboardModel {
               + COALESCE(bill.AMENITIES_CHARGE, 0)
               + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
               + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
-              + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
               - COALESCE(bill.RESERVATION_FEE, 0)
               - COALESCE(bill.DISCOUNT_AMOUNT, 0)
             ) AS TotalCost,
@@ -841,7 +820,6 @@ class DashboardModel {
                   p.BOOKING_ID = b.IDNo
                   OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
                   OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
-                  OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
                 )
             ), 0) AS TotalPaid,
             GREATEST(0, 
@@ -850,7 +828,6 @@ class DashboardModel {
                 + COALESCE(bill.AMENITIES_CHARGE, 0)
                 + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
                 + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
-                + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
                 - COALESCE(bill.RESERVATION_FEE, 0)
                 - COALESCE(bill.DISCOUNT_AMOUNT, 0)
               )
@@ -862,7 +839,6 @@ class DashboardModel {
                     p.BOOKING_ID = b.IDNo
                     OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
                     OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
-                    OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
                   )
               ), 0)
             ) AS Balance,
@@ -913,7 +889,6 @@ class DashboardModel {
               + COALESCE(bill.AMENITIES_CHARGE, 0)
               + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
               + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
-              + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
               - COALESCE(bill.RESERVATION_FEE, 0)
               - COALESCE(bill.DISCOUNT_AMOUNT, 0)
             ) AS TotalCost,
@@ -925,7 +900,6 @@ class DashboardModel {
                   p.BOOKING_ID = b.IDNo
                   OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
                   OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
-                  OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
                 )
             ), 0) AS TotalPaid,
             GREATEST(0, 
@@ -934,7 +908,6 @@ class DashboardModel {
                 + COALESCE(bill.AMENITIES_CHARGE, 0)
                 + COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
                 + COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0)
-                + COALESCE((SELECT SUM(pd.RATE) FROM booking_pick_drop pd WHERE pd.BOOKING_ID = b.IDNo AND pd.ACTIVE = 1), 0)
                 - COALESCE(bill.RESERVATION_FEE, 0)
                 - COALESCE(bill.DISCOUNT_AMOUNT, 0)
               )
@@ -946,7 +919,6 @@ class DashboardModel {
                     p.BOOKING_ID = b.IDNo
                     OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
                     OR p.BOOKING_SERVICE_ID IN (SELECT IDNo FROM booking_service bs2 WHERE bs2.BOOKING_ID = b.IDNo AND bs2.ACTIVE = 1)
-                    OR p.BOOKING_PICKDROP_ID IN (SELECT IDNo FROM booking_pick_drop pd2 WHERE pd2.BOOKING_ID = b.IDNo AND pd2.ACTIVE = 1)
                   )
               ), 0)
             ) AS Balance,

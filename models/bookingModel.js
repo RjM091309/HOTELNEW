@@ -1987,18 +1987,6 @@ class BookingModel {
               WHERE bs.BOOKING_ID = ? AND bs.ACTIVE = 1
           ), 0) AS service_unpaid,
 
-          -- Transport Charges with remaining balance (considering partial payments)
-          COALESCE((
-              SELECT SUM(GREATEST(0, pd.RATE - COALESCE((
-                  SELECT SUM(p.AMOUNT_PAID) 
-                  FROM payments p 
-                  WHERE p.BOOKING_PICKDROP_ID = pd.IDNo
-                  AND p.PAYMENT_TYPE = 'pickdrop'
-              ), 0)))
-              FROM booking_pick_drop pd
-              WHERE pd.BOOKING_ID = ? AND pd.ACTIVE = 1
-          ), 0) AS transport_unpaid,
-
           -- Reservation Fee (always applied to reduce balance)
           COALESCE((
               SELECT b.RESERVATION_FEE
@@ -2055,17 +2043,6 @@ class BookingModel {
                   FROM booking_service bs
                   WHERE bs.BOOKING_ID = ? AND bs.ACTIVE = 1
               ), 0)
-              +
-              COALESCE((
-                  SELECT SUM(GREATEST(0, pd.RATE - COALESCE((
-                      SELECT SUM(p.AMOUNT_PAID) 
-                      FROM payments p 
-                      WHERE p.BOOKING_PICKDROP_ID = pd.IDNo
-                      AND p.PAYMENT_TYPE = 'pickdrop'
-                  ), 0)))
-                  FROM booking_pick_drop pd
-                  WHERE pd.BOOKING_ID = ? AND pd.ACTIVE = 1
-              ), 0)
           ) AS total_unpaid_balance,
           COALESCE((
             SELECT b.REMARKS FROM billing b WHERE b.BOOKING_ID = ?
@@ -2077,14 +2054,12 @@ class BookingModel {
         bookingId, // room_charge_unpaid
         bookingId, // extension_charge_unpaid
         bookingId, // service_unpaid
-        bookingId, // transport_unpaid
         bookingId, // reservation_fee
         bookingId, // discount_amount
         bookingId, // discount_applied
         bookingId, // total_unpaid_balance (room)
         bookingId, // total_unpaid_balance (extension)
         bookingId, // total_unpaid_balance (service)
-        bookingId, // total_unpaid_balance (transport)
         bookingId  // discount_remarks
       ]);
 
@@ -2092,7 +2067,6 @@ class BookingModel {
         room_charge_unpaid: 0,
         extension_charge_unpaid: 0,
         service_unpaid: 0,
-        transport_unpaid: 0,
         reservation_fee: 0,
         discount_amount: 0,
         total_unpaid_balance: 0
@@ -2210,27 +2184,8 @@ class BookingModel {
         ENCODED_DT: ext.ENCODED_DT
       }));
 
-      // Get transport services
-      const transportQuery = `
-        SELECT pd.IDNo, pd.PICKDROP_ID, pd.TYPE, pd.RATE, pd.STATUS, r.NAME AS LOCATION_NAME, pd.ENCODED_DT
-        FROM booking_pick_drop pd
-        JOIN pick_drop_rates r ON pd.PICKDROP_ID = r.IDNo
-        WHERE pd.BOOKING_ID = ? AND pd.ACTIVE = 1
-      `;
-      const pickupDropRows = await queryDatabasePromise(transportQuery, [bookingId]);
-
-      // Format transport services
-      const formattedTransport = pickupDropRows.map(row => ({
-        SERVICE_ID: row.TYPE === 'pick-up' ? -101 : -102,
-        SERVICE_NAME: `${row.TYPE === 'pick-up' ? 'Pick-up' : 'Drop-off'} - ${row.LOCATION_NAME}`,
-        QTY: 1,
-        TOTAL_COST: parseFloat(row.RATE),
-        STATUS: row.STATUS,
-        ENCODED_DT: row.ENCODED_DT
-      }));
-
       // Combine all services
-      const allServices = [...serviceRows, ...formattedExtensions, ...formattedTransport];
+      const allServices = [...serviceRows, ...formattedExtensions];
 
       return allServices;
     } catch (error) {
@@ -2444,58 +2399,7 @@ class BookingModel {
           };
 
         } else if (isTransport) {
-          // Remove from booking_pick_drop
-          const type = serviceId === -101 ? 'pick-up' : 'drop-off';
-
-          const fetchQuery = `
-            SELECT IDNo, RATE FROM booking_pick_drop 
-            WHERE BOOKING_ID = ? AND TYPE = ? AND STATUS != 'paid' AND ACTIVE = 1
-            ORDER BY IDNo DESC
-            LIMIT 1
-          `;
-
-          const results = await new Promise((resolve, reject) => {
-            connection.query(fetchQuery, [bookingId, type], (err, results) => {
-              if (err) reject(err);
-              else resolve(results);
-            });
-          });
-
-          if (results.length === 0) {
-            throw new Error(`${type} not found or already paid.`);
-          }
-
-          const idToUpdate = results[0].IDNo;
-
-          const deactivateQuery = `
-            UPDATE booking_pick_drop
-            SET ACTIVE = 0
-            WHERE IDNo = ?
-          `;
-
-          await new Promise((resolve, reject) => {
-            connection.query(deactivateQuery, [idToUpdate], (err) => {
-              if (err) reject(err);
-              else resolve();
-            });
-          });
-
-          // Commit the transaction
-          await new Promise((resolve, reject) => {
-            connection.commit(err => {
-              if (err) reject(err);
-              else resolve();
-            });
-          });
-
-          connection.release();
-
-          return {
-            success: true,
-            message: `${type} removed successfully.`,
-            totalCost: 0
-          };
-
+          throw new Error('Transport services are no longer supported.');
         } else {
           // Handle booking_service logic
           const fetchServiceQuery = `
@@ -2813,15 +2717,6 @@ class BookingModel {
       `;
       const extensionData = await queryDatabasePromise(extensionQuery, [bookingId]);
 
-      // Fetch transport
-      const transportQuery = `
-        SELECT pd.TYPE, r.NAME AS LOCATION_NAME, pd.RATE, pd.STATUS
-        FROM booking_pick_drop pd
-        JOIN pick_drop_rates r ON pd.PICKDROP_ID = r.IDNo
-        WHERE pd.BOOKING_ID = ? AND pd.ACTIVE = 1
-      `;
-      const pickDropData = await queryDatabasePromise(transportQuery, [bookingId]);
-
       // Format extensions
       extensionData.forEach(ext => {
         roomItems.push({
@@ -2845,16 +2740,6 @@ class BookingModel {
         serviceId: service.SERVICE_ID || service.IDNo || null // Add serviceId for Upgrade detection
       }));
 
-      // Format transport
-      const transportItems = pickDropData.map(row => ({
-        date: b.CHECK_IN_DATE,
-        description: `${row.TYPE === 'pick-up' ? 'Pick-up' : 'Drop-off'} - ${row.LOCATION_NAME}`,
-        basePrice: parseFloat(row.RATE),
-        qty: null, // optional or 1
-        subTotal: parseFloat(row.RATE),
-        status: row.STATUS
-      }));
-
       const penaltyItems = penaltyAmount > 0 ? [{
         date: b.CHECK_OUT_DATE || b.CHECK_IN_DATE,
         description: 'Cancellation Fee',
@@ -2864,7 +2749,7 @@ class BookingModel {
         status: 'penalty'
       }] : [];
 
-      const baseChargeItems = [...roomItems, ...serviceItems, ...transportItems];
+      const baseChargeItems = [...roomItems, ...serviceItems];
 
       // Combine all items
       const allItems = [...baseChargeItems, ...penaltyItems];
@@ -3396,45 +3281,6 @@ class BookingModel {
             connection.query(
               `UPDATE booking_service SET STATUS = 'paid' WHERE BOOKING_ID = ? AND STATUS != 'paid' AND ACTIVE = 1`,
               [bookingId],
-              (err) => {
-                if (err) reject(err);
-                else resolve();
-              }
-            );
-          });
-        }
-
-        // Step 6: Process unpaid pickup/dropoff
-        const pickDropQuery = `
-          SELECT IDNo, RATE, TYPE FROM booking_pick_drop 
-          WHERE BOOKING_ID = ? AND STATUS != 'paid' AND ACTIVE = 1
-        `;
-        const pickDropRows = await new Promise((resolve, reject) => {
-          connection.query(pickDropQuery, [bookingId], (err, rows) => {
-            if (err) reject(err);
-            else resolve(rows);
-          });
-        });
-
-        for (let pd of pickDropRows) {
-          await new Promise((resolve, reject) => {
-            connection.query(
-              `INSERT INTO payments (
-                BOOKING_ID, BOOKING_PICKDROP_ID, AMOUNT_PAID, PAYMENT_METHOD, 
-                                    PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS
-                                ) VALUES (?, ?, ?, ?, 'pickdrop', NOW(), ?, ?)`,
-                                [bookingId, pd.IDNo, pd.RATE, paymentMethod, encodedBy, paymentNotes || 'Pickup/Dropoff payment'],
-              (err) => {
-                if (err) reject(err);
-                else resolve();
-              }
-            );
-          });
-
-          await new Promise((resolve, reject) => {
-            connection.query(
-              `UPDATE booking_pick_drop SET STATUS = 'paid' WHERE IDNo = ?`,
-              [pd.IDNo],
               (err) => {
                 if (err) reject(err);
                 else resolve();
