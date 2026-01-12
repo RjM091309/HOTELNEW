@@ -3,6 +3,7 @@
 // ========================================
 
 const EmployeeModel = require('../models/employeeModel');
+const UserModel = require('../models/userModels');
 const { queryDatabasePromise } = require('../config/database');
 const multer = require('multer');
 const path = require('path');
@@ -131,7 +132,7 @@ class EmployeeController {
       }
 
       try {
-        const { fullName, contactNo, address, dateStarted, department } = req.body;
+        const { fullName, contactNo, address, dateStarted, department, username, password, confirm_password, userRole, userRoom } = req.body;
         
         if (!fullName || !contactNo || !address || !dateStarted || !department) {
           return res.status(400).json({
@@ -156,6 +157,37 @@ class EmployeeController {
         };
 
         const result = await EmployeeModel.createEmployee(employeeData);
+        
+        // If user account fields are provided, create user account
+        if (username && password && confirm_password && userRole) {
+          // Check if passwords match
+          if (password !== confirm_password) {
+            return res.status(400).json({
+              success: false,
+              message: 'Passwords do not match'
+            });
+          }
+
+          // Check if username is available
+          const isUsernameAvailable = await UserModel.checkUsernameAvailability(username);
+          if (!isUsernameAvailable) {
+            return res.status(400).json({
+              success: false,
+              message: 'Username already exists'
+            });
+          }
+
+          const userData = {
+            fullname: fullName,
+            username: username,
+            password: password,
+            role: userRole,
+            roomId: (String(userRole) === '9' ? (userRoom || null) : null),
+            encodedBy: req.user ? req.user.userId : req.session.userId
+          };
+
+          await UserModel.createUser(userData);
+        }
         
         if (result) {
           res.json({
@@ -191,7 +223,7 @@ class EmployeeController {
       }
 
       try {
-        const { employeeId, fullName, department, contactNo, address, dateStarted } = req.body;
+        const { employeeId, fullName, department, contactNo, address, dateStarted, username, password, confirm_password, userRole, userRoom } = req.body;
         
         if (!employeeId || !fullName || !department || !contactNo || !address || !dateStarted) {
           return res.status(400).json({
@@ -206,10 +238,10 @@ class EmployeeController {
         let photo = newPhoto;
         
         // If no new photo uploaded, get existing photo
-                            if (!newPhoto) {
-                      const existingEmployee = await EmployeeModel.getEmployeeById(employeeId);
-                      photo = existingEmployee.PHOTO || 'employee-default.png';
-                    }
+        if (!newPhoto) {
+          const existingEmployee = await EmployeeModel.getEmployeeById(employeeId);
+          photo = existingEmployee.PHOTO || 'employee-default.png';
+        }
 
         const employeeData = {
           IDNo: employeeId,
@@ -224,6 +256,74 @@ class EmployeeController {
         };
 
         const result = await EmployeeModel.updateEmployee(employeeData);
+        
+        // Handle user account update if provided
+        if (username && userRole) {
+          // Check if user account exists for this employee (by matching fullname)
+          const existingUsers = await UserModel.getAllUsers();
+          const existingUser = existingUsers.find(u => u.FULLNAME === fullName);
+          
+          if (existingUser) {
+            // Update existing user account
+            const userData = {
+              userId: existingUser.IDno,
+              fullname: fullName,
+              username: username,
+              password: password || null,
+              role: userRole,
+              roomId: (String(userRole) === '9' ? (userRoom || null) : null),
+              editedBy: req.user ? req.user.userId : req.session.userId
+            };
+            
+            // Check if passwords match if password is provided
+            if (password && password !== confirm_password) {
+              return res.status(400).json({
+                success: false,
+                message: 'Passwords do not match'
+              });
+            }
+            
+            // Check if new username is available (if username is being changed)
+            if (username !== existingUser.USERNAME) {
+              const isUsernameAvailable = await UserModel.checkUsernameAvailability(username);
+              if (!isUsernameAvailable) {
+                return res.status(400).json({
+                  success: false,
+                  message: 'Username already exists'
+                });
+              }
+            }
+            
+            await UserModel.updateUser(userData);
+          } else if (password && confirm_password) {
+            // Create new user account if password is provided
+            if (password !== confirm_password) {
+              return res.status(400).json({
+                success: false,
+                message: 'Passwords do not match'
+              });
+            }
+            
+            const isUsernameAvailable = await UserModel.checkUsernameAvailability(username);
+            if (!isUsernameAvailable) {
+              return res.status(400).json({
+                success: false,
+                message: 'Username already exists'
+              });
+            }
+            
+            const userData = {
+              fullname: fullName,
+              username: username,
+              password: password,
+              role: userRole,
+              roomId: (String(userRole) === '9' ? (userRoom || null) : null),
+              encodedBy: req.user ? req.user.userId : req.session.userId
+            };
+            
+            await UserModel.createUser(userData);
+          }
+        }
         
         if (result) {
           res.json({

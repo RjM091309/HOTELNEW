@@ -1,6 +1,10 @@
 <!-- start js include path -->
 <script src="/plugins/jquery/jquery.min.js"></script>
 <script src="/js/pmsCore.js"></script>
+<!-- Socket.IO for real-time session monitoring (must load before session-handler) -->
+<script src="/socket.io/socket.io.js"></script>
+<!-- Session expiration handler (must load early) -->
+<script src="/js/session-handler.js"></script>
 <script src="https://unpkg.com/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
 <script src="/plugins/jquery-blockui/jquery.blockui.min.js"></script>
 <script src="/plugins/jquery-slimscroll/jquery.slimscroll.min.js"></script>

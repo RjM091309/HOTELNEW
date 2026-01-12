@@ -191,6 +191,19 @@ function setupSocketEvents(io) {
         // This is handled automatically when GPS tracker sends data to the endpoint
         
         // ========================================
+        // SESSION MANAGEMENT EVENTS
+        // ========================================
+        
+        // Join user-specific session room
+        socket.on('join-user-session', (data) => {
+            const userId = data.userId;
+            if (userId) {
+                socket.join(`user-session-${userId}`);
+                console.log(`🔐 Client ${socket.id} joined session room for user ${userId}`);
+            }
+        });
+        
+        // ========================================
         // DISCONNECTION HANDLER
         // ========================================
         
@@ -200,4 +213,28 @@ function setupSocketEvents(io) {
     });
 }
 
+// Helper function to invalidate user sessions via Socket.IO
+function invalidateUserSession(io, userId, reason = 'login') {
+    if (io && userId) {
+        const roomName = `user-session-${userId}`;
+        const socketCount = io.sockets.adapter.rooms.get(roomName)?.size || 0;
+        
+        // Emit to all sockets in the user's session room
+        io.to(roomName).emit('session-invalidated', {
+            userId: userId,
+            reason: reason,
+            timestamp: new Date().toISOString(),
+            message: 'Your session has been terminated because you logged in on another device.'
+        });
+        
+        console.log(`🔐 Session invalidated for user ${userId} (reason: ${reason}, room: ${roomName}, sockets: ${socketCount})`);
+        
+        // Also log all connected rooms for debugging
+        if (socketCount === 0) {
+            console.warn(`⚠️ No sockets found in room ${roomName} - client may not have joined yet`);
+        }
+    }
+}
+
 module.exports = setupSocketEvents;
+module.exports.invalidateUserSession = invalidateUserSession;

@@ -1,8 +1,9 @@
 const AuthModel = require('../models/authModel');
+const SessionModel = require('../models/sessionModel');
 
 class AuthMiddleware {
   // Check if user is authenticated (for API routes)
-  static isAuthenticated(req, res, next) {
+  static async isAuthenticated(req, res, next) {
     const token = req.headers.authorization?.split(' ')[1] || req.cookies?.token;
 
     if (!token) {
@@ -20,10 +21,20 @@ class AuthMiddleware {
           message: 'Invalid token'
         });
       }
+
+      // Check if token is still valid (not invalidated by new login)
+      const isValid = await SessionModel.isTokenValid(decoded.userId, token);
+      if (!isValid) {
+        return res.status(401).json({
+          success: false,
+          message: 'Session expired. Please login again.'
+        });
+      }
       
       req.user = decoded;
       next();
     } catch (error) {
+      console.error('Auth middleware error:', error);
       return res.status(401).json({
         success: false,
         message: 'Invalid token'
@@ -86,13 +97,19 @@ class AuthMiddleware {
   }
 
   // Optional authentication (doesn't fail if no token)
-  static optionalAuth(req, res, next) {
+  static async optionalAuth(req, res, next) {
     const token = req.headers.authorization?.split(' ')[1] || req.cookies?.token;
 
     if (token) {
       try {
         const decoded = AuthModel.verifyToken(token);
-        req.user = decoded;
+        // Check if token is still valid
+        if (decoded) {
+          const isValid = await SessionModel.isTokenValid(decoded.userId, token);
+          if (isValid) {
+            req.user = decoded;
+          }
+        }
       } catch (error) {
         console.log('Invalid token:', error.message);
       }
@@ -102,7 +119,7 @@ class AuthMiddleware {
   }
 
   // Redirect to login if not authenticated (for page routes)
-  static requireAuth(req, res, next) {
+  static async requireAuth(req, res, next) {
     const token = req.headers.authorization?.split(' ')[1] || req.cookies?.token;
 
     if (!token) {
@@ -114,23 +131,36 @@ class AuthMiddleware {
       if (!decoded) {
         return res.redirect('/login');
       }
+
+      // Check if token is still valid (not invalidated by new login)
+      const isValid = await SessionModel.isTokenValid(decoded.userId, token);
+      if (!isValid) {
+        // Clear invalid cookie
+        res.clearCookie('token');
+        return res.redirect('/login?session=expired');
+      }
       
       req.user = decoded;
       next();
     } catch (error) {
+      console.error('Auth middleware error:', error);
       return res.redirect('/login');
     }
   }
 
   // Redirect to dashboard if already authenticated (for login page)
-  static redirectIfAuthenticated(req, res, next) {
+  static async redirectIfAuthenticated(req, res, next) {
     const token = req.headers.authorization?.split(' ')[1] || req.cookies?.token;
 
     if (token) {
       try {
         const decoded = AuthModel.verifyToken(token);
+        // Check if token is still valid
         if (decoded) {
-          return res.redirect('/dashboard');
+          const isValid = await SessionModel.isTokenValid(decoded.userId, token);
+          if (isValid) {
+            return res.redirect('/dashboard');
+          }
         }
       } catch (error) {
         console.log('Invalid token:', error.message);

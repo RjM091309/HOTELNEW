@@ -74,6 +74,33 @@
 	<!-- Login Script -->
 	<script>
 		$(document).ready(function() {
+			// Check if redirected due to session expiration
+			const urlParams = new URLSearchParams(window.location.search);
+			if (urlParams.get('session') === 'expired') {
+				// Show Swal.fire notification if available
+				if (typeof Swal !== 'undefined') {
+					setTimeout(function() {
+						Swal.fire({
+							title: '<div style="font-size: 22px; font-weight: 600; color: #2c3e50;">Session Expired</div>',
+							html: '<div style="text-align: center; padding: 15px 0;">' +
+								  '<div style="font-size: 56px; margin-bottom: 15px;">⚠️</div>' +
+								  '<p style="font-size: 15px; color: #34495e; line-height: 1.6; margin: 0;">' +
+								  'Your session has been terminated because you logged in on another device.</p>' +
+								  '</div>',
+							icon: 'info',
+							iconColor: '#3498db',
+							confirmButtonText: 'OK',
+							confirmButtonColor: '#3085d6',
+							buttonsStyling: true,
+							allowOutsideClick: false,
+							allowEscapeKey: false,
+							width: '420px',
+							padding: '2rem'
+						});
+					}, 300);
+				}
+			}
+			
 			// Handle login form submission
 			$('.login100-form').on('submit', function(e) {
 				e.preventDefault();
@@ -100,6 +127,10 @@
 					}),
 					success: function(response) {
 						if (response.success) {
+							// Store token in localStorage for Socket.IO updates (token cookie is httpOnly)
+							if (response.token) {
+								localStorage.setItem('auth_token', response.token);
+							}
 							// Redirect directly to dashboard
 							window.location.href = response.redirectUrl || '/dashboard';
 						} else {

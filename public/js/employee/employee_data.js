@@ -4,6 +4,26 @@
 
 var dataTable;
 
+// Role ID to display name mapping
+const ROLE_ID_TO_NAME = {
+    '1': 'Admin',
+    '2': 'Frontdesk',
+    '3': 'Manager',
+    '4': 'Housekeeping',
+    '5': 'GuestRoom',
+    '6': 'GuestApp',
+    '7': 'DriverApp',
+    '8': 'SalesRoom',
+    '9': 'Guest Room Controller'
+};
+
+function getRoleNameById(roleId) {
+    return ROLE_ID_TO_NAME[String(roleId)] || 'Unknown';
+}
+
+// Cached rooms for room selector
+let cachedRooms = null;
+
 // ========================================
 // INITIALIZATION
 // ========================================
@@ -13,6 +33,8 @@ $(document).ready(function() {
     setupFormHandlers();
     setupModalHandlers();
     setupDatePickerForAdd();
+    setupUsernameCheckHandlers();
+    setupUserRoleHandlers();
 });
 
 // ========================================
@@ -107,8 +129,11 @@ function setupModalHandlers() {
             });
 
             setupEmployeeDropdownChangeHandlers();
+            setupUserRoleDropdownHandlers();
             // Initialize date picker on show (in case of dynamic assets)
             initializeAddDatePicker();
+            // Initialize room list if needed
+            ensureRoomsLoaded().then(() => handleUserRoleDependentFields('add'));
         }, 200);
     });
 
@@ -143,10 +168,182 @@ function setupModalHandlers() {
             }
 
             setupEmployeeDropdownChangeHandlers();
+            setupUserRoleDropdownHandlers();
             // Initialize date picker/mask for edit
             initializeEditDatePicker();
+            // Initialize room list if needed
+            ensureRoomsLoaded().then(() => handleUserRoleDependentFields('edit'));
         }, 200);
     });
+}
+
+// ========================================
+// USERNAME AVAILABILITY CHECKING
+// ========================================
+
+function setupUsernameCheckHandlers() {
+    $('#addUsername').on('input', function() {
+        const username = $(this).val();
+        if (username) {
+            checkUsernameAvailability(username, 'addUsernameCheck');
+        } else {
+            $('#addUsernameCheck').html('');
+        }
+    });
+
+    $('#editUsername').on('input', function() {
+        const username = $(this).val();
+        if (username) {
+            checkUsernameAvailability(username, 'editUsernameCheck');
+        } else {
+            $('#editUsernameCheck').html('');
+        }
+    });
+}
+
+function checkUsernameAvailability(username, elementId) {
+    if (!username) {
+        $(`#${elementId}`).html('');
+        return;
+    }
+
+    $.ajax({
+        url: '/user_info/api/users/check-username',
+        method: 'POST',
+        data: JSON.stringify({ username: username }),
+        contentType: 'application/json',
+        success: function(response) {
+            if (response.success) {
+                if (response.available) {
+                    $(`#${elementId}`).html('<span class="text-success">✓ Username available</span>');
+                } else {
+                    $(`#${elementId}`).html('<span class="text-danger">✗ Username already taken</span>');
+                }
+            }
+        },
+        error: function() {
+            $(`#${elementId}`).html('<span class="text-warning">⚠ Unable to check availability</span>');
+        }
+    });
+}
+
+// ========================================
+// USER ROLE HANDLERS
+// ========================================
+
+function setupUserRoleHandlers() {
+    setupUserRoleDropdownHandlers();
+    setupRoomDropdownHandlers();
+}
+
+function setupUserRoleDropdownHandlers() {
+    const selector = '[data-mdl-for="addUserRole"] .mdl-menu__item, [data-mdl-for="editUserRole"] .mdl-menu__item';
+    $(document)
+        .off('click.mdlUserRole', selector)
+        .on('click.mdlUserRole', selector, function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const $li = $(this);
+            const $ul = $li.closest('ul');
+            const value = $li.data('val');
+            const input = $('#' + $ul.attr('data-mdl-for'));
+            input.val($li.text().trim());
+            if (typeof value !== 'undefined') {
+                input.attr('data-value', value);
+            }
+            const tf = input.closest('.mdl-textfield');
+            if (tf && tf.length) tf.addClass('is-dirty');
+
+            // Toggle room selector visibility based on role
+            handleUserRoleDependentFields(input.is('#addUserRole') ? 'add' : 'edit');
+        });
+}
+
+function handleUserRoleDependentFields(mode) {
+    const roleInput = mode === 'add' ? $('#addUserRole') : $('#editUserRole');
+    const roomContainer = mode === 'add' ? $('#addUserRoomContainer') : $('#editUserRoomContainer');
+    const roomInput = mode === 'add' ? $('#addUserRoom') : $('#editUserRoom');
+    const roleVal = roleInput.attr('data-value') || roleInput.val();
+    if (String(roleVal) === '9') {
+        roomContainer.show();
+        if (roomInput.val()) {
+            roomInput.closest('.mdl-textfield').addClass('is-dirty');
+        }
+    } else {
+        roomContainer.hide();
+        roomInput.val('').attr('data-value','');
+        roomInput.closest('.mdl-textfield').removeClass('is-dirty');
+    }
+}
+
+// ========================================
+// ROOM SELECTORS FOR GUEST ROOM CONTROLLER
+// ========================================
+
+function ensureRoomsLoaded() {
+    if (cachedRooms) return Promise.resolve(cachedRooms);
+    return new Promise(function(resolve, reject) {
+        $.ajax({
+            url: '/room/api/rooms',
+            method: 'GET',
+            dataType: 'json',
+            success: function(resp) {
+                if (resp && resp.success && Array.isArray(resp.data)) {
+                    cachedRooms = resp.data
+                        .filter(function(r){ return r.ACTIVE === 1; })
+                        .sort(function(a,b){ 
+                            const aNum = String(a.ROOM_NUMBER || '');
+                            const bNum = String(b.ROOM_NUMBER || '');
+                            return aNum.localeCompare(bNum, undefined, {numeric: true, sensitivity: 'base'});
+                        });
+                    populateRoomLists();
+                    resolve(cachedRooms);
+                } else {
+                    resolve([]);
+                }
+            },
+            error: function(){ resolve([]); }
+        });
+    });
+}
+
+function populateRoomLists() {
+    var addUl = document.getElementById('addUserRoomList');
+    var editUl = document.getElementById('editUserRoomList');
+    if (!addUl || !editUl) return;
+    addUl.innerHTML = '';
+    editUl.innerHTML = '';
+    (cachedRooms || []).forEach(function(room){
+        var li1 = document.createElement('li');
+        li1.className = 'mdl-menu__item';
+        li1.setAttribute('data-val', room.IDNo);
+        li1.textContent = room.ROOM_NUMBER;
+        addUl.appendChild(li1);
+
+        var li2 = document.createElement('li');
+        li2.className = 'mdl-menu__item';
+        li2.setAttribute('data-val', room.IDNo);
+        li2.textContent = room.ROOM_NUMBER;
+        editUl.appendChild(li2);
+    });
+}
+
+function setupRoomDropdownHandlers() {
+    const selector = '[data-mdl-for="addUserRoom"] .mdl-menu__item, [data-mdl-for="editUserRoom"] .mdl-menu__item';
+    $(document)
+        .off('click.mdlUserRoom', selector)
+        .on('click.mdlUserRoom', selector, function(e){
+            e.preventDefault();
+            e.stopPropagation();
+            const $li = $(this);
+            const $ul = $li.closest('ul');
+            const value = $li.data('val');
+            const input = $('#' + $ul.attr('data-mdl-for'));
+            input.val($li.text().trim());
+            if (typeof value !== 'undefined') input.attr('data-value', value);
+            const tf = input.closest('.mdl-textfield');
+            if (tf && tf.length) tf.addClass('is-dirty');
+        });
 }
 
 // ========================================
@@ -217,8 +414,8 @@ function initializeDataTable() {
 
     dataTable = $("#employeeTable").DataTable({
         columnDefs: [
-            { targets: [6], className: "text-center" },
-            { targets: [6], orderable: false, searchable: false }
+            { targets: [8], className: "text-center" },
+            { targets: [8], orderable: false, searchable: false }
         ],
         pageLength: 10,
         lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
@@ -239,16 +436,29 @@ function initializeDataTable() {
 // ========================================
 
 function reloadData() {
-    $.ajax({
-        url: '/employee/api/employees',
-        method: 'GET',
-        dataType: 'json',
-        success: function(response) {
-            if (response.success) {
-                dataTable.clear();
-                
-                if (response.data && response.data.length > 0) {
-                    response.data.forEach(function(employee) {
+    // Load both employees and users
+    $.when(
+        $.ajax({
+            url: '/employee/api/employees',
+            method: 'GET',
+            dataType: 'json'
+        }),
+        $.ajax({
+            url: '/user_info/api/users',
+            method: 'GET',
+            dataType: 'json'
+        })
+    ).done(function(employeeResponse, userResponse) {
+        const employees = employeeResponse[0].success ? employeeResponse[0].data : [];
+        const users = userResponse[0].success ? userResponse[0].data : [];
+        
+        if (employeeResponse[0].success) {
+            dataTable.clear();
+            
+            if (employees && employees.length > 0) {
+                employees.forEach(function(employee) {
+                    // Find matching user account
+                    const user = users.find(u => u.FULLNAME === employee.FULLNAME);
                         // Handle photo URL - check for valid photo or use default
                         let photoUrl;
                         if (employee.PHOTO && employee.PHOTO !== '' && 
@@ -267,6 +477,10 @@ function reloadData() {
                             year: 'numeric'
                         }) : '';
                         
+                        // User account info
+                        const usernameDisplay = user ? user.USERNAME : '<span style="color: #888;">No account</span>';
+                        const roleDisplay = user ? getRoleNameById(user.PERMISSIONS) : '<span style="color: #888;">-</span>';
+                        
                         const actions = `
                             <button type="button" class="btn btn-tbl-edit btn-xs" onclick="editEmployee('${employee.IDNo}')" title="Edit Employee">
                                 <i class="fa fa-pencil"></i>
@@ -283,13 +497,15 @@ function reloadData() {
                             contact,
                             employee.ADDRESS || '',
                             dateStarted,
+                            usernameDisplay,
+                            roleDisplay,
                             actions
                         ]);
                     });
                     dataTable.draw();
                 }
             } else {
-                console.error('Error loading employee data:', response.message);
+                console.error('Error loading employee data:', employeeResponse[0].message);
                 Swal.fire({
                     title: 'Error!',
                     text: 'Error loading employee data',
@@ -298,8 +514,7 @@ function reloadData() {
                     confirmButtonText: 'OK'
                 });
             }
-        },
-        error: function(xhr, status, error) {
+        }).fail(function(xhr, status, error) {
             console.error('AJAX Error:', error);
             Swal.fire({
                 title: 'Error!',
@@ -308,8 +523,7 @@ function reloadData() {
                 confirmButtonColor: '#d33',
                 confirmButtonText: 'OK'
             });
-        }
-    });
+        });
 }
 
 // ========================================
@@ -354,7 +568,49 @@ function createEmployee() {
         return;
     }
     
-
+    // Validate user account fields if provided
+    const username = $('#addUsername').val();
+    const password = $('#addPassword').val();
+    const confirmPassword = $('#addConfirmPassword').val();
+    const userRole = $('#addUserRole').attr('data-value') || $('#addUserRole').val();
+    
+    if (username || password || confirmPassword || userRole) {
+        // If any user field is filled, all required fields must be filled
+        if (!username || !password || !confirmPassword || !userRole) {
+            Swal.fire({
+                title: 'Incomplete User Account!',
+                text: 'If creating a user account, all fields (username, password, confirm password, role) must be provided.',
+                icon: 'error',
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'OK'
+            });
+            return;
+        }
+        
+        // Check if passwords match
+        if (password !== confirmPassword) {
+            Swal.fire({
+                title: 'Password Mismatch!',
+                text: 'Passwords do not match.',
+                icon: 'error',
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'OK'
+            });
+            return;
+        }
+        
+        // Check username availability
+        if ($('#addUsernameCheck').find('.text-danger').length > 0) {
+            Swal.fire({
+                title: 'Username Already Taken!',
+                text: 'Please choose a different username.',
+                icon: 'error',
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'OK'
+            });
+            return;
+        }
+    }
     
     const formData = new FormData();
     
@@ -365,6 +621,18 @@ function createEmployee() {
     formData.append('address', $('#addAddress').val());
     // Normalize date to YYYY-MM-DD if entered as MM/DD/YYYY
     formData.append('dateStarted', normalizeDateForSubmit($('#addDateStarted').val()));
+    
+    // Add user account fields if provided
+    if (username && password && confirmPassword && userRole) {
+        formData.append('username', username);
+        formData.append('password', password);
+        formData.append('confirm_password', confirmPassword);
+        formData.append('userRole', userRole);
+        const userRoom = $('#addUserRoom').attr('data-value') || '';
+        if (String(userRole) === '9' && userRoom) {
+            formData.append('userRoom', userRoom);
+        }
+    }
     
     // Add image file if selected
     const imageFile = $('#addPhoto')[0].files[0];
@@ -436,7 +704,49 @@ function updateEmployee() {
         return;
     }
     
-
+    // Validate user account fields if provided
+    const username = $('#editUsername').val();
+    const password = $('#editPassword').val();
+    const confirmPassword = $('#editConfirmPassword').val();
+    const userRole = $('#editUserRole').attr('data-value') || $('#editUserRole').val();
+    
+    if (username || userRole) {
+        // If username or role is provided, username and role are required
+        if (!username || !userRole) {
+            Swal.fire({
+                title: 'Incomplete User Account!',
+                text: 'If updating user account, username and role must be provided.',
+                icon: 'error',
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'OK'
+            });
+            return;
+        }
+        
+        // Check if passwords match if password is provided
+        if (password && password !== confirmPassword) {
+            Swal.fire({
+                title: 'Password Mismatch!',
+                text: 'Passwords do not match.',
+                icon: 'error',
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'OK'
+            });
+            return;
+        }
+        
+        // Check username availability if changed
+        if ($('#editUsernameCheck').find('.text-danger').length > 0) {
+            Swal.fire({
+                title: 'Username Already Taken!',
+                text: 'Please choose a different username.',
+                icon: 'error',
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'OK'
+            });
+            return;
+        }
+    }
     
     const formData = new FormData();
     
@@ -447,6 +757,20 @@ function updateEmployee() {
     formData.append('contactNo', cleanedContact);
     formData.append('address', $('#editAddress').val());
     formData.append('dateStarted', $('#editDateStarted').val());
+    
+    // Add user account fields if provided
+    if (username && userRole) {
+        formData.append('username', username);
+        formData.append('userRole', userRole);
+        const userRoom = $('#editUserRoom').attr('data-value') || '';
+        if (String(userRole) === '9' && userRoom) {
+            formData.append('userRoom', userRoom);
+        }
+        if (password) {
+            formData.append('password', password);
+            formData.append('confirm_password', confirmPassword);
+        }
+    }
     
     // Add image file if selected
     const imageFile = $('#editPhoto')[0].files[0];
@@ -507,6 +831,8 @@ function editEmployee(employeeId) {
         success: function(response) {
             if (response.success) {
                 populateEditForm(response.data);
+                // Also load user account info if exists
+                loadUserAccountForEmployee(response.data.FULLNAME);
                 $('#editEmployeeModal').modal('show');
             } else {
                 console.error('Error loading employee details:', response.message);
@@ -528,6 +854,49 @@ function editEmployee(employeeId) {
                 confirmButtonColor: '#d33',
                 confirmButtonText: 'OK'
             });
+        }
+    });
+}
+
+function loadUserAccountForEmployee(fullName) {
+    $.ajax({
+        url: '/user_info/api/users',
+        method: 'GET',
+        dataType: 'json',
+        success: function(response) {
+            if (response.success && response.data) {
+                const user = response.data.find(u => u.FULLNAME === fullName);
+                if (user) {
+                    $('#editUsername').val(user.USERNAME);
+                    const roleName = getRoleNameById(user.PERMISSIONS);
+                    $('#editUserRole').val(roleName);
+                    $('#editUserRole').attr('data-value', user.PERMISSIONS);
+                    
+                    if (String(user.PERMISSIONS) === '9' && user.ROOM_ID) {
+                        ensureRoomsLoaded().then(function(){
+                            const room = (cachedRooms||[]).find(function(r){ return String(r.IDNo) === String(user.ROOM_ID); });
+                            if (room) {
+                                $('#editUserRoom').val(room.ROOM_NUMBER).attr('data-value', room.IDNo);
+                                $('#editUserRoomContainer').show();
+                                $('#editUserRoom').closest('.mdl-textfield').addClass('is-dirty');
+                            }
+                        });
+                    }
+                    
+                    // Force MDL labels to float
+                    const textfields = document.querySelectorAll('#editEmployeeModal .mdl-textfield');
+                    textfields.forEach(function(tf) {
+                        const input = tf.querySelector('.mdl-textfield__input');
+                        if (input && input.value) {
+                            tf.classList.add('is-dirty');
+                            tf.classList.remove('is-focused');
+                        }
+                    });
+                }
+            }
+        },
+        error: function() {
+            // Silently fail - user account might not exist
         }
     });
 }
@@ -605,6 +974,17 @@ function populateEditForm(employee) {
     } else {
         $('#editPhotoPreview').attr('src', '/img/employee/employee-default.png').show();
     }
+
+    // Clear user account fields initially (will be populated by loadUserAccountForEmployee if exists)
+    $('#editUsername').val('');
+    $('#editUserRole').val('');
+    $('#editUserRole').attr('data-value', '');
+    $('#editPassword').val('');
+    $('#editConfirmPassword').val('');
+    $('#editUsernameCheck').html('');
+    $('#editUserRoom').val('');
+    $('#editUserRoom').attr('data-value', '');
+    $('#editUserRoomContainer').hide();
 
     // Store value for MDL select and force float labels
     $('#editDepartment').attr('data-value', employee.DEPARTMENT);
@@ -765,6 +1145,17 @@ function resetAddEmployeeForm() {
     $('#addContactNo').val('');
     $('#addAddress').val('');
     $('#addDateStarted').val('');
+    
+    // Reset user account fields
+    $('#addUsername').val('');
+    $('#addUserRole').val('');
+    $('#addUserRole').attr('data-value', '');
+    $('#addPassword').val('');
+    $('#addConfirmPassword').val('');
+    $('#addUsernameCheck').html('');
+    $('#addUserRoom').val('');
+    $('#addUserRoom').attr('data-value', '');
+    $('#addUserRoomContainer').hide();
     
     // Reset photo upload interface
     resetFileUploadInterface('#addPhotoPreview', '#addPhotoPreviewContainer', '#addFileInfo', '#addUploadError', '#addFileUploadArea');

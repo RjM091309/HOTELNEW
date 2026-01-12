@@ -27,6 +27,8 @@
                                 <th>Contact No</th>
                                 <th>Address</th>
                                 <th>Date Started</th>
+                                <th>Username</th>
+                                <th>Role</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -107,6 +109,75 @@
                             <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
                                 <input class="mdl-textfield__input" type="text" id="addAddress" name="address" required>
                                 <label class="mdl-textfield__label">Address</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- User Account Information -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <h5 style="color: #aaa; margin-bottom: 15px; border-bottom: 1px solid #444; padding-bottom: 8px;">User Account Information (Optional)</h5>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="addUsername" name="username" autocomplete="off" autocapitalize="none" spellcheck="false">
+                                <label class="mdl-textfield__label">Username</label>
+                            </div>
+                            <div id="addUsernameCheck" class="form-text" style="margin-top: 5px; font-size: 12px;"></div>
+                        </div>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="addUserRole" name="userRole" value="" autocomplete="off" readonly tabIndex="-1">
+                                <label for="addUserRole" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="addUserRole" class="mdl-textfield__label">User Role</label>
+                                <ul data-mdl-for="addUserRole" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                    <li class="mdl-menu__item" data-val="1">Admin</li>
+                                    <li class="mdl-menu__item" data-val="2">Frontdesk</li>
+                                    <li class="mdl-menu__item" data-val="3">Manager</li>
+                                    <li class="mdl-menu__item" data-val="4">Housekeeping</li>
+                                    <li class="mdl-menu__item" data-val="5">GuestRoom</li>
+                                    <li class="mdl-menu__item" data-val="6">GuestApp</li>
+                                    <li class="mdl-menu__item" data-val="7">DriverApp</li>
+                                    <li class="mdl-menu__item" data-val="8">SalesRoom</li>
+                                    <li class="mdl-menu__item" data-val="9">Guest Room Controller</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Guest Room Controller: Room selector -->
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20" id="addUserRoomContainer" style="display:none;">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="addUserRoom" name="userRoom" value="" autocomplete="off" readonly tabIndex="-1">
+                                <label for="addUserRoom" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="addUserRoom" class="mdl-textfield__label">Room</label>
+                                <ul data-mdl-for="addUserRoom" class="mdl-menu mdl-menu--bottom-left mdl-js-menu" id="addUserRoomList">
+                                    <!-- populated dynamically -->
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="password" id="addPassword" name="password" autocomplete="new-password">
+                                <label class="mdl-textfield__label">Password</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Confirm Password -->
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="password" id="addConfirmPassword" name="confirmPassword" autocomplete="new-password">
+                                <label class="mdl-textfield__label">Confirm Password</label>
                             </div>
                         </div>
                     </div>
@@ -239,6 +310,75 @@
                         </div>
                     </div>
                     
+                    <!-- User Account Information -->
+                    <div class="row">
+                        <div class="col-lg-12 p-t-20">
+                            <h5 style="color: #aaa; margin-bottom: 15px; border-bottom: 1px solid #444; padding-bottom: 8px;">User Account Information (Optional)</h5>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editUsername" name="username" autocomplete="off" autocapitalize="none" spellcheck="false">
+                                <label class="mdl-textfield__label">Username</label>
+                            </div>
+                            <div id="editUsernameCheck" class="form-text" style="margin-top: 5px; font-size: 12px;"></div>
+                        </div>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editUserRole" name="userRole" value="" autocomplete="off" readonly tabIndex="-1">
+                                <label for="editUserRole" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="editUserRole" class="mdl-textfield__label">User Role</label>
+                                <ul data-mdl-for="editUserRole" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
+                                    <li class="mdl-menu__item" data-val="1">Admin</li>
+                                    <li class="mdl-menu__item" data-val="2">Frontdesk</li>
+                                    <li class="mdl-menu__item" data-val="3">Manager</li>
+                                    <li class="mdl-menu__item" data-val="4">Housekeeping</li>
+                                    <li class="mdl-menu__item" data-val="5">GuestRoom</li>
+                                    <li class="mdl-menu__item" data-val="6">GuestApp</li>
+                                    <li class="mdl-menu__item" data-val="7">DriverApp</li>
+                                    <li class="mdl-menu__item" data-val="8">SalesRoom</li>
+                                    <li class="mdl-menu__item" data-val="9">Guest Room Controller</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Guest Room Controller: Room selector -->
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20" id="editUserRoomContainer" style="display:none;">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
+                                <input class="mdl-textfield__input" type="text" id="editUserRoom" name="userRoom" value="" autocomplete="off" readonly tabIndex="-1">
+                                <label for="editUserRoom" class="pull-right margin-0">
+                                    <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
+                                </label>
+                                <label for="editUserRoom" class="mdl-textfield__label">Room</label>
+                                <ul data-mdl-for="editUserRoom" class="mdl-menu mdl-menu--bottom-left mdl-js-menu" id="editUserRoomList">
+                                    <!-- populated dynamically -->
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="password" id="editPassword" name="password" autocomplete="new-password">
+                                <label class="mdl-textfield__label">New Password (leave blank to keep current)</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Confirm Password -->
+                    <div class="row">
+                        <div class="col-lg-6 p-t-20">
+                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
+                                <input class="mdl-textfield__input" type="password" id="editConfirmPassword" name="confirmPassword" autocomplete="new-password">
+                                <label class="mdl-textfield__label">Confirm New Password</label>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Photo Upload -->
                     <div class="row">
                         <div class="col-lg-12 p-t-20">
@@ -316,6 +456,21 @@
 #addEmployeeModal,
 #editEmployeeModal {
     z-index: 9999 !important;
+}
+
+/* Ensure MDL dropdown menus can overflow outside Bootstrap modals */
+#addEmployeeModal .modal-dialog,
+#addEmployeeModal .modal-content,
+#addEmployeeModal .modal-body,
+#editEmployeeModal .modal-dialog,
+#editEmployeeModal .modal-content,
+#editEmployeeModal .modal-body {
+    overflow: visible !important;
+}
+
+/* Keep the MDL menu above the modal content/backdrop */
+.mdl-menu__container.is-visible {
+    z-index: 2000 !important; /* Bootstrap modal backdrop ~1050, modal ~1055 */
 }
 
 /* Force modal backdrop to be behind all modals */
