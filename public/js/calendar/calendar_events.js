@@ -261,6 +261,7 @@ function applyCompositeStatusStyles(event, el) {
     if (event.backgroundColor) {
       el.style.backgroundColor = event.backgroundColor;
     }
+  const isCancelled = bookingStatus === 'cancelled';
     // Apply styles for group bookings
     if (isGroupBooking) {
       el.style.color = '#ffffff !important';
@@ -288,7 +289,7 @@ function applyCompositeStatusStyles(event, el) {
       el.style.marginTop = '';
     }
     // Restore default stacking when not composite
-    el.style.zIndex = '';
+  el.style.zIndex = isCancelled ? '1' : '';
   } catch (e) {
     // ignore
   }
@@ -336,11 +337,18 @@ function handleEventDidMount(info) {
   // Control visual overlay: allow only if either event is checkout
   try {
     const harness = info.el.closest('.fc-timeline-event-harness');
+    const isCancelled = info.event.extendedProps?.bookingStatus === 'cancelled';
     if (harness) {
       if (isCheckoutEvent(info.event)) {
         harness.classList.add('fc-allow-overlay');
+        harness.style.zIndex = '';
+      } else if (isCancelled) {
+        // Let cancelled bookings sit behind overlapping active events
+        harness.classList.add('fc-allow-overlay');
+        harness.style.zIndex = '1';
       } else {
         harness.classList.remove('fc-allow-overlay');
+        harness.style.zIndex = '';
       }
     }
   } catch (e) {}

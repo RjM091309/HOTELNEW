@@ -1989,7 +1989,7 @@ class BookingController {
   // Cancel group booking
   static async cancelGroupBooking(req, res) {
     try {
-      const { groupId, reason, manual, manualRefund } = req.body;
+      const { groupId, reason, cancellationFee } = req.body;
       let bookingIds = [];
       if (Array.isArray(req.body.bookingIds)) {
         bookingIds = req.body.bookingIds;
@@ -2008,10 +2008,9 @@ class BookingController {
       }
 
       const result = await BookingModel.cancelGroupBooking({ 
-        groupId, 
-        reason, 
-        manual, 
-        manualRefund, 
+        groupId,
+        reason,
+        cancellationFee,
         encodedBy,
         bookingIds
       });
@@ -2042,6 +2041,30 @@ class BookingController {
         success: false, 
         message: 'Failed to cancel group booking.' 
       });
+    }
+  }
+
+  // Get paid amounts for multiple bookings (used by group cancel UI)
+  static async getBookingsPaidAmounts(req, res) {
+    try {
+      const { bookingIds } = req.body;
+      if (!Array.isArray(bookingIds) || bookingIds.length === 0) {
+        return res.json({ paidAmounts: {} });
+      }
+
+      const parsedIds = bookingIds
+        .map(id => parseInt(id, 10))
+        .filter(id => !Number.isNaN(id));
+
+      if (!parsedIds.length) {
+        return res.json({ paidAmounts: {} });
+      }
+
+      const paidAmounts = await BookingModel.getBookingsPaidAmounts(parsedIds);
+      return res.json({ paidAmounts });
+    } catch (error) {
+      console.error('Error getting paid amounts:', error);
+      return res.status(500).json({ paidAmounts: {} });
     }
   }
 

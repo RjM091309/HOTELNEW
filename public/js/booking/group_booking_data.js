@@ -792,11 +792,29 @@ function viewGroupBilling(groupId) {
             const finalTotal = totalAmount;
             const appliedPaidAmount = Math.min(totalPaid, finalTotal);
             const balance = Math.max(0, finalTotal - appliedPaidAmount);
+            const totalPaidBeforeRefund = Math.max(0, parseFloat(data.totalPaidBeforeRefund || 0));
+            const refundAmount = Math.max(0, parseFloat(data.refundAmount || 0));
             
             // Update display values
             $('#totalAmount').text(finalTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
             $('#totalPaid').text(appliedPaidAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
             $('#balanceAmount').text(balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+            
+            // Total paid before cancellation (show only if refund exists)
+            if (refundAmount > 0 && totalPaidBeforeRefund > 0) {
+                $('#totalPaidBeforeRefund').text(totalPaidBeforeRefund.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                $('#totalPaidBeforeRefundRow').show();
+            } else {
+                $('#totalPaidBeforeRefundRow').hide();
+            }
+            
+            // Refund amount
+            if (refundAmount > 0) {
+                $('#refundAmount').text(refundAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                $('#refundAmountRow').show();
+            } else {
+                $('#refundAmountRow').hide();
+            }
             
             // Update reservation fee and discount fields
             if (reservationFee > 0) {
@@ -1745,10 +1763,12 @@ function openGroupCancelBookingModal(groupId) {
     // Reset form
     $('#cancelGroupBookingId').val(groupId);
     $('#groupCancelReason').val('');
-    $('#groupManualRefund').val('');
-    $('#groupManualOverrideToggle').prop('checked', false);
-    $('#groupManualFields').hide();
+    $('#groupCancellationFee').val('');
+    $('#groupTotalRefund').val('₱0.00');
+    $('#groupCancelTotalPaid').text('₱0.00');
+    $('#groupCancelSelectedCount').text('0');
     $('#groupCancelSelectAll').prop('checked', false);
+    $('#groupCancelFeeWarning').hide();
 
     // Load bookings to cancel (none pre-checked)
     if (typeof loadGroupCancelList === 'function') {

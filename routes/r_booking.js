@@ -89,6 +89,7 @@ router.get('/bookings', BookingController.getBookings);
 router.get('/rooms', BookingController.getRooms);
 router.post('/cancel', BookingController.cancelBooking);
 router.post('/cancel_group', BookingController.cancelGroupBooking);
+router.post('/get_bookings_paid_amounts', BookingController.getBookingsPaidAmounts);
 
 
 // Utility routes

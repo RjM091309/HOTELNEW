@@ -1251,12 +1251,24 @@ class BookingModel {
         // Create billing
         const billingQuery = `
           INSERT INTO billing 
-          (BOOKING_ID, ROOM_CHARGE, AMENITIES_CHARGE, SERVICES_CHARGE, LATE_CHECKOUT_CHARGE, QTY, PAYMENT_STATUS, PAYMENT_METHOD, REMARKS, ENCODED_BY, ENCODED_DT, ACTIVE, RESERVATION_FEE, DISCOUNT_AMOUNT, DISCOUNT_APPLIED, SENIOR_PWD_DISCOUNT_PERCENT) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (BOOKING_ID, ROOM_CHARGE, ROOM_PRICE, AMENITIES_CHARGE, SERVICES_CHARGE, LATE_CHECKOUT_CHARGE, QTY, PAYMENT_STATUS, PAYMENT_METHOD, REMARKS, ENCODED_BY, ENCODED_DT, ACTIVE, RESERVATION_FEE, DISCOUNT_AMOUNT, DISCOUNT_APPLIED, SENIOR_PWD_DISCOUNT_PERCENT) 
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const billingValues = [
-          bookingId, numericRoomPrice, 0.00, 0.00, 0.00, diffindays, paymentStatus, 'cash', '', encodedBy, date, 1,
-          parseFloat(reservationFee) || 0.00, parseFloat(discount) || 0.00, paymentStatus === 'paid' ? 1 : 0,
+          bookingId,
+          numericRoomPrice, // ROOM_CHARGE (per-night stored as charge)
+          numericRoomPrice, // ROOM_PRICE (explicit per-night rate)
+          0.00, 0.00, 0.00,
+          diffindays,
+          paymentStatus,
+          'cash',
+          '',
+          encodedBy,
+          date,
+          1,
+          parseFloat(reservationFee) || 0.00,
+          parseFloat(discount) || 0.00,
+          paymentStatus === 'paid' ? 1 : 0,
           parseFloat(seniorPwdDiscountPercent) || 0.00
         ];
 
@@ -4028,6 +4040,8 @@ class BookingModel {
           b.CHECK_IN_DATE,
           b.CHECK_OUT_DATE,
           b.BOOKING_STATUS,
+          COALESCE(bill.ROOM_PRICE, 0) AS ROOM_PRICE,
+          COALESCE(bill.QTY, 0) AS ROOM_QTY,
           COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) + 
           COALESCE(bill.AMENITIES_CHARGE, 0) + 
           COALESCE(bill.SERVICES_CHARGE, 0) AS TOTAL_COST,
@@ -5182,11 +5196,22 @@ class BookingModel {
 
           // Insert billing
           await connection.promise().query(`
-            INSERT INTO billing (BOOKING_ID, ROOM_CHARGE, AMENITIES_CHARGE, SERVICES_CHARGE, LATE_CHECKOUT_CHARGE, QTY, PAYMENT_STATUS, PAYMENT_METHOD, REMARKS, ENCODED_BY, ENCODED_DT, ACTIVE, RESERVATION_FEE, DISCOUNT_AMOUNT)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO billing (BOOKING_ID, ROOM_CHARGE, ROOM_PRICE, AMENITIES_CHARGE, SERVICES_CHARGE, LATE_CHECKOUT_CHARGE, QTY, PAYMENT_STATUS, PAYMENT_METHOD, REMARKS, ENCODED_BY, ENCODED_DT, ACTIVE, RESERVATION_FEE, DISCOUNT_AMOUNT)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `, [
-            bookingId, roomChargeForBilling, 0.00, 0.00, 0.00, qty, paymentStatus, 'cash', '',
-            encodedBy, date, 1, reservationFeeForBilling, discountForBilling
+            bookingId,
+            roomChargeForBilling,             // charge stored for billing (may be consolidated)
+            roomPrice,                        // per-night price of this room
+            0.00, 0.00, 0.00,
+            qty,
+            paymentStatus,
+            'cash',
+            '',
+            encodedBy,
+            date,
+            1,
+            reservationFeeForBilling,
+            discountForBilling
           ]);
         }
       }
@@ -5435,6 +5460,8 @@ class BookingModel {
             const discountTotal = parseFloat(discount) || 0;
             // Budget for room after discount
             const roomTargetBudget = Math.max(totalBillingAmount - discountTotal, 0);
+            // Track paid amounts per billing so we can redistribute any remainder
+            const billingPaidMap = new Map();
             
             if (remainingPayment > 0 && totalBillingAmount > 0 && roomTargetBudget > 0) {
               
@@ -5467,6 +5494,12 @@ class BookingModel {
                        encodedBy
                      ]);
                      
+                     // Record paid amount for redistribution
+                     billingPaidMap.set(
+                       billing.IDNo,
+                       (billingPaidMap.get(billing.IDNo) || 0) + roomPaymentAmount
+                     );
+                     
                      let newStatus;
                      if (roomPaymentAmount >= billingPayCap && billingPayCap > 0) {
                        newStatus = 'paid';
@@ -5481,6 +5514,53 @@ class BookingModel {
                      );
                      
                      remainingPayment -= roomPaymentAmount;
+                   }
+                 }
+                 
+                 // REDISTRIBUTE REMAINING PAYMENT: cover outstanding balances when payment is enough
+                 if (remainingPayment > 0) {
+                   for (const billing of allBillings) {
+                     if (remainingPayment <= 0) break;
+                     
+                     const billingAmount = billing.ROOM_CHARGE * billing.QTY;
+                     const billingDiscount = (billing.BOOKING_ID === firstBookingId) ? discountTotal : 0;
+                     const billingPayCap = Math.max(billingAmount - billingDiscount, 0);
+                     const alreadyPaid = billingPaidMap.get(billing.IDNo) || 0;
+                     const outstanding = Math.max(billingPayCap - alreadyPaid, 0);
+                     
+                     const roomPaymentAmount = Math.min(outstanding, remainingPayment);
+                     
+                     if (roomPaymentAmount > 0) {
+                       const roomPaymentQuery = `
+                         INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
+                         VALUES (?, ?, ?, ?, 'room', ?, ?)
+                       `;
+                       await connection.promise().query(roomPaymentQuery, [
+                         billing.BOOKING_ID,
+                         billing.IDNo,
+                         roomPaymentAmount,
+                         'cash',
+                         date,
+                         encodedBy
+                       ]);
+                       
+                       const totalPaidForBilling = alreadyPaid + roomPaymentAmount;
+                       let newStatus;
+                       if (totalPaidForBilling >= billingPayCap && billingPayCap > 0) {
+                         newStatus = 'paid';
+                       } else if (totalPaidForBilling > 0) {
+                         newStatus = 'partial';
+                       } else {
+                         newStatus = 'unpaid';
+                       }
+                       await connection.promise().query(
+                         'UPDATE billing SET PAYMENT_STATUS = ? WHERE IDNo = ?',
+                         [newStatus, billing.IDNo]
+                       );
+                       
+                       billingPaidMap.set(billing.IDNo, totalPaidForBilling);
+                       remainingPayment -= roomPaymentAmount;
+                     }
                    }
                  }
                } else {
@@ -6736,7 +6816,7 @@ class BookingModel {
 
   // Cancel group booking
   static async cancelGroupBooking(params) {
-    const { groupId, reason, manual, manualRefund, encodedBy, bookingIds } = params;
+    const { groupId, reason, cancellationFee, encodedBy, bookingIds } = params;
     
     try {
       // Get connection from pool for transaction
@@ -6802,18 +6882,66 @@ class BookingModel {
         let totalRefundAmount = 0;
         let totalPenaltyAmount = 0;
         let totalSelectedAmount = 0;
+        const manualFee = parseFloat(cancellationFee) || 0;
+        const useManualFee = manualFee > 0;
+        const isConsolidated = groupRows[0]?.BILLING_TYPE === 1;
+        // For consolidated billing, track total paid across the group to cap refunds
+        let consolidatedPaidRemaining = 0;
+        if (isConsolidated) {
+          const [groupPaidRows] = await connection.promise().query(
+            `SELECT COALESCE(SUM(p.AMOUNT_PAID),0) AS total_paid
+             FROM payments p
+             JOIN booking b ON p.BOOKING_ID = b.IDNo
+             WHERE b.GROUP_BOOKING_ID = ?
+               AND p.AMOUNT_PAID > 0
+               AND p.PAYMENT_TYPE IN ('room','service')`,
+            [groupId]
+          );
+          consolidatedPaidRemaining = parseFloat(groupPaidRows?.[0]?.total_paid || 0);
+        }
+
+        // Identify main billing booking (first with ROOM_CHARGE > 0) for consolidated groups
+        let mainBillingBookingId = null;
+        if (isConsolidated) {
+          const [mainBillingRow] = await connection.promise().query(
+            `SELECT b.IDNo 
+             FROM booking b 
+             JOIN billing bill ON bill.BOOKING_ID = b.IDNo 
+             WHERE b.GROUP_BOOKING_ID = ? 
+               AND bill.ROOM_CHARGE > 0 
+             ORDER BY b.IDNo ASC 
+             LIMIT 1`,
+            [groupId]
+          );
+          if (mainBillingRow && mainBillingRow.length > 0) {
+            mainBillingBookingId = mainBillingRow[0].IDNo;
+          } else {
+            // Fallback: use the lowest booking ID in the group
+            const [fallbackMain] = await connection.promise().query(
+              `SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ? ORDER BY IDNo ASC LIMIT 1`,
+              [groupId]
+            );
+            mainBillingBookingId = fallbackMain && fallbackMain.length > 0 ? fallbackMain[0].IDNo : null;
+          }
+        }
 
         // First pass: get total amounts per selected booking for proportional manual refund
-        const bookingAmountMap = new Map();
+        const bookingAmountMap = new Map(); // bookingId -> { totalAmount, roomPricePerNight, roomQtyNights }
         for (const booking of selectedRows) {
           const billingQuery = `
-            SELECT SUM(ROOM_CHARGE * QTY) AS TOTAL_AMOUNT 
+            SELECT 
+              COALESCE(ROOM_PRICE, 0) AS ROOM_PRICE,
+              COALESCE(QTY, 0) AS QTY,
+              (COALESCE(ROOM_PRICE, 0) * COALESCE(QTY, 0)) AS TOTAL_AMOUNT
             FROM billing 
             WHERE BOOKING_ID = ?
+            LIMIT 1
           `;
           const billRows = await queryDatabasePromise(billingQuery, [booking.BOOKING_ID], connection);
           const totalAmount = billRows[0] && billRows[0].TOTAL_AMOUNT ? billRows[0].TOTAL_AMOUNT : 0;
-          bookingAmountMap.set(booking.BOOKING_ID, totalAmount);
+          const roomPricePerNight = billRows[0] && billRows[0].ROOM_PRICE ? parseFloat(billRows[0].ROOM_PRICE) : 0;
+          const roomQtyNights = billRows[0] && billRows[0].QTY ? parseFloat(billRows[0].QTY) : 0;
+          bookingAmountMap.set(booking.BOOKING_ID, { totalAmount, roomPricePerNight, roomQtyNights });
           totalSelectedAmount += totalAmount;
         }
 
@@ -6829,23 +6957,45 @@ class BookingModel {
           const totalNights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
           const dayDiff = Math.floor((checkIn - today) / (1000 * 60 * 60 * 24));
 
-          // Calculate penalty nights based on policy
+          // Calculate penalty using either manual fee (distributed) or policy-based nights
           let penaltyNights = 0;
-          if (dayDiff >= 20) penaltyNights = 1;
-          else if (dayDiff >= 10) penaltyNights = 2;
-          else if (dayDiff < 5) penaltyNights = totalNights;
+          let penaltyAmount = 0;
 
-          const totalAmount = bookingAmountMap.get(booking.BOOKING_ID) || 0;
-          const nightlyRate = totalNights > 0 ? totalAmount / totalNights : 0;
-          const penaltyAmount = nightlyRate * penaltyNights;
+          const bookingPricing = bookingAmountMap.get(booking.BOOKING_ID) || { totalAmount: 0, roomPricePerNight: 0, roomQtyNights: 0 };
+          const totalAmount = bookingPricing.totalAmount || 0;
 
-          // Calculate refund amount for this booking
-          let refundAmount = 0;
-          if (manual === 'true' || manual === true) {
-            const proportion = totalSelectedAmount > 0 ? (totalAmount / totalSelectedAmount) : 0;
-            refundAmount = parseFloat(manualRefund) * proportion || 0;
+          if (useManualFee && totalSelectedAmount > 0) {
+            // Distribute manual cancellation fee proportionally based on booking totals
+            const proportion = totalAmount / totalSelectedAmount;
+            penaltyAmount = manualFee * proportion;
+            penaltyNights = 0; // Not applicable in manual fee mode
           } else {
-            refundAmount = totalAmount - penaltyAmount;
+            // Policy-based penalty nights
+            if (dayDiff >= 20) penaltyNights = 1;
+            else if (dayDiff >= 10) penaltyNights = 2;
+            else if (dayDiff < 5) penaltyNights = totalNights;
+
+            const nightlyRate = totalNights > 0 ? totalAmount / totalNights : 0;
+            penaltyAmount = nightlyRate * penaltyNights;
+          }
+
+          // Payment-aware refund: cap by what has been paid
+          let paidAmount = 0;
+          if (isConsolidated) {
+            paidAmount = consolidatedPaidRemaining;
+          } else {
+            const [paidRows] = await connection.promise().query(
+              'SELECT COALESCE(SUM(AMOUNT_PAID), 0) AS TOTAL_PAID FROM payments WHERE BOOKING_ID = ?',
+              [booking.BOOKING_ID]
+            );
+            paidAmount = parseFloat(paidRows[0]?.TOTAL_PAID) || 0;
+          }
+
+          // Calculate refund amount for this booking (cannot exceed paidAmount, never negative)
+          const requestedRefund = Math.max(totalAmount - penaltyAmount, 0);
+          const refundAmount = Math.max(Math.min(requestedRefund, paidAmount), 0);
+          if (isConsolidated) {
+            consolidatedPaidRemaining = Math.max(0, consolidatedPaidRemaining - refundAmount);
           }
 
           totalRefundAmount += refundAmount;
@@ -6864,12 +7014,12 @@ class BookingModel {
 
           // Update billing for this booking - set payment status to 'cancelled' for cancelled bookings
           const updateBillingQuery = `
-            UPDATE billing
-            SET CANCELLATION_PENALTY = ?,
-                REFUNDABLE_AMOUNT = ?,
-                PAYMENT_STATUS = 'cancelled'
-            WHERE BOOKING_ID = ?
-          `;
+          UPDATE billing
+          SET CANCELLATION_PENALTY = ?,
+              REFUNDABLE_AMOUNT = ?,
+              PAYMENT_STATUS = 'cancelled'
+          WHERE BOOKING_ID = ?
+        `;
           await queryDatabasePromise(updateBillingQuery, [penaltyAmount, refundAmount, booking.BOOKING_ID], connection);
 
           // Update booking_service status to 'cancelled' for all services
@@ -6888,21 +7038,71 @@ class BookingModel {
           `;
           await queryDatabasePromise(updateExtensionsQuery, [booking.BOOKING_ID], connection);
 
-          // Insert cancellation log for this booking
+          // Insert cancellation log for this booking (include refund amount)
           const insertLogQuery = `
-            INSERT INTO booking_cancellation
-            (BOOKING_ID, CANCELLATION_REASON, PENALTY_NIGHTS, REFUND_AMOUNT, FULL_PENALTY, ENCODED_BY)
-            VALUES (?, ?, ?, ?, ?, ?)
-          `;
+          INSERT INTO booking_cancellation
+          (BOOKING_ID, CANCELLATION_REASON, PENALTY_NIGHTS, REFUND_AMOUNT, FULL_PENALTY, ENCODED_BY)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `;
           const fullPenalty = penaltyNights >= totalNights ? 1 : 0;
-          await queryDatabasePromise(insertLogQuery, [
+          const safeRefundAmount = Math.max(0, refundAmount);
+          const logResult = await queryDatabasePromise(insertLogQuery, [
             booking.BOOKING_ID, 
             reason || '', 
             penaltyNights, 
-            refundAmount, 
+            safeRefundAmount, 
             fullPenalty, 
             encodedBy
           ], connection);
+
+          // Ensure booking_cancellation reflects the refund explicitly
+          if (logResult && logResult.insertId) {
+            await queryDatabasePromise(
+              'UPDATE booking_cancellation SET REFUND_AMOUNT = ? WHERE IDNo = ?',
+              [safeRefundAmount, logResult.insertId],
+              connection
+            );
+          }
+
+          // Record refund payment entry (negative amount) if applicable
+          if (refundAmount > 0) {
+            const refundQuery = `
+              INSERT INTO payments
+              (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
+              VALUES (?, NULL, ?, 'cash', 'refund', NOW(), ?, ?)
+            `;
+            const refundRemarks = reason ? `Cancellation refund - ${reason}` : 'Cancellation refund';
+            await queryDatabasePromise(refundQuery, [
+              isConsolidated && mainBillingBookingId ? mainBillingBookingId : booking.BOOKING_ID,
+              -refundAmount, // Negative to reflect payout/refund
+              encodedBy,
+              refundRemarks
+            ], connection);
+          }
+
+          // Adjust billing charges to avoid double-charging
+          const perNightReduction = bookingPricing.roomPricePerNight || 0;
+          if (perNightReduction > 0) {
+            if (isConsolidated && mainBillingBookingId) {
+              // Consolidated/master: always reduce the designated main booking charge
+              await queryDatabasePromise(
+                `UPDATE billing
+                 SET ROOM_CHARGE = GREATEST(ROOM_CHARGE - ?, 0)
+                 WHERE BOOKING_ID = ?`,
+                [perNightReduction, mainBillingBookingId],
+                connection
+              );
+            } else if (!isConsolidated) {
+              // Individual billing: reduce the same booking's charge
+              await queryDatabasePromise(
+                `UPDATE billing
+                 SET ROOM_CHARGE = GREATEST(ROOM_CHARGE - ?, 0)
+                 WHERE BOOKING_ID = ?`,
+                [perNightReduction, booking.BOOKING_ID],
+                connection
+              );
+            }
+          }
         }
 
         // No need to update group_booking table since there's no STATUS column
@@ -9546,8 +9746,8 @@ class BookingModel {
 
         // billing
         const billingQuery = `
-          INSERT INTO billing (BOOKING_ID, ROOM_CHARGE, AMENITIES_CHARGE, SERVICES_CHARGE, LATE_CHECKOUT_CHARGE, QTY, PAYMENT_STATUS, PAYMENT_METHOD, REMARKS, ENCODED_BY, ENCODED_DT, ACTIVE, RESERVATION_FEE, DISCOUNT_AMOUNT)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO billing (BOOKING_ID, ROOM_CHARGE, ROOM_PRICE, AMENITIES_CHARGE, SERVICES_CHARGE, LATE_CHECKOUT_CHARGE, QTY, PAYMENT_STATUS, PAYMENT_METHOD, REMARKS, ENCODED_BY, ENCODED_DT, ACTIVE, RESERVATION_FEE, DISCOUNT_AMOUNT)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         let roomChargeForBilling, reservationFeeForBilling, discountForBilling, roomRatePerNight, quantityForBilling;
@@ -9601,11 +9801,12 @@ class BookingModel {
 
         const billingValues = [
           bookingId,
-          roomRatePerNight, // Room rate per night (not total)
+          roomRatePerNight,          // ROOM_CHARGE (per-night charge applied in billing)
+          baseRoomPrice,             // ROOM_PRICE (per-night rate for this specific room)
           0.00,
           0.00,
           0.00,
-          quantityForBilling, // QTY should be number of nights
+          quantityForBilling,        // QTY should be number of nights
           paymentStatus,
           'cash',
           '',
@@ -9848,6 +10049,7 @@ class BookingModel {
 
       // Payment Distribution Logic
       const paidAmountNum = parseFloat(paidAmount) || 0;
+      const isIndividualBilling = !consolidatedBilling;
       
       if ((paymentStatus === 'paid' || paymentStatus === 'partial') && paidAmountNum > 0) {
         // Get all billing IDs for this group (use targetBookingIds which contains the relevant booking IDs)
@@ -9869,11 +10071,10 @@ class BookingModel {
         const discountTotal = parseFloat(discount) || 0;
         // Budget for room after discount
         const roomTargetBudget = Math.max(totalBillingAmount - discountTotal, 0);
+        // Track paid per billing to redistribute remainder
+        const billingPaidMap = new Map();
 
         if (remainingPayment > 0 && totalBillingAmount > 0 && roomTargetBudget > 0) {
-          
-          // Check if individual billing - ONLY for room charges, NOT for services
-          const isIndividualBilling = !consolidatedBilling;
           
            if (isIndividualBilling) {
              // INDIVIDUAL BILLING: Hati-hati ang bayad per booking (equal share, capped per billing)
@@ -9902,6 +10103,12 @@ class BookingModel {
                    encodedBy
                  ]);
                  
+                 // Record paid amount for redistribution
+                 billingPaidMap.set(
+                   billing.IDNo,
+                   (billingPaidMap.get(billing.IDNo) || 0) + roomPaymentAmount
+                 );
+                 
                  let newStatus;
                  if (roomPaymentAmount >= billingPayCap && billingPayCap > 0) {
                    newStatus = 'paid';
@@ -9916,6 +10123,52 @@ class BookingModel {
                  );
                  
                  remainingPayment -= roomPaymentAmount;
+               }
+             }
+             
+             // REDISTRIBUTE REMAINING PAYMENT: pay any outstanding balances if funds remain
+             if (remainingPayment > 0) {
+               for (const billing of allBillings) {
+                 if (remainingPayment <= 0) break;
+                 
+                 const billingAmount = billing.ROOM_CHARGE * billing.QTY;
+                 const billingDiscount = (billing.BOOKING_ID === firstBookingId) ? discountTotal : 0;
+                 const billingPayCap = Math.max(billingAmount - billingDiscount, 0);
+                 const alreadyPaid = billingPaidMap.get(billing.IDNo) || 0;
+                 const outstanding = Math.max(billingPayCap - alreadyPaid, 0);
+                 
+                 const roomPaymentAmount = Math.min(outstanding, remainingPayment);
+                 
+                 if (roomPaymentAmount > 0) {
+                   const roomPaymentQuery = `
+                     INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
+                     VALUES (?, ?, ?, ?, 'room', NOW(), ?)
+                   `;
+                   await connection.promise().query(roomPaymentQuery, [
+                     billing.BOOKING_ID,
+                     billing.IDNo,
+                     roomPaymentAmount,
+                     'cash',
+                     encodedBy
+                   ]);
+                   
+                   const totalPaidForBilling = alreadyPaid + roomPaymentAmount;
+                   let newStatus;
+                   if (totalPaidForBilling >= billingPayCap && billingPayCap > 0) {
+                     newStatus = 'paid';
+                   } else if (totalPaidForBilling > 0) {
+                     newStatus = 'partial';
+                   } else {
+                     newStatus = 'unpaid';
+                   }
+                   await connection.promise().query(
+                     'UPDATE billing SET PAYMENT_STATUS = ? WHERE IDNo = ?',
+                     [newStatus, billing.IDNo]
+                   );
+                   
+                   billingPaidMap.set(billing.IDNo, totalPaidForBilling);
+                   remainingPayment -= roomPaymentAmount;
+                 }
                }
              }
            } else {
@@ -10357,6 +10610,36 @@ class BookingModel {
       return true;
     } catch (e) {
       console.error('Error updateComplaintRequest:', e);
+      throw e;
+    }
+  }
+
+  // Get total paid amounts for a list of booking IDs (excludes reservation_fee, discount, refund)
+  static async getBookingsPaidAmounts(bookingIds) {
+    try {
+      if (!Array.isArray(bookingIds) || bookingIds.length === 0) {
+        return {};
+      }
+
+      const placeholders = bookingIds.map(() => '?').join(',');
+      const sql = `
+        SELECT 
+          p.BOOKING_ID AS bookingId,
+          COALESCE(SUM(p.AMOUNT_PAID), 0) AS total_paid
+        FROM payments p
+        WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+          AND p.BOOKING_ID IN (${placeholders})
+        GROUP BY p.BOOKING_ID
+      `;
+
+      const rows = await queryDatabasePromise(sql, bookingIds);
+      const map = {};
+      rows.forEach(row => {
+        map[row.bookingId] = parseFloat(row.total_paid) || 0;
+      });
+      return map;
+    } catch (e) {
+      console.error('Error getBookingsPaidAmounts:', e);
       throw e;
     }
   }

@@ -1,67 +1,79 @@
 <div class="modal fade" id="modal-cancel-group-booking" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header bg-danger text-white">
-          <h5 class="modal-title"><i class="fa fa-users"></i> Cancel Group Booking</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <input type="hidden" id="cancelGroupBookingId">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title"><i class="fa fa-users"></i> Cancel Group Booking</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="cancelGroupBookingId">
+        <input type="hidden" id="groupCancelSelectedRoomPrices">
+        <input type="hidden" id="groupCancelSelectedTotal">
 
-          <div class="mb-3">
-            <label class="form-label mb-1" style="font-size: 12px;">Select rooms to cancel</label>
-            <div class="table-responsive">
-              <table class="table table-sm table-bordered align-middle mb-2" id="groupCancelTable">
-                <thead class="table-dark">
-                  <tr>
-                    <th class="text-center" style="width: 40px;">
-                      <input type="checkbox" id="groupCancelSelectAll">
-                    </th>
-                    <th style="width: 50px;">Room</th>
-                    <th>Guest</th>
-                    <th style="width: 160px;">Dates</th>
-                    <th style="width: 100px;" class="text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody id="groupCancelTableBody">
-                  <tr><td colspan="5" class="text-center text-muted py-3">Load pending bookings…</td></tr>
-                </tbody>
-              </table>
-            </div>
-            <small class="text-muted d-block">Only pending bookings can be cancelled. Checked-in/out or already-cancelled rows are disabled.</small>
+        <div class="mb-3">
+          <label class="form-label mb-1" style="font-size: 12px;">Select rooms to cancel</label>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered align-middle mb-2" id="groupCancelTable">
+              <thead class="table-dark">
+                <tr>
+                  <th class="text-center" style="width: 40px;">
+                    <input type="checkbox" id="groupCancelSelectAll">
+                  </th>
+                  <th style="width: 50px;">Room</th>
+                  <th>Guest</th>
+                  <th style="width: 160px;">Dates</th>
+                  <th style="width: 100px;" class="text-center">Status</th>
+                  <th style="width: 100px;" class="text-end">Paid</th>
+                </tr>
+              </thead>
+              <tbody id="groupCancelTableBody">
+                <tr><td colspan="6" class="text-center text-muted py-3">Load pending bookings…</td></tr>
+              </tbody>
+            </table>
           </div>
+          <small class="text-muted d-block">Only pending bookings can be cancelled. Checked-in/out or already-cancelled rows are disabled.</small>
+        </div>
 
-          <div class="form-check mt-3">
-            <input class="form-check-input" type="checkbox" id="groupManualOverrideToggle">
-            <label class="form-check-label" for="groupManualOverrideToggle">Enter refund amount manually.</label>
-          </div>
-          
-          <div id="groupManualFields" style="display: none;">
-            <div class="mb-2">
-              <label>Refundable Amount (₱)</label>
-              <input type="number" id="groupManualRefund" class="form-control" step="0.01">
-            </div>
-          </div>
-          <div class="mb-3">
-            <label for="groupCancelReason" class="form-label">Reason</label>
-            <textarea class="form-control" id="groupCancelReason" rows="3" placeholder="Optional..."></textarea>
-          </div>
-          <div class="alert alert-warning">
-            Selected bookings will be cancelled. Cancellation penalties apply based on policy.
-          </div>
+        <!-- Hidden summary values (kept for validation logic) -->
+        <input type="hidden" id="groupCancelSelectedCount" value="0">
+        <input type="hidden" id="groupCancelTotalPaid" value="₱0.00">
+
+        <div class="mb-3">
+          <label class="form-label">Cancellation Fee (₱)</label>
+          <input type="number" id="groupCancellationFee" class="form-control" step="0.01" min="0" placeholder="Enter total cancellation fee (optional)">
+          <!-- <small class="text-muted">If left blank, the system policy will compute penalties automatically.</small>
+          <small class="text-danger d-block mt-1" id="groupCancelFeeWarning" style="display: none;">
+            <i class="fa fa-exclamation-triangle"></i> Cancellation fee cannot exceed total paid amount.
+          </small> -->
         </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-          <button class="btn btn-danger" id="confirmGroupCancelBtn">Confirm Cancel</button>
+
+        <div class="mb-3">
+          <label class="form-label">Total Refund (₱)</label>
+          <input type="text" id="groupTotalRefund" class="form-control" readonly 
+                 style="background-color: #2a3135; color: #9fe073; font-weight: bold;">
+          <!-- <small class="text-muted">Calculated as: Total Paid - Cancellation Fee</small> -->
         </div>
+
+        <div class="mb-3">
+          <label for="groupCancelReason" class="form-label">Reason</label>
+          <textarea class="form-control" id="groupCancelReason" rows="3" placeholder="Optional..."></textarea>
+        </div>
+
+        <div class="alert alert-warning">
+          <i class="fa fa-exclamation-triangle"></i> Selected bookings will be cancelled. Cancellation penalties apply based on policy.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button class="btn btn-danger" id="confirmGroupCancelBtn">Confirm Cancel</button>
       </div>
     </div>
   </div>
-  
+</div>
+
 <!-- Include external JavaScript files -->
 <script>
 	document.addEventListener('DOMContentLoaded', function() {
-		
 		// Load cancel_group_booking.js immediately - this is critical for group booking functionality
 		var cancelGroupBookingScript = document.createElement('script');
 		cancelGroupBookingScript.src = '/js/booking/cancel_group_booking.js';
