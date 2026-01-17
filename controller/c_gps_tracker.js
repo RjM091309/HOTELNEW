@@ -59,6 +59,7 @@ class GpsTrackerController {
           let timestamp = new Date();
           
           // Parse date and time if provided (format: YYMMDD and HHMMSS)
+          // GPS device is configured to send Philippines time (UTC+8)
           if (date && time) {
             const year = 2000 + parseInt(date.substring(0, 2));
             const month = parseInt(date.substring(2, 4)) - 1; // Month is 0-indexed
@@ -66,7 +67,12 @@ class GpsTrackerController {
             const hour = parseInt(time.substring(0, 2));
             const minute = parseInt(time.substring(2, 4));
             const second = parseInt(time.substring(4, 6));
-            timestamp = new Date(year, month, day, hour, minute, second);
+            // GPS device is configured to send Philippines time (UTC+8)
+            // Parse as Philippines time, then convert to UTC for storage
+            // Create date as if it's Philippines time, then subtract 8 hours to get UTC
+            const phTimestamp = new Date(Date.UTC(year, month, day, hour, minute, second));
+            // Subtract 8 hours (8 * 60 * 60 * 1000 ms) to convert Philippines time to UTC
+            timestamp = new Date(phTimestamp.getTime() - (8 * 60 * 60 * 1000));
           }
           
           data = {

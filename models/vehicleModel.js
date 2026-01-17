@@ -149,7 +149,7 @@ class VehicleModel {
           gsm_signal,
           is_moving,
           created_at,
-          ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY created_at DESC, timestamp DESC) as rn
+          ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY timestamp DESC, created_at DESC) as rn
         FROM gps_locations
       ) gl ON v.GPS_DEVICE_ID COLLATE utf8mb4_unicode_ci = gl.device_id COLLATE utf8mb4_unicode_ci AND gl.rn = 1
       WHERE v.ACTIVE = 1
@@ -198,7 +198,7 @@ class VehicleModel {
           gsm_signal,
           is_moving,
           created_at,
-          ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY created_at DESC, timestamp DESC) as rn
+          ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY timestamp DESC, created_at DESC) as rn
         FROM gps_locations
       ) gl ON v.GPS_DEVICE_ID COLLATE utf8mb4_unicode_ci = gl.device_id COLLATE utf8mb4_unicode_ci AND gl.rn = 1
       WHERE v.IDNo = ? AND v.ACTIVE = 1`;

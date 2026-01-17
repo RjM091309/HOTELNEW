@@ -50,7 +50,19 @@ function startGpsTrackerTcpServer(io, port = 8090) {
     
     socket.on('data', async (data) => {
       try {
-        buffer += data.toString();
+        const dataStr = data.toString();
+        
+        // Filter out HTTP requests (browsers, scanners, etc.)
+        // HTTP requests start with methods like GET, POST, HEAD, OPTIONS, etc.
+        if (/^(GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH|CONNECT|TRACE)\s+/i.test(dataStr) ||
+            /^(Host|User-Agent|Accept|Accept-Encoding|Connection|Content-Type|Content-Length):/i.test(dataStr)) {
+          // This is an HTTP request, not GPS data - silently close connection
+          console.log(`⚠️ HTTP request detected from ${clientAddress}, closing connection (GPS tracker expects TCP data, not HTTP)`);
+          socket.destroy();
+          return;
+        }
+        
+        buffer += dataStr;
         
         // Process complete messages (ending with \r\n or #)
         // Preserve original message format exactly as received for forwarding to Sinotrack
@@ -113,6 +125,12 @@ function startGpsTrackerTcpServer(io, port = 8090) {
 
 async function processGpsMessage(message, originalMessage, socket, io) {
   try {
+    // Filter out HTTP headers and other non-GPS data
+    if (/^(Host|User-Agent|Accept|Accept-Encoding|Connection|Content-Type|Content-Length|GET|POST|PUT|DELETE|HEAD|OPTIONS)/i.test(message)) {
+      // This is an HTTP header/request, not GPS data - ignore silently
+      return;
+    }
+    
     const logMsg = `📍 Received GPS data: ${message}`;
     console.log(logMsg);
     
@@ -159,7 +177,12 @@ async function processGpsMessage(message, originalMessage, socket, io) {
         const hour = parseInt(time.substring(0, 2));
         const minute = parseInt(time.substring(2, 4));
         const second = parseInt(time.substring(4, 6));
-        timestamp = new Date(Date.UTC(year, month, day, hour, minute, second));
+        // GPS device is configured to send Philippines time (UTC+8)
+        // Parse as Philippines time, then convert to UTC for storage
+        // Create date as if it's Philippines time, then subtract 8 hours to get UTC
+        const phTimestamp = new Date(Date.UTC(year, month, day, hour, minute, second));
+        // Subtract 8 hours (8 * 60 * 60 * 1000 ms) to convert Philippines time to UTC
+        timestamp = new Date(phTimestamp.getTime() - (8 * 60 * 60 * 1000));
       }
       
       // Validate and clamp battery value to 0-100 range
@@ -221,7 +244,7 @@ async function processGpsMessage(message, originalMessage, socket, io) {
       }
       
       // Parse date and time if provided (format: YYMMDD and HHMMSS)
-      // GPS device sends time in UTC, so we need to create UTC date
+      // GPS device is configured to send Philippines time (UTC+8)
       if (date && time) {
         const year = 2000 + parseInt(date.substring(0, 2));
         const month = parseInt(date.substring(2, 4)) - 1; // Month is 0-indexed
@@ -229,8 +252,12 @@ async function processGpsMessage(message, originalMessage, socket, io) {
         const hour = parseInt(time.substring(0, 2));
         const minute = parseInt(time.substring(2, 4));
         const second = parseInt(time.substring(4, 6));
-        // Create UTC date - GPS device sends time in UTC
-        timestamp = new Date(Date.UTC(year, month, day, hour, minute, second));
+        // GPS device is configured to send Philippines time (UTC+8)
+        // Parse as Philippines time, then convert to UTC for storage
+        // Create date as if it's Philippines time, then subtract 8 hours to get UTC
+        const phTimestamp = new Date(Date.UTC(year, month, day, hour, minute, second));
+        // Subtract 8 hours (8 * 60 * 60 * 1000 ms) to convert Philippines time to UTC
+        timestamp = new Date(phTimestamp.getTime() - (8 * 60 * 60 * 1000));
       }
       
       data = {
@@ -276,7 +303,7 @@ async function processGpsMessage(message, originalMessage, socket, io) {
         const lng = nmeaToDecimal(parseFloat(lngDm), lngDir);
         
         // Parse date and time
-        // GPS device sends time in UTC, so we need to create UTC date
+        // GPS device is configured to send Philippines time (UTC+8)
         let timestamp = new Date();
         if (dateStr && timeStr) {
           const year = 2000 + parseInt(dateStr.substring(4, 6));
@@ -285,8 +312,13 @@ async function processGpsMessage(message, originalMessage, socket, io) {
           const hour = parseInt(timeStr.substring(0, 2));
           const minute = parseInt(timeStr.substring(2, 4));
           const second = parseInt(timeStr.substring(4, 6));
-          // Create UTC date - GPS device sends time in UTC
-          timestamp = new Date(Date.UTC(year, month, day, hour, minute, second));
+          // GPS device is configured to send Philippines time (UTC+8)
+          // Parse as Philippines time, then convert to UTC for storage
+          // Create UTC date by subtracting 8 hours from Philippines time
+          const phHour = hour;
+          const utcHour = phHour >= 8 ? phHour - 8 : phHour + 16; // Handle day rollover
+          const utcDay = phHour >= 8 ? day : day - 1;
+          timestamp = new Date(Date.UTC(year, month, utcDay || day, utcHour, minute, second));
         }
         
         data = {
@@ -346,6 +378,11 @@ async function processGpsMessage(message, originalMessage, socket, io) {
             timestamp: new Date()
           };
         } else {
+          // Check if this looks like HTTP or other non-GPS data
+          if (/^(Host|User-Agent|Accept|GET|POST|HTTP)/i.test(message)) {
+            // HTTP request - silently ignore
+            return;
+          }
           throw new Error('Unknown data format');
         }
       }
@@ -354,6 +391,10 @@ async function processGpsMessage(message, originalMessage, socket, io) {
     
     // Validate
     if (!data.deviceId || !data.latitude || !data.longitude) {
+      // Check if this might be HTTP data
+      if (/^(Host|User-Agent|Accept|GET|POST|HTTP)/i.test(message)) {
+        return; // Silently ignore HTTP requests
+      }
       throw new Error('Missing required fields');
     }
     

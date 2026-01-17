@@ -956,10 +956,13 @@ export function updateMapMarkers() {
                 }
                 
                 // Check if icon/status changed (for non-position updates)
-                const wasDeviceOnline = markers[markerKey].getIcon()?.url?.includes('gpsmarker-1.png') || false;
-                const deviceIconChanged = wasDeviceOnline !== device.isOnline;
+                // Icon depends on both isOnline and isMoving, so check if either changed
+                const currentIconUrl = markers[markerKey].getIcon()?.url || '';
+                const newIconUrl = getMarkerIconUrl(device.isOnline, device.isMoving || false);
+                const deviceIconChanged = currentIconUrl !== newIconUrl;
                 
-                // Only update icon/label if position changed OR status changed
+                // Only update icon/label if position changed OR status changed (isOnline or isMoving)
+                // This ensures transit/standby status changes are reflected immediately
                 if (positionChanged || deviceIconChanged) {
                     // Clear rotation cache when icon changes (DOM element will be recreated)
                     if (deviceIconChanged) {

@@ -2,7 +2,7 @@
 // SOCKET.IO - Vehicle Monitoring
 // ========================================
 
-import { vehicleData, previousGpsDeviceIds, gpsDevicesData } from './state.js';
+import { vehicleData, previousGpsDeviceIds, gpsDevicesData, lastSocketUpdateTime } from './state.js';
 import { loadVehicles } from './data-loader.js';
 import { updateVehicleList } from './vehicle-list.js';
 import { updateMapMarkers, animateMarkerPosition, applyMarkerRotation } from './markers.js';
@@ -260,9 +260,13 @@ async function updateVehicleLocationFromSocket(deviceId, locationData) {
         // Get isMoving status from Socket.IO data FIRST (before updating other data)
         // Server calculates isMoving correctly based on speed >= 3km/h AND distance >= 30m
         // Fallback to vehicle/device data if Socket.IO doesn't have it yet
+        const previousIsMoving = foundVehicle ? (foundVehicle.isMoving || false) : (foundDevice ? (foundDevice.isMoving || false) : false);
         const isMovingFromSocket = locationData.isMoving !== null && locationData.isMoving !== undefined 
             ? !!locationData.isMoving 
-            : (foundVehicle ? (foundVehicle.isMoving || false) : (foundDevice ? (foundDevice.isMoving || false) : false));
+            : previousIsMoving;
+        
+        // Track if isMoving status changed (transit <-> standby) for immediate UI update
+        const isMovingStatusChanged = previousIsMoving !== isMovingFromSocket;
         
         // Snap GPS coordinates to nearest road for accurate positioning
         let newPosition = { lat: locationData.lat, lng: locationData.lng };
@@ -317,6 +321,21 @@ async function updateVehicleLocationFromSocket(deviceId, locationData) {
                 foundVehicle.location.gsmSignal = parseInt(locationData.gsmSignal);
             }
             foundVehicle.location.lastUpdate = locationData.timestamp || new Date();
+            
+            // Update isOnline status immediately based on timestamp (within 10 minutes = online)
+            // This ensures device shows as online immediately when GPS data is received
+            if (locationData.timestamp) {
+                const timestamp = new Date(locationData.timestamp);
+                const timeDiff = new Date() - timestamp;
+                foundVehicle.isOnline = timeDiff < 10 * 60 * 1000; // 10 minutes
+            } else {
+                // If no timestamp, assume online (fresh data from Socket.IO)
+                foundVehicle.isOnline = true;
+            }
+            
+            // Track that this vehicle was updated via Socket.IO (real-time data)
+            // This prevents database refresh from overwriting real-time data
+            lastSocketUpdateTime[markerKey] = Date.now();
         } else if (foundDevice && foundDevice.location) {
             foundDevice.location.lat = newPosition.lat;
             foundDevice.location.lng = newPosition.lng;
@@ -352,6 +371,21 @@ async function updateVehicleLocationFromSocket(deviceId, locationData) {
                 foundDevice.location.gsmSignal = parseInt(locationData.gsmSignal);
             }
             foundDevice.location.lastUpdate = locationData.timestamp || new Date();
+            
+            // Update isOnline status immediately based on timestamp (within 10 minutes = online)
+            // This ensures device shows as online immediately when GPS data is received
+            if (locationData.timestamp) {
+                const timestamp = new Date(locationData.timestamp);
+                const timeDiff = new Date() - timestamp;
+                foundDevice.isOnline = timeDiff < 10 * 60 * 1000; // 10 minutes
+            } else {
+                // If no timestamp, assume online (fresh data from Socket.IO)
+                foundDevice.isOnline = true;
+            }
+            
+            // Track that this device was updated via Socket.IO (real-time data)
+            // This prevents database refresh from overwriting real-time data
+            lastSocketUpdateTime[markerKey] = Date.now();
         }
         
         // 🔁 CORRECT LOGIC: Update marker position based on isMoving status from Socket.IO
@@ -417,6 +451,16 @@ async function updateVehicleLocationFromSocket(deviceId, locationData) {
         // This updates battery, signal, etc. even when marker position doesn't change (standby)
         const { updateOpenInfoWindow } = await import('./infowindow.js');
         updateOpenInfoWindow().catch(err => console.warn('InfoWindow update error:', err));
+        
+        // Update UI immediately to reflect status changes (real-time online/offline and transit/standby indicators)
+        // This ensures device shows correct status immediately when GPS data is received, not waiting for periodic refresh
+        // Force update if isMoving status changed (transit <-> standby) or if this is the first data received
+        if (foundVehicle || foundDevice) {
+            // Always update UI when status changes (isOnline or isMoving)
+            // This ensures immediate visual feedback for transit/standby status changes
+            updateVehicleList();
+            updateMapMarkers();
+        }
         
         // Don't reload from database immediately - Socket.IO is the source of truth for live movement
         // Database is just for history. Only reload periodically or on page refresh

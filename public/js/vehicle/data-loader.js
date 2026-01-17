@@ -11,7 +11,8 @@ import {
     lastVehicleBatteryLevels,
     lastGpsBatteryLevels,
     lastVehicleChargingState,
-    lastGpsChargingState
+    lastGpsChargingState,
+    lastSocketUpdateTime
 } from './state.js';
 import { calculateDistanceMeters } from './utils.js';
 import { clearVehiclePath } from './markers.js';
@@ -115,11 +116,39 @@ export async function loadVehicles() {
                 previousGpsDeviceIds[vehicleId] = currentGpsId;
             });
             
-            // Update vehicleData with fresh data and determine isMoving based on position changes
-            // Clear existing data first
-            Object.keys(vehicleData).forEach(key => delete vehicleData[key]);
+            // Update vehicleData with fresh data from database
+            // IMPORTANT: Don't overwrite data that was recently updated via Socket.IO (real-time)
+            // Socket.IO is the source of truth for live data, database is only for fallback/initial load
+            const SOCKET_DATA_FRESHNESS_MS = 30 * 1000; // 30 seconds - if Socket.IO updated within this time, keep it
             
             vehiclesData.data.forEach(vehicle => {
+                const vehicleId = String(vehicle.id);
+                const existingVehicle = vehicleData[vehicleId];
+                const lastSocketUpdate = lastSocketUpdateTime[vehicleId];
+                const now = Date.now();
+                
+                // If Socket.IO updated this vehicle recently (within 30 seconds), preserve Socket.IO data
+                // Only update from database if Socket.IO data is stale or doesn't exist
+                if (existingVehicle && lastSocketUpdate && (now - lastSocketUpdate) < SOCKET_DATA_FRESHNESS_MS) {
+                    // Keep existing Socket.IO data, skip database update for this vehicle
+                    // But still update GPS Device ID if it changed
+                    if (vehicle.gpsDeviceId !== existingVehicle.gpsDeviceId) {
+                        existingVehicle.gpsDeviceId = vehicle.gpsDeviceId;
+                    }
+                    
+                    // IMPORTANT: Still check if device should be offline based on timestamp
+                    // Even if Socket.IO data is preserved, check if timestamp is > 10 minutes old
+                    if (existingVehicle.location && existingVehicle.location.lastUpdate) {
+                        const timestamp = new Date(existingVehicle.location.lastUpdate);
+                        const timeDiff = now - timestamp.getTime();
+                        existingVehicle.isOnline = timeDiff < 10 * 60 * 1000; // 10 minutes
+                    } else if (existingVehicle.location && !existingVehicle.location.lastUpdate) {
+                        // No timestamp, check if Socket.IO update was recent (within 10 min)
+                        existingVehicle.isOnline = (now - lastSocketUpdate) < 10 * 60 * 1000;
+                    }
+                    
+                    return; // Skip database update, keep Socket.IO data
+                }
                 // Compare new database position with previous lastSavedLocation to determine if moving
                 const newLocation = vehicle.location && vehicle.location.lat && vehicle.location.lng ? {
                     lat: vehicle.location.lat,
@@ -182,14 +211,39 @@ export async function loadVehicles() {
         }
         
         if (gpsData.success) {
-            // Clear and populate gpsDevicesData
-            Object.keys(gpsDevicesData).forEach(key => delete gpsDevicesData[key]);
+            // Update GPS devices data from database
+            // IMPORTANT: Don't overwrite data that was recently updated via Socket.IO (real-time)
+            // Socket.IO is the source of truth for live data, database is only for fallback/initial load
+            const SOCKET_DATA_FRESHNESS_MS = 30 * 1000; // 30 seconds - if Socket.IO updated within this time, keep it
             
             // Track last saved locations for GPS devices (similar to vehicles)
             const lastSavedGpsLocations = window.lastSavedGpsLocations || {};
             window.lastSavedGpsLocations = lastSavedGpsLocations;
             
             gpsData.data.forEach(device => {
+                const deviceId = device.deviceId;
+                const existingDevice = gpsDevicesData[deviceId];
+                const lastSocketUpdate = lastSocketUpdateTime[`gps_${deviceId}`];
+                const now = Date.now();
+                
+                // If Socket.IO updated this device recently (within 30 seconds), preserve Socket.IO data
+                // Only update from database if Socket.IO data is stale or doesn't exist
+                if (existingDevice && lastSocketUpdate && (now - lastSocketUpdate) < SOCKET_DATA_FRESHNESS_MS) {
+                    // Keep existing Socket.IO data, skip database update for this device
+                    
+                    // IMPORTANT: Still check if device should be offline based on timestamp
+                    // Even if Socket.IO data is preserved, check if timestamp is > 10 minutes old
+                    if (existingDevice.location && existingDevice.location.lastUpdate) {
+                        const timestamp = new Date(existingDevice.location.lastUpdate);
+                        const timeDiff = now - timestamp.getTime();
+                        existingDevice.isOnline = timeDiff < 10 * 60 * 1000; // 10 minutes
+                    } else if (existingDevice.location && !existingDevice.location.lastUpdate) {
+                        // No timestamp, check if Socket.IO update was recent (within 10 min)
+                        existingDevice.isOnline = (now - lastSocketUpdate) < 10 * 60 * 1000;
+                    }
+                    
+                    return; // Skip database update, keep Socket.IO data
+                }
                 // Charging detection (unassigned GPS device)
                 const newBatteryRaw = device.location && device.location.battery !== null && device.location.battery !== undefined
                     ? Number(device.location.battery)

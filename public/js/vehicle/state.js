@@ -22,6 +22,8 @@ export let polylines = {};
 export let vehiclePaths = {};
 export let traceEnabled = {};
 export let traceToggles = {};
+// Track last Socket.IO update time to prevent database from overwriting real-time data
+export let lastSocketUpdateTime = {}; // { vehicleId: timestamp } or { deviceId: timestamp }
 
 // Setters for state
 export function setMap(newMap) {

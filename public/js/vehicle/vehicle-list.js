@@ -115,9 +115,11 @@ export function updateVehicleList() {
     // Show unassigned GPS devices
     gpsDevices.forEach(device => {
         if (!device.isAssigned && device.location) {
-            const statusClass = device.isOnline ? 'success' : 'warning';
-            const statusText = device.isOnline ? 'Online' : 'Offline';
-            const statusColor = device.isOnline ? '#28a745' : '#ffc107';
+            // Use same status logic as vehicles (In Transit, Standby, Offline)
+            const statusInfo = getStatusInfo(device.isOnline, device.isMoving || false);
+            const statusClass = statusInfo.badgeClass;
+            const statusText = statusInfo.text;
+            const statusColor = statusInfo.color;
             
             html += `
                 <div class="vehicle-card gps-device-item" data-device-id="${device.deviceId}" data-type="gps">
