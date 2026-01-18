@@ -10035,7 +10035,15 @@ class BookingModel {
         : 0;
       const pickupTotal = pickupPrice ? parseFloat(pickupPrice) : 0;
       const dropoffTotal = dropoffPrice ? parseFloat(dropoffPrice) : 0;
-      const servicesTotal = breakfastAdultTotal + breakfastKidTotal + pickupTotal + dropoffTotal;
+      
+      // Calculate late checkout fee total
+      // For consolidated billing: total fee = fee × numRooms (all goes to main booking)
+      // For individual billing: total fee = fee × numRooms (one per booking, but total is same)
+      const lateCheckoutFeeTotal = (checkOutStatus == 1 && parseFloat(lateCheckoutFee) > 0)
+        ? parseFloat(lateCheckoutFee) * numRooms
+        : 0;
+      
+      const servicesTotal = breakfastAdultTotal + breakfastKidTotal + pickupTotal + dropoffTotal + lateCheckoutFeeTotal;
 
       // console.log('🔄 Grand Total Calculation:');
       // console.log(`   totalGroupRoomCharges: ₱${totalGroupRoomCharges.toLocaleString()}`);
