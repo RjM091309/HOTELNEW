@@ -192,7 +192,7 @@
 				</li>
 
 				<!-- Settings Section -->
-				<% const settingsPages = ['integration', 'telegram_settings', 'booking_channel', 'vehicle', 'room', 'services']; %>
+				<% const settingsPages = ['integration', 'card_writer', 'telegram_settings', 'booking_channel', 'vehicle', 'room', 'services']; %>
 				<li class="nav-item <%= settingsPages.includes(activePage) ? 'open' : '' %>" data-section="settings">
 					<a class="nav-link nav-toggle nav-main-link-submenu <%= settingsPages.includes(activePage) ? 'active' : '' %>" data-toggle="submenu" aria-haspopup="true"
 						aria-expanded="<%= settingsPages.includes(activePage) ? 'true' : 'false' %>" href="#">
@@ -235,6 +235,12 @@
 							<a class="nav-link <%= activePage === 'integration' ? 'active' : '' %>" href="/integration">
 								<i class="fa fa-genderless"></i>
 								<span class="title">Integration</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link <%= activePage === 'card_writer' ? 'active' : '' %>" href="/integration/card-writer">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Card Writer</span>
 							</a>
 						</li>
 						<li class="nav-item">

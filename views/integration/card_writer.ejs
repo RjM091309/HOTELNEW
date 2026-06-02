@@ -1,0 +1,135 @@
+
+<style>
+    .card-writer-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-size: 1rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        padding: 0.45rem 1rem;
+        border-radius: 1.25rem;
+        color: #fff;
+        border: none;
+        min-width: 140px;
+        justify-content: center;
+    }
+    .card-writer-indicator .label {
+        background: none;
+        box-shadow: none;
+        padding: 0;
+        margin: 0;
+        color: inherit;
+        letter-spacing: 0.15em;
+    }
+    .card-writer-indicator .dot {
+        width: 0.55rem;
+        height: 0.55rem;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: inset 0 0 0 1px rgba(0,0,0,0.2);
+    }
+    .card-writer-indicator.connected {
+        background: #28a745;
+    }
+    .card-writer-indicator.connected .dot {
+        background: #1e7e34;
+    }
+    .card-writer-indicator.disconnected {
+        background: #e74c3c;
+    }
+    .card-writer-indicator.disconnected .dot {
+        background: #c0392b;
+    }
+    .card-writer-indicator.unknown {
+        background: #6c757d;
+    }
+    .card-writer-indicator.unknown .dot {
+        background: #343a40;
+    }
+</style>
+
+<div class="row">
+    <div class="col-xl-12 col-md-12 col-12">
+        <div class="dashboard-card">
+            <div class="dashboard-card-header d-flex justify-content-between align-items-center">
+                <header>Card Writer Connection</header>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-light rounded-circle p-2 d-flex align-items-center justify-content-center" id="cardWriterCredentialsButton">
+                        <i class="fa fa-cog"></i>
+                    </button>
+                    <div id="cardWriterConnectionIndicator" class="card-writer-indicator unknown">
+                        <span class="dot"></span>
+                        <span class="label">Disconnected</span>
+                    </div>
+                </div>
+            </div>
+            <div class="dashboard-card-body">
+                
+
+                <form id="cardWriterForm">
+                    <div class="row">
+                        <div class="col-lg-6 mb-3">
+                <label class="form-label text-white">Platform URL <small class="text-muted">(e.g. https://api.hxjiot.com/open/gateway)</small></label>
+                            <input type="text" class="form-control" id="cardWriterPlatformUrl" name="platformUrl" placeholder="https://your-wis-apartment-endpoint" required>
+                        </div>
+                        <div class="col-lg-6 mb-3">
+                <label class="form-label text-white">Callback URL <small class="text-muted">(optional)</small></label>
+                            <input type="text" class="form-control" id="cardWriterCallback" name="callbackUrl" placeholder="https://your-pms/callback">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-lg-6 mb-3">
+                            <label class="form-label text-white">Device S/N</label>
+                            <input type="text" class="form-control" id="cardWriterDeviceSeq" name="deviceSeq" placeholder="FMNR-632XXXXX">
+                            <div class="d-flex gap-2 mt-2">
+                                <button type="submit" class="btn btn-primary">Save Configuration</button>
+                                <button type="button" class="btn btn-success" id="testConnectionButton">Test Connection</button>
+                            </div>
+                        </div>
+                        <div class="col-lg-6 mb-3">
+                            <label for="cardWriterToken" class="form-label text-white mb-0">Token ID (read-only)</label>
+                            <input type="text" readonly class="form-control bg-dark text-white" id="cardWriterToken" placeholder="Token will appear after a successful connection">
+                            <small id="cardWriterCredentialHelper" class="text-muted">Credentials not set</small>
+                        </div>
+                    </div>
+                </form>
+
+                <div id="cardWriterStatus" class="mt-4"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="cardWriterCredentialsModal" tabindex="-1" role="dialog" aria-labelledby="cardWriterCredentialsModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content bg-dark text-white">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cardWriterCredentialsModalLabel">Credentials</h5>
+                <button type="button" class="close text-white" id="cardWriterCredentialsClose" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="cardWriterCredentialsForm">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="cardWriterUsername" class="text-white">Username</label>
+                        <input type="text" class="form-control bg-dark text-white" id="cardWriterUsername" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="cardWriterPassword" class="text-white">Password</label>
+                        <input type="password" class="form-control bg-dark text-white" id="cardWriterPassword" placeholder="Will be hashed automatically" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="/js/integration/card-writer-config.js"></script>
+

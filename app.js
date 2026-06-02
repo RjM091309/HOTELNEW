@@ -19,7 +19,7 @@ const setupSocketEvents = require('./socket-events');
 console.log('🔍 Loaded ENV values:', {
   DATABASE_HOST: process.env.DATABASE_HOST,
   DATABASE_USER: process.env.DATABASE_USER,
-  DATABASE_PASS: process.env.DATABASE_PASS,
+  DATABASE_PASS: process.env.DATABASE_PASS ? '[set]' : '[missing]',
   DATABASE_NAME: process.env.DATABASE_NAME,
 });
 
@@ -136,7 +136,7 @@ app.use((err, req, res, next) => {
 
 // Start server
 server.listen(PORT, () => {
-    console.log(`🚀 Server is running on https://pms.3core21.com (port ${PORT})`);
+    console.log(`🚀 Server is running on http://localhost:${PORT}`);
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`📁 Static files served from: ${path.join(__dirname, 'public')}`);
     console.log(`📊 Database: ${process.env.DATABASE_NAME || 'Not configured'}`);

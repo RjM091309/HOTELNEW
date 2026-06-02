@@ -343,6 +343,15 @@ async function createDynamicRoomModal(bookingId, event, options) {
                     <button class="btn btn-sm btn-primary" ${actionButtonAttributes} onclick="triggerTransferFromMenu('${roomId}')" style="${actionButtonStyle}">
                         <i class="fas fa-exchange-alt"></i> Transfer
                     </button>
+
+                    <!-- Register Card Button -->
+                    <button class="btn btn-sm btn-info text-white" 
+                            id="btnRegisterCard-${bookingId}" 
+                            ${actionButtonAttributes}
+                            onclick="registerGuestCard('${bookingId}', '${roomId}', '${roomNumber}', '${guestName}')"
+                            style="${actionButtonStyle}">
+                        <i class="fas fa-credit-card"></i> Register Card
+                    </button>
                     
                     <!-- Late Checkout Button - will be updated dynamically after services load -->
                     <button class="btn btn-sm btn-secondary" id="lateCheckoutBtn-${bookingId}" ${actionButtonAttributes} onclick="openLateCheckoutModal('${roomId}', '${checkOutDate}', '${bookingId}')" style="${actionButtonStyle}" data-checked-out="${isCheckedOut}">Late Check-Out</button>
