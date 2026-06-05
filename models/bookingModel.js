@@ -3463,7 +3463,7 @@ class BookingModel {
 
     try {
       // Default check-out time
-      const defaultCheckOutTime = '11:00:00';
+      const defaultCheckOutTime = '18:00:00';
 
       // Query to update check-out time
       const query = `
@@ -4692,7 +4692,7 @@ class BookingModel {
     const normalizeDate = (raw, isCheckIn) => {
       if (!raw) return null;
       const clean = raw.split(' (')[0].trim();
-      const time = isCheckIn ? '14:00:00' : (checkOutStatus == 1 ? '23:00:00' : '11:00:00');
+      const time = isCheckIn ? '06:00:00' : (checkOutStatus == 1 ? '23:00:00' : '18:00:00');
       const parsed = moment(clean, 'MMM DD, YYYY');
       if (!parsed.isValid()) return null;
       return `${parsed.format('YYYY-MM-DD')} ${time}`;
@@ -8235,7 +8235,7 @@ class BookingModel {
 
       // Convert dates to MySQL format
       const moment = require('moment');
-      const checkInDate = moment(startDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD') + ' 14:00:00';
+      const checkInDate = moment(startDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD') + ' 06:00:00';
 
       // Set checkout time based on checkOutStatus (0 = regular, 1 = late)
       let checkOutTime;
@@ -8243,8 +8243,8 @@ class BookingModel {
         // Late Check Out: Set to 11:00 PM
         checkOutTime = ' 23:00:00';
       } else {
-        // Regular Check Out: Set to 11:00 AM
-        checkOutTime = ' 11:00:00';
+        // Regular Check Out: Set to 6:00 PM
+        checkOutTime = ' 18:00:00';
       }
       const checkOutDate = moment(endDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD') + checkOutTime;
 
@@ -9404,7 +9404,7 @@ class BookingModel {
     const normalizeDate = (raw, isCheckIn) => {
       if (!raw) return null;
       const clean = raw.split(' (')[0].trim();
-      const time = isCheckIn ? '14:00:00' : (checkOutStatus == 1 ? '23:00:00' : '11:00:00');
+      const time = isCheckIn ? '06:00:00' : (checkOutStatus == 1 ? '23:00:00' : '18:00:00');
       const parsed = moment(clean, 'MMM DD, YYYY');
       if (!parsed.isValid()) return null;
       return `${parsed.format('YYYY-MM-DD')} ${time}`;

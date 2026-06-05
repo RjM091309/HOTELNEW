@@ -2,7 +2,17 @@ const axios = require('axios');
 const crypto = require('crypto');
 const CardWriterModel = require('../models/cardWriterModel');
 
+const API_REASON_TRANSLATIONS = {
+  '开始时间大于结束时间': 'Start time is greater than end time',
+};
+
 class CardWriterController {
+  static translateApiReason(reason) {
+    if (!reason || typeof reason !== 'string') return reason || 'No details provided';
+    const trimmed = reason.trim();
+    return API_REASON_TRANSLATIONS[trimmed] || trimmed;
+  }
+
   static async getCardWriterPage(req, res) {
     res.render('integration/card_writer', {
       title: 'Card Writer Integration',
@@ -98,13 +108,15 @@ class CardWriterController {
         config.id,
         result.success ? result.tokenId : null,
         result.expiresAt,
-        result.success ? 'Connection successful' : result.reason,
+        result.success ? 'Connection successful' : CardWriterController.translateApiReason(result.reason),
         result.success
       );
 
       res.json({
         success: result.success,
-        message: result.success ? 'Connected to card writer cloud successfully' : result.reason,
+        message: result.success
+          ? 'Connected to card writer cloud successfully'
+          : CardWriterController.translateApiReason(result.reason),
         data: result.data,
       });
     } catch (error) {
@@ -147,9 +159,10 @@ class CardWriterController {
           );
           config.last_token = refreshResult.tokenId;
         } else {
-          return res
-            .status(400)
-            .json({ success: false, message: 'Failed to refresh token: ' + refreshResult.reason });
+          return res.status(400).json({
+            success: false,
+            message: 'Failed to refresh token: ' + CardWriterController.translateApiReason(refreshResult.reason),
+          });
         }
       }
 
@@ -185,6 +198,13 @@ class CardWriterController {
       const beginTime = Math.floor(new Date(booking.CHECK_IN_DATE).getTime() / 1000);
       const endTime = Math.floor(new Date(booking.CHECK_OUT_DATE).getTime() / 1000);
 
+      if (beginTime >= endTime) {
+        return res.status(400).json({
+          success: false,
+          message: 'Check-out date must be after check-in date.',
+        });
+      }
+
       const payload = {
         method: 'apartmentAddCardKey',
         tokenId: config.last_token,
@@ -213,7 +233,11 @@ class CardWriterController {
       if (data.resultCode === 0) {
         res.json({ success: true, message: 'Card registered successfully!', data: data.data });
       } else {
-        res.status(400).json({ success: false, message: 'API Error: ' + data.reason, code: data.resultCode });
+        res.status(400).json({
+          success: false,
+          message: 'API Error: ' + CardWriterController.translateApiReason(data.reason),
+          code: data.resultCode,
+        });
       }
     } catch (error) {
       console.error('CardWriterController.registerCard', error);
@@ -265,7 +289,11 @@ class CardWriterController {
         }
         res.json({ success: true, cardNo: decimalValue, message: 'Card read successfully' });
       } else {
-        res.status(400).json({ success: false, message: 'Encoder Error: ' + data.reason, code: data.resultCode });
+        res.status(400).json({
+          success: false,
+          message: 'Encoder Error: ' + CardWriterController.translateApiReason(data.reason),
+          code: data.resultCode,
+        });
       }
     } catch (error) {
       console.error('CardWriterController.readCard', error);
@@ -322,10 +350,15 @@ class CardWriterController {
         config.id,
         result.success ? result.tokenId : null,
         result.expiresAt,
-        result.success ? 'Token auto-renewed' : result.reason,
+        result.success ? 'Token auto-renewed' : CardWriterController.translateApiReason(result.reason),
         result.success
       );
-      if (!result.success) return res.status(400).json({ success: false, message: 'Auto-renew failed: ' + result.reason });
+      if (!result.success) {
+        return res.status(400).json({
+          success: false,
+          message: 'Auto-renew failed: ' + CardWriterController.translateApiReason(result.reason),
+        });
+      }
       const updated = await CardWriterModel.getConfig();
       res.json({ success: true, data: updated, renewed: true });
     } catch (error) {

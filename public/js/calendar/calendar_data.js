@@ -689,11 +689,11 @@ function applyIncomingHighlight() {
   const endDate = new Date(endStr);
   if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return;
 
-  // Align with booking logic: Check-in 2:00 PM, Check-out 11:00 AM
+  // Align with booking logic: Check-in 6:00 AM, Check-out 6:00 PM
   const startAt = new Date(startDate);
-  startAt.setHours(14, 0, 0, 0); // PM cell
+  startAt.setHours(6, 0, 0, 0);
   const endAt = new Date(endDate);
-  endAt.setHours(11, 0, 0, 0);   // AM cell
+  endAt.setHours(18, 0, 0, 0);
 
   // Ensure resource exists
   const resource = (typeof calendar.getResourceById === 'function')
@@ -1091,11 +1091,11 @@ const findHeader = setInterval(() => {
           return; // Exit early, don't show modal
         }
         
-        // Set check-in time to 2 PM (14:00) - PM cell
-        originalStartDate.setHours(14, 0, 0, 0);
+        // Set check-in time to 6 AM
+        originalStartDate.setHours(6, 0, 0, 0);
         
-        // Set check-out time to 11 AM (11:00) - AM cell  
-        originalEndDate.setHours(11, 0, 0, 0);
+        // Set check-out time to 6 PM
+        originalEndDate.setHours(18, 0, 0, 0);
         
         modal.data('calendar-room-id', info.resource.id);
         modal.data('calendar-start', originalStartDate);
@@ -1239,8 +1239,8 @@ function updateCalendarEventsForCheckout(bookings) {
 
       // Parse the checkout date
       const newEndDate = new Date(checkOutDate);
-      // Set checkout time to 11:00 AM (AM cell)
-      newEndDate.setHours(11, 0, 0, 0);
+      // Set checkout time to 6:00 PM
+      newEndDate.setHours(18, 0, 0, 0);
 
       // Update event end date
       event.setEnd(newEndDate);
@@ -1290,16 +1290,16 @@ function updateCalendarEventForBooking(bookingData) {
     // Update checkout date if provided
     if (bookingData.checkOut) {
       const newEndDate = new Date(bookingData.checkOut);
-      // Set checkout time to 11:00 AM (AM cell)
-      newEndDate.setHours(11, 0, 0, 0);
+      // Set checkout time to 6:00 PM
+      newEndDate.setHours(18, 0, 0, 0);
       event.setEnd(newEndDate);
     }
 
     // Update check-in date if provided
     if (bookingData.checkIn) {
       const newStartDate = new Date(bookingData.checkIn);
-      // Set check-in time to 2:00 PM (PM cell)
-      newStartDate.setHours(14, 0, 0, 0);
+      // Set check-in time to 6:00 AM
+      newStartDate.setHours(6, 0, 0, 0);
       event.setStart(newStartDate);
     }
 

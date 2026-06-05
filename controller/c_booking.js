@@ -612,7 +612,7 @@ class BookingController {
       // console.log('Is Direct Reservation:', isDirectReservation);
 
       // Convert dates to MySQL format
-      const checkInDate = moment(startDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD') + ' 14:00:00';
+      const checkInDate = moment(startDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD') + ' 06:00:00';
       
       // Set checkout time based on checkOutStatus
       let checkOutTime;
@@ -620,8 +620,8 @@ class BookingController {
         // Late Check Out: Set to 11:00 PM
         checkOutTime = ' 23:00:00';
       } else {
-        // Regular Check Out: Set to 11:00 AM
-        checkOutTime = ' 11:00:00';
+        // Regular Check Out: Set to 6:00 PM
+        checkOutTime = ' 18:00:00';
       }
       const checkOutDate = moment(endDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD') + checkOutTime;
 

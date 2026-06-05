@@ -226,14 +226,14 @@ async function createDynamicRoomModal(bookingId, event, options) {
     lateCheckout = '0';
     
     // Check if checkout date is today
-    // event.end is set to checkout date at 11:00 AM, not the next day
+    // event.end is set to checkout date at 6:00 PM, not the next day
     let actualCheckOutDate;
     
     // Try to get checkout date from event extendedProps first (more reliable)
     if (event && event.extendedProps && event.extendedProps.checkOutDate) {
       actualCheckOutDate = new Date(event.extendedProps.checkOutDate);
     } else {
-      // Fallback: use event.end directly (it's already the checkout date at 11:00 AM)
+      // Fallback: use event.end directly (it's already the checkout date at 6:00 PM)
       actualCheckOutDate = new Date(checkOutDate);
     }
     

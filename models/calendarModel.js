@@ -199,9 +199,9 @@ class CalendarModel {
         const startDate = new Date(row.start);
         const endDate = new Date(row.end);
         
-        // Set check-in time to 2 PM and check-out time to 11 AM
-        startDate.setHours(14, 0, 0, 0);  // 2 PM
-        endDate.setHours(11, 0, 0, 0);    // 11 AM
+        // Set check-in time to 6 AM and check-out time to 6 PM
+        startDate.setHours(6, 0, 0, 0);   // 6 AM
+        endDate.setHours(18, 0, 0, 0);    // 6 PM
         
         return {
           id: String(row.id),

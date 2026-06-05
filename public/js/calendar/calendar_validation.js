@@ -115,8 +115,8 @@ function proceedWithUpdate(info, newStart, newEnd, targetRoom, bookingId) {
       const updateData = {
         id: bookingId,
         room: targetRoom.title, // New room number
-        checkIn: formatMySQLDateTime(newStart), // New check-in date (2:00 PM)
-        checkOut: formatMySQLDateTime(newEnd),  // New check-out date (11:00 AM)
+        checkIn: formatMySQLDateTime(newStart), // New check-in date (6:00 AM)
+        checkOut: formatMySQLDateTime(newEnd),  // New check-out date (6:00 PM)
         isRoomTransfer: true,
         oldRoomNumber: oldResource.title, // For logging purposes
         newRoomId: newResource.id // For logging purposes
@@ -319,8 +319,8 @@ function proceedWithUpdate(info, newStart, newEnd, targetRoom, bookingId) {
     const updateData = {
       id: bookingId,
       room: targetRoom.title, // Room number
-      checkIn: formatMySQLDateTime(newStart), // 2:00 PM
-      checkOut: formatMySQLDateTime(newEnd)  // 11:00 AM
+      checkIn: formatMySQLDateTime(newStart), // 6:00 AM
+      checkOut: formatMySQLDateTime(newEnd)  // 6:00 PM
     };
     
     // Make AJAX call to update booking in database
@@ -431,8 +431,8 @@ function proceedWithResize(info, newEnd, roomResource, bookingId) {
   const updateData = {
     id: bookingId,
     room: roomResource.title, // Room number
-    checkIn: formatMySQLDateTime(info.event.start), // 2:00 PM
-    checkOut: formatMySQLDateTime(newEnd),  // 11:00 AM
+    checkIn: formatMySQLDateTime(info.event.start), // 6:00 AM
+    checkOut: formatMySQLDateTime(newEnd),  // 6:00 PM
     isExtended: true, // Flag to indicate this is an extension
     originalCheckOut: formatMySQLDateTime(originalEnd), // Original checkout date for tracking
     extensionDate: formatMySQLDateTime(new Date()) // When the extension was made
