@@ -280,6 +280,15 @@
 						</li>
 					</ul>
 				</li>
+				<% if (user && user.PERMISSIONS == 1) { %>
+				<li class="nav-item">
+					<a href="#" id="navDeleteTestData" class="nav-link">
+						<i class="material-icons">delete_forever</i>
+						<span class="title">Delete Data</span>
+					</a>
+				</li>
+				<% } %>
+
 				<script>
 					(function() {
 						try {
