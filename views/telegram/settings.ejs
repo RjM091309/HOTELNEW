@@ -742,7 +742,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const btnReauth = accountDiv.querySelector('.btn-reauth-kakao');
         if (btnReauth) {
             btnReauth.addEventListener('click', function() {
-                loginWithKakaoAccount(config.IDNo, config.REST_API_KEY);
+                loginWithKakaoAccount(config.IDNo, config.REST_API_KEY, true);
             });
         }
 
@@ -823,8 +823,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function loginWithKakaoAccount(accountId, restApiKey) {
+    function loginWithKakaoAccount(accountId, restApiKey, openInNewTab = false) {
         hideKakaoMessages();
+
+        // Open tab immediately on click so popup blockers don't block it after fetch
+        let authWindow = null;
+        if (openInNewTab) {
+            authWindow = window.open('about:blank', '_blank');
+        }
 
         fetch('/telegram/kakao/login', {
             method: 'POST',
@@ -840,13 +846,23 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success && data.authUrl) {
-                // Redirect to Kakao login
-                window.location.href = data.authUrl;
+                if (openInNewTab) {
+                    if (authWindow) {
+                        authWindow.location.href = data.authUrl;
+                    } else {
+                        window.open(data.authUrl, '_blank');
+                    }
+                    showKakaoSuccess('Kakao login opened in a new tab. Complete authentication there, then click Test to verify.');
+                } else {
+                    window.location.href = data.authUrl;
+                }
             } else {
+                if (authWindow) authWindow.close();
                 showKakaoError(data.message || 'Failed to initiate Kakao login');
             }
         })
         .catch(error => {
+            if (authWindow) authWindow.close();
             showKakaoError('Error initiating Kakao login: ' + error.message);
         });
     }
