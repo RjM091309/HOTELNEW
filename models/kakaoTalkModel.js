@@ -61,14 +61,9 @@ class KakaoTalkModel {
 
     static async updateAccessToken(accessToken, refreshToken = null, editedBy = null) {
         try {
-            const query = `UPDATE kakao_talk_config 
-                          SET ACCESS_TOKEN = ?, REFRESH_TOKEN = ?, 
-                              EDITED_BY = ?, EDITED_DT = NOW() 
-                          WHERE ACTIVE = 1`;
-            const result = await queryDatabasePromise(query, [
-                accessToken, refreshToken, editedBy
-            ]);
-            return result.affectedRows > 0;
+            const config = await this.getConfig();
+            if (!config) return false;
+            return this.updateAccessTokenById(config.IDNo, accessToken, refreshToken, editedBy);
         } catch (error) {
             if (error.code === 'ER_NO_SUCH_TABLE') {
                 return false;

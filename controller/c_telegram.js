@@ -1204,7 +1204,10 @@ class TelegramController {
      */
     static async testKakaoTalk(req, res) {
         try {
-            const config = await KakaoTalkModel.getConfig();
+            const { accountId } = req.body || {};
+            const config = accountId
+                ? await KakaoTalkModel.getConfigById(accountId)
+                : await KakaoTalkModel.getConfig();
             
             if (!config) {
                 return res.status(400).json({
@@ -1230,7 +1233,8 @@ class TelegramController {
 
             // If token was refreshed, save the new tokens to database
             if (result.tokenRefreshed && result.newAccessToken) {
-                await KakaoTalkModel.updateAccessToken(
+                await KakaoTalkModel.updateAccessTokenById(
+                    config.IDNo,
                     result.newAccessToken,
                     result.newRefreshToken || config.REFRESH_TOKEN,
                     req.user?.userId || null

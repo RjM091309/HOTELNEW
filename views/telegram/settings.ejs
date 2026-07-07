@@ -871,11 +871,13 @@ document.addEventListener('DOMContentLoaded', function() {
         hideKakaoMessages();
         showKakaoSuccess('Testing connection...');
 
-        // Note: You may need to update the test endpoint to accept accountId
-        // For now, this will test the most recent account
         fetch('/telegram/kakao/test', {
             method: 'POST',
-            credentials: 'include'
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify({ accountId: accountId })
         })
         .then(response => response.json())
         .then(data => {
