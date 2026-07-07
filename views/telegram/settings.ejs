@@ -735,7 +735,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const btnLogin = accountDiv.querySelector('.btn-login-kakao');
         if (btnLogin) {
             btnLogin.addEventListener('click', function() {
-                loginWithKakaoAccount(config.IDNo, config.REST_API_KEY);
+                loginWithKakaoAccount(config.IDNo, config.REST_API_KEY, true);
             });
         }
 
@@ -808,9 +808,17 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.innerHTML = originalText;
 
             if (data.success) {
-                showKakaoSuccess('Account added successfully! Please click "Login" on the account to authenticate.');
-                restApiKeyInput.value = ''; // Clear form
-                loadAllKakaoConfigs(); // Reload accounts list
+                const savedApiKey = restApiKey;
+                restApiKeyInput.value = '';
+                if (nameInput) nameInput.value = '';
+                loadAllKakaoConfigs();
+
+                if (data.accountId) {
+                    showKakaoSuccess('Account added! Opening Kakao login in a new tab. Please log in with the correct Kakao account.');
+                    loginWithKakaoAccount(data.accountId, savedApiKey, true);
+                } else {
+                    showKakaoSuccess('Account added successfully! Please click "Login" on the account to authenticate.');
+                }
             } else {
                 showKakaoError(data.message || 'Failed to add account');
             }

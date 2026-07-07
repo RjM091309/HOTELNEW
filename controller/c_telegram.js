@@ -758,6 +758,28 @@ class TelegramController {
     // KAKAOTALK METHODS
     // ========================================
 
+    static _parseKakaoOAuthState(state) {
+        if (!state) {
+            return { accountId: null, restApiKey: null };
+        }
+
+        const decoded = decodeURIComponent(String(state));
+        if (decoded.startsWith('accountId=')) {
+            const accountId = parseInt(decoded.replace('accountId=', ''), 10);
+            return {
+                accountId: Number.isNaN(accountId) ? null : accountId,
+                restApiKey: null
+            };
+        }
+        if (decoded.startsWith('restApiKey=')) {
+            return {
+                accountId: null,
+                restApiKey: decodeURIComponent(decoded.replace('restApiKey=', ''))
+            };
+        }
+        return { accountId: null, restApiKey: null };
+    }
+
     /**
      * Initiate KakaoTalk OAuth login
      * @param {number} accountId - Optional IDNo of existing account to update, or null to add new account
@@ -802,6 +824,17 @@ class TelegramController {
             const state = accountId ? `accountId=${accountId}` : (restApiKey ? `restApiKey=${encodeURIComponent(restApiKey)}` : 'new');
             const finalAuthURL = `${kakaoAuthURL}&state=${encodeURIComponent(state)}`;
 
+            if (accountId) {
+                res.cookie('kakao_oauth_account_id', String(accountId), {
+                    httpOnly: true,
+                    maxAge: 10 * 60 * 1000,
+                    sameSite: 'lax',
+                    secure: req.protocol === 'https'
+                });
+            } else {
+                res.clearCookie('kakao_oauth_account_id');
+            }
+
             res.json({
                 success: true,
                 authUrl: finalAuthURL
@@ -827,29 +860,47 @@ class TelegramController {
             }
 
             // Parse state to get accountId or restApiKey
-            let accountId = null;
-            let restApiKey = null;
-            if (state) {
-                if (state.startsWith('accountId=')) {
-                    accountId = parseInt(state.replace('accountId=', ''));
-                } else if (state.startsWith('restApiKey=')) {
-                    restApiKey = decodeURIComponent(state.replace('restApiKey=', ''));
+            const parsedState = TelegramController._parseKakaoOAuthState(state);
+            let accountId = parsedState.accountId;
+            let restApiKey = parsedState.restApiKey;
+
+            if (!accountId && req.cookies?.kakao_oauth_account_id) {
+                const cookieAccountId = parseInt(req.cookies.kakao_oauth_account_id, 10);
+                if (!Number.isNaN(cookieAccountId)) {
+                    accountId = cookieAccountId;
                 }
             }
+            res.clearCookie('kakao_oauth_account_id');
 
             let config;
+            let targetAccountId = accountId;
+
             if (accountId) {
-                // Update existing account
                 config = await KakaoTalkModel.getConfigById(accountId);
                 if (!config) {
                     return res.redirect('/telegram/settings?error=account_not_found');
                 }
             } else if (restApiKey) {
-                // Add new account with provided REST API Key
-                config = { REST_API_KEY: restApiKey };
+                const pending = await KakaoTalkModel.findPendingConfigByRestApiKey(restApiKey);
+                if (pending) {
+                    config = pending;
+                    targetAccountId = pending.IDNo;
+                } else {
+                    config = { REST_API_KEY: restApiKey };
+                }
             } else {
-                // Default behavior - use most recent config
-                config = await KakaoTalkModel.getConfig();
+                const pending = await KakaoTalkModel.findPendingConfigByRestApiKey(
+                    (await KakaoTalkModel.getConfig())?.REST_API_KEY
+                );
+                if (pending) {
+                    config = pending;
+                    targetAccountId = pending.IDNo;
+                } else {
+                    config = await KakaoTalkModel.getConfig();
+                    if (config) {
+                        targetAccountId = config.IDNo;
+                    }
+                }
             }
             
             if (!config || !config.REST_API_KEY) {
@@ -888,46 +939,39 @@ class TelegramController {
                 }
             );
 
-            if (accountId) {
-                // Update existing account
-                await KakaoTalkModel.updateAccessTokenById(
-                    accountId,
-                    access_token,
-                    refresh_token,
-                    req.user?.userId || null
-                );
+            const userInfo = userInfoResponse.data;
+            const editedBy = req.user?.userId || null;
+
+            if (targetAccountId) {
                 await KakaoTalkModel.saveConfig(
                     config.REST_API_KEY,
                     access_token,
                     refresh_token,
-                    userInfoResponse.data,
-                    req.user?.userId || null,
-                    accountId,
-                    null // keep existing NAME
+                    userInfo,
+                    editedBy,
+                    targetAccountId,
+                    null
                 );
             } else if (restApiKey) {
-                // Add new account
                 await KakaoTalkModel.addNewConfig(
                     restApiKey,
                     access_token,
                     refresh_token,
-                    userInfoResponse.data,
-                    req.user?.userId || null
+                    userInfo,
+                    editedBy
                 );
-            } else {
-                // Default behavior - update most recent config
-                await KakaoTalkModel.updateAccessToken(
-                    access_token,
-                    refresh_token,
-                    req.user?.userId || null
-                );
+            } else if (config?.IDNo) {
                 await KakaoTalkModel.saveConfig(
                     config.REST_API_KEY,
                     access_token,
                     refresh_token,
-                    userInfoResponse.data,
-                    req.user?.userId || null
+                    userInfo,
+                    editedBy,
+                    config.IDNo,
+                    null
                 );
+            } else {
+                return res.redirect('/telegram/settings?error=no_api_key');
             }
 
             res.redirect('/telegram/settings?kakao_success=true');

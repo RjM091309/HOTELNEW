@@ -149,6 +149,44 @@ class KakaoTalkModel {
     }
 
     /**
+     * Find an account that was added but not yet authenticated (no access token)
+     */
+    static async findPendingConfigByRestApiKey(restApiKey) {
+        try {
+            const query = `SELECT * FROM kakao_talk_config 
+                          WHERE ACTIVE = 1 AND REST_API_KEY = ?
+                          AND (ACCESS_TOKEN IS NULL OR ACCESS_TOKEN = '')
+                          ORDER BY ENCODED_DT DESC LIMIT 1`;
+            const results = await queryDatabasePromise(query, [restApiKey]);
+            return results.length > 0 ? results[0] : null;
+        } catch (error) {
+            if (error.code === 'ER_NO_SUCH_TABLE') {
+                return null;
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Find an account that was added but not yet authenticated by ID
+     */
+    static async findPendingConfigById(idNo) {
+        try {
+            const query = `SELECT * FROM kakao_talk_config 
+                          WHERE ACTIVE = 1 AND IDNo = ?
+                          AND (ACCESS_TOKEN IS NULL OR ACCESS_TOKEN = '')
+                          LIMIT 1`;
+            const results = await queryDatabasePromise(query, [idNo]);
+            return results.length > 0 ? results[0] : null;
+        } catch (error) {
+            if (error.code === 'ER_NO_SUCH_TABLE') {
+                return null;
+            }
+            throw error;
+        }
+    }
+
+    /**
      * Add a new KakaoTalk config (always creates new, doesn't update existing)
      * @param {string} restApiKey - REST API Key
      * @param {string} accessToken - Access token (optional)
