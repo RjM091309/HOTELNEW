@@ -1131,6 +1131,8 @@ class BookingModel {
       pickupPrice,
       dropoffServiceId,
       dropoffPrice,
+      flightNumber,
+      passengerCount,
       // ✅ Additional for Direct Reservations
       bedCount,
       isDirectReservation,
@@ -1207,9 +1209,9 @@ class BookingModel {
 
         // Create booking
         const bookingQuery = `
-          INSERT INTO booking 
-          (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, REMARKS, CONFIRMATION_NUMBER, NOTIFICATION_READ, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, LATE_CHECKOUT, AGENCY_ID, IS_DIRECT_RESERVATION, BED_COUNT) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO booking
+          (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, REMARKS, CONFIRMATION_NUMBER, NOTIFICATION_READ, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, LATE_CHECKOUT, AGENCY_ID, IS_DIRECT_RESERVATION, BED_COUNT, FLIGHT_NUMBER, PASSENGER_COUNT)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const directReservationFlag = isDirectReservation ? 1 : 0;
         // Handle empty agencyID - set to NULL if empty
@@ -1236,7 +1238,9 @@ class BookingModel {
         const bookingValues = [
           customerId, room_id, checkInDate, checkOutDate, 'pending', finalBookingRoute,
           maxOccupants, bookingRemarks, finalConfirmationNumber, encodedBy, date, 1, checkInStatus, checkOutStatus,
-          processedAgencyID, directReservationFlag, bedCount || null
+          processedAgencyID, directReservationFlag, bedCount || null,
+          (pickupServiceId || dropoffServiceId) ? (flightNumber || null) : null,
+          (pickupServiceId || dropoffServiceId) ? (parseInt(passengerCount) || null) : null
         ];
 
         const bookingResult = await new Promise((resolve, reject) => {
@@ -4539,15 +4543,16 @@ class BookingModel {
 
       const groupBooking = groupResult[0];
 
-      // Get room numbers
+      // Room numbers change too often to print reliably - count only, no room numbers on the voucher
       const roomsQuery = `
-        SELECT GROUP_CONCAT(DISTINCT r.ROOM_NUMBER ORDER BY r.ROOM_NUMBER SEPARATOR ', ') AS room_numbers
+        SELECT COUNT(DISTINCT b.ROOM_ID) AS room_count
         FROM booking b
         JOIN room r ON b.ROOM_ID = r.IDNo
         WHERE b.GROUP_BOOKING_ID = ? AND b.ACTIVE = 1
       `;
       const roomsResult = await queryDatabasePromise(roomsQuery, [groupId]);
-      const roomNumbers = roomsResult?.[0]?.room_numbers || '';
+      const roomCount = roomsResult?.[0]?.room_count || 0;
+      const roomNumbers = `${roomCount} Room${roomCount === 1 ? '' : 's'}`;
 
       // Calculate room charges (sum of all room charges)
       const roomChargesQuery = `
@@ -9382,6 +9387,8 @@ class BookingModel {
       pickupPrice,
       dropoffServiceId,
       dropoffPrice,
+      flightNumber,
+      passengerCount,
       discount = 0,
       consolidatedBilling: consolidatedBillingParam = true, // Default: Master Billing (changed from false to true)
       perRoomDiscounts = [],
@@ -9708,8 +9715,8 @@ class BookingModel {
 
         // booking
         const bookingQuery = `
-          INSERT INTO booking (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, LATE_CHECKOUT, REMARKS, CONFIRMATION_NUMBER, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, GROUP_BOOKING_ID, AGENCY_ID, IS_DIRECT_RESERVATION)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO booking (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, LATE_CHECKOUT, REMARKS, CONFIRMATION_NUMBER, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, GROUP_BOOKING_ID, AGENCY_ID, IS_DIRECT_RESERVATION, FLIGHT_NUMBER, PASSENGER_COUNT)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const bookingValues = [
           guestID,
@@ -9728,7 +9735,9 @@ class BookingModel {
           checkInStatus,
           groupBookingId,
           agencyId || null,
-          0
+          0,
+          (pickupServiceId || dropoffServiceId) ? (flightNumber || null) : null,
+          (pickupServiceId || dropoffServiceId) ? (parseInt(passengerCount) || null) : null
         ];
         const [bookResult] = await connection.promise().query(bookingQuery, bookingValues);
         const bookingId = bookResult.insertId;

@@ -117,9 +117,9 @@ function showLateCheckInModal(event) {
   const ciStatus = event.extendedProps?.checkInStatus; // 1 regular, 0 late
   const coStatus = event.extendedProps?.checkOutStatus; // 0 regular, 1 late
   const ciText = (ciStatus === 1 ? 'REGULAR CHECK-IN' : 'LATE CHECK-IN');
-  const ciColor = (ciStatus === 1 ? '#e53935' : '#fff700');
+  const ciColor = (ciStatus === 1 ? '#e53935' : '#e0a316');
   const coText = (coStatus === 1 ? 'LATE CHECK-OUT' : 'REGULAR CHECK-OUT');
-  const coColor = (coStatus === 1 ? '#fff700' : '#e53935');
+  const coColor = (coStatus === 1 ? '#e0a316' : '#e53935');
 
   // Prepare modal configuration based on check-in availability
   const modalConfig = {
@@ -128,10 +128,10 @@ function showLateCheckInModal(event) {
       <div class="text-left" style="padding: 20px 0;">
         <div style="margin-bottom: 20px;">
           <div style="display: flex; align-items: center; margin-bottom: 15px;">
-            <div style="width: 8px; height: 8px; background-color: ${ciStatus === 0 ? '#fff700' : '#e53935'}; border-radius: 50%; margin-right: 12px;"></div>
+            <div style="width: 8px; height: 8px; background-color: ${ciStatus === 0 ? '#e0a316' : '#e53935'}; border-radius: 50%; margin-right: 12px;"></div>
             <span style="font-weight: 600; color: #ffffff; font-size: 16px;">Reservation Details</span>
           </div>
-          <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border-left: 3px solid #fff700;">
+          <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border-left: 3px solid #e0a316;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
               <div style="flex: 1; margin-right: 15px;">
                 <span style="color: #cccccc; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Guest Name</span>
@@ -157,15 +157,15 @@ function showLateCheckInModal(event) {
             </div>
           </div>
         </div>
-        ${canCheckIn ? 
-          (ciStatus === 0 ? 
-            `<div style="text-align: center; padding: 15px; background: rgba(255, 244, 79, 0.15); border-radius: 8px; border: 1px solid rgba(255, 244, 79, 0.35);">
-              <span style="color: #fff700; font-size: 14px; font-weight: 600;">
+        ${canCheckIn ?
+          (ciStatus === 0 ?
+            `<div style="text-align: center; padding: 15px; background: rgba(224, 163, 22, 0.15); border-radius: 8px; border: 1px solid rgba(224, 163, 22, 0.35);">
+              <span style="color: #e0a316; font-size: 14px; font-weight: 600;">
                 ⚠️ This guest has not checked in yet and is past the scheduled check-in time.
               </span>
-            </div>` : 
-            `<div style="text-align: center; padding: 15px; background: rgba(255, 244, 79, 0.15); border-radius: 8px; border: 1px solid rgba(255, 244, 79, 0.35);">
-              <span style="color: #fff700; font-size: 14px; font-weight: 600;">
+            </div>` :
+            `<div style="text-align: center; padding: 15px; background: rgba(224, 163, 22, 0.15); border-radius: 8px; border: 1px solid rgba(224, 163, 22, 0.35);">
+              <span style="color: #e0a316; font-size: 14px; font-weight: 600;">
                 📋 This reservation is Late Check-In confirmation and requires staff approval.
               </span>
             </div>`
@@ -355,9 +355,9 @@ function showPendingModal(event) {
   const ciStatus2 = event.extendedProps?.checkInStatus; // 1 regular, 0 late
   const coStatus2 = event.extendedProps?.checkOutStatus; // 0 regular, 1 late
   const ciText = (ciStatus2 === 1 ? 'REGULAR CHECK-IN' : 'LATE CHECK-IN');
-  const ciColor = (ciStatus2 === 1 ? '#e53935' : '#fff700');
+  const ciColor = (ciStatus2 === 1 ? '#e53935' : '#e0a316');
   const coText = (coStatus2 === 1 ? 'LATE CHECK-OUT' : 'REGULAR CHECK-OUT');
-  const coColor = (coStatus2 === 1 ? '#fff700' : '#e53935');
+  const coColor = (coStatus2 === 1 ? '#e0a316' : '#e53935');
 
   // Prepare modal configuration based on check-in availability
   const modalConfig = {
@@ -366,7 +366,7 @@ function showPendingModal(event) {
       <div class="text-left" style="padding: 20px 0;">
         <div style="margin-bottom: 20px;">
           <div style="display: flex; align-items: center; margin-bottom: 15px;">
-            <div style="width: 8px; height: 8px; background-color: ${ciStatus2 === 0 ? '#fff700' : '#e53935'}; border-radius: 50%; margin-right: 12px;"></div>
+            <div style="width: 8px; height: 8px; background-color: ${ciStatus2 === 0 ? '#e0a316' : '#e53935'}; border-radius: 50%; margin-right: 12px;"></div>
             <span style="font-weight: 600; color: #ffffff; font-size: 16px;">Reservation Details</span>
           </div>
           <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border-left: 3px solid #e53935;">
@@ -1143,7 +1143,7 @@ function reopenCancelledReservation(bookingId, event, newStatus = 'pending') {
       };
       
       // Set background color based on check-in status
-      const statusColor = newStatus === 'late_check_in' ? '#fff700' : '#e53935'; // Lemon for late, Red for regular
+      const statusColor = newStatus === 'late_check_in' ? '#e0a316' : '#e53935'; // Amber for late, Red for regular
       event.backgroundColor = statusColor;
       
       // Update the event status in the calendar INSTANTLY (like drag & drop)

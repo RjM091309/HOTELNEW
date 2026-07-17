@@ -30,9 +30,14 @@ $(document).ready(function () {
     
     const pickupServiceId = $('#groupPickupServiceId').val();
     const pickupPrice = $('#groupPickupPrice').val();
-    
+
     const dropoffServiceId = $('#groupDropoffServiceId').val();
     const dropoffPrice = $('#groupDropoffPrice').val();
+
+    const includePickup = $('#groupIncludePickup').is(':checked');
+    const includeDropoff = $('#groupIncludeDropoff').is(':checked');
+    const flightNumber = $('#groupFlightNumber').val();
+    const passengerCount = $('#groupPassengerCount').val();
 
     if (!daterange || !groupName || !groupContact || !numberOfRooms) {
       Swal.fire({
@@ -114,6 +119,15 @@ $(document).ready(function () {
       return;
     }
 
+    if ((includePickup || includeDropoff) && (!flightNumber || !flightNumber.trim() || !passengerCount)) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Flight Info Required',
+        text: 'Please enter the Flight Number and Number of Passengers for Pick-up/Drop-off.',
+      });
+      return;
+    }
+
     // Compute per-room discounts for Senior/PWD when individual billing
     function computeSeniorPerRoomDiscounts(pricesRaw, nights, percent, roomCount) {
       const prices = pricesRaw
@@ -180,6 +194,8 @@ $(document).ready(function () {
       pickupPrice,
       dropoffServiceId,
       dropoffPrice,
+      flightNumber,
+      passengerCount,
       seniorPwdDiscount,
       seniorPwdDiscountPercent,
       seniorPwdRoomCount,
@@ -208,17 +224,11 @@ $(document).ready(function () {
         const daterange = $('#groupDaterange').val() || '';
         const dateFrom = daterange.includes(' to ') ? daterange.split(' to ')[0] : '';
         const dateTo = daterange.includes(' to ') ? daterange.split(' to ')[1].split('(')[0].trim() : '';
-        // Get room numbers - prefer from hidden field, fallback to converting IDs to numbers
+        // Room numbers change too often to print reliably - show a count on the voucher, not the numbers
         const selectedRoomNumbers = ($('#groupSelectedRoomNumbers').val()||'').split(',').filter(Boolean);
-        let roomNumbersForVoucher = '';
-        
-        if (selectedRoomNumbers.length > 0) {
-          roomNumbersForVoucher = selectedRoomNumbers.join(', ');
-        } else {
-          // Note: In submit context, we don't have access to groupAvailableRooms array
-          // So we'll use a placeholder - room numbers should already be set before submit
-          roomNumbersForVoucher = 'No rooms selected';
-        }
+        const roomNumbersForVoucher = selectedRoomNumbers.length > 0
+          ? `${selectedRoomNumbers.length} Room${selectedRoomNumbers.length === 1 ? '' : 's'}`
+          : 'No rooms selected';
 
         const totalText = $('#groupComputedTotal').text() || '0';
         const numericTotal = totalText.replace(/[^0-9.]/g, '').split(' ')[0] || '0';

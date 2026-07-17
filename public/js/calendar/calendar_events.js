@@ -9,7 +9,7 @@
 // =============================================================================
 
 // Color palette for different group bookings (neon/vibrant colors that don't match booking status colors)
-// Avoid: Green (#43a047), Yellow (#fff700), Red (#e53935), Gray, Black
+// Avoid: Teal (#12866f), Amber (#e0a316), Red (#e53935), Gray, Black
 const GROUP_COLORS = [
   '#00FFFF', // Neon Cyan / Aqua
   '#FF00FF', // Neon Magenta / Fuchsia
@@ -95,7 +95,7 @@ function handleEventClick(info) {
     case 'pending':
       // Check if this is a late check-in (orange) or regular pending (blue)
       const eventColor = event.backgroundColor;
-      if (eventColor === '#fff700') {
+      if (eventColor === '#e0a316') {
         showLateCheckInModal(event);
       } else {
         showPendingModal(event);
@@ -115,7 +115,7 @@ function handleEventClick(info) {
         // Check if we can determine status from event color or other properties
         const eventColor = event.backgroundColor;
         
-        if (eventColor === '#fff700') {
+        if (eventColor === '#e0a316') {
           showLateCheckInModal(event);
         } else if (eventColor === 'red' || eventColor === '#e53935') {
           showPendingModal(event);
@@ -138,10 +138,10 @@ function applyCompositeStatusStyles(event, el) {
     const groupBookingId = event.extendedProps?.groupBookingId;
     const isGroupBooking = groupBookingId != null && groupBookingId !== 0 && groupBookingId !== '' && String(groupBookingId).trim() !== '';
 
-    // Colors - Keep original background colors
+    // Colors
     const red = '#e53935';      // regular (keep original red)
-    const lemon = '#fff700';    // late (keep original yellow)
-    const green = '#43a047';    // occupied (keep original green)
+    const lemon = '#e0a316';    // late = amber
+    const green = '#12866f';    // occupied = teal
 
     let checkInStatusRaw = event.extendedProps?.checkInStatus;   // expected: 1 regular, 0 late
     let checkOutStatusRaw = event.extendedProps?.checkOutStatus; // expected: 0 regular, 1 late
@@ -153,7 +153,7 @@ function applyCompositeStatusStyles(event, el) {
     }
 
     // Normalizers to handle differing encodings from backend/UI
-    const inferFromColor = () => (event.backgroundColor === '#fff700' ? 'late' : 'regular');
+    const inferFromColor = () => (event.backgroundColor === '#e0a316' ? 'late' : 'regular');
     const normalizeCheckIn = (v) => {
       if (v === undefined || v === null || v === '') return inferFromColor();
       if (v === 1 || v === '1' || String(v).toLowerCase() === 'regular') return 'regular';
@@ -295,6 +295,76 @@ function applyCompositeStatusStyles(event, el) {
   }
 }
 
+// =============================================================================
+// BACK-TO-BACK ROOM TURNOVER BORDER
+// =============================================================================
+
+const BACK_TO_BACK_BORDER_COLOR = '#AAFF00';
+
+// Outlines both bookings involved in a same-room, same-day turnover
+// (one checking out, the other checking in) instead of recoloring the fill.
+function applyBackToBackBorder(event, el) {
+  try {
+    const bookingStatus = event.extendedProps?.bookingStatus;
+    const groupBookingId = event.extendedProps?.groupBookingId;
+    const isGroupBooking = groupBookingId != null && groupBookingId !== 0 && groupBookingId !== '' && String(groupBookingId).trim() !== '';
+
+    // Group bookings already own the border for their own highlight; don't fight over it
+    if (isGroupBooking || bookingStatus === 'cancelled') {
+      return;
+    }
+
+    if (event.extendedProps?.isBackToBack) {
+      el.style.setProperty('border', `1.5px solid ${BACK_TO_BACK_BORDER_COLOR}`, 'important');
+      el.setAttribute('data-back-to-back', 'true');
+    } else if (el.getAttribute('data-back-to-back') === 'true') {
+      el.style.border = '';
+      el.removeAttribute('data-back-to-back');
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
+// =============================================================================
+// PAYMENT STATUS INDICATOR (full / partial / unpaid)
+// =============================================================================
+
+const PAYMENT_STATUS_COLORS = {
+  paid: '#2196f3',    // fully paid - blue
+  partial: '#f57c00', // partially paid - orange
+  unpaid: '#ffffff'   // unpaid - white
+};
+
+// Adds a small corner flag/triangle to the event indicating payment status.
+// A solid triangle + white outline stays legible regardless of the
+// booking-status background color underneath, unlike a thin edge line.
+function applyPaymentStatusIndicator(event, el) {
+  try {
+    const bookingStatus = event.extendedProps?.bookingStatus;
+    const existing = el.querySelector('.payment-status-line');
+
+    // Cancelled bookings don't carry a meaningful payment status to flag
+    if (bookingStatus === 'cancelled') {
+      if (existing) existing.remove();
+      return;
+    }
+
+    const paymentStatus = (event.extendedProps?.paymentStatus || 'unpaid').toLowerCase();
+    const lineColor = PAYMENT_STATUS_COLORS[paymentStatus] || PAYMENT_STATUS_COLORS.unpaid;
+
+    const dot = existing || document.createElement('div');
+    dot.className = 'payment-status-line';
+    dot.style.backgroundColor = lineColor;
+    dot.title = paymentStatus === 'paid' ? 'Fully Paid' : paymentStatus === 'partial' ? 'Partially Paid' : 'Unpaid';
+    dot.setAttribute('data-payment-status', paymentStatus);
+
+    if (!existing) el.appendChild(dot);
+  } catch (e) {
+    // ignore
+  }
+}
+
 function handleEventDidMount(info) {
   // TOOLTIPS COMPLETELY REMOVED - No more tooltip setup
   
@@ -333,6 +403,12 @@ function handleEventDidMount(info) {
   } catch (e) {
     // ignore style errors
   }
+
+  // Outline both bookings involved in a same-room, same-day turnover
+  applyBackToBackBorder(info.event, info.el);
+
+  // Apply payment status indicator dot (full / partial / unpaid)
+  applyPaymentStatusIndicator(info.event, info.el);
 
   // Control visual overlay: allow only if either event is checkout
   try {
@@ -558,6 +634,8 @@ function updateEventStatus(event, newStatus) {
 // Make functions globally available
 window.handleEventClick = handleEventClick;
 window.applyCompositeStatusStyles = applyCompositeStatusStyles;
+window.applyBackToBackBorder = applyBackToBackBorder;
+window.applyPaymentStatusIndicator = applyPaymentStatusIndicator;
 window.handleEventDidMount = handleEventDidMount;
 window.handleDatesSet = handleDatesSet;
 window.updateEventStatusInstantly = updateEventStatusInstantly;

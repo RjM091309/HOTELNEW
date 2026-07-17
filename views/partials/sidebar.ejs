@@ -251,35 +251,6 @@
 						</li>
 					</ul>
 				</li>
-				<% const applicationPages = ['guest_app', 'housekeeping_app', 'bellman_app']; %>
-				<li class="nav-item <%= applicationPages.includes(activePage) ? 'open' : '' %>">
-					<a class="nav-link nav-toggle nav-main-link-submenu <%= applicationPages.includes(activePage) ? 'active' : '' %>" data-toggle="submenu" aria-haspopup="true"
-						aria-expanded="<%= applicationPages.includes(activePage) ? 'true' : 'false' %>" href="#">
-						<i class="material-icons">apps</i>
-						<span class="title">Applications</span>
-						<span class="arrow <%= applicationPages.includes(activePage) ? 'open' : '' %>"></span>
-					</a>
-					<ul class="sub-menu <%= applicationPages.includes(activePage) ? 'show' : '' %>" <% if (applicationPages.includes(activePage)) { %>style="display: block;"<% } %>>
-						<li class="nav-item">
-							<a href="https://pmsapp.3core21.com" class="nav-link <%= activePage === 'guest_app' ? 'active' : '' %>" target="_blank">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Guest Room App</span>
-							</a>
-						</li>
-						<li class="nav-item">
-							<a href="https://pmsapp.3core21.com/hk" class="nav-link <%= activePage === 'housekeeping_app' ? 'active' : '' %>" target="_blank">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Housekeeping App</span>
-							</a>
-						</li>
-						<li class="nav-item">
-							<a href="https://pmsapp.3core21.com/bm" class="nav-link <%= activePage === 'bellman_app' ? 'active' : '' %>" target="_blank">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Bellman App</span>
-							</a>
-						</li>
-					</ul>
-				</li>
 				<% if (user && user.PERMISSIONS == 1) { %>
 				<li class="nav-item">
 					<a href="#" id="navDeleteTestData" class="nav-link">

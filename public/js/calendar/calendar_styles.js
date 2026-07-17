@@ -99,7 +99,7 @@ function injectDragStyles() {
       top: 0;
       transform: translateY(0) skewX(12deg);
       height: 16px;
-      background: linear-gradient(90deg, rgba(0,0,0,0.45), rgba(0,0,0,0.35));
+      background: transparent;
       color: #fff;
       padding: 2px 6px;
       border-radius: 4px;
@@ -123,6 +123,22 @@ function injectDragStyles() {
 
     /* Also hide default title container if any slips through */
     .fc-event .fc-event-title, .fc-event .fc-event-title-container { display: none !important; }
+
+    /* Payment status indicator: solid strip that keeps the parallelogram's own
+       skew (full / partial / unpaid) instead of an axis-aligned shape like a circle */
+    /* transform: none overrides the ".fc-event > *" counter-skew so this strip
+       stays parallel to the parallelogram's slanted edge, matching the event shape */
+    .fc-event .payment-status-line {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 7px;
+      box-shadow: 1px 0 3px rgba(0, 0, 0, 0.7);
+      pointer-events: none;
+      z-index: 25;
+      transform: none !important;
+    }
   `;
   
   document.head.appendChild(style);

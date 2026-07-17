@@ -270,6 +270,27 @@
                 <input type="hidden" id="groupDropoffServiceId" name="groupDropoffServiceId">
               </div>
             </div>
+            <div id="groupPickupDropoffFlightInfo" class="col-lg-12" style="display: none; margin-top: 10px;">
+              <div class="row">
+                <div class="col-lg-6">
+                  <div class="form-group">
+                    <label class="form-label">Flight Number</label>
+                    <div class="d-flex gap-2">
+                      <input type="text" class="form-control" id="groupFlightNumber" name="groupFlightNumber" placeholder="e.g. PR123">
+                      <button type="button" class="btn btn-outline-light" id="checkGroupFlightStatusBtn" style="white-space: nowrap;">Check Status</button>
+                      <button type="button" class="btn btn-outline-light" id="viewGroupArrivalsBtn" style="white-space: nowrap;">View Arrivals</button>
+                    </div>
+                    <div id="groupFlightStatusResult" style="display: none; margin-top: 6px; padding: 6px 10px; border-radius: 6px; font-size: 13px;"></div>
+                  </div>
+                </div>
+                <div class="col-lg-6">
+                  <div class="form-group">
+                    <label class="form-label">Number of Passengers</label>
+                    <input type="number" class="form-control" id="groupPassengerCount" name="groupPassengerCount" placeholder="Number of Passengers" min="1" step="1">
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="row p-t-20">
@@ -341,10 +362,45 @@
   </div>
 </div>
 
+<!-- Flight Arrivals Modal (PUAP) -->
+<div class="modal fade" id="modal-group-flight-arrivals" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">Upcoming Arrivals - Clark International (CRK)</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+                <table class="table table-sm table-hover mb-0">
+                    <thead style="position: sticky; top: 0; background-color: #2a3135;">
+                        <tr>
+                            <th>Flight</th>
+                            <th>Airline</th>
+                            <th>From</th>
+                            <th>ETA</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="groupArrivalsListBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
 #modal-add-group-booking .modal-dialog {
   max-height: 99vh;
   margin: 1vh auto;
+}
+
+/* Stacked modal fix: Flight Arrivals opens on top of Add Group Booking */
+#modal-group-flight-arrivals {
+    z-index: 1071 !important;
+}
+#modal-group-flight-arrivals + .modal-backdrop,
+.modal-backdrop + .modal-backdrop {
+    z-index: 1065 !important;
 }
 
 #modal-add-group-booking .modal-content {
@@ -1038,6 +1094,8 @@
     $('#groupPickupWrapper, #groupDropoffWrapper').hide();
     $('#groupPickupPrice, #groupDropoffPrice').val('');
     $('#groupPickupServiceId, #groupDropoffServiceId').val('');
+    $('#groupPickupDropoffFlightInfo').hide();
+    $('#groupFlightNumber, #groupPassengerCount').val('');
     $('#groupRoomBreakdown').removeClass('d-none');
     $('.consolidated-indicator').remove();
     $('#groupIncludeSeniorPwdDiscount').prop('checked', false);
@@ -2041,6 +2099,108 @@
         $('#groupDropoffServiceId').val('');
       }
       computeGroupTotal();
+    });
+
+    // Flight number / passenger count - required when either Pick-up or Drop-off is checked
+    $('#groupIncludePickup, #groupIncludeDropoff').on('change', function() {
+      const needsFlightInfo = $('#groupIncludePickup').is(':checked') || $('#groupIncludeDropoff').is(':checked');
+      $('#groupPickupDropoffFlightInfo').toggle(needsFlightInfo);
+      if (!needsFlightInfo) {
+        $('#groupFlightNumber').val('');
+        $('#groupPassengerCount').val('');
+      }
+    });
+
+    // PUAP flight status lookup
+    function renderGroupFlightStatus($result, kind, message) {
+      const palette = {
+        loading: { bg: 'rgba(255,255,255,0.08)', border: 'rgba(255,255,255,0.2)', color: '#ffffff' },
+        error:   { bg: 'rgba(229,57,53,0.12)',   border: 'rgba(229,57,53,0.35)', color: '#ff9a92' },
+        ok:      { bg: 'rgba(18,134,111,0.15)',  border: 'rgba(18,134,111,0.45)', color: '#5fd6bd' }
+      }[kind];
+      $result.css({ 'background-color': palette.bg, border: `1px solid ${palette.border}`, color: palette.color });
+      $result.html(message).show();
+    }
+
+    $(document).on('click', '#checkGroupFlightStatusBtn', function(){
+      const flightNumber = ($('#groupFlightNumber').val() || '').trim();
+      const $result = $('#groupFlightStatusResult');
+
+      if (!flightNumber) {
+        renderGroupFlightStatus($result, 'error', 'Enter a flight number first.');
+        return;
+      }
+
+      renderGroupFlightStatus($result, 'loading', 'Checking flight status…');
+
+      $.ajax({
+        url: '/booking/flight-status/' + encodeURIComponent(flightNumber),
+        type: 'GET',
+        success: function(response) {
+          if (!response.success || !response.data) {
+            renderGroupFlightStatus($result, 'error', response.message || 'Flight not found.');
+            return;
+          }
+          const f = response.data;
+          const arrival = f.arrival || {};
+          const eta = arrival.estimated || arrival.scheduled;
+          const etaText = eta ? new Date(eta).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'N/A';
+          const statusLabel = (f.status || 'unknown').toUpperCase();
+          const delayText = arrival.delayMinutes ? ` (+${arrival.delayMinutes} min delay)` : '';
+          renderGroupFlightStatus($result, 'ok',
+            `<strong>${f.flightNumber}</strong> ${f.airline ? '· ' + f.airline : ''} — ${statusLabel}${delayText}<br>` +
+            `Arriving ${arrival.airport || ''} (${arrival.iata || ''}) &middot; ETA ${etaText}`
+          );
+        },
+        error: function(xhr) {
+          const message = xhr.responseJSON?.message || 'Could not check flight status.';
+          renderGroupFlightStatus($result, 'error', message);
+        }
+      });
+    });
+
+    $(document).on('input', '#groupFlightNumber', function(){
+      $('#groupFlightStatusResult').hide();
+    });
+
+    // Arrivals list - browse upcoming CRK arrivals and pick one instead of typing
+    $(document).on('click', '#viewGroupArrivalsBtn', function(){
+      const $body = $('#groupArrivalsListBody');
+
+      $body.html('<tr><td colspan="5" class="text-center">Loading…</td></tr>');
+      $('#modal-group-flight-arrivals').modal('show');
+
+      $.ajax({
+        url: '/booking/flight-arrivals',
+        type: 'GET',
+        success: function(response) {
+          if (!response.success || !Array.isArray(response.data) || response.data.length === 0) {
+            $body.html(`<tr><td colspan="5" class="text-center">${response.message || 'No upcoming arrivals found.'}</td></tr>`);
+            return;
+          }
+          $body.empty();
+          response.data.forEach(function(f){
+            const eta = f.estimated || f.scheduled;
+            const etaText = eta ? new Date(eta).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'N/A';
+            const $row = $('<tr style="cursor:pointer;"></tr>')
+              .append(`<td><strong>${f.flightNumber || ''}</strong></td>`)
+              .append(`<td>${f.airline || ''}</td>`)
+              .append(`<td>${f.originIata || ''}</td>`)
+              .append(`<td>${etaText}</td>`)
+              .append(`<td>${(f.status || '').toUpperCase()}</td>`)
+              .on('click', function(){
+                $('#groupFlightNumber').val(f.flightNumber || '');
+                $('#modal-group-flight-arrivals').modal('hide');
+                $('#checkGroupFlightStatusBtn').trigger('click');
+              });
+            $body.append($row);
+          });
+        },
+        error: function(xhr) {
+          const message = xhr.responseJSON?.message || 'Could not load arrivals.';
+          $body.html(`<tr><td colspan="5" class="text-center">${message}</td></tr>`);
+        }
+      });
     });
 
     // Add event listeners for individual service checkboxes

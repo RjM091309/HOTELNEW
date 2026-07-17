@@ -25,6 +25,12 @@
 
                     <div class="row">
 
+                    <div id="arrivalDepartureSummary" class="col-lg-12" style="display: none;">
+                        <div class="form-group">
+                            <div id="arrivalDepartureSummaryText" style="background-color: #2a3135; border: 1px solid #3a4348; border-radius: 6px; padding: 10px 14px; color: #ffffff; font-weight: 600; letter-spacing: 0.3px; text-align: center;"></div>
+                        </div>
+                    </div>
+
                     <div class="row p-t-20">
 
                         <div class="col-lg-6">
@@ -194,8 +200,28 @@
                                       <input type="hidden" id="dropoffServiceId" name="dropoffServiceId">
                                     </div>
                                   </div>
-                                  
-                                  
+                                  <div id="pickupDropoffFlightInfo" class="col-lg-12" style="display: none; margin-top: 10px;">
+                                    <div class="row">
+                                      <div class="col-lg-6">
+                                        <div class="form-group">
+                                          <label class="form-label">Flight Number</label>
+                                          <div class="d-flex gap-2">
+                                            <input type="text" class="form-control" id="flightNumber" name="flightNumber" placeholder="e.g. PR123">
+                                            <button type="button" class="btn btn-outline-light" id="checkFlightStatusBtn" style="white-space: nowrap;">Check Status</button>
+                                            <button type="button" class="btn btn-outline-light" id="viewArrivalsBtn" style="white-space: nowrap;">View Arrivals</button>
+                                          </div>
+                                          <div id="flightStatusResult" style="display: none; margin-top: 6px; padding: 6px 10px; border-radius: 6px; font-size: 13px;"></div>
+                                        </div>
+                                      </div>
+                                      <div class="col-lg-6">
+                                        <div class="form-group">
+                                          <label class="form-label">Number of Passengers</label>
+                                          <input type="number" class="form-control" id="passengerCount" name="passengerCount" placeholder="Number of Passengers" min="1" step="1">
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
                             </div>
 <hr class="my-4">
                             <div id="divpaidAmount" class="col-lg-3">
@@ -361,6 +387,32 @@
                     <tbody id="pendingBookingsTableBody" style="color: #fff;">
                         <!-- Pending bookings will be appended here -->
                     </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Flight Arrivals Modal (PUAP) -->
+<div class="modal fade" id="modal-flight-arrivals" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">Upcoming Arrivals - Clark International (CRK)</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+                <table class="table table-sm table-hover mb-0">
+                    <thead style="position: sticky; top: 0; background-color: #2a3135;">
+                        <tr>
+                            <th>Flight</th>
+                            <th>Airline</th>
+                            <th>From</th>
+                            <th>ETA</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="arrivalsListBody"></tbody>
                 </table>
             </div>
         </div>
@@ -597,11 +649,176 @@
 })();
 </script>
 
+<script>
+// ================================
+// ARRIVAL / DEPARTURE SUMMARY BANNER (Add Booking)
+// EX) ARRIVAL JUL 18, 2026 / LCI  +  DEPARTURE JUL 22, 2026 / RCO
+// ================================
+(function(){
+    function splitDateRange() {
+        const dr = $('#daterange').val() || '';
+        if (!dr.includes(' to ')) return { arrival: null, departure: null };
+        const parts = dr.split(' to ');
+        const arrival = parts[0].trim();
+        const departure = (parts[1] || '').split('(')[0].trim();
+        if (!arrival || !departure) return { arrival: null, departure: null };
+        return { arrival: arrival.toUpperCase(), departure: departure.toUpperCase() };
+    }
+
+    // Check-In: value 1 = Regular, 0 = Late. Check-Out: value 0 = Regular, 1 = Late.
+    function ciAbbrev() {
+        const v = $('#checkInStatus').val();
+        if (v === '1') return 'RCI';
+        if (v === '0') return 'LCI';
+        return null;
+    }
+
+    function coAbbrev() {
+        const v = $('#checkOutStatus').val();
+        if (v === '0') return 'RCO';
+        if (v === '1') return 'LCO';
+        return null;
+    }
+
+    function updateArrivalDepartureSummary() {
+        const { arrival, departure } = splitDateRange();
+        const ci = ciAbbrev();
+        const co = coAbbrev();
+        const $summary = $('#arrivalDepartureSummary');
+        const $text = $('#arrivalDepartureSummaryText');
+
+        if (!arrival || !departure || !ci || !co) {
+            $summary.hide();
+            return;
+        }
+
+        $text.text(`ARRIVAL ${arrival} / ${ci}  -  DEPARTURE ${departure} / ${co}`);
+        $summary.show();
+    }
+
+    $(document).ready(function(){
+        $('#daterange').on('change', updateArrivalDepartureSummary);
+        $('#checkInStatus').on('change', updateArrivalDepartureSummary);
+        $('#checkOutStatus').on('change', updateArrivalDepartureSummary);
+
+        $('#modal-addbooking').on('shown.bs.modal', updateArrivalDepartureSummary);
+    });
+})();
+</script>
+
+<script>
+// ================================
+// PUAP FLIGHT STATUS LOOKUP (Add Booking)
+// ================================
+(function(){
+    function renderFlightStatus($result, kind, message) {
+        const palette = {
+            loading: { bg: 'rgba(255,255,255,0.08)', border: 'rgba(255,255,255,0.2)', color: '#ffffff' },
+            error:   { bg: 'rgba(229,57,53,0.12)',   border: 'rgba(229,57,53,0.35)', color: '#ff9a92' },
+            ok:      { bg: 'rgba(18,134,111,0.15)',  border: 'rgba(18,134,111,0.45)', color: '#5fd6bd' }
+        }[kind];
+        $result.css({ 'background-color': palette.bg, border: `1px solid ${palette.border}`, color: palette.color });
+        $result.html(message).show();
+    }
+
+    $(document).on('click', '#checkFlightStatusBtn', function(){
+        const flightNumber = ($('#flightNumber').val() || '').trim();
+        const $result = $('#flightStatusResult');
+
+        if (!flightNumber) {
+            renderFlightStatus($result, 'error', 'Enter a flight number first.');
+            return;
+        }
+
+        renderFlightStatus($result, 'loading', 'Checking flight status…');
+
+        $.ajax({
+            url: '/booking/flight-status/' + encodeURIComponent(flightNumber),
+            type: 'GET',
+            success: function(response) {
+                if (!response.success || !response.data) {
+                    renderFlightStatus($result, 'error', response.message || 'Flight not found.');
+                    return;
+                }
+                const f = response.data;
+                const arrival = f.arrival || {};
+                const eta = arrival.estimated || arrival.scheduled;
+                const etaText = eta ? new Date(eta).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'N/A';
+                const statusLabel = (f.status || 'unknown').toUpperCase();
+                const delayText = arrival.delayMinutes ? ` (+${arrival.delayMinutes} min delay)` : '';
+                renderFlightStatus($result, 'ok',
+                    `<strong>${f.flightNumber}</strong> ${f.airline ? '· ' + f.airline : ''} — ${statusLabel}${delayText}<br>` +
+                    `Arriving ${arrival.airport || ''} (${arrival.iata || ''}) &middot; ETA ${etaText}`
+                );
+            },
+            error: function(xhr) {
+                const message = xhr.responseJSON?.message || 'Could not check flight status.';
+                renderFlightStatus($result, 'error', message);
+            }
+        });
+    });
+
+    // Hide the result whenever the flight number changes, so it doesn't go stale
+    $(document).on('input', '#flightNumber', function(){
+        $('#flightStatusResult').hide();
+    });
+
+    // Arrivals list - browse upcoming CRK arrivals and pick one instead of typing
+    $(document).on('click', '#viewArrivalsBtn', function(){
+        const $body = $('#arrivalsListBody');
+
+        $body.html('<tr><td colspan="5" class="text-center">Loading…</td></tr>');
+        $('#modal-flight-arrivals').modal('show');
+
+        $.ajax({
+            url: '/booking/flight-arrivals',
+            type: 'GET',
+            success: function(response) {
+                if (!response.success || !Array.isArray(response.data) || response.data.length === 0) {
+                    $body.html(`<tr><td colspan="5" class="text-center">${response.message || 'No upcoming arrivals found.'}</td></tr>`);
+                    return;
+                }
+                $body.empty();
+                response.data.forEach(function(f){
+                    const eta = f.estimated || f.scheduled;
+                    const etaText = eta ? new Date(eta).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'N/A';
+                    const $row = $('<tr style="cursor:pointer;"></tr>')
+                        .append(`<td><strong>${f.flightNumber || ''}</strong></td>`)
+                        .append(`<td>${f.airline || ''}</td>`)
+                        .append(`<td>${f.originIata || ''}</td>`)
+                        .append(`<td>${etaText}</td>`)
+                        .append(`<td>${(f.status || '').toUpperCase()}</td>`)
+                        .on('click', function(){
+                            $('#flightNumber').val(f.flightNumber || '');
+                            $('#modal-flight-arrivals').modal('hide');
+                            $('#checkFlightStatusBtn').trigger('click');
+                        });
+                    $body.append($row);
+                });
+            },
+            error: function(xhr) {
+                const message = xhr.responseJSON?.message || 'Could not load arrivals.';
+                $body.html(`<tr><td colspan="5" class="text-center">${message}</td></tr>`);
+            }
+        });
+    });
+})();
+</script>
+
 <style>
     #modal-addbooking .modal-dialog {
-   
+
    max-height: 99vh;      /* mas mataas na value para mas mahaba ang modal */
    margin: 1vh auto;
+}
+
+/* Stacked modal fix: Flight Arrivals opens on top of Add Booking */
+#modal-flight-arrivals {
+    z-index: 1071 !important;
+}
+#modal-flight-arrivals + .modal-backdrop,
+.modal-backdrop + .modal-backdrop {
+    z-index: 1065 !important;
 }
 
 #modal-addbooking .modal-content {

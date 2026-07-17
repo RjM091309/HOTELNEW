@@ -663,15 +663,15 @@
      EVENT STYLING
      ======================================== */
   
-  /* Occupied - Green */
-  .fc-event[style*="background-color: green"] {
-    background-color: #43a047 !important; /* Material success green */
+  /* Occupied - Teal */
+  .fc-event[style*="background-color: #12866f"] {
+    background-color: #12866f !important;
     color: #fff !important;
   }
-  
-  /* Late Check-In - Lemon */
-  .fc-event[style*="background-color: #fff700"] {
-    background-color: #fff700 !important;
+
+  /* Late Check-In - Amber */
+  .fc-event[style*="background-color: #e0a316"] {
+    background-color: #e0a316 !important;
     color: #000 !important;
   }
   
@@ -1025,15 +1025,19 @@
 
 /* Legend color definitions */
 .legend-color-occupied {
-  background-color: #43a047 !important;
+  background-color: #12866f !important;
 }
 
 .legend-color-late-checkin {
-  background-color: #fff700 !important;
+  background-color: #e0a316 !important;
 }
 
 .legend-color-regular-checkin {
   background-color: #e53935 !important;
+}
+
+.legend-color-back-to-back {
+  background-color: #AAFF00 !important;
 }
 
 .legend-color-checkout {
@@ -1042,6 +1046,19 @@
 
 .legend-color-cancelled {
   background-color: #000000 !important;
+}
+
+/* Payment status legend colors */
+.legend-color-paid {
+  background-color: #2196f3 !important;
+}
+
+.legend-color-partial {
+  background-color: #f57c00 !important;
+}
+
+.legend-color-unpaid {
+  background-color: #ffffff !important;
 }
 
 /* Legend minimize/maximize animation */

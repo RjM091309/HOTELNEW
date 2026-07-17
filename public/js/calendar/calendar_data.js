@@ -1557,14 +1557,14 @@ function performSearch() {
       if (eventStatus === 'pending') {
         if (checkInStatus === 0) {
           displayStatus = 'Pending - Late (CI/CO)';
-          statusColor = '#fff700'; // Yellow for late
+          statusColor = '#e0a316'; // Amber for late
         } else {
           displayStatus = 'Pending - Regular (CI/CO)';
           statusColor = '#e53935'; // Red for regular
         }
       } else if (eventStatus === 'check-In') {
         displayStatus = 'Occupied (Checked In)';
-        statusColor = '#43a047'; // Green
+        statusColor = '#12866f'; // Teal
       } else if (eventStatus === 'check-Out') {
         displayStatus = 'Checked Out';
         statusColor = '#6c757d'; // Gray
@@ -1851,6 +1851,11 @@ function createLegendOverlay() {
         <span class="calendar-legend-count" id="legend-count-regular-checkin">0</span>
       </div>
       <div class="calendar-legend-item">
+        <div class="calendar-legend-color legend-color-back-to-back"></div>
+        <span class="calendar-legend-text">Pending – Back-to-Back</span>
+        <span class="calendar-legend-count" id="legend-count-back-to-back">0</span>
+      </div>
+      <div class="calendar-legend-item">
         <div class="calendar-legend-color legend-color-checkout"></div>
         <span class="calendar-legend-text">Checked Out</span>
         <span class="calendar-legend-count" id="legend-count-checkout">0</span>
@@ -1859,6 +1864,26 @@ function createLegendOverlay() {
         <div class="calendar-legend-color legend-color-cancelled"></div>
         <span class="calendar-legend-text">Cancelled</span>
         <span class="calendar-legend-count" id="legend-count-cancelled">0</span>
+      </div>
+    </div>
+    <div class="calendar-legend-header">
+      <h3 class="calendar-legend-title">Payment Status</h3>
+    </div>
+    <div class="calendar-legend-content">
+      <div class="calendar-legend-item">
+        <div class="calendar-legend-color legend-color-paid"></div>
+        <span class="calendar-legend-text">Fully Paid</span>
+        <span class="calendar-legend-count" id="legend-count-paid">0</span>
+      </div>
+      <div class="calendar-legend-item">
+        <div class="calendar-legend-color legend-color-partial"></div>
+        <span class="calendar-legend-text">Partial Payment</span>
+        <span class="calendar-legend-count" id="legend-count-partial">0</span>
+      </div>
+      <div class="calendar-legend-item">
+        <div class="calendar-legend-color legend-color-unpaid"></div>
+        <span class="calendar-legend-text">Unpaid</span>
+        <span class="calendar-legend-count" id="legend-count-unpaid">0</span>
       </div>
     </div>
   `;
@@ -1877,18 +1902,30 @@ function updateLegendCounts() {
     occupied: 0,
     lateCheckin: 0,
     regularCheckin: 0,
+    backToBack: 0,
     checkout: 0,
-    cancelled: 0
+    cancelled: 0,
+    paid: 0,
+    partial: 0,
+    unpaid: 0
   };
-  
+
   events.forEach(event => {
     const status = event.extendedProps?.bookingStatus || '';
     const backgroundColor = event.backgroundColor || '';
     const ci = event.extendedProps?.checkInStatus;   // 1=regular,0=late
     const co = event.extendedProps?.checkOutStatus;  // 0=regular,1=late
 
+    // Payment status tally (skip cancelled bookings, same as the on-event indicator)
+    if (status !== 'cancelled') {
+      const paymentStatus = (event.extendedProps?.paymentStatus || 'unpaid').toLowerCase();
+      if (paymentStatus === 'paid') counts.paid++;
+      else if (paymentStatus === 'partial') counts.partial++;
+      else counts.unpaid++;
+    }
+
     // Occupied
-    if (status === 'check-In' || backgroundColor === 'green' || backgroundColor === '#43a047') {
+    if (status === 'check-In' || backgroundColor === '#12866f') {
       counts.occupied++;
       return;
     }
@@ -1903,20 +1940,29 @@ function updateLegendCounts() {
       return;
     }
 
-    // Pending: determine late vs regular based on composite statuses
+    // Pending: determine back-to-back / late / regular based on composite statuses
+    // Priority mirrors applyCompositeStatusStyles: Back-to-Back > Late > Regular
     if (status === 'pending') {
+      if (event.extendedProps?.isBackToBack) {
+        counts.backToBack++;
+        return;
+      }
       // If either CI is late (0) or CO is late (1), count as late; otherwise regular
-      const isLate = (ci === 0) || (co === 1) || (ci === undefined && co === undefined && backgroundColor === '#fff700');
+      const isLate = (ci === 0) || (co === 1) || (ci === undefined && co === undefined && backgroundColor === '#e0a316');
       if (isLate) counts.lateCheckin++; else counts.regularCheckin++;
     }
   });
-  
+
   // Update legend counts
   updateLegendCount('legend-count-occupied', counts.occupied);
   updateLegendCount('legend-count-late-checkin', counts.lateCheckin);
   updateLegendCount('legend-count-regular-checkin', counts.regularCheckin);
+  updateLegendCount('legend-count-back-to-back', counts.backToBack);
   updateLegendCount('legend-count-checkout', counts.checkout);
   updateLegendCount('legend-count-cancelled', counts.cancelled);
+  updateLegendCount('legend-count-paid', counts.paid);
+  updateLegendCount('legend-count-partial', counts.partial);
+  updateLegendCount('legend-count-unpaid', counts.unpaid);
 }
 
 function updateLegendCount(elementId, count) {

@@ -149,8 +149,8 @@ class CalendarModel {
           b.CHECK_IN_DATE AS start,
           b.CHECK_OUT_DATE AS end,
           -- Pre-calculated background colors
-          CASE 
-            WHEN b.BOOKING_STATUS = 'check-In' THEN 'green'
+          CASE
+            WHEN b.BOOKING_STATUS = 'check-In' THEN '#12866f'
             WHEN b.BOOKING_STATUS = 'check-Out' 
               AND (
                 COALESCE(bill.PAYMENT_STATUS,'unpaid') <> 'paid'
@@ -161,28 +161,41 @@ class CalendarModel {
               )
               THEN '#0b3d91' -- dark blue when checked out but has balance (rooms or services)
             WHEN b.BOOKING_STATUS = 'check-Out' THEN '#B3B3B3'
-            WHEN b.BOOKING_STATUS = 'pending' AND COALESCE(b.CHECK_IN_STATUS, 1) = 0 THEN '#fff700'
+            WHEN b.BOOKING_STATUS = 'pending' AND COALESCE(b.CHECK_IN_STATUS, 1) = 0 THEN '#e0a316'
             WHEN b.BOOKING_STATUS = 'pending' THEN '#e53935'
             WHEN b.BOOKING_STATUS = 'cancelled' THEN '#000000'
             ELSE 'pink'
           END AS backgroundColor,
           -- Pre-calculated extended properties
           COALESCE(bill.ROOM_CHARGE, 0) + COALESCE(bill.AMENITIES_CHARGE, 0) + COALESCE(bill.SERVICES_CHARGE, 0) + COALESCE(bill.LATE_CHECKOUT_CHARGE, 0) AS totalCost,
-          bill.PAYMENT_STATUS AS paymentStatus,
+          COALESCE(bill.PAYMENT_STATUS, 'unpaid') AS paymentStatus,
           DATEDIFF(b.CHECK_OUT_DATE, b.CHECK_IN_DATE) AS totalDays,
           b.BOOKING_STATUS AS bookingStatus,
           COALESCE(b.CHECK_IN_STATUS, 1) AS checkInStatus,
           COALESCE(b.LATE_CHECKOUT, 0) AS checkOutStatus,
           b.GROUP_BOOKING_ID AS groupBookingId,
+          -- Same room, same-day turnover: flags BOTH sides - this booking checking in the same
+          -- day another checks out, or this booking checking out the same day another checks in
+          EXISTS (
+            SELECT 1 FROM booking b2
+            WHERE b2.ROOM_ID = b.ROOM_ID
+              AND b2.ACTIVE = 1
+              AND b2.IDNo <> b.IDNo
+              AND b2.BOOKING_STATUS <> 'cancelled'
+              AND (
+                DATE(b2.CHECK_OUT_DATE) = DATE(b.CHECK_IN_DATE)
+                OR DATE(b2.CHECK_IN_DATE) = DATE(b.CHECK_OUT_DATE)
+              )
+          ) AS isBackToBack,
           -- Pre-calculated composite status for styling
-          CASE 
-            WHEN b.BOOKING_STATUS = 'pending' THEN 
+          CASE
+            WHEN b.BOOKING_STATUS = 'pending' THEN
               CONCAT(
                 CASE WHEN COALESCE(b.CHECK_IN_STATUS, 1) = 1 THEN 'regular' ELSE 'late' END,
                 '|',
                 CASE WHEN COALESCE(b.LATE_CHECKOUT, 0) = 1 THEN 'late' ELSE 'regular' END
               )
-            WHEN b.BOOKING_STATUS = 'check-In' THEN 
+            WHEN b.BOOKING_STATUS = 'check-In' THEN
               CONCAT('occupied|', CASE WHEN COALESCE(b.LATE_CHECKOUT, 0) = 1 THEN 'late' ELSE 'regular' END)
             ELSE 'none'
           END AS compositeStatus
@@ -217,6 +230,7 @@ class CalendarModel {
             bookingStatus: row.bookingStatus,
             checkInStatus: row.checkInStatus,
             checkOutStatus: row.checkOutStatus,
+            isBackToBack: !!row.isBackToBack,
             groupBookingId: row.groupBookingId,
             compositeStatus: row.compositeStatus
           }

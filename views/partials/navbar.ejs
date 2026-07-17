@@ -2528,7 +2528,9 @@ function initializeAddBookingHandler() {
             pickupPrice: $('#pickupPrice').val(),
             dropoffServiceId: $('#dropoffServiceId').val(),
             dropoffPrice: $('#dropoffPrice').val(),
-            
+            flightNumber: $('#flightNumber').val(),
+            passengerCount: $('#passengerCount').val(),
+
             // ✅ Include reservation fee and discount
             reservationFee: $('#includeReservationFee').prop('checked') ? $('#reservationFeeAmount').val() : '0.00',
             discount: $('#includeDiscount').prop('checked') ? $('#discountAmount').val() : '0.00',
@@ -2556,6 +2558,16 @@ function initializeAddBookingHandler() {
             setTimeout(() => {
                 $('#agencySelectWrapper').css('border', '');
             }, 3000);
+            return;
+        }
+
+        const needsFlightInfo = $('#includePickup').is(':checked') || $('#includeDropoff').is(':checked');
+        if (needsFlightInfo && (!formData.flightNumber || !formData.flightNumber.trim() || !formData.passengerCount)) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Flight Info Required',
+                text: 'Please enter the Flight Number and Number of Passengers for Pick-up/Drop-off.',
+            });
             return;
         }
 

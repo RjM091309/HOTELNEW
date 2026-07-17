@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const BookingController = require('../controller/c_booking');
+const FlightController = require('../controller/c_flight');
 
 // Route to render the main booking page
 router.get('/', BookingController.renderBookingPage);
@@ -13,6 +14,12 @@ router.get('/agency', BookingController.renderAgencyBookingPage);
 
 // Route to render the all booking page
 router.get('/all', BookingController.renderAllBookingPage);
+
+// PUAP: look up live flight status by flight number (for pick-up/drop-off)
+router.get('/flight-status/:flightNumber', FlightController.getFlightStatus);
+
+// PUAP: list upcoming arrivals into Clark (CRK) to pick from
+router.get('/flight-arrivals', FlightController.getArrivals);
 
 // Route to render the unpaid booking page
 router.get('/unpaid', BookingController.renderUnpaidBookingPage);

@@ -56,7 +56,11 @@ $(document).ready(function () {
       const pickupPrice = $('#pickupPrice').val();
       const dropoffServiceId = $('#dropoffServiceId').val();
       const dropoffPrice = $('#dropoffPrice').val();
-      
+      const includePickup = $('#includePickup').is(':checked');
+      const includeDropoff = $('#includeDropoff').is(':checked');
+      const flightNumber = $('#flightNumber').val();
+      const passengerCount = $('#passengerCount').val();
+
       // Discount and fees
       const seniorPwdDiscount = $('#includeSeniorPwdDiscount').is(':checked') ? parseFloat($('#seniorPwdDiscount').val()) || 0 : 0;
       const seniorPwdDiscountPercent = $('#includeSeniorPwdDiscount').is(':checked') ? parseFloat($('#seniorPwdDiscountPercent').val()) || 20 : 0;
@@ -89,7 +93,16 @@ $(document).ready(function () {
         });
         return;
       }
-      
+
+      if ((includePickup || includeDropoff) && (!flightNumber || !flightNumber.trim() || !passengerCount)) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Flight Info Required',
+          text: 'Please enter the Flight Number and Number of Passengers for Pick-up/Drop-off.',
+        });
+        return;
+      }
+
       $.ajax({
         url: '/booking/add_booking',
         type: 'POST',
@@ -100,6 +113,7 @@ $(document).ready(function () {
           breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
           breakfastKidQty, breakfastKidPrice, breakfastKidId,
           pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
+          flightNumber, passengerCount,
           discount: discountAmount, seniorPwdDiscount, seniorPwdDiscountPercent, reservationFee: reservationFeeAmount, lateCheckoutFee
         },
         success: function (response) {

@@ -22,12 +22,12 @@ function getBookingColor(booking) {
   // const isGroupBooking = booking.GROUP_BOOKING_ID && booking.GROUP_BOOKING_ID !== null;
   
   switch (booking.BOOKING_STATUS) {
-    case 'check-In': return 'green'; // Keep original background color
+    case 'check-In': return '#12866f'; // Occupied = teal
     case 'check-Out': return '#B3B3B3';
-    case 'pending': 
+    case 'pending':
       // Distinguish between pending and late check-in based on CHECK_IN_STATUS
       if (booking.CHECK_IN_STATUS === 0 || booking.CHECK_IN_STATUS === '0') {
-        return '#fff700'; // Late check-in = lemon (keep original)
+        return '#e0a316'; // Late check-in = amber
       } else {
         return '#e53935'; // Regular check-in = red (keep original)
       }
@@ -104,7 +104,7 @@ function normalizeCheckOutStatus(value, inferColorFn) {
 
 function isLateCheckout(event) {
   try {
-    const inferFromColor = () => (event.backgroundColor === '#fff700' ? 'late' : 'regular');
+    const inferFromColor = () => (event.backgroundColor === '#e0a316' ? 'late' : 'regular');
     const coRaw = event?.extendedProps?.checkOutStatus;
     const coNorm = normalizeCheckOutStatus(coRaw, inferFromColor);
     return coNorm === 'late';
@@ -115,7 +115,7 @@ function isLateCheckout(event) {
 
 function isRegularCheckIn(event) {
   try {
-    const inferFromColor = () => (event.backgroundColor === '#fff700' ? 'late' : 'regular');
+    const inferFromColor = () => (event.backgroundColor === '#e0a316' ? 'late' : 'regular');
     const ciRaw = event?.extendedProps?.checkInStatus;
     const ciNorm = normalizeCheckInStatus(ciRaw, inferFromColor);
     return ciNorm === 'regular';
@@ -126,7 +126,7 @@ function isRegularCheckIn(event) {
 
 function isLateCheckIn(event) {
   try {
-    const inferFromColor = () => (event.backgroundColor === '#fff700' ? 'late' : 'regular');
+    const inferFromColor = () => (event.backgroundColor === '#e0a316' ? 'late' : 'regular');
     const ciRaw = event?.extendedProps?.checkInStatus;
     const ciNorm = normalizeCheckInStatus(ciRaw, inferFromColor);
     return ciNorm === 'late';
