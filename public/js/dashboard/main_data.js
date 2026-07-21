@@ -1254,12 +1254,16 @@ $(document).ready(function() {
                         icon: totalBalance > 0 ? "warning" : "question",
                         showCancelButton: true,
                         confirmButtonColor: "#dc3545",
-                        confirmButtonText: "Yes, check out!",
+                        confirmButtonText: totalBalance > 0 ? "Proceed to Pay and Checkout" : "Yes, check out!",
                         cancelButtonText: "No, cancel",
                         allowOutsideClick: false
                     }).then((result) => {
                         if (result.isConfirmed) {
-                            processCheckout($toggle, bookingId, newStatus, lateCheckOut, roomId, roomNumber);
+                            if (totalBalance > 0) {
+                                openPaymentModalForCheckout($toggle, bookingId, newStatus, lateCheckOut, roomId, roomNumber, totalBalance);
+                            } else {
+                                processCheckout($toggle, bookingId, newStatus, lateCheckOut, roomId, roomNumber);
+                            }
                         } else {
                             $toggle.prop('checked', false);
                         }
@@ -1291,6 +1295,51 @@ $(document).ready(function() {
             });
         }
     });
+
+    // Helper function to collect an unpaid balance via the Payment Modal before checking out
+    function openPaymentModalForCheckout($toggle, bookingId, newStatus, lateCheckOut, roomId, roomNumber, totalBalance) {
+        const paymentModalEl = document.getElementById('modal-payment');
+        if (!paymentModalEl) {
+            // Payment modal isn't available on this page - fall back to checking out directly
+            processCheckout($toggle, bookingId, newStatus, lateCheckOut, roomId, roomNumber);
+            return;
+        }
+
+        // Populate the payment modal with this booking's outstanding balance
+        const hiddenBookingIdInput = document.getElementById('hiddenBookingId');
+        if (hiddenBookingIdInput) hiddenBookingIdInput.value = bookingId;
+        const bookingIdInput = document.getElementById('bookingID');
+        if (bookingIdInput) bookingIdInput.value = bookingId;
+
+        if (typeof updatePaymentSummaryCard === 'function') {
+            updatePaymentSummaryCard(totalBalance, {});
+        } else {
+            const totalAmountEl = document.getElementById('paymentTotalAmount');
+            if (totalAmountEl) {
+                totalAmountEl.textContent = totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 });
+            }
+        }
+        const amountInput = document.getElementById('paymentAmountInput');
+        if (amountInput) amountInput.value = totalBalance;
+
+        // Once the payment is confirmed, proceed with the checkout
+        window.onPaymentConfirmed = function() {
+            processCheckout($toggle, bookingId, newStatus, lateCheckOut, roomId, roomNumber);
+        };
+
+        // If the payment modal is closed without paying, treat it as a cancelled check-out
+        const onHidden = function() {
+            paymentModalEl.removeEventListener('hidden.bs.modal', onHidden);
+            if (window.onPaymentConfirmed) {
+                window.onPaymentConfirmed = null;
+                $toggle.prop('checked', false);
+            }
+        };
+        paymentModalEl.addEventListener('hidden.bs.modal', onHidden);
+
+        const paymentModal = bootstrap.Modal.getOrCreateInstance(paymentModalEl);
+        paymentModal.show();
+    }
 
     // Helper function for checkout process
     function processCheckout($toggle, bookingId, newStatus, lateCheckOut, roomId, roomNumber) {

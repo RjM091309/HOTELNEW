@@ -129,7 +129,12 @@
             return '<span class="label label-danger">Unpaid</span>';
           }
         },
-        { data: null, className: 'center', render: function(_d,_t,row){ return row.PAYMENT_METHOD || 'N/A'; } },
+        { data: null, className: 'center', render: function(_d,_t,row){
+            const methodLabels = { cash: 'Cash', credit_card: 'Credit Card', credit: 'Credit', marker: 'Credit' };
+            const method = (row.PAYMENT_METHOD || '').toLowerCase();
+            return methodLabels[method] || row.PAYMENT_METHOD || 'N/A';
+          }
+        },
         { 
           data: 'LAST_PAYMENT_DATE', 
           className: 'center', 
@@ -256,7 +261,11 @@
 
     if (payments.length > 0) {
       html += `<h6 class="mt-4"><strong>Payment History:</strong></h6><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Date</th><th>Type</th><th>Method</th><th class="text-right">Amount</th></tr></thead><tbody>`;
-      payments.forEach(p => { html += `<tr><td>${new Date(p.PAYMENT_DATE).toLocaleString()}</td><td>${p.PAYMENT_TYPE}</td><td>${p.PAYMENT_METHOD}</td><td class="text-right">${Number(p.AMOUNT_PAID).toLocaleString()}</td></tr>`; });
+      const methodLabels = { cash: 'Cash', credit_card: 'Credit Card', credit: 'Credit', marker: 'Credit' };
+      payments.forEach(p => {
+        const methodLabel = methodLabels[(p.PAYMENT_METHOD || '').toLowerCase()] || p.PAYMENT_METHOD;
+        html += `<tr><td>${new Date(p.PAYMENT_DATE).toLocaleString()}</td><td>${p.PAYMENT_TYPE}</td><td>${methodLabel}</td><td class="text-right">${Number(p.AMOUNT_PAID).toLocaleString()}</td></tr>`;
+      });
       html += `</tbody></table></div>`;
     }
 

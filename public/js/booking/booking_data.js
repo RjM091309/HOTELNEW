@@ -56,6 +56,7 @@ $(document).ready(function () {
                         Totalcost: item.TOTAL_COST,
                         Balance: item.BALANCE || 0,
                         Paymentstatus: item.PAYMENT_STATUS || 'unpaid',
+                        PaymentMethod: item.PAYMENT_METHOD || '',
                         BookingChannel: item.BOOKING_CHANNEL,
                         Status: getStatusLabel(item.BookingStatus, item.BookingID), // Status label
                         BookingStatus: item.BookingStatus,
@@ -252,7 +253,7 @@ $(document).ready(function () {
                     const balance = parseFloat(row.Balance) || 0;
                     const totalCost = parseFloat(row.Totalcost) || 0;
                     let labelClass, displayText;
-                    
+
                     if (balance <= 0) {
                         // No balance or negative balance (overpaid) = PAID
                         labelClass = 'label-success';

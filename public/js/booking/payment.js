@@ -157,6 +157,17 @@ function initializePaymentModal() {
             return;
         }
         
+        // Credit payments require the name of whoever authorized them
+        if (selectedMethod && selectedMethod.value === 'credit') {
+            const approvedBy = document.getElementById('creditApprovedBy');
+            if (!approvedBy || !approvedBy.value.trim()) {
+                confirmButton.disabled = true;
+                confirmButton.classList.remove('btn-success');
+                confirmButton.classList.add('btn-secondary');
+                return;
+            }
+        }
+
         if (amount > 0 && selectedMethod) {
             confirmButton.disabled = false;
             confirmButton.classList.remove('btn-secondary');
@@ -211,13 +222,36 @@ function initializePaymentModal() {
                     </div>
                 `;
                 break;
+
+            case 'credit':
+                detailsHTML = `
+                    <div class="payment-method-info">
+                        <h6><i class="fa fa-flag"></i> Credit</h6>
+                        <p class="text-muted">This booking will be checked out without collecting payment. Indicate who authorized it.</p>
+                        <label for="creditApprovedBy" class="form-label">Approved By</label>
+                        <input type="text" class="form-control" id="creditApprovedBy" placeholder="Name of person who authorized this">
+                        <div class="alert alert-warning mt-2">
+                            <i class="fa fa-exclamation-triangle"></i>
+                            <strong>Note:</strong> This marks the balance as settled without an actual payment. Use only with proper authorization.
+                        </div>
+                    </div>
+                `;
+                break;
         }
-        
+
         paymentDetailsSection.innerHTML = detailsHTML;
-        
+
         // Add input formatting for credit card
         if (method === 'credit_card') {
             addCreditCardFormatting();
+        }
+
+        // Re-validate as the approver name is typed in
+        if (method === 'credit') {
+            const approvedBy = document.getElementById('creditApprovedBy');
+            if (approvedBy) {
+                approvedBy.addEventListener('input', validatePaymentForm);
+            }
         }
     }
 
@@ -408,6 +442,12 @@ function updatePaymentSummaryCard(totalAmount, breakdown = {}) {
 // Initialize a flag to determine if the Billing Modal should reopen
 let shouldReopenBillingModal = true;
 
+// Optional hook: other flows (e.g. dashboard checkout-with-unpaid-balance) can set this
+// to run custom logic after a successful payment instead of the default reload/reopen.
+// While set, it also means the Payment Modal was NOT opened from the Billing Modal,
+// so the Billing Modal should never be auto-reopened.
+window.onPaymentConfirmed = window.onPaymentConfirmed || null;
+
 // Ensure cleanup after closing the Payment Modal
 document.getElementById('modal-payment').addEventListener('hidden.bs.modal', function () {
     // Remove modal-open class and reset styles
@@ -418,10 +458,14 @@ document.getElementById('modal-payment').addEventListener('hidden.bs.modal', fun
     const backdrops = document.querySelectorAll('.modal-backdrop');
     backdrops.forEach((backdrop) => backdrop.remove());
 
-    // Reopen the Billing Modal only if payment was not successful
-    if (shouldReopenBillingModal) {
-        const billingModal = new bootstrap.Modal(document.getElementById('modal-billing'));
-        billingModal.show();
+    // Reopen the Billing Modal only if payment was not successful and no other flow
+    // (e.g. dashboard checkout) is driving this Payment Modal
+    if (shouldReopenBillingModal && !window.onPaymentConfirmed) {
+        const billingModalEl = document.getElementById('modal-billing');
+        if (billingModalEl) {
+            const billingModal = new bootstrap.Modal(billingModalEl);
+            billingModal.show();
+        }
     }
 });
 
@@ -430,7 +474,23 @@ $('#confirmPaymentButton').on('click', function () {
     const bookingId = $('#hiddenBookingId').val() || $('#bookingID').val(); // Support both hidden input names
     const paymentAmount = $('#paymentAmount').val() || $('#paymentAmountInput').val(); // Support both amount inputs
     const paymentMethod = $('#paymentMethod').val(); // Hidden input from enhanced modal
-    const paymentNotes = $('#paymentNotes').val() || ''; // Payment notes from enhanced modal
+    let paymentNotes = $('#paymentNotes').val() || ''; // Payment notes from enhanced modal
+
+    // Credit payments must record who authorized them
+    if (paymentMethod === 'credit') {
+        const creditApprovedBy = $('#creditApprovedBy').val() ? $('#creditApprovedBy').val().trim() : '';
+        if (!creditApprovedBy) {
+            Swal.fire({
+                title: 'Error!',
+                text: 'Please indicate who approved this Credit payment.',
+                icon: 'error',
+                confirmButtonText: 'OK',
+                backdrop: true,
+            });
+            return;
+        }
+        paymentNotes = `Credit approved by: ${creditApprovedBy}.` + (paymentNotes ? ` ${paymentNotes}` : '');
+    }
 
     // Validate payment details
     if (!paymentMethod) {
@@ -462,11 +522,13 @@ $('#confirmPaymentButton').on('click', function () {
 
     // Show confirmation dialog
     Swal.fire({
-        title: 'Confirm Payment',
-        text: `Are you sure you want to proceed with the payment of ₱${formattedAmount}?`,
+        title: paymentMethod === 'credit' ? 'Confirm Credit' : 'Confirm Payment',
+        text: paymentMethod === 'credit'
+            ? `Are you sure you want to mark ₱${formattedAmount} as settled without collecting payment?`
+            : `Are you sure you want to proceed with the payment of ₱${formattedAmount}?`,
         icon: 'question',
         showCancelButton: true,
-        confirmButtonText: 'Yes, Pay Now!',
+        confirmButtonText: paymentMethod === 'credit' ? 'Yes, Mark as Settled!' : 'Yes, Pay Now!',
         cancelButtonText: 'Cancel'
     }).then((result) => {
         if (result.isConfirmed) {
@@ -493,6 +555,19 @@ $('#confirmPaymentButton').on('click', function () {
                     if (response.success) {
                         // Prevent reopening of the Billing Modal
                         shouldReopenBillingModal = false;
+
+                        // If another flow (e.g. dashboard checkout) is waiting on this payment,
+                        // hand control back to it instead of doing the default reload/reopen.
+                        if (typeof window.onPaymentConfirmed === 'function') {
+                            const onConfirmed = window.onPaymentConfirmed;
+                            window.onPaymentConfirmed = null;
+
+                            $('.modal').modal('hide');
+                            $('.modal-backdrop').remove();
+
+                            onConfirmed(response);
+                            return;
+                        }
 
                         // Hide all modals
                         $('.modal').modal('hide'); // Hides all open modals

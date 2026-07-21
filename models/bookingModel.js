@@ -135,14 +135,15 @@ class BookingModel {
                   - COALESCE(bill.DISCOUNT_AMOUNT, 0)
             END
             `} AS TOTAL_COST,
-            CASE 
+            CASE
               WHEN bill.PAYMENT_STATUS = 'cancelled' THEN 'cancelled'
-              WHEN bill.PAYMENT_STATUS = 'paid' 
+              WHEN bill.PAYMENT_STATUS = 'paid'
                 AND COALESCE(services_unpaid_count.TOTAL_UNPAID_SERVICES, 0) = 0
                 AND COALESCE(extensions_unpaid_count.TOTAL_UNPAID_EXTENSIONS, 0) = 0
               THEN 'paid'
               ELSE 'unpaid'
             END AS PAYMENT_STATUS,
+            bill.PAYMENT_METHOD AS PAYMENT_METHOD,
             ${useIndividualCalculation ? `
             -- Use individual balance calculation for all bookings (including group bookings shown individually)
             ROUND(GREATEST(0, 
@@ -3038,9 +3039,9 @@ class BookingModel {
 
           await new Promise((resolve, reject) => {
             connection.query(
-              `INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
-              VALUES (?, ?, ?, ?, 'room', NOW(), ?)`,
-                                [bookingId, billingId, roomPaymentAmount, paymentMethod, encodedBy],
+              `INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
+              VALUES (?, ?, ?, ?, 'room', NOW(), ?, ?)`,
+                                [bookingId, billingId, roomPaymentAmount, paymentMethod, encodedBy, paymentNotes || null],
               (err) => {
                 if (err) reject(err);
                 else resolve();
@@ -3130,9 +3131,9 @@ class BookingModel {
 
                             await new Promise((resolve, reject) => {
                                 connection.query(
-                                    `INSERT INTO payments (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY) 
-                                    VALUES (?, ?, ?, ?, 'service', NOW(), ?)`,
-                                    [bookingId, service.IDNo, servicePaymentAmount, paymentMethod, encodedBy],
+                                    `INSERT INTO payments (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
+                                    VALUES (?, ?, ?, ?, 'service', NOW(), ?, ?)`,
+                                    [bookingId, service.IDNo, servicePaymentAmount, paymentMethod, encodedBy, paymentNotes || null],
                                     (err) => {
                                         if (err) reject(err);
                                         else resolve();

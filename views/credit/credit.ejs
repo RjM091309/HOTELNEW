@@ -1,0 +1,131 @@
+<!-- Credit Ledger -->
+<div class="dashboard-card">
+  <div class="dashboard-card-header">
+    <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
+        <div class="tab-bar">
+          <header style="display:inline-block; white-space: nowrap;">Credit Ledger</header>
+      </div>
+    </div>
+  </div>
+  <div class="dashboard-card-body">
+
+    <!-- Total Credit Summary -->
+    <div class="row" style="margin-bottom:16px">
+      <div class="col-md-4 offset-md-4">
+        <div style="background: linear-gradient(145deg, #2a3135, #1f2528); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); padding: 18px;">
+          <div class="text-center mb-2"><h5 class="mb-0" style="color:#5bc0de;"><i class="fas fa-flag"></i> Total Outstanding Credit</h5></div>
+          <div class="text-center"><h4 class="mb-0" id="total-credit" style="color:#5bc0de;">0</h4></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-scrollable">
+      <table id="credit_tbl" class="table table-hover table-bordered full-width">
+        <thead>
+          <tr>
+            <th style="display:none"></th>
+            <th style="text-align: center;">#</th>
+            <th style="text-align: center;">DATE</th>
+            <th style="text-align: center;">GUEST NAME</th>
+            <th style="text-align: center;">ROOM NUMBER</th>
+            <th style="text-align: center;">CONFIRMATION NUMBER</th>
+            <th style="text-align: center;">AMOUNT</th>
+            <th style="text-align: center;">APPROVED BY</th>
+            <th style="text-align: center;">PROCESSED BY</th>
+            <th style="text-align: center;">STATUS</th>
+            <th style="text-align: center;">ACTION</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  $(document).ready(function () {
+    function extractApprovedBy(remarks) {
+      if (!remarks) return '-';
+      const match = remarks.match(/(?:Credit|Marker) approved by:\s*([^.]+)\./i);
+      return match ? match[1].trim() : remarks;
+    }
+
+    let table = $('#credit_tbl').DataTable({
+      rowId: 'PAYMENT_ID',
+      processing: true,
+      serverSide: true,
+      ajax: {
+        url: '/credit/credit_data',
+        type: 'GET',
+        dataSrc: function(json){
+          document.getElementById('total-credit').textContent = '₱' + Number(json.totalOutstandingCredit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
+          return json.data;
+        }
+      },
+      columns: [
+        { data: 'PAYMENT_ID', visible: false },
+        { data: null, orderable: false, searchable: false, className: 'center' },
+        {
+          data: 'PAYMENT_DATE',
+          className: 'center',
+          render: d => d ? new Date(d).toLocaleString('en-US') : ''
+        },
+        { data: 'GUEST_NAME', className: 'center', render: d => d || 'N/A' },
+        { data: 'ROOM_NUMBER', className: 'center', render: d => d || 'N/A' },
+        { data: 'CONFIRMATION_NUMBER', className: 'center', render: function(data, type, row){
+            return data ? `<a href="/booking?highlight=${row.BOOKING_ID}" target="_blank" style="color:#007bff;text-decoration:underline;">${data}</a>` : 'N/A';
+          }
+        },
+        { data: 'AMOUNT_PAID', className: 'center', render: d => '₱' + Number(d||0).toLocaleString('en-US', { minimumFractionDigits: 2 }) },
+        { data: 'REMARKS', className: 'center', render: d => extractApprovedBy(d) },
+        { data: 'PROCESSED_BY_NAME', className: 'center', render: d => d || '' },
+        { data: 'SETTLED_DATE', className: 'center', render: function(data, type, row){
+            if (!data) return '<span class="label label-warning">Outstanding</span>';
+            const settledDate = new Date(data).toLocaleString('en-US');
+            const settledBy = row.SETTLED_BY_NAME ? ` by ${row.SETTLED_BY_NAME}` : '';
+            return `<span class="label label-success" title="Settled${settledBy} on ${settledDate}">Paid</span>`;
+          }
+        },
+        { data: null, orderable: false, searchable: false, className: 'center', render: function(_d, _t, row){
+            if (row.SETTLED_DATE) return '-';
+            return `<button type="button" class="btn btn-sm btn-success settle-credit-btn" data-payment-id="${row.PAYMENT_ID}">Mark as Paid</button>`;
+          }
+        }
+      ],
+      order: [[2, 'desc']],
+      language: { emptyTable: 'No credit transactions found.' }
+    });
+
+    table.on('draw.dt', function(){
+      table.column(1, { search: 'applied', order: 'applied' }).nodes().each(function(cell, i){ cell.innerHTML = i + 1; });
+    });
+
+    $('#credit_tbl').on('click', '.settle-credit-btn', function(){
+      const paymentId = $(this).data('payment-id');
+      Swal.fire({
+        title: 'Mark as Paid?',
+        text: 'Confirm that the guest has settled this credit amount.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, mark as paid',
+        cancelButtonText: 'Cancel'
+      }).then((result) => {
+        if (!result.isConfirmed) return;
+        $.ajax({
+          url: `/credit/settle/${paymentId}`,
+          type: 'POST',
+          success: function(response){
+            if (response.success) {
+              table.ajax.reload(null, false);
+            } else {
+              Swal.fire('Error', response.message || 'Failed to settle credit.', 'error');
+            }
+          },
+          error: function(){
+            Swal.fire('Error', 'Failed to settle credit.', 'error');
+          }
+        });
+      });
+    });
+  });
+</script>

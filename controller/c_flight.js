@@ -1,5 +1,59 @@
 const axios = require('axios');
 
+// Major South Korean airport IATA codes - AviationStack's flight endpoint doesn't
+// return a departure country, so "Korea only" is filtered by known origin airports.
+const KOREA_AIRPORT_IATA = new Set([
+  'ICN', // Incheon
+  'GMP', // Gimpo (Seoul)
+  'PUS', // Busan (Gimhae)
+  'CJU', // Jeju
+  'TAE', // Daegu
+  'CJJ', // Cheongju
+  'KWJ', // Gwangju
+  'USN', // Ulsan
+  'RSU', // Yeosu
+  'KPO', // Pohang
+  'HIN', // Sacheon
+  'MWX', // Muan
+  'WJU', // Wonju
+  'YNY'  // Yangyang
+]);
+
+// Derives a front-desk-friendly status instead of trusting the airline's raw
+// flight_status alone - AviationStack's free-tier data can say "landed" while
+// its own arrival time is still in the future, so "Landed" is decided purely
+// by comparing the arrival time to right now, not by the raw status flag.
+// "Delayed" is flagged when it's running meaningfully late.
+function computeDisplayStatus(rawStatus, arrival) {
+  const status = (rawStatus || '').toLowerCase();
+  arrival = arrival || {};
+
+  if (status === 'cancelled' || status === 'incident' || status === 'diverted') {
+    return (rawStatus || 'UNKNOWN').toUpperCase();
+  }
+
+  const bestTime = arrival.actual || arrival.estimated || arrival.scheduled;
+  if (bestTime && new Date(bestTime).getTime() <= Date.now()) {
+    return 'LANDED';
+  }
+
+  const lateByMinutes = arrival.delay
+    || (arrival.estimated && arrival.scheduled
+      ? (new Date(arrival.estimated).getTime() - new Date(arrival.scheduled).getTime()) / 60000
+      : 0);
+  if (lateByMinutes > 15) {
+    return 'DELAYED';
+  }
+
+  // Not landed by time and not delayed - fall back to the raw status, EXCEPT
+  // "landed" itself, which we've already decided not to trust at face value
+  // (that's the whole point of this function): treat it as still en route.
+  if (status === 'landed' || status === 'active') {
+    return 'ARRIVAL';
+  }
+  return (rawStatus || 'SCHEDULED').toUpperCase();
+}
+
 // Flight status lookup for PUAP (airport pick-up/drop-off) - lets front desk see
 // the actual arrival status of a guest's incoming flight (e.g. into Clark/CRK).
 // Uses AviationStack (https://aviationstack.com) since there is no direct/free
@@ -8,6 +62,7 @@ const axios = require('axios');
 class FlightController {
   static async getFlightStatus(req, res) {
     try {
+      res.set('Cache-Control', 'no-store'); // flight status changes constantly - never serve a stale cached copy
       const { flightNumber } = req.params;
       const apiKey = process.env.AVIATIONSTACK_API_KEY;
 
@@ -50,7 +105,7 @@ class FlightController {
         data: {
           flightNumber: flight.flight?.iata || flightNumber.trim().toUpperCase(),
           airline: flight.airline?.name || null,
-          status: flight.flight_status || null, // scheduled, active, landed, cancelled, incident, diverted
+          status: computeDisplayStatus(flight.flight_status, flight.arrival),
           date: flight.flight_date || null,
           departure: {
             airport: flight.departure?.airport || null,
@@ -81,6 +136,7 @@ class FlightController {
   // so we fetch a batch of CRK arrivals and filter/sort to "upcoming" ourselves.
   static async getArrivals(req, res) {
     try {
+      res.set('Cache-Control', 'no-store'); // flight status changes constantly - never serve a stale cached copy
       const apiKey = process.env.AVIATIONSTACK_API_KEY;
 
       if (!apiKey) {
@@ -89,6 +145,8 @@ class FlightController {
           message: 'Flight status lookup is not configured. Set AVIATIONSTACK_API_KEY in your environment variables.'
         });
       }
+
+      const { origin } = req.query; // optional: 'KR' to show only flights departing South Korea
 
       const response = await axios.get('http://api.aviationstack.com/v1/flights', {
         params: {
@@ -110,18 +168,25 @@ class FlightController {
       const now = Date.now();
       const cutoff = now - (2 * 60 * 60 * 1000); // keep flights up to 2 hours in the past (recently landed)
 
-      const arrivals = flights
+      let arrivals = flights
         .map(f => ({
           flightNumber: f.flight?.iata || null,
           airline: f.airline?.name || null,
-          status: f.flight_status || null,
+          status: computeDisplayStatus(f.flight_status, f.arrival),
           originAirport: f.departure?.airport || null,
           originIata: f.departure?.iata || null,
           scheduled: f.arrival?.scheduled || null,
           estimated: f.arrival?.estimated || null,
+          actual: f.arrival?.actual || null,
           delayMinutes: f.arrival?.delay ?? null
         }))
-        .filter(f => f.flightNumber && f.scheduled && new Date(f.scheduled).getTime() >= cutoff)
+        .filter(f => f.flightNumber && f.scheduled && new Date(f.scheduled).getTime() >= cutoff);
+
+      if (origin && origin.toUpperCase() === 'KR') {
+        arrivals = arrivals.filter(f => KOREA_AIRPORT_IATA.has(f.originIata));
+      }
+
+      arrivals = arrivals
         .sort((a, b) => new Date(a.scheduled).getTime() - new Date(b.scheduled).getTime())
         .slice(0, 50);
 
