@@ -25,6 +25,7 @@ $(document).ready(function () {
                         RoomNumbers: item.room_numbers || 'N/A',
                         TotalBookings: item.total_bookings,
                         Channel: item.BOOKING_CHANNEL,
+                        AgencyPayer: item.AGENCY_PAYER || null,
                         Status: item.STATUS_OVERVIEW,
                         TotalPayment: item.TOTAL_PAYMENT,
                         TotalPaid: item.TOTAL_PAID,
@@ -112,7 +113,18 @@ $(document).ready(function () {
                 }
             },
           
-            { data: 'Channel', title: 'BOOKING CHANNEL' },
+            { 
+                data: 'Channel', 
+                title: 'BOOKING CHANNEL',
+                render: function (data, type, row) {
+                    if (data === 'agency') {
+                        const paidBy = row.AgencyPayer === 'guest' ? 'Guest' : 'Agency';
+                        const color = row.AgencyPayer === 'guest' ? '#f0ad4e' : '#5bc0de';
+                        return `agency<br><small style="color:${color}; font-weight:600;">${paidBy}</small>`;
+                    }
+                    return data || '';
+                }
+            },
             {
                 data: 'Status',
                 title: 'BOOKING STATUS',
@@ -1474,7 +1486,19 @@ function populateEditGroupForm(booking) {
     } else {
         $('#editGroupLateCheckoutFeeDisplay').hide();
     }
-    $('#editGroupAgencySelect').val(booking.agencyId);
+    $('#editGroupAgencySelect').data('pending-agency-id', booking.agencyId || '');
+
+    if (booking.bookingRoute === 'agency') {
+        $('#editGroupAgencyWrapper').show();
+        const payer = booking.agencyPayer || 'agency';
+        $(`input[name="editGroupAgencyPayer"][value="${payer}"]`).prop('checked', true);
+        $('#editGroupAgencyPayerRateHint').text(payer === 'guest' ? 'Regular Rate' : 'Agency Rate');
+        if (typeof window.loadEditGroupAgencies === 'function') {
+            window.loadEditGroupAgencies();
+        }
+    } else {
+        $('#editGroupAgencyWrapper').hide();
+    }
 
     // ================= SENIOR/PWD DISCOUNT (EDIT) =================
     // If there is a stored Senior/PWD discount percentage on the group,
@@ -1591,13 +1615,6 @@ function populateEditGroupForm(booking) {
         $('#editGroupDropoffPrice').val('');
         // Set default dropoff service ID when no dropoff is selected
         $('#editGroupDropoffServiceId').val('77'); // Default dropoff service ID
-    }
-
-    // Show/hide agency wrapper based on booking route
-    if (booking.bookingRoute === 'agency') {
-        $('#editGroupAgencyWrapper').show();
-    } else {
-        $('#editGroupAgencyWrapper').hide();
     }
 
     // Handle individual booking dates if they differ from main date range

@@ -997,6 +997,10 @@ function confirmRoomAssignment(roomId, roomNumber, roomFloor, bookingId) {
             function updateRoomPrice(roomDetails, bookingDetails, selectedBookingType) {
               const roomRateField = addBookingModalElement.querySelector('#price');
               if (!roomRateField) return;
+
+              const priceBookingType = (selectedBookingType === 'agency' && typeof window.getPriceBookingType === 'function')
+                ? window.getPriceBookingType()
+                : selectedBookingType;
               
               const seasonalPrices = roomDetails.SEASONAL_PRICES || [];
               const selectedBedCount = roomDetails.ROOM_BED || '';
@@ -1031,7 +1035,7 @@ function confirmRoomAssignment(roomId, roomNumber, roomFloor, bookingId) {
               const currentSeasonId = getSeasonIdForDate(checkInDate, seasonalPrices);
               const match = seasonalPrices.find(p =>
                 parseInt(p.bedCount) === parseInt(selectedBedCount) &&
-                p.bookingType === selectedBookingType &&
+                p.bookingType === priceBookingType &&
                 parseInt(p.seasonId) === parseInt(currentSeasonId)
               );
               

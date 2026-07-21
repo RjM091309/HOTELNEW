@@ -44,6 +44,9 @@ $(document).ready(function () {
       const checkOutStatus = $('#checkOutStatus').val();
       const bookingRemarks = $('#bookingRemarks').val();
       const agencyID = $('#agencySelect').val();
+      const agencyPayer = bookingRoute === 'agency'
+        ? ($('input[name="agencyPayer"]:checked').val() || 'agency')
+        : null;
       const voucherNo = $('#voucherNo').val();
       // Services/Transport
       const breakfastAdultQty = $('#breakfastAdultQty').val();
@@ -109,7 +112,7 @@ $(document).ready(function () {
         data: {
           room_id: roomId, fullname, number, address, daterange, maxOccupants: guestsCount,
           paidAmount, paymentStatus, price: roomPrice, diffindays: qty, guestType, guestLevel, guestID: txtGuestID,
-          bookingRoute, checkInStatus, checkOutStatus, bookingRemarks, agencyID, voucherNo,
+          bookingRoute, checkInStatus, checkOutStatus, bookingRemarks, agencyID, agencyPayer, voucherNo,
           breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
           breakfastKidQty, breakfastKidPrice, breakfastKidId,
           pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
@@ -379,9 +382,11 @@ window.addBookingToCheckedInTab = function(bookingData) {
     const transfer = booking.TRANSFER || booking.transfer || 0;
     const isGroup = booking.IS_GROUP || booking.is_group || 0;
     const remarks = booking.REMARKS || booking.remarks || '';
+    const bookingChannel = booking.BOOKING_CHANNEL || booking.booking_channel || 'walk-in';
+    const agencyPayer = booking.AGENCY_PAYER || booking.agency_payer || 'agency';
     
     const bookingId = booking.BookingID || booking.booking_id;
-    let cardHTML = `<div class="card ${cardClass}" data-floor="${escapeHtml(String(roomFloor))}" data-checkin="${escapeHtml(String(checkInDate))}" data-checkout="${escapeHtml(String(checkOutDate))}" data-idno="${escapeHtml(String(roomId))}" data-room-number="${escapeHtml(String(roomNumber))}" data-booking-id="${bookingId}" data-late-checkout="${lateCheckout}" data-booking-status="${escapeHtml(bookingStatus)}" data-customer-type="${escapeHtml(String(customerType))}" data-customer-level="${escapeHtml(String(customerLevel))}">`;
+    let cardHTML = `<div class="card ${cardClass}" data-floor="${escapeHtml(String(roomFloor))}" data-checkin="${escapeHtml(String(checkInDate))}" data-checkout="${escapeHtml(String(checkOutDate))}" data-idno="${escapeHtml(String(roomId))}" data-room-number="${escapeHtml(String(roomNumber))}" data-booking-id="${bookingId}" data-late-checkout="${lateCheckout}" data-booking-status="${escapeHtml(bookingStatus)}" data-booking-channel="${escapeHtml(String(bookingChannel))}" data-agency-payer="${escapeHtml(String(agencyPayer))}" data-customer-type="${escapeHtml(String(customerType))}" data-customer-level="${escapeHtml(String(customerLevel))}">`;
     
     // Card header
     cardHTML += '<div class="card-head" style="text-align: center; display: flex; align-items: center; justify-content: space-between;">';

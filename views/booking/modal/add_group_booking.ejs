@@ -90,10 +90,28 @@
           <div class="row p-t-20">         
             <div class="col-lg-12" id="groupAgencyWrapper" style="display: none;">
               <div class="form-group">
-                <label class="form-label">Select Agency</label>
-                <select class="form-select" id="groupAgencySelect" name="groupAgencySelect">
-                  <option value="" disabled selected>Select Agency</option>
-                </select>
+                <div class="row g-2">
+                  <div class="col-md-6">
+                    <label class="form-label">Select Agency</label>
+                    <select class="form-select" id="groupAgencySelect" name="groupAgencySelect">
+                      <option value="" disabled selected>Select Agency</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6 d-flex flex-column ps-3 text-center">
+                    <label class="form-label">Who Pays</label>
+                    <div class="d-flex gap-5 align-items-center justify-content-center" style="min-height: 38px;">
+                      <div class="form-check mb-0">
+                        <input class="form-check-input" type="radio" id="groupAgencyPayerAgency" name="groupAgencyPayer" value="agency" checked>
+                        <label class="form-check-label" for="groupAgencyPayerAgency">Agency</label>
+                      </div>
+                      <div class="form-check mb-0">
+                        <input class="form-check-input" type="radio" id="groupAgencyPayerGuest" name="groupAgencyPayer" value="guest">
+                        <label class="form-check-label" for="groupAgencyPayerGuest">Guest</label>
+                      </div>
+                    </div>
+                    <small id="groupAgencyPayerRateHint" class="text-muted d-block text-center" style="font-size: 11px; margin-top: 2px;">Agency Rate</small>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1049,6 +1067,67 @@
   let groupManualRates = {}; // Store manual rates for each room
   let groupBedBasedRates = {}; // Store bed-based rates {1: price, 2: price}
 
+  function getGroupPriceBookingType() {
+    const bookingRoute = $('#groupBookingRoute').val();
+    if (bookingRoute === 'agency') {
+      const agencyPayer = $('input[name="groupAgencyPayer"]:checked').val();
+      return agencyPayer === 'guest' ? 'walk-in' : 'agency';
+    }
+    return bookingRoute;
+  }
+
+  function resolveGroupRoomPrice(room, checkInDate) {
+    const bedCount = parseInt(room.ROOM_BED, 10);
+    const priceBookingType = getGroupPriceBookingType();
+    const bookingRoute = $('#groupBookingRoute').val();
+
+    if (priceBookingType === bookingRoute && typeof room.RESOLVED_PRICE === 'number') {
+      return room.RESOLVED_PRICE;
+    }
+
+    const seasonalPrices = room.SEASONAL_PRICES || [];
+    const seasonId = getSeasonIdForDate(checkInDate, seasonalPrices);
+    const match = seasonalPrices.find(price =>
+      parseInt(price.bedCount, 10) === bedCount &&
+      price.bookingType === priceBookingType &&
+      parseInt(price.seasonId, 10) === parseInt(seasonId, 10)
+    );
+
+    if (match) return parseFloat(match.price);
+    return parseFloat(room.ROOM_PRICE) || 0;
+  }
+
+  function updateGroupAgencyPayerHint() {
+    const payer = $('input[name="groupAgencyPayer"]:checked').val();
+    const hint = payer === 'guest' ? 'Regular Rate' : 'Agency Rate';
+    $('#groupAgencyPayerRateHint').text(hint);
+  }
+
+  function toggleGroupAgencyFields(isAgency) {
+    $('#groupAgencyWrapper').toggle(isAgency);
+    if (isAgency) {
+      loadGroupAgencies();
+      $('input[name="groupAgencyPayer"][value="agency"]').prop('checked', true);
+      updateGroupAgencyPayerHint();
+    } else {
+      $('#groupAgencySelect').val('');
+      $('input[name="groupAgencyPayer"][value="agency"]').prop('checked', true);
+      updateGroupAgencyPayerHint();
+    }
+  }
+
+  function refreshGroupRoomPricing() {
+    if ($('#groupResultsContainer').is(':visible')) {
+      $('#groupSearchRooms').click();
+      return;
+    }
+
+    if (groupManualSelectedRooms.length > 0) {
+      updateManualSelectedRoomValues();
+      computeGroupTotal();
+    }
+  }
+
   function applyGroupBreakfastDefaults() {
     // Only set service IDs, not prices
     if (groupBreakfastAdultBaseId !== '') {
@@ -1635,19 +1714,7 @@
       
       // Get default rate
       const dates = getSelectedDateRange();
-      const bookingType = $('#groupBookingRoute').val();
-      const defaultRate = typeof room.RESOLVED_PRICE === 'number'
-        ? room.RESOLVED_PRICE
-        : (() => {
-            const seasonalPrices = room.SEASONAL_PRICES || [];
-            const seasonId = getSeasonIdForDate(dates.start, seasonalPrices);
-            const match = seasonalPrices.find(price => 
-              parseInt(price.bedCount, 10) === bedCount && 
-              price.bookingType === bookingType && 
-              parseInt(price.seasonId, 10) === parseInt(seasonId, 10)
-            );
-            return match ? parseFloat(match.price) : 0;
-          })();
+      const defaultRate = dates ? resolveGroupRoomPrice(room, dates.start) : 0;
       
       // Get manual rate if exists
       const manualRate = groupManualRates[roomId] || defaultRate;
@@ -1706,19 +1773,7 @@
       // Get default rate for this bed type (use first room as reference)
       const firstRoom = rooms[0];
       const dates = getSelectedDateRange();
-      const bookingType = $('#groupBookingRoute').val();
-      const defaultRate = typeof firstRoom.RESOLVED_PRICE === 'number'
-        ? firstRoom.RESOLVED_PRICE
-        : (() => {
-            const seasonalPrices = firstRoom.SEASONAL_PRICES || [];
-            const seasonId = getSeasonIdForDate(dates.start, seasonalPrices);
-            const match = seasonalPrices.find(price => 
-              parseInt(price.bedCount, 10) === parseInt(bedCount, 10) && 
-              price.bookingType === bookingType && 
-              parseInt(price.seasonId, 10) === parseInt(seasonId, 10)
-            );
-            return match ? parseFloat(match.price) : 0;
-          })();
+      const defaultRate = dates ? resolveGroupRoomPrice(firstRoom, dates.start) : 0;
       
       // Get bed-based rate if exists
       const bedBasedRate = groupBedBasedRates[bedCount] || defaultRate;
@@ -1836,19 +1891,9 @@
         return;
       }
 
-      const bookingType = $('#groupBookingRoute').val();
       const computedPrices = [];
       block.forEach(room => {
-        const price = typeof room.RESOLVED_PRICE === 'number'
-          ? room.RESOLVED_PRICE
-          : (() => {
-              const seasonalPrices = room.SEASONAL_PRICES || [];
-              const bedCount = parseInt(room.ROOM_BED, 10);
-              const seasonId = getSeasonIdForDate(dates.start, seasonalPrices);
-              const match = seasonalPrices.find(price => parseInt(price.bedCount, 10) === bedCount && price.bookingType === bookingType && parseInt(price.seasonId, 10) === parseInt(seasonId, 10));
-              return match ? parseFloat(match.price) : 0;
-            })();
-        const roomId = room.IDNo;
+        const price = dates ? resolveGroupRoomPrice(room, dates.start) : 0;
         computedPrices.push(price);
       });
 
@@ -2536,7 +2581,6 @@
   function updateManualSelectedRoomValues() {
     const selectedRooms = groupAvailableRooms.filter(room => groupManualSelectedRooms.includes(room.IDNo));
     const dates = getSelectedDateRange();
-    const bookingType = $('#groupBookingRoute').val();
 
     const computedBasePrices = selectedRooms.map(room => {
       const roomId = room.IDNo;
@@ -2546,18 +2590,7 @@
         return groupManualRates[roomId];
       }
       
-      // Default rate calculation
-      const basePrice = typeof room.RESOLVED_PRICE === 'number'
-        ? room.RESOLVED_PRICE
-        : (() => {
-            const seasonalPrices = room.SEASONAL_PRICES || [];
-            const bedCount = parseInt(room.ROOM_BED, 10);
-            const seasonId = dates ? getSeasonIdForDate(dates.start, seasonalPrices) : null;
-            const match = seasonalPrices.find(price => parseInt(price.bedCount, 10) === bedCount && price.bookingType === bookingType && parseInt(price.seasonId, 10) === parseInt(seasonId, 10));
-            return match ? parseFloat(match.price) : 0;
-          })();
-      
-      return basePrice;
+      return dates ? resolveGroupRoomPrice(room, dates.start) : 0;
     });
 
     const nights = parseInt($('#groupNights').val(), 10) || 0;
@@ -2576,7 +2609,6 @@
   function updateManualSelectedRoomValuesWithoutRecreating() {
     const selectedRooms = groupAvailableRooms.filter(room => groupManualSelectedRooms.includes(room.IDNo));
     const dates = getSelectedDateRange();
-    const bookingType = $('#groupBookingRoute').val();
 
     const computedBasePrices = selectedRooms.map(room => {
       const roomId = room.IDNo;
@@ -2593,17 +2625,7 @@
         return groupManualRates[roomId];
       }
       
-      // Default rate calculation
-      const basePrice = typeof room.RESOLVED_PRICE === 'number'
-        ? room.RESOLVED_PRICE
-        : (() => {
-            const seasonalPrices = room.SEASONAL_PRICES || [];
-            const seasonId = dates ? getSeasonIdForDate(dates.start, seasonalPrices) : null;
-            const match = seasonalPrices.find(price => parseInt(price.bedCount, 10) === bedCount && price.bookingType === bookingType && parseInt(price.seasonId, 10) === parseInt(seasonId, 10));
-            return match ? parseFloat(match.price) : 0;
-          })();
-      
-      return basePrice;
+      return dates ? resolveGroupRoomPrice(room, dates.start) : 0;
     });
 
     $('#groupSelectedRooms').val(selectedRooms.map(room => room.IDNo).join(','));
@@ -2628,13 +2650,13 @@
 
   function attachBookingRouteHandler() {
     $('#groupBookingRoute').on('change', function() {
-      if (this.value === 'agency') {
-        $('#groupAgencyWrapper').show();
-        loadGroupAgencies();
-      } else {
-        $('#groupAgencyWrapper').hide();
-        $('#groupAgencySelect').val('');
-      }
+      toggleGroupAgencyFields(this.value === 'agency');
+      refreshGroupRoomPricing();
+    });
+
+    $('input[name="groupAgencyPayer"]').on('change', function () {
+      updateGroupAgencyPayerHint();
+      refreshGroupRoomPricing();
     });
   }
 

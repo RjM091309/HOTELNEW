@@ -79,6 +79,7 @@ $(document).ready(function () {
                         Balance: item.BALANCE || 0,
                         Paymentstatus: item.PAYMENT_STATUS || 'unpaid',
                         BookingChannel: item.BOOKING_CHANNEL,
+                        AgencyPayer: item.AGENCY_PAYER || null,
                         Status: getStatusLabel(item.BookingStatus, item.BookingID),
                         BookingStatus: item.BookingStatus,
                         IsDirectReservation: item.IS_DIRECT_RESERVATION,
@@ -172,7 +173,18 @@ $(document).ready(function () {
                     return `<span style="color: #d9534f; font-weight: bold;">₱${formattedBalance}</span>`;
                 }
             },
-            { data: 'BookingChannel', title: 'BOOKING CHANNEL' },
+            {
+                data: 'BookingChannel',
+                title: 'BOOKING CHANNEL',
+                render: function (data, type, row) {
+                    if (data === 'agency') {
+                        const paidBy = row.AgencyPayer === 'guest' ? 'Guest' : 'Agency';
+                        const color = row.AgencyPayer === 'guest' ? '#f0ad4e' : '#5bc0de';
+                        return `agency<br><small style="color:${color}; font-weight:600;">${paidBy}</small>`;
+                    }
+                    return data || '';
+                }
+            },
             {
                 data: 'Paymentstatus',
                 title: 'PAYMENT STATUS',

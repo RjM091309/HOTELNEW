@@ -99,6 +99,9 @@ $(document).ready(function () {
 
     // Get agency ID if booking route is agency
     const agencyId = bookingRoute === 'agency' ? $('#groupAgencySelect').val() || null : null;
+    const agencyPayer = bookingRoute === 'agency'
+      ? ($('input[name="groupAgencyPayer"]:checked').val() || 'agency')
+      : null;
     
     // Validate agency selection if booking route is agency
     if (bookingRoute === 'agency' && (!agencyId || agencyId.trim() === '')) {
@@ -183,6 +186,7 @@ $(document).ready(function () {
       checkOutStatus,
       remarks,
       agencyId,
+      agencyPayer,
       breakfastAdultQty,
       breakfastAdultPrice,
       breakfastAdultId,

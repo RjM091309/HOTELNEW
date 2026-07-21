@@ -975,7 +975,9 @@ function updatePriceForBedCount(bedCount) {
     try {
         // Get booking type from booking route select
         const bookingRouteField = document.querySelector('#bookingRoute');
-        const bookingType = bookingRouteField ? bookingRouteField.value : 'walk-in';
+        const bookingType = (typeof window.getPriceBookingType === 'function')
+            ? window.getPriceBookingType()
+            : (bookingRouteField ? bookingRouteField.value : 'walk-in');
         
         // Get check-in date from date range field
         const dateRangeField = document.querySelector('#daterange');
@@ -2304,7 +2306,9 @@ document.addEventListener('click', function (event) {
       // 🧠 Function to calculate seasonal price and update DOM
       function updateSeasonalPrice() {
   const selectedBedCount = bedCountField.value;
-  const selectedBookingType = document.querySelector('#bookingRoute').value;
+  const selectedBookingType = (typeof window.getPriceBookingType === 'function')
+    ? window.getPriceBookingType()
+    : document.querySelector('#bookingRoute').value;
   const currentSeasonId = getSeasonIdForDate(startDate, seasonalPrices); // from "const [startDate, endDate] = ..."
 
 
@@ -2515,6 +2519,9 @@ function initializeAddBookingHandler() {
             checkOutStatus: $('#checkOutStatus').val(),
             bookingRemarks: $('#bookingRemarks').val(),
             agencyID: $('#agencySelect').val(),
+            agencyPayer: $('#bookingRoute').val() === 'agency'
+                ? ($('input[name="agencyPayer"]:checked').val() || 'agency')
+                : null,
             voucherNo: $('#voucherNo').val(),
             
             // ✅ Include services and transport

@@ -94,12 +94,30 @@
                         </div>
 
                         <!-- AGENCY SELECTION -->
-                        <div id="edit_agencySelectWrapper" class="col-lg-4" style="display: none;">
+                        <div id="edit_agencySelectWrapper" class="col-lg-12" style="display: none;">
                             <div class="form-group">
-                                <label class="form-label">Select Agency</label>
-                                <select class="form-select" id="edit_agencySelect" name="agencyID">
-                                    <option value="" disabled selected>Select Agency</option>
-                                </select>
+                                <div class="row g-2">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Select Agency</label>
+                                        <select class="form-select" id="edit_agencySelect" name="agencyID">
+                                            <option value="" disabled selected>Select Agency</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 d-flex flex-column text-center">
+                                        <label class="form-label">Who Pays</label>
+                                        <div class="d-flex gap-4 align-items-center justify-content-center" style="min-height: 38px;">
+                                            <div class="form-check mb-0">
+                                                <input class="form-check-input" type="radio" id="edit_agencyPayerAgency" name="edit_agencyPayer" value="agency" checked>
+                                                <label class="form-check-label" for="edit_agencyPayerAgency">Agency</label>
+                                            </div>
+                                            <div class="form-check mb-0">
+                                                <input class="form-check-input" type="radio" id="edit_agencyPayerGuest" name="edit_agencyPayer" value="guest">
+                                                <label class="form-check-label" for="edit_agencyPayerGuest">Guest</label>
+                                            </div>
+                                        </div>
+                                        <small id="edit_agencyPayerRateHint" class="text-muted d-block text-center" style="font-size: 11px; margin-top: 2px;">Agency Rate</small>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                           
@@ -558,6 +576,103 @@
 // Global variable for extra services in edit form
 let editAddedServicesMap = {}; // Store added services for edit form
 
+function updateEditAgencyPayerHint() {
+    const payer = $('input[name="edit_agencyPayer"]:checked').val();
+    const hint = payer === 'guest' ? 'Regular Rate' : 'Agency Rate';
+    $('#edit_agencyPayerRateHint').text(hint);
+}
+
+function getEditPriceBookingType() {
+    const bookingRoute = $('#edit_bookingRoute').val();
+    if (bookingRoute === 'agency') {
+        const agencyPayer = $('input[name="edit_agencyPayer"]:checked').val();
+        return agencyPayer === 'guest' ? 'walk-in' : 'agency';
+    }
+    return bookingRoute;
+}
+
+function computeEditSeasonalPrice(room) {
+    if (!room) return null;
+    const seasonalPrices = room.SEASONAL_PRICES || [];
+    const daterange = $('#edit_daterange').val() || '';
+    const [startDate] = daterange.split(' to ');
+    const bookingType = getEditPriceBookingType();
+
+    function getSeasonIdForDate(checkInDate, seasonal) {
+        if (!checkInDate) return null;
+        const checkIn = new Date(checkInDate);
+        const mmdd = (checkIn.getMonth() + 1).toString().padStart(2, '0') + checkIn.getDate().toString().padStart(2, '0');
+        for (const p of (seasonal || [])) {
+            const start = new Date(p.startDate);
+            const end = new Date(p.endDate);
+            const startMMDD = (start.getMonth() + 1).toString().padStart(2, '0') + start.getDate().toString().padStart(2, '0');
+            const endMMDD = (end.getMonth() + 1).toString().padStart(2, '0') + end.getDate().toString().padStart(2, '0');
+            if ((startMMDD <= endMMDD && mmdd >= startMMDD && mmdd <= endMMDD) ||
+                (startMMDD > endMMDD && (mmdd >= startMMDD || mmdd <= endMMDD))) {
+                return p.seasonId;
+            }
+        }
+        return null;
+    }
+
+    const seasonId = getSeasonIdForDate(startDate, seasonalPrices);
+    const bedCount = parseInt(room.ROOM_BED, 10);
+    const match = seasonalPrices.find(p =>
+        parseInt(p.bedCount, 10) === bedCount &&
+        p.bookingType === bookingType &&
+        parseInt(p.seasonId, 10) === parseInt(seasonId, 10)
+    );
+    let pricePerNight = match ? parseFloat(match.price) : parseFloat(room.FINAL_PRICE || room.ROOM_PRICE);
+    if (!isFinite(pricePerNight)) pricePerNight = 0;
+    return pricePerNight;
+}
+
+function cacheEditRoomDetails(roomId) {
+    if (!roomId) return Promise.resolve(null);
+    return fetch('/booking/get-room-details', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success && data.roomDetails) {
+            $('#edit_addroom').data('roomDetails', data.roomDetails);
+            return data.roomDetails;
+        }
+        return null;
+    })
+    .catch(err => {
+        console.error('Error caching edit room details:', err);
+        return null;
+    });
+}
+
+function refreshEditRoomRate() {
+    const applyPrice = (room) => {
+        if (!room) return;
+        const pricePerNight = computeEditSeasonalPrice(room);
+        $('#edit_baseprice').val((pricePerNight || 0).toFixed(2));
+        if (!$('#edit_manualPriceToggle').is(':checked')) {
+            $('#edit_price').val((pricePerNight || 0).toFixed(2));
+        }
+        if (typeof computeEditTotal === 'function') {
+            computeEditTotal();
+        }
+    };
+
+    const cachedRoom = $('#edit_addroom').data('roomDetails');
+    if (cachedRoom) {
+        applyPrice(cachedRoom);
+        return;
+    }
+
+    const roomId = $('#edit_addroom').val();
+    if (roomId) {
+        cacheEditRoomDetails(roomId).then(applyPrice);
+    }
+}
+
 $(document).ready(function() {
     // Initialize flatpickr for edit form
     let editFlatpickrInstance = null;
@@ -716,91 +831,28 @@ $(document).ready(function() {
         }
     });
 
-    // Helper to compute seasonal price for selected room
-    function computeEditSeasonalPrice(room) {
-        if (!room) return null;
-        const seasonalPrices = room.SEASONAL_PRICES || [];
-        const daterange = $('#edit_daterange').val() || '';
-        const [startDate] = daterange.split(' to ');
-        const bookingType = $('#edit_bookingRoute').val();
-
-        function getSeasonIdForDate(checkInDate, seasonal) {
-            if (!checkInDate) return null;
-            const checkIn = new Date(checkInDate);
-            const mmdd = (checkIn.getMonth() + 1).toString().padStart(2, '0') + checkIn.getDate().toString().padStart(2, '0');
-            for (const p of (seasonal || [])) {
-                const start = new Date(p.startDate);
-                const end = new Date(p.endDate);
-                const startMMDD = (start.getMonth() + 1).toString().padStart(2, '0') + start.getDate().toString().padStart(2, '0');
-                const endMMDD = (end.getMonth() + 1).toString().padStart(2, '0') + end.getDate().toString().padStart(2, '0');
-                if ((startMMDD <= endMMDD && mmdd >= startMMDD && mmdd <= endMMDD) ||
-                    (startMMDD > endMMDD && (mmdd >= startMMDD || mmdd <= endMMDD))) {
-                    return p.seasonId;
-                }
-            }
-            return null;
-        }
-
-        const seasonId = getSeasonIdForDate(startDate, seasonalPrices);
-        const bedCount = parseInt(room.ROOM_BED);
-        const match = seasonalPrices.find(p => parseInt(p.bedCount) === bedCount && p.bookingType === bookingType && parseInt(p.seasonId) === parseInt(seasonId));
-        let pricePerNight = match ? parseFloat(match.price) : parseFloat(room.FINAL_PRICE || room.ROOM_PRICE);
-        if (!isFinite(pricePerNight)) pricePerNight = 0;
-        return pricePerNight;
-    }
-
     // When selecting a room, update room details and price
     $('#edit_addroom').off('change').on('change', function () {
         const roomId = $(this).val();
         if (!roomId) return;
 
-        console.log('Room selected:', roomId);
+        cacheEditRoomDetails(roomId).then(room => {
+            if (!room) return;
 
-        fetch('/booking/get-room-details', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ roomId })
-        })
-        .then(r => r.json())
-        .then(data => {
-            console.log('Room details response:', data);
-
-            if (!data.success) {
-                console.error('Failed to fetch room details:', data.message);
-                return;
-            }
-            const room = data.roomDetails;
-            // Save details for later recompute on bookingRoute change
-            $('#edit_addroom').data('roomDetails', room);
-
-            // Update view, bed count, max occupants, amenities
             const roomViewText = room.ROOM_VIEW === 1 ? 'Condo View' : (room.ROOM_VIEW === 2 ? 'Mountain View' : 'N/A');
             $('#edit_room_type').val(roomViewText);
             $('#edit_maxOccupants').val(room.ROOM_MAX);
             $('#edit_bedCount').val(room.ROOM_BED === 1 ? '1' : room.ROOM_BED === 2 ? '2' : 'N/A');
             $('#edit_amenities').val(room.AMENITIES || '');
             $('#edit_room_type_hidden').val(room.ROOM_TYPE);
-
-            // Compute seasonal price and set
-            const pricePerNight = computeEditSeasonalPrice(room);
-            $('#edit_baseprice').val((pricePerNight || 0).toFixed(2));
-            $('#edit_price').val((pricePerNight || 0).toFixed(2));
-            computeEditTotal();
-        })
-        .catch(err => console.error('Error fetching room details:', err));
+            refreshEditRoomRate();
+        });
     });
 
-    // Recompute price when booking route changes (if a room is selected)
-    $('#edit_bookingRoute').on('change', function(){
-        const room = $('#edit_addroom').data('roomDetails');
-        if (room) {
-            const pricePerNight = computeEditSeasonalPrice(room);
-            $('#edit_baseprice').val((pricePerNight || 0).toFixed(2));
-            if (!$('#edit_manualPriceToggle').is(':checked')) {
-                $('#edit_price').val((pricePerNight || 0).toFixed(2));
-            }
-            computeEditTotal();
-        }
+    // Recompute price when who pays changes
+    $('input[name="edit_agencyPayer"]').on('change', function () {
+        updateEditAgencyPayerHint();
+        refreshEditRoomRate();
     });
 
     // Fetch breakfast and transport prices using shared utility
@@ -914,9 +966,14 @@ $(document).ready(function() {
                         agencySelect.append(`<option value="${a.IDNo}">${a.NAME}</option>`);
                     });
                 });
+            updateEditAgencyPayerHint();
         } else {
             $('#edit_agencySelect').val('');
+            $('input[name="edit_agencyPayer"][value="agency"]').prop('checked', true);
+            updateEditAgencyPayerHint();
         }
+
+        refreshEditRoomRate();
     });
 
     // Note: Payment status logic removed - now using paid amount input
@@ -1067,6 +1124,9 @@ $(document).ready(function() {
             lateCheckoutFee: $('#edit_lateCheckoutFee').val(),
             bookingRemarks: $('#edit_bookingRemarks').val(),
             agencyID: $('#edit_agencySelect').val(),
+            agencyPayer: $('#edit_bookingRoute').val() === 'agency'
+                ? ($('input[name="edit_agencyPayer"]:checked').val() || 'agency')
+                : null,
             bedCount: $('#edit_bedCount').val(),
             
             // Services
@@ -1858,6 +1918,10 @@ function populateEditForm(booking) {
                 if (booking.agencyID) {
                     agencySelect.val(booking.agencyID);
                 }
+
+                const payer = booking.agencyPayer || 'agency';
+                $(`input[name="edit_agencyPayer"][value="${payer}"]`).prop('checked', true);
+                updateEditAgencyPayerHint();
             })
             .catch(error => {
                 console.error('Error loading agencies:', error);
@@ -1967,6 +2031,7 @@ function populateEditForm(booking) {
     // Set room selection if not direct reservation
     if (!booking.IS_DIRECT_RESERVATION && booking.ROOM_ID) {
         populateEditRoomSelection(booking.ROOM_ID, booking.ROOM_FLOOR);
+        cacheEditRoomDetails(booking.ROOM_ID);
     }
     
     // Handle direct reservation layout (same as add modal)

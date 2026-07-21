@@ -174,6 +174,8 @@ class CalendarModel {
           COALESCE(b.CHECK_IN_STATUS, 1) AS checkInStatus,
           COALESCE(b.LATE_CHECKOUT, 0) AS checkOutStatus,
           b.GROUP_BOOKING_ID AS groupBookingId,
+          b.BOOKING_CHANNEL AS bookingChannel,
+          b.AGENCY_PAYER AS agencyPayer,
           -- Same room, same-day turnover: flags BOTH sides - this booking checking in the same
           -- day another checks out, or this booking checking out the same day another checks in
           EXISTS (
@@ -232,6 +234,8 @@ class CalendarModel {
             checkOutStatus: row.checkOutStatus,
             isBackToBack: !!row.isBackToBack,
             groupBookingId: row.groupBookingId,
+            bookingChannel: row.bookingChannel || 'walk-in',
+            agencyPayer: row.agencyPayer || 'agency',
             compositeStatus: row.compositeStatus
           }
         };

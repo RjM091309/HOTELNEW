@@ -103,10 +103,28 @@
           
             <div class="col-lg-12" id="editGroupAgencyWrapper" style="display: none;">
               <div class="form-group">
-                <label class="form-label">Select Agency</label>
-                <select class="form-select" id="editGroupAgencySelect" name="groupAgencySelect">
-                  <option value="" disabled selected>Select Agency</option>
-                </select>
+                <div class="row g-2">
+                  <div class="col-md-6">
+                    <label class="form-label">Select Agency</label>
+                    <select class="form-select" id="editGroupAgencySelect" name="groupAgencySelect">
+                      <option value="" disabled selected>Select Agency</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6 d-flex flex-column ps-3 text-center">
+                    <label class="form-label">Who Pays</label>
+                    <div class="d-flex gap-5 align-items-center justify-content-center" style="min-height: 38px;">
+                      <div class="form-check mb-0">
+                        <input class="form-check-input" type="radio" id="editGroupAgencyPayerAgency" name="editGroupAgencyPayer" value="agency" checked>
+                        <label class="form-check-label" for="editGroupAgencyPayerAgency">Agency</label>
+                      </div>
+                      <div class="form-check mb-0">
+                        <input class="form-check-input" type="radio" id="editGroupAgencyPayerGuest" name="editGroupAgencyPayer" value="guest">
+                        <label class="form-check-label" for="editGroupAgencyPayerGuest">Guest</label>
+                      </div>
+                    </div>
+                    <small id="editGroupAgencyPayerRateHint" class="text-muted d-block text-center" style="font-size: 11px; margin-top: 2px;">Agency Rate</small>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -822,6 +840,45 @@ window.editGroupAddedServicesMap = {};
   let editGroupRequiredBed2 = 0;
   let editGroupUnassignedConflicts = [];
 
+  function getEditGroupPriceBookingType() {
+    const bookingRoute = $('#editGroupBookingRoute').val();
+    if (bookingRoute === 'agency') {
+      const agencyPayer = $('input[name="editGroupAgencyPayer"]:checked').val();
+      return agencyPayer === 'guest' ? 'walk-in' : 'agency';
+    }
+    return bookingRoute;
+  }
+
+  function updateEditGroupAgencyPayerHint() {
+    const payer = $('input[name="editGroupAgencyPayer"]:checked').val();
+    const hint = payer === 'guest' ? 'Regular Rate' : 'Agency Rate';
+    $('#editGroupAgencyPayerRateHint').text(hint);
+  }
+
+  function toggleEditGroupAgencyFields(isAgency) {
+    $('#editGroupAgencyWrapper').toggle(isAgency);
+    if (isAgency) {
+      updateEditGroupAgencyPayerHint();
+    } else {
+      $('#editGroupAgencySelect').val('');
+      $('input[name="editGroupAgencyPayer"][value="agency"]').prop('checked', true);
+      updateEditGroupAgencyPayerHint();
+    }
+  }
+
+  function refreshEditGroupRoomPricing() {
+    if ($('#editGroupResultsContainer').is(':visible')) {
+      $('#editGroupSearchRooms').click();
+      return;
+    }
+    if (window.editGroupManualSelectedRooms && window.editGroupManualSelectedRooms.length > 0) {
+      updateEditManualSelectedRoomValues();
+      if (typeof computeEditGroupTotal === 'function') {
+        computeEditGroupTotal();
+      }
+    }
+  }
+
   function resetEditGroupForm() {
     $('#editGroupBookingForm')[0].reset();
     $('#editGroupSelectedRooms').val('');
@@ -836,6 +893,8 @@ window.editGroupAddedServicesMap = {};
     editGroupRequiredBed2 = 0;
     editGroupUnassignedConflicts = [];
     $('#editGroupAgencyWrapper').hide();
+    $('input[name="editGroupAgencyPayer"][value="agency"]').prop('checked', true);
+    updateEditGroupAgencyPayerHint();
     $('#editGroupRoomsList').empty();
     $('#editGroupResultsContainer').hide();
     $('#editGroupComputedTotal').html('₱0.00');
@@ -1027,7 +1086,7 @@ window.editGroupAddedServicesMap = {};
         return;
       }
 
-      const bookingType = $('#editGroupBookingRoute').val();
+      const bookingType = getEditGroupPriceBookingType();
       const computedPrices = [];
       block.forEach(room => {
         const price = typeof room.RESOLVED_PRICE === 'number'
@@ -1220,6 +1279,31 @@ window.editGroupAddedServicesMap = {};
     });
   }
 
+  function loadEditGroupAgencies() {
+    const pendingAgencyId = $('#editGroupAgencySelect').data('pending-agency-id');
+
+    return $.ajax({
+      url: '/booking/get-agency',
+      method: 'GET',
+      success: function(data) {
+        const select = $('#editGroupAgencySelect');
+        select.empty();
+        select.append('<option value="" disabled>Select Agency</option>');
+        (data || []).forEach(agency => {
+          select.append(`<option value="${agency.IDNo}">${agency.NAME}</option>`);
+        });
+        if (pendingAgencyId) {
+          select.val(String(pendingAgencyId));
+        }
+      },
+      error: function(err) {
+        console.error('Error fetching agencies:', err);
+      }
+    });
+  }
+
+  window.loadEditGroupAgencies = loadEditGroupAgencies;
+
   function loadEditGroupData() {
     // Load floors
     $.ajax({
@@ -1275,21 +1359,7 @@ window.editGroupAddedServicesMap = {};
     });
 
     // Load agencies
-    $.ajax({
-      url: '/booking/get-agency',
-      method: 'GET',
-      success: function(data) {
-        const select = $('#editGroupAgencySelect');
-        select.empty();
-        select.append('<option value="" disabled selected>Select Agency</option>');
-        (data || []).forEach(agency => {
-          select.append(`<option value="${agency.IDNo}">${agency.NAME}</option>`);
-        });
-      },
-      error: function(err) {
-        console.error('Error fetching agencies:', err);
-      }
-    });
+    loadEditGroupAgencies();
   }
 
   // Load breakfast and transport prices for edit form
@@ -1383,12 +1453,7 @@ window.editGroupAddedServicesMap = {};
 
   // Booking route change handler
   $('#editGroupBookingRoute').on('change', function() {
-    if (this.value === 'agency') {
-      $('#editGroupAgencyWrapper').show();
-    } else {
-      $('#editGroupAgencyWrapper').hide();
-      $('#editGroupAgencySelect').val('');
-    }
+    toggleEditGroupAgencyFields(this.value === 'agency');
     
     // Call search button on every onChange
     const daterange = $('#editGroupDaterange').val();
@@ -1400,6 +1465,11 @@ window.editGroupAddedServicesMap = {};
     if (daterange && numberOfRooms && this.value && checkInStatus && checkOutStatus) {
       $('#editGroupSearchRooms').click();
     }
+  });
+
+  $('input[name="editGroupAgencyPayer"]').on('change', function() {
+    updateEditGroupAgencyPayerHint();
+    refreshEditGroupRoomPricing();
   });
 
   // Service toggles
@@ -1499,6 +1569,9 @@ window.editGroupAddedServicesMap = {};
       checkOutStatus: $('#editGroupCheckOutStatus').val(),
       remarks: $('#editGroupRemarks').val(),
       agencyId: $('#editGroupBookingRoute').val() === 'agency' ? $('#editGroupAgencySelect').val() : null,
+      agencyPayer: $('#editGroupBookingRoute').val() === 'agency'
+        ? ($('input[name="editGroupAgencyPayer"]:checked').val() || 'agency')
+        : null,
       breakfastAdultQty: $('#editGroupBreakfastAdultQty').val(),
       breakfastAdultPrice: $('#editGroupBreakfastAdultPrice').val(),
       breakfastAdultId: $('#editGroupBreakfastAdultId').val(),
@@ -1702,7 +1775,7 @@ window.editGroupAddedServicesMap = {};
       window.editGroupManualSelectedRooms.includes(parseInt(room.IDNo))
     );
     const dates = getEditSelectedDateRange();
-    const bookingType = $('#editGroupBookingRoute').val();
+    const bookingType = getEditGroupPriceBookingType();
 
     // For originally selected rooms that might not have complete data, use a default price
     const computedBasePrices = selectedRooms.map(room => {

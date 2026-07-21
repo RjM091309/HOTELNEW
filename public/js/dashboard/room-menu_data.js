@@ -121,6 +121,39 @@ function toastInfo(heading, message, options = {}) { notifyToast('info', heading
 * @param {string|number} bookingId
 * @param {FullCalendar.EventApi} [event]  – the clicked calendar event
 */
+function formatBookingChannelLabel(channel) {
+  if (!channel || channel === 'null' || channel === 'undefined') {
+    return 'walk-in';
+  }
+  return String(channel);
+}
+
+function updateBookingChannelLabel(bookingId, channel) {
+  const labelEl = document.getElementById(`booking-channel-label-${bookingId}`);
+  if (labelEl) {
+    labelEl.textContent = formatBookingChannelLabel(channel);
+  }
+}
+
+function formatAgencyPayerLabel(agencyPayer) {
+  return agencyPayer === 'guest' ? 'Guest' : 'Agency';
+}
+
+function updateAgencyPayerDisplay(bookingId, channel, agencyPayer) {
+  const row = document.getElementById(`agency-payer-row-${bookingId}`);
+  const valueEl = document.getElementById(`agency-payer-value-${bookingId}`);
+  if (!row || !valueEl) return;
+
+  if (channel === 'agency') {
+    row.style.display = '';
+    valueEl.textContent = formatAgencyPayerLabel(agencyPayer);
+    valueEl.style.color = agencyPayer === 'guest' ? '#f0ad4e' : '#5bc0de';
+    valueEl.style.fontWeight = '600';
+  } else {
+    row.style.display = 'none';
+  }
+}
+
 async function openRoomMenuModal(bookingId, event) {
   // Always use the original modal structure, but get data from different sources
   if (event && event.extendedProps) {
@@ -206,7 +239,7 @@ async function updateRemarksButtonColor(bookingId) {
 
 // Function to create a dynamic room modal
 async function createDynamicRoomModal(bookingId, event, options) {
-  let roomNumber, roomId, guestName, checkInDate, checkOutDate, daysDiff, roomType, customerType, customerLevel, totalCost, lateCheckout;
+  let roomNumber, roomId, guestName, checkInDate, checkOutDate, daysDiff, roomType, customerType, customerLevel, totalCost, lateCheckout, bookingChannel, agencyPayer;
   let shouldDisableCheckout = false;
   let isCheckedOut = false;
   
@@ -224,6 +257,8 @@ async function createDynamicRoomModal(bookingId, event, options) {
     customerLevel = '';
     totalCost = '₱0.00';
     lateCheckout = '0';
+    bookingChannel = event?.extendedProps?.bookingChannel || 'walk-in';
+    agencyPayer = event?.extendedProps?.agencyPayer || 'agency';
     
     // Check if checkout date is today
     // event.end is set to checkout date at 6:00 PM, not the next day
@@ -272,6 +307,8 @@ async function createDynamicRoomModal(bookingId, event, options) {
     lateCheckout = roomCard.getAttribute('data-late-checkout');
     customerType = roomCard.getAttribute('data-customer-type') || 'Day/s';
     customerLevel = roomCard.getAttribute('data-customer-level') || '';
+    bookingChannel = roomCard.getAttribute('data-booking-channel') || 'walk-in';
+    agencyPayer = roomCard.getAttribute('data-agency-payer') || 'agency';
     const isInCheckedInTab = !!roomCard.closest('#checked-in-content');
     const isInCheckoutTab = !!roomCard.closest('#checkout-content');
     shouldDisableCheckout = isInCheckedInTab || isInCheckoutTab;
@@ -336,7 +373,7 @@ async function createDynamicRoomModal(bookingId, event, options) {
                 <h6 class="modal-title mb-0" style="color: #495057;">
                     <strong>Room</strong>
                     <span style="font-size: 1.5rem; color: #495057;">${roomNumber}</span> | 
-                    <span style="font-size: 1.5rem; color: #495057;">walk-in</span>
+                    <span id="booking-channel-label-${bookingId}" style="font-size: 1.5rem; color: #495057;">${formatBookingChannelLabel(bookingChannel)}</span>
                 </h6>
                 
                 <div class="d-flex gap-1">
@@ -426,6 +463,10 @@ async function createDynamicRoomModal(bookingId, event, options) {
                                     <div class="info-item">
                                         <label class="text-muted small mb-0">Guest Level</label>
                                         <div class="info-value" id="guest-level-${bookingId}">${customerLevel || 'Standard'}</div>
+                                    </div>
+                                    <div class="info-item" id="agency-payer-row-${bookingId}" style="display: ${bookingChannel === 'agency' ? '' : 'none'};">
+                                        <label class="text-muted small mb-0">Paid By</label>
+                                        <div class="info-value" id="agency-payer-value-${bookingId}" style="color: ${agencyPayer === 'guest' ? '#f0ad4e' : '#5bc0de'}; font-weight: 600;">${formatAgencyPayerLabel(agencyPayer)}</div>
                                     </div>
                                 </div>
                             </div>
@@ -1201,6 +1242,12 @@ fetch(`/booking/booking_details/${bookingIdValue}`)
             console.error('No booking data received.');
             return;
         }
+
+        if (data.BOOKING_CHANNEL) {
+            updateBookingChannelLabel(bookingId, data.BOOKING_CHANNEL);
+        }
+
+        updateAgencyPayerDisplay(bookingId, data.BOOKING_CHANNEL, data.AGENCY_PAYER);
 
         // Update Room Type
         if (data.ROOM_TYPE) {
