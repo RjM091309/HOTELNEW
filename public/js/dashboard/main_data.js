@@ -76,6 +76,42 @@ function reloadDashboardData() {
 
 
 
+// --- Jump to the Cleaning Room tab and blink the matching room card ---
+function goToCleaningRoom(roomNumber) {
+    document.querySelectorAll('.tabs_three').forEach(tab => tab.classList.remove('is-active'));
+    const cleaningTab = document.querySelector('.tabs_three[data-target="cleaning-content"]');
+    if (cleaningTab) {
+        cleaningTab.classList.add('is-active');
+    }
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.style.display = 'none';
+        content.classList.remove('active-tab');
+    });
+    const cleaningContent = document.getElementById('cleaning-content');
+    if (!cleaningContent) {
+        return;
+    }
+    cleaningContent.style.display = 'block';
+    cleaningContent.classList.add('active-tab');
+    localStorage.setItem('activeTab', 'cleaning-content');
+
+    const targetRoom = String(roomNumber || '').trim();
+    let targetCard = null;
+    cleaningContent.querySelectorAll('.card').forEach(card => {
+        const header = card.querySelector('.card-head header');
+        if (header && header.textContent.trim() === targetRoom) {
+            targetCard = card;
+        }
+    });
+    if (targetCard) {
+        document.querySelectorAll('.room-card-blink').forEach(el => el.classList.remove('room-card-blink'));
+        targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        void targetCard.offsetWidth; // restart the animation if it's already blinking
+        targetCard.classList.add('room-card-blink');
+        setTimeout(() => targetCard.classList.remove('room-card-blink'), 4600);
+    }
+}
+
 // --- Tab Switching and Tab Order ---
 function initializeTabs() {
     // Ensure chat sidebar functionality is preserved
@@ -1056,6 +1092,8 @@ $(document).ready(function() {
                             confirmButtonColor: "#dc3545",
                             confirmButtonText: "OK",
                             allowOutsideClick: false
+                        }).then(() => {
+                            goToCleaningRoom(roomNumber);
                         });
                         // Toggle already reverted at start, no need to change
                         return;
@@ -1230,78 +1268,74 @@ $(document).ready(function() {
         const roomId = $toggle.closest('.card').attr('data-idno');
 
         if (isChecked) {
-            // CHECK-OUT: Security deposit refund first, then balance check
-            const runCheckoutBalanceFlow = (totalBalance) => {
-                const formattedBalance = totalBalance.toLocaleString('en-US', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                });
-
-                let confirmTitle = "Check Out Guest?";
-                let confirmText = `Are you sure you want to check out Room ${roomNumber}?`;
-
-                if (totalBalance > 0) {
-                    confirmTitle = "⚠️ Outstanding Balance Alert";
-                    confirmText = `Room ${roomNumber} has an outstanding balance of <strong style="color: #dc3545; font-size: 1.2em;">₱${formattedBalance}</strong>.<br><br>Are you sure you want to proceed with check-out?`;
-                }
-
-                Swal.fire({
-                    title: confirmTitle,
-                    html: confirmText,
-                    icon: totalBalance > 0 ? "warning" : "question",
-                    showCancelButton: true,
-                    confirmButtonColor: "#dc3545",
-                    confirmButtonText: totalBalance > 0 ? "Proceed to Pay and Checkout" : "Yes, check out!",
-                    cancelButtonText: "No, cancel",
-                    allowOutsideClick: false
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        if (totalBalance > 0) {
-                            openPaymentModalForCheckout($toggle, bookingId, newStatus, lateCheckOut, roomId, roomNumber, totalBalance);
-                        } else {
-                            processCheckout($toggle, bookingId, newStatus, lateCheckOut, roomId, roomNumber);
-                        }
-                    } else {
-                        $toggle.prop('checked', false);
-                    }
-                });
+            // CHECK-OUT: fetch deposit + balance info, then show a single unified modal
+            // (the payment modal, with the deposit section folded in) instead of two popups.
+            const fetchDepositInfo = () => {
+                return fetch(`/dashboard/booking/security-deposit/${bookingId}`)
+                    .then((r) => r.json())
+                    .then((data) => (data.success && data.data) ? data.data : { exists: false, amount: 0 })
+                    .catch(() => ({ exists: false, amount: 0 }));
             };
 
-            const beginDepositStep = () => {
-                if (typeof SecurityDepositCheckout !== 'undefined') {
-                    SecurityDepositCheckout.begin({
-                        bookingId,
-                        roomNumber,
-                        onComplete: (depositResult) => {
-                            if (depositResult.message && !depositResult.noDeposit) {
-                                if (typeof PMSCore !== 'undefined' && PMSCore.showSuccess) {
-                                    PMSCore.showSuccess('Security Deposit', depositResult.message);
-                                }
+            const fetchUnpaidBalance = () => {
+                return fetch(`/booking/unpaid_balance/${bookingId}`)
+                    .then((r) => r.json())
+                    .then((data) => parseFloat(data.total_unpaid_balance) || 0);
+            };
+
+            Promise.all([fetchDepositInfo(), fetchUnpaidBalance()])
+                .then(([depositInfo, totalBalance]) => {
+                    if (!depositInfo.exists && totalBalance <= 0) {
+                        // Nothing to collect - simple confirmation
+                        Swal.fire({
+                            title: "Check Out Guest?",
+                            text: `Are you sure you want to check out Room ${roomNumber}?`,
+                            icon: "question",
+                            showCancelButton: true,
+                            confirmButtonColor: "#dc3545",
+                            confirmButtonText: "Yes, check out!",
+                            cancelButtonText: "No, cancel",
+                            allowOutsideClick: false
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                processCheckout($toggle, bookingId, newStatus, lateCheckOut, roomId, roomNumber);
+                            } else {
+                                $toggle.prop('checked', false);
                             }
-                            const totalBalance = parseFloat(depositResult.remainingBalance) || 0;
-                            runCheckoutBalanceFlow(totalBalance);
-                        },
-                        onCancel: () => {
-                            $toggle.prop('checked', false);
-                        }
-                    });
-                } else {
-                    $.ajax({
-                        url: `/booking/unpaid_balance/${bookingId}`,
-                        type: 'GET',
-                        success: function(balanceData) {
-                            const totalBalance = parseFloat(balanceData.total_unpaid_balance) || 0;
-                            runCheckoutBalanceFlow(totalBalance);
-                        },
-                        error: function() {
-                            PMSCore.showError('Error!', 'Unable to fetch balance information. Please try again.');
-                            $toggle.prop('checked', false);
-                        }
-                    });
-                }
-            };
+                        });
+                        return;
+                    }
 
-            beginDepositStep();
+                    if (totalBalance > 0) {
+                        const formattedBalance = totalBalance.toLocaleString('en-US', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                        });
+                        Swal.fire({
+                            title: "⚠️ Outstanding Balance Alert",
+                            html: `Room ${roomNumber} has an outstanding balance of <strong style="color: #dc3545; font-size: 1.2em;">₱${formattedBalance}</strong>.<br><br>Are you sure you want to proceed with check-out?`,
+                            icon: "warning",
+                            showCancelButton: true,
+                            confirmButtonColor: "#dc3545",
+                            confirmButtonText: "Proceed to Pay and Checkout",
+                            cancelButtonText: "No, cancel",
+                            allowOutsideClick: false
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                openPaymentModalForCheckout($toggle, bookingId, newStatus, lateCheckOut, roomId, roomNumber, totalBalance, depositInfo);
+                            } else {
+                                $toggle.prop('checked', false);
+                            }
+                        });
+                    } else {
+                        // No outstanding balance, but a deposit still needs to be processed
+                        openPaymentModalForCheckout($toggle, bookingId, newStatus, lateCheckOut, roomId, roomNumber, totalBalance, depositInfo);
+                    }
+                })
+                .catch(() => {
+                    PMSCore.showError('Error!', 'Unable to fetch balance information. Please try again.');
+                    $toggle.prop('checked', false);
+                });
         } else {
             // REVERT TO CHECK-IN: Show confirmation
             Swal.fire({
@@ -1323,8 +1357,9 @@ $(document).ready(function() {
         }
     });
 
-    // Helper function to collect an unpaid balance via the Payment Modal before checking out
-    function openPaymentModalForCheckout($toggle, bookingId, newStatus, lateCheckOut, roomId, roomNumber, totalBalance) {
+    // Helper function to collect a security deposit action and/or an unpaid balance
+    // via the Payment Modal before checking out - a single modal for both steps.
+    function openPaymentModalForCheckout($toggle, bookingId, newStatus, lateCheckOut, roomId, roomNumber, totalBalance, depositInfo) {
         const paymentModalEl = document.getElementById('modal-payment');
         if (!paymentModalEl) {
             // Payment modal isn't available on this page - fall back to checking out directly
@@ -1349,7 +1384,23 @@ $(document).ready(function() {
         const amountInput = document.getElementById('paymentAmountInput');
         if (amountInput) amountInput.value = totalBalance;
 
-        // Once the payment is confirmed, proceed with the checkout
+        // Fold the security deposit step into this same modal instead of a separate popup
+        if (depositInfo && depositInfo.exists && window.PaymentDepositSection) {
+            window.PaymentDepositSection.configure({ bookingId, roomNumber, depositInfo, unpaidBalance: totalBalance });
+        } else if (window.PaymentDepositSection) {
+            window.PaymentDepositSection.hide();
+        }
+
+        // No outstanding balance - hide the payment fields, only the deposit action is needed
+        const skipPaymentStep = totalBalance <= 0;
+        paymentModalEl.dataset.skipPaymentStep = skipPaymentStep ? 'true' : 'false';
+        $(paymentModalEl).find('.payment-amount-group, .payment-method-group, .payment-details-section').toggle(!skipPaymentStep);
+        const confirmBtnText = paymentModalEl.querySelector('#confirmPaymentButton .btn-text');
+        if (confirmBtnText) {
+            confirmBtnText.textContent = skipPaymentStep ? 'Confirm & Check Out' : 'Confirm Payment';
+        }
+
+        // Once the payment (and/or deposit) is confirmed, proceed with the checkout
         window.onPaymentConfirmed = function() {
             processCheckout($toggle, bookingId, newStatus, lateCheckOut, roomId, roomNumber);
         };

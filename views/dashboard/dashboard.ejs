@@ -2682,6 +2682,18 @@ async function deleteRequestFromModal(id) {
   color: #adb5bd;
 }
 
+/* Highlight the room card the user was sent to look at (e.g. from the Cannot Check In popup) */
+.room-card-blink {
+  animation: room-card-blink 0.9s ease-in-out 5;
+  position: relative;
+  z-index: 2;
+}
+
+@keyframes room-card-blink {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+  50% { box-shadow: 0 0 0 6px rgba(220, 53, 69, 0.65); }
+}
+
 .cleaning-note--on {
   background: rgba(40, 167, 69, 0.18);
   color: #28a745;

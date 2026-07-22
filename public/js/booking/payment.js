@@ -458,6 +458,13 @@ document.getElementById('modal-payment').addEventListener('hidden.bs.modal', fun
     const backdrops = document.querySelectorAll('.modal-backdrop');
     backdrops.forEach((backdrop) => backdrop.remove());
 
+    // Reset check-out-only state so it doesn't leak into the next, unrelated payment
+    this.dataset.skipPaymentStep = 'false';
+    $(this).find('.payment-amount-group, .payment-method-group, .payment-details-section').show();
+    if (window.PaymentDepositSection) window.PaymentDepositSection.hide();
+    const confirmBtnText = this.querySelector('#confirmPaymentButton .btn-text');
+    if (confirmBtnText) confirmBtnText.textContent = 'Confirm Payment';
+
     // Reopen the Billing Modal only if payment was not successful and no other flow
     // (e.g. dashboard checkout) is driving this Payment Modal
     if (shouldReopenBillingModal && !window.onPaymentConfirmed) {
@@ -469,12 +476,35 @@ document.getElementById('modal-payment').addEventListener('hidden.bs.modal', fun
     }
 });
 
-$('#confirmPaymentButton').on('click', function () {
+$('#confirmPaymentButton').on('click', async function () {
     // Get payment details - support both old and new modal designs
     const bookingId = $('#hiddenBookingId').val() || $('#bookingID').val(); // Support both hidden input names
     const paymentAmount = $('#paymentAmount').val() || $('#paymentAmountInput').val(); // Support both amount inputs
     const paymentMethod = $('#paymentMethod').val(); // Hidden input from enhanced modal
     let paymentNotes = $('#paymentNotes').val() || ''; // Payment notes from enhanced modal
+
+    // Dashboard check-out flow: process the held security deposit (if the section is
+    // showing) before touching the payment fields below. When there's no outstanding
+    // balance to collect, this also completes the check-out directly.
+    if (window.PaymentDepositSection && window.PaymentDepositSection.isVisible()) {
+        const depositResult = await window.PaymentDepositSection.submit(bookingId);
+        if (!depositResult) {
+            return; // validation/error already shown inside the deposit section
+        }
+
+        const paymentModalEl = document.getElementById('modal-payment');
+        if (paymentModalEl && paymentModalEl.dataset.skipPaymentStep === 'true') {
+            shouldReopenBillingModal = false;
+            if (typeof window.onPaymentConfirmed === 'function') {
+                const onConfirmed = window.onPaymentConfirmed;
+                window.onPaymentConfirmed = null;
+                $('.modal').modal('hide');
+                $('.modal-backdrop').remove();
+                onConfirmed(depositResult);
+            }
+            return;
+        }
+    }
 
     // Credit payments must record who authorized them
     if (paymentMethod === 'credit') {

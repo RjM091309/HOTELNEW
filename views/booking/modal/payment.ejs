@@ -79,6 +79,73 @@
                     </div>
                 </div>
 
+                <!-- Security Deposit Section (populated only when checking out a booking with a held deposit) -->
+                <div id="pdepDepositSection" class="payment-summary-card" style="display: none;">
+                    <div class="summary-header">
+                        <h6><i class="fa fa-hand-holding-usd"></i> Security Deposit</h6>
+                    </div>
+                    <input type="hidden" id="pdepBookingId" value="">
+                    <p class="text-muted mb-1" style="font-size: 0.85rem;" id="pdepRoomInfo">Process security deposit before checking out.</p>
+                    <p class="fw-semibold mb-3" id="pdepDepositQuestion" style="color: #0c2a42;">
+                        Refund security deposit of <span id="pdepDepositAmount" style="color: #198754; font-weight: 700;">₱0.00</span>?
+                    </p>
+
+                    <div class="mb-2">
+                        <label class="pdep-option pdep-option-selected" id="pdepOptionFull">
+                            <input type="radio" name="pdepAction" id="pdepActionFull" value="full_refund" checked>
+                            <span class="pdep-option-label">
+                                <strong>Full Refund</strong>
+                                <span class="pdep-option-desc">Return the entire deposit to the guest.</span>
+                            </span>
+                        </label>
+
+                        <label class="pdep-option" id="pdepOptionPartial">
+                            <input type="radio" name="pdepAction" id="pdepActionPartial" value="partial_deduct">
+                            <span class="pdep-option-label">
+                                <strong>Partial / Deduct</strong>
+                                <span class="pdep-option-desc">Deduct for damages or charges; apply the remainder to balance.</span>
+                            </span>
+                        </label>
+
+                        <div id="pdepPartialWrap" style="display: none;">
+                            <label for="pdepDeductAmount" class="form-label small fw-semibold mb-1">Deduction Amount</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">₱</span>
+                                <input type="text" class="form-control" id="pdepDeductAmount" inputmode="decimal" placeholder="0" autocomplete="off">
+                            </div>
+                            <div id="pdepApplyRemainderWrap" style="display: none;">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="pdepApplyRemainderToBalance">
+                                    <label class="form-check-label" for="pdepApplyRemainderToBalance">
+                                        Apply remainder to outstanding balance
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="pdep-partial-breakdown" id="pdepPartialBreakdown">
+                                <div id="pdepPartialAppliedRow" style="display: none;">Applied to balance: <strong id="pdepPartialAppliedPreview" class="text-primary">₱0.00</strong></div>
+                                <div>Cash refund: <strong id="pdepPartialRefundPreview">₱0.00</strong></div>
+                            </div>
+                        </div>
+
+                        <label class="pdep-option" id="pdepOptionApply" style="display: none;">
+                            <input type="radio" name="pdepAction" id="pdepActionApply" value="apply_to_balance">
+                            <span class="pdep-option-label">
+                                <strong>Apply to Balance</strong>
+                                <span class="pdep-option-desc">Use deposit toward outstanding room balance; refund any excess.</span>
+                            </span>
+                        </label>
+                    </div>
+
+                    <div class="mb-1">
+                        <label for="pdepRemarks" class="form-label fw-semibold small mb-1">
+                            <i class="fa fa-sticky-note me-1"></i>Remarks <span class="text-muted fw-normal">(optional)</span>
+                        </label>
+                        <input type="text" class="form-control form-control-sm" id="pdepRemarks" placeholder="e.g. damage charge, key not returned">
+                    </div>
+
+                    <div id="pdepErrorMsg" class="alert alert-danger py-2 mt-2 mb-0" style="display: none;"></div>
+                </div>
+
                 <!-- Payment Form -->
                 <form id="paymentForm" class="payment-form">
                     <!-- Hidden Input for Booking ID -->
@@ -353,6 +420,87 @@
     border-top: 2px solid #f1f3f4;
     padding-top: 2px;
     margin-top: 2px;
+}
+
+/* Security Deposit Section Styles */
+#modal-payment .pdep-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    border: 1.5px solid #dee2e6;
+    border-radius: 8px;
+    background: #f8f9fa;
+    cursor: pointer;
+    transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+}
+
+#modal-payment .pdep-option:hover {
+    border-color: #adb5bd;
+    background: #f1f3f5;
+}
+
+#modal-payment .pdep-option.pdep-option-selected {
+    border-color: #0c2a42;
+    background: #e8f0f7;
+    box-shadow: 0 0 0 2px rgba(12, 42, 66, 0.12);
+}
+
+#modal-payment .pdep-option input[type="radio"] {
+    flex-shrink: 0;
+    width: 1.1em;
+    height: 1.1em;
+    margin-top: 0.2em;
+    cursor: pointer;
+    accent-color: #0c2a42;
+}
+
+#modal-payment .pdep-option-label {
+    flex: 1;
+    cursor: pointer;
+    margin: 0;
+    color: #212529 !important;
+}
+
+#modal-payment .pdep-option-label strong {
+    display: block;
+    font-size: 0.95rem;
+    color: #212529;
+    margin-bottom: 0.15rem;
+}
+
+#modal-payment .pdep-option-desc {
+    font-size: 0.8rem;
+    color: #6c757d;
+    line-height: 1.4;
+}
+
+#modal-payment #pdepPartialWrap {
+    margin: 0.25rem 0 0.75rem 2rem;
+    padding: 0.75rem 1rem;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+}
+
+#modal-payment #pdepApplyRemainderWrap .form-check-input {
+    width: 1em;
+    height: 1em;
+    margin-top: 0.2em;
+    accent-color: #0d6efd;
+    cursor: pointer;
+}
+
+#modal-payment .pdep-partial-breakdown {
+    font-size: 0.8rem;
+    color: #495057;
+    margin-top: 0.5rem;
+    line-height: 1.6;
+}
+
+#modal-payment .pdep-partial-breakdown strong {
+    color: #212529;
 }
 
 /* Payment Form Styles */
@@ -738,5 +886,9 @@
 		var bookingPaymentScript = document.createElement('script');
 		bookingPaymentScript.src = '/js/booking/payment.js';
 		document.body.appendChild(bookingPaymentScript);
+
+		var depositSectionScript = document.createElement('script');
+		depositSectionScript.src = '/js/dashboard/payment_deposit_section.js';
+		document.body.appendChild(depositSectionScript);
 	});
 </script>
