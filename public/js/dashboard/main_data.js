@@ -1395,9 +1395,17 @@ $(document).ready(function() {
         const skipPaymentStep = totalBalance <= 0;
         paymentModalEl.dataset.skipPaymentStep = skipPaymentStep ? 'true' : 'false';
         $(paymentModalEl).find('.payment-amount-group, .payment-method-group, .payment-details-section').toggle(!skipPaymentStep);
-        const confirmBtnText = paymentModalEl.querySelector('#confirmPaymentButton .btn-text');
+        const confirmBtn = paymentModalEl.querySelector('#confirmPaymentButton');
+        const confirmBtnText = confirmBtn?.querySelector('.btn-text');
         if (confirmBtnText) {
             confirmBtnText.textContent = skipPaymentStep ? 'Confirm & Check Out' : 'Confirm Payment';
+        }
+        if (skipPaymentStep && confirmBtn) {
+            // The amount/method fields (which normally gate this button) are hidden here,
+            // so force it enabled - the deposit action is all that's required.
+            confirmBtn.disabled = false;
+            confirmBtn.classList.remove('btn-secondary');
+            confirmBtn.classList.add('btn-success');
         }
 
         // Once the payment (and/or deposit) is confirmed, proceed with the checkout

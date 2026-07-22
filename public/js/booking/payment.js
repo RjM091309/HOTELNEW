@@ -462,8 +462,15 @@ document.getElementById('modal-payment').addEventListener('hidden.bs.modal', fun
     this.dataset.skipPaymentStep = 'false';
     $(this).find('.payment-amount-group, .payment-method-group, .payment-details-section').show();
     if (window.PaymentDepositSection) window.PaymentDepositSection.hide();
-    const confirmBtnText = this.querySelector('#confirmPaymentButton .btn-text');
-    if (confirmBtnText) confirmBtnText.textContent = 'Confirm Payment';
+    const confirmBtn = this.querySelector('#confirmPaymentButton');
+    if (confirmBtn) {
+        confirmBtn.querySelector('.btn-text').textContent = 'Confirm Payment';
+        // Back to the normal amount/method-gated default; validatePaymentForm() re-enables
+        // it once the user fills in a valid amount + method for a regular payment.
+        confirmBtn.disabled = true;
+        confirmBtn.classList.remove('btn-success');
+        confirmBtn.classList.add('btn-secondary');
+    }
 
     // Reopen the Billing Modal only if payment was not successful and no other flow
     // (e.g. dashboard checkout) is driving this Payment Modal
