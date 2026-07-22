@@ -2804,6 +2804,151 @@ async function computeCheckoutContext(bookingId) {
     }
 }
 
+// --- Security deposit handling folded into the Confirm Checkout SweetAlert ---
+// (fetch/build/wire/collect helpers so the deposit action doesn't need its own separate popup)
+async function fetchCheckoutDepositInfo(bookingId) {
+    try {
+        const resp = await fetch(`/dashboard/booking/security-deposit/${bookingId}`);
+        const data = await resp.json();
+        return (data.success && data.data) ? data.data : { exists: false, amount: 0 };
+    } catch (e) {
+        return { exists: false, amount: 0 };
+    }
+}
+
+function buildCheckoutDepositHtml(depositInfo, unpaidBalance) {
+    if (!depositInfo || !depositInfo.exists) return '';
+    const formatCurrency = (amount) => `₱${parseFloat(amount || 0).toFixed(2)}`;
+    const applyOptionHtml = unpaidBalance > 0 ? `
+        <label class="csd-option" id="csdOptionApply">
+            <input type="radio" name="csdAction" id="csdActionApply" value="apply_to_balance">
+            <span class="csd-option-label">
+                <strong>Apply to Balance</strong>
+                <span class="csd-option-desc">Use deposit toward outstanding room balance; refund any excess.</span>
+            </span>
+        </label>
+    ` : '';
+    return `
+        <div id="csdDepositSection" style="margin-top:15px; padding:12px; background:#f8f9fa; border-radius:6px; border:1px solid #dee2e6; text-align:left;">
+            <div style="font-weight:600; color:#495057; margin-bottom:10px; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px;">
+                <i class="fas fa-hand-holding-usd"></i> Security Deposit
+            </div>
+            <div style="margin-bottom:10px; font-size:0.875rem; color:#495057;">
+                Refund security deposit of <strong style="color:#198754;">${formatCurrency(depositInfo.amount)}</strong>?
+            </div>
+            <label class="csd-option csd-option-selected" id="csdOptionFull">
+                <input type="radio" name="csdAction" id="csdActionFull" value="full_refund" checked>
+                <span class="csd-option-label">
+                    <strong>Full Refund</strong>
+                    <span class="csd-option-desc">Return the entire deposit to the guest.</span>
+                </span>
+            </label>
+            <label class="csd-option" id="csdOptionPartial">
+                <input type="radio" name="csdAction" id="csdActionPartial" value="partial_deduct">
+                <span class="csd-option-label">
+                    <strong>Partial / Deduct</strong>
+                    <span class="csd-option-desc">Deduct for damages or charges; apply the remainder to balance.</span>
+                </span>
+            </label>
+            <div id="csdPartialWrap" style="display:none; margin:6px 0 10px 1.5rem; padding:10px; background:#fff; border:1px solid #dee2e6; border-radius:6px;">
+                <label for="csdDeductAmount" class="form-label" style="margin-bottom:4px; font-size:0.8rem; font-weight:600; display:block;">Deduction Amount</label>
+                <input type="number" min="0" step="0.01" id="csdDeductAmount" class="swal2-input" placeholder="0.00" style="width:100%; box-sizing:border-box; margin:0;">
+                <div id="csdApplyRemainderWrap" style="display:none; margin-top:8px;">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="csdApplyRemainderToBalance">
+                        <label class="form-check-label" for="csdApplyRemainderToBalance" style="font-size:0.8rem;">Apply remainder to outstanding balance</label>
+                    </div>
+                </div>
+            </div>
+            ${applyOptionHtml}
+            <label for="csdRemarks" class="form-label" style="margin:8px 0 4px; font-size:0.8rem; font-weight:600; display:block;">Remarks (optional)</label>
+            <input type="text" id="csdRemarks" class="swal2-input" placeholder="e.g. damage charge, key not returned" style="width:100%; box-sizing:border-box; margin:0;">
+        </div>
+    `;
+}
+
+function wireCheckoutDepositControls(depositInfo, unpaidBalance, checkoutContextCache) {
+    if (!depositInfo || !depositInfo.exists) return;
+    const partialWrap = document.getElementById('csdPartialWrap');
+    const applyRemainderWrap = document.getElementById('csdApplyRemainderWrap');
+    const formatCurrency = (amount) => `₱${parseFloat(amount || 0).toFixed(2)}`;
+    const totalPaid = checkoutContextCache ? checkoutContextCache.totalPaid : 0;
+
+    const updateSelected = () => {
+        document.querySelectorAll('.csd-option').forEach((opt) => opt.classList.remove('csd-option-selected'));
+        const checked = document.querySelector('input[name="csdAction"]:checked');
+        if (checked) {
+            const parent = checked.closest('.csd-option');
+            if (parent) parent.classList.add('csd-option-selected');
+        }
+    };
+
+    // Recompute how much of the deposit would be applied to the balance right now,
+    // and reflect it immediately in the Summary pills (Paid / Balance) at the top.
+    const updateSummaryPreview = () => {
+        const selected = document.querySelector('input[name="csdAction"]:checked');
+        const action = selected ? selected.value : 'full_refund';
+        const deductAmount = parseFloat(document.getElementById('csdDeductAmount')?.value || '0') || 0;
+        const applyRemainderChk = document.getElementById('csdApplyRemainderToBalance');
+        const applyRemainderToBalance = !!(applyRemainderChk && applyRemainderChk.checked);
+
+        let appliedToBalance = 0;
+        if (action === 'apply_to_balance') {
+            const afterDeduction = Math.max(0, depositInfo.amount - deductAmount);
+            appliedToBalance = Math.min(afterDeduction, unpaidBalance);
+        } else if (action === 'partial_deduct' && applyRemainderToBalance) {
+            const remainder = Math.max(0, depositInfo.amount - deductAmount);
+            appliedToBalance = Math.min(remainder, unpaidBalance);
+        }
+
+        const newBalance = Math.max(0, unpaidBalance - appliedToBalance);
+        const newPaid = totalPaid + appliedToBalance;
+
+        const paidPill = document.getElementById('summaryPaidPill');
+        const balancePill = document.getElementById('summaryBalancePill');
+        if (paidPill) paidPill.textContent = formatCurrency(newPaid);
+        if (balancePill) balancePill.textContent = formatCurrency(newBalance);
+    };
+
+    const updateVisibility = () => {
+        const selected = document.querySelector('input[name="csdAction"]:checked');
+        const action = selected ? selected.value : 'full_refund';
+        if (partialWrap) partialWrap.style.display = action === 'partial_deduct' ? 'block' : 'none';
+        if (applyRemainderWrap) {
+            applyRemainderWrap.style.display = (action === 'partial_deduct' && unpaidBalance > 0) ? 'block' : 'none';
+        }
+        updateSelected();
+        updateSummaryPreview();
+    };
+    document.querySelectorAll('input[name="csdAction"]').forEach((radio) => {
+        radio.addEventListener('change', updateVisibility);
+    });
+    document.getElementById('csdDeductAmount')?.addEventListener('input', updateSummaryPreview);
+    document.getElementById('csdApplyRemainderToBalance')?.addEventListener('change', updateSummaryPreview);
+    updateVisibility();
+}
+
+function collectCheckoutDepositSelection(depositInfo) {
+    if (!depositInfo || !depositInfo.exists) return { valid: true, selection: null };
+
+    const selected = document.querySelector('input[name="csdAction"]:checked');
+    const action = selected ? selected.value : 'full_refund';
+    const deductAmount = parseFloat(document.getElementById('csdDeductAmount')?.value || '0') || 0;
+    const applyRemainderToBalance = document.getElementById('csdApplyRemainderToBalance')?.checked || false;
+    const remarks = document.getElementById('csdRemarks')?.value || '';
+
+    if (action === 'partial_deduct') {
+        if (deductAmount <= 0) {
+            return { valid: false, error: 'Please enter a deduction amount greater than 0 for the security deposit.' };
+        }
+        if (deductAmount > depositInfo.amount) {
+            return { valid: false, error: 'Security deposit deduction cannot exceed the held amount.' };
+        }
+    }
+
+    return { valid: true, selection: { action, deductAmount, applyRemainderToBalance, remarks } };
+}
+
 // Trigger checkout: use SweetAlert with a refund checkbox and amount input
 function triggerCheckout(bookingId) {
     // Try to show current balance, grand total, and paid in the prompt
@@ -2839,6 +2984,7 @@ function triggerCheckout(bookingId) {
         const style = document.createElement('style');
         style.id = 'swal-checkout-styles';
         style.textContent = `
+            .swal-checkout.swal2-popup{ width:750px !important; max-width:92vw !important; }
             .swal-checkout .swal2-title{ font-size:1.25rem; font-weight:700; color:#2b2f32; margin-top:.25rem; }
             .swal-checkout .section-label{ font-size:.75rem; text-transform:uppercase; letter-spacing:.3px; color:#6c757d; font-weight:600; display:block; margin-bottom:.25rem; text-align:center; }
             .swal-checkout .balance-pill{ display:inline-block; padding:.25rem .5rem; border-radius:999px; background:#f1f3f5; color:#0c5460; font-weight:700; font-size:1.1rem; text-align:center; }
@@ -2847,6 +2993,18 @@ function triggerCheckout(bookingId) {
             .swal-checkout .balance-pill-red{ color:#dc3545 !important; }
             .swal-checkout .swal2-actions{ margin-top: .75rem; }
             .swal-checkout .choice-row{ margin-top:.5rem; }
+            .checkout-detail-row{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:2px 12px; }
+            .checkout-detail-row span{ white-space:nowrap; }
+            .checkout-detail-row strong{ text-align:right; }
+            .checkout-detail-grid{ position:relative; }
+            .checkout-detail-grid::before{ content:''; position:absolute; top:0; bottom:0; left:50%; width:1px; background:#dee2e6; }
+            .csd-option{ display:flex; align-items:flex-start; gap:.6rem; padding:.6rem .8rem; margin-bottom:.4rem; border:1.5px solid #dee2e6; border-radius:8px; background:#fff; cursor:pointer; transition:border-color .15s, background-color .15s, box-shadow .15s; }
+            .csd-option:hover{ border-color:#adb5bd; background:#f1f3f5; }
+            .csd-option.csd-option-selected{ border-color:#0c2a42; background:#e8f0f7; box-shadow:0 0 0 2px rgba(12,42,66,.12); }
+            .csd-option input[type="radio"]{ flex-shrink:0; width:1.05em; height:1.05em; margin-top:.15em; cursor:pointer; accent-color:#0c2a42; }
+            .csd-option-label{ flex:1; cursor:pointer; margin:0; color:#212529; text-align:left; }
+            .csd-option-label strong{ display:block; font-size:.9rem; color:#212529; margin-bottom:.1rem; }
+            .csd-option-desc{ font-size:.75rem; color:#6c757d; line-height:1.35; }
         `;
         document.head.appendChild(style);
     }
@@ -2893,7 +3051,10 @@ function triggerCheckout(bookingId) {
 
             // Compute checkout context upfront to display details
             const checkoutContext = await computeCheckoutContext(bookingId);
-            
+            const depositInfo = await fetchCheckoutDepositInfo(bookingId);
+            const depositUnpaidBalance = checkoutContext ? Math.max(0, checkoutContext.netBalance - checkoutContext.totalPaid) : 0;
+            const depositHtml = buildCheckoutDepositHtml(depositInfo, depositUnpaidBalance);
+
             // Format amounts for display
             const formatCurrency = (amount) => {
                 return `₱${parseFloat(amount || 0).toFixed(2)}`;
@@ -2926,16 +3087,16 @@ function triggerCheckout(bookingId) {
                 const initialOverpayment = Math.max(0, totalPaid - initialNetBalance);
                 
                 detailsHtml = `
-                    <div id="checkoutDetailsSection" style="margin-top:15px; padding:12px; background:#f8f9fa; border-radius:6px; border:1px solid #dee2e6;">
-                        <div style="font-weight:600; color:#495057; margin-bottom:10px; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px;">Checkout Details</div>
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.875rem;">
-                            <div><span style="color:#6c757d;">Actual Days:</span> <strong>${actualDays}</strong></div>
-                            <div><span style="color:#6c757d;">Room Rate/Day:</span> <strong>${formatCurrency(roomRate)}</strong></div>
-                            <div><span style="color:#6c757d;">Room Amount:</span> <strong>${formatCurrency(roomAmountForActualDays)}</strong></div>
-                            <div><span style="color:#6c757d;">Services:</span> <strong>${formatCurrency(servicesAndExtensionsTotal)}</strong></div>
-                            <div><span style="color:#6c757d;">Discount:</span> <strong id="discountDisplay">${formatCurrency(0)}</strong></div>
-                                <div><span style="color:#6c757d;">Adjusted Total:</span> <strong style="color:#0d6efd;" id="netBalanceDisplay">${formatCurrency(initialNetBalance)}</strong></div>
-                            <div><span style="color:#6c757d;">Overpayment:</span> <strong style="color:${initialOverpayment > 0 ? '#dc3545' : '#6c757d'}" id="overpaymentDisplay">${formatCurrency(initialOverpayment)}</strong></div>
+                    <div id="checkoutDetailsSection" style="margin-top:15px; padding:12px; background:#f8f9fa; border-radius:6px; border:1px solid #dee2e6; text-align:left;">
+                        <div style="font-weight:600; color:#495057; margin-bottom:14px; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px; line-height:1.4;">Checkout Details</div>
+                        <div class="checkout-detail-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.875rem;">
+                            <div class="checkout-detail-row"><span style="color:#6c757d;">Actual Days:</span> <strong>${actualDays}</strong></div>
+                            <div class="checkout-detail-row"><span style="color:#6c757d;">Room Rate/Day:</span> <strong>${formatCurrency(roomRate)}</strong></div>
+                            <div class="checkout-detail-row"><span style="color:#6c757d;">Room Amount:</span> <strong>${formatCurrency(roomAmountForActualDays)}</strong></div>
+                            <div class="checkout-detail-row"><span style="color:#6c757d;">Services:</span> <strong>${formatCurrency(servicesAndExtensionsTotal)}</strong></div>
+                            <div class="checkout-detail-row"><span style="color:#6c757d;">Discount:</span> <strong id="discountDisplay">${formatCurrency(0)}</strong></div>
+                                <div class="checkout-detail-row"><span style="color:#6c757d;">Adjusted Total:</span> <strong style="color:#0d6efd;" id="netBalanceDisplay">${formatCurrency(initialNetBalance)}</strong></div>
+                            <div class="checkout-detail-row"><span style="color:#6c757d;">Overpayment:</span> <strong style="color:${initialOverpayment > 0 ? '#dc3545' : '#6c757d'}" id="overpaymentDisplay">${formatCurrency(initialOverpayment)}</strong></div>
                         </div>
                         <div id="overpaymentWarning" style="${initialOverpayment > 0 ? 'display:block' : 'display:none'}; margin-top:10px; padding:8px; background:#fff3cd; border-left:3px solid #ffc107; border-radius:4px; font-size:0.85rem;">
                             <strong style="color:#856404;">⚠️ Overpayment Detected</strong>
@@ -2952,31 +3113,37 @@ function triggerCheckout(bookingId) {
                 iconHtml: '<i class="fas fa-clipboard-check" style="color:#0d6efd;"></i>',
                 title: 'Confirm Checkout',
                 html: `
-                    <div style=\"text-align:left; margin-bottom:8px; color:#6c757d;\">
-                        <span class=\"section-label\">Summary</span>
-                        Proceed to checkout this booking?
-                        <div style=\"display:flex; gap:12px; margin-top:8px; flex-wrap:wrap; justify-content:center; align-items:center;\">
+                    <div style=\"text-align:center; margin-bottom:8px; color:#6c757d;\">
+                        <span class=\"section-label\" style=\"margin-bottom:.5rem;\">Summary</span>
+                        <div style=\"font-size:0.95rem;\">Proceed to checkout this booking?</div>
+                        <div style=\"display:flex; gap:12px; margin-top:12px; flex-wrap:wrap; justify-content:center; align-items:center;\">
                             ${grandTotalText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Grand Total</span><span class=\"balance-pill grand-total-pill\">${grandTotalText}</span></div>` : ''}
-                            ${paidText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Paid</span><span class=\"balance-pill paid-pill\">${paidText}</span></div>` : ''}
-                            ${balanceText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Balance</span><span class=\"balance-pill balance-pill-red\">${balanceText}</span></div>` : ''}
+                            ${paidText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Paid</span><span class=\"balance-pill paid-pill\" id=\"summaryPaidPill\">${paidText}</span></div>` : ''}
+                            ${balanceText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Balance</span><span class=\"balance-pill balance-pill-red\" id=\"summaryBalancePill\">${balanceText}</span></div>` : ''}
                         </div>
                     </div>
                     ${detailsHtml}
+                    ${depositHtml}
                     ${groupHtml}
                     ${discountOptionHtml}
-                    <div class=\"form-check choice-row\" style=\"text-align:left;\">
-                        <input class=\"form-check-input\" type=\"checkbox\" value=\"\" id=\"withRefundChk\">
-                        <label class=\"form-check-label\" for=\"withRefundChk\">With refund</label>
-                    </div>
-                    <div id=\"refundAmtWrap\" style=\"margin-top:10px; display:none; text-align:left;\">
-                        <label for=\"refundAmountInput\" class=\"form-label\" style=\"margin-bottom:4px;\">Refund Amount</label>
-                        <input type=\"number\" min=\"0\" step=\"0.01\" id=\"refundAmountInput\" class=\"swal2-input\" placeholder=\"0.00\" style=\"width:100%; box-sizing:border-box; margin:0;\">
-                        <small class=\"text-muted\" style=\"display:block; margin-top:6px;\">Enter the exact refund to give to the guest.</small>
-                    </div>
-                    <div id=\"cancellationFeeWrap\" style=\"margin-top:10px; text-align:left;\">
-                        <label for=\"cancellationFeeInput\" class=\"form-label\" style=\"margin-bottom:4px;\">Cancellation Fee</label>
-                        <input type=\"number\" min=\"0\" step=\"0.01\" id=\"cancellationFeeInput\" class=\"swal2-input\" placeholder=\"0.00\" style=\"width:100%; box-sizing:border-box; margin:0;\">
-                        <small id=\"cancellationFeeHelp\" class=\"text-muted\" style=\"display:block; margin-top:6px; display:none;\">Enter the exact cancellation fee.</small>
+                    <div style=\"margin-top:15px; padding:12px; background:#f8f9fa; border-radius:6px; border:1px solid #dee2e6; text-align:left;\">
+                        <div style=\"font-weight:600; color:#495057; margin-bottom:10px; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px;\">
+                            <i class=\"fas fa-receipt\"></i> Overpayment / Cancellation
+                        </div>
+                        <div class=\"form-check choice-row\" style=\"text-align:left; margin-top:0;\">
+                            <input class=\"form-check-input\" type=\"checkbox\" value=\"\" id=\"withRefundChk\">
+                            <label class=\"form-check-label\" for=\"withRefundChk\">With refund</label>
+                        </div>
+                        <div id=\"refundAmtWrap\" style=\"margin-top:10px; display:none; text-align:left;\">
+                            <label for=\"refundAmountInput\" class=\"form-label\" style=\"margin-bottom:4px;\">Refund Amount</label>
+                            <input type=\"number\" min=\"0\" step=\"0.01\" id=\"refundAmountInput\" class=\"swal2-input\" placeholder=\"0.00\" style=\"width:100%; box-sizing:border-box; margin:0;\">
+                            <small class=\"text-muted\" style=\"display:block; margin-top:6px;\">Enter the exact refund to give to the guest.</small>
+                        </div>
+                        <div id=\"cancellationFeeWrap\" style=\"margin-top:10px; text-align:left;\">
+                            <label for=\"cancellationFeeInput\" class=\"form-label\" style=\"margin-bottom:4px;\">Cancellation Fee</label>
+                            <input type=\"number\" min=\"0\" step=\"0.01\" id=\"cancellationFeeInput\" class=\"swal2-input\" placeholder=\"0.00\" style=\"width:100%; box-sizing:border-box; margin:0;\">
+                            <small id=\"cancellationFeeHelp\" class=\"text-muted\" style=\"display:block; margin-top:6px; display:none;\">Enter the exact cancellation fee.</small>
+                        </div>
                     </div>
                     <style>
                         .swal2-actions {
@@ -2990,6 +3157,7 @@ function triggerCheckout(bookingId) {
                 showCancelButton: true,
                 confirmButtonText: 'Proceed',
                 cancelButtonText: 'Cancel',
+                width: '750px',
                 customClass: {
                     popup: 'swal-checkout',
                     confirmButton: 'btn btn-primary',
@@ -3077,15 +3245,15 @@ function triggerCheckout(bookingId) {
                         };
                         
                         detailsSection.innerHTML = `
-                            <div style="font-weight:600; color:#495057; margin-bottom:10px; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px;">Checkout Details</div>
-                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.875rem;">
-                                <div><span style="color:#6c757d;">Actual Days:</span> <strong>${actualDays}</strong></div>
-                                <div><span style="color:#6c757d;">Room Rate/Day:</span> <strong>${formatCurrency(roomRate)}</strong></div>
-                                <div><span style="color:#6c757d;">Room Amount:</span> <strong>${formatCurrency(roomAmountForActualDays)}</strong></div>
-                                <div><span style="color:#6c757d;">Services:</span> <strong>${formatCurrency(servicesAndExtensionsTotal)}</strong></div>
-                                <div><span style="color:#6c757d;">Discount:</span> <strong id="discountDisplay">${formatCurrency(0)}</strong></div>
-                                <div><span style="color:#6c757d;">Adjusted Total:</span> <strong style="color:#0d6efd;" id="netBalanceDisplay">${formatCurrency(initialNetBalance)}</strong></div>
-                                <div><span style="color:#6c757d;">Overpayment:</span> <strong style="color:${initialOverpayment > 0 ? '#dc3545' : '#6c757d'}" id="overpaymentDisplay">${formatCurrency(initialOverpayment)}</strong></div>
+                            <div style="font-weight:600; color:#495057; margin-bottom:14px; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px; line-height:1.4;">Checkout Details</div>
+                            <div class="checkout-detail-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.875rem;">
+                                <div class="checkout-detail-row"><span style="color:#6c757d;">Actual Days:</span> <strong>${actualDays}</strong></div>
+                                <div class="checkout-detail-row"><span style="color:#6c757d;">Room Rate/Day:</span> <strong>${formatCurrency(roomRate)}</strong></div>
+                                <div class="checkout-detail-row"><span style="color:#6c757d;">Room Amount:</span> <strong>${formatCurrency(roomAmountForActualDays)}</strong></div>
+                                <div class="checkout-detail-row"><span style="color:#6c757d;">Services:</span> <strong>${formatCurrency(servicesAndExtensionsTotal)}</strong></div>
+                                <div class="checkout-detail-row"><span style="color:#6c757d;">Discount:</span> <strong id="discountDisplay">${formatCurrency(0)}</strong></div>
+                                <div class="checkout-detail-row"><span style="color:#6c757d;">Adjusted Total:</span> <strong style="color:#0d6efd;" id="netBalanceDisplay">${formatCurrency(initialNetBalance)}</strong></div>
+                                <div class="checkout-detail-row"><span style="color:#6c757d;">Overpayment:</span> <strong style="color:${initialOverpayment > 0 ? '#dc3545' : '#6c757d'}" id="overpaymentDisplay">${formatCurrency(initialOverpayment)}</strong></div>
                             </div>
                             <div id="overpaymentWarning" style="${initialOverpayment > 0 ? 'display:block' : 'display:none'}; margin-top:10px; padding:8px; background:#fff3cd; border-left:3px solid #ffc107; border-radius:4px; font-size:0.85rem;">
                                 <strong style="color:#856404;">⚠️ Overpayment Detected</strong>
@@ -3301,6 +3469,9 @@ function triggerCheckout(bookingId) {
                     
                     // Store context for preConfirm
                     window._checkoutContextCache = checkoutContextCache;
+
+                    // Wire up the security deposit section (if a deposit is held for this booking)
+                    wireCheckoutDepositControls(depositInfo, depositUnpaidBalance, checkoutContextCache);
                 },
                 preConfirm: async () => {
                     const chk = document.getElementById('withRefundChk');
@@ -3411,7 +3582,14 @@ function triggerCheckout(bookingId) {
                     
                     // Get applyDiscount flag (whether to apply discount to early checkout)
                     const applyDiscount = window._applyDiscount !== undefined ? window._applyDiscount : false;
-                    return { hasRefund, amount, scope, penaltyAmount: cancellationFee, applyDiscount };
+                    // Validate the security deposit selection (if a deposit is held) before confirming
+                    const depositCheck = collectCheckoutDepositSelection(depositInfo);
+                    if (!depositCheck.valid) {
+                        Swal.showValidationMessage(depositCheck.error);
+                        return false;
+                    }
+
+                    return { hasRefund, amount, scope, penaltyAmount: cancellationFee, applyDiscount, depositSelection: depositCheck.selection };
                 }
             }).then((result) => {
                 if (result.isConfirmed && result.value) {
@@ -3421,7 +3599,8 @@ function triggerCheckout(bookingId) {
                         result.value.amount || 0,
                         result.value.scope || 'individual',
                         result.value.penaltyAmount || 0,
-                        result.value.applyDiscount || false
+                        result.value.applyDiscount || false,
+                        result.value.depositSelection || null
                     );
                 }
             });
@@ -3432,7 +3611,10 @@ function triggerCheckout(bookingId) {
             
             // Compute checkout context upfront to display details
             const checkoutContext = await computeCheckoutContext(bookingId);
-            
+            const depositInfo = await fetchCheckoutDepositInfo(bookingId);
+            const depositUnpaidBalance = checkoutContext ? Math.max(0, checkoutContext.netBalance - checkoutContext.totalPaid) : 0;
+            const depositHtml = buildCheckoutDepositHtml(depositInfo, depositUnpaidBalance);
+
             // Format amounts for display
             const formatCurrency = (amount) => {
                 return `₱${parseFloat(amount || 0).toFixed(2)}`;
@@ -3444,16 +3626,16 @@ function triggerCheckout(bookingId) {
                 const { totalPaid, netBalance, overpayment, actualDays, roomRate, roomAmountForActualDays, servicesAndExtensionsTotal, grossTotal, reservationFee, discountAmount } = checkoutContext;
                 
                 detailsHtml = `
-                    <div id="checkoutDetailsSection" style="margin-top:15px; padding:12px; background:#f8f9fa; border-radius:6px; border:1px solid #dee2e6;">
-                        <div style="font-weight:600; color:#495057; margin-bottom:10px; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px;">Checkout Details</div>
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.875rem;">
-                            <div><span style="color:#6c757d;">Actual Days:</span> <strong>${actualDays}</strong></div>
-                            <div><span style="color:#6c757d;">Room Rate/Day:</span> <strong>${formatCurrency(roomRate)}</strong></div>
-                            <div><span style="color:#6c757d;">Room Amount:</span> <strong>${formatCurrency(roomAmountForActualDays)}</strong></div>
-                            <div><span style="color:#6c757d;">Services:</span> <strong>${formatCurrency(servicesAndExtensionsTotal)}</strong></div>
-                            <div><span style="color:#6c757d;">Discount:</span> <strong>${formatCurrency(discountAmount)}</strong></div>
-                                <div><span style="color:#6c757d;">Adjusted Total:</span> <strong style="color:#0d6efd;">${formatCurrency(netBalance)}</strong></div>
-                            <div><span style="color:#6c757d;">Overpayment:</span> <strong style="color:${overpayment > 0 ? '#dc3545' : '#6c757d'}">${formatCurrency(overpayment)}</strong></div>
+                    <div id="checkoutDetailsSection" style="margin-top:15px; padding:12px; background:#f8f9fa; border-radius:6px; border:1px solid #dee2e6; text-align:left;">
+                        <div style="font-weight:600; color:#495057; margin-bottom:14px; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px; line-height:1.4;">Checkout Details</div>
+                        <div class="checkout-detail-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.875rem;">
+                            <div class="checkout-detail-row"><span style="color:#6c757d;">Actual Days:</span> <strong>${actualDays}</strong></div>
+                            <div class="checkout-detail-row"><span style="color:#6c757d;">Room Rate/Day:</span> <strong>${formatCurrency(roomRate)}</strong></div>
+                            <div class="checkout-detail-row"><span style="color:#6c757d;">Room Amount:</span> <strong>${formatCurrency(roomAmountForActualDays)}</strong></div>
+                            <div class="checkout-detail-row"><span style="color:#6c757d;">Services:</span> <strong>${formatCurrency(servicesAndExtensionsTotal)}</strong></div>
+                            <div class="checkout-detail-row"><span style="color:#6c757d;">Discount:</span> <strong>${formatCurrency(discountAmount)}</strong></div>
+                                <div class="checkout-detail-row"><span style="color:#6c757d;">Adjusted Total:</span> <strong style="color:#0d6efd;">${formatCurrency(netBalance)}</strong></div>
+                            <div class="checkout-detail-row"><span style="color:#6c757d;">Overpayment:</span> <strong style="color:${overpayment > 0 ? '#dc3545' : '#6c757d'}">${formatCurrency(overpayment)}</strong></div>
                         </div>
                         ${overpayment > 0 ? `
                             <div style="margin-top:10px; padding:8px; background:#fff3cd; border-left:3px solid #ffc107; border-radius:4px; font-size:0.85rem;">
@@ -3472,30 +3654,36 @@ function triggerCheckout(bookingId) {
                 iconHtml: '<i class="fas fa-clipboard-check" style="color:#0d6efd;"></i>',
                 title: 'Confirm Checkout',
                 html: `
-                    <div style=\"text-align:left; margin-bottom:8px; color:#6c757d;\">
-                        <span class=\"section-label\">Summary</span>
-                        Proceed to checkout this booking?
-                        <div style=\"display:flex; gap:12px; margin-top:8px; flex-wrap:wrap; justify-content:center; align-items:center;\">
+                    <div style=\"text-align:center; margin-bottom:8px; color:#6c757d;\">
+                        <span class=\"section-label\" style=\"margin-bottom:.5rem;\">Summary</span>
+                        <div style=\"font-size:0.95rem;\">Proceed to checkout this booking?</div>
+                        <div style=\"display:flex; gap:12px; margin-top:12px; flex-wrap:wrap; justify-content:center; align-items:center;\">
                             ${grandTotalText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Grand Total</span><span class=\"balance-pill grand-total-pill\">${grandTotalText}</span></div>` : ''}
-                            ${paidText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Paid</span><span class=\"balance-pill paid-pill\">${paidText}</span></div>` : ''}
-                            ${balanceText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Balance</span><span class=\"balance-pill balance-pill-red\">${balanceText}</span></div>` : ''}
+                            ${paidText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Paid</span><span class=\"balance-pill paid-pill\" id=\"summaryPaidPill\">${paidText}</span></div>` : ''}
+                            ${balanceText ? `<div style=\"text-align:center;\"><span class=\"section-label\">Balance</span><span class=\"balance-pill balance-pill-red\" id=\"summaryBalancePill\">${balanceText}</span></div>` : ''}
                         </div>
                     </div>
                     ${detailsHtml}
+                    ${depositHtml}
                     ${groupHtml}
-                    <div class=\"form-check choice-row\" style=\"text-align:left;\">
-                        <input class=\"form-check-input\" type=\"checkbox\" value=\"\" id=\"withRefundChk\">
-                        <label class=\"form-check-label\" for=\"withRefundChk\">With refund</label>
-                    </div>
-                    <div id=\"refundAmtWrap\" style=\"margin-top:10px; display:none; text-align:left;\">
-                        <label for=\"refundAmountInput\" class=\"form-label\" style=\"margin-bottom:4px;\">Refund Amount</label>
-                        <input type=\"number\" min=\"0\" step=\"0.01\" id=\"refundAmountInput\" class=\"swal2-input\" placeholder=\"0.00\" style=\"width:100%; box-sizing:border-box; margin:0;\">
-                        <small class=\"text-muted\" style=\"display:block; margin-top:6px;\">Enter the exact refund to give to the guest.</small>
-                    </div>
-                    <div id=\"cancellationFeeWrap\" style=\"margin-top:10px; text-align:left;\">
-                        <label for=\"cancellationFeeInput\" class=\"form-label\" style=\"margin-bottom:4px;\">Cancellation Fee</label>
-                        <input type=\"number\" min=\"0\" step=\"0.01\" id=\"cancellationFeeInput\" class=\"swal2-input\" placeholder=\"0.00\" style=\"width:100%; box-sizing:border-box; margin:0;\">
-                        <small id=\"cancellationFeeHelp\" class=\"text-muted\" style=\"display:none; margin-top:6px;\">Enter the exact cancellation fee.</small>
+                    <div style=\"margin-top:15px; padding:12px; background:#f8f9fa; border-radius:6px; border:1px solid #dee2e6; text-align:left;\">
+                        <div style=\"font-weight:600; color:#495057; margin-bottom:10px; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px;\">
+                            <i class=\"fas fa-receipt\"></i> Overpayment / Cancellation
+                        </div>
+                        <div class=\"form-check choice-row\" style=\"text-align:left; margin-top:0;\">
+                            <input class=\"form-check-input\" type=\"checkbox\" value=\"\" id=\"withRefundChk\">
+                            <label class=\"form-check-label\" for=\"withRefundChk\">With refund</label>
+                        </div>
+                        <div id=\"refundAmtWrap\" style=\"margin-top:10px; display:none; text-align:left;\">
+                            <label for=\"refundAmountInput\" class=\"form-label\" style=\"margin-bottom:4px;\">Refund Amount</label>
+                            <input type=\"number\" min=\"0\" step=\"0.01\" id=\"refundAmountInput\" class=\"swal2-input\" placeholder=\"0.00\" style=\"width:100%; box-sizing:border-box; margin:0;\">
+                            <small class=\"text-muted\" style=\"display:block; margin-top:6px;\">Enter the exact refund to give to the guest.</small>
+                        </div>
+                        <div id=\"cancellationFeeWrap\" style=\"margin-top:10px; text-align:left;\">
+                            <label for=\"cancellationFeeInput\" class=\"form-label\" style=\"margin-bottom:4px;\">Cancellation Fee</label>
+                            <input type=\"number\" min=\"0\" step=\"0.01\" id=\"cancellationFeeInput\" class=\"swal2-input\" placeholder=\"0.00\" style=\"width:100%; box-sizing:border-box; margin:0;\">
+                            <small id=\"cancellationFeeHelp\" class=\"text-muted\" style=\"display:none; margin-top:6px;\">Enter the exact cancellation fee.</small>
+                        </div>
                     </div>
                     <style>
                         .swal2-actions {
@@ -3509,6 +3697,7 @@ function triggerCheckout(bookingId) {
                 showCancelButton: true,
                 confirmButtonText: 'Proceed',
                 cancelButtonText: 'Cancel',
+                width: '750px',
                 customClass: {
                     popup: 'swal-checkout',
                     confirmButton: 'btn btn-primary',
@@ -3596,15 +3785,15 @@ function triggerCheckout(bookingId) {
                         };
                         
                         detailsSection.innerHTML = `
-                            <div style="font-weight:600; color:#495057; margin-bottom:10px; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px;">Checkout Details</div>
-                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.875rem;">
-                                <div><span style="color:#6c757d;">Actual Days:</span> <strong>${actualDays}</strong></div>
-                                <div><span style="color:#6c757d;">Room Rate/Day:</span> <strong>${formatCurrency(roomRate)}</strong></div>
-                                <div><span style="color:#6c757d;">Room Amount:</span> <strong>${formatCurrency(roomAmountForActualDays)}</strong></div>
-                                <div><span style="color:#6c757d;">Services:</span> <strong>${formatCurrency(servicesAndExtensionsTotal)}</strong></div>
-                                <div><span style="color:#6c757d;">Discount:</span> <strong id="discountDisplay">${formatCurrency(0)}</strong></div>
-                                <div><span style="color:#6c757d;">Adjusted Total:</span> <strong style="color:#0d6efd;" id="netBalanceDisplay">${formatCurrency(initialNetBalance)}</strong></div>
-                                <div><span style="color:#6c757d;">Overpayment:</span> <strong style="color:${initialOverpayment > 0 ? '#dc3545' : '#6c757d'}" id="overpaymentDisplay">${formatCurrency(initialOverpayment)}</strong></div>
+                            <div style="font-weight:600; color:#495057; margin-bottom:14px; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px; line-height:1.4;">Checkout Details</div>
+                            <div class="checkout-detail-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.875rem;">
+                                <div class="checkout-detail-row"><span style="color:#6c757d;">Actual Days:</span> <strong>${actualDays}</strong></div>
+                                <div class="checkout-detail-row"><span style="color:#6c757d;">Room Rate/Day:</span> <strong>${formatCurrency(roomRate)}</strong></div>
+                                <div class="checkout-detail-row"><span style="color:#6c757d;">Room Amount:</span> <strong>${formatCurrency(roomAmountForActualDays)}</strong></div>
+                                <div class="checkout-detail-row"><span style="color:#6c757d;">Services:</span> <strong>${formatCurrency(servicesAndExtensionsTotal)}</strong></div>
+                                <div class="checkout-detail-row"><span style="color:#6c757d;">Discount:</span> <strong id="discountDisplay">${formatCurrency(0)}</strong></div>
+                                <div class="checkout-detail-row"><span style="color:#6c757d;">Adjusted Total:</span> <strong style="color:#0d6efd;" id="netBalanceDisplay">${formatCurrency(initialNetBalance)}</strong></div>
+                                <div class="checkout-detail-row"><span style="color:#6c757d;">Overpayment:</span> <strong style="color:${initialOverpayment > 0 ? '#dc3545' : '#6c757d'}" id="overpaymentDisplay">${formatCurrency(initialOverpayment)}</strong></div>
                             </div>
                             <div id="overpaymentWarning" style="${initialOverpayment > 0 ? 'display:block' : 'display:none'}; margin-top:10px; padding:8px; background:#fff3cd; border-left:3px solid #ffc107; border-radius:4px; font-size:0.85rem;">
                                 <strong style="color:#856404;">⚠️ Overpayment Detected</strong>
@@ -3817,6 +4006,9 @@ function triggerCheckout(bookingId) {
                     
                     // Store context for preConfirm
                     window._checkoutContextCache = checkoutContextCache;
+
+                    // Wire up the security deposit section (if a deposit is held for this booking)
+                    wireCheckoutDepositControls(depositInfo, depositUnpaidBalance, checkoutContextCache);
                 },
                 preConfirm: async () => {
                     const chk = document.getElementById('withRefundChk');
@@ -3930,7 +4122,14 @@ function triggerCheckout(bookingId) {
                     
                     // Get applyDiscount flag (whether to apply discount to early checkout)
                     const applyDiscount = window._applyDiscount !== undefined ? window._applyDiscount : false;
-                    return { hasRefund, amount, scope, penaltyAmount: cancellationFee, applyDiscount };
+                    // Validate the security deposit selection (if a deposit is held) before confirming
+                    const depositCheck = collectCheckoutDepositSelection(depositInfo);
+                    if (!depositCheck.valid) {
+                        Swal.showValidationMessage(depositCheck.error);
+                        return false;
+                    }
+
+                    return { hasRefund, amount, scope, penaltyAmount: cancellationFee, applyDiscount, depositSelection: depositCheck.selection };
                 }
             }).then((result) => {
                 if (result.isConfirmed && result.value) {
@@ -3940,7 +4139,8 @@ function triggerCheckout(bookingId) {
                         result.value.amount || 0,
                         'individual',
                         result.value.penaltyAmount || 0,
-                        result.value.applyDiscount || false
+                        result.value.applyDiscount || false,
+                        result.value.depositSelection || null
                     );
                 }
             });
@@ -3948,7 +4148,7 @@ function triggerCheckout(bookingId) {
 }
 
 // Handle checkout process
-function startCheckoutProcess(bookingId, hasRefund, refundAmount = 0, scope = 'individual', penaltyAmount = 0, applyDiscount = false) {
+function startCheckoutProcess(bookingId, hasRefund, refundAmount = 0, scope = 'individual', penaltyAmount = 0, applyDiscount = false, depositSelection = null) {
     const runCheckout = () => {
         // Show loading state
         Swal.fire({
@@ -3990,12 +4190,29 @@ function startCheckoutProcess(bookingId, hasRefund, refundAmount = 0, scope = 'i
         });
     };
 
-    if (typeof SecurityDepositCheckout !== 'undefined') {
-        SecurityDepositCheckout.begin({
-            bookingId,
-            scope,
-            onComplete: () => runCheckout(),
-            onCancel: () => {}
+    if (depositSelection) {
+        // The deposit action was already collected in the Confirm Checkout modal - submit it first
+        fetch('/dashboard/booking/refund-security-deposit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                BookingID: bookingId,
+                action: depositSelection.action,
+                deductAmount: depositSelection.action === 'partial_deduct' ? depositSelection.deductAmount : 0,
+                applyRemainderToBalance: depositSelection.action === 'partial_deduct' ? depositSelection.applyRemainderToBalance : false,
+                remarks: depositSelection.remarks
+            })
+        })
+        .then(r => r.json())
+        .then(result => {
+            if (!result.success) {
+                toastError('Security Deposit', result.message || 'Failed to process security deposit.');
+                return;
+            }
+            runCheckout();
+        })
+        .catch(() => {
+            toastError('Security Deposit', 'An error occurred while processing the security deposit.');
         });
     } else {
         runCheckout();
