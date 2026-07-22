@@ -207,7 +207,7 @@
                                       <input type="hidden" id="pickupServiceId" name="pickupServiceId">
                                     </div>
                                   </div>
-                                 
+
                                   <div class="col-lg-4">
                                     <div class="form-check mb-1">
                                       <input class="form-check-input" type="checkbox" id="includeDropoff">
@@ -220,24 +220,24 @@
                                   </div>
                                   <div id="pickupDropoffFlightInfo" class="col-lg-12" style="display: none; margin-top: 10px;">
                                     <div class="d-flex gap-2 align-items-end flex-wrap">
-                                      <div class="form-group flex-fill" style="min-width: 140px;">
+                                      <div class="form-group flex-fill" style="min-width: 140px; position: relative;">
                                         <label class="form-label">Flight Number</label>
-                                        <input type="text" class="form-control" id="flightNumber" name="flightNumber" placeholder="e.g. PR123">
+                                        <input type="text" class="form-control" id="flightNumber" name="flightNumber" placeholder="e.g. PR123" autocomplete="off">
+                                        <div id="flightNumberDropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 1080; max-height: 220px; overflow-y: auto; background-color: #2a3135; border: 1px solid #445; border-radius: 6px; margin-top: 2px; box-shadow: 0 4px 10px rgba(0,0,0,0.4);"></div>
                                       </div>
-                                      <div class="form-group flex-shrink-0">
-                                        <label class="form-label">&nbsp;</label>
-                                        <button type="button" class="btn btn-outline-light d-block" id="checkFlightStatusBtn">Check Status</button>
+                                      <div id="flightArrivalWrapper" class="form-group flex-fill" style="min-width: 160px; display: none;">
+                                        <label class="form-label">Arrival Date/Time</label>
+                                        <input type="text" class="form-control" id="flightArrivalDisplay" placeholder="Select flight number" readonly>
                                       </div>
-                                      <div class="form-group flex-shrink-0">
-                                        <label class="form-label">&nbsp;</label>
-                                        <button type="button" class="btn btn-outline-light d-block" id="viewArrivalsBtn">View Arrivals</button>
+                                      <div id="flightDepartureWrapper" class="form-group flex-fill" style="min-width: 160px; display: none;">
+                                        <label class="form-label">Departure Date/Time</label>
+                                        <input type="text" class="form-control" id="flightDepartureDisplay" placeholder="Select flight number" readonly>
                                       </div>
                                       <div class="form-group flex-shrink-0" style="width: 160px;">
                                         <label class="form-label">Number of Passengers</label>
                                         <input type="number" class="form-control" id="passengerCount" name="passengerCount" placeholder="Number of Passengers" min="1" step="1">
                                       </div>
                                     </div>
-                                    <div id="flightStatusResult" style="display: none; margin-top: 6px; padding: 6px 10px; border-radius: 6px; font-size: 13px;"></div>
                                   </div>
 
                             </div>
@@ -405,36 +405,6 @@
                     <tbody id="pendingBookingsTableBody" style="color: #fff;">
                         <!-- Pending bookings will be appended here -->
                     </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Flight Arrivals Modal (PUAP) -->
-<div class="modal fade" id="modal-flight-arrivals" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h4 class="modal-title">Upcoming Arrivals - Clark International (CRK)</h4>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
-                <div class="form-check mb-2">
-                    <input class="form-check-input" type="checkbox" id="arrivalsKoreaOnly">
-                    <label class="form-check-label" for="arrivalsKoreaOnly">Korea flights only</label>
-                </div>
-                <table class="table table-sm table-hover mb-0">
-                    <thead style="position: sticky; top: 0; background-color: #2a3135;">
-                        <tr>
-                            <th>Flight</th>
-                            <th>Airline</th>
-                            <th>From</th>
-                            <th>TIME</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody id="arrivalsListBody"></tbody>
                 </table>
             </div>
         </div>
@@ -730,122 +700,102 @@
 
 <script>
 // ================================
-// PUAP FLIGHT STATUS LOOKUP (Add Booking)
+// FLIGHT NUMBER LOOKUP (Add Booking)
 // ================================
 (function(){
-    function renderFlightStatus($result, kind, message) {
-        const palette = {
-            loading: { bg: 'rgba(255,255,255,0.08)', border: 'rgba(255,255,255,0.2)', color: '#ffffff' },
-            error:   { bg: 'rgba(229,57,53,0.12)',   border: 'rgba(229,57,53,0.35)', color: '#ff9a92' },
-            ok:      { bg: 'rgba(18,134,111,0.15)',  border: 'rgba(18,134,111,0.45)', color: '#5fd6bd' }
-        }[kind];
-        $result.css({ 'background-color': palette.bg, border: `1px solid ${palette.border}`, color: palette.color });
-        $result.html(message).show();
-    }
+    // Clear the arrival/departure display whenever the flight number changes, so it doesn't go stale
+    $(document).on('input', '#flightNumber', function(){
+        $('#flightArrivalDisplay').val('');
+        $('#flightDepartureDisplay').val('');
+        renderFlightNumberDropdown(filterFlightScheduleList($(this).val()));
+    });
 
-    $(document).on('click', '#checkFlightStatusBtn', function(){
-        const flightNumber = ($('#flightNumber').val() || '').trim();
-        const $result = $('#flightStatusResult');
+    // Flight number dropdown - pick from flights registered in the Flight Schedule page
+    let flightScheduleList = null;
 
-        if (!flightNumber) {
-            renderFlightStatus($result, 'error', 'Enter a flight number first.');
+    function loadFlightScheduleList(callback) {
+        if (Array.isArray(flightScheduleList)) {
+            callback(flightScheduleList);
             return;
         }
-
-        renderFlightStatus($result, 'loading', 'Checking flight status…');
-
         $.ajax({
-            url: '/booking/flight-status/' + encodeURIComponent(flightNumber),
+            url: '/flight-schedule/api/flights',
             type: 'GET',
             cache: false,
             success: function(response) {
-                if (!response.success || !response.data) {
-                    renderFlightStatus($result, 'error', response.message || 'Flight not found.');
-                    return;
-                }
-                const f = response.data;
-                const arrival = f.arrival || {};
-                const isLanded = (f.status || '').toLowerCase() === 'landed';
-                let eta, etaLabel;
-                if (isLanded) {
-                    eta = arrival.actual || arrival.estimated || arrival.scheduled;
-                    etaLabel = 'Arrival';
-                } else if (arrival.estimated) {
-                    eta = arrival.estimated;
-                    etaLabel = 'ETA';
-                } else {
-                    eta = arrival.scheduled;
-                    etaLabel = 'Scheduled';
-                }
-                const etaText = eta ? new Date(eta).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' }) : 'N/A';
-                const statusLabel = (f.status || 'unknown').toUpperCase();
-                const delayText = arrival.delayMinutes ? ` (+${arrival.delayMinutes} min delay)` : '';
-                renderFlightStatus($result, 'ok',
-                    `<strong>${f.flightNumber}</strong> ${f.airline ? '· ' + f.airline : ''} — ${statusLabel}${delayText}<br>` +
-                    `Arriving ${arrival.airport || ''} (${arrival.iata || ''}) &middot; ${etaLabel} ${etaText}`
-                );
+                flightScheduleList = (response.success && Array.isArray(response.data)) ? response.data : [];
+                callback(flightScheduleList);
             },
-            error: function(xhr) {
-                const message = xhr.responseJSON?.message || 'Could not check flight status.';
-                renderFlightStatus($result, 'error', message);
-            }
-        });
-    });
-
-    // Hide the result whenever the flight number changes, so it doesn't go stale
-    $(document).on('input', '#flightNumber', function(){
-        $('#flightStatusResult').hide();
-    });
-
-    // Arrivals list - browse upcoming CRK arrivals and pick one instead of typing
-    function loadArrivals() {
-        const $body = $('#arrivalsListBody');
-        const koreaOnly = $('#arrivalsKoreaOnly').is(':checked');
-
-        $body.html('<tr><td colspan="5" class="text-center">Loading…</td></tr>');
-
-        $.ajax({
-            url: '/booking/flight-arrivals',
-            type: 'GET',
-            cache: false,
-            data: koreaOnly ? { origin: 'KR' } : {},
-            success: function(response) {
-                if (!response.success || !Array.isArray(response.data) || response.data.length === 0) {
-                    $body.html(`<tr><td colspan="5" class="text-center">${response.message || 'No upcoming arrivals found.'}</td></tr>`);
-                    return;
-                }
-                $body.empty();
-                response.data.forEach(function(f){
-                    const isLanded = (f.status || '').toLowerCase() === 'landed';
-                    const eta = isLanded ? (f.actual || f.estimated || f.scheduled) : (f.estimated || f.scheduled);
-                    const etaText = eta ? new Date(eta).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' }) : 'N/A';
-                    const $row = $('<tr style="cursor:pointer;"></tr>')
-                        .append(`<td><strong>${f.flightNumber || ''}</strong></td>`)
-                        .append(`<td>${f.airline || ''}</td>`)
-                        .append(`<td>${f.originIata || ''}</td>`)
-                        .append(`<td>${etaText}</td>`)
-                        .append(`<td>${(f.status || '').toUpperCase()}</td>`)
-                        .on('click', function(){
-                            $('#flightNumber').val(f.flightNumber || '');
-                            $('#modal-flight-arrivals').modal('hide');
-                            $('#checkFlightStatusBtn').trigger('click');
-                        });
-                    $body.append($row);
-                });
-            },
-            error: function(xhr) {
-                const message = xhr.responseJSON?.message || 'Could not load arrivals.';
-                $body.html(`<tr><td colspan="5" class="text-center">${message}</td></tr>`);
+            error: function() {
+                flightScheduleList = [];
+                callback(flightScheduleList);
             }
         });
     }
 
-    $(document).on('click', '#viewArrivalsBtn', function(){
-        $('#modal-flight-arrivals').modal('show');
-        loadArrivals();
+    function filterFlightScheduleList(term) {
+        const list = flightScheduleList || [];
+        const needle = (term || '').trim().toUpperCase();
+        if (!needle) return list;
+        return list.filter(f => (f.FLIGHT_NUMBER || '').toUpperCase().includes(needle));
+    }
+
+    function renderFlightNumberDropdown(list) {
+        const $dropdown = $('#flightNumberDropdown');
+        if (!list || list.length === 0) {
+            $dropdown.html('<div style="padding: 8px 10px; color: #9aa; font-size: 13px;">No flight in Flight Schedule</div>').show();
+            return;
+        }
+        const isPickup = $('#includePickup').is(':checked');
+        const isDropoff = $('#includeDropoff').is(':checked');
+
+        $dropdown.empty();
+        list.forEach(function(f){
+            let dateLabel;
+            if (isPickup && !isDropoff) {
+                dateLabel = f.ARRIVAL || '';
+            } else if (isDropoff && !isPickup) {
+                dateLabel = f.DEPARTURE || '';
+            } else {
+                dateLabel = `${f.ARRIVAL || ''} / ${f.DEPARTURE || ''}`;
+            }
+            const $item = $('<div class="flight-number-option"></div>')
+                .css({ padding: '6px 10px', cursor: 'pointer', fontSize: '13px', borderBottom: '1px solid #384249' })
+                .html(`<strong>${f.FLIGHT_NUMBER || ''}</strong> <span style="color:#9aa;">— ${dateLabel}</span>`)
+                .on('mouseenter', function(){ $(this).css('background-color', '#374047'); })
+                .on('mouseleave', function(){ $(this).css('background-color', ''); })
+                .on('click', function(){
+                    $('#flightNumber').val(f.FLIGHT_NUMBER || '');
+                    $('#flightArrivalDisplay').val(f.ARRIVAL || '');
+                    $('#flightDepartureDisplay').val(f.DEPARTURE || '');
+                    $dropdown.hide();
+                });
+            $dropdown.append($item);
+        });
+        $dropdown.show();
+    }
+
+    $(document).on('click focus', '#flightNumber', function(){
+        loadFlightScheduleList(function(list){
+            renderFlightNumberDropdown(filterFlightScheduleList($('#flightNumber').val()));
+        });
     });
 
-    $(document).on('change', '#arrivalsKoreaOnly', loadArrivals);
+    $(document).on('click', function(e){
+        if (!$(e.target).closest('#flightNumber, #flightNumberDropdown').length) {
+            $('#flightNumberDropdown').hide();
+        }
+    });
+
+    $(document).on('shown.bs.modal', '#modal-addbooking', function(){
+        flightScheduleList = null;
+    });
+
+    $(document).on('change', '#includePickup, #includeDropoff', function(){
+        if ($('#flightNumberDropdown').is(':visible')) {
+            renderFlightNumberDropdown(filterFlightScheduleList($('#flightNumber').val()));
+        }
+    });
 })();
 </script>
 
@@ -856,11 +806,7 @@
    margin: 1vh auto;
 }
 
-/* Stacked modal fix: Flight Arrivals opens on top of Add Booking */
-#modal-flight-arrivals {
-    z-index: 1071 !important;
-}
-#modal-flight-arrivals + .modal-backdrop,
+/* Stacked modal fix: modals opened on top of Add Booking */
 .modal-backdrop + .modal-backdrop {
     z-index: 1065 !important;
 }

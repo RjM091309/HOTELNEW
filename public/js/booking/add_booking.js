@@ -670,11 +670,21 @@ $(document).ready(function () {
 
     // Flight number / passenger count - required when either Pick-up or Drop-off is checked
     $('#includePickup, #includeDropoff').on('change', function () {
-        const needsFlightInfo = $('#includePickup').is(':checked') || $('#includeDropoff').is(':checked');
+        const pickupChecked = $('#includePickup').is(':checked');
+        const dropoffChecked = $('#includeDropoff').is(':checked');
+        const needsFlightInfo = pickupChecked || dropoffChecked;
         $('#pickupDropoffFlightInfo').toggle(needsFlightInfo);
+        $('#flightArrivalWrapper').toggle(pickupChecked);
+        $('#flightDepartureWrapper').toggle(dropoffChecked);
         if (!needsFlightInfo) {
             $('#flightNumber').val('');
             $('#passengerCount').val('');
+        }
+        if (!pickupChecked) {
+            $('#flightArrivalDisplay').val('');
+        }
+        if (!dropoffChecked) {
+            $('#flightDepartureDisplay').val('');
         }
     });
 
