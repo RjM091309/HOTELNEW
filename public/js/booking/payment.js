@@ -486,7 +486,7 @@ document.getElementById('modal-payment').addEventListener('hidden.bs.modal', fun
 $('#confirmPaymentButton').on('click', async function () {
     // Get payment details - support both old and new modal designs
     const bookingId = $('#hiddenBookingId').val() || $('#bookingID').val(); // Support both hidden input names
-    const paymentAmount = $('#paymentAmount').val() || $('#paymentAmountInput').val(); // Support both amount inputs
+    let paymentAmount = $('#paymentAmount').val() || $('#paymentAmountInput').val(); // Support both amount inputs
     const paymentMethod = $('#paymentMethod').val(); // Hidden input from enhanced modal
     let paymentNotes = $('#paymentNotes').val() || ''; // Payment notes from enhanced modal
 
@@ -510,6 +510,23 @@ $('#confirmPaymentButton').on('click', async function () {
                 onConfirmed(depositResult);
             }
             return;
+        }
+
+        // The deposit may have been applied to the balance - refresh the amount to
+        // pay so the payment step below doesn't charge the stale, pre-deposit total.
+        if (typeof depositResult.remainingBalance !== 'undefined') {
+            const freshBalance = parseFloat(depositResult.remainingBalance) || 0;
+            paymentAmount = freshBalance;
+            const amountInput = document.getElementById('paymentAmountInput');
+            if (amountInput) amountInput.value = freshBalance;
+            if (typeof updatePaymentSummaryCard === 'function') {
+                updatePaymentSummaryCard(freshBalance, {});
+            } else {
+                const totalAmountEl = document.getElementById('paymentTotalAmount');
+                if (totalAmountEl) {
+                    totalAmountEl.textContent = freshBalance.toLocaleString('en-US', { minimumFractionDigits: 2 });
+                }
+            }
         }
     }
 

@@ -43,6 +43,12 @@ class DashboardController {
       // Process employee data
       const categorizedEmployees = DashboardModel.categorizeEmployees(employeesResults);
 
+      // The Today Check-out tab should only list pending checkouts - once a room is
+      // actually checked out, it moves to the Cleaning tab instead of staying here.
+      const pendingTodayCheckedOutDetails = (todayCheckedOutDetails || []).filter(
+        (booking) => booking.BookingStatus !== 'check-Out'
+      );
+
       // Process room data
       const processedRoomData = DashboardModel.processRoomData(roomDataResults);
 
@@ -127,7 +133,7 @@ class DashboardController {
         todayCheckInDetails,
         groupBookingDetails,
         lateInOutDetails,
-        todayCheckedOutDetails,
+        todayCheckedOutDetails: pendingTodayCheckedOutDetails,
         extendedDetails,
         lateCheckOutDetails,
         cleaningRoomDetails: roomDetails.cleaning || [],
