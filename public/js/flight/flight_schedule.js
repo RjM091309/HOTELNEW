@@ -1,6 +1,4 @@
 let flightScheduleTable;
-let addArrivalPicker;
-let addDeparturePicker;
 let editArrivalPicker;
 let editDeparturePicker;
 
@@ -21,15 +19,8 @@ $(document).ready(function () {
 function initializeFlightDateTimePickers() {
   if (typeof flatpickr === 'undefined') return;
 
-  addArrivalPicker = flatpickr('#addArrival', flightDateTimeOptions);
-  addDeparturePicker = flatpickr('#addDeparture', flightDateTimeOptions);
   editArrivalPicker = flatpickr('#editArrival', flightDateTimeOptions);
   editDeparturePicker = flatpickr('#editDeparture', flightDateTimeOptions);
-}
-
-function clearAddFlightPickers() {
-  addArrivalPicker?.clear();
-  addDeparturePicker?.clear();
 }
 
 function setEditFlightPickers(arrival, departure) {
@@ -70,7 +61,6 @@ function initializeFlightScheduleTable() {
 function setupFlightScheduleHandlers() {
   $('#addFlightScheduleBtn').on('click', function () {
     $('#addFlightScheduleForm')[0].reset();
-    clearAddFlightPickers();
     $('#addFlightScheduleModal').modal('show');
   });
 
