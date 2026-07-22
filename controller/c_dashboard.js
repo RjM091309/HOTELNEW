@@ -282,6 +282,107 @@ class DashboardController {
     }
   }
 
+  // Get security deposit for a booking
+  static async getSecurityDeposit(req, res) {
+    try {
+      const { bookingId } = req.params;
+      const deposit = await DashboardModel.getSecurityDeposit(bookingId);
+      res.json({ success: true, data: deposit });
+    } catch (error) {
+      console.error('Error fetching security deposit:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  }
+
+  // Undo security deposit refund (manual or via checkout revert)
+  static async revertSecurityDepositRefund(req, res) {
+    try {
+      const { BookingID } = req.body;
+
+      if (!BookingID) {
+        return res.status(400).json({ success: false, message: 'Booking ID is required.' });
+      }
+
+      const result = await DashboardModel.revertSecurityDepositRefund(BookingID);
+
+      if (result.reverted) {
+        res.json({
+          success: true,
+          message: 'Security deposit refund has been undone. Deposit is on hold again.',
+          data: result
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: 'No refunded security deposit found to undo.'
+        });
+      }
+    } catch (error) {
+      console.error('Error reverting security deposit refund:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  }
+
+  // Process security deposit refund at checkout
+  static async refundSecurityDepositAtCheckout(req, res) {
+    try {
+      const { BookingID, action, deductAmount, applyRemainderToBalance, remarks } = req.body;
+      const encodedBy = req.user?.userId;
+
+      if (!BookingID) {
+        return res.status(400).json({ success: false, message: 'Booking ID is required.' });
+      }
+      if (!action) {
+        return res.status(400).json({ success: false, message: 'Refund action is required.' });
+      }
+
+      const result = await DashboardModel.processSecurityDepositAtCheckout(BookingID, {
+        action,
+        deductAmount,
+        applyRemainderToBalance: !!applyRemainderToBalance,
+        remarks,
+        encodedBy
+      });
+
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error('Error processing security deposit at checkout:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  }
+
+  // Check in guest with security deposit
+  static async checkInWithSecurityDeposit(req, res) {
+    try {
+      const { BookingID, depositAmount, paymentMethod, remarks } = req.body;
+      const encodedBy = req.user?.userId;
+
+      if (!BookingID) {
+        return res.status(400).json({ success: false, message: 'Booking ID is required.' });
+      }
+
+      const result = await DashboardModel.checkInWithSecurityDeposit(BookingID, {
+        depositAmount,
+        paymentMethod,
+        remarks,
+        encodedBy
+      });
+
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error('Error checking in with security deposit:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  }
+
   // Update booking status controller
   static async updateBookingStatus(req, res) {
     try {
@@ -290,7 +391,7 @@ class DashboardController {
       // Convert empty string to null for lateCheckOut
       const processedLateCheckOut = lateCheckOut === '' ? null : lateCheckOut;
       
-      const success = await DashboardModel.updateBookingStatus(BookingID, status, processedLateCheckOut);
+      const success = await DashboardModel.updateBookingStatus(BookingID, status, processedLateCheckOut, req.user?.userId);
       
       if (success) {
         res.json({

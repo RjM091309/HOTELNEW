@@ -331,7 +331,7 @@ class BookingModel {
                 p.BOOKING_ID,
                 SUM(p.AMOUNT_PAID) AS TOTAL_PAYMENTS_MADE
               FROM payments p
-              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount')
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'security_deposit_refund')
               GROUP BY p.BOOKING_ID
             ) actual_payments ON b.IDNo = actual_payments.BOOKING_ID
           WHERE b.ACTIVE = 1
@@ -850,7 +850,7 @@ class BookingModel {
             connection.query(
               `SELECT COALESCE(SUM(AMOUNT_PAID), 0) AS total_paid
                FROM payments
-               WHERE BOOKING_ID = ? AND PAYMENT_TYPE NOT IN ('reservation_fee', 'discount')`,
+               WHERE BOOKING_ID = ? AND PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')`,
               [bookingId],
               (err, rows) => (err ? reject(err) : resolve(rows))
             );
@@ -2041,7 +2041,7 @@ class BookingModel {
                           SELECT SUM(p.AMOUNT_PAID) 
                           FROM payments p 
                           WHERE p.BOOKING_ID = b.BOOKING_ID 
-                          AND p.PAYMENT_TYPE != 'discount'
+                          AND p.PAYMENT_TYPE NOT IN ('discount', 'security_deposit_refund')
                       ), 0))
                   FROM billing b
                   WHERE b.BOOKING_ID = ?
@@ -6198,7 +6198,7 @@ class BookingModel {
       const totalPaid = paymentsData.reduce((sum, payment) => {
         const amount = parseFloat(payment.AMOUNT_PAID) || 0;
         // Only count room and service payments, exclude refunds (negative), reservation_fee, and discount
-        if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount' || amount < 0) {
+        if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount' || payment.PAYMENT_TYPE === 'security_deposit' || payment.PAYMENT_TYPE === 'security_deposit_refund' || amount < 0) {
           return sum;
         }
         if (payment.PAYMENT_TYPE === 'room' || payment.PAYMENT_TYPE === 'service') {
@@ -8216,7 +8216,7 @@ class BookingModel {
       const paidAmountQuery = `
         SELECT COALESCE(SUM(AMOUNT_PAID), 0) as totalPaid
         FROM payments 
-        WHERE BOOKING_ID = ? AND PAYMENT_TYPE NOT IN ('reservation_fee', 'discount')
+        WHERE BOOKING_ID = ? AND PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')
       `;
       const paidAmountResult = await queryDatabasePromise(paidAmountQuery, [bookingId]);
       const totalPaidAmount = parseFloat(paidAmountResult[0]?.totalPaid) || 0;
@@ -10673,7 +10673,7 @@ class BookingModel {
           p.BOOKING_ID AS bookingId,
           COALESCE(SUM(p.AMOUNT_PAID), 0) AS total_paid
         FROM payments p
-        WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+        WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'security_deposit_refund', 'refund')
           AND p.BOOKING_ID IN (${placeholders})
         GROUP BY p.BOOKING_ID
       `;

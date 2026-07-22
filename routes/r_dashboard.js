@@ -17,6 +17,10 @@ router.post('/transfer-room', DashboardController.transferRoom);
 
 // Booking status routes
 router.post('/booking/check_room_occupied', DashboardController.checkRoomOccupied);
+router.get('/booking/security-deposit/:bookingId', DashboardController.getSecurityDeposit);
+router.post('/booking/check-in-with-deposit', DashboardController.checkInWithSecurityDeposit);
+router.post('/booking/refund-security-deposit', DashboardController.refundSecurityDepositAtCheckout);
+router.post('/booking/revert-security-deposit', DashboardController.revertSecurityDepositRefund);
 router.post('/booking/update_status', DashboardController.updateBookingStatus);
 
 // Room maintenance routes

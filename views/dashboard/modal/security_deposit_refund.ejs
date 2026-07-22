@@ -1,0 +1,229 @@
+<!-- Security Deposit Refund at Checkout Modal -->
+<style>
+    #securityDepositRefundModal .modal-content {
+        border: none;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+    }
+
+    #securityDepositRefundModal .modal-body {
+        background-color: #ffffff !important;
+        color: #212529 !important;
+        padding: 1.25rem 1.5rem;
+    }
+
+    #securityDepositRefundModal .modal-footer {
+        background-color: #f8f9fa !important;
+        color: #212529 !important;
+        border-top: 1px solid #dee2e6;
+        padding: 0.75rem 1.5rem;
+    }
+
+    #securityDepositRefundModal .sdr-deposit-question {
+        font-size: 1.05rem;
+        color: #0c2a42;
+        margin-bottom: 1rem;
+    }
+
+    #securityDepositRefundModal .sdr-deposit-question span {
+        color: #198754;
+        font-weight: 700;
+    }
+
+    #securityDepositRefundModal .sdr-option {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.5rem;
+        border: 1.5px solid #dee2e6;
+        border-radius: 8px;
+        background: #f8f9fa;
+        cursor: pointer;
+        transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+    }
+
+    #securityDepositRefundModal .sdr-option:hover {
+        border-color: #adb5bd;
+        background: #f1f3f5;
+    }
+
+    #securityDepositRefundModal .sdr-option.sdr-option-selected {
+        border-color: #0c2a42;
+        background: #e8f0f7;
+        box-shadow: 0 0 0 2px rgba(12, 42, 66, 0.12);
+    }
+
+    #securityDepositRefundModal .sdr-option.sdr-option-selected:hover {
+        border-color: #0c2a42;
+        background: #e8f0f7;
+    }
+
+    #securityDepositRefundModal .sdr-option input[type="radio"] {
+        flex-shrink: 0;
+        width: 1.1em;
+        height: 1.1em;
+        margin-top: 0.2em;
+        cursor: pointer;
+        accent-color: #0c2a42;
+        color: #212529 !important;
+    }
+
+    #securityDepositRefundModal .sdr-option-label {
+        flex: 1;
+        cursor: pointer;
+        margin: 0;
+        color: #212529 !important;
+    }
+
+    #securityDepositRefundModal .sdr-option-label strong {
+        display: block;
+        font-size: 0.95rem;
+        color: #212529;
+        margin-bottom: 0.15rem;
+    }
+
+    #securityDepositRefundModal .sdr-option-desc {
+        font-size: 0.8rem;
+        color: #6c757d;
+        line-height: 1.4;
+    }
+
+    #securityDepositRefundModal #sdrPartialWrap {
+        margin: 0.25rem 0 0.75rem 2rem;
+        padding: 0.75rem 1rem;
+        background: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+    }
+
+    #securityDepositRefundModal .form-control,
+    #securityDepositRefundModal .input-group-text {
+        background-color: #fff !important;
+        color: #212529 !important;
+        border-color: #ced4da;
+    }
+
+    #securityDepositRefundModal .form-control:focus {
+        border-color: #0c2a42;
+        box-shadow: 0 0 0 0.2rem rgba(12, 42, 66, 0.15);
+    }
+
+    #securityDepositRefundModal #sdrPartialWrap .sdr-partial-breakdown {
+        font-size: 0.8rem;
+        color: #495057;
+        margin-top: 0.5rem;
+        line-height: 1.6;
+    }
+
+    #securityDepositRefundModal #sdrPartialWrap .sdr-partial-breakdown strong {
+        color: #212529;
+    }
+
+    #securityDepositRefundModal #sdrApplyRemainderWrap {
+        margin-top: 0.5rem;
+        padding-top: 0.5rem;
+        border-top: 1px dashed #dee2e6;
+    }
+
+    #securityDepositRefundModal #sdrApplyRemainderWrap .form-check-input {
+        width: 1em;
+        height: 1em;
+        margin-top: 0.2em;
+        accent-color: #0d6efd;
+        cursor: pointer;
+    }
+
+    #securityDepositRefundModal #sdrApplyRemainderWrap .form-check-label {
+        font-size: 0.82rem;
+        color: #212529 !important;
+        cursor: pointer;
+    }
+</style>
+
+<div class="modal fade" id="securityDepositRefundModal" tabindex="-1" aria-labelledby="securityDepositRefundModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(145deg, #0c2a42, #1a3a52); border-bottom: 1px solid #495057;">
+                <h5 class="modal-title text-white" id="securityDepositRefundModalLabel">
+                    <i class="fas fa-hand-holding-usd me-2"></i>Security Deposit — Check Out
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="sdrBookingId" value="">
+                <p class="text-muted mb-1 small" id="sdrRoomInfo">Process security deposit before checking out.</p>
+                <p class="sdr-deposit-question fw-semibold" id="sdrDepositQuestion">
+                    Refund security deposit of <span id="sdrDepositAmount">₱0.00</span>?
+                </p>
+
+                <div id="sdrBalanceInfo" class="alert alert-warning py-2 mb-3" style="display: none;">
+                    <i class="fas fa-exclamation-circle me-1"></i>
+                    Outstanding balance: <strong id="sdrUnpaidBalance">₱0.00</strong>
+                </div>
+
+                <div class="mb-3">
+                    <label class="sdr-option sdr-option-selected" id="sdrOptionFull">
+                        <input type="radio" name="sdrAction" id="sdrActionFull" value="full_refund" checked>
+                        <span class="sdr-option-label">
+                            <strong>Full Refund</strong>
+                            <span class="sdr-option-desc">Return the entire deposit to the guest.</span>
+                        </span>
+                    </label>
+
+                    <label class="sdr-option" id="sdrOptionPartial">
+                        <input type="radio" name="sdrAction" id="sdrActionPartial" value="partial_deduct">
+                        <span class="sdr-option-label">
+                            <strong>Partial / Deduct</strong>
+                            <span class="sdr-option-desc">Deduct for damages or charges; apply the remainder to balance.</span>
+                        </span>
+                    </label>
+
+                    <div id="sdrPartialWrap" style="display: none;">
+                        <label for="sdrDeductAmount" class="form-label small fw-semibold mb-1">Deduction Amount</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text">₱</span>
+                            <input type="text" class="form-control" id="sdrDeductAmount" inputmode="decimal" placeholder="0" autocomplete="off">
+                        </div>
+                        <div id="sdrApplyRemainderWrap" style="display: none;">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="sdrApplyRemainderToBalance">
+                                <label class="form-check-label" for="sdrApplyRemainderToBalance">
+                                    Apply remainder to outstanding balance
+                                </label>
+                            </div>
+                        </div>
+                        <div class="sdr-partial-breakdown" id="sdrPartialBreakdown">
+                            <div id="sdrPartialAppliedRow" style="display: none;">Applied to balance: <strong id="sdrPartialAppliedPreview" class="text-primary">₱0.00</strong></div>
+                            <div>Cash refund: <strong id="sdrPartialRefundPreview">₱0.00</strong></div>
+                        </div>
+                    </div>
+
+                    <label class="sdr-option sdr-apply-balance-option" id="sdrOptionApply" style="display: none;">
+                        <input type="radio" name="sdrAction" id="sdrActionApply" value="apply_to_balance">
+                        <span class="sdr-option-label">
+                            <strong>Apply to Balance</strong>
+                            <span class="sdr-option-desc">Use deposit toward outstanding room balance; refund any excess.</span>
+                        </span>
+                    </label>
+                </div>
+
+                <div class="mb-2">
+                    <label for="sdrRemarks" class="form-label fw-semibold small mb-1">
+                        <i class="fas fa-sticky-note me-1"></i>Remarks <span class="text-muted fw-normal">(optional)</span>
+                    </label>
+                    <input type="text" class="form-control form-control-sm" id="sdrRemarks" placeholder="e.g. damage charge, key not returned">
+                </div>
+
+                <div id="sdrErrorMsg" class="alert alert-danger py-2 mt-2 mb-0" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" id="sdrConfirmBtn">
+                    <i class="fas fa-check me-1"></i>Confirm &amp; Continue Checkout
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

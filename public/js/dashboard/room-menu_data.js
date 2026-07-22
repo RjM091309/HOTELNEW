@@ -559,23 +559,29 @@ async function createDynamicRoomModal(bookingId, event, options) {
                         
                         <!-- Summary Section -->
                         <div class="summary-section">
-                            <div class="row">
-                                <div class="col-md-4">
+                            <div class="row" id="summary-totals-row-${bookingId}">
+                                <div class="col-md-4 summary-totals-col-${bookingId}">
                                     <div class="summary-item">
                                         <label class="text-muted small mb-0">Grand Total</label>
                                         <div class="summary-value" id="grand-total-${bookingId}">${totalCost}</div>
                                     </div>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-4 summary-totals-col-${bookingId}">
                                     <div class="summary-item">
                                         <label class="text-muted small mb-0">Paid</label>
                                         <div class="summary-value" id="Paid-${bookingId}">₱0.00</div>
                                     </div>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-4 summary-totals-col-${bookingId}">
                                     <div class="summary-item">
                                         <label class="text-muted small mb-0">Balance</label>
                                         <div class="summary-value" id="Balance-${bookingId}">₱0.00</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 summary-totals-col-${bookingId}" id="security-deposit-col-${bookingId}" style="display: none;">
+                                    <div class="summary-item">
+                                        <label class="text-muted small mb-0">Security Deposit</label>
+                                        <div class="summary-value" id="security-deposit-${bookingId}">₱0.00</div>
                                     </div>
                                 </div>
                             </div>
@@ -605,6 +611,7 @@ async function createDynamicRoomModal(bookingId, event, options) {
                                     <!-- Empty column for alignment -->
                                 </div>
                             </div>
+
                             
                         </div>
                     </div>
@@ -771,7 +778,7 @@ modalStyle.textContent = `
         margin-top: 1px;
     }
     
-    /* Reservation Fee and Discount Row Styling */
+    /* Reservation Fee, Discount, and Security Deposit Row Styling */
     #dynamicRoomModal_${bookingId} #reservation-fee-row-${bookingId},
     #dynamicRoomModal_${bookingId} #discount-row-${bookingId} {
         margin-top: 8px;
@@ -2477,20 +2484,22 @@ async function calculateTotalCost(bookingId) {
 // Calculate balance
 async function calculateBalance(bookingId, currentBookingId) {
     try {
-        // Fetch billing data
-        const billingResponse = await fetch(`/booking/get-billing/${bookingId}?_=${Date.now()}`);
+        // Fetch billing, room payments, and security deposit separately
+        const [billingResponse, paymentsResponse, depositResponse] = await Promise.all([
+            fetch(`/booking/get-billing/${bookingId}?_=${Date.now()}`),
+            fetch(`/payments/get-payments/${bookingId}?_=${Date.now()}`),
+            fetch(`/dashboard/booking/security-deposit/${bookingId}?_=${Date.now()}`)
+        ]);
         const billingData = await billingResponse.json();
-        
-        // Fetch actual payments made
-        const paymentsResponse = await fetch(`/payments/get-payments/${bookingId}?_=${Date.now()}`);
         const paymentsResponseData = await paymentsResponse.json();
+        const depositResponseData = await depositResponse.json();
         
         // Extract payments array from response
         const paymentsData = (paymentsResponseData && paymentsResponseData.data) ? paymentsResponseData.data : (Array.isArray(paymentsResponseData) ? paymentsResponseData : []);
         
         // Calculate total payments made (exclude reservation_fee and discount payments)
         const totalPaymentsMade = (paymentsData && Array.isArray(paymentsData)) ? paymentsData.reduce((sum, payment) => {
-            if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
+            if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount' || payment.PAYMENT_TYPE === 'security_deposit' || payment.PAYMENT_TYPE === 'security_deposit_refund') {
                 return sum;
             }
             return sum + parseFloat(payment.AMOUNT_PAID);
@@ -2609,6 +2618,37 @@ async function calculateBalance(bookingId, currentBookingId) {
             }
         }
 
+        // Calculate total security deposit (held shows amount; refunded shows history)
+        const depositData = depositResponseData?.success ? depositResponseData.data : null;
+        const securityDepositHeld = depositData ? (parseFloat(depositData.heldAmount ?? depositData.amount) || 0) : 0;
+        const hasDepositHistory = !!(depositData && depositData.hasHistory);
+
+        // Handle Security Deposit Display (4th column after Balance)
+        const securityDepositCol = document.getElementById(`security-deposit-col-${bookingId}`);
+        const securityDepositElement = document.getElementById(`security-deposit-${bookingId}`);
+        const summaryCols = document.querySelectorAll(`.summary-totals-col-${bookingId}`);
+        if (hasDepositHistory) {
+            if (securityDepositCol && securityDepositElement) {
+                securityDepositCol.style.display = 'block';
+                if (securityDepositHeld > 0) {
+                    const formattedDeposit = securityDepositHeld.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    securityDepositElement.innerHTML = `<span class="text-info"><strong>₱${formattedDeposit}</strong></span>`;
+                } else {
+                    securityDepositElement.innerHTML = `<span class="text-muted"><strong>Refunded</strong></span>`;
+                }
+            }
+            summaryCols.forEach(col => {
+                col.classList.remove('col-md-4');
+                col.classList.add('col-md-3');
+            });
+        } else {
+            if (securityDepositCol) securityDepositCol.style.display = 'none';
+            summaryCols.forEach(col => {
+                col.classList.remove('col-md-3');
+                col.classList.add('col-md-4');
+            });
+        }
+
         // Use the correct balance calculation (same as billing.js)
         const balanceToShow = remainingBalance;
 
@@ -2685,7 +2725,7 @@ async function computeCheckoutContext(bookingId) {
         
         const paymentsArray = (paymentsData && paymentsData.data) ? paymentsData.data : (Array.isArray(paymentsData) ? paymentsData : []);
         const totalPaid = (paymentsArray && Array.isArray(paymentsArray)) ? paymentsArray.reduce((sum, payment) => {
-            if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
+            if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount' || payment.PAYMENT_TYPE === 'security_deposit' || payment.PAYMENT_TYPE === 'security_deposit_refund') {
                 return sum;
             }
             return sum + parseFloat(payment.AMOUNT_PAID);
@@ -3149,7 +3189,7 @@ function triggerCheckout(bookingId) {
                                 const paymentsArray = (paymentsData && paymentsData.data) ? paymentsData.data : (Array.isArray(paymentsData) ? paymentsData : []);
                                 
                                 totalPaid = (paymentsArray && Array.isArray(paymentsArray)) ? paymentsArray.reduce((sum, payment) => {
-                                    if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
+                                    if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount' || payment.PAYMENT_TYPE === 'security_deposit' || payment.PAYMENT_TYPE === 'security_deposit_refund') {
                                         return sum;
                                     }
                                     return sum + parseFloat(payment.AMOUNT_PAID);
@@ -3664,7 +3704,7 @@ function triggerCheckout(bookingId) {
                                 const paymentsArray = (paymentsData && paymentsData.data) ? paymentsData.data : (Array.isArray(paymentsData) ? paymentsData : []);
                                 
                                 totalPaid = (paymentsArray && Array.isArray(paymentsArray)) ? paymentsArray.reduce((sum, payment) => {
-                                    if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
+                                    if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount' || payment.PAYMENT_TYPE === 'security_deposit' || payment.PAYMENT_TYPE === 'security_deposit_refund') {
                                         return sum;
                                     }
                                     return sum + parseFloat(payment.AMOUNT_PAID);
@@ -3909,45 +3949,57 @@ function triggerCheckout(bookingId) {
 
 // Handle checkout process
 function startCheckoutProcess(bookingId, hasRefund, refundAmount = 0, scope = 'individual', penaltyAmount = 0, applyDiscount = false) {
-    // Show loading state
-    Swal.fire({
-        title: 'Processing Checkout...',
-        text: 'Please wait while we process your checkout.',
-        allowOutsideClick: false,
-        didOpen: () => {
-            Swal.showLoading();
-        }
-    });
+    const runCheckout = () => {
+        // Show loading state
+        Swal.fire({
+            title: 'Processing Checkout...',
+            text: 'Please wait while we process your checkout.',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
 
-    // Call backend checkout API
-    fetch('/booking/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId, scope, hasRefund, refundAmount, penaltyAmount, applyDiscount })
-    })
-    .then(r => {
-        if (!r.ok) {
-            return r.json().then(err => Promise.reject(err));
-        }
-        return r.json();
-    })
-    .then(resp => {
-        if (resp && resp.success) {
+        // Call backend checkout API
+        fetch('/booking/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bookingId, scope, hasRefund, refundAmount, penaltyAmount, applyDiscount })
+        })
+        .then(r => {
+            if (!r.ok) {
+                return r.json().then(err => Promise.reject(err));
+            }
+            return r.json();
+        })
+        .then(resp => {
+            if (resp && resp.success) {
+                Swal.close();
+                let message = resp.message || 'Checkout completed successfully.';
+                toastSuccess('Checkout', message);
+                setTimeout(() => { location.reload(); }, 600);
+            } else {
+                throw new Error(resp?.message || 'Checkout failed');
+            }
+        })
+        .catch(err => {
+            console.error('Checkout error:', err);
             Swal.close();
-            // Show message
-            let message = resp.message || 'Checkout completed successfully.';
-            toastSuccess('Checkout', message);
-            setTimeout(() => { location.reload(); }, 600);
-        } else {
-            throw new Error(resp?.message || 'Checkout failed');
-        }
-    })
-    .catch(err => {
-        console.error('Checkout error:', err);
-        Swal.close();
-        const errorMessage = err?.message || err?.error || 'Failed to checkout. Please try again.';
-        toastError('Checkout', errorMessage);
-    });
+            const errorMessage = err?.message || err?.error || 'Failed to checkout. Please try again.';
+            toastError('Checkout', errorMessage);
+        });
+    };
+
+    if (typeof SecurityDepositCheckout !== 'undefined') {
+        SecurityDepositCheckout.begin({
+            bookingId,
+            scope,
+            onComplete: () => runCheckout(),
+            onCancel: () => {}
+        });
+    } else {
+        runCheckout();
+    }
 }
 
 // Function to show payments
@@ -4008,6 +4060,32 @@ function showPayments(bookingId) {
                                     <tbody id="charges-items-table-${bookingId}" style="background-color: white !important;">
                                         <!-- Charges will be populated here -->
                                     </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Security Deposits Section (separate from room payments) -->
+                        <div class="mb-3" id="security-deposits-section-${bookingId}" style="display: none;">
+                            <h6 class="mb-2" style="color: #0c2a42;">
+                                <i class="fas fa-shield-alt me-1"></i>Security Deposits
+                            </h6>
+                            <div class="table-responsive">
+                                <table class="table table-bordered" style="background-color: white !important;">
+                                    <thead style="background-color: white !important;">
+                                        <tr style="background-color: white !important;">
+                                            <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Amount</th>
+                                            <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Status</th>
+                                            <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Deducted</th>
+                                            <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">To Balance</th>
+                                            <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Cash Refund</th>
+                                            <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Method</th>
+                                            <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Remarks</th>
+                                            <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Collected</th>
+                                            <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Refunded</th>
+                                            <th style="border: 1px solid #dee2e6; padding: 8px; color: black; background-color: white !important;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="security-deposits-table-${bookingId}" style="background-color: white !important;"></tbody>
                                 </table>
                             </div>
                         </div>
@@ -4109,6 +4187,100 @@ function showPayments(bookingId) {
         modal.remove();
     });
 }
+
+// Render security deposits in the Payments modal (from security_deposits table)
+function renderSecurityDepositsInModal(bookingId, depositData) {
+    const section = document.getElementById(`security-deposits-section-${bookingId}`);
+    const tbody = document.getElementById(`security-deposits-table-${bookingId}`);
+    if (!section || !tbody) return;
+
+    const records = depositData?.records || [];
+    tbody.innerHTML = '';
+
+    if (!records.length) {
+        section.style.display = 'none';
+        return;
+    }
+
+    const formatMoney = (val) => `₱${(parseFloat(val) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
+    const formatDate = (val) => val
+        ? new Date(val).toLocaleString('en-PH', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true })
+        : '-';
+
+    section.style.display = 'block';
+    records.forEach(record => {
+        const row = document.createElement('tr');
+        row.style.backgroundColor = 'white';
+        const isHeld = record.status === 'held';
+        const statusHtml = isHeld
+            ? '<span class="text-info">Held</span>'
+            : '<span class="text-success">Refunded</span>';
+        row.innerHTML = `
+            <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right; color: black;">${formatMoney(record.amount)}</td>
+            <td style="border: 1px solid #dee2e6; padding: 8px; text-align: center;">${statusHtml}</td>
+            <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right; color: black;">${record.deductionAmount > 0 ? formatMoney(record.deductionAmount) : '-'}</td>
+            <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right; color: black;">${record.appliedToBalance > 0 ? formatMoney(record.appliedToBalance) : '-'}</td>
+            <td style="border: 1px solid #dee2e6; padding: 8px; text-align: right; color: black;">${record.cashRefundAmount > 0 ? formatMoney(record.cashRefundAmount) : '-'}</td>
+            <td style="border: 1px solid #dee2e6; padding: 8px; text-align: center; color: black;">${record.paymentMethod || 'cash'}</td>
+            <td style="border: 1px solid #dee2e6; padding: 8px; color: black;">${record.remarks || '-'}</td>
+            <td style="border: 1px solid #dee2e6; padding: 8px; text-align: center; color: black;">
+                <div>${formatDate(record.collectedAt)}</div>
+                <small class="text-muted">${record.collectedBy || '-'}</small>
+            </td>
+            <td style="border: 1px solid #dee2e6; padding: 8px; text-align: center; color: black;">
+                <div>${formatDate(record.refundedAt)}</div>
+                <small class="text-muted">${record.refundedBy || '-'}</small>
+            </td>
+            <td style="border: 1px solid #dee2e6; padding: 8px; text-align: center;">
+                ${!isHeld ? `<button type="button" class="btn btn-outline-warning btn-sm" onclick="undoSecurityDepositRefund('${bookingId}')" title="Undo refund and return deposit to held"><i class="fas fa-undo me-1"></i>Undo</button>` : '-'}
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// Undo a mistaken security deposit refund (returns deposit to held)
+async function undoSecurityDepositRefund(bookingId) {
+    const confirm = await Swal.fire({
+        title: 'Undo Deposit Refund?',
+        html: 'This will return the security deposit to <strong>Held</strong> status.<br><br>If deposit was applied to balance, that payment will also be removed.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ffc107',
+        confirmButtonText: 'Yes, undo refund',
+        cancelButtonText: 'Cancel'
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    try {
+        const response = await fetch('/dashboard/booking/revert-security-deposit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ BookingID: bookingId })
+        });
+        const result = await response.json();
+
+        if (!result.success) {
+            Swal.fire('Error', result.message || 'Failed to undo deposit refund.', 'error');
+            return;
+        }
+
+        Swal.fire('Done', result.message || 'Deposit refund undone.', 'success');
+
+        if (typeof loadPaymentData === 'function' && document.getElementById(`paymentsModal_${bookingId}`)) {
+            loadPaymentData(bookingId);
+        }
+        if (typeof calculateBalance === 'function') {
+            calculateBalance(bookingId);
+        }
+    } catch (err) {
+        console.error('Undo security deposit refund error:', err);
+        Swal.fire('Error', 'An error occurred while undoing the deposit refund.', 'error');
+    }
+}
+
+window.undoSecurityDepositRefund = undoSecurityDepositRefund;
 
 // Function to load payment data
 async function loadPaymentData(bookingId) {
@@ -4278,6 +4450,7 @@ async function loadPaymentData(bookingId) {
                         
                         allPaymentItems.push({
                             type: 'payment',
+                            payment_type: payment.PAYMENT_TYPE,
                             item_name: `Payment - Room ${payment.ROOM_NUMBER}`,
                             description: payment.REMARKS || payment.PAYMENT_METHOD || 'Payment',
                             amount: parseFloat(payment.AMOUNT_PAID || 0),
@@ -4342,6 +4515,7 @@ async function loadPaymentData(bookingId) {
                         
                 allPaymentItems.push({
                     type: 'payment',
+                    payment_type: payment.PAYMENT_TYPE,
                     item_name: getPaymentTypeName(payment.PAYMENT_TYPE),
                     description: payment.REMARKS || payment.PAYMENT_METHOD || 'Payment',
                     amount: amountPaid,
@@ -4527,18 +4701,36 @@ async function loadPaymentData(bookingId) {
             allPaymentItems = getFallbackPaymentData(bookingId);
         }
 
+        // Load security deposits separately (NOT from payments table)
+        let depositData = null;
+        try {
+            const depositRes = await fetch(`/dashboard/booking/security-deposit/${bookingId}?_=${Date.now()}`);
+            const depositJson = await depositRes.json();
+            if (depositJson.success) depositData = depositJson.data;
+        } catch (depositErr) {
+            console.warn('Could not load security deposit:', depositErr);
+        }
+        renderSecurityDepositsInModal(bookingId, depositData);
+
         // Hide loading indicator
         if (loadingDiv) loadingDiv.style.display = 'none';
 
-        if (allPaymentItems.length > 0) {
-            // Pass group data if it's a group booking
-            const displayOptions = groupData && groupData.isGroup ? { 
-                isGroup: true, 
-                groupDiscount: groupData.groupDiscount, 
-                groupReservationFee: groupData.groupReservationFee,
-                groupName: groupData.groupName
-            } : { isGroup: false };
-            displayPaymentData(bookingId, allPaymentItems, displayOptions);
+        const hasDeposits = !!(depositData && depositData.hasHistory);
+
+        if (allPaymentItems.length > 0 || hasDeposits) {
+            if (itemsDiv) itemsDiv.style.display = 'block';
+            if (allPaymentItems.length > 0) {
+                // Pass group data if it's a group booking
+                const displayOptions = groupData && groupData.isGroup ? { 
+                    isGroup: true, 
+                    groupDiscount: groupData.groupDiscount, 
+                    groupReservationFee: groupData.groupReservationFee,
+                    groupName: groupData.groupName
+                } : { isGroup: false };
+                displayPaymentData(bookingId, allPaymentItems, displayOptions);
+            } else if (summaryDiv) {
+                summaryDiv.style.display = 'none';
+            }
         } else {
             // Show no payments message
             if (noPaymentsDiv) noPaymentsDiv.style.display = 'block';
@@ -4662,6 +4854,11 @@ function getFallbackPaymentData(bookingId) {
     return fallbackItems;
 }
 
+function isNonRoomPaymentType(paymentType) {
+    const type = String(paymentType || '').toLowerCase();
+    return type === 'reservation_fee' || type === 'discount' || type === 'security_deposit' || type === 'security_deposit_refund';
+}
+
 // Helper function to get payment type name
 function getPaymentTypeName(paymentType) {
     if (!paymentType) return 'Payment';
@@ -4671,6 +4868,8 @@ function getPaymentTypeName(paymentType) {
         case 'service': return 'Service Payment';
         case 'extension': return 'Extension Payment';
         case 'cancellation_fee': return 'Cancellation Fee';
+        case 'security_deposit': return 'Security Deposit';
+        case 'security_deposit_refund': return 'Security Deposit Refund';
         default: return paymentType;
     }
 }
@@ -4684,6 +4883,8 @@ function getPaymentIcon(paymentType) {
         case 'service': return 'fa-concierge-bell';
         case 'extension': return 'fa-calendar-plus';
         case 'cancellation_fee': return 'fa-exclamation-triangle';
+        case 'security_deposit': return 'fa-shield-alt';
+        case 'security_deposit_refund': return 'fa-hand-holding-usd';
         default: return 'fa-receipt';
     }
 }
@@ -4797,8 +4998,8 @@ function displayPaymentData(bookingId, payments, options = {}) {
         const isPaid = payment.status === 'paid';
         const isPartial = payment.status === 'partial';
         
-        // Add to totalPaid if it's an actual payment record
-        if (isPaid || isPartial) {
+        // Add to totalPaid only for actual room/service payments (not deposit, reservation fee, or discount)
+        if ((isPaid || isPartial) && !isNonRoomPaymentType(payment.payment_type)) {
             totalPaid += amount;
         }
         
@@ -4822,7 +5023,11 @@ function displayPaymentData(bookingId, payments, options = {}) {
 
         // Status text and styling
         let statusText, statusClass;
-        if (isPaid) {
+        const isSecurityDeposit = (payment.payment_type || '').toLowerCase() === 'security_deposit';
+        if (isSecurityDeposit) {
+            statusText = 'Held';
+            statusClass = 'text-info';
+        } else if (isPaid) {
             statusText = 'Paid';
             statusClass = 'text-success';
         } else if (isPartial) {

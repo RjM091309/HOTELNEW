@@ -5,6 +5,8 @@ const paymentsModel = {
     const { bookingId, type, method, from, to } = filters;
     const clauses = [];
     const params = [];
+    // Security deposits live in their own table — never return legacy rows from payments
+    clauses.push("p.PAYMENT_TYPE NOT IN ('security_deposit')");
     if (bookingId) { clauses.push('p.BOOKING_ID = ?'); params.push(bookingId); }
     if (type) { clauses.push('p.PAYMENT_TYPE = ?'); params.push(type); }
     if (method) { clauses.push('p.PAYMENT_METHOD = ?'); params.push(method); }
@@ -49,7 +51,7 @@ const paymentsModel = {
       LEFT JOIN room r ON r.IDNo = b.ROOM_ID
       LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
       WHERE b.ACTIVE = 1 
-      AND (SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE != 'discount') > 0
+      AND (SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')) > 0
       ${searchCondition}
     `;
     const [countResult] = await pool.promise().query(countQuery, searchParams);
@@ -76,7 +78,7 @@ const paymentsModel = {
           COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
         ) AS TOTAL_AMOUNT,
         COALESCE(bill.DISCOUNT_AMOUNT, 0) AS DISCOUNT_AMOUNT,
-        COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE != 'discount'), 0) AS TOTAL_PAID,
+        COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')), 0) AS TOTAL_PAID,
         (
           COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) +
           COALESCE(bill.AMENITIES_CHARGE, 0) +
@@ -84,7 +86,7 @@ const paymentsModel = {
           COALESCE(bill.CANCELLATION_PENALTY, 0) +
           COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0) +
           COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
-        ) - COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE != 'discount'), 0) - COALESCE(bill.DISCOUNT_AMOUNT, 0) AS BALANCE,
+        ) - COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')), 0) - COALESCE(bill.DISCOUNT_AMOUNT, 0) AS BALANCE,
         b.ENCODED_DT AS BOOKING_DATE
       FROM booking b
       LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
@@ -101,7 +103,7 @@ const paymentsModel = {
       ) lp ON lp.BOOKING_ID = b.IDNo
       LEFT JOIN user_info u ON u.IDNo = lp.ENCODED_BY
       WHERE b.ACTIVE = 1 
-      AND (SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE != 'discount') > 0
+      AND (SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')) > 0
       ${searchCondition}
       ORDER BY ${orderBy} ${orderDir}
       LIMIT ? OFFSET ?
@@ -119,7 +121,7 @@ const paymentsModel = {
       `SELECT COALESCE(SUM(p.AMOUNT_PAID), 0) AS totalPaid
        FROM payments p
        WHERE DATE(p.PAYMENT_DATE) = ?
-         AND p.PAYMENT_TYPE != 'discount'`,
+         AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')`,
       [todayStr]
     );
 
@@ -127,7 +129,7 @@ const paymentsModel = {
       `SELECT COALESCE(SUM(p.AMOUNT_PAID), 0) AS totalPaid
        FROM payments p
        WHERE DATE(p.PAYMENT_DATE) >= ?
-         AND p.PAYMENT_TYPE != 'discount'`,
+         AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')`,
       [weekStartStr]
     );
 
@@ -135,7 +137,7 @@ const paymentsModel = {
       `SELECT COALESCE(SUM(p.AMOUNT_PAID), 0) AS totalPaid
        FROM payments p
        WHERE DATE(p.PAYMENT_DATE) >= ?
-         AND p.PAYMENT_TYPE != 'discount'`,
+         AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')`,
       [monthStartStr]
     );
 
@@ -175,7 +177,7 @@ const paymentsModel = {
            COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0) +
            COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
          ) AS TOTAL_AMOUNT,
-         COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE != 'discount'), 0) AS TOTAL_PAID,
+         COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')), 0) AS TOTAL_PAID,
          (
            COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) +
            COALESCE(bill.AMENITIES_CHARGE, 0) +
@@ -183,7 +185,7 @@ const paymentsModel = {
            COALESCE(bill.CANCELLATION_PENALTY, 0) +
            COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0) +
            COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
-         ) - COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE != 'discount'), 0) - COALESCE(bill.DISCOUNT_AMOUNT, 0) AS BALANCE
+         ) - COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')), 0) - COALESCE(bill.DISCOUNT_AMOUNT, 0) AS BALANCE
        FROM booking b
        LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
        LEFT JOIN room r ON r.IDNo = b.ROOM_ID
@@ -303,7 +305,7 @@ const paymentsModel = {
            COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0) +
            COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
          ) AS TOTAL_AMOUNT,
-         COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE != 'discount'), 0) AS TOTAL_PAID,
+         COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')), 0) AS TOTAL_PAID,
          (
            COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) +
            COALESCE(bill.AMENITIES_CHARGE, 0) +
@@ -311,7 +313,7 @@ const paymentsModel = {
            COALESCE(bill.CANCELLATION_PENALTY, 0) +
            COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0) +
            COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
-         ) - COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE != 'discount'), 0) - COALESCE(bill.DISCOUNT_AMOUNT, 0) AS BALANCE
+         ) - COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')), 0) - COALESCE(bill.DISCOUNT_AMOUNT, 0) AS BALANCE
        FROM booking b
        LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
        LEFT JOIN room r ON r.IDNo = b.ROOM_ID

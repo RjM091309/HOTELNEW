@@ -116,7 +116,7 @@ class DashboardModel {
           COALESCE((
             SELECT SUM(p.AMOUNT_PAID)
             FROM payments p
-            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
               AND (
                 p.BOOKING_ID = b.IDNo
                 OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -135,7 +135,7 @@ class DashboardModel {
             - COALESCE((
               SELECT SUM(p.AMOUNT_PAID)
               FROM payments p
-              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
                 AND (
                   p.BOOKING_ID = b.IDNo
                   OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -209,7 +209,7 @@ class DashboardModel {
           COALESCE((
             SELECT SUM(p.AMOUNT_PAID)
             FROM payments p
-            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
               AND (
                 p.BOOKING_ID = b.IDNo
                 OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -228,7 +228,7 @@ class DashboardModel {
             - COALESCE((
               SELECT SUM(p.AMOUNT_PAID)
               FROM payments p
-              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
                 AND (
                   p.BOOKING_ID = b.IDNo
                   OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -350,7 +350,7 @@ class DashboardModel {
           COALESCE((
             SELECT SUM(p.AMOUNT_PAID)
             FROM payments p
-            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
               AND (
                 p.BOOKING_ID = b.IDNo
                 OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -369,7 +369,7 @@ class DashboardModel {
             - COALESCE((
               SELECT SUM(p.AMOUNT_PAID)
               FROM payments p
-              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
                 AND (
                   p.BOOKING_ID = b.IDNo
                   OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -446,7 +446,7 @@ class DashboardModel {
           COALESCE((
             SELECT SUM(p.AMOUNT_PAID)
             FROM payments p
-            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
               AND (
                 p.BOOKING_ID = b.IDNo
                 OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -465,7 +465,7 @@ class DashboardModel {
             - COALESCE((
               SELECT SUM(p.AMOUNT_PAID)
               FROM payments p
-              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
                 AND (
                   p.BOOKING_ID = b.IDNo
                   OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -536,7 +536,7 @@ class DashboardModel {
           COALESCE((
             SELECT SUM(p.AMOUNT_PAID)
             FROM payments p
-            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
               AND (
                 p.BOOKING_ID = b.IDNo
                 OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -555,7 +555,7 @@ class DashboardModel {
             - COALESCE((
               SELECT SUM(p.AMOUNT_PAID)
               FROM payments p
-              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
                 AND (
                   p.BOOKING_ID = b.IDNo
                   OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -821,7 +821,7 @@ class DashboardModel {
             COALESCE((
               SELECT SUM(p.AMOUNT_PAID)
               FROM payments p
-              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
                 AND (
                   p.BOOKING_ID = b.IDNo
                   OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -840,7 +840,7 @@ class DashboardModel {
               - COALESCE((
                 SELECT SUM(p.AMOUNT_PAID)
                 FROM payments p
-                WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+                WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
                   AND (
                     p.BOOKING_ID = b.IDNo
                     OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -902,7 +902,7 @@ class DashboardModel {
             COALESCE((
               SELECT SUM(p.AMOUNT_PAID)
               FROM payments p
-              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
                 AND (
                   p.BOOKING_ID = b.IDNo
                   OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -921,7 +921,7 @@ class DashboardModel {
               - COALESCE((
                 SELECT SUM(p.AMOUNT_PAID)
                 FROM payments p
-                WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'refund')
+                WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
                   AND (
                     p.BOOKING_ID = b.IDNo
                     OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -1288,8 +1288,14 @@ class DashboardModel {
   */
 
   // Update booking status
-  static async updateBookingStatus(bookingId, status, lateCheckOut = null) {
+  static async updateBookingStatus(bookingId, status, lateCheckOut = null, encodedBy = null) {
     try {
+      const prevRows = await queryDatabasePromise(
+        `SELECT BOOKING_STATUS FROM booking WHERE IDNo = ? AND ACTIVE = 1 LIMIT 1`,
+        [bookingId]
+      );
+      const previousStatus = prevRows[0]?.BOOKING_STATUS;
+
       let query = 'UPDATE booking SET BOOKING_STATUS = ? WHERE IDNo = ? AND ACTIVE = 1';
       let params = [status, bookingId];
 
@@ -1299,8 +1305,331 @@ class DashboardModel {
       }
 
       const result = await queryDatabasePromise(query, params);
+
+      if (result.affectedRows > 0 && previousStatus === 'check-Out' && status === 'check-In') {
+        await DashboardModel.revertSecurityDepositRefund(bookingId, encodedBy);
+      }
+
       return result.affectedRows > 0;
     } catch (error) {
+      throw error;
+    }
+  }
+
+  // Get security deposit records for a booking (held + refunded history)
+  static async getSecurityDeposit(bookingId) {
+    try {
+      const rows = await queryDatabasePromise(
+        `SELECT sd.IDNo, sd.AMOUNT, sd.PAYMENT_METHOD, sd.STATUS, sd.REMARKS,
+                sd.DEDUCTION_AMOUNT, sd.CASH_REFUND_AMOUNT, sd.APPLIED_TO_BALANCE,
+                sd.COLLECTED_AT, sd.REFUNDED_AT,
+                u.FULLNAME AS COLLECTED_BY, ru.FULLNAME AS REFUNDED_BY_NAME
+         FROM security_deposits sd
+         LEFT JOIN user_info u ON u.IDNo = sd.ENCODED_BY
+         LEFT JOIN user_info ru ON ru.IDNo = sd.REFUNDED_BY
+         WHERE sd.BOOKING_ID = ? AND sd.ACTIVE = 1
+         ORDER BY sd.COLLECTED_AT DESC`,
+        [bookingId]
+      );
+
+      const heldRows = rows.filter(row => row.STATUS === 'held');
+      const heldAmount = heldRows.reduce((sum, row) => sum + (parseFloat(row.AMOUNT) || 0), 0);
+      const refundedAmount = rows
+        .filter(row => row.STATUS === 'refunded')
+        .reduce((sum, row) => sum + (parseFloat(row.AMOUNT) || 0), 0);
+
+      const mapRecord = (row) => ({
+        id: row.IDNo,
+        amount: parseFloat(row.AMOUNT) || 0,
+        paymentMethod: row.PAYMENT_METHOD,
+        status: row.STATUS,
+        remarks: row.REMARKS,
+        deductionAmount: parseFloat(row.DEDUCTION_AMOUNT) || 0,
+        cashRefundAmount: parseFloat(row.CASH_REFUND_AMOUNT) || 0,
+        appliedToBalance: parseFloat(row.APPLIED_TO_BALANCE) || 0,
+        collectedAt: row.COLLECTED_AT,
+        collectedBy: row.COLLECTED_BY,
+        refundedAt: row.REFUNDED_AT,
+        refundedBy: row.REFUNDED_BY_NAME
+      });
+
+      return {
+        exists: heldAmount > 0,
+        amount: heldAmount,
+        heldAmount,
+        refundedAmount,
+        hasHistory: rows.length > 0,
+        records: rows.map(mapRecord),
+        heldRecords: heldRows.map(mapRecord)
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Revert a processed security deposit refund (undo mistaken refund)
+  static async revertSecurityDepositRefund(bookingId) {
+    try {
+      const refundedRows = await queryDatabasePromise(
+        `SELECT IDNo FROM security_deposits
+         WHERE BOOKING_ID = ? AND ACTIVE = 1 AND STATUS = 'refunded'`,
+        [bookingId]
+      );
+
+      if (!refundedRows.length) {
+        return { reverted: false };
+      }
+
+      await queryDatabasePromise('START TRANSACTION');
+
+      for (const row of refundedRows) {
+        const depositTag = `security deposit #${row.IDNo}`;
+
+        await queryDatabasePromise(
+          `DELETE FROM payments
+           WHERE BOOKING_ID = ?
+             AND PAYMENT_TYPE = 'room'
+             AND REMARKS LIKE ?`,
+          [bookingId, `%${depositTag}%`]
+        );
+
+        // Legacy: remove old cash-refund rows if any were recorded before separation
+        await queryDatabasePromise(
+          `DELETE FROM payments
+           WHERE BOOKING_ID = ?
+             AND PAYMENT_TYPE = 'security_deposit_refund'
+             AND REMARKS LIKE ?`,
+          [bookingId, `%${depositTag}%`]
+        );
+
+        await queryDatabasePromise(
+          `UPDATE security_deposits
+           SET STATUS = 'held',
+               REFUNDED_AT = NULL,
+               REFUNDED_BY = NULL,
+               DEDUCTION_AMOUNT = NULL,
+               CASH_REFUND_AMOUNT = NULL,
+               APPLIED_TO_BALANCE = NULL
+           WHERE IDNo = ? AND ACTIVE = 1`,
+          [row.IDNo]
+        );
+      }
+
+      await queryDatabasePromise('COMMIT');
+      return { reverted: true, count: refundedRows.length };
+    } catch (error) {
+      await queryDatabasePromise('ROLLBACK');
+      throw error;
+    }
+  }
+
+  // Record security deposit and check in guest (atomic)
+  static async checkInWithSecurityDeposit(bookingId, { depositAmount, paymentMethod, remarks, encodedBy }) {
+    try {
+      await queryDatabasePromise('START TRANSACTION');
+
+      const bookingRows = await queryDatabasePromise(
+        `SELECT IDNo, BOOKING_STATUS FROM booking WHERE IDNo = ? AND ACTIVE = 1 LIMIT 1`,
+        [bookingId]
+      );
+
+      if (bookingRows.length === 0) {
+        await queryDatabasePromise('ROLLBACK');
+        return { success: false, message: 'Booking not found.' };
+      }
+
+      if (bookingRows[0].BOOKING_STATUS !== 'pending') {
+        await queryDatabasePromise('ROLLBACK');
+        return { success: false, message: 'Only pending bookings can be checked in.' };
+      }
+
+      const depositInfo = await DashboardModel.getSecurityDeposit(bookingId);
+      let recordedDeposit = depositInfo.amount;
+
+      if (!depositInfo.exists) {
+        const amount = parseFloat(depositAmount);
+        if (!amount || amount <= 0) {
+          await queryDatabasePromise('ROLLBACK');
+          return { success: false, message: 'Security deposit amount is required.' };
+        }
+        if (!paymentMethod) {
+          await queryDatabasePromise('ROLLBACK');
+          return { success: false, message: 'Payment method is required.' };
+        }
+
+        const depositRemarks = remarks?.trim() || 'Security deposit collected at check-in';
+
+        await queryDatabasePromise(
+          `INSERT INTO security_deposits (BOOKING_ID, AMOUNT, PAYMENT_METHOD, STATUS, REMARKS, ENCODED_BY, COLLECTED_AT, ACTIVE)
+           VALUES (?, ?, ?, 'held', ?, ?, NOW(), 1)`,
+          [bookingId, amount, paymentMethod, depositRemarks, encodedBy]
+        );
+        recordedDeposit = amount;
+      }
+
+      const updateResult = await queryDatabasePromise(
+        `UPDATE booking SET BOOKING_STATUS = 'check-In', EDITED_DT = NOW() WHERE IDNo = ? AND ACTIVE = 1`,
+        [bookingId]
+      );
+
+      if (updateResult.affectedRows === 0) {
+        await queryDatabasePromise('ROLLBACK');
+        return { success: false, message: 'Failed to update booking status.' };
+      }
+
+      await queryDatabasePromise('COMMIT');
+      return {
+        success: true,
+        message: depositInfo.exists
+          ? 'Guest checked in successfully.'
+          : `Security deposit of ₱${recordedDeposit.toLocaleString('en-US', { minimumFractionDigits: 2 })} recorded. Guest checked in successfully.`,
+        data: { bookingId, status: 'check-In', securityDeposit: recordedDeposit }
+      };
+    } catch (error) {
+      await queryDatabasePromise('ROLLBACK');
+      throw error;
+    }
+  }
+
+  // Process security deposit at checkout (refund, deduct, or apply to balance)
+  static async processSecurityDepositAtCheckout(bookingId, { action, deductAmount = 0, applyRemainderToBalance = false, remarks, encodedBy }) {
+    const BookingModel = require('./bookingModel');
+
+    try {
+      const depositInfo = await DashboardModel.getSecurityDeposit(bookingId);
+      const balanceData = await BookingModel.getUnpaidBalance(bookingId);
+      const unpaidBalance = parseFloat(balanceData.total_unpaid_balance) || 0;
+
+      if (!depositInfo.exists) {
+        return {
+          success: true,
+          noDeposit: true,
+          remainingBalance: unpaidBalance
+        };
+      }
+
+      const totalHeld = depositInfo.amount;
+      const depositRecords = depositInfo.heldRecords || [];
+
+      const validActions = ['full_refund', 'partial_deduct', 'apply_to_balance'];
+      if (!validActions.includes(action)) {
+        return { success: false, message: 'Invalid refund action.' };
+      }
+
+      let deduction = 0;
+      let cashRefund = 0;
+      let appliedToBalance = 0;
+
+      if (action === 'full_refund') {
+        cashRefund = totalHeld;
+      } else if (action === 'partial_deduct') {
+        deduction = parseFloat(deductAmount);
+        if (isNaN(deduction) || deduction < 0) {
+          return { success: false, message: 'Please enter a valid deduction amount.' };
+        }
+        if (deduction > totalHeld) {
+          return { success: false, message: 'Deduction cannot exceed the security deposit amount.' };
+        }
+        const remainder = totalHeld - deduction;
+        if (applyRemainderToBalance) {
+          if (unpaidBalance <= 0) {
+            return { success: false, message: 'No outstanding balance to apply the remainder to.' };
+          }
+          appliedToBalance = Math.min(remainder, unpaidBalance);
+          cashRefund = Math.max(0, remainder - appliedToBalance);
+        } else {
+          cashRefund = remainder;
+        }
+      } else if (action === 'apply_to_balance') {
+        if (unpaidBalance <= 0) {
+          return { success: false, message: 'No outstanding balance to apply the deposit to.' };
+        }
+        deduction = Math.min(Math.max(0, parseFloat(deductAmount) || 0), totalHeld);
+        const afterDeduction = totalHeld - deduction;
+        appliedToBalance = Math.min(afterDeduction, unpaidBalance);
+        cashRefund = Math.max(0, afterDeduction - appliedToBalance);
+      }
+
+      const actionLabels = {
+        full_refund: 'Full refund at checkout',
+        partial_deduct: applyRemainderToBalance
+          ? `Partial deduct at checkout (deducted ₱${deduction.toFixed(2)}, ₱${appliedToBalance.toFixed(2)} to balance, ₱${cashRefund.toFixed(2)} cash refund)`
+          : `Partial refund at checkout (deducted ₱${deduction.toFixed(2)})`,
+        apply_to_balance: `Applied to balance at checkout (₱${appliedToBalance.toFixed(2)} to balance, ₱${cashRefund.toFixed(2)} cash refund)`
+      };
+
+      await queryDatabasePromise('START TRANSACTION');
+
+      for (const record of depositRecords) {
+        const share = totalHeld > 0 ? record.amount / totalHeld : 0;
+        const recordDeduction = deduction * share;
+        const recordApplied = appliedToBalance * share;
+        const recordCashRefund = cashRefund * share;
+        const depositTag = `security deposit #${record.id}`;
+
+        if (recordApplied > 0) {
+          const paymentRemarks = remarks?.trim()
+            || `Applied from ${depositTag} at checkout (₱${recordApplied.toFixed(2)})`;
+          await queryDatabasePromise(
+            `INSERT INTO payments (BOOKING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
+             VALUES (?, ?, 'cash', 'room', NOW(), ?, ?)`,
+            [bookingId, recordApplied, encodedBy, paymentRemarks]
+          );
+        }
+
+        const recordNote = [
+          actionLabels[action],
+          recordApplied > 0 ? `Applied to balance: ₱${recordApplied.toFixed(2)}` : null,
+          recordCashRefund > 0 ? `Cash refund: ₱${recordCashRefund.toFixed(2)}` : null,
+          recordDeduction > 0 ? `Deducted: ₱${recordDeduction.toFixed(2)}` : null,
+          remarks?.trim() || null
+        ].filter(Boolean).join(' | ');
+
+        await queryDatabasePromise(
+          `UPDATE security_deposits
+           SET STATUS = 'refunded',
+               REFUNDED_AT = NOW(),
+               REFUNDED_BY = ?,
+               DEDUCTION_AMOUNT = ?,
+               CASH_REFUND_AMOUNT = ?,
+               APPLIED_TO_BALANCE = ?,
+               REMARKS = ?
+           WHERE IDNo = ? AND ACTIVE = 1 AND STATUS = 'held'`,
+          [
+            encodedBy,
+            recordDeduction > 0 ? recordDeduction : null,
+            recordCashRefund > 0 ? recordCashRefund : null,
+            recordApplied > 0 ? recordApplied : null,
+            recordNote,
+            record.id
+          ]
+        );
+      }
+
+      await queryDatabasePromise('COMMIT');
+
+      const updatedBalance = await BookingModel.getUnpaidBalance(bookingId);
+
+      return {
+        success: true,
+        action,
+        depositAmount: totalHeld,
+        deduction,
+        cashRefund,
+        appliedToBalance,
+        remainingBalance: parseFloat(updatedBalance.total_unpaid_balance) || 0,
+        message: appliedToBalance > 0 && cashRefund > 0
+          ? `₱${appliedToBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })} applied to balance, ₱${cashRefund.toLocaleString('en-US', { minimumFractionDigits: 2 })} cash refund.`
+          : appliedToBalance > 0
+            ? `₱${appliedToBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })} applied to balance.`
+            : cashRefund > 0
+              ? `₱${cashRefund.toLocaleString('en-US', { minimumFractionDigits: 2 })} security deposit refunded.`
+              : deduction > 0
+                ? `₱${deduction.toLocaleString('en-US', { minimumFractionDigits: 2 })} deducted from security deposit.`
+                : 'Security deposit processed.'
+      };
+    } catch (error) {
+      await queryDatabasePromise('ROLLBACK');
       throw error;
     }
   }

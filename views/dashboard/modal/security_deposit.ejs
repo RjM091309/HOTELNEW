@@ -1,0 +1,51 @@
+<!-- Security Deposit Check-In Modal -->
+<div class="modal fade" id="securityDepositModal" tabindex="-1" aria-labelledby="securityDepositModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(145deg, #0c2a42, #1a3a52); border-bottom: 1px solid #495057;">
+                <h5 class="modal-title text-white" id="securityDepositModalLabel">
+                    <i class="fas fa-shield-alt me-2"></i>Security Deposit — Check In
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="sdBookingId" value="">
+                <p class="text-muted mb-3" id="sdRoomInfo">Collect security deposit before checking in the guest.</p>
+
+                <div id="sdExistingDepositAlert" class="alert alert-info py-2" style="display: none;">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Security deposit already recorded: <strong id="sdExistingAmount">₱0.00</strong>
+                </div>
+
+                <div id="sdDepositForm">
+                    <div class="mb-3">
+                        <label for="sdDepositAmount" class="form-label fw-semibold">
+                            <i class="fas fa-money-bill-wave me-1"></i>Deposit Amount <span class="text-danger">*</span>
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text">₱</span>
+                            <input type="text" class="form-control" id="sdDepositAmount" inputmode="decimal" placeholder="Enter deposit amount" autocomplete="off">
+                        </div>
+                    </div>
+
+                    <input type="hidden" id="sdPaymentMethod" value="cash">
+
+                    <div class="mb-3">
+                        <label for="sdRemarks" class="form-label fw-semibold">
+                            <i class="fas fa-sticky-note me-1"></i>Remarks <span class="text-muted">(optional)</span>
+                        </label>
+                        <input type="text" class="form-control" id="sdRemarks">
+                    </div>
+                </div>
+
+                <div id="sdErrorMsg" class="alert alert-danger py-2" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="sdConfirmBtn">
+                    <i class="fas fa-check me-1"></i><span id="sdConfirmBtnText">Record Deposit & Check In</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

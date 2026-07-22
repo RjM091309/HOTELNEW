@@ -302,24 +302,8 @@ function showLateCheckInModal(event) {
               return;
             }
             
-            // Room is available, proceed with confirmation dialog
-            Swal.fire({
-              title: 'Confirm Check-In',
-              text: 'Are you sure you want to check-in this guest?',
-              icon: 'question',
-              showCancelButton: true,
-              confirmButtonText: 'Yes, Check-In',
-              cancelButtonText: 'Cancel',
-              confirmButtonColor: '#28a745', // Green for check-in
-              cancelButtonColor: '#6c757d',
-              background: '#2a3135',
-              color: '#ffffff'
-            }).then((confirmResult) => {
-              if (confirmResult.isConfirmed) {
-                // Process the check-in
-                checkInReservation(bookingId, event);
-              }
-            });
+            // Room is available — collect security deposit then check in
+            proceedToDepositCheckIn(bookingId, roomNumber, event);
           },
           error: (xhr, status, error) => {
             PMSCore.handleError(error, 'Check room occupied AJAX error');
@@ -533,24 +517,8 @@ function showPendingModal(event) {
               return;
             }
             
-            // Room is available, proceed with confirmation dialog
-            Swal.fire({
-              title: 'Confirm Check-In',
-              text: 'Are you sure you want to check-in this guest?',
-              icon: 'question',
-              showCancelButton: true,
-              confirmButtonText: 'Yes, Check-In',
-              cancelButtonText: 'Cancel',
-              confirmButtonColor: '#28a745', // Green for check-in
-              cancelButtonColor: '#6c757d',
-              background: '#2a3135',
-              color: '#ffffff'
-            }).then((confirmResult) => {
-              if (confirmResult.isConfirmed) {
-                // Process the check-in
-                checkInReservation(bookingId, event);
-              }
-            });
+            // Room is available — collect security deposit then check in
+            proceedToDepositCheckIn(bookingId, roomNumber, event);
           },
           error: (xhr, status, error) => {
             PMSCore.handleError(error, 'Check room occupied AJAX error');
@@ -864,125 +832,56 @@ function editBookingFromCalendar(bookingId) {
   }
 }
 
-// Function to check-in a reservation
-function checkInReservation(bookingId, event) {
-  // Show loading modal
-  Swal.fire({
-    title: 'Processing Check-In...',
-    text: 'Please wait while we process the guest check-in.',
-    allowOutsideClick: false,
-    allowEscapeKey: false,
-    showConfirmButton: false,
-    didOpen: () => {
-      Swal.showLoading();
-    }
-  });
+// Open security deposit modal then check in guest
+function proceedToDepositCheckIn(bookingId, roomNumber, event) {
+  if (typeof SecurityDepositCheckIn === 'undefined') {
+    PMSCore.showError('Error!', 'Security deposit module not loaded. Please refresh the page.');
+    return;
+  }
 
-  // Prepare data for API call
-  const checkInData = {
-    bookingId: bookingId,
-    action: 'check-in'
-  };
-  
-  // Make API call to check-in the reservation
-  fetch('/calendar/api/check-in-reservation', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRF-Token': getCSRFToken(),
-      'X-Requested-With': 'XMLHttpRequest'
-    },
-    credentials: 'include',
-    body: JSON.stringify({
-      ...checkInData,
-      _csrf: getCSRFToken()
-    })
-  })
-  .then(response => response.json())
-  .then(data => {
-    if (data.success) {
-      // Close the loading modal
-      Swal.close();
-      
-      // Success - show notification
-      if (typeof PMSCore !== 'undefined') {
-        PMSCore.showSuccess('Check-In Successful!', 'The guest has been successfully checked in and room marked as occupied.');
-      } else {
-        Swal.fire({
-          title: 'Check-In Successful!',
-          text: 'The guest has been successfully checked in and room marked as occupied.',
-          icon: 'success',
-          confirmButtonText: 'OK'
-        });
-      }
-      
-      // Update the event status to check-In (green)
-      updateEventStatusInstantly(event, 'check-In');
-      
-      // Update legend counts to reflect the status change
-      if (typeof updateLegendCounts === 'function') {
-        updateLegendCounts();
-      }
-      
-      // Emit enhanced socket event to update dashboard in real-time
-      if (typeof dashboardSocket !== 'undefined' && dashboardSocket) {
-        dashboardSocket.emit('dashboard-refresh', {
-          action: 'guest-checked-in-occupied',
-          message: `Guest checked in successfully and moved to occupied status`,
-          data: {
-            bookingId: bookingId,
-            newStatus: 'check-In',
-            isOccupied: data.isOccupied,
-            roomId: data.roomId,
-            roomStatus: data.roomStatus,
-            timestamp: new Date().toISOString()
-          }
-        });
-      }
-      
-      // Trigger dashboard refresh if available
-      if (typeof window.reloadDashboardData === 'function') {
-        window.reloadDashboardData();
-      }
-      
-      // Additional: Emit room status update event
-      if (typeof dashboardSocket !== 'undefined' && dashboardSocket) {
-        dashboardSocket.emit('room-status-updated', {
-          action: 'room-occupied',
-          message: `Room ${data.roomId} status updated to occupied`,
-          data: {
-            roomId: data.roomId,
-            newStatus: data.roomStatus,
-            timestamp: new Date().toISOString()
-          }
-        });
-      }
-      
-    } else {
-      // Close the loading modal
-      Swal.close();
-      
-      // Error from server
-      Swal.fire({
-        title: 'Check-In Failed',
-        text: data.message || 'Failed to check-in the guest. Please try again.',
-        icon: 'error',
-        confirmButtonText: 'OK'
-      });
-    }
-  })
-  .catch(error => {
-    // Close the loading modal
-    Swal.close();
-    
-    // Show error message
-    Swal.fire({
-      title: 'Error',
-      text: 'An unexpected error occurred while processing the check-in. Please try again.',
-      icon: 'error',
-      confirmButtonText: 'OK'
-      });
+  SecurityDepositCheckIn.open({
+    bookingId,
+    roomNumber,
+    onSuccess: (response) => handleCalendarCheckInSuccess(bookingId, event, response),
+    onCancel: () => {}
   });
+}
+
+// Handle successful check-in from calendar (after deposit recorded)
+function handleCalendarCheckInSuccess(bookingId, event, response) {
+  if (typeof PMSCore !== 'undefined') {
+    const depositMsg = response?.data?.securityDeposit
+      ? ` Security deposit: ₱${parseFloat(response.data.securityDeposit).toLocaleString('en-US', { minimumFractionDigits: 2 })} recorded.`
+      : '';
+    PMSCore.showSuccess('Check-In Successful!', `The guest has been successfully checked in.${depositMsg}`);
+  } else {
+    Swal.fire({
+      title: 'Check-In Successful!',
+      text: 'The guest has been successfully checked in.',
+      icon: 'success',
+      confirmButtonText: 'OK'
+    });
+  }
+
+  updateEventStatusInstantly(event, 'check-In');
+
+  if (typeof updateLegendCounts === 'function') {
+    updateLegendCounts();
+  }
+
+  if (typeof dashboardSocket !== 'undefined') {
+    dashboardSocket.emit('dashboard-updated', {
+      action: 'calendar-checkin',
+      message: `Booking ${bookingId} checked in from calendar`,
+      data: response?.data
+    });
+  }
+}
+
+// Function to check-in a reservation (legacy — redirects to deposit flow)
+function checkInReservation(bookingId, event) {
+  const roomNumber = event?.getResources?.()[0]?.title || 'N/A';
+  proceedToDepositCheckIn(bookingId, roomNumber, event);
 }
 
 // Function to remove a cancelled reservation

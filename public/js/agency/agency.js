@@ -1052,7 +1052,7 @@ function fetchBillingAndPayments(bookingId) {
 
         // Total payments made (exclude reservation_fee and discount like in cancel logic)
         const paymentsMade = paymentsArray.reduce((sum, payment) => {
-            if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
+            if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount' || payment.PAYMENT_TYPE === 'security_deposit') {
                 return sum;
             }
             return sum + parseFloat(payment.AMOUNT_PAID || 0);

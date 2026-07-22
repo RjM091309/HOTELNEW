@@ -185,8 +185,8 @@ window.showBilling = async function (bookingID) {
                         PAYMENT_DATE: payment.PAYMENT_DATE
                     });
                     
-                    // Exclude reservation_fee and discount payments from paid amount
-                    if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount') {
+                    // Exclude reservation_fee, discount, and security_deposit from paid amount
+                    if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount' || payment.PAYMENT_TYPE === 'security_deposit') {
                         console.log('Excluding payment type:', payment.PAYMENT_TYPE);
                         return sum;
                     }
