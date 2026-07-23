@@ -201,6 +201,24 @@
                                     <input type="hidden" id="edit_dropoffServiceId" name="dropoffServiceId">
                                 </div>
                             </div>
+                            <div id="edit_pickupDropoffFlightInfo" class="col-lg-12" style="display: none; margin-top: 10px;">
+                                <div class="row">
+                                    <div class="col-lg-4 form-group">
+                                        <label class="form-label">Number of Passengers</label>
+                                        <input type="number" class="form-control" id="edit_passengerCount" name="passengerCount" placeholder="Number of Passengers" min="1" step="1">
+                                    </div>
+                                    <div id="edit_flightNumberWrapper" class="col-lg-4 form-group" style="position: relative; display: none;">
+                                        <label class="form-label">Flight Number</label>
+                                        <input type="text" class="form-control" id="edit_flightNumber" name="flightNumber" placeholder="e.g. PR123" autocomplete="off">
+                                        <div id="edit_flightNumberDropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 1080; max-height: 220px; overflow-y: auto; background-color: #2a3135; border: 1px solid #445; border-radius: 6px; margin-top: 2px; box-shadow: 0 4px 10px rgba(0,0,0,0.4);"></div>
+                                    </div>
+                                    <div id="edit_dropoffFlightNumberWrapper" class="col-lg-4 form-group" style="position: relative; display: none;">
+                                        <label class="form-label">Drop-off Flight Number</label>
+                                        <input type="text" class="form-control" id="edit_dropoffFlightNumber" name="dropoffFlightNumber" placeholder="e.g. PR123" autocomplete="off">
+                                        <div id="edit_dropoffFlightNumberDropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 1080; max-height: 220px; overflow-y: auto; background-color: #2a3135; border: 1px solid #445; border-radius: 6px; margin-top: 2px; box-shadow: 0 4px 10px rgba(0,0,0,0.4);"></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- EXTRA SERVICES SECTION -->
@@ -874,22 +892,17 @@ $(document).ready(function() {
         })
         .catch(err => console.error('Failed to load breakfast prices:', err));
 
-    // Fetch transport rates using shared utility
+    // Fetch transport rates using shared utility - kept in scope so the Pick-up/Drop-off
+    // checkbox handlers below can (re-)populate the service ID when checked, even after
+    // populateEditForm has cleared it for a booking that didn't already have the service.
+    let editPickupServiceData = null;
+    let editDropoffServiceData = null;
     getPickDropPrices()
         .then(data => {
             if (!Array.isArray(data)) return console.error("Invalid transport data:", data);
 
-            const pickup = data.find(s => s.SERVICE_NAME.toLowerCase().includes('pick'));
-            const dropoff = data.find(s => s.SERVICE_NAME.toLowerCase().includes('drop'));
-
-            if (pickup) {
-                $('#edit_pickupPrice').val(pickup.SERVICE_COST);
-                $('#edit_pickupServiceId').val(pickup.IDNo);
-            }
-            if (dropoff) {
-                $('#edit_dropoffPrice').val(dropoff.SERVICE_COST);
-                $('#edit_dropoffServiceId').val(dropoff.IDNo);
-            }
+            editPickupServiceData = data.find(s => s.SERVICE_NAME.toLowerCase().includes('pick')) || null;
+            editDropoffServiceData = data.find(s => s.SERVICE_NAME.toLowerCase().includes('drop')) || null;
         })
         .catch(err => console.error('Error fetching transport prices:', err));
 
@@ -915,7 +928,15 @@ $(document).ready(function() {
 
     $('#edit_includePickup').on('change', function () {
         $('#edit_pickupWrapper').toggle(this.checked);
-        if (!this.checked) {
+        if (this.checked) {
+            // Re-populate the service ID/price when the box is (re-)checked - populateEditForm
+            // clears these for bookings that don't already have a pick-up service, so without
+            // this the hidden pickupServiceId stays blank and the save silently drops it.
+            if (editPickupServiceData) {
+                $('#edit_pickupPrice').val(editPickupServiceData.SERVICE_COST);
+                $('#edit_pickupServiceId').val(editPickupServiceData.IDNo);
+            }
+        } else {
             $('#edit_pickupPrice').val('');
             $('#edit_pickupServiceId').val('');
         }
@@ -924,11 +945,38 @@ $(document).ready(function() {
 
     $('#edit_includeDropoff').on('change', function () {
         $('#edit_dropoffWrapper').toggle(this.checked);
-        if (!this.checked) {
+        if (this.checked) {
+            // Re-populate the service ID/price when the box is (re-)checked - populateEditForm
+            // clears these for bookings that don't already have a drop-off service, so without
+            // this the hidden dropoffServiceId stays blank and the save silently drops it.
+            if (editDropoffServiceData) {
+                $('#edit_dropoffPrice').val(editDropoffServiceData.SERVICE_COST);
+                $('#edit_dropoffServiceId').val(editDropoffServiceData.IDNo);
+            }
+        } else {
             $('#edit_dropoffPrice').val('');
             $('#edit_dropoffServiceId').val('');
         }
         computeEditTotal();
+    });
+
+    // Flight number / passenger count - required when either Pick-up or Drop-off is checked
+    $('#edit_includePickup, #edit_includeDropoff').on('change', function () {
+        const pickupChecked = $('#edit_includePickup').is(':checked');
+        const dropoffChecked = $('#edit_includeDropoff').is(':checked');
+        const needsFlightInfo = pickupChecked || dropoffChecked;
+        $('#edit_pickupDropoffFlightInfo').toggle(needsFlightInfo);
+        $('#edit_flightNumberWrapper').toggle(pickupChecked);
+        $('#edit_dropoffFlightNumberWrapper').toggle(dropoffChecked);
+        if (!pickupChecked) {
+            $('#edit_flightNumber').val('');
+        }
+        if (!dropoffChecked) {
+            $('#edit_dropoffFlightNumber').val('');
+        }
+        if (!needsFlightInfo) {
+            $('#edit_passengerCount').val('');
+        }
     });
 
 
@@ -1069,6 +1117,12 @@ $(document).ready(function() {
         $('#edit_pickupWrapper').hide();
         $('#edit_includeDropoff').prop('checked', false);
         $('#edit_dropoffWrapper').hide();
+        $('#edit_pickupDropoffFlightInfo').hide();
+        $('#edit_flightNumberWrapper').hide();
+        $('#edit_dropoffFlightNumberWrapper').hide();
+        $('#edit_flightNumber').val('');
+        $('#edit_dropoffFlightNumber').val('');
+        $('#edit_passengerCount').val('');
         $('#edit_includeDiscount').prop('checked', false);
         $('#edit_discountWrapper').hide();
         $('#edit_discountAmount').val('');
@@ -1102,9 +1156,40 @@ $(document).ready(function() {
     // Edit form submission
     $('#editbooking').off('submit').on('submit', function (e) {
         e.preventDefault();
-        
+
         const bookingId = $('#edit_bookingId').val();
-        
+
+        // Flight number and passenger count are required whenever Pick-up or Drop-off is checked
+        const editIncludePickup = $('#edit_includePickup').is(':checked');
+        const editIncludeDropoff = $('#edit_includeDropoff').is(':checked');
+        const editFlightNumber = $('#edit_flightNumber').val();
+        const editDropoffFlightNumber = $('#edit_dropoffFlightNumber').val();
+        const editPassengerCount = $('#edit_passengerCount').val();
+        if (editIncludePickup && (!editFlightNumber || !editFlightNumber.trim())) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Flight Info Required',
+                text: 'Please enter the Flight Number for Pick-up.',
+            });
+            return;
+        }
+        if (editIncludeDropoff && (!editDropoffFlightNumber || !editDropoffFlightNumber.trim())) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Flight Info Required',
+                text: 'Please enter the Flight Number for Drop-off.',
+            });
+            return;
+        }
+        if ((editIncludePickup || editIncludeDropoff) && !editPassengerCount) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Flight Info Required',
+                text: 'Please enter the Number of Passengers for Pick-up/Drop-off.',
+            });
+            return;
+        }
+
         // Collect form data
         const formData = {
             room_id: $('#edit_addroom').val(),
@@ -1140,7 +1225,10 @@ $(document).ready(function() {
             pickupPrice: $('#edit_includePickup').prop('checked') ? $('#edit_pickupPrice').val() : '0',
             dropoffServiceId: $('#edit_includeDropoff').prop('checked') ? $('#edit_dropoffServiceId').val() : '',
             dropoffPrice: $('#edit_includeDropoff').prop('checked') ? $('#edit_dropoffPrice').val() : '0',
-            
+            flightNumber: $('#edit_includePickup').prop('checked') ? $('#edit_flightNumber').val() : '',
+            dropoffFlightNumber: $('#edit_includeDropoff').prop('checked') ? $('#edit_dropoffFlightNumber').val() : '',
+            passengerCount: ($('#edit_includePickup').prop('checked') || $('#edit_includeDropoff').prop('checked')) ? $('#edit_passengerCount').val() : '',
+
             // Fees
             seniorPwdDiscount: $('#edit_includeSeniorPwdDiscount').prop('checked') ? parseFloat($('#edit_seniorPwdDiscount').val()) || 0 : 0,
             seniorPwdDiscountPercent: $('#edit_includeSeniorPwdDiscount').prop('checked') ? parseFloat($('#edit_seniorPwdDiscountPercent').val()) || 0 : 0,
@@ -1977,7 +2065,7 @@ function populateEditForm(booking) {
         $('#edit_pickupPrice').val('');
         $('#edit_pickupServiceId').val('');
     }
-    
+
     if (parseFloat(booking.dropoffPrice) > 0) {
         $('#edit_includeDropoff').prop('checked', true);
         $('#edit_dropoffWrapper').show();
@@ -1990,7 +2078,33 @@ function populateEditForm(booking) {
         $('#edit_dropoffPrice').val('');
         $('#edit_dropoffServiceId').val('');
     }
-    
+
+    // Flight number / passenger count - only relevant when Pick-up or Drop-off is set
+    const editPickupChecked = $('#edit_includePickup').is(':checked');
+    const editDropoffChecked = $('#edit_includeDropoff').is(':checked');
+    const editNeedsFlightInfo = editPickupChecked || editDropoffChecked;
+    $('#edit_pickupDropoffFlightInfo').toggle(editNeedsFlightInfo);
+    $('#edit_flightNumberWrapper').toggle(editPickupChecked);
+    $('#edit_dropoffFlightNumberWrapper').toggle(editDropoffChecked);
+
+    if (editPickupChecked && booking.flightNumber) {
+        $('#edit_flightNumber').val(booking.flightNumber);
+    } else {
+        $('#edit_flightNumber').val('');
+    }
+
+    if (editDropoffChecked && booking.dropoffFlightNumber) {
+        $('#edit_dropoffFlightNumber').val(booking.dropoffFlightNumber);
+    } else {
+        $('#edit_dropoffFlightNumber').val('');
+    }
+
+    if (editNeedsFlightInfo) {
+        $('#edit_passengerCount').val(booking.passengerCount || '');
+    } else {
+        $('#edit_passengerCount').val('');
+    }
+
     // Set discount (always reset first, then set if exists)
     $('#edit_includeDiscount').prop('checked', false);
     $('#edit_discountWrapper').hide();
@@ -2362,4 +2476,92 @@ function processEditBookingPayment(bookingId, paymentAmount, paymentMethod, paym
         }
     });
 }
+
+// ================================
+// FLIGHT NUMBER LOOKUP (Edit Booking)
+// ================================
+// Flight Schedule's FLIGHT_NUMBER column holds the airline name (not a flight code) -
+// ARRIVAL holds the actual pick-up flight number, DEPARTURE the actual drop-off flight number.
+(function(){
+    let editFlightScheduleList = null;
+
+    function loadEditFlightScheduleList(callback) {
+        if (Array.isArray(editFlightScheduleList)) {
+            callback(editFlightScheduleList);
+            return;
+        }
+        $.ajax({
+            url: '/flight-schedule/api/flights',
+            type: 'GET',
+            cache: false,
+            success: function(response) {
+                editFlightScheduleList = (response.success && Array.isArray(response.data)) ? response.data : [];
+                callback(editFlightScheduleList);
+            },
+            error: function() {
+                editFlightScheduleList = [];
+                callback(editFlightScheduleList);
+            }
+        });
+    }
+
+    function setupEditFlightLookup(inputId, dropdownId, codeField) {
+        function filterList(term) {
+            const list = editFlightScheduleList || [];
+            const needle = (term || '').trim().toUpperCase();
+            if (!needle) return list;
+            return list.filter(f =>
+                (f[codeField] || '').toUpperCase().includes(needle) ||
+                (f.FLIGHT_NUMBER || '').toUpperCase().includes(needle)
+            );
+        }
+
+        function renderDropdown(list) {
+            const $dropdown = $('#' + dropdownId);
+            if (!list || list.length === 0) {
+                $dropdown.html('<div style="padding: 8px 10px; color: #9aa; font-size: 13px;">No flight in Flight Schedule</div>').show();
+                return;
+            }
+            $dropdown.empty();
+            list.forEach(function(f){
+                const code = f[codeField] || '';
+                const airline = f.FLIGHT_NUMBER || '';
+                const $item = $('<div class="flight-number-option"></div>')
+                    .css({ padding: '6px 10px', cursor: 'pointer', fontSize: '13px', borderBottom: '1px solid #384249' })
+                    .html(`<strong>${code}</strong> <span style="color:#9aa;">— ${airline}</span>`)
+                    .on('mouseenter', function(){ $(this).css('background-color', '#374047'); })
+                    .on('mouseleave', function(){ $(this).css('background-color', ''); })
+                    .on('click', function(){
+                        $('#' + inputId).val(code);
+                        $dropdown.hide();
+                    });
+                $dropdown.append($item);
+            });
+            $dropdown.show();
+        }
+
+        $(document).on('input', '#' + inputId, function(){
+            renderDropdown(filterList($(this).val()));
+        });
+
+        $(document).on('click focus', '#' + inputId, function(){
+            loadEditFlightScheduleList(function(){
+                renderDropdown(filterList($('#' + inputId).val()));
+            });
+        });
+
+        $(document).on('click', function(e){
+            if (!$(e.target).closest('#' + inputId + ', #' + dropdownId).length) {
+                $('#' + dropdownId).hide();
+            }
+        });
+    }
+
+    setupEditFlightLookup('edit_flightNumber', 'edit_flightNumberDropdown', 'ARRIVAL');
+    setupEditFlightLookup('edit_dropoffFlightNumber', 'edit_dropoffFlightNumberDropdown', 'DEPARTURE');
+
+    $(document).on('shown.bs.modal', '#modal-editbooking', function(){
+        editFlightScheduleList = null;
+    });
+})();
 </script>

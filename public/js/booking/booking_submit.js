@@ -62,6 +62,7 @@ $(document).ready(function () {
       const includePickup = $('#includePickup').is(':checked');
       const includeDropoff = $('#includeDropoff').is(':checked');
       const flightNumber = $('#flightNumber').val();
+      const dropoffFlightNumber = $('#dropoffFlightNumber').val();
       const passengerCount = $('#passengerCount').val();
 
       // Discount and fees
@@ -97,11 +98,29 @@ $(document).ready(function () {
         return;
       }
 
-      if ((includePickup || includeDropoff) && (!flightNumber || !flightNumber.trim() || !passengerCount)) {
+      if (includePickup && (!flightNumber || !flightNumber.trim())) {
         Swal.fire({
           icon: 'error',
           title: 'Flight Info Required',
-          text: 'Please enter the Flight Number and Number of Passengers for Pick-up/Drop-off.',
+          text: 'Please enter the Flight Number for Pick-up.',
+        });
+        return;
+      }
+
+      if (includeDropoff && (!dropoffFlightNumber || !dropoffFlightNumber.trim())) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Flight Info Required',
+          text: 'Please enter the Flight Number for Drop-off.',
+        });
+        return;
+      }
+
+      if ((includePickup || includeDropoff) && !passengerCount) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Flight Info Required',
+          text: 'Please enter the Number of Passengers for Pick-up/Drop-off.',
         });
         return;
       }
@@ -116,7 +135,7 @@ $(document).ready(function () {
           breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
           breakfastKidQty, breakfastKidPrice, breakfastKidId,
           pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
-          flightNumber, passengerCount,
+          flightNumber, dropoffFlightNumber, passengerCount,
           discount: discountAmount, seniorPwdDiscount, seniorPwdDiscountPercent, reservationFee: reservationFeeAmount, lateCheckoutFee
         },
         success: function (response) {

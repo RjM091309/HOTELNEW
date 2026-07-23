@@ -44,7 +44,7 @@ function initializeFlightScheduleTable() {
 
   flightScheduleTable = $('#flightScheduleTable').DataTable({
     columnDefs: [
-      { targets: 3, className: 'text-center', orderable: false, searchable: false, width: '15%' }
+      { targets: 4, className: 'text-center', orderable: false, searchable: false, width: '15%' }
     ],
     pageLength: 10,
     lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
@@ -102,6 +102,7 @@ function reloadFlightScheduleData() {
           flight.FLIGHT_NUMBER || '',
           flight.ARRIVAL || '',
           flight.DEPARTURE || '',
+          flight.CITY || '',
           actions
         ]);
       });
@@ -120,6 +121,7 @@ function createFlightSchedule() {
     method: 'POST',
     data: {
       flightNumber: $('#addFlightNumber').val(),
+      city: $('#addCity').val(),
       arrival: $('#addArrival').val(),
       departure: $('#addDeparture').val()
     },
@@ -152,6 +154,7 @@ function openEditFlightScheduleModal(id) {
       const flight = response.data;
       $('#editFlightScheduleId').val(flight.IDNo);
       $('#editFlightNumber').val(flight.FLIGHT_NUMBER || '');
+      $('#editCity').val(flight.CITY || '');
       setEditFlightPickers(flight.ARRIVAL || '', flight.DEPARTURE || '');
       $('#editFlightScheduleModal').modal('show');
     },
@@ -168,6 +171,7 @@ function updateFlightSchedule() {
     data: {
       id: $('#editFlightScheduleId').val(),
       flightNumber: $('#editFlightNumber').val(),
+      city: $('#editCity').val(),
       arrival: $('#editArrival').val(),
       departure: $('#editDeparture').val()
     },

@@ -54,7 +54,7 @@ class FlightScheduleController {
 
   static async create(req, res) {
     try {
-      const { flightNumber, arrival, departure } = req.body;
+      const { flightNumber, city, arrival, departure } = req.body;
 
       if (!flightNumber || !arrival || !departure) {
         return res.status(400).json({
@@ -65,6 +65,7 @@ class FlightScheduleController {
 
       const result = await FlightScheduleModel.create({
         FLIGHT_NUMBER: String(flightNumber).trim().toUpperCase(),
+        CITY: city ? String(city).trim() : null,
         ARRIVAL: String(arrival).trim(),
         DEPARTURE: String(departure).trim(),
         ENCODED_BY: req.user?.userId || null,
@@ -88,7 +89,7 @@ class FlightScheduleController {
 
   static async update(req, res) {
     try {
-      const { id, flightNumber, arrival, departure } = req.body;
+      const { id, flightNumber, city, arrival, departure } = req.body;
 
       if (!id || !flightNumber || !arrival || !departure) {
         return res.status(400).json({
@@ -105,6 +106,7 @@ class FlightScheduleController {
       await FlightScheduleModel.update({
         IDNo: id,
         FLIGHT_NUMBER: String(flightNumber).trim().toUpperCase(),
+        CITY: city ? String(city).trim() : null,
         ARRIVAL: String(arrival).trim(),
         DEPARTURE: String(departure).trim(),
         EDITED_BY: req.user?.userId || null,

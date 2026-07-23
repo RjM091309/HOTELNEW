@@ -17,6 +17,7 @@
                 <th>Airline</th>
                 <th>Arrival</th>
                 <th>Departure</th>
+                <th>City</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -49,6 +50,10 @@
             <label for="addDeparture" class="form-label">Departure</label>
             <input type="text" class="form-control" id="addDeparture" placeholder="e.g. 2:45 PM" required>
           </div>
+          <div class="mb-3">
+            <label for="addCity" class="form-label">City</label>
+            <input type="text" class="form-control" id="addCity" placeholder="e.g. Seoul">
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -80,6 +85,10 @@
           <div class="mb-3">
             <label for="editDeparture" class="form-label">Departure</label>
             <input type="text" class="form-control flight-datetime-picker" id="editDeparture" placeholder="Select date and time" readonly required>
+          </div>
+          <div class="mb-3">
+            <label for="editCity" class="form-label">City</label>
+            <input type="text" class="form-control" id="editCity">
           </div>
         </div>
         <div class="modal-footer">

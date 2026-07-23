@@ -674,17 +674,16 @@ $(document).ready(function () {
         const dropoffChecked = $('#includeDropoff').is(':checked');
         const needsFlightInfo = pickupChecked || dropoffChecked;
         $('#pickupDropoffFlightInfo').toggle(needsFlightInfo);
-        $('#flightArrivalWrapper').toggle(pickupChecked);
-        $('#flightDepartureWrapper').toggle(dropoffChecked);
-        if (!needsFlightInfo) {
-            $('#flightNumber').val('');
-            $('#passengerCount').val('');
-        }
+        $('#flightNumberWrapper').toggle(pickupChecked);
+        $('#dropoffFlightNumberWrapper').toggle(dropoffChecked);
         if (!pickupChecked) {
-            $('#flightArrivalDisplay').val('');
+            $('#flightNumber').val('');
         }
         if (!dropoffChecked) {
-            $('#flightDepartureDisplay').val('');
+            $('#dropoffFlightNumber').val('');
+        }
+        if (!needsFlightInfo) {
+            $('#passengerCount').val('');
         }
     });
 

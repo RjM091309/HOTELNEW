@@ -521,7 +521,8 @@ class BookingController {
       pickupPrice,
       dropoffServiceId,    // should be transport ID
       dropoffPrice,
-      flightNumber,        // PUAP - flight number for pick-up/drop-off
+      flightNumber,        // PUAP - pick-up (arrival) flight number
+      dropoffFlightNumber, // PUAP - drop-off (departure) flight number
       passengerCount,      // PUAP - number of passengers for pick-up/drop-off
 
       // ✅ Additional for Direct Reservations
@@ -541,9 +542,15 @@ class BookingController {
         return res.status(400).json({ success: false, message: 'User is not logged in' });
       }
 
-      // PUAP: flight number and passenger count are required whenever Pick-up or Drop-off is selected
-      if ((pickupServiceId || dropoffServiceId) && (!flightNumber || !String(flightNumber).trim() || !passengerCount)) {
-        return res.status(400).json({ success: false, message: 'Flight Number and Number of Passengers are required for Pick-up/Drop-off.' });
+      // PUAP: flight number is required for whichever of Pick-up/Drop-off is selected
+      if (pickupServiceId && (!flightNumber || !String(flightNumber).trim())) {
+        return res.status(400).json({ success: false, message: 'Flight Number is required for Pick-up.' });
+      }
+      if (dropoffServiceId && (!dropoffFlightNumber || !String(dropoffFlightNumber).trim())) {
+        return res.status(400).json({ success: false, message: 'Flight Number is required for Drop-off.' });
+      }
+      if ((pickupServiceId || dropoffServiceId) && !passengerCount) {
+        return res.status(400).json({ success: false, message: 'Number of Passengers is required for Pick-up/Drop-off.' });
       }
 
       // Calculate payment status based on paid amount
@@ -678,6 +685,7 @@ class BookingController {
         dropoffServiceId,
         dropoffPrice,
         flightNumber,
+        dropoffFlightNumber,
         passengerCount,
         // ✅ Additional for Direct Reservations
         bedCount,
@@ -2852,6 +2860,7 @@ class BookingController {
         breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
         breakfastKidQty, breakfastKidPrice, breakfastKidId,
         pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
+        flightNumber, dropoffFlightNumber, passengerCount, // PUAP - flight numbers/passenger count for pick-up/drop-off
         discount, seniorPwdDiscount = 0, // Senior/PWD discount amount
         seniorPwdDiscountPercent = 0, // Senior/PWD discount percentage
         lateCheckoutFee,
@@ -2863,6 +2872,17 @@ class BookingController {
 
       if (!editedBy) {
         return res.status(400).json({ success: false, message: 'User is not logged in' });
+      }
+
+      // PUAP: flight number is required for whichever of Pick-up/Drop-off is selected
+      if (pickupServiceId && (!flightNumber || !String(flightNumber).trim())) {
+        return res.status(400).json({ success: false, message: 'Flight Number is required for Pick-up.' });
+      }
+      if (dropoffServiceId && (!dropoffFlightNumber || !String(dropoffFlightNumber).trim())) {
+        return res.status(400).json({ success: false, message: 'Flight Number is required for Drop-off.' });
+      }
+      if ((pickupServiceId || dropoffServiceId) && !passengerCount) {
+        return res.status(400).json({ success: false, message: 'Number of Passengers is required for Pick-up/Drop-off.' });
       }
 
       // Use paymentStatus coming from frontend (computeEditTotal),
@@ -2904,6 +2924,9 @@ class BookingController {
         pickupPrice,
         dropoffServiceId,
         dropoffPrice,
+        flightNumber,
+        dropoffFlightNumber,
+        passengerCount,
         discount: totalDiscountNum, // Pass combined discount (seniorPwdDiscount + discount)
         seniorPwdDiscountPercent, // Pass percentage for storage
         lateCheckoutFee,

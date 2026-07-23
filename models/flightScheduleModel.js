@@ -6,6 +6,7 @@ class FlightScheduleModel {
       SELECT
         IDNo,
         FLIGHT_NUMBER,
+        CITY,
         ARRIVAL,
         DEPARTURE,
         ENCODED_BY,
@@ -25,6 +26,7 @@ class FlightScheduleModel {
       SELECT
         IDNo,
         FLIGHT_NUMBER,
+        CITY,
         ARRIVAL,
         DEPARTURE,
         ENCODED_BY,
@@ -42,11 +44,12 @@ class FlightScheduleModel {
   static async create(data) {
     const query = `
       INSERT INTO flight_schedule
-      (FLIGHT_NUMBER, ARRIVAL, DEPARTURE, ENCODED_BY, ENCODED_DT, ACTIVE)
-      VALUES (?, ?, ?, ?, ?, 1)
+      (FLIGHT_NUMBER, CITY, ARRIVAL, DEPARTURE, ENCODED_BY, ENCODED_DT, ACTIVE)
+      VALUES (?, ?, ?, ?, ?, ?, 1)
     `;
     const result = await queryDatabasePromise(query, [
       data.FLIGHT_NUMBER,
+      data.CITY,
       data.ARRIVAL,
       data.DEPARTURE,
       data.ENCODED_BY,
@@ -58,11 +61,12 @@ class FlightScheduleModel {
   static async update(data) {
     const query = `
       UPDATE flight_schedule
-      SET FLIGHT_NUMBER = ?, ARRIVAL = ?, DEPARTURE = ?, EDITED_BY = ?, EDITED_DT = ?
+      SET FLIGHT_NUMBER = ?, CITY = ?, ARRIVAL = ?, DEPARTURE = ?, EDITED_BY = ?, EDITED_DT = ?
       WHERE IDNo = ? AND ACTIVE = 1
     `;
     return await queryDatabasePromise(query, [
       data.FLIGHT_NUMBER,
+      data.CITY,
       data.ARRIVAL,
       data.DEPARTURE,
       data.EDITED_BY,
