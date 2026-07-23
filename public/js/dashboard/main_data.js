@@ -1373,13 +1373,39 @@ $(document).ready(function() {
         const bookingIdInput = document.getElementById('bookingID');
         if (bookingIdInput) bookingIdInput.value = bookingId;
 
+        const totalAmountEl = document.getElementById('paymentTotalAmount');
+        if (totalAmountEl) {
+            totalAmountEl.textContent = totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 });
+        }
+
         if (typeof updatePaymentSummaryCard === 'function') {
-            updatePaymentSummaryCard(totalBalance, {});
-        } else {
-            const totalAmountEl = document.getElementById('paymentTotalAmount');
-            if (totalAmountEl) {
-                totalAmountEl.textContent = totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 });
-            }
+            // Fetch the billing breakdown so the reservation fee/deposit line shows here too,
+            // matching the payment modal opened from the main booking list.
+            fetch(`/booking/get-billing/${bookingId}?_=${Date.now()}`)
+                .then((r) => r.json())
+                .then((data) => {
+                    let roomAmount = 0, extensionAmount = 0, serviceAmount = 0;
+                    (data.items || []).forEach((item) => {
+                        const description = (item.description || '').toLowerCase();
+                        const subTotal = parseFloat(item.subTotal) || 0;
+                        if (!description || subTotal === 0) return;
+                        if (description.includes('room') || description.includes('bedroom')) {
+                            roomAmount += subTotal;
+                        } else if (description.includes('extension') || description.includes('extend')) {
+                            extensionAmount += subTotal;
+                        } else {
+                            serviceAmount += subTotal;
+                        }
+                    });
+                    updatePaymentSummaryCard(totalBalance, {
+                        roomAmount,
+                        extensionAmount,
+                        serviceAmount,
+                        reservationFee: parseFloat(data.reservationFee) || 0,
+                        discountAmount: parseFloat(data.discountAmount) || 0
+                    });
+                })
+                .catch(() => updatePaymentSummaryCard(totalBalance, {}));
         }
         const amountInput = document.getElementById('paymentAmountInput');
         if (amountInput) amountInput.value = totalBalance;

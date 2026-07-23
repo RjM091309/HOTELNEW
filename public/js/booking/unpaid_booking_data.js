@@ -78,6 +78,7 @@ $(document).ready(function () {
                         Totalcost: item.TOTAL_COST,
                         Balance: item.BALANCE || 0,
                         Paymentstatus: item.PAYMENT_STATUS || 'unpaid',
+                        PaymentMethod: item.PAYMENT_METHOD || '',
                         BookingChannel: item.BOOKING_CHANNEL,
                         AgencyPayer: item.AGENCY_PAYER || null,
                         Status: getStatusLabel(item.BookingStatus, item.BookingID),
@@ -194,8 +195,11 @@ $(document).ready(function () {
                     if (type === 'sort' || type === 'type' || type === 'filter') return data;
                     const balance = parseFloat(row.Balance) || 0;
                     const totalCost = parseFloat(row.Totalcost) || 0;
+                    const paymentMethod = (row.PaymentMethod || '').toLowerCase();
+                    const isOnCredit = paymentMethod === 'credit' || paymentMethod === 'marker';
                     let labelClass, displayText;
-                    if (balance <= 0) { labelClass = 'label-success'; displayText = 'PAID'; }
+                    if (balance <= 0 && isOnCredit) { labelClass = 'label-info'; displayText = 'CREDIT'; }
+                    else if (balance <= 0) { labelClass = 'label-success'; displayText = 'PAID'; }
                     else if (balance < totalCost) { labelClass = 'label-warning'; displayText = 'PARTIAL'; }
                     else { labelClass = 'label-danger'; displayText = 'UNPAID'; }
                     return `<div style="text-align: center;"><span class="label label-sm ${labelClass}">${displayText}</span></div>`;

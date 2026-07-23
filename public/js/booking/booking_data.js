@@ -264,9 +264,15 @@ $(document).ready(function () {
                     // Calculate actual payment status based on balance for non-cancelled bookings
                     const balance = parseFloat(row.Balance) || 0;
                     const totalCost = parseFloat(row.Totalcost) || 0;
+                    const paymentMethod = (row.PaymentMethod || '').toLowerCase();
+                    const isOnCredit = paymentMethod === 'credit' || paymentMethod === 'marker';
                     let labelClass, displayText;
 
-                    if (balance <= 0) {
+                    if (balance <= 0 && isOnCredit) {
+                        // Settled via credit/marker terms, not actual cash collected
+                        labelClass = 'label-info';
+                        displayText = 'CREDIT';
+                    } else if (balance <= 0) {
                         // No balance or negative balance (overpaid) = PAID
                         labelClass = 'label-success';
                         displayText = 'PAID';

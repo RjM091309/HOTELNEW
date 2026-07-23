@@ -379,6 +379,7 @@ $(document).ready(function () {
                         Totalcost: item.TOTAL_COST,
                         Balance: item.BALANCE || 0,
                         Paymentstatus: item.PAYMENT_STATUS || 'unpaid',
+                        PaymentMethod: item.PAYMENT_METHOD || '',
                         BookingChannel: item.BOOKING_CHANNEL,
                         Status: getStatusLabel(item.BookingStatus, item.BookingID),
                         BookingStatus: item.BookingStatus,
@@ -472,11 +473,14 @@ $(document).ready(function () {
             data: 'Paymentstatus',
             title: 'PAYMENT STATUS',
             className: 'text-center',
-            render: function (data) {
+            render: function (data, type, row) {
                 const paymentStatus = (data || '').toLowerCase().trim();
+                const paymentMethod = (row.PaymentMethod || '').toLowerCase();
+                const isOnCredit = paymentMethod === 'credit' || paymentMethod === 'marker';
                 let labelClass = 'label-danger';
                 let text = data || 'unpaid';
-                if (paymentStatus === 'paid') { labelClass = 'label-success'; text = 'paid'; }
+                if (paymentStatus === 'paid' && isOnCredit) { labelClass = 'label-info'; text = 'credit'; }
+                else if (paymentStatus === 'paid') { labelClass = 'label-success'; text = 'paid'; }
                 else if (paymentStatus === 'partial') { labelClass = 'label-warning'; text = 'partial'; }
                 return `<div style="text-align: center;"><span class="label label-sm ${labelClass}">${text}</span></div>`;
             }

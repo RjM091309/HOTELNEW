@@ -1,41 +1,9 @@
 let flightScheduleTable;
-let editArrivalPicker;
-let editDeparturePicker;
-
-const flightDateTimeOptions = {
-  enableTime: true,
-  dateFormat: 'M d, Y h:i K',
-  time_24hr: false,
-  allowInput: false,
-  disableMobile: true
-};
 
 $(document).ready(function () {
-  initializeFlightDateTimePickers();
   initializeFlightScheduleTable();
   setupFlightScheduleHandlers();
 });
-
-function initializeFlightDateTimePickers() {
-  if (typeof flatpickr === 'undefined') return;
-
-  editArrivalPicker = flatpickr('#editArrival', flightDateTimeOptions);
-  editDeparturePicker = flatpickr('#editDeparture', flightDateTimeOptions);
-}
-
-function setEditFlightPickers(arrival, departure) {
-  if (arrival) {
-    editArrivalPicker?.setDate(arrival, true);
-  } else {
-    editArrivalPicker?.clear();
-  }
-
-  if (departure) {
-    editDeparturePicker?.setDate(departure, true);
-  } else {
-    editDeparturePicker?.clear();
-  }
-}
 
 function initializeFlightScheduleTable() {
   if ($.fn.DataTable.isDataTable('#flightScheduleTable')) {
@@ -155,7 +123,8 @@ function openEditFlightScheduleModal(id) {
       $('#editFlightScheduleId').val(flight.IDNo);
       $('#editFlightNumber').val(flight.FLIGHT_NUMBER || '');
       $('#editCity').val(flight.CITY || '');
-      setEditFlightPickers(flight.ARRIVAL || '', flight.DEPARTURE || '');
+      $('#editArrival').val(flight.ARRIVAL || '');
+      $('#editDeparture').val(flight.DEPARTURE || '');
       $('#editFlightScheduleModal').modal('show');
     },
     error: function () {
