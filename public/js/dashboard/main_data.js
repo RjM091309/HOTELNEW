@@ -1405,7 +1405,15 @@ $(document).ready(function() {
                         discountAmount: parseFloat(data.discountAmount) || 0
                     });
                 })
-                .catch(() => updatePaymentSummaryCard(totalBalance, {}));
+                .catch(() => updatePaymentSummaryCard(totalBalance, {}))
+                .finally(() => {
+                    // If the guest's deposit action (e.g. Apply to Balance) was already
+                    // selected before this fetch resolved, re-apply it so the breakdown
+                    // refresh above doesn't wipe out the reduced total.
+                    if (window.PaymentDepositSection && window.PaymentDepositSection.isVisible()) {
+                        window.PaymentDepositSection.reflectAppliedToSummary();
+                    }
+                });
         }
         const amountInput = document.getElementById('paymentAmountInput');
         if (amountInput) amountInput.value = totalBalance;

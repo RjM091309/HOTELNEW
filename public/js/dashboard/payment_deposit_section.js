@@ -66,6 +66,41 @@
         }
     }
 
+    // How much of the deposit action would apply to the outstanding balance,
+    // for the currently selected radio (full refund / partial-deduct+checkbox / apply-to-balance).
+    function computeAppliedToBalance(action) {
+        if (state.unpaidBalance <= 0) return 0;
+        if (action === 'apply_to_balance') {
+            return Math.min(state.depositAmount, state.unpaidBalance);
+        }
+        if (action === 'partial_deduct') {
+            const deductInput = document.getElementById('pdepDeductAmount');
+            const applyRemainderChk = document.getElementById('pdepApplyRemainderToBalance');
+            const deduction = parseAmountInput(deductInput?.value);
+            const remainder = Math.max(0, state.depositAmount - deduction);
+            const applyRemainder = !!(applyRemainderChk && applyRemainderChk.checked);
+            return applyRemainder ? Math.min(remainder, state.unpaidBalance) : 0;
+        }
+        return 0; // full_refund - nothing applied to balance
+    }
+
+    // Reflect the currently selected deposit action in the Payment Summary card above
+    // (Total Amount to Pay / Amount to Pay input), so staff see the reduced amount
+    // to collect immediately instead of the original outstanding balance.
+    function reflectAppliedToSummary() {
+        const totalAmountEl = document.getElementById('paymentTotalAmount');
+        const amountInput = document.getElementById('paymentAmountInput');
+        const appliedToBalance = computeAppliedToBalance(getSelectedAction());
+        const effectiveAmount = Math.max(0, state.unpaidBalance - appliedToBalance);
+
+        if (totalAmountEl) {
+            totalAmountEl.textContent = effectiveAmount.toLocaleString('en-US', { minimumFractionDigits: 2 });
+        }
+        if (amountInput) {
+            amountInput.value = effectiveAmount;
+        }
+    }
+
     function updatePreviews() {
         const action = getSelectedAction();
         const partialWrap = document.getElementById('pdepPartialWrap');
@@ -89,12 +124,11 @@
 
         const deduction = parseAmountInput(deductInput?.value);
         const remainder = Math.max(0, state.depositAmount - deduction);
-        const applyRemainder = !!(applyRemainderChk && applyRemainderChk.checked && state.unpaidBalance > 0);
-        const appliedToBalance = applyRemainder ? Math.min(remainder, state.unpaidBalance) : 0;
+        const appliedToBalance = computeAppliedToBalance(action);
         const cashRefund = Math.max(0, remainder - appliedToBalance);
 
         if (partialAppliedRow) {
-            partialAppliedRow.style.display = applyRemainder && appliedToBalance > 0 ? 'block' : 'none';
+            partialAppliedRow.style.display = action === 'partial_deduct' && appliedToBalance > 0 ? 'block' : 'none';
         }
         if (partialAppliedPreview) {
             partialAppliedPreview.textContent = formatCurrency(appliedToBalance);
@@ -104,6 +138,8 @@
                 action === 'partial_deduct' ? cashRefund : state.depositAmount
             );
         }
+
+        reflectAppliedToSummary();
     }
 
     function setupAmountInput() {
@@ -237,5 +273,5 @@
         }
     }
 
-    window.PaymentDepositSection = { configure, hide, isVisible, submit };
+    window.PaymentDepositSection = { configure, hide, isVisible, submit, reflectAppliedToSummary };
 })();
