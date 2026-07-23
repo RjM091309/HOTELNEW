@@ -6241,7 +6241,7 @@ class BookingModel {
 
       const path = require('path');
       const fs = require('fs');
-      const imagePath = path.join(__dirname, '../public/img/Logo-Gold.png');
+      const imagePath = path.join(__dirname, '../public/img/Logo-Black.png');
       const imageBase64 = fs.existsSync(imagePath) ? fs.readFileSync(imagePath, 'base64') : '';
 
       // Map rows for template
@@ -7485,7 +7485,7 @@ class BookingModel {
       // Add image and user data
       const path = require('path');
       const fs = require('fs');
-      const imagePath = path.join(__dirname, '../public/img/Logo-Gold.png');
+      const imagePath = path.join(__dirname, '../public/img/Logo-Black.png');
       const imageBase64 = fs.readFileSync(imagePath, 'base64');
       data.imageUrl = `data:image/png;base64,${imageBase64}`;
       data.ISSUED_BY = user?.FULLNAME || 'N/A';
@@ -7532,7 +7532,7 @@ class BookingModel {
       // Add image and user data
       const path = require('path');
       const fs = require('fs');
-      const imagePath = path.join(__dirname, '../public/img/Logo-Black.JPG');
+      const imagePath = path.join(__dirname, '../public/img/Logo-Black.png');
       const imageBase64 = fs.readFileSync(imagePath, 'base64');
 
       data.imageUrl = `data:image/png;base64,${imageBase64}`;
@@ -7600,7 +7600,7 @@ class BookingModel {
       // Add image and user data
       const path = require('path');
       const fs = require('fs');
-      const imagePath = path.join(__dirname, '../public/img/Logo-Black.JPG');
+      const imagePath = path.join(__dirname, '../public/img/Logo-Black.png');
       
       let imageBase64 = '';
       let imageUrl = '';

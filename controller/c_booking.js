@@ -2497,12 +2497,12 @@ class BookingController {
         });
 
         // Load logo as base64 for Playwright
-        const logoPath = path.join(__dirname, '../public/img/Logo-Black.JPG');
+        const logoPath = path.join(__dirname, '../public/img/Logo-Black.png');
         let imageUrl = '';
         try {
           if (require('fs').existsSync(logoPath)) {
             const imageBase64 = require('fs').readFileSync(logoPath, 'base64');
-            imageUrl = `data:image/jpeg;base64,${imageBase64}`;
+            imageUrl = `data:image/png;base64,${imageBase64}`;
             console.log('✅ [VOUCHER] Logo loaded as base64');
           } else {
             console.error('❌ [VOUCHER] Logo file not found:', logoPath);
@@ -3516,12 +3516,12 @@ class BookingController {
       });
 
       // Load logo as base64 for Playwright
-      const logoPath = path.join(__dirname, '../public/img/Logo-Black.JPG');
+      const logoPath = path.join(__dirname, '../public/img/Logo-Black.png');
       let imageUrl = '';
       try {
         if (require('fs').existsSync(logoPath)) {
           const imageBase64 = require('fs').readFileSync(logoPath, 'base64');
-          imageUrl = `data:image/jpeg;base64,${imageBase64}`;
+          imageUrl = `data:image/png;base64,${imageBase64}`;
           console.log('✅ [VOUCHER PDF] Logo loaded as base64');
         } else {
           console.error('❌ [VOUCHER PDF] Logo file not found:', logoPath);

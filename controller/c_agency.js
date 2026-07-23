@@ -271,9 +271,9 @@ class AgencyController {
       // Attempt to load logo from public assets (optional)
       let logoUrl = '';
       try {
-        const logoPath = path.join(__dirname, '../public/img/Logo-Black.JPG');
+        const logoPath = path.join(__dirname, '../public/img/Logo-Black.png');
         const logoBuf = await fs.readFile(logoPath);
-        logoUrl = `data:image/jpeg;base64,${logoBuf.toString('base64')}`;
+        logoUrl = `data:image/png;base64,${logoBuf.toString('base64')}`;
       } catch (_) {
         logoUrl = '';
       }
@@ -343,12 +343,12 @@ class AgencyController {
       const templateContent = await fs.readFile(templatePath, 'utf-8');
 
       // Load logo as base64 for Playwright
-      const logoPath = path.join(__dirname, '../public/img/Logo-Black.JPG');
+      const logoPath = path.join(__dirname, '../public/img/Logo-Black.png');
       let imageUrl = '';
       try {
         if (require('fs').existsSync(logoPath)) {
           const imageBase64 = require('fs').readFileSync(logoPath, 'base64');
-          imageUrl = `data:image/jpeg;base64,${imageBase64}`;
+          imageUrl = `data:image/png;base64,${imageBase64}`;
         } else {
           console.error('❌ [AGENCY VOUCHER PDF] Logo file not found:', logoPath);
         }
