@@ -1,0 +1,215 @@
+<div class="row">
+  <div class="col-xl-12 col-md-12 col-12">
+    <div class="dashboard-card">
+      <div class="dashboard-card-header">
+        <header>Flight Schedule</header>
+        <div class="tools">
+          <button type="button" class="btn btn-primary-10 btn-sm" id="addFlightScheduleBtn">
+            <i class="fa fa-plus"></i> Add Flight
+          </button>
+        </div>
+      </div>
+      <div class="dashboard-card-body">
+        <div class="table-scrollable">
+          <table id="flightScheduleTable" class="table table-hover table-bordered full-width">
+            <thead>
+              <tr>
+                <th>Flight No.</th>
+                <th>Arrival</th>
+                <th>Departure</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="addFlightScheduleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Add Flight</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="addFlightScheduleForm">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="addFlightNumber" class="form-label">Flight No.</label>
+            <input type="text" class="form-control" id="addFlightNumber" placeholder="e.g. PR123" required>
+          </div>
+          <div class="mb-3">
+            <label for="addArrival" class="form-label">Arrival</label>
+            <input type="text" class="form-control flight-datetime-picker" id="addArrival" placeholder="Select date and time" readonly required>
+          </div>
+          <div class="mb-3">
+            <label for="addDeparture" class="form-label">Departure</label>
+            <input type="text" class="form-control flight-datetime-picker" id="addDeparture" placeholder="Select date and time" readonly required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editFlightScheduleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Flight</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="editFlightScheduleForm">
+        <input type="hidden" id="editFlightScheduleId">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="editFlightNumber" class="form-label">Flight No.</label>
+            <input type="text" class="form-control" id="editFlightNumber" required>
+          </div>
+          <div class="mb-3">
+            <label for="editArrival" class="form-label">Arrival</label>
+            <input type="text" class="form-control flight-datetime-picker" id="editArrival" placeholder="Select date and time" readonly required>
+          </div>
+          <div class="mb-3">
+            <label for="editDeparture" class="form-label">Departure</label>
+            <input type="text" class="form-control flight-datetime-picker" id="editDeparture" placeholder="Select date and time" readonly required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Update</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    setTimeout(function () {
+      const script = document.createElement('script');
+      script.src = '/js/flight/flight_schedule.js';
+      document.body.appendChild(script);
+    }, 300);
+  });
+</script>
+
+<style>
+  #addFlightScheduleModal .modal-content,
+  #editFlightScheduleModal .modal-content {
+    background-color: #2a3135;
+    color: #ffffff;
+    border: 1px solid #495057;
+  }
+
+  #addFlightScheduleModal .modal-header,
+  #editFlightScheduleModal .modal-header,
+  #addFlightScheduleModal .modal-body,
+  #editFlightScheduleModal .modal-body,
+  #addFlightScheduleModal .modal-footer,
+  #editFlightScheduleModal .modal-footer {
+    background-color: #2a3135;
+    color: #ffffff;
+  }
+
+  #addFlightScheduleModal .modal-header,
+  #editFlightScheduleModal .modal-header {
+    border-bottom: 1px solid #495057;
+  }
+
+  #addFlightScheduleModal .modal-footer,
+  #editFlightScheduleModal .modal-footer {
+    border-top: 1px solid #495057;
+  }
+
+  #addFlightScheduleModal .modal-title,
+  #editFlightScheduleModal .modal-title,
+  #addFlightScheduleModal .form-label,
+  #editFlightScheduleModal .form-label {
+    color: #ffffff !important;
+    font-weight: 500;
+  }
+
+  #addFlightScheduleModal .form-control,
+  #editFlightScheduleModal .form-control {
+    background-color: #41474c !important;
+    color: #ffffff !important;
+    border: 1px solid #5a6268 !important;
+  }
+
+  #addFlightScheduleModal .form-control::placeholder,
+  #editFlightScheduleModal .form-control::placeholder {
+    color: #c5cdd3 !important;
+    opacity: 1;
+  }
+
+  #addFlightScheduleModal .form-control:focus,
+  #editFlightScheduleModal .form-control:focus {
+    background-color: #4b5359 !important;
+    color: #ffffff !important;
+    border-color: #6c757d !important;
+    box-shadow: 0 0 0 0.15rem rgba(255, 255, 255, 0.12);
+  }
+
+  #addFlightScheduleModal .btn-close,
+  #editFlightScheduleModal .btn-close {
+    filter: invert(1);
+    opacity: 0.85;
+  }
+
+  #addFlightScheduleModal .modal-dialog,
+  #editFlightScheduleModal .modal-dialog,
+  #addFlightScheduleModal .modal-content,
+  #editFlightScheduleModal .modal-content,
+  #addFlightScheduleModal .modal-body,
+  #editFlightScheduleModal .modal-body {
+    overflow: visible !important;
+  }
+
+  .flatpickr-calendar {
+    z-index: 2000 !important;
+  }
+
+  body.white-sidebar-color #addFlightScheduleModal .modal-content,
+  body.white-sidebar-color #editFlightScheduleModal .modal-content,
+  body.white-sidebar-color #addFlightScheduleModal .modal-header,
+  body.white-sidebar-color #editFlightScheduleModal .modal-header,
+  body.white-sidebar-color #addFlightScheduleModal .modal-body,
+  body.white-sidebar-color #editFlightScheduleModal .modal-body,
+  body.white-sidebar-color #addFlightScheduleModal .modal-footer,
+  body.white-sidebar-color #editFlightScheduleModal .modal-footer {
+    background-color: #ffffff;
+    color: #111827;
+  }
+
+  body.white-sidebar-color #addFlightScheduleModal .modal-title,
+  body.white-sidebar-color #editFlightScheduleModal .modal-title,
+  body.white-sidebar-color #addFlightScheduleModal .form-label,
+  body.white-sidebar-color #editFlightScheduleModal .form-label {
+    color: #111827 !important;
+  }
+
+  body.white-sidebar-color #addFlightScheduleModal .form-control,
+  body.white-sidebar-color #editFlightScheduleModal .form-control {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #d1d5db !important;
+  }
+
+  body.white-sidebar-color #addFlightScheduleModal .form-control::placeholder,
+  body.white-sidebar-color #editFlightScheduleModal .form-control::placeholder {
+    color: #6b7280 !important;
+  }
+
+  body.white-sidebar-color #addFlightScheduleModal .btn-close,
+  body.white-sidebar-color #editFlightScheduleModal .btn-close {
+    filter: none;
+  }
+</style>
