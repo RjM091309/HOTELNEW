@@ -33,11 +33,13 @@ const creditModel = {
         SUM(CASE WHEN p.SETTLED_DATE IS NULL THEN 1 ELSE 0 END) AS UNSETTLED_COUNT,
         b.CONFIRMATION_NUMBER,
         c.NAME AS GUEST_NAME,
-        r.ROOM_NUMBER
+        r.ROOM_NUMBER,
+        a.NAME AS AGENCY_NAME
       FROM payments p
       LEFT JOIN booking b ON b.IDNo = p.BOOKING_ID
       LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
       LEFT JOIN room r ON r.IDNo = b.ROOM_ID
+      LEFT JOIN agency a ON a.IDNo = b.AGENCY_ID
       WHERE p.PAYMENT_METHOD IN ('credit', 'marker')
       ${searchCondition}
       GROUP BY p.BOOKING_ID, DATE(p.PAYMENT_DATE)

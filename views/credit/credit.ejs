@@ -27,6 +27,7 @@
             <th style="text-align: center;">DATE</th>
             <th style="text-align: center;">GUEST NAME</th>
             <th style="text-align: center;">ROOM NUMBER</th>
+            <th style="text-align: center;">AGENCY</th>
             <th style="text-align: center;">CONFIRMATION NUMBER</th>
             <th style="text-align: left;">AMOUNT</th>
             <th style="text-align: center;">STATUS</th>
@@ -130,6 +131,7 @@
         },
         { data: 'GUEST_NAME', className: 'center', render: d => d || 'N/A' },
         { data: 'ROOM_NUMBER', className: 'center', render: d => d || 'N/A' },
+        { data: 'AGENCY_NAME', className: 'center', render: d => d || 'N/A' },
         { data: 'CONFIRMATION_NUMBER', className: 'center', render: function(data, type, row){
             return data ? `<a href="/booking?highlight=${row.BOOKING_ID}" target="_blank" style="color:#007bff;text-decoration:underline;">${data}</a>` : 'N/A';
           }

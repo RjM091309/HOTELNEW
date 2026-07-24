@@ -8538,19 +8538,39 @@ class BookingModel {
 
             // 6. Update payments based on paid amount
             if (paymentStatus === 'paid' || paymentStatus === 'partial') {
-              // Delete existing payments for this booking
-              await connection.promise().query('DELETE FROM payments WHERE BOOKING_ID = ?', [bookingId]);
-              
-              // Insert payment record for the paid amount
+              // Only remove the generic cash/room placeholder row(s) this same block
+              // creates below (BILLING_ID/BOOKING_SERVICE_ID/etc all NULL, never settled).
+              // Real transactions - credit/marker entries, settled payments, and
+              // payments tied to a specific bill/service/extension/pickdrop - must never
+              // be touched here, or booking edits silently destroy the credit ledger.
+              await connection.promise().query(
+                `DELETE FROM payments
+                 WHERE BOOKING_ID = ? AND PAYMENT_METHOD = 'cash' AND PAYMENT_TYPE = 'room'
+                   AND BILLING_ID IS NULL AND BOOKING_SERVICE_ID IS NULL
+                   AND BOOKING_EXTENSION_ID IS NULL AND BOOKING_PICKDROP_ID IS NULL
+                   AND SETTLED_DATE IS NULL`,
+                [bookingId]
+              );
+
+              // The submitted paidAmount is the FULL total (it's pre-filled server-side as
+              // SUM of every payment already on this booking - see getEditBookingDetails).
+              // Only insert the portion not already covered by payments still on record
+              // after the placeholder cleanup above, so re-saving an unchanged amount
+              // doesn't keep stacking duplicate cash rows on top of the real ones.
               const paidAmountNum = parseFloat(paidAmount) || 0;
-              if (paidAmountNum > 0) {
+              const [[{ alreadyRecorded }]] = await connection.promise().query(
+                'SELECT COALESCE(SUM(AMOUNT_PAID), 0) AS alreadyRecorded FROM payments WHERE BOOKING_ID = ?',
+                [bookingId]
+              );
+              const deltaToInsert = Math.round((paidAmountNum - parseFloat(alreadyRecorded)) * 100) / 100;
+              if (deltaToInsert > 0) {
                 const paymentQuery = `
-                  INSERT INTO payments 
+                  INSERT INTO payments
                   (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
                   VALUES (?, ?, ?, ?, ?, ?, ?)
                 `;
                 await connection.promise().query(paymentQuery, [
-                  bookingId, null, paidAmountNum, 'cash', 'room', editDate, editedBy
+                  bookingId, null, deltaToInsert, 'cash', 'room', editDate, editedBy
                 ]);
               }
             }

@@ -642,7 +642,7 @@ function computeEditSeasonalPrice(room) {
     );
     let pricePerNight = match ? parseFloat(match.price) : parseFloat(room.FINAL_PRICE || room.ROOM_PRICE);
     if (!isFinite(pricePerNight)) pricePerNight = 0;
-    return pricePerNight;
+    return { price: pricePerNight, matched: !!match };
 }
 
 function cacheEditRoomDetails(roomId) {
@@ -666,10 +666,20 @@ function cacheEditRoomDetails(roomId) {
     });
 }
 
-function refreshEditRoomRate() {
+// preserveIfNoMatch: when true, a recompute that falls back to the room's plain
+// base rate (i.e. no seasonal price configured for the newly selected booking
+// type, e.g. no 'agency' rate set up) is discarded and the currently displayed
+// price is kept as-is, instead of silently overwriting a correct existing price
+// with the wrong rate. Used for route/payer toggles, where the price may not
+// actually need to change; a real room/floor selection always recomputes fully.
+function refreshEditRoomRate(preserveIfNoMatch = false) {
     const applyPrice = (room) => {
         if (!room) return;
-        const pricePerNight = computeEditSeasonalPrice(room);
+        const { price: pricePerNight, matched } = computeEditSeasonalPrice(room);
+        const currentPrice = parseFloat(($('#edit_price').val() || '').toString().replace(/,/g, ''));
+        if (preserveIfNoMatch && !matched && isFinite(currentPrice) && currentPrice > 0) {
+            return;
+        }
         $('#edit_baseprice').val((pricePerNight || 0).toFixed(2));
         if (!$('#edit_manualPriceToggle').is(':checked')) {
             $('#edit_price').val((pricePerNight || 0).toFixed(2));
@@ -870,7 +880,7 @@ $(document).ready(function() {
     // Recompute price when who pays changes
     $('input[name="edit_agencyPayer"]').on('change', function () {
         updateEditAgencyPayerHint();
-        refreshEditRoomRate();
+        refreshEditRoomRate(true);
     });
 
     // Fetch breakfast and transport prices using shared utility
@@ -1021,7 +1031,7 @@ $(document).ready(function() {
             updateEditAgencyPayerHint();
         }
 
-        refreshEditRoomRate();
+        refreshEditRoomRate(true);
     });
 
     // Note: Payment status logic removed - now using paid amount input

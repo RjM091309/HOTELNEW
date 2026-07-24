@@ -23,8 +23,8 @@ const creditController = {
       const orderColumn = order[0]?.column ?? 1;
       const orderDir = order[0]?.dir || 'desc';
 
-      // Mirrors the column order in views/credit/credit.ejs (index 7 is the non-orderable ACTION column)
-      const columns = ['GROUP_KEY', 'FIRST_PAYMENT_DATE', 'GUEST_NAME', 'ROOM_NUMBER', 'CONFIRMATION_NUMBER', 'AMOUNT_PAID', 'UNSETTLED_COUNT'];
+      // Mirrors the column order in views/credit/credit.ejs (index 8 is the non-orderable ACTION column)
+      const columns = ['GROUP_KEY', 'FIRST_PAYMENT_DATE', 'GUEST_NAME', 'ROOM_NUMBER', 'AGENCY_NAME', 'CONFIRMATION_NUMBER', 'AMOUNT_PAID', 'UNSETTLED_COUNT'];
       const orderBy = columns[orderColumn] || 'FIRST_PAYMENT_DATE';
 
       let searchCondition = '';
