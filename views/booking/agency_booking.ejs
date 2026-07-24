@@ -380,6 +380,7 @@ $(document).ready(function () {
                         Balance: item.BALANCE || 0,
                         Paymentstatus: item.PAYMENT_STATUS || 'unpaid',
                         PaymentMethod: item.PAYMENT_METHOD || '',
+                        HasUnsettledCredit: !!item.HAS_UNSETTLED_CREDIT,
                         BookingChannel: item.BOOKING_CHANNEL,
                         Status: getStatusLabel(item.BookingStatus, item.BookingID),
                         BookingStatus: item.BookingStatus,
@@ -476,7 +477,7 @@ $(document).ready(function () {
             render: function (data, type, row) {
                 const paymentStatus = (data || '').toLowerCase().trim();
                 const paymentMethod = (row.PaymentMethod || '').toLowerCase();
-                const isOnCredit = paymentMethod === 'credit' || paymentMethod === 'marker';
+                const isOnCredit = (paymentMethod === 'credit' || paymentMethod === 'marker') && row.HasUnsettledCredit;
                 let labelClass = 'label-danger';
                 let text = data || 'unpaid';
                 if (paymentStatus === 'paid' && isOnCredit) { labelClass = 'label-info'; text = 'credit'; }

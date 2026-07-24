@@ -79,6 +79,7 @@ $(document).ready(function () {
                         Balance: item.BALANCE || 0,
                         Paymentstatus: item.PAYMENT_STATUS || 'unpaid',
                         PaymentMethod: item.PAYMENT_METHOD || '',
+                        HasUnsettledCredit: !!item.HAS_UNSETTLED_CREDIT,
                         BookingChannel: item.BOOKING_CHANNEL,
                         AgencyPayer: item.AGENCY_PAYER || null,
                         Status: getStatusLabel(item.BookingStatus, item.BookingID),
@@ -196,7 +197,7 @@ $(document).ready(function () {
                     const balance = parseFloat(row.Balance) || 0;
                     const totalCost = parseFloat(row.Totalcost) || 0;
                     const paymentMethod = (row.PaymentMethod || '').toLowerCase();
-                    const isOnCredit = paymentMethod === 'credit' || paymentMethod === 'marker';
+                    const isOnCredit = (paymentMethod === 'credit' || paymentMethod === 'marker') && row.HasUnsettledCredit;
                     let labelClass, displayText;
                     if (balance <= 0 && isOnCredit) { labelClass = 'label-info'; displayText = 'CREDIT'; }
                     else if (balance <= 0) { labelClass = 'label-success'; displayText = 'PAID'; }

@@ -67,6 +67,12 @@ const paymentsModel = {
         r.ROOM_NUMBER,
         bill.PAYMENT_STATUS,
         bill.PAYMENT_METHOD,
+        EXISTS (
+          SELECT 1 FROM payments p_credit
+          WHERE p_credit.BOOKING_ID = b.IDNo
+            AND p_credit.PAYMENT_METHOD IN ('credit', 'marker')
+            AND p_credit.SETTLED_DATE IS NULL
+        ) AS HAS_UNSETTLED_CREDIT,
         lp.LAST_PAYMENT_DATE,
         u.FULLNAME AS PROCESSED_BY_NAME,
         (
@@ -116,9 +122,14 @@ const paymentsModel = {
   salesSummary: async (todayStr, weekStartStr, monthStartStr) => {
     // Sales based on PAYMENT_DATE (kailan talaga pumasok ang bayad)
     // Discount entries are excluded (PAYMENT_TYPE != 'discount')
+    // "Paid" excludes credit/marker entries that haven't been settled yet (see creditModel),
+    // so it reflects cash actually collected instead of double-counting outstanding credit as revenue.
+    const collectedCase = `CASE WHEN p.PAYMENT_METHOD NOT IN ('credit', 'marker') OR p.SETTLED_DATE IS NOT NULL THEN p.AMOUNT_PAID ELSE 0 END`;
 
     const [daily] = await pool.promise().query(
-      `SELECT COALESCE(SUM(p.AMOUNT_PAID), 0) AS totalPaid
+      `SELECT
+         COALESCE(SUM(p.AMOUNT_PAID), 0) AS totalAmount,
+         COALESCE(SUM(${collectedCase}), 0) AS paidAmount
        FROM payments p
        WHERE DATE(p.PAYMENT_DATE) = ?
          AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')`,
@@ -126,7 +137,9 @@ const paymentsModel = {
     );
 
     const [weekly] = await pool.promise().query(
-      `SELECT COALESCE(SUM(p.AMOUNT_PAID), 0) AS totalPaid
+      `SELECT
+         COALESCE(SUM(p.AMOUNT_PAID), 0) AS totalAmount,
+         COALESCE(SUM(${collectedCase}), 0) AS paidAmount
        FROM payments p
        WHERE DATE(p.PAYMENT_DATE) >= ?
          AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')`,
@@ -134,7 +147,9 @@ const paymentsModel = {
     );
 
     const [monthly] = await pool.promise().query(
-      `SELECT COALESCE(SUM(p.AMOUNT_PAID), 0) AS totalPaid
+      `SELECT
+         COALESCE(SUM(p.AMOUNT_PAID), 0) AS totalAmount,
+         COALESCE(SUM(${collectedCase}), 0) AS paidAmount
        FROM payments p
        WHERE DATE(p.PAYMENT_DATE) >= ?
          AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')`,
@@ -142,9 +157,9 @@ const paymentsModel = {
     );
 
     return {
-      daily: { dailyTotal: daily[0]?.totalPaid || 0, dailyPaid: daily[0]?.totalPaid || 0 },
-      weekly: { weeklyTotal: weekly[0]?.totalPaid || 0, weeklyPaid: weekly[0]?.totalPaid || 0 },
-      monthly: { monthlyTotal: monthly[0]?.totalPaid || 0, monthlyPaid: monthly[0]?.totalPaid || 0 }
+      daily: { dailyTotal: daily[0]?.totalAmount || 0, dailyPaid: daily[0]?.paidAmount || 0 },
+      weekly: { weeklyTotal: weekly[0]?.totalAmount || 0, weeklyPaid: weekly[0]?.paidAmount || 0 },
+      monthly: { monthlyTotal: monthly[0]?.totalAmount || 0, monthlyPaid: monthly[0]?.paidAmount || 0 }
     };
   },
 

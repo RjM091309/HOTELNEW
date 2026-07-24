@@ -24,20 +24,56 @@
         <thead>
           <tr>
             <th style="display:none"></th>
-            <th style="text-align: center;">#</th>
             <th style="text-align: center;">DATE</th>
             <th style="text-align: center;">GUEST NAME</th>
             <th style="text-align: center;">ROOM NUMBER</th>
             <th style="text-align: center;">CONFIRMATION NUMBER</th>
-            <th style="text-align: center;">AMOUNT</th>
-            <th style="text-align: center;">APPROVED BY</th>
-            <th style="text-align: center;">PROCESSED BY</th>
+            <th style="text-align: left;">AMOUNT</th>
             <th style="text-align: center;">STATUS</th>
             <th style="text-align: center;">ACTION</th>
           </tr>
         </thead>
         <tbody></tbody>
       </table>
+    </div>
+  </div>
+</div>
+
+<!-- Credit Breakdown Modal -->
+<div class="modal fade" id="credit-breakdown-modal" tabindex="-1" aria-labelledby="credit-breakdown-modal-label" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="credit-breakdown-modal-label">Credit Breakdown</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2">
+          <strong id="credit-breakdown-guest"></strong> &mdash; <span id="credit-breakdown-date"></span>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-bordered table-sm" id="credit-breakdown-table">
+            <thead>
+              <tr>
+                <th style="text-align:center;width:36px;"><input type="checkbox" id="credit-breakdown-select-all"></th>
+                <th style="text-align:center;">TIME</th>
+                <th style="text-align:center;">FOR</th>
+                <th style="text-align:center;">AMOUNT</th>
+                <th style="text-align:center;">APPROVED BY</th>
+                <th style="text-align:center;">PROCESSED BY</th>
+                <th style="text-align:center;">STATUS</th>
+                <th style="text-align:center;">ACTION</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" id="credit-breakdown-mark-selected-btn" disabled>Mark Selected as Paid</button>
+        <button type="button" class="btn btn-success" id="credit-breakdown-mark-all-btn">Mark All as Paid</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
     </div>
   </div>
 </div>
@@ -50,25 +86,42 @@
       return match ? match[1].trim() : remarks;
     }
 
+    function formatMoney(d) {
+      return '₱' + Number(d || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
+    }
+
+    const PAYMENT_TYPE_LABELS = {
+      room: 'Room',
+      extended: 'Extension',
+      service: 'Service',
+      pickdrop: 'Pick-up/Drop-off',
+      reservation_fee: 'Reservation Fee',
+      discount: 'Discount',
+      refund: 'Refund',
+      cancellation_fee: 'Cancellation Fee'
+    };
+    function formatPaymentType(type) {
+      return PAYMENT_TYPE_LABELS[type] || (type || '-');
+    }
+
     let table = $('#credit_tbl').DataTable({
-      rowId: 'PAYMENT_ID',
+      rowId: 'GROUP_KEY',
       processing: true,
       serverSide: true,
       ajax: {
         url: '/credit/credit_data',
         type: 'GET',
         dataSrc: function(json){
-          document.getElementById('total-credit').textContent = '₱' + Number(json.totalOutstandingCredit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
+          document.getElementById('total-credit').textContent = formatMoney(json.totalOutstandingCredit);
           return json.data;
         }
       },
       columns: [
-        { data: 'PAYMENT_ID', visible: false },
-        { data: null, orderable: false, searchable: false, className: 'center' },
+        { data: 'GROUP_KEY', visible: false },
         {
-          data: 'PAYMENT_DATE',
+          data: 'FIRST_PAYMENT_DATE',
           className: 'center',
-          render: d => d ? new Date(d).toLocaleString('en-US') : ''
+          render: d => d ? new Date(d).toLocaleDateString('en-US') : ''
         },
         { data: 'GUEST_NAME', className: 'center', render: d => d || 'N/A' },
         { data: 'ROOM_NUMBER', className: 'center', render: d => d || 'N/A' },
@@ -76,32 +129,104 @@
             return data ? `<a href="/booking?highlight=${row.BOOKING_ID}" target="_blank" style="color:#007bff;text-decoration:underline;">${data}</a>` : 'N/A';
           }
         },
-        { data: 'AMOUNT_PAID', className: 'center', render: d => '₱' + Number(d||0).toLocaleString('en-US', { minimumFractionDigits: 2 }) },
-        { data: 'REMARKS', className: 'center', render: d => extractApprovedBy(d) },
-        { data: 'PROCESSED_BY_NAME', className: 'center', render: d => d || '' },
-        { data: 'SETTLED_DATE', className: 'center', render: function(data, type, row){
-            if (!data) return '<span class="label label-warning">Outstanding</span>';
-            const settledDate = new Date(data).toLocaleString('en-US');
-            const settledBy = row.SETTLED_BY_NAME ? ` by ${row.SETTLED_BY_NAME}` : '';
-            return `<span class="label label-success" title="Settled${settledBy} on ${settledDate}">Paid</span>`;
+        { data: 'AMOUNT_PAID', className: 'text-start', render: function(data, type, row){
+            const entries = row.ENTRY_COUNT > 1 ? ` <span class="badge bg-secondary" title="${row.ENTRY_COUNT} entries on this date">${row.ENTRY_COUNT}</span>` : '';
+            return formatMoney(data) + entries;
+          }
+        },
+        { data: 'UNSETTLED_COUNT', className: 'center', render: function(data, type, row){
+            if (Number(data) === 0) return '<span class="label label-success">Paid</span>';
+            if (Number(data) < Number(row.ENTRY_COUNT)) return '<span class="label label-warning" title="Some entries on this date are already settled">Partially Paid</span>';
+            return '<span class="label label-warning">Outstanding</span>';
           }
         },
         { data: null, orderable: false, searchable: false, className: 'center', render: function(_d, _t, row){
-            if (row.SETTLED_DATE) return '-';
-            return `<button type="button" class="btn btn-sm btn-success settle-credit-btn" data-payment-id="${row.PAYMENT_ID}">Mark as Paid</button>`;
+            return `<button type="button" class="btn btn-sm btn-info view-breakdown-btn" data-booking-id="${row.BOOKING_ID}" data-date="${row.PAYMENT_DATE}">View Breakdown</button>`;
           }
         }
       ],
-      order: [[2, 'desc']],
+      order: [[1, 'desc']],
       language: { emptyTable: 'No credit transactions found.' }
     });
 
-    table.on('draw.dt', function(){
-      table.column(1, { search: 'applied', order: 'applied' }).nodes().each(function(cell, i){ cell.innerHTML = i + 1; });
+    let currentGroupBookingId = null;
+    let currentGroupDate = null;
+
+    function loadBreakdown(bookingId, date) {
+      currentGroupBookingId = bookingId;
+      currentGroupDate = date;
+      $.ajax({
+        url: '/credit/breakdown',
+        type: 'GET',
+        data: { bookingId, date },
+        success: function(response){
+          if (!response.success) {
+            Swal.fire('Error', response.message || 'Failed to load breakdown.', 'error');
+            return;
+          }
+          renderBreakdown(response.data);
+          $('#credit-breakdown-modal').modal('show');
+        },
+        error: function(){
+          Swal.fire('Error', 'Failed to load credit breakdown.', 'error');
+        }
+      });
+    }
+
+    function renderBreakdown(rows) {
+      const $tbody = $('#credit-breakdown-table tbody').empty();
+      const first = rows[0] || {};
+      $('#credit-breakdown-date').text(first.PAYMENT_DATE ? new Date(first.PAYMENT_DATE).toLocaleDateString('en-US') : '');
+
+      rows.forEach(function(row){
+        const time = row.PAYMENT_DATE ? new Date(row.PAYMENT_DATE).toLocaleTimeString('en-US') : '';
+        const statusHtml = row.SETTLED_DATE
+          ? `<span class="label label-success" title="Settled${row.SETTLED_BY_NAME ? ' by ' + row.SETTLED_BY_NAME : ''} on ${new Date(row.SETTLED_DATE).toLocaleString('en-US')}">Paid</span>`
+          : '<span class="label label-warning">Outstanding</span>';
+        const actionHtml = row.SETTLED_DATE
+          ? '-'
+          : `<button type="button" class="btn btn-sm btn-success settle-credit-btn" data-payment-id="${row.PAYMENT_ID}">Mark as Paid</button>`;
+
+        const checkboxHtml = row.SETTLED_DATE
+          ? ''
+          : `<input type="checkbox" class="credit-row-checkbox" data-payment-id="${row.PAYMENT_ID}">`;
+
+        $tbody.append(`
+          <tr>
+            <td style="text-align:center;">${checkboxHtml}</td>
+            <td style="text-align:center;">${time}</td>
+            <td style="text-align:center;">${row.PAYMENT_FOR || formatPaymentType(row.PAYMENT_TYPE)}</td>
+            <td style="text-align:center;">${formatMoney(row.AMOUNT_PAID)}</td>
+            <td style="text-align:center;">${extractApprovedBy(row.REMARKS)}</td>
+            <td style="text-align:center;">${row.PROCESSED_BY_NAME || ''}</td>
+            <td style="text-align:center;">${statusHtml}</td>
+            <td style="text-align:center;">${actionHtml}</td>
+          </tr>
+        `);
+      });
+
+      const hasOutstanding = rows.some(row => !row.SETTLED_DATE);
+      $('#credit-breakdown-mark-all-btn').toggle(hasOutstanding);
+      $('#credit-breakdown-select-all').prop('checked', false).toggle(hasOutstanding);
+      updateMarkSelectedBtn();
+    }
+
+    function updateMarkSelectedBtn() {
+      const anyChecked = $('.credit-row-checkbox:checked').length > 0;
+      $('#credit-breakdown-mark-selected-btn').prop('disabled', !anyChecked);
+    }
+
+    $('#credit_tbl').on('click', '.view-breakdown-btn', function(){
+      const bookingId = $(this).data('booking-id');
+      const date = $(this).data('date');
+      const rowData = table.row($(this).closest('tr')).data();
+      $('#credit-breakdown-guest').text(rowData ? (rowData.GUEST_NAME || 'N/A') : '');
+      loadBreakdown(bookingId, date);
     });
 
-    $('#credit_tbl').on('click', '.settle-credit-btn', function(){
+    $('#credit-breakdown-table').on('click', '.settle-credit-btn', function(){
       const paymentId = $(this).data('payment-id');
+      const $btn = $(this);
       Swal.fire({
         title: 'Mark as Paid?',
         text: 'Confirm that the guest has settled this credit amount.',
@@ -116,6 +241,11 @@
           type: 'POST',
           success: function(response){
             if (response.success) {
+              const $row = $btn.closest('tr');
+              $row.find('td:eq(0)').html('');
+              $row.find('td:eq(6)').html('<span class="label label-success">Paid</span>');
+              $row.find('td:eq(7)').html('-');
+              updateMarkSelectedBtn();
               table.ajax.reload(null, false);
             } else {
               Swal.fire('Error', response.message || 'Failed to settle credit.', 'error');
@@ -123,6 +253,84 @@
           },
           error: function(){
             Swal.fire('Error', 'Failed to settle credit.', 'error');
+          }
+        });
+      });
+    });
+
+    $('#credit-breakdown-select-all').on('change', function(){
+      $('.credit-row-checkbox').prop('checked', $(this).is(':checked'));
+      updateMarkSelectedBtn();
+    });
+
+    $('#credit-breakdown-table').on('change', '.credit-row-checkbox', function(){
+      if (!$(this).is(':checked')) {
+        $('#credit-breakdown-select-all').prop('checked', false);
+      } else if ($('.credit-row-checkbox:not(:checked)').length === 0) {
+        $('#credit-breakdown-select-all').prop('checked', true);
+      }
+      updateMarkSelectedBtn();
+    });
+
+    $('#credit-breakdown-mark-selected-btn').on('click', function(){
+      const paymentIds = $('.credit-row-checkbox:checked').map(function(){
+        return $(this).data('payment-id');
+      }).get();
+      if (paymentIds.length === 0) return;
+
+      Swal.fire({
+        title: 'Mark selected as paid?',
+        text: `Confirm that the guest has settled ${paymentIds.length} selected credit entr${paymentIds.length === 1 ? 'y' : 'ies'}.`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, mark as paid',
+        cancelButtonText: 'Cancel'
+      }).then((result) => {
+        if (!result.isConfirmed) return;
+        $.ajax({
+          url: '/credit/settle-selected',
+          type: 'POST',
+          data: { paymentIds },
+          success: function(response){
+            if (response.success) {
+              loadBreakdown(currentGroupBookingId, currentGroupDate);
+              table.ajax.reload(null, false);
+            } else {
+              Swal.fire('Error', response.message || 'Failed to settle selected credit entries.', 'error');
+            }
+          },
+          error: function(){
+            Swal.fire('Error', 'Failed to settle selected credit entries.', 'error');
+          }
+        });
+      });
+    });
+
+    $('#credit-breakdown-mark-all-btn').on('click', function(){
+      if (!currentGroupBookingId || !currentGroupDate) return;
+      Swal.fire({
+        title: 'Mark all as paid?',
+        text: 'Confirm that all outstanding credit entries for this booking on this date have been settled.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, mark all as paid',
+        cancelButtonText: 'Cancel'
+      }).then((result) => {
+        if (!result.isConfirmed) return;
+        $.ajax({
+          url: '/credit/settle-group',
+          type: 'POST',
+          data: { bookingId: currentGroupBookingId, date: currentGroupDate },
+          success: function(response){
+            if (response.success) {
+              loadBreakdown(currentGroupBookingId, currentGroupDate);
+              table.ajax.reload(null, false);
+            } else {
+              Swal.fire('Error', response.message || 'Failed to settle credit entries.', 'error');
+            }
+          },
+          error: function(){
+            Swal.fire('Error', 'Failed to settle credit entries.', 'error');
           }
         });
       });

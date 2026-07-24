@@ -145,6 +145,12 @@ class BookingModel {
               ELSE 'unpaid'
             END AS PAYMENT_STATUS,
             bill.PAYMENT_METHOD AS PAYMENT_METHOD,
+            EXISTS (
+              SELECT 1 FROM payments p_credit
+              WHERE p_credit.BOOKING_ID = b.IDNo
+                AND p_credit.PAYMENT_METHOD IN ('credit', 'marker')
+                AND p_credit.SETTLED_DATE IS NULL
+            ) AS HAS_UNSETTLED_CREDIT,
             ${useIndividualCalculation ? `
             -- Use individual balance calculation for all bookings (including group bookings shown individually)
             ROUND(GREATEST(0, 

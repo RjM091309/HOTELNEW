@@ -125,7 +125,7 @@
         { data: null, className: 'center', render: function(_d,_t,row){
             const balance = parseFloat(row.BALANCE)||0;
             const method = (row.PAYMENT_METHOD || '').toLowerCase();
-            const isOnCredit = method === 'credit' || method === 'marker';
+            const isOnCredit = (method === 'credit' || method === 'marker') && !!row.HAS_UNSETTLED_CREDIT;
             if (balance <= 0 && isOnCredit) return '<span class="label label-info">Credit</span>';
             if (balance <= 0) return '<span class="label label-success">Paid</span>';
             if (balance < parseFloat(row.TOTAL_AMOUNT)) return '<span class="label label-warning">Partial</span>';
