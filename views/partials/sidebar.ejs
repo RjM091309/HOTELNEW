@@ -198,7 +198,7 @@
 				</li>
 
 				<!-- Settings Section -->
-				<% const settingsPages = ['integration', 'card_writer', 'telegram_settings', 'booking_channel', 'vehicle', 'room', 'services', 'flight_schedule']; %>
+				<% const settingsPages = ['integration', 'card_writer', 'telegram_settings', 'booking_channel', 'vehicle', 'room', 'services', 'flight_schedule', 'pickup_drop']; %>
 				<li class="nav-item <%= settingsPages.includes(activePage) ? 'open' : '' %>" data-section="settings">
 					<a class="nav-link nav-toggle nav-main-link-submenu <%= settingsPages.includes(activePage) ? 'active' : '' %>" data-toggle="submenu" aria-haspopup="true"
 						aria-expanded="<%= settingsPages.includes(activePage) ? 'true' : 'false' %>" href="#">
@@ -259,6 +259,12 @@
 							<a class="nav-link <%= activePage === 'flight_schedule' ? 'active' : '' %>" href="/flight-schedule">
 								<i class="fa fa-genderless"></i>
 								<span class="title">Flight Schedule</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link <%= activePage === 'pickup_drop' ? 'active' : '' %>" href="/pickup-drop">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Pick Up & Drop</span>
 							</a>
 						</li>
 					</ul>

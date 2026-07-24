@@ -1,0 +1,321 @@
+<div class="row">
+  <div class="col-xl-12 col-md-12 col-12">
+    <div class="dashboard-card">
+      <div class="dashboard-card-header">
+        <header>Pick Up & Drop</header>
+      </div>
+      <div class="dashboard-card-body pickup-drop-table-wrap">
+        <div class="table-scrollable">
+          <table id="pickupDropTable" class="table table-hover table-bordered full-width">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Flight No.</th>
+                <th>No. of Persons</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="printTypeMenu" class="print-type-menu" style="display: none;">
+  <button type="button" class="print-type-option" data-type="pickup">Pick up</button>
+  <button type="button" class="print-type-option" data-type="dropoff">Drop off</button>
+</div>
+
+<div class="modal fade" id="editPickupDropModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Pick Up & Drop</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="editPickupDropForm">
+        <input type="hidden" id="editPickupDropId">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="editName" class="form-label">Name</label>
+            <input type="text" class="form-control" id="editName" readonly>
+          </div>
+          <div class="mb-3 pickup-drop-flight-field">
+            <label for="editFlightNumber" class="form-label">Pick-up Flight No.</label>
+            <input type="text" class="form-control" id="editFlightNumber" placeholder="e.g. 5J538" autocomplete="off">
+            <div id="editPickupFlightDropdown" class="pickup-drop-flight-dropdown"></div>
+          </div>
+          <div class="mb-3 pickup-drop-flight-field">
+            <label for="editDropoffFlightNumber" class="form-label">Drop-off Flight No.</label>
+            <input type="text" class="form-control" id="editDropoffFlightNumber" placeholder="e.g. 5J537" autocomplete="off">
+            <div id="editDropoffFlightDropdown" class="pickup-drop-flight-dropdown"></div>
+          </div>
+          <div class="mb-3">
+            <label for="editPersonCount" class="form-label">No. of Persons</label>
+            <input type="number" class="form-control" id="editPersonCount" min="1" placeholder="e.g. 2">
+          </div>
+          <div class="mb-3">
+            <label for="editSpecialNotes" class="form-label">Special Notes</label>
+            <textarea class="form-control" id="editSpecialNotes" rows="3" placeholder="Notes for pick-up / drop-off printout"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Update</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    setTimeout(function () {
+      const script = document.createElement('script');
+      script.src = '/js/pickup_drop/pickup_drop.js';
+      document.body.appendChild(script);
+    }, 300);
+  });
+</script>
+
+<style>
+  .pickup-drop-table-wrap .dataTables_paginate {
+    display: none !important;
+  }
+
+  .pickup-drop-table-wrap .dataTables_info {
+    padding-top: 0.5rem;
+    margin-bottom: 0;
+  }
+
+  .pickup-drop-table-wrap .dataTables_length,
+  .pickup-drop-table-wrap .dataTables_filter {
+    margin-bottom: 0.5rem;
+  }
+
+  .pickup-drop-table-wrap .table-scrollable {
+    max-height: calc(100vh - 280px);
+    overflow-y: auto !important;
+    margin: 0.5rem 0 !important;
+  }
+
+  .pickup-drop-table-wrap #pickupDropTable th,
+  .pickup-drop-table-wrap #pickupDropTable td {
+    padding: 6px 10px !important;
+    line-height: 1.35;
+    vertical-align: middle;
+  }
+
+  .pickup-drop-table-wrap #pickupDropTable .btn-xs {
+    padding: 2px 6px;
+    line-height: 1.2;
+  }
+
+  .pickup-drop-table-wrap .btn-tbl-print {
+    background-color: #4a5568;
+    border-radius: 50% !important;
+    padding: 0 !important;
+    color: #fff;
+    box-shadow: none;
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pickup-drop-table-wrap .btn-tbl-print:hover {
+    color: #fff;
+    background-color: #2d3748;
+  }
+
+  .pickup-drop-table-wrap .btn-tbl-print i {
+    font-size: 10px;
+    line-height: 1;
+  }
+
+  .print-type-menu {
+    position: fixed;
+    z-index: 2000;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    padding: 6px;
+    background: #2a3135;
+    border: 1px solid #5a6268;
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  }
+
+  .print-type-option {
+    border: 1px solid #5a6268;
+    background: #41474c;
+    color: #fff;
+    font-size: 12px;
+    line-height: 1.2;
+    padding: 6px 10px;
+    border-radius: 4px;
+    text-align: center;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .print-type-option:hover {
+    background: #4a5568;
+    color: #fff;
+  }
+
+  body.white-sidebar-color .print-type-menu {
+    background: #ffffff;
+    border-color: #d1d5db;
+  }
+
+  body.white-sidebar-color .print-type-option {
+    background: #f9fafb;
+    color: #111827;
+    border-color: #d1d5db;
+  }
+
+  body.white-sidebar-color .print-type-option:hover {
+    background: #eef2f7;
+  }
+
+  .pickup-drop-table-wrap.dashboard-card-body {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  #editPickupDropModal .modal-content {
+    background-color: #2a3135;
+    color: #ffffff;
+    border: 1px solid #495057;
+  }
+
+  #editPickupDropModal .modal-header,
+  #editPickupDropModal .modal-body,
+  #editPickupDropModal .modal-footer {
+    background-color: #2a3135;
+    color: #ffffff;
+  }
+
+  #editPickupDropModal .modal-header {
+    border-bottom: 1px solid #495057;
+  }
+
+  #editPickupDropModal .modal-footer {
+    border-top: 1px solid #495057;
+  }
+
+  #editPickupDropModal .modal-title,
+  #editPickupDropModal .form-label {
+    color: #ffffff !important;
+    font-weight: 500;
+  }
+
+  #editPickupDropModal .form-control {
+    background-color: #41474c !important;
+    color: #ffffff !important;
+    border: 1px solid #5a6268 !important;
+  }
+
+  #editPickupDropModal .form-control[readonly] {
+    opacity: 0.85;
+  }
+
+  #editPickupDropModal .form-control::placeholder {
+    color: #c5cdd3 !important;
+    opacity: 1;
+  }
+
+  #editPickupDropModal .form-control:focus {
+    background-color: #4b5359 !important;
+    color: #ffffff !important;
+    border-color: #6c757d !important;
+    box-shadow: 0 0 0 0.15rem rgba(255, 255, 255, 0.12);
+  }
+
+  #editPickupDropModal .btn-close {
+    filter: invert(1);
+    opacity: 0.85;
+  }
+
+  body.white-sidebar-color #editPickupDropModal .modal-content,
+  body.white-sidebar-color #editPickupDropModal .modal-header,
+  body.white-sidebar-color #editPickupDropModal .modal-body,
+  body.white-sidebar-color #editPickupDropModal .modal-footer {
+    background-color: #ffffff;
+    color: #111827;
+  }
+
+  body.white-sidebar-color #editPickupDropModal .modal-title,
+  body.white-sidebar-color #editPickupDropModal .form-label {
+    color: #111827 !important;
+  }
+
+  body.white-sidebar-color #editPickupDropModal .form-control {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #d1d5db !important;
+  }
+
+  body.white-sidebar-color #editPickupDropModal .btn-close {
+    filter: none;
+  }
+
+  .pickup-drop-flight-field {
+    position: relative;
+  }
+
+  .pickup-drop-flight-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1080;
+    max-height: 220px;
+    overflow-y: auto;
+    background-color: #41474c;
+    border: 1px solid #5a6268;
+    border-radius: 6px;
+    margin-top: 2px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+  }
+
+  .pickup-drop-flight-option {
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 13px;
+    border-bottom: 1px solid #5a6268;
+    color: #ffffff;
+  }
+
+  .pickup-drop-flight-option:hover {
+    background-color: #4a5568;
+  }
+
+  .pickup-drop-flight-option span {
+    color: #c5cdd3;
+  }
+
+  body.white-sidebar-color .pickup-drop-flight-dropdown {
+    background-color: #ffffff;
+    border-color: #d1d5db;
+  }
+
+  body.white-sidebar-color .pickup-drop-flight-option {
+    color: #111827;
+    border-bottom-color: #e5e7eb;
+  }
+
+  body.white-sidebar-color .pickup-drop-flight-option:hover {
+    background-color: #f3f4f6;
+  }
+
+  body.white-sidebar-color .pickup-drop-flight-option span {
+    color: #6b7280;
+  }
+</style>

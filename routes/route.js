@@ -26,6 +26,7 @@ const updatesRoutes = require('./r_updates');
 const mapsRoutes = require('./r_maps');
 const gpsTrackerRoutes = require('./r_gps_tracker');
 const flightScheduleRoutes = require('./r_flight_schedule');
+const pickupDropRoutes = require('./r_pickup_drop');
 
 // Auth middleware
 const AuthMiddleware = require('../middleware/m_auth');
@@ -61,6 +62,7 @@ router.use('/room_clearance', AuthMiddleware.requireAuth, roomClearanceRoutes);
 router.use('/telegram', AuthMiddleware.requireAuth, telegramRoutes);
 router.use('/agency', AuthMiddleware.requireAuth, agencyRoutes);
 router.use('/flight-schedule', AuthMiddleware.requireAuth, flightScheduleRoutes);
+router.use('/pickup-drop', AuthMiddleware.requireAuth, pickupDropRoutes);
 router.use('/delete-data', AuthMiddleware.requireAuth, deleteDataRoutes);
 
 // Redirect root to dashboard if authenticated, otherwise to login
