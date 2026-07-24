@@ -135,7 +135,17 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-server.listen(PORT, () => {
+const { runStartupMigrations } = require('./database_migrations/startupMigrations');
+
+async function startServer() {
+  try {
+    await runStartupMigrations();
+  } catch (error) {
+    console.error('❌ Failed to run startup migrations:', error.message);
+    process.exit(1);
+  }
+
+  server.listen(PORT, () => {
     console.log(`🚀 Server is running on http://localhost:${PORT}`);
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`📁 Static files served from: ${path.join(__dirname, 'public')}`);
@@ -143,4 +153,7 @@ server.listen(PORT, () => {
     console.log(`🔐 Authentication: JWT Token-based`);
     console.log(`🔌 Socket.IO is running`);
     console.log(`✅ API is running`);
-}); 
+  });
+}
+
+startServer(); 
