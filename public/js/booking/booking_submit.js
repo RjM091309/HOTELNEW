@@ -63,6 +63,7 @@ $(document).ready(function () {
       const includeDropoff = $('#includeDropoff').is(':checked');
       const flightNumber = $('#flightNumber').val();
       const dropoffFlightNumber = $('#dropoffFlightNumber').val();
+      const pickupDate = $('#pickupDate').val();
       const passengerCount = $('#passengerCount').val();
 
       // Discount and fees
@@ -135,7 +136,7 @@ $(document).ready(function () {
           breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
           breakfastKidQty, breakfastKidPrice, breakfastKidId,
           pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
-          flightNumber, dropoffFlightNumber, passengerCount,
+          flightNumber, dropoffFlightNumber, pickupDate, passengerCount,
           discount: discountAmount, seniorPwdDiscount, seniorPwdDiscountPercent, reservationFee: reservationFeeAmount, lateCheckoutFee
         },
         success: function (response) {

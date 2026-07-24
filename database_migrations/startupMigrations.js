@@ -108,6 +108,20 @@ async function runPickupDropMigrations() {
     `PICKUP_DROP_SPECIAL_NOTES TEXT NULL DEFAULT NULL COMMENT 'Special notes for pick-up and drop-off printouts'`,
     'PASSENGER_COUNT'
   );
+
+  // Superseded by PICKUP_DATE below - a direct date picker is simpler than inferring
+  // the date from a time-of-day heuristic.
+  if (await columnExists('booking', 'PICKUP_TIME')) {
+    await queryDatabasePromise('ALTER TABLE booking DROP COLUMN PICKUP_TIME');
+    console.log('✅ Dropped column: booking.PICKUP_TIME');
+  }
+
+  await ensureColumn(
+    'booking',
+    'PICKUP_DATE',
+    `PICKUP_DATE DATE NULL DEFAULT NULL COMMENT 'Actual calendar date of airport pick-up, for arrivals after midnight that fall on the day after CHECK_IN_DATE'`,
+    'DROPOFF_FLIGHT_NUMBER'
+  );
 }
 
 async function runStartupMigrations() {

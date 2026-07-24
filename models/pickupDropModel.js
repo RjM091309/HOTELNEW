@@ -8,6 +8,7 @@ class PickupDropModel {
         c.NAME,
         b.FLIGHT_NUMBER,
         b.DROPOFF_FLIGHT_NUMBER,
+        b.PICKUP_DATE,
         b.CONFIRMATION_NUMBER,
         b.CHECK_IN_DATE,
         b.CHECK_OUT_DATE,
@@ -27,6 +28,7 @@ class PickupDropModel {
         c.NAME,
         b.FLIGHT_NUMBER,
         b.DROPOFF_FLIGHT_NUMBER,
+        b.PICKUP_DATE,
         b.CONFIRMATION_NUMBER,
         b.CHECK_IN_DATE,
         b.CHECK_OUT_DATE,
@@ -45,6 +47,7 @@ class PickupDropModel {
         c.NAME,
         b.FLIGHT_NUMBER,
         b.DROPOFF_FLIGHT_NUMBER,
+        b.PICKUP_DATE,
         b.PASSENGER_COUNT,
         b.PICKUP_DROP_SPECIAL_NOTES
       FROM booking b
@@ -58,12 +61,13 @@ class PickupDropModel {
   static async updateBooking(bookingId, data) {
     const query = `
       UPDATE booking
-      SET FLIGHT_NUMBER = ?, DROPOFF_FLIGHT_NUMBER = ?, PASSENGER_COUNT = ?, PICKUP_DROP_SPECIAL_NOTES = ?, EDITED_BY = ?, EDITED_DT = ?
+      SET FLIGHT_NUMBER = ?, DROPOFF_FLIGHT_NUMBER = ?, PICKUP_DATE = ?, PASSENGER_COUNT = ?, PICKUP_DROP_SPECIAL_NOTES = ?, EDITED_BY = ?, EDITED_DT = ?
       WHERE IDNo = ? AND ACTIVE = 1
     `;
     return await queryDatabasePromise(query, [
       data.FLIGHT_NUMBER,
       data.DROPOFF_FLIGHT_NUMBER,
+      data.PICKUP_DATE,
       data.PASSENGER_COUNT,
       data.PICKUP_DROP_SPECIAL_NOTES,
       data.EDITED_BY,

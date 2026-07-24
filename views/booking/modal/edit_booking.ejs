@@ -212,6 +212,10 @@
                                         <input type="text" class="form-control" id="edit_flightNumber" name="flightNumber" placeholder="e.g. PR123" autocomplete="off">
                                         <div id="edit_flightNumberDropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 1080; max-height: 220px; overflow-y: auto; background-color: #2a3135; border: 1px solid #445; border-radius: 6px; margin-top: 2px; box-shadow: 0 4px 10px rgba(0,0,0,0.4);"></div>
                                     </div>
+                                    <div id="edit_pickupDateWrapper" class="col-lg-4 form-group" style="display: none;">
+                                        <label class="form-label">Pickup Date</label>
+                                        <input type="text" class="form-control flatpickr-input" id="edit_pickupDate" name="pickupDate" placeholder="Select date" autocomplete="off">
+                                    </div>
                                     <div id="edit_dropoffFlightNumberWrapper" class="col-lg-4 form-group" style="position: relative; display: none;">
                                         <label class="form-label">Drop-off Flight Number</label>
                                         <input type="text" class="form-control" id="edit_dropoffFlightNumber" name="dropoffFlightNumber" placeholder="e.g. PR123" autocomplete="off">
@@ -744,6 +748,14 @@ $(document).ready(function() {
     // Initialize flatpickr
     initializeEditFlatpickr();
 
+    if (!$('#edit_pickupDate')[0]._flatpickr) {
+        flatpickr('#edit_pickupDate', {
+            dateFormat: 'Y-m-d',
+            allowInput: true,
+            clickOpens: true
+        });
+    }
+
     // Function to toggle breakfast total display for edit form
     function toggleEditBreakfastTotalDisplay() {
         const adultQty = parseInt($('#edit_breakfastAdultQty').val()) || 0;
@@ -977,9 +989,11 @@ $(document).ready(function() {
         const needsFlightInfo = pickupChecked || dropoffChecked;
         $('#edit_pickupDropoffFlightInfo').toggle(needsFlightInfo);
         $('#edit_flightNumberWrapper').toggle(pickupChecked);
+        $('#edit_pickupDateWrapper').toggle(pickupChecked);
         $('#edit_dropoffFlightNumberWrapper').toggle(dropoffChecked);
         if (!pickupChecked) {
             $('#edit_flightNumber').val('');
+            $('#edit_pickupDate').val('');
         }
         if (!dropoffChecked) {
             $('#edit_dropoffFlightNumber').val('');
@@ -1129,8 +1143,10 @@ $(document).ready(function() {
         $('#edit_dropoffWrapper').hide();
         $('#edit_pickupDropoffFlightInfo').hide();
         $('#edit_flightNumberWrapper').hide();
+        $('#edit_pickupDateWrapper').hide();
         $('#edit_dropoffFlightNumberWrapper').hide();
         $('#edit_flightNumber').val('');
+        $('#edit_pickupDate').val('');
         $('#edit_dropoffFlightNumber').val('');
         $('#edit_passengerCount').val('');
         $('#edit_includeDiscount').prop('checked', false);
@@ -1236,6 +1252,7 @@ $(document).ready(function() {
             dropoffServiceId: $('#edit_includeDropoff').prop('checked') ? $('#edit_dropoffServiceId').val() : '',
             dropoffPrice: $('#edit_includeDropoff').prop('checked') ? $('#edit_dropoffPrice').val() : '0',
             flightNumber: $('#edit_includePickup').prop('checked') ? $('#edit_flightNumber').val() : '',
+            pickupDate: $('#edit_includePickup').prop('checked') ? $('#edit_pickupDate').val() : '',
             dropoffFlightNumber: $('#edit_includeDropoff').prop('checked') ? $('#edit_dropoffFlightNumber').val() : '',
             passengerCount: ($('#edit_includePickup').prop('checked') || $('#edit_includeDropoff').prop('checked')) ? $('#edit_passengerCount').val() : '',
 
@@ -2095,12 +2112,20 @@ function populateEditForm(booking) {
     const editNeedsFlightInfo = editPickupChecked || editDropoffChecked;
     $('#edit_pickupDropoffFlightInfo').toggle(editNeedsFlightInfo);
     $('#edit_flightNumberWrapper').toggle(editPickupChecked);
+    $('#edit_pickupDateWrapper').toggle(editPickupChecked);
     $('#edit_dropoffFlightNumberWrapper').toggle(editDropoffChecked);
 
     if (editPickupChecked && booking.flightNumber) {
         $('#edit_flightNumber').val(booking.flightNumber);
     } else {
         $('#edit_flightNumber').val('');
+    }
+
+    if (editPickupChecked && booking.pickupDate) {
+        const pickupDateObj = new Date(booking.pickupDate);
+        $('#edit_pickupDate').val(isNaN(pickupDateObj.getTime()) ? '' : pickupDateObj.toISOString().slice(0, 10));
+    } else {
+        $('#edit_pickupDate').val('');
     }
 
     if (editDropoffChecked && booking.dropoffFlightNumber) {

@@ -91,7 +91,7 @@ class PickupDropController {
 
   static async update(req, res) {
     try {
-      const { id, flightNumber, dropoffFlightNumber, personCount, specialNotes } = req.body;
+      const { id, flightNumber, dropoffFlightNumber, pickupDate, personCount, specialNotes } = req.body;
 
       if (!id) {
         return res.status(400).json({ success: false, message: 'Booking ID is required' });
@@ -113,9 +113,21 @@ class PickupDropController {
         });
       }
 
+      // Pickup Date can also be set from Add/Edit Booking - only touch it here if this
+      // request actually included the field, so other callers never wipe it by omission.
+      let pickupDateToSave = existing.PICKUP_DATE;
+      if (pickupDate !== undefined) {
+        const trimmedPickupDate = pickupDate ? String(pickupDate).trim() : '';
+        if (trimmedPickupDate && !/^\d{4}-\d{2}-\d{2}$/.test(trimmedPickupDate)) {
+          return res.status(400).json({ success: false, message: 'Pickup date must be a valid date' });
+        }
+        pickupDateToSave = trimmedPickupDate || null;
+      }
+
       await PickupDropModel.updateBooking(id, {
         FLIGHT_NUMBER: flightNumber ? String(flightNumber).trim().toUpperCase() : null,
         DROPOFF_FLIGHT_NUMBER: dropoffFlightNumber ? String(dropoffFlightNumber).trim().toUpperCase() : null,
+        PICKUP_DATE: pickupDateToSave,
         PASSENGER_COUNT: parsedPersonCount,
         PICKUP_DROP_SPECIAL_NOTES: specialNotes != null ? String(specialNotes).trim() : null,
         EDITED_BY: req.user?.userId || null,

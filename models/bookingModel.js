@@ -1143,6 +1143,7 @@ class BookingModel {
       dropoffPrice,
       flightNumber,
       dropoffFlightNumber,
+      pickupDate,
       passengerCount,
       // ✅ Additional for Direct Reservations
       bedCount,
@@ -1221,8 +1222,8 @@ class BookingModel {
         // Create booking
         const bookingQuery = `
           INSERT INTO booking
-          (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, REMARKS, CONFIRMATION_NUMBER, NOTIFICATION_READ, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, LATE_CHECKOUT, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, BED_COUNT, FLIGHT_NUMBER, DROPOFF_FLIGHT_NUMBER, PASSENGER_COUNT)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, REMARKS, CONFIRMATION_NUMBER, NOTIFICATION_READ, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, LATE_CHECKOUT, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, BED_COUNT, FLIGHT_NUMBER, DROPOFF_FLIGHT_NUMBER, PICKUP_DATE, PASSENGER_COUNT)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const directReservationFlag = isDirectReservation ? 1 : 0;
         // Handle empty agencyID - set to NULL if empty
@@ -1257,6 +1258,7 @@ class BookingModel {
           processedAgencyID, processedAgencyPayer, directReservationFlag, bedCount || null,
           pickupServiceId ? (flightNumber || null) : null,
           dropoffServiceId ? (dropoffFlightNumber || null) : null,
+          pickupServiceId && pickupDate ? pickupDate : null,
           (pickupServiceId || dropoffServiceId) ? (parseInt(passengerCount) || null) : null
         ];
 
@@ -8148,6 +8150,7 @@ class BookingModel {
           b.BED_COUNT,
           b.FLIGHT_NUMBER as flightNumber,
           b.DROPOFF_FLIGHT_NUMBER as dropoffFlightNumber,
+          b.PICKUP_DATE as pickupDate,
           b.PASSENGER_COUNT as passengerCount,
 
           c.NAME as fullname,
@@ -8258,7 +8261,7 @@ class BookingModel {
         breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
         breakfastKidQty, breakfastKidPrice, breakfastKidId,
         pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
-        flightNumber, dropoffFlightNumber, passengerCount,
+        flightNumber, dropoffFlightNumber, pickupDate, passengerCount,
         discount, seniorPwdDiscountPercent = 0, lateCheckoutFee, editedBy
       } = params;
 
@@ -8323,7 +8326,7 @@ class BookingModel {
               UPDATE booking
               SET ROOM_ID = ?, CHECK_IN_DATE = ?, CHECK_OUT_DATE = ?, BOOKING_CHANNEL = ?,
                   GUESTS_COUNT = ?, REMARKS = ?, CHECK_IN_STATUS = ?, LATE_CHECKOUT = ?, AGENCY_ID = ?,
-                  AGENCY_PAYER = ?, BED_COUNT = ?, FLIGHT_NUMBER = ?, DROPOFF_FLIGHT_NUMBER = ?, PASSENGER_COUNT = ?, EDITED_BY = ?, EDITED_DT = ?
+                  AGENCY_PAYER = ?, BED_COUNT = ?, FLIGHT_NUMBER = ?, DROPOFF_FLIGHT_NUMBER = ?, PICKUP_DATE = ?, PASSENGER_COUNT = ?, EDITED_BY = ?, EDITED_DT = ?
               WHERE IDNo = ?
             `;
             // Handle empty agencyID and bedCount - set to NULL if empty
@@ -8354,12 +8357,13 @@ class BookingModel {
             const processedBedCount = (bedCount && bedCount.trim() !== '') ? bedCount : null;
             const processedFlightNumber = pickupServiceId ? (flightNumber || null) : null;
             const processedDropoffFlightNumber = dropoffServiceId ? (dropoffFlightNumber || null) : null;
+            const processedPickupDate = pickupServiceId && pickupDate ? pickupDate : null;
             const processedPassengerCount = (pickupServiceId || dropoffServiceId) ? (parseInt(passengerCount) || null) : null;
 
             await connection.promise().query(bookingUpdateQuery, [
               room_id, checkInDate, checkOutDate, bookingRoute, maxOccupants,
               bookingRemarks, checkInStatus, checkOutStatus || 0, processedAgencyID,
-              processedAgencyPayer, processedBedCount, processedFlightNumber, processedDropoffFlightNumber, processedPassengerCount,
+              processedAgencyPayer, processedBedCount, processedFlightNumber, processedDropoffFlightNumber, processedPickupDate, processedPassengerCount,
               editedBy, editDate, bookingId
             ]);
 

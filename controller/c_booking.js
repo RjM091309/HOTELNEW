@@ -523,6 +523,7 @@ class BookingController {
       dropoffPrice,
       flightNumber,        // PUAP - pick-up (arrival) flight number
       dropoffFlightNumber, // PUAP - drop-off (departure) flight number
+      pickupDate,          // PUAP - actual calendar date of pick-up (if different from check-in)
       passengerCount,      // PUAP - number of passengers for pick-up/drop-off
 
       // ✅ Additional for Direct Reservations
@@ -551,6 +552,9 @@ class BookingController {
       }
       if ((pickupServiceId || dropoffServiceId) && !passengerCount) {
         return res.status(400).json({ success: false, message: 'Number of Passengers is required for Pick-up/Drop-off.' });
+      }
+      if (pickupDate && !/^\d{4}-\d{2}-\d{2}$/.test(String(pickupDate).trim())) {
+        return res.status(400).json({ success: false, message: 'Pickup Date must be a valid date.' });
       }
 
       // Calculate payment status based on paid amount
@@ -686,6 +690,7 @@ class BookingController {
         dropoffPrice,
         flightNumber,
         dropoffFlightNumber,
+        pickupDate,
         passengerCount,
         // ✅ Additional for Direct Reservations
         bedCount,
@@ -2860,7 +2865,7 @@ class BookingController {
         breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
         breakfastKidQty, breakfastKidPrice, breakfastKidId,
         pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
-        flightNumber, dropoffFlightNumber, passengerCount, // PUAP - flight numbers/passenger count for pick-up/drop-off
+        flightNumber, dropoffFlightNumber, pickupDate, passengerCount, // PUAP - flight numbers/passenger count for pick-up/drop-off
         discount, seniorPwdDiscount = 0, // Senior/PWD discount amount
         seniorPwdDiscountPercent = 0, // Senior/PWD discount percentage
         lateCheckoutFee,
@@ -2883,6 +2888,9 @@ class BookingController {
       }
       if ((pickupServiceId || dropoffServiceId) && !passengerCount) {
         return res.status(400).json({ success: false, message: 'Number of Passengers is required for Pick-up/Drop-off.' });
+      }
+      if (pickupDate && !/^\d{4}-\d{2}-\d{2}$/.test(String(pickupDate).trim())) {
+        return res.status(400).json({ success: false, message: 'Pickup Date must be a valid date.' });
       }
 
       // Use paymentStatus coming from frontend (computeEditTotal),
@@ -2926,6 +2934,7 @@ class BookingController {
         dropoffPrice,
         flightNumber,
         dropoffFlightNumber,
+        pickupDate,
         passengerCount,
         discount: totalDiscountNum, // Pass combined discount (seniorPwdDiscount + discount)
         seniorPwdDiscountPercent, // Pass percentage for storage

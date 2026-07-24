@@ -1,21 +1,19 @@
-let pickupDropTable;
+let pickupTable;
 let pickupDropRecords = {};
+let pickupDropAllRecords = [];
 let pickupDropFlightScheduleList = null;
+let currentDateFilter = 'today';
 
 $(document).ready(function () {
-  initializePickupDropTable();
+  initializePickupDropTables();
   setupPickupDropHandlers();
   setupPickupDropFlightSchedule();
 });
 
-function initializePickupDropTable() {
-  if ($.fn.DataTable.isDataTable('#pickupDropTable')) {
-    $('#pickupDropTable').DataTable().destroy();
-  }
-
-  pickupDropTable = $('#pickupDropTable').DataTable({
+function initializePickupDropTables() {
+  const commonOptions = {
     columnDefs: [
-      { targets: 3, className: 'text-center', orderable: false, searchable: false, width: '15%' }
+      { targets: 4, className: 'text-center', orderable: false, searchable: false, width: '15%' }
     ],
     pageLength: -1,
     lengthMenu: [[10, 50, 100, -1], [10, 50, 100, 'All']],
@@ -28,9 +26,15 @@ function initializePickupDropTable() {
       search: 'Search:',
       info: 'Showing _TOTAL_ entries',
       infoFiltered: '(filtered from _MAX_ total entries)',
-      lengthMenu: 'Show _MENU_ entries'
+      lengthMenu: 'Show _MENU_ entries',
+      emptyTable: 'No records found.'
     }
-  });
+  };
+
+  if ($.fn.DataTable.isDataTable('#pickupTable')) {
+    $('#pickupTable').DataTable().destroy();
+  }
+  pickupTable = $('#pickupTable').DataTable(commonOptions);
 
   reloadPickupDropData();
 }
@@ -41,61 +45,91 @@ function setupPickupDropHandlers() {
     updatePickupDrop();
   });
 
-  $(document).on('click', '.print-type-option', function () {
-    const type = $(this).data('type');
-    if (activePrintBookingId) {
-      printPickupDrop(activePrintBookingId, type);
-    }
-    hidePrintTypeMenu();
-  });
-
-  $(document).on('click', function (e) {
-    if (!$(e.target).closest('.print-type-menu, .btn-tbl-print').length) {
-      hidePrintTypeMenu();
-    }
-  });
-}
-
-let activePrintBookingId = null;
-
-function hidePrintTypeMenu() {
-  $('#printTypeMenu').hide();
-  activePrintBookingId = null;
-}
-
-function togglePrintMenu(bookingId, button) {
-  const menu = $('#printTypeMenu');
-  const isSameButton = activePrintBookingId === String(bookingId) && menu.is(':visible');
-
-  if (isSameButton) {
-    hidePrintTypeMenu();
-    return;
+  if ($('#editPickupDate').length && !$('#editPickupDate')[0]._flatpickr) {
+    flatpickr('#editPickupDate', {
+      dateFormat: 'Y-m-d',
+      allowInput: true,
+      clickOpens: true
+    });
   }
 
-  activePrintBookingId = String(bookingId);
-  const rect = button.getBoundingClientRect();
-
-  menu.css({ visibility: 'hidden', display: 'flex' });
-  const menuWidth = menu.outerWidth();
-  const menuHeight = menu.outerHeight();
-  const top = Math.max(8, rect.top - menuHeight - 6);
-  const left = Math.max(8, rect.left + (rect.width / 2) - (menuWidth / 2));
-
-  menu.css({
-    top: top,
-    left: left,
-    visibility: 'visible'
+  // Today / Previous Week / Future Week / All
+  $(document).on('click', '.filter-btn-group .filter-btn[data-filter]', function () {
+    $('.filter-btn-group .filter-btn').removeClass('active');
+    $(this).addClass('active');
+    currentDateFilter = $(this).data('filter');
+    renderPickupDropTables();
   });
-  menu.show();
 }
 
-function formatFlightNumber(record) {
-  const parts = [record.FLIGHT_NUMBER, record.DROPOFF_FLIGHT_NUMBER]
-    .filter(function (value) {
-      return value != null && String(value).trim() !== '';
-    });
+function formatDisplayDate(effectiveDate) {
+  if (!effectiveDate) return '';
+  return effectiveDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
-  return parts.join(' / ');
+// Uses the explicit Pickup Date set on the booking (Add/Edit Booking) when present -
+// this is what actually handles late-night arrivals that fall a day after check-in.
+// Falls back to CHECK_IN_DATE when no Pickup Date was set.
+function getEffectivePickupDate(record) {
+  const source = record.PICKUP_DATE || record.CHECK_IN_DATE;
+  if (!source) return null;
+  const base = new Date(source);
+  if (isNaN(base.getTime())) return null;
+  base.setHours(0, 0, 0, 0);
+  return base;
+}
+
+// Rolling-window filter relative to today's local date:
+// today = same calendar day, prevWeek = the 7 days before today, futureWeek = the 7 days after today.
+function matchesDateFilter(effectiveDate) {
+  if (currentDateFilter === 'all') return true;
+  if (!effectiveDate) return false;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const diffDays = Math.round((effectiveDate - today) / (1000 * 60 * 60 * 24));
+
+  if (currentDateFilter === 'today') return diffDays === 0;
+  if (currentDateFilter === 'prevWeek') return diffDays >= -7 && diffDays <= -1;
+  if (currentDateFilter === 'futureWeek') return diffDays >= 1 && diffDays <= 7;
+  return true;
+}
+
+function buildActions(bookingId, printType) {
+  return `
+    <button type="button" class="btn btn-tbl-print btn-xs" onclick="printPickupDrop('${bookingId}', '${printType}')" title="Print">
+      <i class="fa fa-print"></i>
+    </button>
+    <button type="button" class="btn btn-tbl-edit btn-xs" onclick="openEditPickupDropModal('${bookingId}')" title="Edit">
+      <i class="fa fa-pencil"></i>
+    </button>
+    <button type="button" class="btn btn-tbl-delete btn-xs" onclick="deletePickupDrop('${bookingId}')" title="Delete">
+      <i class="fa fa-trash"></i>
+    </button>
+  `;
+}
+
+function renderPickupDropTables() {
+  pickupTable.clear();
+
+  pickupDropAllRecords.forEach(function (record) {
+    const hasFlightNumber = record.FLIGHT_NUMBER != null && String(record.FLIGHT_NUMBER).trim() !== '';
+    if (Number(record.HAS_PICKUP) !== 1 || !hasFlightNumber) return;
+
+    const effectiveDate = getEffectivePickupDate(record);
+    if (!matchesDateFilter(effectiveDate)) return;
+
+    pickupTable.row.add([
+      record.NAME || '',
+      formatDisplayDate(effectiveDate),
+      record.FLIGHT_NUMBER || '',
+      record.PASSENGER_COUNT != null ? record.PASSENGER_COUNT : '',
+      buildActions(record.BOOKING_ID, 'pickup')
+    ]);
+  });
+
+  pickupTable.draw();
 }
 
 function printPickupDrop(bookingId, type) {
@@ -112,8 +146,6 @@ function printPickupDrop(bookingId, type) {
     Swal.fire('Error', printType === 'dropoff' ? 'No drop-off flight number set' : 'No pick-up flight number set', 'error');
     return;
   }
-
-  hidePrintTypeMenu();
 
   const existingFrame = document.getElementById('pickupDropPrintFrame');
   if (existingFrame) {
@@ -176,37 +208,14 @@ function reloadPickupDropData() {
     method: 'GET',
     dataType: 'json',
     success: function (response) {
-      pickupDropTable.clear();
+      pickupDropRecords = {};
+      pickupDropAllRecords = (response.success && Array.isArray(response.data)) ? response.data : [];
 
-      if (!response.success || !response.data || response.data.length === 0) {
-        pickupDropTable.draw();
-        return;
-      }
-
-      response.data.forEach(function (record) {
+      pickupDropAllRecords.forEach(function (record) {
         pickupDropRecords[record.BOOKING_ID] = record;
-
-        const actions = `
-          <button type="button" class="btn btn-tbl-print btn-xs" onclick="togglePrintMenu('${record.BOOKING_ID}', this)" title="Print">
-            <i class="fa fa-print"></i>
-          </button>
-          <button type="button" class="btn btn-tbl-edit btn-xs" onclick="openEditPickupDropModal('${record.BOOKING_ID}')" title="Edit">
-            <i class="fa fa-pencil"></i>
-          </button>
-          <button type="button" class="btn btn-tbl-delete btn-xs" onclick="deletePickupDrop('${record.BOOKING_ID}')" title="Delete">
-            <i class="fa fa-trash"></i>
-          </button>
-        `;
-
-        pickupDropTable.row.add([
-          record.NAME || '',
-          formatFlightNumber(record),
-          record.PASSENGER_COUNT != null ? record.PASSENGER_COUNT : '',
-          actions
-        ]);
       });
 
-      pickupDropTable.draw();
+      renderPickupDropTables();
     },
     error: function () {
       Swal.fire('Error', 'Failed to load pickup & drop records', 'error');
@@ -328,6 +337,12 @@ function openEditPickupDropModal(id) {
       $('#editName').val(record.NAME || '');
       $('#editFlightNumber').val(record.FLIGHT_NUMBER || '');
       $('#editDropoffFlightNumber').val(record.DROPOFF_FLIGHT_NUMBER || '');
+      if (record.PICKUP_DATE) {
+        const pickupDateObj = new Date(record.PICKUP_DATE);
+        $('#editPickupDate').val(isNaN(pickupDateObj.getTime()) ? '' : pickupDateObj.toISOString().slice(0, 10));
+      } else {
+        $('#editPickupDate').val('');
+      }
       $('#editPersonCount').val(record.PASSENGER_COUNT != null ? record.PASSENGER_COUNT : '');
       $('#editSpecialNotes').val(record.PICKUP_DROP_SPECIAL_NOTES || '');
       $('#editPickupDropModal').modal('show');
@@ -346,6 +361,7 @@ function updatePickupDrop() {
       id: $('#editPickupDropId').val(),
       flightNumber: $('#editFlightNumber').val(),
       dropoffFlightNumber: $('#editDropoffFlightNumber').val(),
+      pickupDate: $('#editPickupDate').val(),
       personCount: $('#editPersonCount').val(),
       specialNotes: $('#editSpecialNotes').val()
     },

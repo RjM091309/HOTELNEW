@@ -30,9 +30,9 @@ const creditController = {
       let searchCondition = '';
       let searchParams = [];
       if (searchValue) {
-        searchCondition = `AND (c.NAME LIKE ? OR r.ROOM_NUMBER LIKE ? OR b.CONFIRMATION_NUMBER LIKE ? OR p.REMARKS LIKE ?)`;
+        searchCondition = `AND (c.NAME LIKE ? OR r.ROOM_NUMBER LIKE ? OR b.CONFIRMATION_NUMBER LIKE ? OR p.REMARKS LIKE ? OR a.NAME LIKE ?)`;
         const p = `%${searchValue}%`;
-        searchParams = [p, p, p, p];
+        searchParams = [p, p, p, p, p];
       }
 
       const totalRecords = await creditModel.countDatatable(searchCondition, searchParams);

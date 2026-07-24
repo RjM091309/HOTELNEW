@@ -1311,9 +1311,12 @@ $(document).ready(function() {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2
                         });
+                        const depositNote = depositInfo.exists
+                            ? `<br><br>This booking also has a held security deposit of <strong style="color: #0d6efd; font-size: 1.2em;">₱${depositInfo.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>, which will be processed on the next step.`
+                            : '';
                         Swal.fire({
                             title: "⚠️ Outstanding Balance Alert",
-                            html: `Room ${roomNumber} has an outstanding balance of <strong style="color: #dc3545; font-size: 1.2em;">₱${formattedBalance}</strong>.<br><br>Are you sure you want to proceed with check-out?`,
+                            html: `Room ${roomNumber} has an outstanding balance of <strong style="color: #dc3545; font-size: 1.2em;">₱${formattedBalance}</strong>.${depositNote}<br><br>Are you sure you want to proceed with check-out?`,
                             icon: "warning",
                             showCancelButton: true,
                             confirmButtonColor: "#dc3545",

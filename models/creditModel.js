@@ -9,6 +9,7 @@ const creditModel = {
         LEFT JOIN booking b ON b.IDNo = p.BOOKING_ID
         LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
         LEFT JOIN room r ON r.IDNo = b.ROOM_ID
+        LEFT JOIN agency a ON a.IDNo = b.AGENCY_ID
         WHERE p.PAYMENT_METHOD IN ('credit', 'marker')
         ${searchCondition}
         GROUP BY p.BOOKING_ID, DATE(p.PAYMENT_DATE)
