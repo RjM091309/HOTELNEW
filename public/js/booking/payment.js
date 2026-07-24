@@ -230,6 +230,8 @@ function initializePaymentModal() {
                         <p class="text-muted">This booking will be checked out without collecting payment. Indicate who authorized it.</p>
                         <label for="creditApprovedBy" class="form-label">Approved By</label>
                         <input type="text" class="form-control" id="creditApprovedBy" placeholder="Name of person who authorized this">
+                        <label for="creditRemarks" class="form-label mt-2">Remarks <span class="text-muted fw-normal">(optional)</span></label>
+                        <input type="text" class="form-control" id="creditRemarks" placeholder="Additional remarks">
                         <div class="alert alert-warning mt-2">
                             <i class="fa fa-exclamation-triangle"></i>
                             <strong>Note:</strong> This marks the balance as settled without an actual payment. Use only with proper authorization.
@@ -252,6 +254,13 @@ function initializePaymentModal() {
             if (approvedBy) {
                 approvedBy.addEventListener('input', validatePaymentForm);
             }
+        }
+
+        // Credit has its own dedicated Remarks field, so hide the generic
+        // Payment Notes box for that method to avoid two overlapping inputs.
+        const notesGroup = document.querySelector('.payment-notes-group');
+        if (notesGroup) {
+            notesGroup.style.display = (method === 'credit') ? 'none' : '';
         }
     }
 
@@ -294,6 +303,8 @@ function initializePaymentModal() {
         document.getElementById('paymentStatusMessages').style.display = 'none';
         confirmButton.classList.remove('payment-success');
         balanceRow.style.display = 'none';
+        const notesGroup = document.querySelector('.payment-notes-group');
+        if (notesGroup) notesGroup.style.display = '';
     }
 
     // Initialize form validation
@@ -543,7 +554,8 @@ $('#confirmPaymentButton').on('click', async function () {
             });
             return;
         }
-        paymentNotes = `Credit approved by: ${creditApprovedBy}.` + (paymentNotes ? ` ${paymentNotes}` : '');
+        const creditRemarks = $('#creditRemarks').val() ? $('#creditRemarks').val().trim() : '';
+        paymentNotes = `Credit approved by: ${creditApprovedBy}.` + (creditRemarks ? ` ${creditRemarks}` : '');
     }
 
     // Validate payment details

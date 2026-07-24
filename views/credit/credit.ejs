@@ -86,6 +86,11 @@
       return match ? match[1].trim() : remarks;
     }
 
+    function extractRemarksOnly(remarks) {
+      if (!remarks) return '';
+      return remarks.replace(/(?:Credit|Marker) approved by:\s*[^.]+\.\s*/i, '').trim();
+    }
+
     function formatMoney(d) {
       return '₱' + Number(d || 0).toLocaleString('en-US', { minimumFractionDigits: 2 });
     }
@@ -141,7 +146,8 @@
           }
         },
         { data: null, orderable: false, searchable: false, className: 'center', render: function(_d, _t, row){
-            return `<button type="button" class="btn btn-sm btn-info view-breakdown-btn" data-booking-id="${row.BOOKING_ID}" data-date="${row.PAYMENT_DATE}">View Breakdown</button>`;
+            return `<button type="button" class="btn btn-sm btn-info view-breakdown-btn" data-booking-id="${row.BOOKING_ID}" data-date="${row.PAYMENT_DATE}">View Breakdown</button> `
+              + `<button type="button" class="btn btn-sm btn-secondary view-remark-btn" data-booking-id="${row.BOOKING_ID}" data-date="${row.PAYMENT_DATE}">Remark</button>`;
           }
         }
       ],
@@ -222,6 +228,39 @@
       const rowData = table.row($(this).closest('tr')).data();
       $('#credit-breakdown-guest').text(rowData ? (rowData.GUEST_NAME || 'N/A') : '');
       loadBreakdown(bookingId, date);
+    });
+
+    $('#credit_tbl').on('click', '.view-remark-btn', function(){
+      const bookingId = $(this).data('booking-id');
+      const date = $(this).data('date');
+      $.ajax({
+        url: '/credit/breakdown',
+        type: 'GET',
+        data: { bookingId, date },
+        success: function(response){
+          if (!response.success) {
+            Swal.fire('Error', response.message || 'Failed to load remarks.', 'error');
+            return;
+          }
+          const remarksList = response.data
+            .map(row => extractRemarksOnly(row.REMARKS))
+            .filter(r => r);
+          const html = remarksList.length
+            ? '<ul style="text-align:left;padding-left:20px;margin:0;">'
+              + remarksList.map(r => `<li>${$('<div>').text(r).html()}</li>`).join('')
+              + '</ul>'
+            : '<p class="text-muted mb-0">No remarks for this credit entry.</p>';
+          Swal.fire({
+            title: 'Remarks',
+            html,
+            icon: 'info',
+            confirmButtonText: 'Close'
+          });
+        },
+        error: function(){
+          Swal.fire('Error', 'Failed to load remarks.', 'error');
+        }
+      });
     });
 
     $('#credit-breakdown-table').on('click', '.settle-credit-btn', function(){
