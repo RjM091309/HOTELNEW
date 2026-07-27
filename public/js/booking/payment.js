@@ -83,10 +83,12 @@ function initializePaymentModal() {
     if (paymentAmountInput) {
         paymentAmountInput.addEventListener('input', function() {
             const amount = parseFloat(this.value) || 0;
-            const totalAmount = parseFloat(totalAmountDisplay.textContent.replace(',', '')) || 0;
-            
-            // Validate: Amount cannot exceed total amount to pay
-            if (amount > totalAmount) {
+            const totalAmount = parseFloat(totalAmountDisplay.textContent.replace(/,/g, '')) || 0;
+
+            // Validate: Amount cannot exceed total amount to pay (compare in whole
+            // cents so pre-filled values with float rounding noise, e.g. 1234.9999999999998,
+            // don't get flagged as "exceeding" a total displayed as 1235.00)
+            if (Math.round(amount * 100) > Math.round(totalAmount * 100)) {
                 // Reset to total amount if exceeded
                 this.value = totalAmount;
                 const adjustedAmount = totalAmount;
@@ -146,11 +148,13 @@ function initializePaymentModal() {
     // Form validation
     function validatePaymentForm() {
         const amount = parseFloat(paymentAmountInput.value) || 0;
-        const totalAmount = parseFloat(totalAmountDisplay.textContent.replace(',', '')) || 0;
+        const totalAmount = parseFloat(totalAmountDisplay.textContent.replace(/,/g, '')) || 0;
         const selectedMethod = document.querySelector('input[name="paymentMethod"]:checked');
-        
-        // Check if amount exceeds total amount to pay
-        if (amount > totalAmount) {
+
+        // Check if amount exceeds total amount to pay (compare in whole cents - see
+        // note in the input handler above; a strict float compare here silently
+        // disabled the Confirm button for pre-filled amounts with rounding noise)
+        if (Math.round(amount * 100) > Math.round(totalAmount * 100)) {
             confirmButton.disabled = true;
             confirmButton.classList.remove('btn-success');
             confirmButton.classList.add('btn-secondary');
@@ -351,6 +355,8 @@ function updatePaymentSummaryCard(totalAmount, breakdown = {}) {
     const paymentAmountInputElement = document.getElementById('paymentAmountInput');
     
     // Update breakdown rows
+    const roomNumberBadge = document.getElementById('paymentRoomNumberBadge');
+    const roomNumberElement = document.getElementById('paymentRoomNumber');
     const roomRow = document.getElementById('roomRow');
     const roomAmount = document.getElementById('roomAmount');
     const extensionRow = document.getElementById('extensionRow');
@@ -366,6 +372,14 @@ function updatePaymentSummaryCard(totalAmount, breakdown = {}) {
     const subtotalRow = document.getElementById('subtotalRow');
     const subtotalElement = document.getElementById('subtotalAmount');
     
+    // Show/hide and populate room number badge in the header
+    if (breakdown.roomNumber) {
+        if (roomNumberBadge) roomNumberBadge.style.display = 'block';
+        if (roomNumberElement) roomNumberElement.textContent = breakdown.roomNumber;
+    } else {
+        if (roomNumberBadge) roomNumberBadge.style.display = 'none';
+    }
+
     // Show/hide and populate room charges
     if (breakdown.roomAmount && breakdown.roomAmount > 0) {
         if (roomRow) roomRow.style.display = 'flex';

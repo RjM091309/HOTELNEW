@@ -67,6 +67,7 @@ window.showBilling = async function (bookingID) {
         const bookingInput = document.getElementById('hiddenBookingId');
         if (bookingInput) {
             bookingInput.value = bookingID;
+            bookingInput.dataset.roomNumber = '';
         } else {
             console.error('BookingID input not found!');
             return;
@@ -209,6 +210,10 @@ window.showBilling = async function (bookingID) {
                     const el = document.getElementById(id);
                     if (el) el.textContent = value;
                 };
+
+                if (bookingInput) {
+                    bookingInput.dataset.roomNumber = data.roomNumber || '';
+                }
 
                 setText('billingReceiptId', data.bookingId || 'N/A');
                 setText('customerName', data.customerName || 'N/A');

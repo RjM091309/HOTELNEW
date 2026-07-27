@@ -1401,6 +1401,7 @@ $(document).ready(function() {
                         }
                     });
                     updatePaymentSummaryCard(totalBalance, {
+                        roomNumber,
                         roomAmount,
                         extensionAmount,
                         serviceAmount,
@@ -1408,7 +1409,7 @@ $(document).ready(function() {
                         discountAmount: parseFloat(data.discountAmount) || 0
                     });
                 })
-                .catch(() => updatePaymentSummaryCard(totalBalance, {}))
+                .catch(() => updatePaymentSummaryCard(totalBalance, { roomNumber }))
                 .finally(() => {
                     // If the guest's deposit action (e.g. Apply to Balance) was already
                     // selected before this fetch resolved, re-apply it so the breakdown

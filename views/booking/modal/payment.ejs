@@ -9,6 +9,9 @@
                 <h5 class="modal-title" id="paymentModalLabel">Payment</h5>
                     </div>
                 </div>
+                <div class="payment-header-room" id="paymentRoomNumberBadge" style="display: none;">
+                    Room <span id="paymentRoomNumber">-</span>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
@@ -304,6 +307,21 @@
     display: flex;
     align-items: center;
     gap: 15px;
+}
+
+#modal-payment .payment-header-room {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.12);
+    padding: 6px 18px;
+    border-radius: 20px;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
 }
 
 #modal-payment .header-text h5 {

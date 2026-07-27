@@ -317,7 +317,9 @@
 					
 					// Update Payment Summary Card with breakdown
 					if (typeof updatePaymentSummaryCard === 'function') {
+						const roomNumber = document.getElementById('hiddenBookingId')?.dataset.roomNumber || '';
 						updatePaymentSummaryCard(numericAmount, {
+							roomNumber: roomNumber,
 							roomAmount: roomAmount,
 							extensionAmount: extensionAmount,
 							serviceAmount: serviceAmount,

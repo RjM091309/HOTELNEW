@@ -2623,7 +2623,8 @@ class BookingModel {
           COALESCE(bi.CHECKOUT_REFUND, 0) AS CHECKOUT_REFUND,
           COALESCE(bi.REFUNDABLE_AMOUNT, 0) AS REFUNDABLE_AMOUNT,
           bi.DISCOUNT_APPLIED,
-          COALESCE(rt.NAME, 'Unassigned Room') AS ROOM_TYPE
+          COALESCE(rt.NAME, 'Unassigned Room') AS ROOM_TYPE,
+          r.ROOM_NUMBER
         FROM booking b
         JOIN billing bi ON b.IDNo = bi.BOOKING_ID
         LEFT JOIN room r ON b.ROOM_ID = r.IDNo
@@ -2801,6 +2802,7 @@ class BookingModel {
       const receiptData = {
         bookingId: b.bookingId,
         confNumber: b.CONFIRMATION_NUMBER,
+        roomNumber: b.ROOM_NUMBER || null,
         customerName: customerData[0]?.customerName || '',
         address: customerData[0]?.ADDRESS || '',
         invoiceDate: new Date(b.CHECK_IN_DATE).toLocaleDateString(),

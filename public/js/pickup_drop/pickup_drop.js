@@ -1,4 +1,5 @@
 let pickupTable;
+let dropoffTable;
 let pickupDropRecords = {};
 let pickupDropAllRecords = [];
 let pickupDropFlightScheduleList = null;
@@ -11,10 +12,7 @@ $(document).ready(function () {
 });
 
 function initializePickupDropTables() {
-  const commonOptions = {
-    columnDefs: [
-      { targets: 4, className: 'text-center', orderable: false, searchable: false, width: '15%' }
-    ],
+  const baseOptions = {
     pageLength: -1,
     lengthMenu: [[10, 50, 100, -1], [10, 50, 100, 'All']],
     paging: true,
@@ -34,7 +32,22 @@ function initializePickupDropTables() {
   if ($.fn.DataTable.isDataTable('#pickupTable')) {
     $('#pickupTable').DataTable().destroy();
   }
-  pickupTable = $('#pickupTable').DataTable(commonOptions);
+  pickupTable = $('#pickupTable').DataTable({
+    ...baseOptions,
+    columnDefs: [
+      { targets: 4, className: 'text-center', orderable: false, searchable: false, width: '15%' }
+    ]
+  });
+
+  if ($.fn.DataTable.isDataTable('#dropoffTable')) {
+    $('#dropoffTable').DataTable().destroy();
+  }
+  dropoffTable = $('#dropoffTable').DataTable({
+    ...baseOptions,
+    columnDefs: [
+      { targets: 4, className: 'text-center', orderable: false, searchable: false, width: '15%' }
+    ]
+  });
 
   reloadPickupDropData();
 }
@@ -53,7 +66,24 @@ function setupPickupDropHandlers() {
     });
   }
 
-  // Today / Previous Week / Future Week / All
+  // Pick Up / Drop Off tab switch
+  $(document).on('click', '.tab-bar .tab-item[data-view]', function () {
+    const view = $(this).data('view');
+    $('.tab-bar .tab-item[data-view]').removeClass('is-active');
+    $(this).addClass('is-active');
+
+    if (view === 'dropoff') {
+      $('#pickupTableWrap').hide();
+      $('#dropoffTableWrap').show();
+      dropoffTable.columns.adjust();
+    } else {
+      $('#dropoffTableWrap').hide();
+      $('#pickupTableWrap').show();
+      pickupTable.columns.adjust();
+    }
+  });
+
+  // Today / Previous Week / Future Week / All - applies to both tabs
   $(document).on('click', '.filter-btn-group .filter-btn[data-filter]', function () {
     $('.filter-btn-group .filter-btn').removeClass('active');
     $(this).addClass('active');
@@ -79,9 +109,26 @@ function getEffectivePickupDate(record) {
   return base;
 }
 
-// Rolling-window filter relative to today's local date:
-// today = same calendar day, prevWeek = the 7 days before today, futureWeek = the 7 days after today.
-function matchesDateFilter(effectiveDate) {
+// Pick Up only: today = tomorrow's calendar day (today + 1), prevWeek = the 7 days
+// before today, futureWeek = the 7 days after tomorrow (today + 2 to today + 8) so it
+// never overlaps with what "today" already shows.
+function matchesPickupDateFilter(effectiveDate) {
+  if (currentDateFilter === 'all') return true;
+  if (!effectiveDate) return false;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const diffDays = Math.round((effectiveDate - today) / (1000 * 60 * 60 * 24));
+
+  if (currentDateFilter === 'today') return diffDays === 1;
+  if (currentDateFilter === 'prevWeek') return diffDays >= -7 && diffDays <= -1;
+  if (currentDateFilter === 'futureWeek') return diffDays >= 2 && diffDays <= 8;
+  return true;
+}
+
+// Drop Off: plain rolling window relative to today's actual local date, no +1 offset.
+function matchesDropoffDateFilter(effectiveDate) {
   if (currentDateFilter === 'all') return true;
   if (!effectiveDate) return false;
 
@@ -112,24 +159,41 @@ function buildActions(bookingId, printType) {
 
 function renderPickupDropTables() {
   pickupTable.clear();
+  dropoffTable.clear();
 
   pickupDropAllRecords.forEach(function (record) {
-    const hasFlightNumber = record.FLIGHT_NUMBER != null && String(record.FLIGHT_NUMBER).trim() !== '';
-    if (Number(record.HAS_PICKUP) !== 1 || !hasFlightNumber) return;
+    const hasPickupFlightNumber = record.FLIGHT_NUMBER != null && String(record.FLIGHT_NUMBER).trim() !== '';
+    if (Number(record.HAS_PICKUP) === 1 && hasPickupFlightNumber) {
+      const effectiveDate = getEffectivePickupDate(record);
+      if (matchesPickupDateFilter(effectiveDate)) {
+        pickupTable.row.add([
+          record.NAME || '',
+          formatDisplayDate(effectiveDate),
+          record.FLIGHT_NUMBER || '',
+          record.PASSENGER_COUNT != null ? record.PASSENGER_COUNT : '',
+          buildActions(record.BOOKING_ID, 'pickup')
+        ]);
+      }
+    }
 
-    const effectiveDate = getEffectivePickupDate(record);
-    if (!matchesDateFilter(effectiveDate)) return;
-
-    pickupTable.row.add([
-      record.NAME || '',
-      formatDisplayDate(effectiveDate),
-      record.FLIGHT_NUMBER || '',
-      record.PASSENGER_COUNT != null ? record.PASSENGER_COUNT : '',
-      buildActions(record.BOOKING_ID, 'pickup')
-    ]);
+    const hasDropoffFlightNumber = record.DROPOFF_FLIGHT_NUMBER != null && String(record.DROPOFF_FLIGHT_NUMBER).trim() !== '';
+    if (Number(record.HAS_DROPOFF) === 1 && hasDropoffFlightNumber) {
+      const dropoffDate = record.CHECK_OUT_DATE ? new Date(record.CHECK_OUT_DATE) : null;
+      if (dropoffDate && !isNaN(dropoffDate.getTime())) dropoffDate.setHours(0, 0, 0, 0);
+      if (matchesDropoffDateFilter(dropoffDate)) {
+        dropoffTable.row.add([
+          record.NAME || '',
+          formatDisplayDate(dropoffDate),
+          record.DROPOFF_FLIGHT_NUMBER || '',
+          record.PASSENGER_COUNT != null ? record.PASSENGER_COUNT : '',
+          buildActions(record.BOOKING_ID, 'dropoff')
+        ]);
+      }
+    }
   });
 
   pickupTable.draw();
+  dropoffTable.draw();
 }
 
 function printPickupDrop(bookingId, type) {

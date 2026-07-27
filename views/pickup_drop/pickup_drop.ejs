@@ -3,7 +3,10 @@
     <div class="dashboard-card">
       <div class="dashboard-card-header">
         <div style="display:flex; align-items:center; justify-content:space-between; width:100%; flex-wrap:wrap; gap:10px;">
-          <header>Pick Up</header>
+          <div class="tab-bar" id="pdTabBar">
+            <a href="javascript:void(0)" class="tab-item is-active" data-view="pickup">Pick Up</a>
+            <a href="javascript:void(0)" class="tab-item" data-view="dropoff">Drop Off</a>
+          </div>
           <div class="filter-btn-group">
             <button type="button" class="filter-btn" data-filter="all">All</button>
             <button type="button" class="filter-btn active" data-filter="today">Today</button>
@@ -20,6 +23,20 @@
                 <th>Name</th>
                 <th>Date</th>
                 <th>Pick-up Flight No.</th>
+                <th>No. of Persons</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="dropoffTableWrap" class="table-scrollable" style="display:none;">
+          <table id="dropoffTable" class="table table-hover table-bordered full-width">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Date</th>
+                <th>Drop-off Flight No.</th>
                 <th>No. of Persons</th>
                 <th>Actions</th>
               </tr>
@@ -89,6 +106,55 @@
 </script>
 
 <style>
+  .filter-btn-group .filter-btn.active {
+    background: #6f9c40;
+    border-color: #6f9c40;
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .filter-btn-group .filter-btn.active:hover {
+    background: #7aab45;
+    border-color: #7aab45;
+  }
+
+  /* Self-contained pill switcher - its own dark track, independent of whatever
+     color the surrounding header happens to be, so the active pill never
+     blends into the background. */
+  #pdTabBar {
+    background-color: rgba(0, 0, 0, 0.25) !important;
+    border-radius: 8px;
+    padding: 4px;
+    display: inline-flex;
+    gap: 4px;
+  }
+
+  #pdTabBar .tab-item {
+    background-color: transparent !important;
+    color: rgba(255, 255, 255, 0.75) !important;
+    margin: 0;
+  }
+
+  #pdTabBar .tab-item.is-active {
+    background-color: #6f9c40 !important;
+    color: #fff !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  }
+
+  #pdTabBar .tab-item.is-active::after {
+    display: none !important;
+  }
+
+  #pdTabBar .tab-item:not(.is-active):hover {
+    background-color: rgba(255, 255, 255, 0.12) !important;
+    color: #fff !important;
+  }
+
+  #pdTabBar .tab-item.is-active:hover {
+    background-color: #7aab45 !important;
+    color: #fff !important;
+  }
+
   .pickup-drop-table-wrap .dataTables_paginate {
     display: none !important;
   }
@@ -110,13 +176,16 @@
   }
 
   .pickup-drop-table-wrap #pickupTable th,
-  .pickup-drop-table-wrap #pickupTable td {
+  .pickup-drop-table-wrap #pickupTable td,
+  .pickup-drop-table-wrap #dropoffTable th,
+  .pickup-drop-table-wrap #dropoffTable td {
     padding: 6px 10px !important;
     line-height: 1.35;
     vertical-align: middle;
   }
 
-  .pickup-drop-table-wrap #pickupTable .btn-xs {
+  .pickup-drop-table-wrap #pickupTable .btn-xs,
+  .pickup-drop-table-wrap #dropoffTable .btn-xs {
     padding: 2px 6px;
     line-height: 1.2;
   }
