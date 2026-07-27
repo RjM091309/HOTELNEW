@@ -50,6 +50,15 @@ const paymentsModel = {
       LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
       LEFT JOIN room r ON r.IDNo = b.ROOM_ID
       LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
+      LEFT JOIN (
+        SELECT p.BOOKING_ID, p.PAYMENT_DATE AS LAST_PAYMENT_DATE
+        FROM payments p
+        INNER JOIN (
+          SELECT BOOKING_ID, MAX(IDNo) AS MAX_ID
+          FROM payments
+          GROUP BY BOOKING_ID
+        ) latest ON p.IDNo = latest.MAX_ID
+      ) lp ON lp.BOOKING_ID = b.IDNo
       WHERE b.ACTIVE = 1 
       AND (SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')) > 0
       ${searchCondition}
@@ -116,6 +125,40 @@ const paymentsModel = {
     `;
     const dataParams = [...searchParams, parseInt(length), parseInt(start)];
     const [rows] = await pool.promise().query(dataQuery, dataParams);
+    return rows;
+  },
+
+  getCollectedPayments: async (range = 'today') => {
+    let dateCondition = 'DATE(p.PAYMENT_DATE) = CURRENT_DATE()';
+    if (range === 'last7days') {
+      dateCondition = `
+        DATE(p.PAYMENT_DATE) >= DATE_SUB(CURRENT_DATE(), INTERVAL 6 DAY)
+        AND DATE(p.PAYMENT_DATE) <= CURRENT_DATE()
+      `;
+    }
+
+    const [rows] = await pool.promise().query(
+      `SELECT
+         p.IDNo,
+         p.BOOKING_ID,
+         p.AMOUNT_PAID,
+         p.PAYMENT_METHOD,
+         p.PAYMENT_TYPE,
+         p.PAYMENT_DATE,
+         c.NAME AS GUEST_NAME,
+         r.ROOM_NUMBER,
+         b.CONFIRMATION_NUMBER,
+         u.FULLNAME AS PROCESSED_BY_NAME
+       FROM payments p
+       LEFT JOIN booking b ON b.IDNo = p.BOOKING_ID
+       LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
+       LEFT JOIN room r ON r.IDNo = b.ROOM_ID
+       LEFT JOIN user_info u ON u.IDNo = p.ENCODED_BY
+       WHERE ${dateCondition}
+         AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')
+         AND (p.PAYMENT_METHOD NOT IN ('credit', 'marker') OR p.SETTLED_DATE IS NOT NULL)
+       ORDER BY p.PAYMENT_DATE DESC`
+    );
     return rows;
   },
 
@@ -243,7 +286,7 @@ const paymentsModel = {
     );
 
     const [payments] = await pool.promise().query(
-      `SELECT p.AMOUNT_PAID, p.PAYMENT_METHOD, p.PAYMENT_TYPE, p.PAYMENT_DATE, p.REMARKS, p.BILLING_ID, p.BOOKING_SERVICE_ID, u.FULLNAME AS NAME
+      `SELECT p.IDNo, p.AMOUNT_PAID, p.PAYMENT_METHOD, p.PAYMENT_TYPE, p.PAYMENT_DATE, p.REMARKS, p.BILLING_ID, p.BOOKING_SERVICE_ID, u.FULLNAME AS NAME
        FROM payments p
        LEFT JOIN user_info u ON u.IDNo = p.ENCODED_BY
        WHERE p.BOOKING_ID = ?

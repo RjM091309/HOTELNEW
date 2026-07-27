@@ -25,7 +25,10 @@
           <div class="text-center mb-3"><h5 class="text-primary mb-0"><i class="fas fa-calendar-day"></i> Daily Sales</h5></div>
           <div class="row text-center">
             <div class="col-4"><h6 class="text-warning mb-1" id="daily-total">0</h6><small class="text-muted">Total</small></div>
-            <div class="col-4"><h6 class="text-success mb-1" id="daily-paid">0</h6><small class="text-muted">Paid</small></div>
+            <div class="col-4">
+              <h6 class="text-success mb-1 sales-paid-clickable" id="daily-paid" role="button" title="View today's paid payments">0</h6>
+              <small class="text-muted">Paid</small>
+            </div>
             <div class="col-4"><h6 class="text-danger mb-1" id="daily-unpaid">0</h6><small class="text-muted">Unpaid</small></div>
           </div>
         </div></div>
@@ -86,6 +89,33 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body"><div id="breakdownContent" class="p-2"></div></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" id="printBreakdownBtn" style="display:none;" onclick="printBreakdownReceipt()">
+          <i class="fa fa-print"></i> Print Receipt
+        </button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Today's Paid Payments Modal -->
+<div class="modal fade" id="todayPaidModal" tabindex="-1" role="dialog" aria-labelledby="todayPaidModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-2">
+          <h5 class="modal-title mb-0" id="todayPaidModalLabel">Paid Payments</h5>
+          <div class="filter-btn-group paid-modal-filter-group">
+            <button type="button" class="filter-btn active" data-paid-range="today">Today</button>
+            <button type="button" class="filter-btn" data-paid-range="last7days">Last 7 Days</button>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="todayPaidContent" class="p-2"></div>
+      </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
       </div>
@@ -184,6 +214,25 @@
   }
   loadSalesSummary();
 
+  let currentPaidRange = 'today';
+  let currentBreakdownBookingId = null;
+
+  $('#daily-paid').on('click', function () {
+    currentPaidRange = 'today';
+    $('.paid-modal-filter-group .filter-btn').removeClass('active');
+    $('.paid-modal-filter-group .filter-btn[data-paid-range="today"]').addClass('active');
+    showTodayPaidModal('today');
+  });
+
+  $(document).on('click', '.paid-modal-filter-group .filter-btn', function () {
+    const range = $(this).data('paid-range');
+    if (!range || range === currentPaidRange) return;
+    currentPaidRange = range;
+    $('.paid-modal-filter-group .filter-btn').removeClass('active');
+    $(this).addClass('active');
+    loadTodayPaidPayments(range);
+  });
+
   $(document).on('click', '.confirmation-link', function(e){
     e.preventDefault();
     const bookingId = $(this).data('booking-id');
@@ -191,11 +240,20 @@
   });
 
   function showBreakdownModal(bookingId){
+    currentBreakdownBookingId = bookingId;
+    $('#printBreakdownBtn').hide();
     $('#breakdownModal').modal('show');
     $('#breakdownContent').html('<div class="text-center"><div class="spinner-border" role="status"><span class="sr-only">Loading...</span></div></div>');
     fetch(`/payments/breakdown/${bookingId}`)
       .then(r => r.json())
-      .then(data => { if(data.success) displayBreakdown(data); else $('#breakdownContent').html(`<div class="alert alert-danger"><strong>Error:</strong> ${data.message}</div>`); })
+      .then(data => {
+        if (data.success) {
+          displayBreakdown(data);
+          $('#printBreakdownBtn').show();
+        } else {
+          $('#breakdownContent').html(`<div class="alert alert-danger"><strong>Error:</strong> ${data.message}</div>`);
+        }
+      })
       .catch(() => $('#breakdownContent').html('<div class="alert alert-danger"><strong>Error:</strong> Failed to load breakdown data</div>'));
   }
 
@@ -263,17 +321,315 @@
     html += `</tbody></table></div>`;
 
     if (payments.length > 0) {
-      html += `<h6 class="mt-4"><strong>Payment History:</strong></h6><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Date</th><th>Type</th><th>Method</th><th class="text-right">Amount</th></tr></thead><tbody>`;
+      html += `
+        <h6 class="mt-4"><strong>Payment History:</strong></h6>
+        <div class="table-responsive">
+          <table class="table table-sm" id="breakdownPaymentHistoryTable">
+            <thead>
+              <tr>
+                <th class="text-center" style="width:40px;">
+                  <input type="checkbox" id="breakdownSelectAllPayments" checked title="Select all">
+                </th>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Method</th>
+                <th class="text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>`;
       const methodLabels = { cash: 'Cash', credit_card: 'Credit Card', credit: 'Credit', marker: 'Credit' };
       payments.forEach(p => {
         const methodLabel = methodLabels[(p.PAYMENT_METHOD || '').toLowerCase()] || p.PAYMENT_METHOD;
-        html += `<tr><td>${new Date(p.PAYMENT_DATE).toLocaleString()}</td><td>${p.PAYMENT_TYPE}</td><td>${methodLabel}</td><td class="text-right">${Number(p.AMOUNT_PAID).toLocaleString()}</td></tr>`;
+        const paymentId = p.IDNo;
+        html += `
+          <tr>
+            <td class="text-center">
+              <input type="checkbox" class="breakdown-payment-check" value="${paymentId}" checked>
+            </td>
+            <td>${new Date(p.PAYMENT_DATE).toLocaleString()}</td>
+            <td>${p.PAYMENT_TYPE}</td>
+            <td>${methodLabel}</td>
+            <td class="text-right">${Number(p.AMOUNT_PAID).toLocaleString()}</td>
+          </tr>`;
       });
       html += `</tbody></table></div>`;
     }
 
     $('#breakdownContent').html(html);
+
+    $('#breakdownSelectAllPayments').on('change', function () {
+      const isChecked = $(this).is(':checked');
+      $('.breakdown-payment-check').prop('checked', isChecked);
+    });
+
+    $(document).off('change.breakdownPaymentCheck').on('change.breakdownPaymentCheck', '.breakdown-payment-check', function () {
+      const total = $('.breakdown-payment-check').length;
+      const checked = $('.breakdown-payment-check:checked').length;
+      $('#breakdownSelectAllPayments').prop('checked', total > 0 && checked === total);
+    });
+  }
+
+  function getSelectedBreakdownPaymentIds() {
+    return $('.breakdown-payment-check:checked').map(function () {
+      return $(this).val();
+    }).get();
+  }
+
+  function printBreakdownReceipt() {
+    if (!currentBreakdownBookingId) return;
+
+    const selectedPaymentIds = getSelectedBreakdownPaymentIds();
+    if ($('.breakdown-payment-check').length > 0 && selectedPaymentIds.length === 0) {
+      Swal.fire('No selection', 'Please select at least one payment to print.', 'warning');
+      return;
+    }
+
+    const existingFrame = document.getElementById('breakdownReceiptPrintFrame');
+    if (existingFrame) existingFrame.remove();
+
+    let printUrl = `/payments/breakdown-receipt/${currentBreakdownBookingId}?embed=1`;
+    if (selectedPaymentIds.length > 0) {
+      printUrl += `&paymentIds=${encodeURIComponent(selectedPaymentIds.join(','))}`;
+    }
+
+    fetch(printUrl, { credentials: 'same-origin' })
+      .then(function (response) {
+        if (!response.ok) throw new Error('Failed to load receipt');
+        return response.text();
+      })
+      .then(function (html) {
+        const iframe = document.createElement('iframe');
+        iframe.id = 'breakdownReceiptPrintFrame';
+        iframe.setAttribute('style', 'position:fixed;top:0;left:0;width:0;height:0;border:0;visibility:hidden;');
+        document.body.appendChild(iframe);
+
+        const frameWindow = iframe.contentWindow;
+        const frameDoc = iframe.contentDocument || frameWindow.document;
+        frameDoc.open();
+        frameDoc.write(html);
+        frameDoc.close();
+
+        setTimeout(function () {
+          frameWindow.focus();
+          frameWindow.print();
+          setTimeout(function () {
+            if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+          }, 1000);
+        }, 200);
+      })
+      .catch(function () {
+        Swal.fire('Error', 'Failed to load breakdown receipt for printing', 'error');
+      });
+  }
+
+  function showTodayPaidModal(range = 'today') {
+    currentPaidRange = range;
+    $('#todayPaidModal').modal('show');
+    loadTodayPaidPayments(range);
+  }
+
+  function loadTodayPaidPayments(range = 'today') {
+    $('#todayPaidContent').html('<div class="text-center"><div class="spinner-border" role="status"><span class="sr-only">Loading...</span></div></div>');
+
+    fetch(`/payments/today-paid?range=${encodeURIComponent(range)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (!data.success) {
+          $('#todayPaidContent').html(`<div class="alert alert-danger"><strong>Error:</strong> ${data.message || 'Failed to load payments'}</div>`);
+          return;
+        }
+        displayTodayPaidPayments(data.data || [], data.total || 0, data.range || range);
+      })
+      .catch(() => {
+        $('#todayPaidContent').html('<div class="alert alert-danger"><strong>Error:</strong> Failed to load paid payments</div>');
+      });
+  }
+
+  function displayTodayPaidPayments(payments, total, range = 'today') {
+    const rangeLabel = range === 'last7days' ? 'Last 7 Days' : 'Today';
+    const emptyMessage = range === 'last7days'
+      ? 'No paid payments recorded in the last 7 days.'
+      : 'No paid payments recorded for today.';
+    const totalLabel = range === 'last7days' ? 'Total Collected (Last 7 Days)' : 'Total Collected Today';
+
+    $('#todayPaidModalLabel').text(`${rangeLabel} Paid Payments`);
+
+    if (!payments.length) {
+      $('#todayPaidContent').html(`<div class="alert alert-info mb-0">${emptyMessage}</div>`);
+      return;
+    }
+
+    const methodLabels = { cash: 'Cash', credit_card: 'Credit Card', credit: 'Credit', marker: 'Credit' };
+    const colgroup = `
+      <colgroup>
+        <col class="col-index">
+        <col class="col-guest">
+        <col class="col-room">
+        <col class="col-confirmation">
+        <col class="col-type">
+        <col class="col-method">
+        <col class="col-amount">
+        <col class="col-date">
+        <col class="col-processed">
+      </colgroup>`;
+    const headRow = `
+      <tr>
+        <th class="text-center">#</th>
+        <th>Guest Name</th>
+        <th class="text-center">Room</th>
+        <th class="text-center">Confirmation</th>
+        <th class="text-center">Type</th>
+        <th class="text-center">Method</th>
+        <th class="text-end">Amount</th>
+        <th class="text-center">Payment Date</th>
+        <th class="text-center">Processed By</th>
+      </tr>`;
+
+    let bodyRows = '';
+    payments.forEach((payment, index) => {
+      const methodLabel = methodLabels[(payment.PAYMENT_METHOD || '').toLowerCase()] || payment.PAYMENT_METHOD || 'N/A';
+      bodyRows += `
+        <tr>
+          <td class="text-center">${index + 1}</td>
+          <td>${payment.GUEST_NAME || 'N/A'}</td>
+          <td class="text-center">${payment.ROOM_NUMBER || '-'}</td>
+          <td class="text-center">${payment.CONFIRMATION_NUMBER || '-'}</td>
+          <td class="text-center">${payment.PAYMENT_TYPE || '-'}</td>
+          <td class="text-center">${methodLabel}</td>
+          <td class="text-end">${Number(payment.AMOUNT_PAID || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td class="text-center">${payment.PAYMENT_DATE ? new Date(payment.PAYMENT_DATE).toLocaleString('en-US') : '-'}</td>
+          <td class="text-center">${payment.PROCESSED_BY_NAME || '-'}</td>
+        </tr>`;
+    });
+
+    const formattedTotal = Number(total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    let html = `
+      <div class="paid-payments-table-wrap">
+        <table class="table table-bordered paid-payments-table paid-payments-table-head mb-0">
+          ${colgroup}
+          <thead class="table-dark">${headRow}</thead>
+        </table>
+        <div class="paid-payments-scroll">
+          <table class="table table-bordered table-hover paid-payments-table paid-payments-table-body mb-0">
+            ${colgroup}
+            <tbody>${bodyRows}</tbody>
+          </table>
+        </div>
+        <table class="table table-bordered paid-payments-table paid-payments-table-foot mb-0">
+          ${colgroup}
+          <tfoot>
+            <tr class="table-success">
+              <th colspan="6" class="text-end">${totalLabel}</th>
+              <th class="text-end">${formattedTotal}</th>
+              <th></th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>`;
+
+    $('#todayPaidContent').html(html);
+    syncPaidPaymentsTableLayout();
+  }
+
+  function syncPaidPaymentsTableLayout() {
+    const wrap = document.querySelector('.paid-payments-table-wrap');
+    const scroll = document.querySelector('.paid-payments-scroll');
+    const headTable = document.querySelector('.paid-payments-table-head');
+    const footTable = document.querySelector('.paid-payments-table-foot');
+    if (!wrap || !scroll || !headTable || !footTable) return;
+
+    const scrollbarWidth = scroll.offsetWidth - scroll.clientWidth;
+    const adjustedWidth = scrollbarWidth > 0 ? `calc(100% - ${scrollbarWidth}px)` : '100%';
+    headTable.style.width = adjustedWidth;
+    footTable.style.width = adjustedWidth;
   }
 </script>
+
+<style>
+  .sales-paid-clickable {
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+  }
+
+  .sales-paid-clickable:hover {
+    opacity: 0.8;
+    text-decoration: underline;
+  }
+
+  .paid-modal-filter-group .filter-btn.active {
+    background: #6f9c40;
+    border-color: #6f9c40;
+    color: #fff;
+    font-weight: 600;
+  }
+
+  #todayPaidModal .modal-body {
+    overflow: hidden;
+  }
+
+  .paid-payments-table-wrap {
+    max-height: 65vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .paid-payments-table {
+    width: 100%;
+    table-layout: fixed;
+    margin-bottom: 0;
+    border-collapse: collapse;
+  }
+
+  .paid-payments-table .col-index { width: 4%; }
+  .paid-payments-table .col-guest { width: 14%; }
+  .paid-payments-table .col-room { width: 6%; }
+  .paid-payments-table .col-confirmation { width: 13%; }
+  .paid-payments-table .col-type { width: 7%; }
+  .paid-payments-table .col-method { width: 7%; }
+  .paid-payments-table .col-amount { width: 9%; }
+  .paid-payments-table .col-date { width: 22%; }
+  .paid-payments-table .col-processed { width: 8%; }
+
+  .paid-payments-scroll {
+    flex: 1;
+    min-height: 0;
+    max-height: calc(65vh - 96px);
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .paid-payments-table-head,
+  .paid-payments-table-foot {
+    flex-shrink: 0;
+  }
+
+  .paid-payments-table-head {
+    border-bottom: 0;
+  }
+
+  .paid-payments-table-body {
+    border-top: 0;
+    border-bottom: 0;
+  }
+
+  .paid-payments-table-foot {
+    border-top: 0;
+  }
+
+  .paid-payments-table-head th,
+  .paid-payments-table-body td,
+  .paid-payments-table-foot th {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .paid-payments-table-body td:nth-child(2),
+  .paid-payments-table-head th:nth-child(2) {
+    white-space: normal;
+    word-break: break-word;
+  }
+</style>
 
 

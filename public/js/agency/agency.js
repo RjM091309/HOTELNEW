@@ -401,7 +401,15 @@ function initializeDataTable() {
             responsive: true,
             pageLength: 25,
             order: [[0, 'asc']],
-            columnDefs: [{ targets: [4], orderable: false }],
+            columnDefs: [
+                { targets: [4], orderable: false },
+                { targets: [1, 2, 3, 4], searchable: false }
+            ],
+            search: {
+                smart: false,
+                regex: false,
+                caseInsensitive: true
+            },
             language: {
                 search: "Search agencies:",
                 lengthMenu: "Show _MENU_ agencies per page",

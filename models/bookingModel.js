@@ -14,20 +14,39 @@ class BookingModel {
           dateCondition,
           channelCondition,
           groupCondition,
+          searchCondition = '',
+          searchParams = [],
           useIndividualCalculation = false // Flag to use individual calculation for group bookings
         } = params;
-  
-        // ---- COUNT QUERY ----
-        const countQuery = `
-          SELECT COUNT(*) AS total
-          FROM booking b
+
+        const countJoins = `
             LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+            LEFT JOIN agency   a ON b.AGENCY_ID   = a.IDNo
             LEFT JOIN room     r ON b.ROOM_ID      = r.IDNo
             LEFT JOIN billing  bill ON bill.BOOKING_ID = b.IDNo
+            LEFT JOIN user_info u  ON b.ENCODED_BY  = u.IDNo
+            LEFT JOIN user_info u2 ON b.EDITED_BY  = u2.IDNo`;
+
+        const baseWhere = `
           WHERE b.ACTIVE = 1
             ${groupCondition || ''}
             ${dateCondition}
-            ${channelCondition};
+            ${channelCondition}`;
+
+        // ---- COUNT QUERY (total without search) ----
+        const countQuery = `
+          SELECT COUNT(*) AS total
+          FROM booking b
+            ${countJoins}
+          ${baseWhere};
+        `;
+
+        const filteredCountQuery = `
+          SELECT COUNT(*) AS total
+          FROM booking b
+            ${countJoins}
+          ${baseWhere}
+            ${searchCondition};
         `;
   
         // ---- MAIN DATA QUERY ----
@@ -344,6 +363,7 @@ class BookingModel {
             ${groupCondition || ''}
             ${dateCondition}
             ${channelCondition}
+            ${searchCondition}
           ORDER BY b.IDNo
           ${Number.isInteger(start) && Number.isInteger(length) ? `LIMIT ${start}, ${length}` : ''};
         `;
@@ -351,12 +371,19 @@ class BookingModel {
         // First get the total count
         const countResults = await queryDatabasePromise(countQuery, []);
         const totalRecords = countResults[0]?.total || 0;
+
+        let filteredRecords = totalRecords;
+        if (searchCondition) {
+          const filteredCountResults = await queryDatabasePromise(filteredCountQuery, searchParams);
+          filteredRecords = filteredCountResults[0]?.total || 0;
+        }
   
         // Now fetch the page of data
-        const rows = await queryDatabasePromise(dataQuery, []);
+        const rows = await queryDatabasePromise(dataQuery, searchParams);
   
         return {
           totalRecords,
+          filteredRecords,
           rows
         };
   

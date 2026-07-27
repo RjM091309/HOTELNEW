@@ -1,3 +1,5 @@
+const fs = require('fs').promises;
+const path = require('path');
 const paymentsModel = require('../models/paymentsModel');
 
 const paymentsController = {
@@ -29,7 +31,7 @@ const paymentsController = {
 
   tableData: async (req, res) => {
     try {
-      const { start = 0, length = 10, search = { value: '' }, order = [{ column: 11, dir: 'desc' }], filter = 'today' } = req.query;
+      const { start = 0, length = 10, search = { value: '' }, order = [{ column: 11, dir: 'desc' }], filter = 'all' } = req.query;
       const searchValue = search.value || '';
       const orderColumn = order[0]?.column || 11;
       const orderDir = order[0]?.dir || 'desc';
@@ -48,28 +50,30 @@ const paymentsController = {
         searchParams = [p, p, p, p];
       }
 
-      // Date filter based on booking.ENCODED_DT
-      const now = new Date();
-      let fromDate = null;
+      // Date filter based on last payment date (matches PAYMENT DATE column in the table)
+      let dateCondition = '';
       if (filter === 'today') {
-        fromDate = new Date();
+        dateCondition = `AND DATE(lp.LAST_PAYMENT_DATE) = CURRENT_DATE()`;
       } else if (filter === 'last3days') {
-        fromDate = new Date();
-        fromDate.setDate(now.getDate() - 2);
+        dateCondition = `
+          AND DATE(lp.LAST_PAYMENT_DATE) >= DATE_SUB(CURRENT_DATE(), INTERVAL 2 DAY)
+          AND DATE(lp.LAST_PAYMENT_DATE) <= CURRENT_DATE()
+        `;
       } else if (filter === 'thisWeek') {
-        fromDate = new Date();
-        fromDate.setDate(now.getDate() - now.getDay());
+        // Week starts on Sunday (same logic as Weekly Sales summary cards)
+        dateCondition = `
+          AND DATE(lp.LAST_PAYMENT_DATE) >= DATE_SUB(CURRENT_DATE(), INTERVAL (DAYOFWEEK(CURRENT_DATE()) - 1) DAY)
+          AND DATE(lp.LAST_PAYMENT_DATE) <= CURRENT_DATE()
+        `;
       } else if (filter === 'thisMonth') {
-        fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        dateCondition = `
+          AND MONTH(lp.LAST_PAYMENT_DATE) = MONTH(CURRENT_DATE())
+          AND YEAR(lp.LAST_PAYMENT_DATE) = YEAR(CURRENT_DATE())
+        `;
       }
 
-      if (fromDate) {
-        const y = fromDate.getFullYear();
-        const m = String(fromDate.getMonth() + 1).padStart(2, '0');
-        const d = String(fromDate.getDate()).padStart(2, '0');
-        const fromStr = `${y}-${m}-${d}`;
-        searchCondition += ` AND DATE(b.ENCODED_DT) >= ?`;
-        searchParams.push(fromStr);
+      if (dateCondition) {
+        searchCondition += ` ${dateCondition}`;
       }
 
       const totalRecords = await paymentsModel.countDatatable(searchCondition, searchParams);
@@ -132,6 +136,18 @@ const paymentsController = {
     }
   },
 
+  todayPaidPayments: async (req, res) => {
+    try {
+      const range = req.query.range === 'last7days' ? 'last7days' : 'today';
+      const rows = await paymentsModel.getCollectedPayments(range);
+      const total = rows.reduce((sum, row) => sum + Number(row.AMOUNT_PAID || 0), 0);
+      res.json({ success: true, data: rows, total, range });
+    } catch (err) {
+      console.error('Error fetching today paid payments:', err);
+      res.status(500).json({ success: false, message: 'Failed to fetch today paid payments' });
+    }
+  },
+
   breakdown: async (req, res) => {
     try {
       const bookingId = req.params.bookingId;
@@ -141,6 +157,49 @@ const paymentsController = {
     } catch (err) {
       console.error('Error fetching breakdown:', err);
       res.status(500).json({ success: false, message: 'Failed to fetch breakdown' });
+    }
+  },
+
+  breakdownReceipt: async (req, res) => {
+    try {
+      const bookingId = req.params.bookingId;
+      const result = await paymentsModel.bookingBreakdown(bookingId);
+      if (!result) return res.status(404).send('Booking not found');
+
+      let logoUrl = '';
+      try {
+        const logoPath = path.join(__dirname, '../public/img/Logo-Black.png');
+        const logoBuf = await fs.readFile(logoPath);
+        logoUrl = `data:image/png;base64,${logoBuf.toString('base64')}`;
+      } catch (_) {
+        logoUrl = '';
+      }
+
+      const paymentIdsParam = req.query.paymentIds || '';
+      const selectedPaymentIds = paymentIdsParam
+        .split(',')
+        .map((id) => parseInt(id, 10))
+        .filter((id) => Number.isInteger(id) && id > 0);
+
+      let payments = result.payments || [];
+      if (selectedPaymentIds.length > 0) {
+        const selectedSet = new Set(selectedPaymentIds);
+        payments = payments.filter((payment) => selectedSet.has(Number(payment.IDNo)));
+      }
+
+      res.render('payments/breakdown_receipt', {
+        layout: false,
+        embed: req.query.embed === '1',
+        logoUrl,
+        generatedAt: new Date(),
+        bookingData: result.booking,
+        services: result.services || [],
+        extensions: result.extensions || [],
+        payments
+      });
+    } catch (err) {
+      console.error('Error rendering breakdown receipt:', err);
+      res.status(500).send('Failed to load breakdown receipt');
     }
   },
 

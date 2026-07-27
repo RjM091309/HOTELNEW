@@ -14,11 +14,17 @@ router.get('/payments_data', paymentsController.tableData);
 // Sales summary
 router.get('/sales-summary', paymentsController.salesSummary);
 
+// Today's collected payments list
+router.get('/today-paid', paymentsController.todayPaidPayments);
+
 // Get payments by booking ID
 router.get('/get-payments/:bookingId', paymentsController.getPaymentsByBooking);
 
 // Detailed breakdown for a booking
 router.get('/breakdown/:bookingId', paymentsController.breakdown);
+
+// Printable breakdown receipt
+router.get('/breakdown-receipt/:bookingId', paymentsController.breakdownReceipt);
 
 // Group booking breakdown
 router.get('/group-breakdown/:bookingId', paymentsController.groupBreakdown);

@@ -261,6 +261,27 @@ class BookingController {
         channelCondition = `AND b.BOOKING_CHANNEL != 'agency'`;
       }
 
+      // Server-side search (used by agency booking DataTable)
+      const search = req.query.search || {};
+      const searchValue = (typeof search === 'object' ? search.value : '') || '';
+      let searchCondition = '';
+      let searchParams = [];
+      if (searchValue.trim()) {
+        const pattern = `%${searchValue.trim()}%`;
+        searchCondition = `AND (
+          c.NAME LIKE ?
+          OR COALESCE(a.NAME, '') LIKE ?
+          OR COALESCE(r.ROOM_NUMBER, '') LIKE ?
+          OR COALESCE(b.CONFIRMATION_NUMBER, '') LIKE ?
+          OR b.BOOKING_CHANNEL LIKE ?
+          OR b.BOOKING_STATUS LIKE ?
+          OR COALESCE(b.AGENCY_PAYER, '') LIKE ?
+          OR COALESCE(u.FULLNAME, '') LIKE ?
+          OR COALESCE(u2.FULLNAME, '') LIKE ?
+        )`;
+        searchParams = [pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern];
+      }
+
       // Get booking data from model with enhanced structure
       const result = await BookingModel.getBookingDataEnhanced({
         start,
@@ -270,6 +291,8 @@ class BookingController {
         dateCondition,
         channelCondition,
         groupCondition,
+        searchCondition,
+        searchParams,
         useIndividualCalculation // Pass flag to use individual calculation for group bookings in single view
       });
 
@@ -277,7 +300,7 @@ class BookingController {
       res.json({
         draw,
         recordsTotal: result.totalRecords,
-        recordsFiltered: result.totalRecords,
+        recordsFiltered: result.filteredRecords,
         data: result.rows
       });
 

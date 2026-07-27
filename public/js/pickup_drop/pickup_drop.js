@@ -144,10 +144,13 @@ function matchesDropoffDateFilter(effectiveDate) {
 }
 
 function buildActions(bookingId, printType) {
-  return `
+  const printBtn = printType === 'dropoff' ? '' : `
     <button type="button" class="btn btn-tbl-print btn-xs" onclick="printPickupDrop('${bookingId}', '${printType}')" title="Print">
       <i class="fa fa-print"></i>
-    </button>
+    </button>`;
+
+  return `
+    ${printBtn}
     <button type="button" class="btn btn-tbl-edit btn-xs" onclick="openEditPickupDropModal('${bookingId}')" title="Edit">
       <i class="fa fa-pencil"></i>
     </button>
@@ -166,9 +169,12 @@ function renderPickupDropTables() {
     if (Number(record.HAS_PICKUP) === 1 && hasPickupFlightNumber) {
       const effectiveDate = getEffectivePickupDate(record);
       if (matchesPickupDateFilter(effectiveDate)) {
+        const checkInDate = record.CHECK_IN_DATE ? new Date(record.CHECK_IN_DATE) : null;
+        if (checkInDate && !isNaN(checkInDate.getTime())) checkInDate.setHours(0, 0, 0, 0);
+
         pickupTable.row.add([
           record.NAME || '',
-          formatDisplayDate(effectiveDate),
+          formatDisplayDate(checkInDate),
           record.FLIGHT_NUMBER || '',
           record.PASSENGER_COUNT != null ? record.PASSENGER_COUNT : '',
           buildActions(record.BOOKING_ID, 'pickup')

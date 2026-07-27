@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Payment Breakdown Receipt</title>
+  <style>
+    :root {
+      --border: #d1d5db;
+      --muted: #6b7280;
+      --text: #111827;
+      --accent: #0c2a42;
+      --bg-alt: #f9fafb;
+    }
+
+    * { box-sizing: border-box; }
+
+    @page {
+      size: A4 portrait;
+      margin: 12mm;
+    }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--text);
+      margin: 0;
+      padding: 24px 28px;
+      background: #fff;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 18px;
+      border-bottom: 2px solid #f3c200;
+      padding-bottom: 12px;
+    }
+
+    .logo {
+      height: 72px;
+      object-fit: contain;
+    }
+
+    .title {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--accent);
+      margin: 8px 0 4px;
+      letter-spacing: 0.4px;
+    }
+
+    .sub {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+      margin: 18px 0 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 7px 10px;
+      font-size: 12px;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--bg-alt);
+      font-weight: 700;
+    }
+
+    .info-table th {
+      width: 22%;
+      text-align: left;
+      background: #fff;
+    }
+
+    .info-table td {
+      text-align: left;
+    }
+
+    .history-table td:last-child,
+    .history-table th:last-child {
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .history-table th {
+      text-align: center;
+    }
+
+    .history-table td {
+      text-align: center;
+    }
+
+    .footer {
+      margin-top: 20px;
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    @media print {
+      body { padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <% const booking = bookingData; %>
+  <% const methodLabels = { cash: 'Cash', credit_card: 'Credit Card', credit: 'Credit', marker: 'Credit' }; %>
+
+  <div class="header">
+    <% if (logoUrl) { %>
+      <img class="logo" src="<%= logoUrl %>" alt="Hotel Logo">
+    <% } %>
+    <div class="title">Payment Breakdown Receipt</div>
+    <div class="sub">Clark Terrace Building, Lot 2 Block 1, The Villages Prince Balagtas Avenue,</div>
+    <div class="sub">Clark Freeport Zone, Pampanga, 2023</div>
+    <div class="sub">(GLOBE) 0945 146 7000 (SMART) 0969 049 7000</div>
+  </div>
+
+  <div class="section-title">Guest Information</div>
+  <table class="info-table">
+    <tr>
+      <th>Guest</th>
+      <td><%= booking.GUEST_NAME || 'N/A' %></td>
+      <th>Room</th>
+      <td><%= booking.ROOM_NUMBER || '-' %> (<%= booking.ROOM_TYPE || 'N/A' %>)</td>
+    </tr>
+    <tr>
+      <th>Confirmation</th>
+      <td><%= booking.CONFIRMATION_NUMBER || '-' %></td>
+      <th>Booking ID</th>
+      <td><%= booking.BOOKING_ID %></td>
+    </tr>
+  </table>
+
+  <% if (payments && payments.length > 0) { %>
+  <div class="section-title">Payment History</div>
+  <table class="history-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Type</th>
+        <th>Method</th>
+        <th>Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% payments.forEach(function(payment) { %>
+      <tr>
+        <td><%= payment.PAYMENT_DATE ? new Date(payment.PAYMENT_DATE).toLocaleString('en-US') : '-' %></td>
+        <td><%= payment.PAYMENT_TYPE || '-' %></td>
+        <td><%= methodLabels[(payment.PAYMENT_METHOD || '').toLowerCase()] || payment.PAYMENT_METHOD || 'N/A' %></td>
+        <td><%= Number(payment.AMOUNT_PAID || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+      </tr>
+      <% }); %>
+    </tbody>
+  </table>
+  <% } %>
+
+  <div class="footer">
+    Generated on <%= generatedAt ? new Date(generatedAt).toLocaleString('en-US') : new Date().toLocaleString('en-US') %>
+  </div>
+
+  <% if (!embed) { %>
+  <script>
+    window.addEventListener('load', function () {
+      setTimeout(function () {
+        window.focus();
+        window.print();
+      }, 250);
+    });
+    window.addEventListener('afterprint', function () {
+      window.close();
+    });
+  </script>
+  <% } %>
+</body>
+</html>
