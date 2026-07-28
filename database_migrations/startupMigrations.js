@@ -124,11 +124,33 @@ async function runPickupDropMigrations() {
   );
 }
 
+async function runLongTermStayMigrations() {
+  if (!(await tableExists('booking'))) {
+    console.warn('⚠️ booking table not found, skipping long-term stay column migrations');
+    return;
+  }
+
+  await ensureColumn(
+    'booking',
+    'IS_LONG_TERM_STAY',
+    `IS_LONG_TERM_STAY TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'Long-term stay booking - installment payments allowed'`,
+    'REMARKS'
+  );
+
+  await ensureColumn(
+    'booking',
+    'ROOM_CHANGE_NOTE',
+    `ROOM_CHANGE_NOTE VARCHAR(500) NULL DEFAULT NULL COMMENT 'Room change condition note for long-term stay (subject to inquiry)'`,
+    'IS_LONG_TERM_STAY'
+  );
+}
+
 async function runStartupMigrations() {
   console.log('🔄 Running startup database migrations...');
 
   await runFlightScheduleMigrations();
   await runPickupDropMigrations();
+  await runLongTermStayMigrations();
 
   console.log('✅ Startup database migrations complete');
 }

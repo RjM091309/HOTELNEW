@@ -24,6 +24,9 @@ router.get('/flight-arrivals', FlightController.getArrivals);
 // Route to render the unpaid booking page
 router.get('/unpaid', BookingController.renderUnpaidBookingPage);
 
+// Route to render the long-term stay booking page
+router.get('/long-term', BookingController.renderLongTermBookingPage);
+
 // API Routes for booking data
 router.get('/booking_data', BookingController.getBookingDataEnhanced);
 router.get('/booking_details/:bookingID', BookingController.getBookingDetails);
