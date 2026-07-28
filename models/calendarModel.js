@@ -1451,6 +1451,70 @@ class CalendarModel {
     }
   }
 
+  // Remaining rooms per bed type (Single = ROOM_BED 1, Double = ROOM_BED 2) for every
+  // day in the visible calendar range, so the front desk can see both counts at once
+  // instead of checking each date one at a time.
+  static async getRoomBedAvailabilityForCalendar(start, end) {
+    try {
+      const totalsRows = await queryDatabasePromise(
+        `SELECT ROOM_BED, COUNT(*) AS total
+         FROM room
+         WHERE ACTIVE = 1 AND ROOM_STATUS != 3
+         GROUP BY ROOM_BED`
+      );
+      const totals = {};
+      totalsRows.forEach((row) => {
+        totals[row.ROOM_BED] = row.total;
+      });
+
+      const bookingRows = await queryDatabasePromise(
+        `SELECT b.ROOM_ID, r.ROOM_BED,
+                DATE(b.CHECK_IN_DATE) AS checkIn,
+                DATE(b.CHECK_OUT_DATE) AS checkOut
+         FROM booking b
+         JOIN room r ON b.ROOM_ID = r.IDNo AND r.ACTIVE = 1
+         WHERE b.ACTIVE = 1
+           AND b.BOOKING_STATUS != 'cancelled'
+           AND b.CHECK_IN_DATE < ?
+           AND b.CHECK_OUT_DATE > ?`,
+        [end, start]
+      );
+
+      // occupiedByDate[dateKey][bedType] = Set of room IDs occupied that day
+      const occupiedByDate = {};
+      const rangeStart = new Date(start);
+      const rangeEnd = new Date(end);
+
+      bookingRows.forEach((row) => {
+        const dayStart = new Date(Math.max(new Date(row.checkIn), rangeStart));
+        // A room checking out on a given day is available again that same day
+        const dayEnd = new Date(Math.min(new Date(row.checkOut), rangeEnd));
+
+        for (let d = new Date(dayStart); d < dayEnd; d.setDate(d.getDate() + 1)) {
+          const dateKey = d.toISOString().split('T')[0];
+          if (!occupiedByDate[dateKey]) occupiedByDate[dateKey] = {};
+          if (!occupiedByDate[dateKey][row.ROOM_BED]) occupiedByDate[dateKey][row.ROOM_BED] = new Set();
+          occupiedByDate[dateKey][row.ROOM_BED].add(row.ROOM_ID);
+        }
+      });
+
+      const availability = {};
+      for (let d = new Date(rangeStart); d < rangeEnd; d.setDate(d.getDate() + 1)) {
+        const dateKey = d.toISOString().split('T')[0];
+        const occupiedForDate = occupiedByDate[dateKey] || {};
+        availability[dateKey] = {
+          single: Math.max((totals[1] || 0) - (occupiedForDate[1]?.size || 0), 0),
+          double: Math.max((totals[2] || 0) - (occupiedForDate[2]?.size || 0), 0)
+        };
+      }
+
+      return availability;
+    } catch (error) {
+      console.error('❌ Model error in getRoomBedAvailabilityForCalendar:', error);
+      throw error;
+    }
+  }
+
   // Get Unassigned Rooms for FullCalendar
   static async getUnassignedRoomsForCalendar(start, end) {
     try {

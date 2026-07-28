@@ -6,6 +6,18 @@
 
 <!-- Custom CSS for table alignment and height -->
 <style>
+  /* FullCalendar's default #ddd grid border is meant for a light theme - against this
+     page's dark background it reads as a thick, high-contrast line. Soften it. */
+  .fc-unthemed .fc-content,
+  .fc-unthemed .fc-divider,
+  .fc-unthemed .fc-row,
+  .fc-unthemed tbody,
+  .fc-unthemed td,
+  .fc-unthemed th,
+  .fc-unthemed thead {
+    border-color: rgba(255, 255, 255, 0.08) !important;
+  }
+
   .available-rooms-table th,
   .available-rooms-table td {
     text-align: center !important;
@@ -40,6 +52,52 @@
   .col-lg-8 .card,
   .col-lg-4 .card {
     height: 100%;
+  }
+
+  /* Anchored to the bottom-right of the day cell (dayRender sets position:relative on the cell) */
+  .bed-availability-badge {
+    position: absolute;
+    right: 6px;
+    bottom: 4px;
+    pointer-events: none;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  }
+
+  .bed-chip {
+    display: inline;
+  }
+
+  .bed-chip-single {
+    color: #f0b429;
+  }
+
+  .bed-chip-double {
+    color: #22d3ee;
+  }
+
+  .bed-availability-sep {
+    color: #6b7680;
+    margin: 0 4px;
+  }
+
+  [data-theme="white"] .bed-availability-badge {
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.7);
+  }
+
+  [data-theme="white"] .bed-chip-single {
+    color: #b8790a;
+  }
+
+  [data-theme="white"] .bed-chip-double {
+    color: #0c8599;
+  }
+
+  [data-theme="white"] .bed-availability-sep {
+    color: #9aa4ac;
   }
 </style>
 
@@ -99,7 +157,7 @@
                   </div>
                 </div>
               </div>
-              
+
               <!-- Help Message -->
               <!-- <div class="alert alert-info mb-3" style="font-size: 12px;">
                 <i class="fa fa-info-circle"></i>

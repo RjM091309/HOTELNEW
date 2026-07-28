@@ -120,9 +120,49 @@ function initCalendar() {
       const dateStr = info.event.id || formatLocalDateKey(info.event.start);
       openUnassignedRoomsPanel(dateStr);
     },
+
+    // NOTE: this calendar runs FullCalendar v4 - use dayRender/datesRender (not the
+    // v5 dayCellDidMount/datesSet names) for day-cell and view-range hooks.
+    dayRender: function (info) {
+      if (info.el.querySelector('.bed-availability-badge')) return; // already rendered
+      const dateKey = formatLocalDateKey(info.date);
+      if (getComputedStyle(info.el).position === 'static') {
+        info.el.style.position = 'relative';
+      }
+      const badge = document.createElement('div');
+      badge.className = 'bed-availability-badge';
+      badge.setAttribute('data-date', dateKey);
+      badge.textContent = '';
+      info.el.appendChild(badge);
+    },
+
+    datesRender: function (info) {
+      const startStr = formatLocalDateKey(info.view.activeStart);
+      const endStr = formatLocalDateKey(info.view.activeEnd);
+      fetchRoomBedAvailability(startStr, endStr);
+    },
   });
 
   calendar.render();
+}
+
+// Remaining Single/Double bed rooms per day, shown as a small badge under each date
+function fetchRoomBedAvailability(startStr, endStr) {
+  fetch(`/calendar/api/room-bed-availability?start=${startStr}&end=${endStr}`)
+    .then((response) => response.json())
+    .then((data) => {
+      if (!data.success || !data.availability) return;
+
+      Object.keys(data.availability).forEach((dateKey) => {
+        const badge = document.querySelector(`.bed-availability-badge[data-date="${dateKey}"]`);
+        if (!badge) return;
+        const { single, double } = data.availability[dateKey];
+        badge.innerHTML = `<span class="bed-chip bed-chip-single">S ${single}</span><span class="bed-availability-sep">&middot;</span><span class="bed-chip bed-chip-double">D ${double}</span>`;
+      });
+    })
+    .catch((err) => {
+      console.error('Error fetching room bed availability:', err);
+    });
 }
 
 function fetchUnassignedRoomEvents(fetchInfo, successCallback, failureCallback) {
@@ -145,8 +185,8 @@ function fetchUnassignedRoomEvents(fetchInfo, successCallback, failureCallback) 
           start: event.start,
           title: event.title,
           allDay: true,
-          backgroundColor: hasUnassigned ? '#16da43' : '#6c757d', // Gray for previously unassigned but now assigned, Green for currently unassigned
-          borderColor: hasUnassigned ? '#16da43' : '#6c757d',
+          backgroundColor: hasUnassigned ? '#6f9c40' : '#6c757d', // Gray for previously unassigned but now assigned, Green for currently unassigned
+          borderColor: hasUnassigned ? '#6f9c40' : '#6c757d',
           extendedProps: event.extendedProps || {}
         };
       });

@@ -875,6 +875,26 @@ class CalendarController {
     }
   }
 
+  // Remaining Single/Double bed rooms per day, for the Unassigned Rooms calendar
+  static async getRoomBedAvailabilityForCalendar(req, res) {
+    try {
+      const { start, end } = req.query;
+
+      if (!start || !end) {
+        return res.status(400).json({ success: false, message: 'Missing start or end date.' });
+      }
+
+      const availability = await CalendarModel.getRoomBedAvailabilityForCalendar(start, end);
+      res.json({ success: true, availability });
+    } catch (error) {
+      console.error('Error fetching room bed availability for calendar:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error'
+      });
+    }
+  }
+
   // Get detailed Unassigned Rooms for a specific date
   static async getDetailedUnassignedRooms(req, res) {
     try {

@@ -73,6 +73,7 @@ router.post('/api/check-in-reservation',
 // Unassigned Rooms API endpoints
 router.get('/api/unassigned-rooms', CalendarController.getUnassignedRoomsForCalendar);
 router.get('/api/unassigned-rooms/details', CalendarController.getDetailedUnassignedRooms);
+router.get('/api/room-bed-availability', CalendarController.getRoomBedAvailabilityForCalendar);
 
 // Transfer routes for room transfer functionality - with security
 router.get('/transfer-available-rooms', 
