@@ -26,6 +26,9 @@ router.get('/breakdown/:bookingId', paymentsController.breakdown);
 // Printable breakdown receipt
 router.get('/breakdown-receipt/:bookingId', paymentsController.breakdownReceipt);
 
+// Blank printable payment receipt
+router.get('/receipt/blank', paymentsController.blankReceipt);
+
 // Group booking breakdown
 router.get('/group-breakdown/:bookingId', paymentsController.groupBreakdown);
 

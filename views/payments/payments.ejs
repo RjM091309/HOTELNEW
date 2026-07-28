@@ -384,42 +384,17 @@
       return;
     }
 
-    const existingFrame = document.getElementById('breakdownReceiptPrintFrame');
-    if (existingFrame) existingFrame.remove();
-
     let printUrl = `/payments/breakdown-receipt/${currentBreakdownBookingId}?embed=1`;
     if (selectedPaymentIds.length > 0) {
       printUrl += `&paymentIds=${encodeURIComponent(selectedPaymentIds.join(','))}`;
     }
 
-    fetch(printUrl, { credentials: 'same-origin' })
-      .then(function (response) {
-        if (!response.ok) throw new Error('Failed to load receipt');
-        return response.text();
-      })
-      .then(function (html) {
-        const iframe = document.createElement('iframe');
-        iframe.id = 'breakdownReceiptPrintFrame';
-        iframe.setAttribute('style', 'position:fixed;top:0;left:0;width:0;height:0;border:0;visibility:hidden;');
-        document.body.appendChild(iframe);
+    if (typeof printPaymentReceipt === 'function') {
+      printPaymentReceipt(printUrl);
+      return;
+    }
 
-        const frameWindow = iframe.contentWindow;
-        const frameDoc = iframe.contentDocument || frameWindow.document;
-        frameDoc.open();
-        frameDoc.write(html);
-        frameDoc.close();
-
-        setTimeout(function () {
-          frameWindow.focus();
-          frameWindow.print();
-          setTimeout(function () {
-            if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-          }, 1000);
-        }, 200);
-      })
-      .catch(function () {
-        Swal.fire('Error', 'Failed to load breakdown receipt for printing', 'error');
-      });
+    window.open(printUrl.replace('embed=1', ''), '_blank');
   }
 
   function showTodayPaidModal(range = 'today') {

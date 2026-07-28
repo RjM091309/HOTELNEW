@@ -2,6 +2,71 @@ const fs = require('fs').promises;
 const path = require('path');
 const paymentsModel = require('../models/paymentsModel');
 
+async function loadReceiptLogo() {
+  try {
+    const logoPath = path.join(__dirname, '../public/img/Logo-Black.png');
+    const logoBuf = await fs.readFile(logoPath);
+    return `data:image/png;base64,${logoBuf.toString('base64')}`;
+  } catch (_) {
+    return '';
+  }
+}
+
+function formatPaymentMethodLabel(method) {
+  const labels = {
+    cash: 'Cash',
+    credit_card: 'Credit Card',
+    credit: 'Credit',
+    marker: 'Credit',
+    check: 'Check',
+    bank_transfer: 'Bank Transfer'
+  };
+  const key = (method || '').toLowerCase();
+  return labels[key] || method || '';
+}
+
+function buildReceiptDataFromPayments(booking, payments, processedBy) {
+  const totalAmount = payments.reduce((sum, payment) => sum + Number(payment.AMOUNT_PAID || 0), 0);
+  const methods = [...new Set(payments.map((payment) => (payment.PAYMENT_METHOD || '').toLowerCase()).filter(Boolean))];
+  const primaryMethod = methods.length === 1 ? methods[0] : (methods[0] || '');
+
+  const purposeParts = [];
+  if (booking.CONFIRMATION_NUMBER) {
+    purposeParts.push(`Booking Confirmation: ${booking.CONFIRMATION_NUMBER}`);
+  }
+  if (booking.ROOM_NUMBER) {
+    purposeParts.push(`Room: ${booking.ROOM_NUMBER}`);
+  }
+
+  payments.forEach((payment) => {
+    const paymentDate = payment.PAYMENT_DATE
+      ? new Date(payment.PAYMENT_DATE).toLocaleString('en-US')
+      : '';
+    const methodLabel = formatPaymentMethodLabel(payment.PAYMENT_METHOD);
+    const amount = Number(payment.AMOUNT_PAID || 0).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+    purposeParts.push(`${payment.PAYMENT_TYPE || 'Payment'} - ${methodLabel} - PHP ${amount}${paymentDate ? ` (${paymentDate})` : ''}`);
+  });
+
+  const receiptNo = payments.length === 1
+    ? `RCP-${payments[0].IDNo}`
+    : `RCP-${booking.BOOKING_ID}-${Date.now().toString().slice(-6)}`;
+
+  return {
+    isBlank: false,
+    receiptNo,
+    receiptDate: payments[0]?.PAYMENT_DATE || new Date(),
+    receivedFrom: booking.GUEST_NAME || '',
+    amountPaid: totalAmount,
+    paymentMethod: primaryMethod,
+    paymentMethodLabel: methods.length > 1 ? methods.map(formatPaymentMethodLabel).join(', ') : formatPaymentMethodLabel(primaryMethod),
+    purpose: purposeParts.join('\n'),
+    receivedBy: processedBy || payments[0]?.NAME || ''
+  };
+}
+
 const paymentsController = {
   renderPaymentsPage: async (req, res) => {
     try {
@@ -166,14 +231,7 @@ const paymentsController = {
       const result = await paymentsModel.bookingBreakdown(bookingId);
       if (!result) return res.status(404).send('Booking not found');
 
-      let logoUrl = '';
-      try {
-        const logoPath = path.join(__dirname, '../public/img/Logo-Black.png');
-        const logoBuf = await fs.readFile(logoPath);
-        logoUrl = `data:image/png;base64,${logoBuf.toString('base64')}`;
-      } catch (_) {
-        logoUrl = '';
-      }
+      const logoUrl = await loadReceiptLogo();
 
       const paymentIdsParam = req.query.paymentIds || '';
       const selectedPaymentIds = paymentIdsParam
@@ -187,19 +245,48 @@ const paymentsController = {
         payments = payments.filter((payment) => selectedSet.has(Number(payment.IDNo)));
       }
 
-      res.render('payments/breakdown_receipt', {
+      if (!payments.length) {
+        return res.status(400).send('No payments selected for receipt');
+      }
+
+      const receiptData = buildReceiptDataFromPayments(
+        result.booking,
+        payments,
+        req.user?.FULLNAME || ''
+      );
+
+      res.render('payments/payment_receipt', {
         layout: false,
         embed: req.query.embed === '1',
         logoUrl,
-        generatedAt: new Date(),
-        bookingData: result.booking,
-        services: result.services || [],
-        extensions: result.extensions || [],
-        payments
+        ...receiptData
       });
     } catch (err) {
       console.error('Error rendering breakdown receipt:', err);
       res.status(500).send('Failed to load breakdown receipt');
+    }
+  },
+
+  blankReceipt: async (req, res) => {
+    try {
+      const logoUrl = await loadReceiptLogo();
+      res.render('payments/payment_receipt', {
+        layout: false,
+        embed: req.query.embed === '1',
+        logoUrl,
+        isBlank: true,
+        receiptNo: '',
+        receiptDate: '',
+        receivedFrom: '',
+        amountPaid: '',
+        paymentMethod: '',
+        paymentMethodLabel: '',
+        purpose: '',
+        receivedBy: ''
+      });
+    } catch (err) {
+      console.error('Error rendering blank receipt:', err);
+      res.status(500).send('Failed to load payment receipt');
     }
   },
 
