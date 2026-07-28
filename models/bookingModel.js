@@ -295,8 +295,7 @@ class BookingModel {
             COALESCE(u.FULLNAME, 'System') AS ENCODED_BY_NAME,
             b.EDITED_BY,
             COALESCE(u2.FULLNAME, NULL) AS EDITED_BY_NAME,
-            b.IS_LONG_TERM_STAY,
-            b.ROOM_CHANGE_NOTE
+            b.IS_LONG_TERM_STAY
           FROM booking b
             LEFT JOIN customer   c   ON b.CUSTOMER_ID = c.IDNo
             LEFT JOIN agency     a   ON b.AGENCY_ID   = a.IDNo
@@ -1181,8 +1180,7 @@ class BookingModel {
       discount,
       seniorPwdDiscountPercent = 0, // Senior/PWD discount percentage
       lateCheckoutFee,
-      isLongTermStay,
-      roomChangeNote
+      isLongTermStay
     } = bookingData;
 
     try {
@@ -1253,8 +1251,8 @@ class BookingModel {
         // Create booking
         const bookingQuery = `
           INSERT INTO booking
-          (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, REMARKS, CONFIRMATION_NUMBER, NOTIFICATION_READ, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, LATE_CHECKOUT, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, BED_COUNT, FLIGHT_NUMBER, DROPOFF_FLIGHT_NUMBER, PICKUP_DATE, PASSENGER_COUNT, IS_LONG_TERM_STAY, ROOM_CHANGE_NOTE)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, REMARKS, CONFIRMATION_NUMBER, NOTIFICATION_READ, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, LATE_CHECKOUT, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, BED_COUNT, FLIGHT_NUMBER, DROPOFF_FLIGHT_NUMBER, PICKUP_DATE, PASSENGER_COUNT, IS_LONG_TERM_STAY)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const directReservationFlag = isDirectReservation ? 1 : 0;
         // Handle empty agencyID - set to NULL if empty
@@ -1291,8 +1289,7 @@ class BookingModel {
           dropoffServiceId ? (dropoffFlightNumber || null) : null,
           pickupServiceId && pickupDate ? pickupDate : null,
           (pickupServiceId || dropoffServiceId) ? (parseInt(passengerCount) || null) : null,
-          isLongTermStay ? 1 : 0,
-          isLongTermStay ? (roomChangeNote || null) : null
+          isLongTermStay ? 1 : 0
         ];
 
         const bookingResult = await new Promise((resolve, reject) => {

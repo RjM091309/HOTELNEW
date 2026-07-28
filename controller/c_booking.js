@@ -580,8 +580,7 @@ class BookingController {
       seniorPwdDiscount = 0, // Senior/PWD discount amount
       seniorPwdDiscountPercent = 0, // Senior/PWD discount percentage
       lateCheckoutFee,
-      isLongTermStay,
-      roomChangeNote
+      isLongTermStay
     } = req.body;
 
       const encodedBy = req.user.userId; // Use JWT user ID instead of session
@@ -747,8 +746,7 @@ class BookingController {
         discount: totalDiscountNum, // Pass combined discount (seniorPwdDiscount + discount)
         seniorPwdDiscountPercent, // Pass percentage for storage
         lateCheckoutFee,
-        isLongTermStay: isLongTermStay == 1 || isLongTermStay === 'true' || isLongTermStay === true,
-        roomChangeNote: roomChangeNote && String(roomChangeNote).trim() !== '' ? String(roomChangeNote).trim() : null
+        isLongTermStay: isLongTermStay == 1 || isLongTermStay === 'true' || isLongTermStay === true
       });
 
 

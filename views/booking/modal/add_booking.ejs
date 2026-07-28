@@ -325,10 +325,6 @@
                                   <input class="form-check-input" type="checkbox" id="includeLongTermStay" name="isLongTermStay">
                                   <label class="form-check-label" for="includeLongTermStay">Long-Term Stay (installment payments allowed)</label>
                                 </div>
-                                <div id="longTermStayWrapper" class="form-group" style="display: none;">
-                                  <label class="form-label">Room Change Condition <span class="text-muted" style="font-size: 11px;">(subject to inquiry)</span></label>
-                                  <textarea class="form-control" id="roomChangeNote" name="roomChangeNote" rows="2" placeholder="e.g. Room change allowed only after inquiry with management"></textarea>
-                                </div>
                               </div>
 
                               <!-- Discount Section -->
@@ -515,17 +511,8 @@
 // ================================
 (function(){
     $(document).ready(function(){
-        $('#includeLongTermStay').on('change', function(){
-            $('#longTermStayWrapper').toggle(this.checked);
-            if (!this.checked) {
-                $('#roomChangeNote').val('');
-            }
-        });
-
         $('#modal-addbooking').on('hidden.bs.modal', function(){
             $('#includeLongTermStay').prop('checked', false);
-            $('#longTermStayWrapper').hide();
-            $('#roomChangeNote').val('');
         });
     });
 })();

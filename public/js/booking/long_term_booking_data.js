@@ -86,7 +86,6 @@ $(document).ready(function () {
                         BookingStatus: item.BookingStatus,
                         IsDirectReservation: item.IS_DIRECT_RESERVATION,
                         IsLongTermStay: item.IS_LONG_TERM_STAY,
-                        RoomChangeNote: item.ROOM_CHANGE_NOTE || '',
                         BookingRemarks: item.BookingRemarks || '',
                         RemarksCount: item.RemarksCount || 0,
                         CreatedBy: item.ENCODED_BY_NAME || 'System',
@@ -110,10 +109,9 @@ $(document).ready(function () {
             { targets: 9,  width: '70px', className: 'text-center' },
             { targets: 10, width: '70px', className: 'text-center' },
             { targets: 11, width: '70px', className: 'text-center' },
-            { targets: 12, width: '140px' },                          // Room Change Condition
-            { targets: 13, width: '100px', className: 'text-center' }, // Created By
-            { targets: 14, width: '100px', className: 'text-center' }, // Edited By
-            { targets: 15, width: '120px', className: 'text-center' }  // Action
+            { targets: 12, width: '100px', className: 'text-center' }, // Created By
+            { targets: 13, width: '100px', className: 'text-center' }, // Edited By
+            { targets: 14, width: '120px', className: 'text-center' }  // Action
         ],
         initComplete: function () {
             $('#booking_tbl thead th').addClass('text-center');
@@ -215,13 +213,6 @@ $(document).ready(function () {
                 visible: true,
                 className: 'text-center',
                 render: function (data) { return data; }
-            },
-            {
-                data: 'RoomChangeNote',
-                title: 'ROOM CHANGE CONDITION',
-                render: function (data) {
-                    return data && data.trim() !== '' ? data : '<span style="color:#888;">Inquire with management</span>';
-                }
             },
             {
                 data: 'CreatedBy',
