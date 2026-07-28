@@ -5,6 +5,23 @@ var day = date.getDate();
 var month = date.getMonth();
 var year = date.getFullYear();
 
+function parseCalendarDate(dateStr) {
+  const parts = String(dateStr).split('T')[0].split('-').map(Number);
+  return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+
+function formatLocalDateKey(date) {
+  if (typeof date === 'string') {
+    const datePart = date.split('T')[0];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return datePart;
+  }
+  const d = date instanceof Date ? date : new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 (this.$eventModal = $("#event-modal")),
 
 $(document).ready(function () {
@@ -26,10 +43,11 @@ $(document).ready(function () {
 
 // Function to open side panel with unassigned rooms for a specific date
 function openUnassignedRoomsPanel(date) {
-  const formattedDate = new Date(date).toLocaleDateString('en-US', { 
-    month: 'long', 
-    day: 'numeric', 
-    year: 'numeric' 
+  const dateKey = formatLocalDateKey(date);
+  const formattedDate = parseCalendarDate(dateKey).toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
   });
 
   // Open the side panel and show loading message
@@ -38,7 +56,7 @@ function openUnassignedRoomsPanel(date) {
   $('.side-panel .content').html(`<p>Loading Unassigned Room details...</p>`);
 
   // Fetch detailed Unassigned Room for the clicked date
-  fetch(`/calendar/api/unassigned-rooms/details?date=${date}`)
+  fetch(`/calendar/api/unassigned-rooms/details?date=${dateKey}`)
     .then((response) => response.json())
     .then((data) => {
 
@@ -98,27 +116,8 @@ function initCalendar() {
       // Prevent default behavior
       info.jsEvent.preventDefault();
       info.jsEvent.stopPropagation();
-      
-      // Get the date from the event
-      const eventDate = info.event.start;
-      let dateStr;
-      
-      // Handle different date formats
-      if (eventDate instanceof Date) {
-        // Format as YYYY-MM-DD
-        const year = eventDate.getFullYear();
-        const month = String(eventDate.getMonth() + 1).padStart(2, '0');
-        const day = String(eventDate.getDate()).padStart(2, '0');
-        dateStr = `${year}-${month}-${day}`;
-      } else if (typeof eventDate === 'string') {
-        // If it's already a string, use it directly
-        dateStr = eventDate.split('T')[0]; // Remove time if present
-      } else {
-        // Fallback: try to convert
-        dateStr = new Date(eventDate).toISOString().split('T')[0];
-      }
-      
-      // Open the side panel with unassigned rooms for this date
+
+      const dateStr = info.event.id || formatLocalDateKey(info.event.start);
       openUnassignedRoomsPanel(dateStr);
     },
   });
@@ -223,8 +222,16 @@ function renderDirectReservationDetails(booking, index, rooms) {
 
 // Format date for display
 function formatDateTime(dateString) {
-  const date = new Date(dateString);
+  if (!dateString) return '';
 
+  const str = String(dateString);
+  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::\d{2})?)?/);
+  if (match) {
+    const [, year, month, day, hours = '00', minutes = '00'] = match;
+    return `${month}/${day}/${year} ${hours}:${minutes}`;
+  }
+
+  const date = new Date(dateString);
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   const year = date.getFullYear();

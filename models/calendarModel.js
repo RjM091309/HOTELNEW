@@ -1458,6 +1458,7 @@ class CalendarModel {
       
       const query = `
         SELECT 
+          DATE_FORMAT(b.CHECK_IN_DATE, '%Y-%m-%d') AS checkInDateKey,
           b.CHECK_IN_DATE AS checkInDate,
           b.CHECK_OUT_DATE AS checkOutDate,
           COALESCE(r.ROOM_NUMBER, 'Unassigned') AS roomNumber,
@@ -1489,11 +1490,10 @@ class CalendarModel {
       const dateUnassigned = {};
       
       results.forEach((booking) => {
-        const checkInDate = new Date(booking.checkInDate);
+        const formattedDate = booking.checkInDateKey;
         const isUnassigned = booking.roomNumber === 'Unassigned' || booking.isDirectReservation === 1;
 
         // Only show event on check-in date for monitoring purposes
-        const formattedDate = checkInDate.toISOString().split('T')[0];
         dateCounts[formattedDate] = (dateCounts[formattedDate] || 0) + 1;
         
         // Track if any reservation on this date is unassigned (currently or was previously)
@@ -1534,8 +1534,8 @@ class CalendarModel {
           b.ROOM_ID AS room_id,
           COALESCE(r.ROOM_NUMBER, 'Unassigned') AS room_number,
           IFNULL(c.NAME, 'Guest') AS customer_name,
-          b.CHECK_IN_DATE AS checkin_date,
-          b.CHECK_OUT_DATE AS checkout_date,
+          DATE_FORMAT(b.CHECK_IN_DATE, '%Y-%m-%d %H:%i:%s') AS checkin_date,
+          DATE_FORMAT(b.CHECK_OUT_DATE, '%Y-%m-%d %H:%i:%s') AS checkout_date,
           b.CONFIRMATION_NUMBER AS confirmation_number,
           b.GUESTS_COUNT AS guests_count,
           DATE_FORMAT(b.ENCODED_DT, '%Y-%m-%d %H:%i:%s') AS booking_time,
