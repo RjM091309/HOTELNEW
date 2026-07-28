@@ -656,14 +656,6 @@ $(document).ready(function () {
     // Initialize flatpickr
     initializeFlatpickr();
 
-    if ($('#pickupDate').length && !$('#pickupDate')[0]._flatpickr) {
-        flatpickr('#pickupDate', {
-            dateFormat: 'Y-m-d',
-            allowInput: true,
-            clickOpens: true
-        });
-    }
-
     // Event listeners for breakfast quantity and price changes
     $(document).on('input', '#breakfastAdultQty, #breakfastKidQty, #breakfastAdultPrice, #breakfastKidPrice', toggleBreakfastTotalDisplay);
 
@@ -683,11 +675,9 @@ $(document).ready(function () {
         const needsFlightInfo = pickupChecked || dropoffChecked;
         $('#pickupDropoffFlightInfo').toggle(needsFlightInfo);
         $('#flightNumberWrapper').toggle(pickupChecked);
-        $('#pickupDateWrapper').toggle(pickupChecked);
         $('#dropoffFlightNumberWrapper').toggle(dropoffChecked);
         if (!pickupChecked) {
             $('#flightNumber').val('');
-            $('#pickupDate').val('');
         }
         if (!dropoffChecked) {
             $('#dropoffFlightNumber').val('');

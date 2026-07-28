@@ -119,6 +119,29 @@ class BookingController {
     }
   }
 
+  // Render the long-term stay booking page
+  static async renderLongTermBookingPage(req, res) {
+    try {
+      const user = req.user ? {
+        FULLNAME: req.user.FULLNAME,
+        PERMISSIONS: req.user.PERMISSIONS
+      } : null;
+
+      res.render('booking/long_term_booking', {
+        title: 'Long-Term Stay Bookings',
+        subTitle: 'Long-Term Stay Bookings',
+        activePage: 'booking',
+        user: user
+      });
+    } catch (error) {
+      console.error('Error rendering long-term booking page:', error);
+      res.status(500).render('error/500', {
+        title: 'Server Error',
+        subTitle: '500 Error'
+      });
+    }
+  }
+
   // Get booking data for DataTables
   static async getBookingDataEnhanced(req, res) {
     try {
@@ -556,7 +579,9 @@ class BookingController {
       discount,
       seniorPwdDiscount = 0, // Senior/PWD discount amount
       seniorPwdDiscountPercent = 0, // Senior/PWD discount percentage
-      lateCheckoutFee
+      lateCheckoutFee,
+      isLongTermStay,
+      roomChangeNote
     } = req.body;
 
       const encodedBy = req.user.userId; // Use JWT user ID instead of session
@@ -721,7 +746,9 @@ class BookingController {
         reservationFee,
         discount: totalDiscountNum, // Pass combined discount (seniorPwdDiscount + discount)
         seniorPwdDiscountPercent, // Pass percentage for storage
-        lateCheckoutFee
+        lateCheckoutFee,
+        isLongTermStay: isLongTermStay == 1 || isLongTermStay === 'true' || isLongTermStay === true,
+        roomChangeNote: roomChangeNote && String(roomChangeNote).trim() !== '' ? String(roomChangeNote).trim() : null
       });
 
 

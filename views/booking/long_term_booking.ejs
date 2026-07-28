@@ -9,8 +9,8 @@
                         <a class="tab-item" href="/booking/group">Group</a>
                         <a class="tab-item" href="/booking/agency">Agency</a>
                         <a class="tab-item" href="/booking/all">All</a>
-                        <a class="tab-item is-active" href="/booking/unpaid">Unpaid</a>
-                        <a class="tab-item" href="/booking/long-term">Long Term</a>
+                        <a class="tab-item" href="/booking/unpaid">Unpaid</a>
+                        <a class="tab-item is-active" href="/booking/long-term">Long Term</a>
                     </div>
 
                     <div style="flex: 1; display: flex; justify-content: center; margin: 0 20px;">
@@ -21,7 +21,7 @@
                             <button type="button" class="filter-btn" data-filter="thisWeek">This Week</button>
                             <button type="button" class="filter-btn" data-filter="thisMonth">This Month</button>
                         </div>
-                        
+
                         <!-- Custom Date Range Filter with Flatpickr -->
                         <div class="custom-date-filter" style="margin-left: 20px; display: flex; align-items: center; gap: 10px;">
                             <div class="date-picker-container">
@@ -35,10 +35,6 @@
                     </div>
 
                     <div style="flex: 0 0 auto; display: flex; gap: 10px;">
-                        <!-- <button type="button" class="btn btn-success" data-bs-toggle="modal"
-                        data-bs-target="#modal-addbooking"><i class="fa fa-plus"></i> Add
-                            Booking
-                        </button> -->
                         <button type="button" class="btn btn-primary" data-bs-toggle="modal"
                         data-bs-target="#modal-add-group-booking"><i class="fa fa-users"></i> Add
                            Group Booking
@@ -63,6 +59,7 @@
                             <th>BOOKING CHANNEL</th>
                             <th>PAYMENT STATUS</th>
                             <th>BOOKING STATUS</th>
+                            <th>ROOM CHANGE CONDITION</th>
                             <th>CREATED BY</th>
                             <th>EDITED BY</th>
                             <th>ACTION</th>
@@ -83,6 +80,5 @@
 <%- include('../booking/modal/add_booking') %>
 <%- include('../booking/modal/add_group_booking') %>
 
-<script src="/js/booking/unpaid_booking_data.js"></script>
+<script src="/js/booking/long_term_booking_data.js"></script>
 <script src="/js/dashboard/room-menu_data.js"></script>
-

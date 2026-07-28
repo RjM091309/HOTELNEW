@@ -72,6 +72,8 @@ $(document).ready(function () {
       const discountAmount = $('#includeDiscount').is(':checked') ? $('#discountAmount').val() : 0;
       const reservationFeeAmount = $('#includeReservationFee').is(':checked') ? $('#reservationFeeAmount').val() : 0;
       const lateCheckoutFee = $('#lateCheckoutFee').val();
+      const isLongTermStay = $('#includeLongTermStay').is(':checked') ? 1 : 0;
+      const roomChangeNote = isLongTermStay ? $('#roomChangeNote').val() : '';
       console.log('DEBUG Single Booking: lateCheckoutFee =', lateCheckoutFee, 'checkOutStatus =', $('#checkOutStatus').val());
 
       // Validate agency selection if booking route is agency
@@ -137,7 +139,8 @@ $(document).ready(function () {
           breakfastKidQty, breakfastKidPrice, breakfastKidId,
           pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
           flightNumber, dropoffFlightNumber, pickupDate, passengerCount,
-          discount: discountAmount, seniorPwdDiscount, seniorPwdDiscountPercent, reservationFee: reservationFeeAmount, lateCheckoutFee
+          discount: discountAmount, seniorPwdDiscount, seniorPwdDiscountPercent, reservationFee: reservationFeeAmount, lateCheckoutFee,
+          isLongTermStay, roomChangeNote
         },
         success: function (response) {
             console.log('Booking response:', response);
