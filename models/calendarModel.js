@@ -176,6 +176,7 @@ class CalendarModel {
           b.GROUP_BOOKING_ID AS groupBookingId,
           b.BOOKING_CHANNEL AS bookingChannel,
           b.AGENCY_PAYER AS agencyPayer,
+          COALESCE(b.IS_LONG_TERM_STAY, 0) AS isLongTermStay,
           -- Same room, same-day turnover: flags BOTH sides - this booking checking in the same
           -- day another checks out, or this booking checking out the same day another checks in
           EXISTS (
@@ -236,7 +237,8 @@ class CalendarModel {
             groupBookingId: row.groupBookingId,
             bookingChannel: row.bookingChannel || 'walk-in',
             agencyPayer: row.agencyPayer || 'agency',
-            compositeStatus: row.compositeStatus
+            compositeStatus: row.compositeStatus,
+            isLongTermStay: !!row.isLongTermStay
           }
         };
       });

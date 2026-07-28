@@ -1598,11 +1598,12 @@ class BookingModel {
 
         // Add booking remarks to remarks table if bookingRemarks has content
         if (bookingRemarks && bookingRemarks.trim() !== '') {
+          const remarksCategory = isLongTermStay ? 'Long Term' : 'Booking';
           const remarksQuery = `
-            INSERT INTO remarks (BOOKING_ID, CATEGORY, REMARK_TEXT, ENCODED_BY, EDITDED_BY) 
-            VALUES (?, 'Booking', ?, ?, ?)
+            INSERT INTO remarks (BOOKING_ID, CATEGORY, REMARK_TEXT, ENCODED_BY, EDITDED_BY)
+            VALUES (?, '${remarksCategory}', ?, ?, ?)
           `;
-          
+
           await new Promise((resolve, reject) => {
             connection.query(remarksQuery, [bookingId, bookingRemarks.trim(), encodedBy, encodedBy], (err, results) => {
               if (err) {

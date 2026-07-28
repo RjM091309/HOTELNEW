@@ -990,6 +990,26 @@
   transition: all 0.3s ease;
 }
 
+.calendar-legend-item[data-legend-key] {
+  cursor: pointer;
+}
+
+.calendar-legend-item[data-legend-key].legend-item-active {
+  background: rgba(111, 156, 64, 0.18);
+  border-left-color: #6f9c40;
+}
+
+/* Applied to a booking's rendered element on the calendar grid when a legend
+   filter is active and the booking does not match the selected category */
+.legend-dimmed {
+  opacity: 0.15 !important;
+  transition: opacity 0.2s ease;
+}
+
+.legend-color-long-term {
+  background-color: #9c27b0 !important;
+}
+
 /* Removed hover effect that caused movement */
 /* .calendar-legend-item:hover {
   background: rgba(255, 255, 255, 0.08);
@@ -1198,6 +1218,11 @@
 
 [data-theme="white"] .calendar-legend-item {
   background: rgba(0, 0, 0, 0.02) !important;
+}
+
+[data-theme="white"] .calendar-legend-item[data-legend-key].legend-item-active {
+  background: rgba(111, 156, 64, 0.22) !important;
+  border-left-color: #6f9c40 !important;
 }
 
 [data-theme="white"] .calendar-legend-color {

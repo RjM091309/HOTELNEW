@@ -1835,32 +1835,32 @@ function createLegendOverlay() {
       <button class="calendar-legend-toggle" onclick="toggleLegend()">−</button>
     </div>
     <div class="calendar-legend-content">
-      <div class="calendar-legend-item">
+      <div class="calendar-legend-item" data-legend-key="occupied">
         <div class="calendar-legend-color legend-color-occupied"></div>
         <span class="calendar-legend-text">Occupied (Checked In)</span>
         <span class="calendar-legend-count" id="legend-count-occupied">0</span>
       </div>
-      <div class="calendar-legend-item">
+      <div class="calendar-legend-item" data-legend-key="late-checkin">
         <div class="calendar-legend-color legend-color-late-checkin"></div>
         <span class="calendar-legend-text">Pending – Late (CI/CO)</span>
         <span class="calendar-legend-count" id="legend-count-late-checkin">0</span>
       </div>
-      <div class="calendar-legend-item">
+      <div class="calendar-legend-item" data-legend-key="regular-checkin">
         <div class="calendar-legend-color legend-color-regular-checkin"></div>
         <span class="calendar-legend-text">Pending – Regular (CI/CO)</span>
         <span class="calendar-legend-count" id="legend-count-regular-checkin">0</span>
       </div>
-      <div class="calendar-legend-item">
+      <div class="calendar-legend-item" data-legend-key="back-to-back">
         <div class="calendar-legend-color legend-color-back-to-back"></div>
         <span class="calendar-legend-text">Pending – Back-to-Back</span>
         <span class="calendar-legend-count" id="legend-count-back-to-back">0</span>
       </div>
-      <div class="calendar-legend-item">
+      <div class="calendar-legend-item" data-legend-key="checkout">
         <div class="calendar-legend-color legend-color-checkout"></div>
         <span class="calendar-legend-text">Checked Out</span>
         <span class="calendar-legend-count" id="legend-count-checkout">0</span>
       </div>
-      <div class="calendar-legend-item">
+      <div class="calendar-legend-item" data-legend-key="cancelled">
         <div class="calendar-legend-color legend-color-cancelled"></div>
         <span class="calendar-legend-text">Cancelled</span>
         <span class="calendar-legend-count" id="legend-count-cancelled">0</span>
@@ -1870,99 +1870,187 @@ function createLegendOverlay() {
       <h3 class="calendar-legend-title">Payment Status</h3>
     </div>
     <div class="calendar-legend-content">
-      <div class="calendar-legend-item">
+      <div class="calendar-legend-item" data-legend-key="paid">
         <div class="calendar-legend-color legend-color-paid"></div>
         <span class="calendar-legend-text">Fully Paid</span>
         <span class="calendar-legend-count" id="legend-count-paid">0</span>
       </div>
-      <div class="calendar-legend-item">
+      <div class="calendar-legend-item" data-legend-key="partial">
         <div class="calendar-legend-color legend-color-partial"></div>
         <span class="calendar-legend-text">Partial Payment</span>
         <span class="calendar-legend-count" id="legend-count-partial">0</span>
       </div>
-      <div class="calendar-legend-item">
+      <div class="calendar-legend-item" data-legend-key="unpaid">
         <div class="calendar-legend-color legend-color-unpaid"></div>
         <span class="calendar-legend-text">Unpaid</span>
         <span class="calendar-legend-count" id="legend-count-unpaid">0</span>
       </div>
     </div>
+    <div class="calendar-legend-header">
+      <h3 class="calendar-legend-title">Other</h3>
+    </div>
+    <div class="calendar-legend-content">
+      <div class="calendar-legend-item" data-legend-key="long-term">
+        <div class="calendar-legend-color legend-color-long-term"></div>
+        <span class="calendar-legend-text">Long-Term Stay</span>
+        <span class="calendar-legend-count" id="legend-count-long-term">0</span>
+      </div>
+    </div>
   `;
   
   document.body.appendChild(legendOverlay);
-  
+
   // Add drag functionality to legend
   makeLegendDraggable(legendOverlay);
+
+  // Click a legend item to dim every non-matching event on the calendar
+  setupLegendFilterClicks(legendOverlay);
+}
+
+// Classify a calendar event against every legend key.
+// Shared by updateLegendCounts() (tallying) and applyLegendFilter() (dim/highlight),
+// so the two never drift apart.
+function classifyEventForLegend(event) {
+  const status = event.extendedProps?.bookingStatus || '';
+  const backgroundColor = event.backgroundColor || '';
+  const ci = event.extendedProps?.checkInStatus;   // 1=regular,0=late
+  const co = event.extendedProps?.checkOutStatus;  // 0=regular,1=late
+  const paymentStatus = (event.extendedProps?.paymentStatus || 'unpaid').toLowerCase();
+
+  const flags = {
+    'occupied': false,
+    'late-checkin': false,
+    'regular-checkin': false,
+    'back-to-back': false,
+    'checkout': false,
+    'cancelled': false,
+    'paid': false,
+    'partial': false,
+    'unpaid': false,
+    'long-term': !!event.extendedProps?.isLongTermStay
+  };
+
+  // Payment status (skip cancelled bookings, same as the on-event indicator)
+  if (status !== 'cancelled') {
+    if (paymentStatus === 'paid') flags.paid = true;
+    else if (paymentStatus === 'partial') flags.partial = true;
+    else flags.unpaid = true;
+  }
+
+  // Occupied
+  if (status === 'check-In' || backgroundColor === '#12866f') {
+    flags.occupied = true;
+    return flags;
+  }
+  // Checked out
+  if (status === 'check-Out' || backgroundColor === '#B3B3B3' || backgroundColor === '#6c757d') {
+    flags.checkout = true;
+    return flags;
+  }
+  // Cancelled
+  if (status === 'cancelled' || backgroundColor === '#000000') {
+    flags.cancelled = true;
+    return flags;
+  }
+
+  // Pending: determine back-to-back / late / regular based on composite statuses
+  // Priority mirrors applyCompositeStatusStyles: Back-to-Back > Late > Regular
+  if (status === 'pending') {
+    if (event.extendedProps?.isBackToBack) {
+      flags['back-to-back'] = true;
+      return flags;
+    }
+    // If either CI is late (0) or CO is late (1), count as late; otherwise regular
+    const isLate = (ci === 0) || (co === 1) || (ci === undefined && co === undefined && backgroundColor === '#e0a316');
+    if (isLate) flags['late-checkin'] = true; else flags['regular-checkin'] = true;
+  }
+
+  return flags;
 }
 
 function updateLegendCounts() {
   if (!calendar) return;
-  
+
   const events = calendar.getEvents();
   const counts = {
     occupied: 0,
-    lateCheckin: 0,
-    regularCheckin: 0,
-    backToBack: 0,
+    'late-checkin': 0,
+    'regular-checkin': 0,
+    'back-to-back': 0,
     checkout: 0,
     cancelled: 0,
     paid: 0,
     partial: 0,
-    unpaid: 0
+    unpaid: 0,
+    'long-term': 0
   };
 
   events.forEach(event => {
-    const status = event.extendedProps?.bookingStatus || '';
-    const backgroundColor = event.backgroundColor || '';
-    const ci = event.extendedProps?.checkInStatus;   // 1=regular,0=late
-    const co = event.extendedProps?.checkOutStatus;  // 0=regular,1=late
-
-    // Payment status tally (skip cancelled bookings, same as the on-event indicator)
-    if (status !== 'cancelled') {
-      const paymentStatus = (event.extendedProps?.paymentStatus || 'unpaid').toLowerCase();
-      if (paymentStatus === 'paid') counts.paid++;
-      else if (paymentStatus === 'partial') counts.partial++;
-      else counts.unpaid++;
-    }
-
-    // Occupied
-    if (status === 'check-In' || backgroundColor === '#12866f') {
-      counts.occupied++;
-      return;
-    }
-    // Checked out
-    if (status === 'check-Out' || backgroundColor === '#B3B3B3' || backgroundColor === '#6c757d') {
-      counts.checkout++;
-      return;
-    }
-    // Cancelled
-    if (status === 'cancelled' || backgroundColor === '#000000') {
-      counts.cancelled++;
-      return;
-    }
-
-    // Pending: determine back-to-back / late / regular based on composite statuses
-    // Priority mirrors applyCompositeStatusStyles: Back-to-Back > Late > Regular
-    if (status === 'pending') {
-      if (event.extendedProps?.isBackToBack) {
-        counts.backToBack++;
-        return;
-      }
-      // If either CI is late (0) or CO is late (1), count as late; otherwise regular
-      const isLate = (ci === 0) || (co === 1) || (ci === undefined && co === undefined && backgroundColor === '#e0a316');
-      if (isLate) counts.lateCheckin++; else counts.regularCheckin++;
-    }
+    const flags = classifyEventForLegend(event);
+    Object.keys(counts).forEach(key => {
+      if (flags[key]) counts[key]++;
+    });
   });
 
   // Update legend counts
   updateLegendCount('legend-count-occupied', counts.occupied);
-  updateLegendCount('legend-count-late-checkin', counts.lateCheckin);
-  updateLegendCount('legend-count-regular-checkin', counts.regularCheckin);
-  updateLegendCount('legend-count-back-to-back', counts.backToBack);
+  updateLegendCount('legend-count-late-checkin', counts['late-checkin']);
+  updateLegendCount('legend-count-regular-checkin', counts['regular-checkin']);
+  updateLegendCount('legend-count-back-to-back', counts['back-to-back']);
   updateLegendCount('legend-count-checkout', counts.checkout);
   updateLegendCount('legend-count-cancelled', counts.cancelled);
   updateLegendCount('legend-count-paid', counts.paid);
   updateLegendCount('legend-count-partial', counts.partial);
   updateLegendCount('legend-count-unpaid', counts.unpaid);
+  updateLegendCount('legend-count-long-term', counts['long-term']);
+
+  // Re-apply the active dim filter (if any) so newly added/changed events stay in sync
+  applyLegendFilter();
+}
+
+// ============================================================
+// LEGEND CLICK-TO-FILTER (dim non-matching events)
+// ============================================================
+let activeLegendFilterKey = null;
+
+function applyLegendFilter() {
+  if (!calendar) return;
+  const events = calendar.getEvents();
+
+  events.forEach(event => {
+    const el = window.eventElements && window.eventElements[event.id];
+    if (!el) return;
+
+    if (!activeLegendFilterKey) {
+      el.classList.remove('legend-dimmed');
+      return;
+    }
+
+    const flags = classifyEventForLegend(event);
+    if (flags[activeLegendFilterKey]) {
+      el.classList.remove('legend-dimmed');
+    } else {
+      el.classList.add('legend-dimmed');
+    }
+  });
+}
+
+function setLegendFilter(key) {
+  activeLegendFilterKey = (activeLegendFilterKey === key) ? null : key;
+
+  document.querySelectorAll('.calendar-legend-item[data-legend-key]').forEach(item => {
+    item.classList.toggle('legend-item-active', item.getAttribute('data-legend-key') === activeLegendFilterKey);
+  });
+
+  applyLegendFilter();
+}
+
+function setupLegendFilterClicks(legendOverlay) {
+  legendOverlay.querySelectorAll('.calendar-legend-item[data-legend-key]').forEach(item => {
+    item.addEventListener('click', () => {
+      setLegendFilter(item.getAttribute('data-legend-key'));
+    });
+  });
 }
 
 function updateLegendCount(elementId, count) {

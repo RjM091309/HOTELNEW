@@ -7873,7 +7873,7 @@ function createRemarksModal(bookingId) {
                                             <option value="Booking">Booking</option>
                                             <option value="Billing">Billing</option>
                                             <option value="Payment">Payment</option>
-                                          
+                                            <option value="Long Term">Long Term</option>
                                             <option value="Memo">Memo</option>
                                             <option value="Discount">Discount</option>
                                             <option value="Service">Service</option>
