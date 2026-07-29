@@ -334,6 +334,7 @@
                 <th>Type</th>
                 <th>Method</th>
                 <th class="text-right">Amount</th>
+                <th>Processed by</th>
               </tr>
             </thead>
             <tbody>`;
@@ -350,6 +351,7 @@
             <td>${p.PAYMENT_TYPE}</td>
             <td>${methodLabel}</td>
             <td class="text-right">${Number(p.AMOUNT_PAID).toLocaleString()}</td>
+            <td>${p.NAME || '-'}</td>
           </tr>`;
       });
       html += `</tbody></table></div>`;

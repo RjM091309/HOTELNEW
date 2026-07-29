@@ -154,6 +154,7 @@
         <th>Type</th>
         <th>Method</th>
         <th>Amount</th>
+        <th>Processed by</th>
       </tr>
     </thead>
     <tbody>
@@ -163,6 +164,7 @@
         <td><%= payment.PAYMENT_TYPE || '-' %></td>
         <td><%= methodLabels[(payment.PAYMENT_METHOD || '').toLowerCase()] || payment.PAYMENT_METHOD || 'N/A' %></td>
         <td><%= Number(payment.AMOUNT_PAID || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+        <td><%= payment.NAME || '-' %></td>
       </tr>
       <% }); %>
     </tbody>
