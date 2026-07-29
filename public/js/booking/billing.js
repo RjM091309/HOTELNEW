@@ -1,64 +1,260 @@
-// Function to print only the content within the element with the given ID
-function printDiv(divId) {
-    const printContents = document.getElementById(divId);
-    const originalContents = document.body.innerHTML;
-
-    // Hide buttons before printing
-    const buttons = printContents.querySelectorAll('button');
-    buttons.forEach(button => button.style.display = 'none');
-
-    // Add a "Thank You" message temporarily
-    const thankYouMessage = document.createElement('p');
-    thankYouMessage.textContent = "Thank you for choosing SKY HOTEL. We look forward to welcoming you again!";
-    thankYouMessage.style.textAlign = "center";
-    thankYouMessage.style.fontSize = "16px";
-    thankYouMessage.style.fontWeight = "bold";
-    thankYouMessage.style.marginTop = "20px";
-    printContents.appendChild(thankYouMessage);
-
-    // Print the modified content
-    document.body.innerHTML = printContents.innerHTML;
-    window.print();
-
-    // Restore original content after printing
-    document.body.innerHTML = originalContents;
-    location.reload(); // Reload page to restore modal functionality
+function formatBillingMoney(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '0.00';
+    return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+const BILLING_PAYMENT_TYPE_LABELS = {
+    room: 'Room Payment',
+    extended: 'Extension',
+    service: 'Service',
+    pickdrop: 'Pick-up/Drop-off',
+    reservation_fee: 'Reservation Fee',
+    discount: 'Discount',
+    refund: 'Refund',
+    cancellation_fee: 'Cancellation Fee',
+    security_deposit: 'Security Deposit',
+    security_deposit_refund: 'Security Deposit Refund'
+};
 
+const BILLING_PAYMENT_METHOD_LABELS = {
+    cash: 'Cash',
+    credit_card: 'Credit Card',
+    credit: 'Credit',
+    marker: 'Credit',
+    check: 'Check',
+    bank_transfer: 'Bank Transfer'
+};
 
-// Note: The proceedToPaymentButton event handler is now handled in billing.ejs
-// This ensures proper Payment Summary Card updates
+function formatBillingPaymentType(type) {
+    const key = (type || '').toLowerCase();
+    return BILLING_PAYMENT_TYPE_LABELS[key] || (type || '-');
+}
 
-// Initialize invoice button event listener when modal is shown
-document.addEventListener('DOMContentLoaded', function() {
-    // Use event delegation or attach listener when modal is shown
+function formatBillingPaymentMethod(method) {
+    const key = (method || '').toLowerCase();
+    return BILLING_PAYMENT_METHOD_LABELS[key] || (method || '-');
+}
+
+function formatBillingPaymentDate(value) {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function renderBillingPaymentBreakdown(paymentsArray) {
+    const tbody = document.getElementById('billingPaymentBreakdownBody');
+    const emptyEl = document.getElementById('billingPaymentBreakdownEmpty');
+    const tableWrap = document.querySelector('.payment-breakdown-table-wrap');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    const visiblePayments = (paymentsArray || [])
+        .filter((payment) => payment.PAYMENT_TYPE !== 'discount' && payment.PAYMENT_TYPE !== 'security_deposit')
+        .sort((a, b) => new Date(a.PAYMENT_DATE) - new Date(b.PAYMENT_DATE));
+
+    if (!visiblePayments.length) {
+        if (emptyEl) emptyEl.style.display = 'block';
+        if (tableWrap) tableWrap.style.display = 'none';
+        return;
+    }
+
+    if (emptyEl) emptyEl.style.display = 'none';
+    if (tableWrap) tableWrap.style.display = '';
+
+    visiblePayments.forEach((payment) => {
+        const amount = parseFloat(payment.AMOUNT_PAID) || 0;
+        const isRefund = payment.PAYMENT_TYPE === 'refund' || amount < 0;
+        const typeLabel = formatBillingPaymentType(payment.PAYMENT_TYPE);
+        const remarks = (payment.REMARKS || '').trim();
+        const description = remarks ? `${typeLabel} — ${remarks}` : typeLabel;
+        const methodLabel = formatBillingPaymentMethod(payment.PAYMENT_METHOD);
+        const receivedBy = (payment.NAME || '').trim();
+        const amountClass = isRefund ? 'payment-refund' : 'payment-received';
+        const amountDisplay = isRefund
+            ? `-${formatBillingMoney(Math.abs(amount))}`
+            : formatBillingMoney(amount);
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${formatBillingPaymentDate(payment.PAYMENT_DATE)}</td>
+            <td>${description}${receivedBy ? `<br><span class="payment-received-by">Received by ${receivedBy}</span>` : ''}</td>
+            <td>${methodLabel}</td>
+            <td class="text-end ${amountClass}">${amountDisplay}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function waitForImages(root) {
+    const images = Array.from(root.querySelectorAll('img'));
+    if (!images.length) return Promise.resolve();
+
+    return Promise.all(images.map((img) => {
+        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+        return new Promise((resolve) => {
+            img.addEventListener('load', resolve, { once: true });
+            img.addEventListener('error', resolve, { once: true });
+        });
+    }));
+}
+
+function embedHotelLogo(selector) {
+    const logoImg = document.querySelector(selector);
+    if (!logoImg || logoImg.dataset.embedded === '1') return;
+
+    const logoPath = logoImg.getAttribute('src') || '/img/Logo-Black.png';
+    const absoluteUrl = new URL(logoPath, window.location.origin + '/').href;
+    const preload = new Image();
+
+    preload.onload = function () {
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = preload.naturalWidth;
+            canvas.height = preload.naturalHeight;
+            canvas.getContext('2d').drawImage(preload, 0, 0);
+            logoImg.src = canvas.toDataURL('image/png');
+            logoImg.dataset.embedded = '1';
+        } catch (err) {
+            logoImg.src = absoluteUrl;
+        }
+    };
+
+    preload.onerror = function () {
+        logoImg.src = absoluteUrl;
+    };
+
+    preload.src = absoluteUrl;
+}
+
+function printDiv(divId) {
+    const printRoot = document.getElementById(divId);
+    if (!printRoot) return;
+
+    const origin = window.location.origin;
+    const clone = printRoot.cloneNode(true);
+
+    clone.querySelectorAll('button, .btn-close, .billing-actions').forEach((el) => el.remove());
+
+    const thankYouMessage = document.createElement('p');
+    thankYouMessage.textContent = 'Thank you for choosing Main Stay Hotel. We look forward to welcoming you again!';
+    thankYouMessage.style.cssText = 'text-align:center;font-size:16px;font-weight:bold;margin-top:20px;';
+    clone.appendChild(thankYouMessage);
+
+    clone.querySelectorAll('img').forEach((img) => {
+        const src = img.getAttribute('src');
+        if (src && !src.startsWith('data:') && !src.startsWith('http')) {
+            img.src = new URL(src, origin + '/').href;
+        }
+    });
+
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
+    if (!printWindow) {
+        alert('Please allow pop-ups to print the receipt.');
+        return;
+    }
+
+    const printStyles = `
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: white; color: black; }
+        .modal-header, .billing-actions, .btn-close, .paid-image-overlay { display: none !important; }
+        .row { display: flex; flex-wrap: wrap; gap: 16px; }
+        .col-md-6 { flex: 1 1 45%; min-width: 280px; box-sizing: border-box; }
+        .hotel-logo-container { text-align: left; margin-bottom: 8px; }
+        .hotel-logo { max-width: 180px; max-height: 80px; width: auto; height: auto; object-fit: contain; display: block; margin: 0; }
+        .billing-receipt-container { background: white; color: black; padding: 20px; }
+        .billing-title { font-size: 22px; font-weight: bold; text-align: center; margin-bottom: 16px; }
+        .billing-summary-section { margin: 20px 0; padding: 15px; border: 1px solid #333; }
+        .payment-notes .note-item { margin-bottom: 10px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+        .payment-summary { border: 2px solid #333; padding: 15px; background: #f8f8f8; }
+        .payment-breakdown-block { margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #333; }
+        .payment-breakdown-title { font-weight: bold; font-size: 13px; margin-bottom: 8px; }
+        .payment-breakdown-table { width: 100%; border-collapse: collapse; font-size: 11px; table-layout: fixed; }
+        .payment-breakdown-table thead th { font-weight: bold; padding: 5px 6px; border-bottom: 1px solid #333; text-align: left; }
+        .payment-breakdown-table thead th.text-end { text-align: right; }
+        .payment-breakdown-table tbody td { padding: 5px 6px; vertical-align: top; border-bottom: 1px solid #ddd; word-wrap: break-word; }
+        .payment-breakdown-table tbody tr:last-child td { border-bottom: none; }
+        .payment-breakdown-table .text-end { text-align: right; white-space: nowrap; }
+        .payment-received-by { display: block; font-size: 10px; color: #555; margin-top: 3px; }
+        .payment-breakdown-empty { font-size: 12px; color: #666; font-style: italic; }
+        .summary-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 14px; line-height: 1.25; gap: 16px; }
+        .summary-row.total-row { margin-top: 8px; padding: 10px 0 4px 0; font-weight: bold; }
+        .summary-label { font-weight: 600; flex: 1 1 auto; }
+        .summary-value { font-weight: bold; flex: 0 0 auto; text-align: right; min-width: 88px; padding-right: 2px; }
+        img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .billing-table { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 20px 0; }
+        .billing-table th, .billing-table td { padding: 10px 8px; border: 1px solid #333; box-sizing: border-box; vertical-align: middle; }
+        .billing-table thead th.col-index, .billing-table tbody td.col-index,
+        .billing-table thead th.col-date, .billing-table tbody td.col-date { text-align: center; }
+        .billing-table thead th.col-desc, .billing-table tbody td.col-desc { text-align: left; }
+        .billing-table thead th.col-money, .billing-table tbody td.col-money { text-align: right; font-variant-numeric: tabular-nums; padding-right: 14px; padding-left: 6px; }
+        .billing-table .col-w-index { width: 6%; }
+        .billing-table .col-w-date { width: 13%; }
+        .billing-table .col-w-desc { width: 34%; }
+        .billing-table .col-w-money { width: 15%; }
+        .billing-total-row td { font-weight: bold; }
+        .billing-total-row td.col-total-label { white-space: nowrap; }
+        .billing-total-row td.col-total-amount { white-space: nowrap; padding-right: 16px !important; padding-left: 6px !important; }
+        .billing-total-row td.col-total-label { padding-right: 8px !important; padding-left: 8px !important; }
+        .hotel-info-section, .customer-info-section { margin-bottom: 16px; }
+        .customer-name, .invoice-date { font-size: 14px; }
+    `;
+
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Billing Receipt</title>
+            <base href="${origin}/">
+            <style>${printStyles}</style>
+        </head>
+        <body>${clone.innerHTML}</body>
+        </html>
+    `);
+    printWindow.document.close();
+
+    waitForImages(printWindow.document.body).then(() => {
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+    });
+}
+
+window.printDiv = printDiv;
+window.embedHotelLogo = embedHotelLogo;
+
+function initBillingScript() {
     const modalBilling = document.getElementById('modal-billing');
     if (modalBilling) {
-        // Attach listener when modal is shown
-        modalBilling.addEventListener('shown.bs.modal', function() {
+        embedHotelLogo('#modal-billing .hotel-logo');
+
+        modalBilling.addEventListener('shown.bs.modal', function () {
+            embedHotelLogo('#modal-billing .hotel-logo');
+
             const invoiceBtn = document.getElementById('generateInvoiceBtn');
             if (invoiceBtn) {
-                // Remove any existing event listeners by cloning
                 const newInvoiceBtn = invoiceBtn.cloneNode(true);
                 invoiceBtn.parentNode.replaceChild(newInvoiceBtn, invoiceBtn);
-                
-                // Attach event listener to the new button
-                newInvoiceBtn.addEventListener('click', function() {
-                    const bookingId = document.getElementById('hiddenBookingId').value;
 
+                newInvoiceBtn.addEventListener('click', function () {
+                    const bookingId = document.getElementById('hiddenBookingId').value;
                     if (!bookingId) {
-                        alert("Missing Booking ID!");
+                        alert('Missing Booking ID!');
                         return;
                     }
-
-                    const url = `/booking/generate-invoice/${bookingId}`;
-                    window.open(url, '_blank');
+                    window.open(`/booking/generate-invoice/${bookingId}`, '_blank');
                 });
             }
         });
     }
-}); 
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initBillingScript);
+} else {
+    initBillingScript();
+}
 
 // Unified Billing Loader used across pages (overrides other definitions)
 // This ensures the same content and calculations everywhere
@@ -133,7 +329,7 @@ window.showBilling = async function (bookingID) {
                     const isService = !isRoom && !isPenalty;
                     
                     // Subtotal display (always show numeric value even if cancelled)
-                    let subtotalDisplay = displaySubTotal.toFixed(2);
+                    let subtotalDisplay = formatBillingMoney(displaySubTotal);
                     
                     // Include all items in total (including cancellation fee / penalty items)
                     totalSubtotal += displaySubTotal;
@@ -141,22 +337,22 @@ window.showBilling = async function (bookingID) {
                     rowIndex++;
                     const row = `
                     <tr>
-                    <td class="text-center ${paidTextClass}">${rowIndex}</td>
-                    <td class="text-center ${paidTextClass}">${new Date(item.date).toLocaleDateString()}</td>
-                    <td class="text-center ${paidTextClass}">${item.description}</td>
-                    <td class="text-center ${paidTextClass}">${isSpecialService ? '-' : displayBasePrice.toFixed(2)}</td>
-                    <td class="text-center ${paidTextClass}">${displayQty}</td>
-                    <td class="text-right ${paidTextClass}">${subtotalDisplay}</td>
+                    <td class="col-index ${paidTextClass}">${rowIndex}</td>
+                    <td class="col-date ${paidTextClass}">${new Date(item.date).toLocaleDateString()}</td>
+                    <td class="col-desc ${paidTextClass}">${item.description}</td>
+                    <td class="col-money ${paidTextClass}">${isSpecialService ? '-' : formatBillingMoney(displayBasePrice)}</td>
+                    <td class="col-money ${paidTextClass}">${displayQty}</td>
+                    <td class="col-money ${paidTextClass}">${subtotalDisplay}</td>
                     </tr>`;
                     tbody.insertAdjacentHTML('beforeend', row);
                 });
                 
                 // Add total row at the bottom
                 const totalRow = `
-                    <tr style="background-color: #f8f9fa; font-weight: bold;">
-                        <td colspan="4"></td>
-                        <td class="text-right" style="padding: 12px; white-space: nowrap;"><strong>Total:</strong></td>
-                        <td class="text-right" style="padding: 12px;"><strong>${totalSubtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
+                    <tr class="billing-total-row">
+                        <td colspan="4" class="col-total-spacer"></td>
+                        <td class="col-money col-total-label"><strong>Total:</strong></td>
+                        <td class="col-money col-total-amount"><strong>${formatBillingMoney(totalSubtotal)}</strong></td>
                     </tr>`;
                 tbody.insertAdjacentHTML('beforeend', totalRow);
 
@@ -177,25 +373,16 @@ window.showBilling = async function (bookingID) {
                 
                 // Extract payments array from response - handle both array and object responses
                 const paymentsArray = (paymentsData && paymentsData.data) ? paymentsData.data : (Array.isArray(paymentsData) ? paymentsData : []);
-                
+                renderBillingPaymentBreakdown(paymentsArray);
+
                 const totalPaymentsMade = paymentsArray.reduce((sum, payment) => {
-                    console.log('Payment Record:', {
-                        IDNo: payment.IDNo,
-                        AMOUNT_PAID: payment.AMOUNT_PAID,
-                        PAYMENT_TYPE: payment.PAYMENT_TYPE,
-                        PAYMENT_DATE: payment.PAYMENT_DATE
-                    });
-                    
                     // Exclude reservation_fee, discount, and security_deposit from paid amount
                     if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount' || payment.PAYMENT_TYPE === 'security_deposit') {
-                        console.log('Excluding payment type:', payment.PAYMENT_TYPE);
                         return sum;
                     }
-                    
+
                     return sum + parseFloat(payment.AMOUNT_PAID);
                 }, 0);
-                
-                console.log('Total Payments Made:', totalPaymentsMade);
 
                 // Calculate gross total (before reservation fee and discount)
                 const grossTotal = effectiveSubTotal;
@@ -266,7 +453,7 @@ window.showBilling = async function (bookingID) {
                 
                 const paidAmountLabel = document.getElementById('paidAmountLabel');
                 if (paidAmountLabel) {
-                    paidAmountLabel.textContent = isCancelled ? 'Paid Amount (After Cancellation):' : 'Paid Amount:';
+                    paidAmountLabel.textContent = isCancelled ? 'Total Paid (After Cancellation):' : 'Total Paid:';
                 }
                 
                 // Display Paid Amount & Balance
@@ -420,6 +607,8 @@ window.showBilling = async function (bookingID) {
                 } else {
                     document.getElementById('modal-billing').style.display = 'block';
                 }
+
+                embedHotelLogo('#modal-billing .hotel-logo');
             },
             error: function (err) {
                 console.error('Failed to fetch billing data:', err);

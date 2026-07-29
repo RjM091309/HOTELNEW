@@ -1,0 +1,357 @@
+<div class="row">
+  <div class="col-xl-12 col-md-12 col-12">
+    <div class="dashboard-card">
+      <div class="dashboard-card-header">
+        <header>Receipt</header>
+        <div class="tools">
+          <button type="button" class="btn btn-secondary btn-sm" id="printSelectedReceiptsBtn" title="Print selected receipts" style="display: none;">
+            <i class="fa fa-print"></i> Print
+          </button>
+          <button type="button" class="btn btn-primary-10 btn-sm" id="addReceiptBtn">
+            <i class="fa fa-plus"></i> Add Receipt
+          </button>
+        </div>
+      </div>
+      <div class="dashboard-card-body">
+        <div class="table-scrollable">
+          <table id="receiptsTable" class="table table-hover table-bordered full-width">
+            <thead>
+              <tr>
+                <th class="receipt-select-col text-center">
+                  <input type="checkbox" id="receiptSelectAll" title="Select all" aria-label="Select all receipts">
+                </th>
+                <th>Received From</th>
+                <th>Room No.</th>
+                <th>Date</th>
+                <th>Amount</th>
+                <th>Payment Method</th>
+                <th>Received By</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="addReceiptModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Add Receipt</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="addReceiptForm">
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="addReceivedFrom" class="form-label">Received From</label>
+              <div class="receipt-guest-search-wrap">
+                <input type="text" class="form-control" id="addReceivedFrom" autocomplete="off" required>
+                <div id="addReceivedFromResults" class="receipt-guest-search-results"></div>
+              </div>
+              <small class="text-muted">Search booked guests — room no. auto-fills when assigned</small>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="addRoomNo" class="form-label">Room No.</label>
+              <input type="text" class="form-control" id="addRoomNo" placeholder="e.g. 324" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="addReceiptDate" class="form-label">Date</label>
+              <input type="date" class="form-control" id="addReceiptDate" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="addAmountPaid" class="form-label">Amount Paid (PHP)</label>
+              <input type="number" class="form-control" id="addAmountPaid" min="0" step="0.01" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="addPaymentMethod" class="form-label">Payment Method</label>
+              <select class="form-control" id="addPaymentMethod" required>
+                <option value="cash">Cash</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="check">Check</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="col-md-6 mb-3" id="addPaymentMethodOtherWrap" style="display:none;">
+              <label for="addPaymentMethodOther" class="form-label">Other Payment Method</label>
+              <input type="text" class="form-control" id="addPaymentMethodOther" placeholder="e.g. GCash">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="addReceivedBy" class="form-label">Received By</label>
+              <input type="text" class="form-control" id="addReceivedBy" placeholder="Staff name">
+            </div>
+            <div class="col-md-12 mb-3">
+              <label for="addPurpose" class="form-label">Purpose of Payment</label>
+              <textarea class="form-control" id="addPurpose" rows="3" placeholder="e.g. Room payment, deposit, etc."></textarea>
+            </div>
+            <div class="col-md-12">
+              <small class="text-muted"><i class="fa fa-pencil"></i> Signature is not entered digitally — it will be left blank on print for handwritten signing.</small>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save &amp; Print</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editReceiptModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Receipt</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="editReceiptForm">
+        <input type="hidden" id="editReceiptId">
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="editReceivedFrom" class="form-label">Received From</label>
+              <div class="receipt-guest-search-wrap">
+                <input type="text" class="form-control" id="editReceivedFrom" autocomplete="off" required>
+                <div id="editReceivedFromResults" class="receipt-guest-search-results"></div>
+              </div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="editRoomNo" class="form-label">Room No.</label>
+              <input type="text" class="form-control" id="editRoomNo" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="editReceiptDate" class="form-label">Date</label>
+              <input type="date" class="form-control" id="editReceiptDate" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="editAmountPaid" class="form-label">Amount Paid (PHP)</label>
+              <input type="number" class="form-control" id="editAmountPaid" min="0" step="0.01" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="editPaymentMethod" class="form-label">Payment Method</label>
+              <select class="form-control" id="editPaymentMethod" required>
+                <option value="cash">Cash</option>
+                <option value="bank_transfer">Bank Transfer</option>
+                <option value="check">Check</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="col-md-6 mb-3" id="editPaymentMethodOtherWrap" style="display:none;">
+              <label for="editPaymentMethodOther" class="form-label">Other Payment Method</label>
+              <input type="text" class="form-control" id="editPaymentMethodOther">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="editReceivedBy" class="form-label">Received By</label>
+              <input type="text" class="form-control" id="editReceivedBy">
+            </div>
+            <div class="col-md-12 mb-3">
+              <label for="editPurpose" class="form-label">Purpose of Payment</label>
+              <textarea class="form-control" id="editPurpose" rows="3"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Update</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.defaultReceiptReceivedBy = '<%= (defaultReceivedBy || "").replace(/'/g, "\\'") %>';
+  document.addEventListener('DOMContentLoaded', function () {
+    setTimeout(function () {
+      const script = document.createElement('script');
+      script.src = '/js/payments/receipts.js';
+      document.body.appendChild(script);
+    }, 300);
+  });
+</script>
+
+<style>
+  #addReceiptModal .modal-content,
+  #editReceiptModal .modal-content {
+    background-color: #2a3135;
+    color: #ffffff;
+    border: 1px solid #495057;
+  }
+
+  #addReceiptModal .modal-header,
+  #editReceiptModal .modal-header,
+  #addReceiptModal .modal-body,
+  #editReceiptModal .modal-body,
+  #addReceiptModal .modal-footer,
+  #editReceiptModal .modal-footer {
+    background-color: #2a3135;
+    color: #ffffff;
+  }
+
+  #addReceiptModal .modal-header,
+  #editReceiptModal .modal-header {
+    border-bottom: 1px solid #495057;
+  }
+
+  #addReceiptModal .modal-footer,
+  #editReceiptModal .modal-footer {
+    border-top: 1px solid #495057;
+  }
+
+  #addReceiptModal .modal-title,
+  #editReceiptModal .modal-title,
+  #addReceiptModal .form-label,
+  #editReceiptModal .form-label {
+    color: #ffffff !important;
+    font-weight: 500;
+  }
+
+  #addReceiptModal .form-control,
+  #editReceiptModal .form-control {
+    background-color: #41474c !important;
+    color: #ffffff !important;
+    border: 1px solid #5a6268 !important;
+  }
+
+  #addReceiptModal .form-control::placeholder,
+  #editReceiptModal .form-control::placeholder {
+    color: #c5cdd3 !important;
+    opacity: 1;
+  }
+
+  #addReceiptModal .form-control:focus,
+  #editReceiptModal .form-control:focus {
+    background-color: #4b5359 !important;
+    color: #ffffff !important;
+    border-color: #6c757d !important;
+    box-shadow: 0 0 0 0.15rem rgba(255, 255, 255, 0.12);
+  }
+
+  #addReceiptModal .btn-close,
+  #editReceiptModal .btn-close {
+    filter: invert(1);
+    opacity: 0.85;
+  }
+
+  body.white-sidebar-color #addReceiptModal .modal-content,
+  body.white-sidebar-color #editReceiptModal .modal-content,
+  body.white-sidebar-color #addReceiptModal .modal-header,
+  body.white-sidebar-color #editReceiptModal .modal-header,
+  body.white-sidebar-color #addReceiptModal .modal-body,
+  body.white-sidebar-color #editReceiptModal .modal-body,
+  body.white-sidebar-color #addReceiptModal .modal-footer,
+  body.white-sidebar-color #editReceiptModal .modal-footer {
+    background-color: #ffffff;
+    color: #111827;
+  }
+
+  body.white-sidebar-color #addReceiptModal .modal-title,
+  body.white-sidebar-color #editReceiptModal .modal-title,
+  body.white-sidebar-color #addReceiptModal .form-label,
+  body.white-sidebar-color #editReceiptModal .form-label {
+    color: #111827 !important;
+  }
+
+  body.white-sidebar-color #addReceiptModal .form-control,
+  body.white-sidebar-color #editReceiptModal .form-control {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #d1d5db !important;
+  }
+
+  body.white-sidebar-color #addReceiptModal .btn-close,
+  body.white-sidebar-color #editReceiptModal .btn-close {
+    filter: none;
+  }
+
+  .receipt-guest-search-wrap {
+    position: relative;
+  }
+
+  .receipt-guest-search-results {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 2100;
+    max-height: 220px;
+    overflow-y: auto;
+    background: #41474c;
+    border: 1px solid #5a6268;
+    border-radius: 4px;
+    display: none;
+  }
+
+  .receipt-guest-search-results .guest-result-item {
+    padding: 8px 10px;
+    cursor: pointer;
+    color: #fff;
+    font-size: 13px;
+    border-bottom: 1px solid #5a6268;
+  }
+
+  .receipt-guest-search-results .guest-result-item:last-child {
+    border-bottom: none;
+  }
+
+  .receipt-guest-search-results .guest-result-item:hover,
+  .receipt-guest-search-results .guest-result-item.active {
+    background: #4b5359;
+  }
+
+  .receipt-guest-search-results .guest-result-meta {
+    font-size: 11px;
+    color: #c5cdd3;
+    margin-top: 2px;
+  }
+
+  body.white-sidebar-color .receipt-guest-search-results {
+    background: #ffffff;
+    border-color: #d1d5db;
+  }
+
+  body.white-sidebar-color .receipt-guest-search-results .guest-result-item {
+    color: #111827;
+    border-bottom-color: #e5e7eb;
+  }
+
+  body.white-sidebar-color .receipt-guest-search-results .guest-result-item:hover,
+  body.white-sidebar-color .receipt-guest-search-results .guest-result-item.active {
+    background: #f3f4f6;
+  }
+
+  body.white-sidebar-color .receipt-guest-search-results .guest-result-meta {
+    color: #6b7280;
+  }
+
+  #receiptsTable thead th.receipt-select-col,
+  #receiptsTable tbody td.receipt-select-col {
+    width: 40px;
+    min-width: 40px;
+    max-width: 40px;
+    text-align: center;
+    vertical-align: middle;
+    padding: 8px 4px !important;
+  }
+
+  #receiptsTable thead th.receipt-select-col {
+    padding-right: 4px !important;
+  }
+
+  #receiptsTable thead th.receipt-select-col:before,
+  #receiptsTable thead th.receipt-select-col:after {
+    display: none !important;
+    content: none !important;
+  }
+
+  #receiptsTable thead th.receipt-select-col input[type="checkbox"],
+  #receiptsTable tbody td.receipt-select-col input[type="checkbox"] {
+    margin: 0;
+    vertical-align: middle;
+  }
+</style>

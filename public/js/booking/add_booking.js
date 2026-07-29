@@ -224,28 +224,44 @@ function calculateTotalPrice() {
 // Function to calculate late check-out fee
 function calculateLateCheckoutFee() {
     const checkOutStatus = $('#checkOutStatus').val();
-    
-    // Only calculate if we have valid data
-    if (!checkOutStatus) {
+
+    if (!checkOutStatus || checkOutStatus != 1) {
         $('#lateCheckoutFee').val(0);
+        $('#lateCheckoutFeeInput').val(0);
         $('#lateCheckoutFeeDisplay').hide();
+        computeTotal();
         return;
     }
-    
-    let lateCheckoutFee = 0;
-    
-    if (checkOutStatus == 1) { // Late Check Out
-        lateCheckoutFee = 2000; // ₱2,000 fee for Late Check Out
-        $('#lateCheckoutFeeDisplay').show();
+
+    $('#lateCheckoutFeeDisplay').show();
+    computeTotal();
+}
+
+async function handleLateCheckoutStatusChange(previousStatus) {
+    const $status = $('#checkOutStatus');
+    const status = $status.val();
+
+    if (status == 1) {
+        try {
+            const existingFee = parseFloat($('#lateCheckoutFee').val()) || 0;
+            const fee = await window.promptLateCheckoutFee({
+                defaultAmount: existingFee > 0 ? existingFee : 2000
+            });
+            $('#lateCheckoutFee').val(fee);
+            $('#lateCheckoutFeeInput').val(fee);
+            $('#lateCheckoutFeeDisplay').show();
+        } catch (_) {
+            $status.val(previousStatus || '0');
+            $('#lateCheckoutFee').val(0);
+            $('#lateCheckoutFeeInput').val(0);
+            $('#lateCheckoutFeeDisplay').hide();
+        }
     } else {
-        // Regular Check Out - no fee
+        $('#lateCheckoutFee').val(0);
+        $('#lateCheckoutFeeInput').val(0);
         $('#lateCheckoutFeeDisplay').hide();
     }
-    
-    $('#lateCheckoutFee').val(lateCheckoutFee);
-    $('#lateCheckoutFeeInput').val(lateCheckoutFee);
-    
-    // Recalculate total to include late check-out fee
+
     computeTotal();
 }
 
@@ -1265,8 +1281,13 @@ $(document).ready(function () {
     );
 
     // Calculate late check-out fee when check-out status changes
-    $('#checkOutStatus').on('change', function() {
-        calculateLateCheckoutFee();
+    let previousCheckoutStatus = $('#checkOutStatus').val();
+    $('#checkOutStatus').on('focus', function () {
+        previousCheckoutStatus = $(this).val();
+    });
+    $('#checkOutStatus').on('change', async function () {
+        await handleLateCheckoutStatusChange(previousCheckoutStatus);
+        previousCheckoutStatus = $(this).val();
     });
 
     // Calculate late check-out fee when modal opens

@@ -1,29 +1,8 @@
-const fs = require('fs').promises;
-const path = require('path');
 const paymentsModel = require('../models/paymentsModel');
-
-async function loadReceiptLogo() {
-  try {
-    const logoPath = path.join(__dirname, '../public/img/Logo-Black.png');
-    const logoBuf = await fs.readFile(logoPath);
-    return `data:image/png;base64,${logoBuf.toString('base64')}`;
-  } catch (_) {
-    return '';
-  }
-}
-
-function formatPaymentMethodLabel(method) {
-  const labels = {
-    cash: 'Cash',
-    credit_card: 'Credit Card',
-    credit: 'Credit',
-    marker: 'Credit',
-    check: 'Check',
-    bank_transfer: 'Bank Transfer'
-  };
-  const key = (method || '').toLowerCase();
-  return labels[key] || method || '';
-}
+const {
+  formatPaymentMethodLabel,
+  getReceiptRenderContext
+} = require('../helpers/receiptHelpers');
 
 function buildReceiptDataFromPayments(booking, payments, processedBy) {
   const totalAmount = payments.reduce((sum, payment) => sum + Number(payment.AMOUNT_PAID || 0), 0);
@@ -231,8 +210,6 @@ const paymentsController = {
       const result = await paymentsModel.bookingBreakdown(bookingId);
       if (!result) return res.status(404).send('Booking not found');
 
-      const logoUrl = await loadReceiptLogo();
-
       const paymentIdsParam = req.query.paymentIds || '';
       const selectedPaymentIds = paymentIdsParam
         .split(',')
@@ -255,38 +232,11 @@ const paymentsController = {
         req.user?.FULLNAME || ''
       );
 
-      res.render('payments/payment_receipt', {
-        layout: false,
-        embed: req.query.embed === '1',
-        logoUrl,
-        ...receiptData
-      });
+      const context = await getReceiptRenderContext(receiptData, req.query.embed);
+      res.render('payments/payment_receipt', context);
     } catch (err) {
       console.error('Error rendering breakdown receipt:', err);
       res.status(500).send('Failed to load breakdown receipt');
-    }
-  },
-
-  blankReceipt: async (req, res) => {
-    try {
-      const logoUrl = await loadReceiptLogo();
-      res.render('payments/payment_receipt', {
-        layout: false,
-        embed: req.query.embed === '1',
-        logoUrl,
-        isBlank: true,
-        receiptNo: '',
-        receiptDate: '',
-        receivedFrom: '',
-        amountPaid: '',
-        paymentMethod: '',
-        paymentMethodLabel: '',
-        purpose: '',
-        receivedBy: ''
-      });
-    } catch (err) {
-      console.error('Error rendering blank receipt:', err);
-      res.status(500).send('Failed to load payment receipt');
     }
   },
 

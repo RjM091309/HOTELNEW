@@ -206,9 +206,13 @@ function printDiv(divId) {
                     background: white;
                 }
                 .hotel-logo {
-                    width: 80px;
-                    height: 80px;
-                    border: 3px solid black;
+                    max-width: 180px;
+                    max-height: 80px;
+                    width: auto;
+                    height: auto;
+                    object-fit: contain;
+                    display: block;
+                    margin: 0;
                 }
                 .hotel-name {
                     font-size: 24px;

@@ -147,6 +147,32 @@
     const displayServicesTotal = isCancelled ? 0 : servicesTotalValue;
     const totalChargesValue = isCancelled ? cancellationFee : Number(GRAND_TOTAL || 0);
     const totalDueValue = isCancelled ? 0 : Math.max(0, totalChargesValue - totalPaidBeforeValue);
+
+    const paymentTypeLabels = {
+      room: 'Room Payment',
+      extended: 'Extension',
+      service: 'Service',
+      pickdrop: 'Pick-up/Drop-off',
+      reservation_fee: 'Reservation Fee',
+      refund: 'Refund',
+      cancellation_fee: 'Cancellation Fee'
+    };
+    const paymentMethodLabels = {
+      cash: 'Cash',
+      credit_card: 'Credit Card',
+      credit: 'Credit',
+      marker: 'Credit',
+      check: 'Check',
+      bank_transfer: 'Bank Transfer'
+    };
+    const formatPaymentTypeLabel = (type) => paymentTypeLabels[(type || '').toLowerCase()] || type || '-';
+    const formatPaymentMethodLabel = (method) => paymentMethodLabels[(method || '').toLowerCase()] || method || '-';
+    const formatPaymentDate = (value) => {
+      if (!value) return '-';
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return '-';
+      return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    };
   %>
 
   <div style="display: flex; justify-content: space-between; margin-top: 10px;">
@@ -229,15 +255,54 @@
       
       <!-- <hr style="margin: 5px 0;"> -->
       <p class="label"><b>TAX:</b> 0</p>
-      <p class="label"><b>PAYMENT:</b> <%= formatCurrency(totalPaidBeforeValue) %></p>
+
+      <% if (PAYMENTS_LIST && PAYMENTS_LIST.length > 0) { %>
+        <p class="label"><b>PAYMENT DETAILS:</b></p>
+        <table class="info-table" style="margin-top: 8px; margin-bottom: 12px; font-size: 12px;">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Description</th>
+              <th>Method</th>
+              <th>Amount</th>
+              <th>Received By</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% PAYMENTS_LIST.forEach((payment) => {
+              const amount = Number(payment.AMOUNT_PAID || 0);
+              const isRefund = payment.PAYMENT_TYPE === 'refund' || amount < 0;
+              const typeLabel = formatPaymentTypeLabel(payment.PAYMENT_TYPE);
+              const remarks = (payment.REMARKS || '').trim();
+              const description = remarks ? `${typeLabel} — ${remarks}` : typeLabel;
+              const amountDisplay = isRefund
+                ? `-${formatCurrency(Math.abs(amount))}`
+                : formatCurrency(amount);
+            %>
+              <tr>
+                <td><%= formatPaymentDate(payment.PAYMENT_DATE) %></td>
+                <td><%= description %></td>
+                <td><%= formatPaymentMethodLabel(payment.PAYMENT_METHOD) %></td>
+                <td><%= amountDisplay %></td>
+                <td><%= payment.RECEIVED_BY || '-' %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+        <p class="label"><b>TOTAL PAID:</b> <%= formatCurrency(totalPaidBeforeValue) %></p>
+      <% } else { %>
+        <p class="label"><b>PAYMENT:</b> <%= formatCurrency(totalPaidBeforeValue) %></p>
+      <% } %>
       
       <% if (isCancelled) { %>
-        <p class="sub">TOTAL PAID (BEFORE CANCELLATION): <%= formatCurrency(totalPaidBeforeValue) %></p>
+        <% if (!(PAYMENTS_LIST && PAYMENTS_LIST.length > 0)) { %>
+          <p class="sub">TOTAL PAID (BEFORE CANCELLATION): <%= formatCurrency(totalPaidBeforeValue) %></p>
+        <% } %>
         <p class="sub">PAID AMOUNT (AFTER CANCELLATION): <%= formatCurrency(paidAfterCancellationValue) %></p>
         <% if (refundAmount > 0) { %>
           <p class="sub">REFUND AMOUNT: <%= formatCurrency(refundAmount) %></p>
         <% } %>
-      <% } else { %>
+      <% } else if (!(PAYMENTS_LIST && PAYMENTS_LIST.length > 0)) { %>
         <p class="sub">ROOM PAID: <%= formatCurrency(roomPaidValue) %></p>
         <% if (EXTENDED_DAYS > 0) { %>
           <p class="sub">EXTENSION PAID: <%= formatCurrency(extendedPaidValue) %></p>

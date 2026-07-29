@@ -1,7 +1,1 @@
-// Billing Data Scripts
-// Extracted from dashboard.ejs
-
-function showBilling(bookingID) {
-    if (window.showBilling) return window.showBilling(bookingID);
-    console.error('Global showBilling is not available');
-}
+// Billing UI is handled by /js/booking/billing.js (window.showBilling).

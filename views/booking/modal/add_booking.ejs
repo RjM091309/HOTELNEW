@@ -325,6 +325,10 @@
                                   <input class="form-check-input" type="checkbox" id="includeLongTermStay" name="isLongTermStay">
                                   <label class="form-check-label" for="includeLongTermStay">Long-Term Stay (installment payments allowed)</label>
                                 </div>
+                                <div id="longTermStayWrapper" class="form-group" style="display: none;">
+                                  <label class="form-label">Room Change Condition <span class="text-muted" style="font-size: 11px;">(subject to inquiry)</span></label>
+                                  <textarea class="form-control" id="roomChangeNote" name="roomChangeNote" rows="2" placeholder="e.g. Room change allowed only after inquiry with management"></textarea>
+                                </div>
                               </div>
 
                               <!-- Discount Section -->
@@ -425,8 +429,13 @@
 		
 		// Load add_booking.js immediately - this is critical for booking functionality
 		var bookingScript = document.createElement('script');
-		bookingScript.src = '/js/booking/add_booking.js';
+		bookingScript.src = '/js/booking/late_checkout_fee.js';
 		document.body.appendChild(bookingScript);
+		bookingScript.onload = function() {
+			var bookingBillingScript = document.createElement('script');
+			bookingBillingScript.src = '/js/booking/add_booking.js';
+			document.body.appendChild(bookingBillingScript);
+		};
 
 		// Load booking_submit.js for form submission handling
 		var submitScript = document.createElement('script');
@@ -511,8 +520,17 @@
 // ================================
 (function(){
     $(document).ready(function(){
+        $('#includeLongTermStay').on('change', function(){
+            $('#longTermStayWrapper').toggle(this.checked);
+            if (!this.checked) {
+                $('#roomChangeNote').val('');
+            }
+        });
+
         $('#modal-addbooking').on('hidden.bs.modal', function(){
             $('#includeLongTermStay').prop('checked', false);
+            $('#longTermStayWrapper').hide();
+            $('#roomChangeNote').val('');
         });
     });
 })();

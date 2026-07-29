@@ -572,7 +572,7 @@ class CalendarController {
   // Process late check-out
   static async processLateCheckout(req, res) {
     try {
-      const { currentRoomId, newRoomId, bookingId } = req.body;
+      const { currentRoomId, newRoomId, bookingId, lateCheckoutFee } = req.body;
 
       if (!currentRoomId || !bookingId) {
         return res.status(400).json({ 
@@ -581,7 +581,12 @@ class CalendarController {
         });
       }
 
-      const result = await CalendarModel.processLateCheckout(currentRoomId, newRoomId, bookingId);
+      const result = await CalendarModel.processLateCheckout(
+        currentRoomId,
+        newRoomId,
+        bookingId,
+        lateCheckoutFee
+      );
       
       if (result.success) {
         res.json({ 

@@ -265,7 +265,7 @@ function printBookingDiv(divId) {
 
     // Add a "Thank You" message temporarily
     const thankYouMessage = document.createElement('p');
-    thankYouMessage.textContent = "Thank you for choosing SKY HOTEL. We look forward to welcoming you again!";
+    thankYouMessage.textContent = "Thank you for choosing Main Stay Hotel. We look forward to welcoming you again!";
     thankYouMessage.style.textAlign = "center";
     thankYouMessage.style.fontSize = "16px";
     thankYouMessage.style.fontWeight = "bold";

@@ -110,7 +110,7 @@
 					</ul>
 				</li>
 
-				<% const paymentPages = ['daily_settlement', 'payments', 'credit', 'deposits']; %>
+				<% const paymentPages = ['daily_settlement', 'payments', 'credit', 'deposits', 'receipts']; %>
 				<li class="nav-item <%= paymentPages.includes(activePage) ? 'open' : '' %>" data-section="payment-management">
 					<a class="nav-link nav-toggle nav-main-link-submenu <%= paymentPages.includes(activePage) ? 'active' : '' %>" data-toggle="submenu" aria-haspopup="true"
 						aria-expanded="<%= paymentPages.includes(activePage) ? 'true' : 'false' %>" href="#">
@@ -150,7 +150,7 @@
 							</a>
 						</li>
 						<li class="nav-item">
-							<a href="javascript:void(0)" class="nav-link" onclick="printBlankPaymentReceipt(); return false;">
+							<a href="/payments/receipts" class="nav-link <%= activePage === 'receipts' ? 'active' : '' %>">
 								<i class="fa fa-genderless"></i>
 								<span class="title">Receipt</span>
 							</a>

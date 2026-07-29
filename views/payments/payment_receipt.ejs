@@ -317,23 +317,31 @@
           <% if (logoUrl) { %>
             <img class="receipt-logo" src="<%= logoUrl %>" alt="Main Stay Hotel">
           <% } %>
-          <div class="hotel-name">MAIN STAY HOTEL</div>
+          <div class="hotel-name"><%= hotelName || 'MAIN STAY HOTEL' %></div>
           <div class="title-divider">
             <span class="line"></span>
             <span class="diamond"></span>
             <span class="line"></span>
           </div>
-          <div class="receipt-title">Payment Receipt</div>
+          <div class="receipt-title"><%= receiptTitle || 'Payment Receipt' %></div>
         </div>
 
         <div class="receipt-body">
           <div class="receipt-col left">
             <div class="field">
               <div class="field-label">
-                <span class="field-icon"><svg viewBox="0 0 24 24"><path d="M7 3h10v4H7zM5 7h14v12H5z"/></svg></span>
-                Receipt No.
+                <span class="field-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 20c0-4 3-6 7-6s7 2 7 6"/></svg></span>
+                Received From
               </div>
-              <div class="field-value <%= isBlank ? 'blank' : '' %>"><%= isBlank ? '' : (receiptNo || '') %></div>
+              <div class="field-value <%= isBlank ? 'blank' : '' %>"><%= isBlank ? '' : (receivedFrom || '') %></div>
+            </div>
+
+            <div class="field">
+              <div class="field-label">
+                <span class="field-icon"><svg viewBox="0 0 24 24"><path d="M7 3h10v4H7zM5 7h14v12H5z"/></svg></span>
+                Room No.
+              </div>
+              <div class="field-value <%= isBlank ? 'blank' : '' %>"><%= isBlank ? '' : (roomNo || '') %></div>
             </div>
 
             <div class="field">
@@ -342,14 +350,6 @@
                 Date
               </div>
               <div class="field-value <%= isBlank ? 'blank' : '' %>"><%= isBlank ? '' : formatDate(receiptDate) %></div>
-            </div>
-
-            <div class="field">
-              <div class="field-label">
-                <span class="field-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 20c0-4 3-6 7-6s7 2 7 6"/></svg></span>
-                Received From
-              </div>
-              <div class="field-value <%= isBlank ? 'blank' : '' %>"><%= isBlank ? '' : (receivedFrom || '') %></div>
             </div>
 
             <div class="field">
@@ -407,14 +407,14 @@
             <div class="field">
               <div class="field-label">
                 <span class="field-icon"><svg viewBox="0 0 24 24"><path d="M4 18l4-8 4 4 4-6 4 10"/><path d="M4 20h16"/></svg></span>
-                Signature
+                Signature <span style="font-weight:400;font-size:9px;color:#999;">(handwritten)</span>
               </div>
               <div class="field-value blank" style="min-height:36px;"></div>
             </div>
 
             <div class="ack-box">
               <div class="ack-icon">✓</div>
-              <div class="ack-text">This receipt acknowledges that the payment described above has been received.</div>
+              <div class="ack-text"><%= acknowledgmentText || 'This receipt acknowledges that the payment described above has been received.' %></div>
             </div>
           </div>
         </div>

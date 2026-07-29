@@ -1167,10 +1167,7 @@ $(document).ready(function() {
         computeEditTotal();
     });
 
-    // Calculate late check-out fee when check-out status changes
-    $('#edit_checkOutStatus').on('change', function() {
-        calculateEditLateCheckoutFee();
-    });
+    // Late check-out fee uses the dedicated amount field on this form (no popup).
 
     // Sync late checkout fee input with hidden field
     $(document).on('input', '#edit_lateCheckoutFeeInput', function() {
@@ -1696,7 +1693,21 @@ function loadEditExistingServices(bookingId) {
                 $(this).val(prevCO);
                 return;
             }
+
+            const status = $(this).val();
+            if (status == 1) {
+                const existingFee = parseFloat($('#edit_lateCheckoutFee').val()) || 0;
+                $('#edit_lateCheckoutFee').val(existingFee);
+                $('#edit_lateCheckoutFeeInput').val(existingFee);
+                $('#edit_lateCheckoutFeeDisplay').show();
+            } else {
+                $('#edit_lateCheckoutFee').val(0);
+                $('#edit_lateCheckoutFeeInput').val(0);
+                $('#edit_lateCheckoutFeeDisplay').hide();
+            }
+
             prevCO = $(this).val();
+            computeEditTotal();
         });
 
         // Reset previous values when room/date changes
@@ -1714,39 +1725,16 @@ function formatEditPaidAmount(input) {
 // Function to calculate late check-out fee for edit form
 function calculateEditLateCheckoutFee() {
     const checkOutStatus = $('#edit_checkOutStatus').val();
-    const existingFee = $('#edit_lateCheckoutFee').val();
-    
-    // Only calculate if we have valid data
-    if (!checkOutStatus) {
-        // If no existing fee, set to 0
-        if (!existingFee || parseFloat(existingFee) == 0) {
-            $('#edit_lateCheckoutFee').val(0);
-            $('#edit_lateCheckoutFeeDisplay').hide();
-        }
-        return;
-    }
-    
-    let lateCheckoutFee = 0;
-    
-    if (checkOutStatus == 1) { // Late Check Out
-        // Only set to 2000 if there's no existing fee
-        if (!existingFee || parseFloat(existingFee) == 0) {
-            lateCheckoutFee = 2000; // ₱2,000 default fee for Late Check Out
-            $('#edit_lateCheckoutFee').val(lateCheckoutFee);
-            $('#edit_lateCheckoutFeeInput').val(lateCheckoutFee);
-        } else {
-            // Keep the existing fee
-            lateCheckoutFee = parseFloat(existingFee);
-        }
-        $('#edit_lateCheckoutFeeDisplay').show();
-    } else {
-        // Regular Check Out - no fee
+
+    if (!checkOutStatus || checkOutStatus != 1) {
         $('#edit_lateCheckoutFee').val(0);
         $('#edit_lateCheckoutFeeInput').val(0);
         $('#edit_lateCheckoutFeeDisplay').hide();
+        computeEditTotal();
+        return;
     }
-    
-    // Recalculate total to include late check-out fee
+
+    $('#edit_lateCheckoutFeeDisplay').show();
     computeEditTotal();
 }
 
@@ -1998,13 +1986,10 @@ function populateEditForm(booking) {
     $('#edit_checkOutStatus').val(checkOutStatus);
     console.log('DEBUG: Actual dropdown value after setting:', $('#edit_checkOutStatus').val());
     
-    // Set late checkout fee if it exists
-    console.log('DEBUG: booking.lateCheckoutFee =', booking.lateCheckoutFee);
-    if (booking.lateCheckoutFee && parseFloat(booking.lateCheckoutFee) > 0) {
-        $('#edit_lateCheckoutFee').val(parseFloat(booking.lateCheckoutFee));
-        $('#edit_lateCheckoutFeeInput').val(parseFloat(booking.lateCheckoutFee));
-        $('#edit_lateCheckoutFeeDisplay').show(); // Show the field
-    }
+    // Set late checkout fee if it exists (0 = FREE)
+    const lateFee = parseFloat(booking.lateCheckoutFee) || 0;
+    $('#edit_lateCheckoutFee').val(lateFee);
+    $('#edit_lateCheckoutFeeInput').val(lateFee);
     
     // Trigger late checkout fee calculation after setting check-out status
     setTimeout(() => {

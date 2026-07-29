@@ -1168,19 +1168,9 @@ class CalendarModel {
   }
 
   // Process late check-out (copied from dashboard logic)
-  static async processLateCheckout(currentRoomId, newRoomId, bookingId) {
+  static async processLateCheckout(currentRoomId, newRoomId, bookingId, lateCheckoutFee = 0) {
     try {
-      // Fetch the total days of stay for this booking
-      const totalDaysQuery = `SELECT DATEDIFF(CHECK_OUT_DATE, CHECK_IN_DATE) AS TotalDays FROM booking WHERE IDNo = ? AND ACTIVE = 1`;
-      const totalDaysResult = await queryDatabasePromise(totalDaysQuery, [bookingId]);
-      const totalDays = totalDaysResult.length > 0 ? totalDaysResult[0].TotalDays : null;
-
-      let lateCheckoutFee = 0;
-
-      // Apply ₱2,000 Fee if stay is less than 3 days
-      if (totalDays !== null && totalDays < 3) {
-        lateCheckoutFee = 2000;
-      }
+      const fee = Math.max(0, parseFloat(lateCheckoutFee) || 0);
 
       // If a new room is chosen, transfer the guest
       if (newRoomId && newRoomId !== currentRoomId) {
@@ -1221,14 +1211,14 @@ class CalendarModel {
         VALUES (?, 72, 1, ?, ?, ?, NOW())
       `;
 
-      const status = lateCheckoutFee > 0 ? 'unpaid' : 'paid';
+      const status = fee > 0 ? 'unpaid' : 'paid';
 
-      await queryDatabasePromise(insertBookingServiceQuery, [bookingId, lateCheckoutFee, status, 1]);
+      await queryDatabasePromise(insertBookingServiceQuery, [bookingId, fee, status, 1]);
 
       return { 
         success: true,
-        lateCheckoutFee: lateCheckoutFee,
-        isFree: lateCheckoutFee === 0
+        lateCheckoutFee: fee,
+        isFree: fee === 0
       };
 
     } catch (error) {

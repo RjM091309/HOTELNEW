@@ -53,9 +53,6 @@
                             <span class="summary-value" id="paymentDiscountAmount">0.00</span>
                         </div>
                         
-                        <!-- Divider -->
-                        <div class="summary-divider"></div>
-                        
                         <!-- Subtotal -->
                         <div class="summary-row" id="subtotalRow" style="display: none;">
                             <span class="summary-label">Subtotal:</span>
@@ -347,9 +344,9 @@
 }
 
 #modal-payment .summary-header {
-    margin-bottom: 15px;
-    padding-bottom: 10px;
-    border-bottom: 2px solid #f1f3f4;
+    margin-bottom: 12px;
+    padding-bottom: 0;
+    border-bottom: none;
 }
 
 #modal-payment .summary-header h6 {
@@ -369,7 +366,7 @@
 #modal-payment .summary-content {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
 }
 
 #modal-payment .summary-row {
@@ -377,18 +374,25 @@
     justify-content: space-between;
     align-items: center;
     padding: 4px 0;
+    border: none;
+    border-bottom: none;
 }
 
 #modal-payment .summary-label {
     color: #6c757d;
     font-weight: 500;
     font-size: 0.85rem;
+    flex: 1 1 auto;
 }
 
 #modal-payment .summary-value {
     font-weight: 600;
     font-size: 0.85rem;
     color: #495057;
+    flex: 0 0 auto;
+    text-align: right;
+    min-width: 88px;
+    padding-right: 2px;
 }
 
 /* Breakdown values - make them more visible */
@@ -406,10 +410,9 @@
     font-weight: 600 !important;
 }
 
-#modal-payment .summary-divider {
-    height: 1px;
-    background: #e9ecef;
-    margin: 2px 0;
+#modal-payment .balance-row {
+    padding-top: 4px;
+    margin-top: 4px;
 }
 
 #modal-payment .total-amount {
@@ -432,12 +435,6 @@
 #modal-payment .subtotal-amount {
     color: #6c757d;
     font-weight: 600;
-}
-
-#modal-payment .balance-row {
-    border-top: 2px solid #f1f3f4;
-    padding-top: 2px;
-    margin-top: 2px;
 }
 
 /* Security Deposit Section Styles */

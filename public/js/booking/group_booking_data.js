@@ -759,8 +759,8 @@ function viewGroupBilling(groupId) {
                     // Insert total row for previous room
                     let totalRow = `
                         <tr class="room-total">
-                            <td colspan="5" class="text-right"><b>Total for Room - ${currentRoom}:</b></td>
-                            <td class="text-right"><b>${roomTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></td>
+                            <td colspan="5" class="col-money"><b>Total for Room - ${currentRoom}:</b></td>
+                            <td class="col-money"><b>${roomTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></td>
                         </tr>`;
                     billingTable.append(totalRow);
                     roomTotal = 0;
@@ -776,12 +776,12 @@ function viewGroupBilling(groupId) {
 
                 let row = `
                     <tr data-booking-id="${bill.BOOKING_ID}">
-                        <td class="text-center">${rowNumber++}</td>
-                        <td class="text-center">Room - ${bill.ROOM_NUMBER}</td>
-                        <td class="text-center">${bill.description} ${paidIcon}</td>
-                        <td class="text-center">${chargeAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        <td class="text-center">${qtyDisplay}</td>
-                        <td class="text-right">${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td class="col-index">${rowNumber++}</td>
+                        <td class="col-room">Room - ${bill.ROOM_NUMBER}</td>
+                        <td class="col-desc">${bill.description} ${paidIcon}</td>
+                        <td class="col-money">${chargeAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td class="col-money">${qtyDisplay}</td>
+                        <td class="col-money">${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         <input type="hidden" name="bookingId[]" value="${bill.BOOKING_ID}">
                     </tr>`;
                 billingTable.append(row);
@@ -790,8 +790,8 @@ function viewGroupBilling(groupId) {
                 if (index === allBillingData.length - 1) {
                     let totalRow = `
                         <tr class="room-total">
-                            <td colspan="5" class="text-right"><b>Total for Room - ${currentRoom}:</b></td>
-                            <td class="text-right"><b>${roomTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></td>
+                            <td colspan="5" class="col-money"><b>Total for Room - ${currentRoom}:</b></td>
+                            <td class="col-money"><b>${roomTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></td>
                         </tr>`;
                     billingTable.append(totalRow);
                 }

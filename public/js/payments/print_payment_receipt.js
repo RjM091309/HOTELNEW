@@ -38,5 +38,19 @@ function printBlankPaymentReceipt() {
   printPaymentReceipt('/payments/receipt/blank?embed=1');
 }
 
+function printMultiplePaymentReceipts(ids) {
+  const selectedIds = (ids || []).map(String).filter(Boolean);
+  if (!selectedIds.length) {
+    if (typeof Swal !== 'undefined') {
+      Swal.fire('No selection', 'Please select at least one receipt to print.', 'info');
+    }
+    return;
+  }
+
+  const url = '/payments/receipts/print/bulk?ids=' + encodeURIComponent(selectedIds.join(',')) + '&embed=1';
+  printPaymentReceipt(url);
+}
+
 window.printPaymentReceipt = printPaymentReceipt;
 window.printBlankPaymentReceipt = printBlankPaymentReceipt;
+window.printMultiplePaymentReceipts = printMultiplePaymentReceipts;

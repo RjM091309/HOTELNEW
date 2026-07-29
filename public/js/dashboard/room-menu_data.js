@@ -28,7 +28,6 @@ window.toggleCustomCost = toggleCustomCost;
 window.toggleCustomService = toggleCustomService;
 window.loadGuestDetails = loadGuestDetails;
 window.loadTransferHistory = loadTransferHistory;
-window.showBilling = showBilling;
 window.openExtendModal = openExtendModal;
 window.triggerTransferFromMenu = triggerTransferFromMenu;
 window.openRoomMenuModal = openRoomMenuModal;
@@ -621,7 +620,7 @@ async function createDynamicRoomModal(bookingId, event, options) {
             <!-- Modal Footer -->
             <div class="modal-footer py-2" style="background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%); border-top: 1px solid #495057;">
                
-                <button type="button" class="btn btn-primary" onclick="showBilling('${bookingId}')">Billing</button>
+                <button type="button" class="btn btn-primary" onclick="window.showBilling('${bookingId}')">Billing</button>
                 <button type="button" class="btn btn-secondary" onclick="viewFullBookingDetails('${bookingId}')">
                     <i class="fas fa-file-alt me-2"></i>View Details
                 </button>
@@ -2702,12 +2701,6 @@ async function calculateBalance(bookingId, currentBookingId) {
     } catch (error) {
         console.error('❌ Error calculating balance:', error);
     }
-}
-
-// Function to show billing
-function showBilling(bookingId) {
-    if (window.showBilling) return window.showBilling(bookingId);
-    console.error('Global showBilling is not available');
 }
 
 // Helper function to compute checkout context (financial details)
@@ -5867,7 +5860,6 @@ window.removeService = removeService;
 window.saveServices = saveServices;
 window.calculateTotalCost = calculateTotalCost;
 window.calculateBalance = calculateBalance;
-window.showBilling = showBilling;
 window.triggerCheckout = triggerCheckout;
 window.startCheckoutProcess = startCheckoutProcess;
 window.openExtendModal = openExtendModal;
@@ -6754,9 +6746,19 @@ function initializeLateCheckoutModal() {
     });
     
     // ✅ Function to open late checkout modal
-    window.openLateCheckoutModal = function(roomId, checkoutDate, bookingId) {
+    window.openLateCheckoutModal = async function(roomId, checkoutDate, bookingId) {
+        let lateCheckoutFee = 0;
+        try {
+            if (typeof window.promptLateCheckoutFee === 'function') {
+                lateCheckoutFee = await window.promptLateCheckoutFee({ defaultAmount: 2000 });
+            }
+        } catch (_) {
+            return;
+        }
+
         window.globalLateCheckoutRoomId = roomId;
         window.globalLateCheckoutBookingId = bookingId;
+        window.globalLateCheckoutFee = lateCheckoutFee;
         window.globalSelectedRoomId = null; // Reset selected room
 
 
@@ -6882,29 +6884,31 @@ function initializeLateCheckoutModal() {
     };
 
     // ✅ Function to Process Late Check-Out
-    window.processLateCheckout = function(currentRoomId, newRoomId, bookingId) {
-
+    window.processLateCheckout = function(currentRoomId, newRoomId, bookingId, lateCheckoutFee) {
+        const fee = Number.isFinite(Number(lateCheckoutFee))
+            ? Number(lateCheckoutFee)
+            : (Number(window.globalLateCheckoutFee) || 0);
 
         // 🔥 Show Swal Confirmation Prompt Before Processing
         Swal.fire({
             title: "Are you sure?",
-            text: "Do you want to proceed with Late Check-Out?",
+            text: fee > 0
+                ? `Apply late check-out with a charge of ₱${fee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}?`
+                : "Apply free late check-out with no additional charge?",
             icon: "warning",
             showCancelButton: true,
             confirmButtonText: "Yes, Confirm",
             cancelButtonText: "Cancel",
         }).then((result) => {
             if (result.isConfirmed) {
-                // ✅ Only Proceed When User Clicks "Yes, Confirm"
-                
-
                 fetch("/dashboard/late-checkout", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         currentRoomId: currentRoomId,
-                        newRoomId: newRoomId, // Either null (same room) or a selected room ID
+                        newRoomId: newRoomId,
                         bookingId: bookingId,
+                        lateCheckoutFee: fee,
                     }),
                 })
                 .then(response => response.json())
@@ -7169,7 +7173,11 @@ function openCheckoutBacktrackModal(bookingId, event) {
         const billingBtn = document.getElementById(`billingBtn_${bookingId}`);
         if (billingBtn) {
             billingBtn.addEventListener('click', function() {
-                showBilling(bookingId);
+                if (typeof window.showBilling === 'function') {
+                    window.showBilling(bookingId);
+                } else {
+                    console.error('Billing handler not loaded. Please refresh the page.');
+                }
             });
         }
 
@@ -7786,9 +7794,6 @@ function loadExistingServicesForModal(bookingId) {
             console.error('Error loading existing services for modal:', error);
         });
 }
-
-// Make showBilling function globally accessible
-window.showBilling = showBilling;
 
 // ==================== REMARKS/NOTES FUNCTIONALITY ====================
 

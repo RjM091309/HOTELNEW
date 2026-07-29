@@ -124,6 +124,55 @@ async function runPickupDropMigrations() {
   );
 }
 
+async function runReceiptMigrations() {
+  await ensureTable('receipt_settings', `
+    CREATE TABLE receipt_settings (
+      IDNo INT NOT NULL AUTO_INCREMENT,
+      HOTEL_NAME VARCHAR(200) NOT NULL DEFAULT 'MAIN STAY HOTEL',
+      RECEIPT_TITLE VARCHAR(100) NOT NULL DEFAULT 'Payment Receipt',
+      ACKNOWLEDGMENT_TEXT VARCHAR(500) NOT NULL DEFAULT 'This receipt acknowledges that the payment described above has been received.',
+      RECEIPT_PREFIX VARCHAR(20) NOT NULL DEFAULT 'RCP',
+      SHOW_LOGO TINYINT(1) NOT NULL DEFAULT 1,
+      ENCODED_BY INT NULL DEFAULT NULL,
+      ENCODED_DT DATETIME NULL DEFAULT NULL,
+      EDITED_BY INT NULL DEFAULT NULL,
+      EDITED_DT DATETIME NULL DEFAULT NULL,
+      ACTIVE TINYINT(1) NOT NULL DEFAULT 1,
+      PRIMARY KEY (IDNo)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  await ensureTable('payment_receipt', `
+    CREATE TABLE payment_receipt (
+      IDNo INT NOT NULL AUTO_INCREMENT,
+      RECEIPT_NO VARCHAR(50) NOT NULL,
+      ROOM_NO VARCHAR(50) NULL DEFAULT NULL,
+      RECEIPT_DATE DATETIME NOT NULL,
+      RECEIVED_FROM VARCHAR(200) NOT NULL,
+      AMOUNT_PAID DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+      PAYMENT_METHOD VARCHAR(50) NOT NULL DEFAULT 'cash',
+      PAYMENT_METHOD_OTHER VARCHAR(100) NULL DEFAULT NULL,
+      PURPOSE TEXT NULL DEFAULT NULL,
+      RECEIVED_BY VARCHAR(200) NULL DEFAULT NULL,
+      ENCODED_BY INT NULL DEFAULT NULL,
+      ENCODED_DT DATETIME NULL DEFAULT NULL,
+      EDITED_BY INT NULL DEFAULT NULL,
+      EDITED_DT DATETIME NULL DEFAULT NULL,
+      ACTIVE TINYINT(1) NOT NULL DEFAULT 1,
+      PRIMARY KEY (IDNo),
+      KEY idx_payment_receipt_date (RECEIPT_DATE),
+      KEY idx_payment_receipt_no (RECEIPT_NO)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  await ensureColumn(
+    'payment_receipt',
+    'ROOM_NO',
+    `ROOM_NO VARCHAR(50) NULL DEFAULT NULL COMMENT 'Guest room number for receipt'`,
+    'RECEIPT_NO'
+  );
+}
+
 async function runLongTermStayMigrations() {
   if (!(await tableExists('booking'))) {
     console.warn('⚠️ booking table not found, skipping long-term stay column migrations');
@@ -150,6 +199,7 @@ async function runStartupMigrations() {
 
   await runFlightScheduleMigrations();
   await runPickupDropMigrations();
+  await runReceiptMigrations();
   await runLongTermStayMigrations();
 
   console.log('✅ Startup database migrations complete');

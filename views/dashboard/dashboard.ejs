@@ -834,18 +834,23 @@ function calculateCardVariables(booking) {
 		document.body.appendChild(mainScript);
 		
 		// Load other scripts
-		var script2 = document.createElement('script');
-		script2.src = '/js/dashboard/room-menu_data.js';
-		document.body.appendChild(script2);
+		var lateCheckoutFeeScript = document.createElement('script');
+		lateCheckoutFeeScript.src = '/js/booking/late_checkout_fee.js';
+		lateCheckoutFeeScript.onload = function () {
+			var script2 = document.createElement('script');
+			script2.src = '/js/dashboard/room-menu_data.js';
+			document.body.appendChild(script2);
+		};
+		document.body.appendChild(lateCheckoutFeeScript);
 		// var script3 = document.createElement('script');
 		// script3.src = '/js/dashboard/late-checkout_data.js';
 		// document.body.appendChild(script3);
 		var script4 = document.createElement('script');
 		script4.src = '/js/dashboard/extend_data.js';
 		document.body.appendChild(script4);
-		var script5 = document.createElement('script');
-		script5.src = '/js/dashboard/billing_data.js';
-		document.body.appendChild(script5);
+		var billingJs = document.createElement('script');
+		billingJs.src = '/js/booking/billing.js';
+		document.body.appendChild(billingJs);
 		var script7 = document.createElement('script');
 		script7.src = '/js/dashboard/booking_data.js';
 		document.body.appendChild(script7);

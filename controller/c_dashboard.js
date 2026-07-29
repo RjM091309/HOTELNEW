@@ -664,7 +664,7 @@ class DashboardController {
   // Process late check-out
   static async processLateCheckout(req, res) {
     try {
-      const { currentRoomId, newRoomId, bookingId } = req.body;
+      const { currentRoomId, newRoomId, bookingId, lateCheckoutFee } = req.body;
 
       if (!currentRoomId || !bookingId) {
         return res.status(400).json({ 
@@ -673,7 +673,12 @@ class DashboardController {
         });
       }
 
-      const result = await DashboardModel.processLateCheckout(currentRoomId, newRoomId, bookingId);
+      const result = await DashboardModel.processLateCheckout(
+        currentRoomId,
+        newRoomId,
+        bookingId,
+        lateCheckoutFee
+      );
       
       if (result.success) {
         res.json({ 
