@@ -11,8 +11,11 @@ const {
 
 function normalizePaymentMethod(method) {
   const key = (method || 'cash').toLowerCase();
-  const allowed = ['cash', 'bank_transfer', 'check', 'other'];
-  return allowed.includes(key) ? key : 'other';
+  const allowed = ['cash', 'credit', 'other'];
+  if (allowed.includes(key)) return key;
+  if (['credit_card', 'marker', 'bank_transfer'].includes(key)) return 'credit';
+  if (key === 'check') return 'other';
+  return 'other';
 }
 
 function parseReceiptPayload(body) {

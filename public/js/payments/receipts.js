@@ -1,12 +1,16 @@
 let receiptsTable;
 const bookedGuestResults = { add: [], edit: [] };
 let bookedGuestSearchTimer = null;
+const receiptDatePickers = {};
 
 const PAYMENT_METHOD_LABELS = {
   cash: 'Cash',
-  bank_transfer: 'Bank Transfer',
-  check: 'Check',
-  other: 'Other'
+  credit: 'Credit',
+  credit_card: 'Credit',
+  marker: 'Credit',
+  bank_transfer: 'Credit',
+  check: 'Others',
+  other: 'Others'
 };
 
 $(document).ready(function () {
@@ -178,13 +182,60 @@ function initializeReceiptsTable() {
   reloadReceiptsData();
 }
 
+function setupReceiptDatePickers() {
+  if (typeof flatpickr === 'undefined') return;
+
+  ['addReceiptDate', 'editReceiptDate'].forEach(function (id) {
+    const el = document.getElementById(id);
+    if (!el || el._flatpickr) return;
+
+    receiptDatePickers[id] = flatpickr(el, {
+      dateFormat: 'Y-m-d',
+      altInput: true,
+      altFormat: 'F j, Y',
+      allowInput: false,
+      clickOpens: true,
+      disableMobile: true,
+      position: 'auto',
+      static: false,
+      appendTo: document.body,
+      locale: { firstDayOfWeek: 1 },
+      onReady: function (_selectedDates, _dateStr, instance) {
+        instance.calendarContainer.classList.add('receipt-date-calendar');
+        if (instance.altInput) {
+          instance.altInput.classList.add('form-control');
+          instance.altInput.setAttribute('readonly', 'readonly');
+        }
+      }
+    });
+  });
+
+  $('.receipt-date-wrap').on('click', function (e) {
+    const input = this.querySelector('.receipt-date-input');
+    if (!input || !input._flatpickr) return;
+    if (e.target === input || (input._flatpickr.altInput && e.target === input._flatpickr.altInput)) return;
+    input._flatpickr.open();
+  });
+}
+
+function setReceiptPickerDate(id, value) {
+  const picker = receiptDatePickers[id];
+  if (!picker) return;
+  if (value) {
+    picker.setDate(value, false);
+  } else {
+    picker.clear();
+  }
+}
+
 function setupReceiptHandlers() {
   setupGuestSearch('add');
   setupGuestSearch('edit');
+  setupReceiptDatePickers();
 
   $('#addReceiptBtn').on('click', function () {
     $('#addReceiptForm')[0].reset();
-    $('#addReceiptDate').val(formatReceiptDateInput(new Date()));
+    setReceiptPickerDate('addReceiptDate', formatReceiptDateInput(new Date()));
     if (window.defaultReceiptReceivedBy) {
       $('#addReceivedBy').val(window.defaultReceiptReceivedBy);
     }
@@ -200,7 +251,7 @@ function setupReceiptHandlers() {
 
   $('#addReceiptForm').on('submit', function (e) {
     e.preventDefault();
-    createReceipt(true);
+    createReceipt();
   });
 
   $('#editReceiptForm').on('submit', function (e) {
@@ -316,6 +367,13 @@ function reloadReceiptsData() {
   });
 }
 
+function mapReceiptMethodForForm(method) {
+  const key = (method || 'cash').toLowerCase();
+  if (['cash', 'credit', 'other'].includes(key)) return key;
+  if (['credit_card', 'marker', 'bank_transfer'].includes(key)) return 'credit';
+  return 'other';
+}
+
 function buildReceiptPayload(prefix) {
   return {
     roomNo: $('#' + prefix + 'RoomNo').val(),
@@ -329,7 +387,7 @@ function buildReceiptPayload(prefix) {
   };
 }
 
-function createReceipt(printAfterSave) {
+function createReceipt() {
   $.ajax({
     url: '/payments/receipts/api/create',
     method: 'POST',
@@ -339,9 +397,6 @@ function createReceipt(printAfterSave) {
         $('#addReceiptModal').modal('hide');
         Swal.fire('Saved!', response.message, 'success');
         reloadReceiptsData();
-        if (printAfterSave && response.data && response.data.id) {
-          printReceiptRecord(response.data.id);
-        }
       } else {
         Swal.fire('Error', response.message || 'Failed to save receipt', 'error');
       }
@@ -364,12 +419,13 @@ function openEditReceiptModal(id) {
       }
 
       const receipt = response.data;
+      const method = mapReceiptMethodForForm(receipt.PAYMENT_METHOD);
       $('#editReceiptId').val(receipt.IDNo);
       $('#editRoomNo').val(receipt.ROOM_NO || '');
-      $('#editReceiptDate').val(formatReceiptDateInput(receipt.RECEIPT_DATE));
+      setReceiptPickerDate('editReceiptDate', formatReceiptDateInput(receipt.RECEIPT_DATE));
       $('#editReceivedFrom').val(receipt.RECEIVED_FROM || '');
       $('#editAmountPaid').val(receipt.AMOUNT_PAID || '');
-      $('#editPaymentMethod').val((receipt.PAYMENT_METHOD || 'cash').toLowerCase());
+      $('#editPaymentMethod').val(method);
       $('#editPaymentMethodOther').val(receipt.PAYMENT_METHOD_OTHER || '');
       $('#editReceivedBy').val(receipt.RECEIVED_BY || '');
       $('#editPurpose').val(receipt.PURPOSE || '');

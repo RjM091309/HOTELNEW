@@ -35,7 +35,7 @@ function formatPaymentMethodLabel(method, otherLabel = '') {
     online: 'Online'
   };
   const key = (method || '').toLowerCase();
-  if (key === 'other') return otherLabel || 'Other';
+  if (key === 'other') return otherLabel || 'Others';
   return labels[key] || method || '';
 }
 

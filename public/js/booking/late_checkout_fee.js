@@ -83,8 +83,8 @@ window.promptLateCheckoutFee = function promptLateCheckoutFee(options = {}) {
             html: `
                 <p class="late-checkout-fee-intro">Select how to apply the late check-out charge:</p>
                 <div class="late-checkout-fee-actions">
-                    <button type="button" id="swalLateCheckoutFree" class="btn btn-success">FREE</button>
-                    <button type="button" id="swalLateCheckoutAmount" class="btn btn-primary">AMOUNT</button>
+                    <button type="button" id="swalLateCheckoutFree" class="late-checkout-fee-btn">FREE</button>
+                    <button type="button" id="swalLateCheckoutAmount" class="late-checkout-fee-btn">AMOUNT</button>
                 </div>
                 <div id="swalLateCheckoutAmountField" class="late-checkout-fee-field" style="display:none;">
                     <label for="swalLateCheckoutFeeInput">Late Checkout Fee</label>
@@ -99,7 +99,7 @@ window.promptLateCheckoutFee = function promptLateCheckoutFee(options = {}) {
                     >
                     <div id="swalLateCheckoutFeeError" class="late-checkout-fee-error" style="display:none;"></div>
                 </div>
-                <button type="button" id="swalLateCheckoutApply" class="btn btn-primary late-checkout-fee-apply" style="display:none;">Apply Amount</button>
+                <button type="button" id="swalLateCheckoutApply" class="late-checkout-fee-btn late-checkout-fee-apply" style="display:none;">Apply Amount</button>
             `,
             showConfirmButton: false,
             showCancelButton: true,
@@ -109,7 +109,8 @@ window.promptLateCheckoutFee = function promptLateCheckoutFee(options = {}) {
             returnFocus: false,
             customClass: {
                 popup: 'late-checkout-fee-swal',
-                container: 'late-checkout-fee-swal-container'
+                container: 'late-checkout-fee-swal-container',
+                cancelButton: 'late-checkout-fee-cancel-btn'
             },
             didOpen: (popup) => {
                 removeFocusGuard = guardSwalFocusTrap();
@@ -202,6 +203,42 @@ if (!document.getElementById('late-checkout-fee-styles')) {
             gap: 10px;
             justify-content: center;
             margin-bottom: 14px;
+        }
+        .late-checkout-fee-swal .late-checkout-fee-btn {
+            background-color: #6f9c40 !important;
+            background-image: none !important;
+            border: 1px solid #6f9c40 !important;
+            color: #ffffff !important;
+            min-width: 120px;
+            padding: 8px 20px;
+            font-weight: 600;
+            font-size: 14px;
+            line-height: 1.4;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: none !important;
+        }
+        .late-checkout-fee-swal .late-checkout-fee-btn:hover,
+        .late-checkout-fee-swal .late-checkout-fee-btn:focus {
+            background-color: #5a7a33 !important;
+            background-image: none !important;
+            border-color: #5a7a33 !important;
+            color: #ffffff !important;
+            outline: none;
+        }
+        .late-checkout-fee-swal .swal2-cancel.late-checkout-fee-cancel-btn {
+            background-color: #6c757d !important;
+            background-image: none !important;
+            border: 1px solid #6c757d !important;
+            color: #ffffff !important;
+            box-shadow: none !important;
+        }
+        .late-checkout-fee-swal .swal2-cancel.late-checkout-fee-cancel-btn:hover,
+        .late-checkout-fee-swal .swal2-cancel.late-checkout-fee-cancel-btn:focus {
+            background-color: #5a6268 !important;
+            background-image: none !important;
+            border-color: #5a6268 !important;
+            color: #ffffff !important;
         }
         .late-checkout-fee-field { text-align: left; margin-top: 4px; }
         .late-checkout-fee-field label {

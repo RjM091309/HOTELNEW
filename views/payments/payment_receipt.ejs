@@ -304,9 +304,8 @@
   }; %>
   <% const methodKey = (paymentMethod || '').toLowerCase(); %>
   <% const isCash = methodKey === 'cash'; %>
-  <% const isBank = ['credit_card', 'card', 'bank_transfer', 'bank transfer', 'gcash', 'online'].includes(methodKey); %>
-  <% const isCheck = methodKey === 'check'; %>
-  <% const isOther = !isBlank && !isCash && !isBank && !isCheck && !!methodKey; %>
+  <% const isCredit = ['credit', 'credit_card', 'marker', 'bank_transfer'].includes(methodKey); %>
+  <% const isOther = !isBlank && !isCash && !isCredit && (methodKey === 'other' || methodKey === 'check' || !!methodKey); %>
   <% const otherLabel = isOther ? (paymentMethodLabel || paymentMethod || '') : ''; %>
 
   <div class="page">
@@ -369,11 +368,10 @@
               </div>
               <div class="method-options">
                 <span class="method-option"><span class="checkbox <%= !isBlank && isCash ? 'checked' : '' %>"></span> Cash</span>
-                <span class="method-option"><span class="checkbox <%= !isBlank && isBank ? 'checked' : '' %>"></span> Bank Transfer</span>
-                <span class="method-option"><span class="checkbox <%= !isBlank && isCheck ? 'checked' : '' %>"></span> Check</span>
+                <span class="method-option"><span class="checkbox <%= !isBlank && isCredit ? 'checked' : '' %>"></span> Credit</span>
                 <span class="method-option">
                   <span class="checkbox <%= !isBlank && isOther ? 'checked' : '' %>"></span>
-                  Other<% if (!isBlank && otherLabel) { %>: <%= otherLabel %><% } else if (isBlank) { %>: <span class="other-line"></span><% } %>
+                  Other<% if (!isBlank && otherLabel && methodKey === 'other') { %>: <%= otherLabel %><% } else if (isBlank) { %>: <span class="other-line"></span><% } %>
                 </span>
               </div>
             </div>
