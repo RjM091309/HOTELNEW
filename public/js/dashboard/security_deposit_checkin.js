@@ -117,18 +117,11 @@
             const paymentMethod = document.getElementById('sdPaymentMethod')?.value || 'cash';
             const remarks = document.getElementById('sdRemarks')?.value || '';
 
-            if (!amount || amount <= 0) {
-                showError('Please enter a valid security deposit amount.');
-                return null;
+            if (amount > 0) {
+                payload.depositAmount = amount;
+                payload.paymentMethod = paymentMethod;
+                payload.remarks = remarks;
             }
-            if (!paymentMethod) {
-                showError('Please select a payment method.');
-                return null;
-            }
-
-            payload.depositAmount = amount;
-            payload.paymentMethod = paymentMethod;
-            payload.remarks = remarks;
         }
 
         setLoading(true);

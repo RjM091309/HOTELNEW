@@ -1,0 +1,126 @@
+<div class="dashboard-card">
+  <div class="dashboard-card-header">
+    <header>Deposits</header>
+  </div>
+  <div class="dashboard-card-body deposits-table-wrap">
+    <div class="row" style="margin-bottom: 16px;">
+      <div class="col-md-4">
+        <div class="deposits-summary-card">
+          <div class="deposits-summary-label">Total Deposits</div>
+          <div class="deposits-summary-value" id="depositsTotalAmount">₱0.00</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="deposits-summary-card held">
+          <div class="deposits-summary-label">Held</div>
+          <div class="deposits-summary-value" id="depositsHeldAmount">₱0.00</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="deposits-summary-card refunded">
+          <div class="deposits-summary-label">Refunded</div>
+          <div class="deposits-summary-value" id="depositsRefundedAmount">₱0.00</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-scrollable">
+      <table id="depositsTable" class="table table-hover table-bordered full-width">
+        <thead>
+          <tr>
+            <th>Date Collected</th>
+            <th>Guest Name</th>
+            <th>Room</th>
+            <th>Confirmation No.</th>
+            <th>Amount</th>
+            <th>Deduction</th>
+            <th>Cash Refund</th>
+            <th>Applied to Balance</th>
+            <th>Payment Method</th>
+            <th>Status</th>
+            <th>Remarks</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    setTimeout(function () {
+      const script = document.createElement('script');
+      script.src = '/js/deposits/deposits.js';
+      document.body.appendChild(script);
+    }, 300);
+  });
+</script>
+
+<style>
+  .deposits-summary-card {
+    background: linear-gradient(145deg, #2a3135, #1f2528);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 14px;
+    padding: 16px 18px;
+    text-align: center;
+  }
+
+  .deposits-summary-card.held .deposits-summary-value {
+    color: #5bc0de;
+  }
+
+  .deposits-summary-card.refunded .deposits-summary-value {
+    color: #5cb85c;
+  }
+
+  .deposits-summary-label {
+    color: #c5cdd3;
+    font-size: 13px;
+    margin-bottom: 6px;
+  }
+
+  .deposits-summary-value {
+    color: #ffffff;
+    font-size: 22px;
+    font-weight: 700;
+  }
+
+  .deposits-table-wrap .table-scrollable {
+    max-height: calc(100vh - 360px);
+    overflow-y: auto !important;
+  }
+
+  .deposits-table-wrap #depositsTable th,
+  .deposits-table-wrap #depositsTable td {
+    padding: 6px 10px !important;
+    line-height: 1.35;
+    vertical-align: middle;
+    font-size: 13px;
+  }
+
+  .deposit-status-held {
+    color: #5bc0de;
+    font-weight: 600;
+    text-transform: capitalize;
+  }
+
+  .deposit-status-refunded {
+    color: #5cb85c;
+    font-weight: 600;
+    text-transform: capitalize;
+  }
+
+  body.white-sidebar-color .deposits-summary-card {
+    background: #ffffff;
+    border-color: #e5e7eb;
+  }
+
+  body.white-sidebar-color .deposits-summary-label {
+    color: #6b7280;
+  }
+
+  body.white-sidebar-color .deposits-summary-value {
+    color: #111827;
+  }
+</style>

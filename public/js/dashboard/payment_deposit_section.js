@@ -99,6 +99,41 @@
         if (amountInput) {
             amountInput.value = effectiveAmount;
         }
+
+        syncPaymentModalState(effectiveAmount);
+    }
+
+    function syncPaymentModalState(effectiveAmount) {
+        const paymentModalEl = document.getElementById('modal-payment');
+        const confirmBtn = document.getElementById('confirmPaymentButton');
+        const confirmBtnText = confirmBtn?.querySelector('.btn-text');
+        if (!paymentModalEl || !isVisible()) return;
+
+        const amountToPay = typeof effectiveAmount === 'number'
+            ? effectiveAmount
+            : Math.max(0, state.unpaidBalance - computeAppliedToBalance(getSelectedAction()));
+        const skipPayment = amountToPay <= 0;
+
+        paymentModalEl.dataset.skipPaymentStep = skipPayment ? 'true' : 'false';
+        $(paymentModalEl).find('.payment-amount-group, .payment-method-group, .payment-details-section').toggle(!skipPayment);
+
+        if (confirmBtnText) {
+            confirmBtnText.textContent = skipPayment ? 'Confirm & Check Out' : 'Confirm Payment';
+        }
+
+        if (!confirmBtn) return;
+
+        if (skipPayment) {
+            confirmBtn.disabled = false;
+            confirmBtn.classList.remove('btn-secondary');
+            confirmBtn.classList.add('btn-success');
+            return;
+        }
+
+        const amountInput = document.getElementById('paymentAmountInput');
+        if (amountInput) {
+            amountInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
     }
 
     function updatePreviews() {
@@ -219,6 +254,7 @@
 
         updatePreviews();
         section.style.display = 'block';
+        syncPaymentModalState(Math.max(0, unpaidBalance));
     }
 
     function hide() {
@@ -273,5 +309,5 @@
         }
     }
 
-    window.PaymentDepositSection = { configure, hide, isVisible, submit, reflectAppliedToSummary };
+    window.PaymentDepositSection = { configure, hide, isVisible, submit, reflectAppliedToSummary, syncPaymentModalState };
 })();

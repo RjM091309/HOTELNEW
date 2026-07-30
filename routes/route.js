@@ -27,6 +27,7 @@ const mapsRoutes = require('./r_maps');
 const gpsTrackerRoutes = require('./r_gps_tracker');
 const flightScheduleRoutes = require('./r_flight_schedule');
 const pickupDropRoutes = require('./r_pickup_drop');
+const depositsRoutes = require('./r_deposits');
 
 // Auth middleware
 const AuthMiddleware = require('../middleware/m_auth');
@@ -58,6 +59,7 @@ router.use('/integration', AuthMiddleware.requireAuth, integrationRoutes);
 router.use('/booking_channel', AuthMiddleware.requireAuth, bookingChannelRoutes);
 router.use('/payments', AuthMiddleware.requireAuth, paymentsRoutes);
 router.use('/credit', AuthMiddleware.requireAuth, creditRoutes);
+router.use('/deposits', AuthMiddleware.requireAuth, depositsRoutes);
 router.use('/room_clearance', AuthMiddleware.requireAuth, roomClearanceRoutes);
 router.use('/telegram', AuthMiddleware.requireAuth, telegramRoutes);
 router.use('/agency', AuthMiddleware.requireAuth, agencyRoutes);

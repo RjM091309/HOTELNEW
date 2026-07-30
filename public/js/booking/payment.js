@@ -150,6 +150,16 @@ function initializePaymentModal() {
         const amount = parseFloat(paymentAmountInput.value) || 0;
         const totalAmount = parseFloat(totalAmountDisplay.textContent.replace(/,/g, '')) || 0;
         const selectedMethod = document.querySelector('input[name="paymentMethod"]:checked');
+        const paymentModalEl = document.getElementById('modal-payment');
+        const skipPaymentStep = paymentModalEl && paymentModalEl.dataset.skipPaymentStep === 'true';
+        const depositCheckout = window.PaymentDepositSection && window.PaymentDepositSection.isVisible();
+
+        if (depositCheckout && skipPaymentStep && amount <= 0 && totalAmount <= 0) {
+            confirmButton.disabled = false;
+            confirmButton.classList.remove('btn-secondary');
+            confirmButton.classList.add('btn-success');
+            return;
+        }
 
         // Check if amount exceeds total amount to pay (compare in whole cents - see
         // note in the input handler above; a strict float compare here silently
@@ -552,6 +562,18 @@ $('#confirmPaymentButton').on('click', async function () {
                     totalAmountEl.textContent = freshBalance.toLocaleString('en-US', { minimumFractionDigits: 2 });
                 }
             }
+
+            if (freshBalance <= 0) {
+                shouldReopenBillingModal = false;
+                if (typeof window.onPaymentConfirmed === 'function') {
+                    const onConfirmed = window.onPaymentConfirmed;
+                    window.onPaymentConfirmed = null;
+                    $('.modal').modal('hide');
+                    $('.modal-backdrop').remove();
+                    onConfirmed(depositResult);
+                }
+                return;
+            }
         }
     }
 
@@ -598,6 +620,21 @@ $('#confirmPaymentButton').on('click', async function () {
     // Clean and format payment amount for display
     const cleanAmount = paymentAmount ? paymentAmount.toString().replace(/[₹$,]/g, '') : '0';
     const numericAmount = parseFloat(cleanAmount) || 0;
+    const paymentModalEl = document.getElementById('modal-payment');
+    const skipPaymentStep = paymentModalEl && paymentModalEl.dataset.skipPaymentStep === 'true';
+
+    if (skipPaymentStep && numericAmount <= 0) {
+        shouldReopenBillingModal = false;
+        if (typeof window.onPaymentConfirmed === 'function') {
+            const onConfirmed = window.onPaymentConfirmed;
+            window.onPaymentConfirmed = null;
+            $('.modal').modal('hide');
+            $('.modal-backdrop').remove();
+            onConfirmed({ success: true });
+        }
+        return;
+    }
+
     const formattedAmount = numericAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     // Show confirmation dialog

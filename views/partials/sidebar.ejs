@@ -110,7 +110,7 @@
 					</ul>
 				</li>
 
-				<% const paymentPages = ['daily_settlement', 'payments', 'credit']; %>
+				<% const paymentPages = ['daily_settlement', 'payments', 'credit', 'deposits']; %>
 				<li class="nav-item <%= paymentPages.includes(activePage) ? 'open' : '' %>" data-section="payment-management">
 					<a class="nav-link nav-toggle nav-main-link-submenu <%= paymentPages.includes(activePage) ? 'active' : '' %>" data-toggle="submenu" aria-haspopup="true"
 						aria-expanded="<%= paymentPages.includes(activePage) ? 'true' : 'false' %>" href="#">
@@ -135,6 +135,12 @@
 							<a href="/credit" class="nav-link <%= activePage === 'credit' ? 'active' : '' %>">
 								<i class="fa fa-genderless"></i>
 								<span class="title">Credit</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a href="/deposits" class="nav-link <%= activePage === 'deposits' ? 'active' : '' %>">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Deposits</span>
 							</a>
 						</li>
 						<li class="nav-item">

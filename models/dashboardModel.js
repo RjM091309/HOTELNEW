@@ -1448,23 +1448,24 @@ class DashboardModel {
 
       if (!depositInfo.exists) {
         const amount = parseFloat(depositAmount);
-        if (!amount || amount <= 0) {
-          await queryDatabasePromise('ROLLBACK');
-          return { success: false, message: 'Security deposit amount is required.' };
-        }
-        if (!paymentMethod) {
-          await queryDatabasePromise('ROLLBACK');
-          return { success: false, message: 'Payment method is required.' };
-        }
 
-        const depositRemarks = remarks?.trim() || 'Security deposit collected at check-in';
+        if (amount > 0) {
+          if (!paymentMethod) {
+            await queryDatabasePromise('ROLLBACK');
+            return { success: false, message: 'Payment method is required.' };
+          }
 
-        await queryDatabasePromise(
-          `INSERT INTO security_deposits (BOOKING_ID, AMOUNT, PAYMENT_METHOD, STATUS, REMARKS, ENCODED_BY, COLLECTED_AT, ACTIVE)
-           VALUES (?, ?, ?, 'held', ?, ?, NOW(), 1)`,
-          [bookingId, amount, paymentMethod, depositRemarks, encodedBy]
-        );
-        recordedDeposit = amount;
+          const depositRemarks = remarks?.trim() || 'Security deposit collected at check-in';
+
+          await queryDatabasePromise(
+            `INSERT INTO security_deposits (BOOKING_ID, AMOUNT, PAYMENT_METHOD, STATUS, REMARKS, ENCODED_BY, COLLECTED_AT, ACTIVE)
+             VALUES (?, ?, ?, 'held', ?, ?, NOW(), 1)`,
+            [bookingId, amount, paymentMethod, depositRemarks, encodedBy]
+          );
+          recordedDeposit = amount;
+        } else {
+          recordedDeposit = 0;
+        }
       }
 
       const updateResult = await queryDatabasePromise(
@@ -1482,7 +1483,9 @@ class DashboardModel {
         success: true,
         message: depositInfo.exists
           ? 'Guest checked in successfully.'
-          : `Security deposit of ₱${recordedDeposit.toLocaleString('en-US', { minimumFractionDigits: 2 })} recorded. Guest checked in successfully.`,
+          : recordedDeposit > 0
+            ? `Security deposit of ₱${recordedDeposit.toLocaleString('en-US', { minimumFractionDigits: 2 })} recorded. Guest checked in successfully.`
+            : 'Guest checked in successfully.',
         data: { bookingId, status: 'check-In', securityDeposit: recordedDeposit }
       };
     } catch (error) {
