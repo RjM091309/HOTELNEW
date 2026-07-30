@@ -1915,7 +1915,11 @@ function classifyEventForLegend(event) {
   const backgroundColor = event.backgroundColor || '';
   const ci = event.extendedProps?.checkInStatus;   // 1=regular,0=late
   const co = event.extendedProps?.checkOutStatus;  // 0=regular,1=late
-  const paymentStatus = (event.extendedProps?.paymentStatus || 'unpaid').toLowerCase();
+  const paymentStatus = (() => {
+    const raw = (event.extendedProps?.paymentStatus || 'unpaid').toLowerCase();
+    if (raw === 'partial_paid') return 'partial';
+    return raw;
+  })();
 
   const flags = {
     'occupied': false,

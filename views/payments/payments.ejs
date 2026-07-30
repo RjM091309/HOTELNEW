@@ -31,6 +31,7 @@
             </div>
             <div class="col-4"><h6 class="text-danger mb-1" id="daily-unpaid">0</h6><small class="text-muted">Unpaid</small></div>
           </div>
+          <small id="daily-sales-breakdown" class="text-muted d-block text-center mt-2" style="font-size:11px;"></small>
         </div></div>
       </div>
       <div class="col-md-4">
@@ -203,6 +204,10 @@
         document.getElementById('daily-total').textContent = '' + Number(data.dailyTotal||0).toLocaleString('en-US');
         document.getElementById('daily-paid').textContent = '' + Number(data.dailyPaid||0).toLocaleString('en-US');
         document.getElementById('daily-unpaid').textContent = '' + Number(data.dailyUnpaid||0).toLocaleString('en-US');
+        const bookingPaid = Number(data.dailyBookingPaid || 0).toLocaleString('en-US');
+        const receiptPaid = Number(data.dailyReceiptPaid || 0).toLocaleString('en-US');
+        document.getElementById('daily-sales-breakdown').textContent =
+          `Bookings: ${bookingPaid} · Receipts: ${receiptPaid}`;
         document.getElementById('weekly-total').textContent = '' + Number(data.weeklyTotal||0).toLocaleString('en-US');
         document.getElementById('weekly-paid').textContent = '' + Number(data.weeklyPaid||0).toLocaleString('en-US');
         document.getElementById('weekly-unpaid').textContent = '' + Number(data.weeklyUnpaid||0).toLocaleString('en-US');
@@ -415,28 +420,56 @@
           $('#todayPaidContent').html(`<div class="alert alert-danger"><strong>Error:</strong> ${data.message || 'Failed to load payments'}</div>`);
           return;
         }
-        displayTodayPaidPayments(data.data || [], data.total || 0, data.range || range);
+        displayTodayPaidCollections(data);
       })
       .catch(() => {
         $('#todayPaidContent').html('<div class="alert alert-danger"><strong>Error:</strong> Failed to load paid payments</div>');
       });
   }
 
-  function displayTodayPaidPayments(payments, total, range = 'today') {
+  function displayTodayPaidCollections(data) {
+    const payments = data.payments || [];
+    const receipts = data.receipts || [];
+    const range = data.range || 'today';
+    const paymentsTotal = Number(data.paymentsTotal || 0);
+    const receiptsTotal = Number(data.receiptsTotal || 0);
+    const combinedTotal = Number(data.total || paymentsTotal + receiptsTotal);
+
     const rangeLabel = range === 'last7days' ? 'Last 7 Days' : 'Today';
-    const emptyMessage = range === 'last7days'
-      ? 'No paid payments recorded in the last 7 days.'
-      : 'No paid payments recorded for today.';
-    const totalLabel = range === 'last7days' ? 'Total Collected (Last 7 Days)' : 'Total Collected Today';
+    $('#todayPaidModalLabel').text(`${rangeLabel} Collected Sales`);
 
-    $('#todayPaidModalLabel').text(`${rangeLabel} Paid Payments`);
-
-    if (!payments.length) {
+    if (!payments.length && !receipts.length) {
+      const emptyMessage = range === 'last7days'
+        ? 'No collections recorded in the last 7 days.'
+        : 'No collections recorded for today.';
       $('#todayPaidContent').html(`<div class="alert alert-info mb-0">${emptyMessage}</div>`);
       return;
     }
 
-    const methodLabels = { cash: 'Cash', credit_card: 'Credit Card', credit: 'Credit', marker: 'Credit' };
+    const methodLabels = { cash: 'Cash', credit_card: 'Credit Card', credit: 'Credit', marker: 'Credit', other: 'Others' };
+    let html = '';
+
+    if (payments.length) {
+      html += `<h6 class="mb-2"><strong>Booking Payments</strong> <span class="text-muted">(guest balance / billing)</span></h6>`;
+      html += buildPaidCollectionTable(payments, methodLabels);
+      html += `<div class="text-end mb-3"><strong>Booking Total: ${paymentsTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></div>`;
+    }
+
+    if (receipts.length) {
+      html += `<h6 class="mb-2 mt-3"><strong>Standalone Receipts</strong> <span class="text-muted">(not in guest payment history)</span></h6>`;
+      html += buildReceiptCollectionTable(receipts, methodLabels);
+      html += `<div class="text-end mb-3"><strong>Receipt Total: ${receiptsTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></div>`;
+    }
+
+    html += `
+      <div class="alert alert-success text-end mb-0">
+        <strong>Combined Total: ${combinedTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+      </div>`;
+
+    $('#todayPaidContent').html(html);
+  }
+
+  function buildPaidCollectionTable(payments, methodLabels) {
     const colgroup = `
       <colgroup>
         <col class="col-index">
@@ -479,9 +512,8 @@
         </tr>`;
     });
 
-    const formattedTotal = Number(total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    let html = `
-      <div class="paid-payments-table-wrap">
+    return `
+      <div class="paid-payments-table-wrap mb-2">
         <table class="table table-bordered paid-payments-table paid-payments-table-head mb-0">
           ${colgroup}
           <thead class="table-dark">${headRow}</thead>
@@ -492,21 +524,44 @@
             <tbody>${bodyRows}</tbody>
           </table>
         </div>
-        <table class="table table-bordered paid-payments-table paid-payments-table-foot mb-0">
-          ${colgroup}
-          <tfoot>
-            <tr class="table-success">
-              <th colspan="6" class="text-end">${totalLabel}</th>
-              <th class="text-end">${formattedTotal}</th>
-              <th></th>
-              <th></th>
+      </div>`;
+  }
+
+  function buildReceiptCollectionTable(receipts, methodLabels) {
+    let bodyRows = '';
+    receipts.forEach((receipt, index) => {
+      const methodLabel = methodLabels[(receipt.PAYMENT_METHOD || '').toLowerCase()] || receipt.PAYMENT_METHOD || 'N/A';
+      bodyRows += `
+        <tr>
+          <td class="text-center">${index + 1}</td>
+          <td>${receipt.GUEST_NAME || 'N/A'}</td>
+          <td class="text-center">${receipt.ROOM_NUMBER || '-'}</td>
+          <td class="text-center">${receipt.RECEIPT_NO || '-'}</td>
+          <td class="text-end">${Number(receipt.AMOUNT_PAID || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td class="text-center">${methodLabel}</td>
+          <td class="text-center">${receipt.PAYMENT_DATE ? new Date(receipt.PAYMENT_DATE).toLocaleString('en-US') : '-'}</td>
+          <td class="text-center">${receipt.PROCESSED_BY_NAME || '-'}</td>
+        </tr>`;
+    });
+
+    return `
+      <div class="paid-payments-table-wrap mb-2">
+        <table class="table table-bordered paid-payments-table mb-0">
+          <thead class="table-secondary">
+            <tr>
+              <th class="text-center">#</th>
+              <th>Received From</th>
+              <th class="text-center">Room</th>
+              <th class="text-center">Receipt No.</th>
+              <th class="text-end">Amount</th>
+              <th class="text-center">Method</th>
+              <th class="text-center">Receipt Date</th>
+              <th class="text-center">Received By</th>
             </tr>
-          </tfoot>
+          </thead>
+          <tbody>${bodyRows}</tbody>
         </table>
       </div>`;
-
-    $('#todayPaidContent').html(html);
-    syncPaidPaymentsTableLayout();
   }
 
   function syncPaidPaymentsTableLayout() {

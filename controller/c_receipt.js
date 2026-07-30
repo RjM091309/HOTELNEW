@@ -42,9 +42,10 @@ function extractReceiptStyles(html) {
 }
 
 function extractReceiptPage(html) {
-  const start = html.indexOf('<div class="page">');
-  if (start === -1) return '';
+  const pageMatch = html.match(/<div class="page\b[^"]*"/i);
+  if (!pageMatch) return '';
 
+  const start = pageMatch.index;
   const scriptIdx = html.indexOf('<script', start);
   const endSearch = scriptIdx !== -1 ? scriptIdx : html.length;
   const chunk = html.slice(start, endSearch);
@@ -287,8 +288,9 @@ class ReceiptController {
 
       const bulkStyles = `
         .receipt-print-sheet .page {
+          height: 289mm;
+          max-height: 289mm;
           min-height: auto;
-          height: auto;
         }
         @media print {
           .receipt-print-sheet {

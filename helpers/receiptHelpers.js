@@ -51,6 +51,7 @@ function mapReceiptRecordToViewData(record) {
     paymentMethod: methodKey,
     paymentMethodLabel: formatPaymentMethodLabel(methodKey, otherLabel),
     purpose: record.PURPOSE || '',
+    purposeLines: [],
     receivedBy: record.RECEIVED_BY || ''
   };
 }
@@ -65,6 +66,7 @@ function mapBlankReceiptViewData() {
     paymentMethod: '',
     paymentMethodLabel: '',
     purpose: '',
+    purposeLines: [],
     receivedBy: ''
   };
 }

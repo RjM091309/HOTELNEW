@@ -158,8 +158,12 @@ class CalendarModel {
                   SELECT 1 FROM booking_service bs 
                   WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1 AND bs.STATUS <> 'paid'
                 )
+                OR EXISTS (
+                  SELECT 1 FROM booking_extension be
+                  WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1 AND be.PAYMENT_STATUS <> 'paid'
+                )
               )
-              THEN '#0b3d91' -- dark blue when checked out but has balance (rooms or services)
+              THEN '#0b3d91' -- dark blue when checked out but has balance (rooms, services, or extensions)
             WHEN b.BOOKING_STATUS = 'check-Out' THEN '#B3B3B3'
             WHEN b.BOOKING_STATUS = 'pending' AND COALESCE(b.CHECK_IN_STATUS, 1) = 0 THEN '#e0a316'
             WHEN b.BOOKING_STATUS = 'pending' THEN '#e53935'
@@ -168,7 +172,28 @@ class CalendarModel {
           END AS backgroundColor,
           -- Pre-calculated extended properties
           COALESCE(bill.ROOM_CHARGE, 0) + COALESCE(bill.AMENITIES_CHARGE, 0) + COALESCE(bill.SERVICES_CHARGE, 0) + COALESCE(bill.LATE_CHECKOUT_CHARGE, 0) AS totalCost,
-          COALESCE(bill.PAYMENT_STATUS, 'unpaid') AS paymentStatus,
+          CASE
+            WHEN EXISTS (
+              SELECT 1 FROM booking_service bs
+              WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1 AND bs.STATUS <> 'paid'
+            ) OR EXISTS (
+              SELECT 1 FROM booking_extension be
+              WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1 AND be.PAYMENT_STATUS <> 'paid'
+            ) THEN
+              CASE
+                WHEN COALESCE(bill.PAYMENT_STATUS, 'unpaid') IN ('paid', 'partial_paid')
+                  OR EXISTS (
+                    SELECT 1 FROM payments p
+                    WHERE p.BOOKING_ID = b.IDNo
+                      AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'security_deposit_refund')
+                  )
+                THEN 'partial'
+                ELSE 'unpaid'
+              END
+            WHEN COALESCE(bill.PAYMENT_STATUS, 'unpaid') = 'paid' THEN 'paid'
+            WHEN COALESCE(bill.PAYMENT_STATUS, 'unpaid') IN ('partial_paid', 'partial') THEN 'partial'
+            ELSE 'unpaid'
+          END AS paymentStatus,
           DATEDIFF(b.CHECK_OUT_DATE, b.CHECK_IN_DATE) AS totalDays,
           b.BOOKING_STATUS AS bookingStatus,
           COALESCE(b.CHECK_IN_STATUS, 1) AS checkInStatus,
@@ -998,6 +1023,13 @@ class CalendarModel {
         parsedCost,
         userId// Use actual user ID or default to 1
       ]);
+
+      await queryDatabasePromise(
+        `UPDATE billing
+         SET PAYMENT_STATUS = 'partial_paid'
+         WHERE BOOKING_ID = ? AND ACTIVE = 1 AND PAYMENT_STATUS = 'paid'`,
+        [bookingId]
+      );
 
       return { success: true };
     } catch (error) {

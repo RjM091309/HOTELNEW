@@ -2189,6 +2189,14 @@ class DashboardModel {
         cost,
         userId
       ]);
+
+      // Room was fully paid but extension is unpaid — reflect partial payment on billing
+      await queryDatabasePromise(
+        `UPDATE billing
+         SET PAYMENT_STATUS = 'partial_paid'
+         WHERE BOOKING_ID = ? AND ACTIVE = 1 AND PAYMENT_STATUS = 'paid'`,
+        [bookingId]
+      );
       
       return {
         success: true,

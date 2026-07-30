@@ -10,24 +10,60 @@ function buildReceiptDataFromPayments(booking, payments, processedBy) {
   const primaryMethod = methods.length === 1 ? methods[0] : (methods[0] || '');
 
   const purposeParts = [];
+  const purposeLines = [];
+
   if (booking.CONFIRMATION_NUMBER) {
-    purposeParts.push(`Booking Confirmation: ${booking.CONFIRMATION_NUMBER}`);
+    const text = `Booking Confirmation: ${booking.CONFIRMATION_NUMBER}`;
+    purposeParts.push(text);
+    purposeLines.push({ type: 'info', text });
   }
   if (booking.ROOM_NUMBER) {
-    purposeParts.push(`Room: ${booking.ROOM_NUMBER}`);
+    const text = `Room: ${booking.ROOM_NUMBER}`;
+    purposeParts.push(text);
+    purposeLines.push({ type: 'info', text });
   }
 
   payments.forEach((payment) => {
-    const paymentDate = payment.PAYMENT_DATE
-      ? new Date(payment.PAYMENT_DATE).toLocaleString('en-US')
-      : '';
+    let date = '';
+    let time = '';
+    if (payment.PAYMENT_DATE) {
+      const paymentDateObj = new Date(payment.PAYMENT_DATE);
+      date = paymentDateObj.toLocaleDateString('en-US', {
+        month: 'numeric',
+        day: 'numeric',
+        year: 'numeric'
+      });
+      time = paymentDateObj.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+    }
     const methodLabel = formatPaymentMethodLabel(payment.PAYMENT_METHOD);
     const amount = Number(payment.AMOUNT_PAID || 0).toLocaleString('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
-    purposeParts.push(`${payment.PAYMENT_TYPE || 'Payment'} - ${methodLabel} - PHP ${amount}${paymentDate ? ` (${paymentDate})` : ''}`);
+    const paymentType = payment.PAYMENT_TYPE || 'Payment';
+    const paymentDate = payment.PAYMENT_DATE
+      ? new Date(payment.PAYMENT_DATE).toLocaleString('en-US')
+      : '';
+    purposeParts.push(`${paymentType} - ${methodLabel} - PHP ${amount}${paymentDate ? ` (${paymentDate})` : ''}`);
+    purposeLines.push({
+      type: 'payment',
+      paymentType,
+      method: methodLabel,
+      amount,
+      date,
+      time
+    });
   });
+
+  const formattedTotal = totalAmount.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+  purposeParts.push(`Grand Total: PHP ${formattedTotal}`);
+  purposeLines.push({ type: 'total', label: 'Grand Total', amount: formattedTotal });
 
   const receiptNo = payments.length === 1
     ? `RCP-${payments[0].IDNo}`
@@ -43,6 +79,7 @@ function buildReceiptDataFromPayments(booking, payments, processedBy) {
     paymentMethod: primaryMethod,
     paymentMethodLabel: methods.length > 1 ? methods.map(formatPaymentMethodLabel).join(', ') : formatPaymentMethodLabel(primaryMethod),
     purpose: purposeParts.join('\n'),
+    purposeLines,
     receivedBy: processedBy || payments[0]?.NAME || ''
   };
 }
@@ -167,13 +204,19 @@ const paymentsController = {
         success: true,
         dailyTotal: daily.dailyTotal || 0,
         dailyPaid: daily.dailyPaid || 0,
-        dailyUnpaid: (daily.dailyTotal || 0) - (daily.dailyPaid || 0),
+        dailyUnpaid: (daily.bookingTotal || 0) - (daily.bookingPaid || 0),
+        dailyBookingPaid: daily.bookingPaid || 0,
+        dailyReceiptPaid: daily.receiptPaid || 0,
         weeklyTotal: weekly.weeklyTotal || 0,
         weeklyPaid: weekly.weeklyPaid || 0,
-        weeklyUnpaid: (weekly.weeklyTotal || 0) - (weekly.weeklyPaid || 0),
+        weeklyUnpaid: (weekly.bookingTotal || 0) - (weekly.bookingPaid || 0),
+        weeklyBookingPaid: weekly.bookingPaid || 0,
+        weeklyReceiptPaid: weekly.receiptPaid || 0,
         monthlyTotal: monthly.monthlyTotal || 0,
         monthlyPaid: monthly.monthlyPaid || 0,
-        monthlyUnpaid: (monthly.monthlyTotal || 0) - (monthly.monthlyPaid || 0)
+        monthlyUnpaid: (monthly.bookingTotal || 0) - (monthly.bookingPaid || 0),
+        monthlyBookingPaid: monthly.bookingPaid || 0,
+        monthlyReceiptPaid: monthly.receiptPaid || 0
       });
     } catch (err) {
       console.error('Error fetching sales summary:', err);
@@ -184,9 +227,21 @@ const paymentsController = {
   todayPaidPayments: async (req, res) => {
     try {
       const range = req.query.range === 'last7days' ? 'last7days' : 'today';
-      const rows = await paymentsModel.getCollectedPayments(range);
-      const total = rows.reduce((sum, row) => sum + Number(row.AMOUNT_PAID || 0), 0);
-      res.json({ success: true, data: rows, total, range });
+      const payments = await paymentsModel.getCollectedPayments(range);
+      const receipts = await paymentsModel.getCollectedReceipts(range);
+
+      const paymentsTotal = payments.reduce((sum, row) => sum + Number(row.AMOUNT_PAID || 0), 0);
+      const receiptsTotal = receipts.reduce((sum, row) => sum + Number(row.AMOUNT_PAID || 0), 0);
+
+      res.json({
+        success: true,
+        payments,
+        receipts,
+        paymentsTotal,
+        receiptsTotal,
+        total: paymentsTotal + receiptsTotal,
+        range
+      });
     } catch (err) {
       console.error('Error fetching today paid payments:', err);
       res.status(500).json({ success: false, message: 'Failed to fetch today paid payments' });

@@ -162,6 +162,39 @@ const paymentsModel = {
     return rows;
   },
 
+  getCollectedReceipts: async (range = 'today', dateStr = null) => {
+    let dateCondition = 'DATE(pr.RECEIPT_DATE) = CURRENT_DATE()';
+    const params = [];
+
+    if (dateStr) {
+      dateCondition = 'DATE(pr.RECEIPT_DATE) = ?';
+      params.push(dateStr);
+    } else if (range === 'last7days') {
+      dateCondition = `
+        DATE(pr.RECEIPT_DATE) >= DATE_SUB(CURRENT_DATE(), INTERVAL 6 DAY)
+        AND DATE(pr.RECEIPT_DATE) <= CURRENT_DATE()
+      `;
+    }
+
+    const [rows] = await pool.promise().query(
+      `SELECT
+         pr.IDNo,
+         pr.RECEIPT_NO,
+         pr.ROOM_NO AS ROOM_NUMBER,
+         pr.RECEIVED_FROM AS GUEST_NAME,
+         pr.AMOUNT_PAID,
+         pr.PAYMENT_METHOD,
+         pr.RECEIPT_DATE AS PAYMENT_DATE,
+         pr.RECEIVED_BY AS PROCESSED_BY_NAME,
+         pr.PURPOSE
+       FROM payment_receipt pr
+       WHERE pr.ACTIVE = 1 AND ${dateCondition}
+       ORDER BY pr.RECEIPT_DATE DESC`,
+      params
+    );
+    return rows;
+  },
+
   salesSummary: async (todayStr, weekStartStr, monthStartStr) => {
     // Sales based on PAYMENT_DATE (kailan talaga pumasok ang bayad)
     // Discount entries are excluded (PAYMENT_TYPE != 'discount')
@@ -199,10 +232,61 @@ const paymentsModel = {
       [monthStartStr]
     );
 
+    // Standalone receipts (Receipt menu) — income only, not guest booking balance
+    const [dailyReceipts] = await pool.promise().query(
+      `SELECT COALESCE(SUM(AMOUNT_PAID), 0) AS amount
+       FROM payment_receipt
+       WHERE ACTIVE = 1 AND DATE(RECEIPT_DATE) = ?`,
+      [todayStr]
+    );
+
+    const [weeklyReceipts] = await pool.promise().query(
+      `SELECT COALESCE(SUM(AMOUNT_PAID), 0) AS amount
+       FROM payment_receipt
+       WHERE ACTIVE = 1 AND DATE(RECEIPT_DATE) >= ?`,
+      [weekStartStr]
+    );
+
+    const [monthlyReceipts] = await pool.promise().query(
+      `SELECT COALESCE(SUM(AMOUNT_PAID), 0) AS amount
+       FROM payment_receipt
+       WHERE ACTIVE = 1 AND DATE(RECEIPT_DATE) >= ?`,
+      [monthStartStr]
+    );
+
+    const dailyReceiptAmount = parseFloat(dailyReceipts[0]?.amount || 0);
+    const weeklyReceiptAmount = parseFloat(weeklyReceipts[0]?.amount || 0);
+    const monthlyReceiptAmount = parseFloat(monthlyReceipts[0]?.amount || 0);
+
+    const dailyBookingTotal = parseFloat(daily[0]?.totalAmount || 0);
+    const dailyBookingPaid = parseFloat(daily[0]?.paidAmount || 0);
+    const weeklyBookingTotal = parseFloat(weekly[0]?.totalAmount || 0);
+    const weeklyBookingPaid = parseFloat(weekly[0]?.paidAmount || 0);
+    const monthlyBookingTotal = parseFloat(monthly[0]?.totalAmount || 0);
+    const monthlyBookingPaid = parseFloat(monthly[0]?.paidAmount || 0);
+
     return {
-      daily: { dailyTotal: daily[0]?.totalAmount || 0, dailyPaid: daily[0]?.paidAmount || 0 },
-      weekly: { weeklyTotal: weekly[0]?.totalAmount || 0, weeklyPaid: weekly[0]?.paidAmount || 0 },
-      monthly: { monthlyTotal: monthly[0]?.totalAmount || 0, monthlyPaid: monthly[0]?.paidAmount || 0 }
+      daily: {
+        dailyTotal: dailyBookingTotal + dailyReceiptAmount,
+        dailyPaid: dailyBookingPaid + dailyReceiptAmount,
+        bookingTotal: dailyBookingTotal,
+        bookingPaid: dailyBookingPaid,
+        receiptPaid: dailyReceiptAmount
+      },
+      weekly: {
+        weeklyTotal: weeklyBookingTotal + weeklyReceiptAmount,
+        weeklyPaid: weeklyBookingPaid + weeklyReceiptAmount,
+        bookingTotal: weeklyBookingTotal,
+        bookingPaid: weeklyBookingPaid,
+        receiptPaid: weeklyReceiptAmount
+      },
+      monthly: {
+        monthlyTotal: monthlyBookingTotal + monthlyReceiptAmount,
+        monthlyPaid: monthlyBookingPaid + monthlyReceiptAmount,
+        bookingTotal: monthlyBookingTotal,
+        bookingPaid: monthlyBookingPaid,
+        receiptPaid: monthlyReceiptAmount
+      }
     };
   },
 

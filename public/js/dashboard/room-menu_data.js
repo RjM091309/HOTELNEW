@@ -7118,8 +7118,12 @@ function openCheckoutBacktrackModal(bookingId, event) {
                                                         <td class="text-end" style="background-color: transparent !important; border: none !important; color: #6c757d; font-size: 1rem; font-weight: 500;">₱<span id="services-cost-${bookingId}">Loading...</span></td>
                                                     </tr>
                                                     <tr style="background-color: transparent !important; border: none !important;">
+                                                        <td style="background-color: transparent !important; border: none !important; color: #6c757d; font-size: 1rem; font-weight: 500;">Extended Stay:</td>
+                                                        <td class="text-end" style="background-color: transparent !important; border: none !important; color: #6c757d; font-size: 1rem; font-weight: 500;">₱<span id="extension-cost-${bookingId}">Loading...</span></td>
+                                                    </tr>
+                                                    <tr style="background-color: transparent !important; border: none !important;">
                                                         <td style="background-color: transparent !important; border: none !important; color: #6c757d; font-size: 1rem; font-weight: 500;">Late Checkout:</td>
-                                                        <td class="text-end" style="background-color: transparent !important; border: none !important; color: #6c757d; font-size: 1rem; font-weight: 500;">₱<span id="late-checkout-${bookingId}">0.00</span></td>
+                                                        <td class="text-end" style="background-color: transparent !important; border: none !important; color: #6c757d; font-size: 1rem; font-weight: 500;">₱<span id="late-checkout-${bookingId}">Loading...</span></td>
                                                     </tr>
                                                     <tr class="border-top" style="border-color: #dee2e6 !important; background-color: transparent !important;">
                                                         <td style="background-color: transparent !important; border: none !important; color: #6c757d; font-size: 1rem; font-weight: 500;">Total Amount:</td>
@@ -7241,16 +7245,11 @@ function loadCheckoutData(bookingId) {
         .then(data => {
             
             
-            // Update room cost - check different possible field names
+            // Base room cost only — extensions are shown on a separate line
             const roomCostElement = document.getElementById(`room-cost-${bookingId}`);
             if (roomCostElement) {
-                const roomCost = data.total_room_cost || data.room_cost || data.ROOM_COST || data.totalRoomCost || 0;
-        
-                if (roomCost > 0) {
-                    roomCostElement.textContent = parseFloat(roomCost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                } else {
-                    roomCostElement.textContent = '0.00';
-                }
+                const roomCost = parseFloat(data.ROOM_COST || data.room_cost || 0) || 0;
+                roomCostElement.textContent = roomCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             }
             
             // Load services cost
@@ -7267,41 +7266,78 @@ function loadCheckoutData(bookingId) {
         });
 }
 
+function isCheckoutExtensionService(service) {
+    return service.SERVICE_ID === -999
+        || service.SERVICE_NAME === 'Extended Stay'
+        || service.SERVICE_NAME === 'Extended Day';
+}
+
+function isCheckoutLateCheckoutService(service) {
+    return service.SERVICE_ID === 72;
+}
+
+function formatCheckoutAmount(amount) {
+    return (parseFloat(amount) || 0).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
 // Function to load services cost
 function loadServicesCost(bookingId) {
     fetch(`/booking/get-booking-services/${bookingId}`)
         .then(response => response.json())
         .then(response => {
-            // Handle new response format: { success: true, data: [...] }
             const services = response.data || response;
-            
+
             let totalServicesCost = 0;
+            let totalExtensionCost = 0;
+            let totalLateCheckoutCost = 0;
+
             if (Array.isArray(services) && services.length > 0) {
                 services.forEach(service => {
                     const cost = parseFloat(service.TOTAL_COST) || 0;
-                    const quantity = parseInt(service.QTY) || 0;
-                    if (!isNaN(cost) && !isNaN(quantity)) {
+                    const quantity = parseInt(service.QTY, 10) || 0;
+                    if (isNaN(cost) || isNaN(quantity)) return;
+
+                    if (isCheckoutExtensionService(service)) {
+                        totalExtensionCost += cost * quantity;
+                    } else if (isCheckoutLateCheckoutService(service)) {
+                        totalLateCheckoutCost += cost;
+                    } else {
                         totalServicesCost += cost;
                     }
                 });
             }
-            
-            // Update services cost
+
             const servicesCostElement = document.getElementById(`services-cost-${bookingId}`);
             if (servicesCostElement) {
-                servicesCostElement.textContent = totalServicesCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                servicesCostElement.textContent = formatCheckoutAmount(totalServicesCost);
             }
-            
-            // Calculate and update total amount
+
+            const extensionCostElement = document.getElementById(`extension-cost-${bookingId}`);
+            if (extensionCostElement) {
+                extensionCostElement.textContent = formatCheckoutAmount(totalExtensionCost);
+            }
+
+            const lateCheckoutElement = document.getElementById(`late-checkout-${bookingId}`);
+            if (lateCheckoutElement) {
+                lateCheckoutElement.textContent = formatCheckoutAmount(totalLateCheckoutCost);
+            }
+
             updateCheckoutTotal(bookingId);
         })
         .catch(error => {
             console.error('Error loading services cost:', error);
-            // Set default values on error
             const servicesCostElement = document.getElementById(`services-cost-${bookingId}`);
-            if (servicesCostElement) {
-                servicesCostElement.textContent = '0.00';
-            }
+            if (servicesCostElement) servicesCostElement.textContent = '0.00';
+
+            const extensionCostElement = document.getElementById(`extension-cost-${bookingId}`);
+            if (extensionCostElement) extensionCostElement.textContent = '0.00';
+
+            const lateCheckoutElement = document.getElementById(`late-checkout-${bookingId}`);
+            if (lateCheckoutElement) lateCheckoutElement.textContent = '0.00';
+
             updateCheckoutTotal(bookingId);
         });
 }
@@ -7318,13 +7354,15 @@ function updateCheckoutTotal(bookingId) {
     const servicesCostText = servicesCostElement?.textContent || '0.00';
     const servicesCost = parseFloat(servicesCostText.replace(/[₱,]/g, '')) || 0;
     
-    // Get late checkout with proper parsing
+    const extensionCostElement = document.getElementById(`extension-cost-${bookingId}`);
+    const extensionCostText = extensionCostElement?.textContent || '0.00';
+    const extensionCost = parseFloat(extensionCostText.replace(/[₱,]/g, '')) || 0;
+
     const lateCheckoutElement = document.getElementById(`late-checkout-${bookingId}`);
     const lateCheckoutText = lateCheckoutElement?.textContent || '0.00';
     const lateCheckout = parseFloat(lateCheckoutText.replace(/[₱,]/g, '')) || 0;
     
-    // Calculate total with validation
-    const totalAmount = roomCost + servicesCost + lateCheckout;
+    const totalAmount = roomCost + servicesCost + extensionCost + lateCheckout;
     
     // Update total display
     const totalElement = document.getElementById(`total-amount-${bookingId}`);

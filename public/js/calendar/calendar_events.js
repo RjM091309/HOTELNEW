@@ -350,7 +350,11 @@ function applyPaymentStatusIndicator(event, el) {
       return;
     }
 
-    const paymentStatus = (event.extendedProps?.paymentStatus || 'unpaid').toLowerCase();
+    const paymentStatus = (() => {
+      const raw = (event.extendedProps?.paymentStatus || 'unpaid').toLowerCase();
+      if (raw === 'partial_paid') return 'partial';
+      return raw;
+    })();
     const lineColor = PAYMENT_STATUS_COLORS[paymentStatus] || PAYMENT_STATUS_COLORS.unpaid;
 
     const dot = existing || document.createElement('div');

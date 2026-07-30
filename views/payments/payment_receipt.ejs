@@ -6,68 +6,75 @@
   <style>
     @page {
       size: A4 portrait;
-      margin: 10mm 12mm;
+      margin: 4mm;
     }
 
     * { box-sizing: border-box; }
 
-    body {
-      font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+    html, body {
+      font-family: Arial, Helvetica, sans-serif;
       color: #333;
       margin: 0;
       padding: 0;
       background: #fff;
+      font-size: 8.5pt;
+      line-height: 1.15;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
 
     .page {
       width: 100%;
-      min-height: 100vh;
+      height: 289mm;
+      max-height: 289mm;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
 
     .receipt-copy {
-      flex: 1;
-      padding: 14px 20px 10px;
+      flex: 1 1 0;
+      min-height: 0;
+      padding: 2mm 4mm 1mm;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
 
     .page-cut {
       border-top: 1px dashed #bbb;
-      margin: 0 16px;
+      margin: 0 8mm;
       flex-shrink: 0;
     }
 
     .receipt-header {
       text-align: center;
-      margin-bottom: 10px;
+      margin-bottom: 3px;
+      flex-shrink: 0;
     }
 
     .receipt-logo {
-      height: 56px;
+      height: 36px;
       object-fit: contain;
       display: block;
-      margin: 0 auto 4px;
+      margin: 0 auto 1px;
     }
 
     .hotel-name {
-      font-size: 13px;
+      font-size: 9pt;
       font-weight: 600;
-      letter-spacing: 2px;
+      letter-spacing: 1.5px;
       color: #222;
-      margin-bottom: 6px;
+      margin-bottom: 2px;
     }
 
     .title-divider {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 10px;
-      margin: 0 auto 8px;
-      max-width: 280px;
+      gap: 6px;
+      margin: 0 auto 2px;
+      max-width: 220px;
     }
 
     .title-divider .line {
@@ -77,26 +84,27 @@
     }
 
     .title-divider .diamond {
-      width: 5px;
-      height: 5px;
+      width: 4px;
+      height: 4px;
       background: #bbb;
       transform: rotate(45deg);
       flex-shrink: 0;
     }
 
     .receipt-title {
-      font-size: 14px;
+      font-size: 10pt;
       font-weight: 600;
-      letter-spacing: 4px;
+      letter-spacing: 2px;
       text-transform: uppercase;
       color: #444;
-      margin-bottom: 14px;
+      margin-bottom: 4px;
     }
 
     .receipt-body {
       display: flex;
       gap: 0;
-      flex: 1;
+      flex: 1 1 auto;
+      min-height: 0;
       align-items: stretch;
     }
 
@@ -106,13 +114,14 @@
     }
 
     .receipt-col.left {
-      padding-right: 16px;
+      padding-right: 6px;
     }
 
     .receipt-col.right {
-      padding-left: 16px;
+      padding-left: 6px;
       display: flex;
       flex-direction: column;
+      min-height: 0;
     }
 
     .col-divider {
@@ -128,8 +137,8 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      width: 18px;
-      height: 18px;
+      width: 14px;
+      height: 14px;
       background: #fff;
       display: flex;
       align-items: center;
@@ -137,30 +146,31 @@
     }
 
     .col-divider .divider-icon svg {
-      width: 14px;
-      height: 14px;
+      width: 11px;
+      height: 11px;
       opacity: 0.45;
     }
 
     .field {
-      margin-bottom: 10px;
+      margin-bottom: 3px;
+      flex-shrink: 0;
     }
 
     .field-label {
       display: flex;
       align-items: center;
-      gap: 6px;
-      font-size: 10px;
+      gap: 4px;
+      font-size: 7pt;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.3px;
+      letter-spacing: 0.2px;
       color: #888;
-      margin-bottom: 3px;
+      margin-bottom: 1px;
     }
 
     .field-icon {
-      width: 18px;
-      height: 18px;
+      width: 13px;
+      height: 13px;
       border-radius: 50%;
       background: #f0f0f0;
       display: inline-flex;
@@ -170,56 +180,55 @@
     }
 
     .field-icon svg {
-      width: 10px;
-      height: 10px;
+      width: 7px;
+      height: 7px;
       stroke: #777;
       fill: none;
       stroke-width: 1.6;
     }
 
     .field-value {
-      font-size: 12px;
+      font-size: 8.5pt;
       color: #222;
-      min-height: 18px;
-      line-height: 1.35;
-      padding-left: 24px;
+      min-height: 13px;
+      line-height: 1.2;
+      padding-left: 17px;
     }
 
     .field-value.blank {
       border-bottom: 1px solid #ccc;
-      min-height: 20px;
+      min-height: 15px;
     }
 
     .field-value.amount {
-      font-size: 13px;
+      font-size: 9.5pt;
       font-weight: 600;
     }
 
     .method-options {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px 14px;
-      padding-left: 24px;
-      margin-top: 2px;
+      gap: 3px 8px;
+      padding-left: 17px;
     }
 
     .method-option {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
-      font-size: 11px;
+      gap: 3px;
+      font-size: 7.5pt;
       color: #444;
     }
 
     .checkbox {
-      width: 11px;
-      height: 11px;
+      width: 9px;
+      height: 9px;
       border: 1px solid #999;
       border-radius: 2px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-size: 8px;
+      font-size: 6px;
       flex-shrink: 0;
     }
 
@@ -236,60 +245,223 @@
     .other-line {
       display: inline-block;
       border-bottom: 1px solid #ccc;
-      min-width: 60px;
+      min-width: 50px;
       vertical-align: bottom;
-      min-height: 14px;
+      min-height: 12px;
+    }
+
+    .signature-field {
+      margin-top: 2px;
+    }
+
+    .signature-field .field-value.blank {
+      min-height: 38px;
+      margin-top: 2px;
+    }
+
+    .purpose-field {
+      flex: 1 1 auto;
+      min-height: 0;
+      margin-bottom: 2px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .receipt-col.right .purpose-field {
+      min-height: 48px;
     }
 
     .purpose-box {
-      margin-left: 24px;
       border: 1px solid #ddd;
-      border-radius: 3px;
-      min-height: 52px;
-      padding: 6px 8px;
-      font-size: 11px;
-      line-height: 1.45;
-      white-space: pre-wrap;
+      border-radius: 2px;
+      min-height: 0;
+      flex: 1 1 auto;
+      width: 100%;
+      padding: 3px 4px;
+      font-size: 7.5pt;
+      line-height: 1.1;
       color: #222;
       background: #fafafa;
+      overflow: hidden;
+      margin-top: 1px;
+      display: block;
+    }
+
+    .purpose-box.purpose-plain {
+      white-space: pre-wrap;
+      font-size: 11pt;
+      line-height: 1.3;
+      padding: 6px 8px;
+    }
+
+    /* Standalone receipts (short purpose text) — larger readable text */
+    .page.receipt-simple {
+      font-size: 10pt;
+      line-height: 1.2;
+    }
+
+    .page.receipt-simple .receipt-logo {
+      height: 44px;
+    }
+
+    .page.receipt-simple .hotel-name {
+      font-size: 11pt;
+    }
+
+    .page.receipt-simple .receipt-title {
+      font-size: 12pt;
+      margin-bottom: 6px;
+    }
+
+    .page.receipt-simple .field {
+      margin-bottom: 5px;
+    }
+
+    .page.receipt-simple .field-label {
+      font-size: 8.5pt;
+    }
+
+    .page.receipt-simple .field-value {
+      font-size: 10.5pt;
+      min-height: 16px;
+      padding-left: 18px;
+    }
+
+    .page.receipt-simple .field-value.amount {
+      font-size: 12pt;
+    }
+
+    .page.receipt-simple .method-option {
+      font-size: 9pt;
+    }
+
+    .page.receipt-simple .purpose-box.purpose-plain {
+      font-size: 12pt;
+      line-height: 1.35;
+    }
+
+    .page.receipt-simple .ack-text {
+      font-size: 7.5pt;
+    }
+
+    .page.receipt-simple .signature-field .field-value.blank {
+      min-height: 42px;
+    }
+
+    .purpose-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .purpose-table td {
+      padding: 1px 1px;
+      vertical-align: top;
+    }
+
+    .purpose-table tr.purpose-info td {
+      padding-bottom: 2px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    .purpose-table .col-purpose-type {
+      width: 15%;
+      text-align: left;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    .purpose-table .col-purpose-method {
+      width: 11%;
+      text-align: left;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    .purpose-table .col-purpose-amount {
+      width: 30%;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      padding-right: 3px;
+      padding-left: 0;
+    }
+
+    .purpose-table .col-purpose-date {
+      width: 22%;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      padding-left: 2px;
+    }
+
+    .purpose-table .col-purpose-time {
+      width: 22%;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      padding-left: 2px;
+    }
+
+    .purpose-table tr.purpose-total td {
+      padding-top: 3px;
+      font-weight: 600;
+    }
+
+    .purpose-table tr.purpose-total .col-purpose-amount {
+      font-weight: 700;
     }
 
     .purpose-box.blank {
       background: #fff;
+      min-height: 28px;
     }
 
     .ack-box {
-      margin-top: auto;
+      flex-shrink: 0;
       background: #f5f5f5;
-      border-radius: 4px;
-      padding: 10px 12px;
+      border-radius: 3px;
+      padding: 4px 6px;
       text-align: center;
     }
 
     .ack-icon {
-      width: 22px;
-      height: 22px;
+      width: 16px;
+      height: 16px;
       border-radius: 50%;
-      border: 1.5px solid #bbb;
+      border: 1px solid #bbb;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin: 0 auto 6px;
-      font-size: 11px;
+      margin: 0 auto 2px;
+      font-size: 8px;
       color: #888;
     }
 
     .ack-text {
-      font-size: 9px;
+      font-size: 6.5pt;
       font-style: italic;
       color: #777;
-      line-height: 1.45;
+      line-height: 1.2;
     }
 
     @media print {
-      body { margin: 0; }
-      .page { min-height: auto; }
-      .receipt-copy { page-break-inside: avoid; }
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+      }
+      .page {
+        height: 289mm !important;
+        max-height: 289mm !important;
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+      }
+      .receipt-copy {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
     }
   </style>
 </head>
@@ -307,8 +479,9 @@
   <% const isCredit = ['credit', 'credit_card', 'marker', 'bank_transfer'].includes(methodKey); %>
   <% const isOther = !isBlank && !isCash && !isCredit && (methodKey === 'other' || methodKey === 'check' || !!methodKey); %>
   <% const otherLabel = isOther ? (paymentMethodLabel || paymentMethod || '') : ''; %>
+  <% const purposeLinesSafe = (typeof purposeLines !== 'undefined' && purposeLines) ? purposeLines : []; %>
 
-  <div class="page">
+  <div class="page payment-print-fit<%= (!isBlank && !purposeLinesSafe.length) ? ' receipt-simple' : '' %>">
     <% for (let copyIndex = 0; copyIndex < 2; copyIndex++) { %>
       <% if (copyIndex === 1) { %><div class="page-cut"></div><% } %>
       <div class="receipt-copy">
@@ -378,10 +551,18 @@
 
             <div class="field">
               <div class="field-label">
-                <span class="field-icon"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>
-                Purpose of Payment
+                <span class="field-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 20c0-4 3-6 7-6s7 2 7 6"/></svg></span>
+                Received By
               </div>
-              <div class="purpose-box <%= isBlank ? 'blank' : '' %>"><%= isBlank ? '' : (purpose || '') %></div>
+              <div class="field-value <%= isBlank ? 'blank' : '' %>"><%= isBlank ? '' : (receivedBy || '') %></div>
+            </div>
+
+            <div class="field signature-field">
+              <div class="field-label">
+                <span class="field-icon"><svg viewBox="0 0 24 24"><path d="M4 18l4-8 4 4 4-6 4 10"/><path d="M4 20h16"/></svg></span>
+                Signature <span style="font-weight:400;font-size:6.5pt;color:#999;">(handwritten)</span>
+              </div>
+              <div class="field-value blank"></div>
             </div>
           </div>
 
@@ -394,20 +575,42 @@
           </div>
 
           <div class="receipt-col right">
-            <div class="field">
+            <div class="field purpose-field">
               <div class="field-label">
-                <span class="field-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 20c0-4 3-6 7-6s7 2 7 6"/></svg></span>
-                Received By
+                <span class="field-icon"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>
+                Purpose of Payment
               </div>
-              <div class="field-value <%= isBlank ? 'blank' : '' %>"><%= isBlank ? '' : (receivedBy || '') %></div>
-            </div>
-
-            <div class="field">
-              <div class="field-label">
-                <span class="field-icon"><svg viewBox="0 0 24 24"><path d="M4 18l4-8 4 4 4-6 4 10"/><path d="M4 20h16"/></svg></span>
-                Signature <span style="font-weight:400;font-size:9px;color:#999;">(handwritten)</span>
+              <div class="purpose-box <%= isBlank ? 'blank' : (purposeLinesSafe.length ? 'purpose-structured' : 'purpose-plain') %>">
+                <% if (!isBlank && purposeLinesSafe.length) { %>
+                  <table class="purpose-table">
+                    <tbody>
+                      <% purposeLinesSafe.forEach(function (line) {
+                        if (line.type === 'info') { %>
+                          <tr class="purpose-info">
+                            <td colspan="5"><%= line.text %></td>
+                          </tr>
+                        <% } else if (line.type === 'payment') { %>
+                          <tr class="purpose-row">
+                            <td class="col-purpose-type"><%= line.paymentType %></td>
+                            <td class="col-purpose-method"><%= line.method %></td>
+                            <td class="col-purpose-amount">PHP <%= line.amount %></td>
+                            <td class="col-purpose-date"><%= line.date || '' %></td>
+                            <td class="col-purpose-time"><%= line.time || '' %></td>
+                          </tr>
+                        <% } else if (line.type === 'total') { %>
+                          <tr class="purpose-total">
+                            <td class="col-purpose-type" colspan="2"><%= line.label %></td>
+                            <td class="col-purpose-amount">PHP <%= line.amount %></td>
+                            <td class="col-purpose-date" colspan="2"></td>
+                          </tr>
+                        <% }
+                      }); %>
+                    </tbody>
+                  </table>
+                <% } else if (!isBlank) { %>
+                  <%= purpose || '' %>
+                <% } %>
               </div>
-              <div class="field-value blank" style="min-height:36px;"></div>
             </div>
 
             <div class="ack-box">
@@ -420,10 +623,86 @@
     <% } %>
   </div>
 
-  <% if (!embed) { %>
   <script>
+    function fitPurposeBoxFonts(root) {
+      const doc = root || document;
+      const boxes = doc.querySelectorAll('.purpose-box:not(.blank)');
+      const defaultMinFontPt = 6;
+      const defaultMaxFontPt = 8.5;
+      const plainMinFontPt = 9;
+      const plainMaxFontPt = 14;
+      const minLineHeight = 1.05;
+      const defaultMaxLineHeight = 1.2;
+      const plainMaxLineHeight = 1.45;
+
+      boxes.forEach(function (box) {
+        const field = box.closest('.purpose-field');
+        const rightCol = box.closest('.receipt-col.right');
+        if (!field || !rightCol) return;
+
+        const isPlainPurpose = box.classList.contains('purpose-plain');
+        const minFontPt = isPlainPurpose ? plainMinFontPt : defaultMinFontPt;
+        const maxFontPt = isPlainPurpose ? plainMaxFontPt : defaultMaxFontPt;
+        const maxLineHeight = isPlainPurpose ? plainMaxLineHeight : defaultMaxLineHeight;
+
+        const label = field.querySelector('.field-label');
+        const ackBox = rightCol.querySelector('.ack-box');
+
+        box.style.display = 'block';
+        box.style.overflow = 'hidden';
+        box.style.width = '100%';
+
+        const rightHeight = rightCol.offsetHeight;
+        const labelHeight = (label ? label.offsetHeight : 0) + 2;
+        const ackHeight = (ackBox ? ackBox.offsetHeight : 0) + 3;
+        const available = rightHeight - labelHeight - ackHeight;
+        if (available <= 16) return;
+
+        box.style.height = available + 'px';
+        box.style.maxHeight = available + 'px';
+        box.style.minHeight = available + 'px';
+
+        let fontSize = maxFontPt;
+        box.style.fontSize = fontSize + 'pt';
+        box.style.lineHeight = String(minLineHeight);
+
+        while (fontSize > minFontPt && box.scrollHeight > box.clientHeight + 1) {
+          fontSize -= 0.2;
+          box.style.fontSize = fontSize + 'pt';
+        }
+
+        const fillRatio = box.scrollHeight / box.clientHeight;
+        if (fillRatio < 0.75) {
+          let lineHeight = minLineHeight;
+          while (lineHeight < maxLineHeight) {
+            const nextLh = lineHeight + 0.05;
+            box.style.lineHeight = String(nextLh);
+            if (box.scrollHeight > box.clientHeight + 1) {
+              box.style.lineHeight = String(lineHeight);
+              break;
+            }
+            lineHeight = nextLh;
+          }
+        }
+
+        if (box.scrollHeight / box.clientHeight < 0.7 && fontSize < maxFontPt) {
+          while (fontSize < maxFontPt) {
+            const nextSize = fontSize + 0.2;
+            box.style.fontSize = nextSize + 'pt';
+            if (box.scrollHeight > box.clientHeight + 1) {
+              box.style.fontSize = fontSize + 'pt';
+              break;
+            }
+            fontSize = nextSize;
+          }
+        }
+      });
+    }
+
+    <% if (!embed) { %>
     window.addEventListener('load', function () {
       setTimeout(function () {
+        fitPurposeBoxFonts(document);
         window.focus();
         window.print();
       }, 250);
@@ -431,7 +710,7 @@
     window.addEventListener('afterprint', function () {
       window.close();
     });
+    <% } %>
   </script>
-  <% } %>
 </body>
 </html>

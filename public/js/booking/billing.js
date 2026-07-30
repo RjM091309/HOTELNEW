@@ -129,6 +129,80 @@ function embedHotelLogo(selector) {
     preload.src = absoluteUrl;
 }
 
+function getBillingPrintMaxHeightPx() {
+    // A4 portrait with 3mm top/bottom @page margins → ~291mm printable height
+    const printableHeightMm = 291;
+    return printableHeightMm * (96 / 25.4);
+}
+
+function applyBillingPrintFitScale(printDocument) {
+    const fitRoot = printDocument.querySelector('.billing-print-fit');
+    const html = printDocument.documentElement;
+    const body = printDocument.body;
+    if (!fitRoot) return;
+
+    const maxHeightPx = getBillingPrintMaxHeightPx();
+    const minScale = 0.32;
+    const maxScale = 1.15;
+
+    function resetScale() {
+        html.style.zoom = '1';
+        body.style.zoom = '1';
+        fitRoot.style.zoom = '1';
+        fitRoot.style.transform = 'none';
+        fitRoot.style.width = '100%';
+        fitRoot.style.marginBottom = '0';
+    }
+
+    resetScale();
+
+    const naturalHeight = fitRoot.scrollHeight;
+    if (!naturalHeight) return;
+
+    let scale = maxHeightPx / naturalHeight;
+    scale = Math.min(maxScale, Math.max(minScale, scale));
+
+    const probe = printDocument.createElement('div');
+    probe.style.zoom = '0.5';
+    const canUseZoom = probe.style.zoom === '0.5';
+
+    if (canUseZoom) {
+        for (let pass = 0; pass < 4; pass++) {
+            html.style.zoom = String(scale);
+            body.style.zoom = String(scale);
+
+            const measured = html.scrollHeight;
+            if (measured <= maxHeightPx + 2) break;
+
+            scale = Math.max(minScale, scale * (maxHeightPx / measured));
+        }
+
+        // Belt-and-suspenders for Chrome print preview
+        const dynamicPrintStyle = printDocument.getElementById('billingPrintZoomStyle');
+        if (dynamicPrintStyle) {
+            dynamicPrintStyle.textContent = `@media print { html, body { zoom: ${scale} !important; } }`;
+        }
+    } else {
+        fitRoot.style.transform = `scale(${scale})`;
+        fitRoot.style.transformOrigin = 'top left';
+        fitRoot.style.width = `${100 / scale}%`;
+        fitRoot.style.marginBottom = `${naturalHeight * (scale - 1)}px`;
+    }
+
+    html.style.margin = '0';
+    html.style.padding = '0';
+    body.style.margin = '0';
+    body.style.padding = '0';
+
+    const scaledHeight = Math.min(Math.ceil(html.scrollHeight), maxHeightPx);
+    html.style.height = `${scaledHeight}px`;
+    html.style.maxHeight = `${maxHeightPx}px`;
+    html.style.overflow = 'hidden';
+    body.style.height = `${scaledHeight}px`;
+    body.style.maxHeight = `${maxHeightPx}px`;
+    body.style.overflow = 'hidden';
+}
+
 function printDiv(divId) {
     const printRoot = document.getElementById(divId);
     if (!printRoot) return;
@@ -138,15 +212,44 @@ function printDiv(divId) {
 
     clone.querySelectorAll('button, .btn-close, .billing-actions').forEach((el) => el.remove());
 
+    clone.querySelectorAll('.payment-summary, .payment-breakdown-table-wrap').forEach((el) => {
+        el.style.overflow = 'visible';
+        el.style.maxHeight = 'none';
+    });
+
+    clone.querySelectorAll('.payment-received-by').forEach((el) => el.remove());
+
+    ['reservationFeeRow', 'discountRow', 'refundAmountRow', 'totalPaidBeforeRefundRow'].forEach((id) => {
+        const row = clone.querySelector(`#${id}`);
+        if (!row) return;
+        if (row.style.display === 'none') {
+            row.remove();
+            return;
+        }
+        const val = row.querySelector('.summary-value');
+        const raw = (val?.textContent || '').trim();
+        if (!raw || raw === '0.00' || raw === '0') row.remove();
+    });
+
+    const paymentCount = clone.querySelectorAll('#billingPaymentBreakdownBody tr').length;
+    const itemCount = clone.querySelectorAll('.billing-table tbody tr').length;
+    const rowCount = paymentCount + itemCount;
+    let densityClass = '';
+    if (rowCount > 14) densityClass = 'billing-print-dense';
+    else if (rowCount > 10) densityClass = 'billing-print-compact';
+
     const thankYouMessage = document.createElement('p');
+    thankYouMessage.className = 'billing-print-thank-you';
     thankYouMessage.textContent = 'Thank you for choosing Main Stay Hotel. We look forward to welcoming you again!';
-    thankYouMessage.style.cssText = 'text-align:center;font-size:16px;font-weight:bold;margin-top:20px;';
     clone.appendChild(thankYouMessage);
 
     clone.querySelectorAll('img').forEach((img) => {
         const src = img.getAttribute('src');
         if (src && !src.startsWith('data:') && !src.startsWith('http')) {
             img.src = new URL(src, origin + '/').href;
+        }
+        if (img.classList.contains('hotel-logo')) {
+            img.removeAttribute('style');
         }
     });
 
@@ -157,48 +260,237 @@ function printDiv(divId) {
     }
 
     const printStyles = `
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: white; color: black; }
+        @page { size: A4 portrait; margin: 3mm; }
+        * { box-sizing: border-box; }
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: white;
+            color: black;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 10pt;
+            line-height: 1.2;
+        }
+        .billing-print-fit {
+            width: 100%;
+            padding: 2mm 3mm;
+        }
+        .billing-print-compact {
+            font-size: 9pt;
+            line-height: 1.15;
+        }
+        .billing-print-compact .billing-table { font-size: 7.5pt; }
+        .billing-print-compact .payment-breakdown-table { font-size: 7pt; }
+        .billing-print-compact .summary-row { font-size: 8pt !important; }
+        .billing-print-dense {
+            font-size: 8pt;
+            line-height: 1.1;
+        }
+        .billing-print-dense .billing-title { font-size: 13pt !important; }
+        .billing-print-dense .billing-table { font-size: 6.5pt; margin: 3px 0 !important; }
+        .billing-print-dense .billing-table th,
+        .billing-print-dense .billing-table td { padding: 2px 3px !important; }
+        .billing-print-dense .payment-breakdown-table { font-size: 6.5pt; }
+        .billing-print-dense .payment-breakdown-table tbody td { padding: 1px 2px !important; }
+        .billing-print-dense .payment-summary { padding: 4px 6px !important; }
+        .billing-print-dense .summary-row { font-size: 7.5pt !important; padding: 1px 0 !important; }
+        .billing-print-dense .billing-print-thank-you { font-size: 7.5pt !important; margin-top: 3px !important; }
         .modal-header, .billing-actions, .btn-close, .paid-image-overlay { display: none !important; }
-        .row { display: flex; flex-wrap: wrap; gap: 16px; }
-        .col-md-6 { flex: 1 1 45%; min-width: 280px; box-sizing: border-box; }
-        .hotel-logo-container { text-align: left; margin-bottom: 8px; }
-        .hotel-logo { max-width: 180px; max-height: 80px; width: auto; height: auto; object-fit: contain; display: block; margin: 0; }
-        .billing-receipt-container { background: white; color: black; padding: 20px; }
-        .billing-title { font-size: 22px; font-weight: bold; text-align: center; margin-bottom: 16px; }
-        .billing-summary-section { margin: 20px 0; padding: 15px; border: 1px solid #333; }
-        .payment-notes .note-item { margin-bottom: 10px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
-        .payment-summary { border: 2px solid #333; padding: 15px; background: #f8f8f8; }
-        .payment-breakdown-block { margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #333; }
-        .payment-breakdown-title { font-weight: bold; font-size: 13px; margin-bottom: 8px; }
-        .payment-breakdown-table { width: 100%; border-collapse: collapse; font-size: 11px; table-layout: fixed; }
-        .payment-breakdown-table thead th { font-weight: bold; padding: 5px 6px; border-bottom: 1px solid #333; text-align: left; }
+        .billing-header {
+            border-bottom: 1px solid #333;
+            margin-bottom: 4px !important;
+            padding-bottom: 3px !important;
+            text-align: center;
+        }
+        .billing-divider { display: none !important; }
+        .billing-title {
+            font-size: 16pt !important;
+            font-weight: bold;
+            text-align: center;
+            margin: 0 0 4px 0 !important;
+        }
+        .billing-title i { font-size: 14pt !important; margin-right: 6px !important; }
+        .receipt-number { font-size: 13pt !important; margin-left: 8px !important; }
+        .row { display: flex; flex-wrap: nowrap; gap: 8px; margin: 0 !important; }
+        .col-md-6 { flex: 1 1 48%; min-width: 0; box-sizing: border-box; padding: 0 !important; }
+        .col-md-12, .white-box, .modal-body { padding: 0 !important; margin: 0 !important; }
+        .hotel-logo-container { text-align: left; margin-bottom: 3px !important; }
+        .hotel-logo {
+            max-width: 140px !important;
+            max-height: 52px !important;
+            width: auto !important;
+            height: auto !important;
+            object-fit: contain;
+            display: block;
+            margin: 0;
+        }
+        .hotel-info-section, .customer-info-section {
+            padding: 5px 7px !important;
+            margin-bottom: 4px !important;
+            border: 1px solid #333;
+            min-height: unset !important;
+        }
+        .hotel-address p, .customer-details p, .invoice-date p, .invoice-date .date-value, .customer-header h4 {
+            font-size: 8.5pt !important;
+            margin: 1px 0 !important;
+            line-height: 1.2 !important;
+        }
+        .customer-header h4 { margin: 0 0 3px 0 !important; }
+        .customer-name { font-size: 9.5pt !important; font-weight: bold; margin: 0 !important; }
+        .billing-receipt-container { background: white; color: black; padding: 0 !important; }
+        .billing-content { margin-bottom: 4px !important; }
+        .billing-table-section { margin: 3px 0 !important; }
+        .billing-summary-section { margin: 4px 0 !important; padding: 0 !important; border: none !important; }
+        .payment-notes .note-item {
+            margin-bottom: 3px !important;
+            font-size: 9pt !important;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .payment-notes .note-item span { font-size: 9pt !important; }
+        .payment-notes .note-item i { font-size: 8.5pt !important; }
+        .payment-summary {
+            border: 1px solid #333;
+            padding: 7px 9px !important;
+            background: #f8f8f8;
+            overflow: visible !important;
+            min-height: unset !important;
+        }
+        .payment-breakdown-table-wrap {
+            overflow: visible !important;
+            max-height: none !important;
+        }
+        .payment-breakdown-block {
+            margin-bottom: 4px !important;
+            padding-bottom: 3px !important;
+            border-bottom: 1px solid #333;
+        }
+        .payment-breakdown-title { font-weight: bold; font-size: 9pt !important; margin-bottom: 3px !important; }
+        .payment-breakdown-table { width: 100%; border-collapse: collapse; font-size: 8pt; table-layout: fixed; }
+        .payment-breakdown-table thead th {
+            font-weight: bold;
+            padding: 2px 3px !important;
+            border-bottom: 1px solid #333;
+            text-align: left;
+        }
         .payment-breakdown-table thead th.text-end { text-align: right; }
-        .payment-breakdown-table tbody td { padding: 5px 6px; vertical-align: top; border-bottom: 1px solid #ddd; word-wrap: break-word; }
+        .payment-breakdown-table tbody td {
+            padding: 2px 3px !important;
+            vertical-align: top;
+            border-bottom: 1px solid #ddd;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: normal;
+            line-height: 1.1 !important;
+        }
         .payment-breakdown-table tbody tr:last-child td { border-bottom: none; }
         .payment-breakdown-table .text-end { text-align: right; white-space: nowrap; }
-        .payment-received-by { display: block; font-size: 10px; color: #555; margin-top: 3px; }
-        .payment-breakdown-empty { font-size: 12px; color: #666; font-style: italic; }
-        .summary-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 14px; line-height: 1.25; gap: 16px; }
-        .summary-row.total-row { margin-top: 8px; padding: 10px 0 4px 0; font-weight: bold; }
+        .payment-received-by { display: block; font-size: 7pt !important; color: #555; margin-top: 1px !important; }
+        .payment-breakdown-empty { font-size: 8.5pt !important; color: #666; font-style: italic; }
+        .summary-row {
+            display: flex !important;
+            justify-content: space-between;
+            align-items: center;
+            padding: 3px 0 !important;
+            font-size: 9pt !important;
+            line-height: 1.2 !important;
+            gap: 8px;
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
+        .summary-row.total-row {
+            margin-top: 5px !important;
+            padding: 5px 0 3px 0 !important;
+            font-weight: bold;
+            font-size: 10pt !important;
+            border-top: 1px solid #333;
+        }
+        #paidAmountRow,
+        #totalPayment,
+        #balanceAmount,
+        .summary-value.total-amount,
+        .summary-value.paid-amount,
+        .summary-value.balance-amount {
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
         .summary-label { font-weight: 600; flex: 1 1 auto; }
-        .summary-value { font-weight: bold; flex: 0 0 auto; text-align: right; min-width: 88px; padding-right: 2px; }
+        .summary-value {
+            font-weight: bold;
+            flex: 0 0 auto;
+            text-align: right;
+            min-width: 72px;
+            padding-right: 2px;
+        }
+        .billing-print-thank-you {
+            text-align: center;
+            font-size: 9pt !important;
+            font-weight: bold;
+            margin: 6px 0 0 0 !important;
+            line-height: 1.25;
+        }
         img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        .billing-table { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 20px 0; }
-        .billing-table th, .billing-table td { padding: 10px 8px; border: 1px solid #333; box-sizing: border-box; vertical-align: middle; }
+        .billing-table {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+            margin: 6px 0 !important;
+            font-size: 8.5pt;
+        }
+        .billing-table th, .billing-table td {
+            padding: 4px 5px !important;
+            border: 1px solid #333;
+            vertical-align: middle;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: normal;
+        }
         .billing-table thead th.col-index, .billing-table tbody td.col-index,
         .billing-table thead th.col-date, .billing-table tbody td.col-date { text-align: center; }
         .billing-table thead th.col-desc, .billing-table tbody td.col-desc { text-align: left; }
-        .billing-table thead th.col-money, .billing-table tbody td.col-money { text-align: right; font-variant-numeric: tabular-nums; padding-right: 14px; padding-left: 6px; }
-        .billing-table .col-w-index { width: 6%; }
-        .billing-table .col-w-date { width: 13%; }
-        .billing-table .col-w-desc { width: 34%; }
-        .billing-table .col-w-money { width: 15%; }
+        .billing-table thead th.col-money, .billing-table tbody td.col-money {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            padding-right: 6px !important;
+            padding-left: 4px !important;
+        }
+        .billing-table .col-w-index { width: 5%; }
+        .billing-table .col-w-date { width: 12%; }
+        .billing-table .col-w-desc { width: 33%; }
+        .billing-table .col-w-money { width: 14%; }
         .billing-total-row td { font-weight: bold; }
         .billing-total-row td.col-total-label { white-space: nowrap; }
-        .billing-total-row td.col-total-amount { white-space: nowrap; padding-right: 16px !important; padding-left: 6px !important; }
-        .billing-total-row td.col-total-label { padding-right: 8px !important; padding-left: 8px !important; }
-        .hotel-info-section, .customer-info-section { margin-bottom: 16px; }
-        .customer-name, .invoice-date { font-size: 14px; }
+        .billing-total-row td.col-total-amount {
+            white-space: nowrap;
+            padding-right: 8px !important;
+            padding-left: 4px !important;
+        }
+        .billing-total-row td.col-total-label {
+            padding-right: 6px !important;
+            padding-left: 6px !important;
+        }
+        @media print {
+            html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                max-height: 291mm !important;
+                overflow: hidden !important;
+            }
+            .billing-print-fit {
+                overflow: visible !important;
+            }
+            .payment-summary,
+            .payment-breakdown-table-wrap {
+                overflow: visible !important;
+                max-height: none !important;
+            }
+            .summary-row {
+                display: flex !important;
+                break-inside: auto !important;
+                page-break-inside: auto !important;
+            }
+        }
     `;
 
     printWindow.document.write(`
@@ -208,16 +500,22 @@ function printDiv(divId) {
             <title>Billing Receipt</title>
             <base href="${origin}/">
             <style>${printStyles}</style>
+            <style id="billingPrintZoomStyle"></style>
         </head>
-        <body>${clone.innerHTML}</body>
+        <body><div class="billing-print-fit ${densityClass}">${clone.innerHTML}</div></body>
         </html>
     `);
     printWindow.document.close();
 
     waitForImages(printWindow.document.body).then(() => {
-        printWindow.focus();
-        printWindow.print();
-        printWindow.close();
+        requestAnimationFrame(() => {
+            applyBillingPrintFitScale(printWindow.document);
+            requestAnimationFrame(() => {
+                printWindow.focus();
+                printWindow.print();
+                printWindow.close();
+            });
+        });
     });
 }
 
