@@ -309,20 +309,36 @@ function initializePaymentModal() {
         }
     }
 
-    // Reset payment form
-    function resetPaymentForm() {
-        paymentForm.reset();
-        paymentOptions.forEach(opt => opt.classList.remove('selected'));
-        paymentDetailsSection.innerHTML = '';
-        document.getElementById('paymentStatusMessages').style.display = 'none';
-        confirmButton.classList.remove('payment-success');
-        balanceRow.style.display = 'none';
-        const notesGroup = document.querySelector('.payment-notes-group');
-        if (notesGroup) notesGroup.style.display = '';
-    }
-
     // Initialize form validation
     validatePaymentForm();
+}
+
+function resetPaymentForm() {
+    const paymentForm = document.getElementById('paymentForm');
+    if (!paymentForm) return;
+
+    paymentForm.reset();
+
+    document.querySelectorAll('.payment-option').forEach(opt => opt.classList.remove('selected'));
+    document.querySelectorAll('input[name="paymentMethod"]').forEach(radio => { radio.checked = false; });
+
+    const hiddenMethodInput = document.getElementById('paymentMethod');
+    if (hiddenMethodInput) hiddenMethodInput.value = '';
+
+    const paymentDetailsSection = document.getElementById('paymentDetails');
+    if (paymentDetailsSection) paymentDetailsSection.innerHTML = '';
+
+    const statusMessages = document.getElementById('paymentStatusMessages');
+    if (statusMessages) statusMessages.style.display = 'none';
+
+    const confirmButton = document.getElementById('confirmPaymentButton');
+    if (confirmButton) confirmButton.classList.remove('payment-success');
+
+    const balanceRow = document.getElementById('balanceRow');
+    if (balanceRow) balanceRow.style.display = 'none';
+
+    const notesGroup = document.querySelector('.payment-notes-group');
+    if (notesGroup) notesGroup.style.display = '';
 }
 
 // Helper functions for payment modal
@@ -492,6 +508,9 @@ document.getElementById('modal-payment').addEventListener('hidden.bs.modal', fun
     // Remove any leftover backdrops
     const backdrops = document.querySelectorAll('.modal-backdrop');
     backdrops.forEach((backdrop) => backdrop.remove());
+
+    // Reset payment method, amount, notes, and related UI state
+    resetPaymentForm();
 
     // Reset check-out-only state so it doesn't leak into the next, unrelated payment
     this.dataset.skipPaymentStep = 'false';

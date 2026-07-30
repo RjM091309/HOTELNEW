@@ -36,6 +36,7 @@ function buildReceiptDataFromPayments(booking, payments, processedBy) {
   return {
     isBlank: false,
     receiptNo,
+    roomNo: booking.ROOM_NUMBER || '',
     receiptDate: payments[0]?.PAYMENT_DATE || new Date(),
     receivedFrom: booking.GUEST_NAME || '',
     amountPaid: totalAmount,
