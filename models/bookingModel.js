@@ -1459,29 +1459,32 @@ class BookingModel {
           const serviceQuery = `
             INSERT INTO booking_service 
             (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE)
-            VALUES ?
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
           `;
-          await new Promise((resolve, reject) => {
-            connection.query(serviceQuery, [services], (err) => {
-              if (err) reject(err);
-              else resolve();
+          const servicePayments = [];
+
+          for (const s of services) {
+            const serviceResult = await new Promise((resolve, reject) => {
+              connection.query(serviceQuery, s, (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+              });
             });
-          });
 
-          // console.log('✅ booking_service inserted.');
+            if (paymentStatus === 'paid') {
+              servicePayments.push([
+                bookingId,
+                serviceResult.insertId, // booking_service.IDNo
+                parseFloat(s[3]),
+                'cash',
+                'service',
+                date,
+                encodedBy
+              ]);
+            }
+          }
 
-          // Payment record for services if paid
-          if (paymentStatus === 'paid') {
-            const servicePayments = services.map(s => [
-              bookingId,
-              s[1],              // SERVICE_ID
-              parseFloat(s[3]),  // TOTAL_COST
-              'cash',
-              'service',
-              date,
-              encodedBy
-            ]);
-
+          if (servicePayments.length > 0) {
             const payQuery = `
               INSERT INTO payments 
               (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
@@ -1529,30 +1532,32 @@ class BookingModel {
           const insertQuery = `
             INSERT INTO booking_service 
             (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE)
-            VALUES ?
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
           `;
+          const paymentInserts = [];
 
-          await new Promise((resolve, reject) => {
-            connection.query(insertQuery, [pickAnddrop], (err) => {
-              if (err) reject(err);
-              else resolve();
+          for (const s of pickAnddrop) {
+            const pickDropResult = await new Promise((resolve, reject) => {
+              connection.query(insertQuery, s, (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+              });
             });
-          });
 
-          // console.log('✅ booking_service inserted for pick/drop.');
+            if (paymentStatus === 'paid') {
+              paymentInserts.push([
+                bookingId,
+                pickDropResult.insertId, // booking_service.IDNo
+                parseFloat(s[3]),
+                'cash',
+                'service',
+                date,
+                encodedBy
+              ]);
+            }
+          }
 
-          // If paid, insert into payments
-          if (paymentStatus === 'paid') {
-            const paymentInserts = pickAnddrop.map(s => [
-              bookingId,
-              s[1],             // SERVICE_ID
-              parseFloat(s[3]), // AMOUNT
-              'cash',           // PAYMENT_METHOD
-              'service',        // PAYMENT_STATUS
-              date,
-              encodedBy
-            ]);
-
+          if (paymentInserts.length > 0) {
             const payQuery = `
               INSERT INTO payments 
               (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
