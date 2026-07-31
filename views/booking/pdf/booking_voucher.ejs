@@ -123,10 +123,6 @@
         <td><%= new Date(dateTo).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) %></td>
       </tr>
       <tr>
-        <td class="label">NO. PAX:</td>
-        <td>-</td>
-      </tr>
-      <tr>
         <td class="label">LENGTH OF STAY:</td>
         <td>
           <% 
@@ -142,7 +138,13 @@
       </tr>
       <tr>
         <td class="label">ROOM TYPE:</td>
-        <td><%= roomType %></td>
+        <td>
+          <% if (roomType === 'NO ROOM ASSIGNED' || roomNumber === 'NO ROOM ASSIGNED') { %>
+            NO ROOM ASSIGNED
+          <% } else { %>
+            <%= roomType %>
+          <% } %>
+        </td>
       </tr>
       <tr>
         <td class="label">REMARKS:</td>

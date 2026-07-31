@@ -11,11 +11,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const roomSelectionWrapper = document.getElementById("roomSelectionWrapper");
   const availableRoomsGrid = document.getElementById("availableRoomsGrid");
 
-  window.openExtendModal = function (roomId, currentCheckoutDate, bookingId) {
+  window.openExtendModal = function (roomId, currentCheckoutDate, bookingId, roomNumber) {
     // Set global variables
     globalRoomId = roomId;
     globalCurrentCheckoutDate = currentCheckoutDate;
     globalBookingId = bookingId;
+
+    const label = document.getElementById('extendStayModalLabel');
+    if (label) {
+      const display = roomNumber || 'N/A';
+      label.innerHTML = `Room ${display}<span class="d-block mt-1" style="font-size: 0.95rem; font-weight: 600;">Extend Stay</span>`;
+    }
 
     // Reset modal fields
     roomSelectionWrapper.style.display = "none";

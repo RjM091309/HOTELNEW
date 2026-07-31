@@ -2357,7 +2357,17 @@ function editBooking(bookingId) {
         .then(data => {
             if (data.success) {
                 populateEditForm(data.booking);
-                $('#modal-editbooking').modal('show');
+                const editModalEl = document.getElementById('modal-editbooking');
+                if (typeof window.cleanupModalOverlays === 'function') {
+                    window.cleanupModalOverlays();
+                }
+                if (typeof window.showBootstrapModal === 'function') {
+                    window.showBootstrapModal(editModalEl, { backdrop: 'static', keyboard: true });
+                } else if (typeof bootstrap !== 'undefined' && bootstrap.Modal && editModalEl) {
+                    bootstrap.Modal.getOrCreateInstance(editModalEl, { backdrop: 'static', keyboard: true }).show();
+                } else if (typeof $ !== 'undefined' && $.fn.modal) {
+                    $('#modal-editbooking').modal('show');
+                }
             } else {
                 Swal.fire({
                     icon: 'error',

@@ -398,6 +398,58 @@
   100% { transform: scale(1.02); opacity: 0; }
 }
 
+/* Steady gold glow after closing a schedule-bar modal (~3s via JS) */
+.fc-event.schedule-bar-glow,
+.fc-timeline-event-harness.schedule-bar-glow .fc-event {
+  position: relative !important;
+  z-index: 35 !important;
+  overflow: visible !important;
+  box-shadow:
+    0 0 6px rgba(255, 248, 220, 1),
+    0 0 18px rgba(255, 215, 0, 0.95),
+    0 0 36px rgba(255, 193, 7, 0.9),
+    0 0 56px rgba(218, 165, 32, 0.75);
+  filter: brightness(1.25) saturate(1.15);
+}
+
+.fc-event.schedule-bar-glow::after {
+  content: "";
+  position: absolute;
+  left: -5px;
+  right: -5px;
+  top: -5px;
+  bottom: -5px;
+  pointer-events: none;
+  border: 3px solid rgba(255, 236, 179, 0.98);
+  box-shadow:
+    0 0 16px rgba(255, 215, 0, 0.95),
+    0 0 32px rgba(255, 193, 7, 0.85);
+}
+
+.fc-timeline-event-harness.schedule-bar-glow {
+  z-index: 35 !important;
+  overflow: visible !important;
+}
+
+/* Keep calendar booking modals above stray backdrops */
+[id^="dynamicRoomModal_"],
+[id^="checkoutBacktrackModal_"] {
+  z-index: 1060 !important;
+}
+
+[id^="dynamicRoomModal_"] .modal-dialog,
+[id^="checkoutBacktrackModal_"] .modal-dialog {
+  pointer-events: auto !important;
+}
+
+#modal-addbooking {
+  z-index: 1060 !important;
+}
+
+#modal-addbooking .modal-dialog {
+  pointer-events: auto !important;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .search-box-container,

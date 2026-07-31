@@ -64,10 +64,85 @@ function getGroupBookingColor(groupBookingId) {
 }
 
 // =============================================================================
+// SCHEDULE BAR GLOW (after modal close)
+// =============================================================================
+
+const calendarGlowTimers = {};
+const calendarGlowSuppress = {};
+
+function suppressCalendarScheduleBarGlow(bookingId) {
+  if (!bookingId) return;
+  calendarGlowSuppress[String(bookingId)] = true;
+}
+
+function glowCalendarScheduleBar(bookingId, durationMs = 3000) {
+  if (!bookingId) return;
+
+  const id = String(bookingId);
+  if (calendarGlowSuppress[id]) {
+    delete calendarGlowSuppress[id];
+    return;
+  }
+
+  if (calendarGlowTimers[id]) {
+    clearTimeout(calendarGlowTimers[id]);
+    delete calendarGlowTimers[id];
+  }
+
+  let eventEl = window.eventElements?.[id] || window.eventElements?.[bookingId];
+  if (!eventEl && window.calendar?.getEventById) {
+    const fcEvent = window.calendar.getEventById(id);
+    eventEl = fcEvent ? window.eventElements?.[fcEvent.id] : null;
+  }
+  if (!eventEl) return;
+
+  const harness = eventEl.closest('.fc-timeline-event-harness');
+
+  eventEl.classList.remove('schedule-bar-glow');
+  if (harness) harness.classList.remove('schedule-bar-glow');
+
+  // Force reflow so re-adding the class restarts the animation
+  void eventEl.offsetWidth;
+
+  eventEl.classList.add('schedule-bar-glow');
+  if (harness) harness.classList.add('schedule-bar-glow');
+
+  calendarGlowTimers[id] = setTimeout(() => {
+    eventEl.classList.remove('schedule-bar-glow');
+    if (harness) harness.classList.remove('schedule-bar-glow');
+    delete calendarGlowTimers[id];
+  }, durationMs);
+}
+
+function attachCalendarGlowOnBootstrapModal(modalEl, bookingId) {
+  if (!modalEl || !bookingId) return;
+
+  const onHidden = () => {
+    glowCalendarScheduleBar(bookingId);
+  };
+
+  modalEl.addEventListener('hidden.bs.modal', onHidden, { once: true });
+}
+
+// =============================================================================
 // EVENT HANDLERS
 // =============================================================================
 
 function handleEventClick(info) {
+  if (info.jsEvent) {
+    info.jsEvent.preventDefault();
+    info.jsEvent.stopPropagation();
+  }
+
+  const calendar = info.view?.calendar || window.calendar;
+  if (calendar) {
+    calendar.unselect();
+  }
+
+  if (typeof window.cleanupModalOverlays === 'function') {
+    window.cleanupModalOverlays();
+  }
+
   const event = info.event;
   const status = event.extendedProps.bookingStatus;
   const bookingId = event.id;  // should match your BookingID
@@ -637,6 +712,9 @@ function updateEventStatus(event, newStatus) {
 
 // Make functions globally available
 window.handleEventClick = handleEventClick;
+window.glowCalendarScheduleBar = glowCalendarScheduleBar;
+window.suppressCalendarScheduleBarGlow = suppressCalendarScheduleBarGlow;
+window.attachCalendarGlowOnBootstrapModal = attachCalendarGlowOnBootstrapModal;
 window.applyCompositeStatusStyles = applyCompositeStatusStyles;
 window.applyBackToBackBorder = applyBackToBackBorder;
 window.applyPaymentStatusIndicator = applyPaymentStatusIndicator;

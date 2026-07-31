@@ -358,7 +358,7 @@ async function createDynamicRoomModal(bookingId, event, options) {
 
   // Create modal HTML
   const modalHTML = `
-<div class="modal fade" id="dynamicRoomModal_${bookingId}" tabindex="-1" aria-labelledby="dynamicRoomModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+<div class="modal fade" id="dynamicRoomModal_${bookingId}" tabindex="-1" aria-labelledby="dynamicRoomModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content" style="
     background-color: #ffffff;
@@ -395,7 +395,7 @@ async function createDynamicRoomModal(bookingId, event, options) {
                     <button class="btn btn-sm btn-success" 
                             id="btnExtend" 
                             ${actionButtonAttributes}
-                            onclick="openExtendModal('${roomId}', '${checkOutDate}', '${bookingId}')"
+                            onclick="openExtendModal('${roomId}', '${checkOutDate}', '${bookingId}', '${roomNumber}')"
                             style="${actionButtonStyle}">
                         <i class="fas fa-plus-circle"></i> Extend
                     </button>
@@ -515,6 +515,7 @@ async function createDynamicRoomModal(bookingId, event, options) {
                         <div class="extra-services-section mb-2" style="background: #ffffff !important; border-radius: 6px; padding: 10px; border: 1px solid #e9ecef; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                             <h6 class="text-warning mb-2" style="border-bottom: 2px solid #ffc107; padding-bottom: 4px;">
                                 <i class="fas fa-plus-circle me-1"></i>Extra Services
+                                <span id="extra-services-total-${bookingId}" class="ms-2 fw-bold" style="color: #495057; font-size: 0.95rem;">₱0.00</span>
                             </h6>
                             <div class="d-flex align-items-center mb-2 flex-wrap">
                                 <select id="extra-service-select-${bookingId}" class="form-select form-select-sm me-2" style="max-width: 180px;">
@@ -619,8 +620,10 @@ async function createDynamicRoomModal(bookingId, event, options) {
             
             <!-- Modal Footer -->
             <div class="modal-footer py-2" style="background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%); border-top: 1px solid #495057;">
-               
                 <button type="button" class="btn btn-primary" onclick="window.showBilling('${bookingId}')">Billing</button>
+                <button type="button" class="btn btn-danger" onclick="window.previewVoucher('${bookingId}')">
+                    <i class="fas fa-file-pdf me-2"></i>Voucher
+                </button>
                 <button type="button" class="btn btn-secondary" onclick="viewFullBookingDetails('${bookingId}')">
                     <i class="fas fa-file-alt me-2"></i>View Details
                 </button>
@@ -630,10 +633,25 @@ async function createDynamicRoomModal(bookingId, event, options) {
     </div>
 </div>
 `;
-// Remove any existing dynamic modal
+// Remove any existing dynamic modal (dispose first so backdrop is not orphaned)
 const existingModal = document.getElementById(`dynamicRoomModal_${bookingId}`);
 if (existingModal) {
+    if (typeof window.disposeBootstrapModal === 'function') {
+        window.disposeBootstrapModal(existingModal);
+    } else {
+        const existingInstance = bootstrap.Modal.getInstance(existingModal);
+        if (existingInstance) existingInstance.dispose();
+    }
     existingModal.remove();
+}
+
+const existingModalStyle = document.getElementById(`modal-light-theme-${bookingId}`);
+if (existingModalStyle) {
+    existingModalStyle.remove();
+}
+
+if (typeof window.cleanupModalOverlays === 'function') {
+    window.cleanupModalOverlays();
 }
 
 // Ensure the modal HTML is properly formatted
@@ -967,8 +985,25 @@ if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
     return;
 }
 
-const bootstrapModal = new bootstrap.Modal(modal);
-bootstrapModal.show();
+if (typeof window.showBootstrapModal === 'function') {
+    window.showBootstrapModal(modal, { backdrop: 'static', keyboard: true });
+} else {
+    const bootstrapModal = new bootstrap.Modal(modal, { backdrop: 'static', keyboard: true });
+    bootstrapModal.show();
+}
+
+modal.addEventListener('hidden.bs.modal', () => {
+    if (typeof window.cleanupModalOverlays === 'function') {
+        window.cleanupModalOverlays();
+    }
+}, { once: true });
+
+if (options?.isFromCalendar) {
+  const openedFromCheckout = !!document.getElementById(`checkoutBacktrackModal_${bookingId}`);
+  if (!openedFromCheckout && typeof window.attachCalendarGlowOnBootstrapModal === 'function') {
+    window.attachCalendarGlowOnBootstrapModal(modal, bookingId);
+  }
+}
 
 // Load services and booking details after modal is shown
 setTimeout(() => {
@@ -1607,6 +1642,31 @@ function loadTransferHistory(bookingId, currentBookingId) {
 }
 
 // Update the added services list
+function calculateExtraServicesTotal(bookingId) {
+    const roomServices = addedServicesMap[bookingId] || [];
+    return roomServices.reduce((sum, service) => {
+        if (service.HIDDEN_FOR_UI) return sum;
+        // Legacy helper row only — billed "Extended Stay" rows should count
+        if (service.SERVICE_NAME === 'Extended Day') return sum;
+
+        const serviceCost = parseFloat(service.SERVICE_COST) || 0;
+        const quantity = parseInt(service.QUANTITY, 10) || 0;
+
+        if (!isNaN(serviceCost) && !isNaN(quantity)) {
+            return sum + (serviceCost * quantity);
+        }
+        return sum;
+    }, 0);
+}
+
+function updateExtraServicesTotalDisplay(bookingId) {
+    const totalEl = document.getElementById(`extra-services-total-${bookingId}`);
+    if (!totalEl) return;
+
+    const total = calculateExtraServicesTotal(bookingId);
+    totalEl.textContent = `₱${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 function updateAddedServicesList(bookingId) {
 const serviceList = document.getElementById(`added-services-list-${bookingId}`);
 if (!serviceList) {
@@ -1707,6 +1767,8 @@ if (roomServices.length === 0) {
         serviceList.appendChild(serviceRow);
     });
 }
+
+updateExtraServicesTotalDisplay(bookingId);
 
 // Calculate total cost and balance
 calculateTotalCost(bookingId);
@@ -2427,20 +2489,8 @@ async function calculateTotalCost(bookingId) {
         : 0;
 
     // Compute total extra services cost with validation
-    let roomServices = addedServicesMap[bookingId] || [];
-    let extraServicesCost = roomServices.reduce((sum, service) => {
-        if (service.SERVICE_ID === -999 || service.SERVICE_NAME === 'Extended Day') return sum;
-        
-        // Validate service cost and quantity
-        const serviceCost = parseFloat(service.SERVICE_COST) || 0;
-        const quantity = parseInt(service.QUANTITY) || 0;
-        
-        // Only add if both values are valid numbers
-        if (!isNaN(serviceCost) && !isNaN(quantity)) {
-            return sum + (serviceCost * quantity);
-        }
-        return sum;
-    }, 0);
+    let extraServicesCost = calculateExtraServicesTotal(bookingId);
+    updateExtraServicesTotalDisplay(bookingId);
 
     // Get penalty amount from billing data
     let penaltyAmount = 0;
@@ -5423,7 +5473,8 @@ function testPaymentsFeature(bookingId = '123') {
 window.testPaymentsFeature = testPaymentsFeature;
 
 // Real working extend modal function
-function openExtendModal(roomId, checkoutDate, bookingId) {
+function openExtendModal(roomId, checkoutDate, bookingId, roomNumber) {
+  const roomNumberDisplay = roomNumber || 'N/A';
   // Create the extend modal HTML
   const modalHTML = `
     <div class="modal fade" id="extendStayModal_${bookingId}" tabindex="-1" aria-labelledby="extendStayModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
@@ -5431,7 +5482,10 @@ function openExtendModal(roomId, checkoutDate, bookingId) {
         <div class="modal-content" style="background-color: #ffffff;  border: 2px solid #055160; ">
           <div class="modal-header" style="background-color: #ffffff; border-bottom: 1px solid #dee2e6;">
             <h5 class="modal-title" id="extendStayModalLabel" style="color: #495057;">
-              <i class="fas fa-calendar-plus me-2"></i>Extend Stay
+              <span class="d-block fw-bold" style="font-size: 1.1rem;">Room ${roomNumberDisplay}</span>
+              <span class="d-block mt-1" style="font-size: 1rem; font-weight: 600;">
+                <i class="fas fa-calendar-plus me-2"></i>Extend Stay
+              </span>
             </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
@@ -5872,6 +5926,8 @@ window.openRoomMenuModal = openRoomMenuModal;
 window.openCheckoutBacktrackModal = openCheckoutBacktrackModal;
 window.toggleCustomCost = toggleCustomCost;
 window.viewFullBookingDetails = viewFullBookingDetails;
+window.downloadVoucher = downloadVoucher;
+window.previewVoucher = previewVoucher;
 
 // Initialize transfer modal immediately
 function initializeTransferModal() {
@@ -7159,18 +7215,43 @@ function openCheckoutBacktrackModal(bookingId, event) {
         </div>
     `;
     
-    // Remove existing modal if any
+    // Remove existing modal if any (dispose first so backdrop is not orphaned)
     const existingModal = document.getElementById(`checkoutBacktrackModal_${bookingId}`);
     if (existingModal) {
+        if (typeof window.disposeBootstrapModal === 'function') {
+            window.disposeBootstrapModal(existingModal);
+        } else {
+            const existingInstance = bootstrap.Modal.getInstance(existingModal);
+            if (existingInstance) existingInstance.dispose();
+        }
         existingModal.remove();
+    }
+
+    if (typeof window.cleanupModalOverlays === 'function') {
+        window.cleanupModalOverlays();
     }
     
     // Add modal to body
     document.body.insertAdjacentHTML('beforeend', modalHTML);
     
     // Show modal
-    const modal = new bootstrap.Modal(document.getElementById(`checkoutBacktrackModal_${bookingId}`));
-    modal.show();
+    const checkoutModalEl = document.getElementById(`checkoutBacktrackModal_${bookingId}`);
+    if (typeof window.showBootstrapModal === 'function') {
+      window.showBootstrapModal(checkoutModalEl, { backdrop: 'static', keyboard: true });
+    } else {
+      const modal = new bootstrap.Modal(checkoutModalEl, { backdrop: 'static', keyboard: true });
+      modal.show();
+    }
+
+    checkoutModalEl.addEventListener('hidden.bs.modal', () => {
+      if (typeof window.cleanupModalOverlays === 'function') {
+        window.cleanupModalOverlays();
+      }
+    }, { once: true });
+
+    if (typeof window.attachCalendarGlowOnBootstrapModal === 'function') {
+      window.attachCalendarGlowOnBootstrapModal(checkoutModalEl, bookingId);
+    }
     
     // Add event listeners for footer buttons
     setTimeout(() => {
@@ -7188,6 +7269,10 @@ function openCheckoutBacktrackModal(bookingId, event) {
         const generalInfoBtn = document.getElementById(`generalInfoBtn_${bookingId}`);
         if (generalInfoBtn) {
             generalInfoBtn.addEventListener('click', () => {
+                if (typeof window.suppressCalendarScheduleBarGlow === 'function') {
+                    window.suppressCalendarScheduleBarGlow(bookingId);
+                }
+
                 // Hide checkout backtrack modal while viewing general info
                 const checkoutModalEl = document.getElementById(`checkoutBacktrackModal_${bookingId}`);
                 if (checkoutModalEl) {
@@ -7199,9 +7284,16 @@ function openCheckoutBacktrackModal(bookingId, event) {
                     const dynamicModal = document.getElementById(`dynamicRoomModal_${bookingId}`);
                     if (dynamicModal) {
                         const restoreCheckout = () => {
+                            if (typeof window.suppressCalendarScheduleBarGlow === 'function') {
+                                window.suppressCalendarScheduleBarGlow(bookingId);
+                            }
                             const checkoutEl = document.getElementById(`checkoutBacktrackModal_${bookingId}`);
                             if (checkoutEl) {
-                                bootstrap.Modal.getOrCreateInstance(checkoutEl).show();
+                                const checkoutInstance = bootstrap.Modal.getOrCreateInstance(checkoutEl);
+                                if (typeof window.attachCalendarGlowOnBootstrapModal === 'function') {
+                                    window.attachCalendarGlowOnBootstrapModal(checkoutEl, bookingId);
+                                }
+                                checkoutInstance.show();
                             }
                         };
                         dynamicModal.addEventListener('hidden.bs.modal', restoreCheckout, { once: true });
@@ -7403,10 +7495,15 @@ function loadBillingData(bookingId) {
                 invoiceDateElement.textContent = data.invoiceDate;
             }
             
-            // Update billing receipt ID
-            const billingReceiptIdElement = document.getElementById('billingReceiptId');
-            if (billingReceiptIdElement && data.bookingId) {
-                billingReceiptIdElement.textContent = data.bookingId;
+            // Update room number in modal header
+            const billingRoomNumberElement = document.getElementById('billingRoomNumber');
+            if (billingRoomNumberElement && data.roomNumber) {
+                billingRoomNumberElement.textContent = data.roomNumber;
+            }
+
+            const billingReceiptRoomNoElement = document.getElementById('billingReceiptRoomNo');
+            if (billingReceiptRoomNoElement) {
+                billingReceiptRoomNoElement.textContent = data.roomNumber ? `Room ${data.roomNumber}` : '';
             }
             
             // Populate billing table with items
@@ -7693,6 +7790,30 @@ function updateBillingPaymentStatus(bookingId) {
                 totalPaymentElement.textContent = `₱${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
             }
         });
+}
+
+function previewVoucher(bookingId) {
+    if (!bookingId) return;
+    window.open(`/booking/voucher/${bookingId}`, '_blank');
+}
+
+function downloadVoucher(bookingId) {
+    if (!bookingId) return;
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/booking/generate-voucher?download=1';
+    form.target = '_self';
+
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'bookingId';
+    input.value = bookingId;
+    form.appendChild(input);
+
+    document.body.appendChild(form);
+    form.submit();
+    form.remove();
 }
 
 // Function to view full booking details (redirect to booking page)

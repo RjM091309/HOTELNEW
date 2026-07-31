@@ -61,13 +61,14 @@
         <thead>
           <tr>
             <th style="display:none"></th>
+            <th style="display:none"></th>
             <th style="text-align: center;">#</th>
             <th style="text-align: center;">GUEST NAME</th>
             <th style="text-align: center;">ROOM NUMBER</th>
             <th style="text-align: center;">CONFIRMATION NUMBER</th>
             <th style="text-align: center;">TOTAL AMOUNT</th>
             <th style="text-align: center;">PAID</th>
-            <th style="text-align: center;">DISCOUNT</th>
+            <th style="text-align: center;">AMOUNT PAID</th>
             <th style="text-align: center;">BALANCE</th>
             <th style="text-align: center;">PAYMENT STATUS</th>
             <th style="text-align: center;">PAYMENT METHOD</th>
@@ -134,10 +135,14 @@
       ajax: { 
         url: '/payments/payments_data', 
         type: 'GET',
-        data: function(d){ d.filter = currentFilter; }
+        data: function(d){ d.filter = currentFilter; },
+        error: function (_xhr, status, err) {
+          console.error('Payments table load failed:', status, err);
+        }
       },
       columns: [
         { data: 'BOOKING_ID', visible: false },
+        { data: 'LAST_PAYMENT_ID', visible: false },
         { data: null, orderable: false, searchable: false, className: 'center' },
         { data: 'GUEST_NAME', className: 'center' },
         { data: 'ROOM_NUMBER', className: 'center' },
@@ -147,11 +152,7 @@
         },
         { data: 'TOTAL_AMOUNT', className: 'center', render: d => '' + Number(d||0).toLocaleString('en-US', { maximumFractionDigits: 0 }) },
         { data: 'TOTAL_PAID', className: 'center', render: d => '' + Number(d||0).toLocaleString('en-US', { maximumFractionDigits: 0 }) },
-        { data: 'DISCOUNT_AMOUNT', className: 'center', render: d => {
-            const discount = Number(d||0);
-            return discount > 0 ? '<span style="color:#28a745;">-' + discount.toLocaleString('en-US', { maximumFractionDigits: 0 }) + '</span>' : '0';
-          }
-        },
+        { data: 'LAST_PAYMENT_AMOUNT', className: 'center', render: d => '' + Number(d || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) },
         { data: 'BALANCE', className: 'center', render: d => '' + Number(d||0).toLocaleString('en-US', { maximumFractionDigits: 0 }) },
         { data: null, className: 'center', render: function(_d,_t,row){
             const balance = parseFloat(row.BALANCE)||0;
@@ -180,16 +181,16 @@
           render: d => d || ''
         }
       ],
-      order: [[11, 'desc']],
+      order: [[1, 'desc']],
       language: { emptyTable: 'No data available in the table.' }
     });
 
     table.on('draw.dt', function(){
-      table.column(1, { search: 'applied', order: 'applied' }).nodes().each(function(cell, i){ cell.innerHTML = i + 1; });
+      table.column(2, { search: 'applied', order: 'applied' }).nodes().each(function(cell, i){ cell.innerHTML = i + 1; });
     });
 
-    $('.filter-btn').on('click', function(){
-      $('.filter-btn').removeClass('active');
+    $('.dashboard-card .filter-btn-group .filter-btn').on('click', function(){
+      $('.dashboard-card .filter-btn-group .filter-btn').removeClass('active');
       $(this).addClass('active');
       currentFilter = $(this).data('filter');
       table.ajax.reload();
@@ -428,8 +429,8 @@
   }
 
   function displayTodayPaidCollections(data) {
-    const payments = data.payments || [];
-    const receipts = data.receipts || [];
+    const payments = (data.payments || []).slice().sort((a, b) => Number(b.IDNo || 0) - Number(a.IDNo || 0));
+    const receipts = (data.receipts || []).slice().sort((a, b) => Number(b.IDNo || 0) - Number(a.IDNo || 0));
     const range = data.range || 'today';
     const paymentsTotal = Number(data.paymentsTotal || 0);
     const receiptsTotal = Number(data.receiptsTotal || 0);

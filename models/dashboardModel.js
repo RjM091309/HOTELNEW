@@ -2011,6 +2011,13 @@ class DashboardModel {
 
       await queryDatabasePromise(insertBookingServiceQuery, [bookingId, fee, status, "System"]);
 
+      if (fee > 0) {
+        await queryDatabasePromise(
+          `UPDATE billing SET LATE_CHECKOUT_CHARGE = ? WHERE BOOKING_ID = ? AND ACTIVE = 1`,
+          [fee, bookingId]
+        );
+      }
+
       return { 
         success: true,
         lateCheckoutFee: fee,

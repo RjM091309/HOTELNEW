@@ -3,7 +3,7 @@
         <!-- Added id="printableArea" here so that printDiv() can find the element -->
         <div class="modal-content" id="printableArea">
             <div class="modal-header">
-                <h4 class="modal-title">Billing Receipt #<span id="billingReceiptId">N/A</span></h4>
+                <h4 class="modal-title">Room No. <span id="billingRoomNumber">N/A</span></h4>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -41,11 +41,15 @@
                                 <!-- Right Section: Customer Info -->
                                 <div class="col-md-6">
                                     <div class="customer-info-section">
-                                        <div class="customer-header">
-                                            <h4><i class="fa fa-user"></i> Bill To:</h4>
+                                        <div class="customer-header bill-to-header">
+                                            <h4 class="bill-to-line">
+                                                <i class="fa fa-user"></i>
+                                                <span class="bill-to-label">Bill To:</span>
+                                                <span class="customer-name" id="customerName"></span>
+                                                <span class="bill-to-room" id="billingReceiptRoomNo"></span>
+                                            </h4>
                                         </div>
                                         <div class="customer-details">
-                                            <p class="customer-name" id="customerName"><!--CUSTOMER NAME--></p>
                                             <div class="customer-address" id="customerAddress">
                                                 <!--CUSTOMER ADDRESS-->
                                             </div>
@@ -132,8 +136,8 @@
                                                         <thead>
                                                             <tr>
                                                                 <th>Date</th>
-                                                                <th>Description</th>
                                                                 <th>Method</th>
+                                                                <th>Payment Status</th>
                                                                 <th class="text-end">Amount</th>
                                                             </tr>
                                                         </thead>
@@ -616,19 +620,40 @@
     gap: 8px;
 }
 
-.customer-header i {
-    font-size: 1.2rem;
+.bill-to-line {
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px;
 }
 
-.customer-name {
+.bill-to-label {
+    font-weight: 600;
+}
+
+.customer-header .customer-name {
     font-size: 1rem;
     font-weight: 700;
     color: #2c3e50;
-    margin-bottom: 10px;
-    padding: 6px;
+    padding: 4px 8px;
     background: rgba(52, 152, 219, 0.1);
     border-radius: 6px;
     border-left: 4px solid #3498db;
+    margin: 0;
+}
+
+.bill-to-room {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #2c3e50;
+    margin: 0;
+}
+
+.bill-to-room:empty {
+    display: none;
+}
+
+.customer-header i {
+    font-size: 1.2rem;
 }
 
 .customer-address {
@@ -1349,21 +1374,32 @@
         font-size: 18px !important;
         margin-bottom: 15px !important;
         text-align: left !important;
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: baseline !important;
+        gap: 6px !important;
     }
     
     .customer-header i {
         font-size: 20px !important;
-        margin-right: 10px !important;
+        margin-right: 4px !important;
     }
     
-    .customer-name {
+    .customer-header .customer-name {
         color: #000000 !important;
         background: #f0f0f0 !important;
         border-left: 4px solid #000000 !important;
         font-size: 16px !important;
         font-weight: bold !important;
-        padding: 10px !important;
-        margin-bottom: 15px !important;
+        padding: 4px 8px !important;
+        margin: 0 !important;
+    }
+
+    .bill-to-room {
+        color: #000000 !important;
+        font-size: 16px !important;
+        font-weight: bold !important;
+        margin: 0 !important;
     }
     
     .customer-address {
@@ -1676,7 +1712,8 @@
         font-size: 16pt !important;
     }
     
-    .customer-name {
+    .customer-header .customer-name,
+    .bill-to-room {
         font-size: 14pt !important;
     }
     

@@ -1018,6 +1018,7 @@ const findHeader = setInterval(() => {
     height: '850px',
     eventOverlap: true,
     editable: true,
+    eventResourceEditable: false, // Disable dragging bookings to other rooms
     selectable: true,
     // Resize options - compatible with older FullCalendar versions
     eventResize: true, // Enable event resizing
@@ -1107,8 +1108,21 @@ const findHeader = setInterval(() => {
         modal.data('calendar-end', info.end);
       }
       
-      modal.modal('show');
       calendar.unselect();
+
+      const addBookingModalEl = document.getElementById('modal-addbooking');
+      if (addBookingModalEl) {
+        if (typeof window.showBootstrapModal === 'function') {
+          window.showBootstrapModal(addBookingModalEl, { backdrop: 'static', keyboard: true });
+        } else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+          bootstrap.Modal.getOrCreateInstance(addBookingModalEl, {
+            backdrop: 'static',
+            keyboard: true
+          }).show();
+        } else if (typeof modal.modal === 'function') {
+          modal.modal('show');
+        }
+      }
     },
 
     eventClick: handleEventClick,

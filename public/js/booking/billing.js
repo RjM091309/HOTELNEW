@@ -53,7 +53,7 @@ function renderBillingPaymentBreakdown(paymentsArray) {
 
     const visiblePayments = (paymentsArray || [])
         .filter((payment) => payment.PAYMENT_TYPE !== 'discount' && payment.PAYMENT_TYPE !== 'security_deposit')
-        .sort((a, b) => new Date(a.PAYMENT_DATE) - new Date(b.PAYMENT_DATE));
+        .sort((a, b) => new Date(b.PAYMENT_DATE) - new Date(a.PAYMENT_DATE));
 
     if (!visiblePayments.length) {
         if (emptyEl) emptyEl.style.display = 'block';
@@ -67,11 +67,8 @@ function renderBillingPaymentBreakdown(paymentsArray) {
     visiblePayments.forEach((payment) => {
         const amount = parseFloat(payment.AMOUNT_PAID) || 0;
         const isRefund = payment.PAYMENT_TYPE === 'refund' || amount < 0;
-        const typeLabel = formatBillingPaymentType(payment.PAYMENT_TYPE);
-        const remarks = (payment.REMARKS || '').trim();
-        const description = remarks ? `${typeLabel} — ${remarks}` : typeLabel;
+        const statusLabel = isRefund ? 'REFUND' : 'PAID';
         const methodLabel = formatBillingPaymentMethod(payment.PAYMENT_METHOD);
-        const receivedBy = (payment.NAME || '').trim();
         const amountClass = isRefund ? 'payment-refund' : 'payment-received';
         const amountDisplay = isRefund
             ? `-${formatBillingMoney(Math.abs(amount))}`
@@ -80,8 +77,8 @@ function renderBillingPaymentBreakdown(paymentsArray) {
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${formatBillingPaymentDate(payment.PAYMENT_DATE)}</td>
-            <td>${description}${receivedBy ? `<br><span class="payment-received-by">Received by ${receivedBy}</span>` : ''}</td>
             <td>${methodLabel}</td>
+            <td>${statusLabel}</td>
             <td class="text-end ${amountClass}">${amountDisplay}</td>
         `;
         tbody.appendChild(row);
@@ -335,8 +332,9 @@ function printDiv(divId) {
             margin: 1px 0 !important;
             line-height: 1.2 !important;
         }
-        .customer-header h4 { margin: 0 0 3px 0 !important; }
-        .customer-name { font-size: 9.5pt !important; font-weight: bold; margin: 0 !important; }
+        .customer-header h4 { margin: 0 0 3px 0 !important; display: flex !important; flex-wrap: wrap !important; align-items: baseline !important; gap: 4px !important; }
+        .customer-header .customer-name { font-size: 9.5pt !important; font-weight: bold; margin: 0 !important; padding: 2px 6px !important; }
+        .bill-to-room { font-size: 9.5pt !important; font-weight: bold; margin: 0 !important; }
         .billing-receipt-container { background: white; color: black; padding: 0 !important; }
         .billing-content { margin-bottom: 4px !important; }
         .billing-table-section { margin: 3px 0 !important; }
@@ -603,6 +601,9 @@ window.showBilling = async function (bookingID) {
                                             serviceName === 'drop-off' ||
                                             item.serviceId === 71 ||
                                             item.SERVICE_ID === 71;
+                    const isLateCheckout = item.serviceId === 72 ||
+                                           item.SERVICE_ID === 72 ||
+                                           serviceName.includes('late check');
                     
                     let paidTextClass = '';
                     if (isPaid) {
@@ -613,9 +614,19 @@ window.showBilling = async function (bookingID) {
                     
                     let displaySubTotal = parseFloat(item.subTotal) || 0;
                     // For special services (Upgrade, Pick-up, Drop-off), display "-" instead of basePrice
-                    const displayBasePrice = isSpecialService ? '-' : (parseFloat(item.basePrice) || 0);
+                    let displayBasePrice = isSpecialService ? '-' : (parseFloat(item.basePrice) || 0);
                     // For special services (Upgrade, Pick-up, Drop-off), display "-" instead of qty
-                    const displayQty = isSpecialService ? '-' : (item.qty || '-');
+                    let displayQty = isSpecialService ? '-' : (item.qty || '-');
+
+                    if (isLateCheckout) {
+                        const feeAmount = Math.max(
+                            parseFloat(item.subTotal) || 0,
+                            parseFloat(item.basePrice) || 0
+                        );
+                        displaySubTotal = feeAmount;
+                        displayBasePrice = feeAmount;
+                        displayQty = '-';
+                    }
                     
                     // Apply discount to room subtotal if discount exists and hasn't been applied yet
                     if (isRoom && !isPenalty && discountAmount > 0 && !discountAppliedToRoom) {
@@ -633,12 +644,15 @@ window.showBilling = async function (bookingID) {
                     totalSubtotal += displaySubTotal;
                     
                     rowIndex++;
+                    const basePriceCell = (isSpecialService && !isLateCheckout)
+                        ? '-'
+                        : formatBillingMoney(displayBasePrice);
                     const row = `
                     <tr>
                     <td class="col-index ${paidTextClass}">${rowIndex}</td>
                     <td class="col-date ${paidTextClass}">${new Date(item.date).toLocaleDateString()}</td>
                     <td class="col-desc ${paidTextClass}">${item.description}</td>
-                    <td class="col-money ${paidTextClass}">${isSpecialService ? '-' : formatBillingMoney(displayBasePrice)}</td>
+                    <td class="col-money ${paidTextClass}">${basePriceCell}</td>
                     <td class="col-money ${paidTextClass}">${displayQty}</td>
                     <td class="col-money ${paidTextClass}">${subtotalDisplay}</td>
                     </tr>`;
@@ -700,8 +714,9 @@ window.showBilling = async function (bookingID) {
                     bookingInput.dataset.roomNumber = data.roomNumber || '';
                 }
 
-                setText('billingReceiptId', data.bookingId || 'N/A');
+                setText('billingRoomNumber', data.roomNumber || 'N/A');
                 setText('customerName', data.customerName || 'N/A');
+                setText('billingReceiptRoomNo', data.roomNumber ? `Room ${data.roomNumber}` : '');
                 setText('invoiceDate', data.invoiceDate || 'N/A');
                 setText('confNumber', data.confNumber || 'N/A');
 

@@ -2661,6 +2661,7 @@ class BookingModel {
           COALESCE(bi.CANCELLATION_PENALTY, 0) AS PENALTY_AMOUNT,
           COALESCE(bi.CHECKOUT_REFUND, 0) AS CHECKOUT_REFUND,
           COALESCE(bi.REFUNDABLE_AMOUNT, 0) AS REFUNDABLE_AMOUNT,
+          COALESCE(bi.LATE_CHECKOUT_CHARGE, 0) AS LATE_CHECKOUT_CHARGE,
           bi.DISCOUNT_APPLIED,
           COALESCE(rt.NAME, 'Unassigned Room') AS ROOM_TYPE,
           r.ROOM_NUMBER
@@ -2765,6 +2766,7 @@ class BookingModel {
       // Fetch services (including custom services)
       const serviceQuery = `
         SELECT 
+          bs.SERVICE_ID,
           CASE 
             WHEN bs.SERVICE_ID = -1 AND bs.CUSTOM_NAME IS NOT NULL
             THEN bs.CUSTOM_NAME
@@ -2804,16 +2806,40 @@ class BookingModel {
         });
       });
 
+      const lateCheckoutChargeFromBilling = parseFloat(b.LATE_CHECKOUT_CHARGE) || 0;
+
       // Format services
-      const serviceItems = serviceData.map(service => ({
-        date: b.CHECK_IN_DATE,
-        description: service.SERVICE_NAME,
-        basePrice: parseFloat(service.SERVICE_COST),
-        qty: service.QTY,
-        subTotal: parseFloat(service.TOTAL_COST),
-        status: service.STATUS,
-        serviceId: service.SERVICE_ID || service.IDNo || null // Add serviceId for Upgrade detection
-      }));
+      const serviceItems = serviceData.map(service => {
+        const isLateCheckout = service.SERVICE_ID === 72;
+        const totalCost = parseFloat(service.TOTAL_COST) || 0;
+        const catalogCost = parseFloat(service.SERVICE_COST) || 0;
+        const qty = parseInt(service.QTY, 10) || 1;
+
+        let basePrice = catalogCost;
+        let subTotal = totalCost;
+
+        if (isLateCheckout) {
+          // Late checkout is a flat fee — base price and subtotal must match the entered amount
+          let feeAmount = totalCost;
+          if (feeAmount <= 0 && lateCheckoutChargeFromBilling > 0) {
+            feeAmount = lateCheckoutChargeFromBilling;
+          } else if (feeAmount <= 0 && service.STATUS !== 'paid') {
+            feeAmount = catalogCost;
+          }
+          basePrice = feeAmount;
+          subTotal = feeAmount;
+        }
+
+        return {
+          date: b.CHECK_IN_DATE,
+          description: service.SERVICE_NAME,
+          basePrice,
+          qty: isLateCheckout ? '-' : service.QTY,
+          subTotal,
+          status: service.STATUS,
+          serviceId: service.SERVICE_ID
+        };
+      });
 
       const penaltyItems = penaltyAmount > 0 ? [{
         date: b.CHECK_OUT_DATE || b.CHECK_IN_DATE,

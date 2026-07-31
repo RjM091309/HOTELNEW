@@ -1,5 +1,22 @@
 const { queryDatabasePromise, pool } = require('../config/database');
 
+const PAYMENTS_TABLE_ORDER_MAP = {
+  BOOKING_ID: 'b.IDNo',
+  LAST_PAYMENT_ID: 'lp.LAST_PAYMENT_ID',
+  GUEST_NAME: 'c.NAME',
+  ROOM_NUMBER: 'r.ROOM_NUMBER',
+  CONFIRMATION_NUMBER: 'b.CONFIRMATION_NUMBER',
+  TOTAL_AMOUNT: 'TOTAL_AMOUNT',
+  TOTAL_PAID: 'TOTAL_PAID',
+  DISCOUNT_AMOUNT: 'DISCOUNT_AMOUNT',
+  LAST_PAYMENT_AMOUNT: 'lp.LAST_PAYMENT_AMOUNT',
+  BALANCE: 'BALANCE',
+  PAYMENT_STATUS: 'bill.PAYMENT_STATUS',
+  PAYMENT_METHOD: 'bill.PAYMENT_METHOD',
+  LAST_PAYMENT_DATE: 'lp.LAST_PAYMENT_DATE',
+  PROCESSED_BY_NAME: 'u.FULLNAME'
+};
+
 const paymentsModel = {
   listPayments: async (filters = {}, limit = 200) => {
     const { bookingId, type, method, from, to } = filters;
@@ -36,7 +53,7 @@ const paymentsModel = {
       LEFT JOIN room r ON r.IDNo = b.ROOM_ID
       LEFT JOIN user_info u ON u.IDNo = p.ENCODED_BY
       ${whereSql}
-      ORDER BY p.PAYMENT_DATE DESC
+      ORDER BY p.PAYMENT_DATE DESC, p.IDNo DESC
       LIMIT ?`;
     params.push(Number(limit));
     const [rows] = await pool.promise().query(sql, params);
@@ -51,7 +68,7 @@ const paymentsModel = {
       LEFT JOIN room r ON r.IDNo = b.ROOM_ID
       LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
       LEFT JOIN (
-        SELECT p.BOOKING_ID, p.PAYMENT_DATE AS LAST_PAYMENT_DATE
+        SELECT p.BOOKING_ID, p.IDNo AS LAST_PAYMENT_ID, p.PAYMENT_DATE AS LAST_PAYMENT_DATE, p.AMOUNT_PAID AS LAST_PAYMENT_AMOUNT
         FROM payments p
         INNER JOIN (
           SELECT BOOKING_ID, MAX(IDNo) AS MAX_ID
@@ -68,6 +85,8 @@ const paymentsModel = {
   },
 
   fetchDatatable: async (searchCondition, searchParams, orderBy, orderDir, length, start) => {
+    const sortDir = String(orderDir).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    const sortColumn = PAYMENTS_TABLE_ORDER_MAP[orderBy] || 'lp.LAST_PAYMENT_ID';
     const dataQuery = `
       SELECT 
         b.IDNo AS BOOKING_ID,
@@ -82,7 +101,9 @@ const paymentsModel = {
             AND p_credit.PAYMENT_METHOD IN ('credit', 'marker')
             AND p_credit.SETTLED_DATE IS NULL
         ) AS HAS_UNSETTLED_CREDIT,
+        lp.LAST_PAYMENT_ID,
         lp.LAST_PAYMENT_DATE,
+        lp.LAST_PAYMENT_AMOUNT,
         u.FULLNAME AS PROCESSED_BY_NAME,
         (
           COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) +
@@ -108,7 +129,7 @@ const paymentsModel = {
       LEFT JOIN room r ON r.IDNo = b.ROOM_ID
       LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
       LEFT JOIN (
-        SELECT p.BOOKING_ID, p.PAYMENT_DATE AS LAST_PAYMENT_DATE, p.ENCODED_BY
+        SELECT p.BOOKING_ID, p.IDNo AS LAST_PAYMENT_ID, p.PAYMENT_DATE AS LAST_PAYMENT_DATE, p.AMOUNT_PAID AS LAST_PAYMENT_AMOUNT, p.ENCODED_BY
         FROM payments p
         INNER JOIN (
           SELECT BOOKING_ID, MAX(IDNo) AS MAX_ID
@@ -120,7 +141,7 @@ const paymentsModel = {
       WHERE b.ACTIVE = 1 
       AND (SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')) > 0
       ${searchCondition}
-      ORDER BY ${orderBy} ${orderDir}
+      ORDER BY ${sortColumn} ${sortDir}, lp.LAST_PAYMENT_ID ${sortDir}
       LIMIT ? OFFSET ?
     `;
     const dataParams = [...searchParams, parseInt(length), parseInt(start)];
@@ -157,7 +178,7 @@ const paymentsModel = {
        WHERE ${dateCondition}
          AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')
          AND (p.PAYMENT_METHOD NOT IN ('credit', 'marker') OR p.SETTLED_DATE IS NOT NULL)
-       ORDER BY p.PAYMENT_DATE DESC`
+       ORDER BY p.IDNo DESC`
     );
     return rows;
   },
@@ -189,7 +210,7 @@ const paymentsModel = {
          pr.PURPOSE
        FROM payment_receipt pr
        WHERE pr.ACTIVE = 1 AND ${dateCondition}
-       ORDER BY pr.RECEIPT_DATE DESC`,
+       ORDER BY pr.IDNo DESC`,
       params
     );
     return rows;
@@ -374,7 +395,7 @@ const paymentsModel = {
        FROM payments p
        LEFT JOIN user_info u ON u.IDNo = p.ENCODED_BY
        WHERE p.BOOKING_ID = ?
-       ORDER BY p.PAYMENT_DATE DESC`, [bookingId]
+       ORDER BY p.PAYMENT_DATE DESC, p.IDNo DESC`, [bookingId]
     );
 
     return { booking, services, extensions, payments };
@@ -497,7 +518,7 @@ const paymentsModel = {
        LEFT JOIN user_info u ON u.IDNo = p.ENCODED_BY
        LEFT JOIN room r ON b.ROOM_ID = r.IDNo
        WHERE b.GROUP_BOOKING_ID = ?
-       ORDER BY p.PAYMENT_DATE DESC`, [groupId]
+       ORDER BY p.PAYMENT_DATE DESC, p.IDNo DESC`, [groupId]
     );
 
     return { 

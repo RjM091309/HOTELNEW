@@ -113,16 +113,16 @@ const paymentsController = {
 
   tableData: async (req, res) => {
     try {
-      const { start = 0, length = 10, search = { value: '' }, order = [{ column: 11, dir: 'desc' }], filter = 'all' } = req.query;
+      const { start = 0, length = 10, search = { value: '' }, order = [{ column: 1, dir: 'desc' }], filter = 'all' } = req.query;
       const searchValue = search.value || '';
-      const orderColumn = order[0]?.column || 11;
+      const orderColumn = order[0]?.column || 1;
       const orderDir = order[0]?.dir || 'desc';
 
       const columns = [
-        'BOOKING_ID', 'BOOKING_ID', 'GUEST_NAME', 'ROOM_NUMBER', 'CONFIRMATION_NUMBER',
-        'TOTAL_AMOUNT', 'TOTAL_PAID', 'DISCOUNT_AMOUNT', 'BALANCE', 'PAYMENT_STATUS', 'PAYMENT_METHOD', 'LAST_PAYMENT_DATE', 'PROCESSED_BY_NAME'
+        'BOOKING_ID', 'LAST_PAYMENT_ID', 'BOOKING_ID', 'GUEST_NAME', 'ROOM_NUMBER', 'CONFIRMATION_NUMBER',
+        'TOTAL_AMOUNT', 'TOTAL_PAID', 'LAST_PAYMENT_AMOUNT', 'BALANCE', 'PAYMENT_STATUS', 'PAYMENT_METHOD', 'LAST_PAYMENT_DATE', 'PROCESSED_BY_NAME'
       ];
-      const orderBy = columns[orderColumn] || 'LAST_PAYMENT_DATE';
+      const orderBy = columns[orderColumn] || 'LAST_PAYMENT_ID';
 
       let searchCondition = '';
       let searchParams = [];

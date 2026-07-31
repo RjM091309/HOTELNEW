@@ -255,6 +255,59 @@ function globalOverlapCheck(calendar) {
 }
 
 // =============================================================================
+// MODAL OVERLAY CLEANUP
+// =============================================================================
+
+function cleanupModalOverlays() {
+  const openModals = document.querySelectorAll('.modal.show');
+  const backdrops = document.querySelectorAll('.modal-backdrop');
+
+  if (openModals.length === 0) {
+    backdrops.forEach((backdrop) => backdrop.remove());
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('padding-right');
+  } else if (backdrops.length > openModals.length) {
+    const extraCount = backdrops.length - openModals.length;
+    for (let i = 0; i < extraCount; i += 1) {
+      backdrops[i]?.remove();
+    }
+  }
+
+  document.querySelectorAll('.swal2-container').forEach((container) => {
+    if (!container.classList.contains('swal2-shown')) {
+      container.remove();
+    }
+  });
+}
+
+function disposeBootstrapModal(modalEl) {
+  if (!modalEl || typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+    return;
+  }
+
+  const instance = bootstrap.Modal.getInstance(modalEl);
+  if (instance) {
+    instance.dispose();
+  }
+}
+
+function showBootstrapModal(modalEl, options = {}) {
+  if (!modalEl || typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+    return null;
+  }
+
+  cleanupModalOverlays();
+
+  const instance = bootstrap.Modal.getOrCreateInstance(modalEl, {
+    backdrop: options.backdrop ?? 'static',
+    keyboard: options.keyboard ?? true
+  });
+  instance.show();
+  return instance;
+}
+
+// =============================================================================
 // EXPORT FUNCTIONS FOR USE IN OTHER MODULES
 // =============================================================================
 
@@ -275,3 +328,6 @@ window.hasLateCheckoutEndingOn = hasLateCheckoutEndingOn;
 window.hasLateCheckInStartingOn = hasLateCheckInStartingOn;
 window.hasRegularCheckoutEndingOn = hasRegularCheckoutEndingOn;
 window.globalOverlapCheck = globalOverlapCheck;
+window.cleanupModalOverlays = cleanupModalOverlays;
+window.disposeBootstrapModal = disposeBootstrapModal;
+window.showBootstrapModal = showBootstrapModal;

@@ -63,6 +63,10 @@ function showEventInfoModal(event) {
       `Check-out: <b>${checkOut}</b>`,
     icon: statusIcon,
     confirmButtonText: 'OK'
+  }).then(() => {
+    if (typeof window.glowCalendarScheduleBar === 'function') {
+      window.glowCalendarScheduleBar(event.id);
+    }
   });
 }
 
@@ -220,8 +224,12 @@ function showLateCheckInModal(event) {
     `;
   }
 
-  Swal.fire(modalConfig).then((result) => {
-    // This will handle the modal closing but we handle buttons with event listeners
+  let skipScheduleBarGlow = false;
+
+  Swal.fire(modalConfig).then(() => {
+    if (!skipScheduleBarGlow && typeof window.glowCalendarScheduleBar === 'function') {
+      window.glowCalendarScheduleBar(bookingId);
+    }
   });
 
   // Add event listeners for custom buttons after modal is shown
@@ -230,13 +238,19 @@ function showLateCheckInModal(event) {
     const viewDetailsBtn = document.getElementById('btn-view-details');
     if (viewDetailsBtn) {
       viewDetailsBtn.addEventListener('click', () => {
+        skipScheduleBarGlow = true;
         Swal.close();
-        // Open the dynamic room modal
-        if (typeof openRoomMenuModal === 'function') {
-          openRoomMenuModal(bookingId, event);
-        } else {
-          console.error('openRoomMenuModal function not found');
+        if (typeof window.cleanupModalOverlays === 'function') {
+          window.cleanupModalOverlays();
         }
+        setTimeout(() => {
+          // Open the dynamic room modal
+          if (typeof openRoomMenuModal === 'function') {
+            openRoomMenuModal(bookingId, event);
+          } else {
+            console.error('openRoomMenuModal function not found');
+          }
+        }, 100);
       });
     }
 
@@ -244,6 +258,7 @@ function showLateCheckInModal(event) {
     const editDetailsBtn = document.getElementById('btn-edit-details');
     if (editDetailsBtn) {
       editDetailsBtn.addEventListener('click', () => {
+        skipScheduleBarGlow = true;
         Swal.close();
         editBookingFromCalendar(bookingId);
       });
@@ -261,6 +276,7 @@ function showLateCheckInModal(event) {
     const checkInBtn = document.getElementById('btn-checkin');
     if (checkInBtn && canCheckIn) {
       checkInBtn.addEventListener('click', () => {
+        skipScheduleBarGlow = true;
         Swal.close();
         
         // Check if room is occupied or under cleaning before showing confirmation
@@ -435,8 +451,12 @@ function showPendingModal(event) {
     `;
   }
 
-  Swal.fire(modalConfig).then((result) => {
-    // This will handle the modal closing but we handle buttons with event listeners
+  let skipScheduleBarGlow = false;
+
+  Swal.fire(modalConfig).then(() => {
+    if (!skipScheduleBarGlow && typeof window.glowCalendarScheduleBar === 'function') {
+      window.glowCalendarScheduleBar(bookingId);
+    }
   });
 
   // Add event listeners for custom buttons after modal is shown
@@ -445,13 +465,19 @@ function showPendingModal(event) {
     const viewDetailsBtn = document.getElementById('btn-view-details');
     if (viewDetailsBtn) {
       viewDetailsBtn.addEventListener('click', () => {
+        skipScheduleBarGlow = true;
         Swal.close();
-        // Open the dynamic room modal
-        if (typeof openRoomMenuModal === 'function') {
-          openRoomMenuModal(bookingId, event);
-        } else {
-          console.error('openRoomMenuModal function not found');
+        if (typeof window.cleanupModalOverlays === 'function') {
+          window.cleanupModalOverlays();
         }
+        setTimeout(() => {
+          // Open the dynamic room modal
+          if (typeof openRoomMenuModal === 'function') {
+            openRoomMenuModal(bookingId, event);
+          } else {
+            console.error('openRoomMenuModal function not found');
+          }
+        }, 100);
       });
     }
 
@@ -459,6 +485,7 @@ function showPendingModal(event) {
     const editDetailsBtn = document.getElementById('btn-edit-details');
     if (editDetailsBtn) {
       editDetailsBtn.addEventListener('click', () => {
+        skipScheduleBarGlow = true;
         Swal.close();
         editBookingFromCalendar(bookingId);
       });
@@ -476,6 +503,7 @@ function showPendingModal(event) {
     const checkInBtn = document.getElementById('btn-checkin');
     if (checkInBtn && canCheckIn) {
       checkInBtn.addEventListener('click', () => {
+        skipScheduleBarGlow = true;
         Swal.close();
         
         // Check if room is occupied or under cleaning before showing confirmation
@@ -597,6 +625,11 @@ function showCancelledModal(event) {
     color: '#ffffff',
     width: '500px'
       }).then((result) => {
+      const openedAction = result.isConfirmed || result.dismiss === Swal.DismissReason.cancel;
+      if (!openedAction && typeof window.glowCalendarScheduleBar === 'function') {
+        window.glowCalendarScheduleBar(bookingId);
+      }
+
       if (result.isConfirmed) {
         // Reopen button clicked - show status selection first
         Swal.fire({
@@ -805,6 +838,9 @@ $(document).ready(function() {
     $('#daterange').prop('disabled', false);
     $('#addFloor').prop('disabled', false);
     $('#addroom').prop('disabled', false);
+    if (typeof window.cleanupModalOverlays === 'function') {
+      window.cleanupModalOverlays();
+    }
   });
 });
 
@@ -815,6 +851,10 @@ $(document).ready(function() {
 // Function to edit booking from calendar (opens the edit booking modal)
 function editBookingFromCalendar(bookingId) {
   
+  if (typeof window.cleanupModalOverlays === 'function') {
+    window.cleanupModalOverlays();
+  }
+
   // Check if the edit booking modal exists
   if (typeof window.editBooking === 'function') {
     // Use the existing editBooking function from booking.ejs

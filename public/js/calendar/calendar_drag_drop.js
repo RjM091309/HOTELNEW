@@ -23,6 +23,12 @@ async function handleEventDrop(info) {
   // Check if this is a valid drop (either room change or date change)
   const isRoomChange = newResource && oldResource && newResource.id !== oldResource.id;
   const isDateChange = info.delta && (info.delta.days !== 0 || info.delta.milliseconds !== 0);
+
+  // Room transfer via drag is disabled — use the Transfer button in the room menu instead
+  if (isRoomChange) {
+    info.revert();
+    return;
+  }
   
   // Get the target room (either new room or same room)
   let targetRoom = null;
@@ -333,7 +339,7 @@ async function handleEventResize(info) {
     };
     
     // Open the extend modal with pre-filled days
-    openExtendModal(roomResource.id, originalEndDate.toISOString(), bookingId);
+    openExtendModal(roomResource.id, originalEndDate.toISOString(), bookingId, roomResource.title);
     
     // Pre-fill the extension days input
     setTimeout(() => {
