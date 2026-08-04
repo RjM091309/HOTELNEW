@@ -74,15 +74,30 @@
 
     .print-footer {
       width: 100%;
-      text-align: left;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 12mm;
       font-size: 24px;
       line-height: 1.45;
       margin-top: auto;
-      padding: 0 2mm 0 14mm;
+      padding: 0 14mm;
       flex-shrink: 0;
     }
 
-    .print-footer div + div {
+    .print-footer-left,
+    .print-footer-right {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .print-footer-right {
+      text-align: right;
+      margin-left: auto;
+    }
+
+    .print-footer-left div + div,
+    .print-footer-right div + div {
       margin-top: 4px;
     }
     <% } else { %>
@@ -188,6 +203,14 @@
       <span class="dropoff-value"><%= flightNo %></span>
       <span class="dropoff-label">No. Persons</span>
       <span class="dropoff-value"><%= personCount %></span>
+      <% if (typeof vehicleName !== 'undefined' && vehicleName) { %>
+      <span class="dropoff-label">Vehicle</span>
+      <span class="dropoff-value"><%= vehicleName %><% if (plateNumber) { %> (<%= plateNumber %>)<% } %></span>
+      <% } %>
+      <% if (typeof driverName !== 'undefined' && driverName) { %>
+      <span class="dropoff-label">Driver</span>
+      <span class="dropoff-value"><%= driverName %></span>
+      <% } %>
     </div>
     <div class="dropoff-special-notes">Special Notes</div>
     <div class="dropoff-notes-area"><%= specialNotes %></div>
@@ -196,8 +219,18 @@
       <div class="print-guest-name" id="printGuestName"><%= guestName %></div>
     </div>
     <div class="print-footer">
-      <div>No. person <%= personCount %></div>
-      <div>flight no. <%= flightNo %></div>
+      <div class="print-footer-left">
+        <% if (typeof vehicleName !== 'undefined' && vehicleName) { %>
+        <div>Vehicle: <%= vehicleName %><% if (plateNumber) { %> (<%= plateNumber %>)<% } %></div>
+        <% } %>
+        <% if (typeof driverName !== 'undefined' && driverName) { %>
+        <div>Driver: <%= driverName %></div>
+        <% } %>
+      </div>
+      <div class="print-footer-right">
+        <div>No. of Persons: <%= personCount %></div>
+        <div>Flight no.: <%= flightNo %></div>
+      </div>
     </div>
     <% } %>
   </div>

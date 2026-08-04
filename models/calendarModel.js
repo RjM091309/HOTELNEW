@@ -1,5 +1,46 @@
 const { pool, queryDatabase, queryDatabasePromise } = require('../config/database');
 
+function getBookingOutstandingBalanceSql(bookingAlias = 'b') {
+  const b = bookingAlias;
+  return `(
+    COALESCE((
+      SELECT GREATEST(0,
+        (bill2.ROOM_CHARGE * bill2.QTY - COALESCE(bill2.RESERVATION_FEE, 0) - COALESCE(bill2.DISCOUNT_AMOUNT, 0))
+        - COALESCE((
+          SELECT SUM(p.AMOUNT_PAID)
+          FROM payments p
+          WHERE p.BOOKING_ID = ${b}.IDNo
+            AND p.PAYMENT_TYPE NOT IN ('discount', 'security_deposit_refund')
+        ), 0)
+      )
+      FROM billing bill2
+      WHERE bill2.BOOKING_ID = ${b}.IDNo AND bill2.ACTIVE = 1
+    ), 0)
+    + COALESCE((
+      SELECT SUM(GREATEST(0,
+        be.COST * be.QTY - COALESCE((
+          SELECT SUM(p.AMOUNT_PAID)
+          FROM payments p
+          WHERE p.BOOKING_EXTENSION_ID = be.IDNo AND p.PAYMENT_TYPE = 'extended'
+        ), 0)
+      ))
+      FROM booking_extension be
+      WHERE be.BOOKING_ID = ${b}.IDNo AND be.ACTIVE = 1
+    ), 0)
+    + COALESCE((
+      SELECT SUM(GREATEST(0,
+        bs.TOTAL_COST - COALESCE((
+          SELECT SUM(p.AMOUNT_PAID)
+          FROM payments p
+          WHERE p.BOOKING_SERVICE_ID = bs.IDNo AND p.PAYMENT_TYPE = 'service'
+        ), 0)
+      ))
+      FROM booking_service bs
+      WHERE bs.BOOKING_ID = ${b}.IDNo AND bs.ACTIVE = 1
+    ), 0)
+  )`;
+}
+
 class CalendarModel {
   // Get all bookings for calendar display
   // OPTIMIZED VERSION - Get all bookings with date filtering and pagination
@@ -141,6 +182,8 @@ class CalendarModel {
         queryParams = [end, start];
       }
       
+      const outstandingBalanceSql = getBookingOutstandingBalanceSql('b');
+
       const rows = await queryDatabasePromise(`
         SELECT 
           b.IDNo AS id,
@@ -152,18 +195,8 @@ class CalendarModel {
           CASE
             WHEN b.BOOKING_STATUS = 'check-In' THEN '#12866f'
             WHEN b.BOOKING_STATUS = 'check-Out' 
-              AND (
-                COALESCE(bill.PAYMENT_STATUS,'unpaid') <> 'paid'
-                OR EXISTS (
-                  SELECT 1 FROM booking_service bs 
-                  WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1 AND bs.STATUS <> 'paid'
-                )
-                OR EXISTS (
-                  SELECT 1 FROM booking_extension be
-                  WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1 AND be.PAYMENT_STATUS <> 'paid'
-                )
-              )
-              THEN '#0b3d91' -- dark blue when checked out but has balance (rooms, services, or extensions)
+              AND (${outstandingBalanceSql} > 0.009)
+              THEN '#0b3d91' -- dark blue when checked out but has balance
             WHEN b.BOOKING_STATUS = 'check-Out' THEN '#B3B3B3'
             WHEN b.BOOKING_STATUS = 'pending' AND COALESCE(b.HOLD_PENDING, 0) = 1 THEN '#7b1fa2'
             WHEN b.BOOKING_STATUS = 'pending' AND COALESCE(b.CHECK_IN_STATUS, 1) = 0 THEN '#e0a316'
@@ -174,25 +207,14 @@ class CalendarModel {
           -- Pre-calculated extended properties
           COALESCE(bill.ROOM_CHARGE, 0) + COALESCE(bill.AMENITIES_CHARGE, 0) + COALESCE(bill.SERVICES_CHARGE, 0) + COALESCE(bill.LATE_CHECKOUT_CHARGE, 0) AS totalCost,
           CASE
+            WHEN (${outstandingBalanceSql}) <= 0.009 THEN 'paid'
             WHEN EXISTS (
-              SELECT 1 FROM booking_service bs
-              WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1 AND bs.STATUS <> 'paid'
-            ) OR EXISTS (
-              SELECT 1 FROM booking_extension be
-              WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1 AND be.PAYMENT_STATUS <> 'paid'
-            ) THEN
-              CASE
-                WHEN COALESCE(bill.PAYMENT_STATUS, 'unpaid') IN ('paid', 'partial_paid')
-                  OR EXISTS (
-                    SELECT 1 FROM payments p
-                    WHERE p.BOOKING_ID = b.IDNo
-                      AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'security_deposit_refund')
-                  )
-                THEN 'partial'
-                ELSE 'unpaid'
-              END
-            WHEN COALESCE(bill.PAYMENT_STATUS, 'unpaid') = 'paid' THEN 'paid'
-            WHEN COALESCE(bill.PAYMENT_STATUS, 'unpaid') IN ('partial_paid', 'partial') THEN 'partial'
+              SELECT 1 FROM payments p
+              WHERE p.BOOKING_ID = b.IDNo
+                AND p.PAYMENT_TYPE NOT IN ('discount', 'security_deposit', 'security_deposit_refund', 'reservation_fee')
+            )
+              OR COALESCE(bill.PAYMENT_STATUS, 'unpaid') IN ('partial_paid', 'partial', 'paid')
+            THEN 'partial'
             ELSE 'unpaid'
           END AS paymentStatus,
           DATEDIFF(b.CHECK_OUT_DATE, b.CHECK_IN_DATE) AS totalDays,

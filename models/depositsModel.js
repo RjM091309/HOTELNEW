@@ -15,6 +15,7 @@ class DepositsModel {
         sd.REMARKS,
         sd.COLLECTED_AT,
         sd.REFUNDED_AT,
+        COALESCE(sd.REFUNDED_AT, sd.COLLECTED_AT) AS LAST_ACTIVITY_AT,
         b.CONFIRMATION_NUMBER,
         c.NAME AS GUEST_NAME,
         r.ROOM_NUMBER,
@@ -27,7 +28,7 @@ class DepositsModel {
       LEFT JOIN user_info u ON u.IDNo = sd.ENCODED_BY
       LEFT JOIN user_info ru ON ru.IDNo = sd.REFUNDED_BY
       WHERE sd.ACTIVE = 1
-      ORDER BY sd.COLLECTED_AT DESC, sd.IDNo DESC
+      ORDER BY LAST_ACTIVITY_AT DESC, sd.IDNo DESC
     `;
     return await queryDatabasePromise(query);
   }

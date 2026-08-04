@@ -11,7 +11,7 @@ function initializeDepositsTable() {
   }
 
   depositsTable = $('#depositsTable').DataTable({
-    order: [[0, 'desc']],
+    order: [[11, 'desc']],
     pageLength: 25,
     lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
     autoWidth: false,
@@ -21,7 +21,8 @@ function initializeDepositsTable() {
     },
     columnDefs: [
       { targets: [4, 5, 6, 7], className: 'text-end' },
-      { targets: [9], className: 'text-center' }
+      { targets: [9], className: 'text-center' },
+      { targets: [11], visible: false, searchable: false }
     ]
   });
 }
@@ -95,7 +96,8 @@ function loadDepositsData() {
           formatAmountCell(record.APPLIED_TO_BALANCE),
           record.PAYMENT_METHOD || '-',
           formatStatus(record.STATUS),
-          record.REMARKS || '-'
+          record.REMARKS || '-',
+          record.LAST_ACTIVITY_AT || record.COLLECTED_AT || ''
         ]);
       });
 

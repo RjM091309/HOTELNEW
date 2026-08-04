@@ -669,14 +669,14 @@ const customButtons = {
   },
 
   bed1Filter: {
-    text: '1 Bed',
+    text: '1BR',
     click: function() {
       toggleBedFilter('1');
     }
   },
 
   bed2Filter: {
-    text: '2 Bed',
+    text: '2BR',
     click: function() {
       toggleBedFilter('2');
     }
@@ -1098,8 +1098,6 @@ async function loadCalendarData() {
     // No need to process through processBookingsData since backend handles it
     const events = bookingsData;
 
-    // Cache the unfiltered floor/room list and events so the bed-count filter
-    // can rebuild the resource list without needing to re-fetch from the server
     window.allCalendarFloors = sortedFloors;
     window.allCalendarEvents = events;
 
@@ -1111,8 +1109,6 @@ async function loadCalendarData() {
     calendar.removeAllEvents();
     calendar.addEventSource(events);
     calendar.render();
-
-    // Re-apply any active bed-count filter (row visibility) to the freshly rendered grid
     applyBedFilter();
 
     const renderTime = Date.now() - renderStart;
@@ -1666,38 +1662,26 @@ function createSearchBox() {
 function createFilterBox() {}
 
 // =============================================================================
-// BED COUNT FILTER (Rooms) - direct toolbar toggle buttons, no modal
+// BED COUNT FILTER (Rooms) - toolbar toggle buttons
 // =============================================================================
-// null = show all rooms; '1' or '2' = show only that bed count
 let activeBedFilter = null;
 
-// Clicking a bed button shows only that bed count and highlights that button.
-// Clicking the already-active button again clears the filter (back to all).
 function toggleBedFilter(bedValue) {
   activeBedFilter = (activeBedFilter === bedValue) ? null : bedValue;
   updateBedFilterButtonStates();
   applyBedFilter();
 }
 
-// Reflects activeBedFilter on the toolbar buttons (pressed/active look).
-// Uses our own class (not FullCalendar's fc-button-active) since that one is
-// meant for the library's own transient mousedown/mouseup press feedback and
-// gets cleared right after the click, which made the highlight look broken.
 function updateBedFilterButtonStates() {
   const btn1 = document.querySelector('.fc-bed1Filter-button');
   const btn2 = document.querySelector('.fc-bed2Filter-button');
   if (btn1) btn1.classList.toggle('bed-filter-btn-active', activeBedFilter === '1');
   if (btn2) btn2.classList.toggle('bed-filter-btn-active', activeBedFilter === '2');
 
-  // Clicking leaves the button focused, which shows its own lingering green
-  // focus ring even after the active class is removed - blur it so nothing stays behind
   if (btn1) btn1.blur();
   if (btn2) btn2.blur();
 }
 
-// Applies the current activeBedFilter via FullCalendar's own resources option -
-// the officially supported way to show/hide rows, so it's guaranteed to actually
-// filter (unlike manually toggling row display via guessed DOM selectors).
 function applyBedFilter() {
   if (!calendar || !window.allCalendarFloors) return;
 
@@ -2103,6 +2087,7 @@ window.toggleFilterBox = toggleFilterBox;
 window.performSearch = performSearch;
 window.clearSearch = clearSearch;
 window.applyBedFilter = applyBedFilter;
+window.updateBedFilterButtonStates = updateBedFilterButtonStates;
 window.applyFilters = applyFilters;
 window.clearFilters = clearFilters;
 window.highlightBooking = highlightBooking;

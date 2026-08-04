@@ -4,6 +4,27 @@
 let selectedCard = null; // Store the currently selected card
 let addedServicesMap = {}; // Store added services for each room
 
+const STACKED_CHILD_MODAL_Z = 1080;
+const STACKED_CHILD_BACKDROP_Z = 1075;
+
+function stackChildModalAboveRoomMenu(modalEl) {
+  if (!modalEl) return;
+
+  const applyStack = function () {
+    modalEl.style.zIndex = String(STACKED_CHILD_MODAL_Z);
+    const backdrops = document.querySelectorAll('.modal-backdrop');
+    if (backdrops.length) {
+      backdrops[backdrops.length - 1].style.zIndex = String(STACKED_CHILD_BACKDROP_Z);
+    }
+  };
+
+  modalEl.addEventListener('shown.bs.modal', applyStack, { once: true });
+  setTimeout(applyStack, 50);
+  setTimeout(applyStack, 150);
+}
+
+window.stackChildModalAboveRoomMenu = stackChildModalAboveRoomMenu;
+
 // Make functions globally accessible for onclick events
 window.addService = function(bookingId) {
     if (typeof addServiceLocal === 'function') {
@@ -5582,11 +5603,15 @@ function openExtendModal(roomId, checkoutDate, bookingId, roomNumber) {
   document.body.insertAdjacentHTML('beforeend', modalHTML);
   
   // Show the modal
-  const modal = new bootstrap.Modal(document.getElementById(`extendStayModal_${bookingId}`));
+  const modalElement = document.getElementById(`extendStayModal_${bookingId}`);
+  const modal = new bootstrap.Modal(modalElement, {
+    backdrop: 'static',
+    keyboard: false
+  });
+  stackChildModalAboveRoomMenu(modalElement);
   modal.show();
   
   // Clean up when modal is hidden
-  const modalElement = document.getElementById(`extendStayModal_${bookingId}`);
   modalElement.addEventListener('hidden.bs.modal', function() {
     // Check if this was opened from a resize operation (drag and drop)
     if (window.pendingResizeInfo && window.pendingResizeInfo.bookingId === bookingId) {
@@ -6044,14 +6069,19 @@ function initializeTransferModal() {
             }
             
             /* Transfer modal specific styles */
-            #transferAvailableModal {
-                z-index: 1060 !important;
+            #transferAvailableModal,
+            [id^="extendStayModal_"] {
+                z-index: 1080 !important;
             }
-            #transferAvailableModal .modal-backdrop {
-                z-index: 1055 !important;
+            #transferAvailableModal.show,
+            [id^="extendStayModal_"].show {
+                z-index: 1080 !important;
             }
-            .modal-backdrop + .modal-backdrop {
-                z-index: 1056 !important;
+            #lateCheckoutModal {
+                z-index: 1080 !important;
+            }
+            #lateCheckoutModal.show {
+                z-index: 1080 !important;
             }
             
             /* FIX: Billing modal z-index stacking fix */
@@ -6305,7 +6335,7 @@ function initializeTransferModal() {
     if (!modal) {
 
         const modalHTML = `
-            <div class="modal fade" id="transferAvailableModal" tabindex="-1" aria-labelledby="transferAvailableModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false" style="z-index: 1060;">
+            <div class="modal fade" id="transferAvailableModal" tabindex="-1" aria-labelledby="transferAvailableModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
                 <div class="modal-dialog modal-dialog-centered modal-xl">
                     <div class="modal-content">
                         <div class="modal-header" style="background: linear-gradient(135deg, #2a3135, #1f2528); border-bottom: 1px solid #495057;">
@@ -6413,19 +6443,8 @@ function initializeTransferModal() {
             backdrop: 'static',
             keyboard: false
         });
-        
-        // Ensure modal appears on top
-        modal.style.zIndex = '1060';
-        
-        // Handle backdrop properly
-        setTimeout(() => {
-            const backdrops = document.querySelectorAll('.modal-backdrop');
-            if (backdrops.length > 1) {
-                // If there are multiple backdrops, ensure the latest one is on top
-                backdrops[backdrops.length - 1].style.zIndex = '1055';
-            }
-        }, 100);
-        
+
+        stackChildModalAboveRoomMenu(modal);
         bootstrapModal.show();
     };
 
@@ -6654,10 +6673,10 @@ function initializeLateCheckoutModal() {
         style.id = 'late-checkout-modal-styles';
         style.textContent = `
             #lateCheckoutModal {
-                z-index: 1060 !important;
+                z-index: 1080 !important;
             }
-            #lateCheckoutModal .modal-backdrop {
-                z-index: 1055 !important;
+            #lateCheckoutModal.show {
+                z-index: 1080 !important;
             }
             .modal-backdrop + .modal-backdrop {
                 z-index: 1056 !important;
@@ -6747,7 +6766,7 @@ function initializeLateCheckoutModal() {
     if (!modal) {
 
         const modalHTML = `
-            <div class="modal fade" id="lateCheckoutModal" tabindex="-1" aria-labelledby="lateCheckoutModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false" style="z-index: 1060;">
+            <div class="modal fade" id="lateCheckoutModal" tabindex="-1" aria-labelledby="lateCheckoutModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
                 <div class="modal-dialog modal-dialog-centered modal-lg">
                     <div class="modal-content">
                         <div class="modal-header">
@@ -6921,19 +6940,8 @@ function initializeLateCheckoutModal() {
                     backdrop: 'static',
                     keyboard: false
                 });
-                
-                // Ensure modal appears on top
-                modal.style.zIndex = '1060';
-                
-                // Handle backdrop properly
-                setTimeout(() => {
-                    const backdrops = document.querySelectorAll('.modal-backdrop');
-                    if (backdrops.length > 1) {
-                        // If there are multiple backdrops, ensure the latest one is on top
-                        backdrops[backdrops.length - 1].style.zIndex = '1055';
-                    }
-                }, 100);
-                
+
+                stackChildModalAboveRoomMenu(modal);
                 bootstrapModal.show();
             })
             .catch(error => console.error("🚨 Error checking late check-out:", error));

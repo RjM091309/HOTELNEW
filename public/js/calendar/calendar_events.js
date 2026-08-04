@@ -539,6 +539,13 @@ function handleEventDidMount(info) {
 
 function handleDatesSet(info) {
   globalOverlapCheck(info.view.calendar);
+
+  if (typeof window.applyBedFilter === 'function') {
+    window.applyBedFilter();
+  }
+  if (typeof window.updateBedFilterButtonStates === 'function') {
+    window.updateBedFilterButtonStates();
+  }
   
   // Hide "12am" and "12pm" slot labels
   setTimeout(() => {

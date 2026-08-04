@@ -4,6 +4,8 @@ let pickupDropRecords = {};
 let pickupDropAllRecords = [];
 let pickupDropFlightScheduleList = null;
 let currentDateFilter = 'today';
+let pickupDropVehicleList = null;
+let pendingBulkPrint = null;
 
 $(document).ready(function () {
   initializePickupDropTables();
@@ -35,8 +37,28 @@ function initializePickupDropTables() {
   pickupTable = $('#pickupTable').DataTable({
     ...baseOptions,
     columnDefs: [
-      { targets: 4, className: 'text-center', orderable: false, searchable: false, width: '15%' }
-    ]
+      {
+        targets: 0,
+        className: 'pd-select-col text-center',
+        orderable: false,
+        searchable: false,
+        width: '40px'
+      },
+      { targets: 5, className: 'text-center', orderable: false, searchable: false, width: '15%' }
+    ],
+    initComplete: function () {
+      $('#pickupTable thead th.pd-select-col')
+        .removeClass('sorting sorting_asc sorting_desc sorting_asc_disabled sorting_desc_disabled')
+        .addClass('sorting_disabled');
+    }
+  });
+
+  $('#pickupTable').on('draw.dt', function () {
+    $('#pickupTable thead th.pd-select-col')
+      .removeClass('sorting sorting_asc sorting_desc sorting_asc_disabled sorting_desc_disabled')
+      .addClass('sorting_disabled');
+    syncPickupDropSelectAllState('pickupTable', 'pickupSelectAll');
+    updatePrintSelectedButtonVisibility();
   });
 
   if ($.fn.DataTable.isDataTable('#dropoffTable')) {
@@ -45,8 +67,28 @@ function initializePickupDropTables() {
   dropoffTable = $('#dropoffTable').DataTable({
     ...baseOptions,
     columnDefs: [
-      { targets: 4, className: 'text-center', orderable: false, searchable: false, width: '15%' }
-    ]
+      {
+        targets: 0,
+        className: 'pd-select-col text-center',
+        orderable: false,
+        searchable: false,
+        width: '40px'
+      },
+      { targets: 5, className: 'text-center', orderable: false, searchable: false, width: '15%' }
+    ],
+    initComplete: function () {
+      $('#dropoffTable thead th.pd-select-col')
+        .removeClass('sorting sorting_asc sorting_desc sorting_asc_disabled sorting_desc_disabled')
+        .addClass('sorting_disabled');
+    }
+  });
+
+  $('#dropoffTable').on('draw.dt', function () {
+    $('#dropoffTable thead th.pd-select-col')
+      .removeClass('sorting sorting_asc sorting_desc sorting_asc_disabled sorting_desc_disabled')
+      .addClass('sorting_disabled');
+    syncPickupDropSelectAllState('dropoffTable', 'dropoffSelectAll');
+    updatePrintSelectedButtonVisibility();
   });
 
   reloadPickupDropData();
@@ -81,6 +123,7 @@ function setupPickupDropHandlers() {
       $('#pickupTableWrap').show();
       pickupTable.columns.adjust();
     }
+    updatePrintSelectedButtonVisibility();
   });
 
   // Today / Previous Week / Future Week / All - applies to both tabs
@@ -89,6 +132,45 @@ function setupPickupDropHandlers() {
     $(this).addClass('active');
     currentDateFilter = $(this).data('filter');
     renderPickupDropTables();
+  });
+
+  $('#printSelectedPickupDropBtn').on('click', function () {
+    openPickupDropPrintModal();
+  });
+
+  $('#confirmPickupDropPrintBtn').on('click', function () {
+    confirmPickupDropPrint();
+  });
+
+  $('#pdPrintDriverName').on('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      confirmPickupDropPrint();
+    }
+  });
+
+  $('#pickupSelectAll').on('change', function () {
+    const checked = this.checked;
+    $('#pickupTable tbody .pd-row-check').prop('checked', checked);
+    syncPickupDropSelectAllState('pickupTable', 'pickupSelectAll');
+    updatePrintSelectedButtonVisibility();
+  });
+
+  $('#dropoffSelectAll').on('change', function () {
+    const checked = this.checked;
+    $('#dropoffTable tbody .pd-row-check').prop('checked', checked);
+    syncPickupDropSelectAllState('dropoffTable', 'dropoffSelectAll');
+    updatePrintSelectedButtonVisibility();
+  });
+
+  $('#pickupTable').on('change', '.pd-row-check', function () {
+    syncPickupDropSelectAllState('pickupTable', 'pickupSelectAll');
+    updatePrintSelectedButtonVisibility();
+  });
+
+  $('#dropoffTable').on('change', '.pd-row-check', function () {
+    syncPickupDropSelectAllState('dropoffTable', 'dropoffSelectAll');
+    updatePrintSelectedButtonVisibility();
   });
 }
 
@@ -143,8 +225,12 @@ function matchesDropoffDateFilter(effectiveDate) {
   return true;
 }
 
+function buildCheckbox(bookingId, printType) {
+  return '<input type="checkbox" class="pd-row-check" value="' + bookingId + '" data-type="' + printType + '" aria-label="Select row">';
+}
+
 function buildActions(bookingId, printType) {
-  const printBtn = printType === 'dropoff' ? '' : `
+  const printBtn = `
     <button type="button" class="btn btn-tbl-print btn-xs" onclick="printPickupDrop('${bookingId}', '${printType}')" title="Print">
       <i class="fa fa-print"></i>
     </button>`;
@@ -173,6 +259,7 @@ function renderPickupDropTables() {
         if (checkInDate && !isNaN(checkInDate.getTime())) checkInDate.setHours(0, 0, 0, 0);
 
         pickupTable.row.add([
+          buildCheckbox(record.BOOKING_ID, 'pickup'),
           record.NAME || '',
           formatDisplayDate(checkInDate),
           record.FLIGHT_NUMBER || '',
@@ -188,6 +275,7 @@ function renderPickupDropTables() {
       if (dropoffDate && !isNaN(dropoffDate.getTime())) dropoffDate.setHours(0, 0, 0, 0);
       if (matchesDropoffDateFilter(dropoffDate)) {
         dropoffTable.row.add([
+          buildCheckbox(record.BOOKING_ID, 'dropoff'),
           record.NAME || '',
           formatDisplayDate(dropoffDate),
           record.DROPOFF_FLIGHT_NUMBER || '',
@@ -200,29 +288,190 @@ function renderPickupDropTables() {
 
   pickupTable.draw();
   dropoffTable.draw();
+
+  $('#pickupSelectAll').prop('checked', false).prop('indeterminate', false);
+  $('#dropoffSelectAll').prop('checked', false).prop('indeterminate', false);
+  updatePrintSelectedButtonVisibility();
 }
 
-function printPickupDrop(bookingId, type) {
-  if (!pickupDropRecords[bookingId]) {
-    Swal.fire('Error', 'Record not found', 'error');
+function getActivePickupDropTableMeta() {
+  const isDropoff = $('#dropoffTableWrap').is(':visible');
+  return {
+    tableId: isDropoff ? 'dropoffTable' : 'pickupTable'
+  };
+}
+
+function getSelectedPickupDropRows(tableId) {
+  return $('#' + tableId + ' tbody .pd-row-check:checked')
+    .map(function () {
+      return { id: this.value, type: $(this).data('type') };
+    })
+    .get();
+}
+
+function syncPickupDropSelectAllState(tableId, selectAllId) {
+  const $checks = $('#' + tableId + ' tbody .pd-row-check');
+  const $selectAll = $('#' + selectAllId);
+  if (!$checks.length) {
+    $selectAll.prop('checked', false).prop('indeterminate', false);
     return;
   }
 
-  const printType = type === 'dropoff' ? 'dropoff' : 'pickup';
-  const record = pickupDropRecords[bookingId];
-  const flightNo = printType === 'dropoff' ? record.DROPOFF_FLIGHT_NUMBER : record.FLIGHT_NUMBER;
+  const checkedCount = $checks.filter(':checked').length;
+  $selectAll.prop('checked', checkedCount === $checks.length);
+  $selectAll.prop('indeterminate', checkedCount > 0 && checkedCount < $checks.length);
+}
 
-  if (!flightNo || String(flightNo).trim() === '') {
-    Swal.fire('Error', printType === 'dropoff' ? 'No drop-off flight number set' : 'No pick-up flight number set', 'error');
+function updatePrintSelectedButtonVisibility() {
+  const $btn = $('#printSelectedPickupDropBtn');
+  if (!$btn.length) return;
+  const { tableId } = getActivePickupDropTableMeta();
+  const hasSelection = getSelectedPickupDropRows(tableId).length > 0;
+  $btn.toggle(hasSelection);
+}
+
+function printSelectedPickupDrop(vehicleId, driverName) {
+  const { tableId } = getActivePickupDropTableMeta();
+  const selected = getSelectedPickupDropRows(tableId);
+  if (!selected.length) {
+    Swal.fire('No selection', 'Please select at least one record to print.', 'info');
     return;
   }
 
+  const printType = selected[0].type === 'dropoff' ? 'dropoff' : 'pickup';
+  const ids = selected.map(function (item) { return item.id; }).join(',');
+  const printUrl = buildPickupDropBulkPrintUrl(ids, printType, vehicleId, driverName);
+  loadPickupDropPrintPage(printUrl);
+}
+
+function buildPickupDropBulkPrintUrl(ids, printType, vehicleId, driverName) {
+  const params = new URLSearchParams({
+    ids: ids,
+    embed: '1',
+    type: printType
+  });
+
+  if (vehicleId) {
+    params.set('vehicleId', vehicleId);
+  }
+  if (driverName) {
+    params.set('driverName', driverName);
+  }
+
+  return '/pickup-drop/print/bulk?' + params.toString();
+}
+
+function openPickupDropPrintModal() {
+  const { tableId } = getActivePickupDropTableMeta();
+  const selected = getSelectedPickupDropRows(tableId);
+  if (!selected.length) {
+    Swal.fire('No selection', 'Please select at least one record to print.', 'info');
+    return;
+  }
+
+  const printType = selected[0].type === 'dropoff' ? 'dropoff' : 'pickup';
+  const ids = selected.map(function (item) { return item.id; }).join(',');
+  pendingBulkPrint = { ids: ids, printType: printType };
+
+  loadPickupDropVehicles(function () {
+    populatePickupDropVehicleSelect();
+    $('#pdPrintDriverName').val('');
+
+    const modalEl = document.getElementById('pickupDropPrintModal');
+    if (!modalEl) {
+      printSelectedPickupDrop();
+      return;
+    }
+
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.show();
+
+    setTimeout(function () {
+      $('#pdPrintVehicle').trigger('focus');
+    }, 200);
+  });
+}
+
+function confirmPickupDropPrint() {
+  const vehicleId = $('#pdPrintVehicle').val();
+  const driverName = $('#pdPrintDriverName').val().trim();
+
+  if (!vehicleId) {
+    Swal.fire('Required', 'Please select a vehicle.', 'warning');
+    return;
+  }
+
+  if (!driverName) {
+    Swal.fire('Required', 'Please enter the driver name.', 'warning');
+    return;
+  }
+
+  if (!pendingBulkPrint) {
+    return;
+  }
+
+  const modalEl = document.getElementById('pickupDropPrintModal');
+  if (modalEl) {
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) modal.hide();
+  }
+
+  printSelectedPickupDrop(vehicleId, driverName);
+  pendingBulkPrint = null;
+}
+
+function loadPickupDropVehicles(callback) {
+  if (Array.isArray(pickupDropVehicleList)) {
+    callback(pickupDropVehicleList);
+    return;
+  }
+
+  $.ajax({
+    url: '/vehicle/api/vehicles',
+    method: 'GET',
+    dataType: 'json',
+    success: function (response) {
+      pickupDropVehicleList = (response.success && Array.isArray(response.data)) ? response.data : [];
+      callback(pickupDropVehicleList);
+    },
+    error: function () {
+      pickupDropVehicleList = [];
+      Swal.fire('Error', 'Failed to load vehicles', 'error');
+      callback(pickupDropVehicleList);
+    }
+  });
+}
+
+function populatePickupDropVehicleSelect() {
+  const $select = $('#pdPrintVehicle');
+  const currentValue = $select.val();
+  $select.empty();
+  $select.append('<option value="">Select vehicle</option>');
+
+  if (!pickupDropVehicleList || !pickupDropVehicleList.length) {
+    $select.append('<option value="" disabled>No vehicles available</option>');
+    return;
+  }
+
+  pickupDropVehicleList.forEach(function (vehicle) {
+    const modelName = vehicle.MODEL_NAME || 'Unnamed vehicle';
+    const plateNumber = vehicle.PLATE_NUMBER ? ' (' + vehicle.PLATE_NUMBER + ')' : '';
+    $('<option></option>')
+      .val(vehicle.IDNo)
+      .text(modelName + plateNumber)
+      .appendTo($select);
+  });
+
+  if (currentValue && $select.find('option[value="' + currentValue + '"]').length) {
+    $select.val(currentValue);
+  }
+}
+
+function loadPickupDropPrintPage(printUrl, onComplete) {
   const existingFrame = document.getElementById('pickupDropPrintFrame');
   if (existingFrame) {
     existingFrame.remove();
   }
-
-  const printUrl = '/pickup-drop/print/' + bookingId + '?embed=1&type=' + printType;
 
   fetch(printUrl, { credentials: 'same-origin' })
     .then(function (response) {
@@ -255,21 +504,62 @@ function printPickupDrop(bookingId, type) {
             if (iframe.parentNode) {
               iframe.parentNode.removeChild(iframe);
             }
+            if (typeof onComplete === 'function') {
+              onComplete();
+            }
           }, 1000);
         }, 150);
       };
 
-      const logoImg = frameDoc.querySelector('.print-logo img');
-      if (logoImg && !logoImg.complete) {
-        logoImg.onload = function () { setTimeout(runPrint, 200); };
-        logoImg.onerror = function () { setTimeout(runPrint, 200); };
+      const logoImgs = frameDoc.querySelectorAll('.print-logo img');
+      if (logoImgs.length) {
+        let loaded = 0;
+        const checkAllLoaded = function () {
+          loaded += 1;
+          if (loaded >= logoImgs.length) {
+            setTimeout(runPrint, 200);
+          }
+        };
+
+        logoImgs.forEach(function (img) {
+          if (img.complete) {
+            checkAllLoaded();
+          } else {
+            img.onload = checkAllLoaded;
+            img.onerror = checkAllLoaded;
+          }
+        });
       } else {
         setTimeout(runPrint, 300);
       }
     })
     .catch(function () {
       Swal.fire('Error', 'Failed to load print page', 'error');
+      if (typeof onComplete === 'function') {
+        onComplete();
+      }
     });
+}
+
+function printPickupDrop(bookingId, type, onComplete) {
+  if (!pickupDropRecords[bookingId]) {
+    Swal.fire('Error', 'Record not found', 'error');
+    if (typeof onComplete === 'function') onComplete();
+    return;
+  }
+
+  const printType = type === 'dropoff' ? 'dropoff' : 'pickup';
+  const record = pickupDropRecords[bookingId];
+  const flightNo = printType === 'dropoff' ? record.DROPOFF_FLIGHT_NUMBER : record.FLIGHT_NUMBER;
+
+  if (!flightNo || String(flightNo).trim() === '') {
+    Swal.fire('Error', printType === 'dropoff' ? 'No drop-off flight number set' : 'No pick-up flight number set', 'error');
+    if (typeof onComplete === 'function') onComplete();
+    return;
+  }
+
+  const printUrl = '/pickup-drop/print/' + bookingId + '?embed=1&type=' + printType;
+  loadPickupDropPrintPage(printUrl, onComplete);
 }
 
 function reloadPickupDropData() {

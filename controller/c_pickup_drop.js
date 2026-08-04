@@ -1,4 +1,5 @@
 const PickupDropModel = require('../models/pickupDropModel');
+const VehicleModel = require('../models/vehicleModel');
 
 function formatFlightNumber(record) {
   const parts = [record.FLIGHT_NUMBER, record.DROPOFF_FLIGHT_NUMBER]
@@ -9,6 +10,22 @@ function formatFlightNumber(record) {
 function getPrintFlightNumber(record, type) {
   const value = type === 'dropoff' ? record.DROPOFF_FLIGHT_NUMBER : record.FLIGHT_NUMBER;
   return value && String(value).trim() ? String(value).trim() : '-';
+}
+
+async function getPrintVehicleInfo(vehicleId) {
+  if (!vehicleId) {
+    return { vehicleName: '', plateNumber: '' };
+  }
+
+  const vehicle = await VehicleModel.getVehicleById(vehicleId);
+  if (!vehicle) {
+    return { vehicleName: '', plateNumber: '' };
+  }
+
+  return {
+    vehicleName: vehicle.MODEL_NAME || '',
+    plateNumber: vehicle.PLATE_NUMBER || ''
+  };
 }
 
 class PickupDropController {
@@ -40,6 +57,8 @@ class PickupDropController {
 
       const guestName = data.NAME || '';
       const printType = req.query.type === 'dropoff' ? 'dropoff' : 'pickup';
+      const vehicleInfo = await getPrintVehicleInfo(req.query.vehicleId);
+      const driverName = String(req.query.driverName || '').trim();
       res.render('pickup_drop/print', {
         layout: false,
         embed: req.query.embed === '1',
@@ -47,10 +66,64 @@ class PickupDropController {
         flightNo: getPrintFlightNumber(data, printType),
         personCount: data.PASSENGER_COUNT != null ? data.PASSENGER_COUNT : '-',
         specialNotes: data.PICKUP_DROP_SPECIAL_NOTES || '',
-        printType
+        printType,
+        vehicleName: vehicleInfo.vehicleName,
+        plateNumber: vehicleInfo.plateNumber,
+        driverName
       });
     } catch (error) {
       console.error('Error rendering pickup & drop print page:', error);
+      res.status(500).send('Error loading print page');
+    }
+  }
+
+  static async printBulk(req, res) {
+    try {
+      const ids = String(req.query.ids || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
+
+      if (!ids.length) {
+        return res.status(400).send('No records selected');
+      }
+
+      const printType = req.query.type === 'dropoff' ? 'dropoff' : 'pickup';
+      const records = [];
+
+      for (const id of ids) {
+        const data = await PickupDropModel.getByBookingId(id);
+        if (!data) continue;
+
+        const flightNo = getPrintFlightNumber(data, printType);
+        if (!flightNo || flightNo === '-') continue;
+
+        records.push({
+          guestName: data.NAME || '',
+          flightNo,
+          personCount: data.PASSENGER_COUNT != null ? data.PASSENGER_COUNT : '-',
+          specialNotes: data.PICKUP_DROP_SPECIAL_NOTES || ''
+        });
+      }
+
+      if (!records.length) {
+        return res.status(404).send('No records found');
+      }
+
+      const vehicleInfo = await getPrintVehicleInfo(req.query.vehicleId);
+      const driverName = String(req.query.driverName || '').trim();
+
+      res.render('pickup_drop/print_bulk', {
+        layout: false,
+        embed: req.query.embed === '1',
+        printType,
+        records,
+        vehicleName: vehicleInfo.vehicleName,
+        plateNumber: vehicleInfo.plateNumber,
+        driverName
+      });
+    } catch (error) {
+      console.error('Error rendering bulk pickup & drop print page:', error);
       res.status(500).send('Error loading print page');
     }
   }
