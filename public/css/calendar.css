@@ -790,10 +790,10 @@
      HIGHLIGHT SELECTED CELL
      ======================================== */
   .fc-highlight {
-    background: rgba(111, 156, 64, 0.3) !important; /* Dark green highlight */
-    opacity: 0.7 !important;
+    background: rgba(33, 150, 243, 0.35) !important; /* Blue highlight, single or group booking */
+    opacity: 1 !important;
   }
-  
+
   /* ========================================
      HOVER EFFECTS FOR BOOKING
      ======================================== */
@@ -1602,4 +1602,46 @@
   flex-direction:column;
   justify-content:center;
   align-items:center;
+}
+
+/* Group Select: auto-detected when a drag sweeps into more than one room */
+
+#calendar .group-select-armed {
+  background-color: rgba(33, 150, 243, 0.35) !important;
+  outline: 2px solid #2196F3;
+  outline-offset: -2px;
+  cursor: pointer;
+}
+
+.group-select-badge {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2000;
+  background: #2a3135;
+  color: #fff;
+  border: 1px solid #2196F3;
+  border-radius: 8px;
+  padding: 10px 16px;
+  max-width: 90vw;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  font-size: 13px;
+}
+
+/* Prevent native text-selection artifacts while sweeping the drag across rooms/dates */
+body.calendar-drag-active {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+/* Precise per-room highlight rectangle, scoped to exactly the swept date range
+   (position/size set inline in JS via syncGroupSelectOverlay) */
+.group-select-overlay {
+  position: fixed;
+  background-color: rgba(33, 150, 243, 0.35);
+  border-top: 1px solid #2196F3;
+  border-bottom: 1px solid #2196F3;
+  pointer-events: none;
+  z-index: 5;
 }

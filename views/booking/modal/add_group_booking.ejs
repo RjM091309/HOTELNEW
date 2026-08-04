@@ -1066,6 +1066,10 @@
   let groupUnassignedConflicts = [];
   let groupManualRates = {}; // Store manual rates for each room
   let groupBedBasedRates = {}; // Store bed-based rates {1: price, 2: price}
+  let pendingCalendarRoomIds = []; // Room IDs handed off from the calendar's group-select flow
+  let pendingCalendarStart = null;
+  let pendingCalendarEnd = null;
+  let isCalendarDirectSelection = false; // true once rooms came from the calendar hand-off
 
   function getGroupPriceBookingType() {
     const bookingRoute = $('#groupBookingRoute').val();
@@ -1117,6 +1121,18 @@
   }
 
   function refreshGroupRoomPricing() {
+    // Rooms picked via the calendar hand-off are an exact set, not a criteria
+    // search result - re-running Search Rooms here would silently replace them
+    // with whatever the generic search finds. Just recompute prices client-side
+    // from the already-fetched SEASONAL_PRICES instead.
+    if (isCalendarDirectSelection) {
+      if (groupManualSelectedRooms.length > 0) {
+        updateManualSelectedRoomValues();
+        computeGroupTotal();
+      }
+      return;
+    }
+
     if ($('#groupResultsContainer').is(':visible')) {
       $('#groupSearchRooms').click();
       return;
@@ -1149,6 +1165,7 @@
     groupNonConsecutiveBlocks = [];
     groupAvailableRooms = [];
     groupManualMode = false;
+    isCalendarDirectSelection = false;
     groupManualSelectedRooms = [];
     groupRequiredBed1 = 0;
     groupRequiredBed2 = 0;
@@ -1439,7 +1456,7 @@
       
       updateManualSelectionInfo();
     }
-    
+
     $('#groupResultsContainer').show();
   }
 
@@ -1905,6 +1922,78 @@
       populateBreakdown(block, computedPrices);
       updateGroupChargeBreakdown();
       computeGroupTotal();
+    });
+  }
+
+  // Rooms handed off from the calendar's Group Select drag are known exact IDs, not
+  // a "find me N rooms matching criteria" search - so instead of routing them through
+  // the generic find_consecutive_rooms wizard (which could return a completely
+  // different set of rooms), this checks availability/pricing for exactly those IDs
+  // and selects them directly.
+  function fetchAndSelectCalendarRooms() {
+    if (!pendingCalendarRoomIds.length || !pendingCalendarStart || !pendingCalendarEnd) return;
+
+    const roomIdsToCheck = pendingCalendarRoomIds.slice();
+
+    $.ajax({
+      url: '/booking/check_rooms_availability',
+      type: 'POST',
+      data: {
+        roomIds: roomIdsToCheck,
+        startDate: pendingCalendarStart.toISOString(),
+        endDate: pendingCalendarEnd.toISOString()
+      },
+      success: function(response) {
+        if (!response.success) {
+          Swal.fire('Error', response.message || 'Could not check room availability.', 'error');
+          return;
+        }
+
+        const rooms = response.data.rooms || [];
+        const availableRooms = rooms.filter(r => r.isAvailable);
+        const unavailableRooms = rooms.filter(r => !r.isAvailable);
+        const foundIds = rooms.map(r => r.IDNo);
+        const missingIds = roomIdsToCheck.filter(id => !foundIds.includes(id));
+
+        $('#groupNumberOfRooms').val(availableRooms.length);
+
+        displayGroupRoomResults({
+          consecutiveBlocks: [],
+          nonConsecutiveBlocks: [],
+          availableRooms: availableRooms,
+          unassignedConflicts: []
+        }, null, true);
+
+        availableRooms.forEach(function(room) {
+          const checkbox = $(`#groupRoomsList .group-manual-checkbox[data-room-id="${room.IDNo}"]`);
+          if (checkbox.length && !checkbox.is(':checked')) {
+            checkbox.prop('checked', true).trigger('change');
+          }
+        });
+
+        if (unavailableRooms.length || missingIds.length) {
+          const parts = [];
+          if (unavailableRooms.length) {
+            parts.push(`Already booked: ${unavailableRooms.map(r => r.ROOM_NUMBER).join(', ')}.`);
+          }
+          if (missingIds.length) {
+            parts.push(`${missingIds.length} room(s) no longer exist.`);
+          }
+          Swal.fire({
+            title: 'Some selected rooms are unavailable',
+            text: parts.join(' '),
+            icon: 'warning',
+            confirmButtonText: 'OK',
+            background: '#2a3135',
+            color: '#ffffff'
+          });
+        }
+
+        pendingCalendarRoomIds = [];
+      },
+      error: function() {
+        Swal.fire('Error', 'Failed to check room availability. Please try again.', 'error');
+      }
     });
   }
 
@@ -2500,6 +2589,12 @@
   }
 
   function refreshManualSelectionDisabledState() {
+    // Rooms picked via the calendar hand-off are an exact set - none of this
+    // bed1Needed/bed2Needed-driven disabling (built for the generic search wizard)
+    // applies, since we never set those counts in this flow. Leave every checkbox
+    // enabled and untouched.
+    if (isCalendarDirectSelection) return;
+
     const limitReached = hasReachedManualSelectionLimit();
     const summary = getManualBedSummary();
     $('#groupRoomsList .group-manual-checkbox').each(function() {
@@ -2694,6 +2789,28 @@
   window.getGroupBookingState = getGroupBookingState;
   window.resetGroupForm = resetGroupForm; // Make resetGroupForm globally accessible
 
+  // Opens this modal pre-filled with rooms + a date range picked elsewhere on the
+  // same page (e.g. the calendar's Group Select drag). Also used by the URL-param
+  // hand-off below for cross-page navigation (e.g. landing on /booking/group).
+  function openGroupBookingFromCalendar(roomIds, startDate, endDate) {
+    pendingCalendarRoomIds = (roomIds || [])
+      .map(id => parseInt(id, 10))
+      .filter(id => !Number.isNaN(id));
+    pendingCalendarStart = startDate instanceof Date ? startDate : new Date(startDate);
+    pendingCalendarEnd = endDate instanceof Date ? endDate : new Date(endDate);
+
+    const groupModalEl = document.getElementById('modal-add-group-booking');
+    if (!groupModalEl) return;
+    if (typeof window.showBootstrapModal === 'function') {
+      window.showBootstrapModal(groupModalEl, { backdrop: 'static', keyboard: true });
+    } else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+      bootstrap.Modal.getOrCreateInstance(groupModalEl, { backdrop: 'static', keyboard: true }).show();
+    } else {
+      $(groupModalEl).modal('show');
+    }
+  }
+  window.openGroupBookingFromCalendar = openGroupBookingFromCalendar;
+
   $(document).ready(function() {
     initializeGroupFlatpickr();
     fetchGroupFloors();
@@ -2707,6 +2824,24 @@
     attachManualRateHandlers();
     attachBookingRouteHandler();
     handleSearchRooms();
+
+    // Hand-off via URL for cross-page navigation: ?glRooms=1,2,3&glStart=...&glEnd=...
+    const calendarParams = new URLSearchParams(window.location.search);
+    const glRoomsParam = calendarParams.get('glRooms');
+    const glStartParam = calendarParams.get('glStart');
+    const glEndParam = calendarParams.get('glEnd');
+
+    if (glRoomsParam && glStartParam && glEndParam) {
+      // Strip the params so refreshing or reopening the modal later doesn't re-trigger this
+      calendarParams.delete('glRooms');
+      calendarParams.delete('glStart');
+      calendarParams.delete('glEnd');
+      const cleanedQuery = calendarParams.toString();
+      const newUrl = window.location.pathname + (cleanedQuery ? `?${cleanedQuery}` : '') + window.location.hash;
+      window.history.replaceState({}, '', newUrl);
+
+      openGroupBookingFromCalendar(glRoomsParam.split(','), glStartParam, glEndParam);
+    }
 
     $('#groupBookingForm').on('input change', computeGroupTotal);
     
@@ -2726,6 +2861,24 @@
       initializeGroupFlatpickr();
       // Ensure individual billing indicator is properly initialized
       $('#groupIndividualBilling').trigger('change');
+
+      // Prefill date range + directly select the exact rooms handed off from the
+      // calendar (resetGroupForm() runs first and clears everything, so this must
+      // come after it)
+      if (pendingCalendarRoomIds.length && pendingCalendarStart && pendingCalendarEnd) {
+        isCalendarDirectSelection = true;
+
+        const nights = Math.max(1, Math.round(
+          (pendingCalendarEnd.getTime() - pendingCalendarStart.getTime()) / (1000 * 3600 * 24)
+        ));
+        groupFlatpickrInstance.setDate([pendingCalendarStart, pendingCalendarEnd], false);
+        $('#groupNights').val(nights);
+        const rangeText = groupFlatpickrInstance.formatDate(pendingCalendarStart, 'M d, Y')
+          + ' to ' + groupFlatpickrInstance.formatDate(pendingCalendarEnd, 'M d, Y');
+        $('#groupDaterange').val(`${rangeText} (${nights} night/s)`);
+
+        fetchAndSelectCalendarRooms();
+      }
     });
 
     // Toggle wrappers and recalc
@@ -2833,6 +2986,16 @@
 
     // Clear selected rooms when Check-in/Check-out status changes
     $('#groupCheckInStatus, #groupCheckOutStatus, #groupBookingRoute').on('change', function() {
+      // Rooms picked via the calendar hand-off are an exact set that doesn't depend
+      // on these filters - keep them selected and just recompute pricing.
+      if (isCalendarDirectSelection) {
+        if (groupManualSelectedRooms.length > 0) {
+          updateManualSelectedRoomValues();
+          computeGroupTotal();
+        }
+        return;
+      }
+
       // Uncheck any selected block radios or manual checkboxes
       $('#groupRoomsList input[name="groupBlock"]').prop('checked', false);
       $('#groupRoomsList .group-manual-checkbox').prop('checked', false);

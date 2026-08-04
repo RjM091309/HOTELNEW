@@ -350,6 +350,188 @@ function setupHoverEffects() {
 // They are available globally via window.handleEventClick, window.handleEventDidMount, window.handleDatesSet
 
 // =============================================================================
+// GROUP SELECT (auto-detected): dragging within one room works exactly as before
+// (single-booking modal). Sweeping the drag down into other rooms along the way
+// is auto-detected as a group booking and hands off to that modal instead - no
+// separate mode/button needed.
+// =============================================================================
+
+const armedRoomIds = new Set();
+
+function getOrderedRoomIds() {
+  return Array.from(document.querySelectorAll('.fc-datagrid-cell.fc-resource[data-resource-id]:not([data-is-floor])'))
+    .map(el => el.getAttribute('data-resource-id'));
+}
+
+// Sets the armed rooms to exactly the contiguous range between the drag's anchor
+// (where mousedown happened) and whatever room is currently under the cursor - so
+// dragging further sweeps more rooms in, and dragging back shrinks it, same as a
+// spreadsheet range selection (instead of a one-way "only ever adds" set).
+function setArmedRoomRange(anchorId, currentId) {
+  const orderedIds = getOrderedRoomIds();
+  const anchorIndex = orderedIds.indexOf(String(anchorId));
+  const currentIndex = orderedIds.indexOf(String(currentId));
+  if (anchorIndex === -1 || currentIndex === -1) return;
+
+  const start = Math.min(anchorIndex, currentIndex);
+  const end = Math.max(anchorIndex, currentIndex);
+  const rangeIds = orderedIds.slice(start, end + 1);
+  const rangeSet = new Set(rangeIds);
+
+  armedRoomIds.forEach(function(id) {
+    if (!rangeSet.has(id)) {
+      const labelCell = document.querySelector(`.fc-datagrid-cell.fc-resource[data-resource-id="${CSS.escape(id)}"]`);
+      if (labelCell) labelCell.classList.remove('group-select-armed');
+    }
+  });
+
+  armedRoomIds.clear();
+  rangeIds.forEach(function(id) {
+    armedRoomIds.add(id);
+    const labelCell = document.querySelector(`.fc-datagrid-cell.fc-resource[data-resource-id="${CSS.escape(id)}"]`);
+    if (labelCell) labelCell.classList.add('group-select-armed');
+  });
+
+  updateGroupSelectBadge();
+}
+
+// Draws a highlight rectangle for each swept room, scoped to exactly the date
+// range the user dragged over - not the whole row. FullCalendar already computes
+// that date range precisely for the room the drag started in (its native
+// .fc-highlight element); this just borrows that element's left/width and repeats
+// it at each additional armed room's row position.
+let groupSelectOverlays = [];
+
+function clearGroupSelectOverlays() {
+  groupSelectOverlays.forEach(function(el) { el.remove(); });
+  groupSelectOverlays = [];
+}
+
+function syncGroupSelectOverlay() {
+  clearGroupSelectOverlays();
+
+  const nativeHighlight = document.querySelector('.fc-highlight');
+  if (!nativeHighlight) return;
+  const hRect = nativeHighlight.getBoundingClientRect();
+
+  armedRoomIds.forEach(function(id) {
+    const labelCell = document.querySelector(`.fc-datagrid-cell.fc-resource[data-resource-id="${CSS.escape(id)}"]`);
+    if (!labelCell) return;
+    const labelRect = labelCell.getBoundingClientRect();
+
+    // Skip the room whose row already has FullCalendar's own native highlight
+    if (hRect.top >= labelRect.top && hRect.top < labelRect.bottom) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'group-select-overlay';
+    overlay.style.left = hRect.left + 'px';
+    overlay.style.width = hRect.width + 'px';
+    overlay.style.top = labelRect.top + 'px';
+    overlay.style.height = labelRect.height + 'px';
+    document.body.appendChild(overlay);
+    groupSelectOverlays.push(overlay);
+  });
+}
+
+// Single continuous drag: mousedown on a room row, drag down to sweep more rooms,
+// drag across to set the date range, release to hand off. Tracks which room lanes
+// the pointer passed over via the stable data-resource-id attribute FullCalendar
+// puts on every row/lane cell; the date range itself still comes from FullCalendar's
+// own native select event (info.start/info.end), so we never have to reimplement
+// pixel-to-date math against the timeline grid.
+let groupDragActive = false;
+
+// FullCalendar renders its own drag-preview overlay in the timeline pane while a
+// select-drag is in progress, which sits on top and blocks document.elementFromPoint
+// from reaching the real cells. So instead of point-based hit-testing, this compares
+// the cursor's Y position directly against each room label's bounding box — the
+// label column (left side) is never covered by that overlay, so it's a reliable way
+// to know which room row the cursor is over at any moment during the drag.
+function findResourceIdAtY(clientY) {
+  const labelCells = document.querySelectorAll('.fc-datagrid-cell.fc-resource[data-resource-id]:not([data-is-floor])');
+  for (let i = 0; i < labelCells.length; i++) {
+    const rect = labelCells[i].getBoundingClientRect();
+    if (clientY >= rect.top && clientY <= rect.bottom) {
+      return labelCells[i].getAttribute('data-resource-id');
+    }
+  }
+  return null;
+}
+
+let groupDragAnchorRoomId = null;
+
+function attachGroupSelectDragTracking() {
+  document.addEventListener('mousedown', function(e) {
+    // Same Y-position lookup as mousemove below: clicking a date cell in the
+    // timeline lands on FullCalendar's decorative background slot layer, which
+    // has no data-resource-id of its own, so closest() can't find the room here.
+    const roomId = findResourceIdAtY(e.clientY);
+    if (!roomId) return;
+    // Always start a fresh sweep - a prior gesture that ended without FullCalendar's
+    // select event firing (e.g. a plain click with no drag) would otherwise leave a
+    // stale room armed, which then gets counted into THIS gesture too.
+    resetGroupSelectState();
+    groupDragActive = true;
+    groupDragAnchorRoomId = roomId;
+    document.body.classList.add('calendar-drag-active');
+    setArmedRoomRange(roomId, roomId);
+  });
+
+  document.addEventListener('mousemove', function(e) {
+    if (!groupDragActive) return;
+    // Stop the browser's native text/element selection from kicking in mid-drag
+    e.preventDefault();
+    const roomId = findResourceIdAtY(e.clientY);
+    if (roomId) {
+      setArmedRoomRange(groupDragAnchorRoomId, roomId);
+    }
+    syncGroupSelectOverlay();
+  });
+
+  document.addEventListener('mouseup', function() {
+    groupDragActive = false;
+    groupDragAnchorRoomId = null;
+    document.body.classList.remove('calendar-drag-active');
+
+    // Safety net: if this gesture didn't end in a valid FullCalendar selection
+    // (e.g. released outside the grid), its own `select` handler - which normally
+    // resets armedRoomIds - never runs, leaving a stale blue-highlighted room stuck
+    // until the next drag. `select`, if it does fire, runs synchronously within this
+    // same mouseup, so by the time this deferred callback runs it's already been
+    // consumed - calling reset again here is just a harmless no-op in that case.
+    setTimeout(resetGroupSelectState, 0);
+  });
+}
+
+function updateGroupSelectBadge() {
+  let badge = document.getElementById('group-select-badge');
+  const count = armedRoomIds.size;
+
+  // Only surface the badge once the drag has actually turned into a group
+  // selection (2+ rooms) - a normal single-room drag shows nothing extra.
+  if (count <= 1) {
+    if (badge) badge.remove();
+    return;
+  }
+
+  if (!badge) {
+    badge = document.createElement('div');
+    badge.id = 'group-select-badge';
+    badge.className = 'group-select-badge';
+    document.body.appendChild(badge);
+  }
+
+  badge.textContent = `${count} rooms selected for this group booking - release to continue.`;
+}
+
+function resetGroupSelectState() {
+  document.querySelectorAll('.group-select-armed').forEach(el => el.classList.remove('group-select-armed'));
+  armedRoomIds.clear();
+  clearGroupSelectOverlays();
+  updateGroupSelectBadge();
+}
+
+// =============================================================================
 // CUSTOM BUTTONS
 // =============================================================================
 
@@ -1055,7 +1237,27 @@ const findHeader = setInterval(() => {
         calendar.unselect();
         return; // Exit early, don't show modal
       }
-      
+
+      // AUTO-DETECTED GROUP SELECT: if the drag swept into more than one room,
+      // treat it as a group booking and open that modal instead of the normal
+      // single-booking one. A plain single-room drag falls through unchanged below.
+      armedRoomIds.add(String(info.resource.id));
+      if (armedRoomIds.size > 1) {
+        const roomIds = Array.from(armedRoomIds);
+
+        calendar.unselect();
+
+        if (typeof window.openGroupBookingFromCalendar === 'function') {
+          window.openGroupBookingFromCalendar(roomIds, info.start, info.end);
+        } else {
+          console.error('Group Booking modal is not available on this page.');
+        }
+
+        resetGroupSelectState();
+        return;
+      }
+      resetGroupSelectState();
+
       // Check if this selection is from a highlighted area (URL params)
       const params = new URLSearchParams(window.location.search);
       const hlRoomId = params.get('hlRoomId');
@@ -1155,13 +1357,28 @@ const findHeader = setInterval(() => {
       return arg.resource.title;
     },
 
+    resourceLabelDidMount: function(arg) {
+      if (arg.resource.extendedProps.isFloor) {
+        arg.el.setAttribute('data-is-floor', 'true');
+        return;
+      }
+
+      // Re-apply the armed highlight after view re-renders (e.g. changing weeks)
+      if (armedRoomIds.has(String(arg.resource.id))) {
+        arg.el.classList.add('group-select-armed');
+      }
+    },
+
     resources: [],
     events: []
   });
 
   // Load data
   loadCalendarData();
-  
+
+  // Group Select: press-drag-release across rooms and dates in one gesture
+  attachGroupSelectDragTracking();
+
   // Initialize drag and drop functionality immediately
   if (typeof window.initializeDragAndDrop === 'function') {
     window.initializeDragAndDrop();

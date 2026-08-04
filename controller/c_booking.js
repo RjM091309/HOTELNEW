@@ -1451,6 +1451,36 @@ class BookingController {
     }
   }
 
+  // Direct availability/pricing check for specific room IDs (e.g. rooms picked by
+  // dragging across the calendar's Group Select), bypassing the generic
+  // find_consecutive_rooms criteria search.
+  static async checkRoomsAvailability(req, res) {
+    try {
+      const { roomIds, startDate, endDate } = req.body;
+      const parsedRoomIds = Array.isArray(roomIds)
+        ? roomIds.map(id => parseInt(id, 10)).filter(id => !Number.isNaN(id))
+        : [];
+
+      if (!parsedRoomIds.length || !startDate || !endDate) {
+        return res.status(400).json({ success: false, message: 'roomIds, startDate, and endDate are required.' });
+      }
+
+      const result = await BookingModel.checkRoomsAvailability({
+        roomIds: parsedRoomIds,
+        startDate,
+        endDate
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error('Error in checkRoomsAvailability:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error checking room availability'
+      });
+    }
+  }
+
   static async findConsecutiveRoomsEdit(req, res) {
     try {
       let { startDate, endDate, neededRooms, floorNumber, bed1Needed = 0, bed2Needed = 0, bookingRoute, checkInStatus, checkOutStatus, excludeGroupBookingId, currentGroupBookingId } = req.body;

@@ -9169,6 +9169,98 @@ class BookingModel {
     }
   }
 
+  // Direct availability/pricing lookup for a specific set of room IDs (e.g. rooms
+  // picked by dragging across the calendar), instead of a generic criteria search.
+  // Returns the same room shape find_consecutive_rooms uses (IDNo, ROOM_NUMBER,
+  // ROOM_BED, ROOM_PRICE, SEASONAL_PRICES) plus an isAvailable flag per room, so the
+  // frontend can flag any room that got booked by someone else in the meantime.
+  static async checkRoomsAvailability({ roomIds, startDate, endDate }) {
+    const connection = await pool.promise().getConnection();
+
+    try {
+      const moment = require('moment');
+      const formattedStartDate = moment(startDate).format('YYYY-MM-DD');
+      const formattedEndDate = moment(endDate).format('YYYY-MM-DD');
+
+      const roomsQuery = `
+        SELECT r.IDNo, r.ROOM_NUMBER, r.ROOM_FLOOR, r.ROOM_BED, r.ROOM_VIEW,
+               COALESCE(r.ROOM_PRICE, rt.BASE_PRICE) AS ROOM_PRICE,
+               r.ROOM_TYPE_ID,
+               EXISTS (
+                 SELECT 1 FROM booking b
+                 WHERE b.ROOM_ID = r.IDNo
+                   AND b.ACTIVE = 1
+                   AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
+                   AND (DATE(b.CHECK_IN_DATE) < ? AND DATE(b.CHECK_OUT_DATE) > ?)
+               ) AS HAS_CONFLICT
+        FROM room r
+        JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
+        WHERE r.IDNo IN (?)
+          AND r.ROOM_STATUS != 3
+        ORDER BY CAST(r.ROOM_NUMBER AS UNSIGNED)
+      `;
+
+      const [rooms] = await connection.query(roomsQuery, [formattedEndDate, formattedStartDate, roomIds]);
+
+      const foundIds = rooms.map(r => r.IDNo);
+      const seasonalPricesMap = {};
+
+      if (foundIds.length > 0) {
+        const [seasonalRows] = await connection.query(
+          `SELECT
+            rsp.ROOM_ID,
+            rsp.SEASON_ID,
+            s.NAME AS SEASON_NAME,
+            s.START_DATE,
+            s.END_DATE,
+            rsp.ROOM_BED AS BED_COUNT,
+            rsp.BOOKING_TYPE,
+            rsp.PRICE AS SEASONAL_PRICE
+          FROM room_season_price rsp
+          LEFT JOIN season s ON s.IDNo = rsp.SEASON_ID
+          WHERE rsp.ROOM_ID IN (?)
+          ORDER BY rsp.ROOM_ID, rsp.SEASON_ID, rsp.BOOKING_TYPE, rsp.ROOM_BED`,
+          [foundIds]
+        );
+
+        for (const row of seasonalRows) {
+          if (!seasonalPricesMap[row.ROOM_ID]) seasonalPricesMap[row.ROOM_ID] = [];
+          seasonalPricesMap[row.ROOM_ID].push({
+            seasonId: row.SEASON_ID,
+            seasonName: row.SEASON_NAME,
+            bedCount: row.BED_COUNT,
+            bookingType: row.BOOKING_TYPE,
+            price: row.SEASONAL_PRICE,
+            startDate: row.START_DATE,
+            endDate: row.END_DATE
+          });
+        }
+      }
+
+      const resultRooms = rooms.map(room => ({
+        IDNo: room.IDNo,
+        ROOM_NUMBER: room.ROOM_NUMBER,
+        ROOM_FLOOR: room.ROOM_FLOOR,
+        ROOM_BED: room.ROOM_BED,
+        ROOM_VIEW: room.ROOM_VIEW,
+        ROOM_PRICE: room.ROOM_PRICE,
+        SEASONAL_PRICES: seasonalPricesMap[room.IDNo] || [],
+        isAvailable: !room.HAS_CONFLICT
+      }));
+
+      connection.release();
+
+      return {
+        success: true,
+        data: { rooms: resultRooms }
+      };
+    } catch (error) {
+      connection.release();
+      console.error('Error in checkRoomsAvailability:', error);
+      throw error;
+    }
+  }
+
   static async findConsecutiveRoomsEdit(params) {
     const { startDate, endDate, neededRooms, floorNumber, bed1Needed = 0, bed2Needed = 0, bookingRoute, checkInStatus, checkOutStatus, excludeGroupBookingId, currentGroupBookingId } = params;
     
