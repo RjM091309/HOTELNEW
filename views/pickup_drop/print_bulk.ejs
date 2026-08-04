@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title></title>
+  <% const isDropoff = printType === 'dropoff'; %>
+  <style>
+    @page {
+      size: <%= isDropoff ? 'A4 portrait' : 'A4 landscape' %>;
+      margin: 0;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      color: #000;
+      font-family: Arial, Helvetica, sans-serif;
+      overflow: visible;
+    }
+
+    <% if (!isDropoff) { %>
+    .print-sheet {
+      width: 297mm;
+      height: 210mm;
+      padding: 5mm 3mm 6mm;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .print-logo {
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .print-logo img {
+      width: 38mm;
+      height: auto;
+      display: block;
+      margin: 0 auto;
+    }
+
+    .print-guest-name-wrap {
+      flex: 1;
+      width: 100%;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      overflow: visible;
+    }
+
+    .print-guest-name {
+      width: 100%;
+      max-width: 100%;
+      text-align: center;
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      white-space: normal;
+      word-break: break-word;
+      overflow-wrap: break-word;
+      overflow: visible;
+      font-size: 28px;
+    }
+
+    .print-footer {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 12mm;
+      font-size: 24px;
+      line-height: 1.45;
+      margin-top: auto;
+      padding: 0 14mm;
+      flex-shrink: 0;
+    }
+
+    .print-footer-left,
+    .print-footer-right {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .print-footer-right {
+      text-align: right;
+      margin-left: auto;
+    }
+
+    .print-footer-left div + div,
+    .print-footer-right div + div {
+      margin-top: 4px;
+    }
+    <% } else { %>
+    .print-sheet {
+      width: 210mm;
+      height: 297mm;
+      padding: 12mm 14mm 10mm;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .print-logo {
+      text-align: center;
+      flex-shrink: 0;
+      margin-bottom: 20mm;
+    }
+
+    .print-logo img {
+      width: 48mm;
+      height: auto;
+      display: block;
+      margin: 0 auto;
+    }
+
+    .dropoff-details {
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      column-gap: 14mm;
+      row-gap: 5mm;
+      align-items: baseline;
+      text-align: left;
+      font-weight: 700;
+      font-size: 30px;
+      line-height: 1.35;
+    }
+
+    .dropoff-label {
+      white-space: nowrap;
+    }
+
+    .dropoff-value {
+      word-break: break-word;
+      overflow-wrap: break-word;
+    }
+
+    .dropoff-special-notes {
+      margin-top: 38mm;
+      font-size: 30px;
+      font-weight: 700;
+      text-align: left;
+    }
+
+    .dropoff-notes-area {
+      margin-top: 5mm;
+      min-height: 0;
+      font-size: 30px;
+      font-weight: 700;
+      line-height: 1.35;
+      text-align: left;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: break-word;
+    }
+    <% } %>
+
+    @media print {
+      @page {
+        size: <%= isDropoff ? 'A4 portrait' : 'A4 landscape' %>;
+        margin: 0;
+      }
+
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+      }
+
+      .print-sheet {
+        position: relative;
+        top: auto;
+        left: auto;
+        margin: 0;
+        page-break-after: always;
+        break-after: page;
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+
+      .print-sheet:last-child {
+        page-break-after: auto;
+        break-after: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <% records.forEach(function (record, index) { %>
+  <div class="print-sheet" data-sheet-index="<%= index %>">
+    <div class="print-logo">
+      <img src="/img/Logo-Black.png" alt="Main Stay Hotel">
+    </div>
+
+    <% if (isDropoff) { %>
+    <div class="dropoff-details">
+      <span class="dropoff-label">Name</span>
+      <span class="dropoff-value print-guest-name" id="printGuestName-<%= index %>"><%= record.guestName %></span>
+      <span class="dropoff-label">Flight No.</span>
+      <span class="dropoff-value"><%= record.flightNo %></span>
+      <span class="dropoff-label">No. Persons</span>
+      <span class="dropoff-value"><%= record.personCount %></span>
+      <% if (typeof vehicleName !== 'undefined' && vehicleName) { %>
+      <span class="dropoff-label">Vehicle</span>
+      <span class="dropoff-value"><%= vehicleName %><% if (plateNumber) { %> (<%= plateNumber %>)<% } %></span>
+      <% } %>
+      <% if (typeof driverName !== 'undefined' && driverName) { %>
+      <span class="dropoff-label">Driver</span>
+      <span class="dropoff-value"><%= driverName %></span>
+      <% } %>
+    </div>
+    <div class="dropoff-special-notes">Special Notes</div>
+    <div class="dropoff-notes-area"><%= record.specialNotes %></div>
+    <% } else { %>
+    <div class="print-guest-name-wrap">
+      <div class="print-guest-name" id="printGuestName-<%= index %>"><%= record.guestName %></div>
+    </div>
+    <div class="print-footer">
+      <div class="print-footer-left">
+        <% if (typeof vehicleName !== 'undefined' && vehicleName) { %>
+        <div>Vehicle: <%= vehicleName %><% if (plateNumber) { %> (<%= plateNumber %>)<% } %></div>
+        <% } %>
+        <% if (typeof driverName !== 'undefined' && driverName) { %>
+        <div>Driver: <%= driverName %></div>
+        <% } %>
+      </div>
+      <div class="print-footer-right">
+        <div>No. of Persons: <%= record.personCount %></div>
+        <div>Flight no.: <%= record.flightNo %></div>
+      </div>
+    </div>
+    <% } %>
+  </div>
+  <% }); %>
+  <script>
+    document.title = '';
+
+    const isDropoffPrint = <%= isDropoff ? 'true' : 'false' %>;
+
+    function fitGuestNameForSheet(sheet) {
+      if (!sheet || isDropoffPrint) return;
+
+      const el = sheet.querySelector('.print-guest-name');
+      const wrap = sheet.querySelector('.print-guest-name-wrap');
+      if (!el || !wrap) return;
+
+      const maxHeight = wrap.clientHeight;
+      const minFontSize = 24;
+      const maxFontSize = 320;
+      let bestFit = minFontSize;
+
+      el.style.width = '100%';
+      el.style.whiteSpace = 'normal';
+      el.style.overflow = 'visible';
+      el.style.wordBreak = 'break-word';
+      el.style.overflowWrap = 'break-word';
+
+      for (let size = minFontSize; size <= maxFontSize; size += 2) {
+        el.style.fontSize = size + 'px';
+        el.style.lineHeight = size >= 120 ? '1.06' : '1.12';
+
+        if (el.scrollHeight <= maxHeight + 4) {
+          bestFit = size;
+        } else {
+          break;
+        }
+      }
+
+      let fontSize = bestFit;
+      el.style.fontSize = fontSize + 'px';
+
+      while (fontSize > minFontSize && el.scrollHeight > maxHeight + 4) {
+        fontSize -= 1;
+        el.style.fontSize = fontSize + 'px';
+      }
+    }
+
+    function fitGuestName() {
+      document.querySelectorAll('.print-sheet').forEach(fitGuestNameForSheet);
+    }
+
+    window.fitGuestName = fitGuestName;
+
+    function runPrintSetup() {
+      fitGuestName();
+
+      <% if (!embed) { %>
+      setTimeout(function () {
+        window.focus();
+        window.print();
+      }, 200);
+      <% } %>
+    }
+
+    window.addEventListener('load', runPrintSetup);
+    window.addEventListener('resize', fitGuestName);
+
+    <% if (!embed) { %>
+    window.addEventListener('afterprint', function () {
+      window.close();
+    });
+    <% } %>
+  </script>
+</body>
+</html>
