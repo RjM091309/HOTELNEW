@@ -734,6 +734,12 @@
     color: #fff !important;
   }
   
+  /* Hold Pending - Purple */
+  .fc-event[style*="background-color: #7b1fa2"] {
+    background-color: #7b1fa2 !important;
+    color: #fff !important;
+  }
+
   /* Check-Out - Neutral Gray */
   .fc-event[style*="background-color: rgb(179, 179, 179)"] {
     background-color: #6c757d !important; /* Blue-gray for neutral tone */
@@ -1106,6 +1112,10 @@
 
 .legend-color-regular-checkin {
   background-color: #e53935 !important;
+}
+
+.legend-color-hold-pending {
+  background-color: #7b1fa2 !important;
 }
 
 .legend-color-back-to-back {

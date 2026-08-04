@@ -42,6 +42,7 @@ $(document).ready(function () {
       const bookingRoute = $('#bookingRoute').val();
       const checkInStatus = $('#checkInStatus').val();
       const checkOutStatus = $('#checkOutStatus').val();
+      const holdPending = $('#holdPendingCheckbox').is(':checked') ? 'true' : 'false';
       const bookingRemarks = $('#bookingRemarks').val();
       const agencyID = $('#agencySelect').val();
       const agencyPayer = bookingRoute === 'agency'
@@ -134,7 +135,7 @@ $(document).ready(function () {
         data: {
           room_id: roomId, fullname, number, address, daterange, maxOccupants: guestsCount,
           paidAmount, paymentStatus, price: roomPrice, diffindays: qty, guestType, guestLevel, guestID: txtGuestID,
-          bookingRoute, checkInStatus, checkOutStatus, bookingRemarks, agencyID, agencyPayer, voucherNo,
+          bookingRoute, checkInStatus, checkOutStatus, holdPending, bookingRemarks, agencyID, agencyPayer, voucherNo,
           breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
           breakfastKidQty, breakfastKidPrice, breakfastKidId,
           pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
@@ -256,7 +257,9 @@ $(document).ready(function () {
                 title: 'Booking Successful!',
                 text: 'Your booking has been added successfully. Voucher is downloading...',
                 icon: 'success',
-                confirmButtonText: 'OK'
+                confirmButtonText: 'OK',
+                timer: 2500,
+                timerProgressBar: true
               }).then(() => {
                 // Check if this is an unassigned room booking (roomId is empty, 0, or null)
                 const isUnassignedRoom = !roomId || roomId === '' || roomId === '0' || roomId === 0;

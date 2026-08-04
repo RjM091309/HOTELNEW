@@ -274,6 +274,15 @@
                                 </div>
                               </div>
 
+                              <div class="col-lg-6">
+                                <div class="form-group form-check" style="margin-top: 30px;">
+                                  <input type="checkbox" class="form-check-input" id="holdPendingCheckbox" name="holdPending">
+                                  <label class="form-check-label" for="holdPendingCheckbox" style="color: #ba68c8;">
+                                    Mark as Hold Pending (no check-in/check-out processing yet)
+                                  </label>
+                                </div>
+                              </div>
+
                               <!-- Late Checkout Fee Display - appears below when visible -->
                               <div id="lateCheckoutFeeDisplay" class="col-lg-12" style="display: none;">
                                 <div class="row">
@@ -531,6 +540,49 @@
             $('#includeLongTermStay').prop('checked', false);
             $('#longTermStayWrapper').hide();
             $('#roomChangeNote').val('');
+        });
+    });
+})();
+</script>
+
+<script>
+// ================================
+// HOLD PENDING TOGGLE (Add Booking)
+// Hides Check-In/Check-Out Status when the booking is marked Hold Pending,
+// since those fields don't apply until the guest actually arrives.
+// ================================
+(function(){
+    function applyHoldPendingUI(isHoldPending) {
+        const $ci = $('#divtxtCheckInStatus');
+        const $co = $('#divcheckOutStatus');
+        const $lateFee = $('#lateCheckoutFeeDisplay');
+        const $ciField = $('#checkInStatus');
+        const $coField = $('#checkOutStatus');
+
+        $ci.toggle(!isHoldPending);
+        $co.toggle(!isHoldPending);
+
+        if (isHoldPending) {
+            if ($lateFee.length) $lateFee.hide();
+            $ciField.prop('required', false);
+            $coField.prop('required', false);
+            // Default to Regular/Regular as placeholders until the guest actually checks in
+            if (!$ciField.val()) $ciField.val('1');
+            if (!$coField.val()) $coField.val('0');
+        } else {
+            $ciField.prop('required', true);
+            $coField.prop('required', true);
+        }
+    }
+
+    $(document).ready(function(){
+        $('#holdPendingCheckbox').on('change', function(){
+            applyHoldPendingUI(this.checked);
+        });
+
+        $('#modal-addbooking').on('hidden.bs.modal', function(){
+            $('#holdPendingCheckbox').prop('checked', false);
+            applyHoldPendingUI(false);
         });
     });
 })();

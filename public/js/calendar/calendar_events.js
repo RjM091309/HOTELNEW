@@ -9,7 +9,7 @@
 // =============================================================================
 
 // Color palette for different group bookings (neon/vibrant colors that don't match booking status colors)
-// Avoid: Teal (#12866f), Amber (#e0a316), Red (#e53935), Gray, Black
+// Avoid: Teal (#12866f), Amber (#e0a316), Red (#e53935), Gray, Black, Hold Pending Purple (#7b1fa2)
 const GROUP_COLORS = [
   '#00FFFF', // Neon Cyan / Aqua
   '#FF00FF', // Neon Magenta / Fuchsia
@@ -212,6 +212,8 @@ function applyCompositeStatusStyles(event, el) {
     // More robust check: groupBookingId must exist, not be null, not be 0, and not be empty string
     const groupBookingId = event.extendedProps?.groupBookingId;
     const isGroupBooking = groupBookingId != null && groupBookingId !== 0 && groupBookingId !== '' && String(groupBookingId).trim() !== '';
+    const holdPendingRaw = event.extendedProps?.holdPending;
+    const isHoldPending = holdPendingRaw === 1 || holdPendingRaw === '1' || holdPendingRaw === true;
 
     // Colors
     const red = '#e53935';      // regular (keep original red)
@@ -256,7 +258,7 @@ function applyCompositeStatusStyles(event, el) {
     const groupColor = isGroupBooking ? getGroupBookingColor(groupBookingId) : null;
 
     // Decide behavior by booking status
-    if (bookingStatus === 'pending') {
+    if (bookingStatus === 'pending' && !isHoldPending) {
       // Determine each side for pending
       const leftColor = ciNorm === 'regular' ? red : lemon;    // left half = check-in
       const rightColor = coNorm === 'late' ? lemon : red;      // right half = check-out

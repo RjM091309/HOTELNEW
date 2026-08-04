@@ -1154,6 +1154,7 @@ class BookingModel {
       date,
       checkInStatus,
       checkOutStatus,
+      holdPending,
       bookingRemarks,
       agencyID,
       agencyPayer,
@@ -1253,8 +1254,8 @@ class BookingModel {
         // Create booking
         const bookingQuery = `
           INSERT INTO booking
-          (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, REMARKS, CONFIRMATION_NUMBER, NOTIFICATION_READ, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, LATE_CHECKOUT, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, BED_COUNT, FLIGHT_NUMBER, DROPOFF_FLIGHT_NUMBER, PICKUP_DATE, PASSENGER_COUNT, IS_LONG_TERM_STAY, ROOM_CHANGE_NOTE)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, REMARKS, CONFIRMATION_NUMBER, NOTIFICATION_READ, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, HOLD_PENDING, LATE_CHECKOUT, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, BED_COUNT, FLIGHT_NUMBER, DROPOFF_FLIGHT_NUMBER, PICKUP_DATE, PASSENGER_COUNT, IS_LONG_TERM_STAY, ROOM_CHANGE_NOTE)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const directReservationFlag = isDirectReservation ? 1 : 0;
         // Handle empty agencyID - set to NULL if empty
@@ -1283,9 +1284,10 @@ class BookingModel {
           processedAgencyPayer = agencyPayer === 'guest' ? 'guest' : 'agency';
         }
         
+        const holdPendingFlag = (holdPending === true || holdPending === 'true' || holdPending === 1 || holdPending === '1') ? 1 : 0;
         const bookingValues = [
           customerId, room_id, checkInDate, checkOutDate, 'pending', finalBookingRoute,
-          maxOccupants, bookingRemarks, finalConfirmationNumber, encodedBy, date, 1, checkInStatus, checkOutStatus,
+          maxOccupants, bookingRemarks, finalConfirmationNumber, encodedBy, date, 1, checkInStatus, holdPendingFlag, checkOutStatus,
           processedAgencyID, processedAgencyPayer, directReservationFlag, bedCount || null,
           pickupServiceId ? (flightNumber || null) : null,
           dropoffServiceId ? (dropoffFlightNumber || null) : null,
@@ -9612,6 +9614,7 @@ class BookingModel {
       guestLevel,
       checkInStatus,
       checkOutStatus,
+      holdPending,
       remarks,
       agencyId = null,
       agencyPayer = null,
@@ -9955,12 +9958,13 @@ class BookingModel {
 
         // booking
         const bookingQuery = `
-          INSERT INTO booking (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, LATE_CHECKOUT, REMARKS, CONFIRMATION_NUMBER, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, GROUP_BOOKING_ID, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, FLIGHT_NUMBER, PASSENGER_COUNT)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO booking (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, LATE_CHECKOUT, REMARKS, CONFIRMATION_NUMBER, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, HOLD_PENDING, GROUP_BOOKING_ID, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, FLIGHT_NUMBER, PASSENGER_COUNT)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const processedAgencyPayer = (bookingRoute === 'agency' && agencyPayer)
           ? (agencyPayer === 'guest' ? 'guest' : 'agency')
           : null;
+        const holdPendingFlag = (holdPending === true || holdPending === 'true' || holdPending === 1 || holdPending === '1') ? 1 : 0;
         const bookingValues = [
           guestID,
           roomId,
@@ -9976,6 +9980,7 @@ class BookingModel {
           date,
           1,
           checkInStatus,
+          holdPendingFlag,
           groupBookingId,
           agencyId || null,
           processedAgencyPayer,

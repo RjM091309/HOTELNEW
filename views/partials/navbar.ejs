@@ -2517,6 +2517,7 @@ function initializeAddBookingHandler() {
             bookingRoute: isDirectReservation ? 'direct-reservation' : $('#bookingRoute').val(),
             checkInStatus: $('#checkInStatus').val(),
             checkOutStatus: $('#checkOutStatus').val(),
+            holdPending: $('#holdPendingCheckbox').is(':checked') ? 'true' : 'false',
             bookingRemarks: $('#bookingRemarks').val(),
             agencyID: $('#agencySelect').val(),
             agencyPayer: $('#bookingRoute').val() === 'agency'

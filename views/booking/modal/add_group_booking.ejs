@@ -44,7 +44,7 @@
           </div>
 
           <div class="row p-t-20">
-            <div class="col-lg-4">
+            <div class="col-lg-4" id="divGroupCheckInStatus">
               <div class="form-group">
                 <label class="form-label">Check-In Status</label>
                 <select class="form-select" id="groupCheckInStatus" name="groupCheckInStatus" required>
@@ -54,7 +54,7 @@
                 </select>
               </div>
             </div>
-            <div class="col-lg-4">
+            <div class="col-lg-4" id="divGroupCheckOutStatus">
               <div class="form-group">
                 <label class="form-label">Check-Out Status</label>
                 <select class="form-select" id="groupCheckOutStatus" name="groupCheckOutStatus" required>
@@ -64,6 +64,17 @@
                 </select>
               </div>
             </div>
+            <div class="col-lg-4">
+              <div class="form-group form-check" style="margin-top: 30px;">
+                <input type="checkbox" class="form-check-input" id="groupHoldPendingCheckbox" name="groupHoldPending">
+                <label class="form-check-label" for="groupHoldPendingCheckbox" style="color: #ba68c8;">
+                  Mark as Hold Pending (no check-in/check-out processing yet)
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="row p-t-20">
             <div class="col-lg-4">
               <div class="form-group">
                 <label class="form-label">Booking Resources</label>
@@ -2982,6 +2993,43 @@
       const value = parseFloat($(this).val()) || 0;
       $('#groupLateCheckoutFee').val(value);
       computeGroupTotal();
+    });
+
+    // ================================
+    // HOLD PENDING TOGGLE (Add Group Booking)
+    // Hides Check-In/Check-Out Status when the group booking is marked Hold Pending,
+    // since those fields don't apply until the guests actually arrive.
+    // ================================
+    function applyGroupHoldPendingUI(isHoldPending) {
+      const $ci = $('#divGroupCheckInStatus');
+      const $co = $('#divGroupCheckOutStatus');
+      const $lateFee = $('#groupLateCheckoutFeeDisplay');
+      const $ciField = $('#groupCheckInStatus');
+      const $coField = $('#groupCheckOutStatus');
+
+      $ci.toggle(!isHoldPending);
+      $co.toggle(!isHoldPending);
+
+      if (isHoldPending) {
+        if ($lateFee.length) $lateFee.hide();
+        $ciField.prop('required', false);
+        $coField.prop('required', false);
+        // Default to Regular/Regular as placeholders until the guests actually check in
+        if (!$ciField.val()) $ciField.val('1');
+        if (!$coField.val()) $coField.val('0');
+      } else {
+        $ciField.prop('required', true);
+        $coField.prop('required', true);
+      }
+    }
+
+    $(document).on('change', '#groupHoldPendingCheckbox', function() {
+      applyGroupHoldPendingUI(this.checked);
+    });
+
+    $(document).on('hidden.bs.modal', '#modal-add-group-booking', function() {
+      $('#groupHoldPendingCheckbox').prop('checked', false);
+      applyGroupHoldPendingUI(false);
     });
 
     // Clear selected rooms when Check-in/Check-out status changes

@@ -17,6 +17,7 @@ $(document).ready(function () {
     const guestLevel = $('#groupGuestLevel').val();
     const checkOutStatus = $('#groupCheckOutStatus').val();
     const checkInStatus = $('#groupCheckInStatus').val();
+    const holdPending = $('#groupHoldPendingCheckbox').is(':checked') ? 'true' : 'false';
     const remarks = $('#groupRemarks').val();
     const lateCheckoutFee = parseFloat($('#groupLateCheckoutFee').val()) || 0;
 
@@ -184,6 +185,7 @@ $(document).ready(function () {
       guestLevel,
       checkInStatus,
       checkOutStatus,
+      holdPending,
       remarks,
       agencyId,
       agencyPayer,
@@ -353,7 +355,9 @@ $(document).ready(function () {
             title: 'Group Booking Successful!',
             text: details,
             icon: 'success',
-            confirmButtonText: 'OK'
+            confirmButtonText: 'OK',
+            timer: 2500,
+            timerProgressBar: true
           }).then(() => window.location.reload());
         }, 400);
       },

@@ -1780,12 +1780,17 @@ function performSearch() {
       const endDate = event.end.toLocaleDateString();
       const eventStatus = event.extendedProps?.bookingStatus || 'Unknown';
       const checkInStatus = event.extendedProps?.checkInStatus;
-      
+      const holdPending = event.extendedProps?.holdPending;
+      const isHoldPending = holdPending === 1 || holdPending === '1' || holdPending === true;
+
       // Determine display status and color
       let displayStatus = eventStatus;
       let statusColor = '#b0b0b0';
-      
-      if (eventStatus === 'pending') {
+
+      if (eventStatus === 'pending' && isHoldPending) {
+        displayStatus = 'Hold Pending';
+        statusColor = '#7b1fa2'; // Purple for hold pending
+      } else if (eventStatus === 'pending') {
         if (checkInStatus === 0) {
           displayStatus = 'Pending - Late (CI/CO)';
           statusColor = '#e0a316'; // Amber for late
@@ -2081,6 +2086,11 @@ function createLegendOverlay() {
         <span class="calendar-legend-text">Pending – Regular (CI/CO)</span>
         <span class="calendar-legend-count" id="legend-count-regular-checkin">0</span>
       </div>
+      <div class="calendar-legend-item" data-legend-key="hold-pending">
+        <div class="calendar-legend-color legend-color-hold-pending"></div>
+        <span class="calendar-legend-text">Hold Pending</span>
+        <span class="calendar-legend-count" id="legend-count-hold-pending">0</span>
+      </div>
       <div class="calendar-legend-item" data-legend-key="back-to-back">
         <div class="calendar-legend-color legend-color-back-to-back"></div>
         <span class="calendar-legend-text">Pending – Back-to-Back</span>
@@ -2156,6 +2166,7 @@ function classifyEventForLegend(event) {
     'occupied': false,
     'late-checkin': false,
     'regular-checkin': false,
+    'hold-pending': false,
     'back-to-back': false,
     'checkout': false,
     'cancelled': false,
@@ -2191,6 +2202,11 @@ function classifyEventForLegend(event) {
   // Pending: determine back-to-back / late / regular based on composite statuses
   // Priority mirrors applyCompositeStatusStyles: Back-to-Back > Late > Regular
   if (status === 'pending') {
+    const holdPending = event.extendedProps?.holdPending;
+    if (holdPending === 1 || holdPending === '1' || holdPending === true || backgroundColor === '#7b1fa2') {
+      flags['hold-pending'] = true;
+      return flags;
+    }
     if (event.extendedProps?.isBackToBack) {
       flags['back-to-back'] = true;
       return flags;
@@ -2211,6 +2227,7 @@ function updateLegendCounts() {
     occupied: 0,
     'late-checkin': 0,
     'regular-checkin': 0,
+    'hold-pending': 0,
     'back-to-back': 0,
     checkout: 0,
     cancelled: 0,
@@ -2231,6 +2248,7 @@ function updateLegendCounts() {
   updateLegendCount('legend-count-occupied', counts.occupied);
   updateLegendCount('legend-count-late-checkin', counts['late-checkin']);
   updateLegendCount('legend-count-regular-checkin', counts['regular-checkin']);
+  updateLegendCount('legend-count-hold-pending', counts['hold-pending']);
   updateLegendCount('legend-count-back-to-back', counts['back-to-back']);
   updateLegendCount('legend-count-checkout', counts.checkout);
   updateLegendCount('legend-count-cancelled', counts.cancelled);

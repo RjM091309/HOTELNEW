@@ -194,6 +194,20 @@ async function runLongTermStayMigrations() {
   );
 }
 
+async function runHoldPendingMigrations() {
+  if (!(await tableExists('booking'))) {
+    console.warn('⚠️ booking table not found, skipping hold pending column migration');
+    return;
+  }
+
+  await ensureColumn(
+    'booking',
+    'HOLD_PENDING',
+    `HOLD_PENDING TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'Manually marked as Hold Pending - reserved with dates but no check-in/check-out processing yet'`,
+    'CHECK_IN_STATUS'
+  );
+}
+
 async function runStartupMigrations() {
   console.log('🔄 Running startup database migrations...');
 
@@ -201,6 +215,7 @@ async function runStartupMigrations() {
   await runPickupDropMigrations();
   await runReceiptMigrations();
   await runLongTermStayMigrations();
+  await runHoldPendingMigrations();
 
   console.log('✅ Startup database migrations complete');
 }

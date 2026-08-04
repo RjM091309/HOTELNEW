@@ -165,6 +165,7 @@ class CalendarModel {
               )
               THEN '#0b3d91' -- dark blue when checked out but has balance (rooms, services, or extensions)
             WHEN b.BOOKING_STATUS = 'check-Out' THEN '#B3B3B3'
+            WHEN b.BOOKING_STATUS = 'pending' AND COALESCE(b.HOLD_PENDING, 0) = 1 THEN '#7b1fa2'
             WHEN b.BOOKING_STATUS = 'pending' AND COALESCE(b.CHECK_IN_STATUS, 1) = 0 THEN '#e0a316'
             WHEN b.BOOKING_STATUS = 'pending' THEN '#e53935'
             WHEN b.BOOKING_STATUS = 'cancelled' THEN '#000000'
@@ -199,6 +200,7 @@ class CalendarModel {
           COALESCE(b.CHECK_IN_STATUS, 1) AS checkInStatus,
           COALESCE(b.LATE_CHECKOUT, 0) AS checkOutStatus,
           b.GROUP_BOOKING_ID AS groupBookingId,
+          COALESCE(b.HOLD_PENDING, 0) AS holdPending,
           b.BOOKING_CHANNEL AS bookingChannel,
           b.AGENCY_PAYER AS agencyPayer,
           COALESCE(b.IS_LONG_TERM_STAY, 0) AS isLongTermStay,
@@ -217,6 +219,7 @@ class CalendarModel {
           ) AS isBackToBack,
           -- Pre-calculated composite status for styling
           CASE
+            WHEN b.BOOKING_STATUS = 'pending' AND COALESCE(b.HOLD_PENDING, 0) = 1 THEN 'none'
             WHEN b.BOOKING_STATUS = 'pending' THEN
               CONCAT(
                 CASE WHEN COALESCE(b.CHECK_IN_STATUS, 1) = 1 THEN 'regular' ELSE 'late' END,
@@ -258,6 +261,7 @@ class CalendarModel {
             bookingStatus: row.bookingStatus,
             checkInStatus: row.checkInStatus,
             checkOutStatus: row.checkOutStatus,
+            holdPending: !!row.holdPending,
             isBackToBack: !!row.isBackToBack,
             groupBookingId: row.groupBookingId,
             bookingChannel: row.bookingChannel || 'walk-in',
