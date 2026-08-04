@@ -260,23 +260,28 @@ $(document).ready(function () {
                 confirmButtonText: 'OK',
                 timer: 2500,
                 timerProgressBar: true
-              }).then(() => {
-                // Check if this is an unassigned room booking (roomId is empty, 0, or null)
-                const isUnassignedRoom = !roomId || roomId === '' || roomId === '0' || roomId === 0;
-                
-                // Don't redirect if unassigned room or if we're on dashboard - socket/direct add will update it
-                if (isUnassignedRoom) {
-                  // For unassigned rooms, just stay on current page
-                  return;
-                }
-                
-                // If on calendar page, redirect to clean URL without query params
-                if (window.location.pathname.includes('/calendar')) {
-                  window.location.replace('/calendar');
-                } else if (!window.location.pathname.includes('/dashboard')) {
-                  window.location.reload();
-                }
               });
+
+              // Refresh on a fixed timer instead of waiting on the Swal promise - guarantees
+              // the calendar picks up the new booking even if the dialog gets dismissed in
+              // some way that doesn't resolve .then() (e.g. click-away, ESC).
+              const isUnassignedRoom = !roomId || roomId === '' || roomId === '0' || roomId === 0;
+              const onDashboard = window.location.pathname.includes('/dashboard');
+
+              // Don't refresh if unassigned room or if we're on dashboard - socket/direct add will update it
+              if (!isUnassignedRoom && !onDashboard) {
+                setTimeout(function() {
+                  if (typeof window.loadCalendarData === 'function') {
+                    // Already on the calendar - just re-fetch rooms/bookings and re-render,
+                    // no full page reload needed
+                    window.loadCalendarData();
+                  } else if (window.location.pathname.includes('/calendar')) {
+                    window.location.replace('/calendar');
+                  } else {
+                    window.location.reload();
+                  }
+                }, 2500);
+              }
             }, 400);
           },
           error: function (err) {

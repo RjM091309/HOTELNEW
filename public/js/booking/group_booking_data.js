@@ -1473,6 +1473,14 @@ function populateEditGroupForm(booking) {
 
     $('#editGroupCheckInStatus').val(booking.checkInStatus);
     $('#editGroupCheckOutStatus').val(booking.checkOutStatus);
+
+    // Set Hold Pending checkbox and hide/show Check-In/Check-Out Status accordingly
+    const isHoldPending = booking.holdPending === 1 || booking.holdPending === '1' || booking.holdPending === true;
+    $('#editGroupHoldPendingCheckbox').prop('checked', isHoldPending);
+    if (typeof window.applyEditGroupHoldPendingUI === 'function') {
+        window.applyEditGroupHoldPendingUI(isHoldPending);
+    }
+
     $('#editGroupRemarks').val(booking.remarks);
     
     // Set late checkout fee

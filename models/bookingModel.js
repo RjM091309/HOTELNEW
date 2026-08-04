@@ -4363,6 +4363,7 @@ class BookingModel {
           b.GUESTS_COUNT,
           b.LATE_CHECKOUT,
           b.CHECK_IN_STATUS,
+          b.HOLD_PENDING,
           b.REMARKS,
           b.CONFIRMATION_NUMBER,
           b.AGENCY_ID,
@@ -4535,6 +4536,7 @@ class BookingModel {
         guestLevel: bookingsResult[0]?.guestLevel, // Default guest level
         checkInStatus: firstBooking.CHECK_IN_STATUS,
         checkOutStatus: firstBooking.LATE_CHECKOUT,
+        holdPending: firstBooking.HOLD_PENDING,
         paymentStatus: firstBooking.PAYMENT_STATUS,
         bookingRoute: firstBooking.BOOKING_CHANNEL,
         agencyId: firstBooking.AGENCY_ID,
@@ -4756,6 +4758,7 @@ class BookingModel {
       guestLevel,
       checkInStatus,
       checkOutStatus,
+      holdPending,
       remarks,
       agencyId = null,
       agencyPayer = null,
@@ -4959,12 +4962,13 @@ class BookingModel {
             // (isMainBooking already declared above)
             
             // Update booking (use final dates)
+            const holdPendingFlag = (holdPending === true || holdPending === 'true' || holdPending === 1 || holdPending === '1') ? 1 : 0;
             await connection.promise().query(`
               UPDATE booking
-              SET CHECK_IN_DATE = ?, CHECK_OUT_DATE = ?, BOOKING_CHANNEL = ?, CHECK_IN_STATUS = ?, LATE_CHECKOUT = ?, REMARKS = ?, CONFIRMATION_NUMBER = ?, AGENCY_ID = ?, AGENCY_PAYER = ?, EDITED_BY = ?, EDITED_DT = ?
+              SET CHECK_IN_DATE = ?, CHECK_OUT_DATE = ?, BOOKING_CHANNEL = ?, CHECK_IN_STATUS = ?, LATE_CHECKOUT = ?, HOLD_PENDING = ?, REMARKS = ?, CONFIRMATION_NUMBER = ?, AGENCY_ID = ?, AGENCY_PAYER = ?, EDITED_BY = ?, EDITED_DT = ?
               WHERE IDNo = ?
             `, [
-              finalCheckInWithTime, finalCheckOutWithTime, bookingRoute, checkInStatus, checkOutStatus,
+              finalCheckInWithTime, finalCheckOutWithTime, bookingRoute, checkInStatus, checkOutStatus, holdPendingFlag,
               isMainBooking ? remarks : '', confirmationNumber, processedAgencyId, processedAgencyPayer, encodedBy, date, existingBooking.IDNo
             ]);
 
@@ -8229,6 +8233,7 @@ class BookingModel {
           b.CONFIRMATION_NUMBER,
           b.CHECK_IN_STATUS,
           b.LATE_CHECKOUT,
+          b.HOLD_PENDING,
           b.IS_DIRECT_RESERVATION,
           b.AGENCY_ID,
           b.AGENCY_PAYER as agencyPayer,
@@ -8342,7 +8347,7 @@ class BookingModel {
       const {
         bookingId, room_id, fullname, number, daterange, maxOccupants,
         paidAmount, paymentStatus, price, diffindays, guestType, guestLevel,
-        bookingRoute, checkInStatus, checkOutStatus, bookingRemarks, agencyID, agencyPayer, bedCount,
+        bookingRoute, checkInStatus, checkOutStatus, holdPending, bookingRemarks, agencyID, agencyPayer, bedCount,
         breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
         breakfastKidQty, breakfastKidPrice, breakfastKidId,
         pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
@@ -8410,7 +8415,7 @@ class BookingModel {
             const bookingUpdateQuery = `
               UPDATE booking
               SET ROOM_ID = ?, CHECK_IN_DATE = ?, CHECK_OUT_DATE = ?, BOOKING_CHANNEL = ?,
-                  GUESTS_COUNT = ?, REMARKS = ?, CHECK_IN_STATUS = ?, LATE_CHECKOUT = ?, AGENCY_ID = ?,
+                  GUESTS_COUNT = ?, REMARKS = ?, CHECK_IN_STATUS = ?, LATE_CHECKOUT = ?, HOLD_PENDING = ?, AGENCY_ID = ?,
                   AGENCY_PAYER = ?, BED_COUNT = ?, FLIGHT_NUMBER = ?, DROPOFF_FLIGHT_NUMBER = ?, PICKUP_DATE = ?, PASSENGER_COUNT = ?, EDITED_BY = ?, EDITED_DT = ?
               WHERE IDNo = ?
             `;
@@ -8445,9 +8450,10 @@ class BookingModel {
             const processedPickupDate = pickupServiceId && pickupDate ? pickupDate : null;
             const processedPassengerCount = (pickupServiceId || dropoffServiceId) ? (parseInt(passengerCount) || null) : null;
 
+            const holdPendingFlag = (holdPending === true || holdPending === 'true' || holdPending === 1 || holdPending === '1') ? 1 : 0;
             await connection.promise().query(bookingUpdateQuery, [
               room_id, checkInDate, checkOutDate, bookingRoute, maxOccupants,
-              bookingRemarks, checkInStatus, checkOutStatus || 0, processedAgencyID,
+              bookingRemarks, checkInStatus, checkOutStatus || 0, holdPendingFlag, processedAgencyID,
               processedAgencyPayer, processedBedCount, processedFlightNumber, processedDropoffFlightNumber, processedPickupDate, processedPassengerCount,
               editedBy, editDate, bookingId
             ]);

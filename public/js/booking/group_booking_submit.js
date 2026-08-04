@@ -358,7 +358,19 @@ $(document).ready(function () {
             confirmButtonText: 'OK',
             timer: 2500,
             timerProgressBar: true
-          }).then(() => window.location.reload());
+          });
+
+          // Refresh on a fixed timer instead of waiting on the Swal promise - guarantees
+          // the page picks up the new booking even if the dialog is dismissed some other way
+          setTimeout(() => {
+            if (typeof window.loadCalendarData === 'function') {
+              // Already on the calendar - just re-fetch rooms/bookings and re-render,
+              // no full page reload needed
+              window.loadCalendarData();
+            } else {
+              window.location.reload();
+            }
+          }, 2500);
         }, 400);
       },
       error: function () {

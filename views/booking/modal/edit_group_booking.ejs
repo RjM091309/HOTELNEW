@@ -56,7 +56,7 @@
           </div>
 
           <div class="row p-t-20">
-            <div class="col-lg-4">
+            <div class="col-lg-4" id="editDivGroupCheckInStatus">
               <div class="form-group">
                 <label class="form-label">Check-In Status</label>
                 <select class="form-select" id="editGroupCheckInStatus" name="groupCheckInStatus" required>
@@ -66,7 +66,7 @@
                 </select>
               </div>
             </div>
-            <div class="col-lg-4">
+            <div class="col-lg-4" id="editDivGroupCheckOutStatus">
               <div class="form-group">
                 <label class="form-label">Check-Out Status</label>
                 <select class="form-select" id="editGroupCheckOutStatus" name="groupCheckOutStatus" required>
@@ -76,6 +76,17 @@
                 </select>
               </div>
             </div>
+            <div class="col-lg-4">
+              <div class="form-group form-check" style="margin-top: 30px;">
+                <input type="checkbox" class="form-check-input" id="editGroupHoldPendingCheckbox" name="groupHoldPending">
+                <label class="form-check-label" for="editGroupHoldPendingCheckbox">
+                  Hold Pending
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="row p-t-20">
             <div class="col-lg-4">
               <div class="form-group">
                 <label class="form-label">Booking Resources</label>
@@ -1567,6 +1578,7 @@ window.editGroupAddedServicesMap = {};
       guestLevel: $('#editGroupGuestLevel').val(),
       checkInStatus: $('#editGroupCheckInStatus').val(),
       checkOutStatus: $('#editGroupCheckOutStatus').val(),
+      holdPending: $('#editGroupHoldPendingCheckbox').is(':checked') ? 'true' : 'false',
       remarks: $('#editGroupRemarks').val(),
       agencyId: $('#editGroupBookingRoute').val() === 'agency' ? $('#editGroupAgencySelect').val() : null,
       agencyPayer: $('#editGroupBookingRoute').val() === 'agency'
@@ -1893,12 +1905,44 @@ window.editGroupAddedServicesMap = {};
     
     $('#editGroupLateCheckoutFee').val(lateCheckoutFee);
     $('#editGroupLateCheckoutFeeInput').val(lateCheckoutFee);
-    
+
     // Recalculate total to include late check-out fee
     if (typeof computeEditGroupTotal === 'function') {
       computeEditGroupTotal();
     }
   }
+
+  // ================================
+  // HOLD PENDING TOGGLE (Edit Group Booking)
+  // Hides Check-In/Check-Out Status when the group booking is marked Hold Pending,
+  // since those fields don't apply until the guests actually arrive.
+  // ================================
+  function applyEditGroupHoldPendingUI(isHoldPending) {
+    const $ci = $('#editDivGroupCheckInStatus');
+    const $co = $('#editDivGroupCheckOutStatus');
+    const $lateFee = $('#editGroupLateCheckoutFeeDisplay');
+    const $ciField = $('#editGroupCheckInStatus');
+    const $coField = $('#editGroupCheckOutStatus');
+
+    $ci.toggle(!isHoldPending);
+    $co.toggle(!isHoldPending);
+
+    if (isHoldPending) {
+      if ($lateFee.length) $lateFee.hide();
+      $ciField.prop('required', false);
+      $coField.prop('required', false);
+      if (!$ciField.val()) $ciField.val('1');
+      if (!$coField.val()) $coField.val('0');
+    } else {
+      $ciField.prop('required', true);
+      $coField.prop('required', true);
+    }
+  }
+  window.applyEditGroupHoldPendingUI = applyEditGroupHoldPendingUI;
+
+  $(document).on('change', '#editGroupHoldPendingCheckbox', function() {
+    applyEditGroupHoldPendingUI(this.checked);
+  });
 
   // Calculate late check-out fee when check-out status changes
   $('#editGroupCheckOutStatus').on('change', function() {

@@ -279,6 +279,15 @@
                             </div>
                         </div>
 
+                        <div class="col-lg-6">
+                          <div class="form-group form-check" style="margin-top: 30px;">
+                            <input type="checkbox" class="form-check-input" id="edit_holdPendingCheckbox" name="holdPending">
+                            <label class="form-check-label" for="edit_holdPendingCheckbox">
+                              Hold Pending
+                            </label>
+                          </div>
+                        </div>
+
                         <!-- Late Checkout Fee Display - appears below when visible -->
                         <div id="edit_lateCheckoutFeeDisplay" class="col-lg-12" style="display: none;">
                             <div class="row">
@@ -1229,6 +1238,7 @@ $(document).ready(function() {
             bookingRoute: $('#edit_bookingRoute').val(),
             checkInStatus: $('#edit_checkInStatus').val(),
             checkOutStatus: $('#edit_checkOutStatus').val(),
+            holdPending: $('#edit_holdPendingCheckbox').is(':checked') ? 'true' : 'false',
             lateCheckoutFee: $('#edit_lateCheckoutFee').val(),
             bookingRemarks: $('#edit_bookingRemarks').val(),
             agencyID: $('#edit_agencySelect').val(),
@@ -1716,6 +1726,41 @@ function loadEditExistingServices(bookingId) {
     });
 })();
 
+// ================================
+// HOLD PENDING TOGGLE (Edit Booking)
+// Hides Check-In/Check-Out Status when the booking is marked Hold Pending,
+// since those fields don't apply until the guest actually arrives.
+// ================================
+(function(){
+    function applyEditHoldPendingUI(isHoldPending) {
+        const $ci = $('#edit_divtxtCheckInStatus');
+        const $co = $('#edit_divtxtCheckOutStatus');
+        const $lateFee = $('#edit_lateCheckoutFeeDisplay');
+        const $ciField = $('#edit_checkInStatus');
+        const $coField = $('#edit_checkOutStatus');
+
+        $ci.toggle(!isHoldPending);
+        $co.toggle(!isHoldPending);
+
+        if (isHoldPending) {
+            if ($lateFee.length) $lateFee.hide();
+            $ciField.prop('required', false);
+            $coField.prop('required', false);
+            if (!$ciField.val()) $ciField.val('1');
+            if (!$coField.val()) $coField.val('0');
+        } else {
+            $ciField.prop('required', true);
+            $coField.prop('required', true);
+        }
+    }
+
+    $(document).on('change', '#edit_holdPendingCheckbox', function(){
+        applyEditHoldPendingUI(this.checked);
+    });
+
+    window.applyEditHoldPendingUI = applyEditHoldPendingUI;
+})();
+
 // Function to format paid amount to 2 decimal places
 function formatEditPaidAmount(input) {
     const value = parseFloat(input.value) || 0;
@@ -1985,6 +2030,13 @@ function populateEditForm(booking) {
     console.log('DEBUG: Setting checkOutStatus to', checkOutStatus);
     $('#edit_checkOutStatus').val(checkOutStatus);
     console.log('DEBUG: Actual dropdown value after setting:', $('#edit_checkOutStatus').val());
+
+    // Set Hold Pending checkbox and hide/show Check-In/Check-Out Status accordingly
+    const isHoldPending = booking.HOLD_PENDING === 1 || booking.HOLD_PENDING === '1' || booking.HOLD_PENDING === true;
+    $('#edit_holdPendingCheckbox').prop('checked', isHoldPending);
+    if (typeof window.applyEditHoldPendingUI === 'function') {
+        window.applyEditHoldPendingUI(isHoldPending);
+    }
     
     // Set late checkout fee if it exists (0 = FREE)
     const lateFee = parseFloat(booking.lateCheckoutFee) || 0;

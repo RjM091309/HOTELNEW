@@ -354,22 +354,25 @@ function showPendingModal(event) {
   // Build composite status badges (CI/CO)
   const ciStatus2 = event.extendedProps?.checkInStatus; // 1 regular, 0 late
   const coStatus2 = event.extendedProps?.checkOutStatus; // 0 regular, 1 late
+  const holdPendingRaw2 = event.extendedProps?.holdPending;
+  const isHoldPending2 = holdPendingRaw2 === 1 || holdPendingRaw2 === '1' || holdPendingRaw2 === true;
   const ciText = (ciStatus2 === 1 ? 'REGULAR CHECK-IN' : 'LATE CHECK-IN');
   const ciColor = (ciStatus2 === 1 ? '#e53935' : '#e0a316');
   const coText = (coStatus2 === 1 ? 'LATE CHECK-OUT' : 'REGULAR CHECK-OUT');
   const coColor = (coStatus2 === 1 ? '#e0a316' : '#e53935');
+  const accentColor = isHoldPending2 ? '#7b1fa2' : (ciStatus2 === 0 ? '#e0a316' : '#e53935');
 
   // Prepare modal configuration based on check-in availability
   const modalConfig = {
-    title: `Room ${roomNumber} - Pending Reservation`,
+    title: `Room ${roomNumber} - ${isHoldPending2 ? 'Hold Pending' : 'Pending Reservation'}`,
     html: `
       <div class="text-left" style="padding: 20px 0;">
         <div style="margin-bottom: 20px;">
           <div style="display: flex; align-items: center; margin-bottom: 15px;">
-            <div style="width: 8px; height: 8px; background-color: ${ciStatus2 === 0 ? '#e0a316' : '#e53935'}; border-radius: 50%; margin-right: 12px;"></div>
+            <div style="width: 8px; height: 8px; background-color: ${accentColor}; border-radius: 50%; margin-right: 12px;"></div>
             <span style="font-weight: 600; color: #ffffff; font-size: 16px;">Reservation Details</span>
           </div>
-          <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border-left: 3px solid #e53935;">
+          <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border-left: 3px solid ${accentColor};">
             <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
               <div style="flex: 1; margin-right: 15px;">
                 <span style="color: #cccccc; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Guest Name</span>
@@ -378,24 +381,33 @@ function showPendingModal(event) {
               <div style="flex: 1;">
                 <span style="color: #cccccc; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Status</span>
                 <div style="margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: center; text-align: center;">
-                  <span style="background: transparent; border:2px solid ${ciColor}; color:${ciColor}; font-weight:800; font-size:12px; padding:2px 6px; border-radius:6px;">${ciText}</span>
-                  <span style="background: transparent; border:2px solid ${coColor}; color:${coColor}; font-weight:800; font-size:12px; padding:2px 6px; border-radius:6px;">${coText}</span>
+                  ${isHoldPending2
+                    ? `<span style="background: transparent; border:2px solid #ab47bc; color:#ce93d8; font-weight:800; font-size:12px; padding:2px 6px; border-radius:6px;">HOLD PENDING</span>`
+                    : `<span style="background: transparent; border:2px solid ${ciColor}; color:${ciColor}; font-weight:800; font-size:12px; padding:2px 6px; border-radius:6px;">${ciText}</span>
+                  <span style="background: transparent; border:2px solid ${coColor}; color:${coColor}; font-weight:800; font-size:12px; padding:2px 6px; border-radius:6px;">${coText}</span>`
+                  }
                 </div>
               </div>
             </div>
             <div style="display: flex; justify-content: space-between;">
               <div style="flex: 1; margin-right: 15px;">
-                <span style="color: #cccccc; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Check-in Date</span>
+                <span style="color: #cccccc; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">${isHoldPending2 ? 'Start Date' : 'Check-in Date'}</span>
                 <div style="color: #ffffff; font-weight: 600; font-size: 16px; margin-top: 4px;">${checkIn}</div>
               </div>
               <div style="flex: 1;">
-                <span style="color: #cccccc; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Check-out Date</span>
+                <span style="color: #cccccc; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">${isHoldPending2 ? 'End Date' : 'Check-out Date'}</span>
                 <div style="color: #ffffff; font-weight: 600; font-size: 16px; margin-top: 4px;">${checkOut}</div>
               </div>
             </div>
           </div>
         </div>
-        ${canCheckIn ? 
+        ${isHoldPending2 ?
+          `<div style="text-align: center; padding: 15px; background: rgba(123, 31, 162, 0.15); border-radius: 8px; border: 1px solid rgba(171, 71, 188, 0.4);">
+            <span style="color: #ce93d8; font-size: 14px; font-weight: 500;">
+              ⏸️ This reservation is on Hold Pending - no check-in/check-out processing yet.
+            </span>
+          </div>` :
+          canCheckIn ?
           `<div style="text-align: center; padding: 15px; background: rgba(229, 57, 53, 0.1); border-radius: 8px; border: 1px solid rgba(229, 57, 53, 0.35);">
             <span style="color: #e53935; font-size: 14px; font-weight: 500;">
               📋 This reservation is Regular Check-In confirmation and requires staff approval.

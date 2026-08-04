@@ -668,9 +668,18 @@ const customButtons = {
     }
   },
 
-  filterBox: {
-    text: 'Filter',
-    click: function() {}
+  bed1Filter: {
+    text: '1 Bed',
+    click: function() {
+      toggleBedFilter('1');
+    }
+  },
+
+  bed2Filter: {
+    text: '2 Bed',
+    click: function() {
+      toggleBedFilter('2');
+    }
   }
 };
 
@@ -790,7 +799,8 @@ function processRoomsData(roomsData) {
     const roomObj = {
       id: String(room.RoomID),
       title: `${room.ROOM_NUMBER}`.trim(),
-      roomNumber: room.ROOM_NUMBER
+      roomNumber: room.ROOM_NUMBER,
+      bedCount: room.ROOM_BED
     };
     floors[floorName].children.push(roomObj);
   });
@@ -1083,19 +1093,27 @@ async function loadCalendarData() {
     
     // OPTIMIZED: Process data in chunks to prevent blocking
     const sortedFloors = processRoomsData(roomsData);
-    
+
     // OPTIMIZED: Backend already returns FullCalendar-formatted events
     // No need to process through processBookingsData since backend handles it
     const events = bookingsData;
 
+    // Cache the unfiltered floor/room list and events so the bed-count filter
+    // can rebuild the resource list without needing to re-fetch from the server
+    window.allCalendarFloors = sortedFloors;
+    window.allCalendarEvents = events;
+
     // Render calendar with performance optimization
     const renderStart = Date.now();
-    
+
     calendar.getResources().forEach(resource => resource.remove());
     calendar.setOption('resources', sortedFloors);
     calendar.removeAllEvents();
     calendar.addEventSource(events);
     calendar.render();
+
+    // Re-apply any active bed-count filter (row visibility) to the freshly rendered grid
+    applyBedFilter();
 
     const renderTime = Date.now() - renderStart;
 
@@ -1339,7 +1357,7 @@ const findHeader = setInterval(() => {
 
     resourceOrder: '',
     headerToolbar: {
-      left:  'searchBox dayPrev customToday dayNext',
+      left:  'searchBox bed1Filter bed2Filter dayPrev customToday dayNext',
       center:'title',
       right: 'customFullscreen week customMonth customPrev customNext'
     },
@@ -1647,6 +1665,54 @@ function createSearchBox() {
 // Create filter box overlay
 function createFilterBox() {}
 
+// =============================================================================
+// BED COUNT FILTER (Rooms) - direct toolbar toggle buttons, no modal
+// =============================================================================
+// null = show all rooms; '1' or '2' = show only that bed count
+let activeBedFilter = null;
+
+// Clicking a bed button shows only that bed count and highlights that button.
+// Clicking the already-active button again clears the filter (back to all).
+function toggleBedFilter(bedValue) {
+  activeBedFilter = (activeBedFilter === bedValue) ? null : bedValue;
+  updateBedFilterButtonStates();
+  applyBedFilter();
+}
+
+// Reflects activeBedFilter on the toolbar buttons (pressed/active look).
+// Uses our own class (not FullCalendar's fc-button-active) since that one is
+// meant for the library's own transient mousedown/mouseup press feedback and
+// gets cleared right after the click, which made the highlight look broken.
+function updateBedFilterButtonStates() {
+  const btn1 = document.querySelector('.fc-bed1Filter-button');
+  const btn2 = document.querySelector('.fc-bed2Filter-button');
+  if (btn1) btn1.classList.toggle('bed-filter-btn-active', activeBedFilter === '1');
+  if (btn2) btn2.classList.toggle('bed-filter-btn-active', activeBedFilter === '2');
+
+  // Clicking leaves the button focused, which shows its own lingering green
+  // focus ring even after the active class is removed - blur it so nothing stays behind
+  if (btn1) btn1.blur();
+  if (btn2) btn2.blur();
+}
+
+// Applies the current activeBedFilter via FullCalendar's own resources option -
+// the officially supported way to show/hide rows, so it's guaranteed to actually
+// filter (unlike manually toggling row display via guessed DOM selectors).
+function applyBedFilter() {
+  if (!calendar || !window.allCalendarFloors) return;
+
+  const filteredFloors = !activeBedFilter
+    ? window.allCalendarFloors
+    : window.allCalendarFloors
+        .map(floor => ({
+          ...floor,
+          children: (floor.children || []).filter(room => String(room.bedCount) === activeBedFilter)
+        }))
+        .filter(floor => floor.children.length > 0);
+
+  calendar.setOption('resources', filteredFloors);
+}
+
 // Setup event listeners for search and filter
 function setupSearchAndFilterEvents() {
   // Guest search input
@@ -1665,7 +1731,8 @@ function setupSearchAndFilterEvents() {
   searchStatusRadios.forEach(radio => {
     radio.addEventListener('change', performSearch);
   });
-  
+
+
   // Filter change events
   const floorFilter = document.getElementById('floor-filter');
   const statusFilter = document.getElementById('status-filter');
@@ -1713,7 +1780,7 @@ function toggleSearchBox() {
   }
 }
 
-// Toggle filter box visibility
+// Toggle filter box visibility (unused - bed filters are now direct toolbar buttons)
 function toggleFilterBox() {}
 
 // Perform guest name search with status filter
@@ -2030,10 +2097,12 @@ function debounce(func, wait) {
 }
 
 // Make functions globally available
+window.loadCalendarData = loadCalendarData;
 window.toggleSearchBox = toggleSearchBox;
 window.toggleFilterBox = toggleFilterBox;
 window.performSearch = performSearch;
 window.clearSearch = clearSearch;
+window.applyBedFilter = applyBedFilter;
 window.applyFilters = applyFilters;
 window.clearFilters = clearFilters;
 window.highlightBooking = highlightBooking;

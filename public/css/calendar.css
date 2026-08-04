@@ -170,7 +170,8 @@
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
 }
 
-.radio-option input[type="radio"] {
+.radio-option input[type="radio"],
+.radio-option input[type="checkbox"] {
   margin: 0;
   width: 16px;
   height: 16px;
@@ -626,11 +627,41 @@
     border-color: rgba(255,255,255,0.1) !important;
     color: rgba(255,255,255,0.5) !important;
   }
-  
+
+  /* Bed count filter toggle - persistent active state (own class, not fc-button-active,
+     so FullCalendar's own press/release handling can't clear it after the click) */
+  .bed-filter-btn-active {
+    background: linear-gradient(45deg, #6f9c40, #5a7a33) !important;
+    color: #ffffff !important;
+    border-color: #6f9c40 !important;
+    box-shadow: 0 2px 8px rgba(111, 156, 64, 0.3) !important;
+  }
+
+  /* Green hover for the bed filter buttons (placed after .fc-button:hover so it wins
+     the tie in specificity) - active button keeps its green instead of flashing white,
+     and the inactive button previews green too on hover */
+  .fc-bed1Filter-button:hover,
+  .fc-bed2Filter-button:hover {
+    background: rgba(111, 156, 64, 0.35) !important;
+    border-color: #6f9c40 !important;
+  }
+
+  .bed-filter-btn-active:hover {
+    background: linear-gradient(45deg, #7fb350, #6a8f3d) !important;
+    border-color: #6f9c40 !important;
+  }
+
   .fc-button-primary:focus {
     box-shadow: 0 0 0 0.2rem rgba(111, 156, 64, 0.5) !important;
   }
-  
+
+  /* Bed filter buttons shouldn't keep a green focus ring once they're not the
+     active filter - only the .bed-filter-btn-active background should read as "on" */
+  .fc-bed1Filter-button:focus:not(.bed-filter-btn-active),
+  .fc-bed2Filter-button:focus:not(.bed-filter-btn-active) {
+    box-shadow: none !important;
+  }
+
   /* Button group spacing */
   .fc-button-group {
     display: flex;

@@ -274,12 +274,19 @@
                                 </div>
                               </div>
 
-                              <div class="col-lg-6">
+                              <div class="col-lg-3">
                                 <div class="form-group form-check" style="margin-top: 30px;">
                                   <input type="checkbox" class="form-check-input" id="holdPendingCheckbox" name="holdPending">
-                                  <label class="form-check-label" for="holdPendingCheckbox" style="color: #ba68c8;">
-                                    Mark as Hold Pending (no check-in/check-out processing yet)
+                                  <label class="form-check-label" for="holdPendingCheckbox">
+                                    Hold Pending
                                   </label>
+                                </div>
+                              </div>
+
+                              <div class="col-lg-3">
+                                <div class="form-group form-check" style="margin-top: 30px;">
+                                  <input class="form-check-input" type="checkbox" id="includeLongTermStay" name="isLongTermStay">
+                                  <label class="form-check-label" for="includeLongTermStay">Long-Term Stay</label>
                                 </div>
                               </div>
 
@@ -293,6 +300,11 @@
                                     </div>
                                   </div>
                                 </div>
+                              </div>
+
+                              <div id="longTermStayWrapper" class="col-lg-12 form-group" style="display: none;">
+                                <label class="form-label">Room Change Condition <span class="text-muted" style="font-size: 11px;">(subject to inquiry)</span></label>
+                                <textarea class="form-control" id="roomChangeNote" name="roomChangeNote" rows="2" placeholder="e.g. Room change allowed only after inquiry with management"></textarea>
                               </div>
 
                           
@@ -326,17 +338,6 @@
                                 <div class="form-group">
                                   <label class="form-label">Additional Remarks (optional)</label>
                                   <textarea class="form-control" id="bookingRemarks" name="bookingRemarks" rows="3"></textarea>
-                                </div>
-                              </div>
-
-                              <div class="col-lg-12">
-                                <div class="form-check mb-2">
-                                  <input class="form-check-input" type="checkbox" id="includeLongTermStay" name="isLongTermStay">
-                                  <label class="form-check-label" for="includeLongTermStay">Long-Term Stay (installment payments allowed)</label>
-                                </div>
-                                <div id="longTermStayWrapper" class="form-group" style="display: none;">
-                                  <label class="form-label">Room Change Condition <span class="text-muted" style="font-size: 11px;">(subject to inquiry)</span></label>
-                                  <textarea class="form-control" id="roomChangeNote" name="roomChangeNote" rows="2" placeholder="e.g. Room change allowed only after inquiry with management"></textarea>
                                 </div>
                               </div>
 
