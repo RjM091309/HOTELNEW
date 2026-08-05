@@ -1686,3 +1686,31 @@ body.calendar-drag-active {
   pointer-events: none;
   z-index: 5;
 }
+
+/* Manual Group Create mode: separate feature, own color (cyan) so it never
+   reads as the same thing as the auto-detected single-drag group select above */
+#calendar .group-create-armed {
+  background-color: rgba(38, 198, 218, 0.35) !important;
+  outline: 2px solid #26c6da;
+  outline-offset: -2px;
+  cursor: pointer;
+}
+
+.group-create-overlay {
+  position: fixed;
+  background-color: rgba(38, 198, 218, 0.35);
+  border-top: 1px solid #26c6da;
+  border-bottom: 1px solid #26c6da;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Proceed only makes sense once Group Create mode is on and 2+ rooms are picked -
+   hidden by default so there's no flash-of-visible-button before JS state kicks in */
+.fc-groupCreateProceed-button {
+  display: none !important;
+}
+
+.fc-groupCreateProceed-button.fc-proceed-visible {
+  display: inline-block !important;
+}

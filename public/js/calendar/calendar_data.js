@@ -532,6 +532,174 @@ function resetGroupSelectState() {
 }
 
 // =============================================================================
+// MANUAL GROUP CREATE MODE (separate feature - does not touch the auto-detected
+// single-drag group select above). Toggle it on, pick any rooms across any floors
+// one at a time (first pick is a drag that also sets the shared date range, every
+// pick after that is just a click on the room's row since the dates are already
+// locked in), then hit Proceed to hand the whole set off to the existing group
+// booking modal via the same window.openGroupBookingFromCalendar() hook that the
+// auto-detected flow already uses.
+// =============================================================================
+
+let groupCreateModeActive = false;
+const groupCreateSelectedRooms = new Set();
+let groupCreateDateRange = null; // { start: Date, end: Date }
+let groupCreateOverlays = [];
+
+function clearGroupCreateOverlays() {
+  groupCreateOverlays.forEach(function(el) { el.remove(); });
+  groupCreateOverlays = [];
+}
+
+// Computes the current viewport left/width for groupCreateDateRange from the
+// calendar's own date-to-pixel math (same technique as scrollToToday/scrollToDate)
+// instead of reusing a one-time snapshot, so it stays correct after scrolling,
+// resizing, or navigating the calendar - not just at the moment of the first drag.
+function computeGroupCreateDateRangeRect() {
+  if (!groupCreateDateRange || !calendar) return null;
+
+  const bodyScroller = Array.from(document.querySelectorAll('#calendar .fc-scroller'))
+    .find(s => s.scrollWidth > s.clientWidth);
+  if (!bodyScroller) return null;
+
+  const view = calendar.view;
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const totalDays = (view.activeEnd.getTime() - view.activeStart.getTime()) / msPerDay;
+  if (totalDays <= 0) return null;
+  const dayWidth = bodyScroller.scrollWidth / totalDays;
+
+  const startOffsetDays = (groupCreateDateRange.start.getTime() - view.activeStart.getTime()) / msPerDay;
+  const endOffsetDays = (groupCreateDateRange.end.getTime() - view.activeStart.getTime()) / msPerDay;
+
+  const scrollerRect = bodyScroller.getBoundingClientRect();
+  const left = scrollerRect.left - bodyScroller.scrollLeft + (startOffsetDays * dayWidth);
+  const width = (endOffsetDays - startOffsetDays) * dayWidth;
+
+  return { left, width };
+}
+
+function renderGroupCreateOverlays() {
+  clearGroupCreateOverlays();
+  const rangeRect = computeGroupCreateDateRangeRect();
+  if (!rangeRect) return;
+
+  groupCreateSelectedRooms.forEach(function(id) {
+    const labelCell = document.querySelector(`.fc-datagrid-cell.fc-resource[data-resource-id="${CSS.escape(id)}"]`);
+    if (!labelCell) return;
+    const labelRect = labelCell.getBoundingClientRect();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'group-create-overlay';
+    overlay.style.left = rangeRect.left + 'px';
+    overlay.style.width = rangeRect.width + 'px';
+    overlay.style.top = labelRect.top + 'px';
+    overlay.style.height = labelRect.height + 'px';
+    document.body.appendChild(overlay);
+    groupCreateOverlays.push(overlay);
+  });
+}
+
+function updateGroupCreateButtonStates() {
+  const toggleBtn = document.querySelector('.fc-groupCreateToggle-button');
+  const proceedBtn = document.querySelector('.fc-groupCreateProceed-button');
+  if (toggleBtn) {
+    toggleBtn.classList.toggle('bed-filter-btn-active', groupCreateModeActive);
+    toggleBtn.textContent = groupCreateModeActive ? 'Cancel Group Select' : 'Create Group Booking';
+  }
+  if (proceedBtn) {
+    const count = groupCreateSelectedRooms.size;
+    const eligible = groupCreateModeActive && count >= 2;
+    proceedBtn.classList.toggle('fc-proceed-visible', eligible);
+    proceedBtn.disabled = !eligible;
+    proceedBtn.textContent = eligible ? `Proceed (${count} rooms)` : 'Proceed';
+  }
+}
+
+function resetGroupCreateState() {
+  groupCreateSelectedRooms.clear();
+  groupCreateDateRange = null;
+  clearGroupCreateOverlays();
+  document.querySelectorAll('.group-create-armed').forEach(el => el.classList.remove('group-create-armed'));
+  updateGroupCreateButtonStates();
+}
+
+function toggleGroupCreateMode() {
+  groupCreateModeActive = !groupCreateModeActive;
+  if (!groupCreateModeActive) {
+    resetGroupCreateState();
+  } else {
+    // Starting a fresh pick session shouldn't inherit an unrelated in-progress
+    // single-drag selection from the other (auto-detect) flow
+    resetGroupSelectState();
+    updateGroupCreateButtonStates();
+  }
+}
+
+function toggleGroupCreateRoom(roomId, start, end) {
+  const id = String(roomId);
+  const labelCell = document.querySelector(`.fc-datagrid-cell.fc-resource[data-resource-id="${CSS.escape(id)}"]`);
+
+  if (groupCreateSelectedRooms.has(id)) {
+    groupCreateSelectedRooms.delete(id);
+    if (labelCell) labelCell.classList.remove('group-create-armed');
+  } else {
+    // First pick locks in the shared date range for every room added after it
+    if (!groupCreateDateRange && start && end) {
+      groupCreateDateRange = { start, end };
+    }
+    if (!groupCreateDateRange) return; // no dates locked in yet - first pick must be a drag
+    groupCreateSelectedRooms.add(id);
+    if (labelCell) labelCell.classList.add('group-create-armed');
+  }
+
+  renderGroupCreateOverlays();
+  updateGroupCreateButtonStates();
+}
+
+// Room-label clicks add/remove rooms 2+ once the date range is already locked in -
+// only active while the mode is on, so it never interferes with normal clicks
+function attachGroupCreateLabelClicks() {
+  document.addEventListener('click', function(e) {
+    if (!groupCreateModeActive) return;
+    const labelCell = e.target.closest('.fc-datagrid-cell.fc-resource[data-resource-id]:not([data-is-floor])');
+    if (!labelCell) return;
+    if (!groupCreateDateRange) {
+      if (typeof toastr !== 'undefined') {
+        toastr.info('Drag across dates on a room first to set the check-in/check-out for the group.');
+      }
+      return;
+    }
+    e.preventDefault();
+    toggleGroupCreateRoom(labelCell.getAttribute('data-resource-id'));
+  });
+
+  // Keep the persistent overlays glued to their rows across both scroll axes
+  document.addEventListener('scroll', function() {
+    if (groupCreateModeActive && groupCreateSelectedRooms.size) {
+      renderGroupCreateOverlays();
+    }
+  }, true);
+  window.addEventListener('resize', function() {
+    if (groupCreateModeActive && groupCreateSelectedRooms.size) {
+      renderGroupCreateOverlays();
+    }
+  });
+}
+
+function proceedWithGroupCreate() {
+  if (groupCreateSelectedRooms.size < 2 || !groupCreateDateRange) return;
+  const roomIds = Array.from(groupCreateSelectedRooms);
+  const { start, end } = groupCreateDateRange;
+
+  groupCreateModeActive = false;
+  resetGroupCreateState();
+
+  if (typeof window.openGroupBookingFromCalendar === 'function') {
+    window.openGroupBookingFromCalendar(roomIds, start, end);
+  }
+}
+
+// =============================================================================
 // CUSTOM BUTTONS
 // =============================================================================
 
@@ -679,6 +847,20 @@ const customButtons = {
     text: '2 Bed',
     click: function() {
       toggleBedFilter('2');
+    }
+  },
+
+  groupCreateToggle: {
+    text: 'Create Group Booking',
+    click: function() {
+      toggleGroupCreateMode();
+    }
+  },
+
+  groupCreateProceed: {
+    text: 'Proceed',
+    click: function() {
+      proceedWithGroupCreate();
     }
   }
 };
@@ -1227,15 +1409,32 @@ const findHeader = setInterval(() => {
     // Note: eventDropTransformers removed - using eventDrop handler instead
 
     select: function(info) {
+      // Manual Group Create mode: this drag just picks a room + (on the first
+      // pick) locks in the shared date range - never opens any booking modal
+      // directly, and never touches the auto-detected single-drag flow below.
+      if (groupCreateModeActive) {
+        const startOk = new Date(info.start);
+        startOk.setHours(0, 0, 0, 0);
+        const todayOk = new Date();
+        todayOk.setHours(0, 0, 0, 0);
+        if (startOk < todayOk) {
+          calendar.unselect();
+          return;
+        }
+        toggleGroupCreateRoom(info.resource.id, info.start, info.end);
+        calendar.unselect();
+        return;
+      }
+
       const modal = $('#modal-addbooking');
-      
+
       // Check if selected date is in the past
       const today = new Date();
       today.setHours(0, 0, 0, 0); // Reset time to start of day for comparison
-      
+
       const selectedStartDate = new Date(info.start);
       selectedStartDate.setHours(0, 0, 0, 0); // Reset time to start of day for comparison
-      
+
       // If selected start date is before today, prevent modal from opening
       if (selectedStartDate < today) {
         // Show error message
@@ -1357,7 +1556,7 @@ const findHeader = setInterval(() => {
 
     resourceOrder: '',
     headerToolbar: {
-      left:  'searchBox bed1Filter bed2Filter dayPrev customToday dayNext',
+      left:  'searchBox bed1Filter bed2Filter groupCreateToggle groupCreateProceed dayPrev customToday dayNext',
       center:'title',
       right: 'customFullscreen week customMonth customPrev customNext'
     },
@@ -1396,6 +1595,10 @@ const findHeader = setInterval(() => {
 
   // Group Select: press-drag-release across rooms and dates in one gesture
   attachGroupSelectDragTracking();
+
+  // Manual Group Create mode: pick rooms one at a time across any floor
+  attachGroupCreateLabelClicks();
+  updateGroupCreateButtonStates();
 
   // Initialize drag and drop functionality immediately
   if (typeof window.initializeDragAndDrop === 'function') {
