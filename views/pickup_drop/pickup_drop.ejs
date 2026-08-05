@@ -7,11 +7,16 @@
             <a href="javascript:void(0)" class="tab-item is-active" data-view="pickup">Pick Up</a>
             <a href="javascript:void(0)" class="tab-item" data-view="dropoff">Drop Off</a>
           </div>
-          <div class="filter-btn-group">
-            <button type="button" class="filter-btn" data-filter="all">All</button>
-            <button type="button" class="filter-btn active" data-filter="today">Today</button>
-            <button type="button" class="filter-btn" data-filter="prevWeek">Prev Week</button>
-            <button type="button" class="filter-btn" data-filter="futureWeek">Com Week</button>
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <div class="filter-btn-group">
+              <button type="button" class="filter-btn" data-filter="all">All</button>
+              <button type="button" class="filter-btn active" data-filter="today">Today</button>
+              <button type="button" class="filter-btn" data-filter="prevWeek">Prev Week</button>
+              <button type="button" class="filter-btn" data-filter="futureWeek">Com Week</button>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" id="printSelectedPickupDropBtn" title="Print selected" style="display: none;">
+              <i class="fa fa-print"></i> Print
+            </button>
           </div>
         </div>
       </div>
@@ -20,6 +25,9 @@
           <table id="pickupTable" class="table table-hover table-bordered full-width">
             <thead>
               <tr>
+                <th class="pd-select-col text-center">
+                  <input type="checkbox" id="pickupSelectAll" title="Select all" aria-label="Select all pick up">
+                </th>
                 <th>Name</th>
                 <th>Check in date</th>
                 <th>Flight no.</th>
@@ -34,6 +42,9 @@
           <table id="dropoffTable" class="table table-hover table-bordered full-width">
             <thead>
               <tr>
+                <th class="pd-select-col text-center">
+                  <input type="checkbox" id="dropoffSelectAll" title="Select all" aria-label="Select all drop off">
+                </th>
                 <th>Name</th>
                 <th>Date</th>
                 <th>Drop-off Flight No.</th>
@@ -44,6 +55,35 @@
             <tbody></tbody>
           </table>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="pickupDropPrintModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Print Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label for="pdPrintVehicle" class="form-label">Vehicle</label>
+          <select class="form-select" id="pdPrintVehicle">
+            <option value="">Select vehicle</option>
+          </select>
+        </div>
+        <div class="mb-0">
+          <label for="pdPrintDriverName" class="form-label">Name of Driver</label>
+          <input type="text" class="form-control" id="pdPrintDriverName" placeholder="Enter driver name" autocomplete="off">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="confirmPickupDropPrintBtn">
+          <i class="fa fa-print"></i> Print
+        </button>
       </div>
     </div>
   </div>
@@ -203,9 +243,106 @@
     background-color: #2d3748;
   }
 
+  #pickupTable thead th.pd-select-col,
+  #pickupTable tbody td.pd-select-col,
+  #dropoffTable thead th.pd-select-col,
+  #dropoffTable tbody td.pd-select-col {
+    width: 40px;
+    min-width: 40px;
+    max-width: 40px;
+    text-align: center;
+    vertical-align: middle;
+    padding: 8px 4px !important;
+  }
+
+  #pickupTable thead th.pd-select-col:before,
+  #pickupTable thead th.pd-select-col:after,
+  #dropoffTable thead th.pd-select-col:before,
+  #dropoffTable thead th.pd-select-col:after {
+    display: none !important;
+    content: none !important;
+  }
+
+  #pickupTable thead th.pd-select-col input[type="checkbox"],
+  #pickupTable tbody td.pd-select-col input[type="checkbox"],
+  #dropoffTable thead th.pd-select-col input[type="checkbox"],
+  #dropoffTable tbody td.pd-select-col input[type="checkbox"] {
+    margin: 0;
+    vertical-align: middle;
+  }
+
   .pickup-drop-table-wrap.dashboard-card-body {
     padding-top: 0.75rem;
     padding-bottom: 0.75rem;
+  }
+
+  #pickupDropPrintModal .modal-content {
+    border: none;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  }
+
+  #pickupDropPrintModal .modal-header {
+    background-color: #1f2d3d !important;
+    color: #ffffff !important;
+    border-bottom: 1px solid #2f4052;
+    padding: 0.9rem 1.1rem;
+  }
+
+  #pickupDropPrintModal .modal-title {
+    color: #ffffff !important;
+    font-weight: 600;
+  }
+
+  #pickupDropPrintModal .modal-body {
+    background-color: #ffffff !important;
+    color: #212529 !important;
+    padding: 1.1rem 1.25rem;
+  }
+
+  #pickupDropPrintModal .modal-footer {
+    background-color: #f8f9fa !important;
+    color: #212529 !important;
+    border-top: 1px solid #dee2e6;
+    padding: 0.75rem 1.1rem;
+  }
+
+  #pickupDropPrintModal .form-label {
+    color: #212529 !important;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+  }
+
+  #pickupDropPrintModal .form-control,
+  #pickupDropPrintModal .form-select {
+    background-color: #ffffff !important;
+    color: #212529 !important;
+    border: 1px solid #ced4da !important;
+    min-height: 38px;
+  }
+
+  #pickupDropPrintModal .form-control::placeholder {
+    color: #6c757d !important;
+    opacity: 1;
+  }
+
+  #pickupDropPrintModal .form-control:focus,
+  #pickupDropPrintModal .form-select:focus {
+    background-color: #ffffff !important;
+    color: #212529 !important;
+    border-color: #6f9c40 !important;
+    box-shadow: 0 0 0 0.2rem rgba(111, 156, 64, 0.2);
+  }
+
+  #pickupDropPrintModal .form-select option {
+    background-color: #ffffff !important;
+    color: #212529 !important;
+  }
+
+  #pickupDropPrintModal .btn-close {
+    filter: invert(1);
+    opacity: 0.85;
   }
 
   #editPickupDropModal .modal-content {

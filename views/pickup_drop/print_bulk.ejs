@@ -15,8 +15,6 @@
     }
 
     html, body {
-      width: <%= isDropoff ? '210mm' : '297mm' %>;
-      height: <%= isDropoff ? '297mm' : '210mm' %>;
       margin: 0;
       padding: 0;
       background: #fff;
@@ -171,26 +169,32 @@
       }
 
       html, body {
-        width: <%= isDropoff ? '210mm' : '297mm' %> !important;
-        height: <%= isDropoff ? '297mm' : '210mm' %> !important;
         margin: 0 !important;
         padding: 0 !important;
-        overflow: hidden !important;
+        overflow: visible !important;
       }
 
       .print-sheet {
-        position: fixed;
-        top: 0;
-        left: 0;
+        position: relative;
+        top: auto;
+        left: auto;
         margin: 0;
-        page-break-after: avoid;
+        page-break-after: always;
+        break-after: page;
         page-break-inside: avoid;
+        break-inside: avoid;
+      }
+
+      .print-sheet:last-child {
+        page-break-after: auto;
+        break-after: auto;
       }
     }
   </style>
 </head>
 <body>
-  <div class="print-sheet">
+  <% records.forEach(function (record, index) { %>
+  <div class="print-sheet" data-sheet-index="<%= index %>">
     <div class="print-logo">
       <img src="/img/Logo-Black.png" alt="Main Stay Hotel">
     </div>
@@ -198,11 +202,11 @@
     <% if (isDropoff) { %>
     <div class="dropoff-details">
       <span class="dropoff-label">Name</span>
-      <span class="dropoff-value" id="printGuestName"><%= guestName %></span>
+      <span class="dropoff-value print-guest-name" id="printGuestName-<%= index %>"><%= record.guestName %></span>
       <span class="dropoff-label">Flight No.</span>
-      <span class="dropoff-value"><%= flightNo %></span>
+      <span class="dropoff-value"><%= record.flightNo %></span>
       <span class="dropoff-label">No. Persons</span>
-      <span class="dropoff-value"><%= personCount %></span>
+      <span class="dropoff-value"><%= record.personCount %></span>
       <% if (typeof vehicleName !== 'undefined' && vehicleName) { %>
       <span class="dropoff-label">Vehicle</span>
       <span class="dropoff-value"><%= vehicleName %><% if (plateNumber) { %> (<%= plateNumber %>)<% } %></span>
@@ -213,10 +217,10 @@
       <% } %>
     </div>
     <div class="dropoff-special-notes">Special Notes</div>
-    <div class="dropoff-notes-area"><%= specialNotes %></div>
+    <div class="dropoff-notes-area"><%= record.specialNotes %></div>
     <% } else { %>
     <div class="print-guest-name-wrap">
-      <div class="print-guest-name" id="printGuestName"><%= guestName %></div>
+      <div class="print-guest-name" id="printGuestName-<%= index %>"><%= record.guestName %></div>
     </div>
     <div class="print-footer">
       <div class="print-footer-left">
@@ -228,27 +232,24 @@
         <% } %>
       </div>
       <div class="print-footer-right">
-        <div>No. of Persons: <%= personCount %></div>
-        <div>Flight no.: <%= flightNo %></div>
+        <div>No. of Persons: <%= record.personCount %></div>
+        <div>Flight no.: <%= record.flightNo %></div>
       </div>
     </div>
     <% } %>
   </div>
+  <% }); %>
   <script>
     document.title = '';
 
     const isDropoffPrint = <%= isDropoff ? 'true' : 'false' %>;
 
-    function fitGuestName() {
-      const el = document.getElementById('printGuestName');
-      if (!el) return;
+    function fitGuestNameForSheet(sheet) {
+      if (!sheet || isDropoffPrint) return;
 
-      if (isDropoffPrint) {
-        return;
-      }
-
-      const wrap = document.querySelector('.print-guest-name-wrap');
-      if (!wrap) return;
+      const el = sheet.querySelector('.print-guest-name');
+      const wrap = sheet.querySelector('.print-guest-name-wrap');
+      if (!el || !wrap) return;
 
       const maxHeight = wrap.clientHeight;
       const minFontSize = 24;
@@ -279,6 +280,10 @@
         fontSize -= 1;
         el.style.fontSize = fontSize + 'px';
       }
+    }
+
+    function fitGuestName() {
+      document.querySelectorAll('.print-sheet').forEach(fitGuestNameForSheet);
     }
 
     window.fitGuestName = fitGuestName;

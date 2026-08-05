@@ -451,6 +451,19 @@
   pointer-events: auto !important;
 }
 
+/* Child modals opened from room menu (transfer, extend, late checkout) */
+#transferAvailableModal,
+[id^="extendStayModal_"],
+#lateCheckoutModal {
+  z-index: 1080 !important;
+}
+
+#transferAvailableModal.show,
+[id^="extendStayModal_"].show,
+#lateCheckoutModal.show {
+  z-index: 1080 !important;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .search-box-container,
@@ -589,6 +602,14 @@
     font-weight: 600;
     color: #ffffff;
     text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+
+  .fc-header-toolbar .fc-toolbar-chunk:last-child {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
   }
   
   /* Button base styling */
