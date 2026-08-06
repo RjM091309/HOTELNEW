@@ -553,6 +553,25 @@ function handleDatesSet(info) {
       return $(this).text() === '12am' || $(this).text() === '12pm';
     }).hide();
   }, 0);
+
+  // Restore group-create shades after calendar re-render / view change
+  setTimeout(function() {
+    if (typeof window.refreshCalendarVerticalScrollSync === 'function') {
+      window.refreshCalendarVerticalScrollSync();
+    }
+    if (typeof window.refreshGroupBookingShadesAfterLayout === 'function') {
+      window.refreshGroupBookingShadesAfterLayout();
+    }
+    if (typeof window.getGroupCreateShadeStatus !== 'function') return;
+    if (typeof window.renderGroupCreateOverlays !== 'function') return;
+    const status = window.getGroupCreateShadeStatus();
+    if (status.active && status.expectedCount && status.hasRange) {
+      window.renderGroupCreateOverlays();
+    }
+    if (typeof window.syncGroupSelectOverlay === 'function' && !status.active) {
+      window.syncGroupSelectOverlay();
+    }
+  }, 50);
 }
 
 // =============================================================================

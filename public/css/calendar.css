@@ -679,7 +679,8 @@
   /* Bed filter buttons shouldn't keep a green focus ring once they're not the
      active filter - only the .bed-filter-btn-active background should read as "on" */
   .fc-bed1Filter-button:focus:not(.bed-filter-btn-active),
-  .fc-bed2Filter-button:focus:not(.bed-filter-btn-active) {
+  .fc-bed2Filter-button:focus:not(.bed-filter-btn-active),
+  .fc-groupCreateToggle-button:focus:not(.bed-filter-btn-active) {
     box-shadow: none !important;
   }
 
@@ -1675,6 +1676,16 @@
   cursor: pointer;
 }
 
+#calendar .fc-datagrid-cell[data-is-floor] {
+  cursor: default !important;
+}
+
+#calendar .fc-datagrid-cell[data-is-floor].group-create-armed,
+#calendar .fc-datagrid-cell[data-is-floor].group-select-armed {
+  background-color: transparent !important;
+  outline: none !important;
+}
+
 .group-select-badge {
   position: fixed;
   bottom: 20px;
@@ -1700,12 +1711,12 @@ body.calendar-drag-active {
 /* Precise per-room highlight rectangle, scoped to exactly the swept date range
    (position/size set inline in JS via syncGroupSelectOverlay) */
 .group-select-overlay {
-  position: fixed;
+  position: absolute;
   background-color: rgba(33, 150, 243, 0.35);
   border-top: 1px solid #2196F3;
   border-bottom: 1px solid #2196F3;
   pointer-events: none;
-  z-index: 5;
+  box-sizing: border-box;
 }
 
 /* Manual Group Create mode: separate feature, own color (cyan) so it never
@@ -1718,12 +1729,26 @@ body.calendar-drag-active {
 }
 
 .group-create-overlay {
-  position: fixed;
+  position: absolute;
   background-color: rgba(38, 198, 218, 0.35);
   border-top: 1px solid #26c6da;
   border-bottom: 1px solid #26c6da;
   pointer-events: none;
-  z-index: 5;
+  box-sizing: border-box;
+}
+
+/* Overlay layer scrolls with the timeline grid — clipped by scroller, not the header */
+#calendar .fc-timeline-body .fc-scroller > div {
+  position: relative;
+}
+
+.calendar-group-overlay-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 6;
+  overflow: visible;
 }
 
 /* Proceed only makes sense once Group Create mode is on and 2+ rooms are picked -

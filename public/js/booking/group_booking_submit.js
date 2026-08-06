@@ -224,7 +224,22 @@ $(document).ready(function () {
       type: 'POST',
       data: ajaxData,
       success: function (response) {
-        $('#modal-add-group-booking').modal('hide');
+        window.__groupBookingSavedFromCalendar = true;
+        if (typeof window.resetCalendarGroupSelection === 'function') {
+          window.resetCalendarGroupSelection();
+        }
+
+        const modalEl = document.getElementById('modal-add-group-booking');
+        if (modalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+          const modalInstance = bootstrap.Modal.getInstance(modalEl);
+          if (modalInstance) {
+            modalInstance.hide();
+          } else {
+            $('#modal-add-group-booking').modal('hide');
+          }
+        } else {
+          $('#modal-add-group-booking').modal('hide');
+        }
         
         // Prepare voucher data for auto-download
         const daterange = $('#groupDaterange').val() || '';

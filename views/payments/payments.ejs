@@ -19,40 +19,62 @@
   <div class="dashboard-card-body">
    
     <!-- Sales Summary Cards -->
-    <div class="row" style="margin-bottom:16px">
-      <div class="col-md-4">
-        <div class="card-box"><div class="card-body">
-          <div class="text-center mb-3"><h5 class="text-primary mb-0"><i class="fas fa-calendar-day"></i> Daily Sales</h5></div>
-          <div class="row text-center">
-            <div class="col-4"><h6 class="text-warning mb-1" id="daily-total">0</h6><small class="text-muted">Total</small></div>
-            <div class="col-4">
-              <h6 class="text-success mb-1 sales-paid-clickable" id="daily-paid" role="button" title="View today's paid payments">0</h6>
-              <small class="text-muted">Paid</small>
-            </div>
-            <div class="col-4"><h6 class="text-danger mb-1" id="daily-unpaid">0</h6><small class="text-muted">Unpaid</small></div>
+    <div class="payment-sales-summary-grid">
+      <div class="payment-sales-card payment-sales-card--daily">
+        <div class="payment-sales-card__title"><i class="fas fa-calendar-day"></i> Daily Sales</div>
+        <div class="payment-sales-card__stats">
+          <div>
+            <div class="payment-sales-card__value payment-sales-card__value--total" id="daily-total">0</div>
+            <div class="payment-sales-card__label">Total</div>
           </div>
-          <small id="daily-sales-breakdown" class="text-muted d-block text-center mt-2" style="font-size:11px;"></small>
-        </div></div>
+          <div>
+            <div class="payment-sales-card__value payment-sales-card__value--paid sales-paid-clickable" id="daily-paid" role="button" title="View today's paid payments">0</div>
+            <div class="payment-sales-card__label">Paid</div>
+          </div>
+          <div>
+            <div class="payment-sales-card__value payment-sales-card__value--unpaid" id="daily-unpaid">0</div>
+            <div class="payment-sales-card__label">Unpaid</div>
+          </div>
+        </div>
+        <div class="payment-sales-card__footer" id="daily-sales-breakdown"></div>
       </div>
-      <div class="col-md-4">
-        <div class="card-box"><div class="card-body">
-          <div class="text-center mb-3"><h5 class="text-success mb-0"><i class="fas fa-calendar-week"></i> Weekly Sales</h5></div>
-          <div class="row text-center">
-            <div class="col-4"><h6 class="text-warning mb-1" id="weekly-total">0</h6><small class="text-muted">Total</small></div>
-            <div class="col-4"><h6 class="text-success mb-1" id="weekly-paid">0</h6><small class="text-muted">Paid</small></div>
-            <div class="col-4"><h6 class="text-danger mb-1" id="weekly-unpaid">0</h6><small class="text-muted">Unpaid</small></div>
+
+      <div class="payment-sales-card payment-sales-card--weekly">
+        <div class="payment-sales-card__title"><i class="fas fa-calendar-week"></i> Weekly Sales</div>
+        <div class="payment-sales-card__stats">
+          <div>
+            <div class="payment-sales-card__value payment-sales-card__value--total" id="weekly-total">0</div>
+            <div class="payment-sales-card__label">Total</div>
           </div>
-        </div></div>
+          <div>
+            <div class="payment-sales-card__value payment-sales-card__value--paid" id="weekly-paid">0</div>
+            <div class="payment-sales-card__label">Paid</div>
+          </div>
+          <div>
+            <div class="payment-sales-card__value payment-sales-card__value--unpaid" id="weekly-unpaid">0</div>
+            <div class="payment-sales-card__label">Unpaid</div>
+          </div>
+        </div>
+        <div class="payment-sales-card__footer" aria-hidden="true">&nbsp;</div>
       </div>
-      <div class="col-md-4">
-        <div class="card-box"><div class="card-body">
-          <div class="text-center mb-3"><h5 class="text-info mb-0"><i class="fas fa-calendar-alt"></i> Monthly Sales</h5></div>
-          <div class="row text-center">
-            <div class="col-4"><h6 class="text-warning mb-1" id="monthly-total">0</h6><small class="text-muted">Total</small></div>
-            <div class="col-4"><h6 class="text-success mb-1" id="monthly-paid">0</h6><small class="text-muted">Paid</small></div>
-            <div class="col-4"><h6 class="text-danger mb-1" id="monthly-unpaid">0</h6><small class="text-muted">Unpaid</small></div>
+
+      <div class="payment-sales-card payment-sales-card--monthly">
+        <div class="payment-sales-card__title"><i class="fas fa-calendar-alt"></i> Monthly Sales</div>
+        <div class="payment-sales-card__stats">
+          <div>
+            <div class="payment-sales-card__value payment-sales-card__value--total" id="monthly-total">0</div>
+            <div class="payment-sales-card__label">Total</div>
           </div>
-        </div></div>
+          <div>
+            <div class="payment-sales-card__value payment-sales-card__value--paid" id="monthly-paid">0</div>
+            <div class="payment-sales-card__label">Paid</div>
+          </div>
+          <div>
+            <div class="payment-sales-card__value payment-sales-card__value--unpaid" id="monthly-unpaid">0</div>
+            <div class="payment-sales-card__label">Unpaid</div>
+          </div>
+        </div>
+        <div class="payment-sales-card__footer" aria-hidden="true">&nbsp;</div>
       </div>
     </div>
 
@@ -580,6 +602,95 @@
 </script>
 
 <style>
+  .payment-sales-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+    align-items: stretch;
+  }
+
+  .payment-sales-card {
+    background: linear-gradient(145deg, #2a3135, #1f2528);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    padding: 16px 14px 12px;
+    display: flex;
+    flex-direction: column;
+    min-height: 132px;
+    box-sizing: border-box;
+  }
+
+  .payment-sales-card__title {
+    text-align: center;
+    margin-bottom: 14px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #ffffff;
+  }
+
+  .payment-sales-card--daily .payment-sales-card__title {
+    color: #64b5f6;
+  }
+
+  .payment-sales-card--weekly .payment-sales-card__title {
+    color: #81c784;
+  }
+
+  .payment-sales-card--monthly .payment-sales-card__title {
+    color: #4dd0e1;
+  }
+
+  .payment-sales-card__stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    text-align: center;
+    flex: 1;
+    align-items: start;
+  }
+
+  .payment-sales-card__value {
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 4px;
+    color: #ffffff;
+  }
+
+  .payment-sales-card__value--total {
+    color: #ffb74d;
+  }
+
+  .payment-sales-card__value--paid {
+    color: #66bb6a;
+  }
+
+  .payment-sales-card__value--unpaid {
+    color: #ef5350;
+  }
+
+  .payment-sales-card__label {
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .payment-sales-card__footer {
+    min-height: 18px;
+    margin-top: 10px;
+    text-align: center;
+    font-size: 11px;
+    line-height: 1.3;
+    color: rgba(255, 255, 255, 0.58);
+  }
+
+  @media (max-width: 991px) {
+    .payment-sales-summary-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
   .sales-paid-clickable {
     cursor: pointer;
     transition: opacity 0.2s ease;

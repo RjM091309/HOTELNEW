@@ -1983,16 +1983,24 @@
         });
 
         if (unavailableRooms.length || missingIds.length) {
-          const parts = [];
-          if (unavailableRooms.length) {
-            parts.push(`Already booked: ${unavailableRooms.map(r => r.ROOM_NUMBER).join(', ')}.`);
-          }
-          if (missingIds.length) {
-            parts.push(`${missingIds.length} room(s) no longer exist.`);
-          }
+          const unavailableNumbers = unavailableRooms.map(function(r) { return r.ROOM_NUMBER; });
+          const alertContent = (typeof buildUnavailableRoomsAlertContent === 'function')
+            ? buildUnavailableRoomsAlertContent(unavailableNumbers, missingIds.length)
+            : {
+                title: unavailableNumbers.length === 1
+                  ? 'Room ' + unavailableNumbers[0] + ' is unavailable'
+                  : 'Some selected rooms are unavailable',
+                text: [
+                  unavailableNumbers.length === 1
+                    ? 'Room ' + unavailableNumbers[0] + ' is already booked for the selected dates.'
+                    : 'Already booked: ' + unavailableNumbers.join(', ') + '.',
+                  missingIds.length ? missingIds.length + ' selected room(s) no longer exist.' : ''
+                ].filter(Boolean).join(' ')
+              };
+
           Swal.fire({
-            title: 'Some selected rooms are unavailable',
-            text: parts.join(' '),
+            title: alertContent.title,
+            text: alertContent.text,
             icon: 'warning',
             confirmButtonText: 'OK',
             background: '#2a3135',
@@ -2803,6 +2811,14 @@
   // Opens this modal pre-filled with rooms + a date range picked elsewhere on the
   // same page (e.g. the calendar's Group Select drag). Also used by the URL-param
   // hand-off below for cross-page navigation (e.g. landing on /booking/group).
+  function clearGroupBookingCalendarHandoff() {
+    pendingCalendarRoomIds = [];
+    pendingCalendarStart = null;
+    pendingCalendarEnd = null;
+    isCalendarDirectSelection = false;
+  }
+  window.clearGroupBookingCalendarHandoff = clearGroupBookingCalendarHandoff;
+
   function openGroupBookingFromCalendar(roomIds, startDate, endDate) {
     pendingCalendarRoomIds = (roomIds || [])
       .map(id => parseInt(id, 10))

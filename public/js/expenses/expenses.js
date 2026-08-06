@@ -376,7 +376,7 @@ function updateGrandTotal() {
         }
     });
     
-    const totalCell = document.querySelector('#expenses_tbl tfoot td:nth-child(4)');
+    const totalCell = document.getElementById('expenses-grand-total');
     if (totalCell) {
         totalCell.textContent = formatNumber(grandTotal);
     }
@@ -440,6 +440,9 @@ function initializeDataTable() {
             pageLength: 25,
             order: [[5, 'desc']],
             columnDefs: [{ targets: [6], orderable: false }],
+            drawCallback: function() {
+                updateGrandTotal();
+            },
             language: {
                 search: "Search expenses:",
                 lengthMenu: "Show _MENU_ expenses per page",

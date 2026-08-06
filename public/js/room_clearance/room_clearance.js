@@ -116,17 +116,31 @@ function bindEvents() {
 	// Modal show: preload selects
 	$('#new-clearance-modal').on('shown.bs.modal', function() {
 		console.log('New clearance modal shown, loading dropdowns...');
+		prepareClearanceModalFields('new-clearance-modal');
 		setTimeout(() => {
 			loadCheckoutBookings('#nc-booking');
 			loadBellmen('#nc-assigned-to');
 		}, 100);
 	});
+	$('#new-clearance-modal').on('hidden.bs.modal', function() {
+		document.getElementById('new-clearance-form')?.reset();
+		resetClearanceModalFields('new-clearance-modal');
+		toggleIssueFields(false, 'issue-fields');
+	});
+
 	$('#edit-clearance-modal').on('shown.bs.modal', function() {
 		console.log('Edit clearance modal shown, loading dropdowns...');
+		prepareClearanceModalFields('edit-clearance-modal');
 		setTimeout(() => {
 			loadAllCheckoutBookings('#ec-booking');
 			loadBellmen('#ec-assigned-to');
 		}, 100);
+	});
+	$('#edit-clearance-modal').on('hidden.bs.modal', function() {
+		document.getElementById('edit-clearance-form')?.reset();
+		resetClearanceModalFields('edit-clearance-modal');
+		toggleIssueFields(false, 'edit-issue-fields');
+		currentClearanceId = null;
 	});
 
 	// Form submit
@@ -139,6 +153,22 @@ function bindEvents() {
 	});
 	document.getElementById('ec-status')?.addEventListener('change', function() {
 		toggleIssueFields(this.value === 'issue', 'edit-issue-fields');
+	});
+}
+
+function prepareClearanceModalFields(modalId) {
+	const modal = document.getElementById(modalId);
+	if (!modal) return;
+	modal.querySelectorAll('.mdl-textfield').forEach(function(wrapper) {
+		wrapper.classList.add('is-dirty');
+	});
+}
+
+function resetClearanceModalFields(modalId) {
+	const modal = document.getElementById(modalId);
+	if (!modal) return;
+	modal.querySelectorAll('.mdl-textfield').forEach(function(wrapper) {
+		wrapper.classList.remove('is-dirty', 'is-focused');
 	});
 }
 
@@ -155,7 +185,7 @@ function loadCheckoutBookings(selectSel) {
 			console.error('Select element not found:', selectSel);
 			return;
 		}
-		sel.innerHTML = '<option value="">Select Checkout Booking</option>';
+		sel.innerHTML = '<option value="" disabled selected hidden></option>';
 		(res.rows || []).forEach(b => {
 			const opt = document.createElement('option');
 			opt.value = b.booking_id; // Model returns b.IDNo AS booking_id
@@ -163,6 +193,7 @@ function loadCheckoutBookings(selectSel) {
 			opt.setAttribute('data-room', b.room_id);
 			sel.appendChild(opt);
 		});
+		sel.value = '';
 		console.log('Loaded', (res.rows || []).length, 'checkout bookings');
 
 	}).fail(function(xhr, status, error) {
@@ -183,7 +214,7 @@ function loadAllCheckoutBookings(selectSel) {
 			console.error('Select element not found:', selectSel);
 			return;
 		}
-		sel.innerHTML = '<option value="">Select Checkout Booking</option>';
+		sel.innerHTML = '<option value="" disabled selected hidden></option>';
 		(res.rows || []).forEach(b => {
 			const opt = document.createElement('option');
 			opt.value = b.booking_id; // Model returns b.IDNo AS booking_id
@@ -211,7 +242,7 @@ function loadBellmen(selectSel) {
 			console.error('Select element not found:', selectSel);
 			return;
 		}
-		sel.innerHTML = '<option value="">Unassigned</option>';
+		sel.innerHTML = '<option value="" disabled selected hidden></option>';
 		(res.users || []).forEach(u => {
 			const opt = document.createElement('option');
 			opt.value = u.IDno; // UserModel returns IDno (lowercase 'n')

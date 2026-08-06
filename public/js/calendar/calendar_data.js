@@ -97,6 +97,104 @@ function setupScrollbar() {
   return { bodyScroller, top };
 }
 
+function getDatagridVerticalScroller() {
+  return document.querySelector('#calendar .fc-datagrid-body .fc-scroller')
+    || document.querySelector('#calendar .fc-resource-area .fc-scroller');
+}
+
+function getTimelineVerticalScroller() {
+  return document.querySelector('#calendar .fc-timeline-body .fc-scroller');
+}
+
+let calendarVerticalScrollSyncLock = false;
+let calendarVerticalScrollRaf = null;
+
+function syncCalendarVerticalScroll(source, target) {
+  if (calendarVerticalScrollSyncLock || !source || !target || source === target) return;
+
+  calendarVerticalScrollSyncLock = true;
+  const maxSource = Math.max(0, source.scrollHeight - source.clientHeight);
+  const maxTarget = Math.max(0, target.scrollHeight - target.clientHeight);
+
+  if (maxSource > 0 || maxTarget > 0) {
+    const ratio = maxSource > 0 ? source.scrollTop / maxSource : 0;
+    target.scrollTop = Math.min(maxTarget, ratio * maxTarget);
+  }
+
+  calendarVerticalScrollSyncLock = false;
+}
+
+function clampCalendarVerticalScroll() {
+  const dgScroller = getDatagridVerticalScroller();
+  const tlScroller = getTimelineVerticalScroller();
+  if (!dgScroller || !tlScroller) return;
+
+  const maxDg = Math.max(0, dgScroller.scrollHeight - dgScroller.clientHeight);
+  const maxTl = Math.max(0, tlScroller.scrollHeight - tlScroller.clientHeight);
+  if (maxDg <= 0 && maxTl <= 0) return;
+
+  const ratioDg = maxDg > 0 ? dgScroller.scrollTop / maxDg : 0;
+  const ratioTl = maxTl > 0 ? tlScroller.scrollTop / maxTl : 0;
+  const ratio = Math.min(ratioDg, ratioTl, 1);
+
+  calendarVerticalScrollSyncLock = true;
+  if (maxDg > 0) dgScroller.scrollTop = ratio * maxDg;
+  if (maxTl > 0) tlScroller.scrollTop = ratio * maxTl;
+  calendarVerticalScrollSyncLock = false;
+}
+
+function onCalendarVerticalScroll(event) {
+  const target = event.target;
+  if (!target || !target.classList || !target.classList.contains('fc-scroller')) return;
+  if (calendarVerticalScrollSyncLock) return;
+
+  if (calendarVerticalScrollRaf) {
+    cancelAnimationFrame(calendarVerticalScrollRaf);
+  }
+
+  calendarVerticalScrollRaf = requestAnimationFrame(function() {
+    calendarVerticalScrollRaf = null;
+
+    const dgScroller = getDatagridVerticalScroller();
+    const tlScroller = getTimelineVerticalScroller();
+    if (!dgScroller || !tlScroller) return;
+
+    if (target === dgScroller || target.closest('.fc-datagrid-body') || target.closest('.fc-resource-area')) {
+      syncCalendarVerticalScroll(dgScroller, tlScroller);
+    } else if (target === tlScroller || target.closest('.fc-timeline-body')) {
+      syncCalendarVerticalScroll(tlScroller, dgScroller);
+    }
+
+    clampCalendarVerticalScroll();
+  });
+}
+
+function bindCalendarVerticalScrollSync() {
+  const calendarRoot = document.getElementById('calendar');
+  if (!calendarRoot || calendarRoot.dataset.verticalSyncBound) return;
+
+  calendarRoot.dataset.verticalSyncBound = '1';
+  calendarRoot.addEventListener('scroll', onCalendarVerticalScroll, { capture: true, passive: true });
+}
+
+function refreshCalendarVerticalScrollSync() {
+  const dgScroller = getDatagridVerticalScroller();
+  const tlScroller = getTimelineVerticalScroller();
+
+  if (calendar && dgScroller && tlScroller) {
+    const dgRows = dgScroller.querySelectorAll('tbody tr').length;
+    const tlRows = tlScroller.querySelectorAll('tbody tr').length;
+    if (dgRows !== tlRows && typeof calendar.updateSize === 'function') {
+      calendar.updateSize();
+    }
+  }
+
+  requestAnimationFrame(function() {
+    clampCalendarVerticalScroll();
+    bindCalendarVerticalScrollSync();
+  });
+}
+
 function getVerticalScrollerForRow(rowEl) {
   if (!rowEl) return null;
   const scroller = rowEl.closest('.fc-scroller');
@@ -107,15 +205,55 @@ function getVerticalScrollerForRow(rowEl) {
 }
 
 function findTimeRowByResourceId(resourceId) {
-  let timeRow = document.querySelector(`.fc-timeline-body tr[data-resource-id="${resourceId}"]`);
-  if (!timeRow) {
-    const resRow = document.querySelector(`.fc-resource-area tr[data-resource-id="${resourceId}"]`);
-    if (resRow && resRow.parentElement) {
-      const idx = Array.prototype.indexOf.call(resRow.parentElement.children, resRow);
-      timeRow = document.querySelectorAll('.fc-timeline-body tbody tr')[idx];
-    }
+  if (isFloorResourceId(resourceId)) return null;
+
+  const id = CSS.escape(String(resourceId));
+  let timeRow = document.querySelector(`#calendar .fc-timeline-body tr[data-resource-id="${id}"]`);
+  if (timeRow) return isFloorTimelineRow(timeRow) ? null : timeRow;
+
+  const laneCell = document.querySelector(`#calendar .fc-timeline-body td.fc-timeline-lane[data-resource-id="${id}"]`);
+  if (laneCell) {
+    timeRow = laneCell.closest('tr');
+    return isFloorTimelineRow(timeRow) ? null : timeRow;
   }
-  return timeRow || null;
+
+  const labelCell = document.querySelector(`#calendar .fc-datagrid-cell.fc-resource[data-resource-id="${id}"]`);
+  if (!labelCell || labelCell.hasAttribute('data-is-floor')) return null;
+
+  const labelRow = labelCell.closest('tr');
+  if (!labelRow || !labelRow.parentElement) return null;
+
+  const idx = Array.prototype.indexOf.call(labelRow.parentElement.children, labelRow);
+  const bodyRows = document.querySelectorAll('#calendar .fc-timeline-body tbody tr');
+  timeRow = bodyRows[idx] || null;
+  return isFloorTimelineRow(timeRow) ? null : timeRow;
+}
+
+function isFloorResourceId(resourceId) {
+  if (resourceId == null) return false;
+  const id = String(resourceId);
+  if (/^floor_/i.test(id)) return true;
+
+  const labelCell = document.querySelector(`#calendar .fc-datagrid-cell.fc-resource[data-resource-id="${CSS.escape(id)}"]`);
+  if (labelCell && labelCell.hasAttribute('data-is-floor')) return true;
+
+  if (calendar && typeof calendar.getResourceById === 'function') {
+    const resource = calendar.getResourceById(id);
+    if (resource && resource.extendedProps && resource.extendedProps.isFloor) return true;
+  }
+
+  return false;
+}
+
+function isFloorTimelineRow(row) {
+  if (!row) return false;
+  const rowId = row.getAttribute('data-resource-id');
+  if (rowId && isFloorResourceId(rowId)) return true;
+
+  const laneCell = row.querySelector('td.fc-timeline-lane[data-resource-id]');
+  if (laneCell && isFloorResourceId(laneCell.getAttribute('data-resource-id'))) return true;
+
+  return false;
 }
 
 function centerResourceRow(resourceId) {
@@ -375,7 +513,10 @@ function setArmedRoomRange(anchorId, currentId) {
 
   const start = Math.min(anchorIndex, currentIndex);
   const end = Math.max(anchorIndex, currentIndex);
-  const rangeIds = orderedIds.slice(start, end + 1);
+  const rangeIds = orderedIds.slice(start, end + 1).filter(function(id) {
+    return !isFloorResourceId(id);
+  });
+  if (!rangeIds.length) return;
   const rangeSet = new Set(rangeIds);
 
   armedRoomIds.forEach(function(id) {
@@ -393,6 +534,9 @@ function setArmedRoomRange(anchorId, currentId) {
   });
 
   updateGroupSelectBadge();
+  if (armedRoomIds.size > 1 && !groupCreateModeActive) {
+    syncGroupSelectOverlay();
+  }
 }
 
 // Draws a highlight rectangle for each swept room, scoped to exactly the date
@@ -401,35 +545,216 @@ function setArmedRoomRange(anchorId, currentId) {
 // .fc-highlight element); this just borrows that element's left/width and repeats
 // it at each additional armed room's row position.
 let groupSelectOverlays = [];
+let groupSelectDateRange = null; // { start: Date, end: Date } — kept after modal open
+let calendarGroupBookingSnapshot = null; // persists selection across modal open/close
+
+function getHorizontalTimelineScroller() {
+  return Array.from(document.querySelectorAll('#calendar .fc-scroller'))
+    .find(s => s.scrollWidth > s.clientWidth)
+    || null;
+}
+
+function getVerticalTimelineScroller() {
+  return document.querySelector('#calendar .fc-timeline-body .fc-scroller')
+    || document.querySelector('#calendar .fc-scroller');
+}
+
+function getTimelineOverlayScroller() {
+  const sampleRow = document.querySelector('#calendar .fc-timeline-body tbody tr');
+  if (sampleRow) {
+    const rowScroller = sampleRow.closest('.fc-scroller');
+    if (rowScroller) return rowScroller;
+  }
+  return getHorizontalTimelineScroller() || getVerticalTimelineScroller();
+}
+
+function getTimelineBodyScroller() {
+  return getTimelineOverlayScroller();
+}
+
+function computeDateRangeMetrics(startDate, endDate) {
+  if (!calendar || !startDate || !endDate) return null;
+
+  const scroller = getTimelineOverlayScroller();
+  const hScroller = getHorizontalTimelineScroller();
+  const widthSource = (hScroller && hScroller.scrollWidth > hScroller.clientWidth) ? hScroller : scroller;
+  if (!widthSource) return null;
+
+  const view = calendar.view;
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const totalDays = (view.activeEnd.getTime() - view.activeStart.getTime()) / msPerDay;
+  if (totalDays <= 0) return null;
+
+  const dayWidth = widthSource.scrollWidth / totalDays;
+  const startOffsetDays = (startDate.getTime() - view.activeStart.getTime()) / msPerDay;
+  const endOffsetDays = (endDate.getTime() - view.activeStart.getTime()) / msPerDay;
+
+  return {
+    left: startOffsetDays * dayWidth,
+    width: (endOffsetDays - startOffsetDays) * dayWidth
+  };
+}
+
+function getRowContentTopInScroller(row, scroller) {
+  const rowRect = row.getBoundingClientRect();
+  const scrollerRect = scroller.getBoundingClientRect();
+  return rowRect.top - scrollerRect.top + scroller.scrollTop;
+}
+
+function getTimelineOverlayLayer() {
+  const scroller = getTimelineOverlayScroller();
+  if (!scroller) return null;
+
+  const mount = scroller.querySelector(':scope > div') || scroller;
+  let layer = mount.querySelector(':scope > .calendar-group-overlay-layer');
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.className = 'calendar-group-overlay-layer';
+    layer.setAttribute('aria-hidden', 'true');
+    mount.appendChild(layer);
+  }
+
+  const contentTable = mount.querySelector('table') || scroller.querySelector('table');
+  layer.style.width = (contentTable ? contentTable.offsetWidth : scroller.scrollWidth) + 'px';
+  layer.style.height = (contentTable ? contentTable.offsetHeight : 0) + 'px';
+  return layer;
+}
+
+// Shade bars live inside the timeline scroller so they scroll with the grid
+// (never bleed into the header) while spanning the full date range width.
+function appendScrollerContentOverlay(className, timeRow, contentLeft, contentWidth) {
+  const scroller = getTimelineOverlayScroller();
+  const layer = getTimelineOverlayLayer();
+  if (!scroller || !layer || !timeRow || contentWidth <= 0) return null;
+
+  const overlay = document.createElement('div');
+  overlay.className = className;
+  overlay.style.top = getRowContentTopInScroller(timeRow, scroller) + 'px';
+  overlay.style.left = contentLeft + 'px';
+  overlay.style.width = contentWidth + 'px';
+  overlay.style.height = timeRow.offsetHeight + 'px';
+  layer.appendChild(overlay);
+  return overlay;
+}
+
+let groupOverlayScrollSyncBound = false;
+let groupOverlaySyncTimer = null;
+
+function scheduleGroupOverlaySync() {
+  if (groupOverlaySyncTimer) cancelAnimationFrame(groupOverlaySyncTimer);
+  groupOverlaySyncTimer = requestAnimationFrame(function() {
+    groupOverlaySyncTimer = null;
+    // Resize the layer after scroll; content-positioned overlays move on their own.
+    getTimelineOverlayLayer();
+    if (groupCreateModeActive && groupCreateSelectedRooms.size && groupCreateDateRange) {
+      renderGroupCreateOverlaysNow();
+    }
+    if (armedRoomIds.size >= 1 && !groupCreateModeActive) {
+      syncGroupSelectOverlay();
+    }
+  });
+}
+
+function bindGroupOverlayScrollSync() {
+  if (groupOverlayScrollSyncBound) return;
+  groupOverlayScrollSyncBound = true;
+  // Capture phase catches scroll on FC scrollers even if they mount after init.
+  document.addEventListener('scroll', scheduleGroupOverlaySync, true);
+  window.addEventListener('resize', scheduleGroupOverlaySync);
+}
+
+function refreshGroupOverlayScrollSync() {
+  document.querySelectorAll('#calendar .fc-scroller').forEach(function(scroller) {
+    if (scroller.dataset.groupOverlaySyncBound) return;
+    scroller.dataset.groupOverlaySyncBound = '1';
+    scroller.addEventListener('scroll', scheduleGroupOverlaySync, { passive: true });
+  });
+  const topScroller = document.getElementById('top-scroller');
+  if (topScroller && !topScroller.dataset.groupOverlaySyncBound) {
+    topScroller.dataset.groupOverlaySyncBound = '1';
+    topScroller.addEventListener('scroll', scheduleGroupOverlaySync, { passive: true });
+  }
+}
 
 function clearGroupSelectOverlays() {
-  groupSelectOverlays.forEach(function(el) { el.remove(); });
+  document.querySelectorAll('.group-select-overlay').forEach(function(el) { el.remove(); });
   groupSelectOverlays = [];
+}
+
+function getCalendarSelectDateRange() {
+  if (!calendar) return null;
+
+  if (typeof calendar.getSelection === 'function') {
+    const sel = calendar.getSelection();
+    if (sel && sel.start && sel.end) {
+      return { start: new Date(sel.start), end: new Date(sel.end) };
+    }
+  }
+
+  // FullCalendar 6 keeps in-progress date drag here before the select event fires.
+  const currentData = calendar.currentData;
+  const liveRange = currentData && currentData.dateSelection && currentData.dateSelection.range;
+  if (liveRange && liveRange.start && liveRange.end) {
+    return { start: new Date(liveRange.start), end: new Date(liveRange.end) };
+  }
+
+  return null;
+}
+
+function getGroupSelectDateRange() {
+  return getCalendarSelectDateRange() || groupSelectDateRange;
+}
+
+function getHighlightOverlayMetrics() {
+  const nativeHighlight = document.querySelector('#calendar .fc-highlight');
+  if (!nativeHighlight) return null;
+
+  const scroller = getTimelineOverlayScroller();
+  if (!scroller) return null;
+
+  const highlightRect = nativeHighlight.getBoundingClientRect();
+  if (highlightRect.width <= 0) return null;
+
+  const scrollerRect = scroller.getBoundingClientRect();
+  return {
+    left: highlightRect.left - scrollerRect.left + scroller.scrollLeft,
+    width: highlightRect.width
+  };
+}
+
+function getGroupSelectOverlayMetrics() {
+  const highlightMetrics = getHighlightOverlayMetrics();
+  if (highlightMetrics) return highlightMetrics;
+
+  const range = getGroupSelectDateRange();
+  if (!range) return null;
+
+  return computeDateRangeMetrics(range.start, range.end);
 }
 
 function syncGroupSelectOverlay() {
   clearGroupSelectOverlays();
+  if (!armedRoomIds.size || !calendar) return;
 
-  const nativeHighlight = document.querySelector('.fc-highlight');
-  if (!nativeHighlight) return;
-  const hRect = nativeHighlight.getBoundingClientRect();
+  const metrics = getGroupSelectOverlayMetrics();
+  if (!metrics || metrics.width <= 0) return;
+
+  const nativeHighlight = document.querySelector('#calendar .fc-highlight');
+  const nativeLane = nativeHighlight ? nativeHighlight.closest('td.fc-timeline-lane') : null;
 
   armedRoomIds.forEach(function(id) {
-    const labelCell = document.querySelector(`.fc-datagrid-cell.fc-resource[data-resource-id="${CSS.escape(id)}"]`);
-    if (!labelCell) return;
-    const labelRect = labelCell.getBoundingClientRect();
+    const timeRow = findTimeRowByResourceId(id);
+    if (!timeRow || isFloorResourceId(id)) return;
+    const laneCell = timeRow.querySelector('td.fc-timeline-lane');
+    if (nativeLane && laneCell === nativeLane) return;
 
-    // Skip the room whose row already has FullCalendar's own native highlight
-    if (hRect.top >= labelRect.top && hRect.top < labelRect.bottom) return;
-
-    const overlay = document.createElement('div');
-    overlay.className = 'group-select-overlay';
-    overlay.style.left = hRect.left + 'px';
-    overlay.style.width = hRect.width + 'px';
-    overlay.style.top = labelRect.top + 'px';
-    overlay.style.height = labelRect.height + 'px';
-    document.body.appendChild(overlay);
-    groupSelectOverlays.push(overlay);
+    const overlay = appendScrollerContentOverlay(
+      'group-select-overlay',
+      timeRow,
+      metrics.left,
+      metrics.width
+    );
+    if (overlay) groupSelectOverlays.push(overlay);
   });
 }
 
@@ -462,6 +787,7 @@ let groupDragAnchorRoomId = null;
 
 function attachGroupSelectDragTracking() {
   document.addEventListener('mousedown', function(e) {
+    if (groupCreateModeActive) return;
     // Same Y-position lookup as mousemove below: clicking a date cell in the
     // timeline lands on FullCalendar's decorative background slot layer, which
     // has no data-resource-id of its own, so closest() can't find the room here.
@@ -489,9 +815,19 @@ function attachGroupSelectDragTracking() {
   });
 
   document.addEventListener('mouseup', function() {
+    if (groupCreateModeActive) {
+      groupDragActive = false;
+      groupDragAnchorRoomId = null;
+      document.body.classList.remove('calendar-drag-active');
+      return;
+    }
     groupDragActive = false;
     groupDragAnchorRoomId = null;
     document.body.classList.remove('calendar-drag-active');
+
+    if (armedRoomIds.size > 1 && !groupCreateModeActive) {
+      syncGroupSelectOverlay();
+    }
 
     // Safety net: if this gesture didn't end in a valid FullCalendar selection
     // (e.g. released outside the grid), its own `select` handler - which normally
@@ -499,7 +835,11 @@ function attachGroupSelectDragTracking() {
     // until the next drag. `select`, if it does fire, runs synchronously within this
     // same mouseup, so by the time this deferred callback runs it's already been
     // consumed - calling reset again here is just a harmless no-op in that case.
-    setTimeout(resetGroupSelectState, 0);
+    setTimeout(function() {
+      // Keep multi-room selection alive when handing off to the group booking modal.
+      if (armedRoomIds.size > 1) return;
+      resetGroupSelectState();
+    }, 0);
   });
 }
 
@@ -527,6 +867,7 @@ function updateGroupSelectBadge() {
 function resetGroupSelectState() {
   document.querySelectorAll('.group-select-armed').forEach(el => el.classList.remove('group-select-armed'));
   armedRoomIds.clear();
+  groupSelectDateRange = null;
   clearGroupSelectOverlays();
   updateGroupSelectBadge();
 }
@@ -547,55 +888,46 @@ let groupCreateDateRange = null; // { start: Date, end: Date }
 let groupCreateOverlays = [];
 
 function clearGroupCreateOverlays() {
-  groupCreateOverlays.forEach(function(el) { el.remove(); });
+  document.querySelectorAll('.group-create-overlay').forEach(function(el) { el.remove(); });
   groupCreateOverlays = [];
 }
 
-// Computes the current viewport left/width for groupCreateDateRange from the
-// calendar's own date-to-pixel math (same technique as scrollToToday/scrollToDate)
-// instead of reusing a one-time snapshot, so it stays correct after scrolling,
-// resizing, or navigating the calendar - not just at the moment of the first drag.
-function computeGroupCreateDateRangeRect() {
-  if (!groupCreateDateRange || !calendar) return null;
+function renderGroupCreateOverlaysNow() {
+  clearGroupCreateOverlays();
+  if (!groupCreateModeActive || !groupCreateSelectedRooms.size || !groupCreateDateRange || !calendar) return;
 
-  const bodyScroller = Array.from(document.querySelectorAll('#calendar .fc-scroller'))
-    .find(s => s.scrollWidth > s.clientWidth);
-  if (!bodyScroller) return null;
+  groupCreateSelectedRooms.forEach(function(id) {
+    if (isFloorResourceId(id)) {
+      groupCreateSelectedRooms.delete(id);
+      const labelCell = document.querySelector(`.fc-datagrid-cell.fc-resource[data-resource-id="${CSS.escape(String(id))}"]`);
+      if (labelCell) labelCell.classList.remove('group-create-armed');
+    }
+  });
+  if (!groupCreateSelectedRooms.size) return;
 
-  const view = calendar.view;
-  const msPerDay = 1000 * 60 * 60 * 24;
-  const totalDays = (view.activeEnd.getTime() - view.activeStart.getTime()) / msPerDay;
-  if (totalDays <= 0) return null;
-  const dayWidth = bodyScroller.scrollWidth / totalDays;
+  const metrics = computeDateRangeMetrics(groupCreateDateRange.start, groupCreateDateRange.end);
+  if (!metrics) return;
 
-  const startOffsetDays = (groupCreateDateRange.start.getTime() - view.activeStart.getTime()) / msPerDay;
-  const endOffsetDays = (groupCreateDateRange.end.getTime() - view.activeStart.getTime()) / msPerDay;
+  groupCreateSelectedRooms.forEach(function(roomId) {
+    if (isFloorResourceId(roomId)) return;
+    const timeRow = findTimeRowByResourceId(roomId);
+    if (!timeRow) return;
 
-  const scrollerRect = bodyScroller.getBoundingClientRect();
-  const left = scrollerRect.left - bodyScroller.scrollLeft + (startOffsetDays * dayWidth);
-  const width = (endOffsetDays - startOffsetDays) * dayWidth;
-
-  return { left, width };
+    const overlay = appendScrollerContentOverlay(
+      'group-create-overlay',
+      timeRow,
+      metrics.left,
+      metrics.width
+    );
+    if (overlay) groupCreateOverlays.push(overlay);
+  });
 }
 
 function renderGroupCreateOverlays() {
-  clearGroupCreateOverlays();
-  const rangeRect = computeGroupCreateDateRangeRect();
-  if (!rangeRect) return;
-
-  groupCreateSelectedRooms.forEach(function(id) {
-    const labelCell = document.querySelector(`.fc-datagrid-cell.fc-resource[data-resource-id="${CSS.escape(id)}"]`);
-    if (!labelCell) return;
-    const labelRect = labelCell.getBoundingClientRect();
-
-    const overlay = document.createElement('div');
-    overlay.className = 'group-create-overlay';
-    overlay.style.left = rangeRect.left + 'px';
-    overlay.style.width = rangeRect.width + 'px';
-    overlay.style.top = labelRect.top + 'px';
-    overlay.style.height = labelRect.height + 'px';
-    document.body.appendChild(overlay);
-    groupCreateOverlays.push(overlay);
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      renderGroupCreateOverlaysNow();
+    });
   });
 }
 
@@ -605,6 +937,10 @@ function updateGroupCreateButtonStates() {
   if (toggleBtn) {
     toggleBtn.classList.toggle('bed-filter-btn-active', groupCreateModeActive);
     toggleBtn.textContent = groupCreateModeActive ? 'Cancel Group Select' : 'Create Group Booking';
+    if (!groupCreateModeActive) {
+      toggleBtn.classList.remove('fc-button-active');
+      toggleBtn.blur();
+    }
   }
   if (proceedBtn) {
     const count = groupCreateSelectedRooms.size;
@@ -612,6 +948,10 @@ function updateGroupCreateButtonStates() {
     proceedBtn.classList.toggle('fc-proceed-visible', eligible);
     proceedBtn.disabled = !eligible;
     proceedBtn.textContent = eligible ? `Proceed (${count} rooms)` : 'Proceed';
+    if (!eligible) {
+      proceedBtn.classList.remove('fc-button-active');
+      proceedBtn.blur();
+    }
   }
 }
 
@@ -619,41 +959,77 @@ function resetGroupCreateState() {
   groupCreateSelectedRooms.clear();
   groupCreateDateRange = null;
   clearGroupCreateOverlays();
-  document.querySelectorAll('.group-create-armed').forEach(el => el.classList.remove('group-create-armed'));
+  document.querySelectorAll('.group-create-armed').forEach(function(el) {
+    el.classList.remove('group-create-armed');
+  });
+  document.querySelectorAll('.group-create-overlay').forEach(function(el) {
+    el.remove();
+  });
+
+  groupDragActive = false;
+  groupDragAnchorRoomId = null;
+  document.body.classList.remove('calendar-drag-active');
+
+  if (calendar && typeof calendar.unselect === 'function') {
+    calendar.unselect();
+  }
+
   updateGroupCreateButtonStates();
 }
 
+function exitGroupCreateMode() {
+  groupCreateModeActive = false;
+  resetGroupCreateState();
+}
+
 function toggleGroupCreateMode() {
-  groupCreateModeActive = !groupCreateModeActive;
-  if (!groupCreateModeActive) {
-    resetGroupCreateState();
-  } else {
-    // Starting a fresh pick session shouldn't inherit an unrelated in-progress
-    // single-drag selection from the other (auto-detect) flow
-    resetGroupSelectState();
-    updateGroupCreateButtonStates();
+  if (groupCreateModeActive) {
+    exitGroupCreateMode();
+    return;
   }
+
+  groupCreateModeActive = true;
+  // Starting a fresh pick session shouldn't inherit an unrelated in-progress
+  // single-drag selection from the other (auto-detected) flow
+  resetGroupSelectState();
+  updateGroupCreateButtonStates();
 }
 
 function toggleGroupCreateRoom(roomId, start, end) {
   const id = String(roomId);
+  if (isFloorResourceId(id)) return;
+
   const labelCell = document.querySelector(`.fc-datagrid-cell.fc-resource[data-resource-id="${CSS.escape(id)}"]`);
 
   if (groupCreateSelectedRooms.has(id)) {
     groupCreateSelectedRooms.delete(id);
     if (labelCell) labelCell.classList.remove('group-create-armed');
-  } else {
-    // First pick locks in the shared date range for every room added after it
-    if (!groupCreateDateRange && start && end) {
-      groupCreateDateRange = { start, end };
-    }
-    if (!groupCreateDateRange) return; // no dates locked in yet - first pick must be a drag
-    groupCreateSelectedRooms.add(id);
-    if (labelCell) labelCell.classList.add('group-create-armed');
+    renderGroupCreateOverlays();
+    updateGroupCreateButtonStates();
+    return;
   }
 
-  renderGroupCreateOverlays();
-  updateGroupCreateButtonStates();
+  if (!groupCreateDateRange && start && end) {
+    groupCreateDateRange = { start: new Date(start), end: new Date(end) };
+  }
+  if (!groupCreateDateRange) return;
+
+  checkCalendarRoomsAvailability([id], groupCreateDateRange.start, groupCreateDateRange.end)
+    .then(function(result) {
+      if (result.error) return;
+      if (!result.ok) {
+        showUnavailableRoomsAlert(
+          result.unavailable.map(function(r) { return r.ROOM_NUMBER; }),
+          result.missingCount
+        );
+        return;
+      }
+
+      groupCreateSelectedRooms.add(id);
+      if (labelCell) labelCell.classList.add('group-create-armed');
+      renderGroupCreateOverlays();
+      updateGroupCreateButtonStates();
+    });
 }
 
 // Room-label clicks add/remove rooms 2+ once the date range is already locked in -
@@ -673,30 +1049,422 @@ function attachGroupCreateLabelClicks() {
     toggleGroupCreateRoom(labelCell.getAttribute('data-resource-id'));
   });
 
-  // Keep the persistent overlays glued to their rows across both scroll axes
-  document.addEventListener('scroll', function() {
-    if (groupCreateModeActive && groupCreateSelectedRooms.size) {
-      renderGroupCreateOverlays();
-    }
-  }, true);
   window.addEventListener('resize', function() {
     if (groupCreateModeActive && groupCreateSelectedRooms.size) {
       renderGroupCreateOverlays();
     }
+  });
+
+  bindGroupOverlayScrollSync();
+}
+
+function buildUnavailableRoomsAlertContent(unavailableRoomNumbers, missingCount) {
+  const unavailable = (unavailableRoomNumbers || []).map(String).filter(Boolean);
+  const missing = Number(missingCount) || 0;
+  const parts = [];
+
+  if (unavailable.length === 1) {
+    parts.push('Room ' + unavailable[0] + ' is already booked for the selected dates.');
+  } else if (unavailable.length > 1) {
+    parts.push('These rooms are already booked: ' + unavailable.join(', ') + '.');
+  }
+
+  if (missing === 1) {
+    parts.push('1 selected room no longer exists.');
+  } else if (missing > 1) {
+    parts.push(missing + ' selected rooms no longer exist.');
+  }
+
+  const issueCount = unavailable.length + missing;
+  let title;
+
+  if (issueCount === 1 && unavailable.length === 1) {
+    title = 'Room ' + unavailable[0] + ' is unavailable';
+  } else if (issueCount === 1) {
+    title = 'Selected room is unavailable';
+  } else {
+    title = issueCount + ' selected rooms are unavailable';
+  }
+
+  return {
+    title: title,
+    text: parts.join(' ') || title
+  };
+}
+
+function showUnavailableRoomsAlert(unavailableRoomNumbers, missingCount) {
+  const alertContent = buildUnavailableRoomsAlertContent(unavailableRoomNumbers, missingCount);
+
+  if (typeof Swal !== 'undefined') {
+    return Swal.fire({
+      title: alertContent.title,
+      text: alertContent.text,
+      icon: 'warning',
+      confirmButtonText: 'OK',
+      background: '#2a3135',
+      color: '#ffffff'
+    });
+  }
+
+  alert(alertContent.text || alertContent.title);
+  return Promise.resolve();
+}
+
+function removeRoomsFromGroupSelect(roomIdsToRemove) {
+  (roomIdsToRemove || []).forEach(function(id) {
+    const rid = String(id);
+    if (!armedRoomIds.has(rid)) return;
+    armedRoomIds.delete(rid);
+    const labelCell = document.querySelector(`.fc-datagrid-cell.fc-resource[data-resource-id="${CSS.escape(rid)}"]`);
+    if (labelCell) labelCell.classList.remove('group-select-armed');
+  });
+  syncGroupSelectOverlay();
+  updateGroupSelectBadge();
+}
+
+function removeRoomsFromGroupCreate(roomIdsToRemove) {
+  (roomIdsToRemove || []).forEach(function(id) {
+    const rid = String(id);
+    if (!groupCreateSelectedRooms.has(rid)) return;
+    groupCreateSelectedRooms.delete(rid);
+    const labelCell = document.querySelector(`.fc-datagrid-cell.fc-resource[data-resource-id="${CSS.escape(rid)}"]`);
+    if (labelCell) labelCell.classList.remove('group-create-armed');
+  });
+  renderGroupCreateOverlays();
+  updateGroupCreateButtonStates();
+}
+
+function getUnavailableSelectionIds(result, requestedRoomIds) {
+  const removeSet = new Set();
+  (result.unavailable || []).forEach(function(r) { removeSet.add(String(r.IDNo)); });
+  (result.missingIds || []).forEach(function(id) { removeSet.add(String(id)); });
+  return (requestedRoomIds || []).map(String).filter(function(id) { return removeSet.has(id); });
+}
+
+function getAvailableSelectionIds(result, requestedRoomIds) {
+  if (result.availableIds && result.availableIds.length) {
+    return result.availableIds.map(String);
+  }
+  const removeSet = new Set(getUnavailableSelectionIds(result, requestedRoomIds));
+  return (requestedRoomIds || []).map(String).filter(function(id) { return !removeSet.has(id); });
+}
+
+function applyCalendarGroupBookingRoomIds(roomIds, startDate, endDate) {
+  const allowed = (roomIds || []).map(String);
+  const start = startDate instanceof Date ? new Date(startDate) : new Date(startDate);
+  const end = endDate instanceof Date ? new Date(endDate) : new Date(endDate);
+
+  if (groupCreateModeActive) {
+    document.querySelectorAll('.group-create-armed').forEach(function(el) {
+      el.classList.remove('group-create-armed');
+    });
+    groupCreateSelectedRooms.clear();
+    allowed.forEach(function(id) {
+      groupCreateSelectedRooms.add(id);
+      const labelCell = document.querySelector(`.fc-datagrid-cell.fc-resource[data-resource-id="${CSS.escape(id)}"]`);
+      if (labelCell) labelCell.classList.add('group-create-armed');
+    });
+    groupCreateDateRange = { start: start, end: end };
+    renderGroupCreateOverlays();
+    updateGroupCreateButtonStates();
+    return;
+  }
+
+  document.querySelectorAll('.group-select-armed').forEach(function(el) {
+    el.classList.remove('group-select-armed');
+  });
+  armedRoomIds.clear();
+  allowed.forEach(function(id) {
+    armedRoomIds.add(id);
+    const labelCell = document.querySelector(`.fc-datagrid-cell.fc-resource[data-resource-id="${CSS.escape(id)}"]`);
+    if (labelCell) labelCell.classList.add('group-select-armed');
+  });
+  groupSelectDateRange = { start: start, end: end };
+  syncGroupSelectOverlay();
+  updateGroupSelectBadge();
+}
+
+function saveCalendarGroupBookingSnapshot(roomIds, startDate, endDate) {
+  calendarGroupBookingSnapshot = {
+    roomIds: (roomIds || []).map(String),
+    start: startDate instanceof Date ? new Date(startDate) : new Date(startDate),
+    end: endDate instanceof Date ? new Date(endDate) : new Date(endDate),
+    fromGroupCreate: groupCreateModeActive
+  };
+}
+
+function restoreCalendarSelectionFromSnapshot() {
+  if (!calendarGroupBookingSnapshot) {
+    return syncCalendarSelectionToAvailableOnly().then(function() {
+      restoreCalendarGroupSelectionVisuals();
+    });
+  }
+
+  const snap = calendarGroupBookingSnapshot;
+  return checkCalendarRoomsAvailability(snap.roomIds, snap.start, snap.end).then(function(result) {
+    if (result.error) {
+      restoreCalendarGroupSelectionVisuals();
+      return;
+    }
+
+    const availableIds = getAvailableSelectionIds(result, snap.roomIds);
+    if (!availableIds.length) {
+      calendarGroupBookingSnapshot = null;
+      resetCalendarGroupSelection();
+      return;
+    }
+
+    calendarGroupBookingSnapshot = {
+      roomIds: availableIds,
+      start: snap.start,
+      end: snap.end,
+      fromGroupCreate: snap.fromGroupCreate
+    };
+
+    if (snap.fromGroupCreate) {
+      groupCreateModeActive = true;
+    }
+
+    applyCalendarGroupBookingRoomIds(availableIds, snap.start, snap.end);
+
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        if (snap.fromGroupCreate) {
+          renderGroupCreateOverlays();
+          updateGroupCreateButtonStates();
+        } else {
+          syncGroupSelectOverlay();
+          updateGroupSelectBadge();
+        }
+      });
+    });
+  });
+}
+
+function openGroupBookingModalForCalendarSelection(roomIds, startDate, endDate) {
+  saveCalendarGroupBookingSnapshot(roomIds, startDate, endDate);
+  applyCalendarGroupBookingRoomIds(roomIds, startDate, endDate);
+  if (typeof window.openGroupBookingFromCalendar === 'function') {
+    window.openGroupBookingFromCalendar(roomIds, startDate, endDate);
+  }
+}
+
+function syncCalendarSelectionToAvailableOnly() {
+  return new Promise(function(resolve) {
+    if (groupCreateModeActive && groupCreateSelectedRooms.size && groupCreateDateRange) {
+      const roomIds = Array.from(groupCreateSelectedRooms);
+      checkCalendarRoomsAvailability(roomIds, groupCreateDateRange.start, groupCreateDateRange.end)
+        .then(function(result) {
+          if (!result.error) {
+            removeRoomsFromGroupCreate(getUnavailableSelectionIds(result, roomIds));
+          }
+          resolve();
+        });
+      return;
+    }
+
+    if (armedRoomIds.size > 0 && groupSelectDateRange) {
+      const roomIds = Array.from(armedRoomIds);
+      checkCalendarRoomsAvailability(roomIds, groupSelectDateRange.start, groupSelectDateRange.end)
+        .then(function(result) {
+          if (!result.error) {
+            removeRoomsFromGroupSelect(getUnavailableSelectionIds(result, roomIds));
+          }
+          resolve();
+        });
+      return;
+    }
+
+    resolve();
+  });
+}
+
+function handleGroupSelectAvailabilityResult(result, requestedRoomIds, startDate, endDate) {
+  if (result.error) return;
+
+  if (result.ok) {
+    openGroupBookingModalForCalendarSelection(requestedRoomIds, startDate, endDate);
+    return;
+  }
+
+  const removeIds = getUnavailableSelectionIds(result, requestedRoomIds);
+  const availableIds = getAvailableSelectionIds(result, requestedRoomIds);
+
+  showUnavailableRoomsAlert(
+    result.unavailable.map(function(r) { return r.ROOM_NUMBER; }),
+    result.missingCount
+  ).then(function() {
+    removeRoomsFromGroupSelect(removeIds);
+
+    if (availableIds.length >= 2) {
+      openGroupBookingModalForCalendarSelection(availableIds, startDate, endDate);
+    } else if (availableIds.length === 1 && typeof toastr !== 'undefined') {
+      toastr.info('Only 1 available room remains. Pick another room to continue the group booking.');
+    } else if (!availableIds.length) {
+      resetGroupSelectState();
+    }
+  });
+}
+
+function handleGroupCreateAvailabilityResult(result, requestedRoomIds, startDate, endDate) {
+  if (result.error) return;
+
+  if (result.ok) {
+    openGroupBookingModalForCalendarSelection(requestedRoomIds, startDate, endDate);
+    return;
+  }
+
+  const removeIds = getUnavailableSelectionIds(result, requestedRoomIds);
+  const availableIds = getAvailableSelectionIds(result, requestedRoomIds);
+
+  showUnavailableRoomsAlert(
+    result.unavailable.map(function(r) { return r.ROOM_NUMBER; }),
+    result.missingCount
+  ).then(function() {
+    removeRoomsFromGroupCreate(removeIds);
+
+    if (availableIds.length >= 2) {
+      openGroupBookingModalForCalendarSelection(availableIds, startDate, endDate);
+    } else if (availableIds.length === 1 && typeof toastr !== 'undefined') {
+      toastr.info('Only 1 available room remains. Pick another room to continue the group booking.');
+    }
+  });
+}
+
+function checkCalendarRoomsAvailability(roomIds, startDate, endDate) {
+  return new Promise(function(resolve) {
+    const parsedIds = (roomIds || [])
+      .map(function(id) { return parseInt(id, 10); })
+      .filter(function(id) { return !Number.isNaN(id); });
+
+    if (!parsedIds.length || !startDate || !endDate) {
+      resolve({ ok: true, unavailable: [], missingCount: 0 });
+      return;
+    }
+
+    $.ajax({
+      url: '/booking/check_rooms_availability',
+      type: 'POST',
+      data: {
+        roomIds: parsedIds,
+        startDate: startDate instanceof Date ? startDate.toISOString() : startDate,
+        endDate: endDate instanceof Date ? endDate.toISOString() : endDate
+      },
+      success: function(response) {
+        if (!response.success) {
+          if (typeof Swal !== 'undefined') {
+            Swal.fire('Error', response.message || 'Could not check room availability.', 'error');
+          }
+          resolve({ ok: false, error: true });
+          return;
+        }
+
+        const rooms = response.data.rooms || [];
+        const unavailable = rooms.filter(function(r) { return !r.isAvailable; });
+        const foundIds = rooms.map(function(r) { return r.IDNo; });
+        const missingCount = parsedIds.filter(function(id) {
+          return foundIds.indexOf(id) === -1;
+        }).length;
+
+        resolve({
+          ok: unavailable.length === 0 && missingCount === 0,
+          unavailable: unavailable,
+          available: rooms.filter(function(r) { return r.isAvailable; }),
+          availableIds: rooms.filter(function(r) { return r.isAvailable; }).map(function(r) { return String(r.IDNo); }),
+          missingIds: parsedIds.filter(function(id) { return foundIds.indexOf(id) === -1; }).map(String),
+          missingCount: missingCount
+        });
+      },
+      error: function() {
+        if (typeof Swal !== 'undefined') {
+          Swal.fire('Error', 'Failed to check room availability. Please try again.', 'error');
+        }
+        resolve({ ok: false, error: true });
+      }
+    });
   });
 }
 
 function proceedWithGroupCreate() {
   if (groupCreateSelectedRooms.size < 2 || !groupCreateDateRange) return;
   const roomIds = Array.from(groupCreateSelectedRooms);
-  const { start, end } = groupCreateDateRange;
+  const start = groupCreateDateRange.start;
+  const end = groupCreateDateRange.end;
+
+  checkCalendarRoomsAvailability(roomIds, start, end).then(function(result) {
+    handleGroupCreateAvailabilityResult(result, roomIds, start, end);
+  });
+}
+
+function restoreCalendarGroupSelectionVisuals() {
+  groupCreateSelectedRooms.forEach(function(roomId) {
+    if (isFloorResourceId(roomId)) return;
+    const labelCell = document.querySelector(`.fc-datagrid-cell.fc-resource[data-resource-id="${CSS.escape(String(roomId))}"]`);
+    if (labelCell) labelCell.classList.add('group-create-armed');
+  });
+
+  armedRoomIds.forEach(function(id) {
+    if (isFloorResourceId(id)) return;
+    const labelCell = document.querySelector(`.fc-datagrid-cell.fc-resource[data-resource-id="${CSS.escape(String(id))}"]`);
+    if (labelCell) labelCell.classList.add('group-select-armed');
+  });
+
+  if (groupCreateModeActive && groupCreateSelectedRooms.size && groupCreateDateRange) {
+    renderGroupCreateOverlays();
+  } else if (armedRoomIds.size >= 1 && groupSelectDateRange) {
+    syncGroupSelectOverlay();
+  }
+
+  updateGroupCreateButtonStates();
+  updateGroupSelectBadge();
+}
+
+function resetCalendarGroupSelection() {
+  calendarGroupBookingSnapshot = null;
+
+  if (calendar && typeof calendar.unselect === 'function') {
+    calendar.unselect();
+  }
 
   groupCreateModeActive = false;
-  resetGroupCreateState();
+  groupCreateSelectedRooms.clear();
+  groupCreateDateRange = null;
+  clearGroupCreateOverlays();
+  document.querySelectorAll('.group-create-armed').forEach(function(el) {
+    el.classList.remove('group-create-armed');
+  });
 
-  if (typeof window.openGroupBookingFromCalendar === 'function') {
-    window.openGroupBookingFromCalendar(roomIds, start, end);
+  armedRoomIds.clear();
+  groupSelectDateRange = null;
+  clearGroupSelectOverlays();
+  document.querySelectorAll('.group-select-armed').forEach(function(el) {
+    el.classList.remove('group-select-armed');
+  });
+
+  document.querySelectorAll('.group-create-overlay, .group-select-overlay').forEach(function(el) {
+    el.remove();
+  });
+
+  const overlayLayer = document.querySelector('#calendar .calendar-group-overlay-layer');
+  if (overlayLayer) overlayLayer.innerHTML = '';
+
+  if (typeof window.clearGroupBookingCalendarHandoff === 'function') {
+    window.clearGroupBookingCalendarHandoff();
   }
+
+  updateGroupCreateButtonStates();
+  updateGroupSelectBadge();
+}
+
+function attachGroupBookingModalHandlers() {
+  const modal = document.getElementById('modal-add-group-booking');
+  if (!modal || modal.dataset.calendarSelectionHandlerBound) return;
+  modal.dataset.calendarSelectionHandlerBound = '1';
+
+  modal.addEventListener('hidden.bs.modal', function() {
+    window.__groupBookingSavedFromCalendar = false;
+    resetCalendarGroupSelection();
+  });
 }
 
 // =============================================================================
@@ -1292,6 +2060,9 @@ async function loadCalendarData() {
     calendar.addEventSource(events);
     calendar.render();
     applyBedFilter();
+    if (groupCreateModeActive && groupCreateSelectedRooms.size && groupCreateDateRange) {
+      renderGroupCreateOverlays();
+    }
 
     const renderTime = Date.now() - renderStart;
 
@@ -1301,6 +2072,8 @@ async function loadCalendarData() {
       scrollToToday(scrollbarData.bodyScroller, scrollbarData.top);
       updateHeaderOnScroll(scrollbarData.bodyScroller, scrollbarData.top);
     }
+    refreshGroupOverlayScrollSync();
+    refreshCalendarVerticalScrollSync();
 
     window.calendar = calendar;
     setupScrollToDate();
@@ -1398,6 +2171,9 @@ const findHeader = setInterval(() => {
     editable: true,
     eventResourceEditable: false, // Disable dragging bookings to other rooms
     selectable: true,
+    selectAllow: function(selectInfo) {
+      return selectInfo.resource && !isFloorResourceId(selectInfo.resource.id);
+    },
     // Resize options - compatible with older FullCalendar versions
     eventResize: true, // Enable event resizing
     eventResizableFromStart: false, // Only allow resizing from the end (extend checkout)
@@ -1409,6 +2185,10 @@ const findHeader = setInterval(() => {
       // pick) locks in the shared date range - never opens any booking modal
       // directly, and never touches the auto-detected single-drag flow below.
       if (groupCreateModeActive) {
+        if (isFloorResourceId(info.resource.id)) {
+          calendar.unselect();
+          return;
+        }
         const startOk = new Date(info.start);
         startOk.setHours(0, 0, 0, 0);
         const todayOk = new Date();
@@ -1454,19 +2234,29 @@ const findHeader = setInterval(() => {
       // AUTO-DETECTED GROUP SELECT: if the drag swept into more than one room,
       // treat it as a group booking and open that modal instead of the normal
       // single-booking one. A plain single-room drag falls through unchanged below.
+      if (isFloorResourceId(info.resource.id)) {
+        calendar.unselect();
+        resetGroupSelectState();
+        return;
+      }
+
       armedRoomIds.add(String(info.resource.id));
       if (armedRoomIds.size > 1) {
-        const roomIds = Array.from(armedRoomIds);
+        const roomIds = Array.from(armedRoomIds).filter(function(id) {
+          return !isFloorResourceId(id);
+        });
+        if (roomIds.length < 2) {
+          calendar.unselect();
+          return;
+        }
+        groupSelectDateRange = { start: new Date(info.start), end: new Date(info.end) };
 
         calendar.unselect();
 
-        if (typeof window.openGroupBookingFromCalendar === 'function') {
-          window.openGroupBookingFromCalendar(roomIds, info.start, info.end);
-        } else {
-          console.error('Group Booking modal is not available on this page.');
-        }
+        checkCalendarRoomsAvailability(roomIds, info.start, info.end).then(function(result) {
+          handleGroupSelectAvailabilityResult(result, roomIds, info.start, info.end);
+        });
 
-        resetGroupSelectState();
         return;
       }
       resetGroupSelectState();
@@ -1580,6 +2370,9 @@ const findHeader = setInterval(() => {
       if (armedRoomIds.has(String(arg.resource.id))) {
         arg.el.classList.add('group-select-armed');
       }
+      if (groupCreateSelectedRooms.has(String(arg.resource.id))) {
+        arg.el.classList.add('group-create-armed');
+      }
     },
 
     resources: [],
@@ -1594,6 +2387,7 @@ const findHeader = setInterval(() => {
 
   // Manual Group Create mode: pick rooms one at a time across any floor
   attachGroupCreateLabelClicks();
+  attachGroupBookingModalHandlers();
   updateGroupCreateButtonStates();
 
   // Initialize drag and drop functionality immediately
@@ -1885,6 +2679,15 @@ function updateBedFilterButtonStates() {
   if (btn2) btn2.blur();
 }
 
+function refreshGroupBookingShadesAfterLayout() {
+  const hasGroupCreate = groupCreateModeActive && groupCreateSelectedRooms.size && groupCreateDateRange;
+  const hasGroupSelect = !groupCreateModeActive && armedRoomIds.size >= 1 && groupSelectDateRange;
+  if (!hasGroupCreate && !hasGroupSelect) return;
+
+  getTimelineOverlayLayer();
+  restoreCalendarGroupSelectionVisuals();
+}
+
 function applyBedFilter() {
   if (!calendar || !window.allCalendarFloors) return;
 
@@ -1898,6 +2701,22 @@ function applyBedFilter() {
         .filter(floor => floor.children.length > 0);
 
   calendar.setOption('resources', filteredFloors);
+
+  requestAnimationFrame(function() {
+    if (typeof calendar.updateSize === 'function') {
+      calendar.updateSize();
+    }
+
+    const scrollbarData = setupScrollbar();
+    if (scrollbarData) {
+      updateHeaderOnScroll(scrollbarData.bodyScroller, scrollbarData.top);
+    }
+
+    requestAnimationFrame(function() {
+      refreshCalendarVerticalScrollSync();
+      requestAnimationFrame(refreshGroupBookingShadesAfterLayout);
+    });
+  });
 }
 
 // Setup event listeners for search and filter
@@ -2291,9 +3110,26 @@ window.performSearch = performSearch;
 window.clearSearch = clearSearch;
 window.applyBedFilter = applyBedFilter;
 window.updateBedFilterButtonStates = updateBedFilterButtonStates;
+window.refreshCalendarVerticalScrollSync = refreshCalendarVerticalScrollSync;
+window.refreshGroupBookingShadesAfterLayout = refreshGroupBookingShadesAfterLayout;
+window.buildUnavailableRoomsAlertContent = buildUnavailableRoomsAlertContent;
 window.applyFilters = applyFilters;
 window.clearFilters = clearFilters;
 window.highlightBooking = highlightBooking;
+window.renderGroupCreateOverlays = renderGroupCreateOverlays;
+window.syncGroupSelectOverlay = syncGroupSelectOverlay;
+window.restoreCalendarGroupSelectionVisuals = restoreCalendarGroupSelectionVisuals;
+window.resetCalendarGroupSelection = resetCalendarGroupSelection;
+window.getGroupCreateShadeStatus = function() {
+  return {
+    active: groupCreateModeActive,
+    expectedCount: groupCreateSelectedRooms.size,
+    hasRange: !!groupCreateDateRange
+  };
+};
+window.countGroupCreateShadeEvents = function() {
+  return document.querySelectorAll('.group-create-overlay').length;
+};
 
 // =============================================================================
 // CALENDAR LEGEND FUNCTIONALITY
