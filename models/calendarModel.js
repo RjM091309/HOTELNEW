@@ -1,7 +1,6 @@
 const { pool, queryDatabase, queryDatabasePromise } = require('../config/database');
 
-function getBookingOutstandingBalanceSql(bookingAlias = 'b') {
-  const b = bookingAlias;
+function getBookingOutstandingBalanceByIdExprSql(bookingIdExpr) {
   return `(
     COALESCE((
       SELECT GREATEST(0,
@@ -9,12 +8,12 @@ function getBookingOutstandingBalanceSql(bookingAlias = 'b') {
         - COALESCE((
           SELECT SUM(p.AMOUNT_PAID)
           FROM payments p
-          WHERE p.BOOKING_ID = ${b}.IDNo
+          WHERE p.BOOKING_ID = ${bookingIdExpr}
             AND p.PAYMENT_TYPE NOT IN ('discount', 'security_deposit_refund')
         ), 0)
       )
       FROM billing bill2
-      WHERE bill2.BOOKING_ID = ${b}.IDNo AND bill2.ACTIVE = 1
+      WHERE bill2.BOOKING_ID = ${bookingIdExpr} AND bill2.ACTIVE = 1
     ), 0)
     + COALESCE((
       SELECT SUM(GREATEST(0,
@@ -25,7 +24,7 @@ function getBookingOutstandingBalanceSql(bookingAlias = 'b') {
         ), 0)
       ))
       FROM booking_extension be
-      WHERE be.BOOKING_ID = ${b}.IDNo AND be.ACTIVE = 1
+      WHERE be.BOOKING_ID = ${bookingIdExpr} AND be.ACTIVE = 1
     ), 0)
     + COALESCE((
       SELECT SUM(GREATEST(0,
@@ -36,9 +35,45 @@ function getBookingOutstandingBalanceSql(bookingAlias = 'b') {
         ), 0)
       ))
       FROM booking_service bs
-      WHERE bs.BOOKING_ID = ${b}.IDNo AND bs.ACTIVE = 1
+      WHERE bs.BOOKING_ID = ${bookingIdExpr} AND bs.ACTIVE = 1
     ), 0)
   )`;
+}
+
+function getBookingOutstandingBalanceSql(bookingAlias = 'b') {
+  return getBookingOutstandingBalanceByIdExprSql(`${bookingAlias}.IDNo`);
+}
+
+function isMasterGroupBillingSql(bookingAlias = 'b') {
+  const b = bookingAlias;
+  return `(
+    ${b}.GROUP_BOOKING_ID IS NOT NULL
+    AND COALESCE((
+      SELECT gb.BILLING_TYPE
+      FROM group_booking gb
+      WHERE gb.IDNo = ${b}.GROUP_BOOKING_ID
+      LIMIT 1
+    ), 0) = 1
+  )`;
+}
+
+function getMainGroupBookingIdSql(bookingAlias = 'b') {
+  const b = bookingAlias;
+  return `(
+    SELECT MIN(b_main.IDNo)
+    FROM booking b_main
+    WHERE b_main.GROUP_BOOKING_ID = ${b}.GROUP_BOOKING_ID
+      AND b_main.ACTIVE = 1
+  )`;
+}
+
+// Master-billed group members share the main booking's payment status on the calendar.
+function getPaymentEvalBookingIdSql(bookingAlias = 'b') {
+  const b = bookingAlias;
+  return `CASE
+    WHEN ${isMasterGroupBillingSql(b)} THEN ${getMainGroupBookingIdSql(b)}
+    ELSE ${b}.IDNo
+  END`;
 }
 
 class CalendarModel {
@@ -182,7 +217,8 @@ class CalendarModel {
         queryParams = [end, start];
       }
       
-      const outstandingBalanceSql = getBookingOutstandingBalanceSql('b');
+      const paymentEvalBookingIdSql = getPaymentEvalBookingIdSql('b');
+      const paymentOutstandingSql = getBookingOutstandingBalanceByIdExprSql(paymentEvalBookingIdSql);
 
       const rows = await queryDatabasePromise(`
         SELECT 
@@ -195,7 +231,7 @@ class CalendarModel {
           CASE
             WHEN b.BOOKING_STATUS = 'check-In' THEN '#12866f'
             WHEN b.BOOKING_STATUS = 'check-Out' 
-              AND (${outstandingBalanceSql} > 0.009)
+              AND (${paymentOutstandingSql} > 0.009)
               THEN '#0b3d91' -- dark blue when checked out but has balance
             WHEN b.BOOKING_STATUS = 'check-Out' THEN '#B3B3B3'
             WHEN b.BOOKING_STATUS = 'pending' AND COALESCE(b.HOLD_PENDING, 0) = 1 THEN '#7b1fa2'
@@ -207,13 +243,19 @@ class CalendarModel {
           -- Pre-calculated extended properties
           COALESCE(bill.ROOM_CHARGE, 0) + COALESCE(bill.AMENITIES_CHARGE, 0) + COALESCE(bill.SERVICES_CHARGE, 0) + COALESCE(bill.LATE_CHECKOUT_CHARGE, 0) AS totalCost,
           CASE
-            WHEN (${outstandingBalanceSql}) <= 0.009 THEN 'paid'
+            WHEN (${paymentOutstandingSql}) <= 0.009 THEN 'paid'
             WHEN EXISTS (
               SELECT 1 FROM payments p
-              WHERE p.BOOKING_ID = b.IDNo
+              WHERE p.BOOKING_ID = ${paymentEvalBookingIdSql}
                 AND p.PAYMENT_TYPE NOT IN ('discount', 'security_deposit', 'security_deposit_refund', 'reservation_fee')
             )
-              OR COALESCE(bill.PAYMENT_STATUS, 'unpaid') IN ('partial_paid', 'partial', 'paid')
+              OR COALESCE((
+                SELECT bill_main.PAYMENT_STATUS
+                FROM billing bill_main
+                WHERE bill_main.BOOKING_ID = ${paymentEvalBookingIdSql}
+                  AND bill_main.ACTIVE = 1
+                LIMIT 1
+              ), 'unpaid') IN ('partial_paid', 'partial', 'paid')
             THEN 'partial'
             ELSE 'unpaid'
           END AS paymentStatus,

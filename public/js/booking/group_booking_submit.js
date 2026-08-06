@@ -240,6 +240,10 @@ $(document).ready(function () {
         } else {
           $('#modal-add-group-booking').modal('hide');
         }
+
+        if (typeof window.refreshCalendarAfterBookingSave === 'function') {
+          window.refreshCalendarAfterBookingSave();
+        }
         
         // Prepare voucher data for auto-download
         const daterange = $('#groupDaterange').val() || '';
@@ -333,60 +337,46 @@ $(document).ready(function () {
         form.submit();
         form.remove();
 
-        setTimeout(function () {
-          const isConsolidated = consolidatedBilling;
+        const isConsolidated = consolidatedBilling;
 
-          // Show the actual calculated amounts from backend response
-          const grandTotal = parseFloat(response.grandTotal) || 0;
-          const discount = parseFloat(response.discount) || 0;
-          const paidAmount = parseFloat(response.paidAmount) || 0;
+        // Show the actual calculated amounts from backend response
+        const grandTotal = parseFloat(response.grandTotal) || 0;
+        const discount = parseFloat(response.discount) || 0;
+        const paidAmount = parseFloat(response.paidAmount) || 0;
 
-          // Calculate the breakdown consistently for both billing types
-          // Backend formula: grandTotal = (roomCharges + services) - discount
-          // So: subtotal = grandTotal + discount
-          const subtotal = grandTotal + discount;
+        // Calculate the breakdown consistently for both billing types
+        // Backend formula: grandTotal = (roomCharges + services) - discount
+        // So: subtotal = grandTotal + discount
+        const subtotal = grandTotal + discount;
 
-          const details = response && response.grandTotal !== undefined
-            ? `Grand Total: ₱${grandTotal.toLocaleString()}\n\n` +
-              `Breakdown:\n` +
-              `• Discount: -₱${discount.toLocaleString()}\n` +
-              `• Paid Amount: ₱${paidAmount.toLocaleString()}\n` +
-              `• Balance: ₱${(grandTotal - paidAmount).toLocaleString()}\n\n` +
-              `${isConsolidated ? '✅ Master Billing: All charges applied to main booking' : '✅ Individual Billing: Separate charges per room'}\n\n` +
-              `✅ Voucher is downloading...`
-            : `The group booking has been added successfully.\n\n${isConsolidated ? '✅ Master Billing: All charges applied to main booking' : '✅ Individual Billing: Separate charges per room'}\n\n` +
-              `✅ Voucher is downloading...`;
+        const details = response && response.grandTotal !== undefined
+          ? `Grand Total: ₱${grandTotal.toLocaleString()}\n\n` +
+            `Breakdown:\n` +
+            `• Discount: -₱${discount.toLocaleString()}\n` +
+            `• Paid Amount: ₱${paidAmount.toLocaleString()}\n` +
+            `• Balance: ₱${(grandTotal - paidAmount).toLocaleString()}\n\n` +
+            `${isConsolidated ? '✅ Master Billing: All charges applied to main booking' : '✅ Individual Billing: Separate charges per room'}\n\n` +
+            `✅ Voucher is downloading...`
+          : `The group booking has been added successfully.\n\n${isConsolidated ? '✅ Master Billing: All charges applied to main booking' : '✅ Individual Billing: Separate charges per room'}\n\n` +
+            `✅ Voucher is downloading...`;
 
-          console.log('🔄 Success Message - Debug Values:', {
-            rawResponse: response,
-            grandTotal: grandTotal,
-            discount: discount,
-            paidAmount: paidAmount,
-            isConsolidated: isConsolidated,
-            calculatedSubtotal: subtotal
-          });
+        console.log('🔄 Success Message - Debug Values:', {
+          rawResponse: response,
+          grandTotal: grandTotal,
+          discount: discount,
+          paidAmount: paidAmount,
+          isConsolidated: isConsolidated,
+          calculatedSubtotal: subtotal
+        });
 
-          Swal.fire({
-            title: 'Group Booking Successful!',
-            text: details,
-            icon: 'success',
-            confirmButtonText: 'OK',
-            timer: 2500,
-            timerProgressBar: true
-          });
-
-          // Refresh on a fixed timer instead of waiting on the Swal promise - guarantees
-          // the page picks up the new booking even if the dialog is dismissed some other way
-          setTimeout(() => {
-            if (typeof window.loadCalendarData === 'function') {
-              // Already on the calendar - just re-fetch rooms/bookings and re-render,
-              // no full page reload needed
-              window.loadCalendarData();
-            } else {
-              window.location.reload();
-            }
-          }, 2500);
-        }, 400);
+        Swal.fire({
+          title: 'Group Booking Successful!',
+          text: details,
+          icon: 'success',
+          confirmButtonText: 'OK',
+          timer: 2500,
+          timerProgressBar: true
+        });
       },
       error: function () {
         Swal.fire({

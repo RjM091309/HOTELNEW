@@ -2099,6 +2099,59 @@ async function loadCalendarData() {
   }
 }
 
+async function refreshCalendarBookings() {
+  if (!calendar) return;
+
+  try {
+    const bookingsResponse = await fetch('/calendar/api/bookings/optimized');
+    if (!bookingsResponse.ok) {
+      throw new Error(`Bookings API error: ${bookingsResponse.status}`);
+    }
+
+    const bookingsData = await bookingsResponse.json();
+    const events = Array.isArray(bookingsData) ? bookingsData : [];
+
+    window.allCalendarEvents = events;
+    calendar.removeAllEvents();
+    calendar.addEventSource(events);
+    calendar.render();
+
+    if (groupCreateModeActive && groupCreateSelectedRooms.size && groupCreateDateRange) {
+      renderGroupCreateOverlays();
+    }
+
+    if (typeof updateLegendCounts === 'function') {
+      updateLegendCounts();
+    }
+
+    requestAnimationFrame(function() {
+      refreshCalendarVerticalScrollSync();
+      if (typeof refreshGroupBookingShadesAfterLayout === 'function') {
+        refreshGroupBookingShadesAfterLayout();
+      }
+    });
+  } catch (error) {
+    console.error('❌ Calendar bookings refresh failed:', error);
+    if (typeof loadCalendarData === 'function') {
+      loadCalendarData();
+    }
+  }
+}
+
+function refreshCalendarAfterBookingSave() {
+  const onDashboard = window.location.pathname.includes('/dashboard');
+  if (onDashboard) return;
+
+  if (typeof refreshCalendarBookings === 'function') {
+    refreshCalendarBookings();
+    return;
+  }
+
+  if (typeof loadCalendarData === 'function') {
+    loadCalendarData();
+  }
+}
+
 function handleDataError(err) {
   console.error("❌ Error loading data:", err);
   hideLoading();
@@ -3104,6 +3157,8 @@ function debounce(func, wait) {
 
 // Make functions globally available
 window.loadCalendarData = loadCalendarData;
+window.refreshCalendarBookings = refreshCalendarBookings;
+window.refreshCalendarAfterBookingSave = refreshCalendarAfterBookingSave;
 window.toggleSearchBox = toggleSearchBox;
 window.toggleFilterBox = toggleFilterBox;
 window.performSearch = performSearch;

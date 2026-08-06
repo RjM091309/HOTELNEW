@@ -146,6 +146,14 @@ $(document).ready(function () {
         success: function (response) {
             console.log('Booking response:', response);
             $('#modal-addbooking').modal('hide');
+
+            const isUnassignedRoom = !roomId || roomId === '' || roomId === '0' || roomId === 0;
+            const onDashboard = window.location.pathname.includes('/dashboard');
+            if (!isUnassignedRoom && !onDashboard) {
+              if (typeof window.refreshCalendarAfterBookingSave === 'function') {
+                window.refreshCalendarAfterBookingSave();
+              }
+            }
             
             // Payment processing is now handled automatically in the backend
             // No need for separate payment processing calls
@@ -261,28 +269,7 @@ $(document).ready(function () {
                 timer: 2500,
                 timerProgressBar: true
               });
-
-              // Refresh on a fixed timer instead of waiting on the Swal promise - guarantees
-              // the calendar picks up the new booking even if the dialog gets dismissed in
-              // some way that doesn't resolve .then() (e.g. click-away, ESC).
-              const isUnassignedRoom = !roomId || roomId === '' || roomId === '0' || roomId === 0;
-              const onDashboard = window.location.pathname.includes('/dashboard');
-
-              // Don't refresh if unassigned room or if we're on dashboard - socket/direct add will update it
-              if (!isUnassignedRoom && !onDashboard) {
-                setTimeout(function() {
-                  if (typeof window.loadCalendarData === 'function') {
-                    // Already on the calendar - just re-fetch rooms/bookings and re-render,
-                    // no full page reload needed
-                    window.loadCalendarData();
-                  } else if (window.location.pathname.includes('/calendar')) {
-                    window.location.replace('/calendar');
-                  } else {
-                    window.location.reload();
-                  }
-                }, 2500);
-              }
-            }, 400);
+            }, 0);
           },
           error: function (err) {
             Swal.fire({
