@@ -194,6 +194,42 @@ async function runLongTermStayMigrations() {
   );
 }
 
+async function indexExists(tableName, indexName) {
+  const rows = await queryDatabasePromise(
+    `SELECT COUNT(*) AS cnt
+     FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = ?
+       AND INDEX_NAME = ?`,
+    [tableName, indexName]
+  );
+  return Number(rows[0]?.cnt || 0) > 0;
+}
+
+async function ensureIndex(tableName, indexName, columnsSql) {
+  if (await indexExists(tableName, indexName)) {
+    return false;
+  }
+
+  await queryDatabasePromise(`CREATE INDEX ${indexName} ON ${tableName} (${columnsSql})`);
+  console.log(`✅ Created index: ${tableName}.${indexName}`);
+  return true;
+}
+
+async function runCalendarPerformanceMigrations() {
+  if (!(await tableExists('booking'))) {
+    console.warn('⚠️ booking table not found, skipping calendar performance index migrations');
+    return;
+  }
+
+  await ensureIndex('booking', 'idx_booking_active_dates', 'ACTIVE, CHECK_IN_DATE, CHECK_OUT_DATE');
+  await ensureIndex('booking', 'idx_booking_room_active_dates', 'ROOM_ID, ACTIVE, CHECK_IN_DATE, CHECK_OUT_DATE');
+
+  if (await tableExists('payments')) {
+    await ensureIndex('payments', 'idx_payments_booking_type', 'BOOKING_ID, PAYMENT_TYPE');
+  }
+}
+
 async function runHoldPendingMigrations() {
   if (!(await tableExists('booking'))) {
     console.warn('⚠️ booking table not found, skipping hold pending column migration');
@@ -216,6 +252,7 @@ async function runStartupMigrations() {
   await runReceiptMigrations();
   await runLongTermStayMigrations();
   await runHoldPendingMigrations();
+  await runCalendarPerformanceMigrations();
 
   console.log('✅ Startup database migrations complete');
 }

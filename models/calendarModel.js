@@ -215,6 +215,8 @@ class CalendarModel {
       if (start && end) {
         whereClause += ' AND (b.CHECK_IN_DATE <= ? AND b.CHECK_OUT_DATE > ?)';
         queryParams = [end, start];
+      } else {
+        whereClause += ' AND b.CHECK_IN_DATE >= DATE_SUB(NOW(), INTERVAL 3 MONTH) AND b.CHECK_IN_DATE <= DATE_ADD(NOW(), INTERVAL 4 MONTH)';
       }
       
       const paymentEvalBookingIdSql = getPaymentEvalBookingIdSql('b');

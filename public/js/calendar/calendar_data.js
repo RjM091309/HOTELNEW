@@ -2019,45 +2019,140 @@ function ensureHighlightStyles(color) {
   document.head.appendChild(style);
 }
 
+const CALENDAR_DATE_BUFFER_DAYS = 14;
+let calendarBookingsFetchToken = 0;
+let lastFetchedRangeKey = null;
+let calendarBookingsReloadTimer = null;
+
+function formatCalendarDateParam(date) {
+  const d = date instanceof Date ? date : new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getDefaultCalendarDateRange() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  return {
+    start: new Date(year, month - 3, 1),
+    end: new Date(year, month + 4, 1)
+  };
+}
+
+function getCalendarVisibleDateRange() {
+  if (calendar && calendar.view) {
+    return {
+      start: calendar.view.activeStart,
+      end: calendar.view.activeEnd
+    };
+  }
+  return getDefaultCalendarDateRange();
+}
+
+function getCalendarFetchDateRange() {
+  const { start, end } = getCalendarVisibleDateRange();
+  const bufferedStart = new Date(start);
+  bufferedStart.setDate(bufferedStart.getDate() - CALENDAR_DATE_BUFFER_DAYS);
+  const bufferedEnd = new Date(end);
+  bufferedEnd.setDate(bufferedEnd.getDate() + CALENDAR_DATE_BUFFER_DAYS);
+  return {
+    start: formatCalendarDateParam(bufferedStart),
+    end: formatCalendarDateParam(bufferedEnd)
+  };
+}
+
+function getCalendarFetchRangeKey(dateRange) {
+  const range = dateRange || getCalendarFetchDateRange();
+  return `${range.start}|${range.end}`;
+}
+
+function buildOptimizedBookingsUrl(dateRange) {
+  const range = dateRange || getCalendarFetchDateRange();
+  const params = new URLSearchParams({
+    start: range.start,
+    end: range.end
+  });
+  return `/calendar/api/bookings/optimized?${params.toString()}`;
+}
+
+async function fetchCalendarBookings(dateRange) {
+  const range = dateRange || getCalendarFetchDateRange();
+  const fetchToken = ++calendarBookingsFetchToken;
+  const response = await fetch(buildOptimizedBookingsUrl(range));
+  if (!response.ok) {
+    throw new Error(`Bookings API error: ${response.status}`);
+  }
+  const bookingsData = await response.json();
+  if (fetchToken !== calendarBookingsFetchToken) {
+    return null;
+  }
+  lastFetchedRangeKey = getCalendarFetchRangeKey(range);
+  return Array.isArray(bookingsData) ? bookingsData : [];
+}
+
+function applyCalendarBookings(events) {
+  if (!calendar) return;
+  window.allCalendarEvents = events;
+  calendar.removeAllEvents();
+  calendar.addEventSource(events);
+}
+
+async function reloadCalendarBookingsForVisibleRange() {
+  const rangeKey = getCalendarFetchRangeKey();
+  if (rangeKey === lastFetchedRangeKey) return;
+
+  clearTimeout(calendarBookingsReloadTimer);
+  calendarBookingsReloadTimer = setTimeout(async () => {
+    const currentKey = getCalendarFetchRangeKey();
+    if (currentKey === lastFetchedRangeKey) return;
+
+    try {
+      const events = await fetchCalendarBookings();
+      if (!events) return;
+      applyCalendarBookings(events);
+      if (typeof applyBedFilter === 'function') {
+        applyBedFilter();
+      }
+      if (groupCreateModeActive && groupCreateSelectedRooms.size && groupCreateDateRange) {
+        renderGroupCreateOverlays();
+      }
+    } catch (error) {
+      console.error('❌ Calendar bookings reload failed:', error);
+    }
+  }, 150);
+}
+
 async function loadCalendarData() {
   const dataStartTime = Date.now();
   
   try {
-    // OPTIMIZED: Parallel data loading for 3x faster performance
-    
-    const [roomsResponse, bookingsResponse] = await Promise.all([
+    const dateRange = getCalendarFetchDateRange();
+
+    const [roomsResponse, bookingsData] = await Promise.all([
       fetch('/calendar/rooms').then(res => {
         if (!res.ok) throw new Error(`Rooms API error: ${res.status}`);
         return res.json();
       }),
-      fetch('/calendar/api/bookings/optimized').then(res => {
-        if (!res.ok) throw new Error(`Bookings API error: ${res.status}`);
-        return res.json();
-      })
+      fetchCalendarBookings(dateRange)
     ]);
 
-    // Validate data
-    const roomsData = Array.isArray(roomsResponse) ? roomsResponse : [];
-    const bookingsData = Array.isArray(bookingsResponse) ? bookingsResponse : [];
-    
-    
-    // OPTIMIZED: Process data in chunks to prevent blocking
-    const sortedFloors = processRoomsData(roomsData);
+    if (!bookingsData) return;
 
-    // OPTIMIZED: Backend already returns FullCalendar-formatted events
-    // No need to process through processBookingsData since backend handles it
+    const roomsData = Array.isArray(roomsResponse) ? roomsResponse : [];
+    const sortedFloors = processRoomsData(roomsData);
     const events = bookingsData;
 
     window.allCalendarFloors = sortedFloors;
     window.allCalendarEvents = events;
 
-    // Render calendar with performance optimization
     const renderStart = Date.now();
 
     calendar.getResources().forEach(resource => resource.remove());
     calendar.setOption('resources', sortedFloors);
-    calendar.removeAllEvents();
-    calendar.addEventSource(events);
+    applyCalendarBookings(events);
     calendar.render();
     applyBedFilter();
     if (groupCreateModeActive && groupCreateSelectedRooms.size && groupCreateDateRange) {
@@ -2103,17 +2198,11 @@ async function refreshCalendarBookings() {
   if (!calendar) return;
 
   try {
-    const bookingsResponse = await fetch('/calendar/api/bookings/optimized');
-    if (!bookingsResponse.ok) {
-      throw new Error(`Bookings API error: ${bookingsResponse.status}`);
-    }
+    lastFetchedRangeKey = null;
+    const events = await fetchCalendarBookings();
+    if (!events) return;
 
-    const bookingsData = await bookingsResponse.json();
-    const events = Array.isArray(bookingsData) ? bookingsData : [];
-
-    window.allCalendarEvents = events;
-    calendar.removeAllEvents();
-    calendar.addEventSource(events);
+    applyCalendarBookings(events);
     calendar.render();
 
     if (groupCreateModeActive && groupCreateSelectedRooms.size && groupCreateDateRange) {
@@ -3159,6 +3248,7 @@ function debounce(func, wait) {
 window.loadCalendarData = loadCalendarData;
 window.refreshCalendarBookings = refreshCalendarBookings;
 window.refreshCalendarAfterBookingSave = refreshCalendarAfterBookingSave;
+window.reloadCalendarBookingsForVisibleRange = reloadCalendarBookingsForVisibleRange;
 window.toggleSearchBox = toggleSearchBox;
 window.toggleFilterBox = toggleFilterBox;
 window.performSearch = performSearch;

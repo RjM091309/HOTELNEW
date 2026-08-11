@@ -9,65 +9,15 @@ class CalendarController {
       const userId = user?.userId || null;
       const tabOrder = user?.TAB_ORDER || null;
 
-      // Get all calendar data in parallel
-      const [
-        allBookings,
-        allRooms,
-        floors,
-        calendarStats
-      ] = await Promise.all([
-        CalendarModel.getAllBookings(),
-        CalendarModel.getAllRooms(),
-        CalendarModel.getFloors(),
-        CalendarModel.getCalendarStats()
-      ]);
-
-      // Process calendar data for view
-      const processedBookings = allBookings.map(booking => ({
-        id: booking.BookingID,
-        roomId: booking.ROOM_ID,
-        guestName: booking.CUSTOMER_NAME || 'Unknown Guest',
-        startDate: booking.CHECK_IN_DATE,
-        endDate: booking.CHECK_OUT_DATE,
-        status: booking.BOOKING_STATUS,
-        roomNumber: booking.ROOM_NUMBER,
-        totalCost: booking.TOTAL_COST,
-        totalDays: booking.TOTAL_DAYS
-      }));
-
-      const processedRooms = allRooms.map(room => ({
-        id: room.RoomID,
-        name: room.ROOM_NUMBER,
-        floor: room.ROOM_FLOOR,
-        type: room.ROOM_TYPE,
-        rate: room.ROOM_RATE,
-        status: room.ROOM_STATUS
-      }));
-
-      // Generate date range for calendar (next 30 days)
-      const dateRange = [];
-      const today = new Date();
-      for (let i = 0; i < 30; i++) {
-        const date = new Date(today);
-        date.setDate(today.getDate() + i);
-        dateRange.push(date);
-      }
-
       res.render('calendar/calendar', {
-        title: 'Calendar', // Set the page title
-        subTitle: 'Calendar', // Set the breadcrumb subtitle
-        hideBreadcrumb: true, // Hide breadcrumb on calendar
-        activePage: 'calendar', // Set active page for navigation highlighting
+        title: 'Calendar',
+        subTitle: 'Calendar',
+        hideBreadcrumb: true,
+        activePage: 'calendar',
         user,
         userId,
         tabOrder,
-        rooms: processedRooms, // Changed from allRooms to rooms
-        bookings: processedBookings, // Changed from allBookings to bookings
-        dateRange: dateRange, // Added dateRange
-        floors,
-        calendarStats,
         script: `<script>document.body.setAttribute('data-user-id', '${userId}');</script>`
-        // Add any other variables needed by calendar.ejs
       });
     } catch (error) {
       console.error('Error fetching calendar data:', error);

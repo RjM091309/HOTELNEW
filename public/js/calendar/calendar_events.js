@@ -532,6 +532,10 @@ function handleEventDidMount(info) {
 function handleDatesSet(info) {
   globalOverlapCheck(info.view.calendar);
 
+  if (typeof window.reloadCalendarBookingsForVisibleRange === 'function') {
+    window.reloadCalendarBookingsForVisibleRange(info);
+  }
+
   if (typeof window.applyBedFilter === 'function') {
     window.applyBedFilter();
   }
