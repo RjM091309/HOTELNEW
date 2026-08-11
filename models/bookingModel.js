@@ -683,6 +683,87 @@ class BookingModel {
     }
   }
 
+  // Prorate booking_extension rows when guest checks out before using all extended days.
+  // Mirrors frontend computeCheckoutContext(): extensionDaysUsed = max(0, min(actualDays - originalRoomDays, totalExtensionDays))
+  static async prorateExtensionsOnEarlyCheckout(connection, bookingIds, encodedBy = 'system') {
+    for (const bookingId of bookingIds) {
+      const billingRows = await new Promise((resolve, reject) => {
+        connection.query(
+          `SELECT
+             GREATEST(1, DATEDIFF(DATE(NOW()), DATE(b.CHECK_IN_DATE))) AS calendarActualDays,
+             COALESCE(bill.ORIGINAL_QTY, bill.QTY) AS originalRoomDays
+           FROM billing bill
+           JOIN booking b ON bill.BOOKING_ID = b.IDNo
+           WHERE bill.BOOKING_ID = ? AND bill.ACTIVE = 1
+           LIMIT 1`,
+          [bookingId],
+          (err, rows) => (err ? reject(err) : resolve(rows))
+        );
+      });
+
+      if (!billingRows.length) continue;
+
+      const calendarActualDays = parseInt(billingRows[0].calendarActualDays, 10) || 1;
+      const originalRoomDays = parseInt(billingRows[0].originalRoomDays, 10) || calendarActualDays;
+
+      const extensionRows = await new Promise((resolve, reject) => {
+        connection.query(
+          `SELECT IDNo, QTY, COST
+           FROM booking_extension
+           WHERE BOOKING_ID = ? AND ACTIVE = 1
+           ORDER BY EXTEND_DATE ASC, IDNo ASC`,
+          [bookingId],
+          (err, rows) => (err ? reject(err) : resolve(rows))
+        );
+      });
+
+      if (!extensionRows.length) continue;
+
+      const totalExtensionDays = extensionRows.reduce((sum, row) => sum + (parseInt(row.QTY, 10) || 0), 0);
+      const extensionDaysUsed = Math.max(0, Math.min(calendarActualDays - originalRoomDays, totalExtensionDays));
+
+      if (extensionDaysUsed >= totalExtensionDays) continue;
+
+      let remainingUsed = extensionDaysUsed;
+      for (const ext of extensionRows) {
+        const originalQty = parseInt(ext.QTY, 10) || 0;
+        const keepQty = Math.min(originalQty, remainingUsed);
+        remainingUsed -= keepQty;
+
+        if (keepQty <= 0) {
+          await new Promise((resolve, reject) => {
+            connection.query(
+              `UPDATE booking_extension
+               SET ACTIVE = 0, EDITED_BY = ?, EDITED_DT = NOW(), REMARKS = 'Early checkout proration'
+               WHERE IDNo = ?`,
+              [encodedBy || 'system', ext.IDNo],
+              (err, res) => (err ? reject(err) : resolve(res))
+            );
+          });
+        } else if (keepQty < originalQty) {
+          await new Promise((resolve, reject) => {
+            connection.query(
+              `UPDATE booking_extension SET QTY = ? WHERE IDNo = ? AND ACTIVE = 1`,
+              [keepQty, ext.IDNo],
+              (err, res) => (err ? reject(err) : resolve(res))
+            );
+          });
+        }
+      }
+
+      await new Promise((resolve, reject) => {
+        connection.query(
+          `UPDATE booking
+           SET EXTENDED_DAYS = ?,
+               EXTENDED = CASE WHEN ? > 0 THEN 1 ELSE 0 END
+           WHERE IDNo = ?`,
+          [extensionDaysUsed, extensionDaysUsed, bookingId],
+          (err, res) => (err ? reject(err) : resolve(res))
+        );
+      });
+    }
+  }
+
   // New: Checkout bookings now (set CHECK_OUT_DATE=NOW, status to check-Out, update room status)
   static async checkoutBookings({ bookingIds, encodedBy, refundBookingId = null, refundAmount = 0, penaltyAmount = 0, applyDiscount = false }) {
     if (!bookingIds || bookingIds.length === 0) {
@@ -721,17 +802,23 @@ class BookingModel {
         connection.query(updateRoomSql, [ids], (err, res) => (err ? reject(err) : resolve(res)));
       });
 
-      // Update billing.QTY to actual days, preserve ORIGINAL_QTY if not set
+      // Update billing.QTY: cap at originally booked room days unless guest left before that period ended
       const updateBillingQtySql = `
         UPDATE billing bill
         JOIN booking b ON bill.BOOKING_ID = b.IDNo
         SET bill.ORIGINAL_QTY = COALESCE(bill.ORIGINAL_QTY, bill.QTY),
-            bill.QTY = GREATEST(1, DATEDIFF(DATE(NOW()), DATE(b.CHECK_IN_DATE)))
+            bill.QTY = GREATEST(1, LEAST(
+              DATEDIFF(DATE(NOW()), DATE(b.CHECK_IN_DATE)),
+              COALESCE(bill.ORIGINAL_QTY, bill.QTY)
+            ))
         WHERE b.IDNo IN (?) AND bill.ACTIVE = 1
       `;
       await new Promise((resolve, reject) => {
         connection.query(updateBillingQtySql, [ids], (err, res) => (err ? reject(err) : resolve(res)));
       });
+
+      // Prorate unused extension days so billing receipt matches early checkout
+      await BookingModel.prorateExtensionsOnEarlyCheckout(connection, ids, encodedBy);
 
       // Remove discount from billing and payments if applyDiscount is false (early checkout without discount)
       if (!applyDiscount) {
@@ -1154,7 +1241,6 @@ class BookingModel {
       date,
       checkInStatus,
       checkOutStatus,
-      holdPending,
       bookingRemarks,
       agencyID,
       agencyPayer,
@@ -1254,8 +1340,8 @@ class BookingModel {
         // Create booking
         const bookingQuery = `
           INSERT INTO booking
-          (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, REMARKS, CONFIRMATION_NUMBER, NOTIFICATION_READ, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, HOLD_PENDING, LATE_CHECKOUT, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, BED_COUNT, FLIGHT_NUMBER, DROPOFF_FLIGHT_NUMBER, PICKUP_DATE, PASSENGER_COUNT, IS_LONG_TERM_STAY, ROOM_CHANGE_NOTE)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, REMARKS, CONFIRMATION_NUMBER, NOTIFICATION_READ, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, LATE_CHECKOUT, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, BED_COUNT, FLIGHT_NUMBER, DROPOFF_FLIGHT_NUMBER, PICKUP_DATE, PASSENGER_COUNT, IS_LONG_TERM_STAY, ROOM_CHANGE_NOTE)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const directReservationFlag = isDirectReservation ? 1 : 0;
         // Handle empty agencyID - set to NULL if empty
@@ -1284,10 +1370,9 @@ class BookingModel {
           processedAgencyPayer = agencyPayer === 'guest' ? 'guest' : 'agency';
         }
         
-        const holdPendingFlag = (holdPending === true || holdPending === 'true' || holdPending === 1 || holdPending === '1') ? 1 : 0;
         const bookingValues = [
           customerId, room_id, checkInDate, checkOutDate, 'pending', finalBookingRoute,
-          maxOccupants, bookingRemarks, finalConfirmationNumber, encodedBy, date, 1, checkInStatus, holdPendingFlag, checkOutStatus,
+          maxOccupants, bookingRemarks, finalConfirmationNumber, encodedBy, date, 1, checkInStatus, checkOutStatus,
           processedAgencyID, processedAgencyPayer, directReservationFlag, bedCount || null,
           pickupServiceId ? (flightNumber || null) : null,
           dropoffServiceId ? (dropoffFlightNumber || null) : null,
@@ -2657,6 +2742,7 @@ class BookingModel {
           bi.AMENITIES_CHARGE,
           bi.SERVICES_CHARGE,
           bi.QTY,
+          COALESCE(bi.ORIGINAL_QTY, bi.QTY) AS ORIGINAL_QTY,
           bi.PAYMENT_STATUS,
           bi.RESERVATION_FEE,
           bi.DISCOUNT_AMOUNT,
@@ -2683,9 +2769,25 @@ class BookingModel {
       const b = bookingData[0];
       const customerId = b.customerId;
       const roomRate = parseFloat(b.ROOM_CHARGE);
-      const originalQty = parseInt(b.QTY);
+      const billingQty = parseInt(b.QTY, 10) || 1;
+      const originalRoomDays = parseInt(b.ORIGINAL_QTY, 10) || billingQty;
       const bookingStatus = (b.BOOKING_STATUS || '').toLowerCase();
       const isCancelled = bookingStatus === 'cancelled';
+      const isCheckedOut = bookingStatus === 'check-out' || bookingStatus === 'checkout';
+
+      // Billed room days: only reduce when guest left before original room period ended
+      let roomDaysBilled = billingQty;
+      let calendarActualDays = billingQty;
+      if (isCheckedOut) {
+        roomDaysBilled = Math.min(billingQty, originalRoomDays);
+        if (b.CHECK_IN_DATE && b.CHECK_OUT_DATE) {
+          const checkIn = new Date(b.CHECK_IN_DATE);
+          const checkOut = new Date(b.CHECK_OUT_DATE);
+          checkIn.setHours(0, 0, 0, 0);
+          checkOut.setHours(0, 0, 0, 0);
+          calendarActualDays = Math.max(1, Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24)));
+        }
+      }
 
       // Get actual payments made for this booking
       const paymentsQuery = `
@@ -2696,7 +2798,7 @@ class BookingModel {
       const paymentsData = await queryDatabasePromise(paymentsQuery, [bookingId]);
       
       // Calculate room amount and get billing values
-      const roomAmount = roomRate * originalQty;
+      const roomAmount = roomRate * roomDaysBilled;
       const reservationFee = parseFloat(b.RESERVATION_FEE) || 0;
       const discountAmount = parseFloat(b.DISCOUNT_AMOUNT) || 0;
       const checkoutRefund = parseFloat(b.CHECKOUT_REFUND) || 0;
@@ -2752,8 +2854,8 @@ class BookingModel {
         date: b.CHECK_IN_DATE,
         description: `${b.ROOM_TYPE}`,
         basePrice: roomRate,
-        qty: originalQty,
-        subTotal: roomRate * originalQty,
+        qty: roomDaysBilled,
+        subTotal: roomRate * roomDaysBilled,
         status: roomStatus
       }];
 
@@ -2792,12 +2894,34 @@ class BookingModel {
       const extensionQuery = `
         SELECT EXTEND_DATE, QTY, COST, PAYMENT_STATUS
         FROM booking_extension
-        WHERE BOOKING_ID = ? AND ACTIVE = 1
+        WHERE BOOKING_ID = ? AND ACTIVE = 1 AND QTY > 0
+        ORDER BY EXTEND_DATE ASC, IDNo ASC
       `;
       const extensionData = await queryDatabasePromise(extensionQuery, [bookingId]);
 
+      let extensionsToBill = extensionData;
+      if (isCheckedOut && extensionData.length > 0) {
+        const totalExtensionDays = extensionData.reduce((sum, ext) => sum + (parseInt(ext.QTY, 10) || 0), 0);
+        const extensionDaysUsed = Math.max(0, Math.min(calendarActualDays - originalRoomDays, totalExtensionDays));
+
+        if (extensionDaysUsed < totalExtensionDays) {
+          let remainingUsed = extensionDaysUsed;
+          extensionsToBill = [];
+
+          extensionData.forEach(ext => {
+            const extQty = parseInt(ext.QTY, 10) || 0;
+            const keepQty = Math.min(extQty, remainingUsed);
+            remainingUsed -= keepQty;
+
+            if (keepQty > 0) {
+              extensionsToBill.push({ ...ext, QTY: keepQty });
+            }
+          });
+        }
+      }
+
       // Format extensions
-      extensionData.forEach(ext => {
+      extensionsToBill.forEach(ext => {
         roomItems.push({
           date: ext.EXTEND_DATE,
           description: `${b.ROOM_TYPE} (Extended)`,
@@ -4363,7 +4487,6 @@ class BookingModel {
           b.GUESTS_COUNT,
           b.LATE_CHECKOUT,
           b.CHECK_IN_STATUS,
-          b.HOLD_PENDING,
           b.REMARKS,
           b.CONFIRMATION_NUMBER,
           b.AGENCY_ID,
@@ -4536,7 +4659,6 @@ class BookingModel {
         guestLevel: bookingsResult[0]?.guestLevel, // Default guest level
         checkInStatus: firstBooking.CHECK_IN_STATUS,
         checkOutStatus: firstBooking.LATE_CHECKOUT,
-        holdPending: firstBooking.HOLD_PENDING,
         paymentStatus: firstBooking.PAYMENT_STATUS,
         bookingRoute: firstBooking.BOOKING_CHANNEL,
         agencyId: firstBooking.AGENCY_ID,
@@ -4758,7 +4880,6 @@ class BookingModel {
       guestLevel,
       checkInStatus,
       checkOutStatus,
-      holdPending,
       remarks,
       agencyId = null,
       agencyPayer = null,
@@ -4962,13 +5083,12 @@ class BookingModel {
             // (isMainBooking already declared above)
             
             // Update booking (use final dates)
-            const holdPendingFlag = (holdPending === true || holdPending === 'true' || holdPending === 1 || holdPending === '1') ? 1 : 0;
             await connection.promise().query(`
               UPDATE booking
-              SET CHECK_IN_DATE = ?, CHECK_OUT_DATE = ?, BOOKING_CHANNEL = ?, CHECK_IN_STATUS = ?, LATE_CHECKOUT = ?, HOLD_PENDING = ?, REMARKS = ?, CONFIRMATION_NUMBER = ?, AGENCY_ID = ?, AGENCY_PAYER = ?, EDITED_BY = ?, EDITED_DT = ?
+              SET CHECK_IN_DATE = ?, CHECK_OUT_DATE = ?, BOOKING_CHANNEL = ?, CHECK_IN_STATUS = ?, LATE_CHECKOUT = ?, REMARKS = ?, CONFIRMATION_NUMBER = ?, AGENCY_ID = ?, AGENCY_PAYER = ?, EDITED_BY = ?, EDITED_DT = ?
               WHERE IDNo = ?
             `, [
-              finalCheckInWithTime, finalCheckOutWithTime, bookingRoute, checkInStatus, checkOutStatus, holdPendingFlag,
+              finalCheckInWithTime, finalCheckOutWithTime, bookingRoute, checkInStatus, checkOutStatus,
               isMainBooking ? remarks : '', confirmationNumber, processedAgencyId, processedAgencyPayer, encodedBy, date, existingBooking.IDNo
             ]);
 
@@ -8233,7 +8353,6 @@ class BookingModel {
           b.CONFIRMATION_NUMBER,
           b.CHECK_IN_STATUS,
           b.LATE_CHECKOUT,
-          b.HOLD_PENDING,
           b.IS_DIRECT_RESERVATION,
           b.AGENCY_ID,
           b.AGENCY_PAYER as agencyPayer,
@@ -8347,7 +8466,7 @@ class BookingModel {
       const {
         bookingId, room_id, fullname, number, daterange, maxOccupants,
         paidAmount, paymentStatus, price, diffindays, guestType, guestLevel,
-        bookingRoute, checkInStatus, checkOutStatus, holdPending, bookingRemarks, agencyID, agencyPayer, bedCount,
+        bookingRoute, checkInStatus, checkOutStatus, bookingRemarks, agencyID, agencyPayer, bedCount,
         breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
         breakfastKidQty, breakfastKidPrice, breakfastKidId,
         pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
@@ -8415,7 +8534,7 @@ class BookingModel {
             const bookingUpdateQuery = `
               UPDATE booking
               SET ROOM_ID = ?, CHECK_IN_DATE = ?, CHECK_OUT_DATE = ?, BOOKING_CHANNEL = ?,
-                  GUESTS_COUNT = ?, REMARKS = ?, CHECK_IN_STATUS = ?, LATE_CHECKOUT = ?, HOLD_PENDING = ?, AGENCY_ID = ?,
+                  GUESTS_COUNT = ?, REMARKS = ?, CHECK_IN_STATUS = ?, LATE_CHECKOUT = ?, AGENCY_ID = ?,
                   AGENCY_PAYER = ?, BED_COUNT = ?, FLIGHT_NUMBER = ?, DROPOFF_FLIGHT_NUMBER = ?, PICKUP_DATE = ?, PASSENGER_COUNT = ?, EDITED_BY = ?, EDITED_DT = ?
               WHERE IDNo = ?
             `;
@@ -8450,10 +8569,9 @@ class BookingModel {
             const processedPickupDate = pickupServiceId && pickupDate ? pickupDate : null;
             const processedPassengerCount = (pickupServiceId || dropoffServiceId) ? (parseInt(passengerCount) || null) : null;
 
-            const holdPendingFlag = (holdPending === true || holdPending === 'true' || holdPending === 1 || holdPending === '1') ? 1 : 0;
             await connection.promise().query(bookingUpdateQuery, [
               room_id, checkInDate, checkOutDate, bookingRoute, maxOccupants,
-              bookingRemarks, checkInStatus, checkOutStatus || 0, holdPendingFlag, processedAgencyID,
+              bookingRemarks, checkInStatus, checkOutStatus || 0, processedAgencyID,
               processedAgencyPayer, processedBedCount, processedFlightNumber, processedDropoffFlightNumber, processedPickupDate, processedPassengerCount,
               editedBy, editDate, bookingId
             ]);
@@ -9620,7 +9738,6 @@ class BookingModel {
       guestLevel,
       checkInStatus,
       checkOutStatus,
-      holdPending,
       remarks,
       agencyId = null,
       agencyPayer = null,
@@ -9964,13 +10081,12 @@ class BookingModel {
 
         // booking
         const bookingQuery = `
-          INSERT INTO booking (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, LATE_CHECKOUT, REMARKS, CONFIRMATION_NUMBER, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, HOLD_PENDING, GROUP_BOOKING_ID, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, FLIGHT_NUMBER, PASSENGER_COUNT)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO booking (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, LATE_CHECKOUT, REMARKS, CONFIRMATION_NUMBER, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, GROUP_BOOKING_ID, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, FLIGHT_NUMBER, PASSENGER_COUNT)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const processedAgencyPayer = (bookingRoute === 'agency' && agencyPayer)
           ? (agencyPayer === 'guest' ? 'guest' : 'agency')
           : null;
-        const holdPendingFlag = (holdPending === true || holdPending === 'true' || holdPending === 1 || holdPending === '1') ? 1 : 0;
         const bookingValues = [
           guestID,
           roomId,
@@ -9986,7 +10102,6 @@ class BookingModel {
           date,
           1,
           checkInStatus,
-          holdPendingFlag,
           groupBookingId,
           agencyId || null,
           processedAgencyPayer,
