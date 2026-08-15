@@ -27,7 +27,7 @@ function getBookingColor(booking) {
     case 'pending':
       // Hold Pending: booking has dates but no check-in/check-out processing yet
       if (booking.HOLD_PENDING === 1 || booking.HOLD_PENDING === '1' || booking.HOLD_PENDING === true) {
-        return '#7b1fa2'; // Hold Pending = purple
+        return '#FF6D00'; // Hold Pending = bright orange
       }
       // Distinguish between pending and late check-in based on CHECK_IN_STATUS
       if (booking.CHECK_IN_STATUS === 0 || booking.CHECK_IN_STATUS === '0') {

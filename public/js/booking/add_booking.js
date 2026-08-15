@@ -851,9 +851,6 @@ $(document).ready(function () {
 
     // Use shared floor dropdown utility (prevents duplicate API calls)
 
-    // Populate Floor Dropdown for Group Booking (Optional)
-    populateFloorDropdownGeneric('#groupFloorSelect');
-
     // Toggle Group Booking Fields
     $('#groupBookingCheckbox').change(function(){
         if ($(this).is(':checked')) {
@@ -897,7 +894,7 @@ $(document).ready(function () {
             alert('Please enter the number of rooms needed.');
             return;
         }
-        var floor = $('#groupFloorSelect').val() || '';
+        var floor = '';
 
         $.ajax({
             url: '/booking/find_consecutive_rooms',

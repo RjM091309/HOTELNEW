@@ -234,7 +234,7 @@ class CalendarModel {
               AND (${paymentOutstandingSql} > 0.009)
               THEN '#0b3d91' -- dark blue when checked out but has balance
             WHEN b.BOOKING_STATUS = 'check-Out' THEN '#B3B3B3'
-            WHEN b.BOOKING_STATUS = 'pending' AND COALESCE(b.HOLD_PENDING, 0) = 1 THEN '#7b1fa2'
+            WHEN b.BOOKING_STATUS = 'pending' AND COALESCE(b.HOLD_PENDING, 0) = 1 THEN '#FF6D00'
             WHEN b.BOOKING_STATUS = 'pending' AND COALESCE(b.CHECK_IN_STATUS, 1) = 0 THEN '#e0a316'
             WHEN b.BOOKING_STATUS = 'pending' THEN '#e53935'
             WHEN b.BOOKING_STATUS = 'cancelled' THEN '#000000'

@@ -787,9 +787,9 @@
     color: #fff !important;
   }
   
-  /* Hold Pending - Purple */
-  .fc-event[style*="background-color: #7b1fa2"] {
-    background-color: #7b1fa2 !important;
+  /* Hold Pending - Bright Orange */
+  .fc-event[style*="background-color: #FF6D00"] {
+    background-color: #FF6D00 !important;
     color: #fff !important;
   }
 
@@ -805,22 +805,29 @@
     background-color: #000000 !important;
     color: #fff !important;
   }
-  
-  /* Group Bookings - Blue Text Only */
+
+  /* Group / Long-Term Bookings - White Text Only */
   .fc-event.group-booking,
+  .fc-event.long-term-booking,
   .fc-event.group-booking .fc-event-title,
+  .fc-event.long-term-booking .fc-event-title,
   .fc-event[style*="color: rgb(0, 191, 255)"] .fc-event-title,
   .fc-event[style*="color: #00BFFF"] .fc-event-title,
   .fc-event.fc-event-future.group-booking,
   .fc-event.fc-event-past.group-booking,
-  .fc-event.fc-event-present.group-booking {
+  .fc-event.fc-event-present.group-booking,
+  .fc-event.fc-event-future.long-term-booking,
+  .fc-event.fc-event-past.long-term-booking,
+  .fc-event.fc-event-present.long-term-booking {
         color: #ffffff !important; /* Blue text for group bookings */
   }
   
   /* Force override for existing events - Maximum specificity */
   .fc .fc-event .fc-event-main.group-booking-text,
   .fc-event.group-booking .fc-event-title,
+  .fc-event.long-term-booking .fc-event-title,
   .fc-event.group-booking .fc-event-main,
+  .fc-event.long-term-booking .fc-event-main,
   .fc .fc-daygrid-event .fc-event-title.group-booking-text,
   .fc .fc-timegrid-event .fc-event-title.group-booking-text,
   .fc .fc-list-event .fc-event-title.group-booking-text,
@@ -828,7 +835,9 @@
   .fc-content .fc-event.group-booking .fc-event-title,
   .fc-content .fc-event.group-booking .fc-event-main,
   #calendar .fc-event.group-booking,
-  #calendar .fc-event.group-booking * {
+  #calendar .fc-event.long-term-booking,
+  #calendar .fc-event.group-booking *,
+  #calendar .fc-event.long-term-booking * {
         color: #ffffff !important;
   }
   
@@ -1168,7 +1177,7 @@
 }
 
 .legend-color-hold-pending {
-  background-color: #7b1fa2 !important;
+  background-color: #FF6D00 !important;
 }
 
 .legend-color-back-to-back {
@@ -1189,7 +1198,7 @@
 }
 
 .legend-color-partial {
-  background-color: #f57c00 !important;
+  background-color: #00E5FF !important;
 }
 
 .legend-color-unpaid {

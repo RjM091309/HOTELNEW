@@ -527,21 +527,6 @@ function initBillingScript() {
 
         modalBilling.addEventListener('shown.bs.modal', function () {
             embedHotelLogo('#modal-billing .hotel-logo');
-
-            const invoiceBtn = document.getElementById('generateInvoiceBtn');
-            if (invoiceBtn) {
-                const newInvoiceBtn = invoiceBtn.cloneNode(true);
-                invoiceBtn.parentNode.replaceChild(newInvoiceBtn, invoiceBtn);
-
-                newInvoiceBtn.addEventListener('click', function () {
-                    const bookingId = document.getElementById('hiddenBookingId').value;
-                    if (!bookingId) {
-                        alert('Missing Booking ID!');
-                        return;
-                    }
-                    window.open(`/booking/generate-invoice/${bookingId}`, '_blank');
-                });
-            }
         });
     }
 }

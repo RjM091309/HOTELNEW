@@ -10,7 +10,9 @@ $(document).ready(function () {
     const daterange = $('#groupDaterange').val();
     const groupName = $('#groupName').val();
     const groupContact = $('#groupContact').val();
-    const numberOfRooms = $('#groupNumberOfRooms').val();
+    const selectedRoomsArray = (selectedRooms || '').split(',').filter(Boolean);
+    const selectedRoomsCount = selectedRoomsArray.length;
+    const numberOfRooms = String(selectedRoomsCount);
     const paymentStatus = $('#groupPaymentStatus').val();
     const bookingRoute = $('#groupBookingRoute').val();
     const guestType = $('#groupGuestType').val();
@@ -40,7 +42,7 @@ $(document).ready(function () {
     const flightNumber = $('#groupFlightNumber').val();
     const passengerCount = $('#groupPassengerCount').val();
 
-    if (!daterange || !groupName || !groupContact || !numberOfRooms) {
+    if (!daterange || !groupName || !groupContact) {
       Swal.fire({
         icon: 'error',
         title: 'Incomplete Form',
@@ -49,27 +51,11 @@ $(document).ready(function () {
       return;
     }
 
-    if (!selectedRooms) {
+    if (!selectedRooms || !selectedRoomsCount) {
       Swal.fire({
         icon: 'warning',
         title: 'No Rooms Selected',
         text: 'Please select a room block for this group booking.',
-      });
-      return;
-    }
-
-    // Validate that number of rooms needed matches selected rooms count
-    const selectedRoomsArray = selectedRooms.split(',').filter(Boolean);
-    const selectedRoomsCount = selectedRoomsArray.length;
-    const numberOfRoomsNeeded = parseInt(numberOfRooms, 10) || 0;
-
-    if (selectedRoomsCount !== numberOfRoomsNeeded) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Room Count Mismatch',
-        html: `Number of Rooms Needed (${numberOfRoomsNeeded}) does not match the number of selected rooms (${selectedRoomsCount}).<br><br>Please select exactly ${numberOfRoomsNeeded} room(s) or update the "Number of Rooms Needed" field.`,
-        confirmButtonText: 'OK',
-        width: '600px'
       });
       return;
     }

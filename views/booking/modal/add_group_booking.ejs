@@ -27,18 +27,10 @@
                 <input type="text" class="form-control flatpickr-input" id="groupDaterange" name="groupDaterange" required>
               </div>
             </div>
-            <div class="col-lg-3">
+            <div class="col-lg-6">
               <div class="form-group">
-                <label class="form-label">Number of Rooms Needed</label>
-                <input type="number" class="form-control" id="groupNumberOfRooms" name="groupNumberOfRooms" min="1" required>
-              </div>
-            </div>
-            <div class="col-lg-3">
-              <div class="form-group">
-                <label class="form-label">Select Floor (Optional)</label>
-                <select class="form-select" id="groupFloorSelect" name="groupFloorSelect">
-                  <option value="" selected>Select Floor</option>
-                </select>
+                <label class="form-label">Number of Rooms Selected</label>
+                <input type="text" class="form-control group-room-count-display" id="groupNumberOfRooms" name="groupNumberOfRooms" readonly tabindex="-1" placeholder="0" required>
               </div>
             </div>
           </div>
@@ -478,11 +470,17 @@
 #modal-add-group-booking input[type="text"],
 #modal-add-group-booking input[type="number"],
 #modal-add-group-booking input[type="email"],
+#modal-add-group-booking .group-room-count-display,
 #modal-add-group-booking select,
 #modal-add-group-booking textarea {
   background-color: #41474c;
   color: #ffffff;
   border: 1px solid #41474c;
+}
+
+#modal-add-group-booking .group-room-count-display {
+  cursor: default;
+  opacity: 0.95;
 }
 
 #modal-add-group-booking input::placeholder,
@@ -1046,7 +1044,7 @@
 }
 
 #modal-add-group-booking #groupPaymentStatus.status-partial {
-  color: #ffc107 !important;
+  color: #00E5FF !important;
 }
 
 #modal-add-group-booking #groupPaymentStatus.status-unpaid {
@@ -1081,6 +1079,26 @@
   let pendingCalendarStart = null;
   let pendingCalendarEnd = null;
   let isCalendarDirectSelection = false; // true once rooms came from the calendar hand-off
+
+  function getGroupRoomSelectionTarget() {
+    const bedTarget = (groupRequiredBed1 || 0) + (groupRequiredBed2 || 0);
+    if (bedTarget > 0) return bedTarget;
+    if (isCalendarDirectSelection && pendingCalendarRoomIds.length) {
+      return pendingCalendarRoomIds.length;
+    }
+    return 0;
+  }
+
+  function getGroupSelectedRoomCount() {
+    const manualCount = groupManualSelectedRooms.length;
+    const blockCount = ($('#groupSelectedRooms').val() || '').split(',').filter(Boolean).length;
+    return Math.max(manualCount, blockCount);
+  }
+
+  function updateGroupRoomCountDisplay() {
+    const count = getGroupSelectedRoomCount();
+    $('#groupNumberOfRooms').val(count > 0 ? String(count) : '');
+  }
 
   function getGroupPriceBookingType() {
     const bookingRoute = $('#groupBookingRoute').val();
@@ -1226,6 +1244,7 @@
     $('#joinGroupInfo').remove();
     
     applyGroupBreakfastDefaults();
+    updateGroupRoomCountDisplay();
   }
 
   function initializeGroupFlatpickr() {
@@ -1933,6 +1952,7 @@
       populateBreakdown(block, computedPrices);
       updateGroupChargeBreakdown();
       computeGroupTotal();
+      updateGroupRoomCountDisplay();
     });
   }
 
@@ -1966,8 +1986,6 @@
         const foundIds = rooms.map(r => r.IDNo);
         const missingIds = roomIdsToCheck.filter(id => !foundIds.includes(id));
 
-        $('#groupNumberOfRooms').val(availableRooms.length);
-
         displayGroupRoomResults({
           consecutiveBlocks: [],
           nonConsecutiveBlocks: [],
@@ -1981,6 +1999,8 @@
             checkbox.prop('checked', true).trigger('change');
           }
         });
+
+        updateGroupRoomCountDisplay();
 
         if (unavailableRooms.length || missingIds.length) {
           const unavailableNumbers = unavailableRooms.map(function(r) { return r.ROOM_NUMBER; });
@@ -2019,19 +2039,17 @@
   function handleSearchRooms() {
     $('#groupSearchRooms').on('click', function() {
       const dates = getSelectedDateRange();
-      const neededRooms = $('#groupNumberOfRooms').val();
-      const neededRoomsNum = parseInt(neededRooms, 10);
       const bed1Needed = parseInt($('#groupBed1Count').val(), 10) || 0;
       const bed2Needed = parseInt($('#groupBed2Count').val(), 10) || 0;
-      const totalBedNeeded = bed1Needed + bed2Needed;
+      const neededRoomsNum = bed1Needed + bed2Needed;
       const bookingRoute = $('#groupBookingRoute').val();
 
       if (!dates) {
         Swal.fire('Missing Date Range', 'Please select a valid date range.', 'warning');
         return;
       }
-      if (!neededRooms) {
-        Swal.fire('Missing Room Count', 'Please enter the number of rooms needed.', 'warning');
+      if (!neededRoomsNum) {
+        Swal.fire('Bed Requirement Missing', 'Please specify how many rooms should have 1 bed or 2 beds before searching.', 'warning');
         return;
       }
       if (!bookingRoute) {
@@ -2052,16 +2070,6 @@
         return;
       }
 
-      if ((bed1Needed > 0 || bed2Needed > 0) && totalBedNeeded !== neededRoomsNum) {
-        Swal.fire('Bed Count Mismatch', 'The sum of bed requirements must equal the total number of rooms needed.', 'warning');
-        return;
-      }
-
-      if (neededRoomsNum > 0 && totalBedNeeded === 0) {
-        Swal.fire('Bed Requirement Missing', 'Please specify how many rooms should have 1 bed or 2 beds before searching.', 'warning');
-        return;
-      }
-
       groupRequiredBed1 = bed1Needed;
       groupRequiredBed2 = bed2Needed;
 
@@ -2071,8 +2079,8 @@
         data: {
           startDate: dates.start,
           endDate: dates.end,
-          neededRooms: neededRooms,
-          floorNumber: $('#groupFloorSelect').val() || '',
+          neededRooms: neededRoomsNum,
+          floorNumber: '',
           bed1Needed: bed1Needed,
           bed2Needed: bed2Needed,
           bookingRoute: bookingRoute,
@@ -2141,11 +2149,6 @@
         }
       });
     });
-  }
-
-  function fetchGroupFloors() {
-    // Use shared floor dropdown utility
-    populateFloorDropdownGeneric('#groupFloorSelect', true, 'Select Floor');
   }
 
   function loadGroupGuestTypes() {
@@ -2475,7 +2478,7 @@
   }
 
   function hasReachedManualSelectionLimit() {
-    const neededRooms = parseInt($('#groupNumberOfRooms').val(), 10) || 0;
+    const neededRooms = getGroupRoomSelectionTarget();
     const selectedCount = groupManualSelectedRooms.length;
 
     if (groupRequiredBed1 || groupRequiredBed2) {
@@ -2490,7 +2493,7 @@
   }
 
   function updateManualSelectionInfo() {
-    const neededRooms = parseInt($('#groupNumberOfRooms').val(), 10) || 0;
+    const neededRooms = getGroupRoomSelectionTarget();
     const selectedCount = groupManualSelectedRooms.length;
     const remaining = Math.max(neededRooms - selectedCount, 0);
 
@@ -2518,6 +2521,7 @@
 
     $('#groupManualSelectionInfo').text(info).show();
     refreshManualSelectionDisabledState();
+    updateGroupRoomCountDisplay();
   }
 
   function toggleAvailabilityWarning(show, message) {
@@ -2840,7 +2844,6 @@
 
   $(document).ready(function() {
     initializeGroupFlatpickr();
-    fetchGroupFloors();
     loadGroupGuestTypes();
     loadGroupGuestLevels();
     loadGroupBreakfastPrices();

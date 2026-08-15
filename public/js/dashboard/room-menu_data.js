@@ -621,6 +621,9 @@ async function createDynamicRoomModal(bookingId, event, options) {
             <!-- Modal Footer -->
             <div class="modal-footer py-2" style="background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%); border-top: 1px solid #495057;">
                 <button type="button" class="btn btn-primary" onclick="window.showBilling('${bookingId}')">Billing</button>
+                <button type="button" class="btn btn-info text-white" onclick="window.generateInvoice('${bookingId}')">
+                    <i class="fas fa-file-pdf me-2"></i>Generate Invoice
+                </button>
                 <button type="button" class="btn btn-danger" onclick="window.previewVoucher('${bookingId}')">
                     <i class="fas fa-file-pdf me-2"></i>Voucher
                 </button>
@@ -2921,7 +2924,7 @@ function buildCheckoutUnpaidBalanceWarningHtml(unpaidBalance) {
     return `
         <div id="checkoutUnpaidBalanceWarning" style="margin-top:12px; padding:10px 12px; background:#f8d7da; border-left:3px solid #dc3545; border-radius:4px; font-size:0.85rem; text-align:left;">
             <strong style="color:#842029;">Outstanding Balance: ${formatted}</strong>
-            <div style="margin-top:4px; color:#842029;">Guest has not paid in full. You will be asked to confirm before checkout proceeds.</div>
+            <div style="margin-top:4px; color:#842029;">Guest has not paid in full. You will proceed to payment collection on the next step.</div>
         </div>
     `;
 }
@@ -3127,7 +3130,7 @@ function wireCheckoutDepositControls(depositInfo, unpaidBalance, checkoutContext
                     warningEl.style.display = 'block';
                     warningEl.innerHTML = `
                         <strong style="color:#842029;">Outstanding Balance: ${formatCurrency(unpaidBalance)}</strong>
-                        <div style="margin-top:4px; color:#842029;">Guest has not paid in full. You will be asked to confirm before checkout proceeds.</div>
+                        <div style="margin-top:4px; color:#842029;">Guest has not paid in full. You will proceed to payment collection on the next step.</div>
                     `;
                 } else {
                     warningEl.style.display = 'none';
@@ -3164,7 +3167,7 @@ function wireCheckoutDepositControls(depositInfo, unpaidBalance, checkoutContext
                 warningEl.style.display = 'block';
                 warningEl.innerHTML = `
                     <strong style="color:#842029;">Outstanding Balance: ${formatCurrency(newBalance)}</strong>
-                    <div style="margin-top:4px; color:#842029;">Guest has not paid in full. You will be asked to confirm before checkout proceeds.</div>
+                    <div style="margin-top:4px; color:#842029;">Guest has not paid in full. You will proceed to payment collection on the next step.</div>
                 `;
             } else {
                 warningEl.style.display = 'none';
@@ -3614,19 +3617,7 @@ async function runCheckoutPreConfirm(bookingId, depositInfo, { allowScopeSelecti
     }
 
     const applyDiscount = window._applyDiscount !== undefined ? window._applyDiscount : false;
-    const depositCheck = collectCheckoutDepositSelection(depositInfo);
-    if (!depositCheck.valid) {
-        Swal.showValidationMessage(depositCheck.error);
-        return false;
-    }
-
-    const effectiveBalance = getEffectiveUnpaidBalance(checkoutContextCache, depositInfo);
-    if (effectiveBalance > 0) {
-        const confirmed = await confirmUnpaidBalanceCheckout(effectiveBalance);
-        if (!confirmed) return false;
-    }
-
-    return { hasRefund, amount, scope, penaltyAmount: cancellationFee, applyDiscount, depositSelection: depositCheck.selection };
+    return { hasRefund, amount, scope, penaltyAmount: cancellationFee, applyDiscount };
 }
 
 function restoreCheckoutModalFocus(focusState) {
@@ -3654,7 +3645,6 @@ async function openConfirmCheckoutDialog(bookingId, {
         ${buildCheckoutDetailsHtml(checkoutContext)}
         ${groupHtml}
         ${buildCheckoutOverpaymentHtml(checkoutContext)}
-        ${buildCheckoutDepositHtml(depositInfo, depositUnpaidBalance)}
         ${buildCheckoutSummaryHtml(checkoutContext, depositUnpaidBalance)}
         <style>
             .swal2-actions { gap: 10px !important; }
@@ -3667,7 +3657,7 @@ async function openConfirmCheckoutDialog(bookingId, {
         title: 'Confirm Checkout',
         html: modalHtml,
         showCancelButton: true,
-        confirmButtonText: 'Proceed',
+        confirmButtonText: 'Proceed to Payment',
         cancelButtonText: 'Cancel',
         width: '750px',
         customClass: {
@@ -3687,21 +3677,12 @@ async function openConfirmCheckoutDialog(bookingId, {
             }
             setupCheckoutOverpaymentControls(bookingId, checkoutContextCache);
             window._checkoutContextCache = checkoutContextCache;
-            wireCheckoutDepositControls(depositInfo, depositUnpaidBalance, checkoutContextCache);
         },
         preConfirm: () => runCheckoutPreConfirm(bookingId, depositInfo, { allowScopeSelection })
     });
 
     if (result.isConfirmed && result.value) {
-        startCheckoutProcess(
-            bookingId,
-            result.value.hasRefund,
-            result.value.amount || 0,
-            result.value.scope || 'individual',
-            result.value.penaltyAmount || 0,
-            result.value.applyDiscount || false,
-            result.value.depositSelection || null
-        );
+        beginCheckoutPaymentFlow(bookingId, result.value, depositInfo);
     }
 }
 
@@ -3747,6 +3728,217 @@ async function revertCheckoutDeposit(bookingId) {
     } catch (error) {
         console.error('Failed to revert security deposit after checkout error:', error);
     }
+}
+
+function getCheckoutPaymentBalanceFromContext(checkoutContext, applyDiscount = false) {
+    if (!checkoutContext) return 0;
+    const discount = applyDiscount ? (checkoutContext.discountAmount || 0) : 0;
+    return Math.max(0, checkoutContext.grossTotal - checkoutContext.reservationFee - discount - checkoutContext.totalPaid);
+}
+
+function buildCheckoutPaymentBreakdown(checkoutContext, applyDiscount = false) {
+    if (!checkoutContext) {
+        return {
+            roomAmount: 0,
+            extensionAmount: 0,
+            serviceAmount: 0,
+            reservationFee: 0,
+            discountAmount: 0,
+            amountPaid: 0,
+            isEarlyCheckout: false
+        };
+    }
+    const discount = applyDiscount ? (checkoutContext.discountAmount || 0) : 0;
+    return {
+        roomAmount: checkoutContext.roomAmountForActualDays || 0,
+        extensionAmount: checkoutContext.billedExtensionAmount || 0,
+        serviceAmount: checkoutContext.servicesTotal || 0,
+        reservationFee: checkoutContext.reservationFee || 0,
+        discountAmount: discount,
+        amountPaid: checkoutContext.totalPaid || 0,
+        isEarlyCheckout: !!checkoutContext.isEarlyCheckout
+    };
+}
+
+function storePendingRoomMenuCheckout(bookingId, checkoutParams) {
+    window._pendingRoomMenuCheckout = {
+        bookingId,
+        hasRefund: checkoutParams.hasRefund,
+        amount: checkoutParams.amount || 0,
+        scope: checkoutParams.scope || 'individual',
+        penaltyAmount: checkoutParams.penaltyAmount || 0,
+        applyDiscount: checkoutParams.applyDiscount || false
+    };
+}
+
+async function finalizeRoomMenuCheckoutAfterPayment() {
+    const pending = window._pendingRoomMenuCheckout;
+    if (!pending) return;
+
+    const checkoutContext = await computeCheckoutContext(pending.bookingId);
+    const remainingBalance = getCheckoutPaymentBalanceFromContext(checkoutContext, pending.applyDiscount);
+
+    if (remainingBalance > 0) {
+        const confirmed = await confirmUnpaidBalanceCheckout(remainingBalance);
+        if (!confirmed) {
+            window._pendingRoomMenuCheckout = null;
+            return;
+        }
+    }
+
+    const {
+        bookingId,
+        hasRefund,
+        amount,
+        scope,
+        penaltyAmount,
+        applyDiscount
+    } = pending;
+    window._pendingRoomMenuCheckout = null;
+    window.onPaymentConfirmed = null;
+
+    startCheckoutProcess(
+        bookingId,
+        hasRefund,
+        amount || 0,
+        scope || 'individual',
+        penaltyAmount || 0,
+        applyDiscount || false,
+        null
+    );
+}
+
+async function openRoomMenuCheckoutPaymentModal(bookingId, paymentBalance, checkoutContext, applyDiscount, depositInfo) {
+    const paymentModalEl = document.getElementById('modal-payment');
+    if (!paymentModalEl) {
+        const confirmed = paymentBalance > 0
+            ? await confirmUnpaidBalanceCheckout(paymentBalance)
+            : true;
+        if (confirmed) {
+            await finalizeRoomMenuCheckoutAfterPayment();
+        } else {
+            window._pendingRoomMenuCheckout = null;
+        }
+        return;
+    }
+
+    const hiddenBookingIdInput = document.getElementById('hiddenBookingId');
+    if (hiddenBookingIdInput) hiddenBookingIdInput.value = bookingId;
+    const bookingIdInput = document.getElementById('bookingID');
+    if (bookingIdInput) bookingIdInput.value = bookingId;
+
+    let roomNumber = '';
+    try {
+        const data = await fetch(`/booking/get-billing/${bookingId}?_=${Date.now()}`).then((r) => r.json());
+        roomNumber = data.roomNumber || '';
+    } catch (error) {
+        console.warn('Unable to load room number for checkout payment modal:', error);
+    }
+    if (hiddenBookingIdInput) hiddenBookingIdInput.dataset.roomNumber = roomNumber;
+
+    const breakdown = buildCheckoutPaymentBreakdown(checkoutContext, applyDiscount);
+    const grossBalance = getCheckoutPaymentBalanceFromContext(checkoutContext, applyDiscount);
+
+    if (depositInfo?.exists && window.PaymentDepositSection) {
+        window.PaymentDepositSection.configure({
+            bookingId,
+            roomNumber,
+            depositInfo,
+            unpaidBalance: grossBalance
+        });
+        if (typeof window.PaymentDepositSection.reflectAppliedToSummary === 'function') {
+            window.PaymentDepositSection.reflectAppliedToSummary();
+        }
+    } else if (window.PaymentDepositSection) {
+        window.PaymentDepositSection.hide();
+    }
+
+    const effectivePaymentBalance = depositInfo?.exists && window.PaymentDepositSection?.isVisible()
+        ? (parseFloat(document.getElementById('paymentAmountInput')?.value || paymentBalance) || paymentBalance)
+        : paymentBalance;
+
+    if (typeof updatePaymentSummaryCard === 'function') {
+        updatePaymentSummaryCard(effectivePaymentBalance, {
+            roomNumber,
+            ...breakdown
+        });
+    } else {
+        const totalAmountEl = document.getElementById('paymentTotalAmount');
+        if (totalAmountEl) {
+            totalAmountEl.textContent = effectivePaymentBalance.toLocaleString('en-US', { minimumFractionDigits: 2 });
+        }
+        const amountInput = document.getElementById('paymentAmountInput');
+        if (amountInput) amountInput.value = effectivePaymentBalance;
+        const hiddenAmountInput = document.getElementById('paymentAmount');
+        if (hiddenAmountInput) hiddenAmountInput.value = effectivePaymentBalance;
+    }
+
+    paymentModalEl.dataset.skipPaymentStep = effectivePaymentBalance <= 0 ? 'true' : 'false';
+    paymentModalEl.dataset.checkoutPaymentFlow = 'true';
+    if (typeof $ !== 'undefined') {
+        $(paymentModalEl).find('.payment-amount-group, .payment-method-group, .payment-details-section')
+            .toggle(effectivePaymentBalance > 0);
+    }
+    const confirmBtn = paymentModalEl.querySelector('#confirmPaymentButton');
+    const confirmBtnText = confirmBtn?.querySelector('.btn-text');
+    if (confirmBtnText) {
+        confirmBtnText.textContent = effectivePaymentBalance > 0
+            ? 'Confirm Payment & Check Out'
+            : 'Confirm & Check Out';
+    }
+    if (confirmBtn && effectivePaymentBalance <= 0 && depositInfo?.exists) {
+        confirmBtn.disabled = false;
+        confirmBtn.classList.remove('btn-secondary');
+        confirmBtn.classList.add('btn-success');
+    }
+
+    window.onPaymentConfirmed = function onCheckoutPaymentConfirmed() {
+        finalizeRoomMenuCheckoutAfterPayment();
+    };
+
+    const onHidden = function onCheckoutPaymentModalHidden() {
+        paymentModalEl.removeEventListener('hidden.bs.modal', onHidden);
+        delete paymentModalEl.dataset.checkoutPaymentFlow;
+        if (window.onPaymentConfirmed === onCheckoutPaymentConfirmed) {
+            window.onPaymentConfirmed = null;
+            window._pendingRoomMenuCheckout = null;
+        }
+        if (window.PaymentDepositSection) {
+            window.PaymentDepositSection.hide();
+        }
+        if (confirmBtnText) {
+            confirmBtnText.textContent = 'Confirm Payment';
+        }
+    };
+    paymentModalEl.addEventListener('hidden.bs.modal', onHidden);
+
+    const paymentModal = bootstrap.Modal.getOrCreateInstance(paymentModalEl);
+    paymentModal.show();
+}
+
+async function beginCheckoutPaymentFlow(bookingId, checkoutParams, depositInfo) {
+    const checkoutContext = await computeCheckoutContext(bookingId);
+    if (!checkoutContext) {
+        toastError('Checkout', 'Unable to compute checkout details. Please try again.');
+        return;
+    }
+    window._checkoutContextCache = checkoutContext;
+
+    const paymentBalance = getCheckoutPaymentBalanceFromContext(checkoutContext, checkoutParams.applyDiscount);
+    storePendingRoomMenuCheckout(bookingId, checkoutParams);
+
+    if (paymentBalance > 0 || depositInfo?.exists) {
+        await openRoomMenuCheckoutPaymentModal(
+            bookingId,
+            paymentBalance,
+            checkoutContext,
+            checkoutParams.applyDiscount,
+            depositInfo
+        );
+        return;
+    }
+
+    await finalizeRoomMenuCheckoutAfterPayment();
 }
 
 // Trigger checkout: use SweetAlert with a refund checkbox and amount input
@@ -5591,6 +5783,7 @@ window.toggleCustomCost = toggleCustomCost;
 window.viewFullBookingDetails = viewFullBookingDetails;
 window.downloadVoucher = downloadVoucher;
 window.previewVoucher = previewVoucher;
+window.generateInvoice = generateInvoice;
 
 // Initialize transfer modal immediately
 function initializeTransferModal() {
@@ -7458,6 +7651,11 @@ function updateBillingPaymentStatus(bookingId) {
 function previewVoucher(bookingId) {
     if (!bookingId) return;
     window.open(`/booking/voucher/${bookingId}`, '_blank');
+}
+
+function generateInvoice(bookingId) {
+    if (!bookingId) return;
+    window.open(`/booking/generate-invoice/${bookingId}`, '_blank');
 }
 
 function downloadVoucher(bookingId) {

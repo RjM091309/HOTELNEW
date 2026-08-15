@@ -8,32 +8,99 @@
 // GROUP BOOKING COLOR ASSIGNMENT
 // =============================================================================
 
-// Color palette for different group bookings (neon/vibrant colors that don't match booking status colors)
-// Avoid: Teal (#12866f), Amber (#e0a316), Red (#e53935), Gray, Black, Hold Pending Purple (#7b1fa2)
+// Group booking border colors — normal hues, medium saturation (visible but not harsh).
+// Avoid booking-status / legend colors: #12866f, #e0a316, #e53935, #FF6D00, #AAFF00,
+// #6c757d, #000000, #9c27b0, #2196f3, #00E5FF
 const GROUP_COLORS = [
-  '#00FFFF', // Neon Cyan / Aqua
-  '#FF00FF', // Neon Magenta / Fuchsia
-  '#FF1493', // Deep Pink / Neon Pink
-  '#1E90FF', // Dodger Blue
-  '#00FFCC', // Neon Turquoise
-  '#AA00FF', // Neon Purple
-  '#FFAA00', // Neon Orange
-  '#FF00CC', // Neon Magenta-Pink
-  '#8800FF', // Neon Violet
-  '#FF0088', // Neon Rose
-  '#00FF88', // Neon Green-Cyan
-  '#FF8800', // Neon Orange-Red
-  '#AA00AA', // Neon Violet-Magenta
-  '#0088FF', // Neon Sky Blue
-  '#FF00AA', // Neon Pink
-  '#00AAFF', // Bright Neon Blue
-  '#FF00DD', // Neon Pink-Magenta
-  '#00DDFF', // Bright Neon Cyan
-  '#DD00FF'  // Bright Neon Purple
+  '#5C6BC0', // indigo
+  '#7E57C2', // purple
+  '#26A69A', // teal
+  '#66BB6A', // green
+  '#EC407A', // pink
+  '#AB47BC', // violet
+  '#42A5F5', // sky blue
+  '#29B6F6', // light blue
+  '#4DB6AC', // turquoise
+  '#9575CD', // lavender
+  '#7986CB', // periwinkle
+  '#BA68C8', // orchid
+  '#81C784', // mint green
+  '#4DD0E1', // cyan
+  '#8D6E63', // brown
+  '#78909C', // blue gray
+  '#A1887F', // warm taupe
+  '#FF8A65', // soft coral
+  '#9CCC65', // lime green
+  '#64B5F6'  // soft blue
 ];
+
+const LONG_TERM_BORDER_COLOR = '#9c27b0'; // matches legend long-term purple
 
 // Cache to store groupBookingId -> color mapping (consistent across all events)
 const groupColorCache = {};
+
+function hashGroupBookingId(id) {
+  const str = String(id);
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash) ^ str.charCodeAt(i);
+  }
+  return Math.abs(hash);
+}
+
+function isLongTermBooking(event) {
+  const raw = event.extendedProps?.isLongTermStay;
+  return raw === true || raw === 1 || raw === '1';
+}
+
+function isGroupBookingEvent(event) {
+  const groupBookingId = event.extendedProps?.groupBookingId;
+  return groupBookingId != null && groupBookingId !== 0 && groupBookingId !== '' && String(groupBookingId).trim() !== '';
+}
+
+function applyHighlightBorderStyles(el, borderColor, variant) {
+  el.classList.remove('group-booking', 'long-term-booking');
+  if (variant === 'group') el.classList.add('group-booking');
+  if (variant === 'long-term') el.classList.add('long-term-booking');
+  el.style.setProperty('--booking-border-color', borderColor);
+  el.style.setProperty('border', `4px solid ${borderColor}`, 'important');
+  el.setAttribute('data-highlight-border-color', borderColor);
+  el.style.height = '24px';
+  el.style.minHeight = '24px';
+  el.style.marginTop = '-4px';
+  el.style.color = '#ffffff';
+  const titleElement = el.querySelector('.fc-event-title');
+  if (titleElement) {
+    titleElement.style.color = '#ffffff';
+    titleElement.classList.add('group-booking-text');
+  }
+}
+
+function clearHighlightBorderStyles(el) {
+  el.classList.remove('group-booking', 'long-term-booking');
+  el.style.removeProperty('--booking-border-color');
+  el.removeAttribute('data-highlight-border-color');
+  el.style.border = '';
+  el.style.height = '';
+  el.style.minHeight = '';
+  el.style.marginTop = '';
+  const titleElement = el.querySelector('.fc-event-title');
+  if (titleElement) {
+    titleElement.classList.remove('group-booking-text');
+  }
+}
+
+function applyBookingHighlightBorder(event, el) {
+  if (isLongTermBooking(event)) {
+    applyHighlightBorderStyles(el, LONG_TERM_BORDER_COLOR, 'long-term');
+    return;
+  }
+  if (isGroupBookingEvent(event)) {
+    applyHighlightBorderStyles(el, getGroupBookingColor(event.extendedProps.groupBookingId), 'group');
+    return;
+  }
+  clearHighlightBorderStyles(el);
+}
 
 /**
  * Get a consistent color for a group booking based on its ID
@@ -42,7 +109,7 @@ const groupColorCache = {};
  */
 function getGroupBookingColor(groupBookingId) {
   if (!groupBookingId || groupBookingId === 0 || groupBookingId === '') {
-    return '#2196F3'; // Default blue if invalid
+    return '#7986CB'; // Default periwinkle if invalid
   }
   
   const id = String(groupBookingId);
@@ -52,9 +119,7 @@ function getGroupBookingColor(groupBookingId) {
     return groupColorCache[id];
   }
   
-  // Assign color based on groupBookingId (consistent hash)
-  const numericId = parseInt(id, 10) || id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const colorIndex = numericId % GROUP_COLORS.length;
+  const colorIndex = hashGroupBookingId(id) % GROUP_COLORS.length;
   const assignedColor = GROUP_COLORS[colorIndex];
   
   // Cache the color for this group
@@ -210,8 +275,6 @@ function applyCompositeStatusStyles(event, el) {
   try {
     const bookingStatus = event.extendedProps?.bookingStatus;
     // More robust check: groupBookingId must exist, not be null, not be 0, and not be empty string
-    const groupBookingId = event.extendedProps?.groupBookingId;
-    const isGroupBooking = groupBookingId != null && groupBookingId !== 0 && groupBookingId !== '' && String(groupBookingId).trim() !== '';
     const holdPendingRaw = event.extendedProps?.holdPending;
     const isHoldPending = holdPendingRaw === 1 || holdPendingRaw === '1' || holdPendingRaw === true;
 
@@ -226,6 +289,10 @@ function applyCompositeStatusStyles(event, el) {
     if (checkInStatusRaw === undefined && checkOutStatusRaw === undefined) {
       el.removeAttribute('data-composite');
       el.style.background = '';
+      if (event.backgroundColor) {
+        el.style.backgroundColor = event.backgroundColor;
+      }
+      applyBookingHighlightBorder(event, el);
       return;
     }
 
@@ -254,9 +321,6 @@ function applyCompositeStatusStyles(event, el) {
       coNorm = 'regular';
     }
 
-    // Get group color if this is a group booking
-    const groupColor = isGroupBooking ? getGroupBookingColor(groupBookingId) : null;
-
     // Decide behavior by booking status
     if (bookingStatus === 'pending' && !isHoldPending) {
       // Determine each side for pending
@@ -264,31 +328,8 @@ function applyCompositeStatusStyles(event, el) {
       const rightColor = coNorm === 'late' ? lemon : red;      // right half = check-out
       el.setAttribute('data-composite', 'true');
       el.style.background = `linear-gradient(90deg, ${leftColor} 0%, ${leftColor} 50%, ${rightColor} 50%, ${rightColor} 100%)`;
-      el.style.color = isGroupBooking ? '#ffffff !important' : '#fff';
-      if (isGroupBooking) {
-        el.classList.add('group-booking');
-        // Use dynamic group color for border - use !important to override CSS
-        const borderColor = groupColor || '#2196F3';
-        el.style.setProperty('border', `4px solid ${borderColor}`, 'important');
-        el.setAttribute('data-group-color', borderColor);
-        el.style.height = '24px';
-        el.style.minHeight = '24px';
-        el.style.marginTop = '-4px';
-      } else {
-        el.style.border = '';
-        el.style.height = '';
-        el.style.minHeight = '';
-        el.style.marginTop = '';
-      }
-      
-      // Find the text element and apply color directly for group bookings
-      if (isGroupBooking) {
-        const titleElement = el.querySelector('.fc-event-title');
-        if (titleElement) {
-          titleElement.style.color = '#ffffff !important';
-          titleElement.classList.add('group-booking-text');
-        }
-      }
+      el.style.color = '#fff';
+      applyBookingHighlightBorder(event, el);
       
       // Lower z-index so checkout side (right half) visually sits underneath neighbors
       el.style.zIndex = '5';
@@ -301,31 +342,8 @@ function applyCompositeStatusStyles(event, el) {
       const rightColor = coNorm === 'late' ? lemon : red;
       el.setAttribute('data-composite', 'true');
       el.style.background = `linear-gradient(90deg, ${leftColor} 0%, ${leftColor} 50%, ${rightColor} 50%, ${rightColor} 100%)`;
-      el.style.color = isGroupBooking ? '#ffffff !important' : '#fff';
-      if (isGroupBooking) {
-        el.classList.add('group-booking');
-        // Use dynamic group color for border - use !important to override CSS
-        const borderColor = groupColor || '#2196F3';
-        el.style.setProperty('border', `4px solid ${borderColor}`, 'important');
-        el.setAttribute('data-group-color', borderColor);
-        el.style.height = '24px';
-        el.style.minHeight = '24px';
-        el.style.marginTop = '-4px';
-      } else {
-        el.style.border = '';
-        el.style.height = '';
-        el.style.minHeight = '';
-        el.style.marginTop = '';
-      }
-      
-      // Find the text element and apply color directly for group bookings
-      if (isGroupBooking) {
-        const titleElement = el.querySelector('.fc-event-title');
-        if (titleElement) {
-          titleElement.style.color = '#ffffff !important';
-          titleElement.classList.add('group-booking-text');
-        }
-      }
+      el.style.color = '#fff';
+      applyBookingHighlightBorder(event, el);
       
       // Lower z-index so checkout side (right half) visually sits underneath neighbors
       el.style.zIndex = '5';
@@ -338,35 +356,10 @@ function applyCompositeStatusStyles(event, el) {
     if (event.backgroundColor) {
       el.style.backgroundColor = event.backgroundColor;
     }
-  const isCancelled = bookingStatus === 'cancelled';
-    // Apply styles for group bookings
-    if (isGroupBooking) {
-      el.style.color = '#ffffff !important';
-      el.classList.add('group-booking');
-      // Border highlight to distinguish group bookings - use dynamic group color with !important
-      const borderColor = groupColor || '#2196F3';
-      el.style.setProperty('border', `4px solid ${borderColor}`, 'important');
-      el.setAttribute('data-group-color', borderColor);
-      el.style.height = '24px';
-      el.style.minHeight = '24px';
-      el.style.marginTop = '-4px';
-      
-      // Find the text element and apply color directly
-      const titleElement = el.querySelector('.fc-event-title');
-      if (titleElement) {
-        titleElement.style.color = '#ffffff !important';
-        titleElement.classList.add('group-booking-text');
-      }
-      
-    } else {
-      // Ensure non-group events don't keep a border
-      el.style.border = '';
-      el.style.height = '';
-      el.style.minHeight = '';
-      el.style.marginTop = '';
-    }
+    const isCancelled = bookingStatus === 'cancelled';
+    applyBookingHighlightBorder(event, el);
     // Restore default stacking when not composite
-  el.style.zIndex = isCancelled ? '1' : '';
+    el.style.zIndex = isCancelled ? '1' : '';
   } catch (e) {
     // ignore
   }
@@ -383,11 +376,10 @@ const BACK_TO_BACK_BORDER_COLOR = '#AAFF00';
 function applyBackToBackBorder(event, el) {
   try {
     const bookingStatus = event.extendedProps?.bookingStatus;
-    const groupBookingId = event.extendedProps?.groupBookingId;
-    const isGroupBooking = groupBookingId != null && groupBookingId !== 0 && groupBookingId !== '' && String(groupBookingId).trim() !== '';
+    const isGroupBooking = isGroupBookingEvent(event);
 
-    // Group bookings already own the border for their own highlight; don't fight over it
-    if (isGroupBooking || bookingStatus === 'cancelled') {
+    // Group / long-term bookings already own the border highlight
+    if (isGroupBooking || isLongTermBooking(event) || bookingStatus === 'cancelled') {
       return;
     }
 
@@ -409,7 +401,7 @@ function applyBackToBackBorder(event, el) {
 
 const PAYMENT_STATUS_COLORS = {
   paid: '#2196f3',    // fully paid - blue
-  partial: '#f57c00', // partially paid - orange
+  partial: '#00E5FF', // partially paid - bright cyan
   unpaid: '#ffffff'   // unpaid - white
 };
 

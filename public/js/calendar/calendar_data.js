@@ -2915,7 +2915,7 @@ function performSearch() {
 
       if (eventStatus === 'pending' && isHoldPending) {
         displayStatus = 'Hold Pending';
-        statusColor = '#7b1fa2'; // Purple for hold pending
+        statusColor = '#FF6D00'; // Bright orange for hold pending
       } else if (eventStatus === 'pending') {
         if (checkInStatus === 0) {
           displayStatus = 'Pending - Late (CI/CO)';
@@ -3351,7 +3351,7 @@ function classifyEventForLegend(event) {
   // Priority mirrors applyCompositeStatusStyles: Back-to-Back > Late > Regular
   if (status === 'pending') {
     const holdPending = event.extendedProps?.holdPending;
-    if (holdPending === 1 || holdPending === '1' || holdPending === true || backgroundColor === '#7b1fa2') {
+    if (holdPending === 1 || holdPending === '1' || holdPending === true || backgroundColor === '#FF6D00') {
       flags['hold-pending'] = true;
       return flags;
     }

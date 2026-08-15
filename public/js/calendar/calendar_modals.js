@@ -360,7 +360,7 @@ function showPendingModal(event) {
   const ciColor = (ciStatus2 === 1 ? '#e53935' : '#e0a316');
   const coText = (coStatus2 === 1 ? 'LATE CHECK-OUT' : 'REGULAR CHECK-OUT');
   const coColor = (coStatus2 === 1 ? '#e0a316' : '#e53935');
-  const accentColor = isHoldPending2 ? '#7b1fa2' : (ciStatus2 === 0 ? '#e0a316' : '#e53935');
+  const accentColor = isHoldPending2 ? '#FF6D00' : (ciStatus2 === 0 ? '#e0a316' : '#e53935');
 
   // Prepare modal configuration based on check-in availability
   const modalConfig = {
@@ -382,7 +382,7 @@ function showPendingModal(event) {
                 <span style="color: #cccccc; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Status</span>
                 <div style="margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: center; text-align: center;">
                   ${isHoldPending2
-                    ? `<span style="background: transparent; border:2px solid #ab47bc; color:#ce93d8; font-weight:800; font-size:12px; padding:2px 6px; border-radius:6px;">HOLD PENDING</span>`
+                    ? `<span style="background: transparent; border:2px solid #FF6D00; color:#FFB74D; font-weight:800; font-size:12px; padding:2px 6px; border-radius:6px;">HOLD PENDING</span>`
                     : `<span style="background: transparent; border:2px solid ${ciColor}; color:${ciColor}; font-weight:800; font-size:12px; padding:2px 6px; border-radius:6px;">${ciText}</span>
                   <span style="background: transparent; border:2px solid ${coColor}; color:${coColor}; font-weight:800; font-size:12px; padding:2px 6px; border-radius:6px;">${coText}</span>`
                   }
@@ -402,8 +402,8 @@ function showPendingModal(event) {
           </div>
         </div>
         ${isHoldPending2 ?
-          `<div style="text-align: center; padding: 15px; background: rgba(123, 31, 162, 0.15); border-radius: 8px; border: 1px solid rgba(171, 71, 188, 0.4);">
-            <span style="color: #ce93d8; font-size: 14px; font-weight: 500;">
+          `<div style="text-align: center; padding: 15px; background: rgba(255, 109, 0, 0.15); border-radius: 8px; border: 1px solid rgba(255, 109, 0, 0.45);">
+            <span style="color: #FFB74D; font-size: 14px; font-weight: 500;">
               ⏸️ This reservation is on Hold Pending - no check-in/check-out processing yet.
             </span>
           </div>` :

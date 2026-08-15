@@ -191,9 +191,6 @@
                                     <button onclick="printDiv('printableArea')" class="btn btn-print" type="button">
                                         <i class="fa fa-print"></i> Print Receipt
                                     </button>
-                                    <button id="generateInvoiceBtn" class="btn btn-invoice" type="button">
-                                        <i class="fa fa-file-pdf-o"></i> Generate Invoice
-                                    </button>
                                     <button type="button" class="btn btn-close-modal" data-bs-dismiss="modal">
                                         <i class="fa fa-times"></i> Close
                                     </button>
@@ -235,32 +232,6 @@
 	
 	// Also check payment status after a short delay to ensure elements are loaded
 	setTimeout(updatePaymentStatus, 500);
-	
-	// Ensure invoice button is properly initialized when modal is shown
-	const modalBilling = document.getElementById('modal-billing');
-	if (modalBilling) {
-		modalBilling.addEventListener('shown.bs.modal', function() {
-			const invoiceBtn = document.getElementById('generateInvoiceBtn');
-			if (invoiceBtn) {
-				// Remove any existing event listeners by cloning
-				const newInvoiceBtn = invoiceBtn.cloneNode(true);
-				invoiceBtn.parentNode.replaceChild(newInvoiceBtn, invoiceBtn);
-				
-				// Attach event listener to the new button
-				newInvoiceBtn.addEventListener('click', function() {
-					const bookingId = document.getElementById('hiddenBookingId').value;
-
-					if (!bookingId) {
-						alert("Missing Booking ID!");
-						return;
-					}
-
-					const url = `/booking/generate-invoice/${bookingId}`;
-					window.open(url, '_blank');
-				});
-			}
-		});
-	}
 	
 	// Ensure proceed to payment button is properly initialized
 	setTimeout(function() {

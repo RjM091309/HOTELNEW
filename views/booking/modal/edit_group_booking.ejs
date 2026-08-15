@@ -27,18 +27,10 @@
                 <small class="text-muted" style="font-size: 11px;">This is the date range for the main booking. Individual booking dates are shown below if different.</small>
               </div>
             </div>
-            <div class="col-lg-3">
+            <div class="col-lg-6">
               <div class="form-group">
-                <label class="form-label">Number of Rooms Needed</label>
-                <input type="number" class="form-control" id="editGroupNumberOfRooms" name="groupNumberOfRooms" min="1" required>
-              </div>
-            </div>
-            <div class="col-lg-3">
-              <div class="form-group">
-                <label class="form-label">Select Floor (Optional)</label>
-                <select class="form-select" id="editGroupFloorSelect" name="groupFloorSelect">
-                  <option value="" selected>Select Floor</option>
-                </select>
+                <label class="form-label">Number of Rooms Selected</label>
+                <input type="text" class="form-control group-room-count-display" id="editGroupNumberOfRooms" name="groupNumberOfRooms" readonly tabindex="-1" placeholder="0" required>
               </div>
             </div>
           </div>
@@ -1242,7 +1234,7 @@ window.editGroupAddedServicesMap = {};
           startDate: dates.start,
           endDate: dates.end,
           neededRooms: neededRooms,
-          floorNumber: $('#editGroupFloorSelect').val() || '',
+          floorNumber: '',
           bed1Needed: bed1Needed,
           bed2Needed: bed2Needed,
           bookingRoute: bookingRoute,
@@ -1316,23 +1308,6 @@ window.editGroupAddedServicesMap = {};
   window.loadEditGroupAgencies = loadEditGroupAgencies;
 
   function loadEditGroupData() {
-    // Load floors
-    $.ajax({
-      url: '/booking/get_floors_for_dropdown',
-      method: 'GET',
-      success: function(data) {
-        const select = $('#editGroupFloorSelect');
-        select.empty();
-        select.append('<option value="" selected>Select Floor</option>');
-        (data || []).forEach(floor => {
-          select.append(`<option value="${floor.floor_number}">${floor.floor_number} Floor</option>`);
-        });
-      },
-      error: function(err) {
-        console.error('Error fetching floors for edit group booking:', err);
-      }
-    });
-
     // Load guest types
     $.ajax({
       url: '/booking/get_guest_types',
