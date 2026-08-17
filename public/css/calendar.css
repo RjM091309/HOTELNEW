@@ -532,8 +532,9 @@
     /* Enhanced shadow for better depth */
     transform: skew(-25deg) scale(1.02) !important;
     box-shadow: none !important;
-    /* Parallelogram shape */
-    transform: skew(-35deg) !important;
+    /* Parallelogram shape - smaller skew angle so both tips overhang the
+       actual day columns less on either side, plus a small rightward nudge */
+    transform: translateX(10px) skew(-18deg) !important;
     transform-origin: center !important;
     /* Smooth transitions for hover effects */
     transition: all 0.3s ease !important;

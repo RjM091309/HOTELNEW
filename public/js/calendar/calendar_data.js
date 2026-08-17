@@ -245,6 +245,241 @@ function isFloorResourceId(resourceId) {
   return false;
 }
 
+// A valid highlight/selection must start in the PM slot (check-in in the
+// evening) and land its check-out in the AM slot of a later day. Starting
+// the drag in the AM slot (e.g. an AM-to-PM same-day highlight) is not a
+// valid stay and must be blocked before any booking modal is opened.
+function isValidCheckInSelectionStart(start) {
+  return new Date(start).getHours() >= 12;
+}
+
+function showInvalidCheckInSelectionError() {
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      title: 'Invalid Check-in Selection',
+      text: 'Check-in must start on the PM slot, with check-out landing on the AM slot of a later day. Please start your selection from the PM half of the day.',
+      icon: 'warning',
+      confirmButtonText: 'OK',
+      background: '#2a3135',
+      color: '#ffffff'
+    });
+  } else {
+    alert('Check-in must start on the PM slot, with check-out on the AM slot of a later day.');
+  }
+}
+
+// With 12-hour slots, a selection's exclusive end can land on either slot
+// boundary of a day: 12:00 (drag stopped at the end of that day's AM slot -
+// a regular checkout, that day) or 00:00 (drag stopped at the end of the
+// PREVIOUS day's PM slot - a late checkout, but still that previous day).
+// FullCalendar's raw end in the 00:00 case reads as the *next* calendar
+// date, which is what made checkout show Aug 19 for a highlight the user
+// dragged only through Aug 18's PM slot. Roll it back 12h onto the slot's
+// actual day so display and night-count both land on the right date.
+function normalizeSelectionEnd(end) {
+  const e = new Date(end);
+  if (e.getHours() === 0 && e.getMinutes() === 0) {
+    return new Date(e.getTime() - 12 * 60 * 60 * 1000);
+  }
+  return e;
+}
+
+// Asks the user to confirm a calendar highlight as a Late Check Out before
+// the Add Booking modal opens. Resolves true if they choose to proceed,
+// false if they cancel.
+//
+// The block window (ignoreSelectUntil) is held open for the entire time the
+// dialog is visible, plus a buffer after it closes, and is enforced by the
+// capture-phase DOM listener set up in DOMContentLoaded above - that's what
+// actually stops the ghost click a SweetAlert2 button leaves on the cell
+// underneath it from reaching FullCalendar and arming a second room.
+function confirmLateCheckoutSelection() {
+  ignoreSelectUntil = Infinity;
+
+  const reenable = function() {
+    ignoreSelectUntil = Date.now() + 500;
+  };
+
+  if (typeof Swal === 'undefined') {
+    const confirmed = confirm('This booking is Late Check Out. Continue to proceed?');
+    reenable();
+    return Promise.resolve(confirmed);
+  }
+  return Swal.fire({
+    title: 'This booking is Late Check Out',
+    text: 'Continue to proceed?',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, continue',
+    cancelButtonText: 'Cancel',
+    background: '#2a3135',
+    color: '#ffffff'
+  }).then(function(result) {
+    reenable();
+    return !!result.isConfirmed;
+  });
+}
+
+// Continues the select flow: auto-detected group select (synchronous, so a
+// multi-row sweep is fully accounted for in armedRoomIds before anything
+// async runs), then - only once we know for certain this is a single-room
+// selection - the Late Check Out confirmation, and finally opening the Add
+// Booking modal. The confirmation must stay behind the group-select check:
+// asking it any earlier leaves armedRoomIds only partially populated while
+// the dialog is up, which is what let two unrelated rooms both end up armed
+// and mistakenly opened the group booking flow instead of Add Booking.
+function continueCalendarSelectFlow(info, modal, today) {
+  // AUTO-DETECTED GROUP SELECT: if the drag swept into more than one room,
+  // treat it as a group booking and open that modal instead of the normal
+  // single-booking one. A plain single-room drag falls through unchanged below.
+  if (isFloorResourceId(info.resource.id)) {
+    calendar.unselect();
+    resetGroupSelectState();
+    return;
+  }
+
+  // Check-in must start on the PM slot - an AM-started drag never proceeds,
+  // regardless of where it stops.
+  if (!isValidCheckInSelectionStart(info.start)) {
+    showInvalidCheckInSelectionError();
+    calendar.unselect();
+    resetGroupSelectState();
+    return;
+  }
+
+  armedRoomIds.add(String(info.resource.id));
+  if (armedRoomIds.size > 1) {
+    const roomIds = Array.from(armedRoomIds).filter(function(id) {
+      return !isFloorResourceId(id);
+    });
+    if (roomIds.length < 2) {
+      calendar.unselect();
+      return;
+    }
+    groupSelectDateRange = { start: new Date(info.start), end: new Date(info.end) };
+
+    calendar.unselect();
+
+    checkCalendarRoomsAvailability(roomIds, info.start, info.end).then(function(result) {
+      handleGroupSelectAvailabilityResult(result, roomIds, info.start, info.end);
+    });
+
+    return;
+  }
+  resetGroupSelectState();
+
+  // With 12-hour slots, the raw exclusive end lands on either boundary of a
+  // day: 12:00 means the drag stopped inside that day's AM slot (a regular,
+  // morning checkout) - 00:00 means it stopped inside the PREVIOUS day's PM
+  // slot (a late, afternoon/evening checkout). Only the PM-stop case is a
+  // late checkout; a clean PM check-in to AM check-out needs no confirmation
+  // at all and proceeds straight to Add Booking as Regular Check Out.
+  const dragStoppedInPmSlot = new Date(info.end).getHours() === 0;
+
+  if (!dragStoppedInPmSlot) {
+    openAddBookingModalForSelection(info, modal, today, false);
+    return;
+  }
+
+  confirmLateCheckoutSelection().then(function(confirmed) {
+    if (!confirmed) {
+      calendar.unselect();
+      return;
+    }
+    openAddBookingModalForSelection(info, modal, today, true);
+  });
+}
+
+// Opens the Add Booking modal for a confirmed single-room selection,
+// applying any URL-highlight date override first.
+function openAddBookingModalForSelection(info, modal, today, lateCheckout) {
+  // Check if this selection is from a highlighted area (URL params). Only
+  // honor it if the actual drag overlaps the highlighted range - matching on
+  // room id alone let a stale hl* param (left over from an earlier search,
+  // since nothing ever clears it) silently override a later, unrelated drag
+  // on the same room with the wrong checkout date.
+  const params = new URLSearchParams(window.location.search);
+  const hlRoomId = params.get('hlRoomId');
+  const hlStart = params.get('hlStart');
+  const hlEnd = params.get('hlEnd');
+
+  let usedHighlight = false;
+  if (hlRoomId && hlStart && hlEnd && String(info.resource.id) === String(hlRoomId)) {
+    const originalStartDate = new Date(hlStart);
+    const originalEndDate = new Date(hlEnd);
+    const dragStart = new Date(info.start);
+    const dragEnd = new Date(info.end);
+    const overlaps = dragStart < originalEndDate && dragEnd > originalStartDate;
+
+    if (overlaps) {
+      usedHighlight = true;
+      console.log('Using highlight dates from URL params:', { hlStart, hlEnd });
+
+      // Also check if highlight start date is in the past
+      const highlightStartDateOnly = new Date(originalStartDate);
+      highlightStartDateOnly.setHours(0, 0, 0, 0);
+
+      if (highlightStartDateOnly < today) {
+        if (typeof Swal !== 'undefined') {
+          Swal.fire({
+            title: 'Past Date Selected',
+            text: 'Cannot create booking for past dates. Please select today or a future date.',
+            icon: 'warning',
+            confirmButtonText: 'OK',
+            background: '#2a3135',
+            color: '#ffffff'
+          });
+        } else {
+          alert('Cannot create booking for past dates. Please select today or a future date.');
+        }
+
+        calendar.unselect();
+        clearIncomingHighlightParams();
+        return; // Exit early, don't show modal
+      }
+
+      // Set check-in time to 6 AM
+      originalStartDate.setHours(6, 0, 0, 0);
+
+      // Set check-out time to 6 PM
+      originalEndDate.setHours(18, 0, 0, 0);
+
+      modal.data('calendar-room-id', info.resource.id);
+      modal.data('calendar-start', originalStartDate);
+      modal.data('calendar-end', originalEndDate);
+    }
+  }
+
+  if (!usedHighlight) {
+    // Use the calendar selection dates for normal selections
+    modal.data('calendar-room-id', info.resource.id);
+    modal.data('calendar-start', info.start);
+    modal.data('calendar-end', normalizeSelectionEnd(info.end));
+  }
+
+  // The highlight has now served its purpose (or didn't apply) - clear it so
+  // it can't hijack a future drag on this same room.
+  if (hlRoomId) clearIncomingHighlightParams();
+
+  modal.data('calendar-late-checkout', !!lateCheckout);
+
+  calendar.unselect();
+
+  const addBookingModalEl = document.getElementById('modal-addbooking');
+  if (addBookingModalEl) {
+    if (typeof window.showBootstrapModal === 'function') {
+      window.showBootstrapModal(addBookingModalEl, { backdrop: 'static', keyboard: true });
+    } else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+      bootstrap.Modal.getOrCreateInstance(addBookingModalEl, {
+        backdrop: 'static',
+        keyboard: true
+      }).show();
+    } else if (typeof modal.modal === 'function') {
+      modal.modal('show');
+    }
+  }
+}
+
 function isFloorTimelineRow(row) {
   if (!row) return false;
   const rowId = row.getAttribute('data-resource-id');
@@ -495,6 +730,13 @@ function setupHoverEffects() {
 // =============================================================================
 
 const armedRoomIds = new Set();
+
+// Guards against the "ghost click" that some browsers/touch devices fire on
+// whatever sits underneath a SweetAlert2 button right after it closes - that
+// phantom click lands on the calendar cell beneath the OK button and re-enters
+// select(), arming a second room and popping the group booking modal
+// unintentionally. Any select() call before this timestamp is ignored.
+let ignoreSelectUntil = 0;
 
 function getOrderedRoomIds() {
   return Array.from(document.querySelectorAll('.fc-datagrid-cell.fc-resource[data-resource-id]:not([data-is-floor])'))
@@ -1799,6 +2041,20 @@ function hideLoading() {
 // DATA LOADING
 // =============================================================================
 
+// Removes the hlRoomId/hlStart/hlEnd/hlColor incoming-highlight params from
+// the URL and localStorage once they've been consumed, so they can't keep
+// silently overriding whatever the user drags on that room afterward.
+function clearIncomingHighlightParams() {
+  try {
+    const url = new URL(window.location.href);
+    ['hlRoomId', 'hlStart', 'hlEnd', 'hlColor'].forEach(function(key) {
+      url.searchParams.delete(key);
+    });
+    window.history.replaceState({}, '', url.toString());
+  } catch (e) { /* no-op */ }
+  try { localStorage.removeItem('calendarHighlight'); } catch (e) { /* no-op */ }
+}
+
 // Highlight incoming selection from navbar → calendar (via URL/localStorage)
 function applyIncomingHighlight() {
   if (!calendar) return;
@@ -2268,6 +2524,23 @@ function handleDataError(err) {
 document.addEventListener('DOMContentLoaded', function() {
   calendarEl = document.getElementById('calendar'); // Set the global variable
 
+  // Swallow any mousedown/click/touch that lands on the calendar while a
+  // block window is active (see ignoreSelectUntil). This runs in the capture
+  // phase, ahead of FullCalendar's own listeners, so it catches the event
+  // before FullCalendar's interaction plugin ever sees it - toggling the
+  // `selectable` option alone isn't reliable here because that change is
+  // applied on FullCalendar's own render cycle, which can lag behind a ghost
+  // click that a SweetAlert2 button leaves on the cell underneath it.
+  ['mousedown', 'pointerdown', 'touchstart', 'click'].forEach(function(evtName) {
+    document.addEventListener(evtName, function(e) {
+      if (Date.now() < ignoreSelectUntil && calendarEl && calendarEl.contains(e.target)) {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        e.preventDefault();
+      }
+    }, true);
+  });
+
   // Loading removed for faster performance
 
  // ←– INSERT MUTATION OBSERVER HERE
@@ -2323,6 +2596,13 @@ const findHeader = setInterval(() => {
     // Note: eventDropTransformers removed - using eventDrop handler instead
 
     select: function(info) {
+      // Swallow the ghost click a SweetAlert2 button leaves behind on the
+      // calendar cell underneath it right after closing.
+      if (Date.now() < ignoreSelectUntil) {
+        calendar.unselect();
+        return;
+      }
+
       // Manual Group Create mode: this drag just picks a room + (on the first
       // pick) locks in the shared date range - never opens any booking modal
       // directly, and never touches the auto-detected single-drag flow below.
@@ -2336,6 +2616,11 @@ const findHeader = setInterval(() => {
         const todayOk = new Date();
         todayOk.setHours(0, 0, 0, 0);
         if (startOk < todayOk) {
+          calendar.unselect();
+          return;
+        }
+        if (!isValidCheckInSelectionStart(info.start)) {
+          showInvalidCheckInSelectionError();
           calendar.unselect();
           return;
         }
@@ -2368,108 +2653,12 @@ const findHeader = setInterval(() => {
         } else {
           alert('Cannot create booking for past dates. Please select today or a future date.');
         }
-        
+
         calendar.unselect();
         return; // Exit early, don't show modal
       }
 
-      // AUTO-DETECTED GROUP SELECT: if the drag swept into more than one room,
-      // treat it as a group booking and open that modal instead of the normal
-      // single-booking one. A plain single-room drag falls through unchanged below.
-      if (isFloorResourceId(info.resource.id)) {
-        calendar.unselect();
-        resetGroupSelectState();
-        return;
-      }
-
-      armedRoomIds.add(String(info.resource.id));
-      if (armedRoomIds.size > 1) {
-        const roomIds = Array.from(armedRoomIds).filter(function(id) {
-          return !isFloorResourceId(id);
-        });
-        if (roomIds.length < 2) {
-          calendar.unselect();
-          return;
-        }
-        groupSelectDateRange = { start: new Date(info.start), end: new Date(info.end) };
-
-        calendar.unselect();
-
-        checkCalendarRoomsAvailability(roomIds, info.start, info.end).then(function(result) {
-          handleGroupSelectAvailabilityResult(result, roomIds, info.start, info.end);
-        });
-
-        return;
-      }
-      resetGroupSelectState();
-
-      // Check if this selection is from a highlighted area (URL params)
-      const params = new URLSearchParams(window.location.search);
-      const hlRoomId = params.get('hlRoomId');
-      const hlStart = params.get('hlStart');
-      const hlEnd = params.get('hlEnd');
-      
-      // If this is a highlight selection, use the original highlight dates
-      if (hlRoomId && hlStart && hlEnd && String(info.resource.id) === String(hlRoomId)) {
-        console.log('Using highlight dates from URL params:', { hlStart, hlEnd });
-        
-        // Parse the original highlight dates
-        const originalStartDate = new Date(hlStart);
-        const originalEndDate = new Date(hlEnd);
-        
-        // Also check if highlight start date is in the past
-        const highlightStartDateOnly = new Date(originalStartDate);
-        highlightStartDateOnly.setHours(0, 0, 0, 0);
-        
-        if (highlightStartDateOnly < today) {
-          if (typeof Swal !== 'undefined') {
-            Swal.fire({
-              title: 'Past Date Selected',
-              text: 'Cannot create booking for past dates. Please select today or a future date.',
-              icon: 'warning',
-              confirmButtonText: 'OK',
-              background: '#2a3135',
-              color: '#ffffff'
-            });
-          } else {
-            alert('Cannot create booking for past dates. Please select today or a future date.');
-          }
-          
-          calendar.unselect();
-          return; // Exit early, don't show modal
-        }
-        
-        // Set check-in time to 6 AM
-        originalStartDate.setHours(6, 0, 0, 0);
-        
-        // Set check-out time to 6 PM
-        originalEndDate.setHours(18, 0, 0, 0);
-        
-        modal.data('calendar-room-id', info.resource.id);
-        modal.data('calendar-start', originalStartDate);
-        modal.data('calendar-end', originalEndDate);
-      } else {
-        // Use the calendar selection dates for normal selections
-        modal.data('calendar-room-id', info.resource.id);
-        modal.data('calendar-start', info.start);
-        modal.data('calendar-end', info.end);
-      }
-      
-      calendar.unselect();
-
-      const addBookingModalEl = document.getElementById('modal-addbooking');
-      if (addBookingModalEl) {
-        if (typeof window.showBootstrapModal === 'function') {
-          window.showBootstrapModal(addBookingModalEl, { backdrop: 'static', keyboard: true });
-        } else if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-          bootstrap.Modal.getOrCreateInstance(addBookingModalEl, {
-            backdrop: 'static',
-            keyboard: true
-          }).show();
-        } else if (typeof modal.modal === 'function') {
-          modal.modal('show');
-        }
-      }
+      continueCalendarSelectFlow(info, modal, today);
     },
 
     eventClick: handleEventClick,

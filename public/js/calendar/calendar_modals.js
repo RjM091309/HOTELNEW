@@ -833,13 +833,22 @@ $(document).ready(function() {
     if (roomId) {
       const start = $(this).data('calendar-start');
       const end = $(this).data('calendar-end');
+      const lateCheckout = $(this).data('calendar-late-checkout');
 
       populateBookingModal(roomId, start, end);
+
+      // Explicitly set both cases (not just late) - otherwise a Regular
+      // checkout can be left showing a stale "Late Check Out" carried over
+      // from localStorage's sticky preference set by an earlier booking.
+      if (typeof setCheckOutStatusDropdown === 'function') {
+        setCheckOutStatusDropdown(lateCheckout ? '1' : '0');
+      }
 
       // Clean up the data attributes to prevent re-running
       $(this).removeData('calendar-room-id');
       $(this).removeData('calendar-start');
       $(this).removeData('calendar-end');
+      $(this).removeData('calendar-late-checkout');
     }
   });
 
