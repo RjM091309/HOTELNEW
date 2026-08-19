@@ -1,0 +1,196 @@
+
+<!-- ======================================== -->
+<!-- CHANNEX SETTINGS PAGE -->
+<!-- ======================================== -->
+
+<div class="row">
+    <div class="col-xl-12 col-md-12 col-12">
+        <div class="dashboard-card">
+            <div class="dashboard-card-header">
+                <header>Channex Connection</header>
+            </div>
+            <div class="dashboard-card-body">
+
+                <div id="loadingIndicator" class="text-center" style="display: none; padding: 20px;">
+                    <i class="fa fa-spinner fa-spin fa-3x"></i>
+                    <p>Testing connection...</p>
+                </div>
+
+                <div id="errorMessage" class="alert alert-danger" style="display: none;"></div>
+                <div id="successMessage" class="alert alert-success" style="display: none;"></div>
+
+                <p style="color: #fff;">Checks that the API key configured on the server can authenticate with Channex and lists the properties it can see.</p>
+
+                <button type="button" class="btn btn-primary" id="btnTestConnection" style="min-width: 180px;">
+                    <i class="material-icons" style="vertical-align: middle; margin-right: 5px;">wifi_tethering</i>
+                    Test Connection
+                </button>
+
+                <div id="propertiesResult" style="margin-top: 20px; display: none;">
+                    <h5 style="color: #fff;">Properties</h5>
+                    <table class="table table-dark table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>City</th>
+                                <th>Currency</th>
+                                <th>Active</th>
+                            </tr>
+                        </thead>
+                        <tbody id="propertiesTableBody"></tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-xl-12 col-md-12 col-12">
+        <div class="dashboard-card">
+            <div class="dashboard-card-header">
+                <header>Room Types</header>
+            </div>
+            <div class="dashboard-card-body">
+
+                <div id="syncLoadingIndicator" class="text-center" style="display: none; padding: 20px;">
+                    <i class="fa fa-spinner fa-spin fa-3x"></i>
+                    <p>Syncing room types...</p>
+                </div>
+
+                <div id="syncErrorMessage" class="alert alert-danger" style="display: none;"></div>
+                <div id="syncSuccessMessage" class="alert alert-success" style="display: none;"></div>
+
+                <p style="color: #fff;">Pushes your room types to Channex. Each type's room count is the number of active rooms of that type that are not under maintenance.</p>
+
+                <button type="button" class="btn btn-primary" id="btnSyncRoomTypes" style="min-width: 180px;">
+                    <i class="material-icons" style="vertical-align: middle; margin-right: 5px;">sync</i>
+                    Sync Room Types
+                </button>
+
+                <div id="syncResult" style="margin-top: 20px; display: none;">
+                    <table class="table table-dark table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Room Type</th>
+                                <th>Available Rooms</th>
+                                <th>Action</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="syncTableBody"></tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('btnTestConnection').addEventListener('click', testChannexConnection);
+    document.getElementById('btnSyncRoomTypes').addEventListener('click', syncRoomTypes);
+
+    const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    function syncRoomTypes() {
+        const loadingIndicator = document.getElementById('syncLoadingIndicator');
+        const errorMessage = document.getElementById('syncErrorMessage');
+        const successMessage = document.getElementById('syncSuccessMessage');
+        const syncResult = document.getElementById('syncResult');
+        const syncTableBody = document.getElementById('syncTableBody');
+
+        errorMessage.style.display = 'none';
+        successMessage.style.display = 'none';
+        syncResult.style.display = 'none';
+        loadingIndicator.style.display = 'block';
+
+        fetch('/channex/sync-room-types', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include'
+        })
+            .then(response => response.json())
+            .then(data => {
+                loadingIndicator.style.display = 'none';
+
+                if (!data.results) {
+                    errorMessage.textContent = 'Sync failed: ' + data.message;
+                    errorMessage.style.display = 'block';
+                    return;
+                }
+
+                if (data.success) {
+                    successMessage.textContent = 'Synced ' + data.results.length + ' room type(s) to ' + escapeHtml(data.property.title) + '.';
+                    successMessage.style.display = 'block';
+                } else {
+                    errorMessage.textContent = 'Some room types failed to sync, see details below.';
+                    errorMessage.style.display = 'block';
+                }
+
+                syncTableBody.innerHTML = data.results.map(r => `
+                    <tr>
+                        <td>${escapeHtml(r.name)}</td>
+                        <td>${r.available_room_count}</td>
+                        <td>${escapeHtml(r.action)}</td>
+                        <td>${r.success ? 'OK' : 'Failed: ' + escapeHtml(r.message)}</td>
+                    </tr>
+                `).join('');
+                syncResult.style.display = 'block';
+            })
+            .catch(error => {
+                loadingIndicator.style.display = 'none';
+                errorMessage.textContent = 'Error syncing room types: ' + error.message;
+                errorMessage.style.display = 'block';
+            });
+    }
+
+    function testChannexConnection() {
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+        const propertiesResult = document.getElementById('propertiesResult');
+        const propertiesTableBody = document.getElementById('propertiesTableBody');
+
+        errorMessage.style.display = 'none';
+        successMessage.style.display = 'none';
+        propertiesResult.style.display = 'none';
+        loadingIndicator.style.display = 'block';
+
+        fetch('/channex/test-connection', {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include'
+        })
+            .then(response => response.json())
+            .then(data => {
+                loadingIndicator.style.display = 'none';
+
+                if (data.success) {
+                    successMessage.textContent = data.message + ' (' + data.properties.length + ' property/properties found)';
+                    successMessage.style.display = 'block';
+
+                    const escapeHtml = (str) => String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+                    propertiesTableBody.innerHTML = data.properties.map(p => `
+                        <tr>
+                            <td>${escapeHtml(p.attributes.title)}</td>
+                            <td>${escapeHtml(p.attributes.city)}</td>
+                            <td>${escapeHtml(p.attributes.currency)}</td>
+                            <td>${p.attributes.is_active ? 'Yes' : 'No'}</td>
+                        </tr>
+                    `).join('');
+                    propertiesResult.style.display = 'block';
+                } else {
+                    errorMessage.textContent = 'Connection failed: ' + data.message;
+                    errorMessage.style.display = 'block';
+                }
+            })
+            .catch(error => {
+                loadingIndicator.style.display = 'none';
+                errorMessage.textContent = 'Error testing connection: ' + error.message;
+                errorMessage.style.display = 'block';
+            });
+    }
+</script>

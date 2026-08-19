@@ -324,6 +324,43 @@ class RoomModel {
     }
   }
 
+  // Room types with their available (active, not under maintenance) room count, for Channex sync
+  static async getRoomTypesForChannexSync() {
+    try {
+      const query = `
+        SELECT
+          rt.IDNo,
+          rt.NAME,
+          rt.DESCRIPTION,
+          rt.BASE_PRICE,
+          rt.CHANNEX_ROOM_TYPE_ID,
+          (
+            SELECT COUNT(*) FROM room r
+            WHERE r.ROOM_TYPE_ID = rt.IDNo
+              AND r.ACTIVE = 1
+              AND (r.ROOM_MAINTENANCE_STATUS IS NULL OR r.ROOM_MAINTENANCE_STATUS != 'Under Maintenance')
+          ) AS AVAILABLE_ROOM_COUNT
+        FROM room_type rt
+        WHERE rt.ACTIVE = 1
+        ORDER BY rt.NAME ASC
+      `;
+      return await queryDatabasePromise(query);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // Persist the linked Channex room_type id after a successful sync
+  static async setChannexRoomTypeId(id, channexRoomTypeId) {
+    try {
+      const query = 'UPDATE room_type SET CHANNEX_ROOM_TYPE_ID = ? WHERE IDNo = ?';
+      const result = await queryDatabasePromise(query, [channexRoomTypeId, id]);
+      return result.affectedRows > 0;
+    } catch (error) {
+      throw error;
+    }
+  }
+
   // ========================================
   // AMENITY CRUD OPERATIONS
   // ========================================

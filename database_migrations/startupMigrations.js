@@ -244,6 +244,20 @@ async function runHoldPendingMigrations() {
   );
 }
 
+async function runChannexMigrations() {
+  if (!(await tableExists('room_type'))) {
+    console.warn('⚠️ room_type table not found, skipping Channex column migration');
+    return;
+  }
+
+  await ensureColumn(
+    'room_type',
+    'CHANNEX_ROOM_TYPE_ID',
+    `CHANNEX_ROOM_TYPE_ID VARCHAR(36) NULL DEFAULT NULL COMMENT 'Linked room_type.id on Channex, set after first sync'`,
+    'BASE_PRICE'
+  );
+}
+
 async function runStartupMigrations() {
   console.log('🔄 Running startup database migrations...');
 
@@ -253,6 +267,7 @@ async function runStartupMigrations() {
   await runLongTermStayMigrations();
   await runHoldPendingMigrations();
   await runCalendarPerformanceMigrations();
+  await runChannexMigrations();
 
   console.log('✅ Startup database migrations complete');
 }
