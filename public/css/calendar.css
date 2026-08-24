@@ -530,11 +530,10 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     /* Enhanced shadow for better depth */
-    transform: skew(-25deg) scale(1.02) !important;
     box-shadow: none !important;
-    /* Parallelogram shape, same look as before - just scaled down so the
-       whole bar (including its skew overhang) fits more within its own cell */
-    transform: translateX(1px) skew(-18deg) scaleX(0.85) !important;
+    /* Parallelogram look only — do NOT scaleX. Scaling shortens long stays
+       (e.g. Aug 31–Sep 29 looked like it ended on the 27th). */
+    transform: skew(-18deg) !important;
     transform-origin: center !important;
     /* Smooth transitions for hover effects */
     transition: all 0.3s ease !important;
@@ -552,9 +551,9 @@
   #calendar .fc-timeline-event-harness { top: 5px !important; height: 18px !important; }
   #calendar td.fc-timeline-lane .fc-timeline-events { min-height: 18px !important; height: 18px !important; }
   
-  /* Counter the skew for the text inside */
+  /* Counter the bar skew so labels stay upright */
   .fc-event > * {
-    transform: skew(25deg) !important;
+    transform: skew(18deg) !important;
     transform-origin: center !important;
     /* Ensure text stays crisp */
     backface-visibility: hidden !important;
@@ -572,15 +571,88 @@
   .fc-datagrid-cell-cushion {
     display: flex !important;
     align-items: center !important;
+    justify-content: center !important;
     height: 100%;
     box-sizing: border-box;
     padding: 1px !important;
+  }
+
+  /* Room rows sit under floors — FC reserves expander space that pushes labels right. */
+  #calendar .fc-resource-area .fc-datagrid-cell.fc-resource:not([data-is-floor]) .fc-datagrid-cell-frame {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+  }
+
+  #calendar .fc-resource-area .fc-datagrid-cell.fc-resource:not([data-is-floor]) .fc-datagrid-cell-cushion {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin: 0 !important;
+  }
+
+  #calendar .fc-resource-area .fc-datagrid-cell.fc-resource:not([data-is-floor]) .fc-datagrid-expander,
+  #calendar .fc-resource-area .fc-datagrid-cell.fc-resource:not([data-is-floor]) .fc-datagrid-expander-placeholder {
+    display: none !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
   }
   
   /* BOLD the Floor Names */
   .fc-resource-bold {
     font-weight: bold;
     color: #ccc;
+    text-align: center;
+    width: 100%;
+  }
+
+  /* Room view color coding — text only (no box fill, so shade indicators stay visible) */
+  #calendar .fc-datagrid-cell.fc-resource.room-view-mountain .fc-datagrid-cell-cushion,
+  #calendar .fc-datagrid-cell.fc-resource.room-view-condo .fc-datagrid-cell-cushion {
+    font-weight: 700 !important;
+  }
+
+  #calendar .fc-datagrid-cell.fc-resource.room-view-mountain .fc-datagrid-cell-cushion {
+    color: #43A047 !important; /* forest green */
+  }
+
+  #calendar .fc-datagrid-cell.fc-resource.room-view-condo .fc-datagrid-cell-cushion {
+    color: #6B93C7 !important; /* steel / city blue */
+  }
+
+  #calendar .calendar-room-label {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 3px;
+    width: auto !important;
+    max-width: 100%;
+    margin: 0 auto !important;
+    transform: translateX(-5px);
+    min-width: 0;
+  }
+
+  #calendar .calendar-room-number {
+    flex-shrink: 0;
+  }
+
+  #calendar .calendar-room-beds {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+
+  #calendar .calendar-bed-icon {
+    font-size: 9px;
+    line-height: 1;
   }
   
   /* ========================================
@@ -807,11 +879,17 @@
     color: #fff !important;
   }
 
-  /* Group / Long-Term Bookings - White Text Only */
+  .fc-event.group-booking.booking-channel-booking {
+    box-shadow: inset 0 0 0 3px #D5A6BD, 0 0 0 1px rgba(0, 0, 0, 0.12) !important;
+  }
+
+  /* Group / Long-Term / Booking Channel Bookings - White Text Only */
   .fc-event.group-booking,
   .fc-event.long-term-booking,
+  .fc-event.booking-channel-booking,
   .fc-event.group-booking .fc-event-title,
   .fc-event.long-term-booking .fc-event-title,
+  .fc-event.booking-channel-booking .fc-event-title,
   .fc-event[style*="color: rgb(0, 191, 255)"] .fc-event-title,
   .fc-event[style*="color: #00BFFF"] .fc-event-title,
   .fc-event.fc-event-future.group-booking,
@@ -819,7 +897,10 @@
   .fc-event.fc-event-present.group-booking,
   .fc-event.fc-event-future.long-term-booking,
   .fc-event.fc-event-past.long-term-booking,
-  .fc-event.fc-event-present.long-term-booking {
+  .fc-event.fc-event-present.long-term-booking,
+  .fc-event.fc-event-future.booking-channel-booking,
+  .fc-event.fc-event-past.booking-channel-booking,
+  .fc-event.fc-event-present.booking-channel-booking {
         color: #ffffff !important; /* Blue text for group bookings */
   }
   
@@ -827,8 +908,10 @@
   .fc .fc-event .fc-event-main.group-booking-text,
   .fc-event.group-booking .fc-event-title,
   .fc-event.long-term-booking .fc-event-title,
+  .fc-event.booking-channel-booking .fc-event-title,
   .fc-event.group-booking .fc-event-main,
   .fc-event.long-term-booking .fc-event-main,
+  .fc-event.booking-channel-booking .fc-event-main,
   .fc .fc-daygrid-event .fc-event-title.group-booking-text,
   .fc .fc-timegrid-event .fc-event-title.group-booking-text,
   .fc .fc-list-event .fc-event-title.group-booking-text,
@@ -837,8 +920,10 @@
   .fc-content .fc-event.group-booking .fc-event-main,
   #calendar .fc-event.group-booking,
   #calendar .fc-event.long-term-booking,
+  #calendar .fc-event.booking-channel-booking,
   #calendar .fc-event.group-booking *,
-  #calendar .fc-event.long-term-booking * {
+  #calendar .fc-event.long-term-booking *,
+  #calendar .fc-event.booking-channel-booking * {
         color: #ffffff !important;
   }
   
@@ -1025,18 +1110,40 @@
      ======================================== */
 .calendar-legend-overlay {
   position: fixed;
-  bottom: 20px; /* Changed from top: 20px to bottom: 20px */
-  right: 20px;
+  bottom: 12px;
+  right: 12px;
+  top: auto;
+  left: auto;
   background: linear-gradient(145deg, #2a3135, #1f2528);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
-  padding: 20px;
+  padding: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(10px);
   z-index: 1000;
-  min-width: 300px; /* Increased from 280px to 300px for better text fit */
+  width: min(280px, calc(100vw - 24px));
+  min-width: 0;
+  max-height: calc(100vh - 24px);
+  max-height: calc(100dvh - 24px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  transition: all 0.3s ease;
+  transition: box-shadow 0.2s ease, background 0.2s ease;
+  box-sizing: border-box;
+}
+
+.calendar-legend-overlay::-webkit-scrollbar {
+  width: 6px;
+}
+
+.calendar-legend-overlay::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+}
+
+.calendar-legend-overlay::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* Removed hover effect that caused floating */
@@ -1049,22 +1156,31 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 15px;
+  margin-bottom: 8px;
+  margin-top: 10px;
+  padding-bottom: 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  gap: 15px; /* Add gap between title and button */
+  gap: 10px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: linear-gradient(145deg, #2a3135, #1f2528);
+}
+
+.calendar-legend-header:first-child {
+  margin-top: 0;
 }
 
 .calendar-legend-title {
   color: #ffffff;
-  font-size: 16px; /* Reduced from 18px to 16px */
+  font-size: 13px;
   font-weight: 600;
   margin: 0;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  flex: 1; /* Allow title to take available space */
-  white-space: nowrap; /* Prevent text wrapping */
-  overflow: hidden; /* Hide overflow */
-  text-overflow: ellipsis; /* Show ellipsis if text is too long */
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .calendar-legend-toggle {
@@ -1072,13 +1188,13 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 6px;
   color: #ffffff;
-  padding: 6px 12px;
+  padding: 4px 10px;
   font-size: 12px;
   cursor: pointer;
   transition: all 0.3s ease;
   font-weight: 500;
-  flex-shrink: 0; /* Prevent button from shrinking */
-  min-width: 32px; /* Ensure minimum button width */
+  flex-shrink: 0;
+  min-width: 28px;
 }
 
 /* Removed hover effect that caused movement */
@@ -1103,12 +1219,16 @@
 .calendar-legend-item {
   display: flex;
   align-items: center;
-  margin-bottom: 12px;
-  padding: 8px 12px;
+  margin-bottom: 6px;
+  padding: 5px 8px;
   background: rgba(255, 255, 255, 0.03);
-  border-radius: 8px;
-  border-left: 4px solid transparent;
-  transition: all 0.3s ease;
+  border-radius: 6px;
+  border-left: 3px solid transparent;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.calendar-legend-item:last-child {
+  margin-bottom: 0;
 }
 
 .calendar-legend-item[data-legend-key] {
@@ -1131,6 +1251,27 @@
   background-color: #9c27b0 !important;
 }
 
+.legend-color-booking-channel {
+  background-color: #D5A6BD !important;
+}
+
+.legend-color-pickup {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 10px;
+}
+
+.legend-color-condo-view {
+  background-color: #4A6FA5 !important;
+}
+
+.legend-color-mountain-view {
+  background-color: #2E7D32 !important;
+}
+
 /* Removed hover effect that caused movement */
 /* .calendar-legend-item:hover {
   background: rgba(255, 255, 255, 0.08);
@@ -1138,30 +1279,34 @@
 } */
 
 .calendar-legend-color {
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-  margin-right: 12px;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  margin-right: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
 }
 
 .calendar-legend-text {
   color: #ffffff;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   flex: 1;
+  line-height: 1.25;
+  min-width: 0;
 }
 
 .calendar-legend-count {
   background: rgba(255, 255, 255, 0.1);
   color: #ffffff;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 10px;
   font-weight: 600;
-  min-width: 20px;
+  min-width: 18px;
   text-align: center;
+  flex-shrink: 0;
 }
 
 /* Legend color definitions */
@@ -1209,17 +1354,22 @@
 /* Legend minimize/maximize animation */
 .calendar-legend-overlay.minimized {
   min-width: auto;
-  width: 48px; /* compact size */
-  height: 48px; /* compact size */
-  padding: 0; /* no inner padding */
+  width: 48px;
+  height: 48px;
+  max-height: 48px;
+  padding: 0;
   border-radius: 12px;
-  transform: none; /* no slide-out */
+  transform: none;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
-.calendar-legend-overlay.minimized .calendar-legend-content { display: none; }
+.calendar-legend-overlay.minimized .calendar-legend-content,
+.calendar-legend-overlay.minimized .calendar-legend-header:not(:first-child) {
+  display: none !important;
+}
 
 .calendar-legend-overlay.minimized .calendar-legend-header {
   border-bottom: none;
@@ -1229,6 +1379,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  position: static;
+  background: transparent;
 }
 
 .calendar-legend-overlay.minimized .calendar-legend-title { display: none; }
@@ -1255,18 +1407,49 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 } */
 
+/* Fit on short viewports / zoomed pages */
+@media (max-height: 760px) {
+  .calendar-legend-overlay {
+    padding: 8px;
+    width: min(250px, calc(100vw - 16px));
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
+    bottom: 8px;
+    right: 8px;
+  }
+
+  .calendar-legend-header {
+    margin-bottom: 6px;
+    margin-top: 8px;
+    padding-bottom: 6px;
+  }
+
+  .calendar-legend-item {
+    margin-bottom: 4px;
+    padding: 4px 6px;
+  }
+
+  .calendar-legend-text {
+    font-size: 11px;
+  }
+
+  .calendar-legend-title {
+    font-size: 12px;
+  }
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
   .calendar-legend-overlay {
-    bottom: 10px; /* Changed from top: 10px to bottom: 10px */
-    right: 10px;
-    left: 10px;
-    min-width: auto;
-    width: auto;
+    bottom: 8px;
+    right: 8px;
+    left: auto;
+    width: min(260px, calc(100vw - 16px));
+    min-width: 0;
   }
   
   .calendar-legend-overlay.minimized {
-    width: auto;
+    width: 48px;
     left: auto;
   }
 }
@@ -1279,7 +1462,7 @@
 @keyframes legend-slide-in {
   from {
     opacity: 0;
-    transform: translateX(100px);
+    transform: translateX(40px);
   }
   to {
     opacity: 1;
@@ -1464,6 +1647,16 @@
 
 [data-theme="white"] .fc-resource-bold {
   color: #000000 !important;
+}
+
+[data-theme="white"] #calendar .fc-datagrid-cell.fc-resource.room-view-mountain .fc-datagrid-cell-cushion {
+  color: #2E7D32 !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="white"] #calendar .fc-datagrid-cell.fc-resource.room-view-condo .fc-datagrid-cell-cushion {
+  color: #4A6FA5 !important;
+  font-weight: 700 !important;
 }
 
 /* ========================================

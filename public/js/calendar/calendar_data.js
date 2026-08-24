@@ -1847,14 +1847,14 @@ const customButtons = {
   },
 
   bed1Filter: {
-    text: '1BR',
+    text: 'K',
     click: function() {
       toggleBedFilter('1');
     }
   },
 
   bed2Filter: {
-    text: '2BR',
+    text: 'Q',
     click: function() {
       toggleBedFilter('2');
     }
@@ -1992,7 +1992,8 @@ function processRoomsData(roomsData) {
       id: String(room.RoomID),
       title: `${room.ROOM_NUMBER}`.trim(),
       roomNumber: room.ROOM_NUMBER,
-      bedCount: room.ROOM_BED
+      bedCount: room.ROOM_BED,
+      roomView: parseInt(room.ROOM_VIEW, 10) || null
     };
     floors[floorName].children.push(roomObj);
   });
@@ -2011,6 +2012,36 @@ function processRoomsData(roomsData) {
   });
 
   return sortedFloors;
+}
+
+function buildCalendarRoomLabel(arg) {
+  const bedCount = parseInt(
+    arg.resource.extendedProps?.bedCount ?? arg.resource.bedCount,
+    10
+  );
+
+  const wrap = document.createElement('div');
+  wrap.className = 'calendar-room-label';
+
+  if (bedCount === 1 || bedCount === 2) {
+    const beds = document.createElement('span');
+    beds.className = 'calendar-room-beds';
+    beds.setAttribute('aria-label', bedCount === 1 ? 'King Bedroom' : 'Queen Bedroom');
+    for (let i = 0; i < bedCount; i++) {
+      const icon = document.createElement('i');
+      icon.className = 'fa fa-bed calendar-bed-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      beds.appendChild(icon);
+    }
+    wrap.appendChild(beds);
+  }
+
+  const num = document.createElement('span');
+  num.className = 'calendar-room-number';
+  num.textContent = arg.resource.title;
+  wrap.appendChild(num);
+
+  return { domNodes: [wrap] };
 }
 
 // NOTE: processBookingsData() has been removed - backend now handles all data processing
@@ -2161,9 +2192,9 @@ function applyIncomingHighlight() {
             const r = bgEl.getBoundingClientRect();
             const overlay = document.createElement('div');
             overlay.className = 'calendar-highlight-overlay-pulse';
-            // match booking bar skew from calendar.css (.fc-event has skew -35deg)
+            // match booking bar skew from calendar.css (.fc-event has skew -18deg)
             // compute extra width to compensate so tips are not cropped
-            const skewDeg = 35; // keep in sync with CSS
+            const skewDeg = 18; // keep in sync with CSS
             const skewRad = skewDeg * Math.PI / 180;
             const extra = Math.tan(skewRad) * (r.height / 2);
             const pad = 6; // border/blur breathing room
@@ -2175,7 +2206,7 @@ function applyIncomingHighlight() {
             overlay.style.top = Math.max(0, top) + 'px';
             overlay.style.width = Math.max(0, width) + 'px';
             overlay.style.height = Math.max(0, height) + 'px';
-            overlay.style.transform = 'skew(-35deg)';
+            overlay.style.transform = 'skew(-18deg)';
             // inner white fill to mimic event highlight interior
             const fill = document.createElement('div');
             fill.style.position = 'absolute';
@@ -2329,7 +2360,8 @@ function buildOptimizedBookingsUrl(dateRange) {
   const range = dateRange || getCalendarFetchDateRange();
   const params = new URLSearchParams({
     start: range.start,
-    end: range.end
+    end: range.end,
+    _: String(Date.now())
   });
   return `/calendar/api/bookings/optimized?${params.toString()}`;
 }
@@ -2354,6 +2386,10 @@ function applyCalendarBookings(events) {
   window.allCalendarEvents = events;
   calendar.removeAllEvents();
   calendar.addEventSource(events);
+  if (typeof updateLegendCounts === 'function') {
+    // Counts must refresh after bulk source replace — eventAdd may not fire for every event
+    setTimeout(() => updateLegendCounts(), 0);
+  }
 }
 
 async function reloadCalendarBookingsForVisibleRange() {
@@ -2371,6 +2407,9 @@ async function reloadCalendarBookingsForVisibleRange() {
       applyCalendarBookings(events);
       if (typeof applyBedFilter === 'function') {
         applyBedFilter();
+      }
+      if (typeof updateLegendCounts === 'function') {
+        updateLegendCounts();
       }
       if (groupCreateModeActive && groupCreateSelectedRooms.size && groupCreateDateRange) {
         renderGroupCreateOverlays();
@@ -2411,6 +2450,11 @@ async function loadCalendarData() {
     applyCalendarBookings(events);
     calendar.render();
     applyBedFilter();
+    if (typeof updateLegendCounts === 'function') {
+      updateLegendCounts();
+    } else if (typeof updateRoomViewLegendCounts === 'function') {
+      updateRoomViewLegendCounts();
+    }
     if (groupCreateModeActive && groupCreateSelectedRooms.size && groupCreateDateRange) {
       renderGroupCreateOverlays();
     }
@@ -2586,8 +2630,15 @@ const findHeader = setInterval(() => {
     editable: true,
     eventResourceEditable: false, // Disable dragging bookings to other rooms
     selectable: true,
+    selectOverlap: true,
     selectAllow: function(selectInfo) {
-      return selectInfo.resource && !isFloorResourceId(selectInfo.resource.id);
+      if (!selectInfo.resource || isFloorResourceId(selectInfo.resource.id)) {
+        return false;
+      }
+      if (typeof window.isCalendarSlotBooked === 'function') {
+        return !window.isCalendarSlotBooked(selectInfo.resource.id, selectInfo.start, selectInfo.end);
+      }
+      return true;
     },
     // Resize options - compatible with older FullCalendar versions
     eventResize: true, // Enable event resizing
@@ -2688,13 +2739,36 @@ const findHeader = setInterval(() => {
         div.classList.add("fc-resource-bold");
         return { domNodes: [div] };
       }
-      return arg.resource.title;
+      return buildCalendarRoomLabel(arg);
     },
 
     resourceLabelDidMount: function(arg) {
       if (arg.resource.extendedProps.isFloor) {
         arg.el.setAttribute('data-is-floor', 'true');
         return;
+      }
+
+      const roomView = parseInt(
+        arg.resource.extendedProps.roomView ?? arg.resource.roomView,
+        10
+      );
+      const bedCount = parseInt(
+        arg.resource.extendedProps?.bedCount ?? arg.resource.bedCount,
+        10
+      );
+      arg.el.classList.remove('room-view-condo', 'room-view-mountain');
+      const tooltipParts = [];
+      if (bedCount === 1) tooltipParts.push('King Bedroom');
+      else if (bedCount === 2) tooltipParts.push('Queen Bedroom');
+      if (roomView === 1) {
+        arg.el.classList.add('room-view-condo');
+        tooltipParts.push('Condo View');
+      } else if (roomView === 2) {
+        arg.el.classList.add('room-view-mountain');
+        tooltipParts.push('Mountain View');
+      }
+      if (tooltipParts.length) {
+        arg.el.title = tooltipParts.join(' · ');
       }
 
       // Re-apply the armed highlight after view re-renders (e.g. changing weeks)
@@ -3022,14 +3096,17 @@ function refreshGroupBookingShadesAfterLayout() {
 function applyBedFilter() {
   if (!calendar || !window.allCalendarFloors) return;
 
-  const filteredFloors = !activeBedFilter
-    ? window.allCalendarFloors
-    : window.allCalendarFloors
-        .map(floor => ({
-          ...floor,
-          children: (floor.children || []).filter(room => String(room.bedCount) === activeBedFilter)
-        }))
-        .filter(floor => floor.children.length > 0);
+  const roomViewFilter = getActiveRoomViewFilter();
+  const filteredFloors = window.allCalendarFloors
+    .map(floor => ({
+      ...floor,
+      children: (floor.children || []).filter(room => {
+        if (activeBedFilter && String(room.bedCount) !== activeBedFilter) return false;
+        if (roomViewFilter && parseInt(room.roomView, 10) !== roomViewFilter) return false;
+        return true;
+      })
+    }))
+    .filter(floor => floor.children.length > 0);
 
   calendar.setOption('resources', filteredFloors);
 
@@ -3563,6 +3640,26 @@ function createLegendOverlay() {
         <span class="calendar-legend-text">Long-Term Stay</span>
         <span class="calendar-legend-count" id="legend-count-long-term">0</span>
       </div>
+      <div class="calendar-legend-item" data-legend-key="booking-channel">
+        <div class="calendar-legend-color legend-color-booking-channel"></div>
+        <span class="calendar-legend-text">Booking Channel</span>
+        <span class="calendar-legend-count" id="legend-count-booking-channel">0</span>
+      </div>
+    </div>
+    <div class="calendar-legend-header">
+      <h3 class="calendar-legend-title">Room View</h3>
+    </div>
+    <div class="calendar-legend-content">
+      <div class="calendar-legend-item" data-legend-key="condo-view" style="cursor: pointer;">
+        <div class="calendar-legend-color legend-color-condo-view"></div>
+        <span class="calendar-legend-text">Condo View</span>
+        <span class="calendar-legend-count" id="legend-count-condo-view">0</span>
+      </div>
+      <div class="calendar-legend-item" data-legend-key="mountain-view" style="cursor: pointer;">
+        <div class="calendar-legend-color legend-color-mountain-view"></div>
+        <span class="calendar-legend-text">Mountain View</span>
+        <span class="calendar-legend-count" id="legend-count-mountain-view">0</span>
+      </div>
     </div>
   `;
   
@@ -3570,6 +3667,7 @@ function createLegendOverlay() {
 
   // Add drag functionality to legend
   makeLegendDraggable(legendOverlay);
+  clampLegendToViewport(legendOverlay);
 
   // Click a legend item to dim every non-matching event on the calendar
   setupLegendFilterClicks(legendOverlay);
@@ -3600,11 +3698,15 @@ function classifyEventForLegend(event) {
     'paid': false,
     'partial': false,
     'unpaid': false,
-    'long-term': !!event.extendedProps?.isLongTermStay
+    'long-term': !!event.extendedProps?.isLongTermStay,
+    'booking-channel': (() => {
+      const channel = String(event.extendedProps?.bookingChannel || '').trim().toLowerCase();
+      return channel === 'booking-channel' || channel === 'booking channel';
+    })()
   };
 
-  // Payment status (skip cancelled bookings, same as the on-event indicator)
-  if (status !== 'cancelled') {
+  // Payment status (skip cancelled/maintenance bookings, same as the on-event indicator)
+  if (status !== 'cancelled' && status !== 'maintenance') {
     if (paymentStatus === 'paid') flags.paid = true;
     else if (paymentStatus === 'partial') flags.partial = true;
     else flags.unpaid = true;
@@ -3649,7 +3751,16 @@ function classifyEventForLegend(event) {
 function updateLegendCounts() {
   if (!calendar) return;
 
-  const events = calendar.getEvents();
+  // Prefer live calendar events; fall back to last fetched payload if FC has none yet
+  let events = calendar.getEvents();
+  if ((!events || events.length === 0) && Array.isArray(window.allCalendarEvents) && window.allCalendarEvents.length) {
+    events = window.allCalendarEvents.map((e) => ({
+      id: e.id,
+      backgroundColor: e.backgroundColor,
+      extendedProps: e.extendedProps || {}
+    }));
+  }
+
   const counts = {
     occupied: 0,
     'late-checkin': 0,
@@ -3661,7 +3772,8 @@ function updateLegendCounts() {
     paid: 0,
     partial: 0,
     unpaid: 0,
-    'long-term': 0
+    'long-term': 0,
+    'booking-channel': 0
   };
 
   events.forEach(event => {
@@ -3683,25 +3795,57 @@ function updateLegendCounts() {
   updateLegendCount('legend-count-partial', counts.partial);
   updateLegendCount('legend-count-unpaid', counts.unpaid);
   updateLegendCount('legend-count-long-term', counts['long-term']);
+  updateLegendCount('legend-count-booking-channel', counts['booking-channel']);
+  updateRoomViewLegendCounts();
 
   // Re-apply the active dim filter (if any) so newly added/changed events stay in sync
   applyLegendFilter();
 }
 
+function updateRoomViewLegendCounts() {
+  const floors = window.allCalendarFloors || [];
+  let condo = 0;
+  let mountain = 0;
+  floors.forEach(floor => {
+    (floor.children || []).forEach(room => {
+      const view = parseInt(room.roomView, 10);
+      if (view === 1) condo += 1;
+      else if (view === 2) mountain += 1;
+    });
+  });
+  updateLegendCount('legend-count-condo-view', condo);
+  updateLegendCount('legend-count-mountain-view', mountain);
+}
+
 // ============================================================
-// LEGEND CLICK-TO-FILTER (dim non-matching events)
+// LEGEND CLICK-TO-FILTER (dim non-matching events / filter rooms by view)
 // ============================================================
 let activeLegendFilterKey = null;
 
+const ROOM_VIEW_LEGEND_KEYS = {
+  'condo-view': 1,
+  'mountain-view': 2
+};
+
+function getActiveRoomViewFilter() {
+  return ROOM_VIEW_LEGEND_KEYS[activeLegendFilterKey] || null;
+}
+
+function isRoomViewLegendKey(key) {
+  return Object.prototype.hasOwnProperty.call(ROOM_VIEW_LEGEND_KEYS, key);
+}
+
 function applyLegendFilter() {
   if (!calendar) return;
+
   const events = calendar.getEvents();
+  const isRoomViewFilter = isRoomViewLegendKey(activeLegendFilterKey);
 
   events.forEach(event => {
     const el = window.eventElements && window.eventElements[event.id];
     if (!el) return;
 
-    if (!activeLegendFilterKey) {
+    if (!activeLegendFilterKey || isRoomViewFilter) {
       el.classList.remove('legend-dimmed');
       return;
     }
@@ -3716,11 +3860,20 @@ function applyLegendFilter() {
 }
 
 function setLegendFilter(key) {
+  const previousKey = activeLegendFilterKey;
   activeLegendFilterKey = (activeLegendFilterKey === key) ? null : key;
 
   document.querySelectorAll('.calendar-legend-item[data-legend-key]').forEach(item => {
     item.classList.toggle('legend-item-active', item.getAttribute('data-legend-key') === activeLegendFilterKey);
   });
+
+  // Refresh room list when entering/leaving a Room View filter
+  if (
+    typeof applyBedFilter === 'function' &&
+    (isRoomViewLegendKey(previousKey) || isRoomViewLegendKey(activeLegendFilterKey))
+  ) {
+    applyBedFilter();
+  }
 
   applyLegendFilter();
 }
@@ -3749,72 +3902,108 @@ function updateLegendCount(elementId, count) {
 
 function toggleLegend() {
   const legend = document.querySelector('.calendar-legend-overlay');
+  if (!legend) return;
+
   const toggleBtn = legend.querySelector('.calendar-legend-toggle');
-  const content = legend.querySelector('.calendar-legend-content');
-  
-  if (content.classList.contains('collapsed')) {
-    // Expand
-    content.classList.remove('collapsed');
+  const contents = legend.querySelectorAll('.calendar-legend-content');
+  const isCollapsed = legend.classList.contains('minimized');
+
+  if (isCollapsed) {
+    contents.forEach((content) => content.classList.remove('collapsed'));
     legend.classList.remove('minimized');
-    toggleBtn.textContent = '−'; // Minus sign to minimize
+    if (toggleBtn) toggleBtn.textContent = '−';
   } else {
-    // Collapse
-    content.classList.add('collapsed');
+    contents.forEach((content) => content.classList.add('collapsed'));
     legend.classList.add('minimized');
-    toggleBtn.textContent = '→'; // Right arrow to indicate expandable
+    if (toggleBtn) toggleBtn.textContent = '→';
   }
+
+  if (typeof window.clampLegendToViewport === 'function') {
+    window.clampLegendToViewport(legend);
+  }
+}
+
+function clampLegendToViewport(legend) {
+  if (!legend || legend.classList.contains('minimized')) return;
+
+  const margin = 8;
+  const rect = legend.getBoundingClientRect();
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  let shiftX = 0;
+  let shiftY = 0;
+
+  if (rect.right > vw - margin) shiftX -= rect.right - (vw - margin);
+  if (rect.left < margin) shiftX += margin - rect.left;
+  if (rect.bottom > vh - margin) shiftY -= rect.bottom - (vh - margin);
+  if (rect.top < margin) shiftY += margin - rect.top;
+
+  if (shiftX === 0 && shiftY === 0) return;
+
+  const transform = legend.style.transform || '';
+  const match = transform.match(/translate3d\(\s*([-\d.]+)px,\s*([-\d.]+)px/);
+  const currentX = match ? parseFloat(match[1]) : 0;
+  const currentY = match ? parseFloat(match[2]) : 0;
+  legend.style.transform = `translate3d(${currentX + shiftX}px, ${currentY + shiftY}px, 0)`;
+  legend.dataset.legendOffsetX = String(currentX + shiftX);
+  legend.dataset.legendOffsetY = String(currentY + shiftY);
 }
 
 function makeLegendDraggable(legend) {
   let isDragging = false;
-  let currentX;
-  let currentY;
-  let initialX;
-  let initialY;
-  let xOffset = 0;
-  let yOffset = 0;
-  
+  let currentX = 0;
+  let currentY = 0;
+  let initialX = 0;
+  let initialY = 0;
+  let xOffset = parseFloat(legend.dataset.legendOffsetX || '0') || 0;
+  let yOffset = parseFloat(legend.dataset.legendOffsetY || '0') || 0;
+
   legend.addEventListener('mousedown', dragStart);
   document.addEventListener('mousemove', drag);
   document.addEventListener('mouseup', dragEnd);
-  
+  window.addEventListener('resize', () => clampLegendToViewport(legend));
+
   function dragStart(e) {
     if (e.target.classList.contains('calendar-legend-toggle')) {
-      return; // Don't drag when clicking toggle button
+      return;
     }
-    
+
     initialX = e.clientX - xOffset;
     initialY = e.clientY - yOffset;
-    
+
     if (e.target === legend || legend.contains(e.target)) {
       isDragging = true;
     }
   }
-  
+
   function drag(e) {
-    if (isDragging) {
-      e.preventDefault();
-      
-      currentX = e.clientX - initialX;
-      currentY = e.clientY - initialY;
-      
-      xOffset = currentX;
-      yOffset = currentY;
-      
-      setTranslate(currentX, currentY, legend);
-    }
+    if (!isDragging) return;
+    e.preventDefault();
+
+    currentX = e.clientX - initialX;
+    currentY = e.clientY - initialY;
+    xOffset = currentX;
+    yOffset = currentY;
+    setTranslate(currentX, currentY, legend);
   }
-  
+
   function dragEnd() {
-    initialX = currentX;
-    initialY = currentY;
+    if (!isDragging) return;
     isDragging = false;
+    clampLegendToViewport(legend);
+    xOffset = parseFloat(legend.dataset.legendOffsetX || String(xOffset)) || xOffset;
+    yOffset = parseFloat(legend.dataset.legendOffsetY || String(yOffset)) || yOffset;
   }
-  
+
   function setTranslate(xPos, yPos, el) {
     el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
+    el.dataset.legendOffsetX = String(xPos);
+    el.dataset.legendOffsetY = String(yPos);
   }
 }
+
+window.clampLegendToViewport = clampLegendToViewport;
 
 // Global function for legend toggle (accessible from HTML)
 window.toggleLegend = toggleLegend;

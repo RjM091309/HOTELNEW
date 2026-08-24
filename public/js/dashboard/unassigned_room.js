@@ -30,7 +30,7 @@ function showAvailableRoomsForDirectReservation(bookingId, checkInDate, checkOut
             html: `
               <div style="text-align: center; margin-bottom: 20px;">
                 <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                  <h3 style="margin: 0; font-size: 18px;">Available Rooms  - ${bedCount} Bed${bedCount > 1 ? 's' : ''}</h3>
+                  <h3 style="margin: 0; font-size: 18px;">Available Rooms  - ${bedCount == 1 ? 'King Bedroom' : bedCount == 2 ? 'Queen Bedroom' : `${bedCount} Bed${bedCount > 1 ? 's' : ''}`}</h3>
                   <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">(${startFormatted} to ${endFormatted})</p>
                 </div>
                 
@@ -38,12 +38,12 @@ function showAvailableRoomsForDirectReservation(bookingId, checkInDate, checkOut
                   <div style="display: flex; gap: 15px; align-items: center;">
                     <label style="margin: 0;"><input type="radio" name="directReservationRoomFilter" value="all" checked onchange="filterDirectReservationRooms()"> All</label>
                     ${bedCount == 1 ? `
-                      <label style="margin: 0;"><input type="radio" name="directReservationRoomFilter" value="1BC" onchange="filterDirectReservationRooms()"> 1BC</label>
-                      <label style="margin: 0;"><input type="radio" name="directReservationRoomFilter" value="1BM" onchange="filterDirectReservationRooms()"> 1BM</label>
+                      <label style="margin: 0;" title="King Bedroom · Condo View"><input type="radio" name="directReservationRoomFilter" value="1BC" onchange="filterDirectReservationRooms()"> King Condo</label>
+                      <label style="margin: 0;" title="King Bedroom · Mountain View"><input type="radio" name="directReservationRoomFilter" value="1BM" onchange="filterDirectReservationRooms()"> King Mountain</label>
                     ` : ''}
                     ${bedCount == 2 ? `
-                      <label style="margin: 0;"><input type="radio" name="directReservationRoomFilter" value="2BC" onchange="filterDirectReservationRooms()"> 2BC</label>
-                      <label style="margin: 0;"><input type="radio" name="directReservationRoomFilter" value="2BM" onchange="filterDirectReservationRooms()"> 2BM</label>
+                      <label style="margin: 0;" title="Queen Bedroom · Condo View"><input type="radio" name="directReservationRoomFilter" value="2BC" onchange="filterDirectReservationRooms()"> Queen Condo</label>
+                      <label style="margin: 0;" title="Queen Bedroom · Mountain View"><input type="radio" name="directReservationRoomFilter" value="2BM" onchange="filterDirectReservationRooms()"> Queen Mountain</label>
                     ` : ''}
                   </div>
                   <div style="display: flex; align-items: center; gap: 10px;">
@@ -73,7 +73,7 @@ function showAvailableRoomsForDirectReservation(bookingId, checkInDate, checkOut
           Swal.fire({
             title: 'No Available Rooms',
             html: `
-              <p>No rooms with ${bedCount} bed${bedCount > 1 ? 's' : ''} are available for the selected dates:</p>
+              <p>No ${bedCount == 1 ? 'King Bedroom' : bedCount == 2 ? 'Queen Bedroom' : `${bedCount} bed${bedCount > 1 ? 's' : ''}`} rooms are available for the selected dates:</p>
               <p><strong>${startFormatted} to ${endFormatted}</strong></p>
               <p>Please try different dates or contact management.</p>
             `,
@@ -789,6 +789,7 @@ function confirmRoomAssignment(roomId, roomNumber, roomFloor, bookingId) {
                 // Default to walk-in
                 bookingRouteField.value = 'walk-in';
               }
+              bookingRouteField.dispatchEvent(new Event('change'));
               // NOT disabled - user can change this
             }
             
@@ -914,7 +915,7 @@ function confirmRoomAssignment(roomId, roomNumber, roomFloor, bookingId) {
             // Disable all other input fields
             const allInputs = addBookingModalElement.querySelectorAll('input, select, textarea');
             allInputs.forEach(input => {
-              if (!input.id || !['addroom', 'addFloor', 'room_type', 'bedCount', 'price', 'txtFullNameAdd', 'txtNumber', 'txtAddress', 'daterange', 'diffindays', 'checkInStatus', 'paymentStatus', 'bookingRoute', 'agencySelect', 'manualPriceToggle', 'includeBreakfast', 'breakfastAdultQty', 'breakfastAdultPrice', 'breakfastKidQty', 'breakfastKidPrice', 'bookingRemarks', 'guestType', 'guestLevel', 'paidAmount'].includes(input.id)) {
+              if (!input.id || !['addroom', 'addFloor', 'room_type', 'bedCount', 'price', 'weekdayRate', 'weekendRate', 'txtFullNameAdd', 'txtNumber', 'txtAddress', 'daterange', 'diffindays', 'checkInStatus', 'paymentStatus', 'bookingRoute', 'agencySelect', 'manualPriceToggle', 'weekendPriceToggle', 'includeBreakfast', 'breakfastAdultQty', 'breakfastAdultPrice', 'breakfastKidQty', 'breakfastKidPrice', 'bookingRemarks', 'guestType', 'guestLevel', 'paidAmount'].includes(input.id)) {
                 input.disabled = true;
               }
             });

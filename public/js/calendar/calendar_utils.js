@@ -263,26 +263,51 @@ function globalOverlapCheck(calendar) {
 // =============================================================================
 
 function cleanupModalOverlays() {
-  const openModals = document.querySelectorAll('.modal.show');
-  const backdrops = document.querySelectorAll('.modal-backdrop');
+  const openModals = Array.from(document.querySelectorAll('.modal.show'));
+  const backdrops = Array.from(document.querySelectorAll('.modal-backdrop'));
 
   if (openModals.length === 0) {
     backdrops.forEach((backdrop) => backdrop.remove());
     document.body.classList.remove('modal-open');
     document.body.style.removeProperty('overflow');
     document.body.style.removeProperty('padding-right');
-  } else if (backdrops.length > openModals.length) {
-    const extraCount = backdrops.length - openModals.length;
-    for (let i = 0; i < extraCount; i += 1) {
-      backdrops[i]?.remove();
+  } else {
+    while (backdrops.length > openModals.length) {
+      backdrops.pop()?.remove();
+    }
+
+    openModals.forEach((modal, index) => {
+      const modalZ = 1055 + (index * 20);
+      const backdropZ = modalZ - 5;
+      modal.style.zIndex = String(modalZ);
+      if (backdrops[index]) {
+        backdrops[index].style.zIndex = String(backdropZ);
+      }
+    });
+  }
+
+  const swalVisible = typeof Swal !== 'undefined' && Swal.isVisible && Swal.isVisible();
+  if (!swalVisible) {
+    document.querySelectorAll('.swal2-container').forEach((container) => {
+      if (!container.classList.contains('swal2-shown')) {
+        container.remove();
+      }
+    });
+  }
+}
+
+function cleanupAfterNestedModalClose() {
+  const openModals = document.querySelectorAll('.modal.show');
+  const backdrops = document.querySelectorAll('.modal-backdrop');
+
+  if (openModals.length > 0 && backdrops.length > openModals.length) {
+    const extra = backdrops.length - openModals.length;
+    for (let i = 0; i < extra; i += 1) {
+      backdrops[backdrops.length - 1 - i]?.remove();
     }
   }
 
-  document.querySelectorAll('.swal2-container').forEach((container) => {
-    if (!container.classList.contains('swal2-shown')) {
-      container.remove();
-    }
-  });
+  cleanupModalOverlays();
 }
 
 function disposeBootstrapModal(modalEl) {
@@ -311,11 +336,53 @@ function showBootstrapModal(modalEl, options = {}) {
   return instance;
 }
 
+function toLocalDayStartMs(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+function isCalendarSlotBooked(resourceId, start, end) {
+  const calendar = getCalendar();
+  if (!calendar || !resourceId || !start || !end) {
+    return false;
+  }
+
+  const rid = String(resourceId);
+  const selStart = toLocalDayStartMs(start);
+  const selEnd = toLocalDayStartMs(end);
+
+  return calendar.getEvents().some(function(ev) {
+    const evResource = ev.getResources()[0];
+    if (!evResource || String(evResource.id) !== rid) {
+      return false;
+    }
+
+    const status = ev.extendedProps?.bookingStatus;
+    if (status === 'cancelled' || status === 'maintenance') {
+      return false;
+    }
+
+    const evStart = ev.start;
+    const evEnd = ev.end;
+    if (!evStart || !evEnd) {
+      return false;
+    }
+
+    // Hotel nights occupy check-in date through the day before checkout.
+    // Checkout day stays free so a back-to-back booking can start there.
+    const occStart = toLocalDayStartMs(evStart);
+    const occEnd = toLocalDayStartMs(evEnd);
+    return selStart < occEnd && selEnd > occStart;
+  });
+}
+
 // =============================================================================
 // EXPORT FUNCTIONS FOR USE IN OTHER MODULES
 // =============================================================================
 
 // Make functions globally available
+window.isCalendarSlotBooked = isCalendarSlotBooked;
 window.getCSRFToken = getCSRFToken;
 window.getBookingColor = getBookingColor;
 window.getCalendar = getCalendar;
@@ -333,5 +400,6 @@ window.hasLateCheckInStartingOn = hasLateCheckInStartingOn;
 window.hasRegularCheckoutEndingOn = hasRegularCheckoutEndingOn;
 window.globalOverlapCheck = globalOverlapCheck;
 window.cleanupModalOverlays = cleanupModalOverlays;
+window.cleanupAfterNestedModalClose = cleanupAfterNestedModalClose;
 window.disposeBootstrapModal = disposeBootstrapModal;
 window.showBootstrapModal = showBootstrapModal;

@@ -1,4 +1,4 @@
-<div class="modal fade" id="modal-cancel-booking" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+<div class="modal fade" id="modal-cancel-booking" tabindex="-1" data-bs-backdrop="true" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header bg-danger text-white">
@@ -68,11 +68,17 @@
   
 <!-- Include external JavaScript files -->
 <script>
-	document.addEventListener('DOMContentLoaded', function() {
-		
-		// Load add_booking.js immediately - this is critical for booking functionality
-		var cancelBookingScript = document.createElement('script');
-		cancelBookingScript.src = '/js/booking/cancel_booking.js';
-		document.body.appendChild(cancelBookingScript);
-	});
+	(function() {
+		function loadCancelBookingScript() {
+			if (document.querySelector('script[src="/js/booking/cancel_booking.js"]')) return;
+			var cancelBookingScript = document.createElement('script');
+			cancelBookingScript.src = '/js/booking/cancel_booking.js';
+			document.body.appendChild(cancelBookingScript);
+		}
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', loadCancelBookingScript);
+		} else {
+			loadCancelBookingScript();
+		}
+	})();
 </script>

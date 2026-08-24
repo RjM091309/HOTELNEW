@@ -188,9 +188,19 @@
                                     <button type="button" id="proceedToPaymentButton" class="btn btn-payment" data-bs-toggle="modal" data-bs-target="#modal-payment">
                                         <i class="fa fa-credit-card"></i> Proceed to Payment
                                     </button>
-                                    <button onclick="printDiv('printableArea')" class="btn btn-print" type="button">
-                                        <i class="fa fa-print"></i> Print Receipt
-                                    </button>
+                                    <div class="voucher-action-wrap">
+                                        <div class="voucher-action-menu" id="printReceiptActionMenu" hidden style="display: none;" onclick="event.stopPropagation()">
+                                            <button type="button" class="btn btn-sm btn-light voucher-action-btn" onclick="window.printBillingReceipt()">
+                                                <i class="fa fa-print me-1"></i>Print
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-primary voucher-action-btn" onclick="window.sendBillingReceipt()">
+                                                <i class="fa fa-paper-plane me-1"></i>Send
+                                            </button>
+                                        </div>
+                                        <button type="button" class="btn btn-print" onclick="window.toggleActionPopup('printReceiptActionMenu', event)">
+                                            <i class="fa fa-print"></i> Print Receipt
+                                        </button>
+                                    </div>
                                     <button type="button" class="btn btn-close-modal" data-bs-dismiss="modal">
                                         <i class="fa fa-times"></i> Close
                                     </button>
@@ -911,6 +921,12 @@
     color: #333;
 }
 
+#modal-billing .payment-breakdown-table .payment-status-cell {
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.35;
+}
+
 #modal-billing .payment-breakdown-table tbody tr:last-child td {
     border-bottom: none;
 }
@@ -1006,6 +1022,12 @@
     gap: 15px;
     justify-content: center;
     flex-wrap: wrap;
+    overflow: visible;
+}
+
+.billing-actions,
+.voucher-action-wrap {
+    overflow: visible;
 }
 
 .btn {

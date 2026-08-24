@@ -1,3 +1,55 @@
+function refreshAfterCancelBooking() {
+    if (typeof refreshCalendarBookings === 'function') {
+        refreshCalendarBookings();
+    } else if (typeof loadCalendarData === 'function') {
+        loadCalendarData();
+    } else if ($.fn.DataTable && $.fn.DataTable.isDataTable('#booking_tbl')) {
+        $('#booking_tbl').DataTable().ajax.reload();
+    }
+}
+
+function hideCancelAndRoomModals() {
+    const cancelEl = document.getElementById('modal-cancel-booking');
+    if (cancelEl && window.bootstrap && bootstrap.Modal) {
+        const cancelInst = bootstrap.Modal.getInstance(cancelEl);
+        if (cancelInst) {
+            cancelInst.hide();
+        }
+    }
+
+    document.querySelectorAll('[id^="dynamicRoomModal_"]').forEach((roomModal) => {
+        if (window.bootstrap && bootstrap.Modal) {
+            const roomInst = bootstrap.Modal.getInstance(roomModal);
+            if (roomInst) {
+                roomInst.hide();
+            }
+        }
+    });
+}
+
+function cleanupCancelModalUi() {
+    const cancelEl = document.getElementById('modal-cancel-booking');
+
+    if (typeof window.resetSharedCancelModal === 'function') {
+        window.resetSharedCancelModal(cancelEl);
+    } else if (cancelEl && window.bootstrap && bootstrap.Modal) {
+        const inst = bootstrap.Modal.getInstance(cancelEl);
+        if (inst) inst.dispose();
+    }
+
+    if (typeof window.cleanupAfterNestedModalClose === 'function') {
+        window.cleanupAfterNestedModalClose();
+    } else if (typeof window.cleanupModalOverlays === 'function') {
+        window.cleanupModalOverlays();
+    }
+
+    document.querySelectorAll('.swal2-container').forEach((container) => {
+        if (!container.classList.contains('swal2-shown')) {
+            container.remove();
+        }
+    });
+}
+
 function confirmCancelBooking() {
     const bookingId = $('#cancelBookingId').val();
     const reason = $('#cancelReason').val();
@@ -7,7 +59,7 @@ function confirmCancelBooking() {
     const manualCancellationFee = parseFloat(feeInput);
     const maxRefundText = $('#cancelMaxRefund').text().replace(/[₱,]/g, '');
     const maxRefund = parseFloat(maxRefundText) || 0;
-    const paidAmount = maxRefund; // Paid amount is the same as max refund
+    const paidAmount = maxRefund;
     const totalAmount = parseFloat($('#manualRefund').data('total-amount')) || 0;
 
     if (!bookingId) {
@@ -25,30 +77,25 @@ function confirmCancelBooking() {
         return;
     }
 
-    // Get max values from input attributes
     const maxRefundable = parseFloat($('#manualRefund').attr('max')) || maxRefund;
-    // If nothing paid, max cancellation fee is totalAmount; otherwise it's paidAmount
-    const maxCancellationFee = maxRefund === 0 
-        ? totalAmount 
+    const maxCancellationFee = maxRefund === 0
+        ? totalAmount
         : (parseFloat($('#manualCancellationFee').attr('max')) || paidAmount);
-    
+
     if (manualRefund > maxRefundable) {
         Swal.fire('Invalid Amount', `Refund amount cannot exceed ₱${maxRefundable.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`, 'warning');
         return;
     }
-    
+
     if (manualCancellationFee > maxCancellationFee) {
         Swal.fire('Invalid Amount', `Cancellation fee cannot exceed ₱${maxCancellationFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`, 'warning');
         return;
     }
 
-    // Validate that refund + fee equals paid amount (not total amount)
-    // Exception: If nothing was paid (maxRefund = 0), fee can be set independently
     const sum = manualRefund + manualCancellationFee;
     const difference = Math.abs(sum - paidAmount);
-    
+
     if (maxRefund === 0) {
-        // If nothing was paid, refund must be 0, fee can be any amount up to totalAmount
         if (manualRefund !== 0) {
             Swal.fire('Invalid Amount', 'Refund amount must be 0 when no payment was made.', 'warning');
             return;
@@ -57,14 +104,13 @@ function confirmCancelBooking() {
             Swal.fire('Invalid Amount', `Cancellation fee cannot exceed Total Amount (₱${totalAmount.toFixed(2)}).`, 'warning');
             return;
         }
-        // Allow fee to be less than totalAmount (the difference is written off)
-    } else {
-        // If payment was made, refund + fee must equal paid amount
-        if (difference > 0.01) { // Allow small floating point differences
-            Swal.fire('Invalid Amounts', `Refund amount (₱${manualRefund.toFixed(2)}) + Cancellation Fee (₱${manualCancellationFee.toFixed(2)}) must equal Paid Amount (₱${paidAmount.toFixed(2)}).`, 'warning');
-            return;
-        }
+    } else if (difference > 0.01) {
+        Swal.fire('Invalid Amounts', `Refund amount (₱${manualRefund.toFixed(2)}) + Cancellation Fee (₱${manualCancellationFee.toFixed(2)}) must equal Paid Amount (₱${paidAmount.toFixed(2)}).`, 'warning');
+        return;
     }
+
+    const $confirmBtn = $('#confirmCancelBtn');
+    $confirmBtn.prop('disabled', true);
 
     $.ajax({
         url: '/booking/cancel',
@@ -76,30 +122,54 @@ function confirmCancelBooking() {
             manualCancellationFee
         },
         success: function (res) {
+            $confirmBtn.prop('disabled', false);
+
             if (res.success) {
-                $('#modal-cancel-booking').modal('hide');
-                Swal.fire('Cancelled!', res.message, 'success');
-                $('#booking_tbl').DataTable().ajax.reload();
+                hideCancelAndRoomModals();
+                refreshAfterCancelBooking();
+
+                setTimeout(() => {
+                    cleanupCancelModalUi();
+                }, 300);
+
+                Swal.fire('Cancelled!', res.message, 'success').then(() => {
+                    refreshAfterCancelBooking();
+                    cleanupCancelModalUi();
+                });
             } else {
                 Swal.fire('Error', res.message, 'error');
             }
         },
         error: function () {
+            $confirmBtn.prop('disabled', false);
             Swal.fire('Error', 'Something went wrong.', 'error');
         }
     });
 }
 
-// Attach once the DOM is ready
-$(document).ready(function () {
-    $('#confirmCancelBtn').click(confirmCancelBooking);
-    
-    // Clear fields when modal is closed
-    $('#modal-cancel-booking').on('hidden.bs.modal', function() {
+function bindCancelModalCleanup() {
+    const cancelEl = document.getElementById('modal-cancel-booking');
+    if (!cancelEl || cancelEl.dataset.cancelCleanupBound === '1') return;
+    cancelEl.dataset.cancelCleanupBound = '1';
+
+    cancelEl.addEventListener('hidden.bs.modal', function () {
         $('#manualRefund').val('');
-        $('#manualRefund').prop('readonly', false); // Reset readonly state
+        $('#manualRefund').prop('readonly', false);
         $('#manualCancellationFee').val('');
         $('#cancelReason').val('');
         $('#noPaymentNote').hide();
+        $('#confirmCancelBtn').prop('disabled', false);
+        cleanupCancelModalUi();
     });
-}); 
+}
+
+$(document).ready(function () {
+    $('#confirmCancelBtn').off('click.cancelBooking').on('click.cancelBooking', confirmCancelBooking);
+    bindCancelModalCleanup();
+});
+
+if (document.readyState !== 'loading') {
+    bindCancelModalCleanup();
+} else {
+    document.addEventListener('DOMContentLoaded', bindCancelModalCleanup);
+}

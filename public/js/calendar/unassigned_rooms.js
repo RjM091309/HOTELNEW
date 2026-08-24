@@ -157,7 +157,7 @@ function fetchRoomBedAvailability(startStr, endStr) {
         const badge = document.querySelector(`.bed-availability-badge[data-date="${dateKey}"]`);
         if (!badge) return;
         const { single, double } = data.availability[dateKey];
-        badge.innerHTML = `<span class="bed-chip bed-chip-single">S ${single}</span><span class="bed-availability-sep">&middot;</span><span class="bed-chip bed-chip-double">D ${double}</span>`;
+        badge.innerHTML = `<span class="bed-chip bed-chip-single">K ${single}</span><span class="bed-availability-sep">&middot;</span><span class="bed-chip bed-chip-double">Q ${double}</span>`;
       });
     })
     .catch((err) => {
@@ -227,7 +227,7 @@ function renderDirectReservationDetails(booking, index, rooms) {
   <div class="booking-item-details">
     <div class="details-row">
       <span class="data room-number room-title">
-       #${index + 1} ${booking.roomNumber === 'Unassigned' ? 'Unassigned Room' : `Room ${booking.roomNumber}`} - ${booking.customerName} <span style="color: #6c757d; font-weight: normal;">(${booking.bedCount} Bed${(booking.bedCount) > 1 ? 's' : ''})</span>
+       #${index + 1} ${booking.roomNumber === 'Unassigned' ? 'Unassigned Room' : `Room ${booking.roomNumber}`} - ${booking.customerName} <span style="color: #6c757d; font-weight: normal;">(${booking.bedCount == 1 ? 'King' : booking.bedCount == 2 ? 'Queen' : `${booking.bedCount} Bed${(booking.bedCount) > 1 ? 's' : ''}`})</span>
       </span>
       <select class="edit-field room-number" style="display: none;">
         ${roomOptions}
@@ -416,19 +416,19 @@ function showAvailableRoomsForDirectReservation(bookingId, checkInDate, checkOut
           <div style="text-align: center; margin-bottom: 20px;">
             <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
               <h3 style="margin: 0; font-size: 18px;">Available Rooms</h3>
-              <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">(${startFormatted} to ${endFormatted}) - ${bedCount} Bed${bedCount > 1 ? 's' : ''}</p>
+              <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">(${startFormatted} to ${endFormatted}) - ${bedCount == 1 ? 'King Bedroom' : bedCount == 2 ? 'Queen Bedroom' : `${bedCount} Bed${bedCount > 1 ? 's' : ''}`}</p>
             </div>
             
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
               <div style="display: flex; gap: 15px; align-items: center;">
                 <label style="margin: 0;"><input type="radio" name="directReservationRoomFilter" value="all" checked onchange="filterDirectReservationRooms()"> All</label>
                 ${bedCount == 1 ? `
-                  <label style="margin: 0;"><input type="radio" name="directReservationRoomFilter" value="1BC" onchange="filterDirectReservationRooms()"> 1BC</label>
-                  <label style="margin: 0;"><input type="radio" name="directReservationRoomFilter" value="1BM" onchange="filterDirectReservationRooms()"> 1BM</label>
+                  <label style="margin: 0;" title="King Bedroom · Condo View"><input type="radio" name="directReservationRoomFilter" value="1BC" onchange="filterDirectReservationRooms()"> King Condo</label>
+                  <label style="margin: 0;" title="King Bedroom · Mountain View"><input type="radio" name="directReservationRoomFilter" value="1BM" onchange="filterDirectReservationRooms()"> King Mountain</label>
                 ` : ''}
                 ${bedCount == 2 ? `
-                  <label style="margin: 0;"><input type="radio" name="directReservationRoomFilter" value="2BC" onchange="filterDirectReservationRooms()"> 2BC</label>
-                  <label style="margin: 0;"><input type="radio" name="directReservationRoomFilter" value="2BM" onchange="filterDirectReservationRooms()"> 2BM</label>
+                  <label style="margin: 0;" title="Queen Bedroom · Condo View"><input type="radio" name="directReservationRoomFilter" value="2BC" onchange="filterDirectReservationRooms()"> Queen Condo</label>
+                  <label style="margin: 0;" title="Queen Bedroom · Mountain View"><input type="radio" name="directReservationRoomFilter" value="2BM" onchange="filterDirectReservationRooms()"> Queen Mountain</label>
                 ` : ''}
               </div>
               <div style="display: flex; align-items: center; gap: 10px;">
@@ -1175,6 +1175,7 @@ function openAddBookingModalReadOnly(bookingDetails, roomId, roomNumber, roomFlo
               // Default to walk-in
               bookingRouteField.value = 'walk-in';
             }
+            bookingRouteField.dispatchEvent(new Event('change'));
             // NOT disabled - user can change this
           }
           
@@ -1300,7 +1301,7 @@ function openAddBookingModalReadOnly(bookingDetails, roomId, roomNumber, roomFlo
           // Disable all other input fields
           const allInputs = addBookingModalElement.querySelectorAll('input, select, textarea');
           allInputs.forEach(input => {
-            if (!input.id || !['addroom', 'addFloor', 'room_type', 'bedCount', 'price', 'txtFullNameAdd', 'txtNumber', 'txtAddress', 'daterange', 'diffindays', 'checkInStatus', 'paymentStatus', 'bookingRoute', 'agencySelect', 'manualPriceToggle', 'includeBreakfast', 'breakfastAdultQty', 'breakfastAdultPrice', 'breakfastKidQty', 'breakfastKidPrice', 'bookingRemarks', 'guestType', 'guestLevel', 'paidAmount'].includes(input.id)) {
+            if (!input.id || !['addroom', 'addFloor', 'room_type', 'bedCount', 'price', 'weekdayRate', 'weekendRate', 'txtFullNameAdd', 'txtNumber', 'txtAddress', 'daterange', 'diffindays', 'checkInStatus', 'paymentStatus', 'bookingRoute', 'agencySelect', 'manualPriceToggle', 'weekendPriceToggle', 'includeBreakfast', 'breakfastAdultQty', 'breakfastAdultPrice', 'breakfastKidQty', 'breakfastKidPrice', 'bookingRemarks', 'guestType', 'guestLevel', 'paidAmount'].includes(input.id)) {
               input.disabled = true;
             }
           });

@@ -35,6 +35,7 @@ const GROUP_COLORS = [
 ];
 
 const LONG_TERM_BORDER_COLOR = '#9c27b0'; // matches legend long-term purple
+const BOOKING_CHANNEL_BORDER_COLOR = '#D5A6BD'; // matches legend booking-channel pink
 
 // Cache to store groupBookingId -> color mapping (consistent across all events)
 const groupColorCache = {};
@@ -53,15 +54,21 @@ function isLongTermBooking(event) {
   return raw === true || raw === 1 || raw === '1';
 }
 
+function isBookingChannelBooking(event) {
+  const channel = String(event.extendedProps?.bookingChannel || '').trim().toLowerCase();
+  return channel === 'booking-channel' || channel === 'booking channel';
+}
+
 function isGroupBookingEvent(event) {
   const groupBookingId = event.extendedProps?.groupBookingId;
   return groupBookingId != null && groupBookingId !== 0 && groupBookingId !== '' && String(groupBookingId).trim() !== '';
 }
 
 function applyHighlightBorderStyles(el, borderColor, variant) {
-  el.classList.remove('group-booking', 'long-term-booking');
+  el.classList.remove('group-booking', 'long-term-booking', 'booking-channel-booking');
   if (variant === 'group') el.classList.add('group-booking');
   if (variant === 'long-term') el.classList.add('long-term-booking');
+  if (variant === 'booking-channel') el.classList.add('booking-channel-booking');
   el.style.setProperty('--booking-border-color', borderColor);
   el.style.setProperty('border', `4px solid ${borderColor}`, 'important');
   el.setAttribute('data-highlight-border-color', borderColor);
@@ -77,7 +84,7 @@ function applyHighlightBorderStyles(el, borderColor, variant) {
 }
 
 function clearHighlightBorderStyles(el) {
-  el.classList.remove('group-booking', 'long-term-booking');
+  el.classList.remove('group-booking', 'long-term-booking', 'booking-channel-booking');
   el.style.removeProperty('--booking-border-color');
   el.removeAttribute('data-highlight-border-color');
   el.style.border = '';
@@ -95,10 +102,30 @@ function applyBookingHighlightBorder(event, el) {
     applyHighlightBorderStyles(el, LONG_TERM_BORDER_COLOR, 'long-term');
     return;
   }
-  if (isGroupBookingEvent(event)) {
+
+  const isGroup = isGroupBookingEvent(event);
+  const isChannel = isBookingChannelBooking(event);
+
+  // Group bookings keep the group color as the outer border.
+  // Booking Channel adds a pink inner stripe so both types stay visible.
+  if (isGroup) {
     applyHighlightBorderStyles(el, getGroupBookingColor(event.extendedProps.groupBookingId), 'group');
+    if (isChannel) {
+      el.classList.add('booking-channel-booking');
+      el.style.setProperty(
+        'box-shadow',
+        `inset 0 0 0 3px ${BOOKING_CHANNEL_BORDER_COLOR}, 0 0 0 1px rgba(0, 0, 0, 0.12)`,
+        'important'
+      );
+    }
     return;
   }
+
+  if (isChannel) {
+    applyHighlightBorderStyles(el, BOOKING_CHANNEL_BORDER_COLOR, 'booking-channel');
+    return;
+  }
+
   clearHighlightBorderStyles(el);
 }
 
@@ -189,9 +216,54 @@ function attachCalendarGlowOnBootstrapModal(modalEl, bookingId) {
   modalEl.addEventListener('hidden.bs.modal', onHidden, { once: true });
 }
 
+function isCalendarPageContext() {
+  return !!(window.calendar && document.getElementById('calendar'));
+}
+
+async function refreshCalendarAfterPaymentSuccess(bookingId) {
+  if (!isCalendarPageContext()) return false;
+
+  const id = bookingId ? String(bookingId) : '';
+  if (id && typeof suppressCalendarScheduleBarGlow === 'function') {
+    suppressCalendarScheduleBarGlow(id);
+  }
+
+  if (typeof window.refreshCalendarBookings === 'function') {
+    await window.refreshCalendarBookings();
+  }
+
+  if (id) {
+    requestAnimationFrame(() => glowCalendarScheduleBar(id));
+  }
+
+  return true;
+}
+
 // =============================================================================
 // EVENT HANDLERS
 // =============================================================================
+
+function getCalendarBookingStatus(event) {
+  return String(event?.extendedProps?.bookingStatus || '').trim().toLowerCase();
+}
+
+function isMaintenanceCalendarEvent(event) {
+  if (getCalendarBookingStatus(event) === 'maintenance') {
+    return true;
+  }
+
+  const title = String(event?.title || '').trim();
+  if (title === 'Maintenance' || title === 'AG - Maintenance') {
+    return true;
+  }
+
+  const bg = String(event?.backgroundColor || '').trim().toLowerCase();
+  if (bg === '#000000' && event?.extendedProps?.maintenanceReason) {
+    return true;
+  }
+
+  return false;
+}
 
 function handleEventClick(info) {
   if (info.jsEvent) {
@@ -204,7 +276,7 @@ function handleEventClick(info) {
     calendar.unselect();
   }
 
-  if (typeof window.cleanupModalOverlays === 'function') {
+  if (typeof window.cleanupModalOverlays === 'function' && !(typeof Swal !== 'undefined' && Swal.isVisible && Swal.isVisible())) {
     window.cleanupModalOverlays();
   }
 
@@ -217,6 +289,13 @@ function handleEventClick(info) {
   const room = resources.length ? resources[0] : null;
   const roomId = room?.id;
   if (!roomId) {
+    return;
+  }
+
+  if (isMaintenanceCalendarEvent(event)) {
+    if (typeof showMaintenanceModal === 'function') {
+      showMaintenanceModal(event);
+    }
     return;
   }
 
@@ -246,6 +325,10 @@ function handleEventClick(info) {
       // Show cancelled reservation modal
       showCancelledModal(event);
       break;
+
+    case 'maintenance':
+      showMaintenanceModal(event);
+      break;
       
     default:
       // For any other status, show appropriate modal
@@ -260,7 +343,14 @@ function handleEventClick(info) {
         } else if (eventColor === 'red' || eventColor === '#e53935') {
           showPendingModal(event);
         } else if (eventColor === '#000000') {
-          showCancelledModal(event);
+          const barStatus = getCalendarBookingStatus(event);
+          if (barStatus === 'cancelled') {
+            showCancelledModal(event);
+          } else if (isMaintenanceCalendarEvent(event)) {
+            showMaintenanceModal(event);
+          } else {
+            showEventInfoModal(event);
+          }
         } else {
           // Fallback to event info modal
           showEventInfoModal(event);
@@ -274,6 +364,17 @@ function handleEventClick(info) {
 function applyCompositeStatusStyles(event, el) {
   try {
     const bookingStatus = event.extendedProps?.bookingStatus;
+
+    if (bookingStatus === 'cancelled' || bookingStatus === 'maintenance') {
+      el.removeAttribute('data-composite');
+      el.style.background = '';
+      el.style.backgroundColor = event.backgroundColor || '#000000';
+      el.style.color = '#fff';
+      applyBookingHighlightBorder(event, el);
+      el.style.zIndex = bookingStatus === 'cancelled' ? '1' : '2';
+      return;
+    }
+
     // More robust check: groupBookingId must exist, not be null, not be 0, and not be empty string
     const holdPendingRaw = event.extendedProps?.holdPending;
     const isHoldPending = holdPendingRaw === 1 || holdPendingRaw === '1' || holdPendingRaw === true;
@@ -378,8 +479,8 @@ function applyBackToBackBorder(event, el) {
     const bookingStatus = event.extendedProps?.bookingStatus;
     const isGroupBooking = isGroupBookingEvent(event);
 
-    // Group / long-term bookings already own the border highlight
-    if (isGroupBooking || isLongTermBooking(event) || bookingStatus === 'cancelled') {
+    // Group / long-term / booking-channel bookings already own the border highlight
+    if (isGroupBooking || isLongTermBooking(event) || isBookingChannelBooking(event) || bookingStatus === 'cancelled' || bookingStatus === 'maintenance') {
       return;
     }
 
@@ -414,7 +515,7 @@ function applyPaymentStatusIndicator(event, el) {
     const existing = el.querySelector('.payment-status-line');
 
     // Cancelled bookings don't carry a meaningful payment status to flag
-    if (bookingStatus === 'cancelled') {
+    if (bookingStatus === 'cancelled' || bookingStatus === 'maintenance') {
       if (existing) existing.remove();
       return;
     }
@@ -433,6 +534,28 @@ function applyPaymentStatusIndicator(event, el) {
     dot.setAttribute('data-payment-status', paymentStatus);
 
     if (!existing) el.appendChild(dot);
+  } catch (e) {
+    // ignore
+  }
+}
+
+function applyPickupIndicator(event, el) {
+  try {
+    const hasPickup = !!event.extendedProps?.hasPickup;
+    const existing = el.querySelector('.pickup-service-indicator');
+
+    if (!hasPickup) {
+      if (existing) existing.remove();
+      el.classList.remove('has-pickup-service');
+      return;
+    }
+
+    el.classList.add('has-pickup-service');
+    const indicator = existing || document.createElement('div');
+    indicator.className = 'pickup-service-indicator';
+    indicator.title = 'Pick-up Service';
+    indicator.innerHTML = '<i class="fa fa-car" aria-hidden="true"></i>';
+    if (!existing) el.appendChild(indicator);
   } catch (e) {
     // ignore
   }
@@ -482,6 +605,9 @@ function handleEventDidMount(info) {
 
   // Apply payment status indicator dot (full / partial / unpaid)
   applyPaymentStatusIndicator(info.event, info.el);
+
+  // Pick-up service car icon
+  applyPickupIndicator(info.event, info.el);
 
   // Control visual overlay: allow only if either event is checkout
   try {
@@ -739,6 +865,8 @@ window.handleEventClick = handleEventClick;
 window.glowCalendarScheduleBar = glowCalendarScheduleBar;
 window.suppressCalendarScheduleBarGlow = suppressCalendarScheduleBarGlow;
 window.attachCalendarGlowOnBootstrapModal = attachCalendarGlowOnBootstrapModal;
+window.isCalendarPageContext = isCalendarPageContext;
+window.refreshCalendarAfterPaymentSuccess = refreshCalendarAfterPaymentSuccess;
 window.applyCompositeStatusStyles = applyCompositeStatusStyles;
 window.applyBackToBackBorder = applyBackToBackBorder;
 window.applyPaymentStatusIndicator = applyPaymentStatusIndicator;

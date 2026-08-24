@@ -31,9 +31,9 @@ $(document).ready(function () {
                     <input type="email" class="form-control" id="paypalEmail" placeholder="example@paypal.com" required>
                 </div>
             `);
-        } else if (selectedMethod === 'cash') {
+        } else if (selectedMethod === 'cash' || selectedMethod === 'bank_transfer') {
             paymentDetails.html(`
-                <p class="text-success">Cash payment selected.</p>
+                <p class="text-success">${selectedMethod === 'bank_transfer' ? 'Bank Transfer' : 'Cash'} payment selected.</p>
             `);
         }
     });
@@ -206,6 +206,19 @@ function initializePaymentModal() {
                         <div class="alert alert-info">
                             <i class="fa fa-info-circle"></i>
                             <strong>Note:</strong> Ensure you have sufficient cash available before confirming.
+                        </div>
+                    </div>
+                `;
+                break;
+
+            case 'bank_transfer':
+                detailsHTML = `
+                    <div class="payment-method-info">
+                        <h6><i class="fa fa-university"></i> Bank Transfer Payment</h6>
+                        <p class="text-muted">Please confirm the bank transfer has been received before completing this payment.</p>
+                        <div class="alert alert-info">
+                            <i class="fa fa-info-circle"></i>
+                            <strong>Note:</strong> Verify the transfer details before confirming.
                         </div>
                     </div>
                 `;
@@ -499,6 +512,59 @@ let shouldReopenBillingModal = true;
 // so the Billing Modal should never be auto-reopened.
 window.onPaymentConfirmed = window.onPaymentConfirmed || null;
 
+function prepareCalendarPaymentModalClose(bookingId) {
+    const id = bookingId ? String(bookingId) : '';
+    if (!id || typeof window.isCalendarPageContext !== 'function' || !window.isCalendarPageContext()) {
+        return;
+    }
+    if (typeof window.suppressCalendarScheduleBarGlow === 'function') {
+        window.suppressCalendarScheduleBarGlow(id);
+    }
+}
+
+async function finalizeCalendarPaymentSuccess(bookingId) {
+    if (typeof window.refreshCalendarAfterPaymentSuccess === 'function') {
+        return window.refreshCalendarAfterPaymentSuccess(bookingId);
+    }
+    return false;
+}
+
+function showPaymentSuccessDialog(message, bookingId) {
+    const onCalendar = typeof window.isCalendarPageContext === 'function' && window.isCalendarPageContext();
+
+    Swal.fire({
+        title: 'Success!',
+        text: message,
+        icon: 'success',
+        confirmButtonText: 'OK',
+        allowOutsideClick: false,
+    }).then(() => {
+        if (!onCalendar) {
+            location.reload();
+        }
+    });
+}
+
+function handlePaymentSuccessClose(bookingId, message, onConfirmedCallback) {
+    prepareCalendarPaymentModalClose(bookingId);
+
+    $('.modal').modal('hide');
+    $('.modal-backdrop').remove();
+
+    if (typeof onConfirmedCallback === 'function') {
+        onConfirmedCallback();
+        return;
+    }
+
+    finalizeCalendarPaymentSuccess(bookingId)
+        .then(() => {
+            showPaymentSuccessDialog(message, bookingId);
+        })
+        .catch(() => {
+            showPaymentSuccessDialog(message, bookingId);
+        });
+}
+
 // Ensure cleanup after closing the Payment Modal
 document.getElementById('modal-payment').addEventListener('hidden.bs.modal', function () {
     // Remove modal-open class and reset styles
@@ -697,29 +763,11 @@ $('#confirmPaymentButton').on('click', async function () {
                         if (typeof window.onPaymentConfirmed === 'function') {
                             const onConfirmed = window.onPaymentConfirmed;
                             window.onPaymentConfirmed = null;
-
-                            $('.modal').modal('hide');
-                            $('.modal-backdrop').remove();
-
-                            onConfirmed(response);
+                            handlePaymentSuccessClose(bookingId, response.message, () => onConfirmed(response));
                             return;
                         }
 
-                        // Hide all modals
-                        $('.modal').modal('hide'); // Hides all open modals
-                        $('.modal-backdrop').remove(); // Ensures no backdrops remain
-
-                        // Show success SweetAlert
-                        Swal.fire({
-                            title: 'Success!',
-                            text: response.message,
-                            icon: 'success',
-                            confirmButtonText: 'OK',
-                            allowOutsideClick: false, // Prevent closing when clicking outside
-                        }).then(() => {
-                            // Reload the page after closing SweetAlert
-                            location.reload();
-                        });
+                        handlePaymentSuccessClose(bookingId, response.message);
                     } else {
                         // Handle payment failure
                         showPaymentStatus('error', response.message);

@@ -90,6 +90,12 @@
                 </select>
               </div>
             </div>
+            <div class="col-lg-4" id="editGroupChannelBookingIdWrapper" style="display: none;">
+              <div class="form-group">
+                <label class="form-label">Booking ID</label>
+                <input type="text" class="form-control" id="editGroupChannelBookingId" name="groupChannelBookingId" placeholder="Enter channel booking ID" autocomplete="off">
+              </div>
+            </div>
           </div>
 
           <!-- Late Checkout Fee Display - appears below when visible -->
@@ -138,11 +144,11 @@
                 <label class="form-label mb-1">Bed Requirements</label>
                 <div class="d-flex gap-3 flex-wrap">
                   <div class="bed-requirement-group">
-                    <label class="form-label mb-1">1 Bed</label>
+                    <label class="form-label mb-1">King</label>
                     <input type="number" class="form-control" id="editGroupBed1Count" name="groupBed1Count" min="0" value="0">
                   </div>
                   <div class="bed-requirement-group">
-                    <label class="form-label mb-1">2 Beds</label>
+                    <label class="form-label mb-1">Queen</label>
                     <input type="number" class="form-control" id="editGroupBed2Count" name="groupBed2Count" min="0" value="0">
                   </div>
                 </div>
@@ -172,11 +178,11 @@
                       </div>
                       <div class="form-check form-check-inline">
                         <input class="form-check-input" type="radio" name="editGroupRoomFilter" id="editFilter1B" value="1B">
-                        <label class="form-check-label" for="editFilter1B">1B</label>
+                        <label class="form-check-label" for="editFilter1B">King</label>
                       </div>
                       <div class="form-check form-check-inline">
                         <input class="form-check-input" type="radio" name="editGroupRoomFilter" id="editFilter2B" value="2B">
-                        <label class="form-check-label" for="editFilter2B">2B</label>
+                        <label class="form-check-label" for="editFilter2B">Queen</label>
                       </div>
                     </div>
                   </div>
@@ -201,7 +207,15 @@
             <div class="col-lg-6">
               <div class="form-group">
                 <label class="form-label">Group Contact Number</label>
-                <input type="text" class="form-control" id="editGroupContact" name="groupContact" required>
+                <div class="input-group contact-channel-group">
+                  <select class="form-select" id="editGroupContactChannel" name="groupContactChannel">
+                    <option value="Phone" selected>Phone</option>
+                    <option value="KakaoTalk">KakaoTalk</option>
+                    <option value="Viber">Viber</option>
+                    <option value="Telegram">Telegram</option>
+                  </select>
+                  <input type="text" class="form-control" id="editGroupContact" name="groupContact" required placeholder="Enter phone number">
+                </div>
               </div>
             </div>
           </div>
@@ -815,6 +829,7 @@
 </style>
 
 <script src="/plugins/flatpicker/flatpickr.min.js"></script>
+<script src="/js/booking/contact_channel.js?v=2"></script>
 <script>
 // Make editGroupManualSelectedRooms global so it can be accessed from other scripts
 window.editGroupManualSelectedRooms = [];
@@ -869,6 +884,13 @@ window.editGroupAddedServicesMap = {};
     }
   }
 
+  function toggleEditGroupChannelFields(isBookingChannel) {
+    $('#editGroupChannelBookingIdWrapper').toggle(isBookingChannel);
+    if (!isBookingChannel) {
+      $('#editGroupChannelBookingId').val('');
+    }
+  }
+
   function refreshEditGroupRoomPricing() {
     if ($('#editGroupResultsContainer').is(':visible')) {
       $('#editGroupSearchRooms').click();
@@ -896,6 +918,8 @@ window.editGroupAddedServicesMap = {};
     editGroupRequiredBed2 = 0;
     editGroupUnassignedConflicts = [];
     $('#editGroupAgencyWrapper').hide();
+    $('#editGroupChannelBookingIdWrapper').hide();
+    $('#editGroupChannelBookingId').val('');
     $('input[name="editGroupAgencyPayer"][value="agency"]').prop('checked', true);
     updateEditGroupAgencyPayerHint();
     $('#editGroupRoomsList').empty();
@@ -1107,7 +1131,7 @@ window.editGroupAddedServicesMap = {};
       const selectedIds = block.map(room => room.IDNo);
       const selectedNumbers = block.map(room => room.ROOM_NUMBER);
       $('#editGroupSelectedRooms').val(selectedIds.join(','));
-      $('#editGroupSelectedRoomPrices').val(computedPrices.join(','));
+      $('#editGroupSelectedRoomPrices').val(computedPrices.join('|'));
       $('#editGroupSelectedRoomNumbers').val(selectedNumbers.join(','));
       
       // Trigger total computation after room selection
@@ -1220,7 +1244,7 @@ window.editGroupAddedServicesMap = {};
       }
 
       if (neededRoomsNum > 0 && totalBedNeeded === 0) {
-        Swal.fire('Bed Requirement Missing', 'Please specify how many rooms should have 1 bed or 2 beds before searching.', 'warning');
+        Swal.fire('Bed Requirement Missing', 'Please specify how many King or Queen rooms you need before searching.', 'warning');
         return;
       }
 
@@ -1440,6 +1464,7 @@ window.editGroupAddedServicesMap = {};
   // Booking route change handler
   $('#editGroupBookingRoute').on('change', function() {
     toggleEditGroupAgencyFields(this.value === 'agency');
+    toggleEditGroupChannelFields(this.value === 'booking-channel');
     
     // Call search button on every onChange
     const daterange = $('#editGroupDaterange').val();
@@ -1523,7 +1548,7 @@ window.editGroupAddedServicesMap = {};
     // Compute per-room discounts for Senior/PWD (aligned to room order)
     const computeSeniorPerRoomDiscounts = (pricesRaw, nights, percent, roomCount) => {
       const prices = pricesRaw
-        ? pricesRaw.split(',').map(p => parseFloat(p) || 0)
+        ? pricesRaw.split('|').map(p => parseFloat(p) || 0)
         : [];
       const nNights = parseInt(nights, 10) || 0;
       const discountDecimal = (parseFloat(percent) || 0) / 100;
@@ -1545,7 +1570,9 @@ window.editGroupAddedServicesMap = {};
       qty: $('#editGroupNights').val(),
       daterange: $('#editGroupDaterange').val(),
       groupName: $('#editGroupName').val(),
-      groupContact: $('#editGroupContact').val(),
+      groupContact: (window.ContactChannel
+        ? window.ContactChannel.getValue('#editGroupContactChannel', '#editGroupContact')
+        : $('#editGroupContact').val()),
       numberOfRooms: $('#editGroupNumberOfRooms').val(),
       paidAmount: $('#editGroupPaidAmount').val(),
       bookingRoute: $('#editGroupBookingRoute').val(),
@@ -1559,6 +1586,9 @@ window.editGroupAddedServicesMap = {};
       agencyPayer: $('#editGroupBookingRoute').val() === 'agency'
         ? ($('input[name="editGroupAgencyPayer"]:checked').val() || 'agency')
         : null,
+      channelBookingId: $('#editGroupBookingRoute').val() === 'booking-channel'
+        ? ($('#editGroupChannelBookingId').val() || '').trim()
+        : '',
       breakfastAdultQty: $('#editGroupBreakfastAdultQty').val(),
       breakfastAdultPrice: $('#editGroupBreakfastAdultPrice').val(),
       breakfastAdultId: $('#editGroupBreakfastAdultId').val(),
@@ -1791,7 +1821,7 @@ window.editGroupAddedServicesMap = {};
     });
 
     $('#editGroupSelectedRooms').val(selectedRooms.map(room => room.IDNo).join(','));
-    $('#editGroupSelectedRoomPrices').val(computedBasePrices.join(','));
+    $('#editGroupSelectedRoomPrices').val(computedBasePrices.join('|'));
 
     // Update room breakdown if needed
     if (selectedRooms.length > 0) {
@@ -2126,7 +2156,7 @@ window.editGroupAddedServicesMap = {};
       // Calculate room charges
       const nights = parseInt($('#editGroupNights').val(), 10) || 0;
       const pricesRaw = $('#editGroupSelectedRoomPrices').val();
-      const prices = pricesRaw ? pricesRaw.split(',').map(p => parseFloat(p) || 0) : [];
+      const prices = pricesRaw ? pricesRaw.split('|').map(p => parseFloat(p) || 0) : [];
       const baseSubtotal = prices.reduce((sum, price) => sum + price, 0);
       const roomCharges = baseSubtotal * nights;
       
@@ -2148,7 +2178,9 @@ window.editGroupAddedServicesMap = {};
       const bookingData = {
         voucherNo: vno,
         groupName: $('#editGroupName').val() || 'Group Booking',
-        groupContact: $('#editGroupContact').val() || '',
+        groupContact: (window.ContactChannel
+          ? window.ContactChannel.getValue('#editGroupContactChannel', '#editGroupContact')
+          : $('#editGroupContact').val()) || '',
         dateFrom: dateFrom,
         dateTo: dateTo,
         roomSummary: roomNumbersForVoucher || 'No rooms selected',

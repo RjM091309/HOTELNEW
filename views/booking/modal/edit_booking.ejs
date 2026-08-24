@@ -78,6 +78,13 @@
                             </div>
                         </div>
 
+                        <div id="edit_channelBookingIdWrapper" class="col-lg-4" style="display: none;">
+                            <div class="form-group">
+                                <label class="form-label">Booking ID</label>
+                                <input type="text" class="form-control" id="edit_channelBookingId" name="channelBookingId" placeholder="Enter channel booking ID" autocomplete="off">
+                            </div>
+                        </div>
+
                         <!-- ROOM DETAILS -->
                         <div id="edit_divmaxOccupants" class="col-lg-4" style="display: none;">
                             <div class="form-group">
@@ -121,7 +128,7 @@
                             </div>
                         </div>
                           
-                        <div id="edit_divprice" class="col-lg-4">
+                        <div id="edit_divprice" class="col-lg-3">
                             <div class="form-group">
                                 <label class="form-label">Room Rate</label>
                                 <input class="form-control" type="text" id="edit_price" name="price" readonly>
@@ -149,10 +156,18 @@
                             <div id="edit_searchResults"></div>
                         </div>
 
-                        <div id="edit_divtxtNumber" class="col-lg-4">
+                        <div id="edit_divtxtNumber" class="col-lg-5">
                             <div class="form-group">
                                 <label class="form-label">Contact Number</label>
-                                <input class="form-control" type="text" id="edit_txtNumber" name="number" autocomplete="off">
+                                <div class="input-group contact-channel-group">
+                                    <select class="form-select" id="edit_contactChannel" name="contactChannel">
+                                        <option value="Phone" selected>Phone</option>
+                                        <option value="KakaoTalk">KakaoTalk</option>
+                                        <option value="Viber">Viber</option>
+                                        <option value="Telegram">Telegram</option>
+                                    </select>
+                                    <input class="form-control" type="text" id="edit_txtNumber" name="number" autocomplete="off" placeholder="Enter phone number">
+                                </div>
                             </div>
                         </div>
 
@@ -279,12 +294,19 @@
                             </div>
                         </div>
 
-                        <div class="col-lg-6">
+                        <div class="col-lg-3">
                           <div class="form-group form-check" style="margin-top: 30px;">
                             <input type="checkbox" class="form-check-input" id="edit_holdPendingCheckbox" name="holdPending">
                             <label class="form-check-label" for="edit_holdPendingCheckbox">
                               Hold Pending
                             </label>
+                          </div>
+                        </div>
+
+                        <div class="col-lg-3">
+                          <div class="form-group form-check" style="margin-top: 30px;">
+                            <input type="checkbox" class="form-check-input" id="edit_maintenanceCheckbox" name="isMaintenance">
+                            <label class="form-check-label" for="edit_maintenanceCheckbox">Maintenance</label>
                           </div>
                         </div>
 
@@ -601,9 +623,32 @@
 <!-- Scripts -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="/plugins/flatpicker/flatpickr.min.js"></script>
+<script src="/js/booking/contact_channel.js?v=2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+// Maintenance API helpers (shared with booking_submit.js when loaded)
+(function () {
+    if (!window.postSetMaintenance) {
+        window.postSetMaintenance = function (bookingId, reason, guestName) {
+            return new Promise((resolve, reject) => {
+                $.post('/booking/set-maintenance', { bookingId, reason, guestName: guestName || '' })
+                    .done(resolve)
+                    .fail((xhr) => reject(new Error(xhr?.responseJSON?.message || 'Failed to set Maintenance.')));
+            });
+        };
+    }
+    if (!window.postReopenMaintenance) {
+        window.postReopenMaintenance = function (bookingId) {
+            return new Promise((resolve, reject) => {
+                $.post('/booking/reopen-maintenance', { bookingId })
+                    .done(resolve)
+                    .fail((xhr) => reject(new Error(xhr?.responseJSON?.message || 'Failed to reopen booking.')));
+            });
+        };
+    }
+})();
+
 // Global variable for extra services in edit form
 let editAddedServicesMap = {}; // Store added services for edit form
 
@@ -1035,7 +1080,12 @@ $(document).ready(function() {
     // Booking route change handler
     $('#edit_bookingRoute').on('change', function () {
         const isAgency = this.value === 'agency';
+        const isBookingChannel = this.value === 'booking-channel';
         $('#edit_agencySelectWrapper').toggle(isAgency);
+        $('#edit_channelBookingIdWrapper').toggle(isBookingChannel);
+        if (!isBookingChannel) {
+            $('#edit_channelBookingId').val('');
+        }
         
         if (isAgency) {
             fetch('/booking/get-agency')
@@ -1066,10 +1116,18 @@ $(document).ready(function() {
         } else {
             $('#edit_price').prop('readonly', true);
             // Restore calculated price
-            const basePrice = parseFloat($('#edit_baseprice').val()) || 0;
+            const basePrice = parseFloat(String($('#edit_baseprice').val() || '').replace(/,/g, '')) || 0;
             $('#edit_price').val(basePrice.toFixed(2));
         }
         computeEditTotal();
+    });
+
+    $('#edit_price').on('input', function () {
+        if ($('#edit_manualPriceToggle').is(':checked')) {
+            const manualPrice = parseFloat(String($(this).val() || '').replace(/,/g, '')) || 0;
+            $('#edit_baseprice').val(manualPrice);
+            computeEditTotal();
+        }
     });
 
     // Input event listeners for total computation
@@ -1099,6 +1157,11 @@ $(document).ready(function() {
 
     // Reset services map and form fields when modal is hidden
     $(document).on('hidden.bs.modal', '#modal-editbooking', function() {
+        if ($('#modal-editbooking').data('edit-save-success')) {
+            $('#modal-editbooking').removeData('edit-save-success');
+            return;
+        }
+
         const bookingId = $('#edit_bookingId').val();
         if (bookingId && editAddedServicesMap[bookingId]) {
             // Keep the data but clear the UI
@@ -1164,6 +1227,10 @@ $(document).ready(function() {
         $('#edit_extra-services-wrapper').hide();
         $('#edit_extra-services-hr').hide();
         
+        if (typeof window.cleanupModalOverlays === 'function' && !(typeof Swal !== 'undefined' && Swal.isVisible && Swal.isVisible())) {
+            window.cleanupModalOverlays();
+        }
+
         // Reload page if unassigned room, don't reload if assigned room
         if (isUnassignedRoom) {
             window.location.reload();
@@ -1186,6 +1253,62 @@ $(document).ready(function() {
     });
 
     // Edit form submission
+    function finishEditBookingUiRefresh(bookingId) {
+        const onDashboard = window.location.pathname.includes('/dashboard');
+        const onCalendar = !!document.getElementById('calendar');
+
+        if (onCalendar && !onDashboard && typeof window.refreshCalendarAfterBookingSave === 'function') {
+            window.refreshCalendarAfterBookingSave();
+            return;
+        }
+
+        if ($.fn.DataTable && $('#booking_tbl').length && $.fn.DataTable.isDataTable('#booking_tbl')) {
+            $('#booking_tbl').DataTable().ajax.reload(null, false);
+            return;
+        }
+
+        if ($.fn.DataTable && $('#group_booking_tbl').length && $.fn.DataTable.isDataTable('#group_booking_tbl')) {
+            $('#group_booking_tbl').DataTable().ajax.reload(null, false);
+            return;
+        }
+
+        if (!onDashboard) {
+            window.location.reload();
+        }
+    }
+
+    function showEditBookingSuccess(message, bookingId) {
+        $('#modal-editbooking').data('edit-save-success', true);
+
+        const modalEl = document.getElementById('modal-editbooking');
+        const onHidden = function () {
+            finishEditBookingUiRefresh(bookingId);
+
+            Swal.fire({
+                title: 'Success!',
+                text: message || 'Booking updated successfully!',
+                icon: 'success',
+                confirmButtonText: 'OK',
+                allowOutsideClick: false,
+                allowEscapeKey: false
+            }).then(function () {
+                if (bookingId && document.getElementById('calendar') && typeof window.glowCalendarScheduleBar === 'function') {
+                    window.glowCalendarScheduleBar(bookingId);
+                }
+            });
+        };
+
+        if (modalEl) {
+            modalEl.addEventListener('hidden.bs.modal', onHidden, { once: true });
+        } else {
+            onHidden();
+        }
+
+        $('#modal-editbooking').modal('hide');
+    }
+
+    window.finishEditBookingUiRefresh = finishEditBookingUiRefresh;
+
     $('#editbooking').off('submit').on('submit', function (e) {
         e.preventDefault();
 
@@ -1226,7 +1349,9 @@ $(document).ready(function() {
         const formData = {
             room_id: $('#edit_addroom').val(),
             fullname: $('#edit_txtFullNameAdd').val(),
-            number: $('#edit_txtNumber').val(),
+            number: (window.ContactChannel
+                ? window.ContactChannel.getValue('#edit_contactChannel', '#edit_txtNumber')
+                : $('#edit_txtNumber').val()),
             daterange: $('#edit_daterange').val(),
             maxOccupants: $('#edit_maxOccupants').val(),
             paidAmount: $('#edit_paidAmount').val(),
@@ -1245,6 +1370,7 @@ $(document).ready(function() {
             agencyPayer: $('#edit_bookingRoute').val() === 'agency'
                 ? ($('input[name="edit_agencyPayer"]:checked').val() || 'agency')
                 : null,
+            channelBookingId: ($('#edit_channelBookingId').val() || '').trim(),
             bedCount: $('#edit_bedCount').val(),
             
             // Services
@@ -1270,21 +1396,72 @@ $(document).ready(function() {
         };
         
         // Submit update
+        const isMaintenanceChecked = $('#edit_maintenanceCheckbox').is(':checked');
+        const wasMaintenance = $('#edit_bookingId').data('wasMaintenance') === true;
+
         $.ajax({
             url: `/booking/edit_booking/${bookingId}`,
             type: 'POST',
             data: formData,
             success: function (response) {
-                if (response.success) {
-                    $('#modal-editbooking').modal('hide');
-                    Swal.fire({
-                        title: 'Success!',
-                        text: response.message,
-                        icon: 'success',
-                        confirmButtonText: 'OK'
-                    }).then(() => {
-                        window.location.reload();
+                const finishEditSuccess = (message) => {
+                    showEditBookingSuccess(message || response.message, bookingId);
+                };
+
+                const finishEditWarning = (message) => {
+                    Swal.fire('Warning', message, 'warning').then(function () {
+                        finishEditBookingUiRefresh(bookingId);
                     });
+                };
+
+                const handleMaintenanceToggle = () => {
+                    if (isMaintenanceChecked && !wasMaintenance) {
+                        const guestName = $('#edit_txtFullNameAdd').val() || '';
+                        const reason = $('#edit_bookingRemarks').val() || '';
+                        const applyMaintenance = window.postSetMaintenance || null;
+                        if (!applyMaintenance) {
+                            finishEditSuccess(response.message);
+                            return;
+                        }
+                        applyMaintenance(bookingId, reason, guestName)
+                            .then((maintResult) => {
+                                if (!maintResult?.success) {
+                                    finishEditWarning(maintResult?.message || 'Booking updated but maintenance could not be applied.');
+                                    return;
+                                }
+                                finishEditSuccess('Booking updated and set to Maintenance.');
+                            })
+                            .catch((error) => {
+                                finishEditWarning(error.message || 'Booking updated but maintenance failed.');
+                            });
+                        return;
+                    }
+
+                    if (!isMaintenanceChecked && wasMaintenance) {
+                        const reopenMaintenance = window.postReopenMaintenance || null;
+                        if (!reopenMaintenance) {
+                            finishEditSuccess(response.message);
+                            return;
+                        }
+                        reopenMaintenance(bookingId)
+                            .then((reopenResult) => {
+                                if (!reopenResult?.success) {
+                                    finishEditWarning(reopenResult?.message || 'Booking updated but could not reopen from maintenance.');
+                                    return;
+                                }
+                                finishEditSuccess('Booking updated and reopened from Maintenance.');
+                            })
+                            .catch((error) => {
+                                finishEditWarning(error.message || 'Booking updated but reopen failed.');
+                            });
+                        return;
+                    }
+
+                    finishEditSuccess(response.message);
+                };
+
+                if (response.success) {
+                    handleMaintenanceToggle();
                 } else {
                     Swal.fire({
                         title: 'Error!',
@@ -1369,7 +1546,9 @@ $(document).ready(function() {
             fullname: $('#edit_bookingRoute').val() === 'agency' 
                 ? $('#edit_agencySelect option:selected').text() 
                 : $('#edit_txtFullNameAdd').val(),
-            contactNumber: $('#edit_txtNumber').val(),
+            contactNumber: (window.ContactChannel
+                ? window.ContactChannel.getValue('#edit_contactChannel', '#edit_txtNumber')
+                : $('#edit_txtNumber').val()),
             dateFrom: $('#edit_daterange').val().split(' to ')[0],
             dateTo: $('#edit_daterange').val().split(' to ')[1].split('(')[0].trim(),
             bedCount: $('#edit_bedCount').val(),
@@ -1786,7 +1965,18 @@ function calculateEditLateCheckoutFee() {
 // Function to compute total for edit form
 function computeEditTotal() {
     console.log('computeEditTotal called');
-    const roomRate = parseFloat($('#edit_baseprice').val()) || 0;
+    const parseMoney = (value) => {
+        const numeric = parseFloat(String(value || '').replace(/,/g, '').replace(/[^\d.-]/g, ''));
+        return Number.isFinite(numeric) ? numeric : 0;
+    };
+    const roomRate = parseMoney(
+        $('#edit_manualPriceToggle').is(':checked')
+            ? $('#edit_price').val()
+            : $('#edit_baseprice').val()
+    );
+    if ($('#edit_manualPriceToggle').is(':checked')) {
+        $('#edit_baseprice').val(roomRate);
+    }
     const nights = parseInt($('#edit_diffindays').val()) || 1;
     
     const adultQty = parseInt($('#edit_breakfastAdultQty').val()) || 0;
@@ -2010,7 +2200,11 @@ function populateEditForm(booking) {
     // Set form fields
     $('#edit_daterange').val(booking.daterange);
     $('#edit_txtFullNameAdd').val(booking.fullname);
-    $('#edit_txtNumber').val(booking.number);
+    if (window.ContactChannel) {
+        window.ContactChannel.setFields('#edit_contactChannel', '#edit_txtNumber', booking.number);
+    } else {
+        $('#edit_txtNumber').val(booking.number);
+    }
     $('#edit_maxOccupants').val(booking.GUESTS_COUNT);
     $('#edit_paidAmount').val(booking.paidAmount || '');
     $('#edit_paymentStatus').val(booking.PAYMENT_STATUS || 'UNPAID');
@@ -2037,6 +2231,10 @@ function populateEditForm(booking) {
     if (typeof window.applyEditHoldPendingUI === 'function') {
         window.applyEditHoldPendingUI(isHoldPending);
     }
+
+    const isMaintenance = String(booking.BOOKING_STATUS || '').toLowerCase() === 'maintenance';
+    $('#edit_maintenanceCheckbox').prop('checked', isMaintenance);
+    $('#edit_bookingId').data('wasMaintenance', isMaintenance);
     
     // Set late checkout fee if it exists (0 = FREE)
     const lateFee = parseFloat(booking.lateCheckoutFee) || 0;
@@ -2087,6 +2285,11 @@ function populateEditForm(booking) {
         $('#edit_agencySelectWrapper').hide();
         $('#edit_agencySelect').val('');
     }
+
+    const isBookingChannel = bookingRoute === 'booking-channel';
+    $('#edit_channelBookingIdWrapper').toggle(isBookingChannel);
+    $('#edit_channelBookingId').val(isBookingChannel ? (booking.channelBookingId || booking.CHANNEL_BOOKING_ID || '') : '');
+
     $('#edit_bedCount').val(booking.ROOM_BED === 1 ? '1' : booking.ROOM_BED === 2 ? '2' : 'N/A');
     $('#edit_room_type').val(booking.ROOM_VIEW === 1 ? 'Condo View' : booking.ROOM_VIEW === 2 ? 'Mountain View' : 'N/A');
     $('#edit_room_type_hidden').val(booking.ROOM_TYPE);
@@ -2275,8 +2478,8 @@ function populateEditForm(booking) {
                         // Add options
                         const bedOptions = [
                             { value: '', text: 'Select Options', selected: currentValue === '', disabled: true },
-                            { value: '1', text: '1 Bed', selected: currentValue === '1' },
-                            { value: '2', text: '2 Beds', selected: currentValue === '2' }
+                            { value: '1', text: 'King Bedroom', selected: currentValue === '1' },
+                            { value: '2', text: 'Queen Bedroom', selected: currentValue === '2' }
                         ];
                         
                         bedOptions.forEach(option => {
@@ -2402,6 +2605,10 @@ function populateEditRoomSelection(roomId, floorNumber) {
 // Function to open edit booking modal (called from parent page)
 function editBooking(bookingId) {
     console.log('Editing booking ID:', bookingId);
+
+    if (typeof window.suppressCalendarScheduleBarGlow === 'function') {
+        window.suppressCalendarScheduleBarGlow(bookingId);
+    }
     
     // Fetch booking details
     fetch(`/booking/edit_booking/${bookingId}`)
@@ -2508,7 +2715,11 @@ function selectEditCustomer(name, level, customerId, contactNo, guestType) {
     }
 
     // Set the Contact Number field
-    document.getElementById('edit_txtNumber').value = contactNo;
+    if (window.ContactChannel) {
+        window.ContactChannel.setFields('#edit_contactChannel', '#edit_txtNumber', contactNo);
+    } else {
+        document.getElementById('edit_txtNumber').value = contactNo;
+    }
 
     // Store the Customer ID in the hidden input field
     document.getElementById('edit_guestID').val(customerId);
@@ -2519,7 +2730,11 @@ $(document).ready(function() {
     $('#edit_txtFullNameAdd').on('input', function() {
         // Clear the Customer ID and Contact Number fields
         $('#edit_guestID').val('');
-        $('#edit_txtNumber').val('');
+        if (window.ContactChannel) {
+            window.ContactChannel.reset('#edit_contactChannel', '#edit_txtNumber');
+        } else {
+            $('#edit_txtNumber').val('');
+        }
 
         // Reset the selected values in the dropdowns
         $('#edit_guestType').prop('selectedIndex', 0);

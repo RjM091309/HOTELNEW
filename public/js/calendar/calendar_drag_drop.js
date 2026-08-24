@@ -538,36 +538,38 @@ function removeDuplicateEvents() {
     const eventGroups = {};
     const duplicatesToRemove = [];
     
-    // Group events by title and find duplicates
+    // Group by booking id + room. Same guest name on different rooms is NOT a duplicate.
     allEvents.forEach(event => {
-      const key = `${event.title}_${event.start?.getTime()}_${event.end?.getTime()}`;
+      if (event.id && String(event.id).startsWith('temp-highlight-')) return;
+
+      const resourceIds = (typeof event.getResources === 'function')
+        ? event.getResources().map((resource) => resource.id).sort().join(',')
+        : '';
+      const key = event.id
+        ? `${event.id}_${resourceIds}`
+        : `${event.title}_${event.start?.getTime()}_${event.end?.getTime()}_${resourceIds}`;
+
       if (!eventGroups[key]) {
         eventGroups[key] = [];
       }
       eventGroups[key].push(event);
     });
     
-    // Find groups with more than one event (duplicates)
     Object.values(eventGroups).forEach(group => {
       if (group.length > 1) {
-        // Keep the first event, mark others for removal
-        const [keepEvent, ...duplicates] = group;
+        const [, ...duplicates] = group;
         duplicates.forEach(dup => {
           duplicatesToRemove.push(dup);
         });
       }
     });
     
-    // Remove duplicate events
     duplicatesToRemove.forEach(dup => {
       try {
         dup.remove();
       } catch (error) {
       }
     });
-    
-    if (duplicatesToRemove.length > 0) {
-    }
     
   } catch (error) {
   }
@@ -667,8 +669,9 @@ function updateSingleEvent(event, newStart, newEnd, newResource) {
 
 // Set up periodic cleanup to catch any duplicates that slip through
 function setupPeriodicCleanup() {
-  // Run cleanup every 5 seconds to catch any duplicates
-  setInterval(() => {
+  if (window._calendarDuplicateCleanupTimer) return;
+
+  window._calendarDuplicateCleanupTimer = setInterval(() => {
     if (window.calendar) {
       removeDuplicateEvents();
     }

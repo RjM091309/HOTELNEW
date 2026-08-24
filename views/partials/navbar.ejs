@@ -549,9 +549,10 @@ flatpickr("#datePicker", {
             const startDate = selectedDates[0];
             const endDate = selectedDates[1];
 
-            // Calculate the number of nights
-            const diffInTime = endDate.getTime() - startDate.getTime();
-            const nights = diffInTime / (1000 * 3600 * 24); // Convert time difference to days
+            // Calculate the number of nights (date-only, ignore times)
+            const startDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+            const endDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+            const nights = Math.max(Math.round((endDay - startDay) / (1000 * 3600 * 24)), 1);
 
             // Format the display string
             const formattedStartDate = flatpickr.formatDate(startDate, "M d, Y");
@@ -752,8 +753,8 @@ if (!cleanDateRange || !cleanDateRange.includes(" to ")) {
             <div style="display: flex; gap: 10px; align-items: center;">
                 <span style="font-weight: bold; margin-right: 5px;">Bed:</span>
                 <label><input type="radio" name="bedFilter" value="all" checked onchange="filterRooms()"> All</label>
-                <label><input type="radio" name="bedFilter" value="1B" onchange="filterRooms()"> 1B</label>
-                <label><input type="radio" name="bedFilter" value="2B" onchange="filterRooms()"> 2B</label>
+                <label><input type="radio" name="bedFilter" value="1B" onchange="filterRooms()"> King</label>
+                <label><input type="radio" name="bedFilter" value="2B" onchange="filterRooms()"> Queen</label>
             </div>
         </div>
   
@@ -1457,8 +1458,8 @@ function openDirectReservationModal(formattedDateRange, nights) {
                     // Add bed count options
                     const bedOptions = [
                         { value: '', text: 'Select Options', selected: true, disabled: true },
-                        { value: '1', text: '1 Bed' },
-                        { value: '2', text: '2 Beds' }
+                        { value: '1', text: 'King Bedroom' },
+                        { value: '2', text: 'Queen Bedroom' }
                 
                     ];
                     
@@ -1538,8 +1539,8 @@ function openDirectReservationModal(formattedDateRange, nights) {
                     bedCountSelect.style.width = '100%';
                     
                     const bedOptions = [
-                        { value: '1', text: '1 Bed' },
-                        { value: '2', text: '2 Beds' }
+                        { value: '1', text: 'King Bedroom' },
+                        { value: '2', text: 'Queen Bedroom' }
                     ];
                     
                     bedOptions.forEach(option => {
@@ -2305,6 +2306,8 @@ document.addEventListener('click', function (event) {
 
       // 🧠 Function to calculate seasonal price and update DOM
       function updateSeasonalPrice() {
+  if (document.querySelector('#manualPriceToggle')?.checked) return;
+
   const selectedBedCount = bedCountField.value;
   const selectedBookingType = (typeof window.getPriceBookingType === 'function')
     ? window.getPriceBookingType()
@@ -2333,70 +2336,14 @@ document.addEventListener('click', function (event) {
   basePriceField.value = pricePerNight.toFixed(2);
 }
 
-function computeTotal() {
-  const roomRate = $('#manualPriceToggle').prop('checked')
-    ? parseFloat($('#price').val()) || 0
-    : parseFloat($('#baseprice').val()) || 0;
-
-  const nights = parseInt($('#diffindays').val()) || 1;
-
-  const adultQty = parseInt($('#breakfastAdultQty').val()) || 0;
-  const adultPrice = parseFloat($('#breakfastAdultPrice').val()) || 0;
-  const kidQty = parseInt($('#breakfastKidQty').val()) || 0;
-  const kidPrice = parseFloat($('#breakfastKidPrice').val()) || 0;
-
-  const pickupChecked = $('#includePickup').prop('checked');
-  const dropoffChecked = $('#includeDropoff').prop('checked');
-
-  const pickupPrice = pickupChecked ? parseFloat($('#pickupPrice').val()) || 0 : 0;
-  const dropoffPrice = dropoffChecked ? parseFloat($('#dropoffPrice').val()) || 0 : 0;
-
-  // Get reservation fee and discount values
-  const reservationFeeChecked = $('#includeReservationFee').prop('checked');
-  const reservationFeeAmount = reservationFeeChecked ? parseFloat($('#reservationFeeAmount').val()) || 0 : 0;
-  
-  const discountChecked = $('#includeDiscount').prop('checked');
-  const discountAmount = discountChecked ? parseFloat($('#discountAmount').val()) || 0 : 0;
-
-  // Calculate subtotal (charges)
-  const subtotal = (roomRate * nights) + (adultQty * adultPrice) + (kidQty * kidPrice) + pickupPrice + dropoffPrice;
-  
-  // Calculate final balance
-  let finalBalance = subtotal - reservationFeeAmount - discountAmount;
-  
-  // Check if this is a direct reservation (no room selected or no room rate)
-  const isDirectReservation = $('#directReservationFlag').val() === 'true' || subtotal === 0;
-  
-  if (isDirectReservation && subtotal === 0) {
-    // If no charges but has reservation fee, show it as credit
-    if (reservationFeeAmount > 0) {
-      $('#computedTotal').html('<b>0.00</b>');
-      $('#creditAmount').html(reservationFeeAmount.toLocaleString(undefined, { minimumFractionDigits: 2 }));
-      $('#creditDisplay').show();
-      return;
-    }
-  }
-  
-  // Show final balance and handle credit display
-  if (finalBalance < 0) {
-    // Show total as 0.00 and credit below
-    $('#computedTotal').html('<b>0.00</b>');
-    $('#creditAmount').html(Math.abs(finalBalance).toLocaleString(undefined, { minimumFractionDigits: 2 }));
-    $('#creditDisplay').show();
-  } else {
-    // Show normal total and hide credit
-    $('#computedTotal').html('<b>' + finalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 }) + '</b>');
-    $('#creditDisplay').hide();
-  }
-}
       // 🔁 Initial trigger
       updateSeasonalPrice();
 
       // 🔁 Bind update when booking type changes
       document.querySelector('#bookingRoute').addEventListener('change', updateSeasonalPrice);
-      $(document).on('input change', '#bookingRoute, #price, #baseprice, #diffindays, #breakfastAdultQty, #breakfastAdultPrice, #breakfastKidQty, #breakfastKidPrice, #pickupPrice, #dropoffPrice, #pickupLocation, #dropoffLocation, #includePickup, #includeDropoff, #includeReservationFee, #reservationFeeAmount, #includeDiscount, #discountAmount', function () {
-    computeTotal();
-});
+      if (typeof computeTotal === 'function') {
+        computeTotal();
+      }
 
       /*
       // ✅ Show modal for room selection — DISABLED per request
@@ -2502,7 +2449,9 @@ function initializeAddBookingHandler() {
         const formData = {
             room_id: isDirectReservation ? 0 : $('#addroom').val(), // 0 for direct reservations (backend can handle this)
             fullname: $('#txtFullNameAdd').val(),
-            number: $('#txtNumber').val(),
+            number: (window.ContactChannel
+                ? window.ContactChannel.getValue('#contactChannel', '#txtNumber')
+                : $('#txtNumber').val()),
             address: $('#txtAddress').val() || '',
             daterange: $('#daterange').val(),
             maxOccupants: isDirectReservation ? 1 : $('#maxOccupants').val(), // Default to 1 for direct reservations
@@ -2523,6 +2472,7 @@ function initializeAddBookingHandler() {
             agencyPayer: $('#bookingRoute').val() === 'agency'
                 ? ($('input[name="agencyPayer"]:checked').val() || 'agency')
                 : null,
+            channelBookingId: ($('#channelBookingId').val() || '').trim(),
             voucherNo: $('#voucherNo').val(),
             
             // ✅ Include services and transport

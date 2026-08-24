@@ -19,6 +19,7 @@
           <input type="hidden" id="groupPaidAmountHidden" name="groupPaidAmountHidden" value="0">
           <input type="hidden" id="groupLateCheckoutFee" name="groupLateCheckoutFee" value="0">
           <input type="hidden" id="groupSeniorPwdDiscount" name="groupSeniorPwdDiscount" value="0">
+          <input type="hidden" id="groupChannelBookingIdHidden" name="channelBookingId" value="">
 
           <div class="row">
             <div class="col-lg-6">
@@ -78,6 +79,12 @@
                 </select>
               </div>
             </div>
+            <div class="col-lg-4" id="groupChannelBookingIdWrapper" style="display: none;">
+              <div class="form-group">
+                <label class="form-label">Booking ID</label>
+                <input type="text" class="form-control" id="groupChannelBookingId" name="groupChannelBookingId" placeholder="Enter channel booking ID" autocomplete="off">
+              </div>
+            </div>
           </div>
 
           <!-- Late Checkout Fee Display - appears below when visible -->
@@ -125,11 +132,11 @@
                 <label class="form-label mb-1">Bed Requirements</label>
                 <div class="d-flex gap-3 flex-wrap">
                   <div class="bed-requirement-group">
-                    <label class="form-label mb-1">1 Bed</label>
+                    <label class="form-label mb-1">King</label>
                     <input type="number" class="form-control" id="groupBed1Count" name="groupBed1Count" min="0" value="0">
                   </div>
                   <div class="bed-requirement-group">
-                    <label class="form-label mb-1">2 Beds</label>
+                    <label class="form-label mb-1">Queen</label>
                     <input type="number" class="form-control" id="groupBed2Count" name="groupBed2Count" min="0" value="0">
                   </div>
                 </div>
@@ -156,14 +163,30 @@
               <div id="groupManualRoomsContainer" class="room-list-container" style="display: none;"></div>
               <div class="mt-2 text-warning" id="groupAvailabilityWarning" style="display: none;"></div>
               <div class="mt-2 text-muted" id="groupManualSelectionInfo" style="display: none;"></div>
-              <div id="groupRoomBreakdown" class="mt-3"></div>
+              <div id="groupRoomPricingPanel" class="mt-3" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                  <b>Selected Room Prices:</b>
+                  <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <div class="form-check mb-0">
+                      <input class="form-check-input" type="checkbox" id="groupEnableManualRates" name="groupEnableManualRates">
+                      <label class="form-check-label" for="groupEnableManualRates">Manual Room Rates</label>
+                    </div>
+                    <div class="form-check mb-0" id="groupWeekendPriceToggleWrapper" style="display: none;">
+                      <input class="form-check-input" type="checkbox" id="groupWeekendPriceToggle" name="groupWeekendPriceToggle">
+                      <label class="form-check-label" for="groupWeekendPriceToggle">Separate Weekend Rate</label>
+                    </div>
+                  </div>
+                </div>
+                <div id="groupWeekendNightBreakdown" class="text-muted mb-2" style="font-size: 11px; display: none;"></div>
+                <div id="groupRoomBreakdown"></div>
+              </div>
               
               <!-- Manual Room Rate Section -->
               <div id="groupManualRateSection" class="mt-3" style="display: none;">
                 <div class="manual-rate-container">
                   <h6 class="text-info mb-3">
-                    <i class="fa fa-edit"></i> Manual Room Rates
-                    <small class="text-muted">(Override default rates)</small>
+                    <i class="fa fa-edit"></i> Manual / Weekend Rates
+                    <small class="text-muted">(Override default rates · weekend = Fri, Sat &amp; Sun)</small>
                   </h6>
                   
                   <!-- Rate Type Toggle -->
@@ -201,7 +224,15 @@
             <div class="col-lg-6">
               <div class="form-group">
                 <label class="form-label">Group Contact Number</label>
-                <input type="text" class="form-control" id="groupContact" name="groupContact" required>
+                <div class="input-group contact-channel-group">
+                  <select class="form-select" id="groupContactChannel" name="groupContactChannel">
+                    <option value="Phone" selected>Phone</option>
+                    <option value="KakaoTalk">KakaoTalk</option>
+                    <option value="Viber">Viber</option>
+                    <option value="Telegram">Telegram</option>
+                  </select>
+                  <input type="text" class="form-control" id="groupContact" name="groupContact" required placeholder="Enter phone number">
+                </div>
               </div>
             </div>
           </div>
@@ -887,10 +918,43 @@
 }
 
 #modal-add-group-booking .manual-rate-item .rate-input-group .form-control {
-  width: 60px;
+  width: 90px;
   text-align: right;
   padding: 3px 5px;
   font-size: 12px;
+}
+
+#modal-add-group-booking .manual-rate-item .rate-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+}
+
+#modal-add-group-booking .manual-rate-item .rate-field-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#modal-add-group-booking .manual-rate-item .rate-field-row label {
+  margin: 0;
+  font-size: 11px;
+  color: #adb5bd;
+  min-width: 58px;
+  text-align: right;
+}
+
+#modal-add-group-booking #groupRoomPricingPanel .form-check-label {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+#modal-add-group-booking #groupRoomPricingPanel .form-check-input:checked {
+  background-color: #6f9c40;
+  border-color: #6f9c40;
 }
 
 
@@ -1073,8 +1137,129 @@
   let groupRequiredBed1 = 0;
   let groupRequiredBed2 = 0;
   let groupUnassignedConflicts = [];
-  let groupManualRates = {}; // Store manual rates for each room
-  let groupBedBasedRates = {}; // Store bed-based rates {1: price, 2: price}
+  let groupManualRates = {}; // Store manual weekday rates for each room
+  let groupManualWeekendRates = {}; // Store manual weekend rates for each room
+  let groupBedBasedRates = {}; // Store bed-based weekday rates {1: price, 2: price}
+  let groupBedBasedWeekendRates = {}; // Store bed-based weekend rates
+
+  function normalizeRoomId(id) {
+    return String(id);
+  }
+
+  function isRoomManuallySelected(roomId) {
+    const key = normalizeRoomId(roomId);
+    return groupManualSelectedRooms.some(id => normalizeRoomId(id) === key);
+  }
+
+  function getManuallySelectedRooms() {
+    return groupAvailableRooms.filter(room => isRoomManuallySelected(room.IDNo));
+  }
+
+  function getManualRateForRoom(roomId) {
+    return groupManualRates[normalizeRoomId(roomId)];
+  }
+
+  function setManualRateForRoom(roomId, rate) {
+    groupManualRates[normalizeRoomId(roomId)] = rate;
+  }
+
+  function getWeekendRateForRoom(roomId) {
+    return groupManualWeekendRates[normalizeRoomId(roomId)];
+  }
+
+  function setWeekendRateForRoom(roomId, rate) {
+    groupManualWeekendRates[normalizeRoomId(roomId)] = rate;
+  }
+
+  function parseGroupStayDates() {
+    const dates = getSelectedDateRange();
+    if (!dates) return { checkIn: null, checkOut: null };
+    const checkIn = new Date(dates.start);
+    const checkOut = new Date(dates.end);
+    if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
+      return { checkIn: null, checkOut: null };
+    }
+    checkIn.setHours(0, 0, 0, 0);
+    checkOut.setHours(0, 0, 0, 0);
+    return { checkIn, checkOut };
+  }
+
+  // Weekend = Friday + Saturday + Sunday nights
+  function isGroupWeekendNight(date) {
+    const day = date.getDay();
+    return day === 5 || day === 6 || day === 0;
+  }
+
+  function getGroupNightBreakdown() {
+    const { checkIn, checkOut } = parseGroupStayDates();
+    let weekday = 0;
+    let weekend = 0;
+    const nights = [];
+
+    if (checkIn && checkOut && checkOut > checkIn) {
+      const cursor = new Date(checkIn);
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      while (cursor < checkOut) {
+        const isWeekend = isGroupWeekendNight(cursor);
+        nights.push({
+          date: new Date(cursor),
+          label: `${dayNames[cursor.getDay()]} ${cursor.getMonth() + 1}/${cursor.getDate()}`,
+          type: isWeekend ? 'weekend' : 'weekday'
+        });
+        if (isWeekend) weekend += 1;
+        else weekday += 1;
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    } else {
+      weekday = parseInt($('#groupNights').val(), 10) || 0;
+    }
+
+    return { weekday, weekend, total: weekday + weekend, nights };
+  }
+
+  function isGroupWeekendPricingEnabled() {
+    return $('#groupWeekendPriceToggle').is(':checked') && getGroupNightBreakdown().weekend > 0;
+  }
+
+  function updateGroupWeekendToggleVisibility() {
+    const breakdown = getGroupNightBreakdown();
+    const hasWeekendNights = breakdown.weekend > 0;
+    $('#groupWeekendPriceToggleWrapper').toggle(hasWeekendNights);
+    if (!hasWeekendNights) {
+      $('#groupWeekendPriceToggle').prop('checked', false);
+      $('#groupWeekendNightBreakdown').hide().empty();
+      return;
+    }
+
+    if ($('#groupWeekendPriceToggle').is(':checked')) {
+      const summary = `${breakdown.weekday} weekday + ${breakdown.weekend} weekend night(s) (Fri, Sat & Sun)`;
+      const detail = breakdown.nights.map((n) => `${n.label}=${n.type}`).join(', ');
+      $('#groupWeekendNightBreakdown').html(
+        detail ? `${summary}<div style="font-size:10px;margin-top:2px;">${detail}</div>` : summary
+      ).show();
+    } else {
+      $('#groupWeekendNightBreakdown').hide().empty();
+    }
+  }
+
+  function readCheckedRoomIdsFromDOM() {
+    const ids = [];
+    $('#groupRoomsList .group-manual-checkbox:checked').each(function() {
+      const rawId = $(this).attr('data-room-id');
+      if (rawId !== undefined && rawId !== null && rawId !== '') {
+        ids.push(normalizeRoomId(rawId));
+      }
+    });
+    return ids;
+  }
+
+  function syncGroupSelectionFromDOM() {
+    const checkedIds = readCheckedRoomIdsFromDOM();
+    if (checkedIds.length > 0) {
+      groupManualSelectedRooms = [...new Set(checkedIds)];
+    }
+    return syncGroupSelectedRoomPrices();
+  }
   let pendingCalendarRoomIds = []; // Room IDs handed off from the calendar's group-select flow
   let pendingCalendarStart = null;
   let pendingCalendarEnd = null;
@@ -1130,6 +1315,206 @@
     return parseFloat(room.ROOM_PRICE) || 0;
   }
 
+  function getGroupSelectedRoomsForPricing() {
+    const checkedIds = readCheckedRoomIdsFromDOM();
+    if (checkedIds.length > 0) {
+      groupManualSelectedRooms = [...new Set(checkedIds)];
+      const rooms = getManuallySelectedRooms();
+      if (rooms.length === checkedIds.length) {
+        return rooms;
+      }
+      return checkedIds.map(id =>
+        rooms.find(room => normalizeRoomId(room.IDNo) === id)
+        || groupAvailableRooms.find(room => normalizeRoomId(room.IDNo) === id)
+      ).filter(Boolean);
+    }
+
+    if (groupManualSelectedRooms.length > 0) {
+      return getManuallySelectedRooms();
+    }
+
+    const idsFromHidden = ($('#groupSelectedRooms').val() || '')
+      .split(',')
+      .filter(Boolean);
+
+    if (idsFromHidden.length) {
+      return groupAvailableRooms.filter(room =>
+        idsFromHidden.some(id => normalizeRoomId(id) === normalizeRoomId(room.IDNo))
+      );
+    }
+
+    return [];
+  }
+
+  function resolveGroupManualWeekdayRate(room, dates) {
+    const roomId = normalizeRoomId(room.IDNo);
+    const bedCount = parseInt(room.ROOM_BED, 10);
+    const manualRatesEnabled = $('#groupEnableManualRates').is(':checked');
+    const fallback = dates ? resolveGroupRoomPrice(room, dates.start) : 0;
+
+    if (!manualRatesEnabled) {
+      return fallback;
+    }
+
+    const rateType = $('input[name="rateType"]:checked').val();
+
+    if (rateType === 'bed-based') {
+      if (groupBedBasedRates[bedCount] !== undefined) {
+        return groupBedBasedRates[bedCount];
+      }
+      const bedInput = $(`.bed-based-rate-input[data-bed-count="${bedCount}"]`);
+      if (bedInput.length) {
+        const val = parseFloat(bedInput.val());
+        if (!Number.isNaN(val) && val >= 0) {
+          return val;
+        }
+      }
+    } else {
+      if (getManualRateForRoom(roomId) !== undefined) {
+        return getManualRateForRoom(roomId);
+      }
+      const roomInput = $(`.manual-rate-input[data-room-id="${room.IDNo}"]`);
+      if (roomInput.length) {
+        const val = parseFloat(roomInput.val());
+        if (!Number.isNaN(val) && val >= 0) {
+          return val;
+        }
+      }
+    }
+
+    return fallback;
+  }
+
+  function resolveGroupManualWeekendRate(room, dates, weekdayRate) {
+    const roomId = normalizeRoomId(room.IDNo);
+    const bedCount = parseInt(room.ROOM_BED, 10);
+    const rateType = $('input[name="rateType"]:checked').val();
+    const fallback = weekdayRate;
+
+    if (rateType === 'bed-based') {
+      if (groupBedBasedWeekendRates[bedCount] !== undefined) {
+        return groupBedBasedWeekendRates[bedCount];
+      }
+      const bedInput = $(`.bed-based-weekend-rate-input[data-bed-count="${bedCount}"]`);
+      if (bedInput.length) {
+        const val = parseFloat(bedInput.val());
+        if (!Number.isNaN(val) && val >= 0) {
+          return val;
+        }
+      }
+    } else {
+      if (getWeekendRateForRoom(roomId) !== undefined) {
+        return getWeekendRateForRoom(roomId);
+      }
+      const roomInput = $(`.manual-weekend-rate-input[data-room-id="${room.IDNo}"]`);
+      if (roomInput.length) {
+        const val = parseFloat(roomInput.val());
+        if (!Number.isNaN(val) && val >= 0) {
+          return val;
+        }
+      }
+    }
+
+    return fallback;
+  }
+
+  function resolveGroupRoomStayPricing(room, dates) {
+    const breakdown = getGroupNightBreakdown();
+    const nights = breakdown.total || parseInt($('#groupNights').val(), 10) || 0;
+    const weekdayRate = resolveGroupManualWeekdayRate(room, dates);
+    const weekendEnabled = isGroupWeekendPricingEnabled();
+    const weekendRate = weekendEnabled
+      ? resolveGroupManualWeekendRate(room, dates, weekdayRate)
+      : weekdayRate;
+    const charges = weekendEnabled
+      ? (weekdayRate * breakdown.weekday) + (weekendRate * breakdown.weekend)
+      : weekdayRate * nights;
+    const avgRate = nights > 0 ? charges / nights : weekdayRate;
+
+    return {
+      weekdayRate,
+      weekendRate,
+      charges,
+      avgRate,
+      nights,
+      breakdown,
+      weekendEnabled
+    };
+  }
+
+  // Returns average nightly rate (backend multiplies by nights)
+  function resolveGroupManualRoomPrice(room, dates) {
+    return resolveGroupRoomStayPricing(room, dates).avgRate;
+  }
+
+  function getGroupEffectiveRoomPrices() {
+    const dates = getSelectedDateRange();
+    return getGroupSelectedRoomsForPricing().map(room => resolveGroupManualRoomPrice(room, dates));
+  }
+
+  function syncGroupSelectedRoomPrices() {
+    const selectedRooms = getGroupSelectedRoomsForPricing();
+    const dates = getSelectedDateRange();
+    const pricing = selectedRooms.map(room => resolveGroupRoomStayPricing(room, dates));
+    const checkedIds = readCheckedRoomIdsFromDOM();
+    const roomIdsForSubmit = checkedIds.length > 0
+      ? checkedIds
+      : selectedRooms.map(room => normalizeRoomId(room.IDNo));
+
+    $('#groupSelectedRooms').val(roomIdsForSubmit.join(','));
+    $('#groupSelectedRoomPrices').val(
+      roomIdsForSubmit.map(id => {
+        const idx = selectedRooms.findIndex(r => normalizeRoomId(r.IDNo) === id);
+        return idx >= 0 ? pricing[idx].avgRate : 0;
+      }).join('|')
+    );
+    $('#groupSelectedRoomNumbers').val(selectedRooms.map(room => room.ROOM_NUMBER).join(','));
+
+    return {
+      selectedRooms,
+      prices: pricing.map(p => p.avgRate),
+      pricing
+    };
+  }
+
+  function seedRatesOnRateTypeSwitch(newRateType, selectedRooms, dates) {
+    selectedRooms.forEach(room => {
+      const roomId = normalizeRoomId(room.IDNo);
+      const bedCount = parseInt(room.ROOM_BED, 10);
+      const fallbackRate = dates ? resolveGroupRoomPrice(room, dates.start) : 0;
+
+      if (newRateType === 'bed-based') {
+        if (groupBedBasedRates[bedCount] === undefined) {
+          if (getManualRateForRoom(roomId) !== undefined) {
+            groupBedBasedRates[bedCount] = getManualRateForRoom(roomId);
+          } else {
+            groupBedBasedRates[bedCount] = fallbackRate;
+          }
+        }
+        if (groupBedBasedWeekendRates[bedCount] === undefined) {
+          if (getWeekendRateForRoom(roomId) !== undefined) {
+            groupBedBasedWeekendRates[bedCount] = getWeekendRateForRoom(roomId);
+          } else {
+            groupBedBasedWeekendRates[bedCount] = groupBedBasedRates[bedCount];
+          }
+        }
+      } else if (getManualRateForRoom(roomId) === undefined) {
+        if (groupBedBasedRates[bedCount] !== undefined) {
+          setManualRateForRoom(roomId, groupBedBasedRates[bedCount]);
+        } else {
+          setManualRateForRoom(roomId, fallbackRate);
+        }
+        if (getWeekendRateForRoom(roomId) === undefined) {
+          if (groupBedBasedWeekendRates[bedCount] !== undefined) {
+            setWeekendRateForRoom(roomId, groupBedBasedWeekendRates[bedCount]);
+          } else {
+            setWeekendRateForRoom(roomId, getManualRateForRoom(roomId));
+          }
+        }
+      }
+    });
+  }
+
   function updateGroupAgencyPayerHint() {
     const payer = $('input[name="groupAgencyPayer"]:checked').val();
     const hint = payer === 'guest' ? 'Regular Rate' : 'Agency Rate';
@@ -1149,13 +1534,23 @@
     }
   }
 
+  function toggleGroupChannelFields(isBookingChannel) {
+    $('#groupChannelBookingIdWrapper').toggle(isBookingChannel);
+  }
+
+  function syncGroupChannelBookingId() {
+    const value = ($('#groupChannelBookingId').val() || '').trim();
+    $('#groupChannelBookingIdHidden').val(value);
+    return value;
+  }
+
   function refreshGroupRoomPricing() {
-    // Rooms picked via the calendar hand-off are an exact set, not a criteria
-    // search result - re-running Search Rooms here would silently replace them
-    // with whatever the generic search finds. Just recompute prices client-side
-    // from the already-fetched SEASONAL_PRICES instead.
-    if (isCalendarDirectSelection) {
-      if (groupManualSelectedRooms.length > 0) {
+    // Keep already-picked rooms. Re-running Search Rooms when switching to
+    // Booking Channel used to drop extra rooms (e.g. 303) from the submit payload.
+    const hasSelectedRooms = groupManualSelectedRooms.length > 0 || readCheckedRoomIdsFromDOM().length > 0;
+    if (hasSelectedRooms || isCalendarDirectSelection) {
+      if (hasSelectedRooms) {
+        syncGroupSelectionFromDOM();
         updateManualSelectedRoomValues();
         computeGroupTotal();
       }
@@ -1199,18 +1594,27 @@
     groupRequiredBed1 = 0;
     groupRequiredBed2 = 0;
     groupUnassignedConflicts = [];
-    groupManualRates = {}; // Clear manual rates
-    groupBedBasedRates = {}; // Clear bed-based rates
     setManualSelectionMode(false);
     $('#groupManualSelectToggle').prop('disabled', false);
     $('#groupAgencyWrapper').hide();
+    $('#groupChannelBookingIdWrapper').hide();
+    $('#groupChannelBookingId').val('');
+    $('#groupChannelBookingIdHidden').val('');
     $('#groupRoomsList').empty();
     $('#groupManualRoomsContainer').hide();
     $('#groupManualSelectionInfo').hide();
-    $('#groupRoomBreakdown').empty();
     $('#groupResultsContainer').hide();
     $('#groupManualRateSection').hide(); // Hide manual rate section
     $('#groupEnableManualRates').prop('checked', false); // Reset manual rates checkbox
+    $('#groupWeekendPriceToggle').prop('checked', false);
+    $('#groupWeekendPriceToggleWrapper').hide();
+    $('#groupWeekendNightBreakdown').hide().empty();
+    $('#groupRoomPricingPanel').hide();
+    $('#groupRoomBreakdown').empty();
+    groupManualRates = {};
+    groupManualWeekendRates = {};
+    groupBedBasedRates = {};
+    groupBedBasedWeekendRates = {};
     $('#groupComputedTotal').html('0.00');
     $('#groupComputedPaidAmount').html('0.00');
     $('#groupComputedBalance').html('0.00');
@@ -1235,7 +1639,11 @@
     
     // Reset group name and contact fields (remove readonly and restore styling)
     $('#groupName').prop('readonly', false).css('background-color', '');
+    if (window.ContactChannel) {
+      window.ContactChannel.reset('#groupContactChannel', '#groupContact');
+    }
     $('#groupContact').prop('readonly', false).css('background-color', '');
+    $('#groupContactChannel').prop('disabled', false).css('background-color', '');
     
     // Reset modal title
     $('#modalAddGroupBookingLabel').text('Add Group Booking');
@@ -1265,6 +1673,10 @@
           const nights = Math.max(1, Math.round(diffMs / (1000 * 3600 * 24)));
           $('#groupNights').val(nights);
           instance.input.value = `${dateStr} (${nights} night/s)`;
+          updateGroupWeekendToggleVisibility();
+          if (getGroupSelectedRoomsForPricing().length) {
+            updateManualSelectedRoomValues();
+          }
           computeGroupTotal();
         }
       }
@@ -1403,13 +1815,13 @@
             <div class="col-md-4">
               <div class="text-center">
                 <div class="h6 mb-0 text-success" style="font-size: 16px; line-height: 1;">${bed1Count}</div>
-                <div class="text-muted" style="font-size: 10px; line-height: 1;">1-Bed Rooms</div>
+                <div class="text-muted" style="font-size: 10px; line-height: 1;">King Rooms</div>
               </div>
             </div>
             <div class="col-md-4">
               <div class="text-center">
                 <div class="h6 mb-0 text-success" style="font-size: 16px; line-height: 1;">${bed2Count}</div>
-                <div class="text-muted" style="font-size: 10px; line-height: 1;">2-Bed Rooms</div>
+                <div class="text-muted" style="font-size: 10px; line-height: 1;">Queen Rooms</div>
               </div>
             </div>
             <div class="col-md-4">
@@ -1440,11 +1852,11 @@
                 </div>
                 <div class="form-check form-check-inline">
                   <input class="form-check-input" type="radio" name="groupRoomFilter" id="filter1B" value="1B">
-                  <label class="form-check-label" for="filter1B">1B</label>
+                  <label class="form-check-label" for="filter1B">King</label>
                 </div>
                 <div class="form-check form-check-inline">
                   <input class="form-check-input" type="radio" name="groupRoomFilter" id="filter2B" value="2B">
-                  <label class="form-check-label" for="filter2B">2B</label>
+                  <label class="form-check-label" for="filter2B">Queen</label>
                 </div>
               </div>
             </div>
@@ -1467,7 +1879,7 @@
             : '';
           return `
             <div class="form-check room-option${disabled ? ' disabled-room' : ''}">
-              <input class="form-check-input group-manual-checkbox" type="checkbox" data-room-id="${room.IDNo}" ${groupManualSelectedRooms.includes(room.IDNo) ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
+              <input class="form-check-input group-manual-checkbox" type="checkbox" data-room-id="${room.IDNo}" ${isRoomManuallySelected(room.IDNo) ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
               <label class="form-check-label ms-2">
                 ${room.ROOM_NUMBER}${bedBadge ? ` ${bedBadge}` : ''}
               </label>
@@ -1505,7 +1917,7 @@
       const $room = $(this);
       const $checkbox = $room.find('input[data-room-id]');
       const roomData = $checkbox.data('room-id');
-      const room = groupAvailableRooms.find(r => r.IDNo === roomData);
+      const room = groupAvailableRooms.find(r => normalizeRoomId(r.IDNo) === normalizeRoomId(roomData));
       
       if (!room) {
         $room.hide();
@@ -1532,8 +1944,20 @@
 
   function computeGroupTotal() {
     const nights = parseInt($('#groupNights').val(), 10) || 0;
-    const pricesRaw = $('#groupSelectedRoomPrices').val();
-    const prices = pricesRaw ? pricesRaw.split(',').map(p => parseFloat(p) || 0) : [];
+
+    // Always rebuild selection from checked boxes when the room list is visible
+    let prices;
+    if ($('#groupResultsContainer').is(':visible') && readCheckedRoomIdsFromDOM().length > 0) {
+      const synced = syncGroupSelectionFromDOM();
+      prices = synced.prices;
+    } else if ($('#groupEnableManualRates').is(':checked') || isGroupWeekendPricingEnabled()) {
+      const synced = syncGroupSelectedRoomPrices();
+      prices = synced.prices;
+    } else {
+      const pricesRaw = $('#groupSelectedRoomPrices').val();
+      prices = pricesRaw ? pricesRaw.split('|').map(p => parseFloat(p) || 0) : [];
+    }
+
     const baseSubtotal = prices.reduce((sum, price) => sum + price, 0);
     const roomSubtotal = baseSubtotal * nights;
 
@@ -1699,56 +2123,57 @@
     }
   }
 
-  function populateBreakdown(block, computedPrices) {
+  function populateBreakdown(block, computedPrices, pricingDetails) {
+    const panel = $('#groupRoomPricingPanel');
     const container = $('#groupRoomBreakdown');
-    
-    // Get the current state of the checkbox BEFORE emptying the container
-    const isManualRatesChecked = $('#groupEnableManualRates').is(':checked');
-    
-    container.empty();
+
     if (!block || !block.length) {
+      panel.hide();
+      container.empty();
       return;
     }
 
+    panel.show();
+    updateGroupWeekendToggleVisibility();
+
     const nights = parseInt($('#groupNights').val(), 10) || 0;
-    let html = `
-      <div class="group-room-breakdown">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <b>Selected Room Prices:</b>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" id="groupEnableManualRates" name="groupEnableManualRates" ${isManualRatesChecked ? 'checked' : ''}>
-            <label class="form-check-label" for="groupEnableManualRates">
-              Manual Room Rates
-            </label>
-          </div>
-        </div>
-        <ul>`;
-    
+    const weekendEnabled = isGroupWeekendPricingEnabled();
+    const breakdown = getGroupNightBreakdown();
+    let html = `<ul class="mb-0">`;
+
     block.forEach((room, idx) => {
-      const price = computedPrices[idx] || 0;
-      const total = nights > 0 ? price * nights : price;
-      html += `<li>Room ${room.ROOM_NUMBER}: ${formatCurrency(price)} per night ${nights > 0 ? `(${formatCurrency(total)} total)` : ''}</li>`;
+      const detail = pricingDetails && pricingDetails[idx]
+        ? pricingDetails[idx]
+        : null;
+      const avg = detail ? detail.avgRate : (computedPrices[idx] || 0);
+      const total = detail ? detail.charges : (nights > 0 ? avg * nights : avg);
+
+      if (weekendEnabled && detail) {
+        html += `<li>Room ${room.ROOM_NUMBER}: ${formatCurrency(detail.weekdayRate)} wd / ${formatCurrency(detail.weekendRate)} we
+          → ${formatCurrency(total)} total (${breakdown.weekday} wd + ${breakdown.weekend} we)</li>`;
+      } else {
+        html += `<li>Room ${room.ROOM_NUMBER}: ${formatCurrency(avg)} per night ${nights > 0 ? `(${formatCurrency(total)} total)` : ''}</li>`;
+      }
     });
-    html += '</ul></div>';
+    html += '</ul>';
     container.html(html);
+  }
+
+  function shouldShowGroupRateEditor() {
+    return $('#groupEnableManualRates').is(':checked') || isGroupWeekendPricingEnabled();
   }
 
   function displayManualRateInputs(selectedRooms) {
     const container = $('#groupManualRateList');
     const section = $('#groupManualRateSection');
     
-    if (!selectedRooms || !selectedRooms.length) {
+    if (!selectedRooms || !selectedRooms.length || !shouldShowGroupRateEditor()) {
       section.hide();
       return;
     }
 
-    // Check if manual rates checkbox is checked
-    const isManualRatesEnabled = $('#groupEnableManualRates').is(':checked');
-    if (!isManualRatesEnabled) {
-      section.hide();
-      return;
-    }
-
+    const weekendEnabled = isGroupWeekendPricingEnabled();
+    const manualEnabled = $('#groupEnableManualRates').is(':checked');
     container.empty();
     
     selectedRooms.forEach(room => {
@@ -1759,12 +2184,46 @@
         ? `<span class="bed-badge">${bedCount}<i class="fa fa-bed"></i></span>`
         : '';
       
-      // Get default rate
       const dates = getSelectedDateRange();
       const defaultRate = dates ? resolveGroupRoomPrice(room, dates.start) : 0;
+      const weekdayRate = getManualRateForRoom(roomId) !== undefined
+        ? getManualRateForRoom(roomId)
+        : defaultRate;
+      const weekendRate = getWeekendRateForRoom(roomId) !== undefined
+        ? getWeekendRateForRoom(roomId)
+        : weekdayRate;
+      const weekdayReadonly = !manualEnabled ? 'readonly' : '';
       
-      // Get manual rate if exists
-      const manualRate = groupManualRates[roomId] || defaultRate;
+      let rateFields = `
+        <div class="rate-fields">
+          <div class="rate-field-row">
+            <label>${weekendEnabled ? 'Weekday' : 'Rate'}</label>
+            <input type="number"
+                   class="form-control manual-rate-input"
+                   data-room-id="${roomId}"
+                   data-default-rate="${defaultRate}"
+                   value="${weekdayRate}"
+                   min="0"
+                   step="0.01"
+                   ${weekdayReadonly}
+                   placeholder="Enter rate">
+          </div>`;
+
+      if (weekendEnabled) {
+        rateFields += `
+          <div class="rate-field-row">
+            <label>Weekend</label>
+            <input type="number"
+                   class="form-control manual-weekend-rate-input"
+                   data-room-id="${roomId}"
+                   value="${weekendRate}"
+                   min="0"
+                   step="0.01"
+                   placeholder="Weekend rate">
+          </div>`;
+      }
+
+      rateFields += `</div>`;
       
       const rateItem = `
         <div class="manual-rate-item" data-room-id="${roomId}">
@@ -1773,14 +2232,7 @@
             ${bedBadge}
           </div>
           <div class="rate-input-group">
-            <input type="number" 
-                   class="form-control manual-rate-input" 
-                   data-room-id="${roomId}" 
-                   data-default-rate="${defaultRate}"
-                   value="${manualRate}" 
-                   min="0" 
-                   step="0.01"
-                   placeholder="Enter rate">
+            ${rateFields}
           </div>
         </div>`;
       
@@ -1788,18 +2240,20 @@
     });
     
     section.show();
+    $('#individualRateSection').show();
   }
 
   function displayBedBasedRateInputs(selectedRooms) {
     const container = $('#groupBedBasedRateList');
     const section = $('#bedBasedRateSection');
     
-    if (!selectedRooms || !selectedRooms.length) {
+    if (!selectedRooms || !selectedRooms.length || !shouldShowGroupRateEditor()) {
       section.hide();
       return;
     }
 
-    // Group rooms by bed count
+    const weekendEnabled = isGroupWeekendPricingEnabled();
+    const manualEnabled = $('#groupEnableManualRates').is(':checked');
     const roomsByBed = {};
     selectedRooms.forEach(room => {
       const bedCount = parseInt(room.ROOM_BED, 10);
@@ -1811,19 +2265,48 @@
 
     container.empty();
     
-    // Create bed-based rate inputs
     Object.keys(roomsByBed).sort().forEach(bedCount => {
       const rooms = roomsByBed[bedCount];
-      const roomNumbers = rooms.map(r => r.ROOM_NUMBER).join(', ');
-      const roomCount = rooms.length;
-      
-      // Get default rate for this bed type (use first room as reference)
       const firstRoom = rooms[0];
       const dates = getSelectedDateRange();
       const defaultRate = dates ? resolveGroupRoomPrice(firstRoom, dates.start) : 0;
-      
-      // Get bed-based rate if exists
-      const bedBasedRate = groupBedBasedRates[bedCount] || defaultRate;
+      const bedBasedRate = groupBedBasedRates[bedCount] !== undefined
+        ? groupBedBasedRates[bedCount]
+        : defaultRate;
+      const bedWeekendRate = groupBedBasedWeekendRates[bedCount] !== undefined
+        ? groupBedBasedWeekendRates[bedCount]
+        : bedBasedRate;
+      const weekdayReadonly = !manualEnabled ? 'readonly' : '';
+
+      let rateFields = `
+        <div class="rate-fields">
+          <div class="rate-field-row">
+            <label>${weekendEnabled ? 'Weekday' : 'Rate'}</label>
+            <input type="number"
+                   class="form-control bed-based-rate-input"
+                   data-bed-count="${bedCount}"
+                   data-default-rate="${defaultRate}"
+                   value="${bedBasedRate}"
+                   min="0"
+                   step="0.01"
+                   ${weekdayReadonly}
+                   placeholder="Enter rate">
+          </div>`;
+
+      if (weekendEnabled) {
+        rateFields += `
+          <div class="rate-field-row">
+            <label>Weekend</label>
+            <input type="number"
+                   class="form-control bed-based-weekend-rate-input"
+                   data-bed-count="${bedCount}"
+                   value="${bedWeekendRate}"
+                   min="0"
+                   step="0.01"
+                   placeholder="Weekend rate">
+          </div>`;
+      }
+      rateFields += `</div>`;
       
        const bedItem = `
          <div class="bed-based-rate-item" data-bed-count="${bedCount}">
@@ -1832,14 +2315,7 @@
              <span class="bed-badge">${bedCount}<i class="fa fa-bed"></i></span>
            </div>
            <div class="rate-input-group">
-             <input type="number" 
-                    class="form-control bed-based-rate-input" 
-                    data-bed-count="${bedCount}" 
-                    data-default-rate="${defaultRate}"
-                    value="${bedBasedRate}" 
-                    min="0" 
-                    step="0.01"
-                    placeholder="Enter rate">
+             ${rateFields}
            </div>
          </div>`;
       
@@ -1849,64 +2325,126 @@
     section.show();
   }
 
-  function attachManualRateHandlers() {
-    // Handle manual rates checkbox toggle
-    $(document).on('change', '#groupEnableManualRates', function() {
-      const isChecked = $(this).is(':checked');
-      const selectedRooms = groupAvailableRooms.filter(room => groupManualSelectedRooms.includes(room.IDNo));
-      
-      if (isChecked && selectedRooms.length > 0) {
-        const rateType = $('input[name="rateType"]:checked').val();
-        if (rateType === 'individual') {
-          displayManualRateInputs(selectedRooms);
-        } else {
-          displayBedBasedRateInputs(selectedRooms);
+  function refreshGroupRateEditorUI() {
+    const selectedRooms = getGroupSelectedRoomsForPricing();
+    updateGroupWeekendToggleVisibility();
+
+    if (!selectedRooms.length) {
+      $('#groupManualRateSection').hide();
+      return;
+    }
+
+    if (!shouldShowGroupRateEditor()) {
+      $('#groupManualRateSection').hide();
+      return;
+    }
+
+    const rateType = $('input[name="rateType"]:checked').val() || 'individual';
+    const dates = getSelectedDateRange();
+
+    selectedRooms.forEach((room) => {
+      const bedCount = parseInt(room.ROOM_BED, 10);
+      const current = dates ? resolveGroupRoomPrice(room, dates.start) : 0;
+      if (rateType === 'bed-based') {
+        if (groupBedBasedRates[bedCount] === undefined) {
+          groupBedBasedRates[bedCount] = current;
+        }
+        if (groupBedBasedWeekendRates[bedCount] === undefined) {
+          groupBedBasedWeekendRates[bedCount] = groupBedBasedRates[bedCount];
         }
       } else {
+        if (getManualRateForRoom(room.IDNo) === undefined) {
+          setManualRateForRoom(room.IDNo, current);
+        }
+        if (getWeekendRateForRoom(room.IDNo) === undefined) {
+          setWeekendRateForRoom(room.IDNo, getManualRateForRoom(room.IDNo));
+        }
+      }
+    });
+
+    if (rateType === 'individual') {
+      $('#individualRateSection').show();
+      $('#bedBasedRateSection').hide();
+      displayManualRateInputs(selectedRooms);
+    } else {
+      $('#individualRateSection').hide();
+      $('#bedBasedRateSection').show();
+      displayBedBasedRateInputs(selectedRooms);
+    }
+  }
+
+  function attachManualRateHandlers() {
+    $(document).off('change.groupPricingToggles', '#groupEnableManualRates, #groupWeekendPriceToggle');
+    $(document).on('change.groupPricingToggles', '#groupEnableManualRates, #groupWeekendPriceToggle', function() {
+      const selectedRooms = getGroupSelectedRoomsForPricing();
+
+      if (!selectedRooms.length) {
         $('#groupManualRateSection').hide();
-        // Clear manual rates when disabled
+        updateGroupWeekendToggleVisibility();
+        return;
+      }
+
+      if (shouldShowGroupRateEditor()) {
+        refreshGroupRateEditorUI();
+        const { selectedRooms: rooms, prices, pricing } = syncGroupSelectedRoomPrices();
+        populateBreakdown(rooms, prices, pricing);
+        updateGroupChargeBreakdown();
+        computeGroupTotal();
+      } else {
+        $('#groupManualRateSection').hide();
         groupManualRates = {};
+        groupManualWeekendRates = {};
         groupBedBasedRates = {};
-        updateManualSelectedRoomValuesWithoutRecreating();
+        groupBedBasedWeekendRates = {};
+        const { selectedRooms: rooms, prices, pricing } = syncGroupSelectedRoomPrices();
+        populateBreakdown(rooms, prices, pricing);
+        updateGroupChargeBreakdown();
         computeGroupTotal();
       }
     });
     
-    // Handle rate type toggle
-    $(document).on('change', 'input[name="rateType"]', function() {
-      const selectedRooms = groupAvailableRooms.filter(room => groupManualSelectedRooms.includes(room.IDNo));
+    $(document).off('change.groupRateType', 'input[name="rateType"]');
+    $(document).on('change.groupRateType', 'input[name="rateType"]', function() {
+      const selectedRooms = getGroupSelectedRoomsForPricing();
       const rateType = $(this).val();
-      
-      if (rateType === 'individual') {
-        $('#individualRateSection').show();
-        $('#bedBasedRateSection').hide();
-        displayManualRateInputs(selectedRooms);
-      } else {
-        $('#individualRateSection').hide();
-        $('#bedBasedRateSection').show();
-        displayBedBasedRateInputs(selectedRooms);
-      }
+      const dates = getSelectedDateRange();
+
+      seedRatesOnRateTypeSwitch(rateType, selectedRooms, dates);
+      refreshGroupRateEditorUI();
+
+      const { selectedRooms: rooms, prices, pricing } = syncGroupSelectedRoomPrices();
+      populateBreakdown(rooms, prices, pricing);
+      updateGroupChargeBreakdown();
+      computeGroupTotal();
     });
     
-    // Handle individual manual rate input changes
-    $(document).on('input', '.manual-rate-input', function() {
-      const roomId = parseInt($(this).data('room-id'), 10);
+    $(document).off('input.groupManualRate', '.manual-rate-input, .manual-weekend-rate-input');
+    $(document).on('input.groupManualRate', '.manual-rate-input, .manual-weekend-rate-input', function() {
+      const roomId = normalizeRoomId($(this).data('room-id'));
       const newRate = parseFloat($(this).val()) || 0;
       
       if (newRate >= 0) {
-        groupManualRates[roomId] = newRate;
+        if ($(this).hasClass('manual-weekend-rate-input')) {
+          setWeekendRateForRoom(roomId, newRate);
+        } else {
+          setManualRateForRoom(roomId, newRate);
+        }
         updateManualSelectedRoomValuesWithoutRecreating();
         computeGroupTotal();
       }
     });
     
-    // Handle bed-based rate input changes
-    $(document).on('input', '.bed-based-rate-input', function() {
+    $(document).off('input.groupBedRate', '.bed-based-rate-input, .bed-based-weekend-rate-input');
+    $(document).on('input.groupBedRate', '.bed-based-rate-input, .bed-based-weekend-rate-input', function() {
       const bedCount = parseInt($(this).data('bed-count'), 10);
       const newRate = parseFloat($(this).val()) || 0;
       
       if (newRate >= 0) {
-        groupBedBasedRates[bedCount] = newRate;
+        if ($(this).hasClass('bed-based-weekend-rate-input')) {
+          groupBedBasedWeekendRates[bedCount] = newRate;
+        } else {
+          groupBedBasedRates[bedCount] = newRate;
+        }
         updateManualSelectedRoomValuesWithoutRecreating();
         computeGroupTotal();
       }
@@ -1939,17 +2477,19 @@
       }
 
       const computedPrices = [];
+      const pricingDetails = [];
       block.forEach(room => {
-        const price = dates ? resolveGroupRoomPrice(room, dates.start) : 0;
-        computedPrices.push(price);
+        const stay = dates ? resolveGroupRoomStayPricing(room, dates) : { avgRate: 0, charges: 0 };
+        computedPrices.push(stay.avgRate);
+        pricingDetails.push(stay);
       });
 
       const selectedIds = block.map(room => room.IDNo);
       const selectedNumbers = block.map(room => room.ROOM_NUMBER);
       $('#groupSelectedRooms').val(selectedIds.join(','));
-      $('#groupSelectedRoomPrices').val(computedPrices.join(','));
+      $('#groupSelectedRoomPrices').val(computedPrices.join('|'));
       $('#groupSelectedRoomNumbers').val(selectedNumbers.join(','));
-      populateBreakdown(block, computedPrices);
+      populateBreakdown(block, computedPrices, pricingDetails);
       updateGroupChargeBreakdown();
       computeGroupTotal();
       updateGroupRoomCountDisplay();
@@ -1994,7 +2534,10 @@
         }, null, true);
 
         availableRooms.forEach(function(room) {
-          const checkbox = $(`#groupRoomsList .group-manual-checkbox[data-room-id="${room.IDNo}"]`);
+          const roomKey = normalizeRoomId(room.IDNo);
+          const checkbox = $('#groupRoomsList .group-manual-checkbox').filter(function() {
+            return normalizeRoomId($(this).attr('data-room-id')) === roomKey;
+          }).first();
           if (checkbox.length && !checkbox.is(':checked')) {
             checkbox.prop('checked', true).trigger('change');
           }
@@ -2049,7 +2592,7 @@
         return;
       }
       if (!neededRoomsNum) {
-        Swal.fire('Bed Requirement Missing', 'Please specify how many rooms should have 1 bed or 2 beds before searching.', 'warning');
+        Swal.fire('Bed Requirement Missing', 'Please specify how many King or Queen rooms you need before searching.', 'warning');
         return;
       }
       if (!bookingRoute) {
@@ -2444,7 +2987,7 @@
         : '';
       return `
         <div class="form-check room-option${disabled ? ' disabled-room' : ''}">
-          <input class="form-check-input" type="checkbox" data-room-id="${room.IDNo}" ${groupManualSelectedRooms.includes(room.IDNo) ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
+          <input class="form-check-input" type="checkbox" data-room-id="${room.IDNo}" ${isRoomManuallySelected(room.IDNo) ? 'checked' : ''} ${disabled ? 'disabled' : ''}>
           <label class="form-check-label ms-2">
             ${room.ROOM_NUMBER}${bedBadge ? ` ${bedBadge}` : ''}
           </label>
@@ -2454,8 +2997,8 @@
     container.append(listHtml);
 
     container.find('input[type="checkbox"]').each(function() {
-      const roomId = parseInt($(this).data('room-id'), 10);
-      if (groupManualSelectedRooms.includes(roomId)) {
+      const roomId = normalizeRoomId($(this).data('room-id'));
+      if (isRoomManuallySelected(roomId)) {
         $(this).prop('checked', true);
       }
     });
@@ -2467,11 +3010,11 @@
 
   function getManualBedSummary() {
     const bed1 = groupManualSelectedRooms.reduce((count, roomId) => {
-      const room = groupAvailableRooms.find(r => r.IDNo === roomId);
+      const room = groupAvailableRooms.find(r => normalizeRoomId(r.IDNo) === normalizeRoomId(roomId));
       return count + (room && parseInt(room.ROOM_BED, 10) === 1 ? 1 : 0);
     }, 0);
     const bed2 = groupManualSelectedRooms.reduce((count, roomId) => {
-      const room = groupAvailableRooms.find(r => r.IDNo === roomId);
+      const room = groupAvailableRooms.find(r => normalizeRoomId(r.IDNo) === normalizeRoomId(roomId));
       return count + (room && parseInt(room.ROOM_BED, 10) === 2 ? 1 : 0);
     }, 0);
     return { bed1, bed2 };
@@ -2500,10 +3043,10 @@
     const bedSummary = getManualBedSummary();
     const bedInfoParts = [];
     if (groupRequiredBed1 > 0) {
-      bedInfoParts.push(`${bedSummary.bed1}/${groupRequiredBed1} (1 bed)`);
+      bedInfoParts.push(`${bedSummary.bed1}/${groupRequiredBed1} King`);
     }
     if (groupRequiredBed2 > 0) {
-      bedInfoParts.push(`${bedSummary.bed2}/${groupRequiredBed2} (2 beds)`);
+      bedInfoParts.push(`${bedSummary.bed2}/${groupRequiredBed2} Queen`);
     }
 
     let info = '';
@@ -2556,16 +3099,16 @@
 
     const parts = [];
     if (typeof summary.bed1 === 'number') {
-      parts.push(`${summary.bed1} room(s) with 1 bed`);
+      parts.push(`${summary.bed1} King room(s)`);
     }
     if (typeof summary.bed2 === 'number') {
-      parts.push(`${summary.bed2} room(s) with 2 beds`);
+      parts.push(`${summary.bed2} Queen room(s)`);
     }
 
     const availability = summariseBedAvailability(availableRooms);
 
     const requirementInfo = (bed1Needed || bed2Needed)
-      ? `Needs ${bed1Needed} of 1-bed and ${bed2Needed} of 2-bed rooms.`
+      ? `Needs ${bed1Needed} King and ${bed2Needed} Queen rooms.`
       : '';
 
     const message = [
@@ -2599,8 +3142,8 @@
     const bed1 = rooms.filter(room => parseInt(room.ROOM_BED, 10) === 1).length;
     const bed2 = rooms.filter(room => parseInt(room.ROOM_BED, 10) === 2).length;
     const parts = [];
-    if (bed1) parts.push(`${bed1} room(s) with 1 bed`);
-    if (bed2) parts.push(`${bed2} room(s) with 2 beds`);
+    if (bed1) parts.push(`${bed1} King room(s)`);
+    if (bed2) parts.push(`${bed2} Queen room(s)`);
     return parts.join(', ');
   }
 
@@ -2621,8 +3164,8 @@
     const limitReached = hasReachedManualSelectionLimit();
     const summary = getManualBedSummary();
     $('#groupRoomsList .group-manual-checkbox').each(function() {
-      const roomId = parseInt($(this).data('room-id'), 10);
-      const room = groupAvailableRooms.find(r => r.IDNo === roomId);
+      const roomId = normalizeRoomId($(this).data('room-id'));
+      const room = groupAvailableRooms.find(r => normalizeRoomId(r.IDNo) === roomId);
       const bedType = room ? parseInt(room.ROOM_BED, 10) : null;
 
       // REMOVED: shouldDisableRoomForManualSelection check - causing over-disabling
@@ -2631,22 +3174,22 @@
       if (groupRequiredBed2 === 0 && bedType === 2) {
         // If 0 2-bed rooms needed, disable all 2-bed rooms only  
         $(this).prop('checked', false).prop('disabled', true);
-        groupManualSelectedRooms = groupManualSelectedRooms.filter(id => id !== roomId);
+        groupManualSelectedRooms = groupManualSelectedRooms.filter(id => normalizeRoomId(id) !== roomId);
         return;
       }
 
       if (groupRequiredBed1 || groupRequiredBed2) {
-        if (bedType === 1 && summary.bed1 >= groupRequiredBed1 && !groupManualSelectedRooms.includes(roomId)) {
+        if (bedType === 1 && summary.bed1 >= groupRequiredBed1 && !isRoomManuallySelected(roomId)) {
           $(this).prop('disabled', true);
           return;
         }
-        if (bedType === 2 && summary.bed2 >= groupRequiredBed2 && !groupManualSelectedRooms.includes(roomId)) {
+        if (bedType === 2 && summary.bed2 >= groupRequiredBed2 && !isRoomManuallySelected(roomId)) {
           $(this).prop('disabled', true);
           return;
         }
       }
 
-      if (limitReached && !groupManualSelectedRooms.includes(roomId)) {
+      if (limitReached && !isRoomManuallySelected(roomId)) {
         $(this).prop('disabled', true);
       } else {
         $(this).prop('disabled', false);
@@ -2676,16 +3219,18 @@
     });
 
     $('#groupRoomsList').on('change', '.group-manual-checkbox', function() {
-      const roomId = parseInt($(this).data('room-id'), 10);
+      const roomId = normalizeRoomId($(this).data('room-id'));
       if ($(this).is(':checked')) {
         if (hasReachedManualSelectionLimit()) {
           $(this).prop('checked', false);
           Swal.fire('Limit Reached', 'You have already selected the required number of rooms.', 'info');
           return;
         }
-        groupManualSelectedRooms.push(roomId);
+        if (!isRoomManuallySelected(roomId)) {
+          groupManualSelectedRooms.push(roomId);
+        }
       } else {
-        groupManualSelectedRooms = groupManualSelectedRooms.filter(id => id !== roomId);
+        groupManualSelectedRooms = groupManualSelectedRooms.filter(id => normalizeRoomId(id) !== roomId);
       }
 
       refreshManualSelectionDisabledState();
@@ -2697,79 +3242,73 @@
   }
 
   function updateManualSelectedRoomValues() {
-    const selectedRooms = groupAvailableRooms.filter(room => groupManualSelectedRooms.includes(room.IDNo));
-    const dates = getSelectedDateRange();
+    const selectedRooms = getGroupSelectedRoomsForPricing();
+    const { prices, pricing } = syncGroupSelectedRoomPrices();
 
-    const computedBasePrices = selectedRooms.map(room => {
-      const roomId = room.IDNo;
-      
-      // Use manual rate if available, otherwise use default rate
-      if (groupManualRates[roomId] !== undefined) {
-        return groupManualRates[roomId];
-      }
-      
-      return dates ? resolveGroupRoomPrice(room, dates.start) : 0;
-    });
-
-    const nights = parseInt($('#groupNights').val(), 10) || 0;
-
-    $('#groupSelectedRooms').val(selectedRooms.map(room => room.IDNo).join(','));
-    $('#groupSelectedRoomPrices').val(computedBasePrices.join(','));
-    $('#groupSelectedRoomNumbers').val(selectedRooms.map(room => room.ROOM_NUMBER).join(','));
-
-    populateBreakdown(selectedRooms, computedBasePrices);
+    populateBreakdown(selectedRooms, prices, pricing);
     updateGroupChargeBreakdown();
-    
-    // Display manual rate inputs for selected rooms
-    displayManualRateInputs(selectedRooms);
+    refreshGroupRateEditorUI();
   }
 
   function updateManualSelectedRoomValuesWithoutRecreating() {
-    const selectedRooms = groupAvailableRooms.filter(room => groupManualSelectedRooms.includes(room.IDNo));
-    const dates = getSelectedDateRange();
+    const selectedRooms = getGroupSelectedRoomsForPricing();
+    const { prices, pricing } = syncGroupSelectedRoomPrices();
 
-    const computedBasePrices = selectedRooms.map(room => {
-      const roomId = room.IDNo;
-      const bedCount = parseInt(room.ROOM_BED, 10);
-      
-      // Check if bed-based pricing is active
-      const rateType = $('input[name="rateType"]:checked').val();
-      if (rateType === 'bed-based' && groupBedBasedRates[bedCount] !== undefined) {
-        return groupBedBasedRates[bedCount];
-      }
-      
-      // Use individual manual rate if available, otherwise use default rate
-      if (groupManualRates[roomId] !== undefined) {
-        return groupManualRates[roomId];
-      }
-      
-      return dates ? resolveGroupRoomPrice(room, dates.start) : 0;
-    });
-
-    $('#groupSelectedRooms').val(selectedRooms.map(room => room.IDNo).join(','));
-    $('#groupSelectedRoomPrices').val(computedBasePrices.join(','));
-    $('#groupSelectedRoomNumbers').val(selectedRooms.map(room => room.ROOM_NUMBER).join(','));
-
-    populateBreakdown(selectedRooms, computedBasePrices);
+    populateBreakdown(selectedRooms, prices, pricing);
     updateGroupChargeBreakdown();
-    
-    // DON'T recreate manual rate inputs - just update the values in existing inputs
+
+    const rateType = $('input[name="rateType"]:checked').val();
     selectedRooms.forEach(room => {
-      const roomId = room.IDNo;
-      const manualRate = groupManualRates[roomId];
+      const roomId = normalizeRoomId(room.IDNo);
+      const bedCount = parseInt(room.ROOM_BED, 10);
+
+      if (rateType === 'bed-based') {
+        const bedRate = groupBedBasedRates[bedCount];
+        if (bedRate !== undefined) {
+          const input = $(`.bed-based-rate-input[data-bed-count="${bedCount}"]`);
+          if (input.length && input.val() !== bedRate.toString()) {
+            input.val(bedRate);
+          }
+        }
+        const bedWeekend = groupBedBasedWeekendRates[bedCount];
+        if (bedWeekend !== undefined) {
+          const input = $(`.bed-based-weekend-rate-input[data-bed-count="${bedCount}"]`);
+          if (input.length && input.val() !== bedWeekend.toString()) {
+            input.val(bedWeekend);
+          }
+        }
+        return;
+      }
+
+      const manualRate = getManualRateForRoom(roomId);
       if (manualRate !== undefined) {
-        const input = $(`.manual-rate-input[data-room-id="${roomId}"]`);
+        const input = $(`.manual-rate-input[data-room-id="${room.IDNo}"]`);
         if (input.length && input.val() !== manualRate.toString()) {
           input.val(manualRate);
+        }
+      }
+      const weekendRate = getWeekendRateForRoom(roomId);
+      if (weekendRate !== undefined) {
+        const input = $(`.manual-weekend-rate-input[data-room-id="${room.IDNo}"]`);
+        if (input.length && input.val() !== weekendRate.toString()) {
+          input.val(weekendRate);
         }
       }
     });
   }
 
+  window.syncGroupBookingRoomSelection = syncGroupSelectionFromDOM;
+  window.syncGroupChannelBookingId = syncGroupChannelBookingId;
+
   function attachBookingRouteHandler() {
     $('#groupBookingRoute').on('change', function() {
       toggleGroupAgencyFields(this.value === 'agency');
+      toggleGroupChannelFields(this.value === 'booking-channel');
       refreshGroupRoomPricing();
+    });
+
+    $(document).on('input', '#groupChannelBookingId', function() {
+      syncGroupChannelBookingId();
     });
 
     $('input[name="groupAgencyPayer"]').on('change', function () {
@@ -3051,8 +3590,8 @@
       applyGroupHoldPendingUI(false);
     });
 
-    // Clear selected rooms when Check-in/Check-out status changes
-    $('#groupCheckInStatus, #groupCheckOutStatus, #groupBookingRoute').on('change', function() {
+    // Clear selected rooms when Check-in/Check-out status changes (not booking route)
+    $('#groupCheckInStatus, #groupCheckOutStatus').on('change', function() {
       // Rooms picked via the calendar hand-off are an exact set that doesn't depend
       // on these filters - keep them selected and just recompute pricing.
       if (isCalendarDirectSelection) {
@@ -3205,7 +3744,7 @@
       // Calculate room charges
       const nights = parseInt($('#groupNights').val(), 10) || 0;
       const pricesRaw = $('#groupSelectedRoomPrices').val();
-      const prices = pricesRaw ? pricesRaw.split(',').map(p => parseFloat(p) || 0) : [];
+      const prices = pricesRaw ? pricesRaw.split('|').map(p => parseFloat(p) || 0) : [];
       const baseSubtotal = prices.reduce((sum, price) => sum + price, 0);
       const roomCharges = baseSubtotal * nights;
       
@@ -3228,7 +3767,9 @@
       const bookingData = {
         voucherNo: vno,
         groupName: $('#groupName').val() || 'Group Booking',
-        groupContact: $('#groupContact').val() || '',
+        groupContact: (window.ContactChannel
+          ? window.ContactChannel.getValue('#groupContactChannel', '#groupContact')
+          : $('#groupContact').val()) || '',
         dateFrom: dateFrom,
         dateTo: dateTo,
         roomSummary: roomNumbersForVoucher || 'No rooms selected',
@@ -3266,5 +3807,6 @@
   });
 })();
 </script>
-<script src="/js/booking/group_booking_submit.js"></script>
+<script src="/js/booking/contact_channel.js?v=2"></script>
+<script src="/js/booking/group_booking_submit.js?v=contact-channel-1"></script>
 

@@ -10,6 +10,11 @@
 
 // Function to show event info from calendar (fallback)
 function showEventInfoModal(event) {
+  if (isMaintenanceCalendarEvent(event)) {
+    showMaintenanceModal(event);
+    return;
+  }
+
   const roomNumber = event.getResources()[0]?.title || 'N/A';
   const guestName = event.title || 'Unknown Guest';
 
@@ -44,6 +49,10 @@ function showEventInfoModal(event) {
       case 'cancelled':
         statusTitle = `Room ${roomNumber} - Cancelled`;
         statusIcon = 'error';
+        break;
+      case 'maintenance':
+        statusTitle = `Room ${roomNumber} - Maintenance`;
+        statusIcon = 'info';
         break;
       default:
         statusTitle = `Room ${roomNumber} - ${status}`;
@@ -570,11 +579,212 @@ function showPendingModal(event) {
   }, 100);
 }
 
+function escapeCancelledModalText(text) {
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function showMaintenanceModal(event) {
+  if (typeof Swal !== 'undefined' && Swal.isVisible()) {
+    Swal.close();
+  }
+
+  const roomNumber = event.getResources()[0]?.title || 'N/A';
+  const bookingId = event.id;
+
+  const ci = new Date(event.start);
+  const co = new Date(event.end);
+  co.setDate(co.getDate() - 1);
+
+  const checkIn = ci.toLocaleDateString();
+  const checkOut = co.toLocaleDateString();
+
+  const openMaintenanceModal = (maintenanceReason) => {
+    const reasonMessage = maintenanceReason
+      ? escapeCancelledModalText(maintenanceReason)
+      : 'This room is under maintenance.';
+
+    Swal.fire({
+      title: `Room ${roomNumber} - Maintenance`,
+      html: `
+      <div class="text-left" style="padding: 20px 0;">
+        <div style="margin-bottom: 20px;">
+          <div style="display: flex; align-items: center; margin-bottom: 15px;">
+            <div style="width: 8px; height: 8px; background-color: #000000; border-radius: 50%; margin-right: 12px;"></div>
+            <span style="font-weight: 600; color: #ffffff; font-size: 16px;">Maintenance</span>
+          </div>
+          <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border-left: 3px solid #000000;">
+            <div style="margin-bottom: 15px;">
+              <span style="color: #cccccc; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Room No.</span>
+              <div style="color: #ffffff; font-weight: 600; font-size: 16px; margin-top: 4px;">${escapeCancelledModalText(roomNumber)}</div>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <div style="flex: 1; margin-right: 15px;">
+                <span style="color: #cccccc; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Check-in Date</span>
+                <div style="color: #ffffff; font-weight: 600; font-size: 16px; margin-top: 4px;">${checkIn}</div>
+              </div>
+              <div style="flex: 1;">
+                <span style="color: #cccccc; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Check-out Date</span>
+                <div style="color: #ffffff; font-weight: 600; font-size: 16px; margin-top: 4px;">${checkOut}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="text-align: center; padding: 15px; background: rgba(0, 0, 0, 0.15); border-radius: 8px; border: 1px solid rgba(0, 0, 0, 0.35);">
+          <span style="color: #ffffff; font-size: 14px; font-weight: 500; white-space: pre-wrap; word-break: break-word;">
+            🔧 ${reasonMessage}
+          </span>
+        </div>
+      </div>
+    `,
+      icon: 'info',
+      confirmButtonText: 'FIXED',
+      denyButtonText: 'Close',
+      showDenyButton: true,
+      showCancelButton: false,
+      confirmButtonColor: '#000000',
+      denyButtonColor: '#6c757d',
+      background: '#2a3135',
+      color: '#ffffff',
+      width: '500px'
+    }).then((result) => {
+      if (!result.isConfirmed && typeof window.glowCalendarScheduleBar === 'function') {
+        window.glowCalendarScheduleBar(bookingId);
+      }
+
+      if (result.isConfirmed) {
+        Swal.fire({
+          title: 'Mark as Fixed?',
+          text: 'This will remove the maintenance schedule from the calendar. The room will be available again.',
+          icon: 'question',
+          showCancelButton: true,
+          confirmButtonText: 'Yes, Fixed',
+          cancelButtonText: 'Cancel',
+          confirmButtonColor: '#000000'
+        }).then((confirmResult) => {
+          if (confirmResult.isConfirmed) {
+            completeMaintenanceBooking(bookingId, event);
+          }
+        });
+      }
+    });
+  };
+
+  let maintenanceReason = String(event.extendedProps?.maintenanceReason || '').trim();
+
+  if (maintenanceReason) {
+    openMaintenanceModal(maintenanceReason);
+    return;
+  }
+
+  fetch(`/booking/booking_details/${bookingId}`)
+    .then((res) => res.json())
+    .then((data) => {
+      maintenanceReason = String(
+        data?.MAINTENANCE_REASON || data?.REMARKS || ''
+      ).trim();
+      openMaintenanceModal(maintenanceReason);
+    })
+    .catch(() => {
+      openMaintenanceModal('');
+    });
+}
+
+function completeMaintenanceBooking(bookingId, event) {
+  Swal.fire({
+    title: 'Completing...',
+    text: 'Please wait while we remove the maintenance schedule.',
+    allowOutsideClick: false,
+    didOpen: () => Swal.showLoading()
+  });
+
+  fetch('/booking/complete-maintenance', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bookingId })
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success) {
+        if (event && typeof event.remove === 'function') {
+          event.remove();
+        }
+
+        Swal.fire({
+          icon: 'success',
+          title: 'Fixed',
+          text: data.message || 'Maintenance schedule removed.',
+          confirmButtonColor: '#000000',
+          timer: 2000,
+          showConfirmButton: false
+        }).then(() => {
+          if (typeof refreshCalendarBookings === 'function') {
+            refreshCalendarBookings();
+          } else if (typeof loadCalendarData === 'function') {
+            loadCalendarData();
+          }
+        });
+      } else {
+        Swal.fire('Error', data.message || 'Failed to complete maintenance.', 'error');
+      }
+    })
+    .catch(() => {
+      Swal.fire('Error', 'An unexpected error occurred.', 'error');
+    });
+}
+
+function reopenMaintenanceBooking(bookingId, event) {
+  Swal.fire({
+    title: 'Reopening...',
+    text: 'Please wait while we restore the booking data.',
+    allowOutsideClick: false,
+    didOpen: () => Swal.showLoading()
+  });
+
+  fetch('/booking/reopen-maintenance', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bookingId })
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Booking Reopened',
+          text: data.guestName
+            ? `${data.message || 'Previous booking data has been restored.'} (${data.guestName})`
+            : (data.message || 'Previous booking data has been restored.'),
+          confirmButtonColor: '#000000'
+        }).then(() => {
+          if (typeof refreshCalendarBookings === 'function') {
+            refreshCalendarBookings();
+          } else if (typeof loadCalendarData === 'function') {
+            loadCalendarData();
+          }
+        });
+      } else {
+        Swal.fire('Error', data.message || 'Failed to reopen booking.', 'error');
+      }
+    })
+    .catch(() => {
+      Swal.fire('Error', 'An unexpected error occurred while reopening the booking.', 'error');
+    });
+}
+
 // Function to show cancelled reservation modal
 function showCancelledModal(event) {
   const roomNumber = event.getResources()[0]?.title || 'N/A';
   const guestName = event.title || 'Unknown Guest';
   const bookingId = event.id;
+  const cancellationReason = String(event.extendedProps?.cancellationReason || '').trim();
+  const reasonMessage = cancellationReason
+    ? escapeCancelledModalText(cancellationReason)
+    : 'This reservation has been cancelled.';
 
   // FullCalendar uses exclusive end → subtract one day
   const ci = new Date(event.start);
@@ -617,8 +827,8 @@ function showCancelledModal(event) {
           </div>
         </div>
         <div style="text-align: center; padding: 15px; background: rgba(0, 0, 0, 0.15); border-radius: 8px; border: 1px solid rgba(0, 0, 0, 0.35);">
-          <span style="color: #ffffff; font-size: 14px; font-weight: 500;">
-            ❌ This reservation has been cancelled.
+          <span style="color: #ffffff; font-size: 14px; font-weight: 500; white-space: pre-wrap; word-break: break-word;">
+            ❌ ${reasonMessage}
           </span>
         </div>
       </div>
@@ -757,18 +967,20 @@ function populateBookingModal(roomId, start, end) {
 
   // Format dates for the daterange input
   const startDate = new Date(start);
-  const endDate = new Date(end); // The end date from FullCalendar is the exclusive checkout day
+  const endDate = new Date(end); // FullCalendar end is the checkout day (exclusive)
   
   const startFormatted = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const endFormatted = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   
-  const diffInTime = endDate.getTime() - startDate.getTime();
-  const diffInDays = Math.ceil(diffInTime / (1000 * 3600 * 24));
+  const startDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+  const endDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+  const diffInDays = Math.max(Math.round((endDay - startDay) / (1000 * 3600 * 24)), 1);
   
   // Display format: "Check-in to Check-out (Nights)"
   const daterangeValue = `${startFormatted} to ${endFormatted} (${diffInDays} night/s)`;
   $('#daterange').val(daterangeValue);
   $('#diffindays').val(diffInDays);
+  window._addBookingSelectedDates = [startDay, endDay];
   
   // Get room details from calendar resources instead of AJAX call
   const resources = calendar.getResources();
@@ -872,7 +1084,11 @@ $(document).ready(function() {
 // Function to edit booking from calendar (opens the edit booking modal)
 function editBookingFromCalendar(bookingId) {
   
-  if (typeof window.cleanupModalOverlays === 'function') {
+  if (typeof window.suppressCalendarScheduleBarGlow === 'function') {
+    window.suppressCalendarScheduleBarGlow(bookingId);
+  }
+
+  if (typeof window.cleanupModalOverlays === 'function' && !(typeof Swal !== 'undefined' && Swal.isVisible && Swal.isVisible())) {
     window.cleanupModalOverlays();
   }
 
@@ -1220,6 +1436,9 @@ function setCheckInStatusDropdown(value) {
 
 // Make functions globally available
 window.showEventInfoModal = showEventInfoModal;
+window.showMaintenanceModal = showMaintenanceModal;
+window.reopenMaintenanceBooking = reopenMaintenanceBooking;
+window.completeMaintenanceBooking = completeMaintenanceBooking;
 window.showLateCheckInModal = showLateCheckInModal;
 window.showPendingModal = showPendingModal;
 window.showCancelledModal = showCancelledModal;

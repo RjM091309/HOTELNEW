@@ -27,6 +27,11 @@ router.get('/unpaid', BookingController.renderUnpaidBookingPage);
 // Route to render the long-term stay booking page
 router.get('/long-term', BookingController.renderLongTermBookingPage);
 
+// Route to render the check-in notifier page
+router.get('/check-in-notifier', BookingController.renderCheckInNotifierPage);
+router.get('/check-in-notifier/data', BookingController.getCheckInNotifierData);
+router.post('/check-in-notifier/notify', BookingController.notifyCheckInSelections);
+
 // API Routes for booking data
 router.get('/booking_data', BookingController.getBookingDataEnhanced);
 router.get('/booking_details/:bookingID', BookingController.getBookingDetails);
@@ -99,6 +104,9 @@ router.post('/update_group_booking', BookingController.updateGroupBooking);
 router.get('/bookings', BookingController.getBookings);
 router.get('/rooms', BookingController.getRooms);
 router.post('/cancel', BookingController.cancelBooking);
+router.post('/set-maintenance', BookingController.setBookingMaintenance);
+router.post('/reopen-maintenance', BookingController.reopenMaintenanceBooking);
+router.post('/complete-maintenance', BookingController.completeMaintenanceBooking);
 router.post('/cancel_group', BookingController.cancelGroupBooking);
 router.post('/get_bookings_paid_amounts', BookingController.getBookingsPaidAmounts);
 

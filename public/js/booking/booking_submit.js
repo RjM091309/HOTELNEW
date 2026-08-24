@@ -1,3 +1,39 @@
+function postSetMaintenance(bookingId, reason, guestName) {
+  return new Promise((resolve, reject) => {
+    $.post('/booking/set-maintenance', { bookingId, reason, guestName: guestName || '' })
+      .done(resolve)
+      .fail((xhr) => reject(new Error(xhr?.responseJSON?.message || 'Failed to set Maintenance.')));
+  });
+}
+
+function postReopenMaintenance(bookingId) {
+  return new Promise((resolve, reject) => {
+    $.post('/booking/reopen-maintenance', { bookingId })
+      .done(resolve)
+      .fail((xhr) => reject(new Error(xhr?.responseJSON?.message || 'Failed to reopen booking.')));
+  });
+}
+
+window.postSetMaintenance = postSetMaintenance;
+window.postReopenMaintenance = postReopenMaintenance;
+
+function getSelectValueOrFirst($select, fallback) {
+  const val = $select.val();
+  if (val) return val;
+  const first = $select.find('option:not([disabled])').first().val();
+  return first || fallback;
+}
+
+function parseAddBookingDateRange(daterange) {
+  if (!daterange || !daterange.includes(' to ')) {
+    return { checkIn: '-', checkOut: '-' };
+  }
+  const parts = daterange.split(' to ');
+  const checkIn = parts[0].trim();
+  const checkOut = (parts[1] || '').split('(')[0].trim();
+  return { checkIn: checkIn || '-', checkOut: checkOut || '-' };
+}
+
 $(document).ready(function () {
     $('#addbooking').off('submit').on('submit', function (e) {
       e.preventDefault();
@@ -29,7 +65,9 @@ $(document).ready(function () {
       const roomId = $('#addroom').val();
       const daterange = $('#daterange').val();
       const fullname = $('#txtFullNameAdd').val();
-      const number = $('#txtNumber').val();
+      const number = window.ContactChannel
+        ? window.ContactChannel.getValue('#contactChannel', '#txtNumber')
+        : $('#txtNumber').val();
       const address = $('#txtAddress').val();
       const guestsCount = $('#maxOccupants').val();
       const paidAmount = $('#paidAmount').val();
@@ -48,6 +86,7 @@ $(document).ready(function () {
       const agencyPayer = bookingRoute === 'agency'
         ? ($('input[name="agencyPayer"]:checked').val() || 'agency')
         : null;
+      const channelBookingId = ($('#channelBookingId').val() || '').trim();
       const voucherNo = $('#voucherNo').val();
       // Services/Transport
       const breakfastAdultQty = $('#breakfastAdultQty').val();
@@ -135,7 +174,7 @@ $(document).ready(function () {
         data: {
           room_id: roomId, fullname, number, address, daterange, maxOccupants: guestsCount,
           paidAmount, paymentStatus, price: roomPrice, diffindays: qty, guestType, guestLevel, guestID: txtGuestID,
-          bookingRoute, checkInStatus, checkOutStatus, holdPending, bookingRemarks, agencyID, agencyPayer, voucherNo,
+          bookingRoute, checkInStatus, checkOutStatus, holdPending, bookingRemarks, agencyID, agencyPayer, channelBookingId, voucherNo,
           breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
           breakfastKidQty, breakfastKidPrice, breakfastKidId,
           pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
@@ -155,20 +194,12 @@ $(document).ready(function () {
               }
             }
             
-            // Payment processing is now handled automatically in the backend
-            // No need for separate payment processing calls
-            
-            // Auto-download voucher if booking was successful
-            // Trigger IMMEDIATELY before Swal to avoid blocking
             if (response.success && response.bookingId) {
               const bookingId = response.bookingId;
               const confirmationNumber = response.confirmationNumber;
               console.log('Triggering voucher download for bookingId:', bookingId, 'confirmationNumber:', confirmationNumber);
               
               try {
-                console.log('Triggering voucher download for bookingId:', bookingId);
-                
-                // Use POST form (single download only)
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.action = '/booking/generate-voucher?download=1';
@@ -190,26 +221,21 @@ $(document).ready(function () {
                   }
                 }, 2000);
               } catch (error) {
-                console.error('❌ Error in voucher download:', error);
-                console.error('Error details:', error.message, error.stack);
+                console.error('Error in voucher download:', error);
               }
-            } else {
+            } else if (!response.success || !response.bookingId) {
               console.error('Booking response missing success or bookingId:', response);
             }
             
-            // Check if check-in date is today and add to checked-in-content tab
-            // Try socket first, but have fallback for direct add if socket not available
             if (response.success && response.bookingId) {
               const checkInDateStr = daterange.split(' to ')[0].trim();
               const today = new Date();
               today.setHours(0, 0, 0, 0);
               
-              // Parse date from "MMM DD, YYYY" format
               let checkInDate;
               if (typeof moment !== 'undefined') {
                 checkInDate = moment(checkInDateStr, 'MMM DD, YYYY').toDate();
               } else {
-                // Fallback: try to parse manually
                 const months = {
                   'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
                   'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
@@ -225,20 +251,15 @@ $(document).ready(function () {
                 }
               }
               
-              // Reset time to compare dates only
               if (checkInDate && !isNaN(checkInDate.getTime())) {
                 checkInDate.setHours(0, 0, 0, 0);
                 
-                // If check-in is today, add to checked-in-content tab
                 if (checkInDate.getTime() === today.getTime()) {
-                  // Check if socket is available and connected
                   const socketAvailable = typeof window.dashboardSocket !== 'undefined' && 
                                          window.dashboardSocket && 
                                          window.dashboardSocket.connected;
                   
-                  // If socket is not available, do direct fetch as fallback
                   if (!socketAvailable) {
-                    console.log('Socket not available, using direct fetch fallback');
                     fetch(`/booking/booking_details/${response.bookingId}`)
                       .then(res => res.json())
                       .then(bookingData => {
@@ -251,10 +272,6 @@ $(document).ready(function () {
                       .catch(err => {
                         console.error('Error fetching booking details (fallback):', err);
                       });
-                  } else {
-                    // Socket is available - backend will emit socket event
-                    // Just wait for socket to handle it
-                    console.log('Socket available, waiting for socket event');
                   }
                 }
               }
@@ -281,6 +298,114 @@ $(document).ready(function () {
           }
         });
       }
+
+    $('#btnAddBookingMaintenance').off('click').on('click', async function (e) {
+      e.preventDefault();
+
+      const roomId = $('#addroom').val();
+      const daterange = $('#daterange').val();
+
+      if (!roomId || !daterange) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Missing Info',
+          text: 'Please select a room and date range first.',
+        });
+        return;
+      }
+
+      const confirmResult = await Swal.fire({
+        title: 'Set Maintenance?',
+        text: 'This will block the room for maintenance. No guest details are required.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'OK',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#212529',
+      });
+
+      if (!confirmResult.isConfirmed) return;
+
+      const roomNo = $('#addroom option:selected').text().trim() || '-';
+      const { checkIn, checkOut } = parseAddBookingDateRange(daterange);
+      const showPopup = window.showMaintenanceSchedulePopup;
+
+      if (!showPopup) {
+        Swal.fire('Error', 'Maintenance popup is not available. Please refresh the page.', 'error');
+        return;
+      }
+
+      const reason = await showPopup({
+        roomNo,
+        checkIn,
+        checkOut,
+        parentModalEl: document.getElementById('modal-addbooking'),
+      });
+
+      if (reason === null) return;
+
+      const guestType = getSelectValueOrFirst($('#guestType'), 'Golf');
+      const guestLevel = getSelectValueOrFirst($('#guestLevel'), 'New Guest');
+      const roomPrice = $('#baseprice').val() || '0';
+      const qty = $('#diffindays').val() || '1';
+      const maxOccupants = $('#maxOccupants').val() || '1';
+
+      $.ajax({
+        url: '/booking/add_booking',
+        type: 'POST',
+        data: {
+          room_id: roomId,
+          fullname: 'Maintenance',
+          number: '',
+          daterange,
+          maxOccupants,
+          paidAmount: 0,
+          paymentStatus: 'unpaid',
+          price: roomPrice,
+          diffindays: qty,
+          guestType,
+          guestLevel,
+          bookingRoute: 'walk-in',
+          checkInStatus: '1',
+          checkOutStatus: '0',
+          holdPending: 'false',
+          bookingRemarks: reason,
+          discount: 0,
+          seniorPwdDiscount: 0,
+          seniorPwdDiscountPercent: 0,
+          lateCheckoutFee: 0,
+          isLongTermStay: 0,
+          roomChangeNote: '',
+          isMaintenance: 1,
+        },
+        success: function (response) {
+          if (!response.success || !response.bookingId) {
+            Swal.fire('Error', response.message || 'Failed to create maintenance block.', 'error');
+            return;
+          }
+
+          $('#modal-addbooking').modal('hide');
+
+          if (typeof window.refreshCalendarAfterBookingSave === 'function') {
+            window.refreshCalendarAfterBookingSave();
+          } else if (typeof refreshCalendarBookings === 'function') {
+            refreshCalendarBookings();
+          }
+
+          Swal.fire({
+            icon: 'success',
+            title: 'Maintenance',
+            text: response.message || 'Room set to Maintenance.',
+            timer: 2500,
+            showConfirmButton: false,
+            timerProgressBar: true,
+          });
+        },
+        error: function () {
+          Swal.fire('Error', 'An error occurred while setting maintenance.', 'error');
+        },
+      });
+    });
   });
 
 // Function to add booking to checked-in-content tab dynamically
@@ -431,13 +556,13 @@ window.addBookingToCheckedInTab = function(bookingData) {
     if (isDirectReservation) {
       cardHTML += '<p style="color: #ff6b6b; font-weight: bold;"><i class="material-icons" style="font-size: 14px; vertical-align: middle;">warning</i> No Room Assigned</p>';
     }
-    cardHTML += `<p>${escapeHtml(roomType)}</p>`;
     cardHTML += '<div class="d-flex align-items-center justify-content-between">';
     cardHTML += `<p class="mb-2" style="font-weight: normal;">${escapeHtml(customerName)}</p>`;
     if (transfer === 1) {
       cardHTML += '<span class="badge badge-success tr-button">T/R</span>';
     }
     cardHTML += '</div>';
+    cardHTML += `<p>${escapeHtml(roomType)}</p>`;
     cardHTML += '<div class="d-flex align-items-center justify-content-between">';
     if (isDirectReservation) {
       cardHTML += `<p style="margin: 0;">${bedCount || 0} Bed${(bedCount && bedCount > 1) ? 's' : ''}</p>`;

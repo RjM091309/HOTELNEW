@@ -46,13 +46,13 @@
                 No Room Assigned
             </p>
         <% } %>
-        <p><%= booking.RoomType %></p>
         <div class="d-flex align-items-center justify-content-between">
             <p class="mb-2" style="font-weight: normal;"><%= booking.CustomerName %></p>
             <% if (typeof booking.TRANSFER !== 'undefined' && booking.TRANSFER === 1) { %>
                 <span class="badge badge-success tr-button">T/R</span>
             <% } %>
         </div>
+        <p><%= booking.RoomType %></p>
         <div class="d-flex align-items-center justify-content-between">
             <% if (booking.IS_DIRECT_RESERVATION == 1) { %>
                 <!-- Show Bed Count for Direct Reservations -->

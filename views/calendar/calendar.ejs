@@ -15,14 +15,15 @@
 
 <script src="/js/dashboard/socket-config.js"></script>
 <!-- Calendar Modules (load in dependency order) -->
-<script src="/js/calendar/calendar_utils.js"></script>
+<script src="/js/calendar/calendar_utils.js?v=checkout-select-1"></script>
 <script src="/js/calendar/calendar_events.js"></script>
-<script src="/js/calendar/calendar_modals.js"></script>
+<script src="/js/calendar/calendar_modals.js?v=manual-price-fix-1"></script>
 <script src="/js/calendar/calendar_drag_drop.js"></script>
 <script src="/js/calendar/calendar_validation.js"></script>
-<script src="/js/calendar/calendar_styles.js"></script>
-<script src="/js/calendar/calendar_data.js"></script>
-<script src="/js/dashboard/room-menu_data.js"></script>
+<script src="/js/calendar/calendar_styles.js?v=checkout-select-1"></script>
+<script src="/js/calendar/calendar_data.js?v=checkout-select-1"></script>
+<script src="/js/booking/maintenance_popup.js"></script>
+<script src="/js/dashboard/room-menu_data.js?v=voucher-menu-3"></script>
 
 <!-- CALENDAR HTML -->
 <div class="card mb-4">
@@ -39,8 +40,9 @@
 <%- include('../booking/modal/billing') %>
 <%- include('../booking/modal/edit_booking') %>
 <%- include('../booking/modal/add_group_booking') %>
+<%- include('../booking/modal/cancel_booking') %>
 <%- include('../dashboard/modal/security_deposit') %>
 <%- include('../dashboard/modal/security_deposit_refund') %>
 <script src="/js/dashboard/security_deposit_checkin.js"></script>
 <script src="/js/dashboard/security_deposit_checkout.js"></script>
-<script src="/js/booking/group_booking_submit.js"></script>
+<script src="/js/booking/group_booking_submit.js?v=contact-channel-1"></script>

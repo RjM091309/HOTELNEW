@@ -258,6 +258,48 @@ async function runChannexMigrations() {
   );
 }
 
+async function runChannelBookingIdMigrations() {
+  if (await tableExists('group_booking')) {
+    await ensureColumn(
+      'group_booking',
+      'CHANNEL_BOOKING_ID',
+      `CHANNEL_BOOKING_ID VARCHAR(100) NULL DEFAULT NULL COMMENT 'External OTA / booking-channel reference ID'`,
+      'REMARKS'
+    );
+  } else {
+    console.warn('⚠️ group_booking table not found, skipping CHANNEL_BOOKING_ID migration');
+  }
+
+  if (await tableExists('booking')) {
+    await ensureColumn(
+      'booking',
+      'CHANNEL_BOOKING_ID',
+      `CHANNEL_BOOKING_ID VARCHAR(100) NULL DEFAULT NULL COMMENT 'External OTA / booking-channel reference ID'`,
+      'BOOKING_CHANNEL'
+    );
+  } else {
+    console.warn('⚠️ booking table not found, skipping CHANNEL_BOOKING_ID migration');
+  }
+}
+
+async function runCheckInNotifierMigrations() {
+  await queryDatabasePromise(`
+    CREATE TABLE IF NOT EXISTS check_in_notifier_log (
+      IDNo INT NOT NULL AUTO_INCREMENT,
+      BOOKING_ID INT NOT NULL,
+      NOTIFY_WINDOW VARCHAR(10) NOT NULL COMMENT '1day, 3day, 7day',
+      REFERENCE_CHECKIN_DATE DATE NOT NULL,
+      ENCODED_BY INT NULL DEFAULT NULL,
+      ENCODED_DT DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      ACTIVE TINYINT(1) NOT NULL DEFAULT 1,
+      PRIMARY KEY (IDNo),
+      UNIQUE KEY uq_booking_window_checkin (BOOKING_ID, NOTIFY_WINDOW, REFERENCE_CHECKIN_DATE),
+      KEY idx_notifier_checkin_date (REFERENCE_CHECKIN_DATE)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+  console.log('✅ Ensured table: check_in_notifier_log');
+}
+
 async function runStartupMigrations() {
   console.log('🔄 Running startup database migrations...');
 
@@ -266,8 +308,10 @@ async function runStartupMigrations() {
   await runReceiptMigrations();
   await runLongTermStayMigrations();
   await runHoldPendingMigrations();
+  await runChannelBookingIdMigrations();
   await runCalendarPerformanceMigrations();
   await runChannexMigrations();
+  await runCheckInNotifierMigrations();
 
   console.log('✅ Startup database migrations complete');
 }

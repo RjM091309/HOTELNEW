@@ -1409,7 +1409,11 @@ function populateEditGroupForm(booking) {
     // Set form fields
     $('#editGroupDaterange').val(booking.daterange);
     $('#editGroupName').val(booking.groupName);
-    $('#editGroupContact').val(booking.groupContact);
+    if (window.ContactChannel) {
+        window.ContactChannel.setFields('#editGroupContactChannel', '#editGroupContact', booking.groupContact);
+    } else {
+        $('#editGroupContact').val(booking.groupContact);
+    }
     $('#editGroupNumberOfRooms').val(booking.numberOfRooms);
     $('#editGroupPaymentStatus').val(booking.paymentStatus);
     $('#editGroupBookingRoute').val(booking.bookingRoute);
@@ -1506,6 +1510,14 @@ function populateEditGroupForm(booking) {
         }
     } else {
         $('#editGroupAgencyWrapper').hide();
+    }
+
+    if (booking.bookingRoute === 'booking-channel') {
+        $('#editGroupChannelBookingIdWrapper').show();
+        $('#editGroupChannelBookingId').val(booking.channelBookingId || '');
+    } else {
+        $('#editGroupChannelBookingIdWrapper').hide();
+        $('#editGroupChannelBookingId').val('');
     }
 
     // ================= SENIOR/PWD DISCOUNT (EDIT) =================
@@ -1940,11 +1952,16 @@ function joinExistingGroup(groupId) {
                     
                     // Pre-fill group information (read-only or editable based on preference)
                     $('#groupName').val(groupData.groupName || '');
-                    $('#groupContact').val(groupData.groupContact || '');
+                    if (window.ContactChannel) {
+                        window.ContactChannel.setFields('#groupContactChannel', '#groupContact', groupData.groupContact || '');
+                    } else {
+                        $('#groupContact').val(groupData.groupContact || '');
+                    }
                     
                     // Make group name and contact read-only since they should match the existing group
                     $('#groupName').prop('readonly', true).css('background-color', '#2a3135');
                     $('#groupContact').prop('readonly', true).css('background-color', '#2a3135');
+                    $('#groupContactChannel').prop('disabled', true).css('background-color', '#2a3135');
                     
                     // IMPROVEMENT #6: Disable billing type checkbox and show warning
                     const groupBillingType = groupData.billingType === 1 ? 'Master/Consolidated' : 'Individual';

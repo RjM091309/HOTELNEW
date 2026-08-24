@@ -395,6 +395,122 @@ class BookingModel {
       }
     }
 
+  static async getUpcomingCheckIns(filter = 'all') {
+    try {
+      const normalizedFilter = String(filter || 'all').toLowerCase();
+      let daysCondition = '';
+
+      switch (normalizedFilter) {
+        case '1day':
+          daysCondition = 'AND DATEDIFF(DATE(b.CHECK_IN_DATE), CURDATE()) = 1';
+          break;
+        case '3day':
+          daysCondition = 'AND DATEDIFF(DATE(b.CHECK_IN_DATE), CURDATE()) = 3';
+          break;
+        case '7day':
+        case 'week':
+          daysCondition = 'AND DATEDIFF(DATE(b.CHECK_IN_DATE), CURDATE()) = 7';
+          break;
+        default:
+          daysCondition = '';
+          break;
+      }
+
+      const query = `
+        SELECT
+          b.IDNo AS BookingID,
+          c.NAME AS guestName,
+          c.CONTACTNo AS contactNumber,
+          CASE
+            WHEN b.IS_DIRECT_RESERVATION = 1 AND (b.ROOM_ID IS NULL OR b.ROOM_ID = 0) THEN 'Unassigned'
+            ELSE COALESCE(r.ROOM_NUMBER, 'Unassigned')
+          END AS roomNumber,
+          b.CHECK_IN_DATE,
+          b.CHECK_OUT_DATE,
+          b.BOOKING_CHANNEL,
+          b.BOOKING_STATUS AS bookingStatus,
+          COALESCE(actual_payments.TOTAL_PAYMENTS_MADE, 0) AS totalPaid,
+          ROUND(GREATEST(0,
+            COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+            + COALESCE(all_services_total.TOTAL_SERVICES_COST, 0)
+            - COALESCE(bill.RESERVATION_FEE, 0)
+            - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+            - COALESCE(actual_payments.TOTAL_PAYMENTS_MADE, 0)
+          ), 2) AS balance,
+          CASE
+            WHEN COALESCE(actual_payments.TOTAL_PAYMENTS_MADE, 0) <= 0 THEN 'no_payment'
+            WHEN ROUND(GREATEST(0,
+              COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
+              + COALESCE(all_services_total.TOTAL_SERVICES_COST, 0)
+              - COALESCE(bill.RESERVATION_FEE, 0)
+              - COALESCE(bill.DISCOUNT_AMOUNT, 0)
+              - COALESCE(actual_payments.TOTAL_PAYMENTS_MADE, 0)
+            ), 2) <= 0 THEN 'paid'
+            ELSE 'partial'
+          END AS paymentStatus
+        FROM booking b
+        INNER JOIN customer c ON b.CUSTOMER_ID = c.IDNo
+        LEFT JOIN room r ON b.ROOM_ID = r.IDNo AND b.ROOM_ID > 0
+        LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID AND bill.ACTIVE = 1
+        LEFT JOIN (
+          SELECT bs.BOOKING_ID, COALESCE(SUM(bs.TOTAL_COST), 0) AS TOTAL_SERVICES_COST
+          FROM booking_service bs
+          WHERE bs.ACTIVE = 1
+          GROUP BY bs.BOOKING_ID
+        ) all_services_total ON b.IDNo = all_services_total.BOOKING_ID
+        LEFT JOIN (
+          SELECT BOOKING_ID, COALESCE(SUM(AMOUNT_PAID), 0) AS TOTAL_PAYMENTS_MADE
+          FROM payments
+          WHERE PAYMENT_TYPE IN ('room', 'service', 'extended')
+          GROUP BY BOOKING_ID
+        ) actual_payments ON b.IDNo = actual_payments.BOOKING_ID
+        WHERE b.ACTIVE = 1
+          AND (b.IS_CANCELLED = 0 OR b.IS_CANCELLED IS NULL)
+          AND b.BOOKING_STATUS = 'pending'
+          AND DATE(b.CHECK_IN_DATE) >= CURDATE()
+          ${daysCondition}
+        ORDER BY b.CHECK_IN_DATE ASC, c.NAME ASC
+      `;
+
+      return await queryDatabasePromise(query);
+    } catch (error) {
+      console.error('Error in getUpcomingCheckIns:', error);
+      throw error;
+    }
+  }
+
+  static async logCheckInNotifications(bookingIds, notifyWindow = 'all', encodedBy = null) {
+    const allowedWindows = new Set(['1day', '3day', '7day', 'all']);
+    const normalizedWindow = allowedWindows.has(String(notifyWindow || '').toLowerCase())
+      ? String(notifyWindow).toLowerCase()
+      : 'all';
+
+    const placeholders = bookingIds.map(() => '?').join(', ');
+    const bookings = await queryDatabasePromise(
+      `SELECT IDNo AS BookingID, DATE(CHECK_IN_DATE) AS checkInDate
+       FROM booking
+       WHERE IDNo IN (${placeholders}) AND ACTIVE = 1`,
+      bookingIds
+    );
+
+    let logged = 0;
+    for (const booking of bookings) {
+      await queryDatabasePromise(
+        `INSERT INTO check_in_notifier_log
+          (BOOKING_ID, NOTIFY_WINDOW, REFERENCE_CHECKIN_DATE, ENCODED_BY)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+          ENCODED_BY = VALUES(ENCODED_BY),
+          ENCODED_DT = CURRENT_TIMESTAMP,
+          ACTIVE = 1`,
+        [booking.BookingID, normalizedWindow, booking.checkInDate, encodedBy]
+      );
+      logged += 1;
+    }
+
+    return { logged, total: bookings.length };
+  }
+
   // Get booking by ID
   static async getBookingById(bookingId) {
     try {
@@ -1066,12 +1182,11 @@ class BookingModel {
         UPDATE booking 
         SET BOOKING_STATUS = 'cancelled', 
             IS_CANCELLED = 1,
-            CANCELLATION_REASON = ?,
             UPDATED_DT = NOW()
         WHERE IDNo = ? AND ACTIVE = 1
       `;
       
-      const result = await queryDatabasePromise(query, [reason, bookingId]);
+      const result = await queryDatabasePromise(query, [bookingId]);
       return result.affectedRows > 0;
     } catch (error) {
       console.error('Error in cancelBooking:', error);
@@ -1087,16 +1202,30 @@ class BookingModel {
           b.IDNo AS BookingID,
           b.CUSTOMER_ID,
           c.NAME AS CustomerName,
+          c.CONTACTNo AS CONTACT_NO,
           c.IS_GROUP,
           b.ROOM_ID,
           r.ROOM_NUMBER,
           rt.NAME AS ROOM_TYPE,
           b.CHECK_IN_DATE,
           b.CHECK_OUT_DATE,
+          b.BOOKING_STATUS,
+          COALESCE(b.CHECK_IN_STATUS, 1) AS CHECK_IN_STATUS,
+          COALESCE(b.LATE_CHECKOUT, 0) AS LATE_CHECKOUT,
           b.REMARKS,
           b.BOOKING_CHANNEL,
           b.AGENCY_PAYER,
+          b.AGENCY_ID,
+          a.NAME AS AGENCY_NAME,
+          COALESCE(NULLIF(TRIM(b.CHANNEL_BOOKING_ID), ''), gb.CHANNEL_BOOKING_ID) AS CHANNEL_BOOKING_ID,
+          b.FLIGHT_NUMBER,
+          b.DROPOFF_FLIGHT_NUMBER,
+          b.PICKUP_DATE,
+          b.PASSENGER_COUNT,
+          b.ENCODED_DT,
+          COALESCE(u.FULLNAME, 'System') AS ENCODED_BY_NAME,
           bill.ROOM_CHARGE AS ROOM_RATE,
+          COALESCE(bill.RESERVATION_FEE, 0) AS RESERVATION_FEE,
 
           bill.QTY AS ORIGINAL_DAYS,
 
@@ -1141,18 +1270,93 @@ class BookingModel {
               WHEN bill.PAYMENT_STATUS = 'paid' THEN 'paid'
               WHEN bill.PAYMENT_STATUS = 'unpaid' THEN 'unpaid'
               ELSE 'partial_paid'
-          END AS PAYMENT_STATUS
+          END AS PAYMENT_STATUS,
+
+          COALESCE((
+            SELECT SUM(bs.QTY)
+            FROM booking_service bs
+            WHERE bs.BOOKING_ID = b.IDNo
+              AND bs.ACTIVE = 1
+              AND bs.SERVICE_ID IN (74, 75)
+          ), 0) AS BREAKFAST_QTY,
+
+          EXISTS (
+            SELECT 1
+            FROM booking_service bs
+            LEFT JOIN services s ON bs.SERVICE_ID = s.IDNo
+            WHERE bs.BOOKING_ID = b.IDNo
+              AND bs.ACTIVE = 1
+              AND (
+                bs.SERVICE_ID IN (76, -101)
+                OR LOWER(COALESCE(s.SERVICE_NAME, '')) LIKE '%pick%'
+              )
+          ) AS HAS_PICKUP,
+
+          EXISTS (
+            SELECT 1
+            FROM booking_service bs
+            LEFT JOIN services s ON bs.SERVICE_ID = s.IDNo
+            WHERE bs.BOOKING_ID = b.IDNo
+              AND bs.ACTIVE = 1
+              AND (
+                bs.SERVICE_ID IN (77, -102)
+                OR LOWER(COALESCE(s.SERVICE_NAME, '')) LIKE '%drop%'
+              )
+          ) AS HAS_DROPOFF,
+
+          (
+            SELECT p.PAYMENT_METHOD
+            FROM payments p
+            WHERE p.BOOKING_ID = b.IDNo
+              AND p.PAYMENT_TYPE NOT IN ('discount', 'security_deposit', 'security_deposit_refund')
+            ORDER BY p.PAYMENT_DATE DESC, p.IDNo DESC
+            LIMIT 1
+          ) AS LATEST_PAYMENT_METHOD,
+
+          (
+            SELECT rm.REMARK_TEXT
+            FROM remarks rm
+            WHERE rm.BOOKING_ID = b.IDNo
+              AND rm.CATEGORY = 'MaintenanceRestore'
+            ORDER BY rm.ACTIVE DESC, rm.IDNo DESC
+            LIMIT 1
+          ) AS MAINTENANCE_RESTORE_JSON,
+
+          (
+            SELECT rm.REMARK_TEXT
+            FROM remarks rm
+            WHERE rm.BOOKING_ID = b.IDNo
+              AND rm.CATEGORY = 'Maintenance'
+              AND rm.ACTIVE = 1
+            ORDER BY rm.IDNo DESC
+            LIMIT 1
+          ) AS MAINTENANCE_REASON
 
         FROM booking b
         LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
         LEFT JOIN room r ON b.ROOM_ID = r.IDNo
         LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
-        LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID
+        LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID AND bill.ACTIVE = 1
+        LEFT JOIN agency a ON b.AGENCY_ID = a.IDNo
+        LEFT JOIN user_info u ON b.ENCODED_BY = u.IDNo
+        LEFT JOIN group_booking gb ON b.GROUP_BOOKING_ID = gb.IDNo
         WHERE b.IDNo = ? AND b.ACTIVE = 1
       `;
       
       const results = await queryDatabasePromise(query, [bookingID]);
-      return results[0] || null;
+      const row = results[0] || null;
+      if (row && String(row.BOOKING_STATUS || '').toLowerCase() === 'maintenance') {
+        row.MAINTENANCE_GUEST_NAME = '';
+        if (row.MAINTENANCE_RESTORE_JSON) {
+          try {
+            const restoreData = JSON.parse(row.MAINTENANCE_RESTORE_JSON);
+            row.MAINTENANCE_GUEST_NAME = String(restoreData?.guestName || '').trim();
+          } catch (parseErr) {
+            row.MAINTENANCE_GUEST_NAME = '';
+          }
+        }
+      }
+      return row;
     } catch (error) {
       console.error('Error in getBookingDetails:', error);
       throw error;
@@ -1269,7 +1473,8 @@ class BookingModel {
       seniorPwdDiscountPercent = 0, // Senior/PWD discount percentage
       lateCheckoutFee,
       isLongTermStay,
-      roomChangeNote
+      roomChangeNote,
+      channelBookingId
     } = bookingData;
 
     try {
@@ -1340,8 +1545,8 @@ class BookingModel {
         // Create booking
         const bookingQuery = `
           INSERT INTO booking
-          (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, REMARKS, CONFIRMATION_NUMBER, NOTIFICATION_READ, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, LATE_CHECKOUT, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, BED_COUNT, FLIGHT_NUMBER, DROPOFF_FLIGHT_NUMBER, PICKUP_DATE, PASSENGER_COUNT, IS_LONG_TERM_STAY, ROOM_CHANGE_NOTE)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, CHANNEL_BOOKING_ID, GUESTS_COUNT, REMARKS, CONFIRMATION_NUMBER, NOTIFICATION_READ, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, LATE_CHECKOUT, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, BED_COUNT, FLIGHT_NUMBER, DROPOFF_FLIGHT_NUMBER, PICKUP_DATE, PASSENGER_COUNT, IS_LONG_TERM_STAY, ROOM_CHANGE_NOTE)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const directReservationFlag = isDirectReservation ? 1 : 0;
         // Handle empty agencyID - set to NULL if empty
@@ -1369,9 +1574,14 @@ class BookingModel {
         if (finalBookingRoute === 'agency' && agencyPayer) {
           processedAgencyPayer = agencyPayer === 'guest' ? 'guest' : 'agency';
         }
+
+        const processedChannelBookingId = finalBookingRoute === 'booking-channel'
+          ? (String(channelBookingId || '').trim() || null)
+          : null;
         
         const bookingValues = [
           customerId, room_id, checkInDate, checkOutDate, 'pending', finalBookingRoute,
+          processedChannelBookingId,
           maxOccupants, bookingRemarks, finalConfirmationNumber, encodedBy, date, 1, checkInStatus, checkOutStatus,
           processedAgencyID, processedAgencyPayer, directReservationFlag, bedCount || null,
           pickupServiceId ? (flightNumber || null) : null,
@@ -1515,7 +1725,7 @@ class BookingModel {
         const services = [];
 
         if (parseInt(breakfastAdultQty) > 0 && breakfastAdultId) {
-          const totalAdult = parseFloat(breakfastAdultQty) * parseFloat(breakfastAdultPrice);
+          const totalAdult = (parseFloat(breakfastAdultQty) || 0) * (parseFloat(breakfastAdultPrice) || 0);
           services.push([
             bookingId,
             breakfastAdultId,
@@ -1529,7 +1739,7 @@ class BookingModel {
         }
 
         if (parseInt(breakfastKidQty) > 0 && breakfastKidId) {
-          const totalKid = parseFloat(breakfastKidQty) * parseFloat(breakfastKidPrice);
+          const totalKid = (parseFloat(breakfastKidQty) || 0) * (parseFloat(breakfastKidPrice) || 0);
           services.push([
             bookingId,
             breakfastKidId,
@@ -4447,6 +4657,7 @@ class BookingModel {
           gb.GROUP_RESERVATION_FEE,
           gb.GROUP_DISCOUNT,
           gb.REMARKS,
+          gb.CHANNEL_BOOKING_ID,
           gb.ENCODED_BY,
           gb.ENCODED_DT,
           gb.BILLING_TYPE,
@@ -4651,6 +4862,7 @@ class BookingModel {
         seniorPwdDiscountPercent: groupBooking.SENIOR_PWD_DISCOUNT_PERCENT || 0,
       seniorPwdRoomCount: groupBooking.SENIOR_PWD_ROOM_COUNT || 0,
         remarks: groupBooking.REMARKS,
+        channelBookingId: groupBooking.CHANNEL_BOOKING_ID || '',
         selectedRooms,
         selectedRoomPrice: selectedRoomPrices,
         qty: diffInDays,
@@ -4883,6 +5095,7 @@ class BookingModel {
       remarks,
       agencyId = null,
       agencyPayer = null,
+      channelBookingId = null,
       breakfastAdultQty,
       breakfastAdultPrice,
       breakfastAdultId,
@@ -4943,7 +5156,7 @@ class BookingModel {
       // EDITED_BY and EDITED_DT track who last edited and when
       const updateGroupQuery = `
         UPDATE group_booking
-        SET GROUP_NAME = ?, CONTACT_NO = ?, NUMBER_OF_ROOMS = ?, GROUP_RESERVATION_FEE = ?, GROUP_DISCOUNT = ?, REMARKS = ?, BILLING_TYPE = ?, SENIOR_PWD_DISCOUNT_PERCENT = ?, SENIOR_PWD_ROOM_COUNT = ?, EDITED_BY = ?, EDITED_DT = ?
+        SET GROUP_NAME = ?, CONTACT_NO = ?, NUMBER_OF_ROOMS = ?, GROUP_RESERVATION_FEE = ?, GROUP_DISCOUNT = ?, REMARKS = ?, CHANNEL_BOOKING_ID = ?, BILLING_TYPE = ?, SENIOR_PWD_DISCOUNT_PERCENT = ?, SENIOR_PWD_ROOM_COUNT = ?, EDITED_BY = ?, EDITED_DT = ?
         WHERE IDNo = ?
       `;
 
@@ -4954,6 +5167,7 @@ class BookingModel {
         0, // GROUP_RESERVATION_FEE removed - always set to 0
         parseFloat(discount) || 0,
         remarks || '',
+        bookingRoute === 'booking-channel' ? (channelBookingId || null) : null,
         consolidatedBilling ? 1 : 0, // 1 = Master, 0 = Individual
         parseFloat(seniorPwdDiscountPercent) || 0.00,
         parseInt(seniorPwdRoomCount, 10) || 0,
@@ -4972,7 +5186,7 @@ class BookingModel {
 
       // Parse new selected rooms - ensure consistent data types
       const newRoomIds = (selectedRooms || '').split(',').filter(Boolean).map(id => parseInt(id.trim()));
-      const newRoomPrices = (selectedRoomPrice || '').split(',').filter(Boolean).map(p => parseFloat(p));
+      const newRoomPrices = (selectedRoomPrice || '').split('|').filter(p => p.trim() !== '').map(p => parseFloat(p.replace(/,/g, '')) || 0);
       const perRoomDiscountsArray = Array.isArray(perRoomDiscounts)
         ? perRoomDiscounts
         : (typeof perRoomDiscounts === 'string' ? perRoomDiscounts.split(',').map(d => parseFloat(d) || 0) : []);
@@ -5477,7 +5691,7 @@ class BookingModel {
 
         // Breakfast Adult
         if (parseInt(breakfastAdultQty) > 0 && breakfastAdultId) {
-          const totalAdult = parseFloat(breakfastAdultQty) * parseFloat(breakfastAdultPrice);
+          const totalAdult = (parseFloat(breakfastAdultQty) || 0) * (parseFloat(breakfastAdultPrice) || 0);
           const serviceStatus = 'unpaid'; // Will be updated based on payment distribution
           
           if (breakfastIndividual) {
@@ -5495,7 +5709,7 @@ class BookingModel {
 
         // Breakfast Kid
         if (parseInt(breakfastKidQty) > 0 && breakfastKidId) {
-          const totalKid = parseFloat(breakfastKidQty) * parseFloat(breakfastKidPrice);
+          const totalKid = (parseFloat(breakfastKidQty) || 0) * (parseFloat(breakfastKidPrice) || 0);
           const serviceStatus = 'unpaid'; // Will be updated based on payment distribution
           
           if (breakfastIndividual) {
@@ -5514,7 +5728,7 @@ class BookingModel {
         // Pickup
         if (pickupServiceId && pickupPrice) {
           const serviceStatus = 'unpaid'; // Will be updated based on payment distribution
-          groupServices.push([targetBookingIds[0], pickupServiceId, 1, parseFloat(pickupPrice), serviceStatus, encodedBy, date, 1]);
+          groupServices.push([targetBookingIds[0], pickupServiceId, 1, parseFloat(pickupPrice) || 0, serviceStatus, encodedBy, date, 1]);
           // Payment distribution logic will handle service payments
         }
 
@@ -7040,6 +7254,476 @@ class BookingModel {
     }
   }
 
+  // Mark booking as maintenance (black bar + guest name Maintenance)
+  static async setBookingMaintenance(params) {
+    const { bookingId, reason, guestName: guestNameFromUi, encodedBy } = params;
+
+    const isGenericGuestName = (name) => {
+      const normalized = String(name || '').trim().toLowerCase();
+      return !normalized || normalized === 'maintenance' || normalized === 'guest';
+    };
+
+    const pickRestoreGuestName = (...names) => {
+      for (const name of names) {
+        const trimmed = String(name || '').trim();
+        if (trimmed && !isGenericGuestName(trimmed)) {
+          return trimmed;
+        }
+      }
+      return String(names.find((name) => String(name || '').trim()) || '').trim();
+    };
+
+    const connection = await new Promise((resolve, reject) => {
+      pool.getConnection((err, conn) => {
+        if (err) reject(err);
+        else resolve(conn);
+      });
+    });
+
+    try {
+      await new Promise((resolve, reject) => {
+        connection.beginTransaction((err) => (err ? reject(err) : resolve()));
+      });
+
+      const bookingRows = await queryDatabasePromise(
+        `SELECT b.IDNo, b.CUSTOMER_ID, b.ROOM_ID, b.BOOKING_STATUS,
+                c.NAME AS CUSTOMER_NAME,
+                r.ROOM_STATUS, r.ROOM_MAINTENANCE_STATUS
+         FROM booking b
+         LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
+         LEFT JOIN room r ON r.IDNo = b.ROOM_ID
+         WHERE b.IDNo = ? AND b.ACTIVE = 1`,
+        [bookingId],
+        connection
+      );
+
+      if (!bookingRows.length) {
+        throw new Error('Booking not found.');
+      }
+
+      const booking = bookingRows[0];
+      const status = String(booking.BOOKING_STATUS || '').toLowerCase();
+      if (status === 'maintenance') {
+        throw new Error('Booking is already set to Maintenance.');
+      }
+      if (status === 'cancelled' || status === 'check-out') {
+        throw new Error('This booking cannot be set to Maintenance.');
+      }
+
+      const restoreSnapshot = JSON.stringify({
+        guestName: pickRestoreGuestName(booking.CUSTOMER_NAME, guestNameFromUi),
+        bookingStatus: booking.BOOKING_STATUS || 'pending',
+        roomStatus: booking.ROOM_STATUS ?? null,
+        roomMaintenanceStatus: booking.ROOM_MAINTENANCE_STATUS ?? null
+      });
+
+      await queryDatabasePromise(
+        `UPDATE remarks SET ACTIVE = 0
+         WHERE BOOKING_ID = ? AND CATEGORY = 'MaintenanceRestore' AND ACTIVE = 1`,
+        [bookingId],
+        connection
+      );
+
+      await queryDatabasePromise(
+        `INSERT INTO remarks (BOOKING_ID, CATEGORY, REMARK_TEXT, ENCODED_BY, ACTIVE)
+         VALUES (?, 'MaintenanceRestore', ?, ?, 1)`,
+        [bookingId, restoreSnapshot, encodedBy || 0],
+        connection
+      );
+
+      await queryDatabasePromise(
+        `UPDATE booking
+         SET BOOKING_STATUS = 'maintenance'
+         WHERE IDNo = ? AND ACTIVE = 1`,
+        [bookingId],
+        connection
+      );
+
+      if (booking.CUSTOMER_ID) {
+        await queryDatabasePromise(
+          `UPDATE customer
+           SET NAME = 'Maintenance'
+           WHERE IDNo = ?`,
+          [booking.CUSTOMER_ID],
+          connection
+        );
+      }
+
+      if (booking.ROOM_ID) {
+        await queryDatabasePromise(
+          `UPDATE room
+           SET ROOM_STATUS = 3,
+               ROOM_MAINTENANCE_STATUS = 'Under Maintenance'
+           WHERE IDNo = ?`,
+          [booking.ROOM_ID],
+          connection
+        );
+      }
+
+      const trimmedReason = String(reason || '').trim();
+      if (trimmedReason && encodedBy) {
+        await queryDatabasePromise(
+          `INSERT INTO remarks (BOOKING_ID, CATEGORY, REMARK_TEXT, ENCODED_BY, ACTIVE)
+           VALUES (?, 'Maintenance', ?, ?, 1)`,
+          [bookingId, trimmedReason, encodedBy],
+          connection
+        );
+      }
+
+      await new Promise((resolve, reject) => {
+        connection.commit((err) => (err ? reject(err) : resolve()));
+      });
+
+      connection.release();
+
+      return {
+        success: true,
+        message: 'Booking set to Maintenance successfully.',
+        guestName: 'Maintenance',
+        reason: trimmedReason
+      };
+    } catch (error) {
+      await new Promise((resolve) => {
+        connection.rollback(() => resolve());
+      });
+      connection.release();
+      throw error;
+    }
+  }
+
+  // Resolve restore snapshot for a maintenance booking (saved data or best-effort fallback)
+  static async resolveMaintenanceSnapshot(bookingId, connection, overrides = {}) {
+    const isGenericGuestName = (name) => {
+      const normalized = String(name || '').trim().toLowerCase();
+      return !normalized || normalized === 'maintenance' || normalized === 'guest';
+    };
+
+    let parsedSnapshot = null;
+    const snapshotRows = await queryDatabasePromise(
+      `SELECT REMARK_TEXT
+       FROM remarks
+       WHERE BOOKING_ID = ? AND CATEGORY = 'MaintenanceRestore'
+       ORDER BY ACTIVE DESC, IDNo DESC
+       LIMIT 1`,
+      [bookingId],
+      connection
+    );
+
+    if (snapshotRows.length) {
+      try {
+        const parsed = JSON.parse(snapshotRows[0].REMARK_TEXT || '{}');
+        if (parsed && typeof parsed === 'object') {
+          parsedSnapshot = parsed;
+        }
+      } catch (parseErr) {
+        parsedSnapshot = null;
+      }
+    }
+
+    const bookingRows = await queryDatabasePromise(
+      `SELECT b.IDNo, b.CUSTOMER_ID, b.ROOM_ID, b.CHECK_IN_DATE, b.CHECK_OUT_DATE,
+              b.CHECK_IN_STATUS, b.BOOKING_CHANNEL, b.AGENCY_ID,
+              c.NAME AS CUSTOMER_NAME,
+              r.ROOM_NUMBER, r.ROOM_STATUS, r.ROOM_MAINTENANCE_STATUS,
+              a.NAME AS AGENCY_NAME
+       FROM booking b
+       LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
+       LEFT JOIN room r ON r.IDNo = b.ROOM_ID
+       LEFT JOIN agency a ON a.IDNo = b.AGENCY_ID
+       WHERE b.IDNo = ? AND b.ACTIVE = 1`,
+      [bookingId],
+      connection
+    );
+
+    if (!bookingRows.length) {
+      throw new Error('Booking not found.');
+    }
+
+    const booking = bookingRows[0];
+    let guestName = overrides.guestName ? String(overrides.guestName).trim() : null;
+
+    if (!guestName && parsedSnapshot?.guestName && !isGenericGuestName(parsedSnapshot.guestName)) {
+      guestName = String(parsedSnapshot.guestName).trim();
+    }
+
+    const currentCustomerName = String(booking.CUSTOMER_NAME || '').trim();
+    if (!guestName && currentCustomerName && !isGenericGuestName(currentCustomerName)) {
+      guestName = currentCustomerName;
+    }
+
+    if (!guestName && booking.AGENCY_NAME) {
+      guestName = String(booking.AGENCY_NAME).trim();
+    }
+
+    if (!guestName && booking.ROOM_NUMBER) {
+      const receiptRows = await queryDatabasePromise(
+        `SELECT RECEIVED_FROM
+         FROM payment_receipt
+         WHERE ROOM_NO = ?
+           AND RECEIVED_FROM IS NOT NULL
+           AND TRIM(RECEIVED_FROM) <> ''
+           AND LOWER(TRIM(RECEIVED_FROM)) <> 'maintenance'
+         ORDER BY RECEIPT_DATE DESC, IDNo DESC
+         LIMIT 1`,
+        [String(booking.ROOM_NUMBER)],
+        connection
+      );
+      if (receiptRows.length) {
+        guestName = String(receiptRows[0].RECEIVED_FROM).trim();
+      }
+    }
+
+    if (!guestName && parsedSnapshot?.guestName) {
+      guestName = String(parsedSnapshot.guestName).trim();
+    }
+
+    if (!guestName) {
+      guestName = 'Guest';
+    }
+
+    let bookingStatus = overrides.bookingStatus || parsedSnapshot?.bookingStatus || 'pending';
+    if (!overrides.bookingStatus && !parsedSnapshot?.bookingStatus) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const checkInDate = booking.CHECK_IN_DATE ? new Date(booking.CHECK_IN_DATE) : null;
+      if (checkInDate) {
+        checkInDate.setHours(0, 0, 0, 0);
+      }
+
+      if (checkInDate && checkInDate <= today) {
+        const paymentRows = await queryDatabasePromise(
+          `SELECT 1
+           FROM payments
+           WHERE BOOKING_ID = ?
+             AND PAYMENT_TYPE NOT IN ('discount', 'security_deposit', 'security_deposit_refund')
+           LIMIT 1`,
+          [bookingId],
+          connection
+        );
+        if (paymentRows.length) {
+          bookingStatus = 'check-In';
+        }
+      }
+    }
+
+    const roomStatus = parsedSnapshot?.roomStatus ?? (bookingStatus === 'check-In' ? 2 : 1);
+    const roomMaintenanceStatus = parsedSnapshot?.roomMaintenanceStatus ?? null;
+
+    return {
+      guestName,
+      bookingStatus,
+      roomStatus,
+      roomMaintenanceStatus,
+      isFallback: !parsedSnapshot
+    };
+  }
+
+  // Reopen maintenance booking and restore previous data
+  static async reopenMaintenanceBooking(params) {
+    const { bookingId, encodedBy, guestName, bookingStatus } = params;
+
+    const connection = await new Promise((resolve, reject) => {
+      pool.getConnection((err, conn) => {
+        if (err) reject(err);
+        else resolve(conn);
+      });
+    });
+
+    try {
+      await new Promise((resolve, reject) => {
+        connection.beginTransaction((err) => (err ? reject(err) : resolve()));
+      });
+
+      const bookingRows = await queryDatabasePromise(
+        `SELECT b.IDNo, b.CUSTOMER_ID, b.ROOM_ID, b.BOOKING_STATUS
+         FROM booking b
+         WHERE b.IDNo = ? AND b.ACTIVE = 1`,
+        [bookingId],
+        connection
+      );
+
+      if (!bookingRows.length) {
+        throw new Error('Booking not found.');
+      }
+
+      const booking = bookingRows[0];
+      if (String(booking.BOOKING_STATUS || '').toLowerCase() !== 'maintenance') {
+        throw new Error('Booking is not under Maintenance.');
+      }
+
+      const snapshot = await BookingModel.resolveMaintenanceSnapshot(
+        bookingId,
+        connection,
+        {
+          guestName: guestName ? String(guestName).trim() : undefined,
+          bookingStatus: bookingStatus ? String(bookingStatus).trim() : undefined
+        }
+      );
+
+      const restoredStatus = snapshot.bookingStatus || 'pending';
+      const restoredGuestName = snapshot.guestName || 'Guest';
+
+      await queryDatabasePromise(
+        `UPDATE booking
+         SET BOOKING_STATUS = ?
+         WHERE IDNo = ? AND ACTIVE = 1`,
+        [restoredStatus, bookingId],
+        connection
+      );
+
+      if (booking.CUSTOMER_ID && restoredGuestName) {
+        await queryDatabasePromise(
+          `UPDATE customer SET NAME = ? WHERE IDNo = ?`,
+          [restoredGuestName, booking.CUSTOMER_ID],
+          connection
+        );
+      }
+
+      if (booking.ROOM_ID) {
+        const roomStatus = snapshot.roomStatus ?? (restoredStatus === 'check-In' ? 2 : 1);
+        const roomMaintenanceStatus = snapshot.roomMaintenanceStatus ?? null;
+        await queryDatabasePromise(
+          `UPDATE room
+           SET ROOM_STATUS = ?,
+               ROOM_MAINTENANCE_STATUS = ?
+           WHERE IDNo = ?`,
+          [roomStatus, roomMaintenanceStatus, booking.ROOM_ID],
+          connection
+        );
+      }
+
+      await queryDatabasePromise(
+        `UPDATE remarks SET ACTIVE = 0
+         WHERE BOOKING_ID = ? AND CATEGORY = 'MaintenanceRestore' AND ACTIVE = 1`,
+        [bookingId],
+        connection
+      );
+
+      await new Promise((resolve, reject) => {
+        connection.commit((err) => (err ? reject(err) : resolve()));
+      });
+
+      connection.release();
+
+      return {
+        success: true,
+        message: snapshot.isFallback
+          ? `Booking reopened. Restored as ${restoredGuestName} (${restoredStatus}). Please verify guest details if needed.`
+          : 'Booking reopened and previous data restored.',
+        guestName: restoredGuestName,
+        bookingStatus: restoredStatus,
+        usedFallback: !!snapshot.isFallback
+      };
+    } catch (error) {
+      await new Promise((resolve) => {
+        connection.rollback(() => resolve());
+      });
+      connection.release();
+      throw error;
+    }
+  }
+
+  // Mark maintenance as fixed — remove booking from calendar entirely (no restore)
+  static async completeMaintenanceBooking(params) {
+    const { bookingId, encodedBy } = params;
+
+    const connection = await new Promise((resolve, reject) => {
+      pool.getConnection((err, conn) => {
+        if (err) reject(err);
+        else resolve(conn);
+      });
+    });
+
+    try {
+      await new Promise((resolve, reject) => {
+        connection.beginTransaction((err) => (err ? reject(err) : resolve()));
+      });
+
+      const bookingRows = await queryDatabasePromise(
+        `SELECT b.IDNo, b.ROOM_ID, b.BOOKING_STATUS, b.REMARKS,
+                c.NAME AS CUSTOMER_NAME,
+                r.ROOM_MAINTENANCE_STATUS,
+                (
+                  SELECT COUNT(*)
+                  FROM remarks rm
+                  WHERE rm.BOOKING_ID = b.IDNo
+                    AND rm.CATEGORY IN ('Maintenance', 'MaintenanceRestore')
+                    AND rm.ACTIVE = 1
+                ) AS maintenanceRemarkCount
+         FROM booking b
+         LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
+         LEFT JOIN room r ON r.IDNo = b.ROOM_ID
+         WHERE b.IDNo = ? AND b.ACTIVE = 1`,
+        [bookingId],
+        connection
+      );
+
+      if (!bookingRows.length) {
+        throw new Error('Booking not found.');
+      }
+
+      const booking = bookingRows[0];
+      const status = String(booking.BOOKING_STATUS || '').trim().toLowerCase();
+      const customerName = String(booking.CUSTOMER_NAME || '').trim().toLowerCase();
+      const roomMaintenanceStatus = String(booking.ROOM_MAINTENANCE_STATUS || '').trim().toLowerCase();
+      const hasMaintenanceRemark = Number(booking.maintenanceRemarkCount || 0) > 0;
+      const isMaintenanceBooking =
+        status === 'maintenance' ||
+        customerName === 'maintenance' ||
+        hasMaintenanceRemark ||
+        roomMaintenanceStatus.includes('maintenance');
+
+      if (!isMaintenanceBooking) {
+        throw new Error('Booking is not under Maintenance.');
+      }
+
+      await queryDatabasePromise(
+        `UPDATE booking
+         SET ACTIVE = 0,
+             EDITED_BY = ?,
+             EDITED_DT = NOW()
+         WHERE IDNo = ?`,
+        [encodedBy || 0, bookingId],
+        connection
+      );
+
+      if (booking.ROOM_ID) {
+        await queryDatabasePromise(
+          `UPDATE room
+           SET ROOM_STATUS = 1,
+               ROOM_MAINTENANCE_STATUS = NULL
+           WHERE IDNo = ?`,
+          [booking.ROOM_ID],
+          connection
+        );
+      }
+
+      await queryDatabasePromise(
+        `UPDATE remarks SET ACTIVE = 0
+         WHERE BOOKING_ID = ? AND CATEGORY IN ('Maintenance', 'MaintenanceRestore') AND ACTIVE = 1`,
+        [bookingId],
+        connection
+      );
+
+      await new Promise((resolve, reject) => {
+        connection.commit((err) => (err ? reject(err) : resolve()));
+      });
+
+      connection.release();
+
+      return {
+        success: true,
+        message: 'Maintenance completed. Booking schedule removed.'
+      };
+    } catch (error) {
+      await new Promise((resolve) => {
+        connection.rollback(() => resolve());
+      });
+      connection.release();
+      throw error;
+    }
+  }
+
   // Cancel group booking
   static async cancelGroupBooking(params) {
     const { groupId, reason, cancellationFee, encodedBy, bookingIds } = params;
@@ -8348,6 +9032,7 @@ class BookingModel {
           b.CHECK_OUT_DATE,
           b.BOOKING_STATUS,
           b.BOOKING_CHANNEL,
+          COALESCE(NULLIF(TRIM(b.CHANNEL_BOOKING_ID), ''), gb.CHANNEL_BOOKING_ID) as channelBookingId,
           b.GUESTS_COUNT,
           b.REMARKS,
           b.CONFIRMATION_NUMBER,
@@ -8412,6 +9097,7 @@ class BookingModel {
         LEFT JOIN booking_service bs_dropoff ON bs_dropoff.BOOKING_ID = b.IDNo AND bs_dropoff.SERVICE_ID = 77 AND bs_dropoff.ACTIVE = 1
         LEFT JOIN booking_service bs_late_checkout ON bs_late_checkout.BOOKING_ID = b.IDNo AND bs_late_checkout.SERVICE_ID = 72 AND bs_late_checkout.ACTIVE = 1
         LEFT JOIN agency ag ON b.AGENCY_ID = ag.IDNo
+        LEFT JOIN group_booking gb ON b.GROUP_BOOKING_ID = gb.IDNo
         WHERE b.IDNo = ? AND b.ACTIVE = 1
       `;
 
@@ -8471,7 +9157,8 @@ class BookingModel {
         breakfastKidQty, breakfastKidPrice, breakfastKidId,
         pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
         flightNumber, dropoffFlightNumber, pickupDate, passengerCount,
-        discount, seniorPwdDiscountPercent = 0, lateCheckoutFee, editedBy
+        discount, seniorPwdDiscountPercent = 0, lateCheckoutFee, editedBy,
+        channelBookingId
       } = params;
 
       const editDate = new Date();
@@ -8534,6 +9221,7 @@ class BookingModel {
             const bookingUpdateQuery = `
               UPDATE booking
               SET ROOM_ID = ?, CHECK_IN_DATE = ?, CHECK_OUT_DATE = ?, BOOKING_CHANNEL = ?,
+                  CHANNEL_BOOKING_ID = ?,
                   GUESTS_COUNT = ?, REMARKS = ?, CHECK_IN_STATUS = ?, LATE_CHECKOUT = ?, AGENCY_ID = ?,
                   AGENCY_PAYER = ?, BED_COUNT = ?, FLIGHT_NUMBER = ?, DROPOFF_FLIGHT_NUMBER = ?, PICKUP_DATE = ?, PASSENGER_COUNT = ?, EDITED_BY = ?, EDITED_DT = ?
               WHERE IDNo = ?
@@ -8562,6 +9250,10 @@ class BookingModel {
             if (bookingRoute === 'agency' && agencyPayer) {
               processedAgencyPayer = agencyPayer === 'guest' ? 'guest' : 'agency';
             }
+
+            const processedChannelBookingId = bookingRoute === 'booking-channel'
+              ? (String(channelBookingId || '').trim() || null)
+              : null;
             
             const processedBedCount = (bedCount && bedCount.trim() !== '') ? bedCount : null;
             const processedFlightNumber = pickupServiceId ? (flightNumber || null) : null;
@@ -8570,11 +9262,45 @@ class BookingModel {
             const processedPassengerCount = (pickupServiceId || dropoffServiceId) ? (parseInt(passengerCount) || null) : null;
 
             await connection.promise().query(bookingUpdateQuery, [
-              room_id, checkInDate, checkOutDate, bookingRoute, maxOccupants,
+              room_id, checkInDate, checkOutDate, bookingRoute,
+              processedChannelBookingId,
+              maxOccupants,
               bookingRemarks, checkInStatus, checkOutStatus || 0, processedAgencyID,
               processedAgencyPayer, processedBedCount, processedFlightNumber, processedDropoffFlightNumber, processedPickupDate, processedPassengerCount,
               editedBy, editDate, bookingId
             ]);
+
+            // Propagate channel/agency to sibling rooms in the same group booking
+            // (editing the main room should update walk-in → agency on all group rooms)
+            const [groupRows] = await connection.promise().query(
+              `SELECT GROUP_BOOKING_ID FROM booking WHERE IDNo = ? AND ACTIVE = 1 LIMIT 1`,
+              [bookingId]
+            );
+            const groupBookingId = groupRows?.[0]?.GROUP_BOOKING_ID || null;
+            if (groupBookingId) {
+              await connection.promise().query(
+                `UPDATE booking
+                 SET BOOKING_CHANNEL = ?,
+                     CHANNEL_BOOKING_ID = ?,
+                     AGENCY_ID = ?,
+                     AGENCY_PAYER = ?,
+                     EDITED_BY = ?,
+                     EDITED_DT = ?
+                 WHERE GROUP_BOOKING_ID = ?
+                   AND ACTIVE = 1
+                   AND IDNo <> ?`,
+                [
+                  bookingRoute,
+                  processedChannelBookingId,
+                  processedAgencyID,
+                  processedAgencyPayer,
+                  editedBy,
+                  editDate,
+                  groupBookingId,
+                  bookingId
+                ]
+              );
+            }
 
             // 3. Update billing information
             const billingUpdateQuery = `
@@ -8694,12 +9420,12 @@ class BookingModel {
             }
 
             if (parseInt(breakfastAdultQty) > 0 && breakfastAdultId) {
-              const totalAdult = parseFloat(breakfastAdultQty) * parseFloat(breakfastAdultPrice);
+              const totalAdult = (parseFloat(breakfastAdultQty) || 0) * (parseFloat(breakfastAdultPrice) || 0);
               await upsertService(breakfastAdultId, parseInt(breakfastAdultQty), totalAdult);
             }
 
             if (parseInt(breakfastKidQty) > 0 && breakfastKidId) {
-              const totalKid = parseFloat(breakfastKidQty) * parseFloat(breakfastKidPrice);
+              const totalKid = (parseFloat(breakfastKidQty) || 0) * (parseFloat(breakfastKidPrice) || 0);
               await upsertService(breakfastKidId, parseInt(breakfastKidQty), totalKid);
             }
 
@@ -9741,6 +10467,7 @@ class BookingModel {
       remarks,
       agencyId = null,
       agencyPayer = null,
+      channelBookingId = null,
       // Group-level services
       breakfastAdultQty,
       breakfastAdultPrice,
@@ -9893,11 +10620,12 @@ class BookingModel {
             GROUP_RESERVATION_FEE,
             GROUP_DISCOUNT,
             REMARKS,
+            CHANNEL_BOOKING_ID,
             BILLING_TYPE,
             SENIOR_PWD_DISCOUNT_PERCENT,
             SENIOR_PWD_ROOM_COUNT
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const [groupResult] = await connection.promise().query(groupBookingQuery, [
           groupName,
@@ -9907,6 +10635,9 @@ class BookingModel {
           0, // GROUP_RESERVATION_FEE removed - always set to 0
           parseFloat(discount) || 0,
           remarks || '',
+          (String(bookingRoute || '') === 'booking-channel' || channelBookingId)
+            ? (channelBookingId || null)
+            : null,
           consolidatedBilling ? 1 : 0, // 1 = Master, 0 = Individual
           parseFloat(seniorPwdDiscountPercent) || 0.00,
           parseInt(seniorPwdRoomCount, 10) || 0
@@ -9916,7 +10647,12 @@ class BookingModel {
       }
 
       // Prepare per-room arrays
-      const roomBasePrices = (selectedRoomPrice || '').split(',').map(p => parseFloat(p));
+      // selectedRoomPrice is a pipe-separated list of per-room prices (prices may contain commas as thousands separators)
+      const roomPriceParts = (selectedRoomPrice || '').split('|').filter(p => p.trim() !== '');
+      // Fallback: if no pipe separators, treat the whole value as a single price
+      const roomBasePrices = roomPriceParts.length > 0
+        ? roomPriceParts.map(p => parseFloat(p.replace(/,/g, '').trim()) || 0)
+        : [(parseFloat((selectedRoomPrice || '').replace(/,/g, '').trim()) || 0)];
       const nightsCount = parseInt(qty, 10) || 1;
       // Reservation fees removed
       const perRoomDiscountsArray = Array.isArray(perRoomDiscounts) ? perRoomDiscounts : (typeof perRoomDiscounts === 'string' ? perRoomDiscounts.split(',') : []);
@@ -10344,7 +11080,7 @@ class BookingModel {
         
         // Breakfast Adult
         if (parseInt(breakfastAdultQty) > 0 && breakfastAdultId) {
-          const totalAdult = parseFloat(breakfastAdultQty) * parseFloat(breakfastAdultPrice);
+          const totalAdult = (parseFloat(breakfastAdultQty) || 0) * (parseFloat(breakfastAdultPrice) || 0);
           const serviceStatus = 'unpaid'; // Will be updated based on payment distribution
           
           if (breakfastIndividual) {
@@ -10362,7 +11098,7 @@ class BookingModel {
         
         // Breakfast Kid
         if (parseInt(breakfastKidQty) > 0 && breakfastKidId) {
-          const totalKid = parseFloat(breakfastKidQty) * parseFloat(breakfastKidPrice);
+          const totalKid = (parseFloat(breakfastKidQty) || 0) * (parseFloat(breakfastKidPrice) || 0);
           const serviceStatus = 'unpaid'; // Will be updated based on payment distribution
           
           if (breakfastIndividual) {
@@ -10407,10 +11143,10 @@ class BookingModel {
       // If individual breakfast, multiply by number of rooms; otherwise, apply once
       const numRooms = targetBookingIds.length;
       const breakfastAdultTotal = (parseInt(breakfastAdultQty) > 0 && breakfastAdultPrice) 
-        ? parseFloat(breakfastAdultQty) * parseFloat(breakfastAdultPrice) * (breakfastIndividual ? numRooms : 1) 
+        ? (parseFloat(breakfastAdultQty) || 0) * (parseFloat(breakfastAdultPrice) || 0) * (breakfastIndividual ? numRooms : 1) 
         : 0;
       const breakfastKidTotal = (parseInt(breakfastKidQty) > 0 && breakfastKidPrice) 
-        ? parseFloat(breakfastKidQty) * parseFloat(breakfastKidPrice) * (breakfastIndividual ? numRooms : 1) 
+        ? (parseFloat(breakfastKidQty) || 0) * (parseFloat(breakfastKidPrice) || 0) * (breakfastIndividual ? numRooms : 1) 
         : 0;
       const pickupTotal = pickupPrice ? parseFloat(pickupPrice) : 0;
       const dropoffTotal = dropoffPrice ? parseFloat(dropoffPrice) : 0;

@@ -16,6 +16,230 @@ function getPriceBookingType() {
 }
 window.getPriceBookingType = getPriceBookingType;
 
+function parseMoney(value) {
+    if (value === null || value === undefined || value === '') return 0;
+    const numeric = parseFloat(String(value).replace(/,/g, '').replace(/[^\d.-]/g, ''));
+    return Number.isFinite(numeric) ? numeric : 0;
+}
+window.parseMoney = parseMoney;
+
+// Count nights using calendar dates only (ignore check-in/out times).
+function getStayNights() {
+    const daterange = $('#daterange').val() || '';
+    if (daterange.includes(' to ')) {
+        const parts = daterange.split(' to ');
+        const startStr = parts[0].trim();
+        const endStr = (parts[1] || '').split('(')[0].trim();
+        const start = new Date(startStr);
+        const end = new Date(endStr);
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+            const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+            const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+            const nights = Math.round((endDay - startDay) / (1000 * 3600 * 24));
+            if (nights > 0) return nights;
+        }
+    }
+    return Math.max(parseInt($('#diffindays').val(), 10) || 0, 1);
+}
+window.getStayNights = getStayNights;
+
+function parseDisplayDate(dateStr) {
+    if (!dateStr) return null;
+    const trimmed = dateStr.trim();
+
+    const mdyMatch = trimmed.match(/^([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})$/);
+    if (mdyMatch) {
+        const parsed = new Date(`${mdyMatch[1]} ${mdyMatch[2]}, ${mdyMatch[3]} 12:00:00`);
+        if (!isNaN(parsed.getTime())) {
+            return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+        }
+    }
+
+    const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+        return new Date(
+            parseInt(isoMatch[1], 10),
+            parseInt(isoMatch[2], 10) - 1,
+            parseInt(isoMatch[3], 10)
+        );
+    }
+
+    const parsed = new Date(trimmed);
+    if (isNaN(parsed.getTime())) return null;
+    return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+}
+
+function parseStayDateRange() {
+    if (Array.isArray(window._addBookingSelectedDates) && window._addBookingSelectedDates.length === 2) {
+        const start = window._addBookingSelectedDates[0];
+        const end = window._addBookingSelectedDates[1];
+        return {
+            checkIn: new Date(start.getFullYear(), start.getMonth(), start.getDate()),
+            checkOut: new Date(end.getFullYear(), end.getMonth(), end.getDate())
+        };
+    }
+
+    const daterange = $('#daterange').val() || '';
+    if (!daterange.includes(' to ')) return { checkIn: null, checkOut: null };
+    const parts = daterange.split(' to ');
+    const checkIn = parseDisplayDate(parts[0].trim());
+    const checkOut = parseDisplayDate((parts[1] || '').split('(')[0].trim());
+    if (!checkIn || !checkOut) return { checkIn: null, checkOut: null };
+    return { checkIn, checkOut };
+}
+
+// Weekend = Friday night + Saturday night + Sunday night.
+function isWeekendNight(date) {
+    const day = date.getDay();
+    return day === 5 || day === 6 || day === 0; // Fri, Sat, Sun
+}
+
+function countNightBreakdown() {
+    const { checkIn, checkOut } = parseStayDateRange();
+    let weekday = 0;
+    let weekend = 0;
+    const nights = [];
+
+    if (checkIn && checkOut && checkOut > checkIn) {
+        const cursor = new Date(checkIn);
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        while (cursor < checkOut) {
+            const isWeekend = isWeekendNight(cursor);
+            nights.push({
+                date: new Date(cursor),
+                label: `${dayNames[cursor.getDay()]} ${cursor.getMonth() + 1}/${cursor.getDate()}`,
+                type: isWeekend ? 'weekend' : 'weekday'
+            });
+            if (isWeekend) weekend += 1;
+            else weekday += 1;
+            cursor.setDate(cursor.getDate() + 1);
+        }
+    } else {
+        weekday = getStayNights();
+    }
+
+    return { weekday, weekend, total: weekday + weekend, nights };
+}
+window.countNightBreakdown = countNightBreakdown;
+
+function formatRateDisplay(value) {
+    return parseMoney(value).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
+function getCurrentSeasonalRate() {
+    const stored = parseFloat($('#price').data('base-price'));
+    if (Number.isFinite(stored) && stored > 0) return stored;
+    const fromPrice = parseMoney($('#price').val());
+    if (fromPrice > 0) return fromPrice;
+    const fromBase = parseMoney($('#baseprice').val());
+    if (fromBase > 0) return fromBase;
+    return 0;
+}
+
+function syncWeekendRateDefaults(force) {
+    if (!$('#weekendPriceToggle').is(':checked')) return;
+
+    const rate = getCurrentSeasonalRate();
+    if (!rate) return;
+
+    if (force) {
+        $('#weekdayRate').val(formatRateDisplay(rate));
+        $('#weekendRate').val(formatRateDisplay(rate));
+        return;
+    }
+
+    if (!$('#weekdayRate').val().trim()) {
+        $('#weekdayRate').val(formatRateDisplay(rate));
+    }
+    if (!$('#weekendRate').val().trim()) {
+        $('#weekendRate').val(formatRateDisplay(rate));
+    }
+}
+
+function updateWeekendPriceUI() {
+    const breakdown = countNightBreakdown();
+    const hasWeekendNights = breakdown.weekend > 0;
+    const weekendEnabled = $('#weekendPriceToggle').is(':checked') && hasWeekendNights;
+
+    $('#weekendPriceToggleWrapper').toggle(hasWeekendNights);
+
+    if (!hasWeekendNights) {
+        $('#weekendPriceToggle').prop('checked', false);
+        $('#weekendPriceFields').hide();
+        $('#singleRateWrapper').show();
+        return;
+    }
+
+    if (weekendEnabled) {
+        $('#weekendPriceFields').show();
+        $('#singleRateWrapper').hide();
+        const summary = `${breakdown.weekday} weekday + ${breakdown.weekend} weekend night(s) (Fri, Sat & Sun)`;
+        let detail = '';
+        if (Array.isArray(breakdown.nights) && breakdown.nights.length) {
+            detail = breakdown.nights
+                .map((night) => `${night.label} = ${night.type}`)
+                .join(', ');
+        }
+        $('#weekendNightBreakdown').html(
+            detail
+                ? `${summary}<div class="text-muted" style="font-size:10px;margin-top:2px;">${detail}</div>`
+                : summary
+        );
+    } else {
+        $('#weekendPriceFields').hide();
+        $('#singleRateWrapper').show();
+    }
+}
+window.updateWeekendPriceUI = updateWeekendPriceUI;
+
+function getRoomRateDetails() {
+    const nights = getStayNights();
+    const breakdown = countNightBreakdown();
+    const weekendEnabled = $('#weekendPriceToggle').is(':checked') && breakdown.weekend > 0;
+
+    if (weekendEnabled) {
+        const weekdayRate = parseMoney($('#weekdayRate').val());
+        const weekendRate = parseMoney($('#weekendRate').val());
+        const roomCharges = (weekdayRate * breakdown.weekday) + (weekendRate * breakdown.weekend);
+        const avgRate = nights > 0 ? roomCharges / nights : 0;
+        return {
+            roomRate: avgRate,
+            roomCharges,
+            nights,
+            breakdown,
+            weekendEnabled: true,
+            weekdayRate,
+            weekendRate
+        };
+    }
+
+    const roomRate = parseMoney(
+        $('#manualPriceToggle').prop('checked')
+            ? $('#price').val()
+            : $('#baseprice').val()
+    );
+    return {
+        roomRate,
+        roomCharges: roomRate * nights,
+        nights,
+        breakdown,
+        weekendEnabled: false,
+        weekdayRate: roomRate,
+        weekendRate: roomRate
+    };
+}
+window.getRoomRateDetails = getRoomRateDetails;
+
+function toggleChannelBookingIdFields(isBookingChannel) {
+    $('#channelBookingIdWrapper').toggle(!!isBookingChannel);
+    if (!isBookingChannel) {
+        $('#channelBookingId').val('');
+    }
+}
+
 function toggleAgencyFields(isAgency) {
     $('#agencySelectWrapper').toggle(isAgency);
     if (isAgency) {
@@ -35,6 +259,12 @@ function toggleAgencyFields(isAgency) {
         $('input[name="agencyPayer"][value="agency"]').prop('checked', true);
         updateAgencyPayerHint();
     }
+}
+
+function handleBookingRouteDependentFields(routeValue) {
+    const value = routeValue || $('#bookingRoute').val();
+    toggleAgencyFields(value === 'agency');
+    toggleChannelBookingIdFields(value === 'booking-channel');
 }
 
 function refreshSeasonalPrice() {
@@ -104,10 +334,13 @@ function initializeFlatpickr() {
         })),
         onClose: function(selectedDates, dateStr, instance) {
             if (selectedDates.length === 2) {
+                window._addBookingSelectedDates = selectedDates;
                 var startDate = selectedDates[0];
                 var endDate = selectedDates[1];
-                var diffInTime = endDate.getTime() - startDate.getTime();
-                var diffInDays = Math.round(diffInTime / (1000 * 3600 * 24));
+                var startDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+                var endDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+                var diffInDays = Math.round((endDay - startDay) / (1000 * 3600 * 24));
+                if (diffInDays < 1) diffInDays = 1;
 
                 // Update the hidden input for diffindays
                 $('#diffindays').val(diffInDays);
@@ -117,6 +350,7 @@ function initializeFlatpickr() {
                 instance.input.value = formattedDateRange;
 
                 // Also update base price calculation if needed
+                updateWeekendPriceUI();
                 computeTotal();
             }
         }
@@ -209,10 +443,14 @@ function displayConsecutiveRooms(blocks) {
 
 // Function to calculate total price
 function calculateTotalPrice() {
+    if ($('#weekendPriceToggle').is(':checked')) {
+        computeTotal();
+        return;
+    }
     // If manual price toggle is enabled, do not recalculate
     if ($('#manualPriceToggle').is(':checked')) return;
 
-    let basePrice = parseFloat($('#baseprice').val()) || 0;
+    let basePrice = parseMoney($('#baseprice').val());
     let diffInDays = parseFloat($('#diffindays').val()) || 0;
 
     $('#price').val(basePrice.toLocaleString('en-US', {
@@ -277,36 +515,42 @@ function formatPaidAmount(input) {
 function computeTotal() {
     // Only update if NOT group booking
     if ($('#groupBookingCheckbox').is(':checked')) return;
-    const roomRate = $('#manualPriceToggle').prop('checked')
-        ? parseFloat($('#price').val()) || 0
-        : parseFloat($('#baseprice').val()) || 0;
 
-    const nights = parseInt($('#diffindays').val()) || 1;
+    const rateDetails = getRoomRateDetails();
+    const roomRate = rateDetails.roomRate;
+    const nights = rateDetails.nights;
+    $('#diffindays').val(nights);
+
+    if (rateDetails.weekendEnabled) {
+        $('#baseprice').val(roomRate.toFixed(2));
+    } else if ($('#manualPriceToggle').prop('checked')) {
+        $('#baseprice').val(roomRate);
+    }
 
     const adultQty = parseInt($('#breakfastAdultQty').val()) || 0;
-    const adultPrice = parseFloat($('#breakfastAdultPrice').val()) || 0;
+    const adultPrice = parseMoney($('#breakfastAdultPrice').val());
     const kidQty = parseInt($('#breakfastKidQty').val()) || 0;
-    const kidPrice = parseFloat($('#breakfastKidPrice').val()) || 0;
+    const kidPrice = parseMoney($('#breakfastKidPrice').val());
 
     const pickupChecked = $('#includePickup').prop('checked');
     const dropoffChecked = $('#includeDropoff').prop('checked');
 
-    const pickupPrice = pickupChecked ? parseFloat($('#pickupPrice').val()) || 0 : 0;
-    const dropoffPrice = dropoffChecked ? parseFloat($('#dropoffPrice').val()) || 0 : 0;
+    const pickupPrice = pickupChecked ? parseMoney($('#pickupPrice').val()) : 0;
+    const dropoffPrice = dropoffChecked ? parseMoney($('#dropoffPrice').val()) : 0;
 
     // Reservation Fee and Discount
     const reservationFeeChecked = $('#includeReservationFee').prop('checked');
-    const reservationFeeAmount = reservationFeeChecked ? parseFloat($('#reservationFeeAmount').val()) || 0 : 0;
+    const reservationFeeAmount = reservationFeeChecked ? parseMoney($('#reservationFeeAmount').val()) : 0;
     
     // Senior/PWD Discount (percentage-based)
     const seniorPwdDiscountChecked = $('#includeSeniorPwdDiscount').prop('checked');
     let seniorPwdDiscountAmount = 0;
     
     // Get late check-out fee
-    const lateCheckoutFee = parseFloat($('#lateCheckoutFee').val()) || 0;
+    const lateCheckoutFee = parseMoney($('#lateCheckoutFee').val());
 
     // Calculate room charges only (for Senior/PWD discount)
-    const roomCharges = roomRate * nights;
+    const roomCharges = rateDetails.roomCharges;
     
     // Calculate subtotal (charges) - before discounts
     const subtotal = roomCharges + (adultQty * adultPrice) + (kidQty * kidPrice) + pickupPrice + dropoffPrice + lateCheckoutFee;
@@ -342,13 +586,13 @@ function computeTotal() {
     }
     
     const discountChecked = $('#includeDiscount').prop('checked');
-    const discountAmount = discountChecked ? parseFloat($('#discountAmount').val()) || 0 : 0;
+    const discountAmount = discountChecked ? parseMoney($('#discountAmount').val()) : 0;
     
     // Calculate final balance (subtotal - senior/pwd discount - reservation fee - additional discount)
     let finalBalance = subtotal - seniorPwdDiscountAmount - reservationFeeAmount - discountAmount;
     
   // Get paid amount and validate it doesn't exceed total
-  let paidAmount = parseFloat($('#paidAmount').val()) || 0;
+  let paidAmount = parseMoney($('#paidAmount').val());
   
   // Check if this is a direct reservation / unassigned-room scenario
   // (flag coming from navbar + case where subtotal is 0 / no room rate yet)
@@ -444,6 +688,7 @@ function computeTotal() {
       $('#computedPaidAmount').html('<b>' + paidAmount.toLocaleString(undefined, { minimumFractionDigits: 2 }) + '</b>');
     }
 }
+window.computeTotal = computeTotal;
 
 // Function to compute group total
 function computeGroupTotal() {
@@ -617,7 +862,11 @@ function selectCustomer(name, level, customerId, contactNo, guestType) {
     }
 
     // Set the Contact Number field
-    document.getElementById('txtNumber').value = contactNo;
+    if (window.ContactChannel) {
+        window.ContactChannel.setFields('#contactChannel', '#txtNumber', contactNo);
+    } else {
+        document.getElementById('txtNumber').value = contactNo;
+    }
 
     // Store the Customer ID in the hidden input field
     document.getElementById('guestID').value = customerId;
@@ -660,7 +909,11 @@ function getPickAndDropPrices() {
 // Function to clear fields
 function clearFields() {
     // Clear all the fields you want to reset
-    $('#txtNumber').val(''); // Contact Number
+    if (window.ContactChannel) {
+        window.ContactChannel.reset('#contactChannel', '#txtNumber');
+    } else {
+        $('#txtNumber').val(''); // Contact Number
+    }
     $('#txtFullNameAdd').val(''); // Name field
 }
 
@@ -817,8 +1070,7 @@ $(document).ready(function () {
 
     // Booking route change handler
     $('#bookingRoute').on('change', function () {
-        const isAgency = this.value === 'agency';
-        toggleAgencyFields(isAgency);
+        handleBookingRouteDependentFields(this.value);
         refreshSeasonalPrice();
     });
 
@@ -982,11 +1234,44 @@ $(document).ready(function () {
     // Manual price toggle
     $('#manualPriceToggle').change(function () {
         if ($(this).is(':checked')) {
-            $('#price').prop('readonly', false); // allow user to type
+            $('#weekendPriceToggle').prop('checked', false);
+            updateWeekendPriceUI();
+            $('#price').prop('readonly', false);
+            // Clear auto-loaded seasonal rate so total does not keep the old 1,000
+            $('#price').val('');
+            $('#baseprice').val('');
+            computeTotal();
         } else {
-            $('#price').prop('readonly', true); // lock it again
-            calculateTotalPrice(); // restore calculated price if unchecked
+            $('#price').prop('readonly', true);
+            if (typeof window._updateSeasonalPrice === 'function') {
+                window._updateSeasonalPrice();
+            } else {
+                calculateTotalPrice();
+            }
+            computeTotal();
         }
+    });
+
+    $('#weekendPriceToggle').change(function () {
+        if ($(this).is(':checked')) {
+            $('#manualPriceToggle').prop('checked', false);
+            $('#price').prop('readonly', true);
+            syncWeekendRateDefaults(true);
+        } else {
+            $('#weekdayRate').val('');
+            $('#weekendRate').val('');
+            if (typeof window._updateSeasonalPrice === 'function') {
+                window._updateSeasonalPrice();
+            } else {
+                calculateTotalPrice();
+            }
+        }
+        updateWeekendPriceUI();
+        computeTotal();
+    });
+
+    $(document).on('input', '#weekdayRate, #weekendRate', function () {
+        computeTotal();
     });
 
     // Handle Room Selection to Fetch Booked Dates and Populate Fields
@@ -1045,6 +1330,8 @@ $(document).ready(function () {
                 }
 
                 function updateSeasonalPrice() {
+                    if ($('#manualPriceToggle').is(':checked')) return;
+
                     const bedCount = parseInt(room.ROOM_BED);
                     const bookingType = getPriceBookingType();
                     const seasonId = getSeasonIdForDate(startDate, seasonalPrices);
@@ -1058,10 +1345,17 @@ $(document).ready(function () {
                     let pricePerNight = match ? parseFloat(match.price) : parseFloat(room.ROOM_PRICE);
 
                     $('#price')
-                        .val(pricePerNight.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ","))
                         .data('base-price', pricePerNight);
 
                     $('#baseprice').val(pricePerNight.toFixed(2));
+
+                    if ($('#weekendPriceToggle').is(':checked')) {
+                        $('#weekdayRate').val(formatRateDisplay(pricePerNight));
+                        $('#weekendRate').val(formatRateDisplay(pricePerNight));
+                    } else {
+                        $('#price')
+                            .val(pricePerNight.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+                    }
 
                     // Recompute total after setting price
                     computeTotal();
@@ -1072,8 +1366,7 @@ $(document).ready(function () {
                 }
 
                 function handleAgencySelection() {
-                    const isAgency = $('#bookingRoute').val() === 'agency';
-                    toggleAgencyFields(isAgency);
+                    handleBookingRouteDependentFields($('#bookingRoute').val());
                 }
 
                 window._updateSeasonalPrice = updateSeasonalPrice;
@@ -1184,9 +1477,7 @@ $(document).ready(function () {
 
     $('#price').on('input', function () {
         if ($('#manualPriceToggle').is(':checked')) {
-            // Remove commas then parse
-            const manualPrice = parseFloat($(this).val().replace(/,/g, '')) || 0;
-            $('#baseprice').val(manualPrice);
+            computeTotal();
         }
     });
 
@@ -1200,7 +1491,11 @@ $(document).ready(function () {
     document.getElementById('txtFullNameAdd').addEventListener('input', function() {
         // Clear the Customer ID and Contact Number fields
         document.getElementById('guestID').value = '';   // Clear the hidden Guest ID field
-        document.getElementById('txtNumber').value = '';     // Clear the contact number field
+        if (window.ContactChannel) {
+            window.ContactChannel.reset('#contactChannel', '#txtNumber');
+        } else {
+            document.getElementById('txtNumber').value = '';     // Clear the contact number field
+        }
 
         // Only reset dropdowns if the input field is completely cleared
         if (this.value.trim() === '') {
@@ -1291,6 +1586,7 @@ $(document).ready(function () {
     $(document).on('shown.bs.modal', '#modal-addbooking', function() {
         // Calculate late check-out fee after modal is fully shown
         setTimeout(() => {
+            updateWeekendPriceUI();
             calculateLateCheckoutFee();
         }, 100);
     });
@@ -1304,7 +1600,8 @@ $(document).ready(function () {
 
     // Bind events after DOM is fully loaded
     $(document).on('input change', `
-        #baseprice, #price, #manualPriceToggle,
+        #baseprice, #price, #manualPriceToggle, #weekendPriceToggle,
+        #weekdayRate, #weekendRate,
         #diffindays,
         #breakfastAdultQty, #breakfastAdultPrice,
         #breakfastKidQty, #breakfastKidPrice,
@@ -1320,6 +1617,7 @@ $(document).ready(function () {
         computeTotal();
     });
     $('#daterange').on('change', function () {
+        updateWeekendPriceUI();
         computeTotal();
     });
 
@@ -1345,10 +1643,12 @@ $(document).ready(function () {
         
         // If still empty or 0, use computed from total
         if (!computedTotalRaw || computedTotalRaw === '0.00') {
-            // Try to compute total from form values
-            const roomRate = parseFloat($('#price').val().toString().replace(/,/g, '')) || 0;
-            const nights = parseInt($('#diffindays').val()) || 1;
-            const subtotal = roomRate * nights;
+            const rateDetails = typeof getRoomRateDetails === 'function'
+                ? getRoomRateDetails()
+                : null;
+            const subtotal = rateDetails
+                ? rateDetails.roomCharges
+                : (parseFloat($('#price').val().toString().replace(/,/g, '')) || 0) * (parseInt($('#diffindays').val()) || 1);
             computedTotalRaw = subtotal.toFixed(2);
         }
         
@@ -1359,11 +1659,14 @@ $(document).ready(function () {
         computedBalanceRaw = Math.max(0, balance).toFixed(2);
 
       // Calculate room charges and services
-      const priceValue = $('#price').val();
-      const roomRateStr = priceValue ? priceValue.toString().replace(/[,\s₱₹$]/g, '') : '0';
-      const roomRate = parseFloat(roomRateStr) || 0;
-      const nights = parseInt($('#diffindays').val()) || 1;
-      const roomCharges = Math.round((roomRate * nights) * 100) / 100; // Round to 2 decimals
+      const rateDetails = typeof getRoomRateDetails === 'function'
+          ? getRoomRateDetails()
+          : null;
+      const roomCharges = rateDetails
+          ? Math.round(rateDetails.roomCharges * 100) / 100
+          : Math.round(((parseFloat(($('#price').val() || '0').toString().replace(/[,\s₱₹$]/g, '')) || 0) * (parseInt($('#diffindays').val()) || 1)) * 100) / 100;
+      const nights = rateDetails ? rateDetails.nights : (parseInt($('#diffindays').val()) || 1);
+      const roomRate = rateDetails ? rateDetails.roomRate : (parseFloat(($('#price').val() || '0').toString().replace(/[,\s₱₹$]/g, '')) || 0);
       
       // Debug logging
       console.log('Voucher Calculation Debug:', {
@@ -1391,7 +1694,9 @@ $(document).ready(function () {
         fullname: $('#bookingRoute').val() === 'agency' 
           ? $('#agencySelect option:selected').text() 
           : $('#txtFullNameAdd').val(),
-        contactNumber: $('#txtNumber').val(),
+        contactNumber: (window.ContactChannel
+          ? window.ContactChannel.getValue('#contactChannel', '#txtNumber')
+          : $('#txtNumber').val()),
         dateFrom: $('#daterange').val().split(' to ')[0],
         dateTo: $('#daterange').val().split(' to ')[1].split('(')[0].trim(),
         bedCount: $('#bedCount').val(),

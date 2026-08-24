@@ -17,9 +17,10 @@ function injectDragStyles() {
   const style = document.createElement('style');
   style.id = 'calendar-drag-styles';
   style.textContent = `
-    /* Group / long-term booking highlight border */
+    /* Group / long-term / booking-channel booking highlight border */
     .fc-event.group-booking,
-    .fc-event.long-term-booking {
+    .fc-event.long-term-booking,
+    .fc-event.booking-channel-booking {
       box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12) inset;
       height: 24px !important;
       min-height: 24px !important;
@@ -27,13 +28,19 @@ function injectDragStyles() {
     }
     
     .fc-v-event.group-booking,
-    .fc-v-event.long-term-booking {
+    .fc-v-event.long-term-booking,
+    .fc-v-event.booking-channel-booking {
       border: inherit !important;
     }
     
     .fc-event.group-booking[data-highlight-border-color],
-    .fc-event.long-term-booking[data-highlight-border-color] {
+    .fc-event.long-term-booking[data-highlight-border-color],
+    .fc-event.booking-channel-booking[data-highlight-border-color] {
       box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1) inset, 0 0 6px rgba(0, 0, 0, 0.12);
+    }
+
+    .fc-event.group-booking.booking-channel-booking {
+      box-shadow: inset 0 0 0 3px #D5A6BD, 0 0 0 1px rgba(0, 0, 0, 0.12) !important;
     }
 
     .event-being-dragged {
@@ -81,8 +88,13 @@ function injectDragStyles() {
     }
     
     .fc-event .fc-event-resizer-end {
-      display: block !important; /* Show only right resize handle */
+      display: none;
       cursor: ew-resize !important;
+    }
+
+    .fc-event:hover .fc-event-resizer-end,
+    .fc-event.event-being-resized .fc-event-resizer-end {
+      display: block !important;
     }
 
     /* Composite half color background via gradient retained on hover */
@@ -138,6 +150,24 @@ function injectDragStyles() {
       pointer-events: none;
       z-index: 25;
       transform: none !important;
+    }
+
+    .fc-event .pickup-service-indicator {
+      position: absolute;
+      left: 9px;
+      top: 50%;
+      font-size: 10px;
+      color: #fff;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+      pointer-events: none;
+      z-index: 26;
+      line-height: 1;
+      /* Counter the bar's skew(-18deg) so the car stays upright */
+      transform: translateY(-50%) skew(18deg) !important;
+    }
+
+    .fc-event.has-pickup-service .event-title-chip {
+      left: 24px;
     }
   `;
   

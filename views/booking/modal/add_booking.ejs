@@ -85,6 +85,13 @@
                               </div>
                           </div>
                         </div>
+
+                        <div id="channelBookingIdWrapper" class="col-lg-4" style="display: none;">
+                            <div class="form-group">
+                                <label class="form-label">Booking ID</label>
+                                <input type="text" class="form-control" id="channelBookingId" name="channelBookingId" placeholder="Enter channel booking ID" autocomplete="off">
+                            </div>
+                        </div>
                       
                         
                       
@@ -135,12 +142,24 @@
                             </div>
                         </div>
                           
-                        <div id="divprice" class="col-lg-4">
+                        <div id="divprice" class="col-lg-3">
                             <div class="form-group">
-                              <label class="form-label">Room Rate</label>
-                              <input class="form-control" type="text" id="price" name="price" readonly>
-                              <div style="margin-top: 0px;">
-                                <input type="checkbox" id="manualPriceToggle"> <label for="manualPriceToggle" style="font-size: 12px;">Enter Price Manually</label>
+                              <div id="singleRateWrapper">
+                                <label class="form-label">Room Rate</label>
+                                <input class="form-control" type="text" id="price" name="price" readonly>
+                                <div style="margin-top: 0px;">
+                                  <input type="checkbox" id="manualPriceToggle"> <label for="manualPriceToggle" style="font-size: 12px;">Enter Price Manually</label>
+                                </div>
+                              </div>
+                              <div id="weekendPriceToggleWrapper" style="display:none; margin-top: 6px;">
+                                <input type="checkbox" id="weekendPriceToggle"> <label for="weekendPriceToggle" style="font-size: 12px;">Separate Weekend Rate</label>
+                              </div>
+                              <div id="weekendPriceFields" style="display:none; margin-top: 8px;">
+                                <label class="form-label" style="font-size: 12px; margin-bottom: 2px;">Weekday Rate</label>
+                                <input class="form-control form-control-sm" type="text" id="weekdayRate" placeholder="Weekday rate">
+                                <label class="form-label" style="font-size: 12px; margin-top: 6px; margin-bottom: 2px;">Weekend Rate</label>
+                                <input class="form-control form-control-sm" type="text" id="weekendRate" placeholder="Weekend rate">
+                                <small id="weekendNightBreakdown" class="text-muted d-block" style="font-size: 11px; margin-top: 4px;"></small>
                               </div>
                             </div>
                         </div>
@@ -164,10 +183,18 @@
                                 </div>
                             </div>
 
-                            <div id="divtxtNumber" class="col-lg-4">
+                            <div id="divtxtNumber" class="col-lg-5">
                                 <div class="form-group">
                                     <label class="form-label">Contact Number</label>
-                                    <input class="form-control" type="text" id="txtNumber" name="number" autocomplete="off">
+                                    <div class="input-group contact-channel-group">
+                                        <select class="form-select" id="contactChannel" name="contactChannel">
+                                            <option value="Phone" selected>Phone</option>
+                                            <option value="KakaoTalk">KakaoTalk</option>
+                                            <option value="Viber">Viber</option>
+                                            <option value="Telegram">Telegram</option>
+                                        </select>
+                                        <input class="form-control" type="text" id="txtNumber" name="number" autocomplete="off" placeholder="Enter phone number">
+                                    </div>
                                 </div>
                             </div>
                             
@@ -385,6 +412,7 @@
                     
                     <!-- Move submit button inside the form -->
                     <div class="modal-footer ">
+                        <button type="button" class="btn btn-dark" id="btnAddBookingMaintenance">Maintenance</button>
                         <!-- Voucher button -->
                         <button type="button" class="btn btn-primary" id="btnGenerateVoucherPreview">
                         Voucher
@@ -434,6 +462,7 @@
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="/plugins/flatpicker/flatpickr.min.js"></script>
+<script src="/js/booking/contact_channel.js?v=2"></script>
 <script>
 	document.addEventListener('DOMContentLoaded', function() {
 		
@@ -443,14 +472,19 @@
 		document.body.appendChild(bookingScript);
 		bookingScript.onload = function() {
 			var bookingBillingScript = document.createElement('script');
-			bookingBillingScript.src = '/js/booking/add_booking.js';
+			bookingBillingScript.src = '/js/booking/add_booking.js?v=weekend-price-4';
 			document.body.appendChild(bookingBillingScript);
 		};
 
-		// Load booking_submit.js for form submission handling
-		var submitScript = document.createElement('script');
-		submitScript.src = '/js/booking/booking_submit.js';
-		document.body.appendChild(submitScript);
+		// Load maintenance popup, then booking submit handler
+		var maintenanceScript = document.createElement('script');
+		maintenanceScript.src = '/js/booking/maintenance_popup.js';
+		document.body.appendChild(maintenanceScript);
+		maintenanceScript.onload = function() {
+			var submitScript = document.createElement('script');
+			submitScript.src = '/js/booking/booking_submit.js?v=contact-channel-1';
+			document.body.appendChild(submitScript);
+		};
 
 		// When the Add Booking modal is shown, apply saved check-in/out preferences
 		try {
@@ -469,6 +503,9 @@
                         if (outField && (prefOut === 'R/O' || prefOut === 'L/O')) {
                             outField.value = (prefOut === 'R/O') ? '0' : '1';
                             outField.dispatchEvent(new Event('change'));
+                        }
+                        if (typeof handleBookingRouteDependentFields === 'function') {
+                            handleBookingRouteDependentFields();
                         }
 					} catch (e) { /* no-op */ }
 

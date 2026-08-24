@@ -261,13 +261,21 @@ class GuestModel {
       // Format phone number
       const formatPhoneNumber = (phone) => {
         if (!phone || phone === 'N/A') return 'N/A';
-        const cleaned = phone.toString().replace(/\D/g, '');
+        const raw = phone.toString().trim();
+        const channelMatch = raw.match(/^(KakaoTalk|Viber|Telegram|Phone)\s*:\s*(.*)$/i);
+        const channel = channelMatch ? channelMatch[1] : null;
+        const numberPart = channelMatch ? channelMatch[2] : raw;
+        const cleaned = numberPart.replace(/\D/g, '');
+        let formatted = numberPart;
         if (cleaned.length === 11) {
-          return `${cleaned.slice(0, 4)}-${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
+          formatted = `${cleaned.slice(0, 4)}-${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
         } else if (cleaned.length === 10) {
-          return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+          formatted = `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
         }
-        return phone;
+        if (channel && channel.toLowerCase() !== 'phone') {
+          return `${channel}: ${formatted}`;
+        }
+        return formatted;
       };
 
       // Determine guest status

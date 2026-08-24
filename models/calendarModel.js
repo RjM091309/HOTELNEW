@@ -147,6 +147,7 @@ class CalendarModel {
           IFNULL(r.ROOM_PRICE, rt.BASE_PRICE) AS ROOM_RATE, 
           r.ROOM_MAX, 
           r.ROOM_BED, 
+          r.ROOM_VIEW,
           r.ROOM_SIZE, 
           r.ROOM_DESCRIPTION, 
           r.ROOM_STATUS, 
@@ -240,6 +241,8 @@ class CalendarModel {
             WHEN b.BOOKING_STATUS = 'pending' AND COALESCE(b.CHECK_IN_STATUS, 1) = 0 THEN '#e0a316'
             WHEN b.BOOKING_STATUS = 'pending' THEN '#e53935'
             WHEN b.BOOKING_STATUS = 'cancelled' THEN '#000000'
+            WHEN b.BOOKING_STATUS = 'maintenance' THEN '#000000'
+            WHEN c.NAME = 'Maintenance' THEN '#000000'
             ELSE 'pink'
           END AS backgroundColor,
           -- Pre-calculated extended properties
@@ -269,6 +272,30 @@ class CalendarModel {
           COALESCE(b.HOLD_PENDING, 0) AS holdPending,
           b.BOOKING_CHANNEL AS bookingChannel,
           b.AGENCY_PAYER AS agencyPayer,
+          (
+            SELECT bc.CANCELLATION_REASON
+            FROM booking_cancellation bc
+            WHERE bc.BOOKING_ID = b.IDNo
+            ORDER BY bc.IDNo DESC
+            LIMIT 1
+          ) AS cancellationReason,
+          (
+            SELECT rm.REMARK_TEXT
+            FROM remarks rm
+            WHERE rm.BOOKING_ID = b.IDNo
+              AND rm.CATEGORY = 'Maintenance'
+              AND rm.ACTIVE = 1
+            ORDER BY rm.IDNo DESC
+            LIMIT 1
+          ) AS maintenanceReason,
+          (
+            SELECT rm.REMARK_TEXT
+            FROM remarks rm
+            WHERE rm.BOOKING_ID = b.IDNo
+              AND rm.CATEGORY = 'MaintenanceRestore'
+            ORDER BY rm.ACTIVE DESC, rm.IDNo DESC
+            LIMIT 1
+          ) AS maintenanceRestoreJson,
           COALESCE(b.IS_LONG_TERM_STAY, 0) AS isLongTermStay,
           -- Same room, same-day turnover: flags BOTH sides - this booking checking in the same
           -- day another checks out, or this booking checking out the same day another checks in
@@ -283,6 +310,34 @@ class CalendarModel {
                 OR DATE(b2.CHECK_IN_DATE) = DATE(b.CHECK_OUT_DATE)
               )
           ) AS isBackToBack,
+          (
+            EXISTS (
+              SELECT 1
+              FROM booking_service bs
+              LEFT JOIN services s ON bs.SERVICE_ID = s.IDNo
+              WHERE bs.BOOKING_ID = b.IDNo
+                AND bs.ACTIVE = 1
+                AND (
+                  bs.SERVICE_ID IN (76, -101)
+                  OR LOWER(COALESCE(s.SERVICE_NAME, '')) LIKE '%pick%'
+                )
+            )
+            OR (
+              b.GROUP_BOOKING_ID IS NOT NULL
+              AND EXISTS (
+                SELECT 1
+                FROM booking b_grp
+                INNER JOIN booking_service bs ON bs.BOOKING_ID = b_grp.IDNo AND bs.ACTIVE = 1
+                LEFT JOIN services s ON bs.SERVICE_ID = s.IDNo
+                WHERE b_grp.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID
+                  AND b_grp.ACTIVE = 1
+                  AND (
+                    bs.SERVICE_ID IN (76, -101)
+                    OR LOWER(COALESCE(s.SERVICE_NAME, '')) LIKE '%pick%'
+                  )
+              )
+            )
+          ) AS hasPickup,
           -- Pre-calculated composite status for styling
           CASE
             WHEN b.BOOKING_STATUS = 'pending' AND COALESCE(b.HOLD_PENDING, 0) = 1 THEN 'none'
@@ -313,10 +368,29 @@ class CalendarModel {
         startDate.setHours(6, 0, 0, 0);   // 6 AM
         endDate.setHours(18, 0, 0, 0);    // 6 PM
         
+        const isMaintenanceRow =
+          row.bookingStatus === 'maintenance' ||
+          String(row.title || '').trim() === 'Maintenance';
+        const guestName = isMaintenanceRow
+          ? 'Maintenance'
+          : (row.title || 'No Name');
+        const isAgencyBooking = !isMaintenanceRow
+          && String(row.bookingChannel || '').toLowerCase() === 'agency';
+
+        let maintenanceGuestName = '';
+        if (row.maintenanceRestoreJson) {
+          try {
+            const restoreData = JSON.parse(row.maintenanceRestoreJson);
+            maintenanceGuestName = String(restoreData?.guestName || '').trim();
+          } catch (parseErr) {
+            maintenanceGuestName = '';
+          }
+        }
+
         return {
           id: String(row.id),
           resourceIds: [String(row.resourceIds)],
-          title: row.title || 'No Name',
+          title: isAgencyBooking ? `AG - ${guestName}` : guestName,
           start: startDate.toISOString(),
           end: endDate.toISOString(),
           backgroundColor: row.backgroundColor,
@@ -324,7 +398,7 @@ class CalendarModel {
             totalCost: row.totalCost,
             paymentStatus: row.paymentStatus,
             totalDays: row.totalDays,
-            bookingStatus: row.bookingStatus,
+            bookingStatus: isMaintenanceRow ? 'maintenance' : row.bookingStatus,
             checkInStatus: row.checkInStatus,
             checkOutStatus: row.checkOutStatus,
             holdPending: !!row.holdPending,
@@ -333,7 +407,11 @@ class CalendarModel {
             bookingChannel: row.bookingChannel || 'walk-in',
             agencyPayer: row.agencyPayer || 'agency',
             compositeStatus: row.compositeStatus,
-            isLongTermStay: !!row.isLongTermStay
+            isLongTermStay: !!row.isLongTermStay,
+            hasPickup: !!row.hasPickup,
+            cancellationReason: row.cancellationReason || '',
+            maintenanceReason: row.maintenanceReason || '',
+            maintenanceGuestName
           }
         };
       });

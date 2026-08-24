@@ -43,6 +43,24 @@ function formatBillingPaymentDate(value) {
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+function escapeBillingHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function formatBillingPaymentStatusLabel(isRefund, remarks) {
+    const base = isRefund ? 'REFUND' : 'PAID';
+    const remark = String(remarks || '').trim();
+    if (!remark) return base;
+
+    const normalizedRemark = remark.replace(/^paid\s+/i, '').trim();
+    const suffix = (normalizedRemark || remark).toUpperCase();
+    return `${base} - ${suffix}`;
+}
+
 function renderBillingPaymentBreakdown(paymentsArray) {
     const tbody = document.getElementById('billingPaymentBreakdownBody');
     const emptyEl = document.getElementById('billingPaymentBreakdownEmpty');
@@ -67,7 +85,7 @@ function renderBillingPaymentBreakdown(paymentsArray) {
     visiblePayments.forEach((payment) => {
         const amount = parseFloat(payment.AMOUNT_PAID) || 0;
         const isRefund = payment.PAYMENT_TYPE === 'refund' || amount < 0;
-        const statusLabel = isRefund ? 'REFUND' : 'PAID';
+        const statusLabel = formatBillingPaymentStatusLabel(isRefund, payment.REMARKS);
         const methodLabel = formatBillingPaymentMethod(payment.PAYMENT_METHOD);
         const amountClass = isRefund ? 'payment-refund' : 'payment-received';
         const amountDisplay = isRefund
@@ -76,9 +94,9 @@ function renderBillingPaymentBreakdown(paymentsArray) {
 
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td>${formatBillingPaymentDate(payment.PAYMENT_DATE)}</td>
-            <td>${methodLabel}</td>
-            <td>${statusLabel}</td>
+            <td>${escapeBillingHtml(formatBillingPaymentDate(payment.PAYMENT_DATE))}</td>
+            <td>${escapeBillingHtml(methodLabel)}</td>
+            <td class="payment-status-cell">${escapeBillingHtml(statusLabel)}</td>
             <td class="text-end ${amountClass}">${amountDisplay}</td>
         `;
         tbody.appendChild(row);
@@ -917,3 +935,81 @@ window.showBilling = async function (bookingID) {
         console.error('showBilling error:', e);
     }
 };
+
+function ensureActionPopupHelpers() {
+    if (typeof window.closeAllActionPopups === 'function') return;
+
+    window.closeAllActionPopups = function () {
+        document.querySelectorAll('.voucher-action-menu').forEach(function (menu) {
+            menu.classList.remove('show');
+            menu.style.display = 'none';
+            menu.hidden = true;
+        });
+    };
+
+    window.toggleActionPopup = function (menuId, event) {
+        if (event) event.stopPropagation();
+        const menu = document.getElementById(menuId);
+        if (!menu) return;
+
+        const willShow = !menu.classList.contains('show');
+        window.closeAllActionPopups();
+        if (willShow) {
+            menu.classList.add('show');
+            menu.style.display = 'flex';
+            menu.hidden = false;
+        }
+    };
+
+    if (!window._actionPopupListenerAttached) {
+        window._actionPopupListenerAttached = true;
+        document.addEventListener('click', window.closeAllActionPopups);
+    }
+}
+
+function printBillingReceipt() {
+    if (typeof window.closeAllActionPopups === 'function') {
+        window.closeAllActionPopups();
+    }
+    printDiv('printableArea');
+}
+
+async function sendBillingReceipt() {
+    if (typeof window.closeAllActionPopups === 'function') {
+        window.closeAllActionPopups();
+    }
+
+    const bookingInput = document.getElementById('hiddenBookingId');
+    const bookingId = bookingInput ? bookingInput.value : '';
+    let contact = '';
+
+    if (bookingId) {
+        const guestContactEl = document.getElementById('guest-contact-' + bookingId);
+        if (guestContactEl) {
+            contact = guestContactEl.textContent.trim();
+        } else {
+            try {
+                const res = await fetch('/booking/booking_details/' + bookingId);
+                if (res.ok) {
+                    const data = await res.json();
+                    contact = data.CONTACTNo || data.contactNumber || '';
+                }
+            } catch (error) {
+                console.error('Failed to load contact for receipt send:', error);
+            }
+        }
+    }
+
+    if (typeof window.confirmSendDocument === 'function') {
+        window.confirmSendDocument('Receipt', contact);
+        return;
+    }
+
+    if (typeof Swal !== 'undefined') {
+        Swal.fire('Send Receipt', contact ? 'Send receipt to ' + contact + '?' : 'No contact on file.', 'info');
+    }
+}
+
+ensureActionPopupHelpers();
+window.printBillingReceipt = printBillingReceipt;
+window.sendBillingReceipt = sendBillingReceipt;

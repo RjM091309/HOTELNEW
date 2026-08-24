@@ -25,6 +25,69 @@ class BookingController {
     }
   }
 
+  // Render the check-in notifier page
+  static async renderCheckInNotifierPage(req, res) {
+    try {
+      const user = req.user ? {
+        FULLNAME: req.user.FULLNAME,
+        PERMISSIONS: req.user.PERMISSIONS
+      } : null;
+
+      res.render('booking/check_in_notifier', {
+        title: 'Check-in Notifier',
+        subTitle: 'Check-in Notifier',
+        activePage: 'check-in-notifier',
+        user
+      });
+    } catch (error) {
+      console.error('Error rendering check-in notifier page:', error);
+      res.status(500).render('error/500', {
+        title: 'Server Error',
+        subTitle: '500 Error'
+      });
+    }
+  }
+
+  static async getCheckInNotifierData(req, res) {
+    try {
+      const filter = req.query.filter || 'all';
+      const rows = await BookingModel.getUpcomingCheckIns(filter);
+      res.json({ success: true, data: rows });
+    } catch (error) {
+      console.error('Error fetching check-in notifier data:', error);
+      res.status(500).json({ success: false, message: 'Failed to load upcoming check-ins' });
+    }
+  }
+
+  static async notifyCheckInSelections(req, res) {
+    try {
+      const { bookingIds, filter } = req.body || {};
+      const ids = (Array.isArray(bookingIds) ? bookingIds : [])
+        .map((id) => parseInt(id, 10))
+        .filter((id) => Number.isInteger(id) && id > 0);
+
+      if (!ids.length) {
+        return res.status(400).json({
+          success: false,
+          message: 'Select at least one booking to notify.'
+        });
+      }
+
+      const encodedBy = req.user?.userId || null;
+      const result = await BookingModel.logCheckInNotifications(ids, filter || 'all', encodedBy);
+
+      res.json({
+        success: true,
+        message: `Notification logged for ${result.logged} booking(s).`,
+        logged: result.logged,
+        total: result.total
+      });
+    } catch (error) {
+      console.error('Error logging check-in notifications:', error);
+      res.status(500).json({ success: false, message: 'Failed to log notifications' });
+    }
+  }
+
   // Render the group booking page
   static async renderGroupBookingPage(req, res) {
     try {
@@ -580,10 +643,18 @@ class BookingController {
       discount,
       seniorPwdDiscount = 0, // Senior/PWD discount amount
       seniorPwdDiscountPercent = 0, // Senior/PWD discount percentage
-      lateCheckoutFee,
-      isLongTermStay,
-      roomChangeNote
+        lateCheckoutFee,
+        isLongTermStay,
+        roomChangeNote,
+        isMaintenance,
+        channelBookingId
     } = req.body;
+
+      const isMaintenanceBooking =
+        isMaintenance === 1 ||
+        isMaintenance === '1' ||
+        isMaintenance === true ||
+        String(isMaintenance || '').toLowerCase() === 'true';
 
       const encodedBy = req.user.userId; // Use JWT user ID instead of session
       const date = new Date();
@@ -750,10 +821,20 @@ class BookingController {
         seniorPwdDiscountPercent, // Pass percentage for storage
         lateCheckoutFee,
         isLongTermStay: isLongTermStay == 1 || isLongTermStay === 'true' || isLongTermStay === true,
-        roomChangeNote: roomChangeNote && String(roomChangeNote).trim() !== '' ? String(roomChangeNote).trim() : null
+        roomChangeNote: roomChangeNote && String(roomChangeNote).trim() !== '' ? String(roomChangeNote).trim() : null,
+        channelBookingId: String(channelBookingId || '').trim() || null
       });
 
 
+
+      if (isMaintenanceBooking && result.bookingId) {
+        await BookingModel.setBookingMaintenance({
+          bookingId: result.bookingId,
+          reason: bookingRemarks || '',
+          guestName: fullname || 'Maintenance',
+          encodedBy
+        });
+      }
 
       // Check if check-in date is today and emit socket event
       const today = moment().format('YYYY-MM-DD');
@@ -1545,6 +1626,7 @@ class BookingController {
         remarks,
         agencyId,
         agencyPayer,
+        channelBookingId,
         breakfastAdultQty,
         breakfastAdultPrice,
         breakfastAdultId,
@@ -1595,7 +1677,7 @@ class BookingController {
       const totalDiscountNum = seniorPwdDiscountNum + discountNum; // Combine both discounts
       
       // For group booking, we need to calculate total from room prices
-      const roomPrices = selectedRoomPrice.split(',').map(p => parseFloat(p) || 0);
+      const roomPrices = (selectedRoomPrice || '').split('|').filter(p => p.trim() !== '').map(p => parseFloat(p.replace(/,/g, '')) || 0);
       const totalRoomPrice = roomPrices.reduce((sum, price) => sum + price, 0) * parseInt(qty);
       
       // Calculate services total
@@ -1621,9 +1703,19 @@ class BookingController {
       console.log(`Group Booking Payment Status Calculation: Total=${totalAmount}, Paid=${paidAmountNum}, Status=${paymentStatus}`);
 
       const date = new Date();
+      const channelBookingIdValue = String(channelBookingId || req.body.groupChannelBookingId || '').trim() || null;
+
+      const roomIdList = (selectedRooms || '').split(',').map(id => id.trim()).filter(Boolean);
+      const expectedRoomCount = parseInt(numberOfRooms, 10) || 0;
+      if (expectedRoomCount > 0 && roomIdList.length !== expectedRoomCount) {
+        return res.status(400).json({
+          success: false,
+          message: `Room selection mismatch: expected ${expectedRoomCount} room(s) but received ${roomIdList.length}. Please re-select all rooms and try again.`
+        });
+      }
 
       const result = await BookingModel.addGroupBooking({
-        selectedRooms,
+        selectedRooms: roomIdList.join(','),
         selectedRoomPrice,
         qty,
         daterange,
@@ -1641,6 +1733,7 @@ class BookingController {
         remarks,
         agencyId,
         agencyPayer: (bookingRoute === 'agency' && agencyPayer) ? agencyPayer : null,
+        channelBookingId: channelBookingIdValue,
         breakfastAdultQty,
         breakfastAdultPrice,
         breakfastAdultId,
@@ -1764,6 +1857,7 @@ class BookingController {
         remarks,
         agencyId,
         agencyPayer,
+        channelBookingId,
         breakfastAdultQty,
         breakfastAdultPrice,
         breakfastAdultId,
@@ -1808,7 +1902,7 @@ class BookingController {
       const seniorPwdDiscountNum = parseFloat(seniorPwdDiscount) || 0;
       const discountNum = parseFloat(discount) || 0;
       const totalDiscountNum = seniorPwdDiscountNum + discountNum; // Combine both discounts
-      const roomPrices = (selectedRoomPrice || '').split(',').map(p => parseFloat(p) || 0);
+      const roomPrices = (selectedRoomPrice || '').split('|').filter(p => p.trim() !== '').map(p => parseFloat(p.replace(/,/g, '')) || 0);
       const totalRoomPrice = roomPrices.reduce((sum, price) => sum + price, 0) * (parseInt(qty, 10) || 0);
       const servicesTotal = (parseFloat(breakfastAdultQty) * parseFloat(breakfastAdultPrice) || 0)
         + (parseFloat(breakfastKidQty) * parseFloat(breakfastKidPrice) || 0)
@@ -1844,6 +1938,7 @@ class BookingController {
         remarks,
         agencyId,
         agencyPayer,
+        channelBookingId,
         breakfastAdultQty,
         breakfastAdultPrice,
         breakfastAdultId,
@@ -2105,6 +2200,107 @@ class BookingController {
       res.status(500).json({ 
         success: false, 
         message: 'Failed to cancel booking.' 
+      });
+    }
+  }
+
+  // Set booking to maintenance
+  static async setBookingMaintenance(req, res) {
+    try {
+      const { bookingId, reason, guestName } = req.body;
+      const encodedBy = req.user?.userId;
+
+      if (!bookingId || !encodedBy) {
+        return res.status(400).json({
+          success: false,
+          message: 'Missing booking ID or user session.'
+        });
+      }
+
+      const result = await BookingModel.setBookingMaintenance({
+        bookingId,
+        reason,
+        guestName,
+        encodedBy
+      });
+
+      res.json({
+        success: true,
+        message: result.message,
+        guestName: result.guestName
+      });
+    } catch (error) {
+      console.error('Set maintenance error:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to set booking to Maintenance.'
+      });
+    }
+  }
+
+  // Reopen maintenance booking
+  static async reopenMaintenanceBooking(req, res) {
+    try {
+      const { bookingId, guestName, bookingStatus } = req.body;
+      const encodedBy = req.user?.userId;
+
+      if (!bookingId || !encodedBy) {
+        return res.status(400).json({
+          success: false,
+          message: 'Missing booking ID or user session.'
+        });
+      }
+
+      const result = await BookingModel.reopenMaintenanceBooking({
+        bookingId,
+        encodedBy,
+        guestName,
+        bookingStatus
+      });
+
+      res.json({
+        success: true,
+        message: result.message,
+        guestName: result.guestName,
+        bookingStatus: result.bookingStatus,
+        usedFallback: result.usedFallback
+      });
+    } catch (error) {
+      console.error('Reopen maintenance error:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to reopen maintenance booking.'
+      });
+    }
+  }
+
+  // Complete maintenance — remove schedule from calendar (no restore)
+  static async completeMaintenanceBooking(req, res) {
+    try {
+      const { bookingId } = req.body;
+      const encodedBy = req.user?.userId;
+
+      if (!bookingId || !encodedBy) {
+        return res.status(400).json({
+          success: false,
+          message: 'Missing booking ID or user session.'
+        });
+      }
+
+      const result = await BookingModel.completeMaintenanceBooking({
+        bookingId,
+        encodedBy
+      });
+
+      res.json({
+        success: true,
+        message: result.message
+      });
+    } catch (error) {
+      console.error('Complete maintenance error:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to complete maintenance.'
       });
     }
   }
@@ -2956,7 +3152,8 @@ class BookingController {
         seniorPwdDiscountPercent = 0, // Senior/PWD discount percentage
         lateCheckoutFee,
         // Frontend already computes paymentStatus (unpaid/partial/paid)
-        paymentStatus
+        paymentStatus,
+        channelBookingId
       } = req.body;
 
       const editedBy = req.user.userId; // Use JWT user ID
@@ -3026,7 +3223,8 @@ class BookingController {
         discount: totalDiscountNum, // Pass combined discount (seniorPwdDiscount + discount)
         seniorPwdDiscountPercent, // Pass percentage for storage
         lateCheckoutFee,
-        editedBy
+        editedBy,
+        channelBookingId: String(channelBookingId || '').trim() || null
       });
 
       res.json({ 

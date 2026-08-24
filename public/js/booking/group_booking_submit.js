@@ -4,15 +4,67 @@ $(document).ready(function () {
   form.off('submit').on('submit', function (event) {
     event.preventDefault();
 
+    if (typeof window.syncGroupBookingRoomSelection === 'function') {
+      window.syncGroupBookingRoomSelection();
+    }
+
+    const checkedIds = [];
+    $('#groupRoomsList .group-manual-checkbox:checked').each(function() {
+      const id = $(this).attr('data-room-id');
+      if (id) checkedIds.push(String(id));
+    });
+    if (checkedIds.length > 0) {
+      $('#groupSelectedRooms').val(checkedIds.join(','));
+      if (typeof window.syncGroupBookingRoomSelection === 'function') {
+        window.syncGroupBookingRoomSelection();
+      }
+    }
+
     const selectedRooms = $('#groupSelectedRooms').val();
     const selectedRoomPrice = $('#groupSelectedRoomPrices').val();
     const qty = $('#groupNights').val();
     const daterange = $('#groupDaterange').val();
     const groupName = $('#groupName').val();
-    const groupContact = $('#groupContact').val();
+    const groupContact = window.ContactChannel
+      ? window.ContactChannel.getValue('#groupContactChannel', '#groupContact')
+      : $('#groupContact').val();
     const selectedRoomsArray = (selectedRooms || '').split(',').filter(Boolean);
     const selectedRoomsCount = selectedRoomsArray.length;
-    const numberOfRooms = String(selectedRoomsCount);
+    const selectedRoomPriceArray = (selectedRoomPrice || '').split('|').filter(Boolean);
+    const checkedDomCount = $('#groupRoomsList .group-manual-checkbox:checked').length;
+
+    if (checkedDomCount > 0 && checkedDomCount !== selectedRoomsCount) {
+      if (typeof window.syncGroupBookingRoomSelection === 'function') {
+        window.syncGroupBookingRoomSelection();
+      }
+    }
+
+    const finalSelectedRooms = ($('#groupSelectedRooms').val() || '').split(',').filter(Boolean);
+    const finalSelectedPrices = ($('#groupSelectedRoomPrices').val() || '').split('|').filter(Boolean);
+    const finalRoomsCount = finalSelectedRooms.length;
+
+    if (finalSelectedPrices.length !== finalRoomsCount) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Room Pricing Mismatch',
+        text: 'Each selected room must have a price. Please review your room selection and manual rates.',
+      });
+      return;
+    }
+
+    const bed1Needed = parseInt($('#groupBed1Count').val(), 10) || 0;
+    const bed2Needed = parseInt($('#groupBed2Count').val(), 10) || 0;
+    const expectedRooms = bed1Needed + bed2Needed;
+    if (expectedRooms > 0 && finalRoomsCount !== expectedRooms) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Incomplete Room Selection',
+        text: `You selected ${finalRoomsCount} room(s) but requested ${expectedRooms}. Please check all required rooms before saving.`,
+      });
+      return;
+    }
+
+    const numberOfRooms = String(finalRoomsCount);
     const paymentStatus = $('#groupPaymentStatus').val();
     const bookingRoute = $('#groupBookingRoute').val();
     const guestType = $('#groupGuestType').val();
@@ -51,11 +103,11 @@ $(document).ready(function () {
       return;
     }
 
-    if (!selectedRooms || !selectedRoomsCount) {
+    if (!selectedRooms || !finalRoomsCount) {
       Swal.fire({
         icon: 'warning',
         title: 'No Rooms Selected',
-        text: 'Please select a room block for this group booking.',
+        text: 'Please select all required rooms for this group booking.',
       });
       return;
     }
@@ -89,7 +141,16 @@ $(document).ready(function () {
     const agencyPayer = bookingRoute === 'agency'
       ? ($('input[name="groupAgencyPayer"]:checked').val() || 'agency')
       : null;
-    
+    if (typeof window.syncGroupChannelBookingId === 'function') {
+      window.syncGroupChannelBookingId();
+    }
+
+    const channelBookingId = (
+      ($('#groupChannelBookingId').val() || '').trim()
+      || ($('#groupChannelBookingIdHidden').val() || '').trim()
+      || ($('#modal-add-group-booking #groupChannelBookingId').val() || '').trim()
+    );
+
     // Validate agency selection if booking route is agency
     if (bookingRoute === 'agency' && (!agencyId || agencyId.trim() === '')) {
       Swal.fire({
@@ -121,7 +182,7 @@ $(document).ready(function () {
     // Compute per-room discounts for Senior/PWD when individual billing
     function computeSeniorPerRoomDiscounts(pricesRaw, nights, percent, roomCount) {
       const prices = pricesRaw
-        ? pricesRaw.split(',').map(p => parseFloat(p) || 0)
+        ? pricesRaw.split('|').map(p => parseFloat(p) || 0)
         : [];
       const nNights = parseInt(nights, 10) || 0;
       const discountDecimal = (parseFloat(percent) || 0) / 100;
@@ -147,7 +208,7 @@ $(document).ready(function () {
     }
 
     const perRoomDiscounts = computeSeniorPerRoomDiscounts(
-      selectedRoomPrice,
+      $('#groupSelectedRoomPrices').val(),
       qty,
       seniorPwdDiscountPercent,
       seniorPwdRoomCount
@@ -158,8 +219,8 @@ $(document).ready(function () {
     const isJoiningGroup = $('#groupJoinExistingGroup').val() === 'true' && existingGroupId;
     
     const ajaxData = {
-      selectedRooms,
-      selectedRoomPrice,
+      selectedRooms: $('#groupSelectedRooms').val(),
+      selectedRoomPrice: $('#groupSelectedRoomPrices').val(),
       qty,
       daterange,
       groupName,
@@ -175,6 +236,7 @@ $(document).ready(function () {
       remarks,
       agencyId,
       agencyPayer,
+      channelBookingId,
       breakfastAdultQty,
       breakfastAdultPrice,
       breakfastAdultId,
@@ -253,7 +315,7 @@ $(document).ready(function () {
         // Calculate room charges
         const nights = parseInt($('#groupNights').val(), 10) || 0;
         const pricesRaw = $('#groupSelectedRoomPrices').val();
-        const prices = pricesRaw ? pricesRaw.split(',').map(p => parseFloat(p) || 0) : [];
+        const prices = pricesRaw ? pricesRaw.split('|').map(p => parseFloat(p) || 0) : [];
         const baseSubtotal = prices.reduce((sum, price) => sum + price, 0);
         const roomCharges = baseSubtotal * nights;
         
@@ -288,7 +350,9 @@ $(document).ready(function () {
         const bookingData = {
           voucherNo: vno,
           groupName: $('#groupName').val() || 'Group Booking',
-          groupContact: $('#groupContact').val() || '',
+          groupContact: (window.ContactChannel
+            ? window.ContactChannel.getValue('#groupContactChannel', '#groupContact')
+            : $('#groupContact').val()) || '',
           dateFrom: dateFrom,
           dateTo: dateTo,
           roomSummary: roomNumbersForVoucher || 'No rooms selected',
