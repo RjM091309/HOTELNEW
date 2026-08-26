@@ -561,9 +561,37 @@ function applyPickupIndicator(event, el) {
   }
 }
 
+// OPTIMIZATION: handleEventDidMount fires once per event on every full re-mount (initial
+// load, refresh, bed-filter toggle). It used to call calendar.getEvents().filter(...) inside
+// that per-event callback, an O(n) scan repeated for every one of the n events (O(n^2) total
+// per re-mount). This caches a resourceId -> events[] grouping per re-mount batch instead, so
+// each mount is an O(1) lookup. The cache is keyed off the events array reference + length,
+// which is stable for the whole synchronous mount batch FullCalendar runs per reload.
+let __overlapCacheEventsRef = null;
+let __overlapCacheEventsLength = -1;
+let __overlapCacheMap = null;
+
+function getEventsByResourceIdMap(calendarApi) {
+  const events = calendarApi.getEvents();
+  if (__overlapCacheMap && __overlapCacheEventsRef === events && __overlapCacheEventsLength === events.length) {
+    return __overlapCacheMap;
+  }
+  const map = new Map();
+  events.forEach(e => {
+    const resources = e.getResources();
+    const resourceId = String(resources.length && resources[0] ? resources[0].id : undefined);
+    if (!map.has(resourceId)) map.set(resourceId, []);
+    map.get(resourceId).push(e);
+  });
+  __overlapCacheMap = map;
+  __overlapCacheEventsRef = events;
+  __overlapCacheEventsLength = events.length;
+  return map;
+}
+
 function handleEventDidMount(info) {
   // TOOLTIPS COMPLETELY REMOVED - No more tooltip setup
-  
+
   // Overlap detection
   const assignedResources = info.event.getResources();
   const assignedResourceId = assignedResources.length && assignedResources[0] ? assignedResources[0].id : undefined;
@@ -571,11 +599,8 @@ function handleEventDidMount(info) {
   const eventStartDate = getDateString(info.event.start);
   const eventEndDate = getDateString(info.event.end);
 
-  const sameRoomEvents = info.view.calendar.getEvents().filter(e => {
-    const eResources = e.getResources();
-    const eResourceId = eResources.length && eResources[0] ? eResources[0].id : undefined;
-    return String(assignedResourceId) === String(eResourceId) && info.event.id !== e.id;
-  });
+  const resourceMap = getEventsByResourceIdMap(info.view.calendar);
+  const sameRoomEvents = (resourceMap.get(String(assignedResourceId)) || []).filter(e => info.event.id !== e.id);
 
   const overlappingEvents = sameRoomEvents.filter(e => {
     const eStartDate = getDateString(e.start);

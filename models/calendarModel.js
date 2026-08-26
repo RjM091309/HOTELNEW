@@ -1,81 +1,5 @@
 const { pool, queryDatabase, queryDatabasePromise } = require('../config/database');
 
-function getBookingOutstandingBalanceByIdExprSql(bookingIdExpr) {
-  return `(
-    COALESCE((
-      SELECT GREATEST(0,
-        (bill2.ROOM_CHARGE * bill2.QTY - COALESCE(bill2.RESERVATION_FEE, 0) - COALESCE(bill2.DISCOUNT_AMOUNT, 0))
-        - COALESCE((
-          SELECT SUM(p.AMOUNT_PAID)
-          FROM payments p
-          WHERE p.BOOKING_ID = ${bookingIdExpr}
-            AND p.PAYMENT_TYPE NOT IN ('discount', 'security_deposit_refund')
-        ), 0)
-      )
-      FROM billing bill2
-      WHERE bill2.BOOKING_ID = ${bookingIdExpr} AND bill2.ACTIVE = 1
-    ), 0)
-    + COALESCE((
-      SELECT SUM(GREATEST(0,
-        be.COST * be.QTY - COALESCE((
-          SELECT SUM(p.AMOUNT_PAID)
-          FROM payments p
-          WHERE p.BOOKING_EXTENSION_ID = be.IDNo AND p.PAYMENT_TYPE = 'extended'
-        ), 0)
-      ))
-      FROM booking_extension be
-      WHERE be.BOOKING_ID = ${bookingIdExpr} AND be.ACTIVE = 1
-    ), 0)
-    + COALESCE((
-      SELECT SUM(GREATEST(0,
-        bs.TOTAL_COST - COALESCE((
-          SELECT SUM(p.AMOUNT_PAID)
-          FROM payments p
-          WHERE p.BOOKING_SERVICE_ID = bs.IDNo AND p.PAYMENT_TYPE = 'service'
-        ), 0)
-      ))
-      FROM booking_service bs
-      WHERE bs.BOOKING_ID = ${bookingIdExpr} AND bs.ACTIVE = 1
-    ), 0)
-  )`;
-}
-
-function getBookingOutstandingBalanceSql(bookingAlias = 'b') {
-  return getBookingOutstandingBalanceByIdExprSql(`${bookingAlias}.IDNo`);
-}
-
-function isMasterGroupBillingSql(bookingAlias = 'b') {
-  const b = bookingAlias;
-  return `(
-    ${b}.GROUP_BOOKING_ID IS NOT NULL
-    AND COALESCE((
-      SELECT gb.BILLING_TYPE
-      FROM group_booking gb
-      WHERE gb.IDNo = ${b}.GROUP_BOOKING_ID
-      LIMIT 1
-    ), 0) = 1
-  )`;
-}
-
-function getMainGroupBookingIdSql(bookingAlias = 'b') {
-  const b = bookingAlias;
-  return `(
-    SELECT MIN(b_main.IDNo)
-    FROM booking b_main
-    WHERE b_main.GROUP_BOOKING_ID = ${b}.GROUP_BOOKING_ID
-      AND b_main.ACTIVE = 1
-  )`;
-}
-
-// Master-billed group members share the main booking's payment status on the calendar.
-function getPaymentEvalBookingIdSql(bookingAlias = 'b') {
-  const b = bookingAlias;
-  return `CASE
-    WHEN ${isMasterGroupBillingSql(b)} THEN ${getMainGroupBookingIdSql(b)}
-    ELSE ${b}.IDNo
-  END`;
-}
-
 class CalendarModel {
   // Get all bookings for calendar display
   // OPTIMIZED VERSION - Get all bookings with date filtering and pagination
@@ -212,19 +136,90 @@ class CalendarModel {
       // Build query with optional date filtering
       let whereClause = 'WHERE b.ACTIVE = 1';
       let queryParams = [];
-      
+
       if (start && end) {
         whereClause += ' AND (b.CHECK_IN_DATE <= ? AND b.CHECK_OUT_DATE > ?)';
         queryParams = [end, start];
       } else {
-        whereClause += ' AND b.CHECK_IN_DATE >= DATE_SUB(NOW(), INTERVAL 3 MONTH) AND b.CHECK_IN_DATE <= DATE_ADD(NOW(), INTERVAL 4 MONTH)';
+        whereClause += ' AND b.CHECK_IN_DATE >= DATE_SUB(NOW(), INTERVAL 1 MONTH) AND b.CHECK_IN_DATE <= DATE_ADD(NOW(), INTERVAL 2 MONTH)';
       }
-      
-      const paymentEvalBookingIdSql = getPaymentEvalBookingIdSql('b');
-      const paymentOutstandingSql = getBookingOutstandingBalanceByIdExprSql(paymentEvalBookingIdSql);
 
+      // OPTIMIZATION: the outstanding-balance / master-group-billing lookup used to be
+      // inlined as a correlated subquery expression and repeated 8x per output row
+      // (~40 dependent subqueries total), which took 20+ seconds even with a few hundred
+      // bookings. These CTEs compute the same values once each via plain joins/aggregates.
       const rows = await queryDatabasePromise(`
-        SELECT 
+        WITH payment_booking_totals AS (
+          SELECT BOOKING_ID, SUM(AMOUNT_PAID) AS AMOUNT
+          FROM payments
+          WHERE PAYMENT_TYPE NOT IN ('discount','security_deposit_refund')
+          GROUP BY BOOKING_ID
+        ),
+        payment_extension_totals AS (
+          SELECT BOOKING_EXTENSION_ID, SUM(AMOUNT_PAID) AS AMOUNT
+          FROM payments
+          WHERE PAYMENT_TYPE = 'extended'
+          GROUP BY BOOKING_EXTENSION_ID
+        ),
+        payment_service_totals AS (
+          SELECT BOOKING_SERVICE_ID, SUM(AMOUNT_PAID) AS AMOUNT
+          FROM payments
+          WHERE PAYMENT_TYPE = 'service'
+          GROUP BY BOOKING_SERVICE_ID
+        ),
+        billing_balance AS (
+          SELECT bill2.BOOKING_ID,
+            GREATEST(0,
+              (bill2.ROOM_CHARGE * bill2.QTY - COALESCE(bill2.RESERVATION_FEE,0) - COALESCE(bill2.DISCOUNT_AMOUNT,0))
+              - COALESCE(pbt.AMOUNT, 0)
+            ) AS BAL
+          FROM billing bill2
+          LEFT JOIN payment_booking_totals pbt ON pbt.BOOKING_ID = bill2.BOOKING_ID
+          WHERE bill2.ACTIVE = 1
+        ),
+        extension_balance AS (
+          SELECT be.BOOKING_ID,
+            SUM(GREATEST(0, be.COST*be.QTY - COALESCE(pet.AMOUNT,0))) AS BAL
+          FROM booking_extension be
+          LEFT JOIN payment_extension_totals pet ON pet.BOOKING_EXTENSION_ID = be.IDNo
+          WHERE be.ACTIVE = 1
+          GROUP BY be.BOOKING_ID
+        ),
+        service_balance AS (
+          SELECT bs.BOOKING_ID,
+            SUM(GREATEST(0, bs.TOTAL_COST - COALESCE(pst.AMOUNT,0))) AS BAL
+          FROM booking_service bs
+          LEFT JOIN payment_service_totals pst ON pst.BOOKING_SERVICE_ID = bs.IDNo
+          WHERE bs.ACTIVE = 1
+          GROUP BY bs.BOOKING_ID
+        ),
+        outstanding_balance AS (
+          SELECT bk.IDNo AS BOOKING_ID,
+            COALESCE(bb.BAL,0) + COALESCE(eb.BAL,0) + COALESCE(sb.BAL,0) AS BALANCE
+          FROM booking bk
+          LEFT JOIN billing_balance bb ON bb.BOOKING_ID = bk.IDNo
+          LEFT JOIN extension_balance eb ON eb.BOOKING_ID = bk.IDNo
+          LEFT JOIN service_balance sb ON sb.BOOKING_ID = bk.IDNo
+        ),
+        group_main_booking AS (
+          SELECT gb.IDNo AS GROUP_BOOKING_ID, MIN(b2.IDNo) AS MAIN_BOOKING_ID
+          FROM group_booking gb
+          INNER JOIN booking b2 ON b2.GROUP_BOOKING_ID = gb.IDNo AND b2.ACTIVE = 1
+          WHERE gb.BILLING_TYPE = 1
+          GROUP BY gb.IDNo
+        ),
+        payment_eval AS (
+          SELECT bk.IDNo AS BOOKING_ID,
+            COALESCE(gmb.MAIN_BOOKING_ID, bk.IDNo) AS PAYMENT_EVAL_BOOKING_ID
+          FROM booking bk
+          LEFT JOIN group_main_booking gmb ON gmb.GROUP_BOOKING_ID = bk.GROUP_BOOKING_ID
+        ),
+        payment_exists_nonrefund AS (
+          SELECT DISTINCT BOOKING_ID
+          FROM payments
+          WHERE PAYMENT_TYPE NOT IN ('discount', 'security_deposit', 'security_deposit_refund', 'reservation_fee')
+        )
+        SELECT
           b.IDNo AS id,
           b.ROOM_ID AS resourceIds,
           c.NAME AS title,
@@ -233,8 +228,8 @@ class CalendarModel {
           -- Pre-calculated background colors
           CASE
             WHEN b.BOOKING_STATUS = 'check-In' THEN '#12866f'
-            WHEN b.BOOKING_STATUS = 'check-Out' 
-              AND (${paymentOutstandingSql} > 0.009)
+            WHEN b.BOOKING_STATUS = 'check-Out'
+              AND COALESCE(ob.BALANCE, 0) > 0.009
               THEN '#0b3d91' -- dark blue when checked out but has balance
             WHEN b.BOOKING_STATUS = 'check-Out' THEN '#B3B3B3'
             WHEN b.BOOKING_STATUS = 'pending' AND COALESCE(b.HOLD_PENDING, 0) = 1 THEN '#FF6D00'
@@ -248,19 +243,9 @@ class CalendarModel {
           -- Pre-calculated extended properties
           COALESCE(bill.ROOM_CHARGE, 0) + COALESCE(bill.AMENITIES_CHARGE, 0) + COALESCE(bill.SERVICES_CHARGE, 0) + COALESCE(bill.LATE_CHECKOUT_CHARGE, 0) AS totalCost,
           CASE
-            WHEN (${paymentOutstandingSql}) <= 0.009 THEN 'paid'
-            WHEN EXISTS (
-              SELECT 1 FROM payments p
-              WHERE p.BOOKING_ID = ${paymentEvalBookingIdSql}
-                AND p.PAYMENT_TYPE NOT IN ('discount', 'security_deposit', 'security_deposit_refund', 'reservation_fee')
-            )
-              OR COALESCE((
-                SELECT bill_main.PAYMENT_STATUS
-                FROM billing bill_main
-                WHERE bill_main.BOOKING_ID = ${paymentEvalBookingIdSql}
-                  AND bill_main.ACTIVE = 1
-                LIMIT 1
-              ), 'unpaid') IN ('partial_paid', 'partial', 'paid')
+            WHEN COALESCE(ob.BALANCE, 0) <= 0.009 THEN 'paid'
+            WHEN pen.BOOKING_ID IS NOT NULL
+              OR COALESCE(bill_main.PAYMENT_STATUS, 'unpaid') IN ('partial_paid', 'partial', 'paid')
             THEN 'partial'
             ELSE 'unpaid'
           END AS paymentStatus,
@@ -354,8 +339,13 @@ class CalendarModel {
         FROM booking b
         INNER JOIN customer c ON b.CUSTOMER_ID = c.IDNo
         LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo AND bill.ACTIVE = 1
+        LEFT JOIN payment_eval pe ON pe.BOOKING_ID = b.IDNo
+        LEFT JOIN outstanding_balance ob ON ob.BOOKING_ID = pe.PAYMENT_EVAL_BOOKING_ID
+        LEFT JOIN billing bill_main ON bill_main.BOOKING_ID = pe.PAYMENT_EVAL_BOOKING_ID AND bill_main.ACTIVE = 1
+        LEFT JOIN payment_exists_nonrefund pen ON pen.BOOKING_ID = pe.PAYMENT_EVAL_BOOKING_ID
         ${whereClause}
         ORDER BY b.CHECK_IN_DATE ASC
+        LIMIT 2000
       `, queryParams);
       
       // Format the data for FullCalendar

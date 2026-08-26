@@ -535,8 +535,10 @@
        (e.g. Aug 31–Sep 29 looked like it ended on the 27th). */
     transform: skew(-18deg) !important;
     transform-origin: center !important;
-    /* Smooth transitions for hover effects */
-    transition: all 0.3s ease !important;
+    /* Smooth transitions for hover effects (scoped to box-shadow only — `transition: all`
+       forces the browser to watch every property, including layout-affecting ones, on
+       every event element, which adds up during bulk re-mounts/scrolling) */
+    transition: box-shadow 0.3s ease !important;
     /* Better text contrast */
     /* text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important; */
     /* Subtle border for definition */

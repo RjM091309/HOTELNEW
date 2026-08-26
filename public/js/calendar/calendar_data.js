@@ -30,6 +30,28 @@ const V_CENTER_BIAS_PX = 88;
 // Days offset for today's position (positions today after X days from start)
 const TODAY_OFFSET_DAYS = 10;
 
+// =============================================================================
+// LAZY-LOADED CALENDAR RANGE (rendered window grows as the user scrolls, instead
+// of rendering the full 12-month navigable span into the DOM up front)
+// =============================================================================
+// resourceTimeline has no virtual scrolling: every day column x every room row in the
+// rendered range is real DOM. Rendering all 12 navigable months at once (~180,000+ cells
+// with 100+ rooms) is what caused the FPS drop. Instead we start with a small window and
+// extend it by CALENDAR_EXPAND_STEP_MONTHS whenever the user scrolls near an edge, up to
+// these absolute bounds (5 back + 7 forward = 12 months total, same forward-leaning ratio
+// as the original 3-back/4-forward default).
+const CALENDAR_ABSOLUTE_MONTHS_BACK = 5;
+const CALENDAR_ABSOLUTE_MONTHS_FORWARD = 7;
+const CALENDAR_INITIAL_MONTHS_BACK = 1;
+const CALENDAR_INITIAL_MONTHS_FORWARD = 2;
+const CALENDAR_EXPAND_STEP_MONTHS = 1;
+const CALENDAR_EXPAND_EDGE_DAYS = 21;
+
+let calendarWindowMonthsBack = CALENDAR_INITIAL_MONTHS_BACK;
+let calendarWindowMonthsForward = CALENDAR_INITIAL_MONTHS_FORWARD;
+let calendarExpansionInProgress = false;
+let calendarExpandCheckTimer = null;
+
 // Date utility functions
 function getLastDayOfMonth(year, monthIndex) {
   return new Date(year, monthIndex + 1, 0).getDate();
@@ -589,6 +611,122 @@ function scrollToDateCentered(targetDate, bodyScroller, top) {
   top.scrollLeft = bodyScroller.scrollLeft;
 }
 
+// =============================================================================
+// LAZY-LOADED CALENDAR RANGE EXPANSION
+// =============================================================================
+
+function getCalendarAbsoluteBounds() {
+  const today = new Date();
+  const Y = today.getFullYear(), M = today.getMonth();
+  return {
+    min: new Date(Y, M - CALENDAR_ABSOLUTE_MONTHS_BACK, 1),
+    max: new Date(Y, M + CALENDAR_ABSOLUTE_MONTHS_FORWARD, 1)
+  };
+}
+
+// Checks how close the given horizontal scroll position is to either edge of the
+// currently-rendered range, and grows the range by one month in that direction if
+// the user has scrolled within CALENDAR_EXPAND_EDGE_DAYS of an edge that isn't already
+// at the absolute 12-month bound.
+function maybeExpandCalendarRange(scrollLeft, bodyScroller) {
+  if (!calendar || calendarExpansionInProgress) return;
+  const view = calendar.view;
+  if (!view || !bodyScroller.scrollWidth) return;
+
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const totalDays = (view.activeEnd.getTime() - view.activeStart.getTime()) / msPerDay;
+  if (!totalDays) return;
+  const dayWidth = bodyScroller.scrollWidth / totalDays;
+  if (!dayWidth) return;
+
+  const daysFromStart = scrollLeft / dayWidth;
+  const daysFromEnd = totalDays - (scrollLeft + bodyScroller.clientWidth) / dayWidth;
+
+  const bounds = getCalendarAbsoluteBounds();
+  const atMinBound = view.activeStart.getTime() <= bounds.min.getTime();
+  const atMaxBound = view.activeEnd.getTime() >= bounds.max.getTime();
+
+  if (!atMinBound && daysFromStart < CALENDAR_EXPAND_EDGE_DAYS) {
+    expandCalendarRange('backward');
+  } else if (!atMaxBound && daysFromEnd < CALENDAR_EXPAND_EDGE_DAYS) {
+    expandCalendarRange('forward');
+  }
+}
+
+// Grows the rendered window by CALENDAR_EXPAND_STEP_MONTHS in the given direction (capped at
+// the absolute 12-month bound), re-renders the view with the wider range, and restores the
+// user's scroll position (the date they were looking at) afterward. handleDatesSet already
+// re-fetches booking data for whatever range calendar.view resolves to, so no manual fetch
+// is needed here beyond the changeView() call.
+function expandCalendarRange(direction) {
+  if (calendarExpansionInProgress || !calendar || !calendar.view) return;
+
+  if (direction === 'backward') {
+    if (calendarWindowMonthsBack >= CALENDAR_ABSOLUTE_MONTHS_BACK) return;
+    calendarWindowMonthsBack = Math.min(calendarWindowMonthsBack + CALENDAR_EXPAND_STEP_MONTHS, CALENDAR_ABSOLUTE_MONTHS_BACK);
+  } else {
+    if (calendarWindowMonthsForward >= CALENDAR_ABSOLUTE_MONTHS_FORWARD) return;
+    calendarWindowMonthsForward = Math.min(calendarWindowMonthsForward + CALENDAR_EXPAND_STEP_MONTHS, CALENDAR_ABSOLUTE_MONTHS_FORWARD);
+  }
+
+  // Remember the date currently at the left edge of the viewport so we can scroll back to it
+  // once the wider range finishes rendering.
+  let anchorDate = new Date();
+  const scrollbarBefore = setupScrollbar();
+  if (scrollbarBefore && scrollbarBefore.bodyScroller.scrollWidth) {
+    const view = calendar.view;
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const totalDays = (view.activeEnd.getTime() - view.activeStart.getTime()) / msPerDay;
+    const dayWidth = scrollbarBefore.bodyScroller.scrollWidth / totalDays;
+    if (dayWidth) {
+      const daysFromStart = scrollbarBefore.bodyScroller.scrollLeft / dayWidth;
+      anchorDate = new Date(view.activeStart.getTime() + daysFromStart * msPerDay);
+    }
+  }
+
+  const today = new Date();
+  const Y = today.getFullYear(), M = today.getMonth();
+  const newStart = new Date(Y, M - calendarWindowMonthsBack, 1);
+  const newEnd = new Date(Y, M + calendarWindowMonthsForward, 1);
+
+  calendarExpansionInProgress = true;
+  calendar.changeView('month', { start: newStart, end: newEnd });
+
+  // The datesSet handler kicks off a debounced booking refetch + re-render; give it time to
+  // finish before restoring scroll position and re-binding the scrollbar/hover listeners.
+  setTimeout(() => {
+    const sb = setupScrollbar();
+    if (sb) {
+      scrollToDate(new Date(anchorDate), sb.bodyScroller, sb.top);
+      updateHeaderOnScroll(sb.bodyScroller, sb.top);
+    }
+    setupHoverEffects();
+    calendarExpansionInProgress = false;
+  }, 400);
+}
+
+function handleCalendarScrollForExpansion(e) {
+  const el = e.target;
+  if (!el || !el.classList || !el.classList.contains('fc-scroller')) return;
+  if (!calendarEl || !calendarEl.contains(el)) return;
+  if (el.scrollWidth <= el.clientWidth) return; // not the horizontally-scrollable timeline body
+
+  clearTimeout(calendarExpandCheckTimer);
+  calendarExpandCheckTimer = setTimeout(() => {
+    maybeExpandCalendarRange(el.scrollLeft, el);
+  }, 120);
+}
+
+function setupCalendarRangeExpansion() {
+  const container = calendarEl || document.getElementById('calendar');
+  if (!container || container.dataset.rangeExpansionBound === '1') return;
+  container.dataset.rangeExpansionBound = '1';
+  // Capture phase: 'scroll' doesn't bubble, but a capture listener on an ancestor still
+  // receives it from any descendant scroller (the .fc-scroller elements get recreated on
+  // every re-render, so binding to a stable ancestor avoids re-binding per reload).
+  document.addEventListener('scroll', handleCalendarScrollForExpansion, true);
+}
+
 function updateHeaderOnScroll(bodyScroller, top) {
   const view = calendar.view;
   const toolbarTitle = document.querySelector('.fc-toolbar-title');
@@ -616,102 +754,99 @@ function updateHeaderOnScroll(bodyScroller, top) {
 // HOVER ENHANCEMENTS
 // =============================================================================
 
-function setupHoverEffects() {
-  const slots = document.querySelectorAll('.fc-timeline-slot');
+// OPTIMIZATION: previously attached 2 listeners to every .fc-timeline-slot, every
+// .fc-datagrid-cell, and every .fc-event individually (tens of thousands of listeners on
+// a full 7-month timeline), re-created on every calendar reload. mouseenter/mouseleave fire
+// repeatedly while the grid scrolls under a stationary cursor, so each of those listeners'
+// DOM queries ran continuously during scroll, causing jank. This binds two delegated
+// listeners once on the stable calendar container instead, using event bubbling + closest().
+function getHoverLaneCellFromSlot(slotEl) {
+  return slotEl.closest('td.fc-timeline-lane');
+}
 
-  function getLaneCellFromSlot(slotEl) {
-    return slotEl.closest('td.fc-timeline-lane');
+function getHoverMirrorRow(tr, mirrorSelector, allRowsSelector) {
+  if (!tr) return null;
+  const resourceId = tr.dataset?.resourceId;
+  let mirror = resourceId ? document.querySelector(`${mirrorSelector} tr[data-resource-id="${resourceId}"]`) : null;
+  if (!mirror && tr.parentElement) {
+    const idx = Array.prototype.indexOf.call(tr.parentElement.children, tr);
+    mirror = document.querySelectorAll(allRowsSelector)[idx];
+  }
+  return mirror;
+}
+
+function handleHoverDelegatedOver(e) {
+  const slot = e.target.closest('.fc-timeline-slot');
+  if (slot && !slot.classList.contains('fc-slot-hover')) {
+    const isOverEvent = !!e.target.closest('.fc-event');
+    slot.classList.add('fc-slot-hover');
+    if (!isOverEvent) {
+      slot.classList.add('fc-slot-pointer');
+      slot.setAttribute('title', 'Click to book this time slot');
+    }
+    getHoverLaneCellFromSlot(slot)?.classList.add('fc-lane-hover');
+    const timeRow = slot.closest('tr');
+    getHoverMirrorRow(
+      timeRow,
+      '.fc-resource-area',
+      '.fc-resource-area .fc-datagrid-body tbody tr, .fc-resource-area tbody tr'
+    )?.classList.add('fc-row-hover');
   }
 
-  slots.forEach(slot => {
-    slot.addEventListener('mouseenter', function (e) {
-      const isOverEvent = !!e.target.closest('.fc-event');
-
-      // === Vertical hover ===
-      this.classList.add('fc-slot-hover');
-      if (!isOverEvent) {
-        this.classList.add('fc-slot-pointer');
-        this.setAttribute('title', 'Click to book this time slot');
-      }
-
-      // === Horizontal hover (time side) ===
-      const laneTd = getLaneCellFromSlot(this);
-      laneTd?.classList.add('fc-lane-hover');
-
-      // === Horizontal mirror (resource side) ===
-      const timeRow = this.closest('tr');
-      let resRow = document.querySelector(`.fc-resource-area tr[data-resource-id="${timeRow?.dataset?.resourceId}"]`);
-      if (!resRow && timeRow?.parentElement) {
-        const idx = Array.prototype.indexOf.call(timeRow.parentElement.children, timeRow);
-        resRow = document.querySelectorAll('.fc-resource-area .fc-datagrid-body tbody tr, .fc-resource-area tbody tr')[idx];
-      }
-      resRow?.classList.add('fc-row-hover');
-    });
-
-    slot.addEventListener('mouseleave', function () {
-      // vertical
-      this.classList.remove('fc-slot-hover', 'fc-slot-pointer');
-      this.removeAttribute('title');
-
-      // horizontal (time side)
-      const laneTd = getLaneCellFromSlot(this);
-      laneTd?.classList.remove('fc-lane-hover');
-
-      // horizontal mirror (resource side)
-      const timeRow = this.closest('tr');
-      let resRow = document.querySelector(`.fc-resource-area tr[data-resource-id="${timeRow?.dataset?.resourceId}"]`);
-      if (!resRow && timeRow?.parentElement) {
-        const idx = Array.prototype.indexOf.call(timeRow.parentElement.children, timeRow);
-        resRow = document.querySelectorAll('.fc-resource-area .fc-datagrid-body tbody tr, .fc-resource-area tbody tr')[idx];
-      }
-      resRow?.classList.remove('fc-row-hover');
-    });
-  });
-
-  // Left resource cells hover (para mag-highlight din time side)
-  const resourceCells = document.querySelectorAll('.fc-resource-area .fc-datagrid-cell');
-  resourceCells.forEach(cell => {
-    cell.addEventListener('mouseenter', function () {
-      const tr = this.closest('tr');
-      if (!tr) return;
-
+  const cell = e.target.closest('.fc-resource-area .fc-datagrid-cell');
+  if (cell) {
+    const tr = cell.closest('tr');
+    if (tr && !tr.classList.contains('fc-row-hover')) {
       tr.classList.add('fc-row-hover');
+      getHoverMirrorRow(tr, '.fc-timeline-body', '.fc-timeline-body tbody tr')?.classList.add('fc-lane-hover');
+    }
+  }
 
-      let timeRow = document.querySelector(`.fc-timeline-body tr[data-resource-id="${tr.dataset?.resourceId}"]`);
-      if (!timeRow && tr?.parentElement) {
-        const idx = Array.prototype.indexOf.call(tr.parentElement.children, tr);
-        timeRow = document.querySelectorAll('.fc-timeline-body tbody tr')[idx];
-      }
-      timeRow?.classList.add('fc-lane-hover');
-    });
+  const ev = e.target.closest('.fc-event');
+  if (ev && !ev.style.zIndex) {
+    ev.style.zIndex = '20';
+    ev.style.transition = 'box-shadow .2s ease';
+  }
+}
 
-    cell.addEventListener('mouseleave', function () {
-      const tr = this.closest('tr');
-      if (!tr) return;
+function handleHoverDelegatedOut(e) {
+  const related = e.relatedTarget;
 
+  const slot = e.target.closest('.fc-timeline-slot');
+  if (slot && !(related && slot.contains(related))) {
+    slot.classList.remove('fc-slot-hover', 'fc-slot-pointer');
+    slot.removeAttribute('title');
+    getHoverLaneCellFromSlot(slot)?.classList.remove('fc-lane-hover');
+    const timeRow = slot.closest('tr');
+    getHoverMirrorRow(
+      timeRow,
+      '.fc-resource-area',
+      '.fc-resource-area .fc-datagrid-body tbody tr, .fc-resource-area tbody tr'
+    )?.classList.remove('fc-row-hover');
+  }
+
+  const cell = e.target.closest('.fc-resource-area .fc-datagrid-cell');
+  if (cell) {
+    const tr = cell.closest('tr');
+    if (tr && !(related && tr.contains(related))) {
       tr.classList.remove('fc-row-hover');
+      getHoverMirrorRow(tr, '.fc-timeline-body', '.fc-timeline-body tbody tr')?.classList.remove('fc-lane-hover');
+    }
+  }
 
-      let timeRow = document.querySelector(`.fc-timeline-body tr[data-resource-id="${tr.dataset?.resourceId}"]`);
-      if (!timeRow && tr?.parentElement) {
-        const idx = Array.prototype.indexOf.call(tr.parentElement.children, tr);
-        timeRow = document.querySelectorAll('.fc-timeline-body tbody tr')[idx];
-      }
-      timeRow?.classList.remove('fc-lane-hover');
-    });
-  });
+  const ev = e.target.closest('.fc-event');
+  if (ev && !(related && ev.contains(related))) {
+    ev.style.zIndex = '';
+    ev.style.boxShadow = '';
+  }
+}
 
-  // Event hover effect
-  const events = document.querySelectorAll('.fc-event');
-  events.forEach(ev => {
-    ev.addEventListener('mouseenter', function () {
-      this.style.zIndex = '20';
-      this.style.transition = 'box-shadow .2s ease';
-    });
-    ev.addEventListener('mouseleave', function () {
-      this.style.zIndex = '';
-      this.style.boxShadow = '';
-    });
-  });
+function setupHoverEffects() {
+  const container = calendarEl || document.getElementById('calendar');
+  if (!container || container.dataset.hoverDelegationBound === '1') return;
+  container.dataset.hoverDelegationBound = '1';
+  container.addEventListener('mouseover', handleHoverDelegatedOver);
+  container.addEventListener('mouseout', handleHoverDelegatedOut);
 }
 
 
@@ -1938,9 +2073,14 @@ const views = {
     slotDuration: { hours: 12 },
     dateAlignment: 'day',
     visibleRange() {
+      // Starts small (calendarWindowMonthsBack/Forward) and grows via expandCalendarRange()
+      // as the user scrolls near an edge — see the LAZY-LOADED CALENDAR RANGE block above.
       const today = new Date();
       const Y = today.getFullYear(), M = today.getMonth();
-      return { start: new Date(Y, M - 3, 1), end: new Date(Y, M + 4, 1) };
+      return {
+        start: new Date(Y, M - calendarWindowMonthsBack, 1),
+        end: new Date(Y, M + calendarWindowMonthsForward, 1)
+      };
     },
 
     slotLabelContent(arg) {
@@ -2324,8 +2464,8 @@ function getDefaultCalendarDateRange() {
   const year = today.getFullYear();
   const month = today.getMonth();
   return {
-    start: new Date(year, month - 3, 1),
-    end: new Date(year, month + 4, 1)
+    start: new Date(year, month - calendarWindowMonthsBack, 1),
+    end: new Date(year, month + calendarWindowMonthsForward, 1)
   };
 }
 
@@ -2473,6 +2613,7 @@ async function loadCalendarData() {
     window.calendar = calendar;
     setupScrollToDate();
     setupHoverEffects();
+    setupCalendarRangeExpansion();
 
     // Apply any pending highlight
     try {

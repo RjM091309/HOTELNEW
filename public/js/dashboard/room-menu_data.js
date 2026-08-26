@@ -857,6 +857,8 @@ function updateStaySummaryFromBooking(bookingId, data) {
 
 async function openRoomMenuModal(bookingId, event) {
   // Always use the original modal structure, but get data from different sources
+  // Remarks button color is applied asynchronously inside createDynamicRoomModal
+  // once the modal is shown, so it isn't fetched twice here.
   if (event && event.extendedProps) {
     // Calendar context - extract data from event
     await createDynamicRoomModalFromEvent(bookingId, event);
@@ -864,9 +866,6 @@ async function openRoomMenuModal(bookingId, event) {
     // Dashboard context - use existing logic
     await createDynamicRoomModal(bookingId, event, { isFromCalendar: false });
   }
-  
-  // Update button color to ensure it's current
-  await updateRemarksButtonColor(bookingId);
 }
 
 // Function to create a dynamic room modal from calendar event data using original modal structure
@@ -1080,9 +1079,9 @@ async function createDynamicRoomModal(bookingId, event, options) {
     addedServicesMap[bookingId] = [];
   }
 
-  // Check if remarks exist for this booking
-  const hasRemarks = await checkRemarksExist(bookingId);
-  const remarksButtonClass = hasRemarks ? 'btn-danger' : 'btn-info';
+  // Remarks state is applied asynchronously after the modal is shown (see updateRemarksButtonColor
+  // below) so opening the modal doesn't block on this network round-trip.
+  const remarksButtonClass = 'btn-info';
 
   const checkoutButtonAttributes = shouldDisableCheckout ? 'disabled aria-disabled="true" tabindex="-1"' : '';
   const checkoutButtonStyle = shouldDisableCheckout
@@ -2067,6 +2066,7 @@ setTimeout(() => {
     loadBookingDetails(bookingId);
     loadGuestDetails(bookingId);
     loadTransferHistory(bookingId, bookingId);
+    updateRemarksButtonColor(bookingId);
     // Update initial complaint/request badge count
     try { loadComplaintRequests(bookingId); } catch(_){}
     
