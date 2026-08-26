@@ -838,7 +838,7 @@ function calculateCardVariables(booking) {
 		lateCheckoutFeeScript.src = '/js/booking/late_checkout_fee.js';
 		lateCheckoutFeeScript.onload = function () {
 			var script2 = document.createElement('script');
-			script2.src = '/js/dashboard/room-menu_data.js?v=voucher-menu-3';
+			script2.src = '/js/dashboard/room-menu_data.js?v=discount-remarks-3';
 			document.body.appendChild(script2);
 		};
 		document.body.appendChild(lateCheckoutFeeScript);
@@ -1273,6 +1273,30 @@ let currentRemarksData = {
     currentRemarks: null
 };
 
+// Open Bootstrap modals safely (avoids stacked pitch-black backdrops)
+function showDashboardBootstrapModal(modalId) {
+    const el = document.getElementById(modalId);
+    if (!el || typeof bootstrap === 'undefined' || !bootstrap.Modal) return null;
+
+    if (typeof window.hardClearOrphanedModalBackdrops === 'function') {
+        window.hardClearOrphanedModalBackdrops();
+    } else {
+        document.querySelectorAll('.modal-backdrop').forEach((b) => b.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('padding-right');
+        document.body.style.removeProperty('overflow');
+    }
+
+    const existing = bootstrap.Modal.getInstance(el);
+    if (existing) {
+        existing.show();
+        return existing;
+    }
+    const modal = bootstrap.Modal.getOrCreateInstance(el);
+    modal.show();
+    return modal;
+}
+
 // Open remarks modal
 function openRemarksModal(bookingId, roomNumber, guestName, currentRemarks) {
     // Store current data
@@ -1298,8 +1322,7 @@ function openRemarksModal(bookingId, roomNumber, guestName, currentRemarks) {
     }
     
     // Show modal
-    const remarksModal = new bootstrap.Modal(document.getElementById('remarksModal'));
-    remarksModal.show();
+    showDashboardBootstrapModal('remarksModal');
 }
 
 // New function to open remarks modal from data attributes
@@ -1329,8 +1352,6 @@ let currentFilter = 'all'; // Current filter state
 let complaintsDataTable = null; // DataTable instance
 
 function openComplaintsModal() {
-    const modal = new bootstrap.Modal(document.getElementById('complaintsModal'));
-    
     // Show loading state
     document.getElementById('complaintsLoading').style.display = 'block';
     document.getElementById('complaintsListContent').style.display = 'none';
@@ -1348,16 +1369,19 @@ function openComplaintsModal() {
     }
     
     // Show modal
-    modal.show();
+    showDashboardBootstrapModal('complaintsModal');
     
     // Load complaints
     loadAllComplaints();
     
     // Destroy DataTable when modal is closed
-    $('#complaintsModal').on('hidden.bs.modal', function() {
+    $('#complaintsModal').off('hidden.bs.modal.dtCleanup').on('hidden.bs.modal.dtCleanup', function() {
         if (complaintsDataTable) {
             complaintsDataTable.destroy();
             complaintsDataTable = null;
+        }
+        if (typeof window.hardClearOrphanedModalBackdrops === 'function') {
+            window.hardClearOrphanedModalBackdrops();
         }
     });
 }
@@ -1660,7 +1684,13 @@ async function editComplaintFromModal(id, type, details) {
         </div>
     </div>`;
     document.body.insertAdjacentHTML('beforeend', html);
-    const modal = new bootstrap.Modal(document.getElementById(modalId));
+    const editEl = document.getElementById(modalId);
+    const parentOpen = !!document.querySelector('.modal.show');
+    const modal = bootstrap.Modal.getOrCreateInstance(editEl, {
+        backdrop: parentOpen ? false : true,
+        keyboard: true
+    });
+    editEl.style.zIndex = '1080';
     modal.show();
 }
 
@@ -1800,8 +1830,6 @@ let currentRequestsFilter = 'all'; // Current filter state
 let requestsDataTable = null; // DataTable instance
 
 function openRequestsModal() {
-    const modal = new bootstrap.Modal(document.getElementById('requestsModal'));
-    
     // Show loading state
     document.getElementById('requestsLoading').style.display = 'block';
     document.getElementById('requestsListContent').style.display = 'none';
@@ -1819,16 +1847,19 @@ function openRequestsModal() {
     }
     
     // Show modal
-    modal.show();
+    showDashboardBootstrapModal('requestsModal');
     
     // Load requests
     loadAllRequests();
     
     // Destroy DataTable when modal is closed
-    $('#requestsModal').on('hidden.bs.modal', function() {
+    $('#requestsModal').off('hidden.bs.modal.dtCleanup').on('hidden.bs.modal.dtCleanup', function() {
         if (requestsDataTable) {
             requestsDataTable.destroy();
             requestsDataTable = null;
+        }
+        if (typeof window.hardClearOrphanedModalBackdrops === 'function') {
+            window.hardClearOrphanedModalBackdrops();
         }
     });
 }
@@ -1848,7 +1879,6 @@ function updateRequestsFilterButtons() {
 let remarksDataTable = null;
 
 function openRemarksListModal() {
-    const modal = new bootstrap.Modal(document.getElementById('remarksListModal'));
     document.getElementById('remarksLoading').style.display = 'block';
     document.getElementById('remarksListContent').style.display = 'none';
     document.getElementById('remarksEmpty').style.display = 'none';
@@ -1856,10 +1886,13 @@ function openRemarksListModal() {
         remarksDataTable.destroy();
         remarksDataTable = null;
     }
-    modal.show();
+    showDashboardBootstrapModal('remarksListModal');
     loadAllRemarks();
-    $('#remarksListModal').on('hidden.bs.modal', function() {
+    $('#remarksListModal').off('hidden.bs.modal.dtCleanup').on('hidden.bs.modal.dtCleanup', function() {
         if (remarksDataTable) { remarksDataTable.destroy(); remarksDataTable = null; }
+        if (typeof window.hardClearOrphanedModalBackdrops === 'function') {
+            window.hardClearOrphanedModalBackdrops();
+        }
     });
 }
 
@@ -2205,7 +2238,13 @@ async function editRequestFromModal(id, type, details) {
         </div>
     </div>`;
     document.body.insertAdjacentHTML('beforeend', html);
-    const modal = new bootstrap.Modal(document.getElementById(modalId));
+    const editEl = document.getElementById(modalId);
+    const parentOpen = !!document.querySelector('.modal.show');
+    const modal = bootstrap.Modal.getOrCreateInstance(editEl, {
+        backdrop: parentOpen ? false : true,
+        keyboard: true
+    });
+    editEl.style.zIndex = '1080';
     modal.show();
 }
 

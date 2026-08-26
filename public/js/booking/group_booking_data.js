@@ -115,12 +115,15 @@ $(document).ready(function () {
           
             { 
                 data: 'Channel', 
-                title: 'BOOKING CHANNEL',
+                title: 'OTA',
                 render: function (data, type, row) {
                     if (data === 'agency') {
                         const paidBy = row.AgencyPayer === 'guest' ? 'Guest' : 'Agency';
                         const color = row.AgencyPayer === 'guest' ? '#f0ad4e' : '#5bc0de';
                         return `agency<br><small style="color:${color}; font-weight:600;">${paidBy}</small>`;
+                    }
+                    if (data === 'booking-channel' || data === 'booking channel') {
+                        return 'OTA';
                     }
                     return data || '';
                 }

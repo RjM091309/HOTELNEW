@@ -62,7 +62,7 @@
                             <th class="text-center">CHECK OUT</th>
                             <th class="text-center">TOTAL PAYMENT</th>
                             <th class="text-center">BALANCE</th>
-                            <th class="text-center">BOOKING CHANNEL</th>
+                            <th class="text-center">OTA</th>
                             <th class="text-center">PAYMENT STATUS</th>
                             <th class="text-center">BOOKING STATUS</th>
                             <th class="text-center">CREATED BY</th>
@@ -180,7 +180,7 @@
 <script src="/js/booking/booking_data.js"></script>
 
 <!-- Include room-menu_data.js for remarks functionality -->
-<script src="/js/dashboard/room-menu_data.js?v=paid-badge-1"></script>
+<script src="/js/dashboard/room-menu_data.js?v=room-details-click-1"></script>
 <script>
 // Fallback for editDirect function if not yet loaded from modal
 if (typeof window.editDirect === 'undefined') {
@@ -471,7 +471,7 @@ $(document).ready(function () {
                 return `<span>₱${formatted}</span>`;
             }
         },
-        { data: 'BookingChannel', title: 'BOOKING CHANNEL' },
+        { data: 'BookingChannel', title: 'OTA' },
         {
             data: 'Paymentstatus',
             title: 'PAYMENT STATUS',

@@ -32,7 +32,9 @@ function formatPaymentMethodLabel(method, otherLabel = '') {
     check: 'Check',
     bank_transfer: 'Bank Transfer',
     gcash: 'GCash',
-    online: 'Online'
+    online: 'Online',
+    agoda: 'AGODA',
+    expedia: 'EXPEDIA'
   };
   const key = (method || '').toLowerCase();
   if (key === 'other') return otherLabel || 'Others';

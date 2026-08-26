@@ -164,10 +164,10 @@ $(document).ready(function () {
                 render: function (data, type, row) {
                     // If this row represents a group, open the group details modal instead
                     if (row.GroupBookingId && String(row.GroupBookingId) !== '0') {
-                        return `<a href="#" onclick="openGroupFromAll(${row.GroupBookingId})" style="color: #337ab7; text-decoration: none; cursor: pointer;">${data}</a>`;
+                        return `<a href="#" onclick="event.preventDefault(); openGroupFromAll(${row.GroupBookingId})" style="color: #337ab7; text-decoration: none; cursor: pointer;">${data}</a>`;
                     }
-                    // Otherwise show voucher details for single booking
-                    return `<a href="#" onclick="showVoucherDetails(${row.BookingID})" style="color: #337ab7; text-decoration: none; cursor: pointer;">${data}</a>`;
+                    // Open full Room Reservation Details (same as dashboard/calendar)
+                    return `<a href="#" onclick="event.preventDefault(); openRoomMenuModal(${row.BookingID})" style="color: #337ab7; text-decoration: none; cursor: pointer;">${data}</a>`;
                 }
             },
             { 
@@ -236,12 +236,15 @@ $(document).ready(function () {
             },
             {
                 data: 'BookingChannel',
-                title: 'BOOKING CHANNEL',
+                title: 'OTA',
                 render: function (data, type, row) {
                     if (data === 'agency') {
                         const paidBy = row.AgencyPayer === 'guest' ? 'Guest' : 'Agency';
                         const color = row.AgencyPayer === 'guest' ? '#f0ad4e' : '#5bc0de';
                         return `agency<br><small style="color:${color}; font-weight:600;">${paidBy}</small>`;
+                    }
+                    if (data === 'booking-channel' || data === 'booking channel') {
+                        return 'OTA';
                     }
                     return data || '';
                 }
@@ -382,8 +385,97 @@ $(document).ready(function () {
         order: [[0, 'desc']], // Default sort by Confirmation Number descending
         language: {
             emptyTable: "No data available in the table."
+        },
+        createdRow: function (row) {
+            $(row).addClass('booking-row-clickable');
         }
     });
+
+    if (!document.getElementById('booking-row-clickable-style')) {
+        const style = document.createElement('style');
+        style.id = 'booking-row-clickable-style';
+        style.textContent = `
+            #booking_tbl tbody tr.booking-row-clickable { cursor: pointer; }
+            #booking_tbl tbody tr.booking-row-clickable td:last-child { cursor: default; }
+        `;
+        document.head.appendChild(style);
+    }
+
+    function cleanupBookingModalOverlay() {
+        if (typeof window.hardClearOrphanedModalBackdrops === 'function') {
+            window.hardClearOrphanedModalBackdrops();
+            return;
+        }
+        const openModals = document.querySelectorAll('.modal.show');
+        if (!openModals.length) {
+            document.querySelectorAll('.modal-backdrop').forEach((el) => el.remove());
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('padding-right');
+            document.body.style.removeProperty('overflow');
+            return;
+        }
+        const backdrops = Array.from(document.querySelectorAll('.modal-backdrop'));
+        while (backdrops.length > openModals.length) {
+            backdrops.shift()?.remove();
+        }
+    }
+
+    // Used by remarks modal (room-menu_data) when calendar_utils is not on this page
+    window.cleanupBookingModalOverlay = cleanupBookingModalOverlay;
+    window.cleanupModalOverlays = cleanupBookingModalOverlay;
+    window.cleanupAfterNestedModalClose = cleanupBookingModalOverlay;
+
+    // Prevent ACTION icons from bubbling into the row-click handler
+    $('#booking_tbl tbody').on('click', 'td:last-child', function (e) {
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+    });
+
+    // Also stop on action labels themselves (covers any column-order quirks)
+    $('#booking_tbl tbody').on('click', '.label', function (e) {
+        e.stopPropagation();
+    });
+
+    // Whole row opens the same view as Guest Name, except ACTION column icons
+    $('#booking_tbl tbody').on('click', 'tr.booking-row-clickable', function (e) {
+        const $target = $(e.target);
+        const $cell = $target.closest('td');
+        if (!$cell.length) return;
+
+        // Ignore ACTION column (last cell) and its buttons/icons
+        if ($cell.is(':last-child')) return;
+        if ($target.closest('button, .label, input, select, textarea').length) return;
+
+        // Don't stack another modal while one is already open
+        if (document.querySelector('.modal.show')) return;
+
+        // Guest-name link already has its own handler
+        if ($target.closest('a[onclick*="openRoomMenuModal"], a[onclick*="openGroupFromAll"]').length) {
+            return;
+        }
+
+        cleanupBookingModalOverlay();
+
+        const rowData = table.row(this).data();
+        if (!rowData || !rowData.BookingID) return;
+
+        if (rowData.GroupBookingId && String(rowData.GroupBookingId) !== '0') {
+            if (typeof window.openGroupFromAll === 'function') {
+                window.openGroupFromAll(rowData.GroupBookingId);
+            }
+        } else if (typeof window.openRoomMenuModal === 'function') {
+            window.openRoomMenuModal(rowData.BookingID);
+        }
+    });
+
+    // Clean leftover fade/backdrop after booking-related modals close (incl. Remarks)
+    $(document).on(
+        'hidden.bs.modal',
+        '#modal-voucher-details, #modal-billing, #modal-editbooking, #modal-payment, #modal-status, [id^="remarksModal_"], [id^="editRemarkModal_"]',
+        function () {
+            setTimeout(cleanupBookingModalOverlay, 50);
+        }
+    );
     
     // Handle custom tab clicks (Single/Group)
     $('.tab-item').on('click', function(e) {
@@ -1010,8 +1102,29 @@ function showVoucherDetails(bookingID) {
                 // Store booking ID for download function
                 document.getElementById('modal-voucher-details').setAttribute('data-booking-id', bookingID);
                 
-                // Show modal
-                $('#modal-voucher-details').modal('show');
+                // Clear orphaned backdrops before opening (Remarks can leave a high z-index fade)
+                document.querySelectorAll('.modal-backdrop').forEach((el) => el.remove());
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('padding-right');
+                document.body.style.removeProperty('overflow');
+
+                const voucherEl = document.getElementById('modal-voucher-details');
+                if (!voucherEl) return;
+
+                // Keep voucher above any leftover nested-stack backdrop CSS
+                voucherEl.style.zIndex = '1060';
+
+                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                    const existing = bootstrap.Modal.getInstance(voucherEl);
+                    if (existing) existing.dispose();
+                    const voucherModal = bootstrap.Modal.getOrCreateInstance(voucherEl, {
+                        backdrop: true,
+                        keyboard: true
+                    });
+                    voucherModal.show();
+                } else {
+                    $('#modal-voucher-details').modal('show');
+                }
                 
             } else {
                 Swal.fire({

@@ -391,7 +391,7 @@ class CalendarModel {
             bookingStatus: isMaintenanceRow ? 'maintenance' : row.bookingStatus,
             checkInStatus: row.checkInStatus,
             checkOutStatus: row.checkOutStatus,
-            holdPending: !!row.holdPending,
+            holdPending: Number(row.holdPending) === 1,
             isBackToBack: !!row.isBackToBack,
             groupBookingId: row.groupBookingId,
             bookingChannel: row.bookingChannel || 'walk-in',

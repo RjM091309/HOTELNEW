@@ -51,8 +51,8 @@ class BookingChannelController {
       const tabOrder = user?.TAB_ORDER || null;
 
       res.render('booking/booking_channel', {
-        title: 'Booking Channel Management',
-        subTitle: 'Manage your booking channels',
+        title: 'OTA Management',
+        subTitle: 'Manage your OTA channels',
         page: 'booking-channel',
         activePage: 'booking_channel',
         hideBreadcrumb: false,

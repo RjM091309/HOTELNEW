@@ -222,7 +222,7 @@
 		
 		// Load add_booking.js immediately - this is critical for booking functionality
 		var bookingBillingScript = document.createElement('script');
-		bookingBillingScript.src = '/js/booking/billing.js';
+		bookingBillingScript.src = '/js/booking/billing.js?v=backdrop-fix-1';
 		bookingBillingScript.onload = function() {
 			if (window.embedHotelLogo) {
 				window.embedHotelLogo('#modal-billing .hotel-logo');

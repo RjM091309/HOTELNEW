@@ -187,7 +187,7 @@
           }
         },
         { data: null, className: 'center', render: function(_d,_t,row){
-            const methodLabels = { cash: 'Cash', credit_card: 'Credit Card', credit: 'Credit', marker: 'Credit' };
+            const methodLabels = { cash: 'Cash', credit_card: 'Credit Card', credit: 'Credit', marker: 'Credit', bank_transfer: 'Bank Transfer', agoda: 'AGODA', expedia: 'EXPEDIA' };
             const method = (row.PAYMENT_METHOD || '').toLowerCase();
             return methodLabels[method] || row.PAYMENT_METHOD || 'N/A';
           }
@@ -366,7 +366,7 @@
               </tr>
             </thead>
             <tbody>`;
-      const methodLabels = { cash: 'Cash', credit_card: 'Credit Card', credit: 'Credit', marker: 'Credit' };
+      const methodLabels = { cash: 'Cash', credit_card: 'Credit Card', credit: 'Credit', marker: 'Credit', bank_transfer: 'Bank Transfer', agoda: 'AGODA', expedia: 'EXPEDIA' };
       payments.forEach(p => {
         const methodLabel = methodLabels[(p.PAYMENT_METHOD || '').toLowerCase()] || p.PAYMENT_METHOD;
         const paymentId = p.IDNo;
@@ -469,7 +469,7 @@
       return;
     }
 
-    const methodLabels = { cash: 'Cash', credit_card: 'Credit Card', credit: 'Credit', marker: 'Credit', other: 'Others' };
+    const methodLabels = { cash: 'Cash', credit_card: 'Credit Card', credit: 'Credit', marker: 'Credit', other: 'Others', bank_transfer: 'Bank Transfer', agoda: 'AGODA', expedia: 'EXPEDIA' };
     let html = '';
 
     if (payments.length) {

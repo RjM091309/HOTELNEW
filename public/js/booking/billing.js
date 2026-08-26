@@ -23,7 +23,9 @@ const BILLING_PAYMENT_METHOD_LABELS = {
     credit: 'Credit',
     marker: 'Credit',
     check: 'Check',
-    bank_transfer: 'Bank Transfer'
+    bank_transfer: 'Bank Transfer',
+    agoda: 'AGODA',
+    expedia: 'EXPEDIA'
 };
 
 function formatBillingPaymentType(type) {
@@ -916,10 +918,20 @@ window.showBilling = async function (bookingID) {
                 }
 
                 // Finally, show the modal
+                if (!document.querySelector('#modal-billing.show')) {
+                    document.querySelectorAll('.modal-backdrop').forEach((el) => {
+                        if (!document.querySelector('.modal.show')) el.remove();
+                    });
+                    if (!document.querySelector('.modal.show')) {
+                        document.body.classList.remove('modal-open');
+                        document.body.style.removeProperty('padding-right');
+                        document.body.style.removeProperty('overflow');
+                    }
+                }
                 if (typeof $ !== 'undefined' && $.fn.modal) {
                     $('#modal-billing').modal('show');
                 } else if (window.bootstrap && bootstrap.Modal) {
-                    new bootstrap.Modal(document.getElementById('modal-billing')).show();
+                    bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-billing')).show();
                 } else {
                     document.getElementById('modal-billing').style.display = 'block';
                 }

@@ -1445,6 +1445,7 @@ class BookingModel {
       date,
       checkInStatus,
       checkOutStatus,
+      holdPending,
       bookingRemarks,
       agencyID,
       agencyPayer,
@@ -1476,6 +1477,8 @@ class BookingModel {
       roomChangeNote,
       channelBookingId
     } = bookingData;
+
+    const holdPendingFlag = (holdPending === true || holdPending === 1 || holdPending === '1' || holdPending === 'true') ? 1 : 0;
 
     try {
       // Get connection from pool for transaction
@@ -1545,8 +1548,8 @@ class BookingModel {
         // Create booking
         const bookingQuery = `
           INSERT INTO booking
-          (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, CHANNEL_BOOKING_ID, GUESTS_COUNT, REMARKS, CONFIRMATION_NUMBER, NOTIFICATION_READ, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, LATE_CHECKOUT, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, BED_COUNT, FLIGHT_NUMBER, DROPOFF_FLIGHT_NUMBER, PICKUP_DATE, PASSENGER_COUNT, IS_LONG_TERM_STAY, ROOM_CHANGE_NOTE)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, CHANNEL_BOOKING_ID, GUESTS_COUNT, REMARKS, CONFIRMATION_NUMBER, NOTIFICATION_READ, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, LATE_CHECKOUT, HOLD_PENDING, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, BED_COUNT, FLIGHT_NUMBER, DROPOFF_FLIGHT_NUMBER, PICKUP_DATE, PASSENGER_COUNT, IS_LONG_TERM_STAY, ROOM_CHANGE_NOTE)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const directReservationFlag = isDirectReservation ? 1 : 0;
         // Handle empty agencyID - set to NULL if empty
@@ -1583,6 +1586,7 @@ class BookingModel {
           customerId, room_id, checkInDate, checkOutDate, 'pending', finalBookingRoute,
           processedChannelBookingId,
           maxOccupants, bookingRemarks, finalConfirmationNumber, encodedBy, date, 1, checkInStatus, checkOutStatus,
+          holdPendingFlag,
           processedAgencyID, processedAgencyPayer, directReservationFlag, bedCount || null,
           pickupServiceId ? (flightNumber || null) : null,
           dropoffServiceId ? (dropoffFlightNumber || null) : null,
@@ -2961,6 +2965,7 @@ class BookingModel {
           COALESCE(bi.REFUNDABLE_AMOUNT, 0) AS REFUNDABLE_AMOUNT,
           COALESCE(bi.LATE_CHECKOUT_CHARGE, 0) AS LATE_CHECKOUT_CHARGE,
           bi.DISCOUNT_APPLIED,
+          COALESCE(bi.REMARKS, '') AS BILLING_REMARKS,
           COALESCE(rt.NAME, 'Unassigned Room') AS ROOM_TYPE,
           r.ROOM_NUMBER
         FROM booking b
@@ -3213,6 +3218,7 @@ class BookingModel {
         effectiveSubTotal,
         reservationFee: parseFloat(b.RESERVATION_FEE) || 0,
         discountAmount: parseFloat(b.DISCOUNT_AMOUNT) || 0,
+        discountRemarks: (b.BILLING_REMARKS || '').trim(),
         checkoutRefund: checkoutRefund,
         refundAmount: refundAmount,
         totalPaidBeforeRefund: totalPaidBeforeRefund,
@@ -3221,6 +3227,23 @@ class BookingModel {
         isCancelled,
         paidAmountAfterRefund
       };
+
+      // If billing.REMARKS is empty, fall back to latest Discount-category remark
+      if (!receiptData.discountRemarks && receiptData.discountAmount > 0) {
+        try {
+          const remarkRows = await queryDatabasePromise(
+            `SELECT REMARK_TEXT FROM remarks
+             WHERE BOOKING_ID = ? AND CATEGORY = 'Discount' AND ACTIVE = 1
+             ORDER BY IDNo DESC LIMIT 1`,
+            [bookingId]
+          );
+          if (remarkRows.length && remarkRows[0].REMARK_TEXT) {
+            receiptData.discountRemarks = String(remarkRows[0].REMARK_TEXT).trim();
+          }
+        } catch (remarkErr) {
+          console.warn('Could not load discount remarks fallback:', remarkErr.message);
+        }
+      }
 
       return receiptData;
     } catch (error) {
@@ -4697,6 +4720,7 @@ class BookingModel {
           b.BOOKING_CHANNEL,
           b.GUESTS_COUNT,
           b.LATE_CHECKOUT,
+          b.HOLD_PENDING,
           b.CHECK_IN_STATUS,
           b.REMARKS,
           b.CONFIRMATION_NUMBER,
@@ -4871,6 +4895,7 @@ class BookingModel {
         guestLevel: bookingsResult[0]?.guestLevel, // Default guest level
         checkInStatus: firstBooking.CHECK_IN_STATUS,
         checkOutStatus: firstBooking.LATE_CHECKOUT,
+        holdPending: firstBooking.HOLD_PENDING,
         paymentStatus: firstBooking.PAYMENT_STATUS,
         bookingRoute: firstBooking.BOOKING_CHANNEL,
         agencyId: firstBooking.AGENCY_ID,
@@ -5092,6 +5117,7 @@ class BookingModel {
       guestLevel,
       checkInStatus,
       checkOutStatus,
+      holdPending,
       remarks,
       agencyId = null,
       agencyPayer = null,
@@ -5118,6 +5144,8 @@ class BookingModel {
       perRoomDiscounts = [],
       individualBookingDates = null // Individual booking dates if they differ from main date range
     } = data;
+
+    const holdPendingFlag = (holdPending === true || holdPending === 1 || holdPending === '1' || holdPending === 'true') ? 1 : 0;
 
 
     // Helper: parse daterange "MMM DD, YYYY to MMM DD, YYYY (..optional..)"
@@ -5299,10 +5327,10 @@ class BookingModel {
             // Update booking (use final dates)
             await connection.promise().query(`
               UPDATE booking
-              SET CHECK_IN_DATE = ?, CHECK_OUT_DATE = ?, BOOKING_CHANNEL = ?, CHECK_IN_STATUS = ?, LATE_CHECKOUT = ?, REMARKS = ?, CONFIRMATION_NUMBER = ?, AGENCY_ID = ?, AGENCY_PAYER = ?, EDITED_BY = ?, EDITED_DT = ?
+              SET CHECK_IN_DATE = ?, CHECK_OUT_DATE = ?, BOOKING_CHANNEL = ?, CHECK_IN_STATUS = ?, LATE_CHECKOUT = ?, HOLD_PENDING = ?, REMARKS = ?, CONFIRMATION_NUMBER = ?, AGENCY_ID = ?, AGENCY_PAYER = ?, EDITED_BY = ?, EDITED_DT = ?
               WHERE IDNo = ?
             `, [
-              finalCheckInWithTime, finalCheckOutWithTime, bookingRoute, checkInStatus, checkOutStatus,
+              finalCheckInWithTime, finalCheckOutWithTime, bookingRoute, checkInStatus, checkOutStatus, holdPendingFlag,
               isMainBooking ? remarks : '', confirmationNumber, processedAgencyId, processedAgencyPayer, encodedBy, date, existingBooking.IDNo
             ]);
 
@@ -5589,11 +5617,11 @@ class BookingModel {
 
           // Insert booking
           const [bookResult] = await connection.promise().query(`
-            INSERT INTO booking (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, LATE_CHECKOUT, REMARKS, CONFIRMATION_NUMBER, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, GROUP_BOOKING_ID, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO booking (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, LATE_CHECKOUT, HOLD_PENDING, REMARKS, CONFIRMATION_NUMBER, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, GROUP_BOOKING_ID, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `, [
             guestID, roomId, checkInDate, checkOutDate, 'pending', bookingRoute, 1,
-            checkOutStatus, index === 0 ? remarks : '', confirmationNumber, encodedBy, date, 1,
+            checkOutStatus, holdPendingFlag, index === 0 ? remarks : '', confirmationNumber, encodedBy, date, 1,
             checkInStatus, groupBookingId, processedAgencyId, processedAgencyPayer, 0
           ]);
 
@@ -9038,6 +9066,7 @@ class BookingModel {
           b.CONFIRMATION_NUMBER,
           b.CHECK_IN_STATUS,
           b.LATE_CHECKOUT,
+          b.HOLD_PENDING,
           b.IS_DIRECT_RESERVATION,
           b.AGENCY_ID,
           b.AGENCY_PAYER as agencyPayer,
@@ -9152,7 +9181,7 @@ class BookingModel {
       const {
         bookingId, room_id, fullname, number, daterange, maxOccupants,
         paidAmount, paymentStatus, price, diffindays, guestType, guestLevel,
-        bookingRoute, checkInStatus, checkOutStatus, bookingRemarks, agencyID, agencyPayer, bedCount,
+        bookingRoute, checkInStatus, checkOutStatus, holdPending, bookingRemarks, agencyID, agencyPayer, bedCount,
         breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
         breakfastKidQty, breakfastKidPrice, breakfastKidId,
         pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
@@ -9160,6 +9189,8 @@ class BookingModel {
         discount, seniorPwdDiscountPercent = 0, lateCheckoutFee, editedBy,
         channelBookingId
       } = params;
+
+      const holdPendingFlag = (holdPending === true || holdPending === 1 || holdPending === '1' || holdPending === 'true') ? 1 : 0;
 
       const editDate = new Date();
 
@@ -9222,7 +9253,7 @@ class BookingModel {
               UPDATE booking
               SET ROOM_ID = ?, CHECK_IN_DATE = ?, CHECK_OUT_DATE = ?, BOOKING_CHANNEL = ?,
                   CHANNEL_BOOKING_ID = ?,
-                  GUESTS_COUNT = ?, REMARKS = ?, CHECK_IN_STATUS = ?, LATE_CHECKOUT = ?, AGENCY_ID = ?,
+                  GUESTS_COUNT = ?, REMARKS = ?, CHECK_IN_STATUS = ?, LATE_CHECKOUT = ?, HOLD_PENDING = ?, AGENCY_ID = ?,
                   AGENCY_PAYER = ?, BED_COUNT = ?, FLIGHT_NUMBER = ?, DROPOFF_FLIGHT_NUMBER = ?, PICKUP_DATE = ?, PASSENGER_COUNT = ?, EDITED_BY = ?, EDITED_DT = ?
               WHERE IDNo = ?
             `;
@@ -9265,7 +9296,7 @@ class BookingModel {
               room_id, checkInDate, checkOutDate, bookingRoute,
               processedChannelBookingId,
               maxOccupants,
-              bookingRemarks, checkInStatus, checkOutStatus || 0, processedAgencyID,
+              bookingRemarks, checkInStatus, checkOutStatus || 0, holdPendingFlag, processedAgencyID,
               processedAgencyPayer, processedBedCount, processedFlightNumber, processedDropoffFlightNumber, processedPickupDate, processedPassengerCount,
               editedBy, editDate, bookingId
             ]);
@@ -10464,6 +10495,7 @@ class BookingModel {
       guestLevel,
       checkInStatus,
       checkOutStatus,
+      holdPending,
       remarks,
       agencyId = null,
       agencyPayer = null,
@@ -10494,6 +10526,8 @@ class BookingModel {
       seniorPwdRoomCount = 0,
       existingGroupId = null // ID of existing group to join
     } = data;
+
+    const holdPendingFlag = (holdPending === true || holdPending === 1 || holdPending === '1' || holdPending === 'true') ? 1 : 0;
 
     // Use let so we can override when joining existing group
     let consolidatedBilling = consolidatedBillingParam;
@@ -10817,8 +10851,8 @@ class BookingModel {
 
         // booking
         const bookingQuery = `
-          INSERT INTO booking (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, LATE_CHECKOUT, REMARKS, CONFIRMATION_NUMBER, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, GROUP_BOOKING_ID, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, FLIGHT_NUMBER, PASSENGER_COUNT)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO booking (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, LATE_CHECKOUT, HOLD_PENDING, REMARKS, CONFIRMATION_NUMBER, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, GROUP_BOOKING_ID, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, FLIGHT_NUMBER, PASSENGER_COUNT)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const processedAgencyPayer = (bookingRoute === 'agency' && agencyPayer)
           ? (agencyPayer === 'guest' ? 'guest' : 'agency')
@@ -10832,6 +10866,7 @@ class BookingModel {
           bookingRoute,
           1,
           checkOutStatus,
+          holdPendingFlag,
           bookingRemarksForThisRow,
           confirmationNumber,
           encodedBy,

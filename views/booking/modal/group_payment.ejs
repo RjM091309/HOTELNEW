@@ -81,18 +81,32 @@
                                     <label for="cashPayment"></label>
                                 </div>
                             </div>
-                            
-                            <div class="payment-option" data-method="credit_card">
+
+                            <div class="payment-option" data-method="agoda">
                                 <div class="option-icon">
-                                    <i class="fa fa-credit-card"></i>
+                                    <i class="fa fa-globe"></i>
                                 </div>
                                 <div class="option-content">
-                                    <div class="option-title">Credit Card</div>
-                                    <div class="option-description">Visa, Mastercard, etc.</div>
+                                    <div class="option-title">AGODA</div>
+                                    <div class="option-description">Paid via Agoda</div>
                                 </div>
                                 <div class="option-radio">
-                                    <input type="radio" name="groupPaymentMethod" value="credit_card" id="cardPayment">
-                                    <label for="cardPayment"></label>
+                                    <input type="radio" name="groupPaymentMethod" value="agoda" id="groupAgodaPayment">
+                                    <label for="groupAgodaPayment"></label>
+                                </div>
+                            </div>
+
+                            <div class="payment-option" data-method="expedia">
+                                <div class="option-icon">
+                                    <i class="fa fa-plane"></i>
+                                </div>
+                                <div class="option-content">
+                                    <div class="option-title">EXPEDIA</div>
+                                    <div class="option-description">Paid via Expedia</div>
+                                </div>
+                                <div class="option-radio">
+                                    <input type="radio" name="groupPaymentMethod" value="expedia" id="groupExpediaPayment">
+                                    <label for="groupExpediaPayment"></label>
                                 </div>
                             </div>
                         </div>
@@ -762,6 +776,24 @@ function initializeGroupPaymentModal() {
                             <i class="fa fa-info-circle"></i>
                             <strong>Note:</strong> Ensure you have sufficient cash available before confirming.
                         </div>
+                    </div>
+                `;
+                break;
+
+            case 'agoda':
+                detailsHTML = `
+                    <div class="payment-method-info">
+                        <h6><i class="fa fa-globe"></i> AGODA Payment</h6>
+                        <p class="text-muted">Mark this payment as received through Agoda.</p>
+                    </div>
+                `;
+                break;
+
+            case 'expedia':
+                detailsHTML = `
+                    <div class="payment-method-info">
+                        <h6><i class="fa fa-plane"></i> EXPEDIA Payment</h6>
+                        <p class="text-muted">Mark this payment as received through Expedia.</p>
                     </div>
                 `;
                 break;

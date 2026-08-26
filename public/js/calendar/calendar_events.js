@@ -377,15 +377,27 @@ function applyCompositeStatusStyles(event, el) {
 
     // More robust check: groupBookingId must exist, not be null, not be 0, and not be empty string
     const holdPendingRaw = event.extendedProps?.holdPending;
-    const isHoldPending = holdPendingRaw === 1 || holdPendingRaw === '1' || holdPendingRaw === true;
+    const isHoldPending = holdPendingRaw === 1 || holdPendingRaw === '1' || holdPendingRaw === true
+      || String(holdPendingRaw).toLowerCase() === 'true';
 
     // Colors
     const red = '#e53935';      // regular (keep original red)
     const lemon = '#e0a316';    // late = amber
     const green = '#12866f';    // occupied = teal
+    const holdOrange = '#FF6D00'; // hold pending
 
     let checkInStatusRaw = event.extendedProps?.checkInStatus;   // expected: 1 regular, 0 late
     let checkOutStatusRaw = event.extendedProps?.checkOutStatus; // expected: 0 regular, 1 late
+
+    if (bookingStatus === 'pending' && isHoldPending) {
+      el.removeAttribute('data-composite');
+      el.style.background = '';
+      el.style.backgroundColor = holdOrange;
+      el.style.color = '#fff';
+      applyBookingHighlightBorder(event, el);
+      el.style.zIndex = '5';
+      return;
+    }
 
     if (checkInStatusRaw === undefined && checkOutStatusRaw === undefined) {
       el.removeAttribute('data-composite');

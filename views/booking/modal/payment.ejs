@@ -201,17 +201,30 @@
                                     <label for="bankTransferPayment"></label>
                                 </div>
                             </div>
-                    
-                            <div class="payment-option" data-method="credit_card">
+
+                            <div class="payment-option" data-method="agoda">
                                 <div class="option-icon">
-                                    <i class="fa fa-credit-card"></i>
+                                    <i class="fa fa-globe"></i>
                                 </div>
                                 <div class="option-content">
-                                    <div class="option-title">Credit Card</div>
+                                    <div class="option-title">AGODA</div>
                                 </div>
                                 <div class="option-radio">
-                                    <input type="radio" name="paymentMethod" value="credit_card" id="cardPayment">
-                                    <label for="cardPayment"></label>
+                                    <input type="radio" name="paymentMethod" value="agoda" id="agodaPayment">
+                                    <label for="agodaPayment"></label>
+                                </div>
+                            </div>
+
+                            <div class="payment-option" data-method="expedia">
+                                <div class="option-icon">
+                                    <i class="fa fa-plane"></i>
+                                </div>
+                                <div class="option-content">
+                                    <div class="option-title">EXPEDIA</div>
+                                </div>
+                                <div class="option-radio">
+                                    <input type="radio" name="paymentMethod" value="expedia" id="expediaPayment">
+                                    <label for="expediaPayment"></label>
                                 </div>
                             </div>
 
@@ -912,7 +925,7 @@
 		
 		// Load add_booking.js immediately - this is critical for booking functionality
 		var bookingPaymentScript = document.createElement('script');
-		bookingPaymentScript.src = '/js/booking/payment.js';
+		bookingPaymentScript.src = '/js/booking/payment.js?v=agoda-expedia-1';
 		document.body.appendChild(bookingPaymentScript);
 
 		var depositSectionScript = document.createElement('script');

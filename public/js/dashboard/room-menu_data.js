@@ -124,6 +124,10 @@ function formatBookingChannelLabel(channel) {
   if (!channel || channel === 'null' || channel === 'undefined') {
     return 'walk-in';
   }
+  const normalized = String(channel).trim().toLowerCase();
+  if (normalized === 'booking-channel' || normalized === 'booking channel') {
+    return 'OTA';
+  }
   return String(channel);
 }
 
@@ -165,7 +169,9 @@ function formatPaymentMethodLabel(method) {
     credit: 'Credit',
     marker: 'Credit',
     check: 'Check',
-    bank_transfer: 'Bank Transfer'
+    bank_transfer: 'Bank Transfer',
+    agoda: 'AGODA',
+    expedia: 'EXPEDIA'
   };
 
   const key = raw.toLowerCase();
@@ -287,9 +293,12 @@ function updateAgencyPayerDisplay(bookingId, channel, agencyPayer) {
 
 /** Ensure a nested modal (Payments/Remarks/etc.) stacks above the Room Reservation modal. */
 function ensureNestedModalStackCss() {
-  if (document.getElementById('nested-room-modal-stack-css')) return;
-  const style = document.createElement('style');
-  style.id = 'nested-room-modal-stack-css';
+  let style = document.getElementById('nested-room-modal-stack-css');
+  if (!style) {
+    style = document.createElement('style');
+    style.id = 'nested-room-modal-stack-css';
+    document.head.appendChild(style);
+  }
   style.textContent = `
     [id^="paymentsModal_"],
     [id^="remarksModal_"],
@@ -307,8 +316,11 @@ function ensureNestedModalStackCss() {
     .modal-backdrop.show {
       z-index: 1050 !important;
     }
+    /* Extra nested backdrops must not stack opacity (looks pitch-black) */
     .modal-backdrop.show ~ .modal-backdrop.show {
       z-index: 1065 !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
     }
     #modal-cancel-booking.show {
       pointer-events: auto !important;
@@ -359,8 +371,33 @@ function ensureNestedModalStackCss() {
       width: 100%;
     }
   `;
-  document.head.appendChild(style);
 }
+
+function isNestedUnderRoomOrEditModal() {
+  return !!document.querySelector(
+    '[id^="dynamicRoomModal_"].show, #modal-editbooking.show'
+  );
+}
+
+/** Hard-clear orphaned Bootstrap backdrops (booking page Remarks → Voucher fade bug). */
+function hardClearOrphanedModalBackdrops() {
+  const openModals = document.querySelectorAll('.modal.show');
+  const backdrops = Array.from(document.querySelectorAll('.modal-backdrop'));
+
+  if (!openModals.length) {
+    backdrops.forEach((el) => el.remove());
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('padding-right');
+    document.body.style.removeProperty('overflow');
+    return;
+  }
+
+  while (backdrops.length > openModals.length) {
+    backdrops.shift()?.remove();
+  }
+}
+
+window.hardClearOrphanedModalBackdrops = hardClearOrphanedModalBackdrops;
 
 function fixNestedModalStack(topModalEl, topZ = 1070) {
   if (!topModalEl) return;
@@ -422,6 +459,8 @@ function attachNestedModalCleanup(modalEl, zIndex = 1070) {
     }
 
     modalEl.remove();
+
+    hardClearOrphanedModalBackdrops();
 
     if (typeof window.cleanupAfterNestedModalClose === 'function') {
       window.cleanupAfterNestedModalClose();
@@ -863,10 +902,76 @@ async function openRoomMenuModal(bookingId, event) {
     // Calendar context - extract data from event
     await createDynamicRoomModalFromEvent(bookingId, event);
   } else {
-    // Dashboard context - use existing logic
-    await createDynamicRoomModal(bookingId, event, { isFromCalendar: false });
+    const roomCard = document.querySelector(`[data-booking-id="${bookingId}"]`);
+    if (roomCard) {
+      // Dashboard room-card context
+      await createDynamicRoomModal(bookingId, event, { isFromCalendar: false });
+    } else {
+      // Booking table / pages without a room card — load via API
+      await createDynamicRoomModalFromBookingApi(bookingId);
+    }
   }
 }
+
+// Open Room Reservation Details using /booking/booking_details (Booking list pages)
+async function createDynamicRoomModalFromBookingApi(bookingId) {
+  try {
+    const response = await fetch(`/booking/booking_details/${bookingId}`);
+    if (!response.ok) {
+      throw new Error(`Failed to load booking ${bookingId}`);
+    }
+    const data = await response.json();
+    if (!data || data.error) {
+      throw new Error(data?.error || 'Booking not found');
+    }
+
+    const checkInDate = data.CHECK_IN_DATE;
+    const checkOutDate = data.CHECK_OUT_DATE;
+    const checkIn = new Date(checkInDate);
+    const checkOut = new Date(checkOutDate);
+    const daysDiff = Math.max(
+      1,
+      Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24))
+    );
+
+    if (!addedServicesMap[bookingId]) {
+      addedServicesMap[bookingId] = [];
+    }
+
+    const fakeEvent = {
+      extendedProps: {
+        bookingChannel: data.BOOKING_CHANNEL || 'walk-in',
+        agencyPayer: data.AGENCY_PAYER || 'agency',
+        bookingStatus: data.BOOKING_STATUS || '',
+        checkOutDate: data.CHECK_OUT_DATE
+      }
+    };
+
+    await createDynamicRoomModal(bookingId, fakeEvent, {
+      roomNumber: data.ROOM_NUMBER || 'N/A',
+      roomId: data.ROOM_ID || 'N/A',
+      guestName: data.CustomerName || 'Unknown Guest',
+      checkInDate,
+      checkOutDate,
+      daysDiff,
+      isFromCalendar: true
+    });
+  } catch (error) {
+    console.error('Error opening room reservation details:', error);
+    if (typeof Swal !== 'undefined') {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Could not open room reservation details. Please try again.',
+        confirmButtonText: 'OK'
+      });
+    } else {
+      alert('Could not open room reservation details.');
+    }
+  }
+}
+
+window.createDynamicRoomModalFromBookingApi = createDynamicRoomModalFromBookingApi;
 
 // Function to create a dynamic room modal from calendar event data using original modal structure
 async function createDynamicRoomModalFromEvent(bookingId, event) {
@@ -1197,6 +1302,10 @@ async function createDynamicRoomModal(bookingId, event, options) {
                                         <i class="fas fa-user me-1"></i>Guest Info
                                     </h6>
                                     <div class="info-item mb-1">
+                                        <label class="text-muted small mb-0">Guest Name</label>
+                                        <div class="info-value info-value-guest-name" id="guest-name-${bookingId}">${guestName}</div>
+                                    </div>
+                                    <div class="info-item mb-1">
                                         <label class="text-muted small mb-0">Source</label>
                                         <div class="info-value" id="booking-source-${bookingId}">${formatBookingChannelLabel(bookingChannel)}</div>
                                     </div>
@@ -1207,10 +1316,6 @@ async function createDynamicRoomModal(bookingId, event, options) {
                                     <div class="info-item mb-1" id="agency-name-row-${bookingId}" style="display: ${bookingChannel === 'agency' ? '' : 'none'};">
                                         <label class="text-muted small mb-0">Agency</label>
                                         <div class="info-value" id="agency-name-${bookingId}">-</div>
-                                    </div>
-                                    <div class="info-item mb-1">
-                                        <label class="text-muted small mb-0">Guest Name</label>
-                                        <div class="info-value" id="guest-name-${bookingId}">${guestName}</div>
                                     </div>
                                     <div class="info-item mb-1">
                                         <label class="text-muted small mb-0">Contact No</label>
@@ -1425,14 +1530,17 @@ async function createDynamicRoomModal(bookingId, event, options) {
                             
                             <!-- Discount Row (Conditional) -->
                             <div class="row" id="discount-row-${bookingId}" style="display: none;">
-                                <div class="col-md-6">
-                                    <div class="summary-item">
-                                        <label class="text-muted small mb-0" style="color: #28a745;">Discount</label>
-                                        <div class="summary-value" id="discount-amount-${bookingId}" style="color: #dc3545;">₱0.00</div>
+                                <div class="col-12">
+                                    <div class="discount-summary-line">
+                                        <div class="discount-summary-amount">
+                                            <label class="text-muted small mb-0" style="color: #28a745;">Discount</label>
+                                            <div class="summary-value" id="discount-amount-${bookingId}" style="color: #dc3545;">₱0.00</div>
+                                        </div>
+                                        <div class="discount-summary-remarks">
+                                            <label class="text-muted small mb-0">Discount Remarks</label>
+                                            <div class="summary-value small" id="discount-row-remarks-${bookingId}" style="color: #495057; font-weight: 500; white-space: pre-wrap; word-break: break-word;">—</div>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <!-- Empty column for alignment -->
                                 </div>
                             </div>
 
@@ -1752,6 +1860,13 @@ modalStyle.textContent = `
         word-break: break-word;
     }
 
+    #dynamicRoomModal_${bookingId} .info-value-guest-name {
+        font-size: 1.28rem;
+        font-weight: 700;
+        line-height: 1.3;
+        color: #0d6efd;
+    }
+
     #dynamicRoomModal_${bookingId} .stay-summary-section {
         background: #f8f9fa;
     }
@@ -1802,15 +1917,37 @@ modalStyle.textContent = `
     }
     
     #dynamicRoomModal_${bookingId} #reservation-fee-row-${bookingId} .summary-item label,
-    #dynamicRoomModal_${bookingId} #discount-row-${bookingId} .summary-item label {
+    #dynamicRoomModal_${bookingId} #discount-row-${bookingId} label {
         font-weight: 600;
         font-size: 0.8rem;
+        display: block;
+        margin-bottom: 2px;
     }
     
     #dynamicRoomModal_${bookingId} #reservation-fee-row-${bookingId} .summary-value,
     #dynamicRoomModal_${bookingId} #discount-row-${bookingId} .summary-value {
         font-weight: 700;
         font-size: 0.9rem;
+    }
+
+    /* Keep discount amount + remarks centered like Grand Total / Paid / Balance */
+    #dynamicRoomModal_${bookingId} #discount-row-${bookingId} .discount-summary-line {
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 48px;
+        text-align: center;
+        width: 100%;
+    }
+    #dynamicRoomModal_${bookingId} #discount-row-${bookingId} .discount-summary-amount {
+        flex: 0 1 auto;
+        min-width: 120px;
+        text-align: center;
+    }
+    #dynamicRoomModal_${bookingId} #discount-row-${bookingId} .discount-summary-remarks {
+        flex: 0 1 auto;
+        max-width: 55%;
+        text-align: center;
     }
     
     #dynamicRoomModal_${bookingId} .form-control,
@@ -3658,16 +3795,22 @@ async function calculateBalance(bookingId, currentBookingId) {
         if (discountAmount > 0) {
             const discountRow = document.getElementById(`discount-row-${bookingId}`);
             const discountAmountElement = document.getElementById(`discount-amount-${bookingId}`);
+            const discountRowRemarks = document.getElementById(`discount-row-remarks-${bookingId}`);
             if (discountRow && discountAmountElement) {
                 discountRow.style.display = 'block';
                 // Set label - always show "Discount"
-                const label = document.querySelector(`#discount-row-${bookingId} .summary-item label`);
+                const label = document.querySelector(`#discount-row-${bookingId} .discount-summary-amount label`);
                 if (label) {
                     label.textContent = 'Discount';
                 }
                 discountAmountElement.innerHTML = `<span class="text-danger"><strong>-₱${parseFloat(discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>`;
             } else {
                 console.error(`❌ Discount elements not found for booking ${bookingId}`);
+            }
+            if (discountRowRemarks) {
+                discountRowRemarks.textContent = discountRemarks || '—';
+                discountRowRemarks.style.color = discountRemarks ? '#495057' : '#adb5bd';
+                discountRowRemarks.style.fontStyle = discountRemarks ? 'normal' : 'italic';
             }
             // Prefill inputs and show remarks row if provided
             const amountInput = document.getElementById(`discountAmountManual-${bookingId}`);
@@ -3691,6 +3834,10 @@ async function calculateBalance(bookingId, currentBookingId) {
             const discountRow = document.getElementById(`discount-row-${bookingId}`);
             if (discountRow) {
                 discountRow.style.display = 'none';
+            }
+            const discountRowRemarks = document.getElementById(`discount-row-remarks-${bookingId}`);
+            if (discountRowRemarks) {
+                discountRowRemarks.textContent = '—';
             }
             const remarksInline = document.getElementById(`discount-remarks-display-${bookingId}`);
             const remarksLabel = document.getElementById(`discount-remarks-label-${bookingId}`);
@@ -9042,10 +9189,17 @@ function openComplaintRequestModal(bookingId) {
 
 // Function to create remarks modal
 function createRemarksModal(bookingId) {
-    // Remove existing remarks modal if any
+    // Remove existing remarks modal if any (dispose first so backdrop is not orphaned)
     const existingModal = document.getElementById(`remarksModal_${bookingId}`);
     if (existingModal) {
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            const existingInstance = bootstrap.Modal.getInstance(existingModal);
+            if (existingInstance) {
+                existingInstance.dispose();
+            }
+        }
         existingModal.remove();
+        hardClearOrphanedModalBackdrops();
     }
 
     // Create modal HTML
@@ -9152,9 +9306,41 @@ function createRemarksModal(bookingId) {
 
     // Show the modal
     const remarksModalEl = document.getElementById(`remarksModal_${bookingId}`);
-    const modal = bootstrap.Modal.getOrCreateInstance(remarksModalEl);
-    attachNestedModalCleanup(remarksModalEl, 1070);
-    modal.show();
+    const nested = isNestedUnderRoomOrEditModal();
+
+    // Booking / list pages: do NOT use nested stack CSS (it leaves a high-z backdrop that
+    // covers Voucher Details). Room menu: keep nested stacking above the room modal,
+    // but do NOT add a second backdrop (double fade = pitch black).
+    if (nested) {
+        remarksModalEl.removeAttribute('data-bs-backdrop');
+        remarksModalEl.removeAttribute('data-bs-keyboard');
+        const modal = bootstrap.Modal.getOrCreateInstance(remarksModalEl, {
+            backdrop: false,
+            keyboard: true
+        });
+        attachNestedModalCleanup(remarksModalEl, 1070);
+        modal.show();
+    } else {
+        remarksModalEl.removeAttribute('data-bs-backdrop');
+        remarksModalEl.removeAttribute('data-bs-keyboard');
+        remarksModalEl.style.zIndex = '1055';
+        hardClearOrphanedModalBackdrops();
+        const modal = bootstrap.Modal.getOrCreateInstance(remarksModalEl, {
+            backdrop: true,
+            keyboard: true
+        });
+        remarksModalEl.addEventListener('hidden.bs.modal', function onRemarksHidden() {
+            remarksModalEl.removeEventListener('hidden.bs.modal', onRemarksHidden);
+            const instance = bootstrap.Modal.getInstance(remarksModalEl);
+            if (instance) instance.dispose();
+            remarksModalEl.remove();
+            hardClearOrphanedModalBackdrops();
+            if (typeof window.cleanupBookingModalOverlay === 'function') {
+                window.cleanupBookingModalOverlay();
+            }
+        });
+        modal.show();
+    }
 
     // Load existing remarks
     loadRemarks(bookingId);
@@ -9505,7 +9691,14 @@ function openRequestModal(bookingId) {
 
 function createComplaintRequestModal(bookingId) {
     const existing = document.getElementById(`complaintRequestModal_${bookingId}`);
-    if (existing) existing.remove();
+    if (existing) {
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            const existingInstance = bootstrap.Modal.getInstance(existing);
+            if (existingInstance) existingInstance.dispose();
+        }
+        existing.remove();
+        hardClearOrphanedModalBackdrops();
+    }
 
     const html = `
     <div class="modal fade" id="complaintRequestModal_${bookingId}" tabindex="-1" aria-labelledby="complaintRequestLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
@@ -9585,9 +9778,35 @@ function createComplaintRequestModal(bookingId) {
 
     document.body.insertAdjacentHTML('beforeend', html);
     const complaintModalEl = document.getElementById(`complaintRequestModal_${bookingId}`);
-    const modal = new bootstrap.Modal(complaintModalEl);
-    raiseStackedModal(complaintModalEl, 1065);
-    modal.show();
+    const nested = isNestedUnderRoomOrEditModal();
+
+    complaintModalEl.removeAttribute('data-bs-backdrop');
+    complaintModalEl.removeAttribute('data-bs-keyboard');
+
+    if (nested) {
+        // Parent room modal already dims the page — skip second backdrop
+        const modal = bootstrap.Modal.getOrCreateInstance(complaintModalEl, {
+            backdrop: false,
+            keyboard: true
+        });
+        attachNestedModalCleanup(complaintModalEl, 1070);
+        modal.show();
+    } else {
+        complaintModalEl.style.zIndex = '1055';
+        hardClearOrphanedModalBackdrops();
+        const modal = bootstrap.Modal.getOrCreateInstance(complaintModalEl, {
+            backdrop: true,
+            keyboard: true
+        });
+        complaintModalEl.addEventListener('hidden.bs.modal', function onCrHidden() {
+            complaintModalEl.removeEventListener('hidden.bs.modal', onCrHidden);
+            const instance = bootstrap.Modal.getInstance(complaintModalEl);
+            if (instance) instance.dispose();
+            complaintModalEl.remove();
+            hardClearOrphanedModalBackdrops();
+        });
+        modal.show();
+    }
 
     document.getElementById(`crForm_${bookingId}`).addEventListener('submit', function(e){
         e.preventDefault();

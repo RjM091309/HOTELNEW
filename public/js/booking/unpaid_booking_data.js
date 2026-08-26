@@ -137,9 +137,9 @@ $(document).ready(function () {
                 title: 'GUEST NAME',
                 render: function (data, type, row) {
                     if (row.GroupBookingId && String(row.GroupBookingId) !== '0') {
-                        return `<a href="#" onclick="openGroupFromAll(${row.GroupBookingId})" style="color: #337ab7; text-decoration: none; cursor: pointer;">${data}</a>`;
+                        return `<a href="#" onclick="event.preventDefault(); openGroupFromAll(${row.GroupBookingId})" style="color: #337ab7; text-decoration: none; cursor: pointer;">${data}</a>`;
                     }
-                    return `<a href="#" onclick="showVoucherDetails(${row.BookingID})" style="color: #337ab7; text-decoration: none; cursor: pointer;">${data}</a>`;
+                    return `<a href="#" onclick="event.preventDefault(); openRoomMenuModal(${row.BookingID})" style="color: #337ab7; text-decoration: none; cursor: pointer;">${data}</a>`;
                 }
             },
             { 
@@ -177,12 +177,15 @@ $(document).ready(function () {
             },
             {
                 data: 'BookingChannel',
-                title: 'BOOKING CHANNEL',
+                title: 'OTA',
                 render: function (data, type, row) {
                     if (data === 'agency') {
                         const paidBy = row.AgencyPayer === 'guest' ? 'Guest' : 'Agency';
                         const color = row.AgencyPayer === 'guest' ? '#f0ad4e' : '#5bc0de';
                         return `agency<br><small style="color:${color}; font-weight:600;">${paidBy}</small>`;
+                    }
+                    if (data === 'booking-channel' || data === 'booking channel') {
+                        return 'OTA';
                     }
                     return data || '';
                 }

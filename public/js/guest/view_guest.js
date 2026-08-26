@@ -105,7 +105,12 @@ function populateBookingTable(bookings) {
                     formatDate(booking.CHECK_IN_DATE) || 'N/A',
                     formatDate(booking.CHECK_OUT_DATE) || 'N/A',
                     '₱' + formatCurrency(booking.TOTAL_ROOM_COST) || '₱0.00',
-                    booking.BOOKING_CHANNEL || 'N/A',
+                    (function formatGuestBookingChannel(channel) {
+                        if (!channel) return 'N/A';
+                        const normalized = String(channel).trim().toLowerCase();
+                        if (normalized === 'booking-channel' || normalized === 'booking channel') return 'OTA';
+                        return channel;
+                    })(booking.BOOKING_CHANNEL),
                     `<span class="badge badge-${getPaymentStatusBadge(booking.PAYMENT_STATUS)}">
                         ${booking.PAYMENT_STATUS || 'Unknown'}
                     </span>`,

@@ -3237,13 +3237,16 @@ function refreshGroupBookingShadesAfterLayout() {
 function applyBedFilter() {
   if (!calendar || !window.allCalendarFloors) return;
 
-  const roomViewFilter = getActiveRoomViewFilter();
+  const roomViewFilters = getActiveRoomViewFilters();
   const filteredFloors = window.allCalendarFloors
     .map(floor => ({
       ...floor,
       children: (floor.children || []).filter(room => {
         if (activeBedFilter && String(room.bedCount) !== activeBedFilter) return false;
-        if (roomViewFilter && parseInt(room.roomView, 10) !== roomViewFilter) return false;
+        if (roomViewFilters && roomViewFilters.length) {
+          const view = parseInt(room.roomView, 10);
+          if (!roomViewFilters.includes(view)) return false;
+        }
         return true;
       })
     }))
@@ -3783,7 +3786,7 @@ function createLegendOverlay() {
       </div>
       <div class="calendar-legend-item" data-legend-key="booking-channel">
         <div class="calendar-legend-color legend-color-booking-channel"></div>
-        <span class="calendar-legend-text">Booking Channel</span>
+        <span class="calendar-legend-text">OTA</span>
         <span class="calendar-legend-count" id="legend-count-booking-channel">0</span>
       </div>
     </div>
@@ -3960,39 +3963,102 @@ function updateRoomViewLegendCounts() {
 
 // ============================================================
 // LEGEND CLICK-TO-FILTER (dim non-matching events / filter rooms by view)
+// Multi-select: OR within a category, AND across categories.
+// Example: Occupied + Fully Paid → only occupied bookings that are fully paid.
 // ============================================================
-let activeLegendFilterKey = null;
+const activeLegendFilterKeys = new Set();
 
 const ROOM_VIEW_LEGEND_KEYS = {
   'condo-view': 1,
   'mountain-view': 2
 };
 
+const LEGEND_FILTER_GROUPS = {
+  booking: new Set([
+    'occupied',
+    'late-checkin',
+    'regular-checkin',
+    'hold-pending',
+    'back-to-back',
+    'checkout',
+    'cancelled'
+  ]),
+  payment: new Set(['paid', 'partial', 'unpaid']),
+  other: new Set(['long-term', 'booking-channel']),
+  roomView: new Set(['condo-view', 'mountain-view'])
+};
+
+function getLegendFilterGroup(key) {
+  for (const [groupName, keys] of Object.entries(LEGEND_FILTER_GROUPS)) {
+    if (keys.has(key)) return groupName;
+  }
+  return null;
+}
+
+function getActiveRoomViewFilters() {
+  const views = [];
+  activeLegendFilterKeys.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(ROOM_VIEW_LEGEND_KEYS, key)) {
+      views.push(ROOM_VIEW_LEGEND_KEYS[key]);
+    }
+  });
+  return views.length ? views : null;
+}
+
+// Back-compat for callers that expect a single value
 function getActiveRoomViewFilter() {
-  return ROOM_VIEW_LEGEND_KEYS[activeLegendFilterKey] || null;
+  const views = getActiveRoomViewFilters();
+  return views && views.length === 1 ? views[0] : (views ? views[0] : null);
 }
 
 function isRoomViewLegendKey(key) {
   return Object.prototype.hasOwnProperty.call(ROOM_VIEW_LEGEND_KEYS, key);
 }
 
+function hasActiveEventLegendFilters() {
+  for (const key of activeLegendFilterKeys) {
+    if (!isRoomViewLegendKey(key)) return true;
+  }
+  return false;
+}
+
+function eventMatchesActiveLegendFilters(flags) {
+  const activeByGroup = {};
+
+  activeLegendFilterKeys.forEach((key) => {
+    if (isRoomViewLegendKey(key)) return;
+    const group = getLegendFilterGroup(key);
+    if (!group) return;
+    if (!activeByGroup[group]) activeByGroup[group] = [];
+    activeByGroup[group].push(key);
+  });
+
+  const groups = Object.keys(activeByGroup);
+  if (!groups.length) return true;
+
+  // AND across categories, OR within the same category
+  return groups.every((group) =>
+    activeByGroup[group].some((key) => !!flags[key])
+  );
+}
+
 function applyLegendFilter() {
   if (!calendar) return;
 
   const events = calendar.getEvents();
-  const isRoomViewFilter = isRoomViewLegendKey(activeLegendFilterKey);
+  const filterEvents = hasActiveEventLegendFilters();
 
   events.forEach(event => {
     const el = window.eventElements && window.eventElements[event.id];
     if (!el) return;
 
-    if (!activeLegendFilterKey || isRoomViewFilter) {
+    if (!filterEvents) {
       el.classList.remove('legend-dimmed');
       return;
     }
 
     const flags = classifyEventForLegend(event);
-    if (flags[activeLegendFilterKey]) {
+    if (eventMatchesActiveLegendFilters(flags)) {
       el.classList.remove('legend-dimmed');
     } else {
       el.classList.add('legend-dimmed');
@@ -4000,18 +4066,30 @@ function applyLegendFilter() {
   });
 }
 
-function setLegendFilter(key) {
-  const previousKey = activeLegendFilterKey;
-  activeLegendFilterKey = (activeLegendFilterKey === key) ? null : key;
-
+function syncLegendActiveClasses() {
   document.querySelectorAll('.calendar-legend-item[data-legend-key]').forEach(item => {
-    item.classList.toggle('legend-item-active', item.getAttribute('data-legend-key') === activeLegendFilterKey);
+    const key = item.getAttribute('data-legend-key');
+    item.classList.toggle('legend-item-active', activeLegendFilterKeys.has(key));
   });
+}
 
-  // Refresh room list when entering/leaving a Room View filter
+function setLegendFilter(key) {
+  if (!key) return;
+
+  const hadRoomView = [...activeLegendFilterKeys].some(isRoomViewLegendKey);
+
+  if (activeLegendFilterKeys.has(key)) {
+    activeLegendFilterKeys.delete(key);
+  } else {
+    activeLegendFilterKeys.add(key);
+  }
+
+  syncLegendActiveClasses();
+
+  const hasRoomView = [...activeLegendFilterKeys].some(isRoomViewLegendKey);
   if (
     typeof applyBedFilter === 'function' &&
-    (isRoomViewLegendKey(previousKey) || isRoomViewLegendKey(activeLegendFilterKey))
+    (hadRoomView || hasRoomView || isRoomViewLegendKey(key))
   ) {
     applyBedFilter();
   }

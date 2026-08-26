@@ -223,6 +223,32 @@ function initializePaymentModal() {
                     </div>
                 `;
                 break;
+
+            case 'agoda':
+                detailsHTML = `
+                    <div class="payment-method-info">
+                        <h6><i class="fa fa-globe"></i> AGODA Payment</h6>
+                        <p class="text-muted">Mark this payment as received through Agoda.</p>
+                        <div class="alert alert-info">
+                            <i class="fa fa-info-circle"></i>
+                            <strong>Note:</strong> Confirm the Agoda voucher / prepaid amount before confirming.
+                        </div>
+                    </div>
+                `;
+                break;
+
+            case 'expedia':
+                detailsHTML = `
+                    <div class="payment-method-info">
+                        <h6><i class="fa fa-plane"></i> EXPEDIA Payment</h6>
+                        <p class="text-muted">Mark this payment as received through Expedia.</p>
+                        <div class="alert alert-info">
+                            <i class="fa fa-info-circle"></i>
+                            <strong>Note:</strong> Confirm the Expedia voucher / prepaid amount before confirming.
+                        </div>
+                    </div>
+                `;
+                break;
                 
             case 'credit_card':
                 detailsHTML = `
