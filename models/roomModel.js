@@ -669,12 +669,66 @@ class RoomModel {
       // TODO: Create room_control_emergency table and implement proper database storage
       // For now, just log the emergency action to console
       console.log(`🚨 EMERGENCY ROOM CONTROL for Room ${roomNumber}:`, { action, reason, timestamp: new Date().toISOString() });
-      
+
       // Return success to allow the app to work
       return true;
     } catch (error) {
       console.error('Error in emergency room control:', error);
       return false;
+    }
+  }
+
+  // Season match for a given date, using the same MM-DD (year-agnostic, wrap-around)
+  // comparison as the Add Booking modal's client-side getSeasonIdForDate, so a "Peak"
+  // season spanning Nov 13 - Mar 8 still matches correctly across the year boundary.
+  static _findSeasonIdForDate(date, seasons) {
+    const mmdd = String(date.getMonth() + 1).padStart(2, '0') + String(date.getDate()).padStart(2, '0');
+    for (const season of seasons) {
+      const start = new Date(season.START_DATE);
+      const end = new Date(season.END_DATE);
+      const startMMDD = String(start.getMonth() + 1).padStart(2, '0') + String(start.getDate()).padStart(2, '0');
+      const endMMDD = String(end.getMonth() + 1).padStart(2, '0') + String(end.getDate()).padStart(2, '0');
+      if (startMMDD <= endMMDD) {
+        if (mmdd >= startMMDD && mmdd <= endMMDD) return season.IDNo;
+      } else if (mmdd >= startMMDD || mmdd <= endMMDD) {
+        return season.IDNo;
+      }
+    }
+    return null;
+  }
+
+  // King (ROOM_BED=1) and Queen (ROOM_BED=2) nightly rate for a given date + booking
+  // type, for the Room Checker's rate summary panel. room_season_price is technically
+  // stored per-room, but every room sharing a bed count charges the same rate for a
+  // given season/booking type (confirmed uniform across all 120 rooms per group), so
+  // there's no single "the" room to key off of - MIN(PRICE) picks that one shared value.
+  static async getSeasonalRateSummary(bookingType, date) {
+    try {
+      const seasons = await queryDatabasePromise('SELECT IDNo, START_DATE, END_DATE FROM season WHERE ACTIVE = 1');
+      const seasonId = this._findSeasonIdForDate(date, seasons);
+      if (!seasonId) {
+        return { kingRate: 0, queenRate: 0, seasonId: null };
+      }
+
+      const rows = await queryDatabasePromise(
+        `SELECT ROOM_BED, MIN(PRICE) AS PRICE
+         FROM room_season_price
+         WHERE ACTIVE = 1 AND BOOKING_TYPE = ? AND SEASON_ID = ? AND ROOM_BED IN (1, 2)
+         GROUP BY ROOM_BED`,
+        [bookingType, seasonId]
+      );
+
+      const kingRow = rows.find(r => Number(r.ROOM_BED) === 1);
+      const queenRow = rows.find(r => Number(r.ROOM_BED) === 2);
+
+      return {
+        kingRate: kingRow ? parseFloat(kingRow.PRICE) : 0,
+        queenRate: queenRow ? parseFloat(queenRow.PRICE) : 0,
+        seasonId
+      };
+    } catch (error) {
+      console.error('Error fetching seasonal rate summary:', error);
+      return { kingRate: 0, queenRate: 0, seasonId: null };
     }
   }
 }

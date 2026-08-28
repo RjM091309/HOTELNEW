@@ -9,6 +9,11 @@ router.get('/', CalendarController.getCalendar);
 // Unassigned Rooms route
 router.get('/unassigned-rooms', CalendarController.getUnassignedRooms);
 
+// Room Checker route - same calendar/available-rooms data as Unassigned Rooms,
+// but laid out as two stacked months for browsing availability further out.
+router.get('/room-checker', CalendarController.getRoomChecker);
+router.get('/api/room-rate-summary', CalendarController.getRoomRateSummary);
+
 // API endpoints for AJAX - with security middleware
 router.get('/api/bookings', 
   CalendarSecurity.rateLimit,

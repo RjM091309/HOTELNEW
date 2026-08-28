@@ -1,4 +1,5 @@
 const CalendarModel = require('../models/calendarModel');
+const RoomModel = require('../models/roomModel');
 
 class CalendarController {
   // Main calendar controller
@@ -807,6 +808,47 @@ class CalendarController {
     } catch (error) {
       console.error('Error fetching unassigned rooms data:', error);
       res.status(500).render('error', { message: 'Server error' });
+    }
+  }
+
+  // Room Checker - reuses the exact same room-status processing as Unassigned
+  // Rooms (available = ROOM_STATUS 1, not tied to any selected date range),
+  // just rendered on its own page with two stacked months instead of one.
+  static async getRoomChecker(req, res) {
+    try {
+      const user = req.user || null;
+      const userId = user?.userId || null;
+      const tabOrder = user?.TAB_ORDER || null;
+
+      res.render('calendar/room_checker', {
+        title: 'Room Checker',
+        subTitle: 'Room Checker',
+        hideBreadcrumb: true,
+        activePage: 'room-checker',
+        user,
+        userId,
+        tabOrder,
+        script: `<script>document.body.setAttribute('data-user-id', '${userId}');</script>`
+      });
+    } catch (error) {
+      console.error('Error fetching room checker data:', error);
+      res.status(500).render('error', { message: 'Server error' });
+    }
+  }
+
+  // King/Queen nightly rate for the Room Checker's rate summary panel - defaults to
+  // today (a walk-in quote is normally for right now) if no date is given.
+  static async getRoomRateSummary(req, res) {
+    try {
+      const { bookingType, date } = req.query;
+      const type = bookingType === 'agency' ? 'agency' : 'walk-in';
+      const targetDate = date ? new Date(date) : new Date();
+
+      const summary = await RoomModel.getSeasonalRateSummary(type, targetDate);
+      res.json({ success: true, ...summary });
+    } catch (error) {
+      console.error('Error fetching room rate summary:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
     }
   }
 

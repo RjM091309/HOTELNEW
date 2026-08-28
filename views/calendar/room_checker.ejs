@@ -1,0 +1,301 @@
+<!-- FullCalendar CSS -->
+<link href="/plugins/fullcalendar/packages/core/main.min.css" rel="stylesheet" />
+<link href="/plugins/fullcalendar/packages/daygrid/main.min.css" rel="stylesheet" />
+<link href="/plugins/fullcalendar/packages/timegrid/main.min.css" rel="stylesheet" />
+<link href="/css/pages/fullcalendar.css" rel="stylesheet" />
+
+<!-- Custom CSS for table alignment and height -->
+<style>
+  /* FullCalendar's default #ddd grid border is meant for a light theme - against this
+     page's dark background it reads as a thick, high-contrast line. Soften it. */
+  .fc-unthemed .fc-content,
+  .fc-unthemed .fc-divider,
+  .fc-unthemed .fc-row,
+  .fc-unthemed tbody,
+  .fc-unthemed td,
+  .fc-unthemed th,
+  .fc-unthemed thead {
+    border-color: rgba(255, 255, 255, 0.08) !important;
+  }
+
+  .row {
+    align-items: stretch;
+  }
+
+  .col-lg-8 .card,
+  .col-lg-4 .card {
+    height: 100%;
+  }
+
+  /* The sitewide .card-body rule (style.css) is display:flex + justify-content:
+     space-between, meant for cards with a couple of short rows (e.g. two stat
+     blocks) so they spread across the card evenly. Both cards on this page are
+     stretched to match whichever column is taller, but each has only one real
+     child - style.css's own clearfix pseudo-elements (.card-body::before/::after)
+     count as the other two flex items, so space-between was splitting ALL the
+     leftover height into two equal gaps, one of which landed above the content.
+     Pin both cards' content to the top instead - leftover space stays out of
+     sight at the bottom. */
+  .col-lg-8 .card-body,
+  .col-lg-4 .card-body {
+    justify-content: flex-start;
+  }
+
+  /* Two month calendars stacked top-to-bottom, scrolling in their own box so the
+     Summary column next to it stays put instead of scrolling away with them.
+     This used to fight with FullCalendar's selectable:true, which scrolls the
+     clicked cell into view as part of managing its own drag-select - nested
+     inside this box, every click jumped it toward whichever month held that
+     cell. Range selection is now built entirely from plain clicks instead (see
+     handleRoomCheckerDateClick in room_checker.js), so that native behavior -
+     and the jump - no longer applies here. */
+  #room-checker-months {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+
+  /* Click-click range selection highlight - see handleRoomCheckerDateClick in
+     room_checker.js. Same blue used for selection highlights elsewhere in the app. */
+  #room-checker-months td.fc-day.room-checker-range-selected {
+    background-color: rgba(33, 150, 243, 0.35) !important;
+  }
+
+  /* Anchored to the bottom-right of the day cell (dayRender sets position:relative on the cell) */
+  .bed-availability-badge {
+    position: absolute;
+    right: 6px;
+    bottom: 4px;
+    pointer-events: none;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  }
+
+  .bed-chip {
+    display: inline;
+  }
+
+  .bed-chip-single {
+    color: #f0b429;
+  }
+
+  .bed-chip-double {
+    color: #22d3ee;
+  }
+
+  .bed-availability-sep {
+    color: #6b7680;
+    margin: 0 4px;
+  }
+
+  [data-theme="white"] .bed-availability-badge {
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.7);
+  }
+
+  [data-theme="white"] .bed-chip-single {
+    color: #b8790a;
+  }
+
+  [data-theme="white"] .bed-chip-double {
+    color: #0c8599;
+  }
+
+  [data-theme="white"] .bed-availability-sep {
+    color: #9aa4ac;
+  }
+
+  /* Rate summary panel (replaces the Available Rooms table on this page) */
+  #rate-summary {
+    font-size: 14px;
+  }
+
+  .rate-summary-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .rate-summary-checkboxes {
+    justify-content: flex-start;
+    gap: 20px;
+  }
+
+  .rate-summary-label {
+    font-weight: 600;
+    color: #9aa4ac;
+  }
+
+  .rate-summary-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .rate-summary-checkbox input {
+    cursor: pointer;
+  }
+
+  .rate-summary-subtotal {
+    font-weight: 600;
+  }
+
+  .rate-summary-grand-total {
+    border-bottom: none;
+    font-weight: 700;
+    font-size: 17px;
+    color: #6f9c40;
+    padding-top: 14px;
+  }
+
+  .rate-summary-discount-input {
+    width: 110px;
+    text-align: right;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    color: #fff;
+    padding: 4px 8px;
+  }
+
+  [data-theme="white"] .rate-summary-row {
+    border-bottom-color: rgba(0, 0, 0, 0.08);
+  }
+
+  [data-theme="white"] .rate-summary-discount-input {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.15);
+    color: #212529;
+  }
+
+  .rate-summary-qty-input {
+    width: 55px;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    color: #fff;
+    padding: 4px 6px;
+  }
+
+  [data-theme="white"] .rate-summary-qty-input {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.15);
+    color: #212529;
+  }
+
+  #rateSummaryDateRange {
+    font-size: 13px;
+    color: #9aa4ac;
+    text-align: right;
+  }
+</style>
+
+<div class="row">
+  <!-- Calendar Section: two months stacked vertically -->
+  <div class="col-lg-8 col-md-8 col-sm-8 col-8">
+    <div class="card">
+      <div class="card-head">
+        <header>Room Checker</header>
+      </div>
+      <div class="card-body">
+        <div id="room-checker-months">
+          <div id="calendar-month-1" class="has-toolbar"></div>
+          <div id="calendar-month-2" class="has-toolbar"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rate Summary Section -->
+  <div class="col-lg-4 col-md-12 col-sm-12 col-12">
+    <div class="card">
+      <div class="card-head">
+        <header>Summary</header>
+      </div>
+      <div class="card-body">
+        <div id="rate-summary">
+          <div class="rate-summary-row rate-summary-checkboxes">
+            <label class="rate-summary-checkbox">
+              <input type="radio" name="rateSummaryBookingType" id="rateSummaryWalkIn" value="walk-in" checked>
+              Walk In
+            </label>
+            <label class="rate-summary-checkbox">
+              <input type="radio" name="rateSummaryBookingType" id="rateSummaryAgency" value="agency">
+              Agency
+            </label>
+          </div>
+
+          <div class="rate-summary-row">
+            <span>Selected Dates</span>
+            <span id="rateSummaryDateRange">Select a range on the calendar</span>
+          </div>
+
+          <div class="rate-summary-row">
+            <span>King Bed Rate</span>
+            <span id="rateSummaryKingRate">&#8369;0.00</span>
+            <input type="number" id="rateSummaryKingQty" class="rate-summary-qty-input" value="0" min="0" step="1" title="Number of King rooms">
+          </div>
+          <div class="rate-summary-row">
+            <span>Queen Bed Rate</span>
+            <span id="rateSummaryQueenRate">&#8369;0.00</span>
+            <input type="number" id="rateSummaryQueenQty" class="rate-summary-qty-input" value="0" min="0" step="1" title="Number of Queen rooms">
+          </div>
+          <div class="rate-summary-row rate-summary-subtotal">
+            <span>Total Room Rate</span>
+            <span id="rateSummaryTotalRoomRate">&#8369;0.00</span>
+          </div>
+
+          <div class="rate-summary-row rate-summary-checkboxes">
+            <span class="rate-summary-label">Breakfast</span>
+            <label class="rate-summary-checkbox">
+              <input type="radio" name="rateSummaryBreakfast" value="0" checked> None
+            </label>
+            <label class="rate-summary-checkbox">
+              <input type="radio" name="rateSummaryBreakfast" value="1"> 1
+            </label>
+            <label class="rate-summary-checkbox">
+              <input type="radio" name="rateSummaryBreakfast" value="2"> 2
+            </label>
+          </div>
+          <div class="rate-summary-row">
+            <span>Breakfast Total</span>
+            <span id="rateSummaryBreakfastTotal">&#8369;0.00</span>
+          </div>
+
+          <div class="rate-summary-row rate-summary-subtotal">
+            <span>Sub Total</span>
+            <span id="rateSummarySubTotal">&#8369;0.00</span>
+          </div>
+
+          <div class="rate-summary-row">
+            <span>Discount per Night</span>
+            <input type="number" id="rateSummaryDiscount" class="rate-summary-discount-input" value="0" min="0" step="0.01">
+          </div>
+
+          <div class="rate-summary-row rate-summary-grand-total">
+            <span>Grand Total</span>
+            <span id="rateSummaryGrandTotal">&#8369;0.00</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- JavaScript Libraries -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="/plugins/fullcalendar/packages/core/main.min.js"></script>
+<script src="/plugins/fullcalendar/packages/interaction/main.min.js"></script>
+<script src="/plugins/fullcalendar/packages/daygrid/main.min.js"></script>
+<script src="/plugins/fullcalendar/packages/timegrid/main.min.js"></script>
+<script src="/js/calendar/room_checker.js?v=7"></script>
