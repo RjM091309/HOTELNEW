@@ -965,10 +965,31 @@
   /* ========================================
      HOVER EFFECTS FOR BOOKING
      ======================================== */
-  
 
-  
-  /* Hover effect for empty booking slots */ .fc-timeline-slot:not(:has(.fc-event)):hover { background: linear-gradient(45deg, rgba(111, 156, 64, .2), rgba(111, 156, 64, .15)) !important; position: relative !important; } /* Hover effect for the calendar body */ .fc-timeline-body .fc-timeline-slot:hover { cursor: crosshair !important; } /* Enhanced cursor styles */ .fc-timeline-slot:not(:has(.fc-event)) { cursor: pointer !important; } .fc-timeline-slot:has(.fc-event) { cursor: default !important; }
+
+
+  /* Hover effect for empty booking slots (vertical column trace) */ .fc-timeline-slot:not(:has(.fc-event)):hover { background: linear-gradient(45deg, rgba(33, 150, 243, .28) , rgba(33, 150, 243, .18)) !important; position: relative !important; } /* Hover effect for the calendar body */ .fc-timeline-body .fc-timeline-slot:hover { cursor: crosshair !important; } /* Enhanced cursor styles */ .fc-timeline-slot:not(:has(.fc-event)) { cursor: pointer !important; } .fc-timeline-slot:has(.fc-event) { cursor: default !important; }
+
+  /* Row hover trace (horizontal) - see handleRowHoverMouseMove in
+     calendar_data.js. FullCalendar v6 gives each room exactly one wide
+     lane <td> spanning its full date range (the per-day background cells
+     are a separate, room-agnostic layer shared across every row - painting
+     THAT would have tinted every room at once), so that lane <td> - and the
+     matching label cell - are the actual per-room elements to color. */
+  #calendar .fc-timeline-body td.fc-timeline-lane.fc-resource.fc-timeline-row-hover {
+    background-color: rgba(33, 150, 243, 0.14) !important;
+  }
+  #calendar .fc-datagrid-cell.fc-resource.fc-row-hover {
+    background-color: rgba(33, 150, 243, 0.16) !important;
+  }
+
+  /* Column hover trace (vertical, into the sticky header) - see
+     handleRowHoverMouseMove/clearColHoverTrace in calendar_data.js, which
+     mirrors the hovered body date onto the matching header date cell via
+     their shared data-date attribute. */
+  #calendar .fc-timeline-header .fc-timeline-slot.fc-timeline-col-hover {
+    background-color: rgba(33, 150, 243, 0.25) !important;
+  }
 
   
   /* ========================================

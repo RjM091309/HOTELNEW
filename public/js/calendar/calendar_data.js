@@ -690,6 +690,13 @@ function expandCalendarRange(direction) {
   const newEnd = new Date(Y, M + calendarWindowMonthsForward, 1);
 
   calendarExpansionInProgress = true;
+  // changeView() re-mounts the timeline starting from newStart (the far edge of the
+  // widened range), and the corrected scroll position back to anchorDate isn't applied
+  // until the setTimeout below - without hiding in between, the user saw the grid jump to
+  // that far edge and then flick back, mid-drag, every time they scrolled near a boundary.
+  // Same "hide until correct" trick already used for the initial load's today-scroll (see
+  // #calendar.calendar-not-ready in calendar.css).
+  if (calendarEl) calendarEl.classList.add('calendar-not-ready');
   calendar.changeView('month', { start: newStart, end: newEnd });
 
   // The datesSet handler kicks off a debounced booking refetch + re-render; give it time to
@@ -701,6 +708,7 @@ function expandCalendarRange(direction) {
       updateHeaderOnScroll(sb.bodyScroller, sb.top);
     }
     setupHoverEffects();
+    if (calendarEl) calendarEl.classList.remove('calendar-not-ready');
     calendarExpansionInProgress = false;
   }, 400);
 }
@@ -847,6 +855,122 @@ function setupHoverEffects() {
   container.dataset.hoverDelegationBound = '1';
   container.addEventListener('mouseover', handleHoverDelegatedOver);
   container.addEventListener('mouseout', handleHoverDelegatedOut);
+  container.addEventListener('mousemove', handleRowHoverMouseMove);
+  container.addEventListener('mouseleave', clearRowHoverTrace);
+  container.addEventListener('mouseleave', clearColHoverTrace);
+}
+
+// =============================================================================
+// ROW HOVER TRACE (horizontal) - highlights the full room row (both the
+// resource label and its matching timeline row) under the cursor, mirroring
+// the vertical date-column trace above so hovering a cell shows both axes.
+//
+// Deliberately NOT built on the mouseover/mouseout pair used for the slot
+// trace: an earlier attempt mirrored classes on enter/leave, but fast mouse
+// movement drops/coalesces some of those events in the browser, so cleanup
+// for a previously-hovered row could be skipped - each miss left one more
+// row permanently blue, and enough of them accumulated to tint the whole
+// grid. mousemove instead re-evaluates "what row is the cursor over right
+// now" on every move and explicitly tracks the one currently-lit pair of
+// elements in these variables, clearing exactly them before lighting a new
+// pair - there is never a stale element left behind to accumulate.
+// =============================================================================
+let rowHoverRoomId = null;
+let rowHoverTimelineTr = null;
+let rowHoverResourceTr = null;
+let colHoverDate = null;
+let colHoverHeaderCell = null;
+
+function clearRowHoverTrace() {
+  if (rowHoverTimelineTr) rowHoverTimelineTr.classList.remove('fc-timeline-row-hover');
+  if (rowHoverResourceTr) rowHoverResourceTr.classList.remove('fc-row-hover');
+  rowHoverRoomId = null;
+  rowHoverTimelineTr = null;
+  rowHoverResourceTr = null;
+}
+
+// Column trace (vertical) - mirrors the hovered date into the sticky header,
+// the same way the row trace above mirrors the hovered room into the label
+// column. Header date cells (.fc-timeline-header .fc-timeline-slot) and body
+// date cells (.fc-timeline-body .fc-timeline-slot) are two separate elements
+// in two separate tables that just happen to line up visually, so hovering
+// one never natively highlights the other - this keys them together by their
+// shared data-date attribute.
+function clearColHoverTrace() {
+  if (colHoverHeaderCell) colHoverHeaderCell.classList.remove('fc-timeline-col-hover');
+  colHoverDate = null;
+  colHoverHeaderCell = null;
+}
+
+function handleRowHoverMouseMove(e) {
+  // Only trace inside the actual grid (header toolbar/search box are also
+  // inside #calendar, and shouldn't light up a row just because their Y
+  // position happens to fall in a room's vertical range). FullCalendar v6
+  // has no ".fc-resource-area" wrapper (that was a v5 class) - the label
+  // grid's real container is ".fc-datagrid-body".
+  if (!e.target.closest('.fc-timeline-body, .fc-datagrid-body')) {
+    if (rowHoverRoomId) clearRowHoverTrace();
+    if (colHoverDate) clearColHoverTrace();
+    return;
+  }
+
+  // The month view runs a 12-hour slotDuration so it can position half-day
+  // check-in/check-out bars precisely, so the body has two date cells per
+  // day (T00:00:00 and T12:00:00) - but the header collapses those into one
+  // cell per day (T00:00:00 only), since there's only room for one date
+  // label. Matching on the full timestamp made the header trace vanish the
+  // moment the cursor crossed into a day's PM half, whose exact timestamp
+  // has no header counterpart. Matching on just the date portion (the first
+  // 10 chars, "YYYY-MM-DD") finds that one header cell for either half.
+  const slotEl = e.target.closest('.fc-timeline-slot');
+  const date = slotEl ? slotEl.dataset.date : null;
+  const dateOnly = date ? date.slice(0, 10) : null;
+  if (dateOnly !== colHoverDate) {
+    clearColHoverTrace();
+    if (dateOnly) {
+      const headerCell = document.querySelector(`.fc-timeline-header .fc-timeline-slot[data-date^="${CSS.escape(dateOnly)}"]`);
+      if (headerCell) {
+        headerCell.classList.add('fc-timeline-col-hover');
+        colHoverHeaderCell = headerCell;
+      }
+      colHoverDate = dateOnly;
+    }
+  }
+
+  // findResourceIdAtY (already used for group-select drag tracking) reads
+  // purely off the cursor's Y position against the resource label rows -
+  // unlike closest('tr') from e.target, this is unaffected by however a
+  // hovered event bar happens to be nested/positioned in the timeline body,
+  // which was resolving to the same wide row wrapper for every event and
+  // painting the whole grid instead of just the one room under the cursor.
+  const roomId = findResourceIdAtY(e.clientY);
+  if (roomId === rowHoverRoomId) return;
+
+  clearRowHoverTrace();
+  if (!roomId) return;
+  rowHoverRoomId = roomId;
+
+  // The per-day background cells (.fc-timeline-slot) are NOT scoped to a
+  // room - FullCalendar renders exactly one full-height slot per date,
+  // shared across every row, in its own <tr> with no data-resource-id.
+  // The only element that actually represents "this one room's row" in the
+  // timeline is its single wide lane <td> (spans the full date range) - the
+  // data-resource-id attribute lives on that <td>, never on an enclosing
+  // <tr>, so querying for a "tr[data-resource-id]" here always came back
+  // null. Same story on the label side: data-resource-id is on the
+  // .fc-datagrid-cell itself, not its <tr>.
+  const escapedId = CSS.escape(roomId);
+  const timelineLane = document.querySelector(`.fc-timeline-body td.fc-timeline-lane.fc-resource[data-resource-id="${escapedId}"]`);
+  const resourceCell = document.querySelector(`.fc-datagrid-cell.fc-resource[data-resource-id="${escapedId}"]`);
+
+  if (timelineLane) {
+    timelineLane.classList.add('fc-timeline-row-hover');
+    rowHoverTimelineTr = timelineLane;
+  }
+  if (resourceCell) {
+    resourceCell.classList.add('fc-row-hover');
+    rowHoverResourceTr = resourceCell;
+  }
 }
 
 
