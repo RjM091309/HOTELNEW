@@ -24,12 +24,6 @@ async function handleEventDrop(info) {
   const isRoomChange = newResource && oldResource && newResource.id !== oldResource.id;
   const isDateChange = info.delta && (info.delta.days !== 0 || info.delta.milliseconds !== 0);
 
-  // Room transfer via drag is disabled — use the Transfer button in the room menu instead
-  if (isRoomChange) {
-    info.revert();
-    return;
-  }
-  
   // Get the target room (either new room or same room)
   let targetRoom = null;
   
@@ -128,6 +122,14 @@ async function handleEventDrop(info) {
     changeDescription = `Update dates for <b>${info.event.title}</b> in <b>${targetRoom.title}</b>`;
   }
   
+  // Block window so the ghost click a SweetAlert2 button leaves on the
+  // calendar cell underneath it (once the dialog closes) can't reach the
+  // group-select mousedown tracker in calendar_data.js and arm the room the
+  // dialog happened to be sitting over - same guard confirmLateCheckoutSelection
+  // uses for the same reason, enforced by the capture-phase listener in that
+  // file's DOMContentLoaded handler.
+  ignoreSelectUntil = Infinity;
+
   // Show confirmation dialog
   Swal.fire({
     title: confirmationTitle,
@@ -139,6 +141,8 @@ async function handleEventDrop(info) {
     confirmButtonText: isRoomChange ? 'Yes, Transfer' : 'Yes, Update',
     cancelButtonText: 'Cancel'
   }).then((result) => {
+    ignoreSelectUntil = Date.now() + 500;
+    if (typeof resetGroupSelectState === 'function') resetGroupSelectState();
     if (result.isConfirmed) {
       proceedWithUpdate(info, newStart, newEnd, targetRoom, bookingId);
     } else {
@@ -149,7 +153,22 @@ async function handleEventDrop(info) {
 }
 
 function handleEventDragStart(info) {
-  
+
+  // Safety net: dragging an existing booking is never a group-select sweep.
+  // The document-level mousedown tracker in calendar_data.js already skips
+  // event bars, but in case that detection missed (e.g. the click landed on
+  // harness padding outside the event's skewed shape), its mousemove
+  // listener may already be live (groupDragActive === true) - clearing just
+  // the armed rooms isn't enough, since the very next mousemove tick would
+  // re-arm them. Turn the tracker itself off so it can't re-arm mid-drag.
+  try {
+    groupDragActive = false;
+    groupDragAnchorRoomId = null;
+  } catch (e) { /* not declared yet - nothing to clear */ }
+  if (typeof resetGroupSelectState === 'function') {
+    resetGroupSelectState();
+  }
+
   try {
     // Store original event data to prevent duplication
     info.event._originalData = {

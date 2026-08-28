@@ -2,6 +2,18 @@
    CALENDAR STYLES - DARK THEME
    ======================================== */
 
+/* Hidden by default so the very first paint (before FullCalendar has even
+   mounted, let alone scrolled to today) never reaches the screen - only
+   loadCalendarData() in calendar_data.js removes this class, once the
+   corrected "today" scroll position has actually been set. Doing this in CSS
+   (rather than only via an inline style set from JS) closes the race where
+   JS ran a hide/reveal cycle around calendar.render() but the browser still
+   painted one frame at the un-scrolled position in between - CSS applies
+   before the first paint of the page, JS timing can't beat it. */
+#calendar.calendar-not-ready {
+  visibility: hidden;
+}
+
 /* ========================================
    SEARCH AND FILTER STYLES
    ======================================== */

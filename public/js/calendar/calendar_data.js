@@ -1165,6 +1165,23 @@ let groupDragAnchorRoomId = null;
 function attachGroupSelectDragTracking() {
   document.addEventListener('mousedown', function(e) {
     if (groupCreateModeActive) return;
+    // findResourceIdAtY only tests the click's Y-coordinate against room row
+    // bounding rects - it never checks that the click actually landed inside
+    // the calendar. Room rows tile the full page height, so ANY mousedown
+    // anywhere on the page (a SweetAlert2 button, a sidebar link, anything)
+    // whose Y happens to line up with some room row was getting treated as
+    // a group-select click on that room. Require the target to actually be
+    // inside #calendar first.
+    if (!calendarEl || !calendarEl.contains(e.target)) return;
+    // A mousedown starting on an existing booking bar is the start of a
+    // FullCalendar event drag (move/resize/transfer), not a new group-select
+    // sweep - without this check, dragging a booking to another room also
+    // armed this tracker's own room-range, incorrectly flagging the transfer
+    // as a multi-room group booking. Checking the harness too (not just
+    // .fc-event) matters because the event bars are CSS-skewed into a
+    // parallelogram - a click near the harness's own padding/edge can land
+    // outside the skewed .fc-event shape while still being on the booking.
+    if (e.target.closest('.fc-event, .fc-timeline-event-harness')) return;
     // Same Y-position lookup as mousemove below: clicking a date cell in the
     // timeline lands on FullCalendar's decorative background slot layer, which
     // has no data-resource-id of its own, so closest() can't find the room here.
@@ -2588,6 +2605,14 @@ async function loadCalendarData() {
     calendar.getResources().forEach(resource => resource.remove());
     calendar.setOption('resources', sortedFloors);
     applyCalendarBookings(events);
+
+    // Render first paints at scrollLeft 0 (the start of the visible window,
+    // e.g. last month) before scrollToToday() below corrects it. The
+    // .calendar-not-ready CSS class (on by default in the HTML, see
+    // calendar.ejs/calendar.css) is already hiding the grid across that gap -
+    // re-adding it here too covers reloads of this function after the page's
+    // very first paint.
+    if (calendarEl) calendarEl.classList.add('calendar-not-ready');
     calendar.render();
     applyBedFilter();
     if (typeof updateLegendCounts === 'function') {
@@ -2601,14 +2626,61 @@ async function loadCalendarData() {
 
     const renderTime = Date.now() - renderStart;
 
-    // Setup UI enhancements
-    const scrollbarData = setupScrollbar();
-    if (scrollbarData) {
-      scrollToToday(scrollbarData.bodyScroller, scrollbarData.top);
-      updateHeaderOnScroll(scrollbarData.bodyScroller, scrollbarData.top);
+    // Setup UI enhancements. FullCalendar's initial mount can still be
+    // finishing its internal DOM build a frame or two after render()
+    // returns, so the .fc-scroller elements setupScrollbar() looks for may
+    // not exist yet on the very first check - retry across a few frames
+    // instead of revealing at the wrong (unscrolled) position when that
+    // happens.
+    //
+    // A single correction wasn't enough to stop the "last month" flash even
+    // with the reveal gated on it, which points to something AFTER that
+    // first correction (a later reflow - resource row sync, a resize, a
+    // second internal layout pass) silently resetting scrollLeft back to 0
+    // while the calendar was already visible. Re-apply the correction a few
+    // more times at increasing delays and only reveal once the last one has
+    // run, so any such delayed reset gets caught and fixed before the user
+    // ever sees it, regardless of what's causing it.
+    function applyTodayScroll() {
+      const sb = setupScrollbar();
+      if (!sb) return false;
+      scrollToToday(sb.bodyScroller, sb.top);
+      updateHeaderOnScroll(sb.bodyScroller, sb.top);
+      refreshGroupOverlayScrollSync();
+      refreshCalendarVerticalScrollSync();
+      return true;
     }
-    refreshGroupOverlayScrollSync();
-    refreshCalendarVerticalScrollSync();
+
+    (function ensureScrolledToTodayThenReveal(attemptsLeft) {
+      if (!applyTodayScroll()) {
+        if (attemptsLeft > 0) {
+          requestAnimationFrame(() => ensureScrolledToTodayThenReveal(attemptsLeft - 1));
+          return;
+        }
+        // Give up after ~0.5s so a genuinely scroller-less state (e.g. an
+        // error state) never leaves the calendar permanently hidden.
+        if (calendarEl) calendarEl.classList.remove('calendar-not-ready');
+        return;
+      }
+
+      const recheckDelays = [50, 150, 400];
+      let i = 0;
+      (function recheck() {
+        if (i >= recheckDelays.length) {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              if (calendarEl) calendarEl.classList.remove('calendar-not-ready');
+            });
+          });
+          return;
+        }
+        setTimeout(() => {
+          applyTodayScroll();
+          i++;
+          recheck();
+        }, recheckDelays[i]);
+      })();
+    })(30);
 
     window.calendar = calendar;
     setupScrollToDate();
@@ -2688,6 +2760,7 @@ function handleDataError(err) {
   
   const calendarEl = document.getElementById('calendar');
   if (calendarEl) {
+    calendarEl.classList.remove('calendar-not-ready');
     calendarEl.innerHTML = `
       <div style="text-align: center; padding: 50px; color: #666;">
         <h3>⚠️ Unable to load calendar data</h3>
@@ -2708,6 +2781,16 @@ function handleDataError(err) {
 
 document.addEventListener('DOMContentLoaded', function() {
   calendarEl = document.getElementById('calendar'); // Set the global variable
+
+  // Failsafe: the calendar starts hidden via the .calendar-not-ready class
+  // (see calendar.ejs/calendar.css) and loadCalendarData() is what normally
+  // removes it once the corrected scroll position is set. If anything throws
+  // before that point (or the page fails to load calendar_data.js at all
+  // on some future edit), this guarantees the grid still becomes visible
+  // instead of staying blank forever.
+  setTimeout(function() {
+    if (calendarEl) calendarEl.classList.remove('calendar-not-ready');
+  }, 8000);
 
   // Swallow any mousedown/click/touch that lands on the calendar while a
   // block window is active (see ignoreSelectUntil). This runs in the capture
@@ -2769,7 +2852,7 @@ const findHeader = setInterval(() => {
     height: '850px',
     eventOverlap: true,
     editable: true,
-    eventResourceEditable: false, // Disable dragging bookings to other rooms
+    eventResourceEditable: true,
     selectable: true,
     selectOverlap: true,
     selectAllow: function(selectInfo) {
