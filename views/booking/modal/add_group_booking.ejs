@@ -7,8 +7,8 @@
         <h4 class="modal-title" id="modalAddGroupBookingLabel">Add Group Booking</h4>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
+      <form id="groupBookingForm" autocomplete="off">
       <div class="modal-body">
-        <form id="groupBookingForm" autocomplete="off">
           <input type="hidden" id="groupVoucherNo" name="groupVoucherNo">
           <input type="hidden" id="groupBookingId" name="groupBookingId">
           <input type="hidden" id="groupJoinExistingGroup" name="groupJoinExistingGroup" value="false">
@@ -20,6 +20,12 @@
           <input type="hidden" id="groupLateCheckoutFee" name="groupLateCheckoutFee" value="0">
           <input type="hidden" id="groupSeniorPwdDiscount" name="groupSeniorPwdDiscount" value="0">
           <input type="hidden" id="groupChannelBookingIdHidden" name="channelBookingId" value="">
+
+          <div class="group-two-col">
+          <div class="group-col-left">
+
+          <div class="group-field-card group-card-booking">
+          <h6 class="group-field-card-title">Booking Details</h6>
 
           <div class="row">
             <div class="col-lg-6">
@@ -58,17 +64,6 @@
               </div>
             </div>
             <div class="col-lg-4">
-              <div class="form-group form-check" style="margin-top: 30px;">
-                <input type="checkbox" class="form-check-input" id="groupHoldPendingCheckbox" name="groupHoldPending">
-                <label class="form-check-label" for="groupHoldPendingCheckbox">
-                  Hold Pending
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <div class="row p-t-20">
-            <div class="col-lg-4">
               <div class="form-group">
                 <label class="form-label">Booking Resources</label>
                 <select class="form-select" id="groupBookingRoute" name="groupBookingRoute" required>
@@ -79,6 +74,9 @@
                 </select>
               </div>
             </div>
+          </div>
+
+          <div class="row p-t-20">
             <div class="col-lg-4" id="groupChannelBookingIdWrapper" style="display: none;">
               <div class="form-group">
                 <label class="form-label">Booking ID</label>
@@ -126,93 +124,21 @@
             </div>
           </div>
 
-          <div class="row p-t-20">
-            <div class="col-lg-12 d-flex align-items-center gap-3 flex-wrap">
-              <div class="form-group mb-0">
-                <label class="form-label mb-1">Bed Requirements</label>
-                <div class="d-flex gap-3 flex-wrap">
-                  <div class="bed-requirement-group">
-                    <label class="form-label mb-1">King</label>
-                    <input type="number" class="form-control" id="groupBed1Count" name="groupBed1Count" min="0" value="0">
-                  </div>
-                  <div class="bed-requirement-group">
-                    <label class="form-label mb-1">Queen</label>
-                    <input type="number" class="form-control" id="groupBed2Count" name="groupBed2Count" min="0" value="0">
-                  </div>
-                </div>
+          <div class="row p-t-20 justify-content-end">
+            <div class="col-lg-4 d-flex justify-content-end">
+              <div class="form-group form-check mb-0">
+                <input type="checkbox" class="form-check-input" id="groupHoldPendingCheckbox" name="groupHoldPending">
+                <label class="form-check-label" for="groupHoldPendingCheckbox">
+                  Hold Pending
+                </label>
               </div>
             </div>
           </div>
 
-          <div class="row p-t-20">
-            <div class="col-lg-12 d-flex justify-content-start">
-              <button type="button" class="btn btn-success" id="groupSearchRooms">Search Rooms</button>
-            </div>
           </div>
 
-          <div class="row p-t-20" id="groupResultsContainer" style="display: none;">
-            <div class="col-lg-12">
-              <!-- Bed Availability Summary Container -->
-              <div id="groupBedAvailabilitySummary" class="mb-3"></div>
-              
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="mb-0">Available Rooms</h5>
-                <!-- REMOVED: Manual selection toggle - now default method -->
-              </div>
-              <div id="groupRoomsList" class="room-list-container"></div>
-              <div id="groupManualRoomsContainer" class="room-list-container" style="display: none;"></div>
-              <div class="mt-2 text-warning" id="groupAvailabilityWarning" style="display: none;"></div>
-              <div class="mt-2 text-muted" id="groupManualSelectionInfo" style="display: none;"></div>
-              <div id="groupRoomPricingPanel" class="mt-3" style="display: none;">
-                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-                  <b>Selected Room Prices:</b>
-                  <div class="d-flex align-items-center gap-3 flex-wrap">
-                    <div class="form-check mb-0">
-                      <input class="form-check-input" type="checkbox" id="groupEnableManualRates" name="groupEnableManualRates">
-                      <label class="form-check-label" for="groupEnableManualRates">Manual Room Rates</label>
-                    </div>
-                    <div class="form-check mb-0" id="groupWeekendPriceToggleWrapper" style="display: none;">
-                      <input class="form-check-input" type="checkbox" id="groupWeekendPriceToggle" name="groupWeekendPriceToggle">
-                      <label class="form-check-label" for="groupWeekendPriceToggle">Separate Weekend Rate</label>
-                    </div>
-                  </div>
-                </div>
-                <div id="groupWeekendNightBreakdown" class="text-muted mb-2" style="font-size: 11px; display: none;"></div>
-                <div id="groupRoomBreakdown"></div>
-              </div>
-              
-              <!-- Manual Room Rate Section -->
-              <div id="groupManualRateSection" class="mt-3" style="display: none;">
-                <div class="manual-rate-container">
-                  <h6 class="text-info mb-3">
-                    <i class="fa fa-edit"></i> Manual / Weekend Rates
-                    <small class="text-muted">(Override default rates · weekend = Fri, Sat &amp; Sun)</small>
-                  </h6>
-                  
-                  <!-- Rate Type Toggle -->
-                  <div class="rate-type-toggle mb-3">
-                    <div class="btn-group" role="group">
-                      <input type="radio" class="btn-check" name="rateType" id="individualRates" value="individual" checked>
-                      <label class="btn btn-outline-success" for="individualRates">Individual Rooms</label>
-                      
-                      <input type="radio" class="btn-check" name="rateType" id="bedBasedRates" value="bed-based">
-                      <label class="btn btn-outline-success" for="bedBasedRates">Bed-Based Pricing</label>
-                    </div>
-                  </div>
-                  
-                  <!-- Individual Room Rates -->
-                  <div id="individualRateSection">
-                    <div id="groupManualRateList" class="manual-rate-list"></div>
-                  </div>
-                  
-                  <!-- Bed-Based Rates -->
-                  <div id="bedBasedRateSection" style="display: none;">
-                    <div id="groupBedBasedRateList" class="bed-based-rate-list"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <div class="group-field-card group-card-guest">
+          <h6 class="group-field-card-title">Guest &amp; Payment</h6>
 
           <div class="row p-t-20">
             <div class="col-lg-6">
@@ -278,6 +204,11 @@
               </div>
             </div>
           </div>
+
+          </div>
+
+          <div class="group-field-card group-card-addons">
+          <h6 class="group-field-card-title">Add-ons &amp; Discounts</h6>
 
           <div class="row p-t-20 align-items-start">
             <div class="col-lg-4">
@@ -384,32 +315,156 @@
             </div>
           </div>
 
-         
-
-          <hr class="my-4">
-          <div class="row p-t-20">
-            <div class="col-lg-4">
-              <h3>Total: <span id="groupComputedTotal">0.00</span></h3>
-            </div>
-            <div class="col-lg-4">
-              <h3>Paid: <span id="groupComputedPaidAmount">0.00</span></h3>
-            </div>
-            <div class="col-lg-4">
-              <h3>Balance: <span id="groupComputedBalance">0.00</span></h3>
-            </div>
           </div>
-          
+
+          </div>
+          <div class="group-col-right">
+
+            <div class="group-summary-card">
+              <h5 class="group-summary-title">Summary</h5>
+
+              <div id="groupRoomPricingPanel" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                  <b>Selected Room Prices</b>
+                  <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <div class="form-check mb-0">
+                      <input class="form-check-input" type="checkbox" id="groupEnableManualRates" name="groupEnableManualRates">
+                      <label class="form-check-label" for="groupEnableManualRates">Manual Room Rates</label>
+                    </div>
+                    <div class="form-check mb-0" id="groupWeekendPriceToggleWrapper" style="display: none;">
+                      <input class="form-check-input" type="checkbox" id="groupWeekendPriceToggle" name="groupWeekendPriceToggle">
+                      <label class="form-check-label" for="groupWeekendPriceToggle">Separate Weekend Rate</label>
+                    </div>
+                  </div>
+                </div>
+                <div id="groupWeekendNightBreakdown" class="text-muted mb-2" style="font-size: 11px; display: none;"></div>
+                <div id="groupRoomBreakdown"></div>
+              </div>
+
+              <div class="group-summary-line" id="groupSummaryBreakfastLine" style="display: none;">
+                <span>Breakfast</span>
+                <span id="groupSummaryBreakfastTotal">0.00</span>
+              </div>
+              <div class="group-summary-line" id="groupSummaryPickupLine" style="display: none;">
+                <span>Pick-up</span>
+                <span id="groupSummaryPickupTotal">0.00</span>
+              </div>
+              <div class="group-summary-line" id="groupSummaryDropoffLine" style="display: none;">
+                <span>Drop-off</span>
+                <span id="groupSummaryDropoffTotal">0.00</span>
+              </div>
+              <div class="group-summary-line" id="groupSummaryLateCheckoutLine" style="display: none;">
+                <span>Late Checkout Fee</span>
+                <span id="groupSummaryLateCheckoutTotal">0.00</span>
+              </div>
+              <div class="group-summary-line" id="groupSummarySeniorPwdLine" style="display: none;">
+                <span>Senior/PWD Discount</span>
+                <span id="groupSummarySeniorPwdTotal">0.00</span>
+              </div>
+              <div class="group-summary-line" id="groupSummaryDiscountLine" style="display: none;">
+                <span>Additional Discount</span>
+                <span id="groupSummaryDiscountTotal">0.00</span>
+              </div>
+
+              <div class="group-summary-line">
+                <span>Total</span>
+                <h3 id="groupComputedTotal">0.00</h3>
+              </div>
+              <div class="group-summary-line">
+                <span>Paid</span>
+                <h3 id="groupComputedPaidAmount">0.00</h3>
+              </div>
+              <div class="group-summary-line">
+                <span>Balance</span>
+                <h3 id="groupComputedBalance">0.00</h3>
+              </div>
+            </div>
+
+          <div class="group-field-card group-card-rooms">
+          <h6 class="group-field-card-title">Rooms</h6>
+
           <div class="row p-t-20">
-            <div class="col-lg-12">
-              <div class="d-flex justify-content-end gap-2">
-                <button type="button" class="btn btn-success" id="btnGroupVoucherPreview">Voucher</button>
-                <button type="submit" class="btn btn-primary">Save Booking</button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <div class="col-lg-12 d-flex align-items-center gap-3 flex-wrap">
+              <div class="form-group mb-0">
+                <label class="form-label mb-1">Bed Requirements</label>
+                <div class="d-flex gap-3 flex-wrap">
+                  <div class="bed-requirement-group">
+                    <label class="form-label mb-1">King</label>
+                    <input type="number" class="form-control" id="groupBed1Count" name="groupBed1Count" min="0" value="0">
+                  </div>
+                  <div class="bed-requirement-group">
+                    <label class="form-label mb-1">Queen</label>
+                    <input type="number" class="form-control" id="groupBed2Count" name="groupBed2Count" min="0" value="0">
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </form>
+
+          <div class="row p-t-20">
+            <div class="col-lg-12 d-flex justify-content-start">
+              <button type="button" class="btn btn-success" id="groupSearchRooms">Search Rooms</button>
+            </div>
+          </div>
+
+          <div class="row p-t-20" id="groupResultsContainer" style="display: none;">
+            <div class="col-lg-12">
+              <!-- Bed Availability Summary Container -->
+              <div id="groupBedAvailabilitySummary" class="mb-3"></div>
+
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Available Rooms</h5>
+                <!-- REMOVED: Manual selection toggle - now default method -->
+              </div>
+              <div id="groupRoomsList" class="room-list-container"></div>
+              <div id="groupManualRoomsContainer" class="room-list-container" style="display: none;"></div>
+              <div class="mt-2 text-warning" id="groupAvailabilityWarning" style="display: none;"></div>
+              <div class="mt-2 text-muted" id="groupManualSelectionInfo" style="display: none;"></div>
+
+              <!-- Manual Room Rate Section -->
+              <div id="groupManualRateSection" class="mt-3" style="display: none;">
+                <div class="manual-rate-container">
+                  <h6 class="text-info mb-3">
+                    <i class="fa fa-edit"></i> Manual / Weekend Rates
+                    <small class="text-muted">(Override default rates · weekend = Fri, Sat &amp; Sun)</small>
+                  </h6>
+
+                  <!-- Rate Type Toggle -->
+                  <div class="rate-type-toggle mb-3">
+                    <div class="btn-group" role="group">
+                      <input type="radio" class="btn-check" name="rateType" id="individualRates" value="individual" checked>
+                      <label class="btn btn-outline-success" for="individualRates">Individual Rooms</label>
+
+                      <input type="radio" class="btn-check" name="rateType" id="bedBasedRates" value="bed-based">
+                      <label class="btn btn-outline-success" for="bedBasedRates">Bed-Based Pricing</label>
+                    </div>
+                  </div>
+
+                  <!-- Individual Room Rates -->
+                  <div id="individualRateSection">
+                    <div id="groupManualRateList" class="manual-rate-list"></div>
+                  </div>
+
+                  <!-- Bed-Based Rates -->
+                  <div id="bedBasedRateSection" style="display: none;">
+                    <div id="groupBedBasedRateList" class="bed-based-rate-list"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          </div>
+
+          </div>
+
+          </div>
       </div>
+      <div class="modal-footer group-booking-footer">
+        <button type="button" class="btn btn-success" id="btnGroupVoucherPreview">Voucher</button>
+        <button type="submit" class="btn btn-primary">Save Booking</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+      </form>
     </div>
   </div>
 </div>
@@ -448,6 +503,113 @@
 #modal-add-group-booking .modal-dialog {
   max-height: 99vh;
   margin: 1vh auto;
+  max-width: 1600px;
+  width: 97vw;
+}
+
+/* Real modal-footer (a sibling of modal-body, not part of its scroll area) -
+   Save/Voucher/Close stay visible without scrolling to the bottom. */
+#modal-add-group-booking .modal-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: #2a3135;
+}
+
+/* Rooms now has its own dedicated column (see .group-card-rooms below) instead
+   of competing with the rest of the form for shared width/height, so the room
+   grid is free to grow with however many rooms are available - no separate
+   scrollbox needed here anymore. */
+#modal-add-group-booking #groupRoomsList,
+#modal-add-group-booking #groupManualRoomsContainer {
+  padding-right: 4px;
+}
+
+/* Two equal (50/50) columns, each stacking its own cards independently -
+   left: Booking Details / Guest & Payment / Add-ons & Discounts; right:
+   Summary (on top, so the running total is the first thing seen) then Rooms
+   (bed requirements, search, results) below it, since Rooms is the one that
+   grows tall with however many rooms come back from a search. */
+#modal-add-group-booking .group-two-col {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+#modal-add-group-booking .group-col-left,
+#modal-add-group-booking .group-col-right {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Sectioned cards - Booking Details / Guest & Payment / Add-ons & Discounts /
+   Rooms - instead of one long flat list of rows, so related fields read as a
+   group at a glance. */
+#modal-add-group-booking .group-field-card {
+  background: #202629;
+  border-radius: 8px;
+  padding: 18px 20px;
+  margin-bottom: 18px;
+}
+
+#modal-add-group-booking .group-card-rooms {
+  margin-bottom: 0;
+}
+
+#modal-add-group-booking .group-summary-card {
+  margin-bottom: 18px;
+}
+
+#modal-add-group-booking .group-field-card-title {
+  color: #9aa4ac;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#modal-add-group-booking .group-summary-card {
+  background: #202629;
+  border-radius: 8px;
+  padding: 18px;
+}
+
+#modal-add-group-booking .group-summary-title {
+  color: #9aa4ac;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 14px;
+}
+
+#modal-add-group-booking .group-summary-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#modal-add-group-booking .group-summary-line:last-child {
+  border-bottom: none;
+}
+
+#modal-add-group-booking .group-summary-line span {
+  color: #cfcfcf;
+  font-size: 13px;
+}
+
+#modal-add-group-booking .group-summary-line h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+/* Below the modal's own lg breakpoint there's no room for two columns -
+   stack them like before. */
+@media (max-width: 991px) {
+  #modal-add-group-booking .group-two-col {
+    flex-direction: column;
+  }
 }
 
 /* Stacked modal fix: Flight Arrivals opens on top of Add Group Booking */
@@ -470,7 +632,13 @@
 }
 
 #modal-add-group-booking .modal-body {
-  max-height: 90vh;
+  /* Bootstrap's .modal-content is display:flex/column - let flexbox size this
+     against the header+footer instead of a fixed max-height, which would let
+     the body alone claim 90vh on top of them and overflow modal-content's own
+     90vh cap. min-height:0 is required for a flex child to actually shrink
+     and scroll instead of forcing the modal taller than the viewport. */
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto !important;
   padding-bottom: 0;
 }
@@ -2050,7 +2218,24 @@
     
     // Read discount AFTER Senior/PWD discount check (so it reflects the auto-disable if 100%)
     const discount = $('#groupIncludeDiscount').prop('checked') ? (parseFloat($('#groupDiscount').val()) || 0) : 0;
-    
+
+    // Itemized add-on/discount lines in the Summary card - each only shown once
+    // its own checkbox is actually on, so the summary reads as "what's really
+    // being charged" instead of always listing every possible line at ₱0.
+    const summaryLineFmt = (amount) => amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    $('#groupSummaryBreakfastLine').toggle(breakfastTotalWithIndividual > 0);
+    $('#groupSummaryBreakfastTotal').text(summaryLineFmt(breakfastTotalWithIndividual));
+    $('#groupSummaryPickupLine').toggle(pickupPrice > 0);
+    $('#groupSummaryPickupTotal').text(summaryLineFmt(pickupPrice));
+    $('#groupSummaryDropoffLine').toggle(dropoffPrice > 0);
+    $('#groupSummaryDropoffTotal').text(summaryLineFmt(dropoffPrice));
+    $('#groupSummaryLateCheckoutLine').toggle(lateCheckoutFeeTotal > 0);
+    $('#groupSummaryLateCheckoutTotal').text(summaryLineFmt(lateCheckoutFeeTotal));
+    $('#groupSummarySeniorPwdLine').toggle(seniorPwdDiscountAmount > 0);
+    $('#groupSummarySeniorPwdTotal').text('-' + summaryLineFmt(seniorPwdDiscountAmount));
+    $('#groupSummaryDiscountLine').toggle(discount > 0);
+    $('#groupSummaryDiscountTotal').text('-' + summaryLineFmt(discount));
+
     let finalBalance = subtotal - seniorPwdDiscountAmount - discount;
     
     // Ensure finalBalance is not negative
@@ -2107,11 +2292,12 @@
     $('#groupComputedBalance').html('<b>' + balance.toLocaleString(undefined, { minimumFractionDigits: 2 }) + '</b>');
 
     if (isConsolidated) {
-      // Show consolidated total with indicator
+      // Show consolidated total (no "(Master)" indicator - the Summary card
+      // already reads as one running total, doesn't need the extra label)
       if (finalBalance < 0) {
-        $('#groupComputedTotal').html(`<b class="text-warning">0.00 <small>(Master)</small></b>`);
+        $('#groupComputedTotal').html(`<b class="text-warning">0.00</b>`);
       } else {
-        $('#groupComputedTotal').html(`<b>${finalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })} <small class="text-info">(Master)</small></b>`);
+        $('#groupComputedTotal').html(`<b>${finalBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</b>`);
       }
     } else {
       // Regular billing calculation
@@ -2139,7 +2325,10 @@
     const nights = parseInt($('#groupNights').val(), 10) || 0;
     const weekendEnabled = isGroupWeekendPricingEnabled();
     const breakdown = getGroupNightBreakdown();
-    let html = `<ul class="mb-0">`;
+    // Reuses .group-summary-line (same label-left/value-right row the rest of
+    // the Summary card uses) instead of a bullet <ul> - one visual language
+    // for the whole card instead of two clashing ones.
+    let html = '';
 
     block.forEach((room, idx) => {
       const detail = pricingDetails && pricingDetails[idx]
@@ -2149,13 +2338,17 @@
       const total = detail ? detail.charges : (nights > 0 ? avg * nights : avg);
 
       if (weekendEnabled && detail) {
-        html += `<li>Room ${room.ROOM_NUMBER}: ${formatCurrency(detail.weekdayRate)} wd / ${formatCurrency(detail.weekendRate)} we
-          → ${formatCurrency(total)} total (${breakdown.weekday} wd + ${breakdown.weekend} we)</li>`;
+        html += `<div class="group-summary-line group-room-breakdown-line">
+          <span>Room ${room.ROOM_NUMBER}</span>
+          <span>${formatCurrency(detail.weekdayRate)} wd / ${formatCurrency(detail.weekendRate)} we &rarr; ${formatCurrency(total)} (${breakdown.weekday} wd + ${breakdown.weekend} we)</span>
+        </div>`;
       } else {
-        html += `<li>Room ${room.ROOM_NUMBER}: ${formatCurrency(avg)} per night ${nights > 0 ? `(${formatCurrency(total)} total)` : ''}</li>`;
+        html += `<div class="group-summary-line group-room-breakdown-line">
+          <span>Room ${room.ROOM_NUMBER}</span>
+          <span>${formatCurrency(avg)}/night${nights > 0 ? ` &middot; ${formatCurrency(total)}` : ''}</span>
+        </div>`;
       }
     });
-    html += '</ul>';
     container.html(html);
   }
 
@@ -3008,24 +3201,31 @@
     return `₱${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 
-  function getManualBedSummary() {
-    const bed1 = groupManualSelectedRooms.reduce((count, roomId) => {
-      const room = groupAvailableRooms.find(r => normalizeRoomId(r.IDNo) === normalizeRoomId(roomId));
+  // Both read live from the DOM's checked checkboxes (optionally excluding one
+  // room, so the click handler can ask "would accepting THIS one exceed the
+  // limit?" using the state as it was right before this click) instead of the
+  // separate groupManualSelectedRooms array - that array kept drifting out of
+  // sync with what was actually checked on screen, which is what caused the
+  // room-count/limit-check bugs. The DOM is the only thing that can't lie.
+  function getManualBedSummary(excludeRoomId) {
+    const checkedIds = readCheckedRoomIdsFromDOM().filter(id => id !== excludeRoomId);
+    const bed1 = checkedIds.reduce((count, roomId) => {
+      const room = groupAvailableRooms.find(r => normalizeRoomId(r.IDNo) === roomId);
       return count + (room && parseInt(room.ROOM_BED, 10) === 1 ? 1 : 0);
     }, 0);
-    const bed2 = groupManualSelectedRooms.reduce((count, roomId) => {
-      const room = groupAvailableRooms.find(r => normalizeRoomId(r.IDNo) === normalizeRoomId(roomId));
+    const bed2 = checkedIds.reduce((count, roomId) => {
+      const room = groupAvailableRooms.find(r => normalizeRoomId(r.IDNo) === roomId);
       return count + (room && parseInt(room.ROOM_BED, 10) === 2 ? 1 : 0);
     }, 0);
     return { bed1, bed2 };
   }
 
-  function hasReachedManualSelectionLimit() {
+  function hasReachedManualSelectionLimit(excludeRoomId) {
     const neededRooms = getGroupRoomSelectionTarget();
-    const selectedCount = groupManualSelectedRooms.length;
+    const selectedCount = readCheckedRoomIdsFromDOM().filter(id => id !== excludeRoomId).length;
 
     if (groupRequiredBed1 || groupRequiredBed2) {
-      const summary = getManualBedSummary();
+      const summary = getManualBedSummary(excludeRoomId);
       if (summary.bed1 >= groupRequiredBed1 && summary.bed2 >= groupRequiredBed2 && selectedCount >= neededRooms) {
         return true;
       }
@@ -3037,7 +3237,7 @@
 
   function updateManualSelectionInfo() {
     const neededRooms = getGroupRoomSelectionTarget();
-    const selectedCount = groupManualSelectedRooms.length;
+    const selectedCount = readCheckedRoomIdsFromDOM().length;
     const remaining = Math.max(neededRooms - selectedCount, 0);
 
     const bedSummary = getManualBedSummary();
@@ -3220,25 +3420,45 @@
 
     $('#groupRoomsList').on('change', '.group-manual-checkbox', function() {
       const roomId = normalizeRoomId($(this).data('room-id'));
-      if ($(this).is(':checked')) {
-        if (hasReachedManualSelectionLimit()) {
-          $(this).prop('checked', false);
-          Swal.fire('Limit Reached', 'You have already selected the required number of rooms.', 'info');
-          return;
-        }
-        if (!isRoomManuallySelected(roomId)) {
-          groupManualSelectedRooms.push(roomId);
-        }
-      } else {
-        groupManualSelectedRooms = groupManualSelectedRooms.filter(id => normalizeRoomId(id) !== roomId);
+
+      // hasReachedManualSelectionLimit(roomId) excludes this room from its own
+      // count - the DOM already shows it checked at this point (the browser
+      // applies the click before firing 'change'), so without excluding it
+      // we'd be asking "is the state AFTER accepting this one already full?",
+      // which would reject every attempt to fill the very last slot.
+      if ($(this).is(':checked') && hasReachedManualSelectionLimit(roomId)) {
+        $(this).prop('checked', false);
+        Swal.fire('Limit Reached', 'You have already selected the required number of rooms.', 'info');
+        return;
       }
+
+      // Resync to whatever's actually checked in the DOM right now - the
+      // single source of truth, instead of maintaining a parallel array by
+      // hand (push/filter) that could silently drift from the real checkbox
+      // state. That drift was the root cause of the room-count bugs.
+      groupManualSelectedRooms = readCheckedRoomIdsFromDOM();
 
       refreshManualSelectionDisabledState();
       updateManualSelectionInfo();
       updateManualSelectedRoomValues();
+      updateGroupRoomCountDisplay();
       computeGroupTotal();
     });
 
+  }
+
+  // groupRequiredBed1/groupRequiredBed2 (the room-selection limit) only used to
+  // refresh on the NEXT "Search Rooms" click - editing King/Queen after an initial
+  // search left the limit stuck at the old total, blocking selection of the extra
+  // room(s) the new count should allow even though the room list already had them.
+  // Keep the limit in sync with the fields directly instead.
+  function attachBedRequirementLiveSyncHandlers() {
+    $('#groupBed1Count, #groupBed2Count').on('input change', function() {
+      groupRequiredBed1 = parseInt($('#groupBed1Count').val(), 10) || 0;
+      groupRequiredBed2 = parseInt($('#groupBed2Count').val(), 10) || 0;
+      refreshManualSelectionDisabledState();
+      updateManualSelectionInfo();
+    });
   }
 
   function updateManualSelectedRoomValues() {
@@ -3317,27 +3537,13 @@
     });
   }
 
+  // The discount used to also get echoed here as a "Group Adjustments" bullet,
+  // duplicating (in a different visual style) the dedicated Additional
+  // Discount line the Summary card now shows - see computeGroupTotal's
+  // #groupSummaryDiscountLine. Left as a no-op (rather than removed outright)
+  // since it's still called from several places that shouldn't need touching.
   function updateGroupChargeBreakdown() {
-    const discount = $('#groupIncludeDiscount').prop('checked') ? (parseFloat($('#groupDiscount').val()) || 0) : 0;
-    const container = $('#groupRoomBreakdown');
-    if (!container.length) return;
-
-    if (!discount) {
-      container.find('.group-fee-discount-summary').remove();
-      return;
-    }
-
-    let summary = container.find('.group-fee-discount-summary');
-    if (!summary.length) {
-      summary = $('<div class="group-fee-discount-summary" style="margin-top: 12px;"></div>');
-      container.append(summary);
-    }
-
-    const lines = [];
-    if (discount) {
-      lines.push(`<li>Discount (Group): -${formatCurrency(discount)}</li>`);
-    }
-    summary.html(`<b>Group Adjustments:</b><ul>${lines.join('')}</ul>`);
+    $('#groupRoomBreakdown .group-fee-discount-summary').remove();
   }
 
 
@@ -3392,6 +3598,7 @@
     attachManualSelectionHandlers();
     attachManualRateHandlers();
     attachBookingRouteHandler();
+    attachBedRequirementLiveSyncHandlers();
     handleSearchRooms();
 
     // Hand-off via URL for cross-page navigation: ?glRooms=1,2,3&glStart=...&glEnd=...

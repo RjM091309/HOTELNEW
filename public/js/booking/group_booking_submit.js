@@ -272,6 +272,11 @@ $(document).ready(function () {
       type: 'POST',
       data: ajaxData,
       success: function (response) {
+        // Lets any page listen for a completed booking without this script
+        // needing to know about them - e.g. Room Checker resets its Rate
+        // Summary panel back to a blank slate once a booking actually saves.
+        document.dispatchEvent(new CustomEvent('bookingSaved', { detail: { bookingId: response.bookingId } }));
+
         window.__groupBookingSavedFromCalendar = true;
         if (typeof window.resetCalendarGroupSelection === 'function') {
           window.resetCalendarGroupSelection();

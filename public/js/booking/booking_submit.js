@@ -186,6 +186,13 @@ $(document).ready(function () {
             console.log('Booking response:', response);
             $('#modal-addbooking').modal('hide');
 
+            // Lets any page listen for a completed booking without this script
+            // needing to know about them - e.g. Room Checker resets its Rate
+            // Summary panel back to a blank slate once a booking actually saves.
+            if (response.success) {
+              document.dispatchEvent(new CustomEvent('bookingSaved', { detail: { bookingId: response.bookingId } }));
+            }
+
             const isUnassignedRoom = !roomId || roomId === '' || roomId === '0' || roomId === 0;
             const onDashboard = window.location.pathname.includes('/dashboard');
             if (!isUnassignedRoom && !onDashboard) {

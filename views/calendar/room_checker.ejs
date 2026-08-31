@@ -63,16 +63,82 @@
     background-color: rgba(33, 150, 243, 0.35) !important;
   }
 
-  /* Anchored to the bottom-right of the day cell (dayRender sets position:relative on the cell) */
+  /* Pointer cursor on any pickable day (today or future, within the current
+     month) so it reads as clickable - see handleRoomCheckerDateClick in
+     room_checker.js. Day numbers live in a separate overlaid td (fc-day-top)
+     from the background cell (fc-day), so both need the rule. */
+  #room-checker-months td.fc-day:not(.fc-past):not(.fc-disabled-day),
+  #room-checker-months td.fc-day-top:not(.fc-past):not(.fc-disabled-day) {
+    cursor: pointer;
+  }
+
+  /* Past days are ignored by handleRoomCheckerDateClick (room_checker.js) - only
+     today and future days can be picked. FullCalendar already tags these cells
+     fc-past, so just dim them and swap the cursor to match. Day numbers live in
+     a separate overlaid "content skeleton" td (fc-day-top) from the background
+     cell (fc-day) - both get the fc-past class, so both need the rule for the
+     fade to actually show on the number itself. */
+  #room-checker-months td.fc-day.fc-past,
+  #room-checker-months td.fc-day-top.fc-past {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  /* Shared look for the header action buttons - Save (hidden until the first
+     date click starts a pending range, see toggleRoomCheckerSaveButton) and
+     Today (hidden while both calendars are already on their default months,
+     see updateRoomCheckerTodayButtonVisibility), both in room_checker.js. */
+  #roomCheckerSaveRangeBtn,
+  #roomCheckerTodayBtn {
+    display: none;
+    background: #fff;
+    color: #212529;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+    padding: 6px 18px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  #roomCheckerSaveRangeBtn:hover,
+  #roomCheckerTodayBtn:hover {
+    background: #f1f1f1;
+  }
+
+  #roomCheckerTodayBtn {
+    margin-right: 8px;
+  }
+
+  /* Bigger date numbers - the default 12px/22px circle (fullcalendar.css) reads
+     too small against this page's larger day cells. */
+  #room-checker-months .fc-day-number {
+    width: 30px;
+    height: 30px;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  #room-checker-months td.fc-today a {
+    width: 30px;
+    height: 30px;
+    font-size: 18px;
+  }
+
+  /* Centered under the date number (dayRender sets position:relative on the cell) */
   .bed-availability-badge {
     position: absolute;
-    right: 6px;
-    bottom: 4px;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     pointer-events: none;
-    font-size: 15px;
+    font-size: 22px;
     font-weight: 700;
     letter-spacing: 0.2px;
     white-space: nowrap;
+    text-align: center;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
   }
 
@@ -126,6 +192,25 @@
   .rate-summary-checkboxes {
     justify-content: flex-start;
     gap: 20px;
+  }
+
+  /* King/Queen rows: "Queen Bed Rate" is wider than "King Bed Rate", which
+     was pushing the rate value between the two rows out of alignment under
+     space-between. Pin the label to a fixed width so both rate values (and
+     the qty inputs after them) line up in the same columns. */
+  .rate-summary-bed-row > span:first-child {
+    min-width: 110px;
+  }
+
+  /* Soft warning (not a hard block - see recomputeRateSummaryTotals in
+     room_checker.js) shown under a qty input when it exceeds the lowest
+     availability across the selected date range. Hidden by default. */
+  .rate-summary-availability-warning {
+    display: none;
+    text-align: right;
+    font-size: 12px;
+    color: #e0a33c;
+    padding-bottom: 8px;
   }
 
   .rate-summary-label {
@@ -206,6 +291,10 @@
     <div class="card">
       <div class="card-head">
         <header>Room Checker</header>
+        <div class="tools">
+          <button type="button" id="roomCheckerTodayBtn" class="btn">Today</button>
+          <button type="button" id="roomCheckerSaveRangeBtn" class="btn">Save</button>
+        </div>
       </div>
       <div class="card-body">
         <div id="room-checker-months">
@@ -240,15 +329,21 @@
             <span id="rateSummaryDateRange">Select a range on the calendar</span>
           </div>
 
-          <div class="rate-summary-row">
-            <span>King Bed Rate</span>
-            <span id="rateSummaryKingRate">&#8369;0.00</span>
-            <input type="number" id="rateSummaryKingQty" class="rate-summary-qty-input" value="0" min="0" step="1" title="Number of King rooms">
+          <div class="rate-summary-bed-group">
+            <div class="rate-summary-row rate-summary-bed-row">
+              <span>King Bed Rate</span>
+              <span id="rateSummaryKingRate">&#8369;0.00</span>
+              <input type="number" id="rateSummaryKingQty" class="rate-summary-qty-input" value="0" min="0" step="1" title="Number of King rooms">
+            </div>
+            <div id="rateSummaryKingWarning" class="rate-summary-availability-warning"></div>
           </div>
-          <div class="rate-summary-row">
-            <span>Queen Bed Rate</span>
-            <span id="rateSummaryQueenRate">&#8369;0.00</span>
-            <input type="number" id="rateSummaryQueenQty" class="rate-summary-qty-input" value="0" min="0" step="1" title="Number of Queen rooms">
+          <div class="rate-summary-bed-group">
+            <div class="rate-summary-row rate-summary-bed-row">
+              <span>Queen Bed Rate</span>
+              <span id="rateSummaryQueenRate">&#8369;0.00</span>
+              <input type="number" id="rateSummaryQueenQty" class="rate-summary-qty-input" value="0" min="0" step="1" title="Number of Queen rooms">
+            </div>
+            <div id="rateSummaryQueenWarning" class="rate-summary-availability-warning"></div>
           </div>
           <div class="rate-summary-row rate-summary-subtotal">
             <span>Total Room Rate</span>
@@ -286,11 +381,17 @@
             <span>Grand Total</span>
             <span id="rateSummaryGrandTotal">&#8369;0.00</span>
           </div>
+
+          <div class="rate-summary-row" style="border-bottom: none; justify-content: flex-end;">
+            <button type="button" id="roomCheckerProceedBookingBtn" class="btn btn-primary">Proceed Booking</button>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </div>
+
+<%- include('../booking/modal/add_group_booking') %>
 
 <!-- JavaScript Libraries -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -298,4 +399,4 @@
 <script src="/plugins/fullcalendar/packages/interaction/main.min.js"></script>
 <script src="/plugins/fullcalendar/packages/daygrid/main.min.js"></script>
 <script src="/plugins/fullcalendar/packages/timegrid/main.min.js"></script>
-<script src="/js/calendar/room_checker.js?v=7"></script>
+<script src="/js/calendar/room_checker.js?v=8"></script>
