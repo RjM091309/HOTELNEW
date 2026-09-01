@@ -3611,31 +3611,34 @@ function performSearch() {
       const startDate = event.start.toLocaleDateString();
       const endDate = event.end.toLocaleDateString();
       const eventStatus = event.extendedProps?.bookingStatus || 'Unknown';
-      const checkInStatus = event.extendedProps?.checkInStatus;
       const holdPending = event.extendedProps?.holdPending;
       const isHoldPending = holdPending === 1 || holdPending === '1' || holdPending === true;
+      const rawPaymentStatus = (event.extendedProps?.paymentStatus || 'unpaid').toLowerCase();
+      const isFullyPaid = (rawPaymentStatus === 'paid');
+      const isOTA = (() => {
+        const channel = String(event.extendedProps?.bookingChannel || '').trim().toLowerCase();
+        return channel === 'booking-channel' || channel === 'booking channel';
+      })();
 
       // Determine display status and color
       let displayStatus = eventStatus;
       let statusColor = '#b0b0b0';
 
       if (eventStatus === 'pending' && isHoldPending) {
-        displayStatus = 'Hold Pending';
-        statusColor = '#FF6D00'; // Bright orange for hold pending
+        displayStatus = 'Pencil Booking';
+        statusColor = '#FFEB3B'; // Bright yellow for pencil booking
+      } else if (eventStatus === 'pending' && isOTA) {
+        displayStatus = 'OTA Booking (Prepaid)';
+        statusColor = '#D5A6BD'; // Mauve for OTA prepaid
       } else if (eventStatus === 'pending') {
-        if (checkInStatus === 0) {
-          displayStatus = 'Pending - Late (CI/CO)';
-          statusColor = '#e0a316'; // Amber for late
-        } else {
-          displayStatus = 'Pending - Regular (CI/CO)';
-          statusColor = '#e53935'; // Red for regular
-        }
+        displayStatus = isFullyPaid ? 'Reservation (Paid)' : 'Reservation (Unconfirmed)';
+        statusColor = isFullyPaid ? '#5B9BD5' : '#e53935';
       } else if (eventStatus === 'check-In') {
-        displayStatus = 'Occupied (Checked In)';
-        statusColor = '#12866f'; // Teal
+        displayStatus = isFullyPaid ? 'Check-In (Paid)' : 'Check-In (Unpaid)';
+        statusColor = isFullyPaid ? '#FFC107' : '#6f9c40';
       } else if (eventStatus === 'check-Out') {
-        displayStatus = 'Checked Out';
-        statusColor = '#6c757d'; // Gray
+        displayStatus = isFullyPaid ? 'Check-Out (Paid)' : 'Check-Out (Unpaid)';
+        statusColor = isFullyPaid ? '#424242' : '#00E5FF';
       } else if (eventStatus === 'cancelled') {
         displayStatus = 'Cancelled';
         statusColor = '#000000'; // Black
@@ -3922,79 +3925,74 @@ function createLegendOverlay() {
   legendOverlay.className = 'calendar-legend-overlay';
   legendOverlay.innerHTML = `
     <div class="calendar-legend-header">
-      <h3 class="calendar-legend-title">Booking Status</h3>
+      <h3 class="calendar-legend-title">Check In</h3>
       <button class="calendar-legend-toggle" onclick="toggleLegend()">−</button>
     </div>
     <div class="calendar-legend-content">
-      <div class="calendar-legend-item" data-legend-key="occupied">
-        <div class="calendar-legend-color legend-color-occupied"></div>
-        <span class="calendar-legend-text">Occupied (Checked In)</span>
-        <span class="calendar-legend-count" id="legend-count-occupied">0</span>
+      <div class="calendar-legend-item" data-legend-key="checkin-paid">
+        <div class="calendar-legend-color legend-color-checkin-paid"></div>
+        <span class="calendar-legend-text">Check-In (Paid)</span>
+        <span class="calendar-legend-count" id="legend-count-checkin-paid">0</span>
       </div>
-      <div class="calendar-legend-item" data-legend-key="late-checkin">
-        <div class="calendar-legend-color legend-color-late-checkin"></div>
-        <span class="calendar-legend-text">Pending – Late (CI/CO)</span>
-        <span class="calendar-legend-count" id="legend-count-late-checkin">0</span>
-      </div>
-      <div class="calendar-legend-item" data-legend-key="regular-checkin">
-        <div class="calendar-legend-color legend-color-regular-checkin"></div>
-        <span class="calendar-legend-text">Pending – Regular (CI/CO)</span>
-        <span class="calendar-legend-count" id="legend-count-regular-checkin">0</span>
-      </div>
-      <div class="calendar-legend-item" data-legend-key="hold-pending">
-        <div class="calendar-legend-color legend-color-hold-pending"></div>
-        <span class="calendar-legend-text">Hold Pending</span>
-        <span class="calendar-legend-count" id="legend-count-hold-pending">0</span>
-      </div>
-      <div class="calendar-legend-item" data-legend-key="back-to-back">
-        <div class="calendar-legend-color legend-color-back-to-back"></div>
-        <span class="calendar-legend-text">Pending – Back-to-Back</span>
-        <span class="calendar-legend-count" id="legend-count-back-to-back">0</span>
-      </div>
-      <div class="calendar-legend-item" data-legend-key="checkout">
-        <div class="calendar-legend-color legend-color-checkout"></div>
-        <span class="calendar-legend-text">Checked Out</span>
-        <span class="calendar-legend-count" id="legend-count-checkout">0</span>
-      </div>
-      <div class="calendar-legend-item" data-legend-key="cancelled">
-        <div class="calendar-legend-color legend-color-cancelled"></div>
-        <span class="calendar-legend-text">Cancelled</span>
-        <span class="calendar-legend-count" id="legend-count-cancelled">0</span>
+      <div class="calendar-legend-item" data-legend-key="checkin-unpaid">
+        <div class="calendar-legend-color legend-color-checkin-unpaid"></div>
+        <span class="calendar-legend-text">Check-In (Unpaid)</span>
+        <span class="calendar-legend-count" id="legend-count-checkin-unpaid">0</span>
       </div>
     </div>
     <div class="calendar-legend-header">
-      <h3 class="calendar-legend-title">Payment Status</h3>
+      <h3 class="calendar-legend-title">Reservation</h3>
     </div>
     <div class="calendar-legend-content">
-      <div class="calendar-legend-item" data-legend-key="paid">
-        <div class="calendar-legend-color legend-color-paid"></div>
-        <span class="calendar-legend-text">Fully Paid</span>
-        <span class="calendar-legend-count" id="legend-count-paid">0</span>
+      <div class="calendar-legend-item" data-legend-key="reservation-paid">
+        <div class="calendar-legend-color legend-color-reservation-paid"></div>
+        <span class="calendar-legend-text">Reservation (Paid)</span>
+        <span class="calendar-legend-count" id="legend-count-reservation-paid">0</span>
       </div>
-      <div class="calendar-legend-item" data-legend-key="partial">
-        <div class="calendar-legend-color legend-color-partial"></div>
-        <span class="calendar-legend-text">Partial Payment</span>
-        <span class="calendar-legend-count" id="legend-count-partial">0</span>
+      <div class="calendar-legend-item" data-legend-key="reservation-unconfirmed">
+        <div class="calendar-legend-color legend-color-reservation-unconfirmed"></div>
+        <span class="calendar-legend-text">Unconfirmed</span>
+        <span class="calendar-legend-count" id="legend-count-reservation-unconfirmed">0</span>
       </div>
-      <div class="calendar-legend-item" data-legend-key="unpaid">
-        <div class="calendar-legend-color legend-color-unpaid"></div>
-        <span class="calendar-legend-text">Unpaid</span>
-        <span class="calendar-legend-count" id="legend-count-unpaid">0</span>
+      <div class="calendar-legend-item" data-legend-key="ota-prepaid">
+        <div class="calendar-legend-color legend-color-ota-prepaid"></div>
+        <span class="calendar-legend-text">OTA Booking (Prepaid)</span>
+        <span class="calendar-legend-count" id="legend-count-ota-prepaid">0</span>
+      </div>
+      <div class="calendar-legend-item" data-legend-key="pencil-booking">
+        <div class="calendar-legend-color legend-color-pencil-booking"></div>
+        <span class="calendar-legend-text">Pencil Booking</span>
+        <span class="calendar-legend-count" id="legend-count-pencil-booking">0</span>
+      </div>
+    </div>
+    <div class="calendar-legend-header">
+      <h3 class="calendar-legend-title">Check Out</h3>
+    </div>
+    <div class="calendar-legend-content">
+      <div class="calendar-legend-item" data-legend-key="checkout-paid">
+        <div class="calendar-legend-color legend-color-checkout-paid"></div>
+        <span class="calendar-legend-text">Check-Out (Paid)</span>
+        <span class="calendar-legend-count" id="legend-count-checkout-paid">0</span>
+      </div>
+      <div class="calendar-legend-item" data-legend-key="checkout-unpaid">
+        <div class="calendar-legend-color legend-color-checkout-unpaid"></div>
+        <span class="calendar-legend-text">Check-Out (Unpaid)</span>
+        <span class="calendar-legend-count" id="legend-count-checkout-unpaid">0</span>
       </div>
     </div>
     <div class="calendar-legend-header">
       <h3 class="calendar-legend-title">Other</h3>
     </div>
     <div class="calendar-legend-content">
+      <div class="calendar-legend-item" data-legend-key="cancelled">
+        <div class="calendar-legend-color legend-color-cancelled"></div>
+        <span class="calendar-legend-text">Cancelled</span>
+        <span class="calendar-legend-count" id="legend-count-cancelled">0</span>
+      </div>
       <div class="calendar-legend-item" data-legend-key="long-term">
         <div class="calendar-legend-color legend-color-long-term"></div>
         <span class="calendar-legend-text">Long-Term Stay</span>
         <span class="calendar-legend-count" id="legend-count-long-term">0</span>
-      </div>
-      <div class="calendar-legend-item" data-legend-key="booking-channel">
-        <div class="calendar-legend-color legend-color-booking-channel"></div>
-        <span class="calendar-legend-text">OTA</span>
-        <span class="calendar-legend-count" id="legend-count-booking-channel">0</span>
       </div>
     </div>
     <div class="calendar-legend-header">
@@ -4029,71 +4027,64 @@ function createLegendOverlay() {
 // so the two never drift apart.
 function classifyEventForLegend(event) {
   const status = event.extendedProps?.bookingStatus || '';
-  const backgroundColor = event.backgroundColor || '';
-  const ci = event.extendedProps?.checkInStatus;   // 1=regular,0=late
-  const co = event.extendedProps?.checkOutStatus;  // 0=regular,1=late
   const paymentStatus = (() => {
     const raw = (event.extendedProps?.paymentStatus || 'unpaid').toLowerCase();
     if (raw === 'partial_paid') return 'partial';
     return raw;
   })();
+  const isFullyPaid = paymentStatus === 'paid';
+  const isOTA = (() => {
+    const channel = String(event.extendedProps?.bookingChannel || '').trim().toLowerCase();
+    return channel === 'booking-channel' || channel === 'booking channel';
+  })();
+  const holdPendingRaw = event.extendedProps?.holdPending;
+  const isHoldPending = holdPendingRaw === 1 || holdPendingRaw === '1' || holdPendingRaw === true
+    || String(holdPendingRaw).toLowerCase() === 'true';
 
   const flags = {
-    'occupied': false,
-    'late-checkin': false,
-    'regular-checkin': false,
-    'hold-pending': false,
-    'back-to-back': false,
-    'checkout': false,
+    // Booking-phase buckets (mutually exclusive, one true per event)
+    'checkin-paid': false,
+    'checkin-unpaid': false,
+    'reservation-paid': false,
+    'reservation-unconfirmed': false,
+    'ota-prepaid': false,
+    'pencil-booking': false,
+    'checkout-paid': false,
+    'checkout-unpaid': false,
     'cancelled': false,
-    'paid': false,
-    'partial': false,
-    'unpaid': false,
-    'long-term': !!event.extendedProps?.isLongTermStay,
-    'booking-channel': (() => {
-      const channel = String(event.extendedProps?.bookingChannel || '').trim().toLowerCase();
-      return channel === 'booking-channel' || channel === 'booking channel';
-    })()
+    // Side indicators (independent booleans, can combine with any phase bucket above)
+    'late-checkout-btb': (typeof isLateCheckout === 'function' && isLateCheckout(event)) || !!event.extendedProps?.isBackToBack,
+    'reservation-fee-paid': paymentStatus === 'partial',
+    'late-checkin': typeof isLateCheckIn === 'function' && isLateCheckIn(event),
+    // Other
+    'long-term': !!event.extendedProps?.isLongTermStay
   };
 
-  // Payment status (skip cancelled/maintenance bookings, same as the on-event indicator)
-  if (status !== 'cancelled' && status !== 'maintenance') {
-    if (paymentStatus === 'paid') flags.paid = true;
-    else if (paymentStatus === 'partial') flags.partial = true;
-    else flags.unpaid = true;
-  }
-
-  // Occupied
-  if (status === 'check-In' || backgroundColor === '#12866f') {
-    flags.occupied = true;
-    return flags;
-  }
-  // Checked out
-  if (status === 'check-Out' || backgroundColor === '#B3B3B3' || backgroundColor === '#6c757d') {
-    flags.checkout = true;
-    return flags;
-  }
-  // Cancelled
-  if (status === 'cancelled' || backgroundColor === '#000000') {
+  if (status === 'cancelled' || status === 'maintenance') {
     flags.cancelled = true;
     return flags;
   }
 
-  // Pending: determine back-to-back / late / regular based on composite statuses
-  // Priority mirrors applyCompositeStatusStyles: Back-to-Back > Late > Regular
+  if (status === 'check-In') {
+    if (isFullyPaid) flags['checkin-paid'] = true; else flags['checkin-unpaid'] = true;
+    return flags;
+  }
+
+  if (status === 'check-Out') {
+    if (isFullyPaid) flags['checkout-paid'] = true; else flags['checkout-unpaid'] = true;
+    return flags;
+  }
+
   if (status === 'pending') {
-    const holdPending = event.extendedProps?.holdPending;
-    if (holdPending === 1 || holdPending === '1' || holdPending === true || backgroundColor === '#FF6D00') {
-      flags['hold-pending'] = true;
-      return flags;
+    if (isHoldPending) {
+      flags['pencil-booking'] = true;
+    } else if (isOTA) {
+      flags['ota-prepaid'] = true;
+    } else if (isFullyPaid) {
+      flags['reservation-paid'] = true;
+    } else {
+      flags['reservation-unconfirmed'] = true;
     }
-    if (event.extendedProps?.isBackToBack) {
-      flags['back-to-back'] = true;
-      return flags;
-    }
-    // If either CI is late (0) or CO is late (1), count as late; otherwise regular
-    const isLate = (ci === 0) || (co === 1) || (ci === undefined && co === undefined && backgroundColor === '#e0a316');
-    if (isLate) flags['late-checkin'] = true; else flags['regular-checkin'] = true;
   }
 
   return flags;
@@ -4113,18 +4104,19 @@ function updateLegendCounts() {
   }
 
   const counts = {
-    occupied: 0,
+    'checkin-paid': 0,
+    'checkin-unpaid': 0,
+    'reservation-paid': 0,
+    'reservation-unconfirmed': 0,
+    'ota-prepaid': 0,
+    'pencil-booking': 0,
+    'checkout-paid': 0,
+    'checkout-unpaid': 0,
+    'cancelled': 0,
+    'late-checkout-btb': 0,
+    'reservation-fee-paid': 0,
     'late-checkin': 0,
-    'regular-checkin': 0,
-    'hold-pending': 0,
-    'back-to-back': 0,
-    checkout: 0,
-    cancelled: 0,
-    paid: 0,
-    partial: 0,
-    unpaid: 0,
-    'long-term': 0,
-    'booking-channel': 0
+    'long-term': 0
   };
 
   events.forEach(event => {
@@ -4135,18 +4127,9 @@ function updateLegendCounts() {
   });
 
   // Update legend counts
-  updateLegendCount('legend-count-occupied', counts.occupied);
-  updateLegendCount('legend-count-late-checkin', counts['late-checkin']);
-  updateLegendCount('legend-count-regular-checkin', counts['regular-checkin']);
-  updateLegendCount('legend-count-hold-pending', counts['hold-pending']);
-  updateLegendCount('legend-count-back-to-back', counts['back-to-back']);
-  updateLegendCount('legend-count-checkout', counts.checkout);
-  updateLegendCount('legend-count-cancelled', counts.cancelled);
-  updateLegendCount('legend-count-paid', counts.paid);
-  updateLegendCount('legend-count-partial', counts.partial);
-  updateLegendCount('legend-count-unpaid', counts.unpaid);
-  updateLegendCount('legend-count-long-term', counts['long-term']);
-  updateLegendCount('legend-count-booking-channel', counts['booking-channel']);
+  Object.keys(counts).forEach(key => {
+    updateLegendCount(`legend-count-${key}`, counts[key]);
+  });
   updateRoomViewLegendCounts();
 
   // Re-apply the active dim filter (if any) so newly added/changed events stay in sync
@@ -4182,16 +4165,18 @@ const ROOM_VIEW_LEGEND_KEYS = {
 
 const LEGEND_FILTER_GROUPS = {
   booking: new Set([
-    'occupied',
-    'late-checkin',
-    'regular-checkin',
-    'hold-pending',
-    'back-to-back',
-    'checkout',
+    'checkin-paid',
+    'checkin-unpaid',
+    'reservation-paid',
+    'reservation-unconfirmed',
+    'ota-prepaid',
+    'pencil-booking',
+    'checkout-paid',
+    'checkout-unpaid',
     'cancelled'
   ]),
-  payment: new Set(['paid', 'partial', 'unpaid']),
-  other: new Set(['long-term', 'booking-channel']),
+  sideIndicator: new Set(['late-checkout-btb', 'reservation-fee-paid', 'late-checkin']),
+  other: new Set(['long-term']),
   roomView: new Set(['condo-view', 'mountain-view'])
 };
 

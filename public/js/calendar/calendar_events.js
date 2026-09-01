@@ -9,8 +9,8 @@
 // =============================================================================
 
 // Group booking border colors — normal hues, medium saturation (visible but not harsh).
-// Avoid booking-status / legend colors: #12866f, #e0a316, #e53935, #FF6D00, #AAFF00,
-// #6c757d, #000000, #9c27b0, #2196f3, #00E5FF
+// Avoid booking-highlight / legend colors: #FFC107, #6f9c40, #5B9BD5, #e53935,
+// #D5A6BD, #FFEB3B, #424242, #00E5FF, #FB8C00, #1A3FA0, #7B1FA2, #000000, #9c27b0
 const GROUP_COLORS = [
   '#5C6BC0', // indigo
   '#7E57C2', // purple
@@ -35,7 +35,24 @@ const GROUP_COLORS = [
 ];
 
 const LONG_TERM_BORDER_COLOR = '#9c27b0'; // matches legend long-term purple
-const BOOKING_CHANNEL_BORDER_COLOR = '#D5A6BD'; // matches legend booking-channel pink
+const BOOKING_CHANNEL_BORDER_COLOR = '#D5A6BD'; // matches legend OTA prepaid mauve
+
+// =============================================================================
+// BOOKING HIGHLIGHT COLOR SCHEME (phase x payment, plus side-indicator accents)
+// =============================================================================
+const CHECKIN_PAID_COLOR = '#FFC107';           // Yellow: Check-In (paid)
+const CHECKIN_UNPAID_COLOR = '#6f9c40';         // Green: Check-In (unpaid)
+const RESERVATION_PAID_COLOR = '#5B9BD5';       // Blue: Reservation (paid)
+const RESERVATION_UNCONFIRMED_COLOR = '#e53935';// Red: Reservation (unconfirmed)
+const OTA_PREPAID_COLOR = BOOKING_CHANNEL_BORDER_COLOR; // Mauve: OTA booking (prepaid)
+const PENCIL_BOOKING_COLOR = '#FFEB3B';         // Bright yellow: Pencil booking (hold pending)
+const CHECKOUT_PAID_COLOR = '#424242';          // Dark gray: Check-Out (paid)
+const CHECKOUT_UNPAID_COLOR = '#00E5FF';        // Cyan: Check-Out (unpaid)
+
+// Side indicators (box-shadow edge accents layered on top of the fill color above)
+const LATE_CHECKIN_ACCENT_COLOR = '#FB8C00';        // Orange: Check-in late (12mn-2am)
+const LATE_CHECKOUT_BTB_ACCENT_COLOR = '#1A3FA0';   // Dark blue: Late check-out (11PM) & BTB
+const RESERVATION_FEE_ACCENT_COLOR = '#7B1FA2';     // Purple: Reservation fee paid
 
 // Cache to store groupBookingId -> color mapping (consistent across all events)
 const groupColorCache = {};
@@ -75,10 +92,10 @@ function applyHighlightBorderStyles(el, borderColor, variant) {
   el.style.height = '24px';
   el.style.minHeight = '24px';
   el.style.marginTop = '-4px';
-  el.style.color = '#ffffff';
+  // Text color is left as-is here: applyCompositeStatusStyles already picked
+  // black/white based on the fill color's contrast before this runs.
   const titleElement = el.querySelector('.fc-event-title');
   if (titleElement) {
-    titleElement.style.color = '#ffffff';
     titleElement.classList.add('group-booking-text');
   }
 }
@@ -87,6 +104,7 @@ function clearHighlightBorderStyles(el) {
   el.classList.remove('group-booking', 'long-term-booking', 'booking-channel-booking');
   el.style.removeProperty('--booking-border-color');
   el.removeAttribute('data-highlight-border-color');
+  el.removeAttribute('data-channel-stripe-shadow');
   el.style.border = '';
   el.style.height = '';
   el.style.minHeight = '';
@@ -98,7 +116,16 @@ function clearHighlightBorderStyles(el) {
 }
 
 function applyBookingHighlightBorder(event, el) {
+  // Group / long-term / OTA outline borders are disabled for now — removed
+  // per request ("alisin muna yung mga border status outline"). Clearing
+  // whatever was previously applied and returning early; the logic below is
+  // left intact so this can be turned back on later.
+  clearHighlightBorderStyles(el);
+  return;
+
+  // eslint-disable-next-line no-unreachable
   if (isLongTermBooking(event)) {
+    el.removeAttribute('data-channel-stripe-shadow');
     applyHighlightBorderStyles(el, LONG_TERM_BORDER_COLOR, 'long-term');
     return;
   }
@@ -106,20 +133,26 @@ function applyBookingHighlightBorder(event, el) {
   const isGroup = isGroupBookingEvent(event);
   const isChannel = isBookingChannelBooking(event);
 
-  // Group bookings keep the group color as the outer border.
-  // Booking Channel adds a pink inner stripe so both types stay visible.
+  // Group bookings keep the group color as the outer border. Booking Channel
+  // (OTA) adds a pink inner stripe so both types stay visible; the stripe is
+  // stashed on a data attribute rather than applied directly to box-shadow
+  // here, since applySideIndicatorAccents() owns that property and merges
+  // this stripe into its own combined box-shadow value.
   if (isGroup) {
     applyHighlightBorderStyles(el, getGroupBookingColor(event.extendedProps.groupBookingId), 'group');
     if (isChannel) {
       el.classList.add('booking-channel-booking');
-      el.style.setProperty(
-        'box-shadow',
-        `inset 0 0 0 3px ${BOOKING_CHANNEL_BORDER_COLOR}, 0 0 0 1px rgba(0, 0, 0, 0.12)`,
-        'important'
+      el.setAttribute(
+        'data-channel-stripe-shadow',
+        `inset 0 0 0 3px ${BOOKING_CHANNEL_BORDER_COLOR}, 0 0 0 1px rgba(0, 0, 0, 0.12)`
       );
+    } else {
+      el.removeAttribute('data-channel-stripe-shadow');
     }
     return;
   }
+
+  el.removeAttribute('data-channel-stripe-shadow');
 
   if (isChannel) {
     applyHighlightBorderStyles(el, BOOKING_CHANNEL_BORDER_COLOR, 'booking-channel');
@@ -312,9 +345,9 @@ function handleEventClick(info) {
       break;
       
     case 'pending':
-      // Check if this is a late check-in (orange) or regular pending (blue)
-      const eventColor = event.backgroundColor;
-      if (eventColor === '#e0a316') {
+      // Route based on the actual late-check-in flag rather than fill color,
+      // since fill color now encodes payment status (paid/unpaid/OTA/pencil).
+      if (isLateCheckIn(event)) {
         showLateCheckInModal(event);
       } else {
         showPendingModal(event);
@@ -337,10 +370,10 @@ function handleEventClick(info) {
       } else {
         // Check if we can determine status from event color or other properties
         const eventColor = event.backgroundColor;
-        
-        if (eventColor === '#e0a316') {
+
+        if (isLateCheckIn(event)) {
           showLateCheckInModal(event);
-        } else if (eventColor === 'red' || eventColor === '#e53935') {
+        } else if (eventColor === RESERVATION_UNCONFIRMED_COLOR) {
           showPendingModal(event);
         } else if (eventColor === '#000000') {
           const barStatus = getCalendarBookingStatus(event);
@@ -360,7 +393,23 @@ function handleEventClick(info) {
   }
 }
 
-// Creates a left/right split color based on check-in/out statuses
+// Single fill color per booking, driven by phase (reservation / check-in / check-out)
+// crossed with payment status (paid vs not-fully-paid). Late check-in, late
+// check-out/back-to-back, and "reservation fee paid" (partial payment) are shown
+// separately as side-indicator accents — see applySideIndicatorAccents().
+function getPaymentStatusNormalized(event) {
+  const raw = (event.extendedProps?.paymentStatus || 'unpaid').toLowerCase();
+  return raw === 'partial_paid' ? 'partial' : raw;
+}
+
+// Light fill colors need dark text for legibility; everything else stays white.
+const DARK_TEXT_FILL_COLORS = new Set([
+  CHECKIN_PAID_COLOR,
+  PENCIL_BOOKING_COLOR,
+  OTA_PREPAID_COLOR,
+  CHECKOUT_UNPAID_COLOR
+]);
+
 function applyCompositeStatusStyles(event, el) {
   try {
     const bookingStatus = event.extendedProps?.bookingStatus;
@@ -369,183 +418,122 @@ function applyCompositeStatusStyles(event, el) {
       el.removeAttribute('data-composite');
       el.style.background = '';
       el.style.backgroundColor = event.backgroundColor || '#000000';
-      el.style.color = '#fff';
+      el.style.setProperty('color', '#fff', 'important');
+      el.style.setProperty('text-shadow', '0 1px 1px rgba(0, 0, 0, 0.5)', 'important');
       applyBookingHighlightBorder(event, el);
       el.style.zIndex = bookingStatus === 'cancelled' ? '1' : '2';
       return;
     }
 
-    // More robust check: groupBookingId must exist, not be null, not be 0, and not be empty string
     const holdPendingRaw = event.extendedProps?.holdPending;
     const isHoldPending = holdPendingRaw === 1 || holdPendingRaw === '1' || holdPendingRaw === true
       || String(holdPendingRaw).toLowerCase() === 'true';
 
-    // Colors
-    const red = '#e53935';      // regular (keep original red)
-    const lemon = '#e0a316';    // late = amber
-    const green = '#12866f';    // occupied = teal
-    const holdOrange = '#FF6D00'; // hold pending
+    const isFullyPaid = getPaymentStatusNormalized(event) === 'paid';
 
-    let checkInStatusRaw = event.extendedProps?.checkInStatus;   // expected: 1 regular, 0 late
-    let checkOutStatusRaw = event.extendedProps?.checkOutStatus; // expected: 0 regular, 1 late
-
+    let fillColor;
     if (bookingStatus === 'pending' && isHoldPending) {
-      el.removeAttribute('data-composite');
-      el.style.background = '';
-      el.style.backgroundColor = holdOrange;
-      el.style.color = '#fff';
-      applyBookingHighlightBorder(event, el);
-      el.style.zIndex = '5';
-      return;
+      fillColor = PENCIL_BOOKING_COLOR; // Pencil booking / hold pending
+    } else if (bookingStatus === 'pending') {
+      fillColor = isBookingChannelBooking(event)
+        ? OTA_PREPAID_COLOR
+        : (isFullyPaid ? RESERVATION_PAID_COLOR : RESERVATION_UNCONFIRMED_COLOR);
+    } else if (bookingStatus === 'check-In') {
+      fillColor = isFullyPaid ? CHECKIN_PAID_COLOR : CHECKIN_UNPAID_COLOR;
+    } else if (bookingStatus === 'check-Out') {
+      fillColor = isFullyPaid ? CHECKOUT_PAID_COLOR : CHECKOUT_UNPAID_COLOR;
+    } else {
+      fillColor = event.backgroundColor || '';
     }
 
-    if (checkInStatusRaw === undefined && checkOutStatusRaw === undefined) {
-      el.removeAttribute('data-composite');
-      el.style.background = '';
-      if (event.backgroundColor) {
-        el.style.backgroundColor = event.backgroundColor;
-      }
-      applyBookingHighlightBorder(event, el);
-      return;
-    }
-
-    // Normalizers to handle differing encodings from backend/UI
-    const inferFromColor = () => (event.backgroundColor === '#e0a316' ? 'late' : 'regular');
-    const normalizeCheckIn = (v) => {
-      if (v === undefined || v === null || v === '') return inferFromColor();
-      if (v === 1 || v === '1' || String(v).toLowerCase() === 'regular') return 'regular';
-      if (v === 0 || v === '0' || String(v).toLowerCase().includes('late')) return 'late';
-      return inferFromColor();
-    };
-    const normalizeCheckOut = (v) => {
-      if (v === undefined || v === null || v === '') return inferFromColor();
-      // Some systems store CO: 1 = late, 0 = regular. Others invert.
-      const s = String(v).toLowerCase();
-      if (v === 1 || v === '1' || s.includes('late')) return 'late';
-      if (v === 0 || v === '0' || s.includes('regular')) return 'regular';
-      return inferFromColor();
-    };
-
-    const ciNorm = normalizeCheckIn(checkInStatusRaw);
-    let coNorm = normalizeCheckOut(checkOutStatusRaw);
-    if (checkOutStatusRaw === undefined || checkOutStatusRaw === null || checkOutStatusRaw === '') {
-      // If checkout status is absent, default to Regular (red) to avoid all-lemon bars
-      // This aligns with typical default checkout behavior unless explicitly marked late
-      coNorm = 'regular';
-    }
-
-    // Decide behavior by booking status
-    if (bookingStatus === 'pending' && !isHoldPending) {
-      // Determine each side for pending
-      const leftColor = ciNorm === 'regular' ? red : lemon;    // left half = check-in
-      const rightColor = coNorm === 'late' ? lemon : red;      // right half = check-out
-      el.setAttribute('data-composite', 'true');
-      el.style.background = `linear-gradient(90deg, ${leftColor} 0%, ${leftColor} 50%, ${rightColor} 50%, ${rightColor} 100%)`;
-      el.style.color = '#fff';
-      applyBookingHighlightBorder(event, el);
-      
-      // Lower z-index so checkout side (right half) visually sits underneath neighbors
-      el.style.zIndex = '5';
-      return;
-    }
-
-    if (bookingStatus === 'check-In') {
-      // Occupied: keep left green, right reflects checkout status
-      const leftColor = green;
-      const rightColor = coNorm === 'late' ? lemon : red;
-      el.setAttribute('data-composite', 'true');
-      el.style.background = `linear-gradient(90deg, ${leftColor} 0%, ${leftColor} 50%, ${rightColor} 50%, ${rightColor} 100%)`;
-      el.style.color = '#fff';
-      applyBookingHighlightBorder(event, el);
-      
-      // Lower z-index so checkout side (right half) visually sits underneath neighbors
-      el.style.zIndex = '5';
-      return;
-    }
-
-    // Default: no composite, keep original color
     el.removeAttribute('data-composite');
     el.style.background = '';
-    if (event.backgroundColor) {
-      el.style.backgroundColor = event.backgroundColor;
+    if (fillColor) {
+      el.style.backgroundColor = fillColor;
     }
-    const isCancelled = bookingStatus === 'cancelled';
+    // !important: calendar.css forces white text on group/long-term-booking
+    // events; this fill-based contrast choice must win over that.
+    const useDarkText = DARK_TEXT_FILL_COLORS.has(fillColor);
+    el.style.setProperty('color', useDarkText ? '#000' : '#fff', 'important');
+    // The title chip's text-shadow inherits from here. A dark shadow behind
+    // dark text just smudges the letters, so flip to a light halo instead.
+    el.style.setProperty(
+      'text-shadow',
+      useDarkText ? '0 1px 1px rgba(255, 255, 255, 0.7)' : '0 1px 1px rgba(0, 0, 0, 0.5)',
+      'important'
+    );
     applyBookingHighlightBorder(event, el);
-    // Restore default stacking when not composite
-    el.style.zIndex = isCancelled ? '1' : '';
+
+    // Lower z-index for pending/check-in bars so a same-day checkout bar
+    // in the same room can render on top at the turnover boundary
+    el.style.zIndex = (bookingStatus === 'pending' || bookingStatus === 'check-In') ? '5' : '';
   } catch (e) {
     // ignore
   }
 }
 
 // =============================================================================
-// BACK-TO-BACK ROOM TURNOVER BORDER
+// SIDE INDICATORS (late check-in / late check-out & BTB / reservation fee paid)
 // =============================================================================
-
-const BACK_TO_BACK_BORDER_COLOR = '#AAFF00';
+// Layered as box-shadow edge accents so they stack independently of the
+// group/long-term/OTA `border` property set by applyBookingHighlightBorder().
 
 // Outlines both bookings involved in a same-room, same-day turnover
-// (one checking out, the other checking in) instead of recoloring the fill.
-function applyBackToBackBorder(event, el) {
+// (one checking out, the other checking in).
+function isBackToBackEvent(event) {
+  return !!event.extendedProps?.isBackToBack;
+}
+
+// Renders just the group+OTA inner mauve stripe (stashed by applyBookingHighlightBorder
+// on data-channel-stripe-shadow). Used while the rest of applySideIndicatorAccents()
+// is disabled, so that unrelated combo still shows correctly.
+function applyChannelStripeAccent(event, el) {
   try {
-    const bookingStatus = event.extendedProps?.bookingStatus;
-    const isGroupBooking = isGroupBookingEvent(event);
-
-    // Group / long-term / booking-channel bookings already own the border highlight
-    if (isGroupBooking || isLongTermBooking(event) || isBookingChannelBooking(event) || bookingStatus === 'cancelled' || bookingStatus === 'maintenance') {
-      return;
-    }
-
-    if (event.extendedProps?.isBackToBack) {
-      el.style.setProperty('border', `1.5px solid ${BACK_TO_BACK_BORDER_COLOR}`, 'important');
-      el.setAttribute('data-back-to-back', 'true');
-    } else if (el.getAttribute('data-back-to-back') === 'true') {
-      el.style.border = '';
-      el.removeAttribute('data-back-to-back');
+    const channelStripe = el.getAttribute('data-channel-stripe-shadow');
+    if (channelStripe) {
+      el.style.setProperty('box-shadow', channelStripe, 'important');
+    } else {
+      el.style.boxShadow = '';
     }
   } catch (e) {
     // ignore
   }
 }
 
-// =============================================================================
-// PAYMENT STATUS INDICATOR (full / partial / unpaid)
-// =============================================================================
-
-const PAYMENT_STATUS_COLORS = {
-  paid: '#2196f3',    // fully paid - blue
-  partial: '#00E5FF', // partially paid - bright cyan
-  unpaid: '#ffffff'   // unpaid - white
-};
-
-// Adds a small corner flag/triangle to the event indicating payment status.
-// A solid triangle + white outline stays legible regardless of the
-// booking-status background color underneath, unlike a thin edge line.
-function applyPaymentStatusIndicator(event, el) {
+function applySideIndicatorAccents(event, el) {
   try {
     const bookingStatus = event.extendedProps?.bookingStatus;
-    const existing = el.querySelector('.payment-status-line');
 
-    // Cancelled bookings don't carry a meaningful payment status to flag
     if (bookingStatus === 'cancelled' || bookingStatus === 'maintenance') {
-      if (existing) existing.remove();
+      el.style.boxShadow = '';
+      el.removeAttribute('data-side-indicator');
       return;
     }
 
-    const paymentStatus = (() => {
-      const raw = (event.extendedProps?.paymentStatus || 'unpaid').toLowerCase();
-      if (raw === 'partial_paid') return 'partial';
-      return raw;
-    })();
-    const lineColor = PAYMENT_STATUS_COLORS[paymentStatus] || PAYMENT_STATUS_COLORS.unpaid;
+    const shadows = [];
+    // Group+OTA bookings stash their inner mauve stripe here (see applyBookingHighlightBorder)
+    // since this function owns the box-shadow property and must not clobber it.
+    const channelStripe = el.getAttribute('data-channel-stripe-shadow');
+    if (channelStripe) {
+      shadows.push(channelStripe);
+    }
+    if (isLateCheckIn(event)) {
+      shadows.push(`inset 4px 0 0 0 ${LATE_CHECKIN_ACCENT_COLOR}`);
+    }
+    if (isLateCheckout(event) || isBackToBackEvent(event)) {
+      shadows.push(`inset -4px 0 0 0 ${LATE_CHECKOUT_BTB_ACCENT_COLOR}`);
+    }
+    if (getPaymentStatusNormalized(event) === 'partial') {
+      shadows.push(`inset 0 -4px 0 0 ${RESERVATION_FEE_ACCENT_COLOR}`);
+    }
 
-    const dot = existing || document.createElement('div');
-    dot.className = 'payment-status-line';
-    dot.style.backgroundColor = lineColor;
-    dot.title = paymentStatus === 'paid' ? 'Fully Paid' : paymentStatus === 'partial' ? 'Partially Paid' : 'Unpaid';
-    dot.setAttribute('data-payment-status', paymentStatus);
-
-    if (!existing) el.appendChild(dot);
+    if (shadows.length) {
+      el.style.setProperty('box-shadow', shadows.join(', '), 'important');
+      el.setAttribute('data-side-indicator', 'true');
+    } else if (el.getAttribute('data-side-indicator') === 'true') {
+      el.style.boxShadow = '';
+      el.removeAttribute('data-side-indicator');
+    }
   } catch (e) {
     // ignore
   }
@@ -630,18 +618,19 @@ function handleEventDidMount(info) {
 
   window.eventElements[info.event.id] = info.el;
 
-  // Apply composite check-in/check-out status colors (left = check-in, right = check-out)
+  // Apply the booking-highlight fill color (phase x payment status)
   try {
     applyCompositeStatusStyles(info.event, info.el);
   } catch (e) {
     // ignore style errors
   }
 
-  // Outline both bookings involved in a same-room, same-day turnover
-  applyBackToBackBorder(info.event, info.el);
-
-  // Apply payment status indicator dot (full / partial / unpaid)
-  applyPaymentStatusIndicator(info.event, info.el);
+  // Side indicators (late check-in / late check-out & BTB / reservation fee paid)
+  // are disabled for now — removed per request, keeping the function itself
+  // intact in case they come back later. The group+OTA channel stripe is
+  // unrelated to those statuses, so it still renders on its own.
+  // applySideIndicatorAccents(info.event, info.el);
+  applyChannelStripeAccent(info.event, info.el);
 
   // Pick-up service car icon
   applyPickupIndicator(info.event, info.el);
@@ -905,8 +894,8 @@ window.attachCalendarGlowOnBootstrapModal = attachCalendarGlowOnBootstrapModal;
 window.isCalendarPageContext = isCalendarPageContext;
 window.refreshCalendarAfterPaymentSuccess = refreshCalendarAfterPaymentSuccess;
 window.applyCompositeStatusStyles = applyCompositeStatusStyles;
-window.applyBackToBackBorder = applyBackToBackBorder;
-window.applyPaymentStatusIndicator = applyPaymentStatusIndicator;
+window.applySideIndicatorAccents = applySideIndicatorAccents;
+window.applyChannelStripeAccent = applyChannelStripeAccent;
 window.handleEventDidMount = handleEventDidMount;
 window.handleDatesSet = handleDatesSet;
 window.updateEventStatusInstantly = updateEventStatusInstantly;

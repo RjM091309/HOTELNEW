@@ -103,21 +103,28 @@ function injectDragStyles() {
       background-repeat: no-repeat !important;
     }
 
-    /* Title chip for better contrast (parallelogram) */
+    /* Title chip for better contrast (parallelogram, shaped via clip-path below).
+       Text is NOT transformed/skewed here. calendar.css's ".fc-event > *" rule
+       (!important) already counter-skews this chip back upright against the
+       bar's own skew(-18deg), since the chip is a direct child of .fc-event.
+       This element used to ALSO carry its own skewX(12deg) - a no-op in
+       practice since the !important rule always won that cascade - while its
+       inner span carried an unopposed skewX(-12deg) meant to cancel it. With
+       the chip's rule never actually applying, that span skew had nothing to
+       cancel and rendered the label tilted/blurred at small font sizes. */
     .fc-event .event-title-chip {
       position: absolute;
       left: 8px;
       right: 8px;
       top: 0;
-      transform: translateY(0) skewX(12deg);
       height: 16px;
       background: transparent;
-      color: #fff;
+      color: inherit;
       padding: 2px 6px;
       border-radius: 4px;
       font-size: 11px;
       font-weight: 600;
-      text-shadow: 0 1px 1px rgba(0,0,0,.5);
+      text-shadow: inherit;
       line-height: 16px;
       text-align: center;
       pointer-events: none;
@@ -130,27 +137,10 @@ function injectDragStyles() {
     .fc-event .event-title-chip > span {
       display: inline-block;
       width: 100%;
-      transform: skewX(-12deg);
     }
 
     /* Also hide default title container if any slips through */
     .fc-event .fc-event-title, .fc-event .fc-event-title-container { display: none !important; }
-
-    /* Payment status indicator: solid strip that keeps the parallelogram's own
-       skew (full / partial / unpaid) instead of an axis-aligned shape like a circle */
-    /* transform: none overrides the ".fc-event > *" counter-skew so this strip
-       stays parallel to the parallelogram's slanted edge, matching the event shape */
-    .fc-event .payment-status-line {
-      position: absolute;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      width: 7px;
-      box-shadow: 1px 0 3px rgba(0, 0, 0, 0.7);
-      pointer-events: none;
-      z-index: 25;
-      transform: none !important;
-    }
 
     .fc-event .pickup-service-indicator {
       position: absolute;

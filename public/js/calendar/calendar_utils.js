@@ -17,24 +17,19 @@ function getCSRFToken() {
 // BOOKING COLOR LOGIC
 // =============================================================================
 
+// Rough fallback color for a booking (before the full phase x payment logic in
+// applyCompositeStatusStyles runs). Defaults to the "not fully paid" variant of
+// each phase since payment status usually isn't known at this point.
 function getBookingColor(booking) {
-  // Check if this is a group booking first
-  // const isGroupBooking = booking.GROUP_BOOKING_ID && booking.GROUP_BOOKING_ID !== null;
-  
   switch (booking.BOOKING_STATUS) {
-    case 'check-In': return '#12866f'; // Occupied = teal
-    case 'check-Out': return '#B3B3B3';
+    case 'check-In': return '#6f9c40';  // Check-In (unpaid) = green
+    case 'check-Out': return '#00E5FF'; // Check-Out (unpaid) = cyan
     case 'pending':
-      // Hold Pending: booking has dates but no check-in/check-out processing yet
+      // Hold Pending / Pencil booking: booking has dates but no check-in/check-out processing yet
       if (booking.HOLD_PENDING === 1 || booking.HOLD_PENDING === '1' || booking.HOLD_PENDING === true) {
-        return '#FF6D00'; // Hold Pending = bright orange
+        return '#FFEB3B'; // Pencil booking = bright yellow
       }
-      // Distinguish between pending and late check-in based on CHECK_IN_STATUS
-      if (booking.CHECK_IN_STATUS === 0 || booking.CHECK_IN_STATUS === '0') {
-        return '#e0a316'; // Late check-in = amber
-      } else {
-        return '#e53935'; // Regular check-in = red (keep original)
-      }
+      return '#e53935'; // Reservation (unconfirmed) = red
     case 'cancelled': return '#000000';
     default: return 'pink';
   }
@@ -108,7 +103,7 @@ function normalizeCheckOutStatus(value, inferColorFn) {
 
 function isLateCheckout(event) {
   try {
-    const inferFromColor = () => (event.backgroundColor === '#e0a316' ? 'late' : 'regular');
+    const inferFromColor = () => 'regular'; // fill color no longer encodes late/regular status
     const coRaw = event?.extendedProps?.checkOutStatus;
     const coNorm = normalizeCheckOutStatus(coRaw, inferFromColor);
     return coNorm === 'late';
@@ -119,7 +114,7 @@ function isLateCheckout(event) {
 
 function isRegularCheckIn(event) {
   try {
-    const inferFromColor = () => (event.backgroundColor === '#e0a316' ? 'late' : 'regular');
+    const inferFromColor = () => 'regular'; // fill color no longer encodes late/regular status
     const ciRaw = event?.extendedProps?.checkInStatus;
     const ciNorm = normalizeCheckInStatus(ciRaw, inferFromColor);
     return ciNorm === 'regular';
@@ -130,7 +125,7 @@ function isRegularCheckIn(event) {
 
 function isLateCheckIn(event) {
   try {
-    const inferFromColor = () => (event.backgroundColor === '#e0a316' ? 'late' : 'regular');
+    const inferFromColor = () => 'regular'; // fill color no longer encodes late/regular status
     const ciRaw = event?.extendedProps?.checkInStatus;
     const ciNorm = normalizeCheckInStatus(ciRaw, inferFromColor);
     return ciNorm === 'late';

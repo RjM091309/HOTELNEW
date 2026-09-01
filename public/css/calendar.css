@@ -1286,10 +1286,6 @@
   background-color: #9c27b0 !important;
 }
 
-.legend-color-booking-channel {
-  background-color: #D5A6BD !important;
-}
-
 .legend-color-pickup {
   background-color: rgba(255, 255, 255, 0.12) !important;
   display: flex;
@@ -1345,45 +1341,53 @@
 }
 
 /* Legend color definitions */
-.legend-color-occupied {
-  background-color: #12866f !important;
+.legend-color-checkin-paid {
+  background-color: #FFC107 !important;
 }
 
-.legend-color-late-checkin {
-  background-color: #e0a316 !important;
+.legend-color-checkin-unpaid {
+  background-color: #6f9c40 !important;
 }
 
-.legend-color-regular-checkin {
+.legend-color-reservation-paid {
+  background-color: #5B9BD5 !important;
+}
+
+.legend-color-reservation-unconfirmed {
   background-color: #e53935 !important;
 }
 
-.legend-color-hold-pending {
-  background-color: #FF6D00 !important;
+.legend-color-ota-prepaid {
+  background-color: #D5A6BD !important;
 }
 
-.legend-color-back-to-back {
-  background-color: #AAFF00 !important;
+.legend-color-pencil-booking {
+  background-color: #FFEB3B !important;
 }
 
-.legend-color-checkout {
-  background-color: #6c757d !important;
+.legend-color-checkout-paid {
+  background-color: #424242 !important;
+}
+
+.legend-color-checkout-unpaid {
+  background-color: #00E5FF !important;
 }
 
 .legend-color-cancelled {
   background-color: #000000 !important;
 }
 
-/* Payment status legend colors */
-.legend-color-paid {
-  background-color: #2196f3 !important;
+/* Side indicator legend colors */
+.legend-color-late-checkout-btb {
+  background-color: #1A3FA0 !important;
 }
 
-.legend-color-partial {
-  background-color: #00E5FF !important;
+.legend-color-reservation-fee-paid {
+  background-color: #7B1FA2 !important;
 }
 
-.legend-color-unpaid {
-  background-color: #ffffff !important;
+.legend-color-late-checkin {
+  background-color: #FB8C00 !important;
 }
 
 /* Legend minimize/maximize animation */
