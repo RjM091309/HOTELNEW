@@ -554,7 +554,7 @@ function applyPickupIndicator(event, el) {
     const indicator = existing || document.createElement('div');
     indicator.className = 'pickup-service-indicator';
     indicator.title = 'Pick-up Service';
-    indicator.innerHTML = '<i class="fa fa-car" aria-hidden="true"></i>';
+    indicator.innerHTML = '<i class="fa fa-plane" aria-hidden="true"></i>';
     if (!existing) el.appendChild(indicator);
   } catch (e) {
     // ignore

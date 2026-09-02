@@ -341,6 +341,10 @@
                 <div id="groupRoomBreakdown"></div>
               </div>
 
+              <div class="group-summary-line" id="groupSummaryRoomLine" style="display: none;">
+                <span id="groupSummaryRoomLabel">Room Rate</span>
+                <span id="groupSummaryRoomTotal">0.00</span>
+              </div>
               <div class="group-summary-line" id="groupSummaryBreakfastLine" style="display: none;">
                 <span>Breakfast</span>
                 <span id="groupSummaryBreakfastTotal">0.00</span>
@@ -1410,6 +1414,29 @@
     }
   }
 
+  // Hold Pending is a rough advance reservation - it doesn't need staff to
+  // hand-check dozens of individual room boxes, since the exact King/Queen
+  // counts are already known (see #groupHoldPendingCheckbox). Checks the
+  // first `bed1Needed` King rooms and first `bed2Needed` Queen rooms from
+  // what Search Rooms returned, going through the SAME checkbox + 'change'
+  // event the manual click path uses (see the .group-manual-checkbox change
+  // handler below) rather than writing to groupManualSelectedRooms directly -
+  // that array is meant to always be derived from the checked DOM state, per
+  // the comment on that handler about past room-count drift bugs.
+  function autoSelectRoomsForHoldPending(availableRooms, bed1Needed, bed2Needed) {
+    if (!$('#groupHoldPendingCheckbox').is(':checked')) return;
+
+    const kingRooms = (availableRooms || []).filter(r => parseInt(r.ROOM_BED, 10) === 1).slice(0, bed1Needed);
+    const queenRooms = (availableRooms || []).filter(r => parseInt(r.ROOM_BED, 10) === 2).slice(0, bed2Needed);
+
+    [...kingRooms, ...queenRooms].forEach((room) => {
+      const $checkbox = $(`#groupRoomsList .group-manual-checkbox[data-room-id="${normalizeRoomId(room.IDNo)}"]`);
+      if ($checkbox.length && !$checkbox.is(':checked')) {
+        $checkbox.prop('checked', true).trigger('change');
+      }
+    });
+  }
+
   function readCheckedRoomIdsFromDOM() {
     const ids = [];
     $('#groupRoomsList .group-manual-checkbox:checked').each(function() {
@@ -2223,6 +2250,14 @@
     // its own checkbox is actually on, so the summary reads as "what's really
     // being charged" instead of always listing every possible line at ₱0.
     const summaryLineFmt = (amount) => amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    // Room cost itself was only ever folded silently into the grand Total below -
+    // no line item showed it, even though it's usually the single biggest number
+    // in the quote. #groupRoomBreakdown (above, in groupRoomPricingPanel) lists
+    // it per-room, which gets unreadable past a handful of rooms - this is the
+    // one-line aggregate instead, same pattern as every other line here.
+    $('#groupSummaryRoomLine').toggle(roomSubtotal > 0);
+    $('#groupSummaryRoomLabel').text(`Room Rate (${numRooms} room${numRooms === 1 ? '' : 's'} × ${nights} night${nights === 1 ? '' : 's'})`);
+    $('#groupSummaryRoomTotal').text(summaryLineFmt(roomSubtotal));
     $('#groupSummaryBreakfastLine').toggle(breakfastTotalWithIndividual > 0);
     $('#groupSummaryBreakfastTotal').text(summaryLineFmt(breakfastTotalWithIndividual));
     $('#groupSummaryPickupLine').toggle(pickupPrice > 0);
@@ -2878,6 +2913,8 @@
           if (groupManualMode) {
             refreshManualSelectionDisabledState();
           }
+
+          autoSelectRoomsForHoldPending(availableRooms, bed1Needed, bed2Needed);
         },
         error: function(err) {
           console.error('Error finding rooms:', err);

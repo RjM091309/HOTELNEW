@@ -191,7 +191,8 @@
 
   .rate-summary-checkboxes {
     justify-content: flex-start;
-    gap: 20px;
+    flex-wrap: wrap;
+    gap: 10px;
   }
 
   /* King/Queen rows: "Queen Bed Rate" is wider than "King Bed Rate", which
@@ -213,6 +214,64 @@
     padding-bottom: 8px;
   }
 
+  /* Clickable alternative(s) shown when shifting the shortfall to the other bed
+     type, or adding an extra bed, would cover what was typed - see
+     computeRoomCheckerRoomAllocationSuggestion and fetchRoomCheckerExtraBedRate
+     in room_checker.js. Up to two buttons can appear, stacked, each styled by
+     its own class: "complete" (green) fully covers the original request,
+     "partial" (amber, same tone as the warning above it) is the closest still
+     possible using rooms alone. Hidden by default. */
+  .rate-summary-suggestion {
+    display: none;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    padding-bottom: 8px;
+  }
+
+  .rate-summary-suggestion button {
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 10px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+
+  .rate-summary-suggestion button.complete {
+    background: rgba(111, 156, 64, 0.12);
+    border: 1px solid rgba(111, 156, 64, 0.4);
+    color: #8fc35c;
+  }
+
+  .rate-summary-suggestion button.complete:hover {
+    background: rgba(111, 156, 64, 0.22);
+    border-color: rgba(111, 156, 64, 0.7);
+  }
+
+  [data-theme="white"] .rate-summary-suggestion button.complete {
+    background: rgba(111, 156, 64, 0.1);
+    border-color: rgba(111, 156, 64, 0.35);
+    color: #4f7a2a;
+  }
+
+  .rate-summary-suggestion button.partial {
+    background: rgba(224, 163, 60, 0.12);
+    border: 1px solid rgba(224, 163, 60, 0.4);
+    color: #e0a33c;
+  }
+
+  .rate-summary-suggestion button.partial:hover {
+    background: rgba(224, 163, 60, 0.22);
+    border-color: rgba(224, 163, 60, 0.7);
+  }
+
+  [data-theme="white"] .rate-summary-suggestion button.partial {
+    background: rgba(224, 163, 60, 0.1);
+    border-color: rgba(224, 163, 60, 0.35);
+    color: #a86d1c;
+  }
+
   .rate-summary-label {
     font-weight: 600;
     color: #9aa4ac;
@@ -228,6 +287,37 @@
 
   .rate-summary-checkbox input {
     cursor: pointer;
+  }
+
+  /* Quick-set shortcuts for the common small Breakfast counts - just write
+     into #rateSummaryBreakfastQty (see wireRoomCheckerBreakfastPresets in
+     room_checker.js), they don't hold any state of their own. */
+  .rate-summary-preset-btn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    color: #d7dce0;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 9px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+
+  .rate-summary-preset-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+
+  [data-theme="white"] .rate-summary-preset-btn {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.15);
+    color: #495057;
+  }
+
+  [data-theme="white"] .rate-summary-preset-btn:hover {
+    background: rgba(0, 0, 0, 0.08);
+    border-color: rgba(0, 0, 0, 0.3);
   }
 
   .rate-summary-subtotal {
@@ -345,26 +435,51 @@
             </div>
             <div id="rateSummaryQueenWarning" class="rate-summary-availability-warning"></div>
           </div>
+          <!-- Combined suggestion(s) covering either bed type overflowing (or both
+               at once) - see computeRoomCheckerRoomAllocationSuggestion in
+               room_checker.js. Can render up to two buttons: the closest
+               King/Queen-only split, and (when the "Extra Bed" service from
+               /services is active) adding an extra bed to cover what rooms
+               alone can't. Lives outside the King/Queen groups above since it
+               reasons about both together, not one side at a time. -->
+          <div id="rateSummaryBedSuggestion" class="rate-summary-suggestion"></div>
           <div class="rate-summary-row rate-summary-subtotal">
             <span>Total Room Rate</span>
             <span id="rateSummaryTotalRoomRate">&#8369;0.00</span>
           </div>
 
+          <!-- Breakfast count defaults to (and re-syncs to) total rooms booked
+               whenever King/Queen qty changes - see
+               syncRoomCheckerBreakfastToRoomCount in room_checker.js - since a
+               bulk quote almost always wants one breakfast per room. The
+               None/1/2 buttons are just quick overrides for the common small
+               cases; the number field next to them is the actual value and
+               source of truth (was a 3-option radio, capped at 2 - too small
+               once a booking has dozens of rooms). -->
           <div class="rate-summary-row rate-summary-checkboxes">
             <span class="rate-summary-label">Breakfast</span>
-            <label class="rate-summary-checkbox">
-              <input type="radio" name="rateSummaryBreakfast" value="0" checked> None
-            </label>
-            <label class="rate-summary-checkbox">
-              <input type="radio" name="rateSummaryBreakfast" value="1"> 1
-            </label>
-            <label class="rate-summary-checkbox">
-              <input type="radio" name="rateSummaryBreakfast" value="2"> 2
-            </label>
+            <button type="button" class="rate-summary-preset-btn" data-breakfast-preset="0">None</button>
+            <button type="button" class="rate-summary-preset-btn" data-breakfast-preset="1">1</button>
+            <button type="button" class="rate-summary-preset-btn" data-breakfast-preset="2">2</button>
+            <input type="number" id="rateSummaryBreakfastQty" class="rate-summary-qty-input" value="0" min="0" step="1" title="Number of breakfasts">
           </div>
           <div class="rate-summary-row">
             <span>Breakfast Total</span>
             <span id="rateSummaryBreakfastTotal">&#8369;0.00</span>
+          </div>
+
+          <!-- Rate pulled live from the "Extra Bed" entry under /services (Special
+               Requests category) - see fetchRoomCheckerExtraBedRate in room_checker.js.
+               Row stays priced at ₱0.00 / has no effect on the total if that service
+               isn't found or is marked unavailable there. -->
+          <div class="rate-summary-row rate-summary-bed-row">
+            <span>Extra Bed</span>
+            <span id="rateSummaryExtraBedRate">&#8369;0.00</span>
+            <input type="number" id="rateSummaryExtraBedQty" class="rate-summary-qty-input" value="0" min="0" step="1" title="Number of extra beds">
+          </div>
+          <div class="rate-summary-row">
+            <span>Extra Bed Total</span>
+            <span id="rateSummaryExtraBedTotal">&#8369;0.00</span>
           </div>
 
           <div class="rate-summary-row rate-summary-subtotal">
@@ -399,4 +514,4 @@
 <script src="/plugins/fullcalendar/packages/interaction/main.min.js"></script>
 <script src="/plugins/fullcalendar/packages/daygrid/main.min.js"></script>
 <script src="/plugins/fullcalendar/packages/timegrid/main.min.js"></script>
-<script src="/js/calendar/room_checker.js?v=8"></script>
+<script src="/js/calendar/room_checker.js?v=16"></script>
