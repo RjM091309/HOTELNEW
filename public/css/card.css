@@ -144,7 +144,6 @@
 .dashboard-btn-row:hover {
   color: #fff;
   background: rgba(255,255,255,0.05);
-  transform: translateX(4px);
 }
 .dashboard-btn-row:hover::after {
   width: 100%;
@@ -235,7 +234,6 @@
 .dashboard-btn-row1:hover {
   color: #ffffff; /* Darker text on hover */
   background: rgba(255,255,255,0.05);
-  transform: translateX(4px);
 }
 
 .dashboard-btn-row1:hover::after {

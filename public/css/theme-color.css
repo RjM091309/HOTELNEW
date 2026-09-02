@@ -286,7 +286,7 @@
 }
 [data-theme="white"] .dashboard-btn-row:hover,
 [data-theme="white"] .dashboard-btn-row1:hover {
-    background: rgba(0,0,0,0.04) !important;
+    background: transparent !important;
 }
 
 /* Generic cards used across booking/rooms - force dark text on light theme */

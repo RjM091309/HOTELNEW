@@ -2460,18 +2460,23 @@ async function deleteRequestFromModal(id) {
 [data-theme="white"] .card-accent-rose .info-box-icon { background: rgba(239,68,68,.16) !important; border-color: rgba(239,68,68,.3) !important; }
 [data-theme="white"] .card-accent-rose .info-box-icon i { color: #ef4444 !important; }
 
-/* Light mode: brand-green outline pill for the Real-Time Booking Monitor filter buttons (was a washed-out mint tint) */
+/* Light mode: black hover underline on overview-card rows instead of the green gradient */
+[data-theme="white"] .dashboard-btn-row::after,
+[data-theme="white"] .dashboard-btn-row1::after {
+  background: #111827 !important;
+}
+
+/* Light mode: same gray-chip style as the floor tabs for the Real-Time Booking Monitor filter buttons */
 [data-theme="white"] .filter-btn-group .filter-btn,
 [data-theme="white"] .filter-btn-group .dropdown-toggle {
-  background: #f0f7e8 !important;
-  border: 1.5px solid #6f9c40 !important;
-  color: #3f6212 !important;
+  background: #f3f4f6 !important;
+  border: none !important;
+  color: #374151 !important;
 }
 [data-theme="white"] .filter-btn-group .filter-btn:hover,
 [data-theme="white"] .filter-btn-group .dropdown-toggle:hover {
-  background: #6f9c40 !important;
-  border-color: #5a7a33 !important;
-  color: #ffffff !important;
+  background: #e5e7eb !important;
+  color: #111827 !important;
 }
 
 /* Light mode: pill-style tabs for the Real-Time Booking Monitor tab bar */
@@ -2479,18 +2484,20 @@ async function deleteRequestFromModal(id) {
   color: #6b7280 !important;
   font-weight: 600 !important;
   padding: 6px 14px !important;
-  border-radius: 20px !important;
-  border: 1.5px solid transparent;
+  border-radius: 0 !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  background: transparent !important;
   margin: 0 2px;
 }
 [data-theme="white"] .mdl-tabs__tab.tabs_three:hover {
-  background: #f3f4f6 !important;
+  background: transparent !important;
   color: #111827 !important;
 }
 [data-theme="white"] .mdl-tabs__tab.tabs_three.is-active {
-  background: #f0f7e8 !important;
-  border-color: #6f9c40 !important;
-  color: #3f6212 !important;
+  background: transparent !important;
+  border-bottom: 2px solid #374151 !important;
+  color: #374151 !important;
 }
 [data-theme="white"] .mdl-tabs.is-upgraded .mdl-tabs__tab.tabs_three.is-active:after,
 [data-theme="white"] .mdl-tabs .mdl-tabs.is-upgraded .mdl-tabs__tab.tabs_three.is-active:after {
