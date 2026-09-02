@@ -391,6 +391,41 @@
     color: #1565c0;
   }
 
+  /* Recap chip + Total Discount grouped into a single rounded pill/card instead of
+     two separate stacked pills, so the rounding reads as one consistent shape. */
+  .rate-summary-combo-pill {
+    border-radius: 16px;
+    background: rgba(33, 150, 243, 0.12);
+    border: 1px solid rgba(33, 150, 243, 0.3);
+    padding: 4px 14px;
+    margin: 4px 0;
+  }
+
+  .rate-summary-combo-pill .rate-summary-row {
+    border-bottom: 1px solid rgba(33, 150, 243, 0.2);
+  }
+
+  .rate-summary-combo-pill .rate-summary-row:last-child {
+    border-bottom: none;
+  }
+
+  [data-theme="white"] .rate-summary-combo-pill {
+    background: rgba(33, 150, 243, 0.08);
+    border-color: rgba(33, 150, 243, 0.25);
+  }
+
+  [data-theme="white"] .rate-summary-combo-pill .rate-summary-row {
+    border-bottom-color: rgba(33, 150, 243, 0.18);
+  }
+
+  /* The recap chip no longer needs its own pill background/border now that it
+     lives inside .rate-summary-combo-pill - avoids a pill nested in a pill. */
+  .rate-summary-combo-pill .rate-summary-chip {
+    background: transparent;
+    border: none;
+    padding: 6px 0;
+  }
+
   [data-theme="white"] .rate-summary-chip-sep {
     background: rgba(21, 101, 192, 0.35);
   }
@@ -593,10 +628,6 @@
             <span>Discount per Room, per Night</span>
             <input type="number" id="rateSummaryDiscount" class="rate-summary-discount-input" value="0" min="0" step="0.01" title="Applied to every room, every night">
           </div>
-          <div class="rate-summary-row">
-            <span>Total Discount</span>
-            <span id="rateSummaryDiscountTotal">-&#8369;0.00</span>
-          </div>
 
           <div class="rate-summary-row rate-summary-grand-total">
             <span>Grand Total</span>
@@ -606,15 +637,26 @@
           <!-- Quick-glance recap of the current selection, kept in sync from
                recomputeRateSummaryTotals (see updateRoomCheckerSummaryChip in
                room_checker.js) so it never drifts from what Proceed Booking
-               is about to carry over. -->
-          <div class="rate-summary-row rate-summary-actions" style="border-bottom: none;">
-            <div id="roomCheckerSummaryChip" class="rate-summary-chip">
-              <span class="rate-summary-chip-item"><i class="fa fa-moon-o" aria-hidden="true"></i><span id="roomCheckerChipNights">1 night</span></span>
-              <span class="rate-summary-chip-sep"></span>
-              <span class="rate-summary-chip-item"><i class="fa fa-bed" aria-hidden="true"></i><span id="roomCheckerChipRooms">0 King, 0 Queen</span></span>
-              <span class="rate-summary-chip-sep"></span>
-              <span class="rate-summary-chip-item"><i class="fa fa-coffee" aria-hidden="true"></i><span id="roomCheckerChipBreakfast">0 BF</span></span>
+               is about to carry over. Grouped with Total Discount into one
+               rounded pill instead of two separate stacked pills. -->
+          <div class="rate-summary-combo-pill">
+            <div class="rate-summary-row rate-summary-actions">
+              <div id="roomCheckerSummaryChip" class="rate-summary-chip">
+                <span class="rate-summary-chip-item"><i class="fa fa-moon-o" aria-hidden="true"></i><span id="roomCheckerChipNights">1 night</span></span>
+                <span class="rate-summary-chip-sep"></span>
+                <span class="rate-summary-chip-item"><i class="fa fa-bed" aria-hidden="true"></i><span id="roomCheckerChipRooms">0 King, 0 Queen</span></span>
+                <span class="rate-summary-chip-sep"></span>
+                <span class="rate-summary-chip-item"><i class="fa fa-coffee" aria-hidden="true"></i><span id="roomCheckerChipBreakfast">0 BF</span></span>
+              </div>
             </div>
+
+            <div class="rate-summary-row" style="border-bottom: none;">
+              <span>Total Discount</span>
+              <span id="rateSummaryDiscountTotal">-&#8369;0.00</span>
+            </div>
+          </div>
+
+          <div class="rate-summary-row rate-summary-proceed-row" style="border-bottom: none; justify-content: flex-end;">
             <button type="button" id="roomCheckerProceedBookingBtn" class="btn btn-primary">Proceed Booking</button>
           </div>
         </div>
