@@ -51,8 +51,12 @@ function applyRoomCheckerRangeHighlight() {
   // Highlight through the check-out day too (nights + 1 cells) - staff expect to
   // see the full stay span on the calendar (e.g. Aug 31-Sep 3 highlighted for a
   // 3-night stay), even though the check-out day itself isn't a charged night.
+  // Exception: the very first click of a fresh selection only sets the "From"
+  // anchor (see handleRoomCheckerDateClick) - the 1-night default it computes
+  // is just so Save works immediately if staff stop there, not a real range yet,
+  // so only the anchor day itself lights up until a second, distinct day is clicked.
   const end = new Date(range.start);
-  end.setDate(end.getDate() + range.nights + 1);
+  end.setDate(end.getDate() + (range.awaitingSecondClick ? 1 : range.nights + 1));
 
   for (const d = new Date(range.start); d < end; d.setDate(d.getDate() + 1)) {
     const dateKey = roomCheckerFormatDateKey(d);
@@ -75,7 +79,8 @@ function handleRoomCheckerDateClick(info) {
   todayStart.setHours(0, 0, 0, 0);
   if (info.date < todayStart) return;
 
-  if (!roomCheckerPendingAnchor) {
+  const isFirstClick = !roomCheckerPendingAnchor;
+  if (isFirstClick) {
     roomCheckerPendingAnchor = info.date;
   }
 
@@ -88,7 +93,7 @@ function handleRoomCheckerDateClick(info) {
   const checkoutDay = info.date < roomCheckerPendingAnchor ? roomCheckerPendingAnchor : info.date;
   const nights = Math.max(1, Math.round((checkoutDay - start) / (1000 * 60 * 60 * 24)));
 
-  roomCheckerPreviewRange = { start, nights };
+  roomCheckerPreviewRange = { start, nights, awaitingSecondClick: isFirstClick };
   applyRoomCheckerRangeHighlight();
   toggleRoomCheckerSaveButton(true);
 }
@@ -127,6 +132,7 @@ function resetRoomCheckerSummary() {
   document.getElementById('rateSummaryBreakfastQty').value = 0;
   document.getElementById('rateSummaryDiscount').value = 0;
   document.getElementById('rateSummaryDateRange').textContent = 'Select a range on the calendar';
+  syncRoomCheckerBreakfastPresetActiveState();
 
   toggleRoomCheckerSaveButton(false);
   applyRoomCheckerRangeHighlight();
@@ -238,15 +244,20 @@ function updateRoomCheckerAvailabilityWarning(warningElId, label, qty, bedKey) {
 
 // Works out the best King/Queen split achievable when what's typed overflows
 // availability on one side, the other, or BOTH at once - e.g. "need 30 King,
-// only 29 available" -> shift the 1-room shortfall onto Queen if it has a
-// free room. Two-pass allocation so it's symmetric regardless of which side
-// is short: first let King absorb into Queen's spare capacity, then let
+// only 28 available" -> the 2-room shortfall is 2 King beds' worth of guests
+// (a King room = 1 bed), which only takes 1 spare Queen room to cover (a
+// Queen room = 2 beds) - NOT a 1-for-1 King-room-for-Queen-room swap, or it'd
+// suggest twice as many Queen rooms as guests actually need. Converts every
+// shortfall to bed-slot units before crossing it to the other type, then back
+// to whole rooms of that type (rounding up, since a room can't be partly
+// booked). Two-pass so it's symmetric regardless of which side is short:
+// first let King's shortfall draw on Queen's spare capacity, then let
 // whatever King headroom is left absorb back any of Queen's own overflow.
 // Returns null only when neither side overflows (nothing to suggest) or the
 // range's availability hasn't loaded yet (kingMin/queenMin still null).
 // Otherwise returns { kingQty, queenQty, complete, shortBy }: `complete` is
 // true when the split covers everything originally typed; when it's false,
-// `shortBy` is how many rooms still can't be placed anywhere even after
+// `shortBy` is how many bed-slots still can't be placed anywhere even after
 // maxing out both types - callers show that as a best-effort suggestion
 // rather than staying silent just because a full fix isn't possible.
 function computeRoomCheckerRoomAllocationSuggestion(kingQty, queenQty, kingMin, queenMin) {
@@ -254,16 +265,21 @@ function computeRoomCheckerRoomAllocationSuggestion(kingQty, queenQty, kingMin, 
   if (kingQty <= kingMin && queenQty <= queenMin) return null;
 
   let kingAlloc = Math.min(kingQty, kingMin);
-  let kingShort = kingQty - kingAlloc;
+  let queenAlloc = Math.min(queenQty, queenMin);
 
-  let queenAlloc = Math.min(queenQty + kingShort, queenMin);
-  let queenShort = (queenQty + kingShort) - queenAlloc;
+  let kingShortSlots = (kingQty - kingAlloc) * KING_BEDS_PER_ROOM;
+  let queenShortSlots = (queenQty - queenAlloc) * QUEEN_BEDS_PER_ROOM;
 
-  if (queenShort > 0) {
-    const kingHeadroom = kingMin - kingAlloc;
-    const extra = Math.min(queenShort, kingHeadroom);
-    kingAlloc += extra;
-    queenShort -= extra;
+  if (kingShortSlots > 0) {
+    const queenRoomsUsed = Math.min(Math.ceil(kingShortSlots / QUEEN_BEDS_PER_ROOM), queenMin - queenAlloc);
+    queenAlloc += queenRoomsUsed;
+    kingShortSlots = Math.max(0, kingShortSlots - queenRoomsUsed * QUEEN_BEDS_PER_ROOM);
+  }
+
+  if (queenShortSlots > 0) {
+    const kingRoomsUsed = Math.min(Math.ceil(queenShortSlots / KING_BEDS_PER_ROOM), kingMin - kingAlloc);
+    kingAlloc += kingRoomsUsed;
+    queenShortSlots = Math.max(0, queenShortSlots - kingRoomsUsed * KING_BEDS_PER_ROOM);
   }
 
   // Nothing actually changed from what's already typed (e.g. the "overflow"
@@ -274,36 +290,36 @@ function computeRoomCheckerRoomAllocationSuggestion(kingQty, queenQty, kingMin, 
   return {
     kingQty: kingAlloc,
     queenQty: queenAlloc,
-    complete: queenShort === 0,
-    shortBy: queenShort
+    complete: kingShortSlots === 0 && queenShortSlots === 0,
+    shortBy: kingShortSlots + queenShortSlots
   };
 }
 
 // Independent alternative to computeRoomCheckerRoomAllocationSuggestion above:
 // instead of reassigning bed TYPES to use up whatever capacity exists on the
-// other side, this keeps King and Queen at whatever was actually typed for
-// each (capped at what's available) and covers every bit of overflow - on
-// either side, or both - with extra beds in those same rooms instead.
-// Offered whenever EITHER side overflows and the Extra Bed service is active,
+// other side, this keeps King and Queen at whatever was actually typed
+// (Queen capped at what's available) and covers a Queen shortfall with extra
+// beds in those same rooms instead - a Queen room already sleeps 2, so an
+// extra bed there is a real substitute for a whole extra Queen room. A King
+// room only ever has the one bed, so a King shortfall has no such
+// equivalent - never offered for King overflow, no matter how large.
+// Offered whenever Queen overflows and the Extra Bed service is active,
 // regardless of whether a same-type reassignment could also fully solve it -
 // staff may well prefer keeping the originally-requested bed type over
-// reassigning rooms (e.g. guests specifically asked for Queen). Returns null
-// when there's no overflow at all, availability hasn't loaded, or the Extra
-// Bed service isn't active.
+// reassigning rooms. Returns null when Queen isn't over, availability hasn't
+// loaded, or the Extra Bed service isn't active.
 function computeRoomCheckerExtraBedSuggestion(kingQty, queenQty, kingMin, queenMin, currentExtraBedQty) {
   if (window.__rateSummaryExtraBedRate === null) return null;
-  if (kingMin === null || queenMin === null) return null;
+  if (queenMin === null) return null;
 
-  const kingOverflow = kingQty > kingMin ? kingQty - kingMin : 0;
   const queenOverflow = queenQty > queenMin ? queenQty - queenMin : 0;
-  const totalOverflow = kingOverflow + queenOverflow;
-  if (totalOverflow === 0) return null;
+  if (queenOverflow === 0) return null;
 
   return {
-    kingQty: Math.min(kingQty, kingMin),
-    queenQty: Math.min(queenQty, queenMin),
-    extraBedQty: (currentExtraBedQty || 0) + totalOverflow,
-    addedBeds: totalOverflow
+    kingQty,
+    queenQty: queenMin,
+    extraBedQty: (currentExtraBedQty || 0) + queenOverflow,
+    addedBeds: queenOverflow
   };
 }
 
@@ -405,20 +421,44 @@ function updateRoomCheckerSuggestion(suggestionElId, roomSuggestion, extraBedSug
 const KING_BEDS_PER_ROOM = 1;
 const QUEEN_BEDS_PER_ROOM = 2;
 
-function syncRoomCheckerBreakfastToRoomCount() {
+function getRoomCheckerTotalBeds() {
   const kingQty = Math.max(0, parseInt(document.getElementById('rateSummaryKingQty').value, 10) || 0);
   const queenQty = Math.max(0, parseInt(document.getElementById('rateSummaryQueenQty').value, 10) || 0);
   const extraBedQty = Math.max(0, parseInt(document.getElementById('rateSummaryExtraBedQty').value, 10) || 0);
   // Each extra bed is one more guest to feed too, same as any other bed.
-  const totalBeds = (kingQty * KING_BEDS_PER_ROOM) + (queenQty * QUEEN_BEDS_PER_ROOM) + extraBedQty;
-  document.getElementById('rateSummaryBreakfastQty').value = totalBeds;
+  return (kingQty * KING_BEDS_PER_ROOM) + (queenQty * QUEEN_BEDS_PER_ROOM) + extraBedQty;
+}
+
+// Marks which None/1/2 preset (if any) matches the field's current value as
+// "active" (highlighted) - called after every change to the Breakfast qty,
+// whichever triggered it, so the highlight always reflects reality instead
+// of just tracking clicks. No preset lights up once staff hand-edit the
+// field to something that isn't an exact per-bed multiple.
+function syncRoomCheckerBreakfastPresetActiveState() {
+  const qty = parseInt(document.getElementById('rateSummaryBreakfastQty').value, 10) || 0;
+  const totalBeds = getRoomCheckerTotalBeds();
+  document.querySelectorAll('.rate-summary-preset-btn[data-breakfast-preset]').forEach((btn) => {
+    const perBed = parseInt(btn.getAttribute('data-breakfast-preset'), 10) || 0;
+    const matches = perBed === 0 ? qty === 0 : (totalBeds > 0 && qty === perBed * totalBeds);
+    btn.classList.toggle('active', matches);
+  });
+}
+
+function syncRoomCheckerBreakfastToRoomCount() {
+  document.getElementById('rateSummaryBreakfastQty').value = getRoomCheckerTotalBeds();
+  syncRoomCheckerBreakfastPresetActiveState();
   recomputeRateSummaryTotals();
 }
 
+// The None/1/2 preset buttons mean "breakfasts per bed", not a flat guest
+// count - e.g. 10 beds selected with the "2" preset means 2 breakfasts per
+// bed (20 total), matching how many people that many beds actually sleep.
 function wireRoomCheckerBreakfastPresets() {
   document.querySelectorAll('.rate-summary-preset-btn[data-breakfast-preset]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      document.getElementById('rateSummaryBreakfastQty').value = btn.getAttribute('data-breakfast-preset');
+      const perBed = parseInt(btn.getAttribute('data-breakfast-preset'), 10) || 0;
+      document.getElementById('rateSummaryBreakfastQty').value = perBed * getRoomCheckerTotalBeds();
+      syncRoomCheckerBreakfastPresetActiveState();
       recomputeRateSummaryTotals();
     });
   });
@@ -434,7 +474,10 @@ function initRateSummary() {
   const extraBedQtyInput = document.getElementById('rateSummaryExtraBedQty');
 
   bookingTypeInputs.forEach(input => input.addEventListener('change', fetchRateSummary));
-  breakfastQtyInput.addEventListener('input', recomputeRateSummaryTotals);
+  breakfastQtyInput.addEventListener('input', () => {
+    syncRoomCheckerBreakfastPresetActiveState();
+    recomputeRateSummaryTotals();
+  });
   discountInput.addEventListener('input', recomputeRateSummaryTotals);
   kingQtyInput.addEventListener('input', syncRoomCheckerBreakfastToRoomCount);
   queenQtyInput.addEventListener('input', syncRoomCheckerBreakfastToRoomCount);
@@ -536,9 +579,13 @@ function recomputeRateSummaryTotals() {
 
   const subTotal = totalRoomRate + breakfastTotal + extraBedTotal;
 
+  // Per room, per night - same scaling as Total Room Rate above, so a bulk
+  // quote's discount grows with the room count instead of staying a single
+  // flat amount no matter how many rooms are booked.
   const discountInput = document.getElementById('rateSummaryDiscount');
   const discountPerNight = Math.max(0, parseFloat(discountInput.value) || 0);
-  const discount = discountPerNight * nights;
+  const totalRooms = kingQty + queenQty;
+  const discount = discountPerNight * nights * totalRooms;
 
   const grandTotal = Math.max(0, subTotal - discount);
 
@@ -549,7 +596,24 @@ function recomputeRateSummaryTotals() {
   document.getElementById('rateSummaryExtraBedRate').textContent = formatPeso(extraBedRate);
   document.getElementById('rateSummaryExtraBedTotal').textContent = formatPeso(extraBedTotal);
   document.getElementById('rateSummarySubTotal').textContent = formatPeso(subTotal);
+  document.getElementById('rateSummaryDiscountTotal').textContent = (discount > 0 ? '-' : '') + formatPeso(discount);
   document.getElementById('rateSummaryGrandTotal').textContent = formatPeso(grandTotal);
+
+  updateRoomCheckerSummaryChip(nights, kingQty, queenQty, breakfastCount);
+}
+
+// Recap chip next to Proceed Booking - lets staff double-check nights/rooms/
+// breakfast at a glance right before committing, without scanning back up
+// through the whole itemized panel.
+function updateRoomCheckerSummaryChip(nights, kingQty, queenQty, breakfastCount) {
+  const nightsEl = document.getElementById('roomCheckerChipNights');
+  const roomsEl = document.getElementById('roomCheckerChipRooms');
+  const breakfastEl = document.getElementById('roomCheckerChipBreakfast');
+  if (!nightsEl || !roomsEl || !breakfastEl) return;
+
+  nightsEl.textContent = `${nights} night${nights === 1 ? '' : 's'}`;
+  roomsEl.textContent = `${kingQty} King, ${queenQty} Queen`;
+  breakfastEl.textContent = `${breakfastCount} BF`;
 }
 
 window.roomCheckerCalendars = [];
@@ -752,12 +816,13 @@ function proceedRoomCheckerBooking() {
   checkoutDate.setDate(checkoutDate.getDate() + range.nights);
   const dateRangeStr = `${roomCheckerFormatDisplayDate(start)} to ${roomCheckerFormatDisplayDate(checkoutDate)} (${range.nights} night/s)`;
 
-  // Room Checker's Discount field is per-night; both booking modals take a flat
-  // total discount amount (subtracted once, not multiplied by nights) - convert
-  // here so a discount already set in the Rate Summary panel actually carries
-  // over instead of silently resetting to 0 in whichever modal opens.
+  // Room Checker's Discount field is per room, per night; both booking modals take
+  // a flat total discount amount (subtracted once) - convert here, matching the
+  // same per-room x per-night scaling used in recomputeRateSummaryTotals, so a
+  // discount already set in the Rate Summary panel actually carries over instead
+  // of silently resetting to 0 (or under-counting rooms) in whichever modal opens.
   const discountPerNight = Math.max(0, parseFloat(document.getElementById('rateSummaryDiscount').value) || 0);
-  const totalDiscount = discountPerNight * range.nights;
+  const totalDiscount = discountPerNight * range.nights * totalRooms;
 
   // Room Checker's breakfast option is just a flat guest count (None/1/2), with no
   // adult/kid split - both modals do split adult/kid, so carry the count over as

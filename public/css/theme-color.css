@@ -269,7 +269,8 @@
     box-shadow: 0 8px 32px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04) !important;
 }
 [data-theme="white"] .dashboard-card-header {
-    background: linear-gradient(135deg, #e5e7eb, #f3f4f6) !important;
+    background: #ffffff !important;
+    border-bottom: 1px solid #e5e7eb !important;
 }
 [data-theme="white"] .dashboard-card-header-title {
     color: #111827 !important;
@@ -3167,7 +3168,7 @@
 [data-theme="white"] .dashboard-card-header-metric { color: #111827 !important; }
 [data-theme="white"] .dashboard-btn-row-metric,
 [data-theme="white"] .dashboard-btn-row-metric1,
-[data-theme="white"] .dashboard-btn-row-metric2 { color: #166534 !important; }
+[data-theme="white"] .dashboard-btn-row-metric2 { color: #111827 !important; }
 
 /* Dark/colored themes: ensure light text for items that were hardcoded dark */
 [data-theme]:not([data-theme="white"]) .card-body ul li,

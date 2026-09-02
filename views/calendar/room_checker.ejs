@@ -309,6 +309,21 @@
     border-color: rgba(255, 255, 255, 0.3);
   }
 
+  /* Active state - same blue used for calendar range-selection highlights
+     (see #room-checker-months td.fc-day.room-checker-range-selected above) -
+     shows which preset (if any) matches the Breakfast field's current value;
+     see syncRoomCheckerBreakfastPresetActiveState in room_checker.js. */
+  .rate-summary-preset-btn.active {
+    background: #2196f3;
+    border-color: #2196f3;
+    color: #fff;
+  }
+
+  .rate-summary-preset-btn.active:hover {
+    background: #1e88e5;
+    border-color: #1e88e5;
+  }
+
   [data-theme="white"] .rate-summary-preset-btn {
     background: rgba(0, 0, 0, 0.04);
     border-color: rgba(0, 0, 0, 0.15);
@@ -320,16 +335,103 @@
     border-color: rgba(0, 0, 0, 0.3);
   }
 
+  [data-theme="white"] .rate-summary-preset-btn.active {
+    background: #2196f3;
+    border-color: #2196f3;
+    color: #fff;
+  }
+
+  /* Selection recap chip next to Proceed Booking - see updateRoomCheckerSummaryChip
+     in room_checker.js. Same blue used everywhere else on this page (range
+     highlight, active presets) so it reads as "this is what you selected". */
+  .rate-summary-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .rate-summary-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 14px;
+    border-radius: 999px;
+    background: rgba(33, 150, 243, 0.12);
+    border: 1px solid rgba(33, 150, 243, 0.3);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #9fd0fb;
+    white-space: nowrap;
+  }
+
+  .rate-summary-chip-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .rate-summary-chip-item i {
+    color: #2196f3;
+    font-size: 12px;
+  }
+
+  .rate-summary-chip-sep {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: rgba(159, 208, 251, 0.5);
+    flex-shrink: 0;
+  }
+
+  [data-theme="white"] .rate-summary-chip {
+    background: rgba(33, 150, 243, 0.08);
+    border-color: rgba(33, 150, 243, 0.25);
+    color: #1565c0;
+  }
+
+  [data-theme="white"] .rate-summary-chip-sep {
+    background: rgba(21, 101, 192, 0.35);
+  }
+
+  @media (max-width: 420px) {
+    .rate-summary-chip {
+      white-space: normal;
+      font-size: 11.5px;
+    }
+  }
+
   .rate-summary-subtotal {
     font-weight: 600;
   }
 
+  /* Green clashed with the blue accent used everywhere else on this page
+     (range highlight, active presets, the recap chip) - matching that blue
+     here instead so Grand Total reads as "part of the same page", not a
+     leftover color from somewhere else. */
   .rate-summary-grand-total {
     border-bottom: none;
     font-weight: 700;
     font-size: 17px;
-    color: #6f9c40;
     padding-top: 14px;
+  }
+
+  .rate-summary-grand-total span:first-child {
+    color: #d7dce0;
+  }
+
+  .rate-summary-grand-total span:last-child {
+    color: #2196f3;
+    font-size: 19px;
+  }
+
+  [data-theme="white"] .rate-summary-grand-total span:first-child {
+    color: #343a40;
+  }
+
+  [data-theme="white"] .rate-summary-grand-total span:last-child {
+    color: #1565c0;
   }
 
   .rate-summary-discount-input {
@@ -459,8 +561,8 @@
           <div class="rate-summary-row rate-summary-checkboxes">
             <span class="rate-summary-label">Breakfast</span>
             <button type="button" class="rate-summary-preset-btn" data-breakfast-preset="0">None</button>
-            <button type="button" class="rate-summary-preset-btn" data-breakfast-preset="1">1</button>
-            <button type="button" class="rate-summary-preset-btn" data-breakfast-preset="2">2</button>
+            <button type="button" class="rate-summary-preset-btn" data-breakfast-preset="1" title="1 per bed"><i class="fa fa-user" aria-hidden="true"></i></button>
+            <button type="button" class="rate-summary-preset-btn" data-breakfast-preset="2" title="2 per bed"><i class="fa fa-users" aria-hidden="true"></i></button>
             <input type="number" id="rateSummaryBreakfastQty" class="rate-summary-qty-input" value="0" min="0" step="1" title="Number of breakfasts">
           </div>
           <div class="rate-summary-row">
@@ -488,8 +590,12 @@
           </div>
 
           <div class="rate-summary-row">
-            <span>Discount per Night</span>
-            <input type="number" id="rateSummaryDiscount" class="rate-summary-discount-input" value="0" min="0" step="0.01">
+            <span>Discount per Room, per Night</span>
+            <input type="number" id="rateSummaryDiscount" class="rate-summary-discount-input" value="0" min="0" step="0.01" title="Applied to every room, every night">
+          </div>
+          <div class="rate-summary-row">
+            <span>Total Discount</span>
+            <span id="rateSummaryDiscountTotal">-&#8369;0.00</span>
           </div>
 
           <div class="rate-summary-row rate-summary-grand-total">
@@ -497,7 +603,18 @@
             <span id="rateSummaryGrandTotal">&#8369;0.00</span>
           </div>
 
-          <div class="rate-summary-row" style="border-bottom: none; justify-content: flex-end;">
+          <!-- Quick-glance recap of the current selection, kept in sync from
+               recomputeRateSummaryTotals (see updateRoomCheckerSummaryChip in
+               room_checker.js) so it never drifts from what Proceed Booking
+               is about to carry over. -->
+          <div class="rate-summary-row rate-summary-actions" style="border-bottom: none;">
+            <div id="roomCheckerSummaryChip" class="rate-summary-chip">
+              <span class="rate-summary-chip-item"><i class="fa fa-moon-o" aria-hidden="true"></i><span id="roomCheckerChipNights">1 night</span></span>
+              <span class="rate-summary-chip-sep"></span>
+              <span class="rate-summary-chip-item"><i class="fa fa-bed" aria-hidden="true"></i><span id="roomCheckerChipRooms">0 King, 0 Queen</span></span>
+              <span class="rate-summary-chip-sep"></span>
+              <span class="rate-summary-chip-item"><i class="fa fa-coffee" aria-hidden="true"></i><span id="roomCheckerChipBreakfast">0 BF</span></span>
+            </div>
             <button type="button" id="roomCheckerProceedBookingBtn" class="btn btn-primary">Proceed Booking</button>
           </div>
         </div>
