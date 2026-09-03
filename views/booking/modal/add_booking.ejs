@@ -208,6 +208,13 @@
                                 </div>
                             </div>
 
+                            <div id="divReceiptNo" class="col-lg-3">
+                                <div class="form-group">
+                                    <label class="form-label">Receipt No. <span class="text-muted fw-normal">(optional)</span></label>
+                                    <input class="form-control" type="text" id="receiptNo" name="receiptNo" autocomplete="off" placeholder="Auto-generated if blank">
+                                </div>
+                            </div>
+
                             <%# Nightly Rate Breakdown table - temporarily hidden (uncomment to restore)
                             <div id="divRateBreakdown" class="col-lg-12">
                                 <div id="rateBreakdownNote" class="rate-breakdown-card" style="display:none;"></div>
@@ -480,7 +487,7 @@
 		document.body.appendChild(maintenanceScript);
 		maintenanceScript.onload = function() {
 			var submitScript = document.createElement('script');
-			submitScript.src = '/js/booking/booking_submit.js?v=contact-channel-1';
+			submitScript.src = '/js/booking/booking_submit.js?v=receipt-no-1';
 			document.body.appendChild(submitScript);
 		};
 

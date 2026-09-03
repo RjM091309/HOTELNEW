@@ -2473,8 +2473,9 @@ function initializeAddBookingHandler() {
                 ? ($('input[name="agencyPayer"]:checked').val() || 'agency')
                 : null,
             channelBookingId: ($('#channelBookingId').val() || '').trim(),
+            receiptNo: ($('#receiptNo').val() || '').trim(),
             voucherNo: $('#voucherNo').val(),
-            
+
             // ✅ Include services and transport
             breakfastAdultQty: $('#breakfastAdultQty').val(),
             breakfastAdultPrice: $('#breakfastAdultPrice').val(),

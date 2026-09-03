@@ -63,16 +63,19 @@
                             </div>
                         </div>
 
-                        <!-- Booking Resources select -->
+                        <!-- Room Rate category select (from room_rates) -->
                         <div id="edit_bookingRouteSinglePlaceholder" class="col-lg-4">
                             <div id="edit_bookingRouteWrapper">
                                 <div class="form-group">
-                                    <label class="form-label">Booking Resources</label>
+                                    <label class="form-label">Room Rate</label>
                                     <select class="form-select" id="edit_bookingRoute" name="bookingRoute">
-                                        <option value="" disabled selected>Booking Resources</option>
-                                        <option value="walk-in">Walk-in</option>
+                                        <option value="walk-in" selected>Walk-in</option>
                                         <option value="agency">Agency</option>
-                                        <option value="booking-channel">OTA</option>
+                                        <option value="tenant">Tenant (15%)</option>
+                                        <option value="vip">VIP (20%)</option>
+                                        <option value="employee">Employee (30%)</option>
+                                        <option value="senior_special">Senior / Special 20%</option>
+                                        <option value="booking-channel">OTA / Channel</option>
                                     </select>
                                 </div>
                             </div>
@@ -130,11 +133,10 @@
                           
                         <div id="edit_divprice" class="col-lg-3">
                             <div class="form-group">
-                                <label class="form-label">Room Rate</label>
+                                <label class="form-label">Rate / Per Night</label>
                                 <input class="form-control" type="text" id="edit_price" name="price" readonly>
-                                <div style="margin-top: 0px;">
-                                    <input type="checkbox" id="edit_manualPriceToggle"> <label for="edit_manualPriceToggle" style="font-size: 12px;">Enter Price Manually</label>
-                                </div>
+                                <!-- Manual price toggle removed - kept hidden for JS compatibility -->
+                                <input type="checkbox" id="edit_manualPriceToggle" style="display:none;">
                             </div>
                         </div>
 
@@ -322,19 +324,20 @@
                             </div>
                         </div>
 
-                        <div id="edit_divtxtGuestType" class="col-lg-6">
+                        <!-- Guest Type / Level removed from the UI (kept hidden for JS compatibility) -->
+                        <div id="edit_divtxtGuestType" class="col-lg-6" style="display:none;">
                             <div class="form-group">
                                 <label class="form-label">Guest Type</label>
-                                <select class="form-select" id="edit_guestType" name="guestType" data-placeholder="Guest Type" required>
+                                <select class="form-select" id="edit_guestType" name="guestType" data-placeholder="Guest Type">
                                     <option value="" disabled selected>Guest Type</option>
                                 </select>
                             </div>
                         </div>
 
-                        <div id="edit_divtxtGuestLevel" class="col-lg-6">
+                        <div id="edit_divtxtGuestLevel" class="col-lg-6" style="display:none;">
                             <div class="form-group">
                                 <label class="form-label">Guest Level</label>
-                                <select class="form-select" id="edit_guestLevel" name="guestLevel" required>
+                                <select class="form-select" id="edit_guestLevel" name="guestLevel">
                                     <option value="" disabled selected>Guest Level</option>
                                 </select>
                             </div>
@@ -347,9 +350,9 @@
                             </div>
                         </div>
 
-                        <!-- Discount Section -->
+                        <!-- Discount Section - hidden in Edit Booking (optional, handled in Room Reservation Details). Inputs kept for JS compatibility. -->
                         <hr class="my-4">
-                        <div class="row p-t-20">
+                        <div class="row p-t-20" style="display:none;">
                             <div class="col-lg-6">
                                 <div class="form-check mb-2">
                                     <input class="form-check-input" type="checkbox" id="edit_includeSeniorPwdDiscount">

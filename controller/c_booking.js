@@ -698,7 +698,8 @@ class BookingController {
         isLongTermStay,
         roomChangeNote,
         isMaintenance,
-        channelBookingId
+        channelBookingId,
+        receiptNo   // optional manual receipt / confirmation number
     } = req.body;
 
       const isMaintenanceBooking =
@@ -773,24 +774,29 @@ class BookingController {
       const moment = require('moment');
       const checkInDateFormatted = moment(startDateStr, 'MMM DD, YYYY').format('YYYYMMDD');
       let confirmationNumber;
-      
-      if (isDirectReservation) {
+
+      // Regular bookings always need a room, regardless of the receipt-no source.
+      if (!isDirectReservation && !room_id) {
+        return res.status(400).json({ success: false, message: 'Room ID is required for regular bookings' });
+      }
+
+      // Manual Receipt No. entered on the Add Booking form wins - used verbatim
+      // as the CONFIRMATION_NUMBER so exports / prints / vouchers show it as-is.
+      const manualReceiptNo = (receiptNo || '').toString().trim();
+
+      if (manualReceiptNo) {
+        confirmationNumber = manualReceiptNo;
+      } else if (isDirectReservation) {
         // For direct reservations, use current time instead of room number
-        const currentTime = new Date().toLocaleTimeString('en-US', { 
-          hour12: false, 
-          hour: '2-digit', 
+        const currentTime = new Date().toLocaleTimeString('en-US', {
+          hour12: false,
+          hour: '2-digit',
           minute: '2-digit'
         }).replace(/:/g, '');
         confirmationNumber = checkInDateFormatted + 'UR' + currentTime;
       } else {
-        // For regular bookings, check if room_id exists and create confirmation number
-        if (!room_id) {
-          return res.status(400).json({ success: false, message: 'Room ID is required for regular bookings' });
-        }
-        
-        // Query room number to create confirmation number
-        // This will be enhanced in the model function
-        confirmationNumber = checkInDateFormatted + '0' + 'ROOM'; // Temporary, will be updated in model
+        // Temporary placeholder - the model swaps 'ROOM' for the real room number.
+        confirmationNumber = checkInDateFormatted + '0' + 'ROOM';
       }
       
       // Determine the final booking route

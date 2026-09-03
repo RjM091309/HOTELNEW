@@ -86,6 +86,7 @@ $(document).ready(function () {
         ? ($('input[name="agencyPayer"]:checked').val() || 'agency')
         : null;
       const channelBookingId = ($('#channelBookingId').val() || '').trim();
+      const receiptNo = ($('#receiptNo').val() || '').trim();
       const voucherNo = $('#voucherNo').val();
       // Services/Transport
       const breakfastAdultQty = $('#breakfastAdultQty').val();
@@ -178,7 +179,7 @@ $(document).ready(function () {
         data: {
           room_id: roomId, fullname, number, address, daterange, maxOccupants: guestsCount,
           paidAmount, paymentStatus, price: roomPrice, diffindays: qty, nationality, guestID: txtGuestID,
-          bookingRoute, checkInStatus, checkOutStatus, holdPending, bookingRemarks, agencyID, agencyPayer, channelBookingId, voucherNo,
+          bookingRoute, checkInStatus, checkOutStatus, holdPending, bookingRemarks, agencyID, agencyPayer, channelBookingId, receiptNo, voucherNo,
           breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
           breakfastKidQty, breakfastKidPrice, breakfastKidId,
           pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
