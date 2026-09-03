@@ -1423,6 +1423,23 @@ body {
   letter-spacing: 0.4px;
   white-space: nowrap;
 }
+/* Two pre-made logo files (navbar.ejs) instead of one image CSS-inverted for
+   dark mode - darkmodelogo.png is the light-colored mark for the dark-mode
+   .page-logo box, lightmodelogo.png is the dark-colored mark for the
+   light-mode box (background: .logo-white/.logo-dark .page-header.navbar
+   .page-logo in theme-color.css). Toggled purely by [data-theme] like every
+   other light-mode override on this page, so it's already correct at first
+   paint - no flash of the wrong logo (see the anti-flash script that sets
+   data-theme before paint in views/partials/head.ejs). */
+.page-logo-img-light {
+  display: none;
+}
+[data-theme="white"] .page-logo-img-dark {
+  display: none;
+}
+[data-theme="white"] .page-logo-img-light {
+  display: inline-block;
+}
 .page-header.navbar .page-logo .logo-mini {
   display: none;
   margin-left: 5px;
