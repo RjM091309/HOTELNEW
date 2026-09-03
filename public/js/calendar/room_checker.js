@@ -554,6 +554,7 @@ function initRateSummary() {
   const queenQtyInput = document.getElementById('rateSummaryQueenQty');
 
   const extraBedQtyInput = document.getElementById('rateSummaryExtraBedQty');
+  const extraBedRateInput = document.getElementById('rateSummaryExtraBedRate');
 
   bookingTypeInputs.forEach(input => input.addEventListener('change', fetchRateSummary));
   breakfastQtyInput.addEventListener('input', () => {
@@ -564,6 +565,7 @@ function initRateSummary() {
   kingQtyInput.addEventListener('input', syncRoomCheckerBreakfastToRoomCount);
   queenQtyInput.addEventListener('input', syncRoomCheckerBreakfastToRoomCount);
   extraBedQtyInput.addEventListener('input', syncRoomCheckerBreakfastToRoomCount);
+  extraBedRateInput.addEventListener('input', recomputeRateSummaryTotals);
   wireRoomCheckerBreakfastPresets();
 
   fetchRateSummary();
@@ -585,6 +587,11 @@ function fetchRoomCheckerExtraBedRate() {
         && String(s.SERVICE_AVAILABILITY || '').trim().toLowerCase() === 'available'
       );
       window.__rateSummaryExtraBedRate = extraBedService ? (parseFloat(extraBedService.SERVICE_COST) || 0) : null;
+      // Just the starting value - #rateSummaryExtraBedRate is an editable
+      // input (see recomputeRateSummaryTotals, which reads its live value),
+      // so this only fills it in once and never overwrites a staff edit.
+      const rateInput = document.getElementById('rateSummaryExtraBedRate');
+      if (rateInput) rateInput.value = window.__rateSummaryExtraBedRate || 0;
       recomputeRateSummaryTotals();
     })
     .catch((err) => {
@@ -631,7 +638,10 @@ function fetchRateSummary() {
 function recomputeRateSummaryTotals() {
   const kingRate = window.__rateSummaryKingRate || 0;
   const queenRate = window.__rateSummaryQueenRate || 0;
-  const extraBedRate = window.__rateSummaryExtraBedRate || 0;
+  // Editable (see fetchRoomCheckerExtraBedRate, which only sets the starting
+  // value) - read live from the input, not the fetched default, so a staff
+  // override actually takes effect.
+  const extraBedRate = Math.max(0, parseFloat(document.getElementById('rateSummaryExtraBedRate').value) || 0);
   const nights = window.__rateSummaryRange.nights || 1;
 
   const kingQty = Math.max(0, parseInt(document.getElementById('rateSummaryKingQty').value, 10) || 0);
@@ -673,7 +683,6 @@ function recomputeRateSummaryTotals() {
   document.getElementById('rateSummaryQueenRate').textContent = formatPeso(queenRate);
   document.getElementById('rateSummaryTotalRoomRate').textContent = formatPeso(totalRoomRate);
   document.getElementById('rateSummaryBreakfastTotal').textContent = formatPeso(breakfastTotal);
-  document.getElementById('rateSummaryExtraBedRate').textContent = formatPeso(extraBedRate);
   document.getElementById('rateSummaryExtraBedTotal').textContent = formatPeso(extraBedTotal);
   document.getElementById('rateSummarySubTotal').textContent = formatPeso(subTotal);
   document.getElementById('rateSummaryDiscountTotal').textContent = (discount > 0 ? '-' : '') + formatPeso(discount);
@@ -910,6 +919,12 @@ function proceedRoomCheckerBooking() {
   // checkbox is on).
   const breakfastCount = Math.max(0, parseInt(document.getElementById('rateSummaryBreakfastQty').value, 10) || 0);
 
+  // Extra Bed is its own qty + editable rate (see rateSummaryExtraBedRate/Qty),
+  // carried over as-is - there's no free-baseline split for this one, it's a
+  // real add-on charge in both places.
+  const extraBedQty = Math.max(0, parseInt(document.getElementById('rateSummaryExtraBedQty').value, 10) || 0);
+  const extraBedPrice = Math.max(0, parseFloat(document.getElementById('rateSummaryExtraBedRate').value) || 0);
+
   // Just the room-rate portion (no breakfast/discount - those already carry
   // over as real form fields the group-booking modal computes on its own) of
   // what was already quoted here, before any specific room is picked. Handed
@@ -923,7 +938,7 @@ function proceedRoomCheckerBooking() {
   if (totalRooms === 1) {
     openRoomCheckerSingleBooking(dateRangeStr, range.nights, start, checkoutDate, totalDiscount, breakfastCount);
   } else {
-    openRoomCheckerGroupBooking(dateRangeStr, range.nights, start, checkoutDate, kingQty, queenQty, totalDiscount, breakfastCount, quotedRoomTotal);
+    openRoomCheckerGroupBooking(dateRangeStr, range.nights, start, checkoutDate, kingQty, queenQty, totalDiscount, breakfastCount, quotedRoomTotal, extraBedQty, extraBedPrice);
   }
 }
 
@@ -971,7 +986,7 @@ function openRoomCheckerSingleBooking(dateRangeStr, nights, start, checkoutDate,
   }
 }
 
-function openRoomCheckerGroupBooking(dateRangeStr, nights, start, checkoutDate, kingQty, queenQty, totalDiscount, breakfastCount, quotedRoomTotal) {
+function openRoomCheckerGroupBooking(dateRangeStr, nights, start, checkoutDate, kingQty, queenQty, totalDiscount, breakfastCount, quotedRoomTotal, extraBedQty, extraBedPrice) {
   const modalEl = document.getElementById('modal-add-group-booking');
   if (!modalEl) return;
 
@@ -988,6 +1003,7 @@ function openRoomCheckerGroupBooking(dateRangeStr, nights, start, checkoutDate, 
       // shown.bs.modal handler) already zeroed this out - read/cleared again by
       // computeGroupTotal() there.
       window.__roomCheckerQuotedRoomTotal = quotedRoomTotal || 0;
+      window.__roomCheckerQuotedRoomCount = kingQty + queenQty;
 
       const daterangeInput = document.getElementById('groupDaterange');
       const nightsInput = document.getElementById('groupNights');
@@ -1031,6 +1047,18 @@ function openRoomCheckerGroupBooking(dateRangeStr, nights, start, checkoutDate, 
         if (groupBreakfastAdultPrice && !groupBreakfastAdultPrice.value) {
           groupBreakfastAdultPrice.value = BREAKFAST_PRICE;
         }
+      }
+
+      if (extraBedQty > 0) {
+        const groupIncludeExtraBed = document.getElementById('groupIncludeExtraBed');
+        const groupExtraBedQty = document.getElementById('groupExtraBedQty');
+        const groupExtraBedPrice = document.getElementById('groupExtraBedPrice');
+        if (groupIncludeExtraBed && !groupIncludeExtraBed.checked) {
+          groupIncludeExtraBed.checked = true;
+          groupIncludeExtraBed.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        if (groupExtraBedQty) groupExtraBedQty.value = extraBedQty;
+        if (groupExtraBedPrice) groupExtraBedPrice.value = extraBedPrice;
       }
 
       // The group form recomputes its total on any 'change'/'input' event within it

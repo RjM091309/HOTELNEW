@@ -279,6 +279,19 @@
           <div class="row p-t-20">
             <div class="col-lg-4">
               <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="groupIncludeExtraBed" name="groupIncludeExtraBed">
+                <label class="form-check-label" for="groupIncludeExtraBed">Add Extra Bed</label>
+              </div>
+              <div id="groupExtraBedWrapper" class="group-quantity-wrapper mt-2" style="display: none;">
+                <input type="number" class="form-control" id="groupExtraBedQty" name="groupExtraBedQty" placeholder="Qty" min="0" step="1" style="max-width: 90px;">
+                <input type="number" class="form-control" id="groupExtraBedPrice" name="groupExtraBedPrice" placeholder="Price per bed" min="0" step="0.01">
+              </div>
+            </div>
+          </div>
+
+          <div class="row p-t-20">
+            <div class="col-lg-4">
+              <div class="form-check mb-2">
                 <input class="form-check-input" type="checkbox" id="groupIncludeSeniorPwdDiscount">
                 <label class="form-check-label" for="groupIncludeSeniorPwdDiscount">Senior/PWD Discount</label>
               </div>
@@ -356,6 +369,10 @@
               <div class="group-summary-line" id="groupSummaryDropoffLine" style="display: none;">
                 <span>Drop-off</span>
                 <span id="groupSummaryDropoffTotal">0.00</span>
+              </div>
+              <div class="group-summary-line" id="groupSummaryExtraBedLine" style="display: none;">
+                <span>Extra Bed</span>
+                <span id="groupSummaryExtraBedTotal">0.00</span>
               </div>
               <div class="group-summary-line" id="groupSummaryLateCheckoutLine" style="display: none;">
                 <span>Late Checkout Fee</span>
@@ -1440,9 +1457,35 @@
   padding-top: 14px;
 }
 
-[data-theme="white"] #modal-add-group-booking #groupComputedTotal {
+/* The value text isn't a direct child of these h3's - the JS wraps it in
+   <b> (see updateGroupSummary etc.), and theme-color.css:264 has
+   [data-theme="white"] .page-content * { color: #1f2937 } - a UNIVERSAL
+   selector that matches that <b> directly. A direct match always beats an
+   inherited value regardless of the inherited rule's own specificity, so
+   the h3's own color (however specific) never reached the visible text -
+   only the h3 itself would have shown blue/green/orange, not its <b>
+   content. Targeting the "* " descendant too makes sure these colors apply
+   to whatever wraps the value, present or future. */
+[data-theme="white"] #modal-add-group-booking #groupComputedTotal,
+[data-theme="white"] #modal-add-group-booking #groupComputedTotal * {
   color: #1565c0 !important;
   font-size: 20px;
+}
+
+/* Paid/Balance never had their own light override, unlike Total above - both
+   fell through to the generic ".group-summary-line h3" fallback further
+   down (color: #111827, plain dark gray) since that fallback's selector has
+   more classes than these bare #id base rules do, outweighing the #id's own
+   specificity advantage. Matches add_booking.ejs's #computedPaidAmount/
+   #computedBalance colors (green/orange) so both modals agree. */
+[data-theme="white"] #modal-add-group-booking #groupComputedPaidAmount,
+[data-theme="white"] #modal-add-group-booking #groupComputedPaidAmount * {
+  color: #28a745 !important;
+}
+
+[data-theme="white"] #modal-add-group-booking #groupComputedBalance,
+[data-theme="white"] #modal-add-group-booking #groupComputedBalance * {
+  color: #fd7e14 !important;
 }
 
 [data-theme="white"] #modal-add-group-booking .form-label {
@@ -2092,6 +2135,7 @@
     $('#groupSelectedRoomPrices').val('');
     $('#groupNights').val('0');
     window.__roomCheckerQuotedRoomTotal = 0; // only set for this one Room Checker handoff (see openRoomCheckerGroupBooking), never carry into the next open
+    window.__roomCheckerQuotedRoomCount = 0;
     $('#groupBookingId').val(''); // Clear existing group ID
     $('#groupJoinExistingGroup').val('false'); // Reset join flag
     groupBlocks = [];
@@ -2132,11 +2176,11 @@
     $('#groupCreditDisplay').hide();
     $('#groupCreditAmount').text('₱0.00');
     $('#groupBreakfastFields').addClass('d-none');
-    $('#groupIncludeBreakfast, #groupIncludePickup, #groupIncludeDropoff, #groupIndividualBilling').prop('checked', false); // Default to Master Billing (unchecked)
+    $('#groupIncludeBreakfast, #groupIncludePickup, #groupIncludeDropoff, #groupIncludeExtraBed, #groupIndividualBilling').prop('checked', false); // Default to Master Billing (unchecked)
     $('#groupBreakfastIndividual').prop('checked', false); // Default breakfast to group (not individual)
     $('#groupBreakfastAdultQty, #groupBreakfastKidQty').val('');
-    $('#groupPickupWrapper, #groupDropoffWrapper').hide();
-    $('#groupPickupPrice, #groupDropoffPrice').val('');
+    $('#groupPickupWrapper, #groupDropoffWrapper, #groupExtraBedWrapper').hide();
+    $('#groupPickupPrice, #groupDropoffPrice, #groupExtraBedQty, #groupExtraBedPrice').val('');
     $('#groupPickupServiceId, #groupDropoffServiceId').val('');
     $('#groupPickupDropoffFlightInfo').hide();
     $('#groupFlightNumber, #groupPassengerCount').val('');
@@ -2503,15 +2547,36 @@
 
     const pickupPrice = $('#groupIncludePickup').is(':checked') ? parseFloat($('#groupPickupPrice').val()) || 0 : 0;
     const dropoffPrice = $('#groupIncludeDropoff').is(':checked') ? parseFloat($('#groupDropoffPrice').val()) || 0 : 0;
+    const extraBedQty = $('#groupIncludeExtraBed').is(':checked') ? (parseInt($('#groupExtraBedQty').val(), 10) || 0) : 0;
+    const extraBedPrice = parseFloat($('#groupExtraBedPrice').val()) || 0;
+    const extraBedTotal = extraBedQty * extraBedPrice;
 
-    // Get number of rooms for individual service calculations
+    // Get number of rooms for individual service calculations - same Room
+    // Checker preview fallback as roomSubtotal above, so the "(N room x M
+    // night)" Summary label reads right even before any room is picked.
     const selectedRooms = $('#groupSelectedRooms').val();
-    const numRooms = selectedRooms ? selectedRooms.split(',').length : 1;
+    let numRooms = selectedRooms ? selectedRooms.split(',').length : 1;
+    if (!selectedRooms && window.__roomCheckerQuotedRoomCount) {
+      numRooms = window.__roomCheckerQuotedRoomCount;
+    }
 
-    const breakfastTotal = (adultQty * adultPrice) + (kidQty * kidPrice);
+    // The first breakfast per room, per night is already covered by the room
+    // rate (same free baseline as Room Checker's own
+    // freeBreakfastCount/chargeableBreakfastCount split - see
+    // recomputeRateSummaryTotals in room_checker.js) - only charge for
+    // whatever's beyond that. Split proportionally across adult/kid rather
+    // than picking one or the other, since there's no rule for which guests
+    // get the free slot; when only adults are set (breakfastCount handed off
+    // from Room Checker with kidQty 0, the common case) this reduces to the
+    // exact same math Room Checker itself used.
+    const totalBreakfastQty = adultQty + kidQty;
+    const freeBreakfastBaseline = numRooms * nights;
+    const freeBreakfastQty = Math.min(totalBreakfastQty, freeBreakfastBaseline);
+    const chargeableBreakfastRatio = totalBreakfastQty > 0 ? (totalBreakfastQty - freeBreakfastQty) / totalBreakfastQty : 0;
+    const breakfastTotal = ((adultQty * adultPrice) + (kidQty * kidPrice)) * chargeableBreakfastRatio;
     const breakfastTotalWithIndividual = breakfastIndividual ? breakfastTotal * numRooms : breakfastTotal;
 
-    const servicesTotal = breakfastTotalWithIndividual + pickupPrice + dropoffPrice;
+    const servicesTotal = breakfastTotalWithIndividual + pickupPrice + dropoffPrice + extraBedTotal;
 
     // Get late check-out fee (PER ROOM - multiply by number of rooms)
     const lateCheckoutFeePerRoom = parseFloat($('#groupLateCheckoutFee').val()) || 0;
@@ -2603,6 +2668,8 @@
     $('#groupSummaryPickupTotal').text(summaryLineFmt(pickupPrice));
     $('#groupSummaryDropoffLine').toggle(dropoffPrice > 0);
     $('#groupSummaryDropoffTotal').text(summaryLineFmt(dropoffPrice));
+    $('#groupSummaryExtraBedLine').toggle(extraBedTotal > 0);
+    $('#groupSummaryExtraBedTotal').text(summaryLineFmt(extraBedTotal));
     $('#groupSummaryLateCheckoutLine').toggle(lateCheckoutFeeTotal > 0);
     $('#groupSummaryLateCheckoutTotal').text(summaryLineFmt(lateCheckoutFeeTotal));
     $('#groupSummarySeniorPwdLine').toggle(seniorPwdDiscountAmount > 0);
@@ -3373,6 +3440,16 @@
       computeGroupTotal();
     });
 
+    $('#groupIncludeExtraBed').on('change', function() {
+      if (this.checked) {
+        $('#groupExtraBedWrapper').show();
+      } else {
+        $('#groupExtraBedWrapper').hide();
+        $('#groupExtraBedQty, #groupExtraBedPrice').val('');
+      }
+      computeGroupTotal();
+    });
+
     // Flight number / passenger count - required when either Pick-up or Drop-off is checked
     $('#groupIncludePickup, #groupIncludeDropoff').on('change', function() {
       const needsFlightInfo = $('#groupIncludePickup').is(':checked') || $('#groupIncludeDropoff').is(':checked');
@@ -3502,7 +3579,7 @@
       computeGroupTotal();
     });
 
-    $('#groupBreakfastAdultQty, #groupBreakfastKidQty, #groupPickupPrice, #groupDropoffPrice').on('input', function() {
+    $('#groupBreakfastAdultQty, #groupBreakfastKidQty, #groupPickupPrice, #groupDropoffPrice, #groupExtraBedQty, #groupExtraBedPrice').on('input', function() {
       computeGroupTotal();
       // Validate that price is not empty if service is checked
       if ($(this).val() === '' && $(this).closest('.row').find('input[type="checkbox"]:checked').length > 0) {
@@ -4368,12 +4445,22 @@
       const breakfastIndividual = $('#groupBreakfastIndividual').is(':checked');
       const selectedRooms = $('#groupSelectedRooms').val();
       const numRooms = selectedRooms ? selectedRooms.split(',').length : 1;
-      const breakfastTotal = (adultQty * adultPrice) + (kidQty * kidPrice);
+      // Same free-baseline split as computeGroupTotal (1 breakfast per room,
+      // per night is already covered by the room rate) - keeps the printed
+      // voucher's total matching what the live Summary showed.
+      const totalBreakfastQty = adultQty + kidQty;
+      const freeBreakfastBaseline = numRooms * nights;
+      const freeBreakfastQty = Math.min(totalBreakfastQty, freeBreakfastBaseline);
+      const chargeableBreakfastRatio = totalBreakfastQty > 0 ? (totalBreakfastQty - freeBreakfastQty) / totalBreakfastQty : 0;
+      const breakfastTotal = ((adultQty * adultPrice) + (kidQty * kidPrice)) * chargeableBreakfastRatio;
       const breakfastTotalWithIndividual = breakfastIndividual ? breakfastTotal * numRooms : breakfastTotal;
       const pickupPrice = $('#groupIncludePickup').is(':checked') ? parseFloat($('#groupPickupPrice').val()) || 0 : 0;
       const dropoffPrice = $('#groupIncludeDropoff').is(':checked') ? parseFloat($('#groupDropoffPrice').val()) || 0 : 0;
+      const extraBedQty = $('#groupIncludeExtraBed').is(':checked') ? (parseInt($('#groupExtraBedQty').val(), 10) || 0) : 0;
+      const extraBedPrice = parseFloat($('#groupExtraBedPrice').val()) || 0;
+      const extraBedTotal = extraBedQty * extraBedPrice;
       // Exclude late checkout fee from servicesTotal as it's displayed separately
-      const servicesTotal = breakfastTotalWithIndividual + pickupPrice + dropoffPrice;
+      const servicesTotal = breakfastTotalWithIndividual + pickupPrice + dropoffPrice + extraBedTotal;
 
       const isConsolidated = !$('#groupIndividualBilling').is(':checked'); // Inverted logic
       const bookingData = {

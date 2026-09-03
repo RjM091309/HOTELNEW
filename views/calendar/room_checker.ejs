@@ -219,6 +219,24 @@
     gap: 10px;
   }
 
+  /* Groups a small label with its input (e.g. "Qty" + the Extra Bed qty
+     field) as one unit, so adding the label doesn't throw off the row's
+     own space-between layout between Extra Bed's rate and qty inputs. */
+  .rate-summary-qty-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .rate-summary-inline-label {
+    font-size: 11px;
+    color: #9aa4ac;
+  }
+
+  [data-theme="white"] .rate-summary-inline-label {
+    color: #6c757d;
+  }
+
   /* King/Queen rows: "Queen Bed Rate" is wider than "King Bed Rate", which
      was pushing the rate value between the two rows out of alignment under
      space-between. Pin the label to a fixed width so both rate values (and
@@ -653,14 +671,18 @@
             <span id="rateSummaryBreakfastTotal">&#8369;0.00</span>
           </div>
 
-          <!-- Rate pulled live from the "Extra Bed" entry under /services (Special
-               Requests category) - see fetchRoomCheckerExtraBedRate in room_checker.js.
-               Row stays priced at ₱0.00 / has no effect on the total if that service
-               isn't found or is marked unavailable there. -->
+          <!-- Rate defaults from the "Extra Bed" entry under /services (Special
+               Requests category) - see fetchRoomCheckerExtraBedRate in room_checker.js -
+               but is editable, same as Discount below, in case staff need to override it
+               for this quote. Defaults to ₱0.00 if that service isn't found or is marked
+               unavailable there. -->
           <div class="rate-summary-row rate-summary-bed-row">
             <span>Extra Bed</span>
-            <span id="rateSummaryExtraBedRate">&#8369;0.00</span>
-            <input type="number" id="rateSummaryExtraBedQty" class="rate-summary-qty-input" value="0" min="0" step="1" title="Number of extra beds">
+            <input type="number" id="rateSummaryExtraBedRate" class="rate-summary-discount-input" value="0" min="0" step="1" title="Price per extra bed (editable)">
+            <span class="rate-summary-qty-group">
+              <span class="rate-summary-inline-label">Qty</span>
+              <input type="number" id="rateSummaryExtraBedQty" class="rate-summary-qty-input" value="0" min="0" step="1" title="Number of extra beds">
+            </span>
           </div>
           <div class="rate-summary-row">
             <span>Extra Bed Total</span>
@@ -721,4 +743,4 @@
 <script src="/plugins/fullcalendar/packages/interaction/main.min.js"></script>
 <script src="/plugins/fullcalendar/packages/daygrid/main.min.js"></script>
 <script src="/plugins/fullcalendar/packages/timegrid/main.min.js"></script>
-<script src="/js/calendar/room_checker.js?v=23"></script>
+<script src="/js/calendar/room_checker.js?v=25"></script>
