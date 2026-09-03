@@ -496,35 +496,55 @@ function getRoomCheckerTotalBeds() {
   return (kingQty * KING_BEDS_PER_ROOM) + (queenQty * QUEEN_BEDS_PER_ROOM) + extraBedQty;
 }
 
+// Breakfast presets are 1/2 per ROOM (1 King room + 1 Queen room = 2, not
+// weighted by bed capacity like getRoomCheckerTotalBeds() above), served
+// every night of the stay - so "1 per bed" with 2 King + 1 Queen over 3
+// nights is (2 + 1) * 3 = 9, not just 3.
+function getRoomCheckerBreakfastRoomNights() {
+  const kingQty = Math.max(0, parseInt(document.getElementById('rateSummaryKingQty').value, 10) || 0);
+  const queenQty = Math.max(0, parseInt(document.getElementById('rateSummaryQueenQty').value, 10) || 0);
+  const nights = (window.__rateSummaryRange && window.__rateSummaryRange.nights) || 1;
+  return (kingQty + queenQty) * nights;
+}
+
 // Marks which None/1/2 preset (if any) matches the field's current value as
 // "active" (highlighted) - called after every change to the Breakfast qty,
 // whichever triggered it, so the highlight always reflects reality instead
 // of just tracking clicks. No preset lights up once staff hand-edit the
-// field to something that isn't an exact per-bed multiple.
+// field to something that isn't an exact per-room-night multiple.
 function syncRoomCheckerBreakfastPresetActiveState() {
   const qty = parseInt(document.getElementById('rateSummaryBreakfastQty').value, 10) || 0;
-  const totalBeds = getRoomCheckerTotalBeds();
+  const roomNights = getRoomCheckerBreakfastRoomNights();
   document.querySelectorAll('.rate-summary-preset-btn[data-breakfast-preset]').forEach((btn) => {
-    const perBed = parseInt(btn.getAttribute('data-breakfast-preset'), 10) || 0;
-    const matches = perBed === 0 ? qty === 0 : (totalBeds > 0 && qty === perBed * totalBeds);
+    const perRoom = parseInt(btn.getAttribute('data-breakfast-preset'), 10) || 0;
+    const matches = perRoom === 0 ? qty === 0 : (roomNights > 0 && qty === perRoom * roomNights);
     btn.classList.toggle('active', matches);
   });
 }
 
+// Rescales the breakfast qty to match the new room count ONLY if a per-room
+// preset (1 or 2) was already active - e.g. "1 per room" with 2 King rooms
+// selected should become 4 when that grows to 4 rooms. If "None" (or no
+// preset, i.e. a hand-typed custom value) was active, breakfast stays put
+// instead of silently jumping to "1 per room" just because King/Queen qty
+// changed - None is the default and should stay the default.
 function syncRoomCheckerBreakfastToRoomCount() {
-  document.getElementById('rateSummaryBreakfastQty').value = getRoomCheckerTotalBeds();
+  const activeBtn = document.querySelector('.rate-summary-preset-btn[data-breakfast-preset].active');
+  const perRoom = activeBtn ? (parseInt(activeBtn.getAttribute('data-breakfast-preset'), 10) || 0) : 0;
+  if (activeBtn) {
+    document.getElementById('rateSummaryBreakfastQty').value = perRoom * getRoomCheckerBreakfastRoomNights();
+  }
   syncRoomCheckerBreakfastPresetActiveState();
   recomputeRateSummaryTotals();
 }
 
-// The None/1/2 preset buttons mean "breakfasts per bed", not a flat guest
-// count - e.g. 10 beds selected with the "2" preset means 2 breakfasts per
-// bed (20 total), matching how many people that many beds actually sleep.
+// The None/1/2 preset buttons mean "breakfasts per room, per night" (1 King
+// room + 1 Queen room), not a flat guest count.
 function wireRoomCheckerBreakfastPresets() {
   document.querySelectorAll('.rate-summary-preset-btn[data-breakfast-preset]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const perBed = parseInt(btn.getAttribute('data-breakfast-preset'), 10) || 0;
-      document.getElementById('rateSummaryBreakfastQty').value = perBed * getRoomCheckerTotalBeds();
+      const perRoom = parseInt(btn.getAttribute('data-breakfast-preset'), 10) || 0;
+      document.getElementById('rateSummaryBreakfastQty').value = perRoom * getRoomCheckerBreakfastRoomNights();
       syncRoomCheckerBreakfastPresetActiveState();
       recomputeRateSummaryTotals();
     });
@@ -608,6 +628,9 @@ function handleRoomCheckerRangeSelect(info) {
 // quantities, breakfast, discount) is pure client-side arithmetic.
 function fetchRateSummary() {
   fetchRoomCheckerRangeAvailability();
+  // Breakfast is now per-room-per-night (see getRoomCheckerBreakfastRoomNights),
+  // so a nights change needs the same rescale King/Queen qty changes already get.
+  syncRoomCheckerBreakfastToRoomCount();
 }
 
 function recomputeRateSummaryTotals() {

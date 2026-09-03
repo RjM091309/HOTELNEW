@@ -211,6 +211,76 @@
     background: #33291a;
     color: #ffd694;
   }
+
+  /* ===== Light theme =====
+     This page was entirely hardcoded dark - no [data-theme="white"] rules at
+     all - so .table/.dashboard-card's sitewide light overrides (theme-color.css)
+     already lighten the page background and the table headers/cells, but every
+     custom class below (not part of Bootstrap's .table) kept its dark colors
+     regardless of theme, standing out as near-illegible dark-on-white blocks:
+     the category title bar (dark green + gold text) and every rate input
+     (dark navy box + white text). Recolored to the same white/blue/gray
+     language used elsewhere (blue header bar, white fields, gray borders). */
+  [data-theme="white"] .room-rates-note {
+    color: #6b7280;
+  }
+
+  /* Reset was a dark slate button (built for a dark page) that now reads as a
+     heavy, out-of-place block floating on a white page - lighten it to match
+     the "Today"/secondary-button treatment used elsewhere. Save's green stays
+     as-is once enabled (it's a saturated brand color, fine on white), but its
+     :disabled state relied on opacity:0.5 to look "greyed out" against a dark
+     page - on white that just washes green+white into a low-contrast smear,
+     so it gets its own flat disabled colors instead of relying on opacity. */
+  [data-theme="white"] .room-rates-reset-btn {
+    background: #ffffff;
+    border-color: #d1d5db;
+    color: #374151;
+  }
+
+  [data-theme="white"] .room-rates-reset-btn:hover {
+    background: #f3f4f6;
+  }
+
+  [data-theme="white"] .room-rates-save-btn:disabled {
+    opacity: 1;
+    background: #e5e7eb;
+    border-color: #e5e7eb;
+    color: #9ca3af;
+  }
+
+  [data-theme="white"] .rate-category {
+    background: #ffffff;
+    border-color: #e5e7eb;
+  }
+
+  [data-theme="white"] .rate-category-title {
+    background: #2196f3;
+    color: #ffffff;
+    border-bottom-color: #1976d2;
+  }
+
+  [data-theme="white"] .rate-input {
+    color: #111827;
+    background: #ffffff;
+    border-color: #d1d5db;
+  }
+
+  [data-theme="white"] .rate-input:hover {
+    border-color: #9ca3af;
+  }
+
+  [data-theme="white"] .rate-input:focus {
+    border-color: #6f9c40;
+    background: #ffffff;
+    box-shadow: 0 0 0 2px rgba(111, 156, 64, 0.2);
+  }
+
+  [data-theme="white"] .rate-input.rate-changed {
+    border-color: #d97706;
+    background: #fffbeb;
+    color: #92400e;
+  }
 </style>
 
 <script>
