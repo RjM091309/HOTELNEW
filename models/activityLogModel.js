@@ -101,8 +101,8 @@ class ActivityLogModel {
            COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p
               WHERE p.BOOKING_ID = b.IDNo
                 AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'security_deposit_refund')), 0) AS paidAmount,
-           COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p
-              WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE = 'security_deposit'), 0) AS securityDeposit
+           COALESCE((SELECT SUM(sd.AMOUNT) FROM security_deposits sd
+              WHERE sd.BOOKING_ID = b.IDNo AND sd.ACTIVE = 1 AND sd.STATUS = 'held'), 0) AS securityDeposit
          FROM booking b
          LEFT JOIN customer c   ON c.IDNo = b.CUSTOMER_ID
          LEFT JOIN room r       ON r.IDNo = b.ROOM_ID
