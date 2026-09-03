@@ -1,0 +1,311 @@
+<div class="row room-rates-page">
+  <div class="col-12">
+    <div class="dashboard-card">
+      <div class="dashboard-card-header">
+        <div class="room-rates-header">
+          <div>
+            <h4 class="mb-0">Room Rates</h4>
+            <p class="room-rates-note mb-0">
+              Edit any amount, then Save. Priced by day range, bed type and breakfast.
+            </p>
+          </div>
+          <div class="room-rates-actions">
+            <span class="room-rates-dirty" id="roomRatesDirty" style="display:none;">Unsaved changes</span>
+            <button type="button" class="btn room-rates-reset-btn" id="roomRatesResetBtn">Reset</button>
+            <button type="button" class="btn room-rates-save-btn" id="roomRatesSaveBtn" disabled>Save changes</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="dashboard-card-body">
+        <div id="roomRatesGrid">
+          <% categories.forEach(function(cat) { %>
+            <div class="rate-category">
+              <div class="rate-category-title"><%= cat.label %></div>
+              <div class="table-scrollable">
+                <table class="table table-bordered rate-table">
+                  <thead>
+                    <tr>
+                      <th rowspan="2" class="rate-bf-col">Breakfast</th>
+                      <% dayRanges.forEach(function(dr) { %>
+                        <th colspan="<%= bedTypes.length %>" class="text-center rate-day-head"><%= dr.label %></th>
+                      <% }); %>
+                    </tr>
+                    <tr>
+                      <% dayRanges.forEach(function(dr) { %>
+                        <% bedTypes.forEach(function(bt) { %>
+                          <th class="text-center rate-bed-head"><%= bt.label %></th>
+                        <% }); %>
+                      <% }); %>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% breakfastOptions.forEach(function(bf) { %>
+                      <tr>
+                        <td class="rate-bf-label"><%= bf.label %></td>
+                        <% dayRanges.forEach(function(dr) { %>
+                          <% bedTypes.forEach(function(bt) { %>
+                            <td class="rate-cell">
+                              <input type="number" min="0" step="1" inputmode="numeric"
+                                class="rate-input"
+                                data-cat="<%= cat.key %>"
+                                data-day="<%= dr.key %>"
+                                data-bed="<%= bt.key %>"
+                                data-bf="<%= bf.key %>"
+                                value="">
+                            </td>
+                          <% }); %>
+                        <% }); %>
+                      </tr>
+                    <% }); %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .room-rates-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+  .room-rates-note {
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 12px;
+    margin-top: 6px;
+  }
+  .room-rates-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .room-rates-dirty {
+    color: #f0ad4e;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .room-rates-reset-btn {
+    background: #495057;
+    border: 1px solid #6c757d;
+    color: #fff;
+    padding: 6px 16px;
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .room-rates-save-btn {
+    background: #6f9c40;
+    border: 1px solid #6f9c40;
+    color: #fff;
+    padding: 6px 18px;
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .room-rates-save-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .rate-category {
+    margin-bottom: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    overflow: hidden;
+    background: #232a2e;
+  }
+  .rate-category-title {
+    background: linear-gradient(90deg, #2b3a2c, #26302a);
+    color: #e6c877;
+    font-weight: 700;
+    text-align: center;
+    padding: 10px 12px;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    text-transform: uppercase;
+    font-size: 13px;
+  }
+  .rate-category .table-scrollable { border: 0; }
+
+  .rate-table {
+    margin-bottom: 0;
+    background: transparent;
+    color: #e8ebed;
+    border-color: rgba(255, 255, 255, 0.07);
+  }
+  /* Keep Bootstrap's table internals on the dark palette */
+  .rate-table.table {
+    --bs-table-bg: transparent;
+    --bs-table-color: #e8ebed;
+    --bs-table-border-color: rgba(255, 255, 255, 0.08);
+    --bs-border-color: rgba(255, 255, 255, 0.08);
+  }
+  .rate-table td, .rate-table th {
+    text-align: center;
+    vertical-align: middle;
+    padding: 6px 8px;
+    border-color: rgba(255, 255, 255, 0.07);
+    background: transparent;
+  }
+  .rate-table thead th {
+    background: #2c353a;
+    color: #aeb9c0;
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  .rate-table thead .rate-day-head {
+    background: #2f3940;
+    color: #cdd6dc;
+  }
+  .rate-table thead .rate-bed-head {
+    background: #273330;
+    color: #8fcf9c;
+  }
+  .rate-table .rate-bf-col,
+  .rate-table .rate-bf-label {
+    background: #262d31;
+    color: #d99aa4;
+    font-style: italic;
+    font-weight: 700;
+    width: 120px;
+    vertical-align: middle;
+  }
+  .rate-table tbody tr:nth-child(even) td:not(.rate-bf-label) {
+    background: rgba(255, 255, 255, 0.018);
+  }
+  .rate-cell { width: 20%; }
+  .rate-input {
+    width: 100%;
+    max-width: 130px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 6px;
+    padding: 6px 8px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: #ffffff;
+    background: #1c2225;
+    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  }
+  .rate-input:hover {
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+  .rate-input:focus {
+    outline: none;
+    border-color: #6f9c40;
+    background: #20282a;
+    box-shadow: 0 0 0 2px rgba(111, 156, 64, 0.3);
+  }
+  .rate-input.rate-changed {
+    border-color: #e6a94b;
+    background: #33291a;
+    color: #ffd694;
+  }
+</style>
+
+<script>
+  (function () {
+    const grid = document.getElementById('roomRatesGrid');
+    const saveBtn = document.getElementById('roomRatesSaveBtn');
+    const resetBtn = document.getElementById('roomRatesResetBtn');
+    const dirtyTag = document.getElementById('roomRatesDirty');
+    const inputs = Array.from(grid.querySelectorAll('.rate-input'));
+
+    function keyOf(el) {
+      return [el.dataset.cat, el.dataset.day, el.dataset.bed, el.dataset.bf].join('|');
+    }
+
+    function refreshDirty() {
+      let changed = 0;
+      inputs.forEach((el) => {
+        const isChanged = String(el.value).trim() !== String(el.dataset.original ?? '');
+        el.classList.toggle('rate-changed', isChanged);
+        if (isChanged) changed++;
+      });
+      saveBtn.disabled = changed === 0;
+      dirtyTag.style.display = changed > 0 ? 'inline' : 'none';
+      dirtyTag.textContent = changed + ' unsaved change' + (changed === 1 ? '' : 's');
+    }
+
+    function fill(rates) {
+      inputs.forEach((el) => {
+        const v = rates?.[el.dataset.cat]?.[el.dataset.day]?.[el.dataset.bed]?.[el.dataset.bf];
+        const val = (v === undefined || v === null) ? '' : String(Math.round(Number(v)));
+        el.value = val;
+        el.dataset.original = val;
+      });
+      refreshDirty();
+    }
+
+    function load() {
+      fetch('/room-rates/data')
+        .then((r) => r.json())
+        .then((json) => {
+          if (json && json.success) fill(json.rates || {});
+        })
+        .catch(() => {
+          if (typeof Swal !== 'undefined') {
+            Swal.fire('Error', 'Could not load room rates.', 'error');
+          }
+        });
+    }
+
+    inputs.forEach((el) => el.addEventListener('input', refreshDirty));
+
+    resetBtn.addEventListener('click', function () {
+      inputs.forEach((el) => { el.value = el.dataset.original ?? ''; });
+      refreshDirty();
+    });
+
+    saveBtn.addEventListener('click', function () {
+      const updates = inputs
+        .filter((el) => String(el.value).trim() !== String(el.dataset.original ?? ''))
+        .map((el) => ({
+          category: el.dataset.cat,
+          dayRange: el.dataset.day,
+          bedType: el.dataset.bed,
+          breakfast: el.dataset.bf,
+          amount: Number(el.value)
+        }))
+        .filter((u) => Number.isFinite(u.amount) && u.amount >= 0);
+
+      if (!updates.length) return;
+
+      saveBtn.disabled = true;
+      fetch('/room-rates/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates })
+      })
+        .then((r) => r.json())
+        .then((json) => {
+          if (json && json.success) {
+            inputs.forEach((el) => { el.dataset.original = String(el.value).trim(); });
+            refreshDirty();
+            if (typeof Swal !== 'undefined') {
+              Swal.fire({ icon: 'success', title: 'Saved', text: json.updated + ' rate(s) updated.', timer: 1600, showConfirmButton: false });
+            }
+          } else {
+            saveBtn.disabled = false;
+            if (typeof Swal !== 'undefined') Swal.fire('Error', (json && json.message) || 'Save failed.', 'error');
+          }
+        })
+        .catch(() => {
+          saveBtn.disabled = false;
+          if (typeof Swal !== 'undefined') Swal.fire('Error', 'Save failed.', 'error');
+        });
+    });
+
+    load();
+  })();
+</script>

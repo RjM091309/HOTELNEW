@@ -36,14 +36,21 @@ const TODAY_OFFSET_DAYS = 10;
 // =============================================================================
 // resourceTimeline has no virtual scrolling: every day column x every room row in the
 // rendered range is real DOM. Rendering all 12 navigable months at once (~180,000+ cells
-// with 100+ rooms) is what caused the FPS drop. Instead we start with a small window and
+// with 100+ rooms) is what caused the FPS drop. Instead we start with a window and
 // extend it by CALENDAR_EXPAND_STEP_MONTHS whenever the user scrolls near an edge, up to
 // these absolute bounds (5 back + 7 forward = 12 months total, same forward-leaning ratio
 // as the original 3-back/4-forward default).
+//
+// The initial window is deliberately set to the FULL span (== absolute bounds) so that
+// scrolling month-to-month never crosses an expansion boundary. Every expansion does a
+// full calendar.changeView() re-mount + a blank ".calendar-not-ready" gap + a complete
+// booking refetch, which users saw as the calendar "reloading" every single month they
+// scrolled. With the whole navigable range rendered up front that path is never hit
+// during normal browsing; expansion only remains as a safety net if the bounds ever grow.
 const CALENDAR_ABSOLUTE_MONTHS_BACK = 5;
 const CALENDAR_ABSOLUTE_MONTHS_FORWARD = 7;
-const CALENDAR_INITIAL_MONTHS_BACK = 1;
-const CALENDAR_INITIAL_MONTHS_FORWARD = 2;
+const CALENDAR_INITIAL_MONTHS_BACK = CALENDAR_ABSOLUTE_MONTHS_BACK;
+const CALENDAR_INITIAL_MONTHS_FORWARD = CALENDAR_ABSOLUTE_MONTHS_FORWARD;
 const CALENDAR_EXPAND_STEP_MONTHS = 1;
 const CALENDAR_EXPAND_EDGE_DAYS = 21;
 

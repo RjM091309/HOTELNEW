@@ -1,0 +1,402 @@
+<div class="row breakfast-list-page">
+  <div class="col-xl-12 col-md-12 col-12">
+    <div class="dashboard-card breakfast-list-card">
+      <div class="dashboard-card-header">
+        <div class="breakfast-list-header">
+          <div>
+            <h4 class="mb-0">Breakfast List</h4>
+            <p class="breakfast-list-note mb-0">
+              Breakfast for <strong id="breakfastServingDate">&hellip;</strong> &middot;
+              checked-in guests with a breakfast add-on &middot;
+              printed <span id="breakfastPrintedAt"></span>.
+            </p>
+          </div>
+          <div class="breakfast-list-controls">
+            <div class="breakfast-serving-group" role="group" aria-label="Serving day">
+              <button type="button" class="breakfast-serving-btn" data-serving="today">Today</button>
+              <button type="button" class="breakfast-serving-btn active" data-serving="tomorrow">Tomorrow</button>
+            </div>
+            <label for="breakfastDiscountPct" class="breakfast-discount-label">Canteen discount</label>
+            <div class="breakfast-discount-field">
+              <input type="number" id="breakfastDiscountPct" min="0" max="100" step="0.5" value="10" placeholder="none">
+              <span>%</span>
+              <button type="button" class="breakfast-discount-clear" id="breakfastDiscountClear" title="Remove discount" aria-label="Remove discount">&times;</button>
+            </div>
+            <button type="button" class="btn breakfast-refresh-btn" id="breakfastRefreshBtn">
+              <i class="fa fa-sync"></i> Refresh
+            </button>
+            <button type="button" class="btn breakfast-print-btn" id="breakfastPrintBtn">
+              <i class="fa fa-print"></i> Print
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="dashboard-card-body breakfast-list-body">
+        <div class="table-scrollable breakfast-list-table-wrap">
+          <table id="breakfast_list_tbl" class="table table-hover table-bordered full-width">
+            <thead>
+              <tr>
+                <th style="width:52px;">#</th>
+                <th>GUEST NAME</th>
+                <th style="width:120px;">ROOM</th>
+                <th class="text-center" style="width:150px;">BREAKFAST COUNT</th>
+              </tr>
+            </thead>
+            <tbody id="breakfastListBody">
+              <tr><td colspan="4" class="text-center text-muted py-4">Loading&hellip;</td></tr>
+            </tbody>
+            <tfoot>
+              <tr class="breakfast-total-row">
+                <th colspan="3" class="text-end">TOTAL</th>
+                <th class="text-center" id="breakfastTotal">0</th>
+              </tr>
+              <tr class="breakfast-less-row">
+                <th colspan="3" class="text-end">LESS <span id="breakfastLessPct">10</span>%</th>
+                <th class="text-center" id="breakfastLess">0</th>
+              </tr>
+              <tr class="breakfast-net-row">
+                <th colspan="3" class="text-end">
+                  <span class="bl-screen-only">NET COUNT</span><span class="bl-print-only">TOTAL <span id="breakfastNetPct">10</span>% discount applied</span>
+                </th>
+                <th class="text-center" id="breakfastNet">0</th>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .breakfast-list-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .breakfast-list-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .breakfast-refresh-btn {
+    background: #495057;
+    border: 1px solid #6c757d;
+    color: #fff;
+    padding: 6px 14px;
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .breakfast-print-btn {
+    background: #3598dc;
+    border: 1px solid #3598dc;
+    color: #fff;
+    padding: 6px 14px;
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .breakfast-list-note {
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 12px;
+    margin-top: 6px;
+  }
+  .breakfast-serving-group {
+    display: inline-flex;
+    border: 1px solid #6c757d;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .breakfast-serving-btn {
+    background: #343a40;
+    color: #cfd4da;
+    border: none;
+    border-left: 1px solid #6c757d;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .breakfast-serving-btn:first-child { border-left: none; }
+  .breakfast-serving-btn:hover { background: #3d444b; color: #fff; }
+  .breakfast-serving-btn.active { background: #0d6efd; color: #fff; }
+  .breakfast-discount-clear {
+    background: #e0e0e0;
+    border: none;
+    color: #555;
+    width: 18px;
+    height: 18px;
+    line-height: 16px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    border-radius: 50%;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 2px;
+  }
+  .breakfast-discount-clear:hover { background: #c9c9c9; color: #000; }
+  .breakfast-discount-label {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 13px;
+  }
+  .breakfast-discount-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #ffffff;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    padding: 2px 8px 2px 4px;
+  }
+  .breakfast-discount-field input {
+    width: 58px;
+    border: none;
+    outline: none;
+    text-align: right;
+    font-size: 13px;
+    font-weight: 600;
+    color: #212529;
+    background: transparent;
+  }
+  .breakfast-discount-field span {
+    color: #6c757d;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  #breakfast_list_tbl td, #breakfast_list_tbl th {
+    vertical-align: middle;
+  }
+  .breakfast-total-row th,
+  .breakfast-less-row th,
+  .breakfast-net-row th {
+    font-size: 14px;
+  }
+  .breakfast-total-row th { background: rgba(255, 255, 255, 0.06); }
+  .breakfast-less-row th { background: rgba(255, 255, 255, 0.04); color: #f0ad4e; }
+  .breakfast-net-row th {
+    font-size: 15px;
+    background: rgba(111, 156, 64, 0.18);
+  }
+  #breakfastNet {
+    font-size: 17px;
+    color: #8ac249;
+  }
+  .bl-print-only { display: none; }
+
+  /* Auto-shrink for long lists (class set by JS from the row count).
+     Up to ~15 rows keeps the default comfortable size. */
+  #breakfast_list_tbl.bl-compact td, #breakfast_list_tbl.bl-compact th { font-size: 12px; padding: 5px 8px; }
+  #breakfast_list_tbl.bl-compact .breakfast-net-row th { font-size: 13px; }
+  #breakfast_list_tbl.bl-compact #breakfastNet { font-size: 14px; }
+
+  #breakfast_list_tbl.bl-dense td, #breakfast_list_tbl.bl-dense th { font-size: 10.5px; padding: 3px 6px; }
+  #breakfast_list_tbl.bl-dense .breakfast-net-row th { font-size: 11.5px; }
+  #breakfast_list_tbl.bl-dense #breakfastNet { font-size: 12.5px; }
+
+  #breakfast_list_tbl.bl-ultra td, #breakfast_list_tbl.bl-ultra th { font-size: 9px; padding: 2px 5px; }
+  #breakfast_list_tbl.bl-ultra .breakfast-net-row th { font-size: 10px; }
+  #breakfast_list_tbl.bl-ultra #breakfastNet { font-size: 11px; }
+
+  /* No discount applied -> the LESS / NET rows are removed entirely (screen). */
+  #breakfast_list_tbl.bl-no-discount .breakfast-less-row,
+  #breakfast_list_tbl.bl-no-discount .breakfast-net-row { display: none; }
+
+  @media print {
+    .sidebar, .navbar, .app-header, .app-sidebar, .breakfast-list-controls { display: none !important; }
+    body, .breakfast-list-card, .dashboard-card, .dashboard-card-header, .dashboard-card-body {
+      background: #fff !important;
+      color: #000 !important;
+    }
+    .breakfast-list-note { color: #333 !important; }
+    #breakfast_list_tbl th, #breakfast_list_tbl td {
+      color: #000 !important;
+      border-color: #999 !important;
+    }
+    /* With a discount: print only the final (NET) total. */
+    #breakfast_list_tbl.bl-has-discount .breakfast-total-row,
+    #breakfast_list_tbl.bl-has-discount .breakfast-less-row { display: none !important; }
+    /* Without a discount: print only the plain TOTAL. */
+    #breakfast_list_tbl.bl-no-discount .breakfast-less-row,
+    #breakfast_list_tbl.bl-no-discount .breakfast-net-row { display: none !important; }
+    .breakfast-net-row th, .breakfast-total-row th { background: #eee !important; color: #000 !important; }
+    #breakfastNet, #breakfastTotal { color: #000 !important; }
+    .bl-screen-only { display: none; }
+    .bl-print-only { display: inline; }
+  }
+</style>
+
+<script>
+  (function () {
+    const body = document.getElementById('breakfastListBody');
+    const totalCell = document.getElementById('breakfastTotal');
+    const lessCell = document.getElementById('breakfastLess');
+    const lessPctLabel = document.getElementById('breakfastLessPct');
+    const netPctLabel = document.getElementById('breakfastNetPct');
+    const netCell = document.getElementById('breakfastNet');
+    const pctInput = document.getElementById('breakfastDiscountPct');
+    const servingDateEl = document.getElementById('breakfastServingDate');
+    const servingBtns = document.querySelectorAll('.breakfast-serving-btn');
+    const PCT_KEY = 'breakfastCanteenDiscountPct';
+    const SERVING_KEY = 'breakfastServingDay';
+
+    let grossTotal = 0;
+    let serving = 'tomorrow';
+
+    // Remember the last percentage / serving day used on this device
+    try {
+      const saved = localStorage.getItem(PCT_KEY);
+      // saved === '' means the user removed the discount -> keep the field blank.
+      if (saved !== null && !Number.isNaN(Number(saved))) {
+        pctInput.value = saved;
+      }
+      const savedServing = localStorage.getItem(SERVING_KEY);
+      if (savedServing === 'today' || savedServing === 'tomorrow') {
+        serving = savedServing;
+      }
+    } catch (e) {}
+
+    function syncServingButtons() {
+      servingBtns.forEach((b) => b.classList.toggle('active', b.dataset.serving === serving));
+    }
+    syncServingButtons();
+
+    function esc(v) {
+      return String(v == null ? '' : v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // Trim trailing zeros: 5 -> "5", 5.40 -> "5.4"
+    function fmt(n) {
+      return Number(n.toFixed(2)).toString();
+    }
+
+    function currentPct() {
+      let p = parseFloat(pctInput.value);
+      if (Number.isNaN(p) || p < 0) p = 0;
+      if (p > 100) p = 100;
+      return p;
+    }
+
+    const tableEl = document.getElementById('breakfast_list_tbl');
+
+    function recalc() {
+      const pct = currentPct();
+      const hasDiscount = pct > 0;
+
+      // No discount -> the LESS / NET rows are removed entirely (CSS driven).
+      tableEl.classList.toggle('bl-has-discount', hasDiscount);
+      tableEl.classList.toggle('bl-no-discount', !hasDiscount);
+
+      totalCell.textContent = fmt(grossTotal);
+      if (!hasDiscount) return;
+
+      // Net count is rounded DOWN to a whole breakfast; the "less" line is derived
+      // from it so the column always reconciles (TOTAL - LESS = NET).
+      const net = Math.floor(grossTotal * (1 - pct / 100));
+      const less = grossTotal - net;
+      lessPctLabel.textContent = fmt(pct);
+      netPctLabel.textContent = fmt(pct);
+      lessCell.textContent = less > 0 ? '-' + fmt(less) : '0';
+      netCell.textContent = fmt(net);
+    }
+
+    function stamp() {
+      const el = document.getElementById('breakfastPrintedAt');
+      const now = new Date();
+      el.textContent = now.toLocaleString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: 'numeric', minute: '2-digit'
+      });
+    }
+
+    // Shrink the table automatically as the list grows so it still fits on a page.
+    // <=15 rows keeps the current comfortable size.
+    function applyDensity(count) {
+      const t = document.getElementById('breakfast_list_tbl');
+      t.classList.remove('bl-compact', 'bl-dense', 'bl-ultra');
+      if (count > 50) t.classList.add('bl-ultra');
+      else if (count > 30) t.classList.add('bl-dense');
+      else if (count > 15) t.classList.add('bl-compact');
+    }
+
+    function render(rows) {
+      applyDensity(rows.length);
+      if (!rows.length) {
+        body.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">No checked-in guests with breakfast.</td></tr>';
+        return;
+      }
+      body.innerHTML = rows.map((r, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td>${esc(r.GUEST_NAME || 'N/A')}</td>
+          <td><strong>${esc(r.ROOM_NUMBER || '-')}</strong></td>
+          <td class="text-center"><strong>${Number(r.BREAKFAST_COUNT) || 0}</strong></td>
+        </tr>
+      `).join('');
+    }
+
+    function showServingDate(isoDate) {
+      if (!isoDate) { servingDateEl.textContent = serving; return; }
+      const d = new Date(isoDate + 'T00:00:00');
+      servingDateEl.textContent = d.toLocaleDateString('en-US', {
+        weekday: 'long', month: 'short', day: 'numeric', year: 'numeric'
+      });
+    }
+
+    function load() {
+      body.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">Loading&hellip;</td></tr>';
+      fetch('/booking/breakfast-list/data?serving=' + encodeURIComponent(serving))
+        .then((res) => res.json())
+        .then((json) => {
+          if (!json.success) {
+            body.innerHTML = '<tr><td colspan="4" class="text-center text-danger py-4">' + esc(json.message || 'Failed to load.') + '</td></tr>';
+            return;
+          }
+          render(json.data || []);
+          grossTotal = Number(json.totals && json.totals.total) || 0;
+          recalc();
+          showServingDate(json.servingDate);
+          stamp();
+        })
+        .catch(() => {
+          body.innerHTML = '<tr><td colspan="4" class="text-center text-danger py-4">Failed to load breakfast list.</td></tr>';
+        });
+    }
+
+    servingBtns.forEach((btn) => {
+      btn.addEventListener('click', function () {
+        if (btn.dataset.serving === serving) return;
+        serving = btn.dataset.serving;
+        syncServingButtons();
+        try { localStorage.setItem(SERVING_KEY, serving); } catch (e) {}
+        load();
+      });
+    });
+
+    document.getElementById('breakfastRefreshBtn').addEventListener('click', load);
+    document.getElementById('breakfastPrintBtn').addEventListener('click', function () {
+      window.print();
+    });
+
+    pctInput.addEventListener('input', function () {
+      recalc();
+      try { localStorage.setItem(PCT_KEY, pctInput.value); } catch (e) {}
+    });
+
+    // X button: remove the discount entirely (blank field, LESS/NET rows disappear).
+    document.getElementById('breakfastDiscountClear').addEventListener('click', function () {
+      pctInput.value = '';
+      recalc();
+      try { localStorage.setItem(PCT_KEY, ''); } catch (e) {}
+    });
+
+    recalc();
+    load();
+  })();
+</script>

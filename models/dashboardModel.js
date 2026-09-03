@@ -1736,32 +1736,76 @@ class DashboardModel {
   }
 
   // Get available rooms for transfer
-  static async getAvailableRoomsForTransfer(currentRoom, checkOutDate) {
+  static async getAvailableRoomsForTransfer(currentRoom, checkOutDate, bookingId = null) {
     try {
+      // Look up the transferred booking's own stay so we can exclude any room that
+      // already has an overlapping reservation (a room can be physically vacant now
+      // -- ROOM_STATUS = 1 -- yet still be booked for a future/overlapping range).
+      let stayStart = null;
+      let stayEnd = null;
+      if (bookingId) {
+        const bkRows = await queryDatabasePromise(
+          `SELECT CHECK_IN_DATE, CHECK_OUT_DATE FROM booking WHERE IDNo = ? AND ACTIVE = 1 LIMIT 1`,
+          [bookingId]
+        );
+        if (bkRows.length) {
+          stayStart = bkRows[0].CHECK_IN_DATE;
+          stayEnd = bkRows[0].CHECK_OUT_DATE;
+        }
+      }
+
+      // Placeholder order below: checkOutDate, currentRoom, [availability params...]
+      const params = [checkOutDate, currentRoom];
+      let availabilityFilter;
+
+      if (stayStart && stayEnd) {
+        // DATE-BASED availability: a room is a valid transfer target if nothing is
+        // booked over the transferred stay -- regardless of its current ROOM_STATUS
+        // (a room left "dirty"/"cleaning" after the previous guest is still free for
+        // a future range). Only a genuine maintenance block (ROOM_STATUS = 3) or an
+        // overlapping pending/check-In booking disqualifies it.
+        availabilityFilter = `
+          AND (r.ROOM_STATUS IS NULL OR r.ROOM_STATUS <> 3)
+          AND NOT EXISTS (
+            SELECT 1 FROM booking bx
+            WHERE bx.ROOM_ID = r.IDNo
+              AND bx.ACTIVE = 1
+              AND bx.BOOKING_STATUS IN ('pending', 'check-In', 'maintenance')
+              AND bx.IDNo <> ?
+              AND bx.CHECK_IN_DATE < ?
+              AND bx.CHECK_OUT_DATE > ?
+          )`;
+        params.push(bookingId, stayEnd, stayStart);
+      } else {
+        // Fallback when the booking's dates are unavailable: strict current status.
+        availabilityFilter = `AND r.ROOM_STATUS = 1`;
+      }
+
       const rooms = await queryDatabasePromise(`
-        SELECT 
+        SELECT
           r.IDNo AS ROOM_ID,
           r.ROOM_NUMBER,
           r.ROOM_FLOOR,
           r.ROOM_STATUS,
           r.ROOM_BED,
+          r.ROOM_VIEW,
           r.ROOM_MAX,
           r.ROOM_TYPE_ID,
           rt.NAME AS ROOM_TYPE,
           IFNULL(r.ROOM_PRICE, rt.BASE_PRICE) AS ROOM_RATE,
-          CASE 
-            WHEN b.CHECK_OUT_DATE = ? THEN 1 
-            ELSE 0 
+          CASE
+            WHEN b.CHECK_OUT_DATE = ? THEN 1
+            ELSE 0
           END AS OCCUPANT_CHECK_OUT_TODAY
         FROM room r
         LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
         LEFT JOIN booking b ON r.IDNo = b.ROOM_ID AND b.ACTIVE = 1 AND b.BOOKING_STATUS = 'check-In'
-        WHERE r.ACTIVE = 1 
-          AND r.ROOM_STATUS = 1 
+        WHERE r.ACTIVE = 1
           AND r.IDNo != ?
           AND r.ROOM_FLOOR IN (3, 4, 5, 6)
+          ${availabilityFilter}
         ORDER BY r.ROOM_FLOOR ASC, r.ROOM_NUMBER ASC
-      `, [checkOutDate, currentRoom]);
+      `, params);
 
       return rooms;
     } catch (error) {
@@ -1839,9 +1883,29 @@ class DashboardModel {
 
       // Convert status to number for comparison (handle both string and number)
       const roomStatus = parseInt(newRoomStatus[0].ROOM_STATUS, 10);
-      
-      if (roomStatus !== 1) {
-        throw new Error(`Room ${newRoomStatus[0].ROOM_NUMBER} is not available (Status: ${roomStatus})`);
+
+      // Availability is DATE-BASED, and must match getAvailableRoomsForTransfer so the
+      // picker and this action never disagree: block only a maintenance room, or a room
+      // with another active pending / check-In / maintenance booking overlapping this
+      // stay. A merely "dirty"/"cleaning" room (status 4) is still a valid future target.
+      if (roomStatus === 3) {
+        throw new Error(`Room ${newRoomStatus[0].ROOM_NUMBER} is under maintenance.`);
+      }
+
+      const conflictRows = await queryDatabasePromise(`
+        SELECT bx.IDNo
+        FROM booking bx
+        WHERE bx.ROOM_ID = ?
+          AND bx.ACTIVE = 1
+          AND bx.BOOKING_STATUS IN ('pending', 'check-In', 'maintenance')
+          AND bx.IDNo <> ?
+          AND bx.CHECK_IN_DATE < ?
+          AND bx.CHECK_OUT_DATE > ?
+        LIMIT 1
+      `, [newRoomId, bookingId, booking.CHECK_OUT_DATE, booking.CHECK_IN_DATE]);
+
+      if (conflictRows.length > 0) {
+        throw new Error(`Room ${newRoomStatus[0].ROOM_NUMBER} already has a booking during this stay.`);
       }
 
       // Update booking with new room

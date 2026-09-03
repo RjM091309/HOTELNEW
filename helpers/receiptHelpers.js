@@ -31,6 +31,7 @@ function formatPaymentMethodLabel(method, otherLabel = '') {
     marker: 'Credit',
     check: 'Check',
     bank_transfer: 'Bank Transfer',
+    korean_bank: 'Korean Bank',
     gcash: 'GCash',
     online: 'Online',
     agoda: 'AGODA',

@@ -1477,14 +1477,35 @@ class CalendarModel {
       `;
       
       const result = await queryDatabasePromise(updateBookingQuery, [newStatus, checkInStatus, bookingId]);
-      
+
       if (result.affectedRows === 0) {
         await queryDatabasePromise('ROLLBACK');
-        return { 
-          success: false, 
-          message: 'Booking not found or already updated' 
+        return {
+          success: false,
+          message: 'Booking not found or already updated'
         };
       }
+
+      // Reopening undoes the cancellation, so remove the negative "refund" payment
+      // row the cancel added (see cancelBooking / cancelGroupBooking). Otherwise the
+      // refund would keep reducing sales for a booking that is active again.
+      await queryDatabasePromise(
+        `DELETE FROM payments
+         WHERE BOOKING_ID = ?
+           AND PAYMENT_TYPE = 'refund'
+           AND AMOUNT_PAID < 0
+           AND REMARKS LIKE 'Cancellation refund%'`,
+        [bookingId]
+      );
+
+      // Clear the stored cancellation figures on the billing row.
+      await queryDatabasePromise(
+        `UPDATE billing
+         SET CANCELLATION_PENALTY = 0,
+             REFUNDABLE_AMOUNT = 0
+         WHERE BOOKING_ID = ?`,
+        [bookingId]
+      );
 
       // Commit transaction
       await queryDatabasePromise('COMMIT');

@@ -375,10 +375,44 @@ async function runActivityLogMigrations() {
   }
 }
 
+async function runRoomRatesMigrations() {
+  const { seedRows } = require('../config/roomRates');
+
+  await queryDatabasePromise(`
+    CREATE TABLE IF NOT EXISTS room_rates (
+      IDNo INT NOT NULL AUTO_INCREMENT,
+      CATEGORY VARCHAR(40) NOT NULL,
+      DAY_RANGE VARCHAR(10) NOT NULL,
+      BED_TYPE VARCHAR(10) NOT NULL,
+      BREAKFAST VARCHAR(10) NOT NULL,
+      AMOUNT DECIMAL(12,2) NOT NULL DEFAULT 0,
+      UPDATED_BY INT NULL DEFAULT NULL,
+      UPDATED_DT DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (IDNo),
+      UNIQUE KEY uq_room_rate (CATEGORY, DAY_RANGE, BED_TYPE, BREAKFAST)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  // Seed any missing cells from the printed rate sheet (safe to re-run: only
+  // inserts rows that don't exist yet, never overwrites edited amounts).
+  const rows = seedRows();
+  const values = rows.map(() => '(?, ?, ?, ?, ?)').join(', ');
+  const params = [];
+  rows.forEach((r) => params.push(r.category, r.dayRange, r.bedType, r.breakfast, r.amount));
+
+  await queryDatabasePromise(
+    `INSERT IGNORE INTO room_rates (CATEGORY, DAY_RANGE, BED_TYPE, BREAKFAST, AMOUNT)
+     VALUES ${values}`,
+    params
+  );
+  console.log('✅ Ensured table + seed: room_rates');
+}
+
 async function runStartupMigrations() {
   console.log('🔄 Running startup database migrations...');
 
   await runActivityLogMigrations();
+  await runRoomRatesMigrations();
   await runFlightScheduleMigrations();
   await runPickupDropMigrations();
   await runReceiptMigrations();

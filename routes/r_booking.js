@@ -32,6 +32,10 @@ router.get('/check-in-notifier', BookingController.renderCheckInNotifierPage);
 router.get('/check-in-notifier/data', BookingController.getCheckInNotifierData);
 router.post('/check-in-notifier/notify', BookingController.notifyCheckInSelections);
 
+// Breakfast list page
+router.get('/breakfast-list', BookingController.renderBreakfastListPage);
+router.get('/breakfast-list/data', BookingController.getBreakfastListData);
+
 // API Routes for booking data
 router.get('/booking_data', BookingController.getBookingDataEnhanced);
 router.get('/booking_details/:bookingID', BookingController.getBookingDetails);
