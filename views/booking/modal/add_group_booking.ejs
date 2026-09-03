@@ -1066,8 +1066,11 @@
   font-size: 13px;
 }
 
+/* Hidden for now on this compact per-room rate list - room number + rate
+   input is enough here, the bed-type icon/count is more useful on the
+   Rooms picker cards where staff are still choosing rooms. */
 #modal-add-group-booking .manual-rate-item .bed-badge {
-  display: inline-flex;
+  display: none;
   align-items: center;
   gap: 4px;
   padding: 3px 8px;
@@ -1110,7 +1113,11 @@
   gap: 6px;
 }
 
+/* Hidden along with .bed-badge above - "Rate" (or "Weekday"/"Weekend" once
+   weekend rates are enabled) read as clutter once every row already has an
+   obvious rate input next to the room number. */
 #modal-add-group-booking .manual-rate-item .rate-field-row label {
+  display: none;
   margin: 0;
   font-size: 11px;
   color: #adb5bd;
@@ -2084,6 +2091,7 @@
     $('#groupSelectedRooms').val('');
     $('#groupSelectedRoomPrices').val('');
     $('#groupNights').val('0');
+    window.__roomCheckerQuotedRoomTotal = 0; // only set for this one Room Checker handoff (see openRoomCheckerGroupBooking), never carry into the next open
     $('#groupBookingId').val(''); // Clear existing group ID
     $('#groupJoinExistingGroup').val('false'); // Reset join flag
     groupBlocks = [];
@@ -2473,7 +2481,19 @@
     }
 
     const baseSubtotal = prices.reduce((sum, price) => sum + price, 0);
-    const roomSubtotal = baseSubtotal * nights;
+    let roomSubtotal = baseSubtotal * nights;
+
+    // No room priced yet (staff hasn't picked any) - if this modal was opened
+    // via Room Checker's Proceed Booking, fall back to the room-rate total it
+    // already quoted (window.__roomCheckerQuotedRoomTotal, already scaled by
+    // nights/qty - see openRoomCheckerGroupBooking in room_checker.js) so
+    // Total/Balance show that instead of ₱0.00 while rooms are still being
+    // picked. Bypassed the moment real rooms are selected (prices.length > 0),
+    // and reset to 0 on every modal open (see resetGroupForm) so a stale quote
+    // never leaks into an unrelated booking.
+    if (prices.length === 0 && window.__roomCheckerQuotedRoomTotal) {
+      roomSubtotal = window.__roomCheckerQuotedRoomTotal;
+    }
 
     const adultQty = $('#groupIncludeBreakfast').is(':checked') ? (parseInt($('#groupBreakfastAdultQty').val(), 10) || 0) : 0;
     const adultPrice = parseFloat($('#groupBreakfastAdultPrice').val()) || 0;

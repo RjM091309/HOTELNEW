@@ -886,18 +886,20 @@ function proceedRoomCheckerBooking() {
   // checkbox is on).
   const breakfastCount = Math.max(0, parseInt(document.getElementById('rateSummaryBreakfastQty').value, 10) || 0);
 
-  // The exact total already quoted here, before any specific room is picked -
-  // carried into the group-booking modal's Summary as an immediate preview
-  // (see openRoomCheckerGroupBooking) so staff see the cost right away instead
-  // of a misleading ₱0.00 while they haven't picked rooms yet. Once they do
-  // pick specific rooms there, computeGroupTotal() naturally overwrites this
-  // with the real total for those exact rooms.
-  const quotedGrandTotalText = (document.getElementById('rateSummaryGrandTotal') || {}).textContent || '';
+  // Just the room-rate portion (no breakfast/discount - those already carry
+  // over as real form fields the group-booking modal computes on its own) of
+  // what was already quoted here, before any specific room is picked. Handed
+  // to the modal as window.__roomCheckerQuotedRoomTotal (see
+  // openRoomCheckerGroupBooking) so its own computeGroupTotal() can fall back
+  // to this whenever no rooms are selected yet, instead of showing ₱0.00 -
+  // no matter how many times or when that recompute runs, not a one-shot
+  // DOM write that a later recompute can race and overwrite.
+  const quotedRoomTotal = (kingQty * (window.__rateSummaryKingRate || 0) + queenQty * (window.__rateSummaryQueenRate || 0)) * range.nights;
 
   if (totalRooms === 1) {
     openRoomCheckerSingleBooking(dateRangeStr, range.nights, start, checkoutDate, totalDiscount, breakfastCount);
   } else {
-    openRoomCheckerGroupBooking(dateRangeStr, range.nights, start, checkoutDate, kingQty, queenQty, totalDiscount, breakfastCount, quotedGrandTotalText);
+    openRoomCheckerGroupBooking(dateRangeStr, range.nights, start, checkoutDate, kingQty, queenQty, totalDiscount, breakfastCount, quotedRoomTotal);
   }
 }
 
@@ -945,7 +947,7 @@ function openRoomCheckerSingleBooking(dateRangeStr, nights, start, checkoutDate,
   }
 }
 
-function openRoomCheckerGroupBooking(dateRangeStr, nights, start, checkoutDate, kingQty, queenQty, totalDiscount, breakfastCount, quotedGrandTotalText) {
+function openRoomCheckerGroupBooking(dateRangeStr, nights, start, checkoutDate, kingQty, queenQty, totalDiscount, breakfastCount, quotedRoomTotal) {
   const modalEl = document.getElementById('modal-add-group-booking');
   if (!modalEl) return;
 
@@ -958,6 +960,11 @@ function openRoomCheckerGroupBooking(dateRangeStr, nights, start, checkoutDate, 
   // changing, so the Room Checker's values always land on top of the reset, not under it.
   $(modalEl).one('shown.bs.modal', function () {
     setTimeout(() => {
+      // Set AFTER resetGroupForm() (in add_group_booking.ejs's own earlier-firing
+      // shown.bs.modal handler) already zeroed this out - read/cleared again by
+      // computeGroupTotal() there.
+      window.__roomCheckerQuotedRoomTotal = quotedRoomTotal || 0;
+
       const daterangeInput = document.getElementById('groupDaterange');
       const nightsInput = document.getElementById('groupNights');
       const kingInput = document.getElementById('groupBed1Count');
@@ -1015,23 +1022,13 @@ function openRoomCheckerGroupBooking(dateRangeStr, nights, start, checkoutDate, 
       const searchBtn = document.getElementById('groupSearchRooms');
       if (searchBtn && (kingQty > 0 || queenQty > 0)) searchBtn.click();
 
-      // That change-triggered recompute has nothing to work with yet (no rooms
-      // picked) and leaves Total at just the breakfast/discount portion, so
-      // show the total Room Checker already quoted instead - a preview, not a
-      // real selection. Paid Amount wasn't touched above (still 0), so Balance
-      // mirrors the same quoted figure. Deferred an extra tick (past the
-      // synchronous change-trigger and search-click above) so it's the last
-      // write to these fields; once staff actually pick rooms below,
-      // computeGroupTotal() overwrites both with the real total for those
-      // specific rooms.
-      if (quotedGrandTotalText) {
-        setTimeout(() => {
-          const totalEl = document.getElementById('groupComputedTotal');
-          const balanceEl = document.getElementById('groupComputedBalance');
-          if (totalEl) totalEl.textContent = quotedGrandTotalText;
-          if (balanceEl) balanceEl.textContent = quotedGrandTotalText;
-        }, 50);
-      }
+      // window.__roomCheckerQuotedRoomTotal (set above) is read directly by
+      // computeGroupTotal() in add_group_booking.ejs whenever no rooms are
+      // selected yet, so the Total/Balance shown here need no separate write -
+      // that recompute (already nudged via the form trigger above, and run
+      // again by whatever the search above and later room selection trigger)
+      // picks it up on its own every time, instead of a one-shot DOM write
+      // that a later recompute could race and overwrite.
     }, 0);
   });
 }
