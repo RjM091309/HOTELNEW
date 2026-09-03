@@ -321,7 +321,7 @@
           <div class="group-col-right">
 
             <div class="group-summary-card">
-              <h5 class="group-summary-title">Summary</h5>
+              <h6 class="group-field-card-title">Summary</h6>
 
               <div id="groupRoomPricingPanel" style="display: none;">
                 <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
@@ -578,14 +578,6 @@
   padding: 18px;
 }
 
-#modal-add-group-booking .group-summary-title {
-  color: #9aa4ac;
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 14px;
-}
-
 #modal-add-group-booking .group-summary-line {
   display: flex;
   justify-content: space-between;
@@ -789,6 +781,11 @@
   font-size: 14px;
   font-weight: 500;
   margin: 0;
+  cursor: pointer;
+}
+
+#modal-add-group-booking .room-option.disabled-room {
+  cursor: default;
 }
 
 #modal-add-group-booking .room-option .bed-badge {
@@ -1285,6 +1282,256 @@
 
 #modal-add-group-booking #groupPaymentStatus.status-unpaid {
   color: #dc3545 !important;
+}
+
+/* ============================================================
+   LIGHT MODE (data-theme="white") overrides.
+   This whole modal was hardcoded dark regardless of theme; this
+   block mirrors every dark rule above with the light palette used
+   elsewhere in the app (#addRoomModal, .dashboard-card, etc).
+   Brand green accents (#6f9c40) are kept as-is.
+   ============================================================ */
+[data-theme="white"] #modal-add-group-booking .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .modal-header {
+  background-color: #2196f3 !important;
+  color: #ffffff !important;
+  border-bottom: 1px solid #1976d2 !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .modal-title {
+  color: #ffffff !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .modal-header .btn-close {
+  filter: invert(1) !important;
+}
+[data-theme="white"] #modal-add-group-booking .modal-header .btn-close:hover {
+  filter: invert(0.85) !important;
+}
+
+/* table.css has a global .modal .modal-body{background:#2a3135} that applies to
+   every modal site-wide regardless of theme - override it here specifically.
+   Light gray canvas so the white field-cards below read as elevated on top
+   of it, instead of white-on-white. */
+[data-theme="white"] #modal-add-group-booking .modal-body {
+  background-color: #f3f4f6 !important;
+  color: #111827 !important;
+  border-top: 1px solid #e5e7eb !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #modal-group-flight-arrivals .modal-body {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border-top: 1px solid #e5e7eb !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .modal-footer {
+  background: #f9fafb !important;
+  border-top: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+[data-theme="white"] #modal-add-group-booking .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+/* Top-level cards: white, elevated on top of the gray modal-body canvas. */
+[data-theme="white"] #modal-add-group-booking .group-field-card,
+[data-theme="white"] #modal-add-group-booking .group-summary-card {
+  background-color: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+/* Nested inset panels inside those cards keep the gray "well" treatment so
+   they still read as a level deeper than the white card around them. */
+[data-theme="white"] #modal-add-group-booking .group-room-breakdown,
+[data-theme="white"] #modal-add-group-booking .room-filter-section,
+[data-theme="white"] #modal-add-group-booking .manual-rate-container,
+[data-theme="white"] #modal-add-group-booking .room-list-container {
+  background-color: #f9fafb !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .group-field-card-title {
+  color: #6b7280 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  padding-bottom: 10px !important;
+  margin-bottom: 14px !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .group-summary-line {
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .group-summary-line span {
+  color: #374151 !important;
+}
+
+/* Total/Paid/Balance keep their own semantic colors below (blue-ish/green/orange) -
+   this is only a fallback for any other h3 in the summary card that isn't one of them. */
+[data-theme="white"] #modal-add-group-booking .group-summary-line h3 {
+  color: #111827 !important;
+}
+
+/* Match the Grand Total treatment from /calendar/room-checker: bold, larger,
+   no bottom border, and the headline figure in the same blue accent. */
+[data-theme="white"] #modal-add-group-booking .group-summary-line:has(#groupComputedTotal) {
+  border-bottom: none !important;
+  padding-top: 14px;
+}
+
+[data-theme="white"] #modal-add-group-booking #groupComputedTotal {
+  color: #1565c0 !important;
+  font-size: 20px;
+}
+
+[data-theme="white"] #modal-add-group-booking .form-label {
+  color: #6b7280 !important;
+}
+
+[data-theme="white"] #modal-add-group-booking input[type="text"],
+[data-theme="white"] #modal-add-group-booking input[type="number"],
+[data-theme="white"] #modal-add-group-booking input[type="email"],
+[data-theme="white"] #modal-add-group-booking .group-room-count-display,
+[data-theme="white"] #modal-add-group-booking select,
+[data-theme="white"] #modal-add-group-booking textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #d1d5db !important;
+}
+
+[data-theme="white"] #modal-add-group-booking input::placeholder,
+[data-theme="white"] #modal-add-group-booking textarea::placeholder {
+  color: #9ca3af !important;
+}
+
+[data-theme="white"] #modal-add-group-booking select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+[data-theme="white"] #modal-add-group-booking h3,
+[data-theme="white"] #modal-add-group-booking h5,
+[data-theme="white"] #modal-add-group-booking label {
+  color: #111827 !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .form-check-label {
+  color: #374151 !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .room-option {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .room-option .bed-badge,
+[data-theme="white"] #modal-add-group-booking .manual-rate-item .bed-badge,
+[data-theme="white"] #modal-add-group-booking .bed-based-rate-item .bed-badge {
+  background: rgba(111, 156, 64, 0.12) !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .room-option .bed-badge i,
+[data-theme="white"] #modal-add-group-booking .manual-rate-item .bed-badge i,
+[data-theme="white"] #modal-add-group-booking .bed-based-rate-item .bed-badge i {
+  color: #4f7a2a !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .room-option:hover {
+  background: rgba(111, 156, 64, 0.08) !important;
+  border-color: rgba(111, 156, 64, 0.4) !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .room-option .form-check-input:checked + .form-check-label {
+  color: #4f7a2a !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .room-option:has(.form-check-input:checked) {
+  background: rgba(111, 156, 64, 0.12) !important;
+  border-color: #6f9c40 !important;
+}
+
+[data-theme="white"] #modal-add-group-booking hr {
+  border-color: #e5e7eb !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .manual-rate-item,
+[data-theme="white"] #modal-add-group-booking .bed-based-rate-item {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .manual-rate-item:hover,
+[data-theme="white"] #modal-add-group-booking .bed-based-rate-item:hover {
+  background: rgba(111, 156, 64, 0.08) !important;
+  border-color: rgba(111, 156, 64, 0.3) !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .manual-rate-item .room-number,
+[data-theme="white"] #modal-add-group-booking .bed-based-rate-item .bed-label {
+  color: #111827 !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .manual-rate-item .rate-field-row label,
+[data-theme="white"] #modal-add-group-booking .bed-based-rate-item .room-count {
+  color: #6b7280 !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .filter-radio-group .form-check-label,
+[data-theme="white"] #modal-add-group-booking .room-filter-section label,
+[data-theme="white"] #modal-add-group-booking .room-filter-section #groupRoomCount,
+[data-theme="white"] #modal-add-group-booking #groupRoomPricingPanel .form-check-label {
+  color: #111827 !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .consolidated-indicator {
+  background: rgba(111, 156, 64, 0.08) !important;
+  border-color: rgba(111, 156, 64, 0.3) !important;
+  color: #374151 !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .bed-availability-summary {
+  background-color: rgba(0, 0, 0, 0.03) !important;
+  border-color: #e5e7eb !important;
+  color: #374151 !important;
+}
+
+[data-theme="white"] #modal-add-group-booking #groupPaymentStatus {
+  background-color: #f3f4f6 !important;
+  color: #111827 !important;
+  border: 1px solid #d1d5db !important;
+}
+
+[data-theme="white"] #modal-add-group-booking #groupPaymentStatus.status-partial {
+  color: #0e7490 !important;
+}
+
+[data-theme="white"] #modal-add-group-booking #groupSeniorPwdDiscountAmount {
+  background-color: #f3f4f6 !important;
+  color: #4f7a2a !important;
+}
+
+[data-theme="white"] #modal-group-flight-arrivals .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #modal-group-flight-arrivals thead {
+  background-color: #f9fafb !important;
 }
 
 </style>
@@ -3453,6 +3700,16 @@
         updateManualSelectionInfo();
       }
       computeGroupTotal();
+    });
+
+    // Clicking anywhere on a room tile toggles its checkbox - the checkbox and
+    // label aren't nested/paired via for="", so without this only the tiny
+    // checkbox square itself was clickable.
+    $('#groupRoomsList').on('click', '.room-option', function(e) {
+      if ($(e.target).is('input')) return; // native checkbox click already handles itself
+      const $checkbox = $(this).find('.group-manual-checkbox');
+      if (!$checkbox.length || $checkbox.prop('disabled')) return;
+      $checkbox.prop('checked', !$checkbox.prop('checked')).trigger('change');
     });
 
     $('#groupRoomsList').on('change', '.group-manual-checkbox', function() {

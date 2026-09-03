@@ -35,7 +35,7 @@ let roomCheckerPreviewRange = null;
 let roomCheckerHasCommittedSelection = false;
 
 // Repaints highlighting from the active display range - the pending preview
-// while a selection is in progress, otherwise the last Save-committed
+// while a selection is in progress, otherwise the last confirmed
 // window.__rateSummaryRange - rather than tracking which cells got highlighted.
 // FullCalendar tears down and rebuilds a month's cells on every prev/next
 // navigation, which would otherwise silently drop the classList changes the
@@ -53,8 +53,9 @@ function applyRoomCheckerRangeHighlight() {
   // 3-night stay), even though the check-out day itself isn't a charged night.
   // Exception: the very first click of a fresh selection only sets the "From"
   // anchor (see handleRoomCheckerDateClick) - the 1-night default it computes
-  // is just so Save works immediately if staff stop there, not a real range yet,
-  // so only the anchor day itself lights up until a second, distinct day is clicked.
+  // is just so the range is confirmable immediately if staff stop there, not a
+  // real range yet, so only the anchor day itself lights up until a second,
+  // distinct day is clicked.
   const end = new Date(range.start);
   end.setDate(end.getDate() + (range.awaitingSecondClick ? 1 : range.nights + 1));
 
@@ -63,15 +64,6 @@ function applyRoomCheckerRangeHighlight() {
     document.querySelectorAll(`#room-checker-months td.fc-day[data-date="${dateKey}"]`)
       .forEach(cell => cell.classList.add('room-checker-range-selected'));
   }
-}
-
-function toggleRoomCheckerSaveButton(show) {
-  const btn = document.getElementById('roomCheckerSaveRangeBtn');
-  if (!btn) return;
-  // Explicit 'inline-block' (button's native display), not '' - clearing the
-  // inline style would just fall back to the stylesheet's display:none rule
-  // that hides this button by default, leaving it stuck invisible.
-  btn.style.display = show ? 'inline-block' : 'none';
 }
 
 function handleRoomCheckerDateClick(info) {
@@ -95,12 +87,46 @@ function handleRoomCheckerDateClick(info) {
 
   roomCheckerPreviewRange = { start, nights, awaitingSecondClick: isFirstClick };
   applyRoomCheckerRangeHighlight();
-  toggleRoomCheckerSaveButton(true);
+
+  // First click only sets the "From" anchor - nothing to confirm yet since
+  // there's no "To" to pair it with. The swal only fires from the second
+  // click onward, once an actual from-to range exists.
+  if (!isFirstClick) {
+    confirmRoomCheckerRange();
+  }
 }
 
-// Commits the in-progress preview to the Rate Summary panel (see the
-// #roomCheckerSaveRangeBtn click handler below) and clears the anchor so the
-// next click starts a fresh selection.
+// Asks whether to lock in the just-clicked range or keep extending it -
+// replaces what used to be an explicit Save button. "Proceed" commits it to
+// the Rate Summary panel (see commitRoomCheckerRange below); "More" (or
+// dismissing the dialog any other way) just closes it, leaving the anchor and
+// preview highlight in place so the next calendar click redefines the "to"
+// date and asks again.
+function confirmRoomCheckerRange() {
+  if (!roomCheckerPreviewRange) return;
+
+  const { start, nights } = roomCheckerPreviewRange;
+  const end = new Date(start);
+  end.setDate(end.getDate() + nights);
+  const fmt = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+  Swal.fire({
+    title: 'Proceed with this range?',
+    html: `${fmt(start)} - ${fmt(end)} (${nights} night${nights === 1 ? '' : 's'})`,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Proceed',
+    cancelButtonText: 'More'
+  }).then((result) => {
+    if (result.isConfirmed) {
+      commitRoomCheckerRange();
+    }
+  });
+}
+
+// Commits the in-progress preview to the Rate Summary panel (see
+// confirmRoomCheckerRange above) and clears the anchor so the next click
+// starts a fresh selection.
 function commitRoomCheckerRange() {
   if (!roomCheckerPreviewRange) return;
 
@@ -112,7 +138,6 @@ function commitRoomCheckerRange() {
 
   roomCheckerPendingAnchor = null;
   roomCheckerPreviewRange = null;
-  toggleRoomCheckerSaveButton(false);
 }
 
 // Blanks the Rate Summary panel back to its just-loaded state once a booking
@@ -134,7 +159,6 @@ function resetRoomCheckerSummary() {
   document.getElementById('rateSummaryDateRange').textContent = 'Select a range on the calendar';
   syncRoomCheckerBreakfastPresetActiveState();
 
-  toggleRoomCheckerSaveButton(false);
   applyRoomCheckerRangeHighlight();
   updateRoomCheckerTodayButtonVisibility();
   fetchRateSummary();
@@ -147,9 +171,6 @@ $(document).ready(function () {
   initRoomCheckerCalendar('calendar-month-1', today);
   initRoomCheckerCalendar('calendar-month-2', nextMonth);
   initRateSummary();
-
-  const saveRangeBtn = document.getElementById('roomCheckerSaveRangeBtn');
-  if (saveRangeBtn) saveRangeBtn.addEventListener('click', commitRoomCheckerRange);
 
   const todayBtn = document.getElementById('roomCheckerTodayBtn');
   if (todayBtn) todayBtn.addEventListener('click', goToRoomCheckerToday);
@@ -201,28 +222,68 @@ window.__rateSummaryExtraBedRate = null;
 
 // Per-date bed availability, keyed by "YYYY-MM-DD" - populated as each
 // calendar's visible range gets fetched (see fetchRoomCheckerBedAvailability).
-// Reused here so the Rate Summary panel can warn if a King/Queen qty exceeds
-// what's actually free across every night of the selected range, without a
-// second round-trip to the server.
+// This is a per-night estimate (rooms free THAT night, not necessarily the
+// SAME room across the whole stay), so it only backs the calendar's day
+// badges now - the Rate Summary warning below needs the stricter whole-range
+// check in window.__rateSummaryRangeAvailability instead (see
+// getRoomCheckerRangeMinAvailability).
 window.__roomCheckerAvailabilityByDate = {};
 
-// Lowest availability for a bed type (single = King, double = Queen) across
-// every night of the current selection. Returns null if any night in the
-// range hasn't been fetched yet, so callers don't warn off incomplete data.
-function getRoomCheckerRangeMinAvailability(bedKey) {
-  const range = window.__rateSummaryRange;
-  if (!range) return null;
+// Whole-range King/Queen counts for the current selection, from
+// /booking/api/range-availability - the exact same availability rules Add
+// Group Booking's own search applies (same room free for every night of the
+// stay, unassigned-reservation bed holds subtracted, Check-In/Check-Out
+// Status compatibility filtered). Populated by fetchRoomCheckerRangeAvailability
+// below; null while loading or on error, so callers don't warn off stale data.
+// This replaced a per-night-minimum estimate that could disagree with the
+// real search - e.g. showing "27 King available" here when Add Group
+// Booking's stricter whole-range check would come back short moments later,
+// surfacing a confusing "No Rooms Found" alert after a guest was already
+// quoted a number.
+window.__rateSummaryRangeAvailability = null;
 
+// Matches Add Group Booking's own field defaults (Regular Check-In / Regular
+// Check-Out) - openRoomCheckerGroupBooking hands off into that modal without
+// touching those fields, so this quote has to assume the same values or the
+// two won't agree.
+const ROOM_CHECKER_DEFAULT_CHECK_IN_STATUS = '1';
+const ROOM_CHECKER_DEFAULT_CHECK_OUT_STATUS = '0';
+
+// Refetches window.__rateSummaryRangeAvailability for the current
+// window.__rateSummaryRange - called from fetchRateSummary, which already
+// runs at every point the selected range (or booking type) changes.
+function fetchRoomCheckerRangeAvailability() {
+  const range = window.__rateSummaryRange;
   const end = new Date(range.start);
   end.setDate(end.getDate() + range.nights);
 
-  let min = Infinity;
-  for (const d = new Date(range.start); d < end; d.setDate(d.getDate() + 1)) {
-    const entry = window.__roomCheckerAvailabilityByDate[roomCheckerFormatDateKey(d)];
-    if (!entry) return null;
-    min = Math.min(min, entry[bedKey]);
-  }
-  return min === Infinity ? null : min;
+  const startStr = roomCheckerFormatDateKey(range.start);
+  const endStr = roomCheckerFormatDateKey(end);
+
+  // Clear immediately so a stale prior-range count can't be used to warn
+  // against the new range while this request is in flight.
+  window.__rateSummaryRangeAvailability = null;
+
+  fetch(`/booking/api/range-availability?startDate=${startStr}&endDate=${endStr}`
+    + `&checkInStatus=${ROOM_CHECKER_DEFAULT_CHECK_IN_STATUS}&checkOutStatus=${ROOM_CHECKER_DEFAULT_CHECK_OUT_STATUS}`)
+    .then((response) => response.json())
+    .then((data) => {
+      window.__rateSummaryRangeAvailability = data.success ? { single: data.single, double: data.double } : null;
+      recomputeRateSummaryTotals();
+    })
+    .catch((err) => {
+      console.error('Error fetching room range availability:', err);
+      window.__rateSummaryRangeAvailability = null;
+      recomputeRateSummaryTotals();
+    });
+}
+
+// Lowest availability for a bed type (single = King, double = Queen) across
+// the whole current selection - see window.__rateSummaryRangeAvailability.
+function getRoomCheckerRangeMinAvailability(bedKey) {
+  const avail = window.__rateSummaryRangeAvailability;
+  if (!avail) return null;
+  return bedKey === 'single' ? avail.single : avail.double;
 }
 
 // Soft warning only - see the "necessary ba?" discussion: Room Checker is a
@@ -537,6 +598,8 @@ function handleRoomCheckerRangeSelect(info) {
 function fetchRateSummary() {
   const bookingType = document.querySelector('input[name="rateSummaryBookingType"]:checked').value;
   const dateKey = roomCheckerFormatDateKey(window.__rateSummaryRange.start);
+
+  fetchRoomCheckerRangeAvailability();
 
   fetch(`/calendar/api/room-rate-summary?bookingType=${bookingType}&date=${dateKey}`)
     .then((response) => response.json())

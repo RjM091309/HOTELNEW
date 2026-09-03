@@ -10107,3 +10107,20 @@ span.notificationtime {
   scrollbar-width: thin;
   scrollbar-color: #2a3135 #181c1f;
 }
+
+/* Light mode: the rules above are dark by default site-wide (no theme scoping),
+   so any scrollbar without its own page-specific light-mode override - e.g. the
+   page/document scrollbar itself, not just scrollable widgets inside a page -
+   stays a dark bar on an otherwise white page. Override globally instead of
+   per-page so this can't be missed one container at a time. */
+[data-theme="white"] ::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #c7cdd4, #b7bfc7) !important;
+}
+
+[data-theme="white"] ::-webkit-scrollbar-track {
+  background: #eef2f7 !important;
+}
+
+[data-theme="white"] * {
+  scrollbar-color: #c7cdd4 #eef2f7 !important;
+}

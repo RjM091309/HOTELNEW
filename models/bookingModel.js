@@ -9745,89 +9745,193 @@ class BookingModel {
   }
 
   // Find consecutive rooms with bed requirements (Hotel_Old logic)
+  // Shared by findConsecutiveRooms (Add Group Booking's actual room search) and
+  // getRangeAvailabilityCounts (Room Checker's quote) so both apply the exact
+  // same availability rules - same room free for every night of the range,
+  // unassigned-reservation bed holds subtracted, Check-In/Check-Out Status
+  // compatibility filtered. Without this being shared, a count Room Checker
+  // quotes as available can silently stop being available by the time staff
+  // proceed to Add Group Booking's own (stricter) search.
+  static async _findAvailableRoomsForRange(connection, { formattedStartDate, formattedEndDate, floorNumber, checkInStatus, checkOutStatus }) {
+    const roomsQuery = `
+      SELECT r.IDNo, r.ROOM_NUMBER, r.ROOM_FLOOR, r.ROOM_BED, r.ROOM_VIEW,
+             COALESCE(r.ROOM_PRICE, rt.BASE_PRICE) AS FINAL_PRICE,
+             r.ROOM_TYPE_ID,
+             (
+               SELECT CASE
+                 WHEN b2.LATE_CHECKOUT = 1 THEN 'L/O'
+                 WHEN b2.LATE_CHECKOUT = 0 OR b2.LATE_CHECKOUT IS NULL THEN 'R/O'
+                 ELSE NULL
+               END
+               FROM booking b2
+               WHERE b2.ROOM_ID = r.IDNo
+                 AND DATE(b2.CHECK_OUT_DATE) = ?
+                 AND (b2.IS_CANCELLED IS NULL OR b2.IS_CANCELLED != 1)
+                 AND b2.ACTIVE = 1
+               LIMIT 1
+             ) AS checkoutType,
+             (
+               SELECT CASE
+                 WHEN b3.CHECK_IN_STATUS = 0 THEN 'L/I'
+                 WHEN b3.CHECK_IN_STATUS = 1 THEN 'R/I'
+                 ELSE NULL
+               END
+               FROM booking b3
+               WHERE b3.ROOM_ID = r.IDNo
+                 AND DATE(b3.CHECK_IN_DATE) = ?
+                 AND (b3.IS_CANCELLED IS NULL OR b3.IS_CANCELLED != 1)
+                 AND b3.ACTIVE = 1
+               LIMIT 1
+             ) AS checkinType
+      FROM room r
+      JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
+      WHERE r.ROOM_STATUS != 3
+        AND NOT EXISTS (
+          SELECT 1 FROM booking b
+          WHERE b.ROOM_ID = r.IDNo
+            AND b.ACTIVE = 1
+            AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
+            AND (DATE(b.CHECK_IN_DATE) < ? AND DATE(b.CHECK_OUT_DATE) > ?)
+        )`;
+
+    const roomParams = [formattedStartDate, formattedEndDate, formattedEndDate, formattedStartDate];
+
+    if (floorNumber) {
+      roomParams.push(floorNumber);
+    }
+
+    const unassignedQuery = `
+      SELECT
+        b.IDNo AS bookingId,
+        b.CHECK_IN_DATE,
+        b.CHECK_OUT_DATE,
+        b.BED_COUNT,
+        COALESCE(r.ROOM_BED, b.BED_COUNT) AS REQUIRED_BEDS
+      FROM booking b
+      LEFT JOIN room r ON b.ROOM_ID = r.IDNo
+      WHERE b.ACTIVE = 1
+        AND b.IS_DIRECT_RESERVATION = 1
+        AND (b.ROOM_ID = 0 OR b.ROOM_ID IS NULL)
+        AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
+        AND DATE(b.CHECK_IN_DATE) < ?
+        AND DATE(b.CHECK_OUT_DATE) > ?
+    `;
+
+    const [unassignedRows] = await connection.query(unassignedQuery, [formattedEndDate, formattedStartDate]);
+
+    const reservedBeds = unassignedRows.reduce((acc, booking) => {
+      const bedCount = parseInt(booking.REQUIRED_BEDS, 10) || 0;
+      if (bedCount === 1) acc.bed1 += 1;
+      if (bedCount === 2) acc.bed2 += 1;
+      return acc;
+    }, { bed1: 0, bed2: 0 });
+
+    let finalRoomsQuery = roomsQuery;
+    if (floorNumber) {
+      finalRoomsQuery += ' AND r.ROOM_FLOOR = ?';
+    }
+    finalRoomsQuery += ' ORDER BY r.ROOM_FLOOR, CAST(r.ROOM_NUMBER AS UNSIGNED)';
+
+    const [rooms] = await connection.query(finalRoomsQuery, roomParams);
+
+    // Count total rooms by bed type
+    const totalRoomsByBed = rooms.reduce((acc, room) => {
+      const bedCount = parseInt(room.ROOM_BED, 10);
+      acc[bedCount] = (acc[bedCount] || 0) + 1;
+      return acc;
+    }, {});
+
+    // Filter out rooms that are reserved for unassigned bookings (like topbar.ejs logic)
+    const availableRooms = rooms.filter(room => {
+      const bedCount = parseInt(room.ROOM_BED, 10);
+      if (bedCount === 1) {
+        const total1Bed = totalRoomsByBed[1] || 0;
+        const available1Bed = Math.max(0, total1Bed - reservedBeds.bed1);
+        return available1Bed > 0; // Show if there are any available 1-bed rooms
+      } else if (bedCount === 2) {
+        const total2Bed = totalRoomsByBed[2] || 0;
+        const available2Bed = Math.max(0, total2Bed - reservedBeds.bed2);
+        return available2Bed > 0; // Show if there are any available 2-bed rooms
+      }
+      return true; // Show other bed types
+    });
+
+    // Apply Check-In Status and Check-Out Status filters like topbar.ejs
+    let filteredRooms = availableRooms;
+
+    if (checkInStatus !== undefined && checkInStatus !== '' || checkOutStatus !== undefined && checkOutStatus !== '') {
+      filteredRooms = availableRooms.filter(room => {
+        const checkoutType = room.checkoutType;
+        const checkinType = room.checkinType;
+        let belongsToCheckin = true;
+        let belongsToCheckout = true;
+
+        // Check-In Status Filter Logic - Convert numeric values to matching logic
+        if (checkInStatus === '1') {
+          // Regular Check-In (value 1): Only compatible with R/O checkout OR no checkout conflict
+          belongsToCheckin = (checkoutType === 'R/O' || !checkoutType);
+        } else if (checkInStatus === '0') {
+          // Late Check-In (value 0): Compatible with BOTH R/O and L/O checkout OR no checkout conflict
+          belongsToCheckin = (checkoutType === 'R/O' || checkoutType === 'L/O' || !checkoutType);
+        }
+
+        // Check-Out Status Filter Logic - Convert numeric values to matching logic
+        if (checkOutStatus === '0') {
+          // Regular Check-Out (value 0): Compatible with BOTH R/I and L/I checkin OR no checkin conflict
+          belongsToCheckout = (checkinType === 'R/I' || checkinType === 'L/I' || !checkinType);
+        } else if (checkOutStatus === '1') {
+          // Late Check-Out (value 1): Only compatible with L/I checkin OR no checkin conflict
+          belongsToCheckout = (checkinType === 'L/I' || !checkinType);
+        }
+
+        return belongsToCheckin && belongsToCheckout;
+      });
+    }
+
+    return { filteredRooms, reservedBeds };
+  }
+
+  // Whole-range King/Queen counts for Room Checker's quote panel, using the
+  // exact same availability rules findConsecutiveRooms applies for Add Group
+  // Booking's actual search (via the shared _findAvailableRoomsForRange
+  // helper) - so a quote is guaranteed still bookable when staff proceed from
+  // Room Checker into that modal.
+  static async getRangeAvailabilityCounts(params) {
+    const { startDate, endDate, checkInStatus, checkOutStatus, floorNumber } = params;
+
+    const connection = await pool.promise().getConnection();
+    try {
+      const moment = require('moment');
+      const formattedStartDate = moment(startDate, 'YYYY-MM-DD').format('YYYY-MM-DD');
+      const formattedEndDate = moment(endDate, 'YYYY-MM-DD').format('YYYY-MM-DD');
+
+      const { filteredRooms } = await BookingModel._findAvailableRoomsForRange(connection, {
+        formattedStartDate, formattedEndDate, floorNumber, checkInStatus, checkOutStatus
+      });
+
+      return {
+        success: true,
+        single: filteredRooms.filter(r => parseInt(r.ROOM_BED, 10) === 1).length,
+        double: filteredRooms.filter(r => parseInt(r.ROOM_BED, 10) === 2).length
+      };
+    } finally {
+      connection.release();
+    }
+  }
+
   static async findConsecutiveRooms(params) {
     const { startDate, endDate, neededRooms, floorNumber, bed1Needed = 0, bed2Needed = 0, bookingRoute, checkInStatus, checkOutStatus, excludeGroupBookingId } = params;
-    
+
+    const connection = await pool.promise().getConnection();
     try {
-      const connection = await pool.promise().getConnection();
-      
       // Format dates
       const moment = require('moment');
       const formattedStartDate = moment(startDate, 'MMM DD, YYYY').format('YYYY-MM-DD');
       const formattedEndDate = moment(endDate, 'MMM DD, YYYY').format('YYYY-MM-DD');
 
-      const roomsQuery = `
-        SELECT r.IDNo, r.ROOM_NUMBER, r.ROOM_FLOOR, r.ROOM_BED, r.ROOM_VIEW,
-               COALESCE(r.ROOM_PRICE, rt.BASE_PRICE) AS FINAL_PRICE,
-               r.ROOM_TYPE_ID,
-               (
-                 SELECT CASE 
-                   WHEN b2.LATE_CHECKOUT = 1 THEN 'L/O'
-                   WHEN b2.LATE_CHECKOUT = 0 OR b2.LATE_CHECKOUT IS NULL THEN 'R/O'
-                   ELSE NULL
-                 END
-                 FROM booking b2 
-                 WHERE b2.ROOM_ID = r.IDNo 
-                   AND DATE(b2.CHECK_OUT_DATE) = ?
-                   AND (b2.IS_CANCELLED IS NULL OR b2.IS_CANCELLED != 1)
-                   AND b2.ACTIVE = 1
-                 LIMIT 1
-               ) AS checkoutType,
-               (
-                 SELECT CASE 
-                   WHEN b3.CHECK_IN_STATUS = 0 THEN 'L/I'
-                   WHEN b3.CHECK_IN_STATUS = 1 THEN 'R/I'
-                   ELSE NULL
-                 END
-                 FROM booking b3 
-                 WHERE b3.ROOM_ID = r.IDNo 
-                   AND DATE(b3.CHECK_IN_DATE) = ?
-                   AND (b3.IS_CANCELLED IS NULL OR b3.IS_CANCELLED != 1)
-                   AND b3.ACTIVE = 1
-                 LIMIT 1
-               ) AS checkinType
-        FROM room r
-        JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
-        WHERE r.ROOM_STATUS != 3
-          AND NOT EXISTS (
-            SELECT 1 FROM booking b
-            WHERE b.ROOM_ID = r.IDNo
-              AND b.ACTIVE = 1
-              AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
-              AND (DATE(b.CHECK_IN_DATE) < ? AND DATE(b.CHECK_OUT_DATE) > ?)
-          )`;
-
-      const roomParams = [formattedStartDate, formattedEndDate, formattedEndDate, formattedStartDate];
-
-      if (floorNumber) {
-        roomParams.push(floorNumber);
-      }
-
-      const unassignedQuery = `
-        SELECT 
-          b.IDNo AS bookingId,
-          b.CHECK_IN_DATE,
-          b.CHECK_OUT_DATE,
-          b.BED_COUNT,
-          COALESCE(r.ROOM_BED, b.BED_COUNT) AS REQUIRED_BEDS
-        FROM booking b
-        LEFT JOIN room r ON b.ROOM_ID = r.IDNo
-        WHERE b.ACTIVE = 1
-          AND b.IS_DIRECT_RESERVATION = 1
-          AND (b.ROOM_ID = 0 OR b.ROOM_ID IS NULL)
-          AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
-          AND DATE(b.CHECK_IN_DATE) < ?
-          AND DATE(b.CHECK_OUT_DATE) > ?
-      `;
-
-      const [unassignedRows] = await connection.query(unassignedQuery, [formattedEndDate, formattedStartDate]);
-
-      const reservedBeds = unassignedRows.reduce((acc, booking) => {
-        const bedCount = parseInt(booking.REQUIRED_BEDS, 10) || 0;
-        if (bedCount === 1) acc.bed1 += 1;
-        if (bedCount === 2) acc.bed2 += 1;
-        return acc;
-      }, { bed1: 0, bed2: 0 });
+      const { filteredRooms, reservedBeds } = await BookingModel._findAvailableRoomsForRange(connection, {
+        formattedStartDate, formattedEndDate, floorNumber, checkInStatus, checkOutStatus
+      });
 
       const conflicts = [];
       if (bed1Needed > 0 && reservedBeds.bed1 >= bed1Needed) {
@@ -9835,74 +9939,6 @@ class BookingModel {
       }
       if (bed2Needed > 0 && reservedBeds.bed2 >= bed2Needed) {
         conflicts.push({ bed: 2, reserved: reservedBeds.bed2 });
-      }
-
-      const bedNeedsAfterReserve = {
-        bed1: Math.max(bed1Needed - reservedBeds.bed1, 0),
-        bed2: Math.max(bed2Needed - reservedBeds.bed2, 0)
-      };
-
-      let finalRoomsQuery = roomsQuery;
-      if (floorNumber) {
-        finalRoomsQuery += ' AND r.ROOM_FLOOR = ?';
-      }
-      finalRoomsQuery += ' ORDER BY r.ROOM_FLOOR, CAST(r.ROOM_NUMBER AS UNSIGNED)';
-
-      const [rooms] = await connection.query(finalRoomsQuery, roomParams);
-
-      // Count total rooms by bed type
-      const totalRoomsByBed = rooms.reduce((acc, room) => {
-        const bedCount = parseInt(room.ROOM_BED, 10);
-        acc[bedCount] = (acc[bedCount] || 0) + 1;
-        return acc;
-      }, {});
-
-      // Filter out rooms that are reserved for unassigned bookings (like topbar.ejs logic)
-      const availableRooms = rooms.filter(room => {
-        const bedCount = parseInt(room.ROOM_BED, 10);
-        if (bedCount === 1) {
-          const total1Bed = totalRoomsByBed[1] || 0;
-          const available1Bed = Math.max(0, total1Bed - reservedBeds.bed1);
-          return available1Bed > 0; // Show if there are any available 1-bed rooms
-        } else if (bedCount === 2) {
-          const total2Bed = totalRoomsByBed[2] || 0;
-          const available2Bed = Math.max(0, total2Bed - reservedBeds.bed2);
-          return available2Bed > 0; // Show if there are any available 2-bed rooms
-        }
-        return true; // Show other bed types
-      });
-
-      // Apply Check-In Status and Check-Out Status filters like topbar.ejs
-      let filteredRooms = availableRooms;
-      
-      if (checkInStatus !== undefined && checkInStatus !== '' || checkOutStatus !== undefined && checkOutStatus !== '') {
-        filteredRooms = availableRooms.filter(room => {
-          const checkoutType = room.checkoutType;
-          const checkinType = room.checkinType;
-          let belongsToCheckin = true;
-          let belongsToCheckout = true;
-          
-          // Check-In Status Filter Logic - Convert numeric values to matching logic
-          if (checkInStatus === '1') {
-            // Regular Check-In (value 1): Only compatible with R/O checkout OR no checkout conflict
-            belongsToCheckin = (checkoutType === 'R/O' || !checkoutType);
-          } else if (checkInStatus === '0') {
-            // Late Check-In (value 0): Compatible with BOTH R/O and L/O checkout OR no checkout conflict
-            belongsToCheckin = (checkoutType === 'R/O' || checkoutType === 'L/O' || !checkoutType);
-          }
-          
-          // Check-Out Status Filter Logic - Convert numeric values to matching logic
-          if (checkOutStatus === '0') {
-            // Regular Check-Out (value 0): Compatible with BOTH R/I and L/I checkin OR no checkin conflict
-            belongsToCheckout = (checkinType === 'R/I' || checkinType === 'L/I' || !checkinType);
-          } else if (checkOutStatus === '1') {
-            // Late Check-Out (value 1): Only compatible with L/I checkin OR no checkin conflict
-            belongsToCheckout = (checkinType === 'L/I' || !checkinType);
-          }
-          
-          const finalResult = belongsToCheckin && belongsToCheckout;
-          return finalResult;
-        });
       }
 
       if (!filteredRooms.length) {
@@ -9987,15 +10023,6 @@ class BookingModel {
         return fallbackSeason ? (parseFloat(fallbackSeason.price) || 0) : 0;
       };
 
-      const attachResolvedPrices = (block) => {
-        return block.map(room => {
-          return {
-            ...room,
-            RESOLVED_PRICE: resolveSeasonalPrice(room, formattedStartDate)
-          };
-        });
-      };
-
       filteredRooms.sort((a, b) => parseInt(a.ROOM_NUMBER, 10) - parseInt(b.ROOM_NUMBER, 10));
 
       if (neededRooms > filteredRooms.length) {
@@ -10010,7 +10037,7 @@ class BookingModel {
       }
 
       // CHECK: Validate bed requirements against available rooms
-      const bedValidationPassed = !(bed1Needed + bed2Needed) || 
+      const bedValidationPassed = !(bed1Needed + bed2Needed) ||
         (filteredRooms.filter(r => parseInt(r.ROOM_BED, 10) === 1).length >= bed1Needed) &&
         (filteredRooms.filter(r => parseInt(r.ROOM_BED, 10) === 2).length >= bed2Needed);
 
@@ -10038,8 +10065,6 @@ class BookingModel {
         unassignedConflicts: conflicts
       };
 
-      connection.release();
-
       return {
         success: true,
         data: payload,
@@ -10049,6 +10074,8 @@ class BookingModel {
     } catch (error) {
       console.error('Error in findConsecutiveRooms:', error);
       throw error;
+    } finally {
+      connection.release();
     }
   }
 

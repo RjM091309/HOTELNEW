@@ -84,11 +84,11 @@
     cursor: not-allowed;
   }
 
-  /* Shared look for the header action buttons - Save (hidden until the first
-     date click starts a pending range, see toggleRoomCheckerSaveButton) and
-     Today (hidden while both calendars are already on their default months,
-     see updateRoomCheckerTodayButtonVisibility), both in room_checker.js. */
-  #roomCheckerSaveRangeBtn,
+  /* Today button (in the "Room Checker" card header) - hidden while both
+     calendars are already on their default months, see
+     updateRoomCheckerTodayButtonVisibility in room_checker.js. Confirming a
+     date range no longer uses a Save button - see confirmRoomCheckerRange,
+     which asks via SweetAlert instead. */
   #roomCheckerTodayBtn {
     display: none;
     background: #fff;
@@ -100,13 +100,8 @@
     font-weight: 600;
   }
 
-  #roomCheckerSaveRangeBtn:hover,
   #roomCheckerTodayBtn:hover {
     background: #f1f1f1;
-  }
-
-  #roomCheckerTodayBtn {
-    margin-right: 8px;
   }
 
   /* Bigger date numbers - the default 12px/22px circle (fullcalendar.css) reads
@@ -319,6 +314,10 @@
     color: #fff;
   }
 
+  .rate-summary-preset-btn.active i {
+    color: #fff !important;
+  }
+
   .rate-summary-preset-btn.active:hover {
     background: #1e88e5;
     border-color: #1e88e5;
@@ -339,6 +338,10 @@
     background: #2196f3;
     border-color: #2196f3;
     color: #fff;
+  }
+
+  [data-theme="white"] .rate-summary-preset-btn.active i {
+    color: #fff !important;
   }
 
   /* Selection recap chip next to Proceed Booking - see updateRoomCheckerSummaryChip
@@ -520,7 +523,6 @@
         <header>Room Checker</header>
         <div class="tools">
           <button type="button" id="roomCheckerTodayBtn" class="btn">Today</button>
-          <button type="button" id="roomCheckerSaveRangeBtn" class="btn">Save</button>
         </div>
       </div>
       <div class="card-body">

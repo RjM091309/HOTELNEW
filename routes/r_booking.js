@@ -89,6 +89,7 @@ router.post('/update-extend-payment-status', BookingController.updateExtendPayme
 router.post('/find_consecutive_rooms', BookingController.findConsecutiveRooms);
 router.post('/find_consecutive_rooms_edit', BookingController.findConsecutiveRoomsEdit);
 router.post('/check_rooms_availability', BookingController.checkRoomsAvailability);
+router.get('/api/range-availability', BookingController.getRangeAvailabilityCounts);
 
 // Group booking
 router.post('/add_group_booking', BookingController.addGroupBooking);

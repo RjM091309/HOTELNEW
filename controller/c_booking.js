@@ -1534,6 +1534,37 @@ class BookingController {
     }
   }
 
+  // Whole-range King/Queen availability quote for Room Checker, using the same
+  // rules find_consecutive_rooms applies for Add Group Booking's actual search
+  // (see BookingModel.getRangeAvailabilityCounts) - so what staff quote a guest
+  // there still holds once they proceed into that modal.
+  static async getRangeAvailabilityCounts(req, res) {
+    try {
+      const { startDate, endDate, checkInStatus, checkOutStatus, floorNumber } = req.query;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ success: false, message: 'Missing parameters' });
+      }
+
+      const result = await BookingModel.getRangeAvailabilityCounts({
+        startDate,
+        endDate,
+        checkInStatus,
+        checkOutStatus,
+        floorNumber
+      });
+
+      res.json(result);
+
+    } catch (error) {
+      console.error("Error in getRangeAvailabilityCounts:", error);
+      res.status(500).json({
+        success: false,
+        message: "Error querying room availability"
+      });
+    }
+  }
+
   // Direct availability/pricing check for specific room IDs (e.g. rooms picked by
   // dragging across the calendar's Group Select), bypassing the generic
   // find_consecutive_rooms criteria search.
