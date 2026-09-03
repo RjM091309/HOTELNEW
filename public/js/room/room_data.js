@@ -299,8 +299,8 @@ function initializeDataTable() {
 
     dataTable = $("#roomTable").DataTable({
         columnDefs: [
-            { targets: [11], className: "text-center" },
-            { targets: [11], orderable: false, searchable: false }
+            { targets: [10], className: "text-center" },
+            { targets: [10], orderable: false, searchable: false }
         ],
         pageLength: 10,
         lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
@@ -355,13 +355,6 @@ function reloadData() {
                             ? room.AMENITIES.map(amenity => amenity.NAME).join(', ')
                             : 'No amenities';
                         
-                        const price = room.ROOM_PRICE && !isNaN(room.ROOM_PRICE)
-                            ? parseFloat(room.ROOM_PRICE).toLocaleString('en-PH', {
-                                style: 'currency',
-                                currency: 'PHP'
-                              })
-                            : 'P0.00';
-                        
                         const statusText = {
                             '1': 'AVAILABLE',
                             '2': 'OCCUPIED',
@@ -390,7 +383,6 @@ function reloadData() {
                             room.ROOM_SIZE,
                             roomView,
                             amenities,
-                            price,
                             statusBadge,
                             room.ROOM_DESCRIPTION,
                             actions
@@ -433,37 +425,18 @@ function createRoom() {
         selectedAmenities.push($(this).val());
     });
     
-    const seasonalPricing = [];
-    $('#addPricingTableBody tr').each(function() {
-        const seasonId = $(this).find('input[name="season_id[]"]').val();
-        const bookingType = $(this).find('input[name="booking_type[]"]').val();
-        const roomBed = $(this).find('input[name="room_bed[]"]').val();
-        const price = $(this).find('input[name="season_price[]"]').val();
-        
-        if (price && price !== '') {
-            seasonalPricing.push({
-                season_id: seasonId,
-                booking_type: bookingType,
-                room_bed: roomBed,
-                season_price: price
-            });
-        }
-    });
-    
     const formData = new FormData();
-    
-    // Add form fields
+
+    // Add form fields  (room pricing lives in room_rates - no per-room price)
     formData.append('ROOM_TYPE_ID', $('#addRoomType').attr('data-value') || $('#addRoomType').val());
     formData.append('ROOM_NUMBER', $('#addRoomNumber').val());
     formData.append('ROOM_STATUS', $('#addRoomStatus').val());
-    formData.append('ROOM_PRICE', $('#addRoomPrice').val());
     formData.append('ROOM_MAX', $('#addRoomMax').val());
     formData.append('ROOM_BED', $('#addRoomBed').val());
     formData.append('ROOM_SIZE', $('#addRoomSize').val());
     formData.append('ROOM_VIEW', $('#addRoomView').val());
     formData.append('ROOM_DESCRIPTION', $('#addRoomDescription').val());
     formData.append('AMENITIES', JSON.stringify(selectedAmenities));
-    formData.append('SEASONAL_PRICING', JSON.stringify(seasonalPricing));
     
     // Add image file if selected
     const imageFile = $('#addRoomImage')[0].files[0];
@@ -566,18 +539,7 @@ function populateEditRoomForm(room) {
     $('#editRoomStatus').val(room.ROOM_STATUS);
     $('#editRoomBed').val(room.ROOM_BED);
     $('#editRoomView').val(room.ROOM_VIEW);
-    $('#editRoomPrice').val(room.ROOM_PRICE);
-    
-    // Load seasonal pricing if bed count is selected
-    if (room.ROOM_BED) {
-        $('#editSeasonalPricingSection').show();
-        $('#editNoBedCountMessage').hide();
-        loadEditSeasonalPricing(room.SEASONAL_PRICES || []);
-    } else {
-        $('#editSeasonalPricingSection').hide();
-        $('#editNoBedCountMessage').show();
-    }
-    
+
     // Populate amenities (will be done after amenities are loaded)
     window.currentRoomAmenities = room.AMENITIES || [];
     
@@ -601,38 +563,19 @@ function updateRoom() {
         selectedAmenities.push($(this).val());
     });
     
-    const seasonalPricing = [];
-    $('#editPricingTableBody tr').each(function() {
-        const seasonId = $(this).find('input[name="season_id[]"]').val();
-        const bookingType = $(this).find('input[name="booking_type[]"]').val();
-        const roomBed = $(this).find('input[name="room_bed[]"]').val();
-        const price = $(this).find('input[name="season_price[]"]').val();
-        
-        if (price && price !== '') {
-            seasonalPricing.push({
-                season_id: seasonId,
-                booking_type: bookingType,
-                room_bed: roomBed,
-                season_price: price
-            });
-        }
-    });
-    
     const formData = new FormData();
-    
-    // Add form fields
+
+    // Add form fields  (room pricing lives in room_rates - no per-room price)
     formData.append('IDNo', $('#editRoomId').val());
     formData.append('ROOM_TYPE_ID', $('#editRoomType').attr('data-value') || $('#editRoomType').val());
     formData.append('ROOM_NUMBER', $('#editRoomNumber').val());
     formData.append('ROOM_STATUS', $('#editRoomStatus').val());
-    formData.append('ROOM_PRICE', $('#editRoomPrice').val());
     formData.append('ROOM_MAX', $('#editRoomMax').val());
     formData.append('ROOM_BED', $('#editRoomBed').val());
     formData.append('ROOM_SIZE', $('#editRoomSize').val());
     formData.append('ROOM_VIEW', $('#editRoomView').val());
     formData.append('ROOM_DESCRIPTION', $('#editRoomDescription').val());
     formData.append('AMENITIES', JSON.stringify(selectedAmenities));
-    formData.append('SEASONAL_PRICING', JSON.stringify(seasonalPricing));
     
     // Add image file if selected
     const imageFile = $('#editRoomImage')[0].files[0];

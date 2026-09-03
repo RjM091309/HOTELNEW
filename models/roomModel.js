@@ -21,7 +21,7 @@ class RoomModel {
           r.ROOM_NUMBER,
           r.ROOM_STATUS,
           r.ROOM_MAINTENANCE_STATUS,
-          r.ROOM_PRICE,
+          NULL AS ROOM_PRICE,
           r.ROOM_MAX,
           r.ROOM_BED,
           r.ROOM_SIZE,
@@ -70,7 +70,7 @@ class RoomModel {
           r.ROOM_NUMBER,
           r.ROOM_STATUS,
           r.ROOM_MAINTENANCE_STATUS,
-          r.ROOM_PRICE,
+          NULL AS ROOM_PRICE,
           r.ROOM_MAX,
           r.ROOM_BED,
           r.ROOM_SIZE,
@@ -102,17 +102,9 @@ class RoomModel {
         const amenities = await queryDatabasePromise(amenitiesQuery, [room.IDNo]);
         room.AMENITIES = amenities;
         
-        // Get seasonal pricing for this room
-        const seasonalPricingQuery = `
-          SELECT rsp.SEASON_ID, s.NAME AS SEASON_NAME, rsp.BOOKING_TYPE, rsp.ROOM_BED, rsp.PRICE
-          FROM room_season_price rsp
-          JOIN season s ON rsp.SEASON_ID = s.IDNo
-          WHERE rsp.ROOM_ID = ? AND rsp.ACTIVE = 1
-          ORDER BY s.NAME ASC, rsp.BOOKING_TYPE ASC, rsp.ROOM_BED ASC
-        `;
-        const seasonalPricing = await queryDatabasePromise(seasonalPricingQuery, [room.IDNo]);
-        room.SEASONAL_PRICES = seasonalPricing;
-        
+        // Seasonal pricing removed - room pricing now comes from room_rates
+        room.SEASONAL_PRICES = [];
+
         return room;
       }
       return null;
@@ -136,26 +128,26 @@ class RoomModel {
     }
   }
 
-  // Create new room
-  static async createRoom(ROOM_TYPE_ID, ROOM_NUMBER, ROOM_STATUS, 
-                         ROOM_PRICE, ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW, 
-                         ROOM_DESCRIPTION, ROOM_IMAGE = null, AMENITIES = [], SEASONAL_PRICING = [], encodedBy) {
+  // Create new room  (pricing lives in room_rates - no per-room price / seasonal price)
+  static async createRoom(ROOM_TYPE_ID, ROOM_NUMBER, ROOM_STATUS,
+                         ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW,
+                         ROOM_DESCRIPTION, ROOM_IMAGE = null, AMENITIES = [], encodedBy) {
     try {
       const query = `
         INSERT INTO room (
           ROOM_TYPE_ID, ROOM_NUMBER, ROOM_STATUS,
-          ROOM_PRICE, ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW, 
+          ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW,
           ROOM_DESCRIPTION, ROOM_IMAGE, ENCODED_BY, ENCODED_DT, ACTIVE
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 1)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 1)
       `;
       const result = await queryDatabasePromise(query, [
         ROOM_TYPE_ID, ROOM_NUMBER, ROOM_STATUS,
-        ROOM_PRICE, ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW, 
+        ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW,
         ROOM_DESCRIPTION, ROOM_IMAGE, encodedBy
       ]);
-      
+
       const roomId = result.insertId;
-      
+
       // Add amenities if provided
       if (AMENITIES && AMENITIES.length > 0) {
         for (const amenityId of AMENITIES) {
@@ -165,39 +157,29 @@ class RoomModel {
           );
         }
       }
-      
-      // Add seasonal pricing if provided
-      if (SEASONAL_PRICING && SEASONAL_PRICING.length > 0) {
-        for (const pricing of SEASONAL_PRICING) {
-          await queryDatabasePromise(
-            'INSERT INTO room_season_price (ROOM_ID, SEASON_ID, BOOKING_TYPE, ROOM_BED, PRICE, ENCODED_BY, ENCODED_DT, ACTIVE) VALUES (?, ?, ?, ?, ?, ?, NOW(), 1)',
-            [roomId, pricing.season_id, pricing.booking_type, pricing.room_bed, pricing.season_price, encodedBy]
-          );
-        }
-      }
-      
+
       return roomId;
     } catch (error) {
       throw error;
     }
   }
 
-  // Update room
-  static async updateRoom(IDNo, ROOM_TYPE_ID, ROOM_NUMBER, ROOM_STATUS, 
-                         ROOM_PRICE, ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW, 
-                         ROOM_DESCRIPTION, ROOM_IMAGE = null, AMENITIES = [], SEASONAL_PRICING = [], editedBy) {
+  // Update room  (pricing lives in room_rates - no per-room price / seasonal price)
+  static async updateRoom(IDNo, ROOM_TYPE_ID, ROOM_NUMBER, ROOM_STATUS,
+                         ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW,
+                         ROOM_DESCRIPTION, ROOM_IMAGE = null, AMENITIES = [], editedBy) {
     try {
       // Build update query dynamically based on whether image is provided
       let query = `
-        UPDATE room SET 
+        UPDATE room SET
           ROOM_TYPE_ID = ?, ROOM_NUMBER = ?, ROOM_STATUS = ?,
-          ROOM_PRICE = ?, ROOM_MAX = ?, ROOM_BED = ?, ROOM_SIZE = ?, ROOM_VIEW = ?, 
+          ROOM_MAX = ?, ROOM_BED = ?, ROOM_SIZE = ?, ROOM_VIEW = ?,
           ROOM_DESCRIPTION = ?, EDITED_BY = ?, EDITED_DT = NOW()
       `;
-      
+
       let params = [
         ROOM_TYPE_ID, ROOM_NUMBER, ROOM_STATUS,
-        ROOM_PRICE, ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW, 
+        ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW,
         ROOM_DESCRIPTION, editedBy
       ];
       
@@ -229,23 +211,6 @@ class RoomModel {
           await queryDatabasePromise(
             'INSERT INTO room_amenities (ROOM_ID, AMENITY_ID, ENCODED_BY, ENCODED_DT, ACTIVE) VALUES (?, ?, ?, NOW(), 1)',
             [IDNo, amenityId, editedBy]
-          );
-        }
-      }
-      
-      // Update seasonal pricing
-      // First, deactivate all existing seasonal pricing
-      await queryDatabasePromise(
-        'UPDATE room_season_price SET ACTIVE = 0, ENCODED_BY = ?, ENCODED_DT = NOW() WHERE ROOM_ID = ?',
-        [editedBy, IDNo]
-      );
-      
-      // Then add new seasonal pricing if provided
-      if (SEASONAL_PRICING && SEASONAL_PRICING.length > 0) {
-        for (const pricing of SEASONAL_PRICING) {
-          await queryDatabasePromise(
-            'INSERT INTO room_season_price (ROOM_ID, SEASON_ID, BOOKING_TYPE, ROOM_BED, PRICE, ENCODED_BY, ENCODED_DT, ACTIVE) VALUES (?, ?, ?, ?, ?, ?, NOW(), 1)',
-            [IDNo, pricing.season_id, pricing.booking_type, pricing.room_bed, pricing.season_price, editedBy]
           );
         }
       }
@@ -284,29 +249,31 @@ class RoomModel {
     }
   }
 
-  // Create room type
-  static async createRoomType(NAME, DESCRIPTION, BASE_PRICE, encodedBy) {
+  // Create room type. BASE_PRICE no longer used - pricing lives in room_rates,
+  // keyed by room_rates.ROOM_TYPE_ID -> room_type.IDNo.
+  static async createRoomType(NAME, DESCRIPTION, encodedBy) {
     try {
       const query = `
-        INSERT INTO room_type (NAME, DESCRIPTION, BASE_PRICE, ENCODED_BY, ENCODED_DT, ACTIVE) 
-        VALUES (?, ?, ?, ?, NOW(), 1)
+        INSERT INTO room_type (NAME, DESCRIPTION, ENCODED_BY, ENCODED_DT, ACTIVE)
+        VALUES (?, ?, ?, NOW(), 1)
       `;
-      const result = await queryDatabasePromise(query, [NAME, DESCRIPTION, BASE_PRICE, encodedBy]);
+      const result = await queryDatabasePromise(query, [NAME, DESCRIPTION, encodedBy]);
       return result.insertId;
     } catch (error) {
       throw error;
     }
   }
 
-  // Update room type
-  static async updateRoomType(IDNo, NAME, DESCRIPTION, BASE_PRICE, editedBy) {
+  // Update room type. BASE_PRICE no longer used - pricing lives in room_rates,
+  // keyed by room_rates.ROOM_TYPE_ID -> room_type.IDNo.
+  static async updateRoomType(IDNo, NAME, DESCRIPTION, editedBy) {
     try {
       const query = `
-        UPDATE room_type 
-        SET NAME = ?, DESCRIPTION = ?, BASE_PRICE = ?, EDITED_BY = ?, EDITED_DT = NOW()
+        UPDATE room_type
+        SET NAME = ?, DESCRIPTION = ?, EDITED_BY = ?, EDITED_DT = NOW()
         WHERE IDNo = ? AND ACTIVE = 1
       `;
-      const result = await queryDatabasePromise(query, [NAME, DESCRIPTION, BASE_PRICE, editedBy, IDNo]);
+      const result = await queryDatabasePromise(query, [NAME, DESCRIPTION, editedBy, IDNo]);
       return result.affectedRows > 0;
     } catch (error) {
       throw error;
@@ -581,7 +548,7 @@ class RoomModel {
           r.ROOM_NUMBER,
           r.ROOM_STATUS,
           r.ROOM_MAINTENANCE_STATUS,
-          r.ROOM_PRICE,
+          NULL AS ROOM_PRICE,
           r.ROOM_MAX,
           r.ROOM_BED,
           r.ROOM_SIZE,

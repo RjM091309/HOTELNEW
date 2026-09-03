@@ -1,10 +1,12 @@
 const RoomRatesModel = require('../models/roomRatesModel');
-const { CATEGORIES, DAY_RANGES, BED_TYPES, BREAKFAST_OPTIONS } = require('../config/roomRates');
+const RoomModel = require('../models/roomModel');
+const { CATEGORIES, DAY_RANGES, BREAKFAST_OPTIONS } = require('../config/roomRates');
 
 const RoomRatesController = {
   // Settings -> Room Rates page
   renderPage: async (req, res) => {
     try {
+      const roomTypes = await RoomModel.getRoomTypes();
       res.render('room_rates/room_rates', {
         title: 'Room Rates',
         subTitle: 'Room Rates',
@@ -12,7 +14,7 @@ const RoomRatesController = {
         user: req.user || null,
         categories: CATEGORIES,
         dayRanges: DAY_RANGES,
-        bedTypes: BED_TYPES,
+        roomTypes: (roomTypes || []).map((t) => ({ id: t.IDNo, name: t.NAME })),
         breakfastOptions: BREAKFAST_OPTIONS
       });
     } catch (error) {
@@ -21,7 +23,7 @@ const RoomRatesController = {
     }
   },
 
-  // Current amounts as a nested map
+  // Current amounts as a nested map: rates[category][dayRange][roomTypeId][breakfast]
   getData: async (req, res) => {
     try {
       const rates = await RoomRatesModel.getAll();
@@ -32,7 +34,7 @@ const RoomRatesController = {
     }
   },
 
-  // Body: { updates: [{ category, dayRange, bedType, breakfast, amount }, ...] }
+  // Body: { updates: [{ category, dayRange, roomTypeId, breakfast, amount }, ...] }
   saveRates: async (req, res) => {
     try {
       const updates = req.body && Array.isArray(req.body.updates) ? req.body.updates : [];

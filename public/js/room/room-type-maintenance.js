@@ -36,8 +36,8 @@ function initializeRoomTypeDataTable() {
 
     roomTypeDataTable = $("#roomTypeTable").DataTable({
         columnDefs: [
-            { targets: [4], className: "text-center" },
-            { targets: [4], orderable: false, searchable: false }
+            { targets: [3], className: "text-center" },
+            { targets: [3], orderable: false, searchable: false }
         ],
         pageLength: 10,
         lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
@@ -71,15 +71,8 @@ function reloadRoomTypeData() {
                 
                 if (response.data && response.data.length > 0) {
                     response.data.forEach(function(roomType) {
-                        const basePrice = roomType.BASE_PRICE && !isNaN(roomType.BASE_PRICE)
-                            ? parseFloat(roomType.BASE_PRICE).toLocaleString('en-PH', {
-                                style: 'currency',
-                                currency: 'PHP'
-                              })
-                            : 'P0.00';
-                        
                         const description = roomType.DESCRIPTION || '-';
-                        
+
                         const actions = `
                             <button type="button" class="btn btn-tbl-edit btn-xs" onclick="editRoomType('${roomType.IDNo}')" title="Edit Room Type">
                                 <i class="fa fa-pencil"></i>
@@ -93,7 +86,6 @@ function reloadRoomTypeData() {
                             roomType.IDNo,
                             roomType.NAME,
                             description,
-                            basePrice,
                             actions
                         ]);
                     });
@@ -123,10 +115,9 @@ function createRoomType() {
     const form = document.getElementById('addRoomTypeForm');
     const formData = {
         NAME: form.querySelector('[name="NAME"]').value,
-        DESCRIPTION: form.querySelector('[name="DESCRIPTION"]').value,
-        BASE_PRICE: form.querySelector('[name="BASE_PRICE"]').value
+        DESCRIPTION: form.querySelector('[name="DESCRIPTION"]').value
     };
-    
+
     console.log('Form data being sent:', formData);
     
     $.ajax({
@@ -202,8 +193,7 @@ function populateEditRoomTypeForm(roomType) {
     document.getElementById('editRoomTypeId').value = roomType.IDNo;
     document.getElementById('editRoomTypeName').value = roomType.NAME;
     document.getElementById('editRoomTypeDescription').value = roomType.DESCRIPTION || '';
-    document.getElementById('editRoomTypePrice').value = roomType.BASE_PRICE || '';
-    
+
     // Force floating labels after form is populated
     setTimeout(() => {
         const textfields = document.querySelectorAll('#editRoomTypeModal .mdl-textfield');
@@ -223,8 +213,7 @@ function updateRoomType() {
     const formData = {
         IDNo: form.querySelector('[name="IDNo"]').value,
         NAME: form.querySelector('[name="NAME"]').value,
-        DESCRIPTION: form.querySelector('[name="DESCRIPTION"]').value,
-        BASE_PRICE: form.querySelector('[name="BASE_PRICE"]').value
+        DESCRIPTION: form.querySelector('[name="DESCRIPTION"]').value
     };
     
     console.log('Update form data:', formData);

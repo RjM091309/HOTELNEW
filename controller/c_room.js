@@ -130,22 +130,20 @@ class RoomController {
       }
 
       try {
-        const { 
-          ROOM_TYPE_ID, 
-          ROOM_NUMBER, 
-          ROOM_STATUS, 
-          ROOM_PRICE, 
-          ROOM_MAX, 
-          ROOM_BED, 
-          ROOM_SIZE, 
-          ROOM_VIEW, 
+        const {
+          ROOM_TYPE_ID,
+          ROOM_NUMBER,
+          ROOM_STATUS,
+          ROOM_MAX,
+          ROOM_BED,
+          ROOM_SIZE,
+          ROOM_VIEW,
           ROOM_DESCRIPTION,
-          AMENITIES,
-          SEASONAL_PRICING
+          AMENITIES
         } = req.body;
-        
-        if (!ROOM_TYPE_ID || !ROOM_NUMBER || !ROOM_STATUS || 
-            !ROOM_PRICE || !ROOM_MAX || !ROOM_BED || !ROOM_SIZE || !ROOM_VIEW) {
+
+        if (!ROOM_TYPE_ID || !ROOM_NUMBER || !ROOM_STATUS ||
+            !ROOM_MAX || !ROOM_BED || !ROOM_SIZE || !ROOM_VIEW) {
           return res.status(400).json({
             success: false,
             message: 'All required fields must be provided'
@@ -166,14 +164,13 @@ class RoomController {
 
         // Parse JSON strings
         const parsedAmenities = AMENITIES ? JSON.parse(AMENITIES) : [];
-        const parsedSeasonalPricing = SEASONAL_PRICING ? JSON.parse(SEASONAL_PRICING) : [];
 
         const encodedBy = req.user ? req.user.userId : req.session.userId;
-        
+
         const result = await RoomModel.createRoom(
           ROOM_TYPE_ID, ROOM_NUMBER, ROOM_STATUS,
-          ROOM_PRICE, ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW, 
-          ROOM_DESCRIPTION, ROOM_IMAGE, parsedAmenities, parsedSeasonalPricing, encodedBy
+          ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW,
+          ROOM_DESCRIPTION, ROOM_IMAGE, parsedAmenities, encodedBy
         );
         
         if (result) {
@@ -210,23 +207,21 @@ class RoomController {
       }
 
       try {
-        const { 
+        const {
           IDNo,
-          ROOM_TYPE_ID, 
-          ROOM_NUMBER, 
-          ROOM_STATUS, 
-          ROOM_PRICE, 
-          ROOM_MAX, 
-          ROOM_BED, 
-          ROOM_SIZE, 
-          ROOM_VIEW, 
+          ROOM_TYPE_ID,
+          ROOM_NUMBER,
+          ROOM_STATUS,
+          ROOM_MAX,
+          ROOM_BED,
+          ROOM_SIZE,
+          ROOM_VIEW,
           ROOM_DESCRIPTION,
-          AMENITIES,
-          SEASONAL_PRICING
+          AMENITIES
         } = req.body;
-        
-        if (!IDNo || !ROOM_TYPE_ID || !ROOM_NUMBER || !ROOM_STATUS || 
-            !ROOM_PRICE || !ROOM_MAX || !ROOM_BED || !ROOM_SIZE || !ROOM_VIEW) {
+
+        if (!IDNo || !ROOM_TYPE_ID || !ROOM_NUMBER || !ROOM_STATUS ||
+            !ROOM_MAX || !ROOM_BED || !ROOM_SIZE || !ROOM_VIEW) {
           return res.status(400).json({
             success: false,
             message: 'All required fields must be provided'
@@ -247,14 +242,13 @@ class RoomController {
 
         // Parse JSON strings
         const parsedAmenities = AMENITIES ? JSON.parse(AMENITIES) : [];
-        const parsedSeasonalPricing = SEASONAL_PRICING ? JSON.parse(SEASONAL_PRICING) : [];
 
         const editedBy = req.user ? req.user.userId : req.session.userId;
-        
+
         const result = await RoomModel.updateRoom(
           IDNo, ROOM_TYPE_ID, ROOM_NUMBER, ROOM_STATUS,
-          ROOM_PRICE, ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW, 
-          ROOM_DESCRIPTION, ROOM_IMAGE, parsedAmenities, parsedSeasonalPricing, editedBy
+          ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW,
+          ROOM_DESCRIPTION, ROOM_IMAGE, parsedAmenities, editedBy
         );
         
         if (result) {
@@ -344,17 +338,17 @@ class RoomController {
   static async createRoomType(req, res) {
     try {
       console.log('Received request body:', req.body);
-      const { NAME, DESCRIPTION, BASE_PRICE } = req.body;
-      
-      if (!NAME || !BASE_PRICE) {
+      const { NAME, DESCRIPTION } = req.body;
+
+      if (!NAME) {
         return res.status(400).json({
           success: false,
-          message: 'Name and base price are required'
+          message: 'Name is required'
         });
       }
 
       const encodedBy = req.user ? req.user.userId : req.session.userId;
-      const result = await RoomModel.createRoomType(NAME, DESCRIPTION, BASE_PRICE, encodedBy);
+      const result = await RoomModel.createRoomType(NAME, DESCRIPTION, encodedBy);
       
       if (result) {
         res.json({
@@ -381,17 +375,17 @@ class RoomController {
   // Update room type
   static async updateRoomType(req, res) {
     try {
-      const { IDNo, NAME, DESCRIPTION, BASE_PRICE } = req.body;
-      
-      if (!IDNo || !NAME || !BASE_PRICE) {
+      const { IDNo, NAME, DESCRIPTION } = req.body;
+
+      if (!IDNo || !NAME) {
         return res.status(400).json({
           success: false,
-          message: 'ID, name and base price are required'
+          message: 'ID and name are required'
         });
       }
 
       const editedBy = req.user ? req.user.userId : req.session.userId;
-      const result = await RoomModel.updateRoomType(IDNo, NAME, DESCRIPTION, BASE_PRICE, editedBy);
+      const result = await RoomModel.updateRoomType(IDNo, NAME, DESCRIPTION, editedBy);
       
       if (result) {
         res.json({

@@ -71,16 +71,19 @@
                             </div>
                         </div>
 
-                        <!-- Booking Resources select, wrapped for dynamic move -->
+                        <!-- Room Rate category select (from room_rates), wrapped for dynamic move -->
                         <div id="bookingRouteSinglePlaceholder" class="col-lg-4">
                           <div id="bookingRouteWrapper">
                               <div class="form-group">
-                                  <label class="form-label">Booking Resources</label>
+                                  <label class="form-label">Room Rate</label>
                                   <select class="form-select" id="bookingRoute" name="bookingRoute">
-                                      <option value="" disabled selected>Booking Resources</option>
-                                      <option value="walk-in" selected>Walk-in</option>
-                                      <option value="agency">Agency</option>
-                                      <option value="booking-channel">OTA</option>
+                                      <option value="walk-in" selected data-base-label="Walk-in">Walk-in</option>
+                                      <option value="agency" data-base-label="Agency">Agency</option>
+                                      <option value="tenant" data-base-label="Tenant (15%)">Tenant (15%)</option>
+                                      <option value="vip" data-base-label="VIP (20%)">VIP (20%)</option>
+                                      <option value="employee" data-base-label="Employee (30%)">Employee (30%)</option>
+                                      <option value="senior_special" data-base-label="Senior / Special 20%">Senior / Special 20%</option>
+                                      <option value="booking-channel" data-base-label="OTA / Channel">OTA / Channel</option>
                                   </select>
                               </div>
                           </div>
@@ -145,22 +148,16 @@
                         <div id="divprice" class="col-lg-3">
                             <div class="form-group">
                               <div id="singleRateWrapper">
-                                <label class="form-label">Room Rate</label>
+                                <label class="form-label">Rate / Per Night</label>
                                 <input class="form-control" type="text" id="price" name="price" readonly>
-                                <div style="margin-top: 0px;">
-                                  <input type="checkbox" id="manualPriceToggle"> <label for="manualPriceToggle" style="font-size: 12px;">Enter Price Manually</label>
-                                </div>
+                                <small class="text-muted d-block" style="font-size: 11px; margin-top: 4px;">Auto from Room Rates</small>
                               </div>
-                              <div id="weekendPriceToggleWrapper" style="display:none; margin-top: 6px;">
-                                <input type="checkbox" id="weekendPriceToggle"> <label for="weekendPriceToggle" style="font-size: 12px;">Separate Weekend Rate</label>
-                              </div>
-                              <div id="weekendPriceFields" style="display:none; margin-top: 8px;">
-                                <label class="form-label" style="font-size: 12px; margin-bottom: 2px;">Weekday Rate</label>
-                                <input class="form-control form-control-sm" type="text" id="weekdayRate" placeholder="Weekday rate">
-                                <label class="form-label" style="font-size: 12px; margin-top: 6px; margin-bottom: 2px;">Weekend Rate</label>
-                                <input class="form-control form-control-sm" type="text" id="weekendRate" placeholder="Weekend rate">
-                                <small id="weekendNightBreakdown" class="text-muted d-block" style="font-size: 11px; margin-top: 4px;"></small>
-                              </div>
+                              <!-- Manual price + weekend split removed - each night bills at its own room_rates amount -->
+                              <input type="hidden" id="weekdayRate">
+                              <input type="hidden" id="weekendRate">
+                              <!-- Walk-in (undiscounted) reference rates, for the discount breakdown -->
+                              <input type="hidden" id="walkinWeekdayRate">
+                              <input type="hidden" id="walkinWeekendRate">
                             </div>
                         </div>
 
@@ -211,29 +208,31 @@
                                 </div>
                             </div>
 
+                            <%# Nightly Rate Breakdown table - temporarily hidden (uncomment to restore)
+                            <div id="divRateBreakdown" class="col-lg-12">
+                                <div id="rateBreakdownNote" class="rate-breakdown-card" style="display:none;"></div>
+                            </div>
+                            %>
+
 
                             <div class="row p-t-10">
                                 <div class="col-lg-4">
                                     <label><input type="checkbox" id="includeBreakfast"> Breakfast</label>
                                     <div id="breakfastInputs" style="display: none; margin-top: 5px;">
-                                  
-                                      <!-- Breakfast - Adult -->
-                                      <div class="mb-2 d-flex gap-2 align-items-center">
-                                        <input type="number" class="form-control" id="breakfastAdultQty" name="breakfastAdultQty" placeholder="Adult" style="max-width: 80px;">
-                                        <input type="number" class="form-control" id="breakfastAdultPrice" name="breakfastAdultPrice" placeholder="Price per Qty">
-                                         <!-- For display only -->
-                                          <input type="text" class="form-control d-none" id="breakfastAdultTotal" placeholder="Total" readonly style="display: none !important;">
-                                        <input type="hidden" id="breakfastAdultId" name="breakfastAdultId">
-                                      </div>
-                                  
-                                      <!-- Breakfast - Kids -->
+
                                       <div class="d-flex gap-2 align-items-center">
-                                        <input type="number" class="form-control" id="breakfastKidQty" name="breakfastKidQty" placeholder="Kids" style="max-width: 80px;">
-                                        <input type="number" class="form-control" id="breakfastKidPrice" name="breakfastKidPrice" placeholder="Price per Qty">
-                                        <input type="text" class="form-control d-none" id="breakfastKidTotal" placeholder="Total" readonly style="display: none !important;">
-                                        <input type="hidden" id="breakfastKidId" name="breakfastKidId">
+                                        <input type="number" min="0" max="20" class="form-control" id="breakfastAdultQty" name="breakfastAdultQty" placeholder="Pax" style="max-width: 110px;">
+                                        <span class="text-muted" style="font-size: 12px;">person/s</span>
                                       </div>
-                                  
+
+                                      <!-- Adult & kids breakfast are the same tier now - one pax count. Kids kept at 0 for the legacy service payload. -->
+                                      <input type="hidden" id="breakfastKidQty" name="breakfastKidQty" value="0">
+                                      <input type="hidden" id="breakfastAdultPrice" name="breakfastAdultPrice" value="0">
+                                      <input type="hidden" id="breakfastKidPrice" name="breakfastKidPrice" value="0">
+                                      <input type="hidden" id="breakfastAdultId" name="breakfastAdultId">
+                                      <input type="hidden" id="breakfastKidId" name="breakfastKidId">
+                                      <input type="hidden" id="breakfastAdultTotal">
+                                      <input type="hidden" id="breakfastKidTotal">
                                     </div>
                                   </div>
                                   
@@ -257,6 +256,10 @@
                                       <input type="number" class="form-control" id="dropoffPrice" name="dropoffPrice" placeholder="Drop-off Price">
                                       <input type="hidden" id="dropoffServiceId" name="dropoffServiceId">
                                     </div>
+                                  </div>
+
+                                  <div class="col-lg-12">
+                                    <div id="breakfastRateNote" class="booking-note booking-note--warn" style="display: none;"></div>
                                   </div>
                                   <div id="pickupDropoffFlightInfo" class="col-lg-12" style="display: none; margin-top: 10px;">
                                     <div class="row">
@@ -363,9 +366,8 @@
                                 </div>
                               </div>
 
-                              <!-- Discount Section -->
-                              <hr class="my-4">
-                              <div class="row p-t-20">
+                              <!-- Discount Section - hidden in Add Booking (optional, handled elsewhere). Inputs kept for JS compatibility. -->
+                              <div class="row p-t-20" style="display: none;">
                                 <div class="col-lg-6">
                                   <div class="form-check mb-2">
                                     <input class="form-check-input" type="checkbox" id="includeSeniorPwdDiscount">
@@ -390,6 +392,7 @@
                                 </div>
                               </div>
 
+                              <hr class="my-4">
                               <div class="row">
                                 <div class="col-lg-4">
                                   <h3>Total: <span id="computedTotal">0.00</span></h3>
@@ -467,7 +470,7 @@
 		document.body.appendChild(bookingScript);
 		bookingScript.onload = function() {
 			var bookingBillingScript = document.createElement('script');
-			bookingBillingScript.src = '/js/booking/add_booking.js?v=weekend-price-4';
+			bookingBillingScript.src = '/js/booking/add_booking.js?v=discount-col-7';
 			document.body.appendChild(bookingBillingScript);
 		};
 
@@ -914,6 +917,126 @@
    max-height: 99vh;      /* mas mataas na value para mas mahaba ang modal */
    margin: 1vh auto;
 }
+
+/* ===== Rate breakdown - styled like the Billing Receipt table ===== */
+#modal-addbooking .rate-breakdown-card {
+    margin-top: 10px;
+    padding: 0;
+    border-radius: 10px;
+    background: #ffffff;
+    border: 1px solid #e3e6e9;
+    overflow: hidden;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+}
+#modal-addbooking .rate-breakdown-card .rbc-head {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    padding: 10px 14px;
+    font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+    font-size: 11px; color: #2c3e50;
+    background: #f1f4f7;
+    border-bottom: 1px solid #e3e6e9;
+}
+#modal-addbooking .rbc-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+    color: #333333;
+}
+#modal-addbooking .rbc-table th,
+#modal-addbooking .rbc-table td {
+    padding: 10px 12px;
+    text-align: right;
+    white-space: nowrap;
+}
+#modal-addbooking .rbc-table thead th {
+    background: #f8f9fa;
+    color: #2c3e50;
+    font-weight: 600; font-size: 10px;
+    text-transform: uppercase; letter-spacing: .5px;
+    border-bottom: 2px solid #dee2e6;
+}
+#modal-addbooking .rbc-table tbody td {
+    border-bottom: 1px solid #f1f3f4;
+    font-size: 12px;
+}
+#modal-addbooking .rbc-table th:first-child,
+#modal-addbooking .rbc-table td:first-child { text-align: center; width: 42px; color: #8a949c; }
+#modal-addbooking .rbc-table th.rbc-desc,
+#modal-addbooking .rbc-table td.rbc-desc { text-align: left; white-space: normal; }
+#modal-addbooking .rbc-table th.rbc-n,
+#modal-addbooking .rbc-table td.rbc-n { text-align: center; }
+#modal-addbooking .rbc-table .rbc-dim { color: #8a949c; font-weight: 400; }
+#modal-addbooking .rbc-table .rbc-disc-amt { color: #c0392b; font-weight: 600; }
+#modal-addbooking .rbc-table tfoot td {
+    background: #f8f9fa;
+    border-top: 2px solid #dee2e6;
+    color: #2c3e50;
+}
+#modal-addbooking .rbc-table .rbc-foot-total td {
+    font-weight: 700; font-size: 13px;
+    padding-top: 12px; padding-bottom: 12px;
+}
+#modal-addbooking .rbc-table .rbc-foot-total td:first-child {
+    text-align: right; text-transform: uppercase; letter-spacing: .5px;
+}
+#modal-addbooking .rbc-table .rbc-foot-avg td {
+    font-weight: 500; color: #8a949c; font-size: 11px;
+    padding-top: 2px; padding-bottom: 8px;
+}
+#modal-addbooking .rbc-table .rbc-foot-avg td:first-child { text-align: right; }
+
+/* discount tag + inline "was" price + discount total */
+#modal-addbooking .rbc-head .rbc-head-tag {
+    background: #e8f5e9; color: #2e7d32;
+    border: 1px solid #c8e6c9; border-radius: 20px;
+    padding: 1px 9px; font-size: 10px; font-weight: 700;
+    letter-spacing: .3px; text-transform: none;
+}
+#modal-addbooking .rbc-table .rbc-was {
+    color: #9aa4ab; text-decoration: line-through;
+    margin-right: 5px; font-size: 11px;
+}
+#modal-addbooking .rbc-table .rbc-foot-disc td {
+    color: #c0392b; font-weight: 700; font-size: 12px;
+    border-top: 1px solid #f1d6d2;
+    background: #fdf3f2;
+}
+#modal-addbooking .rbc-table .rbc-foot-disc td:first-child {
+    text-align: right; text-transform: none; letter-spacing: 0;
+}
+#modal-addbooking .rbc-table .rbc-foot-disc .rbc-dim { color: #d98b83; font-weight: 500; }
+
+#modal-addbooking .booking-note {
+    display: flex; gap: 8px; align-items: flex-start;
+    margin-top: 6px; padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.10);
+    font-size: 11px; line-height: 1.45; color: #cdd6dc;
+}
+#modal-addbooking .booking-note::before {
+    content: "i";
+    flex: 0 0 auto;
+    width: 15px; height: 15px; margin-top: 1px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    font-size: 10px; font-weight: 800; font-style: normal;
+    background: #e6a94b; color: #221a0c;
+}
+#modal-addbooking .booking-note--warn {
+    background: linear-gradient(180deg, rgba(230,169,75,0.12), rgba(230,169,75,0.05));
+    border-color: rgba(230,169,75,0.30);
+    color: #f0e4cf;
+}
+#modal-addbooking .booking-note--active {
+    background: linear-gradient(180deg, rgba(111,156,64,0.14), rgba(111,156,64,0.05));
+    border-color: rgba(111,156,64,0.35);
+    color: #dff0d4;
+}
+#modal-addbooking .booking-note--active::before {
+    content: "\2713"; background: #6f9c40; color: #10210a;
+}
+#modal-addbooking .booking-note u { text-underline-offset: 2px; }
 
 /* Stacked modal fix: modals opened on top of Add Booking */
 .modal-backdrop + .modal-backdrop {

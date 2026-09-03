@@ -195,40 +195,40 @@ function updateWeekendPriceUI() {
 }
 window.updateWeekendPriceUI = updateWeekendPriceUI;
 
+// %-off categories vs the Walk-in rate (the amounts in room_rates are already
+// discounted; this is only for showing how much was taken off).
+const RATE_DISCOUNT_PCT = { tenant: 15, vip: 20, employee: 30, senior_special: 20 };
+const RATE_CAT_LABEL = { tenant: 'Tenant', vip: 'VIP', employee: 'Employee', senior_special: 'Senior / Special' };
+function currentDiscountCat() {
+    let t = (typeof window.getPriceBookingType === 'function')
+        ? window.getPriceBookingType()
+        : ($('#bookingRoute').val() || '');
+    if (t === 'senior') t = 'senior_special';
+    return RATE_DISCOUNT_PCT[t] ? t : null;
+}
+
 function getRoomRateDetails() {
     const nights = getStayNights();
     const breakdown = countNightBreakdown();
-    const weekendEnabled = $('#weekendPriceToggle').is(':checked') && breakdown.weekend > 0;
 
-    if (weekendEnabled) {
-        const weekdayRate = parseMoney($('#weekdayRate').val());
-        const weekendRate = parseMoney($('#weekendRate').val());
-        const roomCharges = (weekdayRate * breakdown.weekday) + (weekendRate * breakdown.weekend);
-        const avgRate = nights > 0 ? roomCharges / nights : 0;
-        return {
-            roomRate: avgRate,
-            roomCharges,
-            nights,
-            breakdown,
-            weekendEnabled: true,
-            weekdayRate,
-            weekendRate
-        };
-    }
+    // Each night bills at its own room_rates amount: Mon-Thu = weekday rate,
+    // Fri-Sun = weekend rate. Falls back to the single base rate if the split
+    // rates aren't populated yet.
+    const base = parseMoney($('#baseprice').val());
+    const weekdayRate = parseMoney($('#weekdayRate').val()) || base;
+    const weekendRate = parseMoney($('#weekendRate').val()) || weekdayRate;
 
-    const roomRate = parseMoney(
-        $('#manualPriceToggle').prop('checked')
-            ? $('#price').val()
-            : $('#baseprice').val()
-    );
+    const roomCharges = (weekdayRate * breakdown.weekday) + (weekendRate * breakdown.weekend);
+    const avgRate = nights > 0 ? roomCharges / nights : weekdayRate;
+
     return {
-        roomRate,
-        roomCharges: roomRate * nights,
+        roomRate: avgRate,
+        roomCharges,
         nights,
         breakdown,
-        weekendEnabled: false,
-        weekdayRate: roomRate,
-        weekendRate: roomRate
+        weekendEnabled: breakdown.weekend > 0 && weekendRate !== weekdayRate,
+        weekdayRate,
+        weekendRate
     };
 }
 window.getRoomRateDetails = getRoomRateDetails;
@@ -390,37 +390,43 @@ function displayConsecutiveRooms(blocks) {
             let selectedBlockIndex = $(this).data('block-idx');
             let block = window._groupBlocks[selectedBlockIndex];
             if (block) {
-                // Compute price for each room using seasonal logic
-                const daterange = $('#daterange').val() || '';
-                const [startDate] = daterange.split(' to ');
-                const bookingType = getPriceBookingType();
+                // Compute price for each room from the room_rates matrix
+                // (room.ROOM_RATES). room.ROOM_PRICE / SEASONAL_PRICES are no
+                // longer used - pricing lives entirely in room_rates.
+                function grpRateCategory() {
+                    const t = getPriceBookingType();
+                    if (t === 'agency') return 'agency';
+                    if (t === 'tenant') return 'tenant';
+                    if (t === 'vip') return 'vip';
+                    if (t === 'employee') return 'employee';
+                    if (t === 'senior' || t === 'senior_special') return 'senior_special';
+                    return 'walk_in';
+                }
+                function grpBreakfastKey() {
+                    if (!$('#includeBreakfast').is(':checked')) return 'no';
+                    const persons = (parseInt($('#breakfastAdultQty').val(), 10) || 0)
+                        + (parseInt($('#breakfastKidQty').val(), 10) || 0);
+                    if (persons >= 2) return 'two';
+                    if (persons === 1) return 'one';
+                    return 'no';
+                }
+                function grpRateFor(room, dayRange) {
+                    const cat = grpRateCategory();
+                    const bf = grpBreakfastKey();
+                    const m = (room.ROOM_RATES && room.ROOM_RATES[cat] && room.ROOM_RATES[cat][dayRange]) || {};
+                    const val = m[bf];
+                    return Number.isFinite(Number(val)) ? Number(val) : 0;
+                }
+                const grpBd = countNightBreakdown();
+                const grpNights = grpBd.total || 1;
                 let computedPrices = [];
                 block.forEach(room => {
-                    // --- Seasonal price logic (same as single booking) ---
-                    function getSeasonIdForDate(checkInDate, seasonalPrices) {
-                        const checkIn = new Date(checkInDate);
-                        const mmdd = (checkIn.getMonth() + 1).toString().padStart(2, '0') + checkIn.getDate().toString().padStart(2, '0');
-                        for (const p of (room.SEASONAL_PRICES || [])) {
-                            const start = new Date(p.startDate);
-                            const end = new Date(p.endDate);
-                            const startMMDD = (start.getMonth() + 1).toString().padStart(2, '0') + start.getDate().toString().padStart(2, '0');
-                            const endMMDD = (end.getMonth() + 1).toString().padStart(2, '0') + end.getDate().toString().padStart(2, '0');
-                            if ((startMMDD <= endMMDD && mmdd >= startMMDD && mmdd <= endMMDD) ||
-                                (startMMDD > endMMDD && (mmdd >= startMMDD || mmdd <= endMMDD))) {
-                                return p.seasonId;
-                            }
-                        }
-                        return null;
-                    }
-                    const bedCount = parseInt(room.ROOM_BED);
-                    const seasonId = getSeasonIdForDate(startDate, room.SEASONAL_PRICES);
-                    const match = (room.SEASONAL_PRICES || []).find(p =>
-                        parseInt(p.bedCount) === bedCount &&
-                        p.bookingType === bookingType &&
-                        parseInt(p.seasonId) === parseInt(seasonId)
-                    );
-                    let pricePerNight = match ? parseFloat(match.price) : parseFloat(room.FINAL_PRICE);
-                    computedPrices.push(pricePerNight);
+                    const weekdayRate = grpRateFor(room, 'weekday');
+                    const weekendRate = grpRateFor(room, 'weekend');
+                    // Blended per-night: weekday nights at the weekday rate,
+                    // weekend nights (Fri-Sun) at the weekend rate.
+                    const charge = (weekdayRate * grpBd.weekday) + (weekendRate * grpBd.weekend);
+                    computedPrices.push(grpNights > 0 ? charge / grpNights : (weekdayRate || weekendRate || 0));
                 });
                 $('#selectedBlock').val(block.map(r => r.IDNo).join(','));
                 $('#selectedRoomPrice').val(computedPrices.join(','));
@@ -521,10 +527,78 @@ function computeTotal() {
     const nights = rateDetails.nights;
     $('#diffindays').val(nights);
 
-    if (rateDetails.weekendEnabled) {
-        $('#baseprice').val(roomRate.toFixed(2));
-    } else if ($('#manualPriceToggle').prop('checked')) {
-        $('#baseprice').val(roomRate);
+    const bd = rateDetails.breakdown || { weekday: 0, weekend: 0 };
+    const peso = (n) => '₱' + Math.round(n).toLocaleString('en-US');
+    const $rbc = $('#rateBreakdownNote');
+    const totalNights = bd.weekday + bd.weekend;
+
+    if (totalNights > 0 && (rateDetails.roomCharges > 0)) {
+        if (rateDetails.weekendEnabled) {
+            // Different amounts per night - store the blended average so the
+            // server's price x nights matches this breakdown.
+            $('#baseprice').val(roomRate.toFixed(2));
+            $('#price').val(Math.round(roomRate).toLocaleString('en-US'));
+        }
+        const wd = rateDetails.weekdayRate;
+        const we = rateDetails.weekendRate;
+        const discCat = currentDiscountCat();
+        const wiWd = parseMoney($('#walkinWeekdayRate').val()) || wd;
+        const wiWe = parseMoney($('#walkinWeekendRate').val()) || we;
+        const dWd = Math.max(0, wiWd - wd);   // per-night discount, weekday
+        const dWe = Math.max(0, wiWe - we);   // per-night discount, weekend
+        const hasDiscount = !!discCat && (dWd > 0 || dWe > 0);
+        const pct = hasDiscount ? RATE_DISCOUNT_PCT[discCat] : 0;
+        const label = hasDiscount ? RATE_CAT_LABEL[discCat] : '';
+
+        // Rate/Night cell - net rate, with the pre-discount rate struck through
+        // beside it when a %-off category is active.
+        const rateCell = (net, was) => (hasDiscount && was > net)
+            ? `<span class="rbc-was">${peso(was)}</span> ${peso(net)}`
+            : peso(net);
+        const discCell = (d) => d > 0 ? `<span class="rbc-disc-amt">&minus;${peso(d)}</span>` : '&mdash;';
+
+        let body = '';
+        let n = 1;
+        const row = (desc, dPerNight, net, was, nightCount, sub) => hasDiscount
+            ? `<tr><td>${n++}</td><td class="rbc-desc">${desc}</td><td>${discCell(dPerNight)}</td><td>${rateCell(net, was)}</td><td class="rbc-n">${nightCount}</td><td>${peso(sub)}</td></tr>`
+            : `<tr><td>${n++}</td><td class="rbc-desc">${desc}</td><td>${peso(net)}</td><td class="rbc-n">${nightCount}</td><td>${peso(sub)}</td></tr>`;
+
+        if (bd.weekday > 0) body += row('Weekday night <span class="rbc-dim">(Mon&ndash;Thu)</span>', dWd, wd, wiWd, bd.weekday, wd * bd.weekday);
+        if (bd.weekend > 0) body += row('Weekend night <span class="rbc-dim">(Fri&ndash;Sun)</span>', dWe, we, wiWe, bd.weekend, we * bd.weekend);
+
+        const discTotal = (dWd * bd.weekday) + (dWe * bd.weekend);
+        const footSpan = hasDiscount ? 5 : 4;
+        const headSub = hasDiscount
+            ? ` &nbsp;·&nbsp; <span class="rbc-head-tag">${label} &minus;${pct}%</span>`
+            : '';
+        const thead = hasDiscount
+            ? `<tr><th>#</th><th class="rbc-desc">Description</th><th>Discount / Per Night</th><th>Rate / Per Night</th><th class="rbc-n">Nights</th><th>Subtotal</th></tr>`
+            : `<tr><th>#</th><th class="rbc-desc">Description</th><th>Rate / Per Night</th><th class="rbc-n">Nights</th><th>Subtotal</th></tr>`;
+
+        let foot = '';
+        if (hasDiscount) {
+            const dParts = [];
+            if (bd.weekday > 0 && dWd > 0) dParts.push(`${bd.weekday} &times; &minus;${peso(dWd)}`);
+            if (bd.weekend > 0 && dWe > 0) dParts.push(`${bd.weekend} &times; &minus;${peso(dWe)}`);
+            foot += `<tr class="rbc-foot-disc"><td colspan="${footSpan}">Total discount`
+                 + (dParts.length ? ` <span class="rbc-dim">(${dParts.join(' &nbsp;+&nbsp; ')})</span>` : ``)
+                 + `</td><td>&minus;${peso(discTotal)}</td></tr>`;
+        }
+        foot += `<tr class="rbc-foot-total"><td colspan="${footSpan}">Room total <span class="rbc-dim">(${totalNights} night${totalNights > 1 ? 's' : ''})</span></td><td>${peso(rateDetails.roomCharges)}</td></tr>`;
+        if (rateDetails.weekendEnabled || hasDiscount) {
+            foot += `<tr class="rbc-foot-avg"><td colspan="${footSpan}">Average / night</td><td>${peso(roomRate)}</td></tr>`;
+        }
+
+        $rbc.html(
+            `<div class="rbc-head">🧾 Nightly Rate Breakdown${headSub}</div>`
+            + `<table class="rbc-table">`
+            +   `<thead>${thead}</thead>`
+            +   `<tbody>${body}</tbody>`
+            +   `<tfoot>${foot}</tfoot>`
+            + `</table>`
+        ).show();
+    } else {
+        $rbc.empty().hide();
     }
 
     const adultQty = parseInt($('#breakfastAdultQty').val()) || 0;
@@ -944,6 +1018,21 @@ $(document).ready(function () {
 
     $('#includeBreakfast').on('change', function () {
         $('#breakfastInputs').toggle(this.checked);
+        if (this.checked && !$('#breakfastAdultQty').val()) {
+            $('#breakfastAdultQty').val(1);          // sensible default: 1 pax
+        }
+        if (!this.checked) {
+            $('#breakfastRateNote').hide().empty();
+        }
+        if (typeof window._updateSeasonalPrice === 'function') {
+            window._updateSeasonalPrice();
+        } else if (this.checked) {
+            // No room picked yet - still show the advisory.
+            $('#breakfastRateNote')
+                .removeClass('booking-note--active').addClass('booking-note--warn')
+                .html('<div>Breakfast is <b>priced into the room rate</b>, not a separate fee. Base is <u>No Breakfast</u>; adding breakfast moves the nightly rate to the <u>1</u> or <u>2</u> breakfast tier (higher amount).</div>')
+                .show();
+        }
     });
 
     // Reservation Fee and Discount handlers
@@ -1065,7 +1154,9 @@ $(document).ready(function () {
         refreshSeasonalPrice();
     });
 
-    // Fetch breakfast prices using shared utility
+    // Breakfast is now priced inside room_rates (no / one / two tier), so we no
+    // longer pull a per-person price - only the service IDs, so the booking still
+    // records a kitchen breakfast line (at 0 cost) for the daily breakfast list.
     getBreakfastPrices()
         .then(serviceData => {
             if (!Array.isArray(serviceData)) throw new Error('Invalid response format');
@@ -1073,16 +1164,12 @@ $(document).ready(function () {
             const adult = serviceData.find(s => s.SERVICE_NAME.includes('Adult'));
             const kid = serviceData.find(s => s.SERVICE_NAME.includes('Kids'));
 
-            if (adult) {
-                $('#breakfastAdultPrice').val(adult.SERVICE_COST);
-                $('#breakfastAdultId').val(adult.IDNo);
-            }
-            if (kid) {
-                $('#breakfastKidPrice').val(kid.SERVICE_COST);
-                $('#breakfastKidId').val(kid.IDNo);
-            }
+            if (adult) $('#breakfastAdultId').val(adult.IDNo);
+            if (kid) $('#breakfastKidId').val(kid.IDNo);
+            $('#breakfastAdultPrice').val('0');
+            $('#breakfastKidPrice').val('0');
         })
-        .catch(err => console.error('Failed to load breakfast prices:', err));
+        .catch(err => console.error('Failed to load breakfast service ids:', err));
 
     // Fetch and populate transport rates
     getPickAndDropPrices();
@@ -1316,37 +1403,115 @@ $(document).ready(function () {
                     return null;
                 }
 
+                // NEW pricing source: room_rates matrix (room.ROOM_RATES), keyed by
+                // category (booking route) x day range (weekday/weekend) x breakfast.
+                // room.ROOM_PRICE / room_type.BASE_PRICE are no longer used.
+                function rateCategory() {
+                    const t = getPriceBookingType();               // 'walk-in' | 'agency' | ...
+                    if (t === 'agency') return 'agency';
+                    if (t === 'tenant') return 'tenant';
+                    if (t === 'vip') return 'vip';
+                    if (t === 'employee') return 'employee';
+                    if (t === 'senior' || t === 'senior_special') return 'senior_special';
+                    return 'walk_in';
+                }
+                function breakfastKey() {
+                    if (!$('#includeBreakfast').is(':checked')) return 'no';
+                    const persons = (parseInt($('#breakfastAdultQty').val(), 10) || 0)
+                        + (parseInt($('#breakfastKidQty').val(), 10) || 0);
+                    if (persons >= 2) return 'two';
+                    if (persons === 1) return 'one';
+                    return 'no';
+                }
+                function rateForCatDay(cat, dayRange) {
+                    const bf = breakfastKey();
+                    const m = (room.ROOM_RATES && room.ROOM_RATES[cat] && room.ROOM_RATES[cat][dayRange]) || {};
+                    const val = m[bf];
+                    return Number.isFinite(Number(val)) ? Number(val) : 0;
+                }
+                function rateFor(dayRange) {
+                    return rateForCatDay(rateCategory(), dayRange);
+                }
+
+                // Show the resolved room_rates price beside each category in the
+                // "Room Rate" dropdown, kept live with the picked room + dates +
+                // breakfast. OTA / Channel is priced as walk-in.
+                const RATE_OPT_CAT = {
+                    'walk-in': 'walk_in', 'agency': 'agency', 'tenant': 'tenant',
+                    'vip': 'vip', 'employee': 'employee', 'senior_special': 'senior_special',
+                    'booking-channel': 'walk_in'
+                };
+                function refreshRateOptionLabels() {
+                    const bf = breakfastKey();
+                    const bd = countNightBreakdown();
+                    // Mixed weekday + weekend stay has no single nightly rate, so
+                    // don't show a (misleading) price on the category options.
+                    const mixed = bd.weekday > 0 && bd.weekend > 0;
+                    const range = (bd.weekend > 0 && bd.weekday === 0) ? 'weekend' : 'weekday';
+                    $('#bookingRoute option').each(function () {
+                        const $o = $(this);
+                        const val = $o.attr('value');
+                        if (!val) return;
+                        let base = $o.data('base-label');
+                        if (!base) { base = $o.text().replace(/\s+[—-]\s+₱.*$/, '').trim(); $o.data('base-label', base); }
+                        if (mixed) { $o.text(base); return; }
+                        const cat = RATE_OPT_CAT[val] || 'walk_in';
+                        const rr = room.ROOM_RATES && room.ROOM_RATES[cat];
+                        let amt = 0;
+                        if (rr) {
+                            amt = Number((rr[range] && rr[range][bf])
+                                || (rr.weekday && rr.weekday[bf])
+                                || (rr.weekend && rr.weekend[bf]) || 0);
+                        }
+                        $o.text(amt > 0 ? `${base} — ₱${amt.toLocaleString('en-US')}` : base);
+                    });
+                }
+                function updateBreakfastNote() {
+                    const $n = $('#breakfastRateNote');
+                    if (!$n.length) return;
+                    const on = $('#includeBreakfast').is(':checked');
+                    if (!on) { $n.hide().empty(); return; }
+                    const k = breakfastKey();
+                    if (k === 'no') {
+                        $n.removeClass('booking-note--active').addClass('booking-note--warn')
+                          .html('<div>Set the number of persons. Breakfast is <b>priced into the room rate</b> (not a separate fee) &mdash; base is <u>No Breakfast</u>, and adding breakfast moves the nightly rate to the <u>1</u> or <u>2</u> breakfast tier (higher amount).</div>')
+                          .show();
+                    } else {
+                        const tier = k === 'two' ? '2-breakfast' : '1-breakfast';
+                        $n.removeClass('booking-note--warn').addClass('booking-note--active')
+                          .html(`<div>Nightly rate is now on the <b><u>${tier}</u></b> tier &mdash; higher than the No-BF base. This is already inside the room total; no separate breakfast charge is added.</div>`)
+                          .show();
+                    }
+                }
+                function recalcRates() {
+                    updateSeasonalPrice();
+                    refreshRateOptionLabels();
+                    updateBreakfastNote();
+                }
+
                 function updateSeasonalPrice() {
                     if ($('#manualPriceToggle').is(':checked')) return;
 
-                    const bedCount = parseInt(room.ROOM_BED);
-                    const bookingType = getPriceBookingType();
-                    const seasonId = getSeasonIdForDate(startDate, seasonalPrices);
+                    const weekdayRate = rateFor('weekday');
+                    const weekendRate = rateFor('weekend');
+                    const basePerNight = weekdayRate || weekendRate || 0;
 
-                    const match = seasonalPrices.find(p =>
-                        parseInt(p.bedCount) === bedCount &&
-                        p.bookingType === bookingType &&
-                        parseInt(p.seasonId) === parseInt(seasonId)
-                    );
+                    // Always expose both rates so the total can bill each night at
+                    // its own room_rates amount (Mon-Thu vs Fri-Sun).
+                    $('#weekdayRate').val((weekdayRate || basePerNight).toFixed(2));
+                    $('#weekendRate').val((weekendRate || basePerNight).toFixed(2));
 
-                    let pricePerNight = match ? parseFloat(match.price) : parseFloat(room.ROOM_PRICE);
+                    // Walk-in reference rates so the breakdown can show the
+                    // discount when a %-off category (tenant / vip / employee /
+                    // senior) is selected.
+                    $('#walkinWeekdayRate').val((rateForCatDay('walk_in', 'weekday') || weekdayRate).toFixed(2));
+                    $('#walkinWeekendRate').val((rateForCatDay('walk_in', 'weekend') || weekendRate).toFixed(2));
 
-                    $('#price')
-                        .data('base-price', pricePerNight);
+                    $('#price').data('base-price', basePerNight);
+                    $('#baseprice').val(basePerNight.toFixed(2));
+                    $('#price').val(basePerNight.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ","));
 
-                    $('#baseprice').val(pricePerNight.toFixed(2));
-
-                    if ($('#weekendPriceToggle').is(':checked')) {
-                        $('#weekdayRate').val(formatRateDisplay(pricePerNight));
-                        $('#weekendRate').val(formatRateDisplay(pricePerNight));
-                    } else {
-                        $('#price')
-                            .val(pricePerNight.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ","));
-                    }
-
-                    // Recompute total after setting price
                     computeTotal();
-
                     if (typeof calculateTotalPrice === 'function') {
                         calculateTotalPrice();
                     }
@@ -1356,15 +1521,20 @@ $(document).ready(function () {
                     handleBookingRouteDependentFields($('#bookingRoute').val());
                 }
 
-                window._updateSeasonalPrice = updateSeasonalPrice;
-                updateSeasonalPrice();
+                window._updateSeasonalPrice = recalcRates;
+                recalcRates();
 
                 $('#bookingRoute').off('change').on('change', function() {
-                    updateSeasonalPrice();
+                    recalcRates();
                     handleAgencySelection();
                 });
 
-                $('input[name="agencyPayer"]').off('change.priceUpdate').on('change.priceUpdate', updateSeasonalPrice);
+                $('input[name="agencyPayer"]').off('change.priceUpdate').on('change.priceUpdate', recalcRates);
+
+                // Breakfast selection now affects the room_rates rate.
+                $('#includeBreakfast, #breakfastAdultQty, #breakfastKidQty')
+                    .off('change.roomRate input.roomRate')
+                    .on('change.roomRate input.roomRate', recalcRates);
             })
             .catch(err => {
                 console.error('Error fetching room details:', err);
@@ -1585,6 +1755,7 @@ $(document).ready(function () {
     });
     $('#daterange').on('change', function () {
         updateWeekendPriceUI();
+        refreshSeasonalPrice();
         computeTotal();
     });
 

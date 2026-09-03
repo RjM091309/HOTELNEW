@@ -6,7 +6,7 @@
           <div>
             <h4 class="mb-0">Room Rates</h4>
             <p class="room-rates-note mb-0">
-              Edit any amount, then Save. Priced by day range, bed type and breakfast.
+              Edit any amount, then Save. Priced by day range, room type and breakfast.
             </p>
           </div>
           <div class="room-rates-actions">
@@ -28,13 +28,13 @@
                     <tr>
                       <th rowspan="2" class="rate-bf-col">Breakfast</th>
                       <% dayRanges.forEach(function(dr) { %>
-                        <th colspan="<%= bedTypes.length %>" class="text-center rate-day-head"><%= dr.label %></th>
+                        <th colspan="<%= roomTypes.length %>" class="text-center rate-day-head"><%= dr.label %></th>
                       <% }); %>
                     </tr>
                     <tr>
                       <% dayRanges.forEach(function(dr) { %>
-                        <% bedTypes.forEach(function(bt) { %>
-                          <th class="text-center rate-bed-head"><%= bt.label %></th>
+                        <% roomTypes.forEach(function(rt) { %>
+                          <th class="text-center rate-bed-head"><%= rt.name %></th>
                         <% }); %>
                       <% }); %>
                     </tr>
@@ -44,13 +44,13 @@
                       <tr>
                         <td class="rate-bf-label"><%= bf.label %></td>
                         <% dayRanges.forEach(function(dr) { %>
-                          <% bedTypes.forEach(function(bt) { %>
+                          <% roomTypes.forEach(function(rt) { %>
                             <td class="rate-cell">
                               <input type="number" min="0" step="1" inputmode="numeric"
                                 class="rate-input"
                                 data-cat="<%= cat.key %>"
                                 data-day="<%= dr.key %>"
-                                data-bed="<%= bt.key %>"
+                                data-rt="<%= rt.id %>"
                                 data-bf="<%= bf.key %>"
                                 value="">
                             </td>
@@ -292,7 +292,7 @@
     const inputs = Array.from(grid.querySelectorAll('.rate-input'));
 
     function keyOf(el) {
-      return [el.dataset.cat, el.dataset.day, el.dataset.bed, el.dataset.bf].join('|');
+      return [el.dataset.cat, el.dataset.day, el.dataset.rt, el.dataset.bf].join('|');
     }
 
     function refreshDirty() {
@@ -309,7 +309,7 @@
 
     function fill(rates) {
       inputs.forEach((el) => {
-        const v = rates?.[el.dataset.cat]?.[el.dataset.day]?.[el.dataset.bed]?.[el.dataset.bf];
+        const v = rates?.[el.dataset.cat]?.[el.dataset.day]?.[el.dataset.rt]?.[el.dataset.bf];
         const val = (v === undefined || v === null) ? '' : String(Math.round(Number(v)));
         el.value = val;
         el.dataset.original = val;
@@ -343,7 +343,7 @@
         .map((el) => ({
           category: el.dataset.cat,
           dayRange: el.dataset.day,
-          bedType: el.dataset.bed,
+          roomTypeId: Number(el.dataset.rt),
           breakfast: el.dataset.bf,
           amount: Number(el.value)
         }))

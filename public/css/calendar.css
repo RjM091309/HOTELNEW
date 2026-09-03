@@ -1922,6 +1922,36 @@
   cursor: default !important;
 }
 
+/* ----------------------------------------------------------------------------
+   Floor (3 / 4 / 5) grouping rows: black out the timeline body so the
+   day-column grid / alignment bars don't bleed through on the label row.
+   .fc-floor-lane is added in resourceLaneDidMount (calendar_data.js).
+---------------------------------------------------------------------------- */
+#calendar td.fc-timeline-lane.fc-floor-lane,
+#calendar td.fc-timeline-lane.fc-floor-lane .fc-timeline-lane-bg,
+#calendar td.fc-timeline-lane.fc-floor-lane .fc-timeline-bg-harness,
+#calendar td.fc-timeline-lane.fc-floor-lane .fc-timeline-slots,
+#calendar td.fc-timeline-lane.fc-floor-lane .fc-timeline-slot,
+#calendar td.fc-timeline-lane.fc-floor-lane .fc-timeline-slot-lane,
+#calendar td.fc-timeline-lane.fc-floor-lane .fc-non-business {
+  background: #000 !important;
+  background-color: #000 !important;
+  border-color: #000 !important;
+}
+
+#calendar td.fc-timeline-lane.fc-floor-lane::before,
+#calendar td.fc-timeline-lane.fc-floor-lane::after {
+  background: #000 !important;
+  border-color: #000 !important;
+}
+
+/* Match the left-hand "Floor N" label cell */
+#calendar .fc-datagrid-cell[data-is-floor],
+#calendar .fc-datagrid-cell[data-is-floor] .fc-datagrid-cell-frame {
+  background: #000 !important;
+  background-color: #000 !important;
+}
+
 #calendar .fc-datagrid-cell[data-is-floor].group-create-armed,
 #calendar .fc-datagrid-cell[data-is-floor].group-select-armed {
   background-color: transparent !important;

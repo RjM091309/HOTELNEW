@@ -7,6 +7,12 @@ const DAY_RANGES = [
   { key: 'weekend', label: 'Friday - Sunday' }
 ];
 
+// room_rates is now keyed by ROOM_TYPE_ID (FK -> room_type.IDNo). These slugs
+// only describe the printed rate sheet's two columns; the startup migration maps
+// each slug to the matching room_type row (by name) when seeding.
+const BED_SLUGS = ['king', 'queen'];
+
+// Kept for backward compatibility with older callers.
 const BED_TYPES = [
   { key: 'king', label: 'King' },
   { key: 'queen', label: 'Queen' }
@@ -62,26 +68,35 @@ const DAY_RANGE_KEYS = new Set(DAY_RANGES.map((d) => d.key));
 const BED_TYPE_KEYS = new Set(BED_TYPES.map((b) => b.key));
 const BREAKFAST_KEYS = new Set(BREAKFAST_OPTIONS.map((b) => b.key));
 
-function isValidCell(category, dayRange, bedType, breakfast) {
+// Validate the three fixed axes. Room type is validated against the DB, not here.
+function isValidAxes(category, dayRange, breakfast) {
   return CATEGORY_KEYS.has(category)
     && DAY_RANGE_KEYS.has(dayRange)
-    && BED_TYPE_KEYS.has(bedType)
     && BREAKFAST_KEYS.has(breakfast);
 }
 
-// Flatten SEED into [{category, dayRange, bedType, breakfast, amount}]
+// Backward-compatible: old signature (category, dayRange, bedType, breakfast).
+function isValidCell(category, dayRange, bedTypeOrBreakfast, breakfast) {
+  if (arguments.length >= 4) {
+    return isValidAxes(category, dayRange, breakfast) && BED_TYPE_KEYS.has(bedTypeOrBreakfast);
+  }
+  return isValidAxes(category, dayRange, bedTypeOrBreakfast);
+}
+
+// Flatten SEED into [{category, dayRange, bedSlug, breakfast, amount}]. The
+// migration maps bedSlug -> ROOM_TYPE_ID when it seeds room_rates.
 function seedRows() {
   const rows = [];
   for (const { key: category } of CATEGORIES) {
     for (const { key: dayRange } of DAY_RANGES) {
-      for (const { key: bedType } of BED_TYPES) {
+      for (const bedSlug of BED_SLUGS) {
         for (const { key: breakfast } of BREAKFAST_OPTIONS) {
           rows.push({
             category,
             dayRange,
-            bedType,
+            bedSlug,
             breakfast,
-            amount: SEED[category][dayRange][bedType][breakfast]
+            amount: SEED[category][dayRange][bedSlug][breakfast]
           });
         }
       }
@@ -93,9 +108,11 @@ function seedRows() {
 module.exports = {
   DAY_RANGES,
   BED_TYPES,
+  BED_SLUGS,
   BREAKFAST_OPTIONS,
   CATEGORIES,
   SEED,
+  isValidAxes,
   isValidCell,
   seedRows
 };

@@ -59,7 +59,7 @@ class BookingModel {
             COALESCE(a.NAME, 'N/A') AS AGENCY_NAME,
             b.ROOM_ID,
             r.ROOM_NUMBER,
-            IFNULL(r.ROOM_PRICE, rt.BASE_PRICE) AS ROOM_RATE,
+            NULL AS ROOM_RATE,
             rt.NAME         AS ROOM_TYPE,
             b.CHECK_IN_DATE,
             b.CHECK_OUT_DATE,
@@ -4222,29 +4222,20 @@ class BookingModel {
   static async getRoomDetails(roomId) {
     try {
       const query = `
-        SELECT 
-          room.ROOM_NUMBER, 
-          room.ROOM_VIEW, 
-          room_type.NAME AS ROOM_TYPE, 
-          room.ROOM_PRICE, 
-          room.ROOM_MAX, 
-          room.ROOM_BED, 
-          GROUP_CONCAT(DISTINCT amenity.NAME SEPARATOR ', ') AS AMENITIES,
-          rsp.SEASON_ID,
-          s.NAME AS SEASON_NAME,
-          s.START_DATE,
-          s.END_DATE,
-          rsp.ROOM_BED AS BED_COUNT,
-          rsp.BOOKING_TYPE,
-      rsp.PRICE AS SEASONAL_PRICE
-        FROM room 
-        JOIN room_type ON room.ROOM_TYPE_ID = room_type.IDNo 
-        LEFT JOIN room_amenities ON room.IDNo = room_amenities.ROOM_ID 
-        LEFT JOIN amenity ON room_amenities.AMENITY_ID = amenity.IDNo 
-        LEFT JOIN room_season_price rsp ON rsp.ROOM_ID = room.IDNo 
-        LEFT JOIN season s ON s.IDNo = rsp.SEASON_ID
+        SELECT
+          room.ROOM_NUMBER,
+          room.ROOM_VIEW,
+          room.ROOM_TYPE_ID,
+          room_type.NAME AS ROOM_TYPE,
+          room.ROOM_MAX,
+          room.ROOM_BED,
+          GROUP_CONCAT(DISTINCT amenity.NAME SEPARATOR ', ') AS AMENITIES
+        FROM room
+        JOIN room_type ON room.ROOM_TYPE_ID = room_type.IDNo
+        LEFT JOIN room_amenities ON room.IDNo = room_amenities.ROOM_ID
+        LEFT JOIN amenity ON room_amenities.AMENITY_ID = amenity.IDNo
         WHERE room.IDNo = ?
-        GROUP BY room.ROOM_NUMBER, rsp.SEASON_ID, rsp.BOOKING_TYPE, rsp.ROOM_BED
+        GROUP BY room.ROOM_NUMBER
       `;
 
       const results = await queryDatabasePromise(query, [roomId]);
@@ -4253,28 +4244,29 @@ class BookingModel {
         return null;
       }
 
-      // Extract static room info from the first row
       const base = results[0];
-      const seasonalPrices = results.map(row => ({
-        seasonId: row.SEASON_ID,
-        seasonName: row.SEASON_NAME,
-        bedCount: row.BED_COUNT,
-        bookingType: row.BOOKING_TYPE,
-        price: row.SEASONAL_PRICE,
-        startDate: row.START_DATE,
-        endDate: row.END_DATE
-      }));
 
       const roomDetails = {
         ROOM_NUMBER: base.ROOM_NUMBER,
         ROOM_VIEW: base.ROOM_VIEW,
+        ROOM_TYPE_ID: base.ROOM_TYPE_ID,
         ROOM_TYPE: base.ROOM_TYPE,
-        ROOM_PRICE: base.ROOM_PRICE,
         ROOM_MAX: base.ROOM_MAX,
         ROOM_BED: base.ROOM_BED,
         AMENITIES: base.AMENITIES,
-        SEASONAL_PRICES: seasonalPrices
+        SEASONAL_PRICES: [] // deprecated - pricing now uses ROOM_RATES
       };
+
+      // Pricing source: room_rates, keyed by the FK room_rates.ROOM_TYPE_ID ->
+      // room_type.IDNo (same room type the room points to).
+      try {
+        const RoomRatesModel = require('./roomRatesModel');
+        const slice = await RoomRatesModel.getRatesForRoomType(base.ROOM_TYPE_ID);
+        roomDetails.ROOM_RATES = slice.rates;               // [category][dayRange][breakfast] = amount
+      } catch (e) {
+        console.error('getRoomDetails: room_rates lookup failed:', e.message);
+        roomDetails.ROOM_RATES = {};
+      }
 
       return roomDetails;
 
@@ -7073,7 +7065,7 @@ class BookingModel {
           b.ROOM_ID,
           r.ROOM_NUMBER,
           r.ROOM_FLOOR,
-          IFNULL(r.ROOM_PRICE, rt.BASE_PRICE) AS ROOM_RATE,
+          NULL AS ROOM_RATE,
           rt.NAME AS ROOM_TYPE,
           b.CHECK_IN_DATE,
           b.CHECK_OUT_DATE,
@@ -7115,7 +7107,7 @@ class BookingModel {
           r.ROOM_NUMBER,
           r.ROOM_FLOOR,
           rt.NAME AS ROOM_TYPE,
-          IFNULL(r.ROOM_PRICE, rt.BASE_PRICE) AS ROOM_RATE,
+          NULL AS ROOM_RATE,
           r.ROOM_MAX,
           r.ROOM_BED,
           r.ROOM_SIZE,
@@ -9788,7 +9780,7 @@ class BookingModel {
           r.ROOM_MAX,
           r.ROOM_VIEW,
           rt.NAME as ROOM_TYPE,
-          r.ROOM_PRICE
+          NULL AS ROOM_PRICE
         FROM room r
         LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
         WHERE r.ROOM_FLOOR = ?
@@ -9842,7 +9834,7 @@ class BookingModel {
   static async _findAvailableRoomsForRange(connection, { formattedStartDate, formattedEndDate, floorNumber, checkInStatus, checkOutStatus }) {
     const roomsQuery = `
       SELECT r.IDNo, r.ROOM_NUMBER, r.ROOM_FLOOR, r.ROOM_BED, r.ROOM_VIEW,
-             COALESCE(r.ROOM_PRICE, rt.BASE_PRICE) AS FINAL_PRICE,
+             NULL AS FINAL_PRICE,
              r.ROOM_TYPE_ID,
              (
                SELECT CASE
@@ -10177,6 +10169,23 @@ class BookingModel {
 
       filteredRooms.sort((a, b) => parseInt(a.ROOM_NUMBER, 10) - parseInt(b.ROOM_NUMBER, 10));
 
+      // Attach the room_rates matrix per room, resolved through the standard FK
+      // room.ROOM_TYPE_ID -> room_type.IDNo. Cache one slice per room type.
+      try {
+        const RoomRatesModel = require('./roomRatesModel');
+        const rateSliceCache = {};
+        for (const room of filteredRooms) {
+          const key = String(room.ROOM_TYPE_ID || '0');
+          if (!(key in rateSliceCache)) {
+            const slice = await RoomRatesModel.getRatesForRoomType(room.ROOM_TYPE_ID);
+            rateSliceCache[key] = (slice && slice.rates) ? slice.rates : {};
+          }
+          room.ROOM_RATES = rateSliceCache[key];
+        }
+      } catch (e) {
+        console.warn('findConsecutiveRooms: could not attach ROOM_RATES:', e.message);
+      }
+
       if (neededRooms > filteredRooms.length) {
         return {
           success: false,
@@ -10246,7 +10255,7 @@ class BookingModel {
 
       const roomsQuery = `
         SELECT r.IDNo, r.ROOM_NUMBER, r.ROOM_FLOOR, r.ROOM_BED, r.ROOM_VIEW,
-               COALESCE(r.ROOM_PRICE, rt.BASE_PRICE) AS ROOM_PRICE,
+               NULL AS ROOM_PRICE,
                r.ROOM_TYPE_ID,
                EXISTS (
                  SELECT 1 FROM booking b
@@ -10305,7 +10314,7 @@ class BookingModel {
         ROOM_FLOOR: room.ROOM_FLOOR,
         ROOM_BED: room.ROOM_BED,
         ROOM_VIEW: room.ROOM_VIEW,
-        ROOM_PRICE: room.ROOM_PRICE,
+        ROOM_PRICE: null,
         SEASONAL_PRICES: seasonalPricesMap[room.IDNo] || [],
         isAvailable: !room.HAS_CONFLICT
       }));
@@ -10336,7 +10345,7 @@ class BookingModel {
 
       const roomsQuery = `
         SELECT r.IDNo, r.ROOM_NUMBER, r.ROOM_FLOOR, r.ROOM_BED, r.ROOM_VIEW,
-               COALESCE(r.ROOM_PRICE, rt.BASE_PRICE) AS FINAL_PRICE,
+               NULL AS FINAL_PRICE,
                r.ROOM_TYPE_ID,
                (
                  SELECT b.GROUP_BOOKING_ID
@@ -10602,6 +10611,23 @@ class BookingModel {
       };
 
       filteredRooms.sort((a, b) => parseInt(a.ROOM_NUMBER, 10) - parseInt(b.ROOM_NUMBER, 10));
+
+      // Attach the room_rates matrix per room, resolved through the standard FK
+      // room.ROOM_TYPE_ID -> room_type.IDNo. Cache one slice per room type.
+      try {
+        const RoomRatesModel = require('./roomRatesModel');
+        const rateSliceCache = {};
+        for (const room of filteredRooms) {
+          const key = String(room.ROOM_TYPE_ID || '0');
+          if (!(key in rateSliceCache)) {
+            const slice = await RoomRatesModel.getRatesForRoomType(room.ROOM_TYPE_ID);
+            rateSliceCache[key] = (slice && slice.rates) ? slice.rates : {};
+          }
+          room.ROOM_RATES = rateSliceCache[key];
+        }
+      } catch (e) {
+        console.warn('findConsecutiveRooms: could not attach ROOM_RATES:', e.message);
+      }
 
       if (neededRooms > filteredRooms.length) {
         return {

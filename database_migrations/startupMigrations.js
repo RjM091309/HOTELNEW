@@ -378,34 +378,232 @@ async function runActivityLogMigrations() {
 async function runRoomRatesMigrations() {
   const { seedRows } = require('../config/roomRates');
 
+  // Fresh installs get the final shape directly: keyed by ROOM_TYPE_ID
+  // (FK -> room_type.IDNo), no BED_TYPE column.
   await queryDatabasePromise(`
     CREATE TABLE IF NOT EXISTS room_rates (
       IDNo INT NOT NULL AUTO_INCREMENT,
       CATEGORY VARCHAR(40) NOT NULL,
       DAY_RANGE VARCHAR(10) NOT NULL,
-      BED_TYPE VARCHAR(10) NOT NULL,
+      ROOM_TYPE_ID INT NULL DEFAULT NULL,
       BREAKFAST VARCHAR(10) NOT NULL,
       AMOUNT DECIMAL(12,2) NOT NULL DEFAULT 0,
       UPDATED_BY INT NULL DEFAULT NULL,
       UPDATED_DT DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       PRIMARY KEY (IDNo),
-      UNIQUE KEY uq_room_rate (CATEGORY, DAY_RANGE, BED_TYPE, BREAKFAST)
+      UNIQUE KEY uq_room_rate (CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
 
-  // Seed any missing cells from the printed rate sheet (safe to re-run: only
-  // inserts rows that don't exist yet, never overwrites edited amounts).
-  const rows = seedRows();
-  const values = rows.map(() => '(?, ?, ?, ?, ?)').join(', ');
-  const params = [];
-  rows.forEach((r) => params.push(r.category, r.dayRange, r.bedType, r.breakfast, r.amount));
+  // Legacy per-type base price is unused; relax it so room-type INSERTs that
+  // omit it don't fail.
+  try {
+    if (await tableExists('room_type') && await columnExists('room_type', 'BASE_PRICE')) {
+      const [col] = await queryDatabasePromise(
+        `SHOW COLUMNS FROM room_type WHERE Field = 'BASE_PRICE'`
+      );
+      if (col && String(col.Null).toUpperCase() === 'NO') {
+        await queryDatabasePromise(
+          `ALTER TABLE room_type MODIFY BASE_PRICE DECIMAL(10,2) NULL DEFAULT NULL`
+        );
+        console.log('✅ room_type.BASE_PRICE relaxed to NULL DEFAULT NULL (legacy, unused)');
+      }
+    }
+  } catch (e) {
+    console.warn('⚠️ Could not relax room_type.BASE_PRICE:', e.message);
+  }
 
-  await queryDatabasePromise(
-    `INSERT IGNORE INTO room_rates (CATEGORY, DAY_RANGE, BED_TYPE, BREAKFAST, AMOUNT)
-     VALUES ${values}`,
-    params
-  );
-  console.log('✅ Ensured table + seed: room_rates');
+  // ---- Migrate an existing BED_TYPE-keyed table to ROOM_TYPE_ID-keyed ----
+  if (!(await columnExists('room_rates', 'ROOM_TYPE_ID'))) {
+    await ensureColumn('room_rates', 'ROOM_TYPE_ID', 'ROOM_TYPE_ID INT NULL DEFAULT NULL', 'DAY_RANGE');
+  }
+  const hasBedType = await columnExists('room_rates', 'BED_TYPE');
+
+  // Resolve which room_type is king / queen (match by name, fall back to the
+  // ROOM_BED its rooms carry).
+  let kingTypeId = null;
+  let queenTypeId = null;
+  if (await tableExists('room_type')) {
+    const rt = await queryDatabasePromise(`SELECT IDNo, NAME FROM room_type WHERE ACTIVE = 1 ORDER BY IDNo`);
+    for (const t of rt) {
+      const n = String(t.NAME || '').toLowerCase();
+      if (n.includes('queen') && queenTypeId == null) queenTypeId = t.IDNo;
+      else if (n.includes('king') && kingTypeId == null) kingTypeId = t.IDNo;
+    }
+    if ((kingTypeId == null || queenTypeId == null)
+        && await tableExists('room') && await columnExists('room', 'ROOM_BED')) {
+      const byBed = await queryDatabasePromise(
+        `SELECT ROOM_TYPE_ID,
+                IF(SUM(ROOM_BED = 2) >= SUM(ROOM_BED = 1), 'queen', 'king') AS bt
+           FROM room WHERE ACTIVE = 1 GROUP BY ROOM_TYPE_ID`
+      );
+      for (const b of byBed) {
+        if (b.bt === 'queen' && queenTypeId == null) queenTypeId = b.ROOM_TYPE_ID;
+        if (b.bt === 'king' && kingTypeId == null) kingTypeId = b.ROOM_TYPE_ID;
+      }
+    }
+  }
+  const slugToType = { king: kingTypeId, queen: queenTypeId };
+
+  // Backfill ROOM_TYPE_ID from the old BED_TYPE values.
+  if (hasBedType) {
+    if (kingTypeId != null) {
+      await queryDatabasePromise(
+        `UPDATE room_rates SET ROOM_TYPE_ID = ? WHERE ROOM_TYPE_ID IS NULL AND BED_TYPE = 'king'`,
+        [kingTypeId]
+      );
+    }
+    if (queenTypeId != null) {
+      await queryDatabasePromise(
+        `UPDATE room_rates SET ROOM_TYPE_ID = ? WHERE ROOM_TYPE_ID IS NULL AND BED_TYPE = 'queen'`,
+        [queenTypeId]
+      );
+    }
+    // Drop rows that can't be mapped (blank / unknown BED_TYPE with no type) -
+    // they are unusable once the table is keyed by ROOM_TYPE_ID.
+    const junk = await queryDatabasePromise(
+      `DELETE FROM room_rates
+        WHERE ROOM_TYPE_ID IS NULL
+          AND (BED_TYPE IS NULL OR BED_TYPE = '' OR BED_TYPE NOT IN ('king', 'queen'))`
+    );
+    if (junk.affectedRows) {
+      console.log(`✅ Removed ${junk.affectedRows} unmappable room_rates row(s)`);
+    }
+  }
+
+  // Seed missing cells from the printed rate sheet (INSERT IGNORE - never
+  // overwrites edited amounts). Skipped for a slug with no matching room type.
+  const seed = seedRows().filter((r) => slugToType[r.bedSlug] != null);
+  if (seed.length) {
+    const values = seed.map(() => '(?, ?, ?, ?, ?)').join(', ');
+    const params = [];
+    seed.forEach((r) => params.push(r.category, r.dayRange, slugToType[r.bedSlug], r.breakfast, r.amount));
+    await queryDatabasePromise(
+      `INSERT IGNORE INTO room_rates (CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST, AMOUNT)
+       VALUES ${values}`,
+      params
+    );
+  }
+  console.log('✅ Ensured table + seed: room_rates (keyed by ROOM_TYPE_ID)');
+
+  // Swap the unique key to include ROOM_TYPE_ID instead of BED_TYPE.
+  try {
+    if (await indexExists('room_rates', 'uq_room_rate')) {
+      const idxCols = await queryDatabasePromise(
+        `SELECT COLUMN_NAME FROM information_schema.STATISTICS
+          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'room_rates' AND INDEX_NAME = 'uq_room_rate'`
+      );
+      if (idxCols.map((c) => c.COLUMN_NAME).includes('BED_TYPE')) {
+        await queryDatabasePromise(`ALTER TABLE room_rates DROP INDEX uq_room_rate`);
+        await queryDatabasePromise(
+          `ALTER TABLE room_rates ADD UNIQUE KEY uq_room_rate (CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST)`
+        );
+        console.log('✅ room_rates unique key -> (CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST)');
+      }
+    } else {
+      await queryDatabasePromise(
+        `ALTER TABLE room_rates ADD UNIQUE KEY uq_room_rate (CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST)`
+      );
+    }
+  } catch (e) {
+    console.warn('⚠️ room_rates unique key swap:', e.message);
+  }
+
+  // FK room_rates.ROOM_TYPE_ID -> room_type.IDNo.
+  try {
+    const [fk] = await queryDatabasePromise(
+      `SELECT COUNT(*) AS c FROM information_schema.KEY_COLUMN_USAGE
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'room_rates'
+          AND COLUMN_NAME = 'ROOM_TYPE_ID' AND REFERENCED_TABLE_NAME = 'room_type'`
+    );
+    if ((!fk || !fk.c) && await tableExists('room_type')) {
+      const [orphan] = await queryDatabasePromise(
+        `SELECT COUNT(*) AS c FROM room_rates rr
+           LEFT JOIN room_type rt ON rt.IDNo = rr.ROOM_TYPE_ID
+          WHERE rr.ROOM_TYPE_ID IS NOT NULL AND rt.IDNo IS NULL`
+      );
+      if (orphan && orphan.c > 0) {
+        console.warn(`⚠️ ${orphan.c} room_rates row(s) point at a missing room type - skipping FK`);
+      } else {
+        await queryDatabasePromise(
+          `ALTER TABLE room_rates ADD CONSTRAINT fk_room_rates_room_type
+             FOREIGN KEY (ROOM_TYPE_ID) REFERENCES room_type (IDNo)
+             ON UPDATE CASCADE ON DELETE RESTRICT`
+        );
+        console.log('✅ Added FK room_rates.ROOM_TYPE_ID -> room_type.IDNo (fk_room_rates_room_type)');
+      }
+    }
+  } catch (e) {
+    console.warn('⚠️ room_rates FK:', e.message);
+  }
+
+  // Drop the now-unused BED_TYPE columns once every row is migrated.
+  try {
+    if (await columnExists('room_rates', 'BED_TYPE')) {
+      const [nulls] = await queryDatabasePromise(
+        `SELECT COUNT(*) AS c FROM room_rates WHERE ROOM_TYPE_ID IS NULL`
+      );
+      if (nulls && nulls.c > 0) {
+        console.warn(`⚠️ ${nulls.c} room_rates row(s) still have NULL ROOM_TYPE_ID - keeping BED_TYPE`);
+      } else {
+        await queryDatabasePromise(`ALTER TABLE room_rates DROP COLUMN BED_TYPE`);
+        console.log('✅ Dropped room_rates.BED_TYPE');
+      }
+    }
+    if (await tableExists('room_type') && await columnExists('room_type', 'BED_TYPE')) {
+      await queryDatabasePromise(`ALTER TABLE room_type DROP COLUMN BED_TYPE`);
+      console.log('✅ Dropped room_type.BED_TYPE');
+    }
+  } catch (e) {
+    console.warn('⚠️ dropping BED_TYPE columns:', e.message);
+  }
+}
+
+// room.ROOM_TYPE_ID has always been a plain int with no constraint. Every row
+// already points at a valid room_type (verified: 0 orphans, 0 NULLs), so add the
+// missing FK so a room can never reference a deleted/typo'd room type. Room-type
+// deletes are soft (ACTIVE = 0), so ON DELETE RESTRICT is safe and just blocks a
+// hard delete of a type still in use.
+async function runRoomTypeFkMigration() {
+  if (!(await tableExists('room')) || !(await tableExists('room_type'))) {
+    console.warn('⚠️ room / room_type table not found, skipping room->room_type FK migration');
+    return;
+  }
+
+  try {
+    const [existing] = await queryDatabasePromise(
+      `SELECT COUNT(*) AS c
+         FROM information_schema.KEY_COLUMN_USAGE
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'room'
+          AND COLUMN_NAME = 'ROOM_TYPE_ID'
+          AND REFERENCED_TABLE_NAME = 'room_type'`
+    );
+    if (existing && existing.c > 0) {
+      return; // FK already in place
+    }
+
+    const [orphan] = await queryDatabasePromise(
+      `SELECT COUNT(*) AS c
+         FROM room r
+         LEFT JOIN room_type rt ON rt.IDNo = r.ROOM_TYPE_ID
+        WHERE r.ROOM_TYPE_ID IS NULL OR rt.IDNo IS NULL`
+    );
+    if (orphan && orphan.c > 0) {
+      console.warn(`⚠️ ${orphan.c} room row(s) have an invalid ROOM_TYPE_ID - skipping room->room_type FK (fix the data first)`);
+      return;
+    }
+
+    await queryDatabasePromise(
+      `ALTER TABLE room
+         ADD CONSTRAINT fk_room_room_type
+         FOREIGN KEY (ROOM_TYPE_ID) REFERENCES room_type (IDNo)
+         ON UPDATE CASCADE ON DELETE RESTRICT`
+    );
+    console.log('✅ Added FK room.ROOM_TYPE_ID -> room_type.IDNo (fk_room_room_type)');
+  } catch (e) {
+    console.warn('⚠️ Could not add room->room_type FK:', e.message);
+  }
 }
 
 async function runCustomerNationalityMigration() {
@@ -485,6 +683,7 @@ async function runStartupMigrations() {
   await runCustomerNationalityMigration();
   await runBookingActualTimesMigration();
   await runRoomRatesMigrations();
+  await runRoomTypeFkMigration();
   await runFlightScheduleMigrations();
   await runPickupDropMigrations();
   await runReceiptMigrations();

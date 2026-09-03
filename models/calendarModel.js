@@ -68,7 +68,7 @@ class CalendarModel {
           r.ROOM_NUMBER, 
           r.ROOM_FLOOR, 
           rt.NAME AS ROOM_TYPE, 
-          IFNULL(r.ROOM_PRICE, rt.BASE_PRICE) AS ROOM_RATE, 
+          NULL AS ROOM_RATE, 
           r.ROOM_MAX, 
           r.ROOM_BED, 
           r.ROOM_VIEW,
@@ -709,7 +709,7 @@ class CalendarModel {
           r.ROOM_NUMBER,
           r.ROOM_FLOOR,
           rt.NAME AS ROOM_TYPE,
-          IFNULL(r.ROOM_PRICE, rt.BASE_PRICE) AS ROOM_RATE,
+          NULL AS ROOM_RATE,
           r.ROOM_STATUS,
           r.ROOM_MAINTENANCE_STATUS
         FROM room r
@@ -775,10 +775,10 @@ class CalendarModel {
           r.ROOM_VIEW,
           r.ROOM_BED,
           r.ROOM_MAX,
-          r.ROOM_PRICE,
+          NULL AS ROOM_PRICE,
           r.AMENITIES,
           rt.NAME AS ROOM_TYPE_NAME,
-          rt.BASE_PRICE,
+          NULL AS BASE_PRICE,
           rt.SEASONAL_PRICES
         FROM room r
         LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo

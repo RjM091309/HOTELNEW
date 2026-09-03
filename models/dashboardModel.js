@@ -88,7 +88,7 @@ class DashboardModel {
           b.ROOM_ID,
           r.ROOM_NUMBER,
           r.ROOM_FLOOR,
-          IFNULL(r.ROOM_PRICE, rt.BASE_PRICE) AS RoomRate,
+          NULL AS RoomRate,
           rt.NAME AS RoomType,
           b.CHECK_IN_DATE,
           b.CHECK_OUT_DATE,
@@ -184,7 +184,7 @@ class DashboardModel {
           b.ROOM_ID,
           r.ROOM_NUMBER,
           r.ROOM_FLOOR,
-          IFNULL(r.ROOM_PRICE, rt.BASE_PRICE) AS RoomRate,
+          NULL AS RoomRate,
           rt.NAME AS RoomType,
           b.CHECK_IN_DATE,
           b.CHECK_OUT_DATE,
@@ -325,7 +325,7 @@ class DashboardModel {
           b.ROOM_ID,
           r.ROOM_NUMBER,
           r.ROOM_FLOOR,
-          IFNULL(r.ROOM_PRICE, rt.BASE_PRICE) AS RoomRate,
+          NULL AS RoomRate,
           rt.NAME AS RoomType,
           b.CHECK_IN_DATE,
           b.CHECK_OUT_DATE,
@@ -420,7 +420,7 @@ class DashboardModel {
           b.ROOM_ID,
           r.ROOM_NUMBER,
           r.ROOM_FLOOR,
-          IFNULL(r.ROOM_PRICE, rt.BASE_PRICE) AS RoomRate,
+          NULL AS RoomRate,
           rt.NAME AS RoomType,
           b.CHECK_IN_DATE,
           b.CHECK_OUT_DATE,
@@ -510,7 +510,7 @@ class DashboardModel {
           b.ROOM_ID,
           r.ROOM_NUMBER,
           r.ROOM_FLOOR,
-          IFNULL(r.ROOM_PRICE, rt.BASE_PRICE) AS RoomRate,
+          NULL AS RoomRate,
           rt.NAME AS RoomType,
           b.CHECK_IN_DATE,
           b.CHECK_OUT_DATE,
@@ -710,7 +710,7 @@ class DashboardModel {
             R.ROOM_BED, 
             R.ROOM_SIZE, 
             R.ROOM_FLOOR,
-            IFNULL(R.ROOM_PRICE, RT.BASE_PRICE) AS FINAL_PRICE,
+            NULL AS FINAL_PRICE,
             GROUP_CONCAT(A.NAME SEPARATOR ', ') AS AMENITIES
           FROM 
             room R 
@@ -734,7 +734,7 @@ class DashboardModel {
             R.ROOM_BED, 
             R.ROOM_SIZE, 
             R.ROOM_FLOOR,
-            IFNULL(R.ROOM_PRICE, RT.BASE_PRICE) AS FINAL_PRICE,
+            NULL AS FINAL_PRICE,
             GROUP_CONCAT(A.NAME SEPARATOR ', ') AS AMENITIES
           FROM 
             room R 
@@ -759,7 +759,7 @@ class DashboardModel {
             R.ROOM_BED, 
             R.ROOM_SIZE, 
             R.ROOM_FLOOR,
-            IFNULL(R.ROOM_PRICE, RT.BASE_PRICE) AS FINAL_PRICE,
+            NULL AS FINAL_PRICE,
             GROUP_CONCAT(A.NAME SEPARATOR ', ') AS AMENITIES
           FROM 
             room R 
@@ -791,7 +791,7 @@ class DashboardModel {
             r.DND_DEVICE_ID AS DndID,
             r.HSENSOR_DEVICE_ID AS SensorID,
             r.CHOLDER_DEVICE_ID AS CholderID,
-            IFNULL(r.ROOM_PRICE, rt.BASE_PRICE) AS RoomRate,
+            NULL AS RoomRate,
             rt.NAME AS RoomType,
             b.CHECK_IN_DATE,
             b.CHECK_OUT_DATE,
@@ -877,7 +877,7 @@ class DashboardModel {
             r.CLEAN_UP_DEVICE_ID AS DeviceID, 
             r.HSENSOR_DEVICE_ID AS SensorID,
             r.CHOLDER_DEVICE_ID AS CholderID,
-            IFNULL(r.ROOM_PRICE, rt.BASE_PRICE) AS RoomRate,
+            NULL AS RoomRate,
             rt.NAME AS RoomType,
             b.CHECK_IN_DATE,
             b.CHECK_OUT_DATE,
@@ -1797,7 +1797,7 @@ class DashboardModel {
           r.ROOM_MAX,
           r.ROOM_TYPE_ID,
           rt.NAME AS ROOM_TYPE,
-          IFNULL(r.ROOM_PRICE, rt.BASE_PRICE) AS ROOM_RATE,
+          NULL AS ROOM_RATE,
           CASE
             WHEN b.CHECK_OUT_DATE = ? THEN 1
             ELSE 0
@@ -2001,7 +2001,7 @@ class DashboardModel {
             r.ROOM_NUMBER,
             r.ROOM_FLOOR,
             rt.NAME AS ROOM_TYPE,
-            IFNULL(r.ROOM_PRICE, rt.BASE_PRICE) AS ROOM_RATE
+            NULL AS ROOM_RATE
           FROM room r
           LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
           WHERE r.ACTIVE = 1 
@@ -2144,7 +2144,7 @@ class DashboardModel {
             r.ROOM_NUMBER,
             r.ROOM_FLOOR,
             rt.NAME AS ROOM_TYPE,
-            IFNULL(r.ROOM_PRICE, rt.BASE_PRICE) AS ROOM_RATE
+            NULL AS ROOM_RATE
           FROM room r
           JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
           WHERE r.ACTIVE = 1 

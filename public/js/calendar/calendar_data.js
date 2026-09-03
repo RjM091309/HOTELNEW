@@ -3135,6 +3135,14 @@ const findHeader = setInterval(() => {
       }
     },
 
+    // Black out the timeline body of the Floor (3/4/5) grouping rows so the
+    // day-column grid lines don't show through on the label row.
+    resourceLaneClassNames: function(arg) {
+      return (arg.resource && arg.resource.extendedProps && arg.resource.extendedProps.isFloor)
+        ? ['fc-floor-lane']
+        : [];
+    },
+
     resources: [],
     events: []
   });
