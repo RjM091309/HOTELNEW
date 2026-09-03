@@ -1588,9 +1588,10 @@ class CalendarModel {
 
       // Update booking status to check-In and set IS_OCCUPIED = 1
       const updateBookingQuery = `
-        UPDATE booking 
+        UPDATE booking
         SET BOOKING_STATUS = 'check-In',
             IS_OCCUPIED = 1,
+            ACTUAL_CHECK_IN_DT = COALESCE(ACTUAL_CHECK_IN_DT, NOW()),
             EDITED_DT = NOW()
         WHERE IDNo = ? AND ACTIVE = 1
       `;

@@ -63,6 +63,8 @@ class BookingModel {
             rt.NAME         AS ROOM_TYPE,
             b.CHECK_IN_DATE,
             b.CHECK_OUT_DATE,
+            b.ACTUAL_CHECK_IN_DT,
+            b.ACTUAL_CHECK_OUT_DT,
             DATEDIFF(b.CHECK_OUT_DATE, b.CHECK_IN_DATE) AS TOTAL_DAYS,
             b.BOOKING_STATUS AS BookingStatus,
             b.GUESTS_COUNT,
@@ -649,7 +651,7 @@ class BookingModel {
         if (status === 'check-In') {
           updateBookingQuery = `
             UPDATE booking
-            SET BOOKING_STATUS = ?
+            SET BOOKING_STATUS = ?, ACTUAL_CHECK_IN_DT = COALESCE(ACTUAL_CHECK_IN_DT, NOW())
             WHERE IDNo = ? AND ACTIVE = 1;
           `;
           queryParams = [status, bookingID];
@@ -658,13 +660,13 @@ class BookingModel {
           if (lateCheckOut == 1) {
             updateBookingQuery = `
               UPDATE booking
-              SET BOOKING_STATUS = ?, CHECK_OUT_DATE = NOW()
+              SET BOOKING_STATUS = ?, CHECK_OUT_DATE = NOW(), ACTUAL_CHECK_OUT_DT = NOW()
               WHERE IDNo = ? AND ACTIVE = 1;
             `;
           } else {
             updateBookingQuery = `
               UPDATE booking
-              SET BOOKING_STATUS = ?
+              SET BOOKING_STATUS = ?, ACTUAL_CHECK_OUT_DT = NOW()
               WHERE IDNo = ? AND ACTIVE = 1;
             `;
           }
@@ -936,7 +938,7 @@ class BookingModel {
       // Update bookings: status and checkout timestamp
       const updateBookingSql = `
         UPDATE booking
-        SET BOOKING_STATUS = 'check-Out', CHECK_OUT_DATE = NOW()
+        SET BOOKING_STATUS = 'check-Out', CHECK_OUT_DATE = NOW(), ACTUAL_CHECK_OUT_DT = NOW()
         WHERE IDNo IN (?) AND ACTIVE = 1
       `;
       await new Promise((resolve, reject) => {
@@ -1245,6 +1247,8 @@ class BookingModel {
           rt.NAME AS ROOM_TYPE,
           b.CHECK_IN_DATE,
           b.CHECK_OUT_DATE,
+          b.ACTUAL_CHECK_IN_DT,
+          b.ACTUAL_CHECK_OUT_DT,
           b.BOOKING_STATUS,
           COALESCE(b.CHECK_IN_STATUS, 1) AS CHECK_IN_STATUS,
           COALESCE(b.LATE_CHECKOUT, 0) AS LATE_CHECKOUT,
@@ -1488,6 +1492,7 @@ class BookingModel {
       guestID,
       guestType,
       guestLevel,
+      nationality = null,
       breakfastAdultQty,
       breakfastAdultPrice,
       breakfastAdultId,
@@ -1558,27 +1563,37 @@ class BookingModel {
         }
 
         let customerId = guestID;
+        const processedNationality = (nationality && String(nationality).trim() !== '') ? String(nationality).trim() : null;
 
         // If no guestID, create new customer
         if (!customerId) {
           // Handle empty guestType and guestLevel - set to NULL if empty
           const processedGuestType = (guestType && guestType.trim() !== '') ? guestType : null;
           const processedGuestLevel = (guestLevel && guestLevel.trim() !== '') ? guestLevel : null;
-          
+
           const customerQuery = `
-            INSERT INTO customer (NAME, CONTACTNo, TYPE, LEVEL, ADDRESS, ENCODED_BY, ENCODED_DT, ACTIVE) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+            INSERT INTO customer (NAME, CONTACTNo, NATIONALITY, TYPE, LEVEL, ADDRESS, ENCODED_BY, ENCODED_DT, ACTIVE)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
           `;
-          const customerValues = [fullname, number, processedGuestType, processedGuestLevel, address, encodedBy, date];
-          
+          const customerValues = [fullname, number, processedNationality, processedGuestType, processedGuestLevel, address, encodedBy, date];
+
           const customerResult = await new Promise((resolve, reject) => {
             connection.query(customerQuery, customerValues, (err, result) => {
               if (err) reject(err);
               else resolve(result);
             });
           });
-          
+
           customerId = customerResult.insertId;
+        } else if (processedNationality) {
+          // Existing guest picked - keep their nationality up to date
+          await new Promise((resolve, reject) => {
+            connection.query(
+              'UPDATE customer SET NATIONALITY = ? WHERE IDNo = ?',
+              [processedNationality, customerId],
+              (err) => (err ? reject(err) : resolve())
+            );
+          });
         }
 
         // Create booking
@@ -4060,13 +4075,14 @@ class BookingModel {
   static async searchCustomer(searchQuery) {
     try {
       const query = `
-        SELECT 
-          customer.IDNo as CUSTOMER_ID, 
-          customer.NAME AS NAME, 
-          guest_level.TYPE AS LEVEL, 
-          guest_type.TYPE AS TYPE, 
-          customer.CONTACTNo AS CONTACT_NO 
-        FROM customer 
+        SELECT
+          customer.IDNo as CUSTOMER_ID,
+          customer.NAME AS NAME,
+          guest_level.TYPE AS LEVEL,
+          guest_type.TYPE AS TYPE,
+          customer.NATIONALITY AS NATIONALITY,
+          customer.CONTACTNo AS CONTACT_NO
+        FROM customer
         LEFT JOIN guest_level ON guest_level.IDNo = customer.LEVEL
         LEFT JOIN guest_type ON guest_type.IDNo = customer.TYPE
         WHERE customer.NAME LIKE ? 

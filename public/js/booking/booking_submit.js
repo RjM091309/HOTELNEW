@@ -74,8 +74,7 @@ $(document).ready(function () {
       const paymentStatus = $('#paymentStatus').val();
       const roomPrice = $('#baseprice').val();
       const qty = $('#diffindays').val();
-      const guestType = $('#guestType').val();
-      const guestLevel = $('#guestLevel').val();
+      const nationality = ($('#nationality').val() || '').trim();
       const txtGuestID = $('#guestID').val();
       const bookingRoute = $('#bookingRoute').val();
       const checkInStatus = $('#checkInStatus').val();
@@ -132,12 +131,17 @@ $(document).ready(function () {
         return;
       }
       
-      if (!roomId || !daterange || !fullname || !guestsCount || !paymentStatus || !roomPrice || !guestType || !guestLevel) {
+      if (!roomId || !daterange || !fullname || !guestsCount || !paymentStatus || !roomPrice) {
         Swal.fire({
           icon: 'error',
           title: 'Oops...',
           text: 'Please fill all the required fields for booking!',
         });
+        return;
+      }
+
+      if (!nationality) {
+        Swal.fire({ icon: 'error', title: 'Nationality Required', text: 'Please select the guest nationality.' });
         return;
       }
 
@@ -173,7 +177,7 @@ $(document).ready(function () {
         type: 'POST',
         data: {
           room_id: roomId, fullname, number, address, daterange, maxOccupants: guestsCount,
-          paidAmount, paymentStatus, price: roomPrice, diffindays: qty, guestType, guestLevel, guestID: txtGuestID,
+          paidAmount, paymentStatus, price: roomPrice, diffindays: qty, nationality, guestID: txtGuestID,
           bookingRoute, checkInStatus, checkOutStatus, holdPending, bookingRemarks, agencyID, agencyPayer, channelBookingId, voucherNo,
           breakfastAdultQty, breakfastAdultPrice, breakfastAdultId,
           breakfastKidQty, breakfastKidPrice, breakfastKidId,
@@ -351,8 +355,6 @@ $(document).ready(function () {
 
       if (reason === null) return;
 
-      const guestType = getSelectValueOrFirst($('#guestType'), 'Golf');
-      const guestLevel = getSelectValueOrFirst($('#guestLevel'), 'New Guest');
       const roomPrice = $('#baseprice').val() || '0';
       const qty = $('#diffindays').val() || '1';
       const maxOccupants = $('#maxOccupants').val() || '1';
@@ -370,8 +372,6 @@ $(document).ready(function () {
           paymentStatus: 'unpaid',
           price: roomPrice,
           diffindays: qty,
-          guestType,
-          guestLevel,
           bookingRoute: 'walk-in',
           checkInStatus: '1',
           checkOutStatus: '0',

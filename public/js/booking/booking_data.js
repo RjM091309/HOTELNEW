@@ -43,16 +43,31 @@ $(document).ready(function () {
                             timeZone: 'UTC' // Force UTC to avoid timezone shifts
                         }).format(date);
                     };
+                    // Actual check-in/out timestamps are real event times (server local),
+                    // so render them without the UTC override.
+                    const formatActualTime = (ts) => {
+                        if (!ts) return '';
+                        const d = new Date(String(ts).replace(' ', 'T'));
+                        if (isNaN(d.getTime())) return '';
+                        return new Intl.DateTimeFormat('en-US', {
+                            hour: 'numeric', minute: '2-digit', hour12: true
+                        }).format(d);
+                    };
+                    const withActualTime = (scheduledStr, actualTs) => {
+                        const base = formatDate(scheduledStr);
+                        const t = formatActualTime(actualTs);
+                        return t ? `${base} · ${t}` : base;
+                    };
                     const isCancelled = (item.BookingStatus || '').toLowerCase() === 'cancelled' || item.IS_CANCELLED === 1;
-                    
+
                     return {
                         BookingID: item.BookingID,
                         GroupBookingId: item.GROUP_BOOKING_ID,
                         CustomerName: item.NAME,
                         RoomID: item.ROOM_NUMBER,
                         CONFIRMATION: item.CONFIRMATION_NUMBER,
-                        Checkin: formatDate(item.CHECK_IN_DATE),
-                        Checkout: formatDate(item.CHECK_OUT_DATE), // Plain text like check-in
+                        Checkin: withActualTime(item.CHECK_IN_DATE, item.ACTUAL_CHECK_IN_DT),
+                        Checkout: withActualTime(item.CHECK_OUT_DATE, item.ACTUAL_CHECK_OUT_DT),
                         Totalcost: item.TOTAL_COST,
                         Balance: item.BALANCE || 0,
                         Paymentstatus: item.PAYMENT_STATUS || 'unpaid',
@@ -79,8 +94,8 @@ $(document).ready(function () {
             { targets: 2,  width: '120px' },                    // Guest Name
             { targets: 3,  width: '70px', className: 'text-center'  },                    // Room Number
             { targets: 4,  width: '80px', className: 'text-center' },                    // Confirmation Number
-            { targets: 5,  width: '80px', className: 'text-center' }, // Check In
-            { targets: 6,  width: '80px', className: 'text-center' }, // Check Out
+            { targets: 5,  width: '110px', className: 'text-center' }, // Check In
+            { targets: 6,  width: '110px', className: 'text-center' }, // Check Out
             { targets: 7,  width: '70px', className: 'text-end' },    // Total Payment
             { targets: 8,  width: '70px', className: 'text-end' },    // Balance
             { targets: 9,  width: '70px', className: 'text-center' },                    // Booking Channel

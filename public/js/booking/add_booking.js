@@ -819,9 +819,9 @@ function searchCustomer(query) {
         .then(data => {
             const resultsDiv = document.getElementById('searchResults');
             if (data.length > 0) {
-                resultsDiv.innerHTML = data.map(customer => 
-                 `<div style="color: #000; padding: 10px; cursor: pointer;" onclick="selectCustomer('${customer.NAME}', '${customer.LEVEL}', '${customer.CUSTOMER_ID}', '${customer.CONTACT_NO}', '${customer.TYPE}')">
-                        ${customer.NAME} (${customer.LEVEL})
+                resultsDiv.innerHTML = data.map(customer =>
+                 `<div style="color: #000; padding: 10px; cursor: pointer;" onclick="selectCustomer('${customer.NAME}', '${customer.LEVEL}', '${customer.CUSTOMER_ID}', '${customer.CONTACT_NO}', '${customer.TYPE}', '${(customer.NATIONALITY || '').replace(/'/g, "\\'")}')">
+                        ${customer.NAME}${customer.NATIONALITY ? ' - ' + customer.NATIONALITY : ''}
                     </div>`).join('');
                 resultsDiv.style.display = 'block';
             } else {
@@ -839,27 +839,13 @@ function hideSearchResults() {
 }
 
 // Function to select customer
-function selectCustomer(name, level, customerId, contactNo, guestType) {
+function selectCustomer(name, level, customerId, contactNo, guestType, nationality) {
     document.getElementById('txtFullNameAdd').value = name;
     document.getElementById('searchResults').style.display = 'none';
 
-    // Set the Guest Level dropdown value based on the level of the selected customer
-    const guestLevelDropdown = document.getElementById('guestLevel');
-    for (let i = 0; i < guestLevelDropdown.options.length; i++) {
-        if (guestLevelDropdown.options[i].text === level) {
-            guestLevelDropdown.selectedIndex = i; // Set the selected option
-            break;
-        }
-    }
-
-    // Update the Guest Type dropdown value based on the type of the selected customer
-    const guestTypeDropdown = document.getElementById('guestType');
-    for (let i = 0; i < guestTypeDropdown.options.length; i++) {
-        if (guestTypeDropdown.options[i].text === guestType) {
-            guestTypeDropdown.selectedIndex = i; // Set the selected option
-            break;
-        }
-    }
+    // Prefill nationality from the selected customer
+    const nationalityInput = document.getElementById('nationality');
+    if (nationalityInput) nationalityInput.value = nationality || '';
 
     // Set the Contact Number field
     if (window.ContactChannel) {
@@ -1109,10 +1095,10 @@ $(document).ready(function () {
             $('#groupBookingFields').slideDown(); // Show group booking fields
 
             // Hide individual room selection fields
-            $('#divaddFloor, #divaddroom, #divroom_type, #divprice, #divmaxOccupants, #divbedCount, #divtxtFullNameAdd, #divtxtNumber').hide();
-            $('#txtFullNameAdd, #txtNumber').prop('required', false); 
+            $('#divaddFloor, #divaddroom, #divroom_type, #divprice, #divmaxOccupants, #divbedCount, #divtxtFullNameAdd, #divtxtNumber, #divtxtNationality').hide();
+            $('#txtFullNameAdd, #txtNumber, #nationality').prop('required', false);
             // Adjust layout of remaining fields for better alignment
-            $('#divpaymentStatus, #divtxtCheckInStatus, #divselectBookingRoute, #divtxtGuestType, #divtxtGuestLevel')
+            $('#divpaymentStatus, #divtxtCheckInStatus, #divselectBookingRoute, #divtxtNationality')
                 .removeClass('col-lg-3').addClass('col-lg-4'); // Widen remaining fields for better spacing
 
         } else {
@@ -1120,9 +1106,10 @@ $(document).ready(function () {
             $('#consecutiveResultsContainer').hide(); // Hide consecutive results
 
             // Show individual booking fields again
-            $('#divaddFloor, #divaddroom, #divroom_type, #divprice, #divbedCount, #divtxtFullNameAdd, #divtxtNumber').show();
+            $('#divaddFloor, #divaddroom, #divroom_type, #divprice, #divbedCount, #divtxtFullNameAdd, #divtxtNumber, #divtxtNationality').show();
+            $('#txtFullNameAdd, #nationality').prop('required', true);
 
-            $('#divpaymentStatus, #divtxtCheckInStatus, #divselectBookingRoute, #divtxtGuestType, #divtxtGuestLevel')
+            $('#divpaymentStatus, #divtxtCheckInStatus, #divselectBookingRoute, #divtxtNationality')
                 .removeClass('col-lg-4').addClass('col-lg-3'); // Reset to original size
         }
     });
@@ -1481,13 +1468,9 @@ $(document).ready(function () {
         }
     });
 
-    // FOR GUEST TYPE using shared utility
-    populateGuestTypesDropdown('#guestType', true, 'Guest Type');
+    // Guest Type / Guest Level removed from Add Booking - Nationality is used instead.
 
-    // FOR GUEST LEVEL using shared utility
-    populateGuestLevelsDropdown('#guestLevel', true, 'Guest Level');
-
-    // Add an event listener to reset the dropdowns when txtFullNameAdd changes
+    // Add an event listener to clear guest fields when txtFullNameAdd changes
     document.getElementById('txtFullNameAdd').addEventListener('input', function() {
         // Clear the Customer ID and Contact Number fields
         document.getElementById('guestID').value = '';   // Clear the hidden Guest ID field
@@ -1497,26 +1480,10 @@ $(document).ready(function () {
             document.getElementById('txtNumber').value = '';     // Clear the contact number field
         }
 
-        // Only reset dropdowns if the input field is completely cleared
+        // Only reset when the input field is completely cleared
         if (this.value.trim() === '') {
-            // Reset to default selected values (not placeholder)
-            // Find and select the default Guest Type (ID = 1)
-            const guestTypeSelect = document.getElementById('guestType');
-            for (let i = 0; i < guestTypeSelect.options.length; i++) {
-                if (guestTypeSelect.options[i].value === '1') {
-                    guestTypeSelect.selectedIndex = i;
-                    break;
-                }
-            }
-            
-            // Find and select the default Guest Level (ID = 9)
-            const guestLevelSelect = document.getElementById('guestLevel');
-            for (let i = 0; i < guestLevelSelect.options.length; i++) {
-                if (guestLevelSelect.options[i].value === '9') {
-                    guestLevelSelect.selectedIndex = i;
-                    break;
-                }
-            }
+            const nationalityInput = document.getElementById('nationality');
+            if (nationalityInput) nationalityInput.value = '';
         }
     });
 
