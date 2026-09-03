@@ -1047,16 +1047,35 @@ class BookingController {
   // Apply or update manual discount for an occupied booking
   static async applyDiscount(req, res) {
     try {
-      const { bookingId, amount, remarks } = req.body;
+      const { bookingId, amount, remarks, perNight } = req.body;
       const editedBy = req.user?.userId || 'system';
       if (!bookingId) return res.status(400).json({ error: 'Missing bookingId' });
-      const numericAmount = parseFloat(amount);
+      let numericAmount = parseFloat(amount);
       if (isNaN(numericAmount) || numericAmount < 0) {
         return res.status(400).json({ error: 'Invalid discount amount' });
       }
 
-      const result = await BookingModel.applyDiscount({ bookingId, amount: numericAmount, remarks: remarks || '', editedBy });
-      res.json({ success: true, result });
+      // Per-night discount: the entered amount is per night, so multiply by the
+      // number of billed nights and tag the remark so it stays clear on receipts.
+      const isPerNight = perNight === true || perNight === 'true' || perNight === '1' || perNight === 1;
+      let finalRemarks = remarks || '';
+      let perNightValue = null;
+      let nights = 1;
+      if (isPerNight && numericAmount > 0) {
+        const { queryDatabasePromise } = require('../config/database');
+        const rows = await queryDatabasePromise(
+          `SELECT COALESCE(ORIGINAL_QTY, QTY, 1) AS nights FROM billing WHERE BOOKING_ID = ? LIMIT 1`,
+          [bookingId]
+        );
+        nights = Math.max(1, parseInt(rows[0]?.nights, 10) || 1);
+        perNightValue = numericAmount;
+        numericAmount = Math.round(perNightValue * nights * 100) / 100;
+        const tag = `₱${perNightValue.toLocaleString('en-US')}/night × ${nights} night${nights > 1 ? 's' : ''}`;
+        finalRemarks = finalRemarks ? `${tag} — ${finalRemarks}` : tag;
+      }
+
+      const result = await BookingModel.applyDiscount({ bookingId, amount: numericAmount, remarks: finalRemarks, editedBy });
+      res.json({ success: true, result: { ...result, appliedAmount: numericAmount, perNight: perNightValue, nights } });
     } catch (error) {
       console.error('❌ Failed to apply discount:', error);
       res.status(500).json({ error: 'Failed to apply discount' });
