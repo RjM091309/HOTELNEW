@@ -1296,11 +1296,16 @@ class DashboardModel {
       );
       const previousStatus = prevRows[0]?.BOOKING_STATUS;
 
-      let query = 'UPDATE booking SET BOOKING_STATUS = ? WHERE IDNo = ? AND ACTIVE = 1';
+      // Stamp the actual check-in / check-out time when the status moves there.
+      let tsSet = '';
+      if (status === 'check-In') tsSet = ', ACTUAL_CHECK_IN_DT = COALESCE(ACTUAL_CHECK_IN_DT, NOW())';
+      else if (status === 'check-Out') tsSet = ', ACTUAL_CHECK_OUT_DT = NOW()';
+
+      let query = `UPDATE booking SET BOOKING_STATUS = ?${tsSet} WHERE IDNo = ? AND ACTIVE = 1`;
       let params = [status, bookingId];
 
       if (lateCheckOut !== null && lateCheckOut !== '') {
-        query = 'UPDATE booking SET BOOKING_STATUS = ?, LATE_CHECKOUT = ? WHERE IDNo = ? AND ACTIVE = 1';
+        query = `UPDATE booking SET BOOKING_STATUS = ?, LATE_CHECKOUT = ?${tsSet} WHERE IDNo = ? AND ACTIVE = 1`;
         params = [status, lateCheckOut, bookingId];
       }
 
@@ -1469,7 +1474,7 @@ class DashboardModel {
       }
 
       const updateResult = await queryDatabasePromise(
-        `UPDATE booking SET BOOKING_STATUS = 'check-In', EDITED_DT = NOW() WHERE IDNo = ? AND ACTIVE = 1`,
+        `UPDATE booking SET BOOKING_STATUS = 'check-In', ACTUAL_CHECK_IN_DT = COALESCE(ACTUAL_CHECK_IN_DT, NOW()), EDITED_DT = NOW() WHERE IDNo = ? AND ACTIVE = 1`,
         [bookingId]
       );
 

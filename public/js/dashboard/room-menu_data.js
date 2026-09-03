@@ -309,6 +309,21 @@ function formatStayDateOnly(value) {
   });
 }
 
+// Actual check-in / check-out timestamp -> "h:mm AM/PM" (server local time).
+function formatActualTimeOnly(ts) {
+  if (!ts) return '';
+  const d = new Date(String(ts).replace(' ', 'T'));
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+// Scheduled date + actual event time when available: "09/03/26 · 9:58 AM"
+function formatStayDateWithActual(scheduledValue, actualTs) {
+  const base = formatStayDateOnly(scheduledValue);
+  const t = formatActualTimeOnly(actualTs);
+  return t ? `${base} · ${t}` : base;
+}
+
 function setInfoText(elementId, value, fallback = '-') {
   const el = document.getElementById(elementId);
   if (!el) return;
@@ -926,8 +941,8 @@ function updateStaySummaryFromBooking(bookingId, data) {
       : data.CustomerName
   );
   setInfoText(`guest-contact-${bookingId}`, data.CONTACT_NO);
-  setInfoText(`checkin-display-${bookingId}`, formatStayDateOnly(data.CHECK_IN_DATE));
-  setInfoText(`checkout-display-${bookingId}`, formatStayDateOnly(data.CHECK_OUT_DATE));
+  setInfoText(`checkin-display-${bookingId}`, formatStayDateWithActual(data.CHECK_IN_DATE, data.ACTUAL_CHECK_IN_DT));
+  setInfoText(`checkout-display-${bookingId}`, formatStayDateWithActual(data.CHECK_OUT_DATE, data.ACTUAL_CHECK_OUT_DT));
 
   const hasPickup = !!(data.HAS_PICKUP === 1 || data.HAS_PICKUP === true || data.HAS_PICKUP === '1');
   const hasDropoff = !!(data.HAS_DROPOFF === 1 || data.HAS_DROPOFF === true || data.HAS_DROPOFF === '1');
@@ -8448,7 +8463,7 @@ function openCheckoutBacktrackModal(bookingId, event) {
                                                         </div>
                                                         <div>
                                                             <small style="color: #6c757d; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Check-in Date</small>
-                                                            <div style="color: #495057; font-weight: 600; font-size: 16px;">${checkInDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                                                            <div id="backtrack-checkin-${bookingId}" style="color: #495057; font-weight: 600; font-size: 16px;">${checkInDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -8459,7 +8474,7 @@ function openCheckoutBacktrackModal(bookingId, event) {
                                                         </div>
                                                         <div>
                                                             <small style="color: #6c757d; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">Check-out Date</small>
-                                                            <div style="color: #495057; font-weight: 600; font-size: 16px;">${checkOutDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                                                            <div id="backtrack-checkout-${bookingId}" style="color: #495057; font-weight: 600; font-size: 16px;">${checkOutDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -8660,8 +8675,15 @@ function loadCheckoutData(bookingId) {
             return response.json();
         })
         .then(data => {
-            
-            
+
+            // Append the actual check-in / check-out time to the date lines
+            const ciEl = document.getElementById(`backtrack-checkin-${bookingId}`);
+            const coEl = document.getElementById(`backtrack-checkout-${bookingId}`);
+            const ciTime = formatActualTimeOnly(data.ACTUAL_CHECK_IN_DT);
+            const coTime = formatActualTimeOnly(data.ACTUAL_CHECK_OUT_DT);
+            if (ciEl && ciTime && ciEl.textContent.indexOf('·') === -1) ciEl.textContent += ` · ${ciTime}`;
+            if (coEl && coTime && coEl.textContent.indexOf('·') === -1) coEl.textContent += ` · ${coTime}`;
+
             // Base room cost only — extensions are shown on a separate line
             const roomCostElement = document.getElementById(`room-cost-${bookingId}`);
             if (roomCostElement) {

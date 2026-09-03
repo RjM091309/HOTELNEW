@@ -421,11 +421,69 @@ async function runCustomerNationalityMigration() {
   );
 }
 
+async function runBookingActualTimesMigration() {
+  if (!(await tableExists('booking'))) {
+    console.warn('⚠️ booking table not found, skipping actual check-in/out timestamp migration');
+    return;
+  }
+
+  await ensureColumn(
+    'booking',
+    'ACTUAL_CHECK_IN_DT',
+    `ACTUAL_CHECK_IN_DT DATETIME NULL DEFAULT NULL`,
+    'CHECK_IN_DATE'
+  );
+  await ensureColumn(
+    'booking',
+    'ACTUAL_CHECK_OUT_DT',
+    `ACTUAL_CHECK_OUT_DT DATETIME NULL DEFAULT NULL`,
+    'CHECK_OUT_DATE'
+  );
+
+  // Best-effort backfill - runs every startup but only touches rows that are
+  // still NULL, so it stays cheap and idempotent.
+
+  // Checkout: on checkout the system already overwrites CHECK_OUT_DATE with
+  // NOW(), so a non-midnight time there is the real checkout timestamp.
+  const outFill = await queryDatabasePromise(
+    `UPDATE booking
+        SET ACTUAL_CHECK_OUT_DT = CHECK_OUT_DATE
+      WHERE BOOKING_STATUS = 'check-Out'
+        AND ACTUAL_CHECK_OUT_DT IS NULL
+        AND CHECK_OUT_DATE IS NOT NULL
+        AND TIME(CHECK_OUT_DATE) <> '00:00:00'`
+  );
+  if (outFill.affectedRows) {
+    console.log(`✅ Backfilled ACTUAL_CHECK_OUT_DT for ${outFill.affectedRows} booking(s)`);
+  }
+
+  // Check-in: only source is the audit trail (a real event timestamp).
+  if (await tableExists('activity_log')) {
+    const inFill = await queryDatabasePromise(
+      `UPDATE booking b
+          JOIN (
+            SELECT BOOKING_ID, MAX(ENCODED_DT) AS dt
+              FROM activity_log
+             WHERE BOOKING_ID IS NOT NULL
+               AND STATUS = 'SUCCESS'
+               AND (ACTION LIKE 'CHECK_IN%' OR ACTION = 'MOVE_TO_OCCUPIED')
+             GROUP BY BOOKING_ID
+          ) al ON al.BOOKING_ID = b.IDNo
+          SET b.ACTUAL_CHECK_IN_DT = al.dt
+        WHERE b.ACTUAL_CHECK_IN_DT IS NULL`
+    );
+    if (inFill.affectedRows) {
+      console.log(`✅ Backfilled ACTUAL_CHECK_IN_DT for ${inFill.affectedRows} booking(s)`);
+    }
+  }
+}
+
 async function runStartupMigrations() {
   console.log('🔄 Running startup database migrations...');
 
   await runActivityLogMigrations();
   await runCustomerNationalityMigration();
+  await runBookingActualTimesMigration();
   await runRoomRatesMigrations();
   await runFlightScheduleMigrations();
   await runPickupDropMigrations();
