@@ -522,18 +522,13 @@ function syncRoomCheckerBreakfastPresetActiveState() {
   });
 }
 
-// Rescales the breakfast qty to match the new room count ONLY if a per-room
-// preset (1 or 2) was already active - e.g. "1 per room" with 2 King rooms
-// selected should become 4 when that grows to 4 rooms. If "None" (or no
-// preset, i.e. a hand-typed custom value) was active, breakfast stays put
-// instead of silently jumping to "1 per room" just because King/Queen qty
-// changed - None is the default and should stay the default.
+// Defaults breakfast to "1 per room" (the free-with-the-room-rate baseline -
+// see the freeBreakfastCount/chargeableBreakfastCount split in
+// recomputeRateSummaryTotals) whenever King/Queen qty is entered, since
+// there's no cost reason to make staff click it manually - and back to
+// "None" once rooms drop back to 0.
 function syncRoomCheckerBreakfastToRoomCount() {
-  const activeBtn = document.querySelector('.rate-summary-preset-btn[data-breakfast-preset].active');
-  const perRoom = activeBtn ? (parseInt(activeBtn.getAttribute('data-breakfast-preset'), 10) || 0) : 0;
-  if (activeBtn) {
-    document.getElementById('rateSummaryBreakfastQty').value = perRoom * getRoomCheckerBreakfastRoomNights();
-  }
+  document.getElementById('rateSummaryBreakfastQty').value = getRoomCheckerBreakfastRoomNights();
   syncRoomCheckerBreakfastPresetActiveState();
   recomputeRateSummaryTotals();
 }
@@ -652,8 +647,14 @@ function recomputeRateSummaryTotals() {
 
   const totalRoomRate = (kingQty * kingRate + queenQty * queenRate) * nights;
 
+  // The first breakfast per room, per night (the "1 per room" preset - see
+  // getRoomCheckerBreakfastRoomNights) is already covered by the room rate,
+  // not an extra charge. Only breakfasts beyond that free baseline (e.g. the
+  // "2 per room" preset, or a hand-typed count above it) actually get billed.
   const breakfastCount = Math.max(0, parseInt(document.getElementById('rateSummaryBreakfastQty').value, 10) || 0);
-  const breakfastTotal = breakfastCount * BREAKFAST_PRICE;
+  const freeBreakfastCount = Math.min(breakfastCount, getRoomCheckerBreakfastRoomNights());
+  const chargeableBreakfastCount = Math.max(0, breakfastCount - freeBreakfastCount);
+  const breakfastTotal = chargeableBreakfastCount * BREAKFAST_PRICE;
   const extraBedTotal = extraBedQty * extraBedRate;
 
   const subTotal = totalRoomRate + breakfastTotal + extraBedTotal;
