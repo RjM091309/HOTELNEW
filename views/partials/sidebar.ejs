@@ -85,7 +85,7 @@
 					</a>
 				</li>
 
-				<% const bookingPages = ['booking', 'unassigned-rooms', 'room-checker', 'check-in-notifier']; %>
+				<% const bookingPages = ['booking', 'unassigned-rooms', 'room-checker', 'check-in-notifier', 'breakfast-list']; %>
 				<li class="nav-item <%= bookingPages.includes(activePage) ? 'open' : '' %>">
 					<a class="nav-link nav-toggle nav-main-link-submenu <%= bookingPages.includes(activePage) ? 'active' : '' %>" data-toggle="submenu" aria-haspopup="true"
 						aria-expanded="<%= bookingPages.includes(activePage) ? 'true' : 'false' %>" href="#">
@@ -116,6 +116,12 @@
 							<a href="/booking/check-in-notifier" class="nav-link <%= activePage === 'check-in-notifier' ? 'active' : '' %>">
 								<i class="fa fa-genderless"></i>
 								<span class="title">Check-in Notifier</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a href="/booking/breakfast-list" class="nav-link <%= activePage === 'breakfast-list' ? 'active' : '' %>">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Breakfast List</span>
 							</a>
 						</li>
 						<!-- Rooms and Guest moved to Management -->
@@ -230,7 +236,7 @@
 				</li>
 
 				<!-- Settings Section -->
-				<% const settingsPages = ['integration', 'card_writer', 'telegram_settings', 'booking_channel', 'vehicle', 'room', 'services', 'flight_schedule', 'pickup_drop']; %>
+				<% const settingsPages = ['integration', 'card_writer', 'telegram_settings', 'booking_channel', 'vehicle', 'room', 'room_rates', 'services', 'flight_schedule', 'pickup_drop']; %>
 				<li class="nav-item <%= settingsPages.includes(activePage) ? 'open' : '' %>" data-section="settings">
 					<a class="nav-link nav-toggle nav-main-link-submenu <%= settingsPages.includes(activePage) ? 'active' : '' %>" data-toggle="submenu" aria-haspopup="true"
 						aria-expanded="<%= settingsPages.includes(activePage) ? 'true' : 'false' %>" href="#">
@@ -261,6 +267,12 @@
 							<a class="nav-link <%= activePage === 'room' ? 'active' : '' %>" href="/room">
 								<i class="fa fa-genderless"></i>
 								<span class="title">Rooms</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link <%= activePage === 'room_rates' ? 'active' : '' %>" href="/room-rates">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Room Rates</span>
 							</a>
 						</li>
 						<li class="nav-item">

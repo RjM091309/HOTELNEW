@@ -128,11 +128,19 @@
   <div class="modal-dialog modal-xl modal-dialog-centered" role="document">
     <div class="modal-content">
       <div class="modal-header">
-        <div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-2">
+        <div class="d-flex align-items-start justify-content-between w-100 flex-wrap gap-2">
           <h5 class="modal-title mb-0" id="todayPaidModalLabel">Paid Payments</h5>
-          <div class="filter-btn-group paid-modal-filter-group">
-            <button type="button" class="filter-btn active" data-paid-range="today">Today</button>
-            <button type="button" class="filter-btn" data-paid-range="last7days">Last 7 Days</button>
+          <div class="d-flex flex-column align-items-end gap-1">
+            <div class="filter-btn-group paid-modal-filter-group">
+              <button type="button" class="filter-btn active" data-paid-range="today">Today</button>
+              <button type="button" class="filter-btn" data-paid-range="last7days">Last 7 Days</button>
+            </div>
+            <div class="filter-btn-group paid-modal-shift-group">
+              <button type="button" class="filter-btn active" data-paid-shift="all">All Shifts</button>
+              <button type="button" class="filter-btn" data-paid-shift="1">Shift 1 &middot; 7AM&ndash;4PM</button>
+              <button type="button" class="filter-btn" data-paid-shift="2">Shift 2 &middot; 1PM&ndash;10PM</button>
+              <button type="button" class="filter-btn" data-paid-shift="3">Shift 3 &middot; 10PM&ndash;7AM</button>
+            </div>
           </div>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -187,7 +195,7 @@
           }
         },
         { data: null, className: 'center', render: function(_d,_t,row){
-            const methodLabels = { cash: 'Cash', credit_card: 'Credit Card', credit: 'Credit', marker: 'Credit', bank_transfer: 'Bank Transfer', agoda: 'AGODA', expedia: 'EXPEDIA' };
+            const methodLabels = { cash: 'Cash', credit_card: 'Credit Card', credit: 'Credit', marker: 'Credit', bank_transfer: 'Bank Transfer', korean_bank: 'Korean Bank', agoda: 'AGODA', expedia: 'EXPEDIA' };
             const method = (row.PAYMENT_METHOD || '').toLowerCase();
             return methodLabels[method] || row.PAYMENT_METHOD || 'N/A';
           }
@@ -243,12 +251,32 @@
   loadSalesSummary();
 
   let currentPaidRange = 'today';
+  let currentPaidShift = 'all';
+  let loadedPaidData = null;
   let currentBreakdownBookingId = null;
 
-  $('#daily-paid').on('click', function () {
+  // Shift filters only make sense for a single day, so hide them for the 7-day view.
+  function updateShiftGroupVisibility() {
+    if (currentPaidRange === 'today') {
+      $('.paid-modal-shift-group').show();
+    } else {
+      $('.paid-modal-shift-group').hide();
+    }
+  }
+
+  function resetPaidShift() {
+    currentPaidShift = 'all';
+    $('.paid-modal-shift-group .filter-btn').removeClass('active');
+    $('.paid-modal-shift-group .filter-btn[data-paid-shift="all"]').addClass('active');
+  }
+
+  // The whole Daily Sales card opens the collected-sales modal (not just the "Paid" number).
+  $(document).on('click', '.payment-sales-card--daily', function () {
     currentPaidRange = 'today';
     $('.paid-modal-filter-group .filter-btn').removeClass('active');
     $('.paid-modal-filter-group .filter-btn[data-paid-range="today"]').addClass('active');
+    resetPaidShift();
+    updateShiftGroupVisibility();
     showTodayPaidModal('today');
   });
 
@@ -258,7 +286,18 @@
     currentPaidRange = range;
     $('.paid-modal-filter-group .filter-btn').removeClass('active');
     $(this).addClass('active');
+    resetPaidShift();
+    updateShiftGroupVisibility();
     loadTodayPaidPayments(range);
+  });
+
+  $(document).on('click', '.paid-modal-shift-group .filter-btn', function () {
+    const shift = String($(this).data('paid-shift'));
+    if (!shift || shift === currentPaidShift) return;
+    currentPaidShift = shift;
+    $('.paid-modal-shift-group .filter-btn').removeClass('active');
+    $(this).addClass('active');
+    renderPaidCollections();
   });
 
   $(document).on('click', '.confirmation-link', function(e){
@@ -366,7 +405,7 @@
               </tr>
             </thead>
             <tbody>`;
-      const methodLabels = { cash: 'Cash', credit_card: 'Credit Card', credit: 'Credit', marker: 'Credit', bank_transfer: 'Bank Transfer', agoda: 'AGODA', expedia: 'EXPEDIA' };
+      const methodLabels = { cash: 'Cash', credit_card: 'Credit Card', credit: 'Credit', marker: 'Credit', bank_transfer: 'Bank Transfer', korean_bank: 'Korean Bank', agoda: 'AGODA', expedia: 'EXPEDIA' };
       payments.forEach(p => {
         const methodLabel = methodLabels[(p.PAYMENT_METHOD || '').toLowerCase()] || p.PAYMENT_METHOD;
         const paymentId = p.IDNo;
@@ -429,47 +468,93 @@
 
   function showTodayPaidModal(range = 'today') {
     currentPaidRange = range;
+    updateShiftGroupVisibility();
     $('#todayPaidModal').modal('show');
     loadTodayPaidPayments(range);
   }
 
   function loadTodayPaidPayments(range = 'today') {
     $('#todayPaidContent').html('<div class="text-center"><div class="spinner-border" role="status"><span class="sr-only">Loading...</span></div></div>');
+    updateShiftGroupVisibility();
 
     fetch(`/payments/today-paid?range=${encodeURIComponent(range)}`)
       .then(r => r.json())
       .then(data => {
         if (!data.success) {
+          loadedPaidData = null;
           $('#todayPaidContent').html(`<div class="alert alert-danger"><strong>Error:</strong> ${data.message || 'Failed to load payments'}</div>`);
           return;
         }
-        displayTodayPaidCollections(data);
+        loadedPaidData = data;
+        renderPaidCollections();
       })
       .catch(() => {
+        loadedPaidData = null;
         $('#todayPaidContent').html('<div class="alert alert-danger"><strong>Error:</strong> Failed to load paid payments</div>');
       });
   }
 
-  function displayTodayPaidCollections(data) {
-    const payments = (data.payments || []).slice().sort((a, b) => Number(b.IDNo || 0) - Number(a.IDNo || 0));
-    const receipts = (data.receipts || []).slice().sort((a, b) => Number(b.IDNo || 0) - Number(a.IDNo || 0));
+  // Shift windows keyed by the hour of PAYMENT_DATE. Shift 3 wraps past midnight.
+  const PAID_SHIFT_LABELS = {
+    '1': 'Shift 1 (7AM–4PM)',
+    '2': 'Shift 2 (1PM–10PM)',
+    '3': 'Shift 3 (10PM–7AM)'
+  };
+
+  function paidShiftPredicate(shift) {
+    if (shift === '1') return h => h >= 7 && h < 16;
+    if (shift === '2') return h => h >= 13 && h < 22;
+    if (shift === '3') return h => h >= 22 || h < 7;
+    return null; // 'all'
+  }
+
+  function filterPaidRowsByShift(rows, shift) {
+    const pred = paidShiftPredicate(shift);
+    if (!pred) return rows.slice();
+    return rows.filter(row => {
+      if (!row.PAYMENT_DATE) return false;
+      const hour = new Date(row.PAYMENT_DATE).getHours();
+      return pred(hour);
+    });
+  }
+
+  function renderPaidCollections() {
+    const data = loadedPaidData;
+    if (!data) return;
+
     const range = data.range || 'today';
-    const paymentsTotal = Number(data.paymentsTotal || 0);
-    const receiptsTotal = Number(data.receiptsTotal || 0);
-    const combinedTotal = Number(data.total || paymentsTotal + receiptsTotal);
+    const applyShift = range === 'today' && currentPaidShift !== 'all';
+
+    let payments = (data.payments || []).slice().sort((a, b) => Number(b.IDNo || 0) - Number(a.IDNo || 0));
+    let receipts = (data.receipts || []).slice().sort((a, b) => Number(b.IDNo || 0) - Number(a.IDNo || 0));
+
+    if (applyShift) {
+      payments = filterPaidRowsByShift(payments, currentPaidShift);
+      receipts = filterPaidRowsByShift(receipts, currentPaidShift);
+    }
+
+    const paymentsTotal = payments.reduce((sum, row) => sum + Number(row.AMOUNT_PAID || 0), 0);
+    const receiptsTotal = receipts.reduce((sum, row) => sum + Number(row.AMOUNT_PAID || 0), 0);
+    const combinedTotal = paymentsTotal + receiptsTotal;
 
     const rangeLabel = range === 'last7days' ? 'Last 7 Days' : 'Today';
-    $('#todayPaidModalLabel').text(`${rangeLabel} Collected Sales`);
+    const shiftLabel = applyShift ? ` – ${PAID_SHIFT_LABELS[currentPaidShift]}` : '';
+    $('#todayPaidModalLabel').text(`${rangeLabel} Collected Sales${shiftLabel}`);
 
     if (!payments.length && !receipts.length) {
-      const emptyMessage = range === 'last7days'
-        ? 'No collections recorded in the last 7 days.'
-        : 'No collections recorded for today.';
+      let emptyMessage;
+      if (applyShift) {
+        emptyMessage = `No collections recorded for ${PAID_SHIFT_LABELS[currentPaidShift]} today.`;
+      } else {
+        emptyMessage = range === 'last7days'
+          ? 'No collections recorded in the last 7 days.'
+          : 'No collections recorded for today.';
+      }
       $('#todayPaidContent').html(`<div class="alert alert-info mb-0">${emptyMessage}</div>`);
       return;
     }
 
-    const methodLabels = { cash: 'Cash', credit_card: 'Credit Card', credit: 'Credit', marker: 'Credit', other: 'Others', bank_transfer: 'Bank Transfer', agoda: 'AGODA', expedia: 'EXPEDIA' };
+    const methodLabels = { cash: 'Cash', credit_card: 'Credit Card', credit: 'Credit', marker: 'Credit', other: 'Others', bank_transfer: 'Bank Transfer', korean_bank: 'Korean Bank', agoda: 'AGODA', expedia: 'EXPEDIA' };
     let html = '';
 
     if (payments.length) {
@@ -701,9 +786,31 @@
     text-decoration: underline;
   }
 
+  /* Whole Daily Sales card is clickable */
+  .payment-sales-card--daily {
+    cursor: pointer;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .payment-sales-card--daily:hover {
+    border-color: #64b5f6;
+    box-shadow: 0 0 0 1px #64b5f6;
+  }
+
   .paid-modal-filter-group .filter-btn.active {
     background: #6f9c40;
     border-color: #6f9c40;
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .paid-modal-shift-group .filter-btn {
+    font-size: 12px;
+  }
+
+  .paid-modal-shift-group .filter-btn.active {
+    background: #3f7cad;
+    border-color: #3f7cad;
     color: #fff;
     font-weight: 600;
   }

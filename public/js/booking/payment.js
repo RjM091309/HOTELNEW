@@ -254,23 +254,23 @@ function initializePaymentModal() {
                 detailsHTML = `
                     <div class="payment-method-info">
                         <h6><i class="fa fa-credit-card"></i> Credit Card Payment</h6>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <label for="cardNumber" class="form-label">Card Number</label>
-                                <input type="text" class="form-control" id="cardNumber" placeholder="1234 5678 9012 3456" maxlength="19">
-                            </div>
-                            <div class="col-md-3">
-                                <label for="expiryDate" class="form-label">Expiry</label>
-                                <input type="text" class="form-control" id="expiryDate" placeholder="MM/YY" maxlength="5">
-                            </div>
-                            <div class="col-md-3">
-                                <label for="cvv" class="form-label">CVV</label>
-                                <input type="text" class="form-control" id="cvv" placeholder="123" maxlength="3">
-                            </div>
+                        <p class="text-muted">Please confirm the card charge has been approved on the terminal before completing this payment.</p>
+                        <div class="alert alert-info">
+                            <i class="fa fa-info-circle"></i>
+                            <strong>Note:</strong> Verify the approval slip / reference before confirming.
                         </div>
-                        <div class="mt-3">
-                            <label for="cardholderName" class="form-label">Cardholder Name</label>
-                            <input type="text" class="form-control" id="cardholderName" placeholder="John Doe">
+                    </div>
+                `;
+                break;
+
+            case 'korean_bank':
+                detailsHTML = `
+                    <div class="payment-method-info">
+                        <h6><span aria-hidden="true">₩</span> Korean Bank Payment</h6>
+                        <p class="text-muted">Please confirm the Korean bank transfer has been received before completing this payment.</p>
+                        <div class="alert alert-info">
+                            <i class="fa fa-info-circle"></i>
+                            <strong>Note:</strong> Verify the remittance / transfer details before confirming.
                         </div>
                     </div>
                 `;

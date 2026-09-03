@@ -30,6 +30,7 @@ const flightScheduleRoutes = require('./r_flight_schedule');
 const pickupDropRoutes = require('./r_pickup_drop');
 const depositsRoutes = require('./r_deposits');
 const channexRoutes = require('./r_channex');
+const roomRatesRoutes = require('./r_room_rates');
 
 // Auth middleware
 const AuthMiddleware = require('../middleware/m_auth');
@@ -60,6 +61,7 @@ router.use('/employee', AuthMiddleware.requireAuth, employeeRoutes);
 router.use('/services', AuthMiddleware.requireAuth, servicesRoutes);
 router.use('/vehicle', AuthMiddleware.requireAuth, vehicleRoutes);
 router.use('/room', AuthMiddleware.requireAuth, roomRoutes);
+router.use('/room-rates', AuthMiddleware.requireAuth, roomRatesRoutes);
 router.use('/integration', AuthMiddleware.requireAuth, auditTrail({ module: 'integration' }), integrationRoutes);
 router.use('/booking_channel', AuthMiddleware.requireAuth, bookingChannelRoutes);
 router.use('/payments', AuthMiddleware.requireAuth, auditTrail({ module: 'payments' }), paymentsRoutes);

@@ -73,6 +73,45 @@ window.applyManualDiscount = function(bookingId){
     });
 };
 
+// Remove an applied discount: sends amount 0 so the backend zeroes the billing
+// discount, deletes the discount payment row, and clears the discount remark.
+window.removeManualDiscount = function(bookingId){
+    const run = () => {
+        fetch('/booking/apply-discount', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+            body: new URLSearchParams({ bookingId: bookingId, amount: 0, remarks: '' }).toString()
+        })
+        .then(res => { if (!res.ok) throw new Error('Failed to remove discount'); return res.json(); })
+        .then(() => {
+            toastSuccess('Success', 'Discount removed');
+            const amt = document.getElementById(`discountAmountManual-${bookingId}`);
+            if (amt) amt.value = '';
+            const rem = document.getElementById(`discountRemarks-${bookingId}`);
+            if (rem) rem.value = '';
+            calculateBalance(bookingId, bookingId);
+        })
+        .catch(err => {
+            console.error('Failed to remove discount', err);
+            toastError('Error', 'Failed to remove discount');
+        });
+    };
+
+    if (typeof Swal !== 'undefined') {
+        Swal.fire({
+            title: 'Remove discount?',
+            text: 'This clears the discount amount and its remark from this booking.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, remove',
+            cancelButtonText: 'Cancel',
+            confirmButtonColor: '#dc3545'
+        }).then((r) => { if (r.isConfirmed) run(); });
+    } else if (confirm('Remove the discount from this booking?')) {
+        run();
+    }
+};
+
 // Add a function to refresh services when payment status changes
 window.refreshServicesList = function(bookingId) {
     loadExistingServicesForModal(bookingId);
@@ -170,6 +209,7 @@ function formatPaymentMethodLabel(method) {
     marker: 'Credit',
     check: 'Check',
     bank_transfer: 'Bank Transfer',
+    korean_bank: 'Korean Bank',
     agoda: 'AGODA',
     expedia: 'EXPEDIA'
   };
@@ -815,6 +855,45 @@ async function reopenMaintenanceFromRoomMenu(bookingId) {
 
 window.reopenMaintenanceFromRoomMenu = reopenMaintenanceFromRoomMenu;
 
+// Cancelled-reservation actions from the read-only room modal. These hand off to
+// the calendar module's prompt flows (status pick + confirmation + API call),
+// recovering the FullCalendar event so its bar updates in place.
+function getCalendarEventForBooking(bookingId) {
+  try {
+    if (window.calendar && typeof window.calendar.getEventById === 'function') {
+      return window.calendar.getEventById(String(bookingId)) || null;
+    }
+  } catch (_) {}
+  return null;
+}
+
+function reopenCancelledFromRoomMenu(bookingId) {
+  const ev = getCalendarEventForBooking(bookingId);
+  if (typeof window.promptReopenCancelledReservation === 'function' && ev) {
+    closeRoomReservationModal(bookingId);
+    window.promptReopenCancelledReservation(bookingId, ev);
+    return;
+  }
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({ icon: 'info', title: 'Open from Calendar', text: 'Please reopen this cancelled reservation from the Calendar view.', confirmButtonColor: '#000000' });
+  }
+}
+
+function removeCancelledFromRoomMenu(bookingId) {
+  const ev = getCalendarEventForBooking(bookingId);
+  if (typeof window.promptRemoveCancelledReservation === 'function' && ev) {
+    closeRoomReservationModal(bookingId);
+    window.promptRemoveCancelledReservation(bookingId, ev);
+    return;
+  }
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({ icon: 'info', title: 'Open from Calendar', text: 'Please remove this cancelled reservation from the Calendar view.', confirmButtonColor: '#000000' });
+  }
+}
+
+window.reopenCancelledFromRoomMenu = reopenCancelledFromRoomMenu;
+window.removeCancelledFromRoomMenu = removeCancelledFromRoomMenu;
+
 function updateStaySummaryFromBooking(bookingId, data) {
   if (!data) return;
 
@@ -1194,11 +1273,18 @@ async function createDynamicRoomModal(bookingId, event, options) {
     : 'transition: none; opacity: 1 !important;';
 
   const statusLower = String(bookingStatus || '').toLowerCase();
+  // Cancelled bookings open this modal purely as a read-only detail view: every
+  // action is disabled except "Reopen Reservation" / "Remove" in the header.
+  const isCancelledView = statusLower === 'cancelled';
   const canCancelBooking = statusLower === 'pending' || statusLower === 'check-in';
   const isMaintenance = statusLower === 'maintenance';
 
-  // Disable Transfer, Late Check-Out, and Extend buttons if checked out or under maintenance
-  const actionButtonsDisabled = isCheckedOut || isMaintenance;
+  if (isCancelledView) {
+    shouldDisableCheckout = true;
+  }
+
+  // Disable Transfer, Late Check-Out, and Extend buttons if checked out, under maintenance, or cancelled
+  const actionButtonsDisabled = isCheckedOut || isMaintenance || isCancelledView;
   const actionButtonAttributes = actionButtonsDisabled ? 'disabled aria-disabled="true" tabindex="-1"' : '';
   const actionButtonStyle = actionButtonsDisabled
     ? 'transition: none; opacity: 0.6 !important; cursor: not-allowed; pointer-events: none;'
@@ -1206,7 +1292,7 @@ async function createDynamicRoomModal(bookingId, event, options) {
 
   // Create modal HTML
   const modalHTML = `
-<div class="modal fade" id="dynamicRoomModal_${bookingId}" tabindex="-1" aria-labelledby="dynamicRoomModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="true">
+<div class="modal fade${isCancelledView ? ' room-modal-readonly' : ''}" id="dynamicRoomModal_${bookingId}" tabindex="-1" aria-labelledby="dynamicRoomModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content" style="
     background-color: #ffffff;
@@ -1220,34 +1306,43 @@ async function createDynamicRoomModal(bookingId, event, options) {
                 <h6 class="modal-title mb-0 room-modal-title">
                     <span class="room-modal-title-label">Room</span>
                     <span class="room-modal-title-number">${roomNumber}</span>
+                    ${isCancelledView ? `<span class="room-modal-cancelled-badge">Cancelled &middot; View Only</span>` : ''}
                 </h6>
                 <div class="room-modal-header-actions">
+                    ${isCancelledView ? `
+                    <button type="button" class="btn btn-sm btn-dark room-toolbar-btn" onclick="reopenCancelledFromRoomMenu('${bookingId}')" title="Reopen Reservation">
+                        <i class="fas fa-undo"></i> Reopen Reservation
+                    </button>
+                    <button type="button" class="btn btn-sm btn-danger room-toolbar-btn" onclick="removeCancelledFromRoomMenu('${bookingId}')" title="Remove Reservation">
+                        <i class="fas fa-trash"></i> Remove
+                    </button>
+                    ` : `
                     ${canCancelBooking ? `
                     <button type="button" class="btn btn-sm room-toolbar-btn room-cancel-btn" id="btnCancelBooking-${bookingId}" onclick="openCancelBookingFromRoomMenu('${bookingId}')" title="Cancel Booking">
                         <i class="fas fa-times"></i> Cancel
                     </button>` : ''}
 
                     <!-- Register Card Button -->
-                    <button class="btn btn-sm btn-info text-white room-toolbar-btn" 
-                            id="btnRegisterCard-${bookingId}" 
+                    <button class="btn btn-sm btn-info text-white room-toolbar-btn"
+                            id="btnRegisterCard-${bookingId}"
                             ${actionButtonAttributes}
                             onclick="registerGuestCard('${bookingId}', '${roomId}', '${roomNumber}', '${guestName}')"
                             style="${actionButtonStyle}">
                         <i class="fas fa-credit-card"></i> Register Card
                     </button>
-                    
+
                     <!-- Late Checkout Button - will be updated dynamically after services load -->
                     <button class="btn btn-sm btn-secondary room-toolbar-btn" id="lateCheckoutBtn-${bookingId}" ${actionButtonAttributes} onclick="openLateCheckoutModal('${roomId}', '${checkOutDate}', '${bookingId}')" style="${actionButtonStyle}" data-checked-out="${isCheckedOut}">Late C/O</button>
-                    
-                    <button class="btn btn-sm btn-success room-toolbar-btn" 
-                            id="btnExtend" 
+
+                    <button class="btn btn-sm btn-success room-toolbar-btn"
+                            id="btnExtend"
                             ${actionButtonAttributes}
                             onclick="openExtendModal('${roomId}', '${checkOutDate}', '${bookingId}', '${roomNumber}')"
                             style="${actionButtonStyle}">
                         <i class="fas fa-plus-circle"></i> Extend
                     </button>
-                    
-                  
+
+
                     <button type="button" class="btn btn-danger btn-sm room-toolbar-btn" ${checkoutButtonAttributes} onclick="triggerCheckout('${bookingId}')" style="${checkoutButtonStyle}">
                         <i class="fas fa-sign-out-alt"></i> Checkout
                     </button>
@@ -1258,6 +1353,7 @@ async function createDynamicRoomModal(bookingId, event, options) {
                     <button class="btn btn-sm btn-primary room-toolbar-btn" ${actionButtonAttributes} onclick="triggerTransferFromMenu('${roomId}')" style="${actionButtonStyle}">
                         <i class="fas fa-exchange-alt"></i> Transfer
                     </button>
+                    `}
                 </div>
             </div>
             
@@ -1479,6 +1575,9 @@ async function createDynamicRoomModal(bookingId, event, options) {
                                     <input type="number" min="0" step="0.01" id="discountAmountManual-${bookingId}" class="form-control form-control-sm" placeholder="Enter amount" style="max-width: 140px; display: none;">
                                     <input type="text" id="discountRemarks-${bookingId}" class="form-control form-control-sm" placeholder="Remarks (optional)" style="max-width: 260px; display: none;">
                                     <button type="button" class="btn btn-sm btn-success" id="applyDiscountBtn-${bookingId}" style="display: none;" onclick="applyManualDiscount('${bookingId}')">Apply</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" id="removeDiscountBtn-${bookingId}" style="display: none;" onclick="removeManualDiscount('${bookingId}')">
+                                        <i class="fas fa-times"></i> Remove discount
+                                    </button>
                                 </div>
                                 <div class="discount-divider"></div>
                                 <div id="discount-remarks-label-${bookingId}" class="discount-remarks-label" style="display:none;">Discount Remarks</div>
@@ -2166,6 +2265,31 @@ modalStyle.textContent = `
         font-weight: 600;
         width: 100%;
     }
+
+    /* Cancelled reservation = read-only. Everything is inert except the header
+       Reopen/Remove buttons and the footer Close button. */
+    #dynamicRoomModal_${bookingId}.room-modal-readonly .room-modal-card-actions,
+    #dynamicRoomModal_${bookingId}.room-modal-readonly .extra-services-section .d-flex,
+    #dynamicRoomModal_${bookingId}.room-modal-readonly #added-services-list-${bookingId},
+    #dynamicRoomModal_${bookingId}.room-modal-readonly .discount-section .section-body,
+    #dynamicRoomModal_${bookingId}.room-modal-readonly .modal-footer .btn:not([data-bs-dismiss="modal"]),
+    #dynamicRoomModal_${bookingId}.room-modal-readonly .modal-footer .voucher-action-wrap {
+        opacity: 0.5 !important;
+        pointer-events: none !important;
+    }
+    #dynamicRoomModal_${bookingId} .room-modal-cancelled-badge {
+        display: inline-block;
+        margin-left: 10px;
+        padding: 2px 10px;
+        border-radius: 10px;
+        background: #dc3545;
+        color: #ffffff;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        vertical-align: middle;
+    }
 `;
 
 document.head.appendChild(modalStyle);
@@ -2188,6 +2312,22 @@ modal.addEventListener('hidden.bs.modal', () => {
         window.cleanupModalOverlays();
     }
 }, { once: true });
+
+// Cancelled reservations: lock every form control in the modal. The CSS above
+// already neutralises the surrounding button groups; this also blocks keyboard
+// access to inputs and re-runs after the async service/detail loads finish.
+if (isCancelledView) {
+    const lockRoomModalControls = () => {
+        modal.querySelectorAll('input, select, textarea').forEach((el) => {
+            el.disabled = true;
+        });
+        modal.querySelectorAll('.room-modal-card-actions .btn, .extra-services-section .btn, .discount-section .btn, .modal-footer .btn:not([data-bs-dismiss="modal"])')
+            .forEach((btn) => { btn.disabled = true; });
+    };
+    lockRoomModalControls();
+    setTimeout(lockRoomModalControls, 700);
+    setTimeout(lockRoomModalControls, 1500);
+}
 
 if (options?.isFromCalendar) {
   const openedFromCheckout = !!document.getElementById(`checkoutBacktrackModal_${bookingId}`);
@@ -3792,6 +3932,8 @@ async function calculateBalance(bookingId, currentBookingId) {
         }
 
         // Handle Discount Display
+        const removeDiscountBtn = document.getElementById(`removeDiscountBtn-${bookingId}`);
+        if (removeDiscountBtn) removeDiscountBtn.style.display = discountAmount > 0 ? 'inline-block' : 'none';
         if (discountAmount > 0) {
             const discountRow = document.getElementById(`discount-row-${bookingId}`);
             const discountAmountElement = document.getElementById(`discount-amount-${bookingId}`);
@@ -7365,11 +7507,53 @@ function initializeTransferModal() {
                 font-size: 16px;
                 padding: 40px 20px;
             }
-            
+
             #transferAvailableModal .text-center.text-danger {
                 color: #dc3545 !important;
                 font-size: 16px;
                 padding: 40px 20px;
+            }
+
+            /* Bed / view filter bar */
+            #transferAvailableModal .transfer-filter-bar {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                align-items: center;
+                justify-content: space-between;
+            }
+            #transferAvailableModal .transfer-filter-groups {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            #transferAvailableModal .transfer-filter-group {
+                display: inline-flex;
+                border: 1px solid #6c757d;
+                border-radius: 6px;
+                overflow: hidden;
+            }
+            #transferAvailableModal .transfer-filter-btn {
+                background: #343a40;
+                color: #cfd4da;
+                border: none;
+                border-left: 1px solid #6c757d;
+                padding: 7px 12px;
+                font-size: 12px;
+                font-weight: 600;
+                cursor: pointer;
+                white-space: nowrap;
+            }
+            #transferAvailableModal .transfer-filter-group .transfer-filter-btn:first-child {
+                border-left: none;
+            }
+            #transferAvailableModal .transfer-filter-btn:hover {
+                background: #3d444b;
+                color: #ffffff;
+            }
+            #transferAvailableModal .transfer-filter-btn.active {
+                background: #0d6efd;
+                color: #ffffff;
             }
         `;
         document.head.appendChild(style);
@@ -7410,22 +7594,80 @@ function initializeTransferModal() {
     
     const grid = modal.querySelector(".rooms-grid");
 
-    // Create search container div
+    // Create search + filter container div
     const searchContainer = document.createElement("div");
-    searchContainer.className = "search-container";
-    searchContainer.style.cssText = "text-align: right; margin-bottom: 20px; padding: 15px; background: #495057; border-radius: 8px; border: 1px solid #6c757d;";
+    searchContainer.className = "search-container transfer-filter-bar";
+    searchContainer.style.cssText = "margin-bottom: 20px; padding: 15px; background: #495057; border-radius: 8px; border: 1px solid #6c757d;";
+
+    // Bed (King/Queen) + View (Condo/Mountain) filter groups
+    const filterGroups = document.createElement("div");
+    filterGroups.className = "transfer-filter-groups";
+    filterGroups.innerHTML = `
+        <div class="transfer-filter-group" data-transfer-filter="bed">
+            <button type="button" class="transfer-filter-btn active" data-bed="all">All Beds</button>
+            <button type="button" class="transfer-filter-btn" data-bed="1" title="King Bedroom">K</button>
+            <button type="button" class="transfer-filter-btn" data-bed="2" title="Queen Bedroom">Q</button>
+        </div>
+        <div class="transfer-filter-group" data-transfer-filter="view">
+            <button type="button" class="transfer-filter-btn active" data-view="all">All Views</button>
+            <button type="button" class="transfer-filter-btn" data-view="1">Condo View</button>
+            <button type="button" class="transfer-filter-btn" data-view="2">Mountain View</button>
+        </div>
+    `;
 
     // Create and style search input
     const searchInput = document.createElement("input");
     searchInput.id = "searchRoomInput";
     searchInput.className = "form-control form-control-sm";
     searchInput.placeholder = "Search Room #";
-    searchInput.style.cssText = "width: 200px; display: inline-block; background: #ffffff; color: #495057; border: 1px solid #ced4da; border-radius: 6px; padding: 8px 12px;";
+    searchInput.style.cssText = "width: 200px; background: #ffffff; color: #495057; border: 1px solid #ced4da; border-radius: 6px; padding: 8px 12px;";
 
-    // Add search input to container, then container to modal body
+    searchContainer.appendChild(filterGroups);
     searchContainer.appendChild(searchInput);
     const modalBody = modal.querySelector(".modal-body");
     modalBody.prepend(searchContainer);
+
+    // Active filter state
+    let activeBedFilter = 'all';
+    let activeViewFilter = 'all';
+
+    // Show/hide rooms by search text + bed + view (all AND'd together)
+    function applyTransferFilters() {
+        const searchQuery = searchInput.value.trim().toLowerCase();
+        grid.querySelectorAll(".room-container").forEach((roomContainer) => {
+            const roomNumber = (roomContainer.querySelector(".room-button")?.textContent || "").toLowerCase();
+            const bed = roomContainer.dataset.bed || "";
+            const view = roomContainer.dataset.view || "";
+            const matchesSearch = !searchQuery || roomNumber.includes(searchQuery);
+            const matchesBed = activeBedFilter === 'all' || bed === activeBedFilter;
+            const matchesView = activeViewFilter === 'all' || view === activeViewFilter;
+            roomContainer.style.display = (matchesSearch && matchesBed && matchesView) ? "flex" : "none";
+        });
+        // Hide a floor block whose rooms are all filtered out
+        grid.querySelectorAll(".room-grid").forEach((floorRow) => {
+            const anyVisible = Array.from(floorRow.querySelectorAll(".room-container"))
+                .some((rc) => rc.style.display !== "none");
+            floorRow.style.display = anyVisible ? "flex" : "none";
+            const header = floorRow.previousElementSibling;
+            if (header && header.classList.contains("floor-header")) {
+                header.style.display = anyVisible ? "" : "none";
+            }
+        });
+    }
+
+    filterGroups.addEventListener("click", (e) => {
+        const btn = e.target.closest(".transfer-filter-btn");
+        if (!btn) return;
+        const group = btn.closest(".transfer-filter-group");
+        group.querySelectorAll(".transfer-filter-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        if (group.dataset.transferFilter === "bed") {
+            activeBedFilter = btn.dataset.bed;
+        } else {
+            activeViewFilter = btn.dataset.view;
+        }
+        applyTransferFilters();
+    });
 
     // ✅ Function to manually open the modal
     window.openTransferModal = function (button) {
@@ -7437,6 +7679,14 @@ function initializeTransferModal() {
 
         // Reset modal content
         grid.innerHTML = '<p class="text-center text-muted">Loading available rooms...</p>';
+
+        // Reset bed / view / search filters each time the modal opens
+        activeBedFilter = 'all';
+        activeViewFilter = 'all';
+        searchInput.value = '';
+        filterGroups.querySelectorAll('.transfer-filter-group').forEach((group) => {
+            group.querySelectorAll('.transfer-filter-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
+        });
 
         // Format the checkout date properly for MySQL DATETIME
         let formattedCheckOutDate = checkOutDate;
@@ -7458,7 +7708,7 @@ function initializeTransferModal() {
         }
 
         // Fetch available rooms for transfer
-        fetch(`/dashboard/transfer-available-rooms?currentRoom=${currentRoom}&checkOutDate=${encodeURIComponent(formattedCheckOutDate)}`)
+        fetch(`/dashboard/transfer-available-rooms?currentRoom=${currentRoom}&checkOutDate=${encodeURIComponent(formattedCheckOutDate)}&bookingId=${encodeURIComponent(bookingId || '')}`)
             .then((response) => {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
@@ -7583,12 +7833,15 @@ function initializeTransferModal() {
 
                 const roomContainer = document.createElement("div");
                 roomContainer.className = "room-container";
+                // 1 = King, 2 = Queen ; view 1 = Condo, 2 = Mountain
+                roomContainer.dataset.bed = (room.ROOM_BED ?? '').toString();
+                roomContainer.dataset.view = (room.ROOM_VIEW ?? '').toString();
                 roomContainer.style.cssText = `
-                    display: flex; 
-                    justify-content: center; 
-                    align-items: center; 
-                    width: 70px; 
-                    height: 70px; 
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    width: 70px;
+                    height: 70px;
                     border: 1px solid #dee2e6; 
                     border-radius: 6px; 
                     background-color: ${roomBackground}; 
@@ -7626,6 +7879,9 @@ function initializeTransferModal() {
 
             grid.appendChild(floorRow);
         });
+
+        // Re-apply any active bed/view/search filter to the freshly rendered rooms
+        applyTransferFilters();
     }
 
     // ✅ Function to group rooms by floor
@@ -7711,15 +7967,8 @@ function initializeTransferModal() {
         });
     }
 
-    // ✅ Filter rooms by search input
-    searchInput.addEventListener("input", () => {
-        const searchQuery = searchInput.value.trim().toLowerCase();
-        const allRooms = grid.querySelectorAll(".room-container");
-        allRooms.forEach((roomContainer) => {
-            const roomNumber = roomContainer.querySelector(".room-button").textContent.toLowerCase();
-            roomContainer.style.display = roomNumber.includes(searchQuery) ? "flex" : "none";
-        });
-    });
+    // ✅ Filter rooms by search input (combined with the bed/view filters)
+    searchInput.addEventListener("input", applyTransferFilters);
 }
 
 // ✅ Initialize Late Checkout Modal (Dynamic Creation)

@@ -588,6 +588,7 @@ function escapeCancelledModalText(text) {
     .replace(/'/g, '&#39;');
 }
 
+
 function showMaintenanceModal(event) {
   if (typeof Swal !== 'undefined' && Swal.isVisible()) {
     Swal.close();
@@ -776,186 +777,98 @@ function reopenMaintenanceBooking(bookingId, event) {
     });
 }
 
-// Function to show cancelled reservation modal
-function showCancelledModal(event) {
-  const roomNumber = event.getResources()[0]?.title || 'N/A';
-  const guestName = event.title || 'Unknown Guest';
-  const bookingId = event.id;
-  const cancellationReason = String(event.extendedProps?.cancellationReason || '').trim();
-  const reasonMessage = cancellationReason
-    ? escapeCancelledModalText(cancellationReason)
-    : 'This reservation has been cancelled.';
+// Cancelled reservations now open the full (read-only) Room Reservation Details
+// modal instead of a bespoke SweetAlert. The Reopen / Remove prompt flows below
+// are triggered from that modal's header buttons (see
+// reopenCancelledFromRoomMenu / removeCancelledFromRoomMenu in room-menu_data.js).
 
-  // FullCalendar uses exclusive end → subtract one day
-  const ci = new Date(event.start);
-  const co = new Date(event.end);
-  co.setDate(co.getDate() - 1);
-
-  const checkIn = ci.toLocaleDateString();
-  const checkOut = co.toLocaleDateString();
-
+// Reopen prompt: status pick -> confirm -> loading -> API call.
+function promptReopenCancelledReservation(bookingId, event) {
+  if (typeof Swal === 'undefined') return;
   Swal.fire({
-    title: `Room ${roomNumber} - Cancelled Reservation`,
-    html: `
-      <div class="text-left" style="padding: 20px 0;">
-        <div style="margin-bottom: 20px;">
-          <div style="display: flex; align-items: center; margin-bottom: 15px;">
-            <div style="width: 8px; height: 8px; background-color: #000000; border-radius: 50%; margin-right: 12px;"></div>
-            <span style="font-weight: 600; color: #ffffff; font-size: 16px;">Cancelled Reservation</span>
-          </div>
-          <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border-left: 3px solid #000000;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
-              <div style="flex: 1; margin-right: 15px;">
-                <span style="color: #cccccc; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Guest Name</span>
-                <div style="color: #ffffff; font-weight: 600; font-size: 16px; margin-top: 4px;">${guestName}</div>
-              </div>
-              <div style="flex: 1;">
-                <span style="color: #cccccc; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Status</span>
-                <div style="color: #ffffff; font-weight: 700; font-size: 16px; margin-top: 4px; text-transform: uppercase;">Cancelled</div>
-              </div>
-            </div>
-            <div style="display: flex; justify-content: space-between;">
-              <div style="flex: 1; margin-right: 15px;">
-                <span style="color: #cccccc; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Check-in Date</span>
-                <div style="color: #ffffff; font-weight: 600; font-size: 16px; margin-top: 4px;">${checkIn}</div>
-              </div>
-              <div style="flex: 1;">
-                <span style="color: #cccccc; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Check-out Date</span>
-                <div style="color: #ffffff; font-weight: 600; font-size: 16px; margin-top: 4px;">${checkOut}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div style="text-align: center; padding: 15px; background: rgba(0, 0, 0, 0.15); border-radius: 8px; border: 1px solid rgba(0, 0, 0, 0.35);">
-          <span style="color: #ffffff; font-size: 14px; font-weight: 500; white-space: pre-wrap; word-break: break-word;">
-            ❌ ${reasonMessage}
-          </span>
-        </div>
-      </div>
-    `,
-    icon: 'error',
-    cancelButtonText: 'Remove',
-    confirmButtonText: 'Reopen Reservation',
-    denyButtonText: 'Close',
-    showDenyButton: true,
-    reverseButtons: true, 
+    title: 'Select New Status',
+    text: 'Choose the new status for this reopened reservation:',
+    icon: 'question',
     showCancelButton: true,
-    confirmButtonColor: '#000000',
-    cancelButtonColor: '#dc3545',
-    denyButtonColor: '#6c757d',
+    showDenyButton: true,
+    confirmButtonText: 'Regular Check-in',
+    denyButtonText: 'Late Check-in',
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: '#e53935',
+    denyButtonColor: '#b8a600',
+    cancelButtonColor: '#6c757d',
     background: '#2a3135',
-    color: '#ffffff',
-    width: '500px'
-      }).then((result) => {
-      const openedAction = result.isConfirmed || result.dismiss === Swal.DismissReason.cancel;
-      if (!openedAction && typeof window.glowCalendarScheduleBar === 'function') {
-        window.glowCalendarScheduleBar(bookingId);
-      }
+    color: '#ffffff'
+  }).then((statusResult) => {
+    if (statusResult.isConfirmed) {
+      Swal.fire({
+        title: 'Reopen as Regular Check-in?',
+        text: 'Are you sure you want to reopen this cancelled reservation as a regular check-in?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, Reopen as Regular Check-in',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#e53935',
+        cancelButtonColor: '#6c757d'
+      }).then((reopenResult) => {
+        if (reopenResult.isConfirmed) {
+          Swal.fire({
+            title: 'Reopening Reservation...',
+            text: 'Please wait while we reopen the cancelled reservation as regular check-in.',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
+          });
+          reopenCancelledReservation(bookingId, event, 'pending');
+        }
+      });
+    } else if (statusResult.isDenied) {
+      Swal.fire({
+        title: 'Reopen as Late Check-in?',
+        text: 'Are you sure you want to reopen this cancelled reservation as a late check-in?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, Reopen as Late Check-in',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#b8a600',
+        cancelButtonColor: '#6c757d'
+      }).then((reopenResult) => {
+        if (reopenResult.isConfirmed) {
+          Swal.fire({
+            title: 'Reopening Reservation...',
+            text: 'Please wait while we reopen the cancelled reservation as late check-in.',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
+          });
+          reopenCancelledReservation(bookingId, event, 'late_check_in');
+        }
+      });
+    }
+  });
+}
 
-      if (result.isConfirmed) {
-        // Reopen button clicked - show status selection first
-        Swal.fire({
-          title: 'Select New Status',
-          text: 'Choose the new status for this reopened reservation:',
-          icon: 'question',
-          showCancelButton: true,
-          showDenyButton: true,
-          confirmButtonText: 'Regular Check-in',
-          denyButtonText: 'Late Check-in',
-          cancelButtonText: 'Cancel',
-          confirmButtonColor: '#e53935', // Red for regular
-          denyButtonColor: '#b8a600', // Dark lemon for late
-          cancelButtonColor: '#6c757d',
-          background: '#2a3135',
-          color: '#ffffff'
-        }).then((statusResult) => {
-          if (statusResult.isConfirmed) {
-            // User selected "Regular Check-in" - show confirmation
-            Swal.fire({
-              title: 'Reopen as Regular Check-in?',
-              text: 'Are you sure you want to reopen this cancelled reservation as a regular check-in?',
-              icon: 'question',
-              showCancelButton: true,
-              confirmButtonText: 'Yes, Reopen as Regular Check-in',
-              cancelButtonText: 'Cancel',
-              confirmButtonColor: '#e53935',
-              cancelButtonColor: '#6c757d'
-            }).then((reopenResult) => {
-              if (reopenResult.isConfirmed) {
-                // Show loading state
-                Swal.fire({
-                  title: 'Reopening Reservation...',
-                  text: 'Please wait while we reopen the cancelled reservation as regular check-in.',
-                  allowOutsideClick: false,
-                  didOpen: () => {
-                    Swal.showLoading();
-                  }
-                });
-                
-                // Call API to reopen the cancelled reservation as pending
-                reopenCancelledReservation(bookingId, event, 'pending');
-              }
-            });
-          } else if (statusResult.isDenied) {
-            // User selected "Late Check-in Modal" - show confirmation
-            Swal.fire({
-              title: 'Reopen as Late Check-in?',
-              text: 'Are you sure you want to reopen this cancelled reservation as a late check-in?',
-              icon: 'question',
-              showCancelButton: true,
-              confirmButtonText: 'Yes, Reopen as Late Check-in',
-              cancelButtonText: 'Cancel',
-              confirmButtonColor: '#b8a600',
-              cancelButtonColor: '#6c757d'
-            }).then((reopenResult) => {
-              if (reopenResult.isConfirmed) {
-                // Show loading state
-                Swal.fire({
-                  title: 'Reopening Reservation...',
-                  text: 'Please wait while we reopen the cancelled reservation as late check-in.',
-                  allowOutsideClick: false,
-                  didOpen: () => {
-                    Swal.showLoading();
-                  }
-                });
-                
-                // Call API to reopen the cancelled reservation as late check-in
-                reopenCancelledReservation(bookingId, event, 'late_check_in');
-              }
-            });
-          }
-          // Cancel button just closes the modal automatically
-        });
-      } else if (result.dismiss === Swal.DismissReason.cancel) {
-        // Remove button clicked
-        Swal.fire({
-          title: 'Remove Reservation?',
-          text: 'Are you sure you want to permanently remove this cancelled reservation? This action cannot be undone.',
-          icon: 'warning',
-          showCancelButton: true,
-          confirmButtonText: 'Yes, Remove',
-          cancelButtonText: 'Cancel',
-          confirmButtonColor: '#dc3545',
-          cancelButtonColor: '#6c757d'
-        }).then((removeResult) => {
-          if (removeResult.isConfirmed) {
-            // Show loading state
-            Swal.fire({
-              title: 'Removing Reservation...',
-              text: 'Please wait while we remove the reservation.',
-              allowOutsideClick: false,
-              didOpen: () => {
-                Swal.showLoading();
-              }
-            });
-            
-            // Call API to remove the reservation
-            removeCancelledReservation(bookingId, event);
-          }
-        });
-      }
-      // Close button (deny) just closes the modal automatically
-    });
+// Remove prompt: confirm -> loading -> API call.
+function promptRemoveCancelledReservation(bookingId, event) {
+  if (typeof Swal === 'undefined') return;
+  Swal.fire({
+    title: 'Remove Reservation?',
+    text: 'Are you sure you want to permanently remove this cancelled reservation? This action cannot be undone.',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, Remove',
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: '#dc3545',
+    cancelButtonColor: '#6c757d'
+  }).then((removeResult) => {
+    if (removeResult.isConfirmed) {
+      Swal.fire({
+        title: 'Removing Reservation...',
+        text: 'Please wait while we remove the reservation.',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      });
+      removeCancelledReservation(bookingId, event);
+    }
+  });
 }
 
 // =============================================================================
@@ -1441,7 +1354,8 @@ window.reopenMaintenanceBooking = reopenMaintenanceBooking;
 window.completeMaintenanceBooking = completeMaintenanceBooking;
 window.showLateCheckInModal = showLateCheckInModal;
 window.showPendingModal = showPendingModal;
-window.showCancelledModal = showCancelledModal;
+window.promptReopenCancelledReservation = promptReopenCancelledReservation;
+window.promptRemoveCancelledReservation = promptRemoveCancelledReservation;
 window.showBookingDetailsModal = showBookingDetailsModal;
 window.populateBookingModal = populateBookingModal;
 window.editBookingFromCalendar = editBookingFromCalendar;

@@ -27,6 +27,7 @@ var BILLING_PAYMENT_METHOD_LABELS = window.BILLING_PAYMENT_METHOD_LABELS || {
     marker: 'Credit',
     check: 'Check',
     bank_transfer: 'Bank Transfer',
+    korean_bank: 'Korean Bank',
     agoda: 'AGODA',
     expedia: 'EXPEDIA'
 };

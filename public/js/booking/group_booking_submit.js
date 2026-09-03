@@ -94,7 +94,7 @@ $(document).ready(function () {
     const flightNumber = $('#groupFlightNumber').val();
     const passengerCount = $('#groupPassengerCount').val();
 
-    if (!daterange || !groupName || !groupContact) {
+    if (!daterange || !groupName) {
       Swal.fire({
         icon: 'error',
         title: 'Incomplete Form',

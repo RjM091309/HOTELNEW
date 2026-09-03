@@ -546,11 +546,47 @@ class BookingModel {
     return rows.map(r => r.IDNo);
   }
 
+  // Breakfast list for a given serving date (YYYY-MM-DD): checked-in guests with a
+  // breakfast add-on who slept the night before that date (i.e. they eat breakfast
+  // that morning). Breakfast is SERVICE_ID 74 / 75, or any service whose name /
+  // custom name contains "breakfast".
+  static async getBreakfastList(servingDateStr) {
+    const query = `
+      SELECT
+        b.IDNo AS BOOKING_ID,
+        c.NAME AS GUEST_NAME,
+        r.ROOM_NUMBER,
+        r.ROOM_FLOOR,
+        COALESCE(SUM(bs.QTY), 0) AS BREAKFAST_COUNT
+      FROM booking_service bs
+      INNER JOIN booking b ON b.IDNo = bs.BOOKING_ID
+      LEFT JOIN room r ON r.IDNo = b.ROOM_ID
+      LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
+      LEFT JOIN services s ON s.IDNo = bs.SERVICE_ID
+      WHERE bs.ACTIVE = 1
+        AND b.ACTIVE = 1
+        AND b.BOOKING_STATUS = 'check-In'
+        AND (bs.STATUS IS NULL OR bs.STATUS <> 'cancelled')
+        AND (
+          bs.SERVICE_ID IN (74, 75)
+          OR LOWER(COALESCE(s.SERVICE_NAME, '')) LIKE '%breakfast%'
+          OR LOWER(COALESCE(bs.CUSTOM_NAME, '')) LIKE '%breakfast%'
+        )
+        AND DATE(b.CHECK_IN_DATE) < DATE(?)
+        AND DATE(b.CHECK_OUT_DATE) >= DATE(?)
+      GROUP BY b.IDNo, c.NAME, r.ROOM_NUMBER, r.ROOM_FLOOR
+      HAVING BREAKFAST_COUNT > 0
+      ORDER BY r.ROOM_FLOOR ASC, r.ROOM_NUMBER ASC
+    `;
+    const rows = await queryDatabasePromise(query, [servingDateStr, servingDateStr]);
+    return rows;
+  }
+
   // Get booking services
   static async getBookingServices(bookingId) {
     try {
       const query = `
-        SELECT 
+        SELECT
           bs.IDNo,
           bs.BOOKING_ID,
           bs.SERVICE_ID,
@@ -2472,6 +2508,20 @@ class BookingModel {
       // Remove existing discount payments, then insert a new negative one if amount > 0
       const deleteSql = `DELETE FROM payments WHERE BOOKING_ID = ? AND PAYMENT_TYPE = 'discount'`;
       await queryDatabasePromise(deleteSql, [bookingId]);
+
+      // amount 0 == "remove discount": also wipe the leftover discount remark so it
+      // doesn't linger on the billing row / receipts.
+      if (!(amount > 0)) {
+        await queryDatabasePromise(
+          `UPDATE billing SET REMARKS = '' WHERE BOOKING_ID = ?`,
+          [bookingId]
+        );
+        await queryDatabasePromise(
+          `UPDATE remarks SET ACTIVE = 0
+           WHERE BOOKING_ID = ? AND CATEGORY = 'Discount' AND ACTIVE = 1`,
+          [bookingId]
+        );
+      }
 
       if (amount > 0) {
         const insertSql = `
@@ -7230,13 +7280,34 @@ class BookingModel {
         VALUES (?, ?, ?, ?, ?, ?)
       `;
       await queryDatabasePromise(insertLogQuery, [
-        bookingId, 
-        reason || '', 
-        null, 
-        refundAmount, 
-        null, 
+        bookingId,
+        reason || '',
+        null,
+        refundAmount,
+        null,
         encodedBy
       ], connection);
+
+      // Record the refund as a negative payment row so it nets out of sales /
+      // daily-settlement reports and shows in the payment history — same as the
+      // group-cancel flow (see cancelGroupBooking). Without this the money paid
+      // by the guest stays counted as revenue even after it's refunded.
+      if (refundAmount > 0.01) {
+        const refundPaymentQuery = `
+          INSERT INTO payments
+          (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
+          VALUES (?, NULL, ?, 'cash', 'refund', NOW(), ?, ?)
+        `;
+        const refundRemarks = reason && reason.trim() !== ''
+          ? `Cancellation refund - ${reason.trim()}`
+          : 'Cancellation refund';
+        await queryDatabasePromise(refundPaymentQuery, [
+          bookingId,
+          -refundAmount, // Negative to reflect the payout
+          encodedBy,
+          refundRemarks
+        ], connection);
+      }
 
       // Insert remark if reason is provided
       if (reason && reason.trim() !== '') {

@@ -355,8 +355,10 @@ function handleEventClick(info) {
       break;
       
     case 'cancelled':
-      // Show cancelled reservation modal
-      showCancelledModal(event);
+      // Open the full Room Reservation Details modal in read-only mode so a
+      // cancelled booking can be inspected (guest, room, services, totals) while
+      // every action button stays disabled.
+      window.openRoomMenuModal(bookingId, event);
       break;
 
     case 'maintenance':
@@ -378,7 +380,7 @@ function handleEventClick(info) {
         } else if (eventColor === '#000000') {
           const barStatus = getCalendarBookingStatus(event);
           if (barStatus === 'cancelled') {
-            showCancelledModal(event);
+            window.openRoomMenuModal(bookingId, event);
           } else if (isMaintenanceCalendarEvent(event)) {
             showMaintenanceModal(event);
           } else {

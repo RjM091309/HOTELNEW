@@ -466,8 +466,8 @@ class DashboardController {
   // Get available rooms for transfer
   static async getAvailableRoomsForTransfer(req, res) {
     try {
-      const { currentRoom, checkOutDate } = req.query;
-      
+      const { currentRoom, checkOutDate, bookingId } = req.query;
+
       if (!currentRoom || !checkOutDate) {
         return res.status(400).json({
           success: false,
@@ -475,7 +475,7 @@ class DashboardController {
         });
       }
 
-      const availableRooms = await DashboardModel.getAvailableRoomsForTransfer(currentRoom, checkOutDate);
+      const availableRooms = await DashboardModel.getAvailableRoomsForTransfer(currentRoom, checkOutDate, bookingId || null);
       
       res.json(availableRooms);
     } catch (error) {

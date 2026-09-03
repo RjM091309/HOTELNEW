@@ -88,6 +88,56 @@ class BookingController {
     }
   }
 
+  // Render the Breakfast list page
+  static async renderBreakfastListPage(req, res) {
+    try {
+      const user = req.user ? {
+        FULLNAME: req.user.FULLNAME,
+        PERMISSIONS: req.user.PERMISSIONS
+      } : null;
+
+      res.render('booking/breakfast_list', {
+        title: 'Breakfast List',
+        subTitle: 'Breakfast List',
+        activePage: 'breakfast-list',
+        user
+      });
+    } catch (error) {
+      console.error('Error rendering breakfast list page:', error);
+      res.status(500).render('error/500', {
+        title: 'Server Error',
+        subTitle: '500 Error'
+      });
+    }
+  }
+
+  static async getBreakfastListData(req, res) {
+    try {
+      // 'today'   -> breakfast served this morning (guests who slept last night)
+      // 'tomorrow'-> breakfast served tomorrow morning (guests staying tonight); default
+      const serving = req.query.serving === 'today' ? 'today' : 'tomorrow';
+      const base = new Date();
+      if (serving === 'tomorrow') base.setDate(base.getDate() + 1);
+      const servingDate =
+        base.getFullYear() + '-' +
+        String(base.getMonth() + 1).padStart(2, '0') + '-' +
+        String(base.getDate()).padStart(2, '0');
+
+      const rows = await BookingModel.getBreakfastList(servingDate);
+
+      const totals = rows.reduce((acc, r) => {
+        acc.total += Number(r.BREAKFAST_COUNT) || 0;
+        acc.guests += 1;
+        return acc;
+      }, { total: 0, guests: 0 });
+
+      res.json({ success: true, serving, servingDate, data: rows, totals });
+    } catch (error) {
+      console.error('Error fetching breakfast list:', error);
+      res.status(500).json({ success: false, message: 'Failed to load breakfast list' });
+    }
+  }
+
   // Render the group booking page
   static async renderGroupBookingPage(req, res) {
     try {
