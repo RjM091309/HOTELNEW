@@ -116,8 +116,8 @@ function pickBookingId(req, params, responseBody) {
   const b = req.body || {};
   const p = params || {};
   const fromReq =
-    p.bookingId || p.bookingID ||
-    b.bookingId || b.booking_id || b.bookingID || b.BOOKING_ID ||
+    p.bookingId || p.bookingID || p.BookingID ||
+    b.bookingId || b.booking_id || b.bookingID || b.BOOKING_ID || b.BookingID || b.bookingid ||
     (b.booking && (b.booking.id || b.booking.IDNo));
   if (fromReq) return fromReq;
   if (responseBody && typeof responseBody === 'object') {
@@ -214,7 +214,8 @@ const AMOUNT_KEYS = [
   'amount', 'amountPaid', 'amount_paid', 'paidAmount', 'paid_amount',
   'payment_amount', 'paymentAmount', 'cost', 'lateCheckoutFee', 'late_checkout_fee',
   'discount', 'discountAmount', 'discount_amount', 'depositAmount', 'deposit_amount',
-  'securityDeposit', 'security_deposit', 'refundAmount', 'refund_amount', 'total', 'grandTotal'
+  'securityDeposit', 'security_deposit', 'refundAmount', 'refund_amount',
+  'deductAmount', 'deduct_amount', 'total', 'grandTotal'
 ];
 
 function extractAmount(body) {
