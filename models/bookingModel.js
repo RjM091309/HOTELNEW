@@ -1488,6 +1488,7 @@ class BookingModel {
       guestID,
       guestType,
       guestLevel,
+      nationality = null,
       breakfastAdultQty,
       breakfastAdultPrice,
       breakfastAdultId,
@@ -1558,27 +1559,37 @@ class BookingModel {
         }
 
         let customerId = guestID;
+        const processedNationality = (nationality && String(nationality).trim() !== '') ? String(nationality).trim() : null;
 
         // If no guestID, create new customer
         if (!customerId) {
           // Handle empty guestType and guestLevel - set to NULL if empty
           const processedGuestType = (guestType && guestType.trim() !== '') ? guestType : null;
           const processedGuestLevel = (guestLevel && guestLevel.trim() !== '') ? guestLevel : null;
-          
+
           const customerQuery = `
-            INSERT INTO customer (NAME, CONTACTNo, TYPE, LEVEL, ADDRESS, ENCODED_BY, ENCODED_DT, ACTIVE) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+            INSERT INTO customer (NAME, CONTACTNo, NATIONALITY, TYPE, LEVEL, ADDRESS, ENCODED_BY, ENCODED_DT, ACTIVE)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
           `;
-          const customerValues = [fullname, number, processedGuestType, processedGuestLevel, address, encodedBy, date];
-          
+          const customerValues = [fullname, number, processedNationality, processedGuestType, processedGuestLevel, address, encodedBy, date];
+
           const customerResult = await new Promise((resolve, reject) => {
             connection.query(customerQuery, customerValues, (err, result) => {
               if (err) reject(err);
               else resolve(result);
             });
           });
-          
+
           customerId = customerResult.insertId;
+        } else if (processedNationality) {
+          // Existing guest picked - keep their nationality up to date
+          await new Promise((resolve, reject) => {
+            connection.query(
+              'UPDATE customer SET NATIONALITY = ? WHERE IDNo = ?',
+              [processedNationality, customerId],
+              (err) => (err ? reject(err) : resolve())
+            );
+          });
         }
 
         // Create booking
@@ -4060,13 +4071,14 @@ class BookingModel {
   static async searchCustomer(searchQuery) {
     try {
       const query = `
-        SELECT 
-          customer.IDNo as CUSTOMER_ID, 
-          customer.NAME AS NAME, 
-          guest_level.TYPE AS LEVEL, 
-          guest_type.TYPE AS TYPE, 
-          customer.CONTACTNo AS CONTACT_NO 
-        FROM customer 
+        SELECT
+          customer.IDNo as CUSTOMER_ID,
+          customer.NAME AS NAME,
+          guest_level.TYPE AS LEVEL,
+          guest_type.TYPE AS TYPE,
+          customer.NATIONALITY AS NATIONALITY,
+          customer.CONTACTNo AS CONTACT_NO
+        FROM customer
         LEFT JOIN guest_level ON guest_level.IDNo = customer.LEVEL
         LEFT JOIN guest_type ON guest_type.IDNo = customer.TYPE
         WHERE customer.NAME LIKE ? 

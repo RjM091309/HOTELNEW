@@ -2461,8 +2461,7 @@ function initializeAddBookingHandler() {
             paidAmount: $('#paidAmountHidden').val() || $('#paidAmount').val() || '0.00',
             price: isDirectReservation ? ($('#baseprice').val() || $('#price').val() || '0.00') : $('#baseprice').val(), // Use calculated price for direct reservations based on bed count
             diffindays: $('#diffindays').val(),
-            guestType: $('#guestType').val(),
-            guestLevel: $('#guestLevel').val(),
+            nationality: ($('#nationality').val() || '').trim(),
             guestID: $('#guestID').val(),
             bookingRoute: isDirectReservation ? 'direct-reservation' : $('#bookingRoute').val(),
             checkInStatus: $('#checkInStatus').val(),
@@ -2501,6 +2500,11 @@ function initializeAddBookingHandler() {
             // Add direct reservation flag
             directReservationFlag: isDirectReservation ? 'true' : 'false'
         };
+
+        if (!isDirectReservation && !formData.nationality) {
+            Swal.fire({ icon: 'error', title: 'Nationality Required', text: 'Please select the guest nationality.' });
+            return;
+        }
 
         // Validate agency selection if booking route is agency (for both regular and unassigned room bookings)
         // Check the actual booking route from the form, not the processed one

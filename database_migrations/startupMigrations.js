@@ -408,10 +408,24 @@ async function runRoomRatesMigrations() {
   console.log('✅ Ensured table + seed: room_rates');
 }
 
+async function runCustomerNationalityMigration() {
+  if (!(await tableExists('customer'))) {
+    console.warn('⚠️ customer table not found, skipping NATIONALITY column migration');
+    return;
+  }
+  await ensureColumn(
+    'customer',
+    'NATIONALITY',
+    `NATIONALITY VARCHAR(60) NULL DEFAULT NULL`,
+    'CONTACTNo'
+  );
+}
+
 async function runStartupMigrations() {
   console.log('🔄 Running startup database migrations...');
 
   await runActivityLogMigrations();
+  await runCustomerNationalityMigration();
   await runRoomRatesMigrations();
   await runFlightScheduleMigrations();
   await runPickupDropMigrations();
