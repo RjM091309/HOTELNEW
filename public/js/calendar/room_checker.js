@@ -886,10 +886,18 @@ function proceedRoomCheckerBooking() {
   // checkbox is on).
   const breakfastCount = Math.max(0, parseInt(document.getElementById('rateSummaryBreakfastQty').value, 10) || 0);
 
+  // The exact total already quoted here, before any specific room is picked -
+  // carried into the group-booking modal's Summary as an immediate preview
+  // (see openRoomCheckerGroupBooking) so staff see the cost right away instead
+  // of a misleading ₱0.00 while they haven't picked rooms yet. Once they do
+  // pick specific rooms there, computeGroupTotal() naturally overwrites this
+  // with the real total for those exact rooms.
+  const quotedGrandTotalText = (document.getElementById('rateSummaryGrandTotal') || {}).textContent || '';
+
   if (totalRooms === 1) {
     openRoomCheckerSingleBooking(dateRangeStr, range.nights, start, checkoutDate, totalDiscount, breakfastCount);
   } else {
-    openRoomCheckerGroupBooking(dateRangeStr, range.nights, start, checkoutDate, kingQty, queenQty, totalDiscount, breakfastCount);
+    openRoomCheckerGroupBooking(dateRangeStr, range.nights, start, checkoutDate, kingQty, queenQty, totalDiscount, breakfastCount, quotedGrandTotalText);
   }
 }
 
@@ -937,7 +945,7 @@ function openRoomCheckerSingleBooking(dateRangeStr, nights, start, checkoutDate,
   }
 }
 
-function openRoomCheckerGroupBooking(dateRangeStr, nights, start, checkoutDate, kingQty, queenQty, totalDiscount, breakfastCount) {
+function openRoomCheckerGroupBooking(dateRangeStr, nights, start, checkoutDate, kingQty, queenQty, totalDiscount, breakfastCount, quotedGrandTotalText) {
   const modalEl = document.getElementById('modal-add-group-booking');
   if (!modalEl) return;
 
@@ -1006,6 +1014,24 @@ function openRoomCheckerGroupBooking(dateRangeStr, nights, start, checkoutDate, 
       // Check-Out selections (Walk-in / Regular / Regular), same as a fresh open.
       const searchBtn = document.getElementById('groupSearchRooms');
       if (searchBtn && (kingQty > 0 || queenQty > 0)) searchBtn.click();
+
+      // That change-triggered recompute has nothing to work with yet (no rooms
+      // picked) and leaves Total at just the breakfast/discount portion, so
+      // show the total Room Checker already quoted instead - a preview, not a
+      // real selection. Paid Amount wasn't touched above (still 0), so Balance
+      // mirrors the same quoted figure. Deferred an extra tick (past the
+      // synchronous change-trigger and search-click above) so it's the last
+      // write to these fields; once staff actually pick rooms below,
+      // computeGroupTotal() overwrites both with the real total for those
+      // specific rooms.
+      if (quotedGrandTotalText) {
+        setTimeout(() => {
+          const totalEl = document.getElementById('groupComputedTotal');
+          const balanceEl = document.getElementById('groupComputedBalance');
+          if (totalEl) totalEl.textContent = quotedGrandTotalText;
+          if (balanceEl) balanceEl.textContent = quotedGrandTotalText;
+        }, 50);
+      }
     }, 0);
   });
 }

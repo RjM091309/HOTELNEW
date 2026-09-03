@@ -384,11 +384,38 @@
               </div>
             </div>
 
+          <!-- Manual Room Rate Section - its own card, between Summary and Rooms -->
+          <div id="groupManualRateSection" class="group-field-card" style="display: none;">
+            <h6 class="group-field-card-title">Manual / Weekend Rates</h6>
+            <small class="text-muted manual-rate-subtitle">(Override default rates &middot; weekend = Fri, Sat &amp; Sun)</small>
+
+            <!-- Rate Type Toggle -->
+            <div class="rate-type-toggle mb-3">
+              <div class="btn-group" role="group">
+                <input type="radio" class="btn-check" name="rateType" id="individualRates" value="individual" checked>
+                <label class="btn btn-outline-success" for="individualRates">Individual Rooms</label>
+
+                <input type="radio" class="btn-check" name="rateType" id="bedBasedRates" value="bed-based">
+                <label class="btn btn-outline-success" for="bedBasedRates">Bed-Based Pricing</label>
+              </div>
+            </div>
+
+            <!-- Individual Room Rates -->
+            <div id="individualRateSection">
+              <div id="groupManualRateList" class="manual-rate-list"></div>
+            </div>
+
+            <!-- Bed-Based Rates -->
+            <div id="bedBasedRateSection" style="display: none;">
+              <div id="groupBedBasedRateList" class="bed-based-rate-list"></div>
+            </div>
+          </div>
+
           <div class="group-field-card group-card-rooms">
           <h6 class="group-field-card-title">Rooms</h6>
 
           <div class="row p-t-20">
-            <div class="col-lg-12 d-flex align-items-center gap-3 flex-wrap">
+            <div class="col-lg-12 d-flex align-items-end justify-content-between gap-3 flex-wrap">
               <div class="form-group mb-0">
                 <label class="form-label mb-1">Bed Requirements</label>
                 <div class="d-flex gap-3 flex-wrap">
@@ -402,11 +429,6 @@
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-
-          <div class="row p-t-20">
-            <div class="col-lg-12 d-flex justify-content-start">
               <button type="button" class="btn btn-success" id="groupSearchRooms">Search Rooms</button>
             </div>
           </div>
@@ -424,37 +446,6 @@
               <div id="groupManualRoomsContainer" class="room-list-container" style="display: none;"></div>
               <div class="mt-2 text-warning" id="groupAvailabilityWarning" style="display: none;"></div>
               <div class="mt-2 text-muted" id="groupManualSelectionInfo" style="display: none;"></div>
-
-              <!-- Manual Room Rate Section -->
-              <div id="groupManualRateSection" class="mt-3" style="display: none;">
-                <div class="manual-rate-container">
-                  <h6 class="text-info mb-3">
-                    <i class="fa fa-edit"></i> Manual / Weekend Rates
-                    <small class="text-muted">(Override default rates · weekend = Fri, Sat &amp; Sun)</small>
-                  </h6>
-
-                  <!-- Rate Type Toggle -->
-                  <div class="rate-type-toggle mb-3">
-                    <div class="btn-group" role="group">
-                      <input type="radio" class="btn-check" name="rateType" id="individualRates" value="individual" checked>
-                      <label class="btn btn-outline-success" for="individualRates">Individual Rooms</label>
-
-                      <input type="radio" class="btn-check" name="rateType" id="bedBasedRates" value="bed-based">
-                      <label class="btn btn-outline-success" for="bedBasedRates">Bed-Based Pricing</label>
-                    </div>
-                  </div>
-
-                  <!-- Individual Room Rates -->
-                  <div id="individualRateSection">
-                    <div id="groupManualRateList" class="manual-rate-list"></div>
-                  </div>
-
-                  <!-- Bed-Based Rates -->
-                  <div id="bedBasedRateSection" style="display: none;">
-                    <div id="groupBedBasedRateList" class="bed-based-rate-list"></div>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
           </div>
@@ -555,7 +546,7 @@
 }
 
 #modal-add-group-booking .group-card-rooms {
-  margin-bottom: 0;
+  margin-bottom: 18px;
 }
 
 #modal-add-group-booking .group-summary-card {
@@ -1019,18 +1010,19 @@
   }
 }
 
-/* Manual Rate Section Styling */
-#modal-add-group-booking .manual-rate-container {
-  background-color: #1f262a;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  padding: 16px;
-  margin-top: 16px;
-}
-
+/* Manual Rate Section Styling - a fixed "1fr 1fr 1fr 1fr" always reserves 4
+   columns' worth of width, but 1fr alone won't shrink a column below its
+   content's natural min-width, so whenever 4 columns' worth of items (room
+   number + bed badge + rate input) didn't actually fit the card, the last
+   column got pushed outside the modal instead of wrapping. auto-fit lets the
+   browser fit as many columns as the available width actually allows, wrap
+   the rest to new rows, AND stretch the row's actual items to fill any
+   leftover space instead of leaving unused blank track(s) sized for items
+   that don't exist (auto-fill's behavior) - self-adjusts to any modal/screen
+   width instead of assuming 4 always fits. */
 #modal-add-group-booking .manual-rate-list {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 8px;
 }
 
@@ -1051,8 +1043,17 @@
   border-color: rgba(111, 156, 64, 0.3);
 }
 
+/* min-width: 0 overrides flexbox's default "never shrink below content's own
+   min-content size" - without it, when an item's row is too narrow, the rate
+   input below (which has its own flex-shrink: 0) couldn't take space FROM
+   this side, so the two together fought over the same space and the room
+   number ended up winning by default, squeezing the rate field down to
+   nothing instead. This makes room-info the one that gives way (room number/
+   bed badge can tolerate being tight; a rate field disappearing can't - see
+   .rate-fields below). */
 #modal-add-group-booking .manual-rate-item .room-info {
   flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1093,11 +1094,14 @@
   font-size: 12px;
 }
 
+/* flex-shrink: 0 - this is the rate input itself; it must never be the side
+   that gives up space when the row is tight (see .room-info above). */
 #modal-add-group-booking .manual-rate-item .rate-fields {
   display: flex;
   flex-direction: column;
   gap: 4px;
   align-items: flex-end;
+  flex-shrink: 0;
 }
 
 #modal-add-group-booking .manual-rate-item .rate-field-row {
@@ -1161,27 +1165,58 @@
   border-color: #6f9c40;
 }
 
-/* Rate Type Toggle Styling */
+/* Sits directly under .group-field-card-title (which keeps its own border-bottom
+   separator) instead of crowding the same line as the all-caps title - was
+   previously an inline-styled <small> right next to "MANUAL / WEEKEND RATES"
+   with barely a word-gap between them. */
+#modal-add-group-booking .manual-rate-subtitle {
+  display: block;
+  margin-top: -10px;
+  margin-bottom: 12px;
+  font-size: 11px;
+}
+
+/* Rate Type Toggle Styling - a single rounded track with the active choice as
+   a solid pill inside it (segmented-control look), instead of two separate
+   Bootstrap btn-outline-success buttons mashed together with no shared
+   container styling of their own. */
 #modal-add-group-booking .rate-type-toggle .btn-group {
+  display: flex;
   width: 100%;
+  gap: 3px;
+  padding: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
 }
 
 #modal-add-group-booking .rate-type-toggle .btn {
   flex: 1;
   font-size: 12px;
+  font-weight: 600;
   padding: 6px 12px;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 6px !important;
+  color: #9aa4ac;
+}
+
+#modal-add-group-booking .rate-type-toggle .btn:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #d7dce0;
 }
 
 #modal-add-group-booking .rate-type-toggle .btn-check:checked + .btn {
-  background-color: #6f9c40;
-  border-color: #6f9c40;
+  background-color: #6f9c40 !important;
   color: #ffffff;
 }
 
-/* Bed-Based Rate List Styling */
+/* Bed-Based Rate List Styling - same auto-fit fix as .manual-rate-list above,
+   so this can't overflow the same way if its content ever needs more room
+   than a fixed 2-column split assumes. */
 #modal-add-group-booking .bed-based-rate-list {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 8px;
 }
 
@@ -1234,10 +1269,16 @@
   color: #bbbbbb;
 }
 
+/* flex-shrink: 0 - same reasoning as .manual-rate-item .rate-fields above:
+   the rate input must never be the side that gets squeezed away. */
+#modal-add-group-booking .bed-based-rate-item .bed-info {
+  min-width: 0;
+}
 #modal-add-group-booking .bed-based-rate-item .rate-input-group {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 #modal-add-group-booking .bed-based-rate-item .rate-input-group .form-control {
@@ -1359,7 +1400,6 @@
    they still read as a level deeper than the white card around them. */
 [data-theme="white"] #modal-add-group-booking .group-room-breakdown,
 [data-theme="white"] #modal-add-group-booking .room-filter-section,
-[data-theme="white"] #modal-add-group-booking .manual-rate-container,
 [data-theme="white"] #modal-add-group-booking .room-list-container {
   background-color: #f9fafb !important;
   border: 1px solid #e5e7eb !important;
@@ -1466,6 +1506,25 @@
 
 [data-theme="white"] #modal-add-group-booking hr {
   border-color: #e5e7eb !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .rate-type-toggle .btn-group {
+  background: #f3f4f6 !important;
+  border-color: #e5e7eb !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .rate-type-toggle .btn {
+  color: #6b7280 !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .rate-type-toggle .btn:hover {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #374151 !important;
+}
+
+[data-theme="white"] #modal-add-group-booking .rate-type-toggle .btn-check:checked + .btn {
+  background-color: #6f9c40 !important;
+  color: #ffffff !important;
 }
 
 [data-theme="white"] #modal-add-group-booking .manual-rate-item,
