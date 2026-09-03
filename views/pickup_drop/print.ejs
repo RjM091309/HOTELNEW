@@ -63,13 +63,22 @@
       max-width: 100%;
       text-align: center;
       font-weight: 700;
-      line-height: 1.1;
+      line-height: 1.08;
       letter-spacing: -0.02em;
-      white-space: normal;
-      word-break: break-word;
-      overflow-wrap: break-word;
+      white-space: nowrap;
+      word-break: normal;
+      overflow-wrap: normal;
       overflow: visible;
       font-size: 28px;
+    }
+
+    .print-guest-name .name-line {
+      display: block;
+      white-space: nowrap;
+    }
+
+    .print-guest-name .name-line + .name-line {
+      margin-top: 0.06em;
     }
 
     .print-footer {
@@ -216,7 +225,7 @@
     <div class="dropoff-notes-area"><%= specialNotes %></div>
     <% } else { %>
     <div class="print-guest-name-wrap">
-      <div class="print-guest-name" id="printGuestName"><%= guestName %></div>
+      <div class="print-guest-name" id="printGuestName" data-name="<%= guestName %>"><%= guestName %></div>
     </div>
     <div class="print-footer">
       <div class="print-footer-left">
@@ -234,51 +243,68 @@
     </div>
     <% } %>
   </div>
+  <script src="/js/pickup_drop/roman-to-hangul.js"></script>
   <script>
     document.title = '';
 
     const isDropoffPrint = <%= isDropoff ? 'true' : 'false' %>;
 
+    // Split "김민지 (TINA HWANG)" -> ["김민지", "TINA HWANG"] (Korean line first).
+    function splitGuestName(raw) {
+      var s = (raw || '').trim();
+      var korean = (s.match(/[가-힣㄰-㆏ᄀ-ᇿ][가-힣㄰-㆏ᄀ-ᇿ\s]*/g) || [])
+        .join(' ').replace(/\s+/g, ' ').trim();
+      var english = s.replace(/[가-힣㄰-㆏ᄀ-ᇿ]+/g, ' ')
+        .replace(/[()\[\]]/g, ' ')
+        .replace(/\s+/g, ' ').trim();
+      var lines = [];
+      if (korean) lines.push(korean);
+      if (english) lines.push(english);
+      if (!lines.length) lines.push(s);
+      return lines;
+    }
+
+    function esc(t) {
+      return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // Korean line first, English line below. If only a romanized name exists,
+    // transliterate a Korean line from the romanization (approximate).
+    function buildNameLines(raw) {
+      var lines = splitGuestName(raw);
+      if (lines.length === 1 && /[A-Za-z]/.test(lines[0]) && window.RomanToHangul) {
+        var kr = window.RomanToHangul.name(lines[0]);
+        if (kr) lines = [kr, lines[0]];
+      }
+      return lines.map(function (t) {
+        return '<div class="name-line">' + esc(t) + '</div>';
+      }).join('');
+    }
+
+    // Render the name (1 line per script) and shrink the font until the
+    // widest line fits the width AND all lines fit the height.
+    function fitNameEl(el, wrap) {
+      if (!el || !wrap) return;
+      el.innerHTML = buildNameLines(el.getAttribute('data-name') || el.textContent);
+
+      var maxW = wrap.clientWidth;
+      var maxH = wrap.clientHeight;
+      var lo = 12, hi = 460, best = 12;
+
+      while (lo <= hi) {
+        var mid = (lo + hi) >> 1;
+        el.style.fontSize = mid + 'px';
+        var widest = 0;
+        el.querySelectorAll('.name-line').forEach(function (n) { widest = Math.max(widest, n.scrollWidth); });
+        if (widest <= maxW + 1 && el.scrollHeight <= maxH + 2) { best = mid; lo = mid + 1; }
+        else { hi = mid - 1; }
+      }
+      el.style.fontSize = best + 'px';
+    }
+
     function fitGuestName() {
-      const el = document.getElementById('printGuestName');
-      if (!el) return;
-
-      if (isDropoffPrint) {
-        return;
-      }
-
-      const wrap = document.querySelector('.print-guest-name-wrap');
-      if (!wrap) return;
-
-      const maxHeight = wrap.clientHeight;
-      const minFontSize = 24;
-      const maxFontSize = 320;
-      let bestFit = minFontSize;
-
-      el.style.width = '100%';
-      el.style.whiteSpace = 'normal';
-      el.style.overflow = 'visible';
-      el.style.wordBreak = 'break-word';
-      el.style.overflowWrap = 'break-word';
-
-      for (let size = minFontSize; size <= maxFontSize; size += 2) {
-        el.style.fontSize = size + 'px';
-        el.style.lineHeight = size >= 120 ? '1.06' : '1.12';
-
-        if (el.scrollHeight <= maxHeight + 4) {
-          bestFit = size;
-        } else {
-          break;
-        }
-      }
-
-      let fontSize = bestFit;
-      el.style.fontSize = fontSize + 'px';
-
-      while (fontSize > minFontSize && el.scrollHeight > maxHeight + 4) {
-        fontSize -= 1;
-        el.style.fontSize = fontSize + 'px';
-      }
+      if (isDropoffPrint) return;
+      fitNameEl(document.getElementById('printGuestName'), document.querySelector('.print-guest-name-wrap'));
     }
 
     window.fitGuestName = fitGuestName;
