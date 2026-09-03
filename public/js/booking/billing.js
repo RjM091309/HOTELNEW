@@ -4,7 +4,9 @@ function formatBillingMoney(value) {
     return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-const BILLING_PAYMENT_TYPE_LABELS = {
+// `var` (not `const`) so a second include of this file never throws
+// "Identifier ... has already been declared".
+var BILLING_PAYMENT_TYPE_LABELS = window.BILLING_PAYMENT_TYPE_LABELS || {
     room: 'Room Payment',
     extended: 'Extension',
     service: 'Service',
@@ -16,8 +18,9 @@ const BILLING_PAYMENT_TYPE_LABELS = {
     security_deposit: 'Security Deposit',
     security_deposit_refund: 'Security Deposit Refund'
 };
+window.BILLING_PAYMENT_TYPE_LABELS = BILLING_PAYMENT_TYPE_LABELS;
 
-const BILLING_PAYMENT_METHOD_LABELS = {
+var BILLING_PAYMENT_METHOD_LABELS = window.BILLING_PAYMENT_METHOD_LABELS || {
     cash: 'Cash',
     credit_card: 'Credit Card',
     credit: 'Credit',
@@ -27,6 +30,7 @@ const BILLING_PAYMENT_METHOD_LABELS = {
     agoda: 'AGODA',
     expedia: 'EXPEDIA'
 };
+window.BILLING_PAYMENT_METHOD_LABELS = BILLING_PAYMENT_METHOD_LABELS;
 
 function formatBillingPaymentType(type) {
     const key = (type || '').toLowerCase();

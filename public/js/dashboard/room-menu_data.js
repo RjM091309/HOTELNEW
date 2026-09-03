@@ -5479,8 +5479,30 @@ function showPayments(bookingId) {
     // Show the modal
     const modal = document.getElementById(`paymentsModal_${bookingId}`);
     const bootstrapModal = new bootstrap.Modal(modal);
+
+    // Force this modal ABOVE every currently-open modal (Room Reservation
+    // Details, and on the Check-out tab the checkout/payment modal too),
+    // otherwise it can render on a lower layer than the modal that opened it.
+    const liftPaymentsModal = () => {
+        let maxZ = 1055;
+        document.querySelectorAll('.modal.show').forEach((m) => {
+            if (m === modal) return;
+            const z = parseInt(window.getComputedStyle(m).zIndex, 10);
+            if (Number.isFinite(z)) maxZ = Math.max(maxZ, z);
+        });
+        const top = maxZ + 20;
+        modal.style.setProperty('z-index', String(top), 'important');
+        const backdrops = document.querySelectorAll('.modal-backdrop.show');
+        if (backdrops.length) {
+            backdrops[backdrops.length - 1].style.setProperty('z-index', String(top - 5), 'important');
+        }
+    };
+
     raiseStackedModal(modal, 1065);
+    modal.addEventListener('shown.bs.modal', liftPaymentsModal, { once: true });
     bootstrapModal.show();
+    liftPaymentsModal();
+    setTimeout(liftPaymentsModal, 60);
 
     // Load payment data
     loadPaymentData(bookingId);

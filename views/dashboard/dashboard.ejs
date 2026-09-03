@@ -848,9 +848,12 @@ function calculateCardVariables(booking) {
 		var script4 = document.createElement('script');
 		script4.src = '/js/dashboard/extend_data.js';
 		document.body.appendChild(script4);
-		var billingJs = document.createElement('script');
-		billingJs.src = '/js/booking/billing.js';
-		document.body.appendChild(billingJs);
+		if (!window.__billingJsRequested) {
+			window.__billingJsRequested = true;
+			var billingJs = document.createElement('script');
+			billingJs.src = '/js/booking/billing.js';
+			document.body.appendChild(billingJs);
+		}
 		var script7 = document.createElement('script');
 		script7.src = '/js/dashboard/booking_data.js';
 		document.body.appendChild(script7);
