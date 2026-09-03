@@ -259,21 +259,27 @@ function fetchRoomCheckerRangeAvailability() {
 
   const startStr = roomCheckerFormatDateKey(range.start);
   const endStr = roomCheckerFormatDateKey(end);
+  const bookingType = document.querySelector('input[name="rateSummaryBookingType"]:checked').value;
 
-  // Clear immediately so a stale prior-range count can't be used to warn
-  // against the new range while this request is in flight.
+  // Clear immediately so a stale prior-range count/rate can't be used to warn
+  // against (or quote) the new range while this request is in flight.
   window.__rateSummaryRangeAvailability = null;
 
   fetch(`/booking/api/range-availability?startDate=${startStr}&endDate=${endStr}`
-    + `&checkInStatus=${ROOM_CHECKER_DEFAULT_CHECK_IN_STATUS}&checkOutStatus=${ROOM_CHECKER_DEFAULT_CHECK_OUT_STATUS}`)
+    + `&checkInStatus=${ROOM_CHECKER_DEFAULT_CHECK_IN_STATUS}&checkOutStatus=${ROOM_CHECKER_DEFAULT_CHECK_OUT_STATUS}`
+    + `&bookingType=${bookingType}`)
     .then((response) => response.json())
     .then((data) => {
       window.__rateSummaryRangeAvailability = data.success ? { single: data.single, double: data.double } : null;
+      window.__rateSummaryKingRate = data.success ? (data.kingRate || 0) : 0;
+      window.__rateSummaryQueenRate = data.success ? (data.queenRate || 0) : 0;
       recomputeRateSummaryTotals();
     })
     .catch((err) => {
       console.error('Error fetching room range availability:', err);
       window.__rateSummaryRangeAvailability = null;
+      window.__rateSummaryKingRate = 0;
+      window.__rateSummaryQueenRate = 0;
       recomputeRateSummaryTotals();
     });
 }
@@ -592,29 +598,16 @@ function handleRoomCheckerRangeSelect(info) {
   fetchRateSummary();
 }
 
-// King/Queen nightly rates come from the server (season for the selected range's
-// start date, per the selected booking type) - everything below that (nights,
-// room quantities, breakfast, discount) is pure client-side arithmetic.
+// King/Queen nightly rates come from fetchRoomCheckerRangeAvailability (the
+// mode/most-common ACTUAL price among rooms genuinely available for the
+// whole selected range + booking type) rather than a separate "cheapest
+// seasonal price anywhere in the property" lookup - Room Checker is used as
+// a real guest quotation, so it has to quote a price a room actually
+// available right now can be booked at, not just an exception that happens
+// to exist on some other room. Everything below that (nights, room
+// quantities, breakfast, discount) is pure client-side arithmetic.
 function fetchRateSummary() {
-  const bookingType = document.querySelector('input[name="rateSummaryBookingType"]:checked').value;
-  const dateKey = roomCheckerFormatDateKey(window.__rateSummaryRange.start);
-
   fetchRoomCheckerRangeAvailability();
-
-  fetch(`/calendar/api/room-rate-summary?bookingType=${bookingType}&date=${dateKey}`)
-    .then((response) => response.json())
-    .then((data) => {
-      if (!data.success) throw new Error(data.message || 'Failed to load rates');
-      window.__rateSummaryKingRate = data.kingRate || 0;
-      window.__rateSummaryQueenRate = data.queenRate || 0;
-      recomputeRateSummaryTotals();
-    })
-    .catch((err) => {
-      console.error('Error fetching room rate summary:', err);
-      window.__rateSummaryKingRate = 0;
-      window.__rateSummaryQueenRate = 0;
-      recomputeRateSummaryTotals();
-    });
 }
 
 function recomputeRateSummaryTotals() {

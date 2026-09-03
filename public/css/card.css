@@ -4395,30 +4395,35 @@ body.white-sidebar-color #addUserModal #usernameCheck {
   color: #6b7280 !important;
 }
 
+/* Duplicate of theme-color.css's [data-theme="white"] #modal-addbooking rules,
+   under the older body.{color}-sidebar-color selector - both are set together
+   by the Light/Dark toggle (theme-color.js) so they must always agree, or
+   whichever has higher specificity (this one does, thanks to the extra `body`
+   element) silently wins and a fix in theme-color.css alone won't show up.
+   Matches add_group_booking.ejs's blue header. */
 body.white-sidebar-color #modal-addbooking .modal-header {
-  background-color: #f9fafb !important;
-  color: #111827 !important;
-  border-bottom: 1px solid #e5e7eb !important;
+  background-color: #2196f3 !important;
+  color: #ffffff !important;
+  border-bottom: 1px solid #1976d2 !important;
 }
 
 /* Override modal header inline styles */
 body.white-sidebar-color #modal-addbooking .modal-header[style*="background-color: #0c2a42"] {
-  background-color: #f9fafb !important;
-  color: #111827 !important;
-  border-bottom: 1px solid #e5e7eb !important;
+  background-color: #2196f3 !important;
+  color: #ffffff !important;
+  border-bottom: 1px solid #1976d2 !important;
 }
 
 body.white-sidebar-color #modal-addbooking .modal-title {
-  color: #111827 !important;
+  color: #ffffff !important;
 }
 
 body.white-sidebar-color #modal-addbooking .btn-close {
-  filter: none !important;
-  opacity: 0.6 !important;
+  filter: invert(1) !important;
 }
 
 body.white-sidebar-color #modal-addbooking .btn-close:hover {
-  filter: none !important;
+  filter: invert(0.85) !important;
   opacity: 1 !important;
 }
 

@@ -1540,7 +1540,7 @@ class BookingController {
   // there still holds once they proceed into that modal.
   static async getRangeAvailabilityCounts(req, res) {
     try {
-      const { startDate, endDate, checkInStatus, checkOutStatus, floorNumber } = req.query;
+      const { startDate, endDate, checkInStatus, checkOutStatus, floorNumber, bookingType } = req.query;
 
       if (!startDate || !endDate) {
         return res.status(400).json({ success: false, message: 'Missing parameters' });
@@ -1551,7 +1551,8 @@ class BookingController {
         endDate,
         checkInStatus,
         checkOutStatus,
-        floorNumber
+        floorNumber,
+        bookingType
       });
 
       res.json(result);

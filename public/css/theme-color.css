@@ -2861,31 +2861,31 @@
     color: #6b7280 !important;
 }
 
+/* Matches add_group_booking.ejs's [data-theme="white"] #modal-add-group-booking
+   .modal-header - same blue so both booking modals share one header language. */
 [data-theme="white"] #modal-addbooking .modal-header {
-    background-color: #f9fafb !important;
-    color: #111827 !important;
-    border-bottom: 1px solid #e5e7eb !important;
+    background-color: #2196f3 !important;
+    color: #ffffff !important;
+    border-bottom: 1px solid #1976d2 !important;
 }
 
 /* Override modal header inline styles */
 [data-theme="white"] #modal-addbooking .modal-header[style*="background-color: #0c2a42"] {
-    background-color: #f9fafb !important;
-    color: #111827 !important;
-    border-bottom: 1px solid #e5e7eb !important;
+    background-color: #2196f3 !important;
+    color: #ffffff !important;
+    border-bottom: 1px solid #1976d2 !important;
 }
 
 [data-theme="white"] #modal-addbooking .modal-title {
-    color: #111827 !important;
+    color: #ffffff !important;
 }
 
 [data-theme="white"] #modal-addbooking .btn-close {
-    filter: none !important;
-    opacity: 0.6 !important;
+    filter: invert(1) !important;
 }
 
 [data-theme="white"] #modal-addbooking .btn-close:hover {
-    filter: none !important;
-    opacity: 1 !important;
+    filter: invert(0.85) !important;
 }
 
 [data-theme="white"] #modal-addbooking input[type="text"],
@@ -2938,6 +2938,46 @@
 [data-theme="white"] #modal-addbooking .btn[data-role="voucher"]:hover,
 [data-theme="white"] #modal-addbooking .btn[data-role="save"]:hover {
     color: #ffffff !important;
+}
+
+/* Payment Status field - its own #modal-addbooking #paymentStatus rule
+   (add_booking.ejs) has two IDs in its selector, which outweighs the generic
+   input[type="text"] light override above (only one ID), so it needs its own
+   override here too - same pattern add_group_booking.ejs already uses for
+   #groupPaymentStatus. */
+[data-theme="white"] #modal-addbooking #paymentStatus {
+    background-color: #f3f4f6 !important;
+    color: #111827 !important;
+    border: 1px solid #d1d5db !important;
+}
+[data-theme="white"] #modal-addbooking #paymentStatus.status-partial {
+    color: #0e7490 !important;
+}
+
+/* Senior/PWD Discount readout - styled via an inline style attribute
+   (add_booking.ejs) rather than a shared class, so it needs its own
+   attribute-selector override the same way the dark input fields above do. */
+[data-theme="white"] #modal-addbooking #seniorPwdDiscountAmount,
+[data-theme="white"] #modal-addbooking input[style*="background-color: #2a3135"] {
+    background-color: #f3f4f6 !important;
+    color: #15803d !important;
+}
+
+/* Arrival/Departure summary banner + flight-number autocomplete dropdowns -
+   same inline-dark-background pattern as the fields above, on non-input
+   elements so they need their own selectors rather than reusing the
+   input[style*=...] one. Dropdown item text isn't set here - it has no
+   inline color of its own, so it already inherits the light .modal-content
+   text color correctly. */
+[data-theme="white"] #modal-addbooking #arrivalDepartureSummaryText {
+    background-color: #f3f4f6 !important;
+    border: 1px solid #d1d5db !important;
+    color: #111827 !important;
+}
+[data-theme="white"] #modal-addbooking #flightNumberDropdown,
+[data-theme="white"] #modal-addbooking #dropoffFlightNumberDropdown {
+    background-color: #ffffff !important;
+    border: 1px solid #d1d5db !important;
 }
 /* =====================
    Light theme: Unassigned Rooms Side Panel
