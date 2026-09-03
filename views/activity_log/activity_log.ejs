@@ -1,0 +1,152 @@
+<!-- start page content -->
+<div class="row">
+	<div class="col-xl-12 col-md-12 col-12">
+		<div class="dashboard-card">
+			<div class="dashboard-card-header">
+				<div style="display: flex; align-items: center; justify-content: space-between; width: 100%; flex-wrap: wrap; gap: 10px;">
+					<div class="tab-bar">
+						<a class="tab-item is-active" href="/activity-log">Activity Log</a>
+					</div>
+					<div style="flex: 0 0 auto;">
+						<button id="al-refresh" class="btn btn-primary">
+							<i class="fa fa-sync"></i> Refresh
+						</button>
+						<button id="al-export" class="btn btn-success" style="margin-left: 8px;">
+							<i class="fa fa-download"></i> Export to Excel
+						</button>
+					</div>
+				</div>
+			</div>
+
+			<div class="dashboard-card-body">
+				<div class="al-daterange-bar">
+					<span class="al-daterange-lbl">Date range</span>
+					<input type="text" id="al-date-range" class="form-control form-control-sm" placeholder="All dates" readonly>
+					<button id="al-date-clear" type="button" class="btn btn-sm btn-secondary">Clear</button>
+				</div>
+
+				<div class="table-scrollable">
+					<table id="activity_log_tbl" class="table table-hover full-width al-table">
+						<thead>
+							<tr>
+								<th>Description</th>
+								<th>Source</th>
+								<th class="text-end">Amount</th>
+								<th>Action</th>
+								<th>Processed By</th>
+								<th>Date &amp; Time</th>
+							</tr>
+						</thead>
+						<tbody></tbody>
+					</table>
+				</div>
+				<p class="al-muted" style="margin-top:8px; font-size:11px;">Tip: click a row to see the full before / after details.</p>
+			</div>
+		</div>
+	</div>
+</div>
+
+<!-- ======================================== -->
+<!-- ACTIVITY LOG DETAILS MODAL -->
+<!-- ======================================== -->
+<div class="modal fade" id="al-details-modal" tabindex="-1" role="dialog" aria-labelledby="alDetailsLabel" aria-hidden="true">
+	<div class="modal-dialog modal-lg" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h4 class="modal-title" id="alDetailsLabel">Activity Details</h4>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<div class="modal-body">
+				<div id="al-d-desc" class="al-detail-headline"></div>
+
+				<div class="al-meta-grid">
+					<div><span class="al-meta-k">Date &amp; Time</span><span id="al-d-dt"></span></div>
+					<div><span class="al-meta-k">Processed By</span><span id="al-d-user"></span></div>
+					<div><span class="al-meta-k">Source</span><span id="al-d-module"></span></div>
+					<div><span class="al-meta-k">Action</span><span id="al-d-action"></span></div>
+					<div><span class="al-meta-k">Booking No.</span><span id="al-d-booking"></span></div>
+					<div><span class="al-meta-k">Guest / Room</span><span id="al-d-guestroom"></span></div>
+					<div><span class="al-meta-k">Amount</span><span id="al-d-amount"></span></div>
+					<div><span class="al-meta-k">Result</span><span id="al-d-status"></span></div>
+				</div>
+
+				<div id="al-d-error-wrap" style="margin-top:8px;" hidden>
+					<span class="al-meta-k" style="color:#e06666;">Error</span>
+					<div id="al-d-error"></div>
+				</div>
+
+				<hr>
+				<strong>What changed</strong>
+				<div id="al-d-changes-empty" class="al-muted" style="margin-top:6px;">This action did not change any booking details.</div>
+				<div class="table-scrollable" style="margin-top:6px;">
+					<table id="al-d-changes-tbl" class="table table-sm al-changes-tbl" style="display:none;">
+						<thead><tr><th style="width:34%;">Detail</th><th style="width:33%;">Before</th><th style="width:33%;">After</th></tr></thead>
+						<tbody></tbody>
+					</table>
+				</div>
+
+				<div id="al-d-moved-wrap" style="margin-top:12px;" hidden>
+					<strong>Guests moved</strong>
+					<div class="table-scrollable" style="margin-top:6px;">
+						<table id="al-d-moved-tbl" class="table table-sm al-changes-tbl">
+							<thead><tr><th style="width:25%;">Booking</th><th>Guest</th><th style="width:20%;">Room</th></tr></thead>
+							<tbody></tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<style>
+	.al-badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+	.al-badge-success { background: #1e7e34; color: #fff; }
+	.al-badge-failed { background: #c0392b; color: #fff; }
+	.al-chip { padding: 1px 7px; border-radius: 8px; font-size: 11px; background: rgba(255,255,255,.08); }
+	.al-muted { opacity: .6; }
+	.al-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; margin-top: 4px; }
+	.al-meta-grid > div { display: flex; flex-direction: column; }
+	.al-meta-k { font-size: 10px; text-transform: uppercase; opacity: .55; letter-spacing: .04em; }
+	.al-detail-headline { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+	.al-changes-tbl td { vertical-align: middle; }
+	.al-chg-from { color: #b26a00; text-decoration: line-through; opacity: .8; }
+	.al-chg-to { color: #1e7e34; font-weight: 600; }
+	.al-table { width: 100%; table-layout: fixed; }
+	.al-table tbody tr { cursor: pointer; }
+	.al-table td, .al-table th { vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.al-desc-1line { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.al-row-failed td { background: rgba(192, 57, 43, .08); }
+	.al-amt { font-variant-numeric: tabular-nums; font-weight: 600; }
+	.al-cat { display:inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; background: #6c757d; color: #fff; }
+	.al-act { font-weight: 600; }
+	.al-daterange-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+	.al-daterange-lbl { font-size: 11px; text-transform: uppercase; opacity: .7; letter-spacing: .03em; }
+	.al-daterange-bar input { max-width: 300px; cursor: pointer; }
+	[data-theme="dark"] .al-daterange-bar input { background: #2a3135; color: #e9edef; border-color: #3a4247; }
+
+	/* Source badges - Bootstrap primary / secondary semantic colours (solid) */
+	.al-cat--dashboard { background: #0d6efd; color: #fff; }  /* primary   */
+	.al-cat--calendar  { background: #0dcaf0; color: #04303a; }  /* info     */
+	.al-cat--booking   { background: #198754; color: #fff; }  /* success   */
+	.al-cat--payments  { background: #ffc107; color: #3d2f00; }  /* warning  */
+	.al-cat--settings  { background: #6c757d; color: #fff; }  /* secondary */
+	.al-cat--rooms     { background: #dc3545; color: #fff; }  /* danger    */
+	.al-cat--system    { background: #6c757d; color: #fff; }  /* secondary */
+
+	[data-theme="dark"] .al-chg-from { color: #e6a23c; }
+	[data-theme="dark"] .al-chg-to { color: #86efac; }
+</style>
+
+<script>
+	document.addEventListener('DOMContentLoaded', function () {
+		setTimeout(function () {
+			var s = document.createElement('script');
+			s.src = '/js/activity_log/activity_log.js';
+			document.body.appendChild(s);
+		}, 300);
+	});
+</script>

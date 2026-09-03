@@ -21,6 +21,7 @@ const creditRoutes = require('./r_credit');
 const telegramRoutes = require('./r_telegram');
 const agencyRoutes = require('./r_agency');
 const deleteDataRoutes = require('./r_delete_data');
+const activityLogRoutes = require('./r_activity_log');
 const apiRoutes = require('./r_api');
 const updatesRoutes = require('./r_updates');
 const mapsRoutes = require('./r_maps');
@@ -32,6 +33,9 @@ const channexRoutes = require('./r_channex');
 
 // Auth middleware
 const AuthMiddleware = require('../middleware/m_auth');
+
+// Auto audit-trail middleware (writes every state-changing request to activity_log)
+const { auditTrail } = require('../middleware/m_activity_log');
 
 // Public routes (no authentication required)
 router.use('/', loginRoutes);
@@ -46,8 +50,8 @@ router.post('/telegram/webhook/update', TelegramController.handleWebhook);
 
 
 // Protected routes (require authentication)
-router.use('/dashboard', AuthMiddleware.requireAuth, dashboardRoutes);
-router.use('/booking', AuthMiddleware.requireAuth, bookingRoutes);
+router.use('/dashboard', AuthMiddleware.requireAuth, auditTrail({ module: 'dashboard' }), dashboardRoutes);
+router.use('/booking', AuthMiddleware.requireAuth, auditTrail({ module: 'booking' }), bookingRoutes);
 router.use('/user_info', AuthMiddleware.requireAuth, userRoutes);
 router.use('/guest', AuthMiddleware.requireAuth, guestRoutes);
 router.use('/calendar', AuthMiddleware.requireAuth, calendarRoutes);
@@ -56,9 +60,9 @@ router.use('/employee', AuthMiddleware.requireAuth, employeeRoutes);
 router.use('/services', AuthMiddleware.requireAuth, servicesRoutes);
 router.use('/vehicle', AuthMiddleware.requireAuth, vehicleRoutes);
 router.use('/room', AuthMiddleware.requireAuth, roomRoutes);
-router.use('/integration', AuthMiddleware.requireAuth, integrationRoutes);
+router.use('/integration', AuthMiddleware.requireAuth, auditTrail({ module: 'integration' }), integrationRoutes);
 router.use('/booking_channel', AuthMiddleware.requireAuth, bookingChannelRoutes);
-router.use('/payments', AuthMiddleware.requireAuth, paymentsRoutes);
+router.use('/payments', AuthMiddleware.requireAuth, auditTrail({ module: 'payments' }), paymentsRoutes);
 router.use('/credit', AuthMiddleware.requireAuth, creditRoutes);
 router.use('/deposits', AuthMiddleware.requireAuth, depositsRoutes);
 router.use('/room_clearance', AuthMiddleware.requireAuth, roomClearanceRoutes);
@@ -67,6 +71,7 @@ router.use('/agency', AuthMiddleware.requireAuth, agencyRoutes);
 router.use('/flight-schedule', AuthMiddleware.requireAuth, flightScheduleRoutes);
 router.use('/pickup-drop', AuthMiddleware.requireAuth, pickupDropRoutes);
 router.use('/delete-data', AuthMiddleware.requireAuth, deleteDataRoutes);
+router.use('/activity-log', AuthMiddleware.requireAuth, activityLogRoutes);
 router.use('/channex', AuthMiddleware.requireAuth, channexRoutes);
 
 // Redirect root to dashboard if authenticated, otherwise to login

@@ -114,4 +114,10 @@ router.post('/remove-late-checkout-service', CalendarController.removeLateChecko
 router.get('/rooms', CalendarController.getRooms);
 router.get('/bookings', CalendarController.getBookings);
 
+// Audit trail / activity log viewer
+router.get('/api/activity-log',
+  CalendarSecurity.rateLimit,
+  CalendarController.getActivityLog
+);
+
 module.exports = router;

@@ -1,5 +1,17 @@
 const CalendarModel = require('../models/calendarModel');
 const RoomModel = require('../models/roomModel');
+const ActivityLogModel = require('../models/activityLogModel');
+const { logActivity } = require('../utils/activityLogger');
+
+// Best-effort "before" snapshot of a booking for the audit trail. Never throws.
+async function snapshotBooking(bookingId) {
+  try {
+    if (!bookingId) return null;
+    return (await CalendarModel.getBookingDetails(bookingId)) || null;
+  } catch (e) {
+    return null;
+  }
+}
 
 class CalendarController {
   // Main calendar controller
@@ -126,6 +138,8 @@ class CalendarController {
       //   newRoomId
       // });
 
+      const beforeSnapshot = await snapshotBooking(id);
+
       const result = await CalendarModel.updateBooking(
         id,
         room,
@@ -173,10 +187,30 @@ class CalendarController {
           io.emit('calendar-booking-updated', eventData);
         }
         
+        const resolvedAction = (isExtended && originalCheckOut)
+          ? 'BOOKING_EXTEND'
+          : ((Boolean(isRoomTransfer) || result.isRoomTransfer) ? 'ROOM_TRANSFER' : 'UPDATE');
+
+        await logActivity(req, {
+          module: 'calendar',
+          action: resolvedAction,
+          entityType: 'booking',
+          entityId: id,
+          description: `Booking #${id} ${resolvedAction === 'ROOM_TRANSFER' ? 'transferred to' : 'updated - room'} ${room}, ${checkIn} → ${checkOut}`,
+          oldData: beforeSnapshot,
+          newData: {
+            id, room, checkIn, checkOut,
+            isExtended: Boolean(isExtended),
+            originalCheckOut: originalCheckOut || null,
+            isRoomTransfer: Boolean(isRoomTransfer) || Boolean(result.isRoomTransfer),
+            oldRoomNumber, newRoomId
+          }
+        });
+
         res.json({
           success: true,
-          message: result.isRoomTransfer 
-            ? 'Room transfer completed successfully.' 
+          message: result.isRoomTransfer
+            ? 'Room transfer completed successfully.'
             : 'Booking updated successfully.',
           data: {
             bookingId: id,
@@ -185,6 +219,17 @@ class CalendarController {
           }
         });
       } else {
+        await logActivity(req, {
+          module: 'calendar',
+          action: 'UPDATE',
+          entityType: 'booking',
+          entityId: id,
+          status: 'FAILED',
+          description: `Failed to update booking #${id} (room ${room}, ${checkIn} → ${checkOut})`,
+          oldData: beforeSnapshot,
+          newData: { id, room, checkIn, checkOut }
+        });
+
         res.status(400).json({
           success: false,
           message: 'Failed to update booking. Please check if the booking exists and you have permission to modify it.',
@@ -196,6 +241,17 @@ class CalendarController {
         error: error.message,
         stack: error.stack,
         bookingData: { id: req.body.id, room: req.body.room, checkIn: req.body.checkIn, checkOut: req.body.checkOut }
+      });
+
+      await logActivity(req, {
+        module: 'calendar',
+        action: 'UPDATE',
+        entityType: 'booking',
+        entityId: req.body?.id,
+        status: 'FAILED',
+        errorMessage: error.message,
+        description: `Error updating booking #${req.body?.id}`,
+        newData: { id: req.body?.id, room: req.body?.room, checkIn: req.body?.checkIn, checkOut: req.body?.checkOut }
       });
 
       // Determine error type and provide appropriate response
@@ -340,21 +396,61 @@ class CalendarController {
 
       // console.log('🔄 Calendar transfer request:', { bookingId, oldRoomNumber, newRoomId, transferDate });
 
+      const beforeSnapshot = await snapshotBooking(bookingId);
+
       // Process room transfer using the same logic as dashboard
       const result = await CalendarModel.transferRoom(bookingId, oldRoomNumber, newRoomId, transferDate);
-      
+
       if (result.success) {
+        await logActivity(req, {
+          module: 'calendar',
+          action: 'ROOM_TRANSFER',
+          entityType: 'booking',
+          entityId: bookingId,
+          description: `Booking #${bookingId} transferred from room ${oldRoomNumber} to room id ${newRoomId} on ${transferDate}`,
+          oldData: beforeSnapshot,
+          newData: { bookingId, oldRoomNumber, newRoomId, transferDate }
+        });
+
         // Calendar transfer successful
-        res.json({ 
+        res.json({
           success: true,
-          message: result.message 
+          message: result.message
         });
       } else {
+        await logActivity(req, {
+          module: 'calendar',
+          action: 'ROOM_TRANSFER',
+          entityType: 'booking',
+          entityId: bookingId,
+          status: 'FAILED',
+          description: `Failed room transfer for booking #${bookingId}`,
+          errorMessage: result.error || null,
+          oldData: beforeSnapshot,
+          newData: { bookingId, oldRoomNumber, newRoomId, transferDate }
+        });
+
         // console.log('❌ Calendar transfer failed:', result);
         res.status(400).json({ error: result.error });
       }
     } catch (error) {
       console.error('❌ Error transferring room:', error);
+
+      await logActivity(req, {
+        module: 'calendar',
+        action: 'ROOM_TRANSFER',
+        entityType: 'booking',
+        entityId: req.body?.bookingId,
+        status: 'FAILED',
+        errorMessage: error.message,
+        description: `Error transferring room for booking #${req.body?.bookingId}`,
+        newData: {
+          bookingId: req.body?.bookingId,
+          oldRoomNumber: req.body?.oldRoomNumber,
+          newRoomId: req.body?.newRoomId,
+          transferDate: req.body?.transferDate
+        }
+      });
       
       // Provide more specific error messages based on error type
       let errorMessage = 'Server error occurred during room transfer.';
@@ -433,17 +529,57 @@ class CalendarController {
         });
       }
 
-      const result = await CalendarModel.extendStay(currentRoomId, newRoomId, daysToExtend, bookingId, cost, userId);
-      
-      if (result.success) {
+      const beforeSnapshot = await snapshotBooking(bookingId);
 
-        
+      const result = await CalendarModel.extendStay(currentRoomId, newRoomId, daysToExtend, bookingId, cost, userId);
+
+      if (result.success) {
+        await logActivity(req, {
+          module: 'calendar',
+          action: 'BOOKING_EXTEND',
+          entityType: 'booking',
+          entityId: bookingId,
+          description: `Booking #${bookingId} stay extended by ${daysToExtend} day(s)${newRoomId ? ` (moved to room id ${newRoomId})` : ''}`,
+          oldData: beforeSnapshot,
+          newData: { currentRoomId, newRoomId, daysToExtend, bookingId, cost }
+        });
+
         res.json({ success: true, message: 'Stay extended successfully!' });
       } else {
+        await logActivity(req, {
+          module: 'calendar',
+          action: 'BOOKING_EXTEND',
+          entityType: 'booking',
+          entityId: bookingId,
+          status: 'FAILED',
+          description: `Failed to extend stay for booking #${bookingId}`,
+          errorMessage: result.message || null,
+          oldData: beforeSnapshot,
+          newData: { currentRoomId, newRoomId, daysToExtend, bookingId, cost }
+        });
+
         res.status(400).json({ success: false, message: result.message });
       }
     } catch (error) {
       console.error('Error extending stay:', error);
+
+      await logActivity(req, {
+        module: 'calendar',
+        action: 'BOOKING_EXTEND',
+        entityType: 'booking',
+        entityId: req.body?.bookingId,
+        status: 'FAILED',
+        errorMessage: error.message,
+        description: `Error extending stay for booking #${req.body?.bookingId}`,
+        newData: {
+          currentRoomId: req.body?.currentRoomId,
+          newRoomId: req.body?.newRoomId,
+          daysToExtend: req.body?.daysToExtend,
+          bookingId: req.body?.bookingId,
+          cost: req.body?.cost
+        }
+      });
+
       res.status(500).json({
         success: false,
         message: error.message || 'Server error'
@@ -487,9 +623,35 @@ class CalendarController {
       }
 
       const result = await CalendarModel.removeBookingExtension(extensionId, bookingId);
+
+      await logActivity(req, {
+        module: 'calendar',
+        action: 'DELETE',
+        bookingId,
+        entityType: 'booking_extension',
+        entityId: extensionId,
+        status: (result && result.success === false) ? 'FAILED' : 'SUCCESS',
+        description: `Removed extension #${extensionId} from booking #${bookingId}`,
+        errorMessage: (result && result.success === false) ? (result.message || null) : null,
+        newData: { extensionId, bookingId }
+      });
+
       res.json(result);
     } catch (error) {
       console.error('Error removing booking extension:', error);
+
+      await logActivity(req, {
+        module: 'calendar',
+        action: 'DELETE',
+        bookingId: req.body?.bookingId,
+        entityType: 'booking_extension',
+        entityId: req.body?.extensionId,
+        status: 'FAILED',
+        errorMessage: error.message,
+        description: `Error removing extension #${req.body?.extensionId} from booking #${req.body?.bookingId}`,
+        newData: { extensionId: req.body?.extensionId, bookingId: req.body?.bookingId }
+      });
+
       res.status(500).json({
         success: false,
         message: error.message || 'Server error'
@@ -532,25 +694,66 @@ class CalendarController {
         });
       }
 
+      const beforeSnapshot = await snapshotBooking(bookingId);
+
       const result = await CalendarModel.processLateCheckout(
         currentRoomId,
         newRoomId,
         bookingId,
         lateCheckoutFee
       );
-      
+
       if (result.success) {
-        res.json({ 
-          success: true, 
+        await logActivity(req, {
+          module: 'calendar',
+          action: 'LATE_CHECKOUT',
+          entityType: 'booking',
+          entityId: bookingId,
+          description: `Late check-out processed for booking #${bookingId} (fee: ${result.lateCheckoutFee}${result.isFree ? ', free' : ''})`,
+          oldData: beforeSnapshot,
+          newData: { currentRoomId, newRoomId, bookingId, lateCheckoutFee, resolvedFee: result.lateCheckoutFee, isFree: result.isFree }
+        });
+
+        res.json({
+          success: true,
           message: 'Late check-out processed successfully!',
           lateCheckoutFee: result.lateCheckoutFee,
           isFree: result.isFree
         });
       } else {
+        await logActivity(req, {
+          module: 'calendar',
+          action: 'LATE_CHECKOUT',
+          entityType: 'booking',
+          entityId: bookingId,
+          status: 'FAILED',
+          description: `Failed late check-out for booking #${bookingId}`,
+          errorMessage: result.message || null,
+          oldData: beforeSnapshot,
+          newData: { currentRoomId, newRoomId, bookingId, lateCheckoutFee }
+        });
+
         res.status(400).json({ success: false, message: result.message });
       }
     } catch (error) {
       console.error('Error processing late check-out:', error);
+
+      await logActivity(req, {
+        module: 'calendar',
+        action: 'LATE_CHECKOUT',
+        entityType: 'booking',
+        entityId: req.body?.bookingId,
+        status: 'FAILED',
+        errorMessage: error.message,
+        description: `Error processing late check-out for booking #${req.body?.bookingId}`,
+        newData: {
+          currentRoomId: req.body?.currentRoomId,
+          newRoomId: req.body?.newRoomId,
+          bookingId: req.body?.bookingId,
+          lateCheckoutFee: req.body?.lateCheckoutFee
+        }
+      });
+
       res.status(500).json({
         success: false,
         message: error.message || 'Server error'
@@ -594,9 +797,35 @@ class CalendarController {
       }
 
       const result = await CalendarModel.removeLateCheckoutService(serviceId, bookingId);
+
+      await logActivity(req, {
+        module: 'calendar',
+        action: 'DELETE',
+        bookingId,
+        entityType: 'late_checkout_service',
+        entityId: serviceId,
+        status: (result && result.success === false) ? 'FAILED' : 'SUCCESS',
+        description: `Removed late check-out service #${serviceId} from booking #${bookingId}`,
+        errorMessage: (result && result.success === false) ? (result.message || null) : null,
+        newData: { serviceId, bookingId }
+      });
+
       res.json(result);
     } catch (error) {
       console.error('Error removing late check-out service:', error);
+
+      await logActivity(req, {
+        module: 'calendar',
+        action: 'DELETE',
+        bookingId: req.body?.bookingId,
+        entityType: 'late_checkout_service',
+        entityId: req.body?.serviceId,
+        status: 'FAILED',
+        errorMessage: error.message,
+        description: `Error removing late check-out service #${req.body?.serviceId} from booking #${req.body?.bookingId}`,
+        newData: { serviceId: req.body?.serviceId, bookingId: req.body?.bookingId }
+      });
+
       res.status(500).json({
         success: false,
         message: error.message || 'Server error'
@@ -632,19 +861,51 @@ class CalendarController {
       }
 
       const result = await CalendarModel.reopenReservation(bookingId, newStatus, checkInStatus);
-      
+
       if (result.success) {
-        res.json({ 
-          success: true, 
+        await logActivity(req, {
+          module: 'calendar',
+          action: 'RESERVATION_REOPEN',
+          entityType: 'booking',
+          entityId: bookingId,
+          description: `Reservation #${bookingId} reopened to status "${newStatus}" (check-in status ${checkInStatus})`,
+          newData: { bookingId, newStatus, checkInStatus }
+        });
+
+        res.json({
+          success: true,
           message: 'Reservation reopened successfully!',
           newStatus: newStatus,
           checkInStatus: checkInStatus
         });
       } else {
+        await logActivity(req, {
+          module: 'calendar',
+          action: 'RESERVATION_REOPEN',
+          entityType: 'booking',
+          entityId: bookingId,
+          status: 'FAILED',
+          description: `Failed to reopen reservation #${bookingId}`,
+          errorMessage: result.message || null,
+          newData: { bookingId, newStatus, checkInStatus }
+        });
+
         res.status(400).json({ success: false, message: result.message });
       }
     } catch (error) {
       console.error('Error reopening reservation:', error);
+
+      await logActivity(req, {
+        module: 'calendar',
+        action: 'RESERVATION_REOPEN',
+        entityType: 'booking',
+        entityId: req.body?.bookingId,
+        status: 'FAILED',
+        errorMessage: error.message,
+        description: `Error reopening reservation #${req.body?.bookingId}`,
+        newData: { bookingId: req.body?.bookingId, newStatus: req.body?.newStatus, checkInStatus: req.body?.checkInStatus }
+      });
+
       res.status(500).json({
         success: false,
         message: error.message || 'Server error'
@@ -671,18 +932,54 @@ class CalendarController {
         });
       }
 
+      const beforeSnapshot = await snapshotBooking(bookingId);
+
       const result = await CalendarModel.removeReservation(bookingId);
-      
+
       if (result.success) {
-        res.json({ 
-          success: true, 
+        await logActivity(req, {
+          module: 'calendar',
+          action: 'DELETE',
+          entityType: 'booking',
+          entityId: bookingId,
+          description: `Reservation #${bookingId} removed (set inactive)`,
+          oldData: beforeSnapshot,
+          newData: { bookingId, setActive: 0 }
+        });
+
+        res.json({
+          success: true,
           message: 'Reservation removed successfully!'
         });
       } else {
+        await logActivity(req, {
+          module: 'calendar',
+          action: 'DELETE',
+          entityType: 'booking',
+          entityId: bookingId,
+          status: 'FAILED',
+          description: `Failed to remove reservation #${bookingId}`,
+          errorMessage: result.message || null,
+          oldData: beforeSnapshot,
+          newData: { bookingId, setActive: 0 }
+        });
+
         res.status(400).json({ success: false, message: result.message });
       }
     } catch (error) {
       console.error('Error removing reservation:', error);
+
+      await logActivity(req, {
+        module: 'calendar',
+        action: 'DELETE',
+        entityType: 'booking',
+        entityId: req.body?.bookingId,
+        status: 'FAILED',
+        errorMessage: error.message,
+        description: `Error removing reservation #${req.body?.bookingId}`,
+        newData: { bookingId: req.body?.bookingId }
+      });
+
       res.status(500).json({
         success: false,
         message: error.message || 'Server error'
@@ -709,11 +1006,23 @@ class CalendarController {
         });
       }
 
+      const beforeSnapshot = await snapshotBooking(bookingId);
+
       const result = await CalendarModel.checkInReservation(bookingId);
-      
+
       if (result.success) {
-        res.json({ 
-          success: true, 
+        await logActivity(req, {
+          module: 'calendar',
+          action: 'CHECK_IN',
+          entityType: 'booking',
+          entityId: bookingId,
+          description: `Guest checked in for booking #${bookingId} (room id ${result.roomId})`,
+          oldData: beforeSnapshot,
+          newData: { bookingId, newStatus: 'check-In', roomId: result.roomId, roomStatus: result.roomStatus, isOccupied: result.isOccupied }
+        });
+
+        res.json({
+          success: true,
           message: 'Guest checked in successfully!',
           newStatus: 'check-In',
           isOccupied: result.isOccupied,
@@ -721,10 +1030,34 @@ class CalendarController {
           roomStatus: result.roomStatus
         });
       } else {
+        await logActivity(req, {
+          module: 'calendar',
+          action: 'CHECK_IN',
+          entityType: 'booking',
+          entityId: bookingId,
+          status: 'FAILED',
+          description: `Failed check-in for booking #${bookingId}`,
+          errorMessage: result.message || null,
+          oldData: beforeSnapshot,
+          newData: { bookingId }
+        });
+
         res.status(400).json({ success: false, message: result.message });
       }
     } catch (error) {
       console.error('Error checking in reservation:', error);
+
+      await logActivity(req, {
+        module: 'calendar',
+        action: 'CHECK_IN',
+        entityType: 'booking',
+        entityId: req.body?.bookingId,
+        status: 'FAILED',
+        errorMessage: error.message,
+        description: `Error checking in booking #${req.body?.bookingId}`,
+        newData: { bookingId: req.body?.bookingId }
+      });
+
       res.status(500).json({
         success: false,
         message: error.message || 'Server error'
@@ -971,8 +1304,8 @@ class CalendarController {
         bookingId || null
       );
       
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         conflicts: conflicts,
         hasConflicts: conflicts.length > 0
       });
@@ -982,6 +1315,29 @@ class CalendarController {
         success: false,
         message: 'Server error'
       });
+    }
+  }
+
+  // Audit trail viewer - returns activity_log rows, calendar module by default.
+  static async getActivityLog(req, res) {
+    try {
+      const { action, entityType, entityId, userId, status, module, limit, offset } = req.query;
+
+      const logs = await ActivityLogModel.getLogs({
+        module: module || 'calendar',
+        action: action || undefined,
+        entityType: entityType || undefined,
+        entityId: entityId || undefined,
+        userId: userId || undefined,
+        status: status || undefined,
+        limit: limit || 100,
+        offset: offset || 0
+      });
+
+      res.json({ success: true, count: logs.length, logs });
+    } catch (error) {
+      console.error('Error fetching activity log:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
     }
   }
 }

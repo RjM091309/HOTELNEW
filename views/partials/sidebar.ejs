@@ -171,7 +171,7 @@
 				</li>
 
 
-				<% const managementPages = ['expenses', 'guest', 'room_clearance', 'employee', 'user_info', 'vehicle_monitoring']; %>
+				<% const managementPages = ['expenses', 'guest', 'room_clearance', 'employee', 'user_info', 'vehicle_monitoring', 'activity_log']; %>
 				<li class="nav-item <%= managementPages.includes(activePage) ? 'open' : '' %>">
 					<a class="nav-link nav-toggle nav-main-link-submenu <%= managementPages.includes(activePage) ? 'active' : '' %>" data-toggle="submenu" aria-haspopup="true"
 						aria-expanded="<%= managementPages.includes(activePage) ? 'true' : 'false' %>" href="#">
@@ -216,6 +216,12 @@
 							<a href="/user_info" class="nav-link <%= activePage === 'user_info' ? 'active' : '' %>">
 								<i class="fa fa-genderless"></i>
 								<span class="title">User Info</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a href="/activity-log" class="nav-link <%= activePage === 'activity_log' ? 'active' : '' %>">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Activity Log</span>
 							</a>
 						</li>
 					</ul>

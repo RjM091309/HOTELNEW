@@ -300,9 +300,85 @@ async function runCheckInNotifierMigrations() {
   console.log('✅ Ensured table: check_in_notifier_log');
 }
 
+async function runActivityLogMigrations() {
+  // Lean, staff-facing audit trail. Column order: when -> source -> action ->
+  // booking -> summary -> amount -> outcome -> who -> before/after JSON.
+  // Single source of truth for each column definition (no COMMENT clauses).
+  const COLUMNS = {
+    IDNo: 'BIGINT NOT NULL AUTO_INCREMENT',
+    ENCODED_DT: 'DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP',
+    MODULE: 'VARCHAR(50) NOT NULL',
+    ACTION: 'VARCHAR(60) NOT NULL',
+    BOOKING_ID: 'INT NULL DEFAULT NULL',
+    DESCRIPTION: 'VARCHAR(500) NULL DEFAULT NULL',
+    AMOUNT: 'DECIMAL(14,2) NULL DEFAULT NULL',
+    STATUS: "VARCHAR(20) NOT NULL DEFAULT 'SUCCESS'",
+    ERROR_MESSAGE: 'VARCHAR(500) NULL DEFAULT NULL',
+    USER_ID: 'INT NULL DEFAULT NULL',
+    USER_NAME: 'VARCHAR(150) NULL DEFAULT NULL',
+    OLD_DATA: 'LONGTEXT NULL DEFAULT NULL',
+    NEW_DATA: 'LONGTEXT NULL DEFAULT NULL'
+  };
+
+  const CREATE_SQL = `
+    CREATE TABLE activity_log (
+      ${Object.entries(COLUMNS).map(([n, d]) => `${n} ${d}`).join(',\n      ')},
+      PRIMARY KEY (IDNo),
+      KEY idx_activity_dt (ENCODED_DT),
+      KEY idx_activity_module (MODULE),
+      KEY idx_activity_action (ACTION),
+      KEY idx_activity_booking (BOOKING_ID),
+      KEY idx_activity_user (USER_ID)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `;
+
+  // Create only if it does not exist yet.
+  const created = await ensureTable('activity_log', CREATE_SQL);
+  if (created) return;
+
+  // ---- Evolve an existing table to the trimmed schema ----
+
+  // Columns we keep (add if missing).
+  await ensureColumn('activity_log', 'BOOKING_ID', `BOOKING_ID ${COLUMNS.BOOKING_ID}`, 'ACTION');
+  await ensureColumn('activity_log', 'AMOUNT', `AMOUNT ${COLUMNS.AMOUNT}`, 'DESCRIPTION');
+
+  // Columns we no longer keep.
+  for (const col of ['ENTITY_TYPE', 'ENTITY_ID', 'IP_ADDRESS', 'HTTP_METHOD', 'ENDPOINT', 'USER_AGENT']) {
+    if (await columnExists('activity_log', col)) {
+      await queryDatabasePromise(`ALTER TABLE activity_log DROP COLUMN ${col}`);
+      console.log(`✅ Dropped column: activity_log.${col}`);
+    }
+  }
+
+  if (await indexExists('activity_log', 'idx_activity_entity')) {
+    await queryDatabasePromise('DROP INDEX idx_activity_entity ON activity_log');
+    console.log('✅ Dropped index: activity_log.idx_activity_entity');
+  }
+  await ensureIndex('activity_log', 'idx_activity_booking', 'BOOKING_ID');
+  await ensureIndex('activity_log', 'idx_activity_user', 'USER_ID');
+
+  // Strip any leftover column comments from earlier versions of this migration.
+  const commented = await queryDatabasePromise(
+    `SELECT COUNT(*) AS cnt
+       FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'activity_log'
+        AND COLUMN_COMMENT <> ''`
+  );
+  if (Number(commented[0]?.cnt || 0) > 0) {
+    for (const [name, def] of Object.entries(COLUMNS)) {
+      if (await columnExists('activity_log', name)) {
+        await queryDatabasePromise(`ALTER TABLE activity_log MODIFY COLUMN ${name} ${def}`);
+      }
+    }
+    console.log('✅ Removed column comments from activity_log');
+  }
+}
+
 async function runStartupMigrations() {
   console.log('🔄 Running startup database migrations...');
 
+  await runActivityLogMigrations();
   await runFlightScheduleMigrations();
   await runPickupDropMigrations();
   await runReceiptMigrations();
