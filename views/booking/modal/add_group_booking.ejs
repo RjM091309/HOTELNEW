@@ -2057,6 +2057,8 @@
     groupManualWeekendRates = {};
     groupBedBasedRates = {};
     groupBedBasedWeekendRates = {};
+    groupShowAvailableOnly = false;
+    $('#groupSortAvailableBtn').text('Sort').removeClass('btn-success').addClass('btn-outline-success');
     $('#groupComputedTotal').html('0.00');
     $('#groupComputedPaidAmount').html('0.00');
     $('#groupComputedBalance').html('0.00');
@@ -2301,6 +2303,7 @@
                   <label class="form-check-label" for="filter2B">Queen</label>
                 </div>
               </div>
+              <button type="button" id="groupSortAvailableBtn" class="btn btn-sm btn-outline-success ms-3" title="Group the still-available rooms together at the top">Sort</button>
             </div>
             <div class="text-white">
               <span id="groupRoomCount" style="margin-left: 24px;">&nbsp;&nbsp;&nbsp;&nbsp;Available: 0</span>
@@ -2348,29 +2351,39 @@
     return rooms.map(room => [room]);
   }
 
+  // When true (toggled by #groupSortAvailableBtn), already-checked rooms are
+  // hidden entirely instead of just being reordered - see updateRoomFilterAndCount.
+  let groupShowAvailableOnly = false;
+
   function updateRoomFilterAndCount() {
     const filter = $('input[name="groupRoomFilter"]:checked').val();
     const roomsContainer = $('.manual-rooms-container');
     let visibleCount = 0;
-    
+
     if (!roomsContainer.length) return;
-    
+
     roomsContainer.find('.room-option').each(function() {
       const $room = $(this);
       const $checkbox = $room.find('input[data-room-id]');
       const roomData = $checkbox.data('room-id');
       const room = groupAvailableRooms.find(r => normalizeRoomId(r.IDNo) === normalizeRoomId(roomData));
-      
+
       if (!room) {
         $room.hide();
         return;
       }
-      
+
       const bedType = parseInt(room.ROOM_BED, 10);
-      const shouldShow = filter === 'all' || 
-        (filter === '1B' && bedType === 1) || 
+      const matchesBedFilter = filter === 'all' ||
+        (filter === '1B' && bedType === 1) ||
         (filter === '2B' && bedType === 2);
-        
+      // "Unavailable" here means disabled (the bed-count quota for that type
+      // is already met and this one isn't part of the current selection) -
+      // NOT checked. A checked/selected room stays visible; only the grayed,
+      // can't-be-picked ones get hidden.
+      const isUnavailable = $checkbox.prop('disabled') && !$checkbox.is(':checked');
+      const shouldShow = matchesBedFilter && !(groupShowAvailableOnly && isUnavailable);
+
       if (shouldShow) {
         $room.show();
         visibleCount++; // Count ALL rooms regardless of disabled state
@@ -2378,7 +2391,7 @@
         $room.hide();
       }
     });
-    
+
     // Update count badge
     const filterText = filter === 'all' ? 'rooms' : filter + ' rooms';
     $('#groupRoomCount').text(`Available: ${visibleCount}`);
@@ -3712,6 +3725,21 @@
       $checkbox.prop('checked', !$checkbox.prop('checked')).trigger('change');
     });
 
+    // Sort button: hide the already-picked (checked) rooms entirely so only
+    // the still-available ones show. Toggles back to showing everything.
+    // Also re-applied on every checkbox change so a room disappears the
+    // moment it's checked while the filter is active, and re-applied
+    // whenever the King/Queen filter changes so both filters combine.
+    $('#groupRoomsList').on('click', '#groupSortAvailableBtn', function() {
+      groupShowAvailableOnly = !groupShowAvailableOnly;
+      $(this)
+        .text(groupShowAvailableOnly ? 'Show All' : 'Sort')
+        .toggleClass('btn-outline-success', !groupShowAvailableOnly)
+        .toggleClass('btn-success', groupShowAvailableOnly);
+      refreshManualSelectionDisabledState();
+      updateRoomFilterAndCount();
+    });
+
     $('#groupRoomsList').on('change', '.group-manual-checkbox', function() {
       const roomId = normalizeRoomId($(this).data('room-id'));
 
@@ -3737,6 +3765,10 @@
       updateManualSelectedRoomValues();
       updateGroupRoomCountDisplay();
       computeGroupTotal();
+
+      if (groupShowAvailableOnly) {
+        updateRoomFilterAndCount();
+      }
     });
 
   }

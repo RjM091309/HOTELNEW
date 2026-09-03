@@ -18,6 +18,19 @@
     border-color: rgba(255, 255, 255, 0.08) !important;
   }
 
+  /* The soften-for-dark-background override above is a near-invisible white on
+     light mode's white page - restore a visible (but still light) grid border
+     there, same gray used for borders elsewhere in this app's light theme. */
+  [data-theme="white"] .fc-unthemed .fc-content,
+  [data-theme="white"] .fc-unthemed .fc-divider,
+  [data-theme="white"] .fc-unthemed .fc-row,
+  [data-theme="white"] .fc-unthemed tbody,
+  [data-theme="white"] .fc-unthemed td,
+  [data-theme="white"] .fc-unthemed th,
+  [data-theme="white"] .fc-unthemed thead {
+    border-color: #e5e7eb !important;
+  }
+
   .row {
     align-items: stretch;
   }
@@ -61,6 +74,14 @@
      room_checker.js. Same blue used for selection highlights elsewhere in the app. */
   #room-checker-months td.fc-day.room-checker-range-selected {
     background-color: rgba(33, 150, 243, 0.35) !important;
+  }
+
+  /* Today's cell - fullcalendar.css's sitewide .fc-today default is green; use
+     a lighter tint of the SAME blue as the range-selection highlight above
+     instead, so today reads as part of the same blue family without being
+     mistaken for an actual selected range (0.08 vs 0.35 opacity). */
+  #room-checker-months td.fc-today {
+    background: rgba(33, 150, 243, 0.08) !important;
   }
 
   /* Pointer cursor on any pickable day (today or future, within the current
@@ -119,7 +140,10 @@
     font-size: 18px;
   }
 
-  /* Centered under the date number (dayRender sets position:relative on the cell) */
+  /* Centered under the date number (dayRender sets position:relative on the cell) -
+     a small floating pill/chip (same rounded-pill language as .rate-summary-chip
+     below) instead of plain colored text, so it stays readable regardless of
+     which cell background is behind it (plain, today, or range-selected). */
   .bed-availability-badge {
     position: absolute;
     left: 50%;
@@ -129,12 +153,15 @@
     align-items: center;
     justify-content: center;
     pointer-events: none;
-    font-size: 22px;
+    font-size: 16px;
     font-weight: 700;
     letter-spacing: 0.2px;
     white-space: nowrap;
     text-align: center;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+    padding: 5px 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
   }
 
   .bed-chip {
@@ -142,11 +169,11 @@
   }
 
   .bed-chip-single {
-    color: #f0b429;
+    color: #4dabf7;
   }
 
   .bed-chip-double {
-    color: #22d3ee;
+    color: #9aa4ac;
   }
 
   .bed-availability-sep {
@@ -155,15 +182,17 @@
   }
 
   [data-theme="white"] .bed-availability-badge {
-    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.7);
+    background: #ffffff;
+    border-color: #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   }
 
   [data-theme="white"] .bed-chip-single {
-    color: #b8790a;
+    color: #1c7ed6;
   }
 
   [data-theme="white"] .bed-chip-double {
-    color: #0c8599;
+    color: #6b7280;
   }
 
   [data-theme="white"] .bed-availability-sep {
@@ -287,16 +316,29 @@
   /* Quick-set shortcuts for the common small Breakfast counts - just write
      into #rateSummaryBreakfastQty (see wireRoomCheckerBreakfastPresets in
      room_checker.js), they don't hold any state of their own. */
+  /* box-sizing/height matched to .rate-summary-qty-input below so the preset
+     buttons and the number field they write into read as one consistent
+     control group instead of the buttons looking undersized next to it. */
   .rate-summary-preset-btn {
+    box-sizing: border-box;
+    height: 30px;
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 4px;
     color: #d7dce0;
     font-size: 12px;
     font-weight: 600;
-    padding: 3px 9px;
+    padding: 0 9px;
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease;
+  }
+
+  /* The two icon-only presets (1 per bed / 2 per bed) get a square footprint
+     instead of hugging the icon glyph width - "None" stays text-width. */
+  .rate-summary-preset-btn[data-breakfast-preset="1"],
+  .rate-summary-preset-btn[data-breakfast-preset="2"] {
+    width: 30px;
+    padding: 0;
   }
 
   .rate-summary-preset-btn:hover {
@@ -492,8 +534,12 @@
     color: #212529;
   }
 
+  /* Height matched to .rate-summary-preset-btn above (Breakfast row's None/1/2
+     shortcut buttons) so they read as one control group. */
   .rate-summary-qty-input {
+    box-sizing: border-box;
     width: 55px;
+    height: 30px;
     text-align: center;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.15);

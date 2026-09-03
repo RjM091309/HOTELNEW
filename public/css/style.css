@@ -1405,9 +1405,23 @@ body {
   display: inline-block;
   float: left;
 }
+/* "MAIN STAY HOTEL" is a lot longer than the old "3CORE" text this was tuned
+   for - lay the mark and name out as a centered flex row with a small font
+   instead of the old fixed-height/margin single-word baseline, so the full
+   name fits on one line inside the fixed 235x60 .page-logo box instead of
+   overflowing past it (this box has no overflow control of its own). */
+.page-header.navbar .page-logo > a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .page-header.navbar .page-logo .logo-default {
-  margin: 7px 0 0;
-  height: 34px;
+  margin: 0;
+  height: auto;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
 }
 .page-header.navbar .page-logo .logo-mini {
   display: none;
