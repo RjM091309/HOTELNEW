@@ -8,7 +8,7 @@
 		font-weight: 800;
 		color: #ffffff;
 		background: #495057;
-		border-radius: 6px;
+		border-radius: 0;
 	}
 	/* Reduce highlight height for top-level items (e.g., Dashboard, Calendar) */
 	.sidebar-container .sidemenu > .nav-item > .nav-link {
@@ -16,6 +16,25 @@
 		line-height: 26px;
 	}
 
+	/* The active-item rule above uses the same dark gray/white treatment in
+	   both themes now (was briefly light-blue-tinted for light mode, reverted
+	   back to match dark mode) - the vendor template's own light-sidebar
+	   active-item rule (.white-sidebar-color .sidemenu-container
+	   .sidemenu>li.active>a, in theme-color.css) would otherwise show light
+	   gray/dark text instead, but it loses on specificity to the rule above,
+	   so text/background already stay #495057/white in light mode without
+	   help. The icon is a separate story though: the vendor also has
+	   .white-sidebar-color .sidemenu-container .sidemenu>li.active>a>i
+	   forcing a dark #1f2937 icon for ITS light treatment, and that one has
+	   MORE classes in its selector than our unscoped icon rule
+	   (.sidemenu-container .sidemenu>li.active>a>i, color:#fff, in
+	   style.css), so it wins and the icon stayed dark on the now-dark
+	   background - unreadable. Force it back to white in light mode here. */
+	[data-theme="white"] .sidebar-container .sidemenu .nav-item.active > .nav-link i,
+	[data-theme="white"] .sidebar-container .sidemenu .nav-link.active i,
+	[data-theme="white"] .sidebar-container .sidemenu .sub-menu .nav-link.active i {
+		color: #ffffff !important;
+	}
 </style>
 <div class="sidebar-container">
 	<div class="sidemenu-container navbar-collapse collapse fixed-menu">
@@ -133,7 +152,7 @@
 					<a class="nav-link nav-toggle nav-main-link-submenu <%= paymentPages.includes(activePage) ? 'active' : '' %>" data-toggle="submenu" aria-haspopup="true"
 						aria-expanded="<%= paymentPages.includes(activePage) ? 'true' : 'false' %>" href="#">
 						<i class="material-icons">payment</i>
-						<span class="title">Payment<br>Management</span>
+						<span class="title">Payment</span>
 						<span class="arrow <%= paymentPages.includes(activePage) ? 'open' : '' %>"></span>
 					</a>
 					<ul class="sub-menu <%= paymentPages.includes(activePage) ? 'show' : '' %>" <% if (paymentPages.includes(activePage)) { %>style="display: block;"<% } %>>
