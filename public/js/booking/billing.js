@@ -554,6 +554,74 @@ function initBillingScript() {
             embedHotelLogo('#modal-billing .hotel-logo');
         });
     }
+
+    initReceiptNoEditor();
+}
+
+// Manual override of the receipt/confirmation number shown on the billing
+// receipt (booking.CONFIRMATION_NUMBER) - click the pencil, edit, save.
+function initReceiptNoEditor() {
+    const editBtn = document.getElementById('editReceiptNoBtn');
+    const displayWrap = document.getElementById('confNumberDisplay');
+    const editWrap = document.getElementById('receiptNoEditWrapper');
+    const input = document.getElementById('receiptNoInput');
+    const saveBtn = document.getElementById('saveReceiptNoBtn');
+    const cancelBtn = document.getElementById('cancelReceiptNoBtn');
+    const confSpan = document.getElementById('confNumber');
+    if (!editBtn || !displayWrap || !editWrap || !input || !saveBtn || !cancelBtn || !confSpan) return;
+
+    function openEditor() {
+        input.value = confSpan.textContent || '';
+        displayWrap.style.display = 'none';
+        editWrap.style.display = 'inline-flex';
+        input.focus();
+        input.select();
+    }
+    function closeEditor() {
+        editWrap.style.display = 'none';
+        displayWrap.style.display = 'inline-flex';
+    }
+    function save() {
+        const bookingInput = document.getElementById('hiddenBookingId');
+        const bookingId = bookingInput ? bookingInput.value : null;
+        const newVal = (input.value || '').trim();
+        if (!bookingId) return;
+        if (!newVal) {
+            if (typeof Swal !== 'undefined') Swal.fire('Error', 'Receipt No. cannot be empty.', 'error');
+            return;
+        }
+        saveBtn.disabled = true;
+        fetch('/booking/update-receipt-no', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+            body: new URLSearchParams({ bookingId, receiptNo: newVal }).toString()
+        })
+            .then((res) => res.json())
+            .then((json) => {
+                saveBtn.disabled = false;
+                if (json && json.success) {
+                    confSpan.textContent = json.confirmationNumber;
+                    closeEditor();
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({ icon: 'success', title: 'Saved', text: 'Receipt No. updated.', timer: 1400, showConfirmButton: false });
+                    }
+                } else if (typeof Swal !== 'undefined') {
+                    Swal.fire('Error', (json && json.message) || 'Failed to update.', 'error');
+                }
+            })
+            .catch(() => {
+                saveBtn.disabled = false;
+                if (typeof Swal !== 'undefined') Swal.fire('Error', 'Failed to update receipt no.', 'error');
+            });
+    }
+
+    editBtn.addEventListener('click', openEditor);
+    cancelBtn.addEventListener('click', closeEditor);
+    saveBtn.addEventListener('click', save);
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); save(); }
+        if (e.key === 'Escape') { e.preventDefault(); closeEditor(); }
+    });
 }
 
 if (document.readyState === 'loading') {

@@ -2505,7 +2505,22 @@ class BookingModel {
     }
   }
 
-  // Apply or update manual discount
+  // Manually set the printed receipt number, stored separately from
+  // booking.CONFIRMATION_NUMBER (which stays fully auto-generated). The billing
+  // receipt displays RECEIPT_NO when set, falling back to CONFIRMATION_NUMBER.
+  static async updateReceiptNo({ bookingId, receiptNo, editedBy }) {
+    try {
+      const result = await queryDatabasePromise(
+        `UPDATE billing SET RECEIPT_NO = ?, EDITED_BY = ?, EDITED_DT = NOW() WHERE BOOKING_ID = ?`,
+        [receiptNo, editedBy, bookingId]
+      );
+      return result.affectedRows > 0;
+    } catch (error) {
+      console.error('Error in updateReceiptNo:', error);
+      throw error;
+    }
+  }
+
   static async applyDiscount(params) {
     const { bookingId, amount, remarks, editedBy } = params;
     try {
@@ -3016,6 +3031,7 @@ class BookingModel {
           b.CHECK_IN_DATE,
           b.CHECK_OUT_DATE,
           b.CONFIRMATION_NUMBER,
+          bi.RECEIPT_NO,
           b.BOOKING_STATUS,
           bi.ROOM_CHARGE,
           bi.AMENITIES_CHARGE,
@@ -3272,7 +3288,7 @@ class BookingModel {
 
       const receiptData = {
         bookingId: b.bookingId,
-        confNumber: b.CONFIRMATION_NUMBER,
+        confNumber: (b.RECEIPT_NO && String(b.RECEIPT_NO).trim()) ? b.RECEIPT_NO : b.CONFIRMATION_NUMBER,
         roomNumber: b.ROOM_NUMBER || null,
         customerName: customerData[0]?.customerName || '',
         address: customerData[0]?.ADDRESS || '',
@@ -5374,14 +5390,14 @@ class BookingModel {
             const roomQuery = 'SELECT ROOM_NUMBER FROM room WHERE IDNo = ?';
             const [roomResult] = await connection.promise().query(roomQuery, [roomId]);
             const roomNumber = roomResult[0]?.ROOM_NUMBER || '';
-            
+
             // Generate confirmation number in format: YYYYMMDD0ROOMNUMBER
             const datePart = moment(finalCheckInWithTime).format('YYYYMMDD');
             const confirmationNumber = `${datePart}0${roomNumber}`;
 
             // IMPORTANT: Only main booking (lowest ID) should have remarks
             // (isMainBooking already declared above)
-            
+
             // Update booking (use final dates)
             await connection.promise().query(`
               UPDATE booking

@@ -619,6 +619,22 @@ async function runCustomerNationalityMigration() {
   );
 }
 
+async function runBillingReceiptNoMigration() {
+  if (!(await tableExists('billing'))) {
+    console.warn('⚠️ billing table not found, skipping RECEIPT_NO column migration');
+    return;
+  }
+  // Manual override of the printed receipt number, set from the Billing Receipt
+  // ("Edit receipt no."). Separate from booking.CONFIRMATION_NUMBER, which stays
+  // fully auto-generated/regenerated as before.
+  await ensureColumn(
+    'billing',
+    'RECEIPT_NO',
+    `RECEIPT_NO VARCHAR(255) NULL DEFAULT NULL`,
+    'BOOKING_ID'
+  );
+}
+
 async function runBookingActualTimesMigration() {
   if (!(await tableExists('booking'))) {
     console.warn('⚠️ booking table not found, skipping actual check-in/out timestamp migration');
@@ -681,6 +697,7 @@ async function runStartupMigrations() {
 
   await runActivityLogMigrations();
   await runCustomerNationalityMigration();
+  await runBillingReceiptNoMigration();
   await runBookingActualTimesMigration();
   await runRoomRatesMigrations();
   await runRoomTypeFkMigration();

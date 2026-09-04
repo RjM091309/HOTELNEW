@@ -698,8 +698,7 @@ class BookingController {
         isLongTermStay,
         roomChangeNote,
         isMaintenance,
-        channelBookingId,
-        receiptNo   // optional manual receipt / confirmation number
+        channelBookingId
     } = req.body;
 
       const isMaintenanceBooking =
@@ -775,18 +774,7 @@ class BookingController {
       const checkInDateFormatted = moment(startDateStr, 'MMM DD, YYYY').format('YYYYMMDD');
       let confirmationNumber;
 
-      // Regular bookings always need a room, regardless of the receipt-no source.
-      if (!isDirectReservation && !room_id) {
-        return res.status(400).json({ success: false, message: 'Room ID is required for regular bookings' });
-      }
-
-      // Manual Receipt No. entered on the Add Booking form wins - used verbatim
-      // as the CONFIRMATION_NUMBER so exports / prints / vouchers show it as-is.
-      const manualReceiptNo = (receiptNo || '').toString().trim();
-
-      if (manualReceiptNo) {
-        confirmationNumber = manualReceiptNo;
-      } else if (isDirectReservation) {
+      if (isDirectReservation) {
         // For direct reservations, use current time instead of room number
         const currentTime = new Date().toLocaleTimeString('en-US', {
           hour12: false,
@@ -795,6 +783,11 @@ class BookingController {
         }).replace(/:/g, '');
         confirmationNumber = checkInDateFormatted + 'UR' + currentTime;
       } else {
+        // For regular bookings, check if room_id exists and create confirmation number
+        if (!room_id) {
+          return res.status(400).json({ success: false, message: 'Room ID is required for regular bookings' });
+        }
+
         // Temporary placeholder - the model swaps 'ROOM' for the real room number.
         confirmationNumber = checkInDateFormatted + '0' + 'ROOM';
       }
@@ -1085,6 +1078,28 @@ class BookingController {
     } catch (error) {
       console.error('❌ Failed to apply discount:', error);
       res.status(500).json({ error: 'Failed to apply discount' });
+    }
+  }
+
+  // Manually set the printed receipt number shown on the billing receipt
+  // (billing.RECEIPT_NO) - separate from the auto-generated
+  // booking.CONFIRMATION_NUMBER, which is left untouched.
+  static async updateReceiptNo(req, res) {
+    try {
+      const { bookingId, receiptNo } = req.body;
+      const editedBy = req.user?.userId || 'system';
+      if (!bookingId) return res.status(400).json({ success: false, message: 'Missing bookingId' });
+      const trimmed = (receiptNo || '').toString().trim();
+      if (!trimmed) return res.status(400).json({ success: false, message: 'Receipt No. cannot be empty' });
+
+      const result = await BookingModel.updateReceiptNo({ bookingId, receiptNo: trimmed, editedBy });
+      if (!result) {
+        return res.status(404).json({ success: false, message: 'Billing record not found for this booking' });
+      }
+      res.json({ success: true, confirmationNumber: trimmed });
+    } catch (error) {
+      console.error('❌ Failed to update receipt no:', error);
+      res.status(500).json({ success: false, message: 'Failed to update receipt no.' });
     }
   }
 

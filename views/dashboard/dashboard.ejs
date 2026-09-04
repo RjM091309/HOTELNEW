@@ -851,7 +851,7 @@ function calculateCardVariables(booking) {
 		if (!window.__billingJsRequested) {
 			window.__billingJsRequested = true;
 			var billingJs = document.createElement('script');
-			billingJs.src = '/js/booking/billing.js';
+			billingJs.src = '/js/booking/billing.js?v=receipt-edit-1';
 			document.body.appendChild(billingJs);
 		}
 		var script7 = document.createElement('script');

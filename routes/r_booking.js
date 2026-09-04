@@ -60,6 +60,9 @@ router.post('/process-payment', BookingController.processPayment);
 // Discount management
 router.post('/apply-discount', BookingController.applyDiscount);
 
+// Manually override the receipt / confirmation number shown on the billing receipt
+router.post('/update-receipt-no', BookingController.updateReceiptNo);
+
 // Check-out management
 router.post('/late_checkout', BookingController.lateCheckout);
 
