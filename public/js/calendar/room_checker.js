@@ -440,19 +440,22 @@ function computeRoomCheckerRoomAllocationSuggestion(kingQty, queenQty, kingMin, 
   let kingAlloc = Math.min(kingQty, kingMin);
   let queenAlloc = Math.min(queenQty, queenMin);
 
-  let kingShortSlots = (kingQty - kingAlloc) * KING_BEDS_PER_ROOM;
-  let queenShortSlots = (queenQty - queenAlloc) * QUEEN_BEDS_PER_ROOM;
+  // Straight room-for-room substitution - each room short on one side needs
+  // exactly one spare room of the other type, not a bed-capacity conversion
+  // (a King and a Queen room are still just one room each).
+  let kingShort = kingQty - kingAlloc;
+  let queenShort = queenQty - queenAlloc;
 
-  if (kingShortSlots > 0) {
-    const queenRoomsUsed = Math.min(Math.ceil(kingShortSlots / QUEEN_BEDS_PER_ROOM), queenMin - queenAlloc);
+  if (kingShort > 0) {
+    const queenRoomsUsed = Math.min(kingShort, queenMin - queenAlloc);
     queenAlloc += queenRoomsUsed;
-    kingShortSlots = Math.max(0, kingShortSlots - queenRoomsUsed * QUEEN_BEDS_PER_ROOM);
+    kingShort -= queenRoomsUsed;
   }
 
-  if (queenShortSlots > 0) {
-    const kingRoomsUsed = Math.min(Math.ceil(queenShortSlots / KING_BEDS_PER_ROOM), kingMin - kingAlloc);
+  if (queenShort > 0) {
+    const kingRoomsUsed = Math.min(queenShort, kingMin - kingAlloc);
     kingAlloc += kingRoomsUsed;
-    queenShortSlots = Math.max(0, queenShortSlots - kingRoomsUsed * KING_BEDS_PER_ROOM);
+    queenShort -= kingRoomsUsed;
   }
 
   // Nothing actually changed from what's already typed (e.g. the "overflow"
@@ -463,8 +466,8 @@ function computeRoomCheckerRoomAllocationSuggestion(kingQty, queenQty, kingMin, 
   return {
     kingQty: kingAlloc,
     queenQty: queenAlloc,
-    complete: kingShortSlots === 0 && queenShortSlots === 0,
-    shortBy: kingShortSlots + queenShortSlots
+    complete: kingShort === 0 && queenShort === 0,
+    shortBy: kingShort + queenShort
   };
 }
 
@@ -581,12 +584,6 @@ function updateRoomCheckerSuggestion(suggestionElId, roomSuggestion, extraBedSug
     el.querySelector(`[data-suggestion-index="${i}"]`).addEventListener('click', b.onClick);
   });
 }
-
-// A King room has 1 bed; a Queen room has 2 - used by the extra-bed shortfall
-// allocation below (computeRoomCheckerExtraBedSuggestion), which reasons in
-// individual bed slots, not whole rooms.
-const KING_BEDS_PER_ROOM = 1;
-const QUEEN_BEDS_PER_ROOM = 2;
 
 // Breakfast is now a TIER that picks which room_rates.BREAKFAST column the
 // King/Queen rate is pulled from (see /room-rates, RoomRatesModel), not a
@@ -821,7 +818,7 @@ function recomputeRateSummaryTotals() {
   document.getElementById('rateSummaryDiscountTotal').textContent = (discount > 0 ? '-' : '') + formatPeso(discount);
   document.getElementById('rateSummaryGrandTotal').textContent = formatPeso(grandTotal);
 
-  updateRoomCheckerSummaryChip(nights, kingQty, queenQty);
+  updateRoomCheckerSummaryChip(nights, kingQty, queenQty, includeLateCheckout, lateCheckoutWaived);
 }
 
 // "How was this price arrived at" - turns a weekday/weekend rate + night-
@@ -863,10 +860,13 @@ function updateRoomCheckerRateBreakdown() {
 // Recap chip next to Proceed Booking - lets staff double-check nights/rooms/
 // breakfast tier at a glance right before committing, without scanning back
 // up through the whole itemized panel.
-function updateRoomCheckerSummaryChip(nights, kingQty, queenQty) {
+function updateRoomCheckerSummaryChip(nights, kingQty, queenQty, includeLateCheckout, lateCheckoutWaived) {
   const nightsEl = document.getElementById('roomCheckerChipNights');
   const roomsEl = document.getElementById('roomCheckerChipRooms');
   const breakfastEl = document.getElementById('roomCheckerChipBreakfast');
+  const lateCheckoutSep = document.getElementById('roomCheckerChipLateCheckoutSep');
+  const lateCheckoutItem = document.getElementById('roomCheckerChipLateCheckoutItem');
+  const lateCheckoutEl = document.getElementById('roomCheckerChipLateCheckout');
   if (!nightsEl || !roomsEl || !breakfastEl) return;
 
   nightsEl.textContent = `${nights} night${nights === 1 ? '' : 's'}`;
@@ -877,6 +877,12 @@ function updateRoomCheckerSummaryChip(nights, kingQty, queenQty) {
   // show both so this doesn't silently drop the extra like it used to.
   const extraQty = Math.max(0, parseInt((document.getElementById('rateSummaryExtraBreakfastQty') || {}).value, 10) || 0);
   breakfastEl.textContent = extraQty > 0 ? `${tierLabel} +${extraQty}` : tierLabel;
+
+  if (lateCheckoutSep && lateCheckoutItem && lateCheckoutEl) {
+    lateCheckoutSep.style.display = includeLateCheckout ? '' : 'none';
+    lateCheckoutItem.style.display = includeLateCheckout ? '' : 'none';
+    lateCheckoutEl.textContent = lateCheckoutWaived ? 'Late CO Free' : 'Late CO';
+  }
 }
 
 window.roomCheckerCalendars = [];
