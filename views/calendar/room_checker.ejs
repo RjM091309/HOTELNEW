@@ -352,6 +352,56 @@
     cursor: pointer;
   }
 
+  /* Toggle switch (Include Late Checkout) - styled like a standard on/off
+     switch instead of a plain checkbox since it's a single opt-in flag,
+     not part of a list of checkboxes. */
+  .rate-summary-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .rate-summary-toggle input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  .rate-summary-toggle-track {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+    background: #d1d5db;
+    border-radius: 999px;
+    transition: background 0.15s ease;
+    flex-shrink: 0;
+  }
+
+  .rate-summary-toggle-track::before {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 2px;
+    width: 16px;
+    height: 16px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.15s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  }
+
+  .rate-summary-toggle input:checked + .rate-summary-toggle-track {
+    background: #2563eb;
+  }
+
+  .rate-summary-toggle input:checked + .rate-summary-toggle-track::before {
+    transform: translateX(16px);
+  }
+
   /* Breakfast tier toggle - exactly one active at a time, picks the
      room_rates.BREAKFAST column the King/Queen rate is fetched from (see
      wireRoomCheckerBreakfastPresets in room_checker.js). */
@@ -767,11 +817,11 @@
                see recomputeRateSummaryTotals in room_checker.js, which also
                keeps the note text below in sync whenever nights changes. -->
           <div class="rate-summary-row">
-            <label class="rate-summary-checkbox">
+            <span>Include Late Checkout</span>
+            <label class="rate-summary-toggle">
               <input type="checkbox" id="rateSummaryIncludeLateCheckout">
-              Include Late Checkout
+              <span class="rate-summary-toggle-track"></span>
             </label>
-            <span id="rateSummaryLateCheckoutNote" class="rate-summary-inline-label"></span>
           </div>
           <div class="rate-summary-row" id="rateSummaryLateCheckoutTotalRow" style="display: none;">
             <span>Late Checkout Fee</span>
@@ -832,4 +882,4 @@
 <script src="/plugins/fullcalendar/packages/interaction/main.min.js"></script>
 <script src="/plugins/fullcalendar/packages/daygrid/main.min.js"></script>
 <script src="/plugins/fullcalendar/packages/timegrid/main.min.js"></script>
-<script src="/js/calendar/room_checker.js?v=42"></script>
+<script src="/js/calendar/room_checker.js?v=45"></script>

@@ -159,7 +159,6 @@ function resetRoomCheckerSummary() {
   document.getElementById('rateSummaryExtraBreakfastToggle').classList.remove('active');
   document.getElementById('rateSummaryDiscount').value = 0;
   document.getElementById('rateSummaryIncludeLateCheckout').checked = false;
-  document.getElementById('rateSummaryLateCheckoutNote').textContent = '';
   document.getElementById('rateSummaryLateCheckoutTotalRow').style.display = 'none';
   document.getElementById('rateSummaryDateRange').textContent = 'Select a range on the calendar';
   window.__rateSummaryBreakfastTier = 'no';
@@ -284,7 +283,7 @@ function fetchRoomCheckerLateCheckoutRate() {
 }
 
 function formatPeso(amount) {
-  return '₱' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return '₱' + Math.round(amount).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
 // Selected date range from the calendar - defaults to "today, 1 night" until the
@@ -813,15 +812,11 @@ function recomputeRateSummaryTotals() {
   document.getElementById('rateSummaryIncludedBreakfastQueenTotal').textContent = formatPeso(queenBakedInBreakfast);
   document.getElementById('rateSummaryExtraBreakfastTotal').textContent = formatPeso(breakfastTotal);
   document.getElementById('rateSummaryExtraBedTotal').textContent = formatPeso(extraBedTotal);
-  const lateCheckoutNote = document.getElementById('rateSummaryLateCheckoutNote');
   const lateCheckoutTotalRow = document.getElementById('rateSummaryLateCheckoutTotalRow');
-  if (lateCheckoutNote) {
-    lateCheckoutNote.textContent = includeLateCheckout
-      ? (lateCheckoutWaived ? 'FREE (3+ nights)' : formatPeso(lateCheckoutRate))
-      : '';
-  }
-  if (lateCheckoutTotalRow) lateCheckoutTotalRow.style.display = (includeLateCheckout && !lateCheckoutWaived) ? '' : 'none';
-  document.getElementById('rateSummaryLateCheckoutTotal').textContent = formatPeso(lateCheckoutFee);
+  if (lateCheckoutTotalRow) lateCheckoutTotalRow.style.display = includeLateCheckout ? '' : 'none';
+  document.getElementById('rateSummaryLateCheckoutTotal').textContent = includeLateCheckout && lateCheckoutWaived
+    ? 'FREE (3+ nights)'
+    : formatPeso(lateCheckoutFee);
   document.getElementById('rateSummarySubTotal').textContent = formatPeso(subTotal);
   document.getElementById('rateSummaryDiscountTotal').textContent = (discount > 0 ? '-' : '') + formatPeso(discount);
   document.getElementById('rateSummaryGrandTotal').textContent = formatPeso(grandTotal);
