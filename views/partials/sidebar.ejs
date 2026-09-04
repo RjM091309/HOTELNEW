@@ -104,7 +104,7 @@
 					</a>
 				</li>
 
-				<% const bookingPages = ['booking', 'unassigned-rooms', 'room-checker', 'check-in-notifier', 'breakfast-list']; %>
+				<% const bookingPages = ['booking', 'unassigned-rooms', 'room-checker', 'check-in-notifier', 'breakfast-list', 'cancelled-booking']; %>
 				<li class="nav-item <%= bookingPages.includes(activePage) ? 'open' : '' %>">
 					<a class="nav-link nav-toggle nav-main-link-submenu <%= bookingPages.includes(activePage) ? 'active' : '' %>" data-toggle="submenu" aria-haspopup="true"
 						aria-expanded="<%= bookingPages.includes(activePage) ? 'true' : 'false' %>" href="#">
@@ -141,6 +141,12 @@
 							<a href="/booking/breakfast-list" class="nav-link <%= activePage === 'breakfast-list' ? 'active' : '' %>">
 								<i class="fa fa-genderless"></i>
 								<span class="title">Breakfast List</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a href="/booking/cancelled" class="nav-link <%= activePage === 'cancelled-booking' ? 'active' : '' %>">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Cancelled Bookings</span>
 							</a>
 						</li>
 						<!-- Rooms and Guest moved to Management -->

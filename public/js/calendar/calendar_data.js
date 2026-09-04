@@ -104,16 +104,19 @@ function setupScrollbar() {
     return null; // Return null instead of undefined
   }
 
-  // Build & insert the top scrollbar
+  // Build the horizontal scrollbar. Kept the #top-scroller id (many other refs).
+  // It's now a <body> child, position:fixed to the VIEWPORT bottom - it can't
+  // live under #calendar because #calendar has transform: translateZ(0), which
+  // would trap position:fixed inside it (and #calendar is taller than the
+  // viewport, so its "bottom" is off-screen).
   let top = document.getElementById('top-scroller');
   if (!top) {
     top = document.createElement('div');
     top.id = 'top-scroller';
     top.innerHTML = '<div></div>';
-    const grid = document.querySelector('#calendar .fc-scrollgrid');
-    if (grid) {
-      grid.parentNode.insertBefore(top, grid);
-    }
+  }
+  if (top.parentElement !== document.body) {
+    document.body.appendChild(top);
   }
 
   // Size & two-way sync
@@ -122,6 +125,23 @@ function setupScrollbar() {
   top.scrollLeft = bodyScroller.scrollLeft;
   top.addEventListener('scroll', () => bodyScroller.scrollLeft = top.scrollLeft);
   bodyScroller.addEventListener('scroll', () => top.scrollLeft = bodyScroller.scrollLeft);
+
+  // Line the fixed bar up horizontally with the calendar grid (the layout has a
+  // sidebar, so full-width would run under it).
+  const alignBar = () => {
+    const live = Array.from(document.querySelectorAll('#calendar .fc-scroller'))
+      .find(s => s.scrollWidth > s.clientWidth) || bodyScroller;
+    const r = live.getBoundingClientRect();
+    if (r.width) {
+      top.style.left = r.left + 'px';
+      top.style.width = r.width + 'px';
+    }
+  };
+  alignBar();
+  if (!top._alignBound) {
+    top._alignBound = true;
+    window.addEventListener('resize', alignBar);
+  }
 
   return { bodyScroller, top };
 }
@@ -742,27 +762,46 @@ function setupCalendarRangeExpansion() {
   document.addEventListener('scroll', handleCalendarScrollForExpansion, true);
 }
 
-function updateHeaderOnScroll(bodyScroller, top) {
+// The toolbar month/year shows the month at the CENTRE of what's currently
+// visible - i.e. the month you're actually looking at - not the date sitting at
+// the far-left scroll edge (which only flipped the title once the 1st of the
+// next month scrolled into that corner).
+function computeVisibleMonthTitle(bodyScroller) {
+  if (!calendar || !calendar.view || !bodyScroller || !bodyScroller.scrollWidth) return null;
   const view = calendar.view;
-  const toolbarTitle = document.querySelector('.fc-toolbar-title');
   const msPerDay = 1000 * 60 * 60 * 24;
   const totalDays = (view.activeEnd.getTime() - view.activeStart.getTime()) / msPerDay;
+  if (!totalDays) return null;
   const dayWidth = bodyScroller.scrollWidth / totalDays;
-  
-  let throttle;
-  bodyScroller.addEventListener('scroll', () => {
-    clearTimeout(throttle);
-    throttle = setTimeout(() => {
-      const daysFromStart = bodyScroller.scrollLeft / dayWidth;
-      const leftDate = new Date(view.activeStart.getTime() + daysFromStart * msPerDay);
-      toolbarTitle.textContent = leftDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    }, 0);
-  });
+  if (!dayWidth) return null;
 
-  // Initial header update
-  const daysFromStart = bodyScroller.scrollLeft / dayWidth;
-  const leftDate = new Date(view.activeStart.getTime() + daysFromStart * msPerDay);
-  toolbarTitle.textContent = leftDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const centreDays = (bodyScroller.scrollLeft + bodyScroller.clientWidth / 2) / dayWidth;
+  const centreDate = new Date(view.activeStart.getTime() + centreDays * msPerDay);
+  return centreDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+function updateHeaderOnScroll(bodyScroller, top) {
+  const toolbarTitle = document.querySelector('.fc-toolbar-title');
+  if (!toolbarTitle || !bodyScroller) return;
+
+  const setTitle = () => {
+    const t = computeVisibleMonthTitle(bodyScroller);
+    if (t) toolbarTitle.textContent = t;
+  };
+
+  // Bind the scroll listener ONCE per scroller element (the .fc-scroller is
+  // re-created on every calendar re-render, so a fresh element => a fresh
+  // listener, and the old element + its listener are GC'd on removal).
+  if (!bodyScroller._headerScrollBound) {
+    bodyScroller._headerScrollBound = true;
+    let throttle;
+    bodyScroller.addEventListener('scroll', () => {
+      clearTimeout(throttle);
+      throttle = setTimeout(setTitle, 0);
+    });
+  }
+
+  setTitle();
 }
 
 // =============================================================================
@@ -2163,10 +2202,84 @@ const customButtons = {
 // VIEW CONFIGURATIONS
 // =============================================================================
 
+// ---- Date bookmarks (click a date header to keep its column highlighted) ------
+const CALENDAR_BOOKMARK_KEY = 'calendarBookmarkedDates';
+
+function dateKeyOf(date) {
+  const d = (date instanceof Date) ? date : new Date(date);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function loadBookmarkedDates() {
+  try {
+    const raw = localStorage.getItem(CALENDAR_BOOKMARK_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch (e) {
+    return new Set();
+  }
+}
+
+let calendarBookmarkedDates = loadBookmarkedDates();
+window.calendarBookmarkedDates = calendarBookmarkedDates;
+
+function saveBookmarkedDates() {
+  try {
+    localStorage.setItem(CALENDAR_BOOKMARK_KEY, JSON.stringify([...calendarBookmarkedDates]));
+  } catch (e) {}
+}
+
+// Toggle both the header slot and every body lane cell for that day, and keep the
+// set so re-renders (scroll / view change) restore it via getDayClassNames().
+function applyDateBookmarks() {
+  document.querySelectorAll('#calendar .fc-timeline-slot[data-date]').forEach((slot) => {
+    const key = String(slot.getAttribute('data-date')).slice(0, 10);
+    slot.classList.toggle('date-bookmarked', calendarBookmarkedDates.has(key));
+  });
+}
+window.applyDateBookmarks = applyDateBookmarks;
+
+function toggleDateBookmark(dateInput) {
+  const key = typeof dateInput === 'string' && /^\d{4}-\d{2}-\d{2}/.test(dateInput)
+    ? dateInput.slice(0, 10)
+    : dateKeyOf(dateInput);
+  if (calendarBookmarkedDates.has(key)) {
+    calendarBookmarkedDates.delete(key);
+  } else {
+    calendarBookmarkedDates.add(key);
+  }
+  saveBookmarkedDates();
+  applyDateBookmarks();
+}
+window.toggleDateBookmark = toggleDateBookmark;
+
+// One delegated click listener on the timeline header - a click on a date label
+// toggles that day's bookmark column.
+function setupDateBookmarks() {
+  const container = calendarEl || document.getElementById('calendar');
+  if (!container || container.dataset.dateBookmarksBound === '1') return;
+  container.dataset.dateBookmarksBound = '1';
+
+  container.addEventListener('click', (e) => {
+    const header = e.target.closest('.fc-timeline-header');
+    if (!header) return;
+    const slot = e.target.closest('[data-date]');
+    if (!slot || !header.contains(slot)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    toggleDateBookmark(slot.getAttribute('data-date'));
+  }, true);
+}
+window.setupDateBookmarks = setupDateBookmarks;
+
 function getDayClassNames(date) {
   const classes = [];
   const day = date.getDay();
   const today = new Date();
+
+  if (calendarBookmarkedDates.has(dateKeyOf(date))) {
+    classes.push('date-bookmarked');
+  }
 
   // Highlight today
   if (date.getFullYear() === today.getFullYear() &&
@@ -2212,6 +2325,9 @@ const views = {
     },
 
     slotLaneClassNames(arg) {
+      return getDayClassNames(arg.date);
+    },
+    slotLabelClassNames(arg) {
       return getDayClassNames(arg.date);
     }
   },
@@ -2779,6 +2895,8 @@ async function loadCalendarData() {
       updateHeaderOnScroll(sb.bodyScroller, sb.top);
       refreshGroupOverlayScrollSync();
       refreshCalendarVerticalScrollSync();
+      setupDateBookmarks();
+      applyDateBookmarks();
       return true;
     }
 
@@ -2980,6 +3098,9 @@ const findHeader = setInterval(() => {
     initialDate: today,
     resourceAreaHeaderContent: 'Rooms',
     resourceAreaWidth: "70px",
+    // The horizontal scrollbar is a position:fixed <body> child pinned to the
+    // viewport bottom, so it doesn't consume grid height; #calendar has
+    // padding-bottom so its last row stays clear of the fixed bar.
     height: '850px',
     eventOverlap: true,
     editable: true,
@@ -3141,6 +3262,50 @@ const findHeader = setInterval(() => {
       return (arg.resource && arg.resource.extendedProps && arg.resource.extendedProps.isFloor)
         ? ['fc-floor-lane']
         : [];
+    },
+
+    // resourceLaneClassNames is unreliable for parent/floor rows in this FC
+    // build, so also stamp the lane <td> (and its <tr>) directly on mount and
+    // paint them solid black inline - CSS alone can't win if the class is
+    // missing from the element the grid lines actually render on.
+    resourceLaneDidMount: function(arg) {
+      if (!(arg.resource && arg.resource.extendedProps && arg.resource.extendedProps.isFloor)) return;
+      const td = arg.el;
+      if (!td) return;
+      td.classList.add('fc-floor-lane');
+      const paint = (node) => {
+        if (!node || node.classList.contains('fc-floor-blackout')) return;
+        node.style.setProperty('background', '#000', 'important');
+        node.style.setProperty('background-image', 'none', 'important');
+        node.style.setProperty('border-color', '#000', 'important');
+        node.style.setProperty('box-shadow', 'none', 'important');
+      };
+      paint(td);
+      if (td.parentElement) paint(td.parentElement);
+      td.querySelectorAll('*').forEach(paint);
+      td.style.setProperty('position', 'relative', 'important');
+
+      // Physical opaque cover so the shared today/weekend column layer that
+      // renders through the lane can't show any tint on the black band.
+      if (!td.querySelector(':scope > .fc-floor-blackout')) {
+        const cover = document.createElement('div');
+        cover.className = 'fc-floor-blackout';
+        td.appendChild(cover);
+      }
+
+      // Descendants (slot cells, bg harness) can be (re)created after mount.
+      if (!td._floorPaintObserver && window.MutationObserver) {
+        td._floorPaintObserver = new MutationObserver(() => {
+          paint(td);
+          td.querySelectorAll('*').forEach(paint);
+          if (!td.querySelector(':scope > .fc-floor-blackout')) {
+            const cover = document.createElement('div');
+            cover.className = 'fc-floor-blackout';
+            td.appendChild(cover);
+          }
+        });
+        td._floorPaintObserver.observe(td, { childList: true, subtree: true });
+      }
     },
 
     resources: [],

@@ -1,0 +1,557 @@
+<!-- start page content -->
+<div class="row cancelled-booking-page">
+  <div class="col-xl-12 col-md-12 col-12">
+    <div class="dashboard-card">
+      <div class="dashboard-card-header">
+        <div class="cb-header">
+          <div>
+            <h4 class="mb-0">Cancelled Bookings</h4>
+            <p class="cb-note mb-0">
+              Every booking with status <strong>cancelled</strong> and its general details.
+              Click a row to view the full details. <span id="cbCount"></span>
+            </p>
+          </div>
+          <div class="cb-controls">
+            <div class="cb-search-field">
+              <i class="fa fa-search"></i>
+              <input type="text" id="cbSearch" placeholder="Search guest, room, confirmation&hellip;">
+            </div>
+            <button type="button" class="btn cb-refresh-btn" id="cbRefreshBtn">
+              <i class="fa fa-sync"></i> Refresh
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="dashboard-card-body">
+        <div class="table-scrollable">
+          <table id="cancelled_tbl" class="table table-hover table-bordered full-width">
+            <thead>
+              <tr>
+                <th style="width:44px;">#</th>
+                <th>CONFIRMATION</th>
+                <th>GUEST</th>
+                <th>ROOM</th>
+                <th>STAY</th>
+                <th class="text-center" style="width:64px;">NIGHTS</th>
+                <th>CANCELLED</th>
+                <th>REASON</th>
+                <th class="text-end">TOTAL COST</th>
+                <th class="text-end">CANCEL FEE</th>
+                <th class="text-end">REFUND</th>
+                <th class="text-center">PAYMENT</th>
+              </tr>
+            </thead>
+            <tbody id="cancelledBody">
+              <tr><td colspan="12" class="text-center text-muted py-4">Loading&hellip;</td></tr>
+            </tbody>
+            <tfoot>
+              <tr class="cb-total-row">
+                <th colspan="9" class="text-end">TOTALS</th>
+                <th class="text-end" id="cbFeeTotal">0</th>
+                <th class="text-end" id="cbRefundTotal">0</th>
+                <th></th>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Read-only details modal -->
+<div class="modal fade" id="cancelledDetailsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content cbd-content">
+      <div class="modal-header cbd-header">
+        <div>
+          <h5 class="modal-title mb-0">Cancelled Reservation Details</h5>
+          <span class="cbd-viewonly"><i class="fa fa-eye"></i> View only</span>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body cbd-body">
+        <div id="cbdLoading" class="text-center text-muted py-5">Loading&hellip;</div>
+
+        <div id="cbdContent" style="display:none;">
+          <div class="cbd-cancel-ribbon">
+            <span class="cb-badge cb-pay-cancelled">CANCELLED</span>
+            <span id="cbdCancelledMeta"></span>
+          </div>
+
+          <div class="cbd-grid">
+            <section class="cbd-section">
+              <h6 class="cbd-section-title"><i class="fa fa-user"></i> Guest Info</h6>
+              <dl class="cbd-dl">
+                <dt>Guest Name</dt><dd id="cbdGuestName">-</dd>
+                <dt>Source</dt><dd id="cbdSource">-</dd>
+                <dt>Booking ID</dt><dd id="cbdBookingId">-</dd>
+                <dt>Contact No</dt><dd id="cbdContact">-</dd>
+                <dt>Confirmation</dt><dd id="cbdConfirmation">-</dd>
+              </dl>
+            </section>
+
+            <section class="cbd-section">
+              <h6 class="cbd-section-title"><i class="fa fa-bed"></i> Room Info</h6>
+              <dl class="cbd-dl">
+                <dt>Room No</dt><dd id="cbdRoomNo">-</dd>
+                <dt>Room Type</dt><dd id="cbdRoomType">-</dd>
+                <dt>Room Rate</dt><dd id="cbdRoomRate">-</dd>
+                <dt>No. of Nights</dt><dd id="cbdNights">-</dd>
+                <dt>Check-in</dt><dd id="cbdCheckIn">-</dd>
+                <dt>Check-out</dt><dd id="cbdCheckOut">-</dd>
+                <dt>Room Cost</dt><dd id="cbdRoomCost">-</dd>
+              </dl>
+            </section>
+          </div>
+
+          <section class="cbd-section cbd-section-wide">
+            <h6 class="cbd-section-title"><i class="fa fa-clipboard-list"></i> Stay Summary</h6>
+            <div class="cbd-summary-grid">
+              <div><span class="cbd-lbl">Pick-up</span><span id="cbdPickup">-</span></div>
+              <div><span class="cbd-lbl">Drop-off</span><span id="cbdDropoff">-</span></div>
+              <div><span class="cbd-lbl">Breakfast</span><span id="cbdBreakfast">-</span></div>
+              <div><span class="cbd-lbl">Late Check-out</span><span id="cbdLateCheckout">-</span></div>
+              <div><span class="cbd-lbl">Payment Method</span><span id="cbdPaymentMethod">-</span></div>
+              <div><span class="cbd-lbl">Reservation Fee</span><span id="cbdReservationFee">-</span></div>
+              <div><span class="cbd-lbl">Reserved By</span><span id="cbdReservedBy">-</span></div>
+              <div><span class="cbd-lbl">Reserved Time</span><span id="cbdReservedTime">-</span></div>
+              <div><span class="cbd-lbl">Status</span><span id="cbdStatus">-</span></div>
+            </div>
+          </section>
+
+          <section class="cbd-section cbd-section-wide">
+            <h6 class="cbd-section-title"><i class="fa fa-ban"></i> Cancellation</h6>
+            <div class="cbd-summary-grid">
+              <div><span class="cbd-lbl">Cancelled At</span><span id="cbdCancelledAt">-</span></div>
+              <div><span class="cbd-lbl">Cancelled By</span><span id="cbdCancelledBy">-</span></div>
+              <div><span class="cbd-lbl">Cancellation Fee</span><span id="cbdCancelFee">-</span></div>
+              <div><span class="cbd-lbl">Refund Amount</span><span id="cbdRefund">-</span></div>
+              <div class="cbd-reason-cell"><span class="cbd-lbl">Reason</span><span id="cbdReason">-</span></div>
+            </div>
+          </section>
+
+          <section class="cbd-section cbd-section-wide">
+            <h6 class="cbd-section-title"><i class="fa fa-list"></i> Extra Services</h6>
+            <table class="table cbd-services-tbl">
+              <thead>
+                <tr><th>Service</th><th class="text-center">Qty</th><th class="text-end">Cost</th><th class="text-center">Status</th></tr>
+              </thead>
+              <tbody id="cbdServicesBody">
+                <tr><td colspan="4" class="text-center text-muted">No extra services.</td></tr>
+              </tbody>
+            </table>
+          </section>
+
+          <div class="cbd-totals">
+            <div><span class="cbd-lbl">Grand Total</span><strong id="cbdGrandTotal">-</strong></div>
+            <div><span class="cbd-lbl">Paid</span><strong id="cbdPaid">-</strong></div>
+            <div><span class="cbd-lbl">Balance</span><strong id="cbdBalance">-</strong></div>
+          </div>
+        </div>
+
+        <div id="cbdError" class="text-center text-danger py-5" style="display:none;">Failed to load details.</div>
+      </div>
+      <div class="modal-footer cbd-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .cb-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .cb-note {
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 12px;
+    margin-top: 6px;
+  }
+  .cb-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .cb-search-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #ffffff;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    padding: 4px 10px;
+  }
+  .cb-search-field i { color: #6c757d; font-size: 12px; }
+  .cb-search-field input {
+    width: 240px;
+    border: none;
+    outline: none;
+    font-size: 13px;
+    color: #212529;
+    background: transparent;
+  }
+  .cb-refresh-btn {
+    background: #495057;
+    border: 1px solid #6c757d;
+    color: #fff;
+    padding: 6px 14px;
+    font-weight: 600;
+    font-size: 13px;
+  }
+  #cancelled_tbl td, #cancelled_tbl th { vertical-align: middle; font-size: 12.5px; }
+  #cancelled_tbl tbody tr { cursor: pointer; }
+  #cancelled_tbl td .cb-sub {
+    display: block;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+  }
+  #cancelled_tbl .cb-reason {
+    max-width: 240px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .cb-badge {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 11px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .cb-pay-cancelled { background: rgba(230,169,75,.18); color: #f0ad4e; border-color: rgba(230,169,75,.5); }
+  .cb-pay-paid      { background: rgba(111,156,64,.18); color: #9ccc65; border-color: rgba(111,156,64,.45); }
+  .cb-pay-unpaid    { background: rgba(229,57,53,.18);  color: #ef9a9a; border-color: rgba(229,57,53,.5); }
+  .cb-pay-other     { background: rgba(255,255,255,.10); color: #cfd4d8; border-color: rgba(255,255,255,.25); }
+  .cb-total-row th { font-size: 13px; background: rgba(255, 255, 255, 0.06); }
+  #cbFeeTotal { color: #f0ad4e; }
+  #cbRefundTotal { color: #8ac249; }
+
+  /* ---- details modal ---- */
+  .cbd-content { background: #1f2528; color: #e8eaed; border: 1px solid rgba(255,255,255,.12); }
+  .cbd-header { border-bottom: 1px solid rgba(255,255,255,.12); align-items: flex-start; }
+  .cbd-viewonly { display: inline-block; margin-top: 4px; font-size: 11px; font-weight: 600; color: #9aa0a6; }
+  .cbd-footer { border-top: 1px solid rgba(255,255,255,.12); }
+  .cbd-cancel-ribbon { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; font-size: 12px; color: #9aa0a6; }
+  .cbd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .cbd-section {
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+  }
+  .cbd-section-wide { margin-top: 0; }
+  .cbd-section-title {
+    font-size: 12px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+    color: #8ab4f8; margin: 0 0 10px; display: flex; align-items: center; gap: 6px;
+  }
+  .cbd-dl { display: grid; grid-template-columns: 40% 60%; row-gap: 7px; margin: 0; font-size: 13px; }
+  .cbd-dl dt { color: #9aa0a6; font-weight: 500; }
+  .cbd-dl dd { margin: 0; font-weight: 600; }
+  .cbd-summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 16px; font-size: 13px; }
+  .cbd-summary-grid > div { display: flex; flex-direction: column; }
+  .cbd-lbl { font-size: 10.5px; text-transform: uppercase; letter-spacing: .4px; color: #9aa0a6; margin-bottom: 2px; }
+  .cbd-summary-grid > div > span:last-child { font-weight: 600; }
+  .cbd-reason-cell { grid-column: 1 / -1; }
+  .cbd-services-tbl { color: #e8eaed; margin: 0; font-size: 13px; }
+  .cbd-services-tbl thead th { color: #9aa0a6; font-size: 11px; border-color: rgba(255,255,255,.12); }
+  .cbd-services-tbl td { border-color: rgba(255,255,255,.08); }
+  .cbd-totals {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+    background: rgba(111,156,64,.10); border: 1px solid rgba(111,156,64,.25);
+    border-radius: 8px; padding: 12px 14px; margin-top: 4px; text-align: center;
+  }
+  .cbd-totals > div { display: flex; flex-direction: column; }
+  .cbd-totals strong { font-size: 16px; margin-top: 2px; }
+  #cbdBalance { color: #f0ad4e; }
+  @media (max-width: 640px) {
+    .cbd-grid { grid-template-columns: 1fr; }
+    .cbd-summary-grid { grid-template-columns: 1fr 1fr; }
+    .cbd-totals { grid-template-columns: 1fr; gap: 8px; }
+  }
+
+  /* Light theme */
+  [data-theme="white"] .cb-note { color: #6c757d; }
+  [data-theme="white"] #cancelled_tbl td .cb-sub { color: #6c757d; }
+  [data-theme="white"] .cb-total-row th { background: #f1f3f5; }
+  [data-theme="white"] .cbd-content { background: #ffffff; color: #212529; border-color: #dee2e6; }
+  [data-theme="white"] .cbd-header,
+  [data-theme="white"] .cbd-footer { border-color: #dee2e6; }
+  [data-theme="white"] .cbd-header .btn-close { filter: none; }
+  [data-theme="white"] .cbd-section { background: #f8f9fa; border-color: #e9ecef; }
+  [data-theme="white"] .cbd-section-title { color: #1a73e8; }
+  [data-theme="white"] .cbd-dl dt,
+  [data-theme="white"] .cbd-lbl,
+  [data-theme="white"] .cbd-viewonly,
+  [data-theme="white"] .cbd-cancel-ribbon { color: #6c757d; }
+  [data-theme="white"] .cbd-services-tbl { color: #212529; }
+  [data-theme="white"] .cbd-services-tbl thead th { color: #6c757d; border-color: #dee2e6; }
+  [data-theme="white"] .cbd-services-tbl td { border-color: #e9ecef; }
+</style>
+
+<script>
+  (function () {
+    const body = document.getElementById('cancelledBody');
+    const searchInput = document.getElementById('cbSearch');
+    const countEl = document.getElementById('cbCount');
+    const feeTotalEl = document.getElementById('cbFeeTotal');
+    const refundTotalEl = document.getElementById('cbRefundTotal');
+
+    let allRows = [];
+    let rowById = {};
+    let detailsModal = null;
+
+    function esc(v) {
+      return String(v == null ? '' : v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function money(n) {
+      const v = Number(n) || 0;
+      return '₱' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function moneyPlain(n) {
+      const v = Number(n) || 0;
+      return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function fmtDate(iso) {
+      if (!iso) return '-';
+      const d = new Date(iso);
+      if (isNaN(d)) return esc(iso);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    function fmtDateTime(iso) {
+      if (!iso) return '-';
+      const d = new Date(iso);
+      if (isNaN(d)) return esc(iso);
+      return d.toLocaleString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit'
+      });
+    }
+
+    function sourceLabel(channel) {
+      if (!channel || channel === 'null' || channel === 'undefined') return 'walk-in';
+      const n = String(channel).trim().toLowerCase();
+      if (n === 'booking-channel' || n === 'booking channel') return 'OTA';
+      return String(channel);
+    }
+
+    function paymentMethodLabel(method) {
+      const raw = String(method || '').trim();
+      if (!raw) return 'None';
+      const labels = {
+        cash: 'Cash', credit_card: 'Credit Card', credit: 'Credit', marker: 'Credit',
+        check: 'Check', bank_transfer: 'Bank Transfer', korean_bank: 'Korean Bank',
+        agoda: 'AGODA', expedia: 'EXPEDIA'
+      };
+      const key = raw.toLowerCase();
+      if (labels[key]) return labels[key];
+      return raw.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim()
+        .replace(/\b\w/g, (l) => l.toUpperCase());
+    }
+
+    function payBadge(status) {
+      const s = String(status || '').toLowerCase();
+      let key = 'other', label = status || 'N/A';
+      if (s === 'cancelled') { key = 'cancelled'; label = 'Cancelled'; }
+      else if (s === 'paid' || s === 'fully paid') { key = 'paid'; label = 'Paid'; }
+      else if (s === 'unpaid' || s === 'partial' || s === 'partial_paid' || s === 'partially paid') { key = 'unpaid'; label = status; }
+      return '<span class="cb-badge cb-pay-' + key + '">' + esc(label) + '</span>';
+    }
+
+    function render(rows) {
+      if (!rows.length) {
+        body.innerHTML = '<tr><td colspan="12" class="text-center text-muted py-4">No cancelled bookings.</td></tr>';
+        feeTotalEl.textContent = '0.00';
+        refundTotalEl.textContent = '0.00';
+        return;
+      }
+
+      let feeSum = 0, refundSum = 0;
+      body.innerHTML = rows.map((r, i) => {
+        feeSum += Number(r.CANCELLATION_FEE) || 0;
+        refundSum += Number(r.REFUND_AMOUNT) || 0;
+        const room = r.ROOM_NUMBER ? esc(r.ROOM_NUMBER) : '-';
+        const groupTag = r.GROUP_BOOKING_ID
+          ? ' <span class="cb-badge cb-pay-other">GROUP</span>' : '';
+        return `
+          <tr data-booking-id="${esc(r.BOOKING_ID)}">
+            <td>${i + 1}</td>
+            <td>${esc(r.CONFIRMATION_NUMBER || '-')}${groupTag}</td>
+            <td>
+              ${esc(r.GUEST_NAME || 'N/A')}
+              <span class="cb-sub">${esc(r.GUEST_CONTACT || '')}</span>
+            </td>
+            <td>
+              <strong>${room}</strong>
+              <span class="cb-sub">${esc(r.ROOM_TYPE || '')}</span>
+            </td>
+            <td>${fmtDate(r.CHECK_IN_DATE)} &rarr; ${fmtDate(r.CHECK_OUT_DATE)}</td>
+            <td class="text-center">${Number(r.NIGHTS) || 0}</td>
+            <td>
+              ${fmtDateTime(r.CANCELLED_AT)}
+              <span class="cb-sub">by ${esc(r.CANCELLED_BY || 'System')}</span>
+            </td>
+            <td><div class="cb-reason" title="${esc(r.CANCELLATION_REASON || '')}">${esc(r.CANCELLATION_REASON || '-')}</div></td>
+            <td class="text-end">${moneyPlain(r.TOTAL_COST)}</td>
+            <td class="text-end">${moneyPlain(r.CANCELLATION_FEE)}</td>
+            <td class="text-end">${moneyPlain(r.REFUND_AMOUNT)}</td>
+            <td class="text-center">${payBadge(r.PAYMENT_STATUS)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      feeTotalEl.textContent = moneyPlain(feeSum);
+      refundTotalEl.textContent = moneyPlain(refundSum);
+    }
+
+    function applyFilter() {
+      const q = searchInput.value.trim().toLowerCase();
+      if (!q) { render(allRows); return; }
+      const filtered = allRows.filter((r) => [
+        r.CONFIRMATION_NUMBER, r.GUEST_NAME, r.GUEST_CONTACT, r.ROOM_NUMBER,
+        r.ROOM_TYPE, r.CANCELLATION_REASON, r.CANCELLED_BY, r.PAYMENT_STATUS
+      ].some((v) => String(v == null ? '' : v).toLowerCase().includes(q)));
+      render(filtered);
+    }
+
+    function load() {
+      body.innerHTML = '<tr><td colspan="12" class="text-center text-muted py-4">Loading&hellip;</td></tr>';
+      fetch('/booking/cancelled/data')
+        .then((res) => res.json())
+        .then((json) => {
+          if (!json.success) {
+            body.innerHTML = '<tr><td colspan="12" class="text-center text-danger py-4">' +
+              esc(json.message || 'Failed to load.') + '</td></tr>';
+            return;
+          }
+          allRows = json.data || [];
+          rowById = {};
+          allRows.forEach((r) => { rowById[String(r.BOOKING_ID)] = r; });
+          countEl.textContent = '(' + allRows.length + ' total)';
+          applyFilter();
+        })
+        .catch(() => {
+          body.innerHTML = '<tr><td colspan="12" class="text-center text-danger py-4">Failed to load cancelled bookings.</td></tr>';
+        });
+    }
+
+    // ---- details modal ----
+    function setText(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = (value == null || value === '') ? '-' : value;
+    }
+
+    function openDetails(bookingId) {
+      const listRow = rowById[String(bookingId)] || {};
+      const modalEl = document.getElementById('cancelledDetailsModal');
+      if (!detailsModal && window.bootstrap && bootstrap.Modal) {
+        detailsModal = new bootstrap.Modal(modalEl);
+      }
+      document.getElementById('cbdLoading').style.display = 'block';
+      document.getElementById('cbdContent').style.display = 'none';
+      document.getElementById('cbdError').style.display = 'none';
+      if (detailsModal) detailsModal.show();
+
+      Promise.all([
+        fetch('/booking/booking_details/' + encodeURIComponent(bookingId)).then((r) => r.json()).catch(() => null),
+        fetch('/booking/get-booking-services/' + encodeURIComponent(bookingId)).then((r) => r.json()).catch(() => null)
+      ]).then(([d, svc]) => {
+        if (!d || d.error) {
+          document.getElementById('cbdLoading').style.display = 'none';
+          document.getElementById('cbdError').style.display = 'block';
+          return;
+        }
+
+        setText('cbdCancelledMeta', 'Reservation #' + (d.BookingID || bookingId));
+
+        // Guest Info
+        setText('cbdGuestName', d.CustomerName || listRow.GUEST_NAME);
+        setText('cbdSource', sourceLabel(d.BOOKING_CHANNEL));
+        setText('cbdBookingId', d.BookingID || bookingId);
+        setText('cbdContact', d.CONTACT_NO || listRow.GUEST_CONTACT || '-');
+        setText('cbdConfirmation', listRow.CONFIRMATION_NUMBER || '-');
+
+        // Room Info
+        setText('cbdRoomNo', d.ROOM_NUMBER || listRow.ROOM_NUMBER);
+        setText('cbdRoomType', d.ROOM_TYPE || listRow.ROOM_TYPE);
+        setText('cbdRoomRate', money(d.ROOM_RATE));
+        setText('cbdNights', d.TOTAL_DAYS || listRow.NIGHTS || '-');
+        setText('cbdCheckIn', fmtDate(d.CHECK_IN_DATE || listRow.CHECK_IN_DATE));
+        setText('cbdCheckOut', fmtDate(d.CHECK_OUT_DATE || listRow.CHECK_OUT_DATE));
+        setText('cbdRoomCost', money(d.TOTAL_ROOM_COST != null ? d.TOTAL_ROOM_COST : d.ROOM_COST));
+
+        // Stay Summary
+        setText('cbdPickup', d.HAS_PICKUP ? 'Yes' : 'No');
+        setText('cbdDropoff', d.HAS_DROPOFF ? 'Yes' : 'No');
+        setText('cbdBreakfast', Number(d.BREAKFAST_QTY) > 0 ? (d.BREAKFAST_QTY + ' pax') : 'None');
+        setText('cbdLateCheckout', Number(d.LATE_CHECKOUT) ? 'Yes' : 'No');
+        setText('cbdPaymentMethod', paymentMethodLabel(d.LATEST_PAYMENT_METHOD));
+        setText('cbdReservationFee', money(d.RESERVATION_FEE));
+        setText('cbdReservedBy', d.ENCODED_BY_NAME || '-');
+        setText('cbdReservedTime', fmtDateTime(d.ENCODED_DT));
+        setText('cbdStatus', d.BOOKING_STATUS || 'cancelled');
+
+        // Cancellation (from the list row)
+        setText('cbdCancelledAt', fmtDateTime(listRow.CANCELLED_AT));
+        setText('cbdCancelledBy', listRow.CANCELLED_BY || 'System');
+        setText('cbdCancelFee', money(listRow.CANCELLATION_FEE));
+        setText('cbdRefund', money(listRow.REFUND_AMOUNT));
+        setText('cbdReason', listRow.CANCELLATION_REASON || '-');
+
+        // Extra Services
+        const services = (svc && svc.success && Array.isArray(svc.data)) ? svc.data : [];
+        const sBody = document.getElementById('cbdServicesBody');
+        let servicesTotal = 0;
+        if (!services.length) {
+          sBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No extra services.</td></tr>';
+        } else {
+          sBody.innerHTML = services.map((s) => {
+            const cost = Number(s.TOTAL_COST) || 0;
+            servicesTotal += cost;
+            return '<tr>' +
+              '<td>' + esc(s.SERVICE_NAME || 'Service') + '</td>' +
+              '<td class="text-center">' + (Number(s.QTY) || 0) + '</td>' +
+              '<td class="text-end">' + money(cost) + '</td>' +
+              '<td class="text-center">' + esc(s.STATUS || '-') + '</td>' +
+            '</tr>';
+          }).join('');
+        }
+
+        // Totals
+        const roomCost = Number(d.TOTAL_ROOM_COST != null ? d.TOTAL_ROOM_COST : d.ROOM_COST) || 0;
+        const grand = roomCost + servicesTotal;
+        const paid = Number(d.TOTAL_PAID) || 0;
+        setText('cbdGrandTotal', money(grand));
+        setText('cbdPaid', money(paid));
+        setText('cbdBalance', money(grand - paid));
+
+        document.getElementById('cbdLoading').style.display = 'none';
+        document.getElementById('cbdContent').style.display = 'block';
+      });
+    }
+
+    body.addEventListener('click', function (e) {
+      const tr = e.target.closest('tr[data-booking-id]');
+      if (!tr) return;
+      openDetails(tr.getAttribute('data-booking-id'));
+    });
+
+    searchInput.addEventListener('input', applyFilter);
+    document.getElementById('cbRefreshBtn').addEventListener('click', load);
+
+    load();
+  })();
+</script>

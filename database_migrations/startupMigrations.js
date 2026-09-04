@@ -338,9 +338,21 @@ async function runActivityLogMigrations() {
 
   // ---- Evolve an existing table to the trimmed schema ----
 
-  // Columns we keep (add if missing).
-  await ensureColumn('activity_log', 'BOOKING_ID', `BOOKING_ID ${COLUMNS.BOOKING_ID}`, 'ACTION');
-  await ensureColumn('activity_log', 'AMOUNT', `AMOUNT ${COLUMNS.AMOUNT}`, 'DESCRIPTION');
+  // Back-add EVERY column we keep (older tables predate STATUS / ERROR_MESSAGE /
+  // USER_NAME / OLD_DATA / NEW_DATA, which downstream migrations and the app now
+  // depend on). ensureColumn() no-ops when the column already exists; a NOT NULL
+  // column with no default gets a safe default so ADD COLUMN can't fail on an
+  // already-populated table.
+  let prevCol = 'IDNo';
+  for (const [name, rawDef] of Object.entries(COLUMNS)) {
+    if (name === 'IDNo') continue;
+    let def = rawDef;
+    if (/\bNOT NULL\b/i.test(def) && !/\bDEFAULT\b/i.test(def)) {
+      def += " DEFAULT ''";
+    }
+    await ensureColumn('activity_log', name, `${name} ${def}`, prevCol);
+    prevCol = name;
+  }
 
   // Columns we no longer keep.
   for (const col of ['ENTITY_TYPE', 'ENTITY_ID', 'IP_ADDRESS', 'HTTP_METHOD', 'ENDPOINT', 'USER_AGENT']) {
@@ -672,7 +684,9 @@ async function runBookingActualTimesMigration() {
   }
 
   // Check-in: only source is the audit trail (a real event timestamp).
-  if (await tableExists('activity_log')) {
+  if (await tableExists('activity_log')
+      && await columnExists('activity_log', 'STATUS')
+      && await columnExists('activity_log', 'ACTION')) {
     const inFill = await queryDatabasePromise(
       `UPDATE booking b
           JOIN (

@@ -197,7 +197,9 @@
         { data: null, className: 'center', render: function(_d,_t,row){
             const methodLabels = { cash: 'Cash', credit_card: 'Credit Card', credit: 'Credit', marker: 'Credit', bank_transfer: 'Bank Transfer', korean_bank: 'Korean Bank', agoda: 'AGODA', expedia: 'EXPEDIA' };
             const method = (row.PAYMENT_METHOD || '').toLowerCase();
-            return methodLabels[method] || row.PAYMENT_METHOD || 'N/A';
+            const label = methodLabels[method] || row.PAYMENT_METHOD || 'N/A';
+            const key = (method === 'marker') ? 'credit' : (methodLabels[method] ? method : 'other');
+            return `<span class="pm-badge pm-${key}">${label}</span>`;
           }
         },
         { 
@@ -881,6 +883,27 @@
     white-space: normal;
     word-break: break-word;
   }
+
+  /* Payment-method pills - one colour per method so Credit / Credit Card / Korean
+     Bank read as clearly distinct at a glance (they were plain grey text before). */
+  .pm-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 11px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .pm-cash          { background: rgba(111,156,64,.18);  color: #9ccc65; border-color: rgba(111,156,64,.45); }
+  .pm-credit        { background: rgba(230,169,75,.18);  color: #f0ad4e; border-color: rgba(230,169,75,.5); }
+  .pm-credit_card   { background: rgba(66,165,245,.18);  color: #64b5f6; border-color: rgba(66,165,245,.5); }
+  .pm-korean_bank   { background: rgba(38,166,154,.18);  color: #4db6ac; border-color: rgba(38,166,154,.5); }
+  .pm-bank_transfer { background: rgba(120,144,156,.20); color: #b0bec5; border-color: rgba(120,144,156,.5); }
+  .pm-agoda         { background: rgba(171,71,188,.18);  color: #ce93d8; border-color: rgba(171,71,188,.5); }
+  .pm-expedia       { background: rgba(236,64,122,.18);  color: #f48fb1; border-color: rgba(236,64,122,.5); }
+  .pm-other         { background: rgba(255,255,255,.10); color: #cfd4d8; border-color: rgba(255,255,255,.25); }
 </style>
 
 

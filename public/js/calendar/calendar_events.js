@@ -686,6 +686,12 @@ function handleEventDidMount(info) {
 function handleDatesSet(info) {
   globalOverlapCheck(info.view.calendar);
 
+  if (typeof window.setupDateBookmarks === 'function') {
+    window.setupDateBookmarks();
+    window.applyDateBookmarks();
+    setTimeout(window.applyDateBookmarks, 60);
+  }
+
   if (typeof window.reloadCalendarBookingsForVisibleRange === 'function') {
     window.reloadCalendarBookingsForVisibleRange(info);
   }

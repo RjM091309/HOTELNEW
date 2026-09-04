@@ -36,6 +36,10 @@ router.post('/check-in-notifier/notify', BookingController.notifyCheckInSelectio
 router.get('/breakfast-list', BookingController.renderBreakfastListPage);
 router.get('/breakfast-list/data', BookingController.getBreakfastListData);
 
+// Cancelled bookings list page
+router.get('/cancelled', BookingController.renderCancelledBookingPage);
+router.get('/cancelled/data', BookingController.getCancelledBookingData);
+
 // API Routes for booking data
 router.get('/booking_data', BookingController.getBookingDataEnhanced);
 router.get('/booking_details/:bookingID', BookingController.getBookingDetails);

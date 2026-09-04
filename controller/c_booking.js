@@ -138,6 +138,48 @@ class BookingController {
     }
   }
 
+  // Render the cancelled bookings list page
+  static async renderCancelledBookingPage(req, res) {
+    try {
+      const user = req.user ? {
+        FULLNAME: req.user.FULLNAME,
+        PERMISSIONS: req.user.PERMISSIONS
+      } : null;
+
+      res.render('booking/cancelled_booking', {
+        title: 'Cancelled Bookings',
+        subTitle: 'Cancelled Bookings',
+        activePage: 'cancelled-booking',
+        user
+      });
+    } catch (error) {
+      console.error('Error rendering cancelled booking page:', error);
+      res.status(500).render('error/500', {
+        title: 'Server Error',
+        subTitle: '500 Error'
+      });
+    }
+  }
+
+  // JSON: all cancelled bookings with general details
+  static async getCancelledBookingData(req, res) {
+    try {
+      const rows = await BookingModel.getCancelledBookings();
+
+      const totals = rows.reduce((acc, r) => {
+        acc.count += 1;
+        acc.refund += Number(r.REFUND_AMOUNT) || 0;
+        acc.fee += Number(r.CANCELLATION_FEE) || 0;
+        return acc;
+      }, { count: 0, refund: 0, fee: 0 });
+
+      res.json({ success: true, data: rows, totals });
+    } catch (error) {
+      console.error('Error fetching cancelled bookings:', error);
+      res.status(500).json({ success: false, message: 'Failed to load cancelled bookings' });
+    }
+  }
+
   // Render the group booking page
   static async renderGroupBookingPage(req, res) {
     try {

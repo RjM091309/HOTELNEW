@@ -584,6 +584,54 @@ class BookingModel {
     return rows;
   }
 
+  // All cancelled bookings with their general details, for the
+  // Booking > Cancelled Bookings list page.
+  static async getCancelledBookings() {
+    const query = `
+      SELECT
+        b.IDNo                              AS BOOKING_ID,
+        b.CONFIRMATION_NUMBER,
+        b.GROUP_BOOKING_ID,
+        c.NAME                              AS GUEST_NAME,
+        c.CONTACTNo                         AS GUEST_CONTACT,
+        r.ROOM_NUMBER,
+        r.ROOM_FLOOR,
+        rt.NAME                             AS ROOM_TYPE,
+        b.CHECK_IN_DATE,
+        b.CHECK_OUT_DATE,
+        DATEDIFF(b.CHECK_OUT_DATE, b.CHECK_IN_DATE) AS NIGHTS,
+        b.GUESTS_COUNT,
+        b.CANCELLED_AT,
+        b.REMARKS,
+        bill.PAYMENT_STATUS,
+        COALESCE(bill.ROOM_CHARGE, 0)
+          + COALESCE(bill.AMENITIES_CHARGE, 0)
+          + COALESCE(bill.SERVICES_CHARGE, 0)
+          + COALESCE(bill.LATE_CHECKOUT_CHARGE, 0)          AS TOTAL_COST,
+        COALESCE(bill.CANCELLATION_PENALTY, 0)              AS CANCELLATION_FEE,
+        COALESCE(bill.REFUNDABLE_AMOUNT, bc.REFUND_AMOUNT, 0) AS REFUND_AMOUNT,
+        bc.CANCELLATION_REASON,
+        COALESCE(u.FULLNAME, 'System')                     AS CANCELLED_BY
+      FROM booking b
+      LEFT JOIN customer c   ON c.IDNo  = b.CUSTOMER_ID
+      LEFT JOIN room r       ON r.IDNo  = b.ROOM_ID
+      LEFT JOIN room_type rt ON rt.IDNo = r.ROOM_TYPE_ID
+      LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
+      LEFT JOIN booking_cancellation bc
+        ON bc.IDNo = (
+          SELECT bc2.IDNo FROM booking_cancellation bc2
+          WHERE bc2.BOOKING_ID = b.IDNo
+          ORDER BY bc2.IDNo DESC LIMIT 1
+        )
+      LEFT JOIN user_info u  ON u.IDNo = bc.ENCODED_BY
+      WHERE b.ACTIVE = 1
+        AND b.BOOKING_STATUS = 'cancelled'
+      ORDER BY b.CANCELLED_AT DESC, b.IDNo DESC
+    `;
+    const rows = await queryDatabasePromise(query);
+    return rows;
+  }
+
   // Get booking services
   static async getBookingServices(bookingId) {
     try {

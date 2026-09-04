@@ -848,7 +848,33 @@
   /* Highlight the current day */
   .current-day {
     background-color: rgba(111, 156, 64, 0.3) !important; /* Dark green highlight */
-   
+
+  }
+
+  /* ========================================
+     DATE BOOKMARK - click a date header to keep its whole column highlighted
+     (spreadsheet-style column select). Works in dark + light theme.
+     ======================================== */
+  #calendar .fc-timeline-header .fc-timeline-slot.date-bookmarked,
+  #calendar .fc-timeline-header .date-bookmarked {
+    background-color: #1a73e8 !important;
+    box-shadow: inset 0 -3px 0 0 #0b57d0;
+    cursor: pointer;
+  }
+  #calendar .fc-timeline-header .fc-timeline-slot.date-bookmarked .fc-timeline-slot-cushion,
+  #calendar .fc-timeline-header .fc-timeline-slot.date-bookmarked .day,
+  #calendar .fc-timeline-header .fc-timeline-slot.date-bookmarked .dow {
+    color: #ffffff !important;
+    font-weight: 700 !important;
+  }
+  #calendar .fc-timeline-body .fc-timeline-slot.date-bookmarked {
+    background-color: rgba(26, 115, 232, 0.16) !important;
+    box-shadow: inset 1px 0 0 rgba(26, 115, 232, 0.45), inset -1px 0 0 rgba(26, 115, 232, 0.45);
+  }
+  /* header cells look clickable */
+  #calendar .fc-timeline-header .fc-timeline-slot,
+  #calendar .fc-timeline-header .fc-timeline-slot-cushion {
+    cursor: pointer;
   }
   
   /* ========================================
@@ -1057,42 +1083,48 @@
      SCROLLBAR STYLING
      ======================================== */
   
-  /* make room for our injected bar */
-  #calendar .fc-scrollgrid {
-    margin-top: 12px;
-  }
-  
-  /* style our injected bar */
-  #calendar #top-scroller {
-    height: 12px;
-    overflow-x: auto;
+  /* Injected horizontal scrollbar - a <body> child pinned to the VIEWPORT bottom
+     so it's always visible without page-scrolling. (Can't be a #calendar child:
+     that element has a transform, which traps position:fixed inside it.)
+     left / width are set by JS to line up with the calendar grid. */
+  #top-scroller {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    z-index: 45;
+    display: block;
+    width: 100%;
+    height: 22px;
+    overflow-x: scroll;
     overflow-y: hidden;
-    background: linear-gradient(145deg, #2a3135, #1f2528);
+    background: transparent;
     /* Firefox */
-    scrollbar-color: #6f9c40 rgba(255,255,255,0.1);
-    scrollbar-width: thin;
-    /* GPU rendering for smooth horizontal scrolling */
-    transform: translateZ(0);
+    scrollbar-color: #6f9c40 rgba(255,255,255,0.12);
+    scrollbar-width: auto;
     will-change: scroll-position;
   }
-  
+
   /* WebKit browsers */
-  #calendar #top-scroller::-webkit-scrollbar {
-    height: 12px;
+  #top-scroller::-webkit-scrollbar {
+    height: 22px;
   }
-  
-  #calendar #top-scroller::-webkit-scrollbar-thumb {
+
+  #top-scroller::-webkit-scrollbar-thumb {
     background-color: #6f9c40;
-    border-radius: 6px;
+    border-radius: 11px;
+    min-width: 60px;
   }
-  
-  #calendar #top-scroller::-webkit-scrollbar-track {
-    background-color: rgba(255,255,255,0.1);
+
+  #top-scroller::-webkit-scrollbar-track {
+    background-color: rgba(255,255,255,0.12);
   }
-  
-  #calendar #top-scroller > div {
+
+  #top-scroller > div {
     height: 1px; /* just enough to render the inner width */
   }
+
+  /* keep the calendar's last row clear of the fixed bar */
+  #calendar { padding-bottom: 28px; }
   
   /* Hide scrollbars for calendar */
   #calendar .fc-scroller::-webkit-scrollbar {
@@ -1775,23 +1807,24 @@
 /* ========================================
      LIGHT THEME OVERRIDES FOR TOP SCROLLER
      ======================================== */
-[data-theme="white"] #calendar #top-scroller {
-  background: linear-gradient(145deg, #ffffff, #f8f9fa) !important;
+[data-theme="white"] #top-scroller {
+  background: transparent !important;
   /* Firefox */
   scrollbar-color: #000000 rgba(0,0,0,0.15) !important;
 }
 
 /* WebKit browsers */
-[data-theme="white"] #calendar #top-scroller::-webkit-scrollbar {
-  height: 12px !important;
+[data-theme="white"] #top-scroller::-webkit-scrollbar {
+  height: 22px !important;
 }
 
-[data-theme="white"] #calendar #top-scroller::-webkit-scrollbar-thumb {
+[data-theme="white"] #top-scroller::-webkit-scrollbar-thumb {
   background-color: #000000 !important;
-  border-radius: 6px !important;
+  border-radius: 11px !important;
+  min-width: 60px !important;
 }
 
-[data-theme="white"] #calendar #top-scroller::-webkit-scrollbar-track {
+[data-theme="white"] #top-scroller::-webkit-scrollbar-track {
   background-color: rgba(0,0,0,0.15) !important;
 }
 
@@ -1923,39 +1956,94 @@
 }
 
 /* ----------------------------------------------------------------------------
-   Floor (3 / 4 / 5) grouping rows: black out the timeline body so the
-   day-column grid / alignment bars don't bleed through on the label row.
+   Floor (3 / 4 / 5) grouping rows: a solid pure-black divider band. Black out
+   the whole timeline lane AND every descendant so no day-column grid line,
+   weekend tint, today highlight or alignment bar bleeds through.
    .fc-floor-lane is added in resourceLaneDidMount (calendar_data.js).
 ---------------------------------------------------------------------------- */
 #calendar td.fc-timeline-lane.fc-floor-lane,
-#calendar td.fc-timeline-lane.fc-floor-lane .fc-timeline-lane-bg,
-#calendar td.fc-timeline-lane.fc-floor-lane .fc-timeline-bg-harness,
-#calendar td.fc-timeline-lane.fc-floor-lane .fc-timeline-slots,
-#calendar td.fc-timeline-lane.fc-floor-lane .fc-timeline-slot,
-#calendar td.fc-timeline-lane.fc-floor-lane .fc-timeline-slot-lane,
-#calendar td.fc-timeline-lane.fc-floor-lane .fc-non-business {
+#calendar td.fc-timeline-lane.fc-floor-lane * {
   background: #000 !important;
   background-color: #000 !important;
+  background-image: none !important;
   border-color: #000 !important;
+  box-shadow: none !important;
 }
 
-#calendar td.fc-timeline-lane.fc-floor-lane::before,
+#calendar td.fc-timeline-lane.fc-floor-lane *::before,
+#calendar td.fc-timeline-lane.fc-floor-lane *::after {
+  background: #000 !important;
+  background-image: none !important;
+  border-color: #000 !important;
+  box-shadow: none !important;
+}
+
+/* Opaque black cap that physically covers the shared day-column layer
+   (today green / weekend tint) that renders through the floor lane. Floor
+   rows never hold events, so a full-bleed cover is safe here. */
+#calendar td.fc-timeline-lane.fc-floor-lane {
+  position: relative !important;
+}
+#calendar td.fc-timeline-lane.fc-floor-lane::before {
+  content: "" !important;
+  position: absolute !important;
+  top: -2px !important;
+  right: -2px !important;
+  bottom: -2px !important;
+  left: -2px !important;
+  background: #000 !important;
+  z-index: 4 !important;
+  pointer-events: none !important;
+}
 #calendar td.fc-timeline-lane.fc-floor-lane::after {
+  content: none !important;
+}
+/* JS-injected cover div (belt and braces) */
+#calendar td.fc-timeline-lane.fc-floor-lane .fc-floor-blackout {
+  position: absolute !important;
+  inset: -2px !important;
   background: #000 !important;
-  border-color: #000 !important;
+  z-index: 5 !important;
+  pointer-events: none !important;
 }
 
-/* Match the left-hand "Floor N" label cell */
+/* Match the left-hand "Floor N" label cell — same pure black, no bleed */
 #calendar .fc-datagrid-cell[data-is-floor],
-#calendar .fc-datagrid-cell[data-is-floor] .fc-datagrid-cell-frame {
+#calendar .fc-datagrid-cell[data-is-floor] * {
   background: #000 !important;
   background-color: #000 !important;
+  background-image: none !important;
+  border-color: #000 !important;
+  box-shadow: none !important;
+}
+
+/* Crisp separators so the black band reads as a divider between floors */
+#calendar td.fc-timeline-lane.fc-floor-lane,
+#calendar .fc-datagrid-cell[data-is-floor] {
+  border-top: 2px solid #000 !important;
+  border-bottom: 2px solid #000 !important;
 }
 
 #calendar .fc-datagrid-cell[data-is-floor].group-create-armed,
 #calendar .fc-datagrid-cell[data-is-floor].group-select-armed {
   background-color: transparent !important;
   outline: none !important;
+}
+
+/* Light theme: keep the floor divider solid black too */
+[data-theme="white"] #calendar td.fc-timeline-lane.fc-floor-lane,
+[data-theme="white"] #calendar td.fc-timeline-lane.fc-floor-lane *,
+[data-theme="white"] #calendar td.fc-timeline-lane.fc-floor-lane::before,
+[data-theme="white"] #calendar td.fc-timeline-lane.fc-floor-lane::after,
+[data-theme="white"] #calendar td.fc-timeline-lane.fc-floor-lane *::before,
+[data-theme="white"] #calendar td.fc-timeline-lane.fc-floor-lane *::after,
+[data-theme="white"] #calendar .fc-datagrid-cell[data-is-floor],
+[data-theme="white"] #calendar .fc-datagrid-cell[data-is-floor] * {
+  background: #000 !important;
+  background-color: #000 !important;
+  background-image: none !important;
+  border-color: #000 !important;
+  box-shadow: none !important;
 }
 
 .group-select-badge {
