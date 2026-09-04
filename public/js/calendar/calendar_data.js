@@ -2272,6 +2272,44 @@ function setupDateBookmarks() {
 }
 window.setupDateBookmarks = setupDateBookmarks;
 
+function syncFloorRowStyling() {
+  const container = calendarEl || document.getElementById('calendar');
+  if (!container) return;
+
+  const datagridTbody = container.querySelector('.fc-datagrid-body tbody');
+  if (!datagridTbody) return;
+
+  const datagridRows = Array.from(datagridTbody.children);
+  // ONLY select real resource lane cells (td.fc-timeline-lane), NEVER date slot cells!
+  const laneCells = Array.from(container.querySelectorAll('.fc-timeline-body td.fc-timeline-lane'));
+
+  datagridRows.forEach((tr, idx) => {
+    const isFloor = !!tr.querySelector('.fc-datagrid-cell[data-is-floor]');
+    const laneCell = laneCells[idx];
+    if (isFloor) {
+      tr.classList.add('fc-floor-row');
+      if (laneCell) {
+        laneCell.classList.add('fc-floor-lane');
+        if (laneCell.parentElement) laneCell.parentElement.classList.add('fc-floor-row');
+        if (!laneCell.querySelector(':scope > .fc-floor-band')) {
+          const band = document.createElement('div');
+          band.className = 'fc-floor-band';
+          laneCell.appendChild(band);
+        }
+      }
+    } else {
+      tr.classList.remove('fc-floor-row');
+      if (laneCell) {
+        laneCell.classList.remove('fc-floor-lane');
+        if (laneCell.parentElement) laneCell.parentElement.classList.remove('fc-floor-row');
+        const band = laneCell.querySelector(':scope > .fc-floor-band');
+        if (band) band.remove();
+      }
+    }
+  });
+}
+window.syncFloorRowStyling = syncFloorRowStyling;
+
 function getDayClassNames(date) {
   const classes = [];
   const day = date.getDay();
@@ -2897,6 +2935,7 @@ async function loadCalendarData() {
       refreshCalendarVerticalScrollSync();
       setupDateBookmarks();
       applyDateBookmarks();
+      syncFloorRowStyling();
       return true;
     }
 
@@ -3221,6 +3260,12 @@ const findHeader = setInterval(() => {
     resourceLabelDidMount: function(arg) {
       if (arg.resource.extendedProps.isFloor) {
         arg.el.setAttribute('data-is-floor', 'true');
+        arg.el.classList.add('fc-floor-cell', 'fc-floor-row');
+        if (arg.el.parentElement) {
+          arg.el.parentElement.setAttribute('data-is-floor', 'true');
+          arg.el.parentElement.classList.add('fc-floor-row');
+        }
+        syncFloorRowStyling();
         return;
       }
 
@@ -3256,56 +3301,27 @@ const findHeader = setInterval(() => {
       }
     },
 
-    // Black out the timeline body of the Floor (3/4/5) grouping rows so the
-    // day-column grid lines don't show through on the label row.
     resourceLaneClassNames: function(arg) {
       return (arg.resource && arg.resource.extendedProps && arg.resource.extendedProps.isFloor)
-        ? ['fc-floor-lane']
+        ? ['fc-floor-lane', 'fc-floor-row']
         : [];
     },
 
-    // resourceLaneClassNames is unreliable for parent/floor rows in this FC
-    // build, so also stamp the lane <td> (and its <tr>) directly on mount and
-    // paint them solid black inline - CSS alone can't win if the class is
-    // missing from the element the grid lines actually render on.
     resourceLaneDidMount: function(arg) {
-      if (!(arg.resource && arg.resource.extendedProps && arg.resource.extendedProps.isFloor)) return;
-      const td = arg.el;
-      if (!td) return;
-      td.classList.add('fc-floor-lane');
-      const paint = (node) => {
-        if (!node || node.classList.contains('fc-floor-blackout')) return;
-        node.style.setProperty('background', '#000', 'important');
-        node.style.setProperty('background-image', 'none', 'important');
-        node.style.setProperty('border-color', '#000', 'important');
-        node.style.setProperty('box-shadow', 'none', 'important');
-      };
-      paint(td);
-      if (td.parentElement) paint(td.parentElement);
-      td.querySelectorAll('*').forEach(paint);
-      td.style.setProperty('position', 'relative', 'important');
-
-      // Physical opaque cover so the shared today/weekend column layer that
-      // renders through the lane can't show any tint on the black band.
-      if (!td.querySelector(':scope > .fc-floor-blackout')) {
-        const cover = document.createElement('div');
-        cover.className = 'fc-floor-blackout';
-        td.appendChild(cover);
+      if (arg.resource && arg.resource.extendedProps && arg.resource.extendedProps.isFloor) {
+        arg.el.setAttribute('data-is-floor', 'true');
+        arg.el.classList.add('fc-floor-lane', 'fc-floor-row');
+        if (arg.el.parentElement) {
+          arg.el.parentElement.setAttribute('data-is-floor', 'true');
+          arg.el.parentElement.classList.add('fc-floor-row');
+        }
+        if (!arg.el.querySelector(':scope > .fc-floor-band')) {
+          const band = document.createElement('div');
+          band.className = 'fc-floor-band';
+          arg.el.appendChild(band);
+        }
       }
-
-      // Descendants (slot cells, bg harness) can be (re)created after mount.
-      if (!td._floorPaintObserver && window.MutationObserver) {
-        td._floorPaintObserver = new MutationObserver(() => {
-          paint(td);
-          td.querySelectorAll('*').forEach(paint);
-          if (!td.querySelector(':scope > .fc-floor-blackout')) {
-            const cover = document.createElement('div');
-            cover.className = 'fc-floor-blackout';
-            td.appendChild(cover);
-          }
-        });
-        td._floorPaintObserver.observe(td, { childList: true, subtree: true });
-      }
+      syncFloorRowStyling();
     },
 
     resources: [],

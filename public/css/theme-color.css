@@ -16,6 +16,67 @@
     border: 1px solid rgba(0, 0, 0, 0.2) !important;
 }
 
+/* Light theme: Slim down resource timeline divider with low opacity */
+[data-theme="white"] .fc .fc-resource-timeline-divider,
+[data-theme="white"] .fc-resource-timeline-divider,
+[data-theme="white"] .fc-resource-timeline-divider.fc-cell-shaded,
+[data-theme="white"] td.fc-resource-timeline-divider,
+[data-theme="light"] .fc .fc-resource-timeline-divider,
+[data-theme="light"] .fc-resource-timeline-divider,
+[data-theme="light"] .fc-resource-timeline-divider.fc-cell-shaded,
+[data-theme="light"] td.fc-resource-timeline-divider,
+body.white-sidebar-color .fc .fc-resource-timeline-divider,
+body.white-sidebar-color .fc-resource-timeline-divider,
+body.white-sidebar-color .fc-resource-timeline-divider.fc-cell-shaded,
+body.white-sidebar-color td.fc-resource-timeline-divider {
+    width: 1px !important;
+    min-width: 1px !important;
+    max-width: 1px !important;
+    padding: 0 !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-left: 1px solid rgba(0, 0, 0, 0.1) !important;
+    border-right: none !important;
+    background-color: rgba(0, 0, 0, 0.04) !important;
+    opacity: 0.3 !important;
+    box-shadow: none !important;
+}
+
+[data-theme="white"] .fc .fc-resource-timeline-divider:hover,
+[data-theme="white"] .fc-resource-timeline-divider:hover,
+[data-theme="light"] .fc .fc-resource-timeline-divider:hover,
+body.white-sidebar-color .fc .fc-resource-timeline-divider:hover {
+    opacity: 0.6 !important;
+}
+
+/* Light theme: Calendar body grid lines with low opacity */
+[data-theme="white"] .fc-scrollgrid-section-body td,
+[data-theme="white"] .fc-scrollgrid-section-body th,
+[data-theme="white"] .fc-timeline-body td,
+[data-theme="white"] .fc-timeline-body th,
+[data-theme="white"] .fc-timeline-body .fc-timeline-slot,
+[data-theme="white"] .fc-timeline-lane,
+[data-theme="white"] .fc-datagrid-body td,
+[data-theme="white"] .fc-datagrid-body th,
+[data-theme="light"] .fc-scrollgrid-section-body td,
+[data-theme="light"] .fc-scrollgrid-section-body th,
+[data-theme="light"] .fc-timeline-body td,
+[data-theme="light"] .fc-timeline-body th,
+[data-theme="light"] .fc-timeline-body .fc-timeline-slot,
+[data-theme="light"] .fc-timeline-lane,
+[data-theme="light"] .fc-datagrid-body td,
+[data-theme="light"] .fc-datagrid-body th,
+body.white-sidebar-color .fc-scrollgrid-section-body td,
+body.white-sidebar-color .fc-scrollgrid-section-body th,
+body.white-sidebar-color .fc-timeline-body td,
+body.white-sidebar-color .fc-timeline-body th,
+body.white-sidebar-color .fc-timeline-body .fc-timeline-slot,
+body.white-sidebar-color .fc-timeline-lane,
+body.white-sidebar-color .fc-datagrid-body td,
+body.white-sidebar-color .fc-datagrid-body th {
+    border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
 /* =====================
    Smooth Theme Transitions
    ===================== */
@@ -254,6 +315,74 @@
 .header-red .page-header.navbar,
 .header-green .page-header.navbar {
     background-color: var(--header-color);
+}
+
+/* =====================
+   Light theme: Header navbar background & content
+   ===================== */
+[data-theme="white"] .page-header.navbar,
+[data-theme="light"] .page-header.navbar,
+body.white-sidebar-color .page-header.navbar,
+body.header-white .page-header.navbar {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    border-bottom: 1px solid #e5e7eb !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] .page-header.navbar .page-logo,
+[data-theme="light"] .page-header.navbar .page-logo,
+body.white-sidebar-color .page-header.navbar .page-logo,
+body.logo-white .page-header.navbar .page-logo {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    border-right: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] .page-header.navbar .page-logo a,
+[data-theme="white"] .page-header.navbar .page-logo .logo-default,
+[data-theme="light"] .page-header.navbar .page-logo a,
+body.white-sidebar-color .page-header.navbar .page-logo a,
+body.logo-white .page-header.navbar .page-logo a {
+    color: #111827 !important;
+}
+
+[data-theme="white"] .page-header.navbar .menu-toggler,
+[data-theme="white"] .page-header.navbar .menu-toggler i,
+[data-theme="white"] .page-header.navbar .menu-toggler i.icon-menu,
+[data-theme="white"] .page-header.navbar a.menu-toggler i,
+[data-theme="light"] .page-header.navbar .menu-toggler i,
+body.white-sidebar-color .page-header.navbar .menu-toggler i,
+body.header-white .page-header.navbar .menu-toggler i {
+    color: #1f2937 !important;
+}
+
+[data-theme="white"] .page-header.navbar .top-menu .navbar-nav > li > a,
+[data-theme="white"] .page-header.navbar .top-menu .navbar-nav > li > a > i,
+[data-theme="white"] .page-header.navbar .top-menu .navbar-nav > li.dropdown-user > .dropdown-toggle > .username,
+[data-theme="white"] .page-header.navbar .top-menu .navbar-nav > li.dropdown-user > .dropdown-toggle > i,
+[data-theme="white"] .page-header.navbar #headerSettingButton,
+[data-theme="light"] .page-header.navbar .top-menu .navbar-nav > li > a,
+[data-theme="light"] .page-header.navbar .top-menu .navbar-nav > li > a > i,
+[data-theme="light"] .page-header.navbar .top-menu .navbar-nav > li.dropdown-user > .dropdown-toggle > .username,
+[data-theme="light"] .page-header.navbar .top-menu .navbar-nav > li.dropdown-user > .dropdown-toggle > i,
+body.white-sidebar-color .page-header.navbar .top-menu .navbar-nav > li > a,
+body.white-sidebar-color .page-header.navbar .top-menu .navbar-nav > li > a > i,
+body.white-sidebar-color .page-header.navbar .top-menu .navbar-nav > li.dropdown-user > .dropdown-toggle > .username,
+body.white-sidebar-color .page-header.navbar .top-menu .navbar-nav > li.dropdown-user > .dropdown-toggle > i,
+body.white-sidebar-color .page-header.navbar #headerSettingButton,
+body.header-white .page-header.navbar .top-menu .navbar-nav > li > a,
+body.header-white .page-header.navbar .top-menu .navbar-nav > li > a > i {
+    color: #1f2937 !important;
+}
+
+[data-theme="white"] .page-header.navbar input#datePicker,
+[data-theme="light"] .page-header.navbar input#datePicker,
+body.white-sidebar-color .page-header.navbar input#datePicker,
+body.header-white .page-header.navbar input#datePicker {
+    background-color: #f3f4f6 !important;
+    border: 1px solid #d1d5db !important;
+    color: #111827 !important;
 }
 
 /* =====================
@@ -6381,6 +6510,39 @@
 [data-theme="white"] .fc .fc-timeline-event .fc-event-main-frame .fc-event-title-container .fc-event-title {
     color: #1f2937 !important;
     font-weight: 600 !important;
+}
+
+/* Light Theme: Calendar Legend Headers and Overlay */
+[data-theme="white"] .calendar-legend-overlay,
+[data-theme="light"] .calendar-legend-overlay,
+body.white-sidebar-color .calendar-legend-overlay {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15) !important;
+}
+
+[data-theme="white"] .calendar-legend-header,
+[data-theme="light"] .calendar-legend-header,
+body.white-sidebar-color .calendar-legend-header {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
+}
+
+[data-theme="white"] .calendar-legend-title,
+[data-theme="light"] .calendar-legend-title,
+body.white-sidebar-color .calendar-legend-title {
+    color: #111827 !important;
+    text-shadow: none !important;
+}
+
+[data-theme="white"] .calendar-legend-toggle,
+[data-theme="light"] .calendar-legend-toggle,
+body.white-sidebar-color .calendar-legend-toggle {
+    background: rgba(0, 0, 0, 0.05) !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
+    color: #111827 !important;
 }
 
 

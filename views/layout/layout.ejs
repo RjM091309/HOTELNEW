@@ -3,7 +3,7 @@
 <html lang="en" data-theme="dark">
   <%- include('../partials/head') %>
   <body class="page-header-fixed sidemenu-closed-hidelogo page-content-white page-md header-dark dark-sidebar-color logo-dark">
-    <script>(function(){try{var ss=localStorage.getItem('sidebar_color');var lg=localStorage.getItem('logo_color');var hd=localStorage.getItem('header_color');var c=document.body.className;if(ss){c=c.replace(/\b(white|dark|blue|indigo|green|red|cyan)-sidebar-color\b/g,'').trim();c+=' '+ss;}if(lg){c=c.replace(/\blogo-(white|dark|blue|indigo|red|cyan|green)\b/g,'').trim();c+=' '+lg;}if(hd){c=c.replace(/\bheader-(white|dark|blue|indigo|red|cyan|green)\b/g,'').trim();c+=' '+hd;}document.body.className=c.trim();}catch(e){}})();</script>
+    <script>(function(){try{var dt=localStorage.getItem('ui_data_theme');var ss=localStorage.getItem('sidebar_color');var lg=localStorage.getItem('logo_color');var hd=localStorage.getItem('header_color');if(dt==='white'){if(!ss||ss==='dark-sidebar-color')ss='white-sidebar-color';if(!lg||lg==='logo-dark')lg='logo-white';if(!hd||hd==='header-dark')hd='header-white';}var c=document.body.className;if(ss){c=c.replace(/\b(white|dark|blue|indigo|green|red|cyan)-sidebar-color\b/g,'').trim();c+=' '+ss;}if(lg){c=c.replace(/\blogo-(white|dark|blue|indigo|red|cyan|green)\b/g,'').trim();c+=' '+lg;}if(hd){c=c.replace(/\bheader-(white|dark|blue|indigo|red|cyan|green)\b/g,'').trim();c+=' '+hd;}document.body.className=c.trim();}catch(e){}})();</script>
     <div class="page-wrapper">
       <%- include('../partials/navbar') %>
       

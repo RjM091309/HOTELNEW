@@ -620,10 +620,29 @@
   
   /* BOLD the Floor Names */
   .fc-resource-bold {
-    font-weight: bold;
+    font-weight: 700;
+    font-size: 14px !important;
     color: #ccc;
     text-align: center;
     width: 100%;
+    line-height: 1.2 !important;
+    letter-spacing: 0.2px;
+  }
+
+  #calendar .fc-datagrid-cell[data-is-floor] .fc-resource-bold,
+  #calendar .fc-datagrid-cell[data-is-floor] .fc-resource-bold strong {
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    line-height: 1.2 !important;
+  }
+
+  #calendar .fc-datagrid-cell[data-is-floor] .fc-datagrid-expander {
+    font-size: 13.5px !important;
+  }
+
+  #calendar .fc-datagrid-cell[data-is-floor] .fc-datagrid-expander .fc-icon {
+    font-size: 13.5px !important;
+    vertical-align: middle;
   }
 
   /* Room view color coding — text only (no box fill, so shade indicators stay visible) */
@@ -644,29 +663,35 @@
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 3px;
+    gap: 5px !important;
     width: auto !important;
     max-width: 100%;
     margin: 0 auto !important;
-    transform: translateX(-5px);
+    transform: translateX(-4px);
     min-width: 0;
+    line-height: 1 !important;
   }
 
   #calendar .calendar-room-number {
     flex-shrink: 0;
+    font-size: 13.5px !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    letter-spacing: 0.2px;
   }
 
   #calendar .calendar-room-beds {
-    display: inline-flex;
-    align-items: center;
-    gap: 1px;
-    flex-shrink: 0;
-    line-height: 1;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    flex-shrink: 0 !important;
+    line-height: 1 !important;
   }
 
   #calendar .calendar-bed-icon {
-    font-size: 9px;
-    line-height: 1;
+    font-size: 11.5px !important;
+    line-height: 1 !important;
+    vertical-align: middle;
   }
   
   /* ========================================
@@ -1574,51 +1599,74 @@
 /* ========================================
      LIGHT THEME OVERRIDES FOR BOOKING STATUS
      ======================================== */
-[data-theme="white"] .calendar-legend-overlay {
-  background: linear-gradient(145deg, #ffffff, #f8f9fa) !important;
+[data-theme="white"] .calendar-legend-overlay,
+[data-theme="light"] .calendar-legend-overlay,
+body.white-sidebar-color .calendar-legend-overlay {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
   border: 1px solid rgba(0, 0, 0, 0.1) !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15) !important;
 }
 
-[data-theme="white"] .calendar-legend-header {
+[data-theme="white"] .calendar-legend-header,
+[data-theme="light"] .calendar-legend-header,
+body.white-sidebar-color .calendar-legend-header {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
   border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
 }
 
-[data-theme="white"] .calendar-legend-title {
-  color: #000000 !important;
+[data-theme="white"] .calendar-legend-title,
+[data-theme="light"] .calendar-legend-title,
+body.white-sidebar-color .calendar-legend-title {
+  color: #111827 !important;
   text-shadow: none !important;
 }
 
-[data-theme="white"] .calendar-legend-toggle {
+[data-theme="white"] .calendar-legend-toggle,
+[data-theme="light"] .calendar-legend-toggle,
+body.white-sidebar-color .calendar-legend-toggle {
   background: rgba(0, 0, 0, 0.05) !important;
   border: 1px solid rgba(0, 0, 0, 0.1) !important;
-  color: #000000 !important;
+  color: #111827 !important;
 }
 
-[data-theme="white"] .calendar-legend-item {
+[data-theme="white"] .calendar-legend-item,
+[data-theme="light"] .calendar-legend-item,
+body.white-sidebar-color .calendar-legend-item {
   background: rgba(0, 0, 0, 0.02) !important;
 }
 
-[data-theme="white"] .calendar-legend-item[data-legend-key].legend-item-active {
+[data-theme="white"] .calendar-legend-item[data-legend-key].legend-item-active,
+[data-theme="light"] .calendar-legend-item[data-legend-key].legend-item-active,
+body.white-sidebar-color .calendar-legend-item[data-legend-key].legend-item-active {
   background: rgba(111, 156, 64, 0.22) !important;
   border-left-color: #6f9c40 !important;
 }
 
-[data-theme="white"] .calendar-legend-color {
+[data-theme="white"] .calendar-legend-color,
+[data-theme="light"] .calendar-legend-color,
+body.white-sidebar-color .calendar-legend-color {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
   border: 1px solid rgba(0, 0, 0, 0.1) !important;
 }
 
-[data-theme="white"] .calendar-legend-text {
-  color: #000000 !important;
+[data-theme="white"] .calendar-legend-text,
+[data-theme="light"] .calendar-legend-text,
+body.white-sidebar-color .calendar-legend-text {
+  color: #111827 !important;
 }
 
-[data-theme="white"] .calendar-legend-count {
+[data-theme="white"] .calendar-legend-count,
+[data-theme="light"] .calendar-legend-count,
+body.white-sidebar-color .calendar-legend-count {
   background: rgba(0, 0, 0, 0.05) !important;
-  color: #000000 !important;
+  color: #111827 !important;
 }
 
-[data-theme="white"] .calendar-legend-overlay.minimized .calendar-legend-toggle {
+[data-theme="white"] .calendar-legend-overlay.minimized .calendar-legend-toggle,
+[data-theme="light"] .calendar-legend-overlay.minimized .calendar-legend-toggle,
+body.white-sidebar-color .calendar-legend-overlay.minimized .calendar-legend-toggle {
   background: rgba(0, 0, 0, 0.05) !important;
   border: 1px solid rgba(0, 0, 0, 0.1) !important;
   box-shadow: inset 0 0 0 1px rgba(0,0,0,0.1) !important;
@@ -1656,6 +1704,74 @@
 }
 
 /* ========================================
+   LIGHT THEME OVERRIDES FOR HEADER NAVBAR
+   ======================================== */
+[data-theme="white"] .page-header.navbar,
+[data-theme="light"] .page-header.navbar,
+body.white-sidebar-color .page-header.navbar,
+body.header-white .page-header.navbar {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] .page-header.navbar .page-logo,
+[data-theme="light"] .page-header.navbar .page-logo,
+body.white-sidebar-color .page-header.navbar .page-logo,
+body.logo-white .page-header.navbar .page-logo {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  border-right: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] .page-header.navbar .page-logo a,
+[data-theme="white"] .page-header.navbar .page-logo .logo-default,
+[data-theme="light"] .page-header.navbar .page-logo a,
+body.white-sidebar-color .page-header.navbar .page-logo a,
+body.logo-white .page-header.navbar .page-logo a {
+  color: #111827 !important;
+}
+
+[data-theme="white"] .page-header.navbar .menu-toggler,
+[data-theme="white"] .page-header.navbar .menu-toggler i,
+[data-theme="white"] .page-header.navbar .menu-toggler i.icon-menu,
+[data-theme="white"] .page-header.navbar a.menu-toggler i,
+[data-theme="light"] .page-header.navbar .menu-toggler i,
+body.white-sidebar-color .page-header.navbar .menu-toggler i,
+body.header-white .page-header.navbar .menu-toggler i {
+  color: #1f2937 !important;
+}
+
+[data-theme="white"] .page-header.navbar .top-menu .navbar-nav > li > a,
+[data-theme="white"] .page-header.navbar .top-menu .navbar-nav > li > a > i,
+[data-theme="white"] .page-header.navbar .top-menu .navbar-nav > li.dropdown-user > .dropdown-toggle > .username,
+[data-theme="white"] .page-header.navbar .top-menu .navbar-nav > li.dropdown-user > .dropdown-toggle > i,
+[data-theme="white"] .page-header.navbar #headerSettingButton,
+[data-theme="light"] .page-header.navbar .top-menu .navbar-nav > li > a,
+[data-theme="light"] .page-header.navbar .top-menu .navbar-nav > li > a > i,
+[data-theme="light"] .page-header.navbar .top-menu .navbar-nav > li.dropdown-user > .dropdown-toggle > .username,
+[data-theme="light"] .page-header.navbar .top-menu .navbar-nav > li.dropdown-user > .dropdown-toggle > i,
+body.white-sidebar-color .page-header.navbar .top-menu .navbar-nav > li > a,
+body.white-sidebar-color .page-header.navbar .top-menu .navbar-nav > li > a > i,
+body.white-sidebar-color .page-header.navbar .top-menu .navbar-nav > li.dropdown-user > .dropdown-toggle > .username,
+body.white-sidebar-color .page-header.navbar .top-menu .navbar-nav > li.dropdown-user > .dropdown-toggle > i,
+body.white-sidebar-color .page-header.navbar #headerSettingButton,
+body.header-white .page-header.navbar .top-menu .navbar-nav > li > a,
+body.header-white .page-header.navbar .top-menu .navbar-nav > li > a > i {
+  color: #1f2937 !important;
+}
+
+[data-theme="white"] .page-header.navbar input#datePicker,
+[data-theme="light"] .page-header.navbar input#datePicker,
+body.white-sidebar-color .page-header.navbar input#datePicker,
+body.header-white .page-header.navbar input#datePicker {
+  background-color: #f3f4f6 !important;
+  border: 1px solid #d1d5db !important;
+  color: #111827 !important;
+}
+
+/* ========================================
      LIGHT THEME OVERRIDES FOR CALENDAR FOOTER/BODY
      ======================================== */
 [data-theme="white"] .fc-theme-standard .fc-scrollgrid,
@@ -1673,10 +1789,38 @@
   border-collapse: collapse !important;
 }
 
+/* Calendar body grid lines: low opacity borders for both vertical slots and horizontal rows */
+[data-theme="white"] .fc-timeline-body td,
+[data-theme="white"] .fc-timeline-body th,
+[data-theme="white"] .fc-timeline-body .fc-timeline-slot,
+[data-theme="white"] .fc-timeline-body .fc-timeline-lane,
+[data-theme="white"] .fc-scrollgrid-section-body td,
+[data-theme="white"] .fc-scrollgrid-section-body th,
+[data-theme="white"] .fc-datagrid-body td,
+[data-theme="white"] .fc-datagrid-body th,
+[data-theme="light"] .fc-timeline-body td,
+[data-theme="light"] .fc-timeline-body th,
+[data-theme="light"] .fc-timeline-body .fc-timeline-slot,
+[data-theme="light"] .fc-timeline-body .fc-timeline-lane,
+[data-theme="light"] .fc-scrollgrid-section-body td,
+[data-theme="light"] .fc-scrollgrid-section-body th,
+[data-theme="light"] .fc-datagrid-body td,
+[data-theme="light"] .fc-datagrid-body th,
+body.white-sidebar-color .fc-timeline-body td,
+body.white-sidebar-color .fc-timeline-body th,
+body.white-sidebar-color .fc-timeline-body .fc-timeline-slot,
+body.white-sidebar-color .fc-timeline-body .fc-timeline-lane,
+body.white-sidebar-color .fc-scrollgrid-section-body td,
+body.white-sidebar-color .fc-scrollgrid-section-body th,
+body.white-sidebar-color .fc-datagrid-body td,
+body.white-sidebar-color .fc-datagrid-body th {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
 [data-theme="white"] .fc-timeline-slot {
   background: rgba(0,0,0,0.02) !important;
-  border-right: 1px solid rgba(0,0,0,0.2) !important;
-  border-top: 1px solid rgba(0,0,0,0.2) !important;
+  border-right: 1px solid rgba(0,0,0,0.08) !important;
+  border-top: 1px solid rgba(0,0,0,0.08) !important;
 }
 
 /* Force visible horizontal hairline inside each lane (even if events overlap borders) */
@@ -1684,7 +1828,7 @@
   position: relative !important;
 }
 
-/* Draw a 1px separator above events to guarantee visibility */
+/* Draw a 1px separator above events with subtle low opacity */
 [data-theme="white"] td.fc-timeline-lane::after {
   content: "";
   position: absolute;
@@ -1692,7 +1836,7 @@
   right: 0;
   bottom: 0;
   height: 1px;
-  background: rgba(0,0,0,0.2);
+  background: rgba(0,0,0,0.08);
   pointer-events: none;
   z-index: 20; /* higher than .fc-event (z-index:10) */
 }
@@ -1714,6 +1858,39 @@
   background: rgba(0,0,0,0.05) !important;
   color: #000000 !important;
   border-right: 1px solid rgba(0,0,0,0.2) !important;
+}
+
+/* Light theme: Slim down resource timeline divider with low opacity */
+[data-theme="white"] .fc .fc-resource-timeline-divider,
+[data-theme="white"] .fc-resource-timeline-divider,
+[data-theme="white"] .fc-resource-timeline-divider.fc-cell-shaded,
+[data-theme="white"] td.fc-resource-timeline-divider,
+[data-theme="light"] .fc .fc-resource-timeline-divider,
+[data-theme="light"] .fc-resource-timeline-divider,
+[data-theme="light"] .fc-resource-timeline-divider.fc-cell-shaded,
+[data-theme="light"] td.fc-resource-timeline-divider,
+body.white-sidebar-color .fc .fc-resource-timeline-divider,
+body.white-sidebar-color .fc-resource-timeline-divider,
+body.white-sidebar-color .fc-resource-timeline-divider.fc-cell-shaded,
+body.white-sidebar-color td.fc-resource-timeline-divider {
+  width: 1px !important;
+  min-width: 1px !important;
+  max-width: 1px !important;
+  padding: 0 !important;
+  border-top: none !important;
+  border-bottom: none !important;
+  border-left: 1px solid rgba(0, 0, 0, 0.1) !important;
+  border-right: none !important;
+  background-color: rgba(0, 0, 0, 0.04) !important;
+  opacity: 0.3 !important;
+  box-shadow: none !important;
+}
+
+[data-theme="white"] .fc .fc-resource-timeline-divider:hover,
+[data-theme="white"] .fc-resource-timeline-divider:hover,
+[data-theme="light"] .fc .fc-resource-timeline-divider:hover,
+body.white-sidebar-color .fc .fc-resource-timeline-divider:hover {
+  opacity: 0.6 !important;
 }
 
 [data-theme="white"] .fc-resource-bold {
@@ -1955,95 +2132,55 @@
   cursor: default !important;
 }
 
-/* ----------------------------------------------------------------------------
-   Floor (3 / 4 / 5) grouping rows: a solid pure-black divider band. Black out
-   the whole timeline lane AND every descendant so no day-column grid line,
-   weekend tint, today highlight or alignment bar bleeds through.
-   .fc-floor-lane is added in resourceLaneDidMount (calendar_data.js).
----------------------------------------------------------------------------- */
-#calendar td.fc-timeline-lane.fc-floor-lane,
-#calendar td.fc-timeline-lane.fc-floor-lane * {
-  background: #000 !important;
-  background-color: #000 !important;
-  background-image: none !important;
-  border-color: #000 !important;
-  box-shadow: none !important;
-}
-
-#calendar td.fc-timeline-lane.fc-floor-lane *::before,
-#calendar td.fc-timeline-lane.fc-floor-lane *::after {
-  background: #000 !important;
-  background-image: none !important;
-  border-color: #000 !important;
-  box-shadow: none !important;
-}
-
-/* Opaque black cap that physically covers the shared day-column layer
-   (today green / weekend tint) that renders through the floor lane. Floor
-   rows never hold events, so a full-bleed cover is safe here. */
-#calendar td.fc-timeline-lane.fc-floor-lane {
-  position: relative !important;
-}
-#calendar td.fc-timeline-lane.fc-floor-lane::before {
-  content: "" !important;
-  position: absolute !important;
-  top: -2px !important;
-  right: -2px !important;
-  bottom: -2px !important;
-  left: -2px !important;
-  background: #000 !important;
-  z-index: 4 !important;
-  pointer-events: none !important;
-}
-#calendar td.fc-timeline-lane.fc-floor-lane::after {
-  content: none !important;
-}
-/* JS-injected cover div (belt and braces) */
-#calendar td.fc-timeline-lane.fc-floor-lane .fc-floor-blackout {
-  position: absolute !important;
-  inset: -2px !important;
-  background: #000 !important;
-  z-index: 5 !important;
-  pointer-events: none !important;
-}
-
-/* Match the left-hand "Floor N" label cell — same pure black, no bleed */
-#calendar .fc-datagrid-cell[data-is-floor],
-#calendar .fc-datagrid-cell[data-is-floor] * {
-  background: #000 !important;
-  background-color: #000 !important;
-  background-image: none !important;
-  border-color: #000 !important;
-  box-shadow: none !important;
-}
-
-/* Crisp separators so the black band reads as a divider between floors */
-#calendar td.fc-timeline-lane.fc-floor-lane,
-#calendar .fc-datagrid-cell[data-is-floor] {
-  border-top: 2px solid #000 !important;
-  border-bottom: 2px solid #000 !important;
-}
-
 #calendar .fc-datagrid-cell[data-is-floor].group-create-armed,
 #calendar .fc-datagrid-cell[data-is-floor].group-select-armed {
   background-color: transparent !important;
   outline: none !important;
 }
 
-/* Light theme: keep the floor divider solid black too */
-[data-theme="white"] #calendar td.fc-timeline-lane.fc-floor-lane,
-[data-theme="white"] #calendar td.fc-timeline-lane.fc-floor-lane *,
-[data-theme="white"] #calendar td.fc-timeline-lane.fc-floor-lane::before,
-[data-theme="white"] #calendar td.fc-timeline-lane.fc-floor-lane::after,
-[data-theme="white"] #calendar td.fc-timeline-lane.fc-floor-lane *::before,
-[data-theme="white"] #calendar td.fc-timeline-lane.fc-floor-lane *::after,
-[data-theme="white"] #calendar .fc-datagrid-cell[data-is-floor],
-[data-theme="white"] #calendar .fc-datagrid-cell[data-is-floor] * {
-  background: #000 !important;
-  background-color: #000 !important;
-  background-image: none !important;
-  border-color: #000 !important;
-  box-shadow: none !important;
+/* ============================================================================
+   Floor (3 / 4 / 5) grouping rows: gray band (#00000029) across entire row
+   ============================================================================ */
+/* Left side: Rooms column datagrid cell for floor */
+#calendar .fc-datagrid-cell[data-is-floor],
+#calendar .fc-datagrid-cell[data-is-floor] .fc-datagrid-cell-frame,
+#calendar .fc-datagrid-cell[data-is-floor] .fc-datagrid-cell-cushion {
+  background-color: #00000029 !important;
+}
+
+/* Right side: Timeline lane ONLY for floor */
+#calendar td.fc-timeline-lane.fc-floor-lane {
+  background-color: #00000029 !important;
+  position: relative !important;
+}
+
+/* Full-bleed solid band overlay across the floor timeline lane ONLY */
+#calendar td.fc-timeline-lane.fc-floor-lane .fc-floor-band,
+#calendar td.fc-timeline-lane.fc-floor-lane::before {
+  content: "" !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  background-color: #00000029 !important;
+  z-index: 5 !important;
+  pointer-events: none !important;
+}
+
+#calendar td.fc-timeline-lane.fc-floor-lane::after {
+  display: none !important;
+}
+
+/* Ensure all room rows and the calendar body stay pure white in Light Theme */
+[data-theme="white"] #calendar,
+[data-theme="white"] .fc-timeline-body,
+[data-theme="white"] .fc-timeline-body table,
+[data-theme="white"] .fc-scrollgrid-section-body,
+[data-theme="white"] .fc-datagrid-body,
+[data-theme="white"] td.fc-timeline-lane:not(.fc-floor-lane),
+[data-theme="white"] td.fc-datagrid-cell:not([data-is-floor]) {
+  background-color: #ffffff !important;
 }
 
 .group-select-badge {
