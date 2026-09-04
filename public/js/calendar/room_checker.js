@@ -154,10 +154,18 @@ function resetRoomCheckerSummary() {
   document.getElementById('rateSummaryKingQty').value = 0;
   document.getElementById('rateSummaryQueenQty').value = 0;
   document.getElementById('rateSummaryExtraBedQty').value = 0;
-  document.getElementById('rateSummaryBreakfastQty').value = 0;
+  document.getElementById('rateSummaryExtraBreakfastQty').value = 0;
+  document.getElementById('rateSummaryExtraBreakfastQtyGroup').style.display = 'none';
+  document.getElementById('rateSummaryExtraBreakfastToggle').classList.remove('active');
   document.getElementById('rateSummaryDiscount').value = 0;
+  document.getElementById('rateSummaryIncludeLateCheckout').checked = false;
+  document.getElementById('rateSummaryLateCheckoutNote').textContent = '';
+  document.getElementById('rateSummaryLateCheckoutTotalRow').style.display = 'none';
   document.getElementById('rateSummaryDateRange').textContent = 'Select a range on the calendar';
-  syncRoomCheckerBreakfastPresetActiveState();
+  window.__rateSummaryBreakfastTier = 'no';
+  document.querySelectorAll('.rate-summary-preset-btn[data-breakfast-preset]').forEach((btn) => {
+    btn.classList.toggle('active', btn.getAttribute('data-breakfast-preset') === 'no');
+  });
 
   applyRoomCheckerRangeHighlight();
   updateRoomCheckerTodayButtonVisibility();
@@ -204,7 +212,76 @@ $(document).ready(function () {
   });
 });
 
+// Fallback only - see fetchRoomCheckerBreakfastRate, which pulls the real
+// price from the "Breakfast" (Adult) entry under /services, same way
+// fetchRoomCheckerExtraBedRate does for Extra Bed. Used if that service
+// isn't found/available, or before it's finished loading.
 const BREAKFAST_PRICE = 500;
+window.__rateSummaryBreakfastRate = null;
+
+// Additional Breakfast's price (the "+" toggle next to the None/One/Two
+// tier) - matches the same Adult Breakfast service the booking modals
+// already price their own breakfast add-on from (see groupBreakfastAdultId/
+// applyGroupBreakfastDefaults in add_group_booking.ejs, and the SERVICE_ID
+// 74 / name-contains-"adult"+"breakfast" convention in bookingModel.js),
+// instead of a hardcoded number here that could drift from what /services
+// actually charges. Fetched once on load, not per date/category, same as
+// Extra Bed's rate.
+function fetchRoomCheckerBreakfastRate() {
+  fetch('/services/api/services')
+    .then((response) => response.json())
+    .then((data) => {
+      if (!data.success) throw new Error(data.message || 'Failed to load services');
+      const breakfastService = (data.data || []).find((s) => {
+        const name = String(s.SERVICE_NAME || '').trim().toLowerCase();
+        const isAvailable = String(s.SERVICE_AVAILABILITY || '').trim().toLowerCase() === 'available';
+        // Matches bookingModel.js's own SERVICE_ID 74 = Adult Breakfast
+        // convention - the actual service here is just named "Breakfast"
+        // (not "...Adult..."), with the kids' price as its own separate
+        // "Breakfast (Kids)" entry, so name-only matching has to exclude
+        // "kid" rather than require "adult".
+        return isAvailable && (Number(s.IDNo) === 74 || (name.includes('breakfast') && !name.includes('kid')));
+      });
+      window.__rateSummaryBreakfastRate = breakfastService ? (parseFloat(breakfastService.SERVICE_COST) || 0) : null;
+      recomputeRateSummaryTotals();
+    })
+    .catch((err) => {
+      console.error('Error fetching Breakfast service rate:', err);
+      window.__rateSummaryBreakfastRate = null;
+      recomputeRateSummaryTotals();
+    });
+}
+
+// Fallback only - see fetchRoomCheckerLateCheckoutRate.
+const LATE_CHECKOUT_PRICE = 2000;
+window.__rateSummaryLateCheckoutRate = null;
+
+// Late Checkout's price ("Include Late Checkout" toggle below) - pulled from
+// the "LATE CHECK OUT" entry under /services (SERVICE_ID 72, matches the
+// billing.js/bookingModel.js convention used elsewhere for this service),
+// same pattern as fetchRoomCheckerBreakfastRate/fetchRoomCheckerExtraBedRate.
+// Excludes "FREE LATE CHECK OUT" (SERVICE_ID 73), a separate ₱0 entry with
+// "late" and "check" and "out" in its name too.
+function fetchRoomCheckerLateCheckoutRate() {
+  fetch('/services/api/services')
+    .then((response) => response.json())
+    .then((data) => {
+      if (!data.success) throw new Error(data.message || 'Failed to load services');
+      const lateCheckoutService = (data.data || []).find((s) => {
+        const name = String(s.SERVICE_NAME || '').trim().toLowerCase();
+        const isAvailable = String(s.SERVICE_AVAILABILITY || '').trim().toLowerCase() === 'available';
+        return isAvailable && (Number(s.IDNo) === 72
+          || (name.includes('late') && name.includes('check') && name.includes('out') && !name.includes('free')));
+      });
+      window.__rateSummaryLateCheckoutRate = lateCheckoutService ? (parseFloat(lateCheckoutService.SERVICE_COST) || 0) : null;
+      recomputeRateSummaryTotals();
+    })
+    .catch((err) => {
+      console.error('Error fetching Late Checkout service rate:', err);
+      window.__rateSummaryLateCheckoutRate = null;
+      recomputeRateSummaryTotals();
+    });
+}
 
 function formatPeso(amount) {
   return '₱' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -259,7 +336,9 @@ function fetchRoomCheckerRangeAvailability() {
 
   const startStr = roomCheckerFormatDateKey(range.start);
   const endStr = roomCheckerFormatDateKey(end);
-  const bookingType = document.querySelector('input[name="rateSummaryBookingType"]:checked').value;
+  const categorySelect = document.getElementById('rateSummaryCategory');
+  const category = categorySelect ? categorySelect.value : 'walk_in';
+  const breakfast = window.__rateSummaryBreakfastTier || 'no';
 
   // Clear immediately so a stale prior-range count/rate can't be used to warn
   // against (or quote) the new range while this request is in flight.
@@ -267,12 +346,34 @@ function fetchRoomCheckerRangeAvailability() {
 
   fetch(`/booking/api/range-availability?startDate=${startStr}&endDate=${endStr}`
     + `&checkInStatus=${ROOM_CHECKER_DEFAULT_CHECK_IN_STATUS}&checkOutStatus=${ROOM_CHECKER_DEFAULT_CHECK_OUT_STATUS}`
-    + `&bookingType=${bookingType}`)
+    + `&category=${category}&breakfast=${breakfast}`)
     .then((response) => response.json())
     .then((data) => {
       window.__rateSummaryRangeAvailability = data.success ? { single: data.single, double: data.double } : null;
       window.__rateSummaryKingRate = data.success ? (data.kingRate || 0) : 0;
       window.__rateSummaryQueenRate = data.success ? (data.queenRate || 0) : 0;
+      window.__rateSummaryKingTotal = data.success ? (data.kingTotal || 0) : 0;
+      window.__rateSummaryQueenTotal = data.success ? (data.queenTotal || 0) : 0;
+      // Weekday/weekend ROOM-ONLY rate (data.king/queenNoBreakfastWeekday/
+      // WeekendRate - "no breakfast" tier, matching what King/Queen Bed Rate
+      // itself now displays, kingRateExclBreakfast/queenRateExclBreakfast in
+      // recomputeRateSummaryTotals) + night-count, so this breakdown adds up
+      // to the SAME number as the Bed Rate line above it instead of the
+      // blended (breakfast-included) rate that line no longer shows. See
+      // updateRoomCheckerRateBreakdown, which turns this into the "how was
+      // this price arrived at" line.
+      window.__rateSummaryKingBreakdown = data.success
+        ? { weekdayRate: data.kingNoBreakfastWeekdayRate || 0, weekendRate: data.kingNoBreakfastWeekendRate || 0, weekdayNights: data.kingWeekdayNights || 0, weekendNights: data.kingWeekendNights || 0 }
+        : null;
+      window.__rateSummaryQueenBreakdown = data.success
+        ? { weekdayRate: data.queenNoBreakfastWeekdayRate || 0, weekendRate: data.queenNoBreakfastWeekendRate || 0, weekdayNights: data.queenWeekdayNights || 0, weekendNights: data.queenWeekendNights || 0 }
+        : null;
+      // The same room/category/range priced at the "no breakfast" tier - the
+      // gap between it and kingTotal/queenTotal above is exactly how much of
+      // the selected tier's rate is breakfast, baked in rather than billed
+      // separately. See recomputeRateSummaryTotals's bakedInBreakfastTotal.
+      window.__rateSummaryKingNoBreakfastTotal = data.success ? (data.kingNoBreakfastTotal || 0) : 0;
+      window.__rateSummaryQueenNoBreakfastTotal = data.success ? (data.queenNoBreakfastTotal || 0) : 0;
       recomputeRateSummaryTotals();
     })
     .catch((err) => {
@@ -280,6 +381,12 @@ function fetchRoomCheckerRangeAvailability() {
       window.__rateSummaryRangeAvailability = null;
       window.__rateSummaryKingRate = 0;
       window.__rateSummaryQueenRate = 0;
+      window.__rateSummaryKingTotal = 0;
+      window.__rateSummaryQueenTotal = 0;
+      window.__rateSummaryKingBreakdown = null;
+      window.__rateSummaryQueenBreakdown = null;
+      window.__rateSummaryKingNoBreakfastTotal = 0;
+      window.__rateSummaryQueenNoBreakfastTotal = 0;
       recomputeRateSummaryTotals();
     });
 }
@@ -390,17 +497,16 @@ function computeRoomCheckerExtraBedSuggestion(kingQty, queenQty, kingMin, queenM
   };
 }
 
-// Sets King/Queen/Extra Bed qty inputs and re-runs the totals (including the
-// Breakfast auto-sync, since King/Queen just changed) - shared by every
-// suggestion button below. extraBedQty is optional; omit to leave it as
-// whatever the staff already had typed.
+// Sets King/Queen/Extra Bed qty inputs and re-runs the totals - shared by
+// every suggestion button below. extraBedQty is optional; omit to leave it
+// as whatever the staff already had typed.
 function applyRoomCheckerSuggestion(kingQty, queenQty, extraBedQty) {
   document.getElementById('rateSummaryKingQty').value = kingQty;
   document.getElementById('rateSummaryQueenQty').value = queenQty;
   if (extraBedQty !== undefined) {
     document.getElementById('rateSummaryExtraBedQty').value = extraBedQty;
   }
-  syncRoomCheckerBreakfastToRoomCount();
+  recomputeRateSummaryTotals();
 }
 
 // Renders up to two independent suggestion buttons under the King/Queen rows:
@@ -477,99 +583,67 @@ function updateRoomCheckerSuggestion(suggestionElId, roomSuggestion, extraBedSug
   });
 }
 
-// A bulk quote almost always wants one breakfast per room, so this keeps
-// #rateSummaryBreakfastQty tracking King qty + Queen qty by default. Called
-// whenever either room qty changes (typed directly, or via a suggestion
-// button) - NOT from recomputeRateSummaryTotals itself, so typing directly
-// into the Breakfast field or clicking a None/1/2 preset isn't immediately
-// overwritten by this same sync on the next recompute.
-// A King room has 1 bed; a Queen room has 2 - so a Queen room feeds twice as
-// many guests as a King room, not the same "1 room = 1 breakfast" rate.
+// A King room has 1 bed; a Queen room has 2 - used by the extra-bed shortfall
+// allocation below (computeRoomCheckerExtraBedSuggestion), which reasons in
+// individual bed slots, not whole rooms.
 const KING_BEDS_PER_ROOM = 1;
 const QUEEN_BEDS_PER_ROOM = 2;
 
-function getRoomCheckerTotalBeds() {
-  const kingQty = Math.max(0, parseInt(document.getElementById('rateSummaryKingQty').value, 10) || 0);
-  const queenQty = Math.max(0, parseInt(document.getElementById('rateSummaryQueenQty').value, 10) || 0);
-  const extraBedQty = Math.max(0, parseInt(document.getElementById('rateSummaryExtraBedQty').value, 10) || 0);
-  // Each extra bed is one more guest to feed too, same as any other bed.
-  return (kingQty * KING_BEDS_PER_ROOM) + (queenQty * QUEEN_BEDS_PER_ROOM) + extraBedQty;
-}
+// Breakfast is now a TIER that picks which room_rates.BREAKFAST column the
+// King/Queen rate is pulled from (see /room-rates, RoomRatesModel), not a
+// separate per-guest add-on charge - so it's just one of three mutually
+// exclusive states, no qty/room-count math needed. Defaults to 'no'.
+window.__rateSummaryBreakfastTier = 'no';
 
-// Breakfast presets are 1/2 per ROOM (1 King room + 1 Queen room = 2, not
-// weighted by bed capacity like getRoomCheckerTotalBeds() above), served
-// every night of the stay - so "1 per bed" with 2 King + 1 Queen over 3
-// nights is (2 + 1) * 3 = 9, not just 3.
-function getRoomCheckerBreakfastRoomNights() {
-  const kingQty = Math.max(0, parseInt(document.getElementById('rateSummaryKingQty').value, 10) || 0);
-  const queenQty = Math.max(0, parseInt(document.getElementById('rateSummaryQueenQty').value, 10) || 0);
-  const nights = (window.__rateSummaryRange && window.__rateSummaryRange.nights) || 1;
-  return (kingQty + queenQty) * nights;
-}
-
-// Marks which None/1/2 preset (if any) matches the field's current value as
-// "active" (highlighted) - called after every change to the Breakfast qty,
-// whichever triggered it, so the highlight always reflects reality instead
-// of just tracking clicks. No preset lights up once staff hand-edit the
-// field to something that isn't an exact per-room-night multiple.
-function syncRoomCheckerBreakfastPresetActiveState() {
-  const qty = parseInt(document.getElementById('rateSummaryBreakfastQty').value, 10) || 0;
-  const roomNights = getRoomCheckerBreakfastRoomNights();
-  document.querySelectorAll('.rate-summary-preset-btn[data-breakfast-preset]').forEach((btn) => {
-    const perRoom = parseInt(btn.getAttribute('data-breakfast-preset'), 10) || 0;
-    const matches = perRoom === 0 ? qty === 0 : (roomNights > 0 && qty === perRoom * roomNights);
-    btn.classList.toggle('active', matches);
-  });
-}
-
-// Defaults breakfast to "1 per room" (the free-with-the-room-rate baseline -
-// see the freeBreakfastCount/chargeableBreakfastCount split in
-// recomputeRateSummaryTotals) whenever King/Queen qty is entered, since
-// there's no cost reason to make staff click it manually - and back to
-// "None" once rooms drop back to 0.
-function syncRoomCheckerBreakfastToRoomCount() {
-  document.getElementById('rateSummaryBreakfastQty').value = getRoomCheckerBreakfastRoomNights();
-  syncRoomCheckerBreakfastPresetActiveState();
-  recomputeRateSummaryTotals();
-}
-
-// The None/1/2 preset buttons mean "breakfasts per room, per night" (1 King
-// room + 1 Queen room), not a flat guest count.
 function wireRoomCheckerBreakfastPresets() {
   document.querySelectorAll('.rate-summary-preset-btn[data-breakfast-preset]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const perRoom = parseInt(btn.getAttribute('data-breakfast-preset'), 10) || 0;
-      document.getElementById('rateSummaryBreakfastQty').value = perRoom * getRoomCheckerBreakfastRoomNights();
-      syncRoomCheckerBreakfastPresetActiveState();
-      recomputeRateSummaryTotals();
+      window.__rateSummaryBreakfastTier = btn.getAttribute('data-breakfast-preset') || 'no';
+      document.querySelectorAll('.rate-summary-preset-btn[data-breakfast-preset]').forEach((b) => {
+        b.classList.toggle('active', b === btn);
+      });
+      fetchRoomCheckerRangeAvailability();
     });
   });
 }
 
 function initRateSummary() {
-  const bookingTypeInputs = document.querySelectorAll('input[name="rateSummaryBookingType"]');
-  const breakfastQtyInput = document.getElementById('rateSummaryBreakfastQty');
+  const categorySelect = document.getElementById('rateSummaryCategory');
   const discountInput = document.getElementById('rateSummaryDiscount');
   const kingQtyInput = document.getElementById('rateSummaryKingQty');
   const queenQtyInput = document.getElementById('rateSummaryQueenQty');
 
   const extraBedQtyInput = document.getElementById('rateSummaryExtraBedQty');
   const extraBedRateInput = document.getElementById('rateSummaryExtraBedRate');
+  const extraBreakfastQtyInput = document.getElementById('rateSummaryExtraBreakfastQty');
+  const extraBreakfastToggle = document.getElementById('rateSummaryExtraBreakfastToggle');
+  const extraBreakfastQtyGroup = document.getElementById('rateSummaryExtraBreakfastQtyGroup');
 
-  bookingTypeInputs.forEach(input => input.addEventListener('change', fetchRateSummary));
-  breakfastQtyInput.addEventListener('input', () => {
-    syncRoomCheckerBreakfastPresetActiveState();
+  // Category and breakfast tier both select which room_rates rate applies -
+  // need a full refetch, not just a local recompute.
+  categorySelect.addEventListener('change', fetchRateSummary);
+  discountInput.addEventListener('input', recomputeRateSummaryTotals);
+  kingQtyInput.addEventListener('input', recomputeRateSummaryTotals);
+  queenQtyInput.addEventListener('input', recomputeRateSummaryTotals);
+  extraBedQtyInput.addEventListener('input', recomputeRateSummaryTotals);
+  extraBedRateInput.addEventListener('input', recomputeRateSummaryTotals);
+  extraBreakfastQtyInput.addEventListener('input', recomputeRateSummaryTotals);
+  // "+" reveals the qty field on demand instead of always taking up row
+  // space; clicking it again hides it and clears the qty back to 0.
+  extraBreakfastToggle.addEventListener('click', () => {
+    const willShow = extraBreakfastQtyGroup.style.display === 'none';
+    extraBreakfastQtyGroup.style.display = willShow ? '' : 'none';
+    extraBreakfastToggle.classList.toggle('active', willShow);
+    if (!willShow) extraBreakfastQtyInput.value = 0;
     recomputeRateSummaryTotals();
   });
-  discountInput.addEventListener('input', recomputeRateSummaryTotals);
-  kingQtyInput.addEventListener('input', syncRoomCheckerBreakfastToRoomCount);
-  queenQtyInput.addEventListener('input', syncRoomCheckerBreakfastToRoomCount);
-  extraBedQtyInput.addEventListener('input', syncRoomCheckerBreakfastToRoomCount);
-  extraBedRateInput.addEventListener('input', recomputeRateSummaryTotals);
+  document.getElementById('rateSummaryIncludeLateCheckout').addEventListener('change', recomputeRateSummaryTotals);
   wireRoomCheckerBreakfastPresets();
 
   fetchRateSummary();
   fetchRoomCheckerExtraBedRate();
+  fetchRoomCheckerBreakfastRate();
+  fetchRoomCheckerLateCheckoutRate();
 }
 
 // Extra Bed isn't a room type - it's the "Extra Bed" entry under /services
@@ -630,18 +704,31 @@ function handleRoomCheckerRangeSelect(info) {
 // quantities, breakfast, discount) is pure client-side arithmetic.
 function fetchRateSummary() {
   fetchRoomCheckerRangeAvailability();
-  // Breakfast is now per-room-per-night (see getRoomCheckerBreakfastRoomNights),
-  // so a nights change needs the same rescale King/Queen qty changes already get.
-  syncRoomCheckerBreakfastToRoomCount();
 }
 
 function recomputeRateSummaryTotals() {
+  // window.__rateSummaryKingTotal/QueenTotal are the exact per-room totals for
+  // the WHOLE stay (already split weekday/weekend per night by the server -
+  // see RoomRatesModel.getRoomCheckerRates) - used for the actual math.
+  // kingRate/queenRate are that total's per-night AVERAGE (a mixed weekday/
+  // weekend stay has no single "the" nightly rate) - kept around for the
+  // handoff/chip, but the King/Queen Bed Rate line itself now displays
+  // kingRateExclBreakfast/queenRateExclBreakfast instead (see below).
+  const kingTotal = window.__rateSummaryKingTotal || 0;
+  const queenTotal = window.__rateSummaryQueenTotal || 0;
   const kingRate = window.__rateSummaryKingRate || 0;
   const queenRate = window.__rateSummaryQueenRate || 0;
   // Editable (see fetchRoomCheckerExtraBedRate, which only sets the starting
   // value) - read live from the input, not the fetched default, so a staff
   // override actually takes effect.
   const extraBedRate = Math.max(0, parseFloat(document.getElementById('rateSummaryExtraBedRate').value) || 0);
+  // On top of the None/One/Two tier above - for a guest who wants more
+  // breakfasts than "Two" covers. Priced from the Adult Breakfast /services
+  // entry (see fetchRoomCheckerBreakfastRate); BREAKFAST_PRICE only backs it
+  // up if that service isn't found. No editable rate input for this - see
+  // rateSummaryExtraBreakfastToggle.
+  const extraBreakfastRate = window.__rateSummaryBreakfastRate != null ? window.__rateSummaryBreakfastRate : BREAKFAST_PRICE;
+  const extraBreakfastQty = Math.max(0, parseInt(document.getElementById('rateSummaryExtraBreakfastQty').value, 10) || 0);
   const nights = window.__rateSummaryRange.nights || 1;
 
   const kingQty = Math.max(0, parseInt(document.getElementById('rateSummaryKingQty').value, 10) || 0);
@@ -655,19 +742,52 @@ function recomputeRateSummaryTotals() {
   const extraBedSuggestion = computeRoomCheckerExtraBedSuggestion(kingQty, queenQty, kingMin, queenMin, extraBedQty);
   updateRoomCheckerSuggestion('rateSummaryBedSuggestion', roomSuggestion, extraBedSuggestion);
 
-  const totalRoomRate = (kingQty * kingRate + queenQty * queenRate) * nights;
+  // How much of the selected tier's PER-ROOM total is breakfast, baked into
+  // the rate rather than billed separately - the gap between it and the same
+  // room/range/category priced at "no breakfast" (see window.__rateSummaryKing/
+  // QueenNoBreakfastTotal, fetched alongside the selected tier in
+  // fetchRoomCheckerRangeAvailability). kingNoBreakfastTotal/queenNoBreakfastTotal
+  // ARE the room-only totals, so Total Room Rate below uses those directly
+  // instead of kingTotal/queenTotal (which still include the tier's breakfast) -
+  // that breakfast portion moves into Breakfast Total instead, so the two
+  // rows split cleanly: Total Room Rate is room-only, Breakfast Total is
+  // every breakfast charge (tier-included + additional) combined.
+  const kingNoBreakfastTotal = window.__rateSummaryKingNoBreakfastTotal || 0;
+  const queenNoBreakfastTotal = window.__rateSummaryQueenNoBreakfastTotal || 0;
+  const kingBakedInBreakfast = Math.max(0, kingTotal - kingNoBreakfastTotal);
+  const queenBakedInBreakfast = Math.max(0, queenTotal - queenNoBreakfastTotal);
 
-  // The first breakfast per room, per night (the "1 per room" preset - see
-  // getRoomCheckerBreakfastRoomNights) is already covered by the room rate,
-  // not an extra charge. Only breakfasts beyond that free baseline (e.g. the
-  // "2 per room" preset, or a hand-typed count above it) actually get billed.
-  const breakfastCount = Math.max(0, parseInt(document.getElementById('rateSummaryBreakfastQty').value, 10) || 0);
-  const freeBreakfastCount = Math.min(breakfastCount, getRoomCheckerBreakfastRoomNights());
-  const chargeableBreakfastCount = Math.max(0, breakfastCount - freeBreakfastCount);
-  const breakfastTotal = chargeableBreakfastCount * BREAKFAST_PRICE;
+  // Each room's own already-nights-summed ROOM-ONLY total x how many of that
+  // type - no separate "* nights" here, that's already inside
+  // kingNoBreakfastTotal/queenNoBreakfastTotal.
+  const totalRoomRate = (kingQty * kingNoBreakfastTotal) + (queenQty * queenNoBreakfastTotal);
+
+  // King/Queen Bed Rate itself shows the ROOM-ONLY nightly average (the "no
+  // breakfast" tier's own average) instead of the blended one, matching
+  // Total Room Rate above now also being room-only. Falls back to the
+  // blended rate on the "None" tier, where the two are identical anyway
+  // (nothing baked in to subtract).
+  const kingRateExclBreakfast = nights > 0 ? (kingNoBreakfastTotal / nights) : kingRate;
+  const queenRateExclBreakfast = nights > 0 ? (queenNoBreakfastTotal / nights) : queenRate;
+
+  // Breakfast Total = every breakfast charge combined: the tier's baked-in
+  // amount (kingBakedInBreakfast/queenBakedInBreakfast above, now qty-scaled
+  // since it's moving out of Total Room Rate and into this sum) plus
+  // whatever's on top of that tier from the "+" toggle.
+  const bakedInBreakfastTotal = (kingQty * kingBakedInBreakfast) + (queenQty * queenBakedInBreakfast);
+  const extraBreakfastTotal = extraBreakfastQty * extraBreakfastRate;
+  const breakfastTotal = bakedInBreakfastTotal + extraBreakfastTotal;
   const extraBedTotal = extraBedQty * extraBedRate;
 
-  const subTotal = totalRoomRate + breakfastTotal + extraBedTotal;
+  // Opt-in (see the checkbox listener in initRateSummary) - never applied
+  // automatically. Rule from the "LATE CHECK OUT" /services entry: a short
+  // stay (2 nights or fewer) still bills the fee, 3+ nights is free.
+  const lateCheckoutRate = window.__rateSummaryLateCheckoutRate != null ? window.__rateSummaryLateCheckoutRate : LATE_CHECKOUT_PRICE;
+  const includeLateCheckout = document.getElementById('rateSummaryIncludeLateCheckout').checked;
+  const lateCheckoutWaived = nights >= 3;
+  const lateCheckoutFee = (includeLateCheckout && !lateCheckoutWaived) ? lateCheckoutRate : 0;
+
+  const subTotal = totalRoomRate + breakfastTotal + extraBedTotal + lateCheckoutFee;
 
   // Per room, per night - same scaling as Total Room Rate above, so a bulk
   // quote's discount grows with the room count instead of staying a single
@@ -679,22 +799,76 @@ function recomputeRateSummaryTotals() {
 
   const grandTotal = Math.max(0, subTotal - discount);
 
-  document.getElementById('rateSummaryKingRate').textContent = formatPeso(kingRate);
-  document.getElementById('rateSummaryQueenRate').textContent = formatPeso(queenRate);
+  document.getElementById('rateSummaryKingRate').textContent = formatPeso(kingRateExclBreakfast);
+  document.getElementById('rateSummaryQueenRate').textContent = formatPeso(queenRateExclBreakfast);
+  updateRoomCheckerRateBreakdown();
   document.getElementById('rateSummaryTotalRoomRate').textContent = formatPeso(totalRoomRate);
-  document.getElementById('rateSummaryBreakfastTotal').textContent = formatPeso(breakfastTotal);
+  const includedBreakfastKingRow = document.getElementById('rateSummaryIncludedBreakfastKingRow');
+  const includedBreakfastQueenRow = document.getElementById('rateSummaryIncludedBreakfastQueenRow');
+  // Same as King/Queen Breakdown above - only shown once that bed type
+  // actually has a qty typed in, not just because its rate has breakfast baked in.
+  if (includedBreakfastKingRow) includedBreakfastKingRow.style.display = (kingQty > 0 && kingBakedInBreakfast > 0) ? '' : 'none';
+  if (includedBreakfastQueenRow) includedBreakfastQueenRow.style.display = (queenQty > 0 && queenBakedInBreakfast > 0) ? '' : 'none';
+  document.getElementById('rateSummaryIncludedBreakfastKingTotal').textContent = formatPeso(kingBakedInBreakfast);
+  document.getElementById('rateSummaryIncludedBreakfastQueenTotal').textContent = formatPeso(queenBakedInBreakfast);
+  document.getElementById('rateSummaryExtraBreakfastTotal').textContent = formatPeso(breakfastTotal);
   document.getElementById('rateSummaryExtraBedTotal').textContent = formatPeso(extraBedTotal);
+  const lateCheckoutNote = document.getElementById('rateSummaryLateCheckoutNote');
+  const lateCheckoutTotalRow = document.getElementById('rateSummaryLateCheckoutTotalRow');
+  if (lateCheckoutNote) {
+    lateCheckoutNote.textContent = includeLateCheckout
+      ? (lateCheckoutWaived ? 'FREE (3+ nights)' : formatPeso(lateCheckoutRate))
+      : '';
+  }
+  if (lateCheckoutTotalRow) lateCheckoutTotalRow.style.display = (includeLateCheckout && !lateCheckoutWaived) ? '' : 'none';
+  document.getElementById('rateSummaryLateCheckoutTotal').textContent = formatPeso(lateCheckoutFee);
   document.getElementById('rateSummarySubTotal').textContent = formatPeso(subTotal);
   document.getElementById('rateSummaryDiscountTotal').textContent = (discount > 0 ? '-' : '') + formatPeso(discount);
   document.getElementById('rateSummaryGrandTotal').textContent = formatPeso(grandTotal);
 
-  updateRoomCheckerSummaryChip(nights, kingQty, queenQty, breakfastCount);
+  updateRoomCheckerSummaryChip(nights, kingQty, queenQty);
+}
+
+// "How was this price arrived at" - turns a weekday/weekend rate + night-
+// count breakdown (window.__rateSummaryKingBreakdown/QueenBreakdown, set by
+// fetchRoomCheckerRangeAvailability) into e.g. "Weekday ₱3,800 x 2n + Weekend
+// ₱4,300 x 2n" under the King/Queen Bed Rate row. Only the side(s) that
+// actually have nights show - a stay entirely on one side doesn't need to
+// mention the other at ₱0 x 0.
+function formatRoomCheckerRateBreakdown(breakdown) {
+  if (!breakdown) return '';
+  const parts = [];
+  if (breakdown.weekdayNights > 0) {
+    parts.push(`Weekday ${formatPeso(breakdown.weekdayRate)} × ${breakdown.weekdayNights}n`);
+  }
+  if (breakdown.weekendNights > 0) {
+    parts.push(`Weekend ${formatPeso(breakdown.weekendRate)} × ${breakdown.weekendNights}n`);
+  }
+  return parts.join(' + ');
+}
+
+function updateRoomCheckerRateBreakdown() {
+  const kingRow = document.getElementById('rateSummaryKingBreakdownRow');
+  const queenRow = document.getElementById('rateSummaryQueenBreakdownRow');
+  const kingEl = document.getElementById('rateSummaryKingBreakdownValue');
+  const queenEl = document.getElementById('rateSummaryQueenBreakdownValue');
+  const kingText = formatRoomCheckerRateBreakdown(window.__rateSummaryKingBreakdown);
+  const queenText = formatRoomCheckerRateBreakdown(window.__rateSummaryQueenBreakdown);
+  // Only shown once a real date range is committed (roomCheckerHasCommittedSelection)
+  // AND that bed type actually has a qty typed in - a room type nobody's
+  // booking doesn't need its rate explained.
+  const kingQty = Math.max(0, parseInt(document.getElementById('rateSummaryKingQty').value, 10) || 0);
+  const queenQty = Math.max(0, parseInt(document.getElementById('rateSummaryQueenQty').value, 10) || 0);
+  if (kingEl) kingEl.textContent = kingText;
+  if (queenEl) queenEl.textContent = queenText;
+  if (kingRow) kingRow.style.display = (roomCheckerHasCommittedSelection && kingQty > 0 && kingText) ? '' : 'none';
+  if (queenRow) queenRow.style.display = (roomCheckerHasCommittedSelection && queenQty > 0 && queenText) ? '' : 'none';
 }
 
 // Recap chip next to Proceed Booking - lets staff double-check nights/rooms/
-// breakfast at a glance right before committing, without scanning back up
-// through the whole itemized panel.
-function updateRoomCheckerSummaryChip(nights, kingQty, queenQty, breakfastCount) {
+// breakfast tier at a glance right before committing, without scanning back
+// up through the whole itemized panel.
+function updateRoomCheckerSummaryChip(nights, kingQty, queenQty) {
   const nightsEl = document.getElementById('roomCheckerChipNights');
   const roomsEl = document.getElementById('roomCheckerChipRooms');
   const breakfastEl = document.getElementById('roomCheckerChipBreakfast');
@@ -702,7 +876,12 @@ function updateRoomCheckerSummaryChip(nights, kingQty, queenQty, breakfastCount)
 
   nightsEl.textContent = `${nights} night${nights === 1 ? '' : 's'}`;
   roomsEl.textContent = `${kingQty} King, ${queenQty} Queen`;
-  breakfastEl.textContent = `${breakfastCount} BF`;
+  const tierLabels = { no: 'No BF', one: '1 BF', two: '2 BF' };
+  const tierLabel = tierLabels[window.__rateSummaryBreakfastTier] || 'No BF';
+  // Extra Qty (the "+" toggle) is on top of the tier, not the same count -
+  // show both so this doesn't silently drop the extra like it used to.
+  const extraQty = Math.max(0, parseInt((document.getElementById('rateSummaryExtraBreakfastQty') || {}).value, 10) || 0);
+  breakfastEl.textContent = extraQty > 0 ? `${tierLabel} +${extraQty}` : tierLabel;
 }
 
 window.roomCheckerCalendars = [];
@@ -913,11 +1092,13 @@ function proceedRoomCheckerBooking() {
   const discountPerNight = Math.max(0, parseFloat(document.getElementById('rateSummaryDiscount').value) || 0);
   const totalDiscount = discountPerNight * range.nights * totalRooms;
 
-  // Room Checker's breakfast option is just a flat guest count (None/1/2), with no
-  // adult/kid split - both modals do split adult/kid, so carry the count over as
-  // "adults" (the modals' own default per-head price already applies once the
-  // checkbox is on).
-  const breakfastCount = Math.max(0, parseInt(document.getElementById('rateSummaryBreakfastQty').value, 10) || 0);
+  // The None/One/Two TIER is baked into the King/Queen rate itself (a
+  // room_rates column - see window.__rateSummaryBreakfastTier), so it isn't
+  // carried over here (both booking modals still charge breakfast as their
+  // own separate add-on, unrelated to room_rates - passing the tier's count
+  // too would double-charge it). Only genuinely ADDITIONAL breakfasts (on
+  // top of that tier) are real extra charges, so only those carry over.
+  const breakfastCount = Math.max(0, parseInt(document.getElementById('rateSummaryExtraBreakfastQty').value, 10) || 0);
 
   // Extra Bed is its own qty + editable rate (see rateSummaryExtraBedRate/Qty),
   // carried over as-is - there's no free-baseline split for this one, it's a
@@ -933,7 +1114,7 @@ function proceedRoomCheckerBooking() {
   // to this whenever no rooms are selected yet, instead of showing ₱0.00 -
   // no matter how many times or when that recompute runs, not a one-shot
   // DOM write that a later recompute can race and overwrite.
-  const quotedRoomTotal = (kingQty * (window.__rateSummaryKingRate || 0) + queenQty * (window.__rateSummaryQueenRate || 0)) * range.nights;
+  const quotedRoomTotal = (kingQty * (window.__rateSummaryKingTotal || 0)) + (queenQty * (window.__rateSummaryQueenTotal || 0));
 
   if (totalRooms === 1) {
     openRoomCheckerSingleBooking(dateRangeStr, range.nights, start, checkoutDate, totalDiscount, breakfastCount);
@@ -1041,11 +1222,11 @@ function openRoomCheckerGroupBooking(dateRangeStr, nights, start, checkoutDate, 
         if (groupBreakfastAdultQty) groupBreakfastAdultQty.value = breakfastCount;
         // This modal leaves Adult/Kid Price blank by design (staff fill it in per
         // booking) - unlike the single Add Booking modal, which auto-fills it from
-        // the real breakfast service cost. Default it to Room Checker's own
-        // BREAKFAST_PRICE so the group total actually matches what was quoted,
-        // still editable by staff afterward.
+        // the real breakfast service cost. Default it to the same Adult Breakfast
+        // rate Room Checker itself just quoted (see fetchRoomCheckerBreakfastRate)
+        // so the group total actually matches, still editable by staff afterward.
         if (groupBreakfastAdultPrice && !groupBreakfastAdultPrice.value) {
-          groupBreakfastAdultPrice.value = BREAKFAST_PRICE;
+          groupBreakfastAdultPrice.value = window.__rateSummaryBreakfastRate != null ? window.__rateSummaryBreakfastRate : BREAKFAST_PRICE;
         }
       }
 

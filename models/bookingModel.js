@@ -9992,12 +9992,12 @@ class BookingModel {
   // helper) - so a quote is guaranteed still bookable when staff proceed from
   // Room Checker into that modal.
   static async getRangeAvailabilityCounts(params) {
-    const { startDate, endDate, checkInStatus, checkOutStatus, floorNumber, bookingType } = params;
-    const bookingRoute = bookingType === 'agency' ? 'agency' : 'walk-in';
+    const { startDate, endDate, checkInStatus, checkOutStatus, floorNumber, category, breakfast } = params;
 
     const connection = await pool.promise().getConnection();
     try {
       const moment = require('moment');
+      const RoomRatesModel = require('./roomRatesModel');
       const formattedStartDate = moment(startDate, 'YYYY-MM-DD').format('YYYY-MM-DD');
       const formattedEndDate = moment(endDate, 'YYYY-MM-DD').format('YYYY-MM-DD');
 
@@ -10006,73 +10006,46 @@ class BookingModel {
       });
 
       // Room Checker is used as an actual guest quotation, so the King/Queen
-      // rate shown there has to be a real bookable price - not the cheapest
-      // seasonal exception that happens to exist somewhere in the property
-      // (see the old getSeasonalRateSummary MIN(PRICE) approach, which could
-      // quote a discount that doesn't apply to any of the rooms actually
-      // available for this date range). For each room actually available,
-      // resolve the same real price findConsecutiveRooms would (that room's
-      // own seasonal override for this date range + booking type, else its
-      // base FINAL_PRICE), then take the most common ("mode") price per bed
-      // type - the rate a guest is actually most likely to be quoted.
-      const roomIds = filteredRooms.map(r => r.IDNo);
-      const seasonalPricesMap = {};
-
-      if (roomIds.length > 0) {
-        const [seasonalRows] = await connection.query(
-          `SELECT rsp.ROOM_ID, rsp.ROOM_BED AS BED_COUNT, rsp.BOOKING_TYPE, rsp.PRICE AS SEASONAL_PRICE,
-                  s.START_DATE, s.END_DATE
-           FROM room_season_price rsp
-           LEFT JOIN season s ON s.IDNo = rsp.SEASON_ID
-           WHERE rsp.ROOM_ID IN (?)`,
-          [roomIds]
-        );
-        for (const row of seasonalRows) {
-          if (!seasonalPricesMap[row.ROOM_ID]) seasonalPricesMap[row.ROOM_ID] = [];
-          seasonalPricesMap[row.ROOM_ID].push(row);
-        }
-      }
-
-      const checkMoment = moment(formattedStartDate, 'YYYY-MM-DD');
-      const resolveActualPrice = (room) => {
-        const seasonalPrices = seasonalPricesMap[room.IDNo] || [];
-        const bedCount = parseInt(room.ROOM_BED, 10);
-        const match = seasonalPrices.find((price) => {
-          const start = moment(price.START_DATE);
-          const end = moment(price.END_DATE);
-          if (!start.isValid() || !end.isValid()) return false;
-          const inRange = start.isSameOrBefore(end)
-            ? checkMoment.isBetween(start, end, 'day', '[]')
-            : checkMoment.isSameOrAfter(start) || checkMoment.isSameOrBefore(end);
-          return inRange && parseInt(price.BED_COUNT, 10) === bedCount && price.BOOKING_TYPE === bookingRoute;
-        });
-        return match ? parseFloat(match.SEASONAL_PRICE) || 0 : parseFloat(room.FINAL_PRICE) || 0;
-      };
-
-      const modePrice = (prices) => {
-        if (!prices.length) return 0;
-        const freq = new Map();
-        prices.forEach((p) => freq.set(p, (freq.get(p) || 0) + 1));
-        let bestPrice = prices[0];
-        let bestCount = 0;
-        for (const [price, count] of freq.entries()) {
-          if (count > bestCount || (count === bestCount && price < bestPrice)) {
-            bestCount = count;
-            bestPrice = price;
-          }
-        }
-        return bestPrice;
-      };
-
+      // price shown there now comes straight from the /room-rates matrix
+      // (RoomRatesModel) - the same table staff edit there - split per night
+      // (weekday/weekend can differ within one stay) and per the selected
+      // rate category + breakfast tier (breakfast now selects which rate
+      // COLUMN applies, not a separate add-on charge). This replaced an
+      // older per-room-availability-based "mode price" estimate pulled from
+      // room_season_price, which had no breakfast dimension.
       const kingRooms = filteredRooms.filter(r => parseInt(r.ROOM_BED, 10) === 1);
       const queenRooms = filteredRooms.filter(r => parseInt(r.ROOM_BED, 10) === 2);
+
+      const rates = await RoomRatesModel.getRoomCheckerRates({
+        startDate: moment(formattedStartDate, 'YYYY-MM-DD').toDate(),
+        endDate: moment(formattedEndDate, 'YYYY-MM-DD').toDate(),
+        category: category || 'walk_in',
+        breakfast: breakfast || 'no'
+      });
 
       return {
         success: true,
         single: kingRooms.length,
         double: queenRooms.length,
-        kingRate: modePrice(kingRooms.map(resolveActualPrice)),
-        queenRate: modePrice(queenRooms.map(resolveActualPrice))
+        kingRate: rates.kingNightlyRate,
+        kingTotal: rates.kingTotal,
+        kingWeekdayRate: rates.kingWeekdayRate,
+        kingWeekendRate: rates.kingWeekendRate,
+        kingWeekdayNights: rates.kingWeekdayNights,
+        kingWeekendNights: rates.kingWeekendNights,
+        kingNoBreakfastTotal: rates.kingNoBreakfastTotal,
+        kingNoBreakfastWeekdayRate: rates.kingNoBreakfastWeekdayRate,
+        kingNoBreakfastWeekendRate: rates.kingNoBreakfastWeekendRate,
+        queenRate: rates.queenNightlyRate,
+        queenTotal: rates.queenTotal,
+        queenWeekdayRate: rates.queenWeekdayRate,
+        queenWeekendRate: rates.queenWeekendRate,
+        queenWeekdayNights: rates.queenWeekdayNights,
+        queenWeekendNights: rates.queenWeekendNights,
+        queenNoBreakfastTotal: rates.queenNoBreakfastTotal,
+        queenNoBreakfastWeekdayRate: rates.queenNoBreakfastWeekdayRate,
+        queenNoBreakfastWeekendRate: rates.queenNoBreakfastWeekendRate,
+        nights: rates.nights
       };
     } finally {
       connection.release();

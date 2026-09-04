@@ -228,6 +228,13 @@
     gap: 6px;
   }
 
+  /* Breakfast row uses flex-start (unlike Extra Bed's space-between row), so
+     push its qty group to the far right instead of it sitting right next to
+     the "+" toggle with empty space trailing after it. */
+  #rateSummaryExtraBreakfastQtyGroup {
+    margin-left: auto;
+  }
+
   .rate-summary-inline-label {
     font-size: 11px;
     color: #9aa4ac;
@@ -254,6 +261,20 @@
     font-size: 12px;
     color: #e0a33c;
     padding-bottom: 8px;
+  }
+
+  /* "How was this price arrived at" - the weekday/weekend rate + night count
+     the King/Queen Bed Rate average above was blended from. Hidden (empty)
+     until there's an actual stay to break down - see
+     updateRoomCheckerRateBreakdown in room_checker.js. */
+  .rate-summary-rate-breakdown {
+    font-size: 11px;
+    color: #9aa4ac;
+    padding: 4px 0;
+  }
+
+  [data-theme="white"] .rate-summary-rate-breakdown {
+    color: #6c757d;
   }
 
   /* Clickable alternative(s) shown when shifting the shortfall to the other bed
@@ -331,12 +352,11 @@
     cursor: pointer;
   }
 
-  /* Quick-set shortcuts for the common small Breakfast counts - just write
-     into #rateSummaryBreakfastQty (see wireRoomCheckerBreakfastPresets in
-     room_checker.js), they don't hold any state of their own. */
-  /* box-sizing/height matched to .rate-summary-qty-input below so the preset
-     buttons and the number field they write into read as one consistent
-     control group instead of the buttons looking undersized next to it. */
+  /* Breakfast tier toggle - exactly one active at a time, picks the
+     room_rates.BREAKFAST column the King/Queen rate is fetched from (see
+     wireRoomCheckerBreakfastPresets in room_checker.js). */
+  /* box-sizing/height matched to .rate-summary-qty-input so it reads as the
+     same control family as the King/Queen qty inputs next to it. */
   .rate-summary-preset-btn {
     box-sizing: border-box;
     height: 30px;
@@ -351,10 +371,10 @@
     transition: background 0.15s ease, border-color 0.15s ease;
   }
 
-  /* The two icon-only presets (1 per bed / 2 per bed) get a square footprint
+  /* The two icon-only presets (one/two breakfasts) get a square footprint
      instead of hugging the icon glyph width - "None" stays text-width. */
-  .rate-summary-preset-btn[data-breakfast-preset="1"],
-  .rate-summary-preset-btn[data-breakfast-preset="2"] {
+  .rate-summary-preset-btn[data-breakfast-preset="one"],
+  .rate-summary-preset-btn[data-breakfast-preset="two"] {
     width: 30px;
     padding: 0;
   }
@@ -366,8 +386,8 @@
 
   /* Active state - same blue used for calendar range-selection highlights
      (see #room-checker-months td.fc-day.room-checker-range-selected above) -
-     shows which preset (if any) matches the Breakfast field's current value;
-     see syncRoomCheckerBreakfastPresetActiveState in room_checker.js. */
+     shows the selected breakfast tier; see wireRoomCheckerBreakfastPresets
+     in room_checker.js. */
   .rate-summary-preset-btn.active {
     background: #2196f3;
     border-color: #2196f3;
@@ -552,6 +572,22 @@
     color: #212529;
   }
 
+  /* The <select>'s own translucent background (rgba above) only ever paints
+     the CLOSED control - the native options popup falls back to the browser's
+     own default (usually solid white) regardless of theme, so with no
+     explicit color here the dark theme's white text became invisible white-
+     on-white once the dropdown opened. Solid, theme-matched colors here fix
+     that regardless of what the popup's own background defaults to. */
+  .rate-summary-discount-input option {
+    background-color: #1f2528;
+    color: #fff;
+  }
+
+  [data-theme="white"] .rate-summary-discount-input option {
+    background-color: #ffffff;
+    color: #212529;
+  }
+
   /* Height matched to .rate-summary-preset-btn above (Breakfast row's None/1/2
      shortcut buttons) so they read as one control group. */
   .rate-summary-qty-input {
@@ -606,15 +642,18 @@
       </div>
       <div class="card-body">
         <div id="rate-summary">
-          <div class="rate-summary-row rate-summary-checkboxes">
-            <label class="rate-summary-checkbox">
-              <input type="radio" name="rateSummaryBookingType" id="rateSummaryWalkIn" value="walk-in" checked>
-              Walk In
-            </label>
-            <label class="rate-summary-checkbox">
-              <input type="radio" name="rateSummaryBookingType" id="rateSummaryAgency" value="agency">
-              Agency
-            </label>
+          <!-- Rate category - drives which room_rates.CATEGORY column the King/Queen
+               rate below is pulled from (see /room-rates, models/roomRatesModel.js). -->
+          <div class="rate-summary-row">
+            <span class="rate-summary-label">Rate Category</span>
+            <select id="rateSummaryCategory" class="rate-summary-discount-input" style="width: auto; min-width: 160px;">
+              <option value="walk_in" selected>Walk-in</option>
+              <option value="agency">Agency</option>
+              <option value="tenant">Tenant (15%)</option>
+              <option value="vip">VIP (20%)</option>
+              <option value="employee">Employee (30%)</option>
+              <option value="senior_special">Senior/Special (20%)</option>
+            </select>
           </div>
 
           <div class="rate-summary-row">
@@ -646,29 +685,62 @@
                alone can't. Lives outside the King/Queen groups above since it
                reasons about both together, not one side at a time. -->
           <div id="rateSummaryBedSuggestion" class="rate-summary-suggestion"></div>
+          <!-- "How was this price arrived at" - King + Queen's weekday/weekend
+               rate + night-count breakdown, right above the total it explains
+               instead of interrupting each row above - label left, value right,
+               same as every other row here. See updateRoomCheckerRateBreakdown
+               in room_checker.js. -->
+          <div class="rate-summary-row rate-summary-rate-breakdown" id="rateSummaryKingBreakdownRow" style="display: none;">
+            <span>King Breakdown</span>
+            <span id="rateSummaryKingBreakdownValue"></span>
+          </div>
+          <div class="rate-summary-row rate-summary-rate-breakdown" id="rateSummaryQueenBreakdownRow" style="display: none;">
+            <span>Queen Breakdown</span>
+            <span id="rateSummaryQueenBreakdownValue"></span>
+          </div>
           <div class="rate-summary-row rate-summary-subtotal">
             <span>Total Room Rate</span>
             <span id="rateSummaryTotalRoomRate">&#8369;0.00</span>
           </div>
 
-          <!-- Breakfast count defaults to (and re-syncs to) total rooms booked
-               whenever King/Queen qty changes - see
-               syncRoomCheckerBreakfastToRoomCount in room_checker.js - since a
-               bulk quote almost always wants one breakfast per room. The
-               None/1/2 buttons are just quick overrides for the common small
-               cases; the number field next to them is the actual value and
-               source of truth (was a 3-option radio, capped at 2 - too small
-               once a booking has dozens of rooms). -->
+          <!-- Breakfast tier (None/One/Two - picks which room_rates.BREAKFAST column
+               the King/Queen rate above is pulled from, see /room-rates) plus a "+"
+               to reveal a qty for anything ABOVE that tier (e.g. an extra person in
+               the room wanting breakfast too) - a real add-on charge on top of the
+               tier, priced at the fixed BREAKFAST_PRICE in room_checker.js (no
+               separate rate input for now). Exactly one tier button is ever active -
+               see wireRoomCheckerBreakfastPresets in room_checker.js. -->
           <div class="rate-summary-row rate-summary-checkboxes">
             <span class="rate-summary-label">Breakfast</span>
-            <button type="button" class="rate-summary-preset-btn" data-breakfast-preset="0">None</button>
-            <button type="button" class="rate-summary-preset-btn" data-breakfast-preset="1" title="1 per bed"><i class="fa fa-user" aria-hidden="true"></i></button>
-            <button type="button" class="rate-summary-preset-btn" data-breakfast-preset="2" title="2 per bed"><i class="fa fa-users" aria-hidden="true"></i></button>
-            <input type="number" id="rateSummaryBreakfastQty" class="rate-summary-qty-input" value="0" min="0" step="1" title="Number of breakfasts">
+            <button type="button" class="rate-summary-preset-btn active" data-breakfast-preset="no">None</button>
+            <button type="button" class="rate-summary-preset-btn" data-breakfast-preset="one" title="One breakfast"><i class="fa fa-user" aria-hidden="true"></i></button>
+            <button type="button" class="rate-summary-preset-btn" data-breakfast-preset="two" title="Two breakfasts"><i class="fa fa-users" aria-hidden="true"></i></button>
+            <button type="button" class="rate-summary-preset-btn" id="rateSummaryExtraBreakfastToggle" title="Add breakfast(s) beyond the tier above">+</button>
+            <span class="rate-summary-qty-group" id="rateSummaryExtraBreakfastQtyGroup" style="display: none;">
+              <span class="rate-summary-inline-label">Qty</span>
+              <input type="number" id="rateSummaryExtraBreakfastQty" class="rate-summary-qty-input" value="0" min="0" step="1" title="Number of additional breakfasts">
+            </span>
+          </div>
+          <!-- How much of the King/Queen Bed Rate above is breakfast, baked into
+               the selected tier's rate (One/Two) instead of billed separately -
+               (tier's per-room total) minus (same room/range priced at "no
+               breakfast"). Shown per room type - not qty-scaled, same as the
+               Bed Rate/Breakdown rows above, so it's visible even before a qty
+               is typed in. Purely informational, already counted in Total Room
+               Rate, so not added to Sub Total below. Hidden on the "None" tier
+               (nothing baked in) - see recomputeRateSummaryTotals in
+               room_checker.js. -->
+          <div class="rate-summary-row rate-summary-rate-breakdown" id="rateSummaryIncludedBreakfastKingRow" style="display: none;">
+            <span>King Breakfast (Included)</span>
+            <span id="rateSummaryIncludedBreakfastKingTotal">&#8369;0.00</span>
+          </div>
+          <div class="rate-summary-row rate-summary-rate-breakdown" id="rateSummaryIncludedBreakfastQueenRow" style="display: none;">
+            <span>Queen Breakfast (Included)</span>
+            <span id="rateSummaryIncludedBreakfastQueenTotal">&#8369;0.00</span>
           </div>
           <div class="rate-summary-row">
-            <span>Additional Breakfast Total</span>
-            <span id="rateSummaryBreakfastTotal">&#8369;0.00</span>
+            <span>Breakfast Total</span>
+            <span id="rateSummaryExtraBreakfastTotal">&#8369;0.00</span>
           </div>
 
           <!-- Rate defaults from the "Extra Bed" entry under /services (Special
@@ -687,6 +759,23 @@
           <div class="rate-summary-row">
             <span>Extra Bed Total</span>
             <span id="rateSummaryExtraBedTotal">&#8369;0.00</span>
+          </div>
+
+          <!-- Opt-in - see fetchRoomCheckerLateCheckoutRate for the rate (from
+               the "LATE CHECK OUT" /services entry). Only actually charged on a
+               short stay: 2 nights or fewer bills the rate, 3+ nights is free -
+               see recomputeRateSummaryTotals in room_checker.js, which also
+               keeps the note text below in sync whenever nights changes. -->
+          <div class="rate-summary-row">
+            <label class="rate-summary-checkbox">
+              <input type="checkbox" id="rateSummaryIncludeLateCheckout">
+              Include Late Checkout
+            </label>
+            <span id="rateSummaryLateCheckoutNote" class="rate-summary-inline-label"></span>
+          </div>
+          <div class="rate-summary-row" id="rateSummaryLateCheckoutTotalRow" style="display: none;">
+            <span>Late Checkout Fee</span>
+            <span id="rateSummaryLateCheckoutTotal">&#8369;0.00</span>
           </div>
 
           <div class="rate-summary-row rate-summary-subtotal">
@@ -743,4 +832,4 @@
 <script src="/plugins/fullcalendar/packages/interaction/main.min.js"></script>
 <script src="/plugins/fullcalendar/packages/daygrid/main.min.js"></script>
 <script src="/plugins/fullcalendar/packages/timegrid/main.min.js"></script>
-<script src="/js/calendar/room_checker.js?v=25"></script>
+<script src="/js/calendar/room_checker.js?v=42"></script>
