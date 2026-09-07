@@ -103,40 +103,44 @@ function injectDragStyles() {
       background-repeat: no-repeat !important;
     }
 
-    /* Title chip for better contrast (parallelogram, shaped via clip-path below).
-       Text is NOT transformed/skewed here. calendar.css's ".fc-event > *" rule
-       (!important) already counter-skews this chip back upright against the
-       bar's own skew(-18deg), since the chip is a direct child of .fc-event.
-       This element used to ALSO carry its own skewX(12deg) - a no-op in
-       practice since the !important rule always won that cascade - while its
-       inner span carried an unopposed skewX(-12deg) meant to cancel it. With
-       the chip's rule never actually applying, that span skew had nothing to
-       cancel and rendered the label tilted/blurred at small font sizes. */
+    /* Title chip for better contrast and crisp text rendering.
+       Text is upright thanks to calendar.css's ".fc-event > *" rule.
+       clip-path is removed to prevent Chromium font rasterization blur. */
     .fc-event .event-title-chip {
       position: absolute;
       left: 8px;
       right: 8px;
       top: 0;
-      height: 16px;
-      background: transparent;
+      height: 18px !important;
+      background: transparent !important;
       color: inherit;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: 600;
+      padding: 0 4px !important;
+      font-size: 11px !important;
+      font-weight: 600 !important;
       text-shadow: inherit;
-      line-height: 16px;
+      line-height: 18px !important;
       text-align: center;
       pointer-events: none;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+      clip-path: none !important;
+      -webkit-clip-path: none !important;
+      transform-style: flat !important;
+      backface-visibility: visible !important;
+      -webkit-font-smoothing: antialiased !important;
+      -moz-osx-font-smoothing: grayscale !important;
+      text-rendering: optimizeLegibility !important;
     }
 
     .fc-event .event-title-chip > span {
       display: inline-block;
       width: 100%;
+      transform-style: flat !important;
+      backface-visibility: visible !important;
+      -webkit-font-smoothing: antialiased !important;
+      -moz-osx-font-smoothing: grayscale !important;
+      text-rendering: optimizeLegibility !important;
     }
 
     /* Also hide default title container if any slips through */
@@ -154,6 +158,8 @@ function injectDragStyles() {
       line-height: 1;
       /* Counter the bar's skew(-18deg) so the car stays upright */
       transform: translateY(-50%) skew(18deg) !important;
+      transform-style: flat !important;
+      backface-visibility: visible !important;
     }
 
     .fc-event.has-pickup-service .event-title-chip {

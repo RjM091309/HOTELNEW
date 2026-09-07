@@ -859,7 +859,6 @@ function handleHoverDelegatedOver(e) {
   const ev = e.target.closest('.fc-event');
   if (ev && !ev.style.zIndex) {
     ev.style.zIndex = '20';
-    ev.style.transition = 'box-shadow .2s ease';
   }
 }
 
@@ -891,7 +890,6 @@ function handleHoverDelegatedOut(e) {
   const ev = e.target.closest('.fc-event');
   if (ev && !(related && ev.contains(related))) {
     ev.style.zIndex = '';
-    ev.style.boxShadow = '';
   }
 }
 
