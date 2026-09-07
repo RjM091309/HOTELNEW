@@ -4559,6 +4559,38 @@ body.white-sidebar-color .dashboard-card .room .room-status {
   border: 1px solid #cbd5e1 !important;
 }
 
+/* Real-Time Room Status - light theme: color the status pill to match the
+   legend (AVAILABLE green / OCCUPIED blue / CLEANING red / MAINTENANCE
+   orange) instead of the uniform gray fallback above. data-status is set by
+   createRoomElement in room_data.js. Both theming mechanisms are covered -
+   theme-color.js keeps body.white-sidebar-color and [data-theme="white"] in
+   sync, but the older body-class selectors are what's proven to reach this
+   markup (see the !important overrides just above). */
+[data-theme="white"] .dashboard-card .room[data-status="AVAILABLE"] .room-status,
+body.white-sidebar-color .dashboard-card .room[data-status="AVAILABLE"] .room-status {
+  color: #2e7d32 !important;
+  background: rgba(76, 175, 80, 0.12) !important;
+  border: 1px solid rgba(76, 175, 80, 0.35) !important;
+}
+[data-theme="white"] .dashboard-card .room[data-status="OCCUPIED"] .room-status,
+body.white-sidebar-color .dashboard-card .room[data-status="OCCUPIED"] .room-status {
+  color: #1c6ea4 !important;
+  background: rgba(53, 152, 220, 0.12) !important;
+  border: 1px solid rgba(53, 152, 220, 0.35) !important;
+}
+[data-theme="white"] .dashboard-card .room[data-status="CLEANING"] .room-status,
+body.white-sidebar-color .dashboard-card .room[data-status="CLEANING"] .room-status {
+  color: #c62828 !important;
+  background: rgba(244, 67, 54, 0.12) !important;
+  border: 1px solid rgba(244, 67, 54, 0.35) !important;
+}
+[data-theme="white"] .dashboard-card .room[data-status="MAINTENANCE"] .room-status,
+body.white-sidebar-color .dashboard-card .room[data-status="MAINTENANCE"] .room-status {
+  color: #e65100 !important;
+  background: rgba(255, 152, 0, 0.12) !important;
+  border: 1px solid rgba(255, 152, 0, 0.35) !important;
+}
+
 /* Make bed icons fully visible on light theme */
 body.white-sidebar-color .dashboard-card .room i {
   color: #0f172a !important;
