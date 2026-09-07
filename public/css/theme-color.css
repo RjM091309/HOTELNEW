@@ -697,6 +697,139 @@ body.header-white .page-header.navbar input#datePicker {
     border-color: #e5e7eb !important;
 }
 
+/* =====================
+   /booking section - light theme
+   Single/Group/Agency/All/Unpaid/Long Term are 6 separate view files
+   (booking.ejs, group_booking.ejs, agency_booking.ejs, all_booking.ejs,
+   unpaid_booking.ejs, long_term_booking.ejs) that each render their own copy
+   of this same tab bar + filter row + table. All 6 shared the same
+   generic-gray/hardcoded-dark styling below, but only booking.ejs had been
+   patched to the room-checker blue accent - the other 5 still showed the
+   old look, so keeping every rule here (scoped by href/id, not by page)
+   covers all 6 from one place instead of drifting again per-file.
+   ===================== */
+
+/* Tab links (Single/Group/Agency/...) - identified by href, not by a
+   per-page wrapper id, so this covers all 6 view files at once. Distinct
+   from dashboard's floor tabs, which are <div data-target="..."> instead of
+   <a href="/booking...">. !important because the generic [data-theme="white"]
+   .tab-item rule above (green, #166534) is also !important. */
+[data-theme="white"] .tab-bar a.tab-item[href^="/booking"] {
+    color: #495057 !important;
+    background-color: transparent !important;
+}
+[data-theme="white"] .tab-bar a.tab-item[href^="/booking"]:hover,
+[data-theme="white"] .tab-bar a.tab-item[href^="/booking"].is-active {
+    color: #1565c0 !important;
+    background-color: rgba(33, 150, 243, 0.1) !important;
+}
+[data-theme="white"] .tab-bar a.tab-item[href^="/booking"].is-active::after {
+    background-color: #2196f3 !important;
+}
+
+/* Filter pills (All/Today/Last 3 Days/...) - .filter-btn-group is also used
+   on the dashboard, payments, and pickup/drop pages with the same
+   data-filter values, so it can't be scoped by attribute alone; :has() ties
+   it to a header that also contains one of this section's tab links. */
+[data-theme="white"] .dashboard-card-header:has(.tab-bar a.tab-item[href^="/booking"]) .filter-btn-group .filter-btn {
+    background: rgba(33, 150, 243, 0.08) !important;
+    border: 1px solid rgba(33, 150, 243, 0.25) !important;
+    color: #1565c0 !important;
+}
+[data-theme="white"] .dashboard-card-header:has(.tab-bar a.tab-item[href^="/booking"]) .filter-btn-group .filter-btn:hover {
+    background: rgba(33, 150, 243, 0.15) !important;
+    border-color: rgba(33, 150, 243, 0.4) !important;
+}
+[data-theme="white"] .dashboard-card-header:has(.tab-bar a.tab-item[href^="/booking"]) .filter-btn-group .filter-btn.active {
+    background: #2196f3 !important;
+    border-color: #2196f3 !important;
+    color: #ffffff !important;
+}
+
+/* Date range input - each of the 6 files hardcodes its own dark (#2a3135)
+   .date-range-input with no light-theme split (unpaid/long-term don't even
+   define it locally, so theirs rendered as a bare unstyled input instead).
+   One shared override here instead of patching every copy. */
+[data-theme="white"] .date-range-input {
+    background-color: #ffffff !important;
+    border: 1px solid #d1d5db !important;
+    color: #111827 !important;
+}
+[data-theme="white"] .date-range-input:focus {
+    border-color: #2196f3 !important;
+    box-shadow: 0 0 0 0.2rem rgba(33, 150, 243, 0.2);
+}
+[data-theme="white"] .date-picker-icon {
+    color: #6b7280;
+}
+
+/* Clear button + Add Group Booking's icon were losing to some other rule's
+   dark text/icon color, dropping contrast on their solid gray/blue fills -
+   pin both to white. Scoped to light theme only - dark mode wasn't reported
+   broken here and light-theme fixes must never touch dark mode's own
+   styling. #clearDateFilter and the Add Group Booking button are duplicated
+   with the same id/attribute across all 6 files. */
+[data-theme="white"] #clearDateFilter,
+[data-theme="white"] #clearDateFilter i {
+    color: #ffffff !important;
+}
+[data-theme="white"] button[data-bs-target="#modal-add-group-booking"] i {
+    color: #ffffff !important;
+}
+
+/* Table - adopts the same blue accent as /calendar/room-checker (its
+   rate-summary chip / active breakfast presets, #2196f3 / #1565c0) instead
+   of the generic gray table above. #booking_tbl is reused as-is by
+   all_booking.ejs, unpaid_booking.ejs and long_term_booking.ejs; group and
+   agency give their table a different id each, so all three ids are listed
+   here together. Every other table on the site keeps the neutral gray
+   styling from the generic .table rule above. */
+[data-theme="white"] #booking_tbl thead th,
+[data-theme="white"] #group_booking_tbl thead th,
+[data-theme="white"] #agency_booking_tbl thead th {
+    background: rgba(33, 150, 243, 0.08) !important;
+    color: #1565c0 !important;
+    border-color: rgba(33, 150, 243, 0.25) !important;
+}
+[data-theme="white"] #booking_tbl tbody td,
+[data-theme="white"] #booking_tbl tbody th,
+[data-theme="white"] #group_booking_tbl tbody td,
+[data-theme="white"] #group_booking_tbl tbody th,
+[data-theme="white"] #agency_booking_tbl tbody td,
+[data-theme="white"] #agency_booking_tbl tbody th {
+    border-color: rgba(33, 150, 243, 0.15) !important;
+}
+/* table.css's base .table-hover row-hover is a dark-mode #41474c fill with
+   light text (!important, unscoped by theme) - beat it here with an ID
+   selector on both the row AND its cells, since the row's own dark
+   background otherwise still shows through/around the cells. */
+[data-theme="white"] #booking_tbl.table-hover tbody tr:hover,
+[data-theme="white"] #booking_tbl.table-hover tbody tr:hover td,
+[data-theme="white"] #group_booking_tbl.table-hover tbody tr:hover,
+[data-theme="white"] #group_booking_tbl.table-hover tbody tr:hover td,
+[data-theme="white"] #agency_booking_tbl.table-hover tbody tr:hover,
+[data-theme="white"] #agency_booking_tbl.table-hover tbody tr:hover td {
+    background: rgba(33, 150, 243, 0.06) !important;
+    color: #111827 !important;
+}
+[data-theme="white"] #booking_tbl_wrapper .dataTables_paginate ul.pagination .page-item .page-link:hover,
+[data-theme="white"] #group_booking_tbl_wrapper .dataTables_paginate ul.pagination .page-item .page-link:hover,
+[data-theme="white"] #agency_booking_tbl_wrapper .dataTables_paginate ul.pagination .page-item .page-link:hover {
+    background: rgba(33, 150, 243, 0.1) !important;
+    border-color: rgba(33, 150, 243, 0.3) !important;
+    color: #1565c0 !important;
+}
+[data-theme="white"] #booking_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link,
+[data-theme="white"] #booking_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link:hover,
+[data-theme="white"] #group_booking_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link,
+[data-theme="white"] #group_booking_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link:hover,
+[data-theme="white"] #agency_booking_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link,
+[data-theme="white"] #agency_booking_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link:hover {
+    background: #2196f3 !important;
+    border-color: #2196f3 !important;
+    color: #ffffff !important;
+}
+
 /* Light theme form controls styling */
 [data-theme="white"] .form-control,
 [data-theme="white"] .form-control:focus,

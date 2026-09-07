@@ -282,6 +282,12 @@
   }
 
   /* Light theme */
+  /* Same dark-on-dark bug fixed on breakfast-list's Refresh button - the
+     plain color:#fff on .cb-refresh-btn loses to something else here. */
+  [data-theme="white"] .cb-refresh-btn,
+  [data-theme="white"] .cb-refresh-btn i {
+    color: #ffffff !important;
+  }
   [data-theme="white"] .cb-note { color: #6c757d; }
   [data-theme="white"] #cancelled_tbl td .cb-sub { color: #6c757d; }
   [data-theme="white"] .cb-total-row th { background: #f1f3f5; }
@@ -298,6 +304,48 @@
   [data-theme="white"] .cbd-services-tbl { color: #212529; }
   [data-theme="white"] .cbd-services-tbl thead th { color: #6c757d; border-color: #dee2e6; }
   [data-theme="white"] .cbd-services-tbl td { border-color: #e9ecef; }
+
+  /* .cb-pay-* badges above were missed by the light-theme block - translucent
+     bg + light text tuned for a dark card, invisible on white. Reuses the
+     same green/orange/red as /booking's own PAID/PARTIAL/UNPAID labels so
+     the whole booking section reads as one system. */
+  [data-theme="white"] .cb-pay-cancelled { background: rgba(255, 152, 0, 0.12); color: #e65100; border-color: rgba(255, 152, 0, 0.35); }
+  [data-theme="white"] .cb-pay-paid      { background: rgba(76, 175, 80, 0.12); color: #2e7d32; border-color: rgba(76, 175, 80, 0.35); }
+  [data-theme="white"] .cb-pay-unpaid    { background: rgba(244, 67, 54, 0.12); color: #c62828; border-color: rgba(244, 67, 54, 0.35); }
+  [data-theme="white"] .cb-pay-other     { background: rgba(107, 114, 128, 0.12); color: #4b5563; border-color: rgba(107, 114, 128, 0.3); }
+  [data-theme="white"] #cbFeeTotal { color: #e65100; }
+  [data-theme="white"] #cbRefundTotal { color: #2e7d32; }
+  [data-theme="white"] #cbdBalance { color: #e65100; }
+
+  /* Table - same #2196f3/#1565c0 blue accent as the rest of /booking and
+     /calendar/room-checker. table.css/theme-color.css's base table rules
+     (gray thead, dark row hover) are !important and unscoped by page - need
+     !important + an ID here to win. */
+  [data-theme="white"] #cancelled_tbl thead th {
+    background: rgba(33, 150, 243, 0.08) !important;
+    color: #1565c0 !important;
+    border-color: rgba(33, 150, 243, 0.25) !important;
+  }
+  [data-theme="white"] #cancelled_tbl tbody td,
+  [data-theme="white"] #cancelled_tbl tbody th {
+    border-color: rgba(33, 150, 243, 0.15) !important;
+  }
+  [data-theme="white"] #cancelled_tbl.table-hover tbody tr:hover,
+  [data-theme="white"] #cancelled_tbl.table-hover tbody tr:hover td {
+    background: rgba(33, 150, 243, 0.06) !important;
+    color: #111827 !important;
+  }
+  [data-theme="white"] #cancelled_tbl_wrapper .dataTables_paginate ul.pagination .page-item .page-link:hover {
+    background: rgba(33, 150, 243, 0.1) !important;
+    border-color: rgba(33, 150, 243, 0.3) !important;
+    color: #1565c0 !important;
+  }
+  [data-theme="white"] #cancelled_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link,
+  [data-theme="white"] #cancelled_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link:hover {
+    background: #2196f3 !important;
+    border-color: #2196f3 !important;
+    color: #ffffff !important;
+  }
 </style>
 
 <script>

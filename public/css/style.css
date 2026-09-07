@@ -7893,6 +7893,60 @@ h6 .label {
 .label-download[href]:hover {
   background-color: rgba(142, 68, 173, 0.3) !important;
 }
+
+/* Light theme: these labels are translucent tints designed for a dark
+   background - .label's default white text (see above) goes invisible on
+   them once the card behind is white. Same soft-tint-plus-solid-colored-text
+   pattern already used for /calendar/room-checker's accent pills and the
+   dashboard's Real-Time Room Status badges - #2196f3/#1565c0 here is the
+   literal room-checker accent blue, reused for every "blue" label so the
+   two pages read as one system. */
+[data-theme="white"] .label-primary,
+[data-theme="white"] .label-billing {
+  background: rgba(33, 150, 243, 0.1) !important;
+  border: 1px solid rgba(33, 150, 243, 0.3) !important;
+  color: #1565c0 !important;
+}
+[data-theme="white"] .label-info {
+  background: rgba(33, 150, 243, 0.1) !important;
+  border: 1px solid rgba(33, 150, 243, 0.3) !important;
+  color: #1565c0 !important;
+}
+[data-theme="white"] .label-success {
+  background: rgba(76, 175, 80, 0.12) !important;
+  border: 1px solid rgba(76, 175, 80, 0.35) !important;
+  color: #2e7d32 !important;
+}
+[data-theme="white"] .label-warning {
+  background: rgba(255, 152, 0, 0.12) !important;
+  border: 1px solid rgba(255, 152, 0, 0.35) !important;
+  color: #e65100 !important;
+}
+[data-theme="white"] .label-danger {
+  background: rgba(244, 67, 54, 0.12) !important;
+  border: 1px solid rgba(244, 67, 54, 0.35) !important;
+  color: #c62828 !important;
+}
+[data-theme="white"] .label-muted {
+  background: rgba(107, 114, 128, 0.15) !important;
+  border: 1px solid rgba(107, 114, 128, 0.3) !important;
+  color: #4b5563 !important;
+}
+[data-theme="white"] .label-download {
+  background: rgba(155, 89, 182, 0.15) !important;
+  border: 1px solid rgba(155, 89, 182, 0.4) !important;
+  color: #6f2da8 !important;
+}
+[data-theme="white"] .label-primary i,
+[data-theme="white"] .label-billing i,
+[data-theme="white"] .label-info i,
+[data-theme="white"] .label-success i,
+[data-theme="white"] .label-warning i,
+[data-theme="white"] .label-danger i,
+[data-theme="white"] .label-muted i,
+[data-theme="white"] .label-download i {
+  color: inherit !important;
+}
 .label.label-icon {
   padding: 4px 0 4px 4px;
   margin-right: 2px;

@@ -207,6 +207,77 @@
   #breakfast_list_tbl.bl-no-discount .breakfast-less-row,
   #breakfast_list_tbl.bl-no-discount .breakfast-net-row { display: none; }
 
+  /* Light theme - this page skips the site's [data-theme="white"] split
+     entirely (translucent white text/backgrounds throughout assume a dark
+     card), so none of it adapted when the rest of the UI went light. Brings
+     this table + its accent buttons onto the same #2196f3/#1565c0 blue used
+     across /booking and /calendar/room-checker. */
+  [data-theme="white"] .breakfast-list-note {
+    color: #6b7280;
+  }
+  [data-theme="white"] .breakfast-discount-label {
+    color: #374151;
+  }
+  [data-theme="white"] .breakfast-serving-group {
+    border-color: #d1d5db;
+  }
+  [data-theme="white"] .breakfast-serving-btn {
+    background: #f3f4f6;
+    color: #374151;
+    border-left-color: #d1d5db;
+  }
+  [data-theme="white"] .breakfast-serving-btn:hover {
+    background: #e5e7eb;
+    color: #111827;
+  }
+  [data-theme="white"] .breakfast-serving-btn.active {
+    background: #2196f3;
+    color: #ffffff;
+  }
+  [data-theme="white"] .breakfast-print-btn {
+    background: #2196f3;
+    border-color: #2196f3;
+  }
+  /* Refresh keeps its own dark-gray fill in light mode (like the Clear
+     button elsewhere in /booking), but something wins over its plain
+     color:#fff declaration here - !important pins it. */
+  [data-theme="white"] .breakfast-refresh-btn,
+  [data-theme="white"] .breakfast-refresh-btn i {
+    color: #ffffff !important;
+  }
+
+  [data-theme="white"] .breakfast-total-row th {
+    background: #f3f4f6;
+  }
+  [data-theme="white"] .breakfast-less-row th {
+    background: rgba(255, 152, 0, 0.1);
+    color: #e65100;
+  }
+  [data-theme="white"] .breakfast-net-row th {
+    background: rgba(33, 150, 243, 0.1);
+  }
+  [data-theme="white"] #breakfastNet {
+    color: #1565c0;
+  }
+
+  /* table.css/theme-color.css's base table rules (gray thead, dark row
+     hover) are !important and unscoped by page - need !important + an ID
+     here to win. */
+  [data-theme="white"] #breakfast_list_tbl thead th {
+    background: rgba(33, 150, 243, 0.08) !important;
+    color: #1565c0 !important;
+    border-color: rgba(33, 150, 243, 0.25) !important;
+  }
+  [data-theme="white"] #breakfast_list_tbl tbody td,
+  [data-theme="white"] #breakfast_list_tbl tbody th {
+    border-color: rgba(33, 150, 243, 0.15) !important;
+  }
+  [data-theme="white"] #breakfast_list_tbl.table-hover tbody tr:hover,
+  [data-theme="white"] #breakfast_list_tbl.table-hover tbody tr:hover td {
+    background: rgba(33, 150, 243, 0.06) !important;
+    color: #111827 !important;
+  }
+
   @media print {
     .sidebar, .navbar, .app-header, .app-sidebar, .breakfast-list-controls { display: none !important; }
     body, .breakfast-list-card, .dashboard-card, .dashboard-card-header, .dashboard-card-body {

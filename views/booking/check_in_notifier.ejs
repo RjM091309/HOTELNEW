@@ -270,4 +270,95 @@
 #checkin_notifier_tbl_wrapper .dataTables_length {
     display: none !important;
 }
+
+/* Light theme - this whole page skips the site's [data-theme="white"] split
+   (scroll box, search input, filter buttons, payment badges are all
+   hardcoded dark above), so none of it adapted when the rest of the UI went
+   light. Filter buttons + table get the same #2196f3/#1565c0 blue accent
+   used across /booking and /calendar/room-checker; payment badges reuse the
+   same green/orange/red as /booking's own PAID/PARTIAL/UNPAID labels so the
+   whole booking section reads as one system instead of drifting per page. */
+[data-theme="white"] .notify-btn {
+    background-color: #2196f3;
+    border-color: #2196f3;
+}
+[data-theme="white"] .notify-btn:hover:not(:disabled) {
+    background-color: #1e88e5;
+    border-color: #1e88e5;
+}
+
+[data-theme="white"] .checkin-notifier-scroll-box {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    box-shadow: none;
+}
+
+[data-theme="white"] .filter-btn {
+    background-color: rgba(33, 150, 243, 0.08);
+    border: 1px solid rgba(33, 150, 243, 0.25);
+    color: #1565c0;
+}
+
+[data-theme="white"] .filter-btn:hover,
+[data-theme="white"] .filter-btn.active {
+    background-color: #2196f3;
+    border-color: #2196f3;
+    color: #ffffff;
+}
+
+[data-theme="white"] .payment-badge-paid {
+    background-color: rgba(76, 175, 80, 0.12);
+    color: #2e7d32;
+}
+[data-theme="white"] .payment-badge-partial {
+    background-color: rgba(255, 152, 0, 0.12);
+    color: #e65100;
+}
+[data-theme="white"] .payment-badge-none {
+    background-color: rgba(244, 67, 54, 0.12);
+    color: #c62828;
+}
+
+[data-theme="white"] #checkin_notifier_tbl_wrapper .dataTables_filter label,
+[data-theme="white"] #checkin_notifier_tbl_wrapper .dataTables_info {
+    color: #4b5563;
+}
+
+[data-theme="white"] #checkin_notifier_tbl_wrapper .dataTables_filter input {
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    color: #111827;
+}
+
+[data-theme="white"] #checkin_notifier_tbl_wrapper .dataTables_scroll {
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+}
+
+[data-theme="white"] #checkin_notifier_tbl_wrapper .dataTables_scrollBody::-webkit-scrollbar-track {
+    background-color: #eef2f7;
+}
+
+/* table.css/theme-color.css's base table rules (gray thead, dark row hover)
+   are !important and unscoped by page - need !important + an ID here to win.
+   This table uses DataTables scrollX/scrollY, which CLONES the <thead> into
+   a separate .dataTables_scrollHead table for the visible sticky header -
+   the original #checkin_notifier_tbl's own thead stays in the DOM but is
+   visually collapsed inside .dataTables_scrollBody, so it has to be targeted
+   separately (by the never-cloned wrapper id) or the visible header misses it. */
+[data-theme="white"] #checkin_notifier_tbl thead th,
+[data-theme="white"] #checkin_notifier_tbl_wrapper .dataTables_scrollHead thead th {
+    background: rgba(33, 150, 243, 0.08) !important;
+    color: #1565c0 !important;
+    border-color: rgba(33, 150, 243, 0.25) !important;
+}
+[data-theme="white"] #checkin_notifier_tbl tbody td,
+[data-theme="white"] #checkin_notifier_tbl tbody th {
+    border-color: rgba(33, 150, 243, 0.15) !important;
+}
+[data-theme="white"] #checkin_notifier_tbl.table-hover tbody tr:hover,
+[data-theme="white"] #checkin_notifier_tbl.table-hover tbody tr:hover td {
+    background: rgba(33, 150, 243, 0.06) !important;
+    color: #111827 !important;
+}
 </style>

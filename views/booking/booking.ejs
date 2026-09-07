@@ -1,7 +1,7 @@
 <!-- start page content -->
 <div class="row">
     <div class="col-xl-12 col-md-12 col-12">
-        <div class="dashboard-card">
+        <div class="dashboard-card" id="bookingListCard">
             <div class="dashboard-card-header">
                 <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
                     <div class="tab-bar">
@@ -482,6 +482,13 @@
     cursor: pointer;
     pointer-events: none;
 }
+
+/* The booking section's blue-accent theming (tabs, filter buttons, date
+   range input, clear button, table header/hover/pagination) lives centrally
+   in theme-color.css now, not here - Single/Group/Agency/All/Unpaid/Long
+   Term are 6 separate view files that all share this same header/table
+   markup, so duplicating per-page overrides drifted out of sync between
+   them. See the "/booking section" block in theme-color.css. */
 
 .custom-date-filter .btn {
     border-radius: 4px;
