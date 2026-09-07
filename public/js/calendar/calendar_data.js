@@ -859,7 +859,6 @@ function handleHoverDelegatedOver(e) {
   const ev = e.target.closest('.fc-event');
   if (ev && !ev.style.zIndex) {
     ev.style.zIndex = '20';
-    ev.style.transition = 'box-shadow .2s ease';
   }
 }
 
@@ -891,7 +890,6 @@ function handleHoverDelegatedOut(e) {
   const ev = e.target.closest('.fc-event');
   if (ev && !(related && ev.contains(related))) {
     ev.style.zIndex = '';
-    ev.style.boxShadow = '';
   }
 }
 
@@ -2464,6 +2462,16 @@ function buildCalendarRoomLabel(arg) {
 
   const wrap = document.createElement('div');
   wrap.className = 'calendar-room-label';
+
+  const roomView = parseInt(
+    arg.resource.extendedProps?.roomView ?? arg.resource.roomView,
+    10
+  );
+  if (roomView === 1) {
+    wrap.classList.add('room-view-condo');
+  } else if (roomView === 2) {
+    wrap.classList.add('room-view-mountain');
+  }
 
   if (bedCount === 1 || bedCount === 2) {
     const beds = document.createElement('span');

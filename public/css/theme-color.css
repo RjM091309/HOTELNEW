@@ -6678,6 +6678,76 @@ body.white-sidebar-color .calendar-legend-toggle {
     color: #111827 !important;
 }
 
+/* Light theme: Mountain View (Green) - Room bed icons & room number */
+[data-theme="white"] #calendar .fc-datagrid-cell.fc-resource.room-view-mountain,
+[data-theme="white"] #calendar .fc-datagrid-cell.fc-resource.room-view-mountain .fc-datagrid-cell-cushion,
+[data-theme="white"] #calendar .fc-datagrid-cell.fc-resource.room-view-mountain .calendar-room-label,
+[data-theme="white"] #calendar .fc-datagrid-cell.fc-resource.room-view-mountain .calendar-room-label *,
+[data-theme="white"] #calendar .fc-datagrid-cell.fc-resource.room-view-mountain .calendar-bed-icon,
+[data-theme="white"] #calendar .fc-datagrid-cell.fc-resource.room-view-mountain .calendar-room-number,
+[data-theme="white"] #calendar .calendar-room-label.room-view-mountain,
+[data-theme="white"] #calendar .calendar-room-label.room-view-mountain *,
+[data-theme="light"] #calendar .fc-datagrid-cell.fc-resource.room-view-mountain,
+[data-theme="light"] #calendar .fc-datagrid-cell.fc-resource.room-view-mountain .fc-datagrid-cell-cushion,
+[data-theme="light"] #calendar .fc-datagrid-cell.fc-resource.room-view-mountain .calendar-room-label,
+[data-theme="light"] #calendar .fc-datagrid-cell.fc-resource.room-view-mountain .calendar-room-label *,
+[data-theme="light"] #calendar .fc-datagrid-cell.fc-resource.room-view-mountain .calendar-bed-icon,
+[data-theme="light"] #calendar .fc-datagrid-cell.fc-resource.room-view-mountain .calendar-room-number,
+[data-theme="light"] #calendar .calendar-room-label.room-view-mountain,
+[data-theme="light"] #calendar .calendar-room-label.room-view-mountain *,
+body.white-sidebar-color #calendar .fc-datagrid-cell.fc-resource.room-view-mountain,
+body.white-sidebar-color #calendar .fc-datagrid-cell.fc-resource.room-view-mountain .fc-datagrid-cell-cushion,
+body.white-sidebar-color #calendar .fc-datagrid-cell.fc-resource.room-view-mountain .calendar-room-label,
+body.white-sidebar-color #calendar .fc-datagrid-cell.fc-resource.room-view-mountain .calendar-room-label *,
+body.white-sidebar-color #calendar .fc-datagrid-cell.fc-resource.room-view-mountain .calendar-bed-icon,
+body.white-sidebar-color #calendar .fc-datagrid-cell.fc-resource.room-view-mountain .calendar-room-number,
+body.white-sidebar-color #calendar .calendar-room-label.room-view-mountain,
+body.white-sidebar-color #calendar .calendar-room-label.room-view-mountain * {
+    color: #2E7D32 !important;
+    font-weight: 700 !important;
+}
+
+/* Light theme: Condo View (Blue) - Room bed icons & room number */
+[data-theme="white"] #calendar .fc-datagrid-cell.fc-resource.room-view-condo,
+[data-theme="white"] #calendar .fc-datagrid-cell.fc-resource.room-view-condo .fc-datagrid-cell-cushion,
+[data-theme="white"] #calendar .fc-datagrid-cell.fc-resource.room-view-condo .calendar-room-label,
+[data-theme="white"] #calendar .fc-datagrid-cell.fc-resource.room-view-condo .calendar-room-label *,
+[data-theme="white"] #calendar .fc-datagrid-cell.fc-resource.room-view-condo .calendar-bed-icon,
+[data-theme="white"] #calendar .fc-datagrid-cell.fc-resource.room-view-condo .calendar-room-number,
+[data-theme="white"] #calendar .calendar-room-label.room-view-condo,
+[data-theme="white"] #calendar .calendar-room-label.room-view-condo *,
+[data-theme="light"] #calendar .fc-datagrid-cell.fc-resource.room-view-condo,
+[data-theme="light"] #calendar .fc-datagrid-cell.fc-resource.room-view-condo .fc-datagrid-cell-cushion,
+[data-theme="light"] #calendar .fc-datagrid-cell.fc-resource.room-view-condo .calendar-room-label,
+[data-theme="light"] #calendar .fc-datagrid-cell.fc-resource.room-view-condo .calendar-room-label *,
+[data-theme="light"] #calendar .fc-datagrid-cell.fc-resource.room-view-condo .calendar-bed-icon,
+[data-theme="light"] #calendar .fc-datagrid-cell.fc-resource.room-view-condo .calendar-room-number,
+[data-theme="light"] #calendar .calendar-room-label.room-view-condo,
+[data-theme="light"] #calendar .calendar-room-label.room-view-condo *,
+body.white-sidebar-color #calendar .fc-datagrid-cell.fc-resource.room-view-condo,
+body.white-sidebar-color #calendar .fc-datagrid-cell.fc-resource.room-view-condo .fc-datagrid-cell-cushion,
+body.white-sidebar-color #calendar .fc-datagrid-cell.fc-resource.room-view-condo .calendar-room-label,
+body.white-sidebar-color #calendar .fc-datagrid-cell.fc-resource.room-view-condo .calendar-room-label *,
+body.white-sidebar-color #calendar .fc-datagrid-cell.fc-resource.room-view-condo .calendar-bed-icon,
+body.white-sidebar-color #calendar .fc-datagrid-cell.fc-resource.room-view-condo .calendar-room-number,
+body.white-sidebar-color #calendar .calendar-room-label.room-view-condo,
+body.white-sidebar-color #calendar .calendar-room-label.room-view-condo * {
+    color: #1976D2 !important;
+    font-weight: 700 !important;
+}
+
+[data-theme="white"] .legend-color-condo-view,
+[data-theme="light"] .legend-color-condo-view,
+body.white-sidebar-color .legend-color-condo-view {
+    background-color: #1976D2 !important;
+}
+
+[data-theme="white"] .legend-color-mountain-view,
+[data-theme="light"] .legend-color-mountain-view,
+body.white-sidebar-color .legend-color-mountain-view {
+    background-color: #2E7D32 !important;
+}
+
 
 
 
