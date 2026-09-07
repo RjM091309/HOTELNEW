@@ -2465,6 +2465,16 @@ function buildCalendarRoomLabel(arg) {
   const wrap = document.createElement('div');
   wrap.className = 'calendar-room-label';
 
+  const roomView = parseInt(
+    arg.resource.extendedProps?.roomView ?? arg.resource.roomView,
+    10
+  );
+  if (roomView === 1) {
+    wrap.classList.add('room-view-condo');
+  } else if (roomView === 2) {
+    wrap.classList.add('room-view-mountain');
+  }
+
   if (bedCount === 1 || bedCount === 2) {
     const beds = document.createElement('span');
     beds.className = 'calendar-room-beds';
