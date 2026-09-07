@@ -23,13 +23,13 @@
                     <table id="expenses_tbl" class="table table-hover table-bordered full-width">
                         <thead>
                             <tr>
-                                <th>Category</th>
-                                <th>Expense Items</th>
-                                <th>Description</th>
-                                <th>Amount</th>
-                                <th>Encoded By</th>
-                                <th>Encoded Date</th>
-                                <th>Action</th>
+                                <th>CATEGORY</th>
+                                <th>EXPENSE ITEMS</th>
+                                <th>DESCRIPTION</th>
+                                <th>AMOUNT</th>
+                                <th>ENCODED BY</th>
+                                <th>ENCODED DATE</th>
+                                <th>ACTION</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -37,10 +37,9 @@
                         </tbody>
                         <tfoot>
                             <tr>
-                                <td colspan="3" class="text-right font-weight-bold"><strong>Grand Total:</strong></td>
-                                <td id="expenses-grand-total" class="font-weight-bold"></td>
+                                <td colspan="3" class="text-end font-weight-bold"><strong>Grand Total:</strong></td>
+                                <td id="expenses-grand-total" class="font-weight-bold text-end"></td>
                                 <td colspan="3"></td>
-                                
                             </tr>
                         </tfoot>
                     </table>
@@ -50,8 +49,65 @@
     </div>
 </div>
 
+<style>
+/* Table styling - exactly matching booking table design */
+[data-theme="white"] #expenses_tbl thead th {
+    background: rgba(33, 150, 243, 0.08) !important;
+    color: #1565c0 !important;
+    border-color: rgba(33, 150, 243, 0.25) !important;
+    font-weight: 700;
+}
+
+[data-theme="white"] #expenses_tbl tbody td,
+[data-theme="white"] #expenses_tbl tbody th,
+[data-theme="white"] #expenses_tbl tfoot td,
+[data-theme="white"] #expenses_tbl tfoot th {
+    border-color: rgba(33, 150, 243, 0.15) !important;
+    vertical-align: middle;
+}
+
+[data-theme="white"] #expenses_tbl.table-hover tbody tr:hover,
+[data-theme="white"] #expenses_tbl.table-hover tbody tr:hover td {
+    background: rgba(33, 150, 243, 0.06) !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #expenses_tbl tfoot tr {
+    background: rgba(33, 150, 243, 0.04) !important;
+}
+
+[data-theme="white"] #expenses_tbl_wrapper .dataTables_paginate ul.pagination .page-item .page-link:hover {
+    background: rgba(33, 150, 243, 0.1) !important;
+    border-color: rgba(33, 150, 243, 0.3) !important;
+    color: #1565c0 !important;
+}
+
+[data-theme="white"] #expenses_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link,
+[data-theme="white"] #expenses_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link:hover {
+    background: #2196f3 !important;
+    border-color: #2196f3 !important;
+    color: #ffffff !important;
+}
+
+/* Tab bar blue accent matching booking tab */
+[data-theme="white"] .tab-bar a.tab-item[href^="/expenses"] {
+    color: #495057 !important;
+    background-color: transparent !important;
+}
+
+[data-theme="white"] .tab-bar a.tab-item[href^="/expenses"]:hover,
+[data-theme="white"] .tab-bar a.tab-item[href^="/expenses"].is-active {
+    color: #1565c0 !important;
+    background-color: rgba(33, 150, 243, 0.1) !important;
+}
+
+[data-theme="white"] .tab-bar a.tab-item[href^="/expenses"].is-active::after {
+    background-color: #2196f3 !important;
+}
+</style>
+
 <%- include('modal/new_expenses') %>
 <%- include('modal/edit_expenses') %>
 
 <!-- Include external JavaScript file -->
-<script src="/js/expenses/expenses.js"></script> 
+<script src="/js/expenses/expenses.js?v=expenses-table-style-1"></script> 

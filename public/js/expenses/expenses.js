@@ -351,13 +351,13 @@ function updateExpenseInTable(expense) {
 
 function createActionButtons(expenseId) {
     return `
-        <div class="text-center">
-            <button class="btn btn-tbl-edit btn-xs" onclick="editExpense('${expenseId}')">
+        <div style="text-align: center;">
+            <span class="label label-sm label-warning ms-1" onclick="editExpense('${expenseId}')" title="Edit Expense" style="cursor:pointer; margin:0 2px; display:inline-block;">
                 <i class="fa fa-pencil"></i>
-            </button>
-            <a href="#" class="btn btn-tbl-delete btn-xs delete-link" data-id="${expenseId}">
+            </span>
+            <span class="label label-sm label-danger ms-1 delete-link" data-id="${expenseId}" title="Delete Expense" style="cursor:pointer; margin:0 2px; display:inline-block;">
                 <i class="fa fa-trash-o"></i>
-            </a>
+            </span>
         </div>
     `;
 }
@@ -437,16 +437,26 @@ function initializeDataTable() {
         expensesDataTable = $('#expenses_tbl').DataTable({
             data: [],
             responsive: true,
-            pageLength: 25,
+            pageLength: 10,
+            lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
             order: [[5, 'desc']],
-            columnDefs: [{ targets: [6], orderable: false }],
+            autoWidth: false,
+            columnDefs: [
+                { targets: [0, 1, 2], className: 'text-start' },
+                { targets: 3, className: 'text-end' },
+                { targets: [4, 5, 6], className: 'text-center' },
+                { targets: [6], orderable: false }
+            ],
+            initComplete: function () {
+                $('#expenses_tbl thead th').addClass('text-center');
+            },
             drawCallback: function() {
                 updateGrandTotal();
             },
             language: {
-                search: "Search expenses:",
-                lengthMenu: "Show _MENU_ expenses per page",
-                info: "Showing _START_ to _END_ of _TOTAL_ expenses",
+                search: "Search:",
+                lengthMenu: "Show _MENU_ entries",
+                info: "Showing _START_ to _END_ of _TOTAL_ entries",
                 emptyTable: "No expenses found. Click 'Add Expense' to get started."
             }
         });

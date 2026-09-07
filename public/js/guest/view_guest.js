@@ -117,9 +117,9 @@ function populateBookingTable(bookings) {
                     `<span class="badge badge-${getBookingStatusBadge(booking.BOOKING_STATUS)}">
                         ${booking.BOOKING_STATUS || 'Unknown'}
                     </span>`,
-                    `<button type="button" class="btn btn-tbl-view btn-xs" onclick="viewBookingDetails('${booking.BookingID}')" title="View Details">
+                    `<span class="label label-sm label-success" onclick="viewBookingDetails('${booking.BookingID}')" title="View Details" style="cursor:pointer; margin:0 2px; display:inline-block;">
                         <i class="fa fa-eye"></i>
-                    </button>`
+                    </span>`
                 ]);
             });
         }

@@ -482,12 +482,14 @@ function reloadData() {
                         const roleDisplay = user ? getRoleNameById(user.PERMISSIONS) : '<span style="color: #888;">-</span>';
                         
                         const actions = `
-                            <button type="button" class="btn btn-tbl-edit btn-xs" onclick="editEmployee('${employee.IDNo}')" title="Edit Employee">
-                                <i class="fa fa-pencil"></i>
-                            </button>
-                            <button type="button" class="btn btn-tbl-delete btn-xs" onclick="deleteEmployee('${employee.IDNo}')" title="Delete Employee">
-                                <i class="fa fa-trash"></i>
-                            </button>
+                            <div style="text-align: center;">
+                                <span class="label label-sm label-warning" onclick="editEmployee('${employee.IDNo}')" title="Edit Employee" style="cursor:pointer; margin:0 2px; display:inline-block;">
+                                    <i class="fa fa-edit"></i>
+                                </span>
+                                <span class="label label-sm label-danger ms-1" onclick="deleteEmployee('${employee.IDNo}')" title="Delete Employee" style="cursor:pointer; margin:0 2px; display:inline-block;">
+                                    <i class="fa fa-trash"></i>
+                                </span>
+                            </div>
                         `;
                         
                         dataTable.row.add([

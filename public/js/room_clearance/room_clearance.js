@@ -80,9 +80,9 @@ function actions(id, photos) {
 			const photoArray = JSON.parse(photos);
 			if (photoArray && photoArray.length > 0) {
 				photoButtons = `
-					<button class="btn btn-tbl-view btn-xs" onclick="viewPhotos('${id}', '${photos}')" title="View Photos">
+					<span class="label label-sm label-billing" onclick="viewPhotos('${id}', '${photos}')" title="View Photos" style="cursor:pointer; margin:0 2px; display:inline-block;">
 						<i class="fa fa-image"></i> (${photoArray.length})
-					</button>
+					</span>
 				`;
 			}
 		} catch (e) {
@@ -93,8 +93,8 @@ function actions(id, photos) {
 	return `
 		<div class="text-center">
 			${photoButtons}
-			<button class="btn btn-tbl-edit btn-xs" onclick="editClearance('${id}')"><i class="fa fa-pencil"></i></button>
-			<a href="#" class="btn btn-tbl-delete btn-xs rc-delete" data-id="${id}"><i class="fa fa-trash-o"></i></a>
+			<span class="label label-sm label-warning ms-1" onclick="editClearance('${id}')" title="Edit" style="cursor:pointer; margin:0 2px; display:inline-block;"><i class="fa fa-edit"></i></span>
+			<span class="label label-sm label-danger ms-1 rc-delete" data-id="${id}" title="Delete" style="cursor:pointer; margin:0 2px; display:inline-block;"><i class="fa fa-trash-o"></i></span>
 		</div>
 	`;
 }

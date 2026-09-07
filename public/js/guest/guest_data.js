@@ -140,14 +140,14 @@ function reloadData() {
                         };
                         
                         var btn = `
-                          
-                                <button type="button" class=" btn btn-tbl-view btn-xs " onclick="viewGuestDetails('${guest.IDNo}')" title="View Guest Details">
+                            <div style="text-align: center;">
+                                <span class="label label-sm label-success" onclick="viewGuestDetails('${guest.IDNo}')" title="View Guest Details" style="cursor:pointer; margin:0 2px; display:inline-block;">
                                     <i class="fa fa-eye"></i>
-                                </button>
-                                <button type="button" class=" btn btn-tbl-edit btn-xs " onclick="openEditModal('${guest.IDNo}')" title="Edit Guest">
-                                    <i class="fa fa-pencil"></i>
-                                </button>
-                            
+                                </span>
+                                <span class="label label-sm label-warning ms-1" onclick="openEditModal('${guest.IDNo}')" title="Edit Guest" style="cursor:pointer; margin:0 2px; display:inline-block;">
+                                    <i class="fa fa-edit"></i>
+                                </span>
+                            </div>
                         `;
                         
                         dataTable.row.add([

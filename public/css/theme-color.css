@@ -714,16 +714,20 @@ body.header-white .page-header.navbar input#datePicker {
    from dashboard's floor tabs, which are <div data-target="..."> instead of
    <a href="/booking...">. !important because the generic [data-theme="white"]
    .tab-item rule above (green, #166534) is also !important. */
-[data-theme="white"] .tab-bar a.tab-item[href^="/booking"] {
+[data-theme="white"] .tab-bar a.tab-item[href^="/booking"],
+[data-theme="white"] .tab-bar a.tab-item[href^="/expenses"] {
     color: #495057 !important;
     background-color: transparent !important;
 }
 [data-theme="white"] .tab-bar a.tab-item[href^="/booking"]:hover,
-[data-theme="white"] .tab-bar a.tab-item[href^="/booking"].is-active {
+[data-theme="white"] .tab-bar a.tab-item[href^="/booking"].is-active,
+[data-theme="white"] .tab-bar a.tab-item[href^="/expenses"]:hover,
+[data-theme="white"] .tab-bar a.tab-item[href^="/expenses"].is-active {
     color: #1565c0 !important;
     background-color: rgba(33, 150, 243, 0.1) !important;
 }
-[data-theme="white"] .tab-bar a.tab-item[href^="/booking"].is-active::after {
+[data-theme="white"] .tab-bar a.tab-item[href^="/booking"].is-active::after,
+[data-theme="white"] .tab-bar a.tab-item[href^="/expenses"].is-active::after {
     background-color: #2196f3 !important;
 }
 
@@ -782,11 +786,21 @@ body.header-white .page-header.navbar input#datePicker {
    of the generic gray table above. #booking_tbl is reused as-is by
    all_booking.ejs, unpaid_booking.ejs and long_term_booking.ejs; group and
    agency give their table a different id each, so all three ids are listed
-   here together. Every other table on the site keeps the neutral gray
-   styling from the generic .table rule above. */
+   here together. The same blue-accent look is extended by id to the Guest
+   Profile (#guestTable), Room Clearance (#room_clearance_tbl), Employee
+   (#employeeTable), User Info (#usersTable) and Activity Log
+   (#activity_log_tbl) list tables so those pages read as one system with
+   /booking. Every other table on the site keeps the neutral gray styling
+   from the generic .table rule above. */
 [data-theme="white"] #booking_tbl thead th,
 [data-theme="white"] #group_booking_tbl thead th,
-[data-theme="white"] #agency_booking_tbl thead th {
+[data-theme="white"] #agency_booking_tbl thead th,
+[data-theme="white"] #expenses_tbl thead th,
+[data-theme="white"] #guestTable thead th,
+[data-theme="white"] #room_clearance_tbl thead th,
+[data-theme="white"] #employeeTable thead th,
+[data-theme="white"] #usersTable thead th,
+[data-theme="white"] #activity_log_tbl thead th {
     background: rgba(33, 150, 243, 0.08) !important;
     color: #1565c0 !important;
     border-color: rgba(33, 150, 243, 0.25) !important;
@@ -796,7 +810,21 @@ body.header-white .page-header.navbar input#datePicker {
 [data-theme="white"] #group_booking_tbl tbody td,
 [data-theme="white"] #group_booking_tbl tbody th,
 [data-theme="white"] #agency_booking_tbl tbody td,
-[data-theme="white"] #agency_booking_tbl tbody th {
+[data-theme="white"] #agency_booking_tbl tbody th,
+[data-theme="white"] #expenses_tbl tbody td,
+[data-theme="white"] #expenses_tbl tbody th,
+[data-theme="white"] #expenses_tbl tfoot td,
+[data-theme="white"] #expenses_tbl tfoot th,
+[data-theme="white"] #guestTable tbody td,
+[data-theme="white"] #guestTable tbody th,
+[data-theme="white"] #room_clearance_tbl tbody td,
+[data-theme="white"] #room_clearance_tbl tbody th,
+[data-theme="white"] #employeeTable tbody td,
+[data-theme="white"] #employeeTable tbody th,
+[data-theme="white"] #usersTable tbody td,
+[data-theme="white"] #usersTable tbody th,
+[data-theme="white"] #activity_log_tbl tbody td,
+[data-theme="white"] #activity_log_tbl tbody th {
     border-color: rgba(33, 150, 243, 0.15) !important;
 }
 /* table.css's base .table-hover row-hover is a dark-mode #41474c fill with
@@ -808,13 +836,31 @@ body.header-white .page-header.navbar input#datePicker {
 [data-theme="white"] #group_booking_tbl.table-hover tbody tr:hover,
 [data-theme="white"] #group_booking_tbl.table-hover tbody tr:hover td,
 [data-theme="white"] #agency_booking_tbl.table-hover tbody tr:hover,
-[data-theme="white"] #agency_booking_tbl.table-hover tbody tr:hover td {
+[data-theme="white"] #agency_booking_tbl.table-hover tbody tr:hover td,
+[data-theme="white"] #expenses_tbl.table-hover tbody tr:hover,
+[data-theme="white"] #expenses_tbl.table-hover tbody tr:hover td,
+[data-theme="white"] #guestTable.table-hover tbody tr:hover,
+[data-theme="white"] #guestTable.table-hover tbody tr:hover td,
+[data-theme="white"] #room_clearance_tbl.table-hover tbody tr:hover,
+[data-theme="white"] #room_clearance_tbl.table-hover tbody tr:hover td,
+[data-theme="white"] #employeeTable.table-hover tbody tr:hover,
+[data-theme="white"] #employeeTable.table-hover tbody tr:hover td,
+[data-theme="white"] #usersTable.table-hover tbody tr:hover,
+[data-theme="white"] #usersTable.table-hover tbody tr:hover td,
+[data-theme="white"] #activity_log_tbl.table-hover tbody tr:hover,
+[data-theme="white"] #activity_log_tbl.table-hover tbody tr:hover td {
     background: rgba(33, 150, 243, 0.06) !important;
     color: #111827 !important;
 }
 [data-theme="white"] #booking_tbl_wrapper .dataTables_paginate ul.pagination .page-item .page-link:hover,
 [data-theme="white"] #group_booking_tbl_wrapper .dataTables_paginate ul.pagination .page-item .page-link:hover,
-[data-theme="white"] #agency_booking_tbl_wrapper .dataTables_paginate ul.pagination .page-item .page-link:hover {
+[data-theme="white"] #agency_booking_tbl_wrapper .dataTables_paginate ul.pagination .page-item .page-link:hover,
+[data-theme="white"] #expenses_tbl_wrapper .dataTables_paginate ul.pagination .page-item .page-link:hover,
+[data-theme="white"] #guestTable_wrapper .dataTables_paginate ul.pagination .page-item .page-link:hover,
+[data-theme="white"] #room_clearance_tbl_wrapper .dataTables_paginate ul.pagination .page-item .page-link:hover,
+[data-theme="white"] #employeeTable_wrapper .dataTables_paginate ul.pagination .page-item .page-link:hover,
+[data-theme="white"] #usersTable_wrapper .dataTables_paginate ul.pagination .page-item .page-link:hover,
+[data-theme="white"] #activity_log_tbl_wrapper .dataTables_paginate ul.pagination .page-item .page-link:hover {
     background: rgba(33, 150, 243, 0.1) !important;
     border-color: rgba(33, 150, 243, 0.3) !important;
     color: #1565c0 !important;
@@ -824,10 +870,119 @@ body.header-white .page-header.navbar input#datePicker {
 [data-theme="white"] #group_booking_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link,
 [data-theme="white"] #group_booking_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link:hover,
 [data-theme="white"] #agency_booking_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link,
-[data-theme="white"] #agency_booking_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link:hover {
+[data-theme="white"] #agency_booking_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link:hover,
+[data-theme="white"] #expenses_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link,
+[data-theme="white"] #expenses_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link:hover,
+[data-theme="white"] #guestTable_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link,
+[data-theme="white"] #guestTable_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link:hover,
+[data-theme="white"] #room_clearance_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link,
+[data-theme="white"] #room_clearance_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link:hover,
+[data-theme="white"] #employeeTable_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link,
+[data-theme="white"] #employeeTable_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link:hover,
+[data-theme="white"] #usersTable_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link,
+[data-theme="white"] #usersTable_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link:hover,
+[data-theme="white"] #activity_log_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link,
+[data-theme="white"] #activity_log_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link:hover {
     background: #2196f3 !important;
     border-color: #2196f3 !important;
     color: #ffffff !important;
+}
+
+/* Row actions on these pages moved from the solid round .btn-tbl-* buttons
+   to /booking's translucent `.label label-sm label-*` badges (blue billing /
+   amber warning / red danger). Older per-page rules further down this file
+   (`#guestTable i.fa-eye {#fff}`, `#room_clearance_tbl i.fa-trash {#fff}`, ...)
+   were written for the old solid buttons and force every action <i> to white -
+   on the new light tinted badges that makes the icon nearly invisible. Re-pin
+   the icon to the badge's own strong tint colour (label CSS already exposes it
+   via `.label-* i { color: inherit }`). The extra `.label.label-sm` classes
+   raise specificity above those per-page rules so this wins regardless of
+   source order. The badge fills/borders are strengthened here too so the
+   pill itself reads clearly on a white card. */
+[data-theme="white"] #guestTable .label.label-sm i,
+[data-theme="white"] #room_clearance_tbl .label.label-sm i,
+[data-theme="white"] #employeeTable .label.label-sm i,
+[data-theme="white"] #usersTable .label.label-sm i,
+[data-theme="white"] #activity_log_tbl .label.label-sm i,
+[data-theme="white"] #bookingTable .label.label-sm i,
+[data-theme="white"] #roomUsersTable .label.label-sm i {
+    color: inherit !important;
+}
+[data-theme="white"] #guestTable .label.label-sm,
+[data-theme="white"] #room_clearance_tbl .label.label-sm,
+[data-theme="white"] #employeeTable .label.label-sm,
+[data-theme="white"] #usersTable .label.label-sm,
+[data-theme="white"] #activity_log_tbl .label.label-sm,
+[data-theme="white"] #bookingTable .label.label-sm,
+[data-theme="white"] #roomUsersTable .label.label-sm {
+    padding: 5px 9px !important;
+    font-size: 12px !important;
+}
+[data-theme="white"] #guestTable .label.label-sm.label-success,
+[data-theme="white"] #room_clearance_tbl .label.label-sm.label-success,
+[data-theme="white"] #employeeTable .label.label-sm.label-success,
+[data-theme="white"] #usersTable .label.label-sm.label-success,
+[data-theme="white"] #bookingTable .label.label-sm.label-success,
+[data-theme="white"] #roomUsersTable .label.label-sm.label-success {
+    background: rgba(76, 175, 80, 0.18) !important;
+    border: 1px solid rgba(76, 175, 80, 0.5) !important;
+    color: #1b5e20 !important;
+}
+[data-theme="white"] #guestTable .label.label-sm.label-warning,
+[data-theme="white"] #room_clearance_tbl .label.label-sm.label-warning,
+[data-theme="white"] #employeeTable .label.label-sm.label-warning,
+[data-theme="white"] #usersTable .label.label-sm.label-warning,
+[data-theme="white"] #bookingTable .label.label-sm.label-warning,
+[data-theme="white"] #roomUsersTable .label.label-sm.label-warning {
+    background: rgba(255, 152, 0, 0.18) !important;
+    border: 1px solid rgba(255, 152, 0, 0.5) !important;
+    color: #e65100 !important;
+}
+[data-theme="white"] #guestTable .label.label-sm.label-danger,
+[data-theme="white"] #room_clearance_tbl .label.label-sm.label-danger,
+[data-theme="white"] #employeeTable .label.label-sm.label-danger,
+[data-theme="white"] #usersTable .label.label-sm.label-danger,
+[data-theme="white"] #bookingTable .label.label-sm.label-danger,
+[data-theme="white"] #roomUsersTable .label.label-sm.label-danger {
+    background: rgba(244, 67, 54, 0.16) !important;
+    border: 1px solid rgba(244, 67, 54, 0.5) !important;
+    color: #c62828 !important;
+}
+[data-theme="white"] #room_clearance_tbl .label.label-sm.label-billing {
+    background: rgba(33, 150, 243, 0.14) !important;
+    border: 1px solid rgba(33, 150, 243, 0.5) !important;
+    color: #1565c0 !important;
+}
+
+/* Modal list tables that mirror these pages - the Guest Booking History
+   table (#bookingTable, inside #viewGuestModal) and the Room-Assigned Users
+   table (#roomUsersTable, inside #roomUsersModal). table.css styles
+   `.modal .table` for a permanently-dark modal; in the light theme the
+   surrounding .modal-content is white, so pin these two to the same
+   blue-accent look the page tables use above. Dark theme needs nothing
+   extra - the base dark table already matches /booking's modals. */
+[data-theme="white"] #bookingTable thead th,
+[data-theme="white"] #roomUsersTable thead th {
+    background: rgba(33, 150, 243, 0.08) !important;
+    color: #1565c0 !important;
+    border-color: rgba(33, 150, 243, 0.25) !important;
+}
+[data-theme="white"] #bookingTable tbody td,
+[data-theme="white"] #bookingTable tbody th,
+[data-theme="white"] #roomUsersTable tbody td,
+[data-theme="white"] #roomUsersTable tbody th {
+    background: #ffffff !important;
+    color: #111827 !important;
+    border-color: rgba(33, 150, 243, 0.15) !important;
+}
+[data-theme="white"] #bookingTable.table-hover tbody tr:hover td,
+[data-theme="white"] #roomUsersTable.table-hover tbody tr:hover td {
+    background: rgba(33, 150, 243, 0.06) !important;
+    color: #111827 !important;
+}
+[data-theme="white"] #bookingTable .label i,
+[data-theme="white"] #roomUsersTable .label i {
+    color: inherit !important;
 }
 
 /* Light theme form controls styling */
@@ -5177,21 +5332,7 @@ body.header-white .page-header.navbar input#datePicker {
     color: #ffffff !important;
 }
 
-/* Expenses Table Action Icons */
-[data-theme="white"] #expenses_tbl i.fa-pencil,
-[data-theme="white"] #expenses_tbl i.fa-trash-o,
-[data-theme="white"] #expenses_tbl i.fa-trash,
-[data-theme="white"] #expenses_tbl i.fas.fa-pencil,
-[data-theme="white"] #expenses_tbl i.fas.fa-trash-o,
-[data-theme="white"] #expenses_tbl i.fas.fa-trash,
-[data-theme="white"] #expenses_tbl i.far.fa-pencil,
-[data-theme="white"] #expenses_tbl i.far.fa-trash-o,
-[data-theme="white"] #expenses_tbl i.far.fa-trash {
-    color: #ffffff !important;
-}
-
 /* Expenses Table Text */
-[data-theme="white"] #expenses_tbl th,
 [data-theme="white"] #expenses_tbl td {
     color: #111827 !important;
 }
@@ -6586,21 +6727,7 @@ body.header-white .page-header.navbar input#datePicker {
     color: #ffffff !important;
 }
 
-/* Expenses Table Action Icons */
-[data-theme="white"] #expenses_tbl i.fa-pencil,
-[data-theme="white"] #expenses_tbl i.fa-trash-o,
-[data-theme="white"] #expenses_tbl i.fa-trash,
-[data-theme="white"] #expenses_tbl i.fas.fa-pencil,
-[data-theme="white"] #expenses_tbl i.fas.fa-trash-o,
-[data-theme="white"] #expenses_tbl i.fas.fa-trash,
-[data-theme="white"] #expenses_tbl i.far.fa-pencil,
-[data-theme="white"] #expenses_tbl i.far.fa-trash-o,
-[data-theme="white"] #expenses_tbl i.far.fa-trash {
-    color: #ffffff !important;
-}
-
 /* Expenses Table Text */
-[data-theme="white"] #expenses_tbl th,
 [data-theme="white"] #expenses_tbl td {
     color: #111827 !important;
 }

@@ -178,12 +178,14 @@ function reloadData() {
                         }
 
                         const actions = `
-                            <button type="button" class="btn btn-tbl-edit btn-xs" onclick="editUser('${user.IDno}')" title="Edit User">
-                                <i class="fa fa-pencil"></i>
-                            </button>
-                            <button type="button" class="btn btn-tbl-delete btn-xs" onclick="deleteUser('${user.IDno}')" title="Delete User">
-                                <i class="fa fa-trash"></i>
-                            </button>
+                            <div style="text-align: center;">
+                                <span class="label label-sm label-warning" onclick="editUser('${user.IDno}')" title="Edit User" style="cursor:pointer; margin:0 2px; display:inline-block;">
+                                    <i class="fa fa-edit"></i>
+                                </span>
+                                <span class="label label-sm label-danger ms-1" onclick="deleteUser('${user.IDno}')" title="Delete User" style="cursor:pointer; margin:0 2px; display:inline-block;">
+                                    <i class="fa fa-trash"></i>
+                                </span>
+                            </div>
                         `;
                         
                         // Create role display
@@ -771,12 +773,14 @@ function loadRoomUsersData() {
                         }
 
                         const actions = `
-                            <button type="button" class="btn btn-tbl-edit btn-xs" onclick="editUser('${user.IDno}')" title="Edit User">
-                                <i class="fa fa-pencil"></i>
-                            </button>
-                            <button type="button" class="btn btn-tbl-delete btn-xs" onclick="deleteUser('${user.IDno}')" title="Delete User">
-                                <i class="fa fa-trash"></i>
-                            </button>
+                            <div style="text-align: center;">
+                                <span class="label label-sm label-warning" onclick="editUser('${user.IDno}')" title="Edit User" style="cursor:pointer; margin:0 2px; display:inline-block;">
+                                    <i class="fa fa-edit"></i>
+                                </span>
+                                <span class="label label-sm label-danger ms-1" onclick="deleteUser('${user.IDno}')" title="Delete User" style="cursor:pointer; margin:0 2px; display:inline-block;">
+                                    <i class="fa fa-trash"></i>
+                                </span>
+                            </div>
                         `;
                         
                         // Create role display
