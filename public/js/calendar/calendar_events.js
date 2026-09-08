@@ -344,15 +344,23 @@ function handleEventClick(info) {
       window.openCheckoutBacktrackModal(bookingId, event);
       break;
       
-    case 'pending':
-      // Route based on the actual late-check-in flag rather than fill color,
+    case 'pending': {
+      // Hold-pending reservations have no meaningful check-in status yet, so
+      // never route them to the late-check-in modal - showPendingModal renders
+      // the "HOLD PENDING" badge for them.
+      const hpRaw = event.extendedProps?.holdPending;
+      const isHoldPendingEvt = hpRaw === 1 || hpRaw === '1' || hpRaw === true
+        || String(hpRaw).toLowerCase() === 'true';
+
+      // Otherwise route on the actual late-check-in flag rather than fill color,
       // since fill color now encodes payment status (paid/unpaid/OTA/pencil).
-      if (isLateCheckIn(event)) {
+      if (!isHoldPendingEvt && isLateCheckIn(event)) {
         showLateCheckInModal(event);
       } else {
         showPendingModal(event);
       }
       break;
+    }
       
     case 'cancelled':
       // Open the full Room Reservation Details modal in read-only mode so a
@@ -563,6 +571,140 @@ function applyPickupIndicator(event, el) {
   }
 }
 
+// Solid blue cap over the END (checkout edge) of every Late Check-Out booking
+// bar. Mounted on the un-skewed .fc-timeline-event-harness wrapper (NOT on the
+// skewed, overflow:hidden .fc-event) so it can fully cover the bar's slanted
+// tip - blue all the way, no bar colour left showing.
+function applyLateCheckoutEndMarker(event, el) {
+  try {
+    const harness = el.closest('.fc-timeline-event-harness') || el;
+    const status = String(event.extendedProps?.bookingStatus || '').toLowerCase();
+    const isLate =
+      event.extendedProps?.checkOutStatus === 1 ||
+      event.extendedProps?.checkOutStatus === '1' ||
+      (typeof isLateCheckout === 'function' && isLateCheckout(event));
+
+    const existing = harness.querySelector(':scope > .late-checkout-end-marker');
+
+    if (!isLate || status === 'cancelled' || status === 'maintenance') {
+      if (existing) existing.remove();
+      el.classList.remove('has-late-checkout-end');
+      return;
+    }
+
+    el.classList.add('has-late-checkout-end');
+    if (!existing) {
+      const marker = document.createElement('div');
+      marker.className = 'late-checkout-end-marker';
+      marker.title = 'Late Check-Out';
+      harness.appendChild(marker);
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
+// Orange cap over the START (check-in edge) of every Late Check-In booking bar -
+// mirror of the blue late-check-out cap, on the left edge.
+function applyLateCheckInStartMarker(event, el) {
+  try {
+    const harness = el.closest('.fc-timeline-event-harness') || el;
+    const status = String(event.extendedProps?.bookingStatus || '').toLowerCase();
+    const hpRaw = event.extendedProps?.holdPending;
+    const isHoldPending = hpRaw === 1 || hpRaw === '1' || hpRaw === true
+      || String(hpRaw).toLowerCase() === 'true';
+    const isLate = !isHoldPending && (
+      event.extendedProps?.checkInStatus === 0 ||
+      event.extendedProps?.checkInStatus === '0' ||
+      (typeof isLateCheckIn === 'function' && isLateCheckIn(event))
+    );
+
+    const existing = harness.querySelector(':scope > .late-checkin-start-marker');
+
+    if (!isLate || status === 'cancelled' || status === 'maintenance') {
+      if (existing) existing.remove();
+      el.classList.remove('has-late-checkin-start');
+      return;
+    }
+
+    el.classList.add('has-late-checkin-start');
+    if (!existing) {
+      const marker = document.createElement('div');
+      marker.className = 'late-checkin-start-marker';
+      marker.title = 'Late Check-In';
+      harness.appendChild(marker);
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
+// Pixels this bar spans per calendar day, from its own rendered geometry
+// (pixel width / duration in days) - no dependency on slot DOM layout timing.
+function oneDayWidthForBar(event, el) {
+  const startMs = event.start ? event.start.getTime() : 0;
+  const endMs = event.end ? event.end.getTime() : 0;
+  const durMs = endMs - startMs;
+  const barW = el.getBoundingClientRect().width;
+  if (durMs > 0 && barW > 0) return barW * (86400000 / durMs);
+  return 40;
+}
+
+// Black cap on the check-in edge of every Early Check-In bar. The bar's real
+// start stays at 3 PM (so drag/resize math is unaffected); the cap is drawn
+// EXTENDING LEFT past the bar edge to the day's first gridline, so it reads as
+// "the bar starts in the first box of the day". Purely visual.
+function applyEarlyCheckInStartMarker(event, el) {
+  try {
+    const harness = el.closest('.fc-timeline-event-harness') || el;
+    const status = String(event.extendedProps?.bookingStatus || '').toLowerCase();
+    const hpRaw = event.extendedProps?.holdPending;
+    const isHoldPending = hpRaw === 1 || hpRaw === '1' || hpRaw === true
+      || String(hpRaw).toLowerCase() === 'true';
+    const isEarly = !isHoldPending && (
+      Number(event.extendedProps?.checkInStatus) === 2
+    );
+
+    const existing = harness.querySelector(':scope > .early-checkin-start-marker');
+
+    if (!isEarly || status === 'cancelled' || status === 'maintenance') {
+      if (existing) existing.remove();
+      el.classList.remove('has-early-checkin-start');
+      el.style.removeProperty('--early-ci-cap-w');
+      el.style.removeProperty('--early-ci-cap-left');
+      return;
+    }
+
+    el.classList.add('has-early-checkin-start');
+    let marker = existing;
+    if (!marker) {
+      marker = document.createElement('div');
+      marker.className = 'early-checkin-start-marker';
+      marker.title = 'Early Check-In';
+      harness.appendChild(marker);
+    }
+
+    const sizeCap = () => {
+      const dayW = oneDayWidthForBar(event, el);      // px per calendar day
+      const preStart = Math.max(0, dayW * (15 / 24)); // 3 PM start -> gridline gap
+      const left = -(preStart + 3);
+      // Fill the first day column: from the 00:00 gridline to end of that day.
+      const width = Math.max(16, dayW);
+      // How far the cap actually reaches over the coloured bar (right of the bar edge).
+      const inset = Math.max(10, width + left);
+      el.style.setProperty('--early-ci-cap-left', left + 'px');
+      el.style.setProperty('--early-ci-cap-w', width + 'px');
+      el.style.setProperty('--early-ci-cap-inset', inset + 'px');
+      marker.style.left = left + 'px';
+      marker.style.width = width + 'px';
+    };
+    sizeCap();
+    requestAnimationFrame(sizeCap); // re-measure once layout settles
+  } catch (e) {
+    // ignore
+  }
+}
+
 // OPTIMIZATION: handleEventDidMount fires once per event on every full re-mount (initial
 // load, refresh, bed-filter toggle). It used to call calendar.getEvents().filter(...) inside
 // that per-event callback, an O(n) scan repeated for every one of the n events (O(n^2) total
@@ -636,6 +778,11 @@ function handleEventDidMount(info) {
 
   // Pick-up service car icon
   applyPickupIndicator(info.event, info.el);
+
+  // Blue end marker for Late Check-Out bookings
+  applyLateCheckoutEndMarker(info.event, info.el);
+  applyLateCheckInStartMarker(info.event, info.el);
+  applyEarlyCheckInStartMarker(info.event, info.el);
 
   // Control visual overlay: allow only if either event is checkout
   try {

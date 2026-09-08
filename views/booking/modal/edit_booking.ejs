@@ -281,6 +281,7 @@
                                     <option value="" disabled selected>Check-In Status</option>
                                     <option value="1">Regular Check In</option>
                                     <option value="0">Late Check In</option>
+                                    <option value="2">Early Check In</option>
                                 </select>
                             </div>
                         </div>
@@ -1478,7 +1479,7 @@ $(document).ready(function() {
                 console.error('Error:', err);
                 Swal.fire({
                     title: 'Error!',
-                    text: 'An error occurred while updating the booking',
+                    text: err?.responseJSON?.message || 'An error occurred while updating the booking',
                     icon: 'error',
                     confirmButtonText: 'OK'
                 });
@@ -1992,7 +1993,7 @@ function computeEditTotal() {
     
     // Get late check-out fee
     const lateCheckoutFee = parseFloat($('#edit_lateCheckoutFee').val()) || 0;
-    
+
     // Calculate extra services total
     const bookingId = $('#edit_bookingId').val();
     let extraServicesTotal = 0;
@@ -2195,7 +2196,7 @@ function populateEditForm(booking) {
     $('#edit_lateCheckoutFee').val(0);
     $('#edit_lateCheckoutFeeInput').val(0);
     $('#edit_lateCheckoutFeeDisplay').hide();
-    
+
     // Set hidden fields
     $('#edit_bookingId').val(booking.bookingId);
     $('#edit_guestID').val(booking.CUSTOMER_ID);
@@ -2243,7 +2244,7 @@ function populateEditForm(booking) {
     const lateFee = parseFloat(booking.lateCheckoutFee) || 0;
     $('#edit_lateCheckoutFee').val(lateFee);
     $('#edit_lateCheckoutFeeInput').val(lateFee);
-    
+
     // Trigger late checkout fee calculation after setting check-out status
     setTimeout(() => {
         calculateEditLateCheckoutFee();

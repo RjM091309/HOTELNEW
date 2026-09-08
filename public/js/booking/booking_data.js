@@ -1038,7 +1038,7 @@ function showVoucherDetails(bookingID) {
                 
                 // Set check-in status
                 const checkInStatus = data.checkInStatus;
-                const checkInStatusText = checkInStatus === 1 ? 'Regular Check-in' : 'Late Check-in';
+                const checkInStatusText = checkInStatus === 2 ? 'Early Check-in' : (checkInStatus === 1 ? 'Regular Check-in' : 'Late Check-in');
                 document.getElementById('voucher-checkin-status').textContent = checkInStatusText;
                 
                 // Set check-out status

@@ -1429,12 +1429,12 @@ class DashboardModel {
   }
 
   // Record security deposit and check in guest (atomic)
-  static async checkInWithSecurityDeposit(bookingId, { depositAmount, paymentMethod, remarks, encodedBy }) {
+  static async checkInWithSecurityDeposit(bookingId, { depositAmount, paymentMethod, remarks, earlyCheckInFee, encodedBy }) {
     try {
       await queryDatabasePromise('START TRANSACTION');
 
       const bookingRows = await queryDatabasePromise(
-        `SELECT IDNo, BOOKING_STATUS FROM booking WHERE IDNo = ? AND ACTIVE = 1 LIMIT 1`,
+        `SELECT IDNo, BOOKING_STATUS, CHECK_IN_STATUS FROM booking WHERE IDNo = ? AND ACTIVE = 1 LIMIT 1`,
         [bookingId]
       );
 
@@ -1481,6 +1481,29 @@ class DashboardModel {
       if (updateResult.affectedRows === 0) {
         await queryDatabasePromise('ROLLBACK');
         return { success: false, message: 'Failed to update booking status.' };
+      }
+
+      // Early check-in fee: for an "Early Check In" booking (CHECK_IN_STATUS = 2),
+      // add the staff-confirmed fee as a booking_service row (SERVICE_ID 70) so it
+      // lists under Extra Services and rolls into the bill - same as Late Check Out.
+      const earlyFeeNum = Math.max(0, parseFloat(earlyCheckInFee) || 0);
+      if (String(bookingRows[0].CHECK_IN_STATUS) === '2' && earlyFeeNum > 0) {
+        const existing = await queryDatabasePromise(
+          `SELECT IDNo FROM booking_service WHERE BOOKING_ID = ? AND SERVICE_ID = 70 AND ACTIVE = 1 LIMIT 1`,
+          [bookingId]
+        );
+        if (existing.length) {
+          await queryDatabasePromise(
+            `UPDATE booking_service SET TOTAL_COST = ?, ENCODED_DT = NOW() WHERE IDNo = ?`,
+            [earlyFeeNum, existing[0].IDNo]
+          );
+        } else {
+          await queryDatabasePromise(
+            `INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE)
+             VALUES (?, 70, 1, ?, 'unpaid', ?, NOW(), 1)`,
+            [bookingId, earlyFeeNum, encodedBy]
+          );
+        }
       }
 
       await queryDatabasePromise('COMMIT');

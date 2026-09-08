@@ -41,14 +41,14 @@ async function handleEventDrop(info) {
   }
   
   // Auto-snap times based on check-in/check-out defaults
-  // Set check-in time to 6 AM
+  // Set check-in time to 3 PM
   if (newStart) {
-    newStart.setHours(6, 0, 0, 0);
+    newStart.setHours(15, 0, 0, 0);
   }
   
-  // Set check-out time to 6 PM
+  // Set check-out time to 12 noon
   if (newEnd) {
-    newEnd.setHours(18, 0, 0, 0);
+    newEnd.setHours(12, 0, 0, 0);
   }
   
   // Check for overlapping events BEFORE showing confirmation
@@ -135,7 +135,7 @@ async function handleEventDrop(info) {
     title: confirmationTitle,
     html: `${changeDescription}<br>
            New dates: ${newStart.toLocaleDateString()} - ${newEnd.toLocaleDateString()}<br>
-           Check-in: 6:00 AM | Check-out: 6:00 PM`,
+           Check-in: 3:00 PM | Check-out: 12:00 noon`,
     icon: 'question',
     showCancelButton: true,
     confirmButtonText: isRoomChange ? 'Yes, Transfer' : 'Yes, Update',
@@ -273,9 +273,9 @@ async function handleEventResize(info) {
     return;
   }
   
-  // Auto-snap checkout time to 6 PM
+  // Auto-snap checkout time to 12 noon
   if (newEnd) {
-    newEnd.setHours(18, 0, 0, 0);
+    newEnd.setHours(12, 0, 0, 0);
   }
   
   // Check for overlapping events BEFORE showing confirmation
@@ -380,7 +380,7 @@ async function handleEventResize(info) {
       html: `Extend <b>${info.event.title}</b> checkout in <b>${roomResource.title}</b><br><br>
              New checkout date: <b>${newEnd.toLocaleDateString()}</b><br>
              Extension: <b>${extensionDays} day${extensionDays > 1 ? 's' : ''}</b><br>
-             Check-in: 6:00 AM | Check-out: 6:00 PM`,
+             Check-in: 3:00 PM | Check-out: 12:00 noon`,
       icon: 'question',
       showCancelButton: true,
       confirmButtonText: 'Yes, Extend',

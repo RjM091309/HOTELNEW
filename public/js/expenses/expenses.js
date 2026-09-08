@@ -1,19 +1,49 @@
 // ========================================
 // EXPENSES MANAGEMENT SYSTEM
+// Columns: Date of Expense | Company Name | Details of Expense | SI No. | Amount
+//          | Encoded By | Encoded Date | Action
 // ========================================
 
 let currentExpenseId = null;
 let expensesDataTable = null;
+let newDateFp = null;
+let editDateFp = null;
+
+const COL_AMOUNT = 4;
+const COL_ENCODED_DATE = 6;
+const COL_ACTION = 7;
 
 // ========================================
 // INITIALIZATION
 // ========================================
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     initializeDataTable();
     loadExpensesData();
     initializeEventListeners();
+    initDatePickers();
 });
+
+// flatpickr for the Date of Expense fields. Opens on click anywhere in the
+// field (not just an icon), stores Y-m-d for the backend, shows "Sep 7, 2026".
+function initDatePickers() {
+    if (typeof flatpickr === 'undefined') return;
+
+    const commonOpts = {
+        dateFormat: 'Y-m-d',
+        altInput: true,
+        altFormat: 'M j, Y',
+        allowInput: false,
+        disableMobile: true,
+        monthSelectorType: 'static'
+    };
+
+    const newEl = document.getElementById('expenseDate');
+    if (newEl && !newDateFp) newDateFp = flatpickr(newEl, commonOpts);
+
+    const editEl = document.getElementById('edit-expense-date');
+    if (editEl && !editDateFp) editDateFp = flatpickr(editEl, commonOpts);
+}
 
 // ========================================
 // DATA LOADING
@@ -24,39 +54,42 @@ function loadExpensesData() {
         url: '/expenses/data',
         type: 'GET',
         dataType: 'json',
-        success: function(data) {
+        success: function (data) {
             if (data.success) {
                 populateTableWithData(data.expenses);
             } else {
                 showError(data.message || 'Failed to load expenses data.');
             }
         },
-        error: function() {
+        error: function () {
             showError('Failed to load expenses data.');
         }
     });
 }
 
+function buildRowData(expense) {
+    return [
+        formatDateOnly(expense.EXPENSE_DATE),
+        escapeHtml(expense.COMPANY_NAME || '-'),
+        escapeHtml(expense.Description || ''),
+        escapeHtml(expense.ReceiptNo || '-'),
+        formatNumber(expense.Amount),
+        escapeHtml(expense.ENCODED_BY || ''),
+        formatDateTime(expense.ENCODED_DT),
+        createActionButtons(expense.IDNo)
+    ];
+}
+
 function populateTableWithData(expenses) {
     if (!expensesDataTable) return;
-    
+
     expensesDataTable.clear();
-    
+
     expenses.forEach(expense => {
-        const rowData = [
-            expense.Category,
-            expense.ReceiptNo || '',
-            expense.Description,
-            formatNumber(expense.Amount),
-            expense.ENCODED_BY,
-            formatDate(expense.ENCODED_DT),
-            createActionButtons(expense.IDNo)
-        ];
-        
-        const newRow = expensesDataTable.row.add(rowData);
+        const newRow = expensesDataTable.row.add(buildRowData(expense));
         newRow.node().setAttribute('data-id', expense.IDNo);
     });
-    
+
     expensesDataTable.draw();
     updateGrandTotal();
 }
@@ -66,83 +99,69 @@ function populateTableWithData(expenses) {
 // ========================================
 
 function initializeEventListeners() {
-    // Delete event delegation
-    document.addEventListener('click', function(event) {
+    document.addEventListener('click', function (event) {
         if (event.target.closest('.delete-link')) {
             event.preventDefault();
             const expenseId = event.target.closest('.delete-link').getAttribute('data-id');
             confirmDeleteExpense(expenseId);
         }
     });
-    
-    // Export button
+
     const exportBtn = document.getElementById('exportToExcel');
     if (exportBtn) {
         exportBtn.addEventListener('click', exportToExcel);
     }
-    
-    // Form submissions
+
     const newExpenseForm = document.getElementById('new-expense-form');
     if (newExpenseForm) {
         newExpenseForm.addEventListener('submit', handleNewExpenseSubmit);
     }
-    
+
     const editExpenseForm = document.getElementById('edit-expense-form');
     if (editExpenseForm) {
         editExpenseForm.addEventListener('submit', handleEditExpenseSubmit);
     }
-    
-    // Modal resets
+
     $('#new-expense-modal').on('hidden.bs.modal', () => {
         document.getElementById('new-expense-form')?.reset();
-    });
-    
-    $('#edit-expense-modal').on('hidden.bs.modal', () => {
-        document.getElementById('edit-expense-form')?.reset();
-        currentExpenseId = null;
-    });
-    
-    // Initialize MDL components when modals are shown
-    $('#new-expense-modal').on('shown.bs.modal', function() {
-        setTimeout(() => {
-            if (window.componentHandler) {
-                window.componentHandler.upgradeElements(document.querySelectorAll('.mdl-textfield'));
-            }
-            // Also try to initialize with original handler if available
-            if (window.originalComponentHandler) {
-                window.originalComponentHandler.upgradeElements(document.querySelectorAll('.mdl-textfield'));
-            }
-            
-            // Add event listeners for MDL dropdown changes
-            setupDropdownChangeHandlers();
-        }, 300);
+        if (newDateFp) newDateFp.clear();
     });
 
-    $('#edit-expense-modal').on('shown.bs.modal', function() {
-        setTimeout(() => {
-            if (window.componentHandler) {
-                window.componentHandler.upgradeElements(document.querySelectorAll('.mdl-textfield'));
-            }
-            // Also try to initialize with original handler if available
-            if (window.originalComponentHandler) {
-                window.originalComponentHandler.upgradeElements(document.querySelectorAll('.mdl-textfield'));
-            }
-            
-            // Force floating labels for all textfields with values
-            const textfields = document.querySelectorAll('#edit-expense-modal .mdl-textfield');
-            textfields.forEach(function(textfield) {
-                const input = textfield.querySelector('.mdl-textfield__input');
-                if (input && input.value) {
-                    textfield.classList.add('is-dirty');
-                    // Remove is-focused to prevent green underline by default
-                    textfield.classList.remove('is-focused');
-                }
-            });
-            
-            // Add event listeners for MDL dropdown changes
-            setupDropdownChangeHandlers();
-        }, 300);
+    $('#edit-expense-modal').on('hidden.bs.modal', () => {
+        document.getElementById('edit-expense-form')?.reset();
+        if (editDateFp) editDateFp.clear();
+        currentExpenseId = null;
     });
+
+    $('#new-expense-modal').on('shown.bs.modal', function () {
+        // Default the date to today when opening a fresh form
+        if (newDateFp && !newDateFp.selectedDates.length) {
+            newDateFp.setDate(new Date(), true);
+        }
+        upgradeMdl();
+    });
+
+    $('#edit-expense-modal').on('shown.bs.modal', function () {
+        upgradeMdl();
+        document.querySelectorAll('#edit-expense-modal .mdl-textfield').forEach(function (tf) {
+            const input = tf.querySelector('.mdl-textfield__input');
+            if (input && input.value) {
+                tf.classList.add('is-dirty');
+                tf.classList.remove('is-focused');
+            }
+        });
+    });
+}
+
+function upgradeMdl() {
+    setTimeout(() => {
+        if (window.componentHandler) {
+            window.componentHandler.upgradeElements(document.querySelectorAll('.mdl-textfield'));
+        }
+        if (window.originalComponentHandler) {
+            window.originalComponentHandler.upgradeElements(document.querySelectorAll('.mdl-textfield'));
+        }
+    }, 200);
 }
 
 // ========================================
@@ -152,7 +171,7 @@ function initializeEventListeners() {
 function confirmDeleteExpense(expenseId) {
     Swal.fire({
         title: 'Are you sure?',
-        text: "This action cannot be undone!",
+        text: 'This action cannot be undone!',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#3085d6',
@@ -170,7 +189,7 @@ function deleteExpense(expenseId) {
         url: `/expenses/delete/${expenseId}`,
         type: 'DELETE',
         dataType: 'json',
-        success: function(data) {
+        success: function (data) {
             if (data.message === 'Expense deleted successfully') {
                 const row = expensesDataTable.row(`[data-id="${expenseId}"]`);
                 if (row.length) {
@@ -182,7 +201,7 @@ function deleteExpense(expenseId) {
                 showError(data.error || 'Error deleting expense.');
             }
         },
-        error: function() {
+        error: function () {
             showError('Something went wrong while deleting the expense.');
         }
     });
@@ -193,7 +212,7 @@ function editExpense(expenseId) {
         url: `/expenses/edit_expense?id=${expenseId}`,
         type: 'GET',
         dataType: 'json',
-        success: function(data) {
+        success: function (data) {
             if (data.expense) {
                 populateEditForm(data.expense);
                 $('#edit-expense-modal').modal('show');
@@ -201,7 +220,7 @@ function editExpense(expenseId) {
                 showError('Expense not found.');
             }
         },
-        error: function() {
+        error: function () {
             showError('Failed to fetch expense details.');
         }
     });
@@ -209,90 +228,94 @@ function editExpense(expenseId) {
 
 function populateEditForm(expense) {
     document.getElementById('edit-expense-id').value = expense.IDNo;
-    document.getElementById('edit-expense-category').value = expense.Category;
-    document.getElementById('edit-expense-receipt').value = expense.ReceiptNo || '';
-    document.getElementById('edit-expense-description').value = expense.Description;
+    const isoDate = toDateInputValue(expense.EXPENSE_DATE);
+    if (editDateFp) {
+        editDateFp.setDate(isoDate || null, true);
+    } else {
+        document.getElementById('edit-expense-date').value = isoDate;
+    }
+    document.getElementById('edit-expense-company').value = expense.COMPANY_NAME || '';
+    document.getElementById('edit-expense-sino').value = expense.ReceiptNo || '';
+    document.getElementById('edit-expense-details').value = expense.Description || '';
     document.getElementById('edit-expense-amount').value = expense.Amount;
-    
-    // Store the actual values for form submission
-    $('#edit-expense-category').attr('data-value', expense.Category);
-    
+
     currentExpenseId = expense.IDNo;
+}
+
+function collectFormData(prefix) {
+    return {
+        expenseDate: document.getElementById(prefix.date).value || null,
+        companyName: document.getElementById(prefix.company).value.trim(),
+        siNo: document.getElementById(prefix.sino).value.trim(),
+        details: document.getElementById(prefix.details).value.trim(),
+        amount: document.getElementById(prefix.amount).value
+    };
 }
 
 function handleNewExpenseSubmit(event) {
     event.preventDefault();
-    const formData = new FormData(event.target);
-    const expenseData = {
-        category: $('#expenseCategory').attr('data-value') || $('#expenseCategory').val(),
-        receipt: formData.get('receipt'),
-        description: formData.get('description'),
-        amount: formData.get('amount')
-    };
-    
+    const expenseData = collectFormData({
+        date: 'expenseDate', company: 'expenseCompany', sino: 'expenseSiNo',
+        details: 'expenseDetails', amount: 'expenseAmount'
+    });
+
     if (validateExpenseData(expenseData)) {
-        submitExpense('/expenses/add', expenseData, 'Adding Expense...', 'Expense added successfully!');
+        submitExpense('/expenses/add', expenseData, 'Expense added successfully!');
     }
 }
 
 function handleEditExpenseSubmit(event) {
     event.preventDefault();
-    const formData = new FormData(event.target);
-    const expenseData = {
-        category: $('#edit-expense-category').attr('data-value') || $('#edit-expense-category').val(),
-        receipt: formData.get('receipt'),
-        description: formData.get('description'),
-        amount: formData.get('amount')
-    };
-    
+    const expenseData = collectFormData({
+        date: 'edit-expense-date', company: 'edit-expense-company', sino: 'edit-expense-sino',
+        details: 'edit-expense-details', amount: 'edit-expense-amount'
+    });
+
     if (!currentExpenseId) {
         showError('No expense selected for editing.');
         return;
     }
-    
+
     if (validateExpenseData(expenseData)) {
-        submitExpense(`/expenses/edit_expense/${currentExpenseId}`, expenseData, 'Updating Expense...', 'Expense updated successfully!');
+        submitExpense(`/expenses/edit_expense/${currentExpenseId}`, expenseData, 'Expense updated successfully!');
     }
 }
 
 function validateExpenseData(data) {
-    if (!data.category || !data.description || !data.amount) {
-        showError('Please fill in all required fields (Category, Description, Amount).');
+    if (!data.details || !data.amount) {
+        showError('Please fill in the Details of Expense and Amount.');
         return false;
     }
-    
     if (isNaN(data.amount) || parseFloat(data.amount) <= 0) {
         showError('Please enter a valid amount greater than 0.');
         return false;
     }
-    
     return true;
 }
 
-function submitExpense(url, expenseData, loadingText, successMessage) {
+function submitExpense(url, expenseData, successMessage) {
     $.ajax({
         url: url,
         type: 'POST',
         dataType: 'json',
         contentType: 'application/json',
         data: JSON.stringify(expenseData),
-        success: function(data) {
+        success: function (data) {
             if (data.success) {
                 if (data.expense) {
-                    if (url.includes('add')) {
+                    if (url.includes('/add')) {
                         addExpenseToTable(data.expense);
                     } else {
                         updateExpenseInTable(data.expense);
                     }
                 }
-                
-                $(url.includes('add') ? '#new-expense-modal' : '#edit-expense-modal').modal('hide');
+                $(url.includes('/add') ? '#new-expense-modal' : '#edit-expense-modal').modal('hide');
                 showSuccess(successMessage);
             } else {
                 showError(data.message || 'Operation failed.');
             }
         },
-        error: function() {
+        error: function () {
             showError('Something went wrong.');
         }
     });
@@ -304,47 +327,25 @@ function submitExpense(url, expenseData, loadingText, successMessage) {
 
 function addExpenseToTable(expense) {
     if (!expensesDataTable) return;
-    
-    const rowData = [
-        expense.Category,
-        expense.ReceiptNo || '',
-        expense.Description,
-        formatNumber(expense.Amount),
-        expense.ENCODED_BY,
-        formatDate(expense.ENCODED_DT),
-        createActionButtons(expense.IDNo)
-    ];
-    
-    const newRow = expensesDataTable.row.add(rowData).draw();
+    const newRow = expensesDataTable.row.add(buildRowData(expense)).draw();
     newRow.node().setAttribute('data-id', expense.IDNo);
     updateGrandTotal();
 }
 
 function updateExpenseInTable(expense) {
     if (!expensesDataTable) return;
-    
+
     const rows = expensesDataTable.rows().nodes();
     let rowIndex = -1;
-    
     for (let i = 0; i < rows.length; i++) {
         if (rows[i].getAttribute('data-id') === expense.IDNo.toString()) {
             rowIndex = i;
             break;
         }
     }
-    
+
     if (rowIndex !== -1) {
-        const rowData = [
-            expense.Category,
-            expense.ReceiptNo || '',
-            expense.Description,
-            formatNumber(expense.Amount),
-            expense.ENCODED_BY,
-            formatDate(expense.ENCODED_DT),
-            createActionButtons(expense.IDNo)
-        ];
-        
-        expensesDataTable.row(rowIndex).data(rowData).draw();
+        expensesDataTable.row(rowIndex).data(buildRowData(expense)).draw();
         updateGrandTotal();
     }
 }
@@ -364,18 +365,16 @@ function createActionButtons(expenseId) {
 
 function updateGrandTotal() {
     if (!expensesDataTable) return;
-    
+
     let grandTotal = 0;
-    expensesDataTable.rows().every(function() {
-        const amountCell = this.data()[3];
+    expensesDataTable.rows().every(function () {
+        const amountCell = this.data()[COL_AMOUNT];
         if (amountCell) {
-            const amount = parseFloat(amountCell.replace(/,/g, ''));
-            if (!isNaN(amount)) {
-                grandTotal += amount;
-            }
+            const amount = parseFloat(String(amountCell).replace(/,/g, ''));
+            if (!isNaN(amount)) grandTotal += amount;
         }
     });
-    
+
     const totalCell = document.getElementById('expenses-grand-total');
     if (totalCell) {
         totalCell.textContent = formatNumber(grandTotal);
@@ -386,43 +385,150 @@ function updateGrandTotal() {
 // EXPORT FUNCTIONALITY
 // ========================================
 
+// Blank ledger rows to leave between a month's data and its total row.
+const MONTH_BLOCK_MIN_ROWS = 18;
+
+const XL_HEADERS = ['Date of Expense', 'Company Name', 'Details of Expense', 'SI No.', 'Amount', 'Encoded By', 'Encoded Date'];
+const XL_COL_WIDTHS = [16, 22, 34, 22, 14, 14, 22];
+const XL_YELLOW = 'FFFFFF00';
+const XL_ORANGE = 'FFF8CBAD';
+
 function exportToExcel() {
+    if (typeof ExcelJS === 'undefined') {
+        showError('Excel library not loaded. Please refresh and try again.');
+        return;
+    }
+
+    $.ajax({
+        url: '/expenses/data',
+        type: 'GET',
+        dataType: 'json',
+        success: function (res) {
+            if (!res.success) {
+                showError(res.message || 'Failed to load expenses for export.');
+                return;
+            }
+            buildExpensesWorkbook(res.expenses || []);
+        },
+        error: function () {
+            showError('Failed to load expenses for export.');
+        }
+    });
+}
+
+function monthKey(dateStr) {
+    const d = dateStr ? new Date(dateStr) : null;
+    if (!d || isNaN(d)) return { key: 'zzzz-undated', label: 'NO DATE' };
+    return {
+        key: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'),
+        label: d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase()
+    };
+}
+
+async function buildExpensesWorkbook(expenses) {
     try {
-        const table = document.getElementById('expenses_tbl');
-        const tableClone = table.cloneNode(true);
-        
-        // Remove footer and action column
-        const tfoot = tableClone.querySelector('tfoot');
-        if (tfoot) tfoot.parentNode.removeChild(tfoot);
-        
-        const rows = tableClone.querySelectorAll('tr');
-        rows.forEach(row => {
-            if (row.children.length > 0) {
-                row.removeChild(row.children[row.children.length - 1]);
-            }
+        // Group by calendar month, chronological
+        const groups = {};
+        expenses.forEach(e => {
+            const mk = monthKey(e.EXPENSE_DATE);
+            (groups[mk.key] = groups[mk.key] || { label: mk.label, rows: [] }).rows.push(e);
         });
-        
-        // Format amounts
-        rows.forEach(row => {
-            const amountCell = row.children[3];
-            if (amountCell && !isNaN(amountCell.innerText.replace(/,/g, ''))) {
-                const amount = parseFloat(amountCell.innerText.replace(/,/g, ''));
-                amountCell.innerText = amount.toLocaleString('en-US');
-            }
+        const orderedKeys = Object.keys(groups).sort();
+
+        const wb = new ExcelJS.Workbook();
+        const ws = wb.addWorksheet('Expenses');
+        ws.columns = XL_COL_WIDTHS.map(w => ({ width: w }));
+
+        // Header row (yellow, bold)
+        const header = ws.addRow(XL_HEADERS);
+        header.font = { bold: true };
+        header.eachCell(cell => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_YELLOW } };
+            cell.border = thinBorderAll();
+            cell.alignment = { vertical: 'middle' };
         });
-        
-        const worksheet = XLSX.utils.table_to_sheet(tableClone);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Expenses');
-        
+
+
+        orderedKeys.forEach(key => {
+            const group = groups[key];
+            let monthTotal = 0;
+
+            group.rows.forEach(e => {
+                const amount = parseFloat(e.Amount) || 0;
+                monthTotal += amount;
+                const row = ws.addRow([
+                    fmtDateCell(e.EXPENSE_DATE),
+                    e.COMPANY_NAME || '',
+                    e.Description || '',
+                    e.ReceiptNo == null ? '' : String(e.ReceiptNo), // text, no scientific notation
+                    amount,
+                    e.ENCODED_BY || '',
+                    fmtDateTimeCell(e.ENCODED_DT)
+                ]);
+                row.getCell(4).numFmt = '@';
+                row.getCell(5).numFmt = '#,##0';
+                row.eachCell({ includeEmpty: true }, cell => { cell.border = thinBorderAll(); });
+            });
+
+            // Blank ledger rows so each month reads as its own page
+            const pad = Math.max(0, MONTH_BLOCK_MIN_ROWS - group.rows.length);
+            for (let i = 0; i < pad; i++) {
+                const blank = ws.addRow(['', '', '', '', '', '', '']);
+                blank.eachCell({ includeEmpty: true }, cell => { cell.border = thinBorderAll(); });
+            }
+
+            // Month total row (orange, bold): MONTH | ... | GRAND TOTAL | total | ...
+            const totalRow = ws.addRow([group.label, '', '', 'GRAND TOTAL', monthTotal, '', '']);
+            totalRow.font = { bold: true };
+            totalRow.getCell(5).numFmt = '#,##0';
+            totalRow.getCell(4).alignment = { horizontal: 'right' };
+            totalRow.eachCell({ includeEmpty: true }, cell => {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL_ORANGE } };
+                cell.border = thinBorderAll();
+            });
+
+        });
+
         const filename = `Expenses_${new Date().toISOString().split('T')[0]}.xlsx`;
-        XLSX.writeFile(workbook, filename);
-        
+        const buf = await wb.xlsx.writeBuffer();
+        const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+
         showSuccess(`Expenses exported to ${filename}`);
-        
     } catch (error) {
+        console.error('Excel export error:', error);
         showError('Failed to export expenses to Excel.');
     }
+}
+
+function thinBorderAll() {
+    const s = { style: 'thin', color: { argb: 'FFBFBFBF' } };
+    return { top: s, left: s, bottom: s, right: s };
+}
+
+// "9/5/2026" style for the Date of Expense column
+function fmtDateCell(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d)) return '';
+    return (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear();
+}
+
+// "Sep 07 2026, 11:42 AM" style for the Encoded Date column
+function fmtDateTimeCell(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d)) return '';
+    return d.toLocaleString('en-US', {
+        month: 'short', day: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: true
+    });
 }
 
 // ========================================
@@ -432,31 +538,21 @@ function exportToExcel() {
 function initializeDataTable() {
     const table = document.getElementById('expenses_tbl');
     if (!table || typeof $.fn.DataTable === 'undefined') return;
-    
+
     try {
         expensesDataTable = $('#expenses_tbl').DataTable({
             data: [],
             responsive: true,
-            pageLength: 10,
-            lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
-            order: [[5, 'desc']],
-            autoWidth: false,
-            columnDefs: [
-                { targets: [0, 1, 2], className: 'text-start' },
-                { targets: 3, className: 'text-end' },
-                { targets: [4, 5, 6], className: 'text-center' },
-                { targets: [6], orderable: false }
-            ],
-            initComplete: function () {
-                $('#expenses_tbl thead th').addClass('text-center');
-            },
-            drawCallback: function() {
+            pageLength: 25,
+            order: [[COL_ENCODED_DATE, 'desc']],
+            columnDefs: [{ targets: [COL_ACTION], orderable: false }],
+            drawCallback: function () {
                 updateGrandTotal();
             },
             language: {
-                search: "Search:",
-                lengthMenu: "Show _MENU_ entries",
-                info: "Showing _START_ to _END_ of _TOTAL_ entries",
+                search: 'Search expenses:',
+                lengthMenu: 'Show _MENU_ expenses per page',
+                info: 'Showing _START_ to _END_ of _TOTAL_ expenses',
                 emptyTable: "No expenses found. Click 'Add Expense' to get started."
             }
         });
@@ -466,73 +562,51 @@ function initializeDataTable() {
 }
 
 // ========================================
-// MDL DROPDOWN HANDLERS
-// ========================================
-
-function setupDropdownChangeHandlers() {
-    // Handle MDL dropdown changes for Category in Add Modal
-    $('[data-mdl-for="expenseCategory"]').on('click', '.mdl-menu__item', function() {
-        const value = $(this).data('val');
-        const targetInput = $('#' + $(this).closest('ul').attr('data-mdl-for'));
-        targetInput.val($(this).text());
-        targetInput.attr('data-value', value);
-        
-        // Trigger MDL update
-        if (targetInput.closest('.mdl-textfield').length) {
-            targetInput.closest('.mdl-textfield').addClass('is-dirty');
-        }
-    });
-
-    // Handle MDL dropdown changes for Category in Edit Modal
-    $('[data-mdl-for="edit-expense-category"]').on('click', '.mdl-menu__item', function() {
-        const value = $(this).data('val');
-        const targetInput = $('#' + $(this).closest('ul').attr('data-mdl-for'));
-        targetInput.val($(this).text());
-        targetInput.attr('data-value', value);
-        
-        // Trigger MDL update
-        if (targetInput.closest('.mdl-textfield').length) {
-            targetInput.closest('.mdl-textfield').addClass('is-dirty');
-        }
-    });
-}
-
-// ========================================
 // UTILITY FUNCTIONS
 // ========================================
+
+function escapeHtml(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
 function formatNumber(num) {
     return Number(num).toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 
-function formatDate(dateString) {
+// yyyy-mm-dd for <input type="date">
+function toDateInputValue(dateString) {
+    if (!dateString) return '';
+    const d = new Date(dateString);
+    if (isNaN(d)) return '';
+    return d.toISOString().split('T')[0];
+}
+
+// "Jan 20, 2025" for the Date of Expense column
+function formatDateOnly(dateString) {
+    if (!dateString) return '-';
+    const d = new Date(dateString);
+    if (isNaN(d)) return '-';
+    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' });
+}
+
+// "Jan 20 2025 03:58 PM" for the Encoded Date column
+function formatDateTime(dateString) {
+    if (!dateString) return '';
     const date = new Date(dateString);
+    if (isNaN(date)) return '';
     return date.toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
+        year: 'numeric', month: 'short', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hour12: true
     }).replace(',', '');
 }
 
 function showSuccess(message) {
-    Swal.fire({
-        title: 'Success!',
-        text: message,
-        icon: 'success',
-        timer: 2000,
-        showConfirmButton: false
-    });
+    Swal.fire({ title: 'Success!', text: message, icon: 'success', timer: 2000, showConfirmButton: false });
 }
 
 function showError(message) {
-    Swal.fire({
-        title: 'Error!',
-        text: message,
-        icon: 'error'
-    });
+    Swal.fire({ title: 'Error!', text: message, icon: 'error' });
 }
 
 // ========================================
@@ -541,4 +615,4 @@ function showError(message) {
 
 window.editExpense = editExpense;
 window.deleteExpense = deleteExpense;
-window.exportToExcel = exportToExcel; 
+window.exportToExcel = exportToExcel;

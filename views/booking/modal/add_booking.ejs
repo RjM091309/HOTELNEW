@@ -303,6 +303,7 @@
                                     <option value="" disabled selected>Check-In Status</option>
                                     <option value="1">Regular Check In</option>
                                     <option value="0">Late Check In</option>
+                                    <option value="2">Early Check In</option>
                                   </select>
                                 </div>
                               </div>
@@ -471,7 +472,7 @@
 		document.body.appendChild(bookingScript);
 		bookingScript.onload = function() {
 			var bookingBillingScript = document.createElement('script');
-			bookingBillingScript.src = '/js/booking/add_booking.js?v=discount-col-7';
+			bookingBillingScript.src = '/js/booking/add_booking.js?v=early-ci-conflict-1';
 			document.body.appendChild(bookingBillingScript);
 		};
 
@@ -481,7 +482,7 @@
 		document.body.appendChild(maintenanceScript);
 		maintenanceScript.onload = function() {
 			var submitScript = document.createElement('script');
-			submitScript.src = '/js/booking/booking_submit.js?v=receipt-no-1';
+			submitScript.src = '/js/booking/booking_submit.js?v=early-ci-conflict-4';
 			document.body.appendChild(submitScript);
 		};
 

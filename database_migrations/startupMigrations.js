@@ -647,6 +647,105 @@ async function runBillingReceiptNoMigration() {
   );
 }
 
+async function runEarlyCheckInMigration() {
+  if (await tableExists('billing')) {
+    // Kept for backward compatibility; the fee is now tracked as a
+    // booking_service row (SERVICE_ID 70), mirroring Late Check Out (72).
+    await ensureColumn(
+      'billing',
+      'EARLY_CHECK_IN_CHARGE',
+      `EARLY_CHECK_IN_CHARGE DECIMAL(10,2) NOT NULL DEFAULT 0.00`,
+      'LATE_CHECKOUT_CHARGE'
+    );
+  }
+
+  // Fixed "EARLY CHECK IN" service row so the fee shows in Extra Services just
+  // like Late Check Out. ID 70 sits just before the 72/73 late-checkout pair.
+  if (await tableExists('services')) {
+    const existing = await queryDatabasePromise('SELECT IDNo FROM services WHERE IDNo = 70');
+    if (!existing.length) {
+      await queryDatabasePromise(
+        `INSERT INTO services (IDNo, SERVICE_CATEGORY, SERVICE_NAME, SERVICE_DESCRIPTION, SERVICE_COST, SERVICE_AVAILABILITY, ENCODED_DT, ACTIVE)
+         VALUES (70, '', 'EARLY CHECK IN', 'EARLY CHECK IN', 200.00, 'Available', NOW(), 1)`
+      );
+      console.log('✅ Seeded services row: EARLY CHECK IN (IDNo 70)');
+    }
+  }
+}
+
+async function runExpensesRevampMigration() {
+  // Create-if-not-exists so a fresh database is fully provisioned.
+  await ensureTable('expenses', `
+    CREATE TABLE expenses (
+      IDNo INT(11) NOT NULL AUTO_INCREMENT,
+      EXPENSE_DATE DATE NULL DEFAULT NULL,
+      COMPANY_NAME VARCHAR(255) NULL DEFAULT NULL,
+      Category VARCHAR(255) NULL DEFAULT NULL,
+      Group_Category VARCHAR(255) NULL DEFAULT NULL,
+      ReceiptNo VARCHAR(255) NULL DEFAULT NULL,
+      Description TEXT NOT NULL,
+      Amount DECIMAL(10,2) NOT NULL,
+      ENCODED_BY VARCHAR(255) NOT NULL,
+      ENCODED_DT TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      EDITED_BY VARCHAR(255) NULL DEFAULT NULL,
+      EDITED_DT DATETIME NULL DEFAULT NULL,
+      ACTIVE INT(11) NULL DEFAULT 1,
+      PRIMARY KEY (IDNo)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  // Add-if-missing for databases that already had the old expenses table.
+  // New structure: date of expense + company name (vendor). SI no. reuses the
+  // existing ReceiptNo column; details reuse Description.
+  await ensureColumn('expenses', 'EXPENSE_DATE', `EXPENSE_DATE DATE NULL DEFAULT NULL`, 'IDNo');
+  await ensureColumn('expenses', 'COMPANY_NAME', `COMPANY_NAME VARCHAR(255) NULL DEFAULT NULL`, 'EXPENSE_DATE');
+}
+
+async function runLateCheckoutServiceBackfill() {
+  if (!(await tableExists('booking')) || !(await tableExists('booking_service'))) return;
+
+  // Every active late check-out (LATE_CHECKOUT = 1) should carry a SERVICE_ID 72
+  // line so it appears in Extra Services - including free ones set from the
+  // booking form before this was enforced. One-time, idempotent (only fills gaps).
+  const res = await queryDatabasePromise(`
+    INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE)
+    SELECT b.IDNo, 72, 1,
+           COALESCE(bill.LATE_CHECKOUT_CHARGE, 0),
+           CASE WHEN COALESCE(bill.LATE_CHECKOUT_CHARGE, 0) > 0 THEN 'unpaid' ELSE 'paid' END,
+           'System', NOW(), 1
+    FROM booking b
+    LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo AND bill.ACTIVE = 1
+    WHERE b.ACTIVE = 1
+      AND b.LATE_CHECKOUT = 1
+      AND NOT EXISTS (
+        SELECT 1 FROM booking_service bs
+        WHERE bs.BOOKING_ID = b.IDNo AND bs.SERVICE_ID = 72 AND bs.ACTIVE = 1
+      )
+  `);
+  if (res.affectedRows) {
+    console.log(`✅ Backfilled ${res.affectedRows} late check-out service line(s)`);
+  }
+}
+
+async function runHoldPendingStatusBackfill() {
+  if (!(await tableExists('booking'))) return;
+
+  // Hold-pending reservations have no meaningful check-in/out status yet.
+  // Normalise any that were saved as Late Check-In / Late Check-Out so they
+  // stop showing the wrong badge. Idempotent.
+  const res = await queryDatabasePromise(`
+    UPDATE booking
+       SET CHECK_IN_STATUS = 1, LATE_CHECKOUT = 0
+     WHERE ACTIVE = 1
+       AND HOLD_PENDING = 1
+       AND BOOKING_STATUS = 'pending'
+       AND (COALESCE(CHECK_IN_STATUS, 1) <> 1 OR COALESCE(LATE_CHECKOUT, 0) <> 0)
+  `);
+  if (res.affectedRows) {
+    console.log(`✅ Normalised ${res.affectedRows} hold-pending booking status(es)`);
+  }
+}
+
 async function runBookingActualTimesMigration() {
   if (!(await tableExists('booking'))) {
     console.warn('⚠️ booking table not found, skipping actual check-in/out timestamp migration');
@@ -712,6 +811,10 @@ async function runStartupMigrations() {
   await runActivityLogMigrations();
   await runCustomerNationalityMigration();
   await runBillingReceiptNoMigration();
+  await runEarlyCheckInMigration();
+  await runExpensesRevampMigration();
+  await runLateCheckoutServiceBackfill();
+  await runHoldPendingStatusBackfill();
   await runBookingActualTimesMigration();
   await runRoomRatesMigrations();
   await runRoomTypeFkMigration();

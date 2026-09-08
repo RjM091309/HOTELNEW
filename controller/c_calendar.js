@@ -852,11 +852,11 @@ class CalendarController {
         });
       }
 
-      // Validate checkInStatus (0 = late check-in, 1 = regular check-in)
-      if (checkInStatus !== 0 && checkInStatus !== 1) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Invalid check-in status. Must be 0 (late) or 1 (regular).' 
+      // Validate checkInStatus (0 = late check-in, 1 = regular check-in, 2 = early check-in)
+      if (checkInStatus !== 0 && checkInStatus !== 1 && checkInStatus !== 2) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid check-in status. Must be 0 (late), 1 (regular) or 2 (early).'
         });
       }
 

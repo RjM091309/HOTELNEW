@@ -37,14 +37,16 @@ const expensesController = {
   // Add a new expense
   addExpense: async (req, res) => {
     try {
-      const { category, receipt, description, amount } = req.body;
-      
-      if (!category || !description || !amount) {
-        return res.json({ success: false, message: 'All required fields must be filled out.' });
+      const { expenseDate, companyName, siNo, details, amount } = req.body;
+
+      if (!details || !amount) {
+        return res.json({ success: false, message: 'Details of expense and amount are required.' });
       }
 
       const encodedBy = req.user ? req.user.FULLNAME : 'Unknown User';
-      const result = await expensesModel.addExpense(category, receipt, description, amount, encodedBy);
+      const result = await expensesModel.addExpense({
+        expenseDate, companyName, siNo, details, amount, encodedBy
+      });
       
       if (result.success) {
         // Fetch the newly created expense to return complete data
@@ -89,14 +91,16 @@ const expensesController = {
   updateExpense: async (req, res) => {
     try {
       const id = req.params.id;
-      const { category, receipt, description, amount } = req.body;
+      const { expenseDate, companyName, siNo, details, amount } = req.body;
 
-      if (!category || !description || !amount) {
-        return res.json({ success: false, message: 'All required fields must be filled out.' });
+      if (!details || !amount) {
+        return res.json({ success: false, message: 'Details of expense and amount are required.' });
       }
 
       const editedBy = req.user ? req.user.FULLNAME : 'Unknown User';
-      const result = await expensesModel.updateExpense(id, category, receipt, description, amount, editedBy);
+      const result = await expensesModel.updateExpense(id, {
+        expenseDate, companyName, siNo, details, amount, editedBy
+      });
       
       if (result.success) {
         // Fetch the updated expense to return complete data

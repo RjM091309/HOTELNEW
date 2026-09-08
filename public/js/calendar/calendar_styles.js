@@ -165,6 +165,98 @@ function injectDragStyles() {
     .fc-event.has-pickup-service .event-title-chip {
       left: 24px;
     }
+
+    /* Solid blue cap over the checkout (right) end of every Late Check-Out
+       booking bar. Mounted on the un-skewed .fc-timeline-event-harness wrapper
+       (not the skewed, overflow:hidden .fc-event), so it can fully cover the
+       bar's slanted tip - blue all the way, nothing of the bar colour left. */
+    .fc-timeline-event-harness > .late-checkout-end-marker {
+      position: absolute;
+      right: -3px;
+      top: 0;
+      bottom: 0;
+      width: 26px;
+      background: #1A3FA0;   /* matches the late-check-out / BTB deep blue accent */
+      pointer-events: none;
+      z-index: 20;
+      /* match the bar's parallelogram slant */
+      transform: skewX(-18deg);
+      transform-origin: right center;
+    }
+
+    .fc-event.has-late-checkout-end .event-title-chip {
+      /* keep the title clear of the blue cap */
+      padding-right: 26px;
+    }
+
+    /* Mirror on the START (check-in / left) edge for every Late Check-In bar,
+       in orange. */
+    .fc-timeline-event-harness > .late-checkin-start-marker {
+      position: absolute;
+      left: -3px;
+      top: 0;
+      bottom: 0;
+      width: 26px;
+      background: #FB8C00;   /* matches the late-check-in orange accent */
+      pointer-events: none;
+      z-index: 20;
+      transform: skewX(-18deg);
+      transform-origin: left center;
+    }
+
+    .fc-event.has-late-checkin-start .event-title-chip {
+      /* keep the title clear of the orange cap */
+      padding-left: 26px;
+    }
+
+    /* The orange cap sits above the bar, hiding the pick-up plane that lives at
+       left:9px. When both are present, slide the plane out past the cap. */
+    .fc-event.has-late-checkin-start .pickup-service-indicator {
+      left: 30px;
+    }
+    .fc-event.has-late-checkin-start.has-pickup-service .event-title-chip {
+      left: 24px;
+      padding-left: 44px;
+    }
+
+    /* Black cap on the check-in edge of every Early Check-In bar. left + width
+       are set in JS (vars on the .fc-event): the cap extends LEFT past the bar
+       edge to the day's first gridline, so the bar reads as starting in the
+       first box of the day. */
+    .fc-timeline-event-harness > .early-checkin-start-marker {
+      position: absolute;
+      left: var(--early-ci-cap-left, -3px);
+      top: 0;
+      bottom: 0;
+      width: var(--early-ci-cap-w, 26px);
+      background: #000;
+      pointer-events: none;
+      z-index: 20;
+      transform: skewX(-18deg);
+      transform-origin: left center;
+    }
+
+    .fc-event.has-early-checkin-start .event-title-chip {
+      /* keep the title clear of the part of the cap that covers the bar */
+      padding-left: calc(var(--early-ci-cap-inset, 20px) + 4px);
+    }
+
+    .fc-event.has-early-checkin-start .pickup-service-indicator {
+      left: calc(var(--early-ci-cap-inset, 20px) + 6px);
+    }
+    .fc-event.has-early-checkin-start.has-pickup-service .event-title-chip {
+      left: 24px;
+      padding-left: calc(var(--early-ci-cap-inset, 20px) + 20px);
+    }
+
+    /* When a legend filter dims the booking bar, dim its caps to match
+       (the caps are harness siblings of .fc-event, so .legend-dimmed on the
+       bar doesn't reach them on its own). */
+    .fc-timeline-event-harness > .fc-event.legend-dimmed ~ .late-checkout-end-marker,
+    .fc-timeline-event-harness > .fc-event.legend-dimmed ~ .late-checkin-start-marker,
+    .fc-timeline-event-harness > .fc-event.legend-dimmed ~ .early-checkin-start-marker {
+      opacity: 0.45 !important;
+    }
   `;
   
   document.head.appendChild(style);

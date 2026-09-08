@@ -353,10 +353,10 @@ class CalendarModel {
         // Ensure proper date formatting for FullCalendar
         const startDate = new Date(row.start);
         const endDate = new Date(row.end);
-        
-        // Set check-in time to 6 AM and check-out time to 6 PM
-        startDate.setHours(6, 0, 0, 0);   // 6 AM
-        endDate.setHours(18, 0, 0, 0);    // 6 PM
+
+        // Set check-in time to 3 PM and check-out time to 12 noon
+        startDate.setHours(15, 0, 0, 0);   // 3 PM
+        endDate.setHours(12, 0, 0, 0);    // 12 noon
         
         const isMaintenanceRow =
           row.bookingStatus === 'maintenance' ||

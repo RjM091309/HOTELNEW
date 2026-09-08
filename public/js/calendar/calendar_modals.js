@@ -126,11 +126,11 @@ function showLateCheckInModal(event) {
   checkInDateOnly.setHours(0, 0, 0, 0); // Reset time to start of day
   const canCheckIn = checkInDateOnly <= today;
 
-  // Build composite status badges (CI/CO)
-  const ciStatus = event.extendedProps?.checkInStatus; // 1 regular, 0 late
+  // Build composite status badges (CI/CO). CI: 1 regular, 0 late, 2 early
+  const ciStatus = event.extendedProps?.checkInStatus;
   const coStatus = event.extendedProps?.checkOutStatus; // 0 regular, 1 late
-  const ciText = (ciStatus === 1 ? 'REGULAR CHECK-IN' : 'LATE CHECK-IN');
-  const ciColor = (ciStatus === 1 ? '#e53935' : '#e0a316');
+  const ciText = ciStatus === 2 ? 'EARLY CHECK-IN' : (ciStatus === 1 ? 'REGULAR CHECK-IN' : 'LATE CHECK-IN');
+  const ciColor = ciStatus === 2 ? '#26c6da' : (ciStatus === 1 ? '#e53935' : '#e0a316');
   const coText = (coStatus === 1 ? 'LATE CHECK-OUT' : 'REGULAR CHECK-OUT');
   const coColor = (coStatus === 1 ? '#e0a316' : '#e53935');
 
@@ -360,16 +360,17 @@ function showPendingModal(event) {
   checkInDateOnly.setHours(0, 0, 0, 0); // Reset time to start of day
   const canCheckIn = checkInDateOnly <= today;
 
-  // Build composite status badges (CI/CO)
-  const ciStatus2 = event.extendedProps?.checkInStatus; // 1 regular, 0 late
+  // Build composite status badges (CI/CO). CI: 1 regular, 0 late, 2 early
+  const ciStatus2 = event.extendedProps?.checkInStatus;
   const coStatus2 = event.extendedProps?.checkOutStatus; // 0 regular, 1 late
   const holdPendingRaw2 = event.extendedProps?.holdPending;
   const isHoldPending2 = holdPendingRaw2 === 1 || holdPendingRaw2 === '1' || holdPendingRaw2 === true;
-  const ciText = (ciStatus2 === 1 ? 'REGULAR CHECK-IN' : 'LATE CHECK-IN');
-  const ciColor = (ciStatus2 === 1 ? '#e53935' : '#e0a316');
+  const isEarlyCI2 = ciStatus2 === 2;
+  const ciText = isEarlyCI2 ? 'EARLY CHECK-IN' : (ciStatus2 === 1 ? 'REGULAR CHECK-IN' : 'LATE CHECK-IN');
+  const ciColor = isEarlyCI2 ? '#26c6da' : (ciStatus2 === 1 ? '#e53935' : '#e0a316');
   const coText = (coStatus2 === 1 ? 'LATE CHECK-OUT' : 'REGULAR CHECK-OUT');
   const coColor = (coStatus2 === 1 ? '#e0a316' : '#e53935');
-  const accentColor = isHoldPending2 ? '#FF6D00' : (ciStatus2 === 0 ? '#e0a316' : '#e53935');
+  const accentColor = isHoldPending2 ? '#FF6D00' : (isEarlyCI2 ? '#26c6da' : (ciStatus2 === 0 ? '#e0a316' : '#e53935'));
 
   // Prepare modal configuration based on check-in availability
   const modalConfig = {
@@ -417,9 +418,9 @@ function showPendingModal(event) {
             </span>
           </div>` :
           canCheckIn ?
-          `<div style="text-align: center; padding: 15px; background: rgba(229, 57, 53, 0.1); border-radius: 8px; border: 1px solid rgba(229, 57, 53, 0.35);">
-            <span style="color: #e53935; font-size: 14px; font-weight: 500;">
-              📋 This reservation is Regular Check-In confirmation and requires staff approval.
+          `<div style="text-align: center; padding: 15px; background: ${isEarlyCI2 ? 'rgba(38, 198, 218, 0.12)' : 'rgba(229, 57, 53, 0.1)'}; border-radius: 8px; border: 1px solid ${isEarlyCI2 ? 'rgba(38, 198, 218, 0.4)' : 'rgba(229, 57, 53, 0.35)'};">
+            <span style="color: ${isEarlyCI2 ? '#26c6da' : '#e53935'}; font-size: 14px; font-weight: 500;">
+              📋 This reservation is ${isEarlyCI2 ? 'Early' : 'Regular'} Check-In confirmation and requires staff approval.
             </span>
           </div>` :
           `<div style="text-align: center; padding: 15px; background: rgba(108, 117, 125, 0.1); border-radius: 8px; border: 1px solid rgba(108, 117, 125, 0.35);">

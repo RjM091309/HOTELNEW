@@ -336,6 +336,44 @@ function setInfoText(elementId, value, fallback = '-') {
   el.textContent = text;
 }
 
+// CHECK_IN_STATUS: 1 = Regular, 0 = Late, 2 = Early
+function checkInTimeBadge(status) {
+  const s = String(status == null ? 1 : status);
+  if (s === '2') return { label: 'Early Check-In', cls: 'bg-info' };
+  if (s === '0') return { label: 'Late Check-In', cls: 'bg-warning text-dark' };
+  return null; // regular - no badge
+}
+
+// LATE_CHECKOUT: 1 = Late check-out, otherwise regular
+function checkOutTimeBadge(lateCheckout) {
+  const isLate = lateCheckout === 1 || lateCheckout === '1' || lateCheckout === true;
+  return isLate ? { label: 'Late Check-Out', cls: 'bg-warning text-dark' } : null;
+}
+
+function appendStayTimeBadge(elementId, badge) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  // Inline badge right after the date text (same pattern as the Room Cost row).
+  el.querySelectorAll('.stay-time-badge').forEach((b) => b.remove());
+  if (!badge) return;
+  const span = document.createElement('span');
+  span.className = `badge ${badge.cls} ms-1 stay-time-badge`;
+  span.textContent = badge.label;
+  el.appendChild(span);
+}
+
+// Text of a stay-date field without any inline status badge (for prompts/logs).
+function stayDisplayDateText(elementId) {
+  const el = document.getElementById(elementId);
+  if (!el) return '-';
+  let out = '';
+  el.childNodes.forEach((n) => {
+    if (n.nodeType === Node.TEXT_NODE) out += n.textContent;
+  });
+  out = out.trim();
+  return out || '-';
+}
+
 function updateAgencyPayerDisplay(bookingId, channel, agencyPayer) {
   const row = document.getElementById(`agency-payer-row-${bookingId}`);
   const valueEl = document.getElementById(`agency-payer-value-${bookingId}`);
@@ -697,8 +735,8 @@ window.openCancelBookingFromRoomMenu = openCancelBookingFromRoomMenu;
 
 async function setBookingMaintenanceFromRoomMenu(bookingId) {
   const roomNo = document.getElementById(`room-number-${bookingId}`)?.textContent?.trim() || '-';
-  const checkIn = document.getElementById(`checkin-display-${bookingId}`)?.textContent?.trim() || '-';
-  const checkOut = document.getElementById(`checkout-display-${bookingId}`)?.textContent?.trim() || '-';
+  const checkIn = stayDisplayDateText(`checkin-display-${bookingId}`);
+  const checkOut = stayDisplayDateText(`checkout-display-${bookingId}`);
   const parentModalEl = document.getElementById(`dynamicRoomModal_${bookingId}`);
 
   const showPopup = window.showMaintenanceSchedulePopup;
@@ -948,6 +986,11 @@ function updateStaySummaryFromBooking(bookingId, data) {
   setInfoText(`guest-contact-${bookingId}`, data.CONTACT_NO);
   setInfoText(`checkin-display-${bookingId}`, formatStayDateWithActual(data.CHECK_IN_DATE, data.ACTUAL_CHECK_IN_DT));
   setInfoText(`checkout-display-${bookingId}`, formatStayDateWithActual(data.CHECK_OUT_DATE, data.ACTUAL_CHECK_OUT_DT));
+
+  // Show a badge next to the dates when the check-in / check-out is not the
+  // regular time (Early / Late check-in, Late check-out).
+  appendStayTimeBadge(`checkin-display-${bookingId}`, checkInTimeBadge(data.CHECK_IN_STATUS));
+  appendStayTimeBadge(`checkout-display-${bookingId}`, checkOutTimeBadge(data.LATE_CHECKOUT));
 
   const hasPickup = !!(data.HAS_PICKUP === 1 || data.HAS_PICKUP === true || data.HAS_PICKUP === '1');
   const hasDropoff = !!(data.HAS_DROPOFF === 1 || data.HAS_DROPOFF === true || data.HAS_DROPOFF === '1');
@@ -1674,28 +1717,34 @@ async function createDynamicRoomModal(bookingId, event, options) {
             <div class="modal-footer py-2" style="background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%); border-top: 1px solid #495057;">
                 <button type="button" class="btn btn-primary" onclick="window.showBilling('${bookingId}')">Billing</button>
                 <div class="voucher-action-wrap" id="invoiceActionWrap_${bookingId}">
+                    <!-- SEND temporarily disabled - print only for now -->
                     <div class="voucher-action-menu" id="invoiceActionMenu_${bookingId}" hidden style="display: none;" onclick="event.stopPropagation()">
                         <button type="button" class="btn btn-sm btn-light voucher-action-btn" onclick="window.printInvoice('${bookingId}')">
                             <i class="fas fa-print me-1"></i>Print
                         </button>
+                        <!--
                         <button type="button" class="btn btn-sm btn-primary voucher-action-btn" onclick="window.sendInvoice('${bookingId}')">
                             <i class="fas fa-paper-plane me-1"></i>Send
                         </button>
+                        -->
                     </div>
-                    <button type="button" class="btn btn-info text-white" onclick="window.toggleActionPopup('invoiceActionMenu_${bookingId}', event)">
+                    <button type="button" class="btn btn-info text-white" onclick="window.printInvoice('${bookingId}')">
                         <i class="fas fa-file-pdf me-2"></i>Generate Invoice
                     </button>
                 </div>
                 <div class="voucher-action-wrap" id="voucherActionWrap_${bookingId}">
+                    <!-- SEND temporarily disabled - print only for now -->
                     <div class="voucher-action-menu" id="voucherActionMenu_${bookingId}" hidden style="display: none;" onclick="event.stopPropagation()">
                         <button type="button" class="btn btn-sm btn-light voucher-action-btn" onclick="window.printVoucher('${bookingId}')">
                             <i class="fas fa-print me-1"></i>Print
                         </button>
+                        <!--
                         <button type="button" class="btn btn-sm btn-primary voucher-action-btn" onclick="window.sendVoucher('${bookingId}')">
                             <i class="fas fa-paper-plane me-1"></i>Send
                         </button>
+                        -->
                     </div>
-                    <button type="button" class="btn btn-danger" onclick="window.toggleActionPopup('voucherActionMenu_${bookingId}', event)">
+                    <button type="button" class="btn btn-danger" onclick="window.printVoucher('${bookingId}')">
                         <i class="fas fa-file-pdf me-2"></i>Voucher
                     </button>
                 </div>

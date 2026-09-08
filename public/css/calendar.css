@@ -1389,14 +1389,11 @@
 }
 
 /* Applied to a booking's rendered element on the calendar grid when a legend
-   filter is active and the booking does not match the selected category */
+   filter is active and the booking does not match the selected category.
+   0.45 keeps non-matching bars clearly de-emphasised but still readable. */
 .legend-dimmed {
-  opacity: 0.15 !important;
+  opacity: 0.45 !important;
   transition: opacity 0.2s ease;
-}
-
-.legend-color-long-term {
-  background-color: #9c27b0 !important;
 }
 
 .legend-color-pickup {
@@ -1414,6 +1411,13 @@
 
 .legend-color-mountain-view {
   background-color: #2E7D32 !important;
+}
+
+/* Legend row with no colour swatch (e.g. Early Check-In - black is already used
+   for Cancelled, so this filter is text-only). Keep the label aligned with the
+   swatched rows. */
+.calendar-legend-item.legend-item-nocolor .calendar-legend-text {
+  padding-left: 22px;
 }
 
 /* Removed hover effect that caused movement */
@@ -1492,6 +1496,10 @@
 
 /* Side indicator legend colors */
 .legend-color-late-checkout-btb {
+  background-color: #1A3FA0 !important;
+}
+
+.legend-color-late-checkout {
   background-color: #1A3FA0 !important;
 }
 

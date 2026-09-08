@@ -417,6 +417,29 @@ function continueCalendarSelectFlow(info, modal, today) {
   }
   resetGroupSelectState();
 
+  // Block before opening Add Booking if the room already has an Early Check-In
+  // arriving the same day this stay would check out.
+  if (typeof window.calendarSelectionEarlyCheckInConflict === 'function') {
+    const eci = window.calendarSelectionEarlyCheckInConflict(info.resource.id, info.end);
+    if (eci) {
+      calendar.unselect();
+      if (typeof Swal !== 'undefined') {
+        const roomNo = eci.getResources && eci.getResources()[0] ? eci.getResources()[0].title : '';
+        const guest = (eci.extendedProps && eci.extendedProps.guestName) || eci.title || 'another guest';
+        Swal.fire({
+          icon: 'error',
+          title: 'Not Allowed - Early Check-In Conflict',
+          html: `Room ${roomNo} has an <strong>Early Check-In</strong> for <strong>${guest}</strong> on that check-out day. ` +
+                `A stay that checks out at 12 noon would overlap it. Pick another room or dates.`,
+          confirmButtonText: 'OK',
+          background: '#2a3135',
+          color: '#ffffff'
+        });
+      }
+      return;
+    }
+  }
+
   // With 12-hour slots, the raw exclusive end lands on either boundary of a
   // day: 12:00 means the drag stopped inside that day's AM slot (a regular,
   // morning checkout) - 00:00 means it stopped inside the PREVIOUS day's PM
@@ -487,11 +510,11 @@ function openAddBookingModalForSelection(info, modal, today, lateCheckout) {
         return; // Exit early, don't show modal
       }
 
-      // Set check-in time to 6 AM
-      originalStartDate.setHours(6, 0, 0, 0);
+      // Set check-in time to 3 PM
+      originalStartDate.setHours(15, 0, 0, 0);
 
-      // Set check-out time to 6 PM
-      originalEndDate.setHours(18, 0, 0, 0);
+      // Set check-out time to 12 noon
+      originalEndDate.setHours(12, 0, 0, 0);
 
       modal.data('calendar-room-id', info.resource.id);
       modal.data('calendar-start', originalStartDate);
@@ -2568,11 +2591,11 @@ function applyIncomingHighlight() {
   const endDate = new Date(endStr);
   if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return;
 
-  // Align with booking logic: Check-in 6:00 AM, Check-out 6:00 PM
+  // Align with booking logic: Check-in 3:00 PM, Check-out 12:00 noon
   const startAt = new Date(startDate);
-  startAt.setHours(6, 0, 0, 0);
+  startAt.setHours(15, 0, 0, 0);
   const endAt = new Date(endDate);
-  endAt.setHours(18, 0, 0, 0);
+  endAt.setHours(12, 0, 0, 0);
 
   // Ensure resource exists
   const resource = (typeof calendar.getResourceById === 'function')
@@ -3438,8 +3461,8 @@ function updateCalendarEventsForCheckout(bookings) {
 
       // Parse the checkout date
       const newEndDate = new Date(checkOutDate);
-      // Set checkout time to 6:00 PM
-      newEndDate.setHours(18, 0, 0, 0);
+      // Set checkout time to 12:00 noon
+      newEndDate.setHours(12, 0, 0, 0);
 
       // Update event end date
       event.setEnd(newEndDate);
@@ -3489,16 +3512,16 @@ function updateCalendarEventForBooking(bookingData) {
     // Update checkout date if provided
     if (bookingData.checkOut) {
       const newEndDate = new Date(bookingData.checkOut);
-      // Set checkout time to 6:00 PM
-      newEndDate.setHours(18, 0, 0, 0);
+      // Set checkout time to 12:00 noon
+      newEndDate.setHours(12, 0, 0, 0);
       event.setEnd(newEndDate);
     }
 
     // Update check-in date if provided
     if (bookingData.checkIn) {
       const newStartDate = new Date(bookingData.checkIn);
-      // Set check-in time to 6:00 AM
-      newStartDate.setHours(6, 0, 0, 0);
+      // Set check-in time to 3:00 PM
+      newStartDate.setHours(15, 0, 0, 0);
       event.setStart(newStartDate);
     }
 
@@ -4193,10 +4216,14 @@ function createLegendOverlay() {
         <span class="calendar-legend-text">Cancelled</span>
         <span class="calendar-legend-count" id="legend-count-cancelled">0</span>
       </div>
-      <div class="calendar-legend-item" data-legend-key="long-term">
-        <div class="calendar-legend-color legend-color-long-term"></div>
-        <span class="calendar-legend-text">Long-Term Stay</span>
-        <span class="calendar-legend-count" id="legend-count-long-term">0</span>
+      <div class="calendar-legend-item" data-legend-key="late-checkout">
+        <div class="calendar-legend-color legend-color-late-checkout"></div>
+        <span class="calendar-legend-text">Late Check-Out</span>
+        <span class="calendar-legend-count" id="legend-count-late-checkout">0</span>
+      </div>
+      <div class="calendar-legend-item legend-item-nocolor" data-legend-key="early-checkin">
+        <span class="calendar-legend-text">Early Check-In</span>
+        <span class="calendar-legend-count" id="legend-count-early-checkin">0</span>
       </div>
     </div>
     <div class="calendar-legend-header">
@@ -4258,10 +4285,10 @@ function classifyEventForLegend(event) {
     'cancelled': false,
     // Side indicators (independent booleans, can combine with any phase bucket above)
     'late-checkout-btb': (typeof isLateCheckout === 'function' && isLateCheckout(event)) || !!event.extendedProps?.isBackToBack,
+    'late-checkout': (typeof isLateCheckout === 'function' && isLateCheckout(event)) || event.extendedProps?.checkOutStatus === 1 || event.extendedProps?.checkOutStatus === '1',
     'reservation-fee-paid': paymentStatus === 'partial',
     'late-checkin': typeof isLateCheckIn === 'function' && isLateCheckIn(event),
-    // Other
-    'long-term': !!event.extendedProps?.isLongTermStay
+    'early-checkin': !isHoldPending && Number(event.extendedProps?.checkInStatus) === 2
   };
 
   if (status === 'cancelled' || status === 'maintenance') {
@@ -4318,9 +4345,10 @@ function updateLegendCounts() {
     'checkout-unpaid': 0,
     'cancelled': 0,
     'late-checkout-btb': 0,
+    'late-checkout': 0,
     'reservation-fee-paid': 0,
     'late-checkin': 0,
-    'long-term': 0
+    'early-checkin': 0
   };
 
   events.forEach(event => {
@@ -4379,8 +4407,8 @@ const LEGEND_FILTER_GROUPS = {
     'checkout-unpaid',
     'cancelled'
   ]),
-  sideIndicator: new Set(['late-checkout-btb', 'reservation-fee-paid', 'late-checkin']),
-  other: new Set(['long-term']),
+  sideIndicator: new Set(['late-checkout-btb', 'late-checkout', 'reservation-fee-paid', 'late-checkin', 'early-checkin']),
+  other: new Set([]),
   roomView: new Set(['condo-view', 'mountain-view'])
 };
 

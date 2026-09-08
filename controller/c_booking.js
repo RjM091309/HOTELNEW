@@ -1,4 +1,5 @@
 const BookingModel = require('../models/bookingModel');
+const moment = require('moment');
 
 class BookingController {
   // Render the main booking page
@@ -778,13 +779,13 @@ class BookingController {
       const discountNum = parseFloat(discount) || 0;
       const totalDiscountNum = seniorPwdDiscountNum + discountNum; // Combine both discounts
       const lateCheckoutFeeNum = parseFloat(lateCheckoutFee) || 0;
-      
+
       // Calculate services costs
       const breakfastAdultCost = (parseInt(breakfastAdultQty) || 0) * (parseFloat(breakfastAdultPrice) || 0);
       const breakfastKidCost = (parseInt(breakfastKidQty) || 0) * (parseFloat(breakfastKidPrice) || 0);
       const pickupCost = parseFloat(pickupPrice) || 0;
       const dropoffCost = parseFloat(dropoffPrice) || 0;
-      
+
       // Calculate total amount (matching frontend calculation)
       const roomTotal = roomPriceNum * parseInt(diffindays) || 1;
       const servicesTotal = breakfastAdultCost + breakfastKidCost + pickupCost + dropoffCost;
@@ -843,20 +844,40 @@ class BookingController {
       // console.log('Is Direct Reservation:', isDirectReservation);
 
       // Convert dates to MySQL format
-      const checkInDate = moment(startDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD') + ' 06:00:00';
-      
+      const checkInDate = moment(startDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD') + ' 15:00:00';
+
+      // Hold-pending reservations have no check-in/out status yet - force
+      // Regular so they don't get mislabelled as Late Check-In / Check-Out.
+      const holdPendingFlag = holdPending === true || holdPending === 1 || holdPending === '1'
+        || String(holdPending || '').toLowerCase() === 'true';
+      const effCheckInStatus = holdPendingFlag ? 1 : checkInStatus;
+      const effCheckOutStatus = holdPendingFlag ? 0 : checkOutStatus;
+
       // Set checkout time based on checkOutStatus
       let checkOutTime;
-      if (checkOutStatus == 1) {
+      if (effCheckOutStatus == 1) {
         // Late Check Out: Set to 11:00 PM
         checkOutTime = ' 23:00:00';
       } else {
-        // Regular Check Out: Set to 6:00 PM
-        checkOutTime = ' 18:00:00';
+        // Regular Check Out: Set to 12:00 noon
+        checkOutTime = ' 12:00:00';
       }
       const checkOutDate = moment(endDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD') + checkOutTime;
 
       // console.log('Check-in date:', checkInDate, 'Check-out date:', checkOutDate);
+
+      // Block if this stay checks out (12 noon) on the same day the room already
+      // has an Early Check-In arriving - the early guest can be in from ~1 AM.
+      if (room_id && !isMaintenanceBooking) {
+        const eciConflict = await BookingModel.findEarlyCheckInConflict(room_id, checkOutDate);
+        if (eciConflict) {
+          return res.status(409).json({
+            success: false,
+            message: `Room ${eciConflict.roomNumber} has an Early Check-In for ${eciConflict.guestName} on ${eciConflict.checkInDate}. ` +
+                     `A booking that only checks out at 12 noon that day would overlap it. Pick another room or move the dates.`
+          });
+        }
+      }
 
       // Remove commas from price and convert to a decimal number
       let numericRoomPrice = parseFloat(price.replace(',', ''));
@@ -882,8 +903,8 @@ class BookingController {
         numericRoomPrice,
         encodedBy,
         date,
-        checkInStatus,
-        checkOutStatus,
+        checkInStatus: effCheckInStatus,
+        checkOutStatus: effCheckOutStatus,
         holdPending,
         bookingRemarks,
         agencyID,
@@ -1879,6 +1900,24 @@ class BookingController {
           success: false,
           message: `Room selection mismatch: expected ${expectedRoomCount} room(s) but received ${roomIdList.length}. Please re-select all rooms and try again.`
         });
+      }
+
+      // Block any selected room whose check-out day already has an Early Check-In.
+      {
+        const gEnd = String(daterange || '').split(' to ')[1];
+        const gEndMoment = moment(gEnd ? gEnd.split('(')[0].trim() : '', 'MMM DD, YYYY');
+        if (gEndMoment.isValid()) {
+          for (const rid of roomIdList) {
+            const eci = await BookingModel.findEarlyCheckInConflict(rid, gEndMoment.format('YYYY-MM-DD'));
+            if (eci) {
+              return res.status(409).json({
+                success: false,
+                message: `Room ${eci.roomNumber} has an Early Check-In for ${eci.guestName} on ${eci.checkInDate}. ` +
+                         `A booking that only checks out at 12 noon that day would overlap it. Remove that room or move the dates.`
+              });
+            }
+          }
+        }
       }
 
       const result = await BookingModel.addGroupBooking({
@@ -3341,6 +3380,26 @@ class BookingController {
       }
       if (pickupDate && !/^\d{4}-\d{2}-\d{2}$/.test(String(pickupDate).trim())) {
         return res.status(400).json({ success: false, message: 'Pickup Date must be a valid date.' });
+      }
+
+      // Block if this stay's check-out day already has an Early Check-In in the
+      // same room (see addBooking). Exclude this booking itself.
+      if (room_id && daterange) {
+        const endPart = String(daterange).split(' to ')[1];
+        const endClean = endPart ? endPart.split('(')[0].trim() : '';
+        const endMoment = moment(endClean, 'MMM DD, YYYY');
+        if (endMoment.isValid()) {
+          const eciConflict = await BookingModel.findEarlyCheckInConflict(
+            room_id, endMoment.format('YYYY-MM-DD'), bookingId
+          );
+          if (eciConflict) {
+            return res.status(409).json({
+              success: false,
+              message: `Room ${eciConflict.roomNumber} has an Early Check-In for ${eciConflict.guestName} on ${eciConflict.checkInDate}. ` +
+                       `A booking that only checks out at 12 noon that day would overlap it. Pick another room or move the dates.`
+            });
+          }
+        }
       }
 
       // Use paymentStatus coming from frontend (computeEditTotal),

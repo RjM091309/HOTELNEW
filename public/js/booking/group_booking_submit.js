@@ -433,10 +433,10 @@ $(document).ready(function () {
           timerProgressBar: true
         });
       },
-      error: function () {
+      error: function (xhr) {
         Swal.fire({
           title: 'Error',
-          text: 'An error occurred while saving the group booking. Please try again.',
+          text: xhr?.responseJSON?.message || 'An error occurred while saving the group booking. Please try again.',
           icon: 'error',
           confirmButtonText: 'OK'
         });

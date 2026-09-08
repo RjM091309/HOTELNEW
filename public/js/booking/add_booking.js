@@ -625,7 +625,7 @@ function computeTotal() {
 
     // Calculate room charges only (for Senior/PWD discount)
     const roomCharges = rateDetails.roomCharges;
-    
+
     // Calculate subtotal (charges) - before discounts
     const subtotal = roomCharges + (adultQty * adultPrice) + (kidQty * kidPrice) + pickupPrice + dropoffPrice + lateCheckoutFee;
     
@@ -796,7 +796,7 @@ function computeGroupTotal() {
     
     // Get late check-out fee
     const lateCheckoutFee = parseFloat($('#lateCheckoutFee').val()) || 0;
-    
+
     // Calculate subtotal (charges)
     const subtotal = roomTotal + (adultQty * adultPrice) + (kidQty * kidPrice) + pickupPrice + dropoffPrice + lateCheckoutFee;
     

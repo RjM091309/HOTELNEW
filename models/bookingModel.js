@@ -3,6 +3,30 @@ const CalendarModel = require('./calendarModel');
 
 class BookingModel {
 
+  // A regular stay checks out at 12 noon. An Early Check-In (CHECK_IN_STATUS = 2)
+  // can arrive from ~1 AM, so it overlaps any booking that only frees the room at
+  // noon on that same date. Returns the conflicting Early Check-In booking, or
+  // null if the room+checkout-date is clear.
+  static async findEarlyCheckInConflict(roomId, checkOutDate, excludeBookingId = null) {
+    if (!roomId || !checkOutDate) return null;
+    const rows = await queryDatabasePromise(
+      `SELECT b.IDNo, DATE_FORMAT(b.CHECK_IN_DATE, '%b %e, %Y') AS checkInDate,
+              COALESCE(c.NAME, 'a guest') AS guestName, r.ROOM_NUMBER AS roomNumber
+         FROM booking b
+         LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
+         LEFT JOIN room r ON r.IDNo = b.ROOM_ID
+        WHERE b.ACTIVE = 1
+          AND b.ROOM_ID = ?
+          AND b.CHECK_IN_STATUS = 2
+          AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
+          AND DATE(b.CHECK_IN_DATE) = DATE(?)
+          AND (? IS NULL OR b.IDNo <> ?)
+        LIMIT 1`,
+      [roomId, checkOutDate, excludeBookingId, excludeBookingId]
+    );
+    return rows.length ? rows[0] : null;
+  }
+
     // Get enhanced booking data for DataTables (matching Hotel_Old structure)
     static async getBookingDataEnhanced(params) {
       try {
@@ -174,7 +198,7 @@ class BookingModel {
             ) AS HAS_UNSETTLED_CREDIT,
             ${useIndividualCalculation ? `
             -- Use individual balance calculation for all bookings (including group bookings shown individually)
-            ROUND(GREATEST(0, 
+            ROUND(GREATEST(0,
               COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
               + COALESCE(all_services_total.TOTAL_SERVICES_COST, 0)
               + COALESCE(all_extensions_total.TOTAL_EXTENSIONS_COST, 0)
@@ -272,7 +296,7 @@ class BookingModel {
                 END
               ELSE
                 -- For individual bookings, calculate individual balance
-                ROUND(GREATEST(0, 
+                ROUND(GREATEST(0,
                   COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
                   + COALESCE(all_services_total.TOTAL_SERVICES_COST, 0)
                   + COALESCE(all_extensions_total.TOTAL_EXTENSIONS_COST, 0)
@@ -1706,15 +1730,16 @@ class BookingModel {
 
         // Create billing
         const billingQuery = `
-          INSERT INTO billing 
-          (BOOKING_ID, ROOM_CHARGE, ROOM_PRICE, AMENITIES_CHARGE, SERVICES_CHARGE, LATE_CHECKOUT_CHARGE, QTY, PAYMENT_STATUS, PAYMENT_METHOD, REMARKS, ENCODED_BY, ENCODED_DT, ACTIVE, RESERVATION_FEE, DISCOUNT_AMOUNT, DISCOUNT_APPLIED, SENIOR_PWD_DISCOUNT_PERCENT) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO billing
+          (BOOKING_ID, ROOM_CHARGE, ROOM_PRICE, AMENITIES_CHARGE, SERVICES_CHARGE, LATE_CHECKOUT_CHARGE, EARLY_CHECK_IN_CHARGE, QTY, PAYMENT_STATUS, PAYMENT_METHOD, REMARKS, ENCODED_BY, ENCODED_DT, ACTIVE, RESERVATION_FEE, DISCOUNT_AMOUNT, DISCOUNT_APPLIED, SENIOR_PWD_DISCOUNT_PERCENT)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const billingValues = [
           bookingId,
           numericRoomPrice, // ROOM_CHARGE (per-night stored as charge)
           numericRoomPrice, // ROOM_PRICE (explicit per-night rate)
           0.00, 0.00, 0.00,
+          0.00, // EARLY_CHECK_IN_CHARGE (fee now tracked as booking_service 70)
           diffindays,
           paymentStatus,
           'cash',
@@ -1973,29 +1998,32 @@ class BookingModel {
           }
         }
 
-        // Process late check-out fee if applicable
-        if (checkOutStatus == 1 && parseFloat(lateCheckoutFee) > 0) {
+        // Late Check-Out always gets a booking_service line (SERVICE_ID 72) so it
+        // shows in Extra Services - even when it's a free (0) late check-out.
+        if (checkOutStatus == 1) {
+          const lateCheckoutFeeNum = Math.max(0, parseFloat(lateCheckoutFee) || 0);
           const lateCheckoutQuery = `
             INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT)
             VALUES (?, 72, 1, ?, ?, ?, NOW())
           `;
 
-          const status = paymentStatus === 'paid' ? 'paid' : 'unpaid';
+          // A zero-fee late check-out is nothing to collect -> mark it paid.
+          const status = (lateCheckoutFeeNum === 0 || paymentStatus === 'paid') ? 'paid' : 'unpaid';
           const lateCheckoutResult = await new Promise((resolve, reject) => {
-            connection.query(lateCheckoutQuery, [bookingId, lateCheckoutFee, status, encodedBy], (err, results) => {
+            connection.query(lateCheckoutQuery, [bookingId, lateCheckoutFeeNum, status, encodedBy], (err, results) => {
               if (err) reject(err);
               else resolve(results);
             });
           });
 
-          // Insert payment record for late checkout fee if paid
-          if (paymentStatus === 'paid') {
+          // Insert payment record for late checkout fee only when there is one to record
+          if (lateCheckoutFeeNum > 0 && paymentStatus === 'paid') {
             const lateCheckoutPaymentQuery = `
               INSERT INTO payments (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
               VALUES (?, ?, ?, ?, 'service', NOW(), ?)
             `;
             await new Promise((resolve, reject) => {
-              connection.query(lateCheckoutPaymentQuery, [bookingId, lateCheckoutResult.insertId, parseFloat(lateCheckoutFee), 'cash', encodedBy], (err) => {
+              connection.query(lateCheckoutPaymentQuery, [bookingId, lateCheckoutResult.insertId, lateCheckoutFeeNum, 'cash', encodedBy], (err) => {
                 if (err) reject(err);
                 else resolve();
               });
@@ -3093,6 +3121,7 @@ class BookingModel {
           COALESCE(bi.CHECKOUT_REFUND, 0) AS CHECKOUT_REFUND,
           COALESCE(bi.REFUNDABLE_AMOUNT, 0) AS REFUNDABLE_AMOUNT,
           COALESCE(bi.LATE_CHECKOUT_CHARGE, 0) AS LATE_CHECKOUT_CHARGE,
+          COALESCE(bi.EARLY_CHECK_IN_CHARGE, 0) AS EARLY_CHECK_IN_CHARGE,
           bi.DISCOUNT_APPLIED,
           COALESCE(bi.REMARKS, '') AS BILLING_REMARKS,
           COALESCE(rt.NAME, 'Unassigned Room') AS ROOM_TYPE,
@@ -3281,6 +3310,8 @@ class BookingModel {
       // Format services
       const serviceItems = serviceData.map(service => {
         const isLateCheckout = service.SERVICE_ID === 72;
+        const isEarlyCheckIn = service.SERVICE_ID === 70;
+        const isFlatFee = isLateCheckout || isEarlyCheckIn;
         const totalCost = parseFloat(service.TOTAL_COST) || 0;
         const catalogCost = parseFloat(service.SERVICE_COST) || 0;
         const qty = parseInt(service.QTY, 10) || 1;
@@ -3288,10 +3319,11 @@ class BookingModel {
         let basePrice = catalogCost;
         let subTotal = totalCost;
 
-        if (isLateCheckout) {
-          // Late checkout is a flat fee — base price and subtotal must match the entered amount
+        if (isFlatFee) {
+          // Flat fee (late checkout / early check-in) — base price and subtotal
+          // must match the entered amount, no per-night multiply.
           let feeAmount = totalCost;
-          if (feeAmount <= 0 && lateCheckoutChargeFromBilling > 0) {
+          if (isLateCheckout && feeAmount <= 0 && lateCheckoutChargeFromBilling > 0) {
             feeAmount = lateCheckoutChargeFromBilling;
           } else if (feeAmount <= 0 && service.STATUS !== 'paid') {
             feeAmount = catalogCost;
@@ -3304,7 +3336,7 @@ class BookingModel {
           date: b.CHECK_IN_DATE,
           description: service.SERVICE_NAME,
           basePrice,
-          qty: isLateCheckout ? '-' : service.QTY,
+          qty: isFlatFee ? '-' : service.QTY,
           subTotal,
           status: service.STATUS,
           serviceId: service.SERVICE_ID
@@ -4206,6 +4238,7 @@ class BookingModel {
             SELECT CASE 
               WHEN b4.CHECK_IN_STATUS = 0 THEN 'L/I'
               WHEN b4.CHECK_IN_STATUS = 1 THEN 'R/I'
+              WHEN b4.CHECK_IN_STATUS = 2 THEN 'E/I'
               ELSE NULL
             END
             FROM booking b4 
@@ -5276,7 +5309,7 @@ class BookingModel {
     const normalizeDate = (raw, isCheckIn) => {
       if (!raw) return null;
       const clean = raw.split(' (')[0].trim();
-      const time = isCheckIn ? '06:00:00' : (checkOutStatus == 1 ? '23:00:00' : '18:00:00');
+      const time = isCheckIn ? '15:00:00' : (checkOutStatus == 1 ? '23:00:00' : '12:00:00');
       const parsed = moment(clean, 'MMM DD, YYYY');
       if (!parsed.isValid()) return null;
       return `${parsed.format('YYYY-MM-DD')} ${time}`;
@@ -5889,18 +5922,19 @@ class BookingModel {
           // Payment distribution logic will handle service payments
         }
 
-        // Late Checkout Fee (PER ROOM, but handling differs by billing type)
-        if (checkOutStatus == 1 && parseFloat(lateCheckoutFee) > 0 && targetBookingIds.length > 0) {
-          const serviceStatus = 'unpaid'; // Will be updated based on payment distribution
-          
+        // Late Checkout - always add a SERVICE_ID 72 line (even a free 0 one) so it
+        // shows in Extra Services. PER ROOM, handling differs by billing type.
+        if (checkOutStatus == 1 && targetBookingIds.length > 0) {
+          const lateFeeNum = Math.max(0, parseFloat(lateCheckoutFee) || 0);
+          const serviceStatus = lateFeeNum === 0 ? 'paid' : 'unpaid'; // free -> nothing to collect
+
           if (consolidatedBilling) {
             // Consolidated Billing: Total fee (fee × numRooms) goes to main booking only
-            const totalLateCheckoutFee = parseFloat(lateCheckoutFee) * targetBookingIds.length;
-            groupServices.push([targetBookingIds[0], 72, 1, totalLateCheckoutFee, serviceStatus, encodedBy, date, 1]);
+            groupServices.push([targetBookingIds[0], 72, 1, lateFeeNum * targetBookingIds.length, serviceStatus, encodedBy, date, 1]);
           } else {
             // Individual Billing: Each room gets the fee
             for (const bookingId of targetBookingIds) {
-              groupServices.push([bookingId, 72, 1, parseFloat(lateCheckoutFee), serviceStatus, encodedBy, date, 1]);
+              groupServices.push([bookingId, 72, 1, lateFeeNum, serviceStatus, encodedBy, date, 1]);
             }
           }
           // Payment distribution logic will handle service payments
@@ -9237,7 +9271,7 @@ class BookingModel {
           bill.RESERVATION_FEE,
           bill.DISCOUNT_AMOUNT,
           bill.SENIOR_PWD_DISCOUNT_PERCENT,
-          
+
           bs_adult.QTY as breakfastAdultQty,
           bs_adult.TOTAL_COST as breakfastAdultPrice,
           bs_adult.SERVICE_ID as breakfastAdultId,
@@ -9344,7 +9378,7 @@ class BookingModel {
 
       // Convert dates to MySQL format
       const moment = require('moment');
-      const checkInDate = moment(startDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD') + ' 06:00:00';
+      const checkInDate = moment(startDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD') + ' 15:00:00';
 
       // Set checkout time based on checkOutStatus (0 = regular, 1 = late)
       let checkOutTime;
@@ -9352,8 +9386,8 @@ class BookingModel {
         // Late Check Out: Set to 11:00 PM
         checkOutTime = ' 23:00:00';
       } else {
-        // Regular Check Out: Set to 6:00 PM
-        checkOutTime = ' 18:00:00';
+        // Regular Check Out: Set to 12:00 noon
+        checkOutTime = ' 12:00:00';
       }
       const checkOutDate = moment(endDateStr, 'MMM DD, YYYY').format('YYYY-MM-DD') + checkOutTime;
 
@@ -9478,26 +9512,30 @@ class BookingModel {
 
             // 3. Update billing information
             const billingUpdateQuery = `
-              UPDATE billing 
-              SET ROOM_CHARGE = ?, QTY = ?, PAYMENT_STATUS = ?, 
+              UPDATE billing
+              SET ROOM_CHARGE = ?, QTY = ?, PAYMENT_STATUS = ?,
                   DISCOUNT_AMOUNT = ?, SENIOR_PWD_DISCOUNT_PERCENT = ?, EDITED_BY = ?, EDITED_DT = ?
               WHERE BOOKING_ID = ?
             `;
             await connection.promise().query(billingUpdateQuery, [
-              numericRoomPrice, diffindays, paymentStatus, 
+              numericRoomPrice, diffindays, paymentStatus,
               parseFloat(discount) || 0.00,
               parseFloat(seniorPwdDiscountPercent) || 0.00,
               editedBy, editDate, bookingId
             ]);
 
+            // NOTE: the EARLY CHECK IN fee (SERVICE_ID 70) is added at actual
+            // check-in from the dashboard, not here - editing a booking leaves it
+            // untouched.
+
             // 4. DO NOT DELETE ALL UNPAID SERVICES - only delete specific form-managed services
             //    Extra services (like Car Rentals) should be preserved and not deleted
             //    We'll only delete breakfast, pickup, dropoff, and late checkout services below
 
-            // 4A. If checkout status is now REGULAR (0) or fee is 0,
-            //     tanggalin lahat ng late checkout services (SERVICE_ID = 72),
-            //     kahit dati pa silang paid – dahil binago na ang status.
-            if (checkOutStatus != 1 || !(parseFloat(lateCheckoutFee) > 0)) {
+            // 4A. If checkout status is now REGULAR (0), remove all late checkout
+            //     services (SERVICE_ID = 72). A free (0) late check-out still keeps
+            //     its line - it's re-created in 4C below.
+            if (checkOutStatus != 1) {
               await connection.promise().query(
                 'DELETE FROM booking_service WHERE BOOKING_ID = ? AND SERVICE_ID = 72',
                 [bookingId]
@@ -9622,30 +9660,31 @@ class BookingModel {
               await connection.promise().query(serviceQuery, [servicesToInsert]);
             }
 
-            // 5A. Handle late checkout fee if applicable
-            if (checkOutStatus == 1 && parseFloat(lateCheckoutFee) > 0) {
-              // Huwag mag-duplicate ng late checkout service (SERVICE_ID = 72)
+            // 5A. Late Check-Out always gets a booking_service line (SERVICE_ID 72),
+            //     even a free (0) one, so it shows in Extra Services.
+            if (checkOutStatus == 1) {
+              const lateFeeNum = Math.max(0, parseFloat(lateCheckoutFee) || 0);
+              const lateCheckoutStatus = (lateFeeNum === 0 || paymentStatus === 'paid') ? 'paid' : 'unpaid';
+
               const [existingLate] = await connection.promise().query(
-                `SELECT IDNo FROM booking_service 
-                 WHERE BOOKING_ID = ? AND SERVICE_ID = 72 AND ACTIVE = 1 
+                `SELECT IDNo FROM booking_service
+                 WHERE BOOKING_ID = ? AND SERVICE_ID = 72 AND ACTIVE = 1
                  LIMIT 1`,
                 [bookingId]
               );
 
               if (existingLate.length === 0) {
-                console.log('✅ Adding late checkout service to booking_service (EDIT)');
-                const lateCheckoutQuery = `
-                  INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE)
-                  VALUES (?, 72, 1, ?, ?, ?, NOW(), 1)
-                `;
-                
-                const lateCheckoutStatus = paymentStatus === 'paid' ? 'paid' : 'unpaid';
-                await connection.promise().query(lateCheckoutQuery, [
-                  bookingId, lateCheckoutFee, lateCheckoutStatus, editedBy
-                ]);
-                console.log('✅ Late checkout service added successfully');
+                await connection.promise().query(
+                  `INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE)
+                   VALUES (?, 72, 1, ?, ?, ?, NOW(), 1)`,
+                  [bookingId, lateFeeNum, lateCheckoutStatus, editedBy]
+                );
               } else {
-                console.log('ℹ️ Late checkout service already exists for booking, skipping insert.');
+                // Keep the amount in sync with the form
+                await connection.promise().query(
+                  `UPDATE booking_service SET TOTAL_COST = ?, ENCODED_DT = NOW() WHERE IDNo = ?`,
+                  [lateFeeNum, existingLate[0].IDNo]
+                );
               }
             }
 
@@ -9917,6 +9956,7 @@ class BookingModel {
                SELECT CASE
                  WHEN b3.CHECK_IN_STATUS = 0 THEN 'L/I'
                  WHEN b3.CHECK_IN_STATUS = 1 THEN 'R/I'
+                 WHEN b3.CHECK_IN_STATUS = 2 THEN 'E/I'
                  ELSE NULL
                END
                FROM booking b3
@@ -10410,6 +10450,7 @@ class BookingModel {
                  SELECT CASE 
                    WHEN b3.CHECK_IN_STATUS = 0 THEN 'L/I'
                    WHEN b3.CHECK_IN_STATUS = 1 THEN 'R/I'
+                   WHEN b3.CHECK_IN_STATUS = 2 THEN 'E/I'
                    ELSE NULL
                  END
                  FROM booking b3 
@@ -10780,7 +10821,7 @@ class BookingModel {
     const normalizeDate = (raw, isCheckIn) => {
       if (!raw) return null;
       const clean = raw.split(' (')[0].trim();
-      const time = isCheckIn ? '06:00:00' : (checkOutStatus == 1 ? '23:00:00' : '18:00:00');
+      const time = isCheckIn ? '15:00:00' : (checkOutStatus == 1 ? '23:00:00' : '12:00:00');
       const parsed = moment(clean, 'MMM DD, YYYY');
       if (!parsed.isValid()) return null;
       return `${parsed.format('YYYY-MM-DD')} ${time}`;
@@ -11215,38 +11256,25 @@ class BookingModel {
         const finalAmount = roomChargeForBilling - reservationFeeForBilling - discountForBilling;
         // console.log(`💰 Final Billing - Room ${index + 1}: ₱${finalAmount.toLocaleString()} (Room: ₱${roomChargeForBilling}, Fee: ₱${reservationFeeForBilling}, Discount: -₱${discountForBilling})`);
 
-        // Process late check-out fee if applicable
-        // Late checkout fee is PER ROOM, but handling differs by billing type:
+        // Late Check-Out - always add a SERVICE_ID 72 line (even a free 0 one) so
+        // it shows in Extra Services. PER ROOM, handling differs by billing type:
         // - Consolidated Billing: Total fee (fee × numRooms) goes to main booking only
         // - Individual Billing: Each room gets the fee
         // - When joining existing group with Master Billing: Each booking gets its own fee (separate billing)
-        if (checkOutStatus == 1 && parseFloat(lateCheckoutFee) > 0) {
+        if (checkOutStatus == 1) {
+          const lateFeeNum = Math.max(0, parseFloat(lateCheckoutFee) || 0);
+          const status = lateFeeNum === 0 ? 'paid' : 'unpaid'; // free -> nothing to collect
+          const lateCheckoutQuery = `
+            INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT)
+            VALUES (?, 72, 1, ?, ?, ?, NOW())
+          `;
+
           if (existingGroupId && consolidatedBilling && existingMasterBookingId) {
-            // Joining existing group with Master Billing: Add late checkout fee to current booking (separate billing)
-            const lateCheckoutQuery = `
-              INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT)
-              VALUES (?, 72, 1, ?, ?, ?, NOW())
-            `;
-            const status = 'unpaid'; // Will be updated by payment distribution logic
-            await connection.promise().query(lateCheckoutQuery, [bookingId, lateCheckoutFee, status, encodedBy]);
-            console.log(`✅ Added late checkout fee (${lateCheckoutFee}) to booking ${bookingId} (separate billing)`);
+            await connection.promise().query(lateCheckoutQuery, [bookingId, lateFeeNum, status, encodedBy]);
           } else if (consolidatedBilling && index === 0) {
-            // Consolidated: Add total late checkout fee (fee × number of rooms) to main booking only
-            const totalLateCheckoutFee = parseFloat(lateCheckoutFee) * roomIds.length;
-            const lateCheckoutQuery = `
-              INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT)
-              VALUES (?, 72, 1, ?, ?, ?, NOW())
-            `;
-            const status = 'unpaid'; // Will be updated by payment distribution logic
-            await connection.promise().query(lateCheckoutQuery, [bookingId, totalLateCheckoutFee, status, encodedBy]);
+            await connection.promise().query(lateCheckoutQuery, [bookingId, lateFeeNum * roomIds.length, status, encodedBy]);
           } else if (!consolidatedBilling) {
-            // Individual: Add fee to each room
-            const lateCheckoutQuery = `
-              INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT)
-              VALUES (?, 72, 1, ?, ?, ?, NOW())
-            `;
-            const status = 'unpaid'; // Will be updated by payment distribution logic
-            await connection.promise().query(lateCheckoutQuery, [bookingId, lateCheckoutFee, status, encodedBy]);
+            await connection.promise().query(lateCheckoutQuery, [bookingId, lateFeeNum, status, encodedBy]);
           }
           // For consolidated billing and index > 0, skip (fee already added to main booking)
         }

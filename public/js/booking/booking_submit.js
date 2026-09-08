@@ -59,11 +59,61 @@ $(document).ready(function () {
       });
     });
     
+    // Block a booking whose 12-noon check-out day already has an Early Check-In
+    // in the same room (that guest can be in from ~1 AM -> overlap).
+    async function earlyCheckInConflictBlocks(roomId, daterange) {
+      try {
+        if (!roomId || !daterange || !daterange.includes(' to ')) return false;
+        const endRaw = daterange.split(' to ')[1].split('(')[0].trim();
+        const coDate = new Date(endRaw);
+        if (isNaN(coDate)) return false;
+        // local YYYY-MM-DD (avoid UTC shift in Manila / UTC+8)
+        const localKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const coKey = localKey(coDate);
+        const dateKeyOf = raw => {
+          if (typeof raw === 'string') {
+            const m = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+            if (m) return m[1];
+          }
+          const dd = new Date(raw);
+          return isNaN(dd) ? null : localKey(dd);
+        };
+        const cancelled = ['cancelled', 'canceled', 'void', 'no-show', 'no show', 'noshow'];
+
+        const res = await fetch('/calendar/bookings', { headers: { 'Accept': 'application/json' } });
+        const list = await res.json();
+        const hit = (Array.isArray(list) ? list : []).find(b => {
+          if (String(b.ROOM_ID) !== String(roomId)) return false;
+          const status = String(b.BOOKING_STATUS || '').toLowerCase();
+          if (cancelled.includes(status)) return false;
+          const ci = b.CHECK_IN_STATUS ?? b.checkInStatus ?? b.check_in_status;
+          if (Number(ci) !== 2) return false;
+          const inRaw = b.CHECK_IN_DATE ?? b.check_in_date ?? b.checkInDate;
+          return dateKeyOf(inRaw) === coKey;
+        });
+        if (!hit) return false;
+
+        Swal.fire({
+          icon: 'error',
+          title: 'Not Allowed - Early Check-In Conflict',
+          html: `This room has an <strong>Early Check-In</strong> on <strong>${endRaw}</strong>. ` +
+                `A booking that only checks out at 12 noon that day would overlap it. ` +
+                `Pick another room or change the dates.`,
+          confirmButtonText: 'OK'
+        });
+        return true;
+      } catch (e) {
+        return false; // never block on a fetch error - the server check still guards
+      }
+    }
+
     // Function to handle the actual booking processing
-    function processBooking() {
+    async function processBooking() {
       // SINGLE BOOKING LOGIC ONLY
       const roomId = $('#addroom').val();
       const daterange = $('#daterange').val();
+
+      if (await earlyCheckInConflictBlocks(roomId, daterange)) return;
       const fullname = $('#txtFullNameAdd').val();
       const number = window.ContactChannel
         ? window.ContactChannel.getValue('#contactChannel', '#txtNumber')
@@ -113,7 +163,7 @@ $(document).ready(function () {
       const lateCheckoutFee = $('#lateCheckoutFee').val();
       const isLongTermStay = $('#includeLongTermStay').is(':checked') ? 1 : 0;
       const roomChangeNote = isLongTermStay ? $('#roomChangeNote').val() : '';
-      console.log('DEBUG Single Booking: lateCheckoutFee =', lateCheckoutFee, 'checkOutStatus =', $('#checkOutStatus').val());
+      console.log('DEBUG Single Booking: lateCheckoutFee =', lateCheckoutFee, 'checkInStatus =', $('#checkInStatus').val());
 
       // Validate agency selection if booking route is agency
       if (bookingRoute === 'agency' && (!agencyID || agencyID.trim() === '')) {
@@ -302,7 +352,7 @@ $(document).ready(function () {
           error: function (err) {
             Swal.fire({
               title: 'Error!',
-              text: 'An error occurred. Please try again later.',
+              text: err?.responseJSON?.message || 'An error occurred. Please try again later.',
               icon: 'error',
               confirmButtonText: 'OK'
             });

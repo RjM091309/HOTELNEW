@@ -364,7 +364,7 @@ class DashboardController {
   // Check in guest with security deposit
   static async checkInWithSecurityDeposit(req, res) {
     try {
-      const { BookingID, depositAmount, paymentMethod, remarks } = req.body;
+      const { BookingID, depositAmount, paymentMethod, remarks, earlyCheckInFee } = req.body;
       const encodedBy = req.user?.userId;
 
       if (!BookingID) {
@@ -375,6 +375,7 @@ class DashboardController {
         depositAmount,
         paymentMethod,
         remarks,
+        earlyCheckInFee,
         encodedBy
       });
 

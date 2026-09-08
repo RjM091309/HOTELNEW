@@ -6,8 +6,75 @@
     let pendingCallbacks = { onSuccess: null, onCancel: null };
     let modalInstance = null;
 
+    // Early check-in: standard check-in is 3:00 PM. Guests arriving earlier are
+    // charged EARLY_CHECKIN_RATE per whole hour before 3 PM. The actual arrival
+    // time is rounded UP to the next hour first (10:30 -> counts as 11:00).
+    const EARLY_CHECKIN_STANDARD_HOUR = 15;
+    const EARLY_CHECKIN_RATE = 200;
+    let earlyCheckInState = { isEarly: false, fee: 0 };
+
     function getModalEl() {
         return document.getElementById('securityDepositModal');
+    }
+
+    function computeEarlyCheckInFee(now) {
+        const d = now instanceof Date ? now : new Date();
+        let hour = d.getHours();
+        if (d.getMinutes() > 0 || d.getSeconds() > 0) hour += 1; // round up to next hour
+        const hoursEarly = Math.max(0, EARLY_CHECKIN_STANDARD_HOUR - hour);
+        return { hoursEarly, fee: hoursEarly * EARLY_CHECKIN_RATE };
+    }
+
+    async function fetchIsEarlyCheckIn(bookingId) {
+        try {
+            const res = await fetch('/booking/booking_details/' + bookingId);
+            if (!res.ok) return false;
+            const data = await res.json();
+            return String(data.CHECK_IN_STATUS) === '2';
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // SweetAlert prompt with the auto-calculated early check-in fee, editable.
+    // Resolves with a number (>= 0) to proceed, or null to abort check-in.
+    function promptEarlyCheckInFee() {
+        const { hoursEarly, fee } = computeEarlyCheckInFee();
+        if (typeof Swal === 'undefined') return Promise.resolve(fee);
+
+        return Swal.fire({
+            title: 'Early Check-In Fee',
+            html:
+                '<p style="margin-bottom:10px;color:#555;">Guest is checking in <strong>' + hoursEarly +
+                ' hour' + (hoursEarly === 1 ? '' : 's') + '</strong> before the 3:00 PM standard time ' +
+                '(₱' + EARLY_CHECKIN_RATE + '/hour). Adjust the amount if needed.</p>' +
+                '<input id="sdEarlyFeeInput" type="number" min="0" step="0.01" class="swal2-input" ' +
+                'style="width:70%;" value="' + fee + '">',
+            showCancelButton: true,
+            confirmButtonText: 'Confirm & Check In',
+            cancelButtonText: 'Cancel',
+            confirmButtonColor: '#6f9c40',
+            allowOutsideClick: false,
+            focusConfirm: false,
+            customClass: { container: 'sd-early-fee-swal-container' },
+            didRender: () => {
+                const c = document.querySelector('.sd-early-fee-swal-container');
+                if (c) c.style.zIndex = '20000';
+            },
+            didOpen: () => {
+                const el = document.getElementById('sdEarlyFeeInput');
+                if (el) { el.focus(); el.select(); }
+            },
+            preConfirm: () => {
+                const raw = document.getElementById('sdEarlyFeeInput')?.value;
+                const n = parseFloat(String(raw).replace(/,/g, ''));
+                if (!Number.isFinite(n) || n < 0) {
+                    Swal.showValidationMessage('Enter a valid amount (0 or more).');
+                    return false;
+                }
+                return n;
+            }
+        }).then((result) => (result.isConfirmed ? Number(result.value) : null));
     }
 
     function parseAmountInput(value) {
@@ -112,6 +179,10 @@
     async function submitCheckIn(bookingId, depositInfo) {
         const payload = { BookingID: bookingId };
 
+        if (earlyCheckInState.isEarly && earlyCheckInState.fee > 0) {
+            payload.earlyCheckInFee = earlyCheckInState.fee;
+        }
+
         if (!depositInfo.exists) {
             const amount = parseAmountInput(document.getElementById('sdDepositAmount')?.value);
             const paymentMethod = document.getElementById('sdPaymentMethod')?.value || 'cash';
@@ -158,6 +229,13 @@
             const bookingId = document.getElementById('sdBookingId')?.value;
             const depositExists = this.dataset.depositExists === 'true';
 
+            // Early Check In: ask for the (auto-calculated, editable) fee first.
+            if (earlyCheckInState.isEarly) {
+                const fee = await promptEarlyCheckInFee();
+                if (fee === null) return; // staff cancelled - do not check in
+                earlyCheckInState.fee = fee;
+            }
+
             const result = await submitCheckIn(bookingId, { exists: depositExists });
             if (!result) return;
 
@@ -197,6 +275,7 @@
 
         pendingCallbacks = { onSuccess, onCancel };
         resetForm();
+        earlyCheckInState = { isEarly: await fetchIsEarlyCheckIn(bookingId), fee: 0 };
 
         document.getElementById('sdBookingId').value = bookingId;
         document.getElementById('sdRoomInfo').textContent =

@@ -1,74 +1,79 @@
 const { queryDatabasePromise } = require('../config/database');
 
+// Expense record shape:
+//   EXPENSE_DATE  -> Date of Expense
+//   COMPANY_NAME  -> Company Name (vendor)
+//   Description   -> Details of Expense
+//   ReceiptNo     -> SI no. (sales invoice number)
+//   Amount        -> Amount
 const expensesModel = {
   // Get all active expenses
   getAllExpenses: async () => {
-    try {
-      const query = 'SELECT * FROM expenses WHERE ACTIVE = 1 ORDER BY ENCODED_DT DESC';
-      return await queryDatabasePromise(query);
-    } catch (error) {
-      throw error;
-    }
+    const query = `
+      SELECT IDNo, EXPENSE_DATE, COMPANY_NAME, Description, ReceiptNo, Amount,
+             ENCODED_BY, ENCODED_DT, EDITED_BY, EDITED_DT
+      FROM expenses
+      WHERE ACTIVE = 1
+      ORDER BY EXPENSE_DATE DESC, IDNo DESC
+    `;
+    return await queryDatabasePromise(query);
   },
 
   // Add a new expense
-  addExpense: async (category, receipt, description, amount, encodedBy) => {
-    try {
-      const query = `
-        INSERT INTO expenses (Category, ReceiptNo, Description, Amount, ENCODED_BY, ENCODED_DT, ACTIVE)
-        VALUES (?, ?, ?, ?, ?, NOW(), 1)
-      `;
-      const result = await queryDatabasePromise(query, [category, receipt, description, amount, encodedBy]);
-      return { success: true, id: result.insertId };
-    } catch (error) {
-      throw error;
-    }
+  addExpense: async ({ expenseDate, companyName, siNo, details, amount, encodedBy }) => {
+    const query = `
+      INSERT INTO expenses (EXPENSE_DATE, COMPANY_NAME, ReceiptNo, Description, Amount, ENCODED_BY, ENCODED_DT, ACTIVE)
+      VALUES (?, ?, ?, ?, ?, ?, NOW(), 1)
+    `;
+    const result = await queryDatabasePromise(query, [
+      expenseDate || null,
+      companyName || null,
+      siNo || null,
+      details,
+      amount,
+      encodedBy
+    ]);
+    return { success: true, id: result.insertId };
   },
 
   // Get expense by ID
   getExpenseById: async (id) => {
-    try {
-      const query = 'SELECT * FROM expenses WHERE IDNo = ? AND ACTIVE = 1';
-      const results = await queryDatabasePromise(query, [id]);
-      return results.length > 0 ? results[0] : null;
-    } catch (error) {
-      throw error;
-    }
+    const query = `
+      SELECT IDNo, EXPENSE_DATE, COMPANY_NAME, Description, ReceiptNo, Amount,
+             ENCODED_BY, ENCODED_DT, EDITED_BY, EDITED_DT
+      FROM expenses
+      WHERE IDNo = ? AND ACTIVE = 1
+    `;
+    const results = await queryDatabasePromise(query, [id]);
+    return results.length > 0 ? results[0] : null;
   },
 
   // Update an existing expense
-  updateExpense: async (id, category, receipt, description, amount, editedBy) => {
-    try {
-      const query = `
-        UPDATE expenses
-        SET Category = ?, ReceiptNo = ?, Description = ?, Amount = ?, EDITED_BY = ?, EDITED_DT = NOW()
-        WHERE IDNo = ? AND ACTIVE = 1
-      `;
-      const result = await queryDatabasePromise(query, [category, receipt, description, amount, editedBy, id]);
-      if (result.affectedRows === 0) {
-        return { success: false, notFound: true };
-      } else {
-        return { success: true };
-      }
-    } catch (error) {
-      throw error;
-    }
+  updateExpense: async (id, { expenseDate, companyName, siNo, details, amount, editedBy }) => {
+    const query = `
+      UPDATE expenses
+      SET EXPENSE_DATE = ?, COMPANY_NAME = ?, ReceiptNo = ?, Description = ?, Amount = ?,
+          EDITED_BY = ?, EDITED_DT = NOW()
+      WHERE IDNo = ? AND ACTIVE = 1
+    `;
+    const result = await queryDatabasePromise(query, [
+      expenseDate || null,
+      companyName || null,
+      siNo || null,
+      details,
+      amount,
+      editedBy,
+      id
+    ]);
+    return result.affectedRows === 0 ? { success: false, notFound: true } : { success: true };
   },
 
   // Soft delete an expense
   deleteExpense: async (expenseId) => {
-    try {
-      const query = 'UPDATE expenses SET ACTIVE = 0 WHERE IDNo = ?';
-      const result = await queryDatabasePromise(query, [expenseId]);
-      if (result.affectedRows === 0) {
-        return { success: false, notFound: true };
-      } else {
-        return { success: true };
-      }
-    } catch (error) {
-      throw error;
-    }
+    const query = 'UPDATE expenses SET ACTIVE = 0 WHERE IDNo = ?';
+    const result = await queryDatabasePromise(query, [expenseId]);
+    return result.affectedRows === 0 ? { success: false, notFound: true } : { success: true };
   }
 };
 
-module.exports = expensesModel; 
+module.exports = expensesModel;

@@ -372,12 +372,43 @@ function isCalendarSlotBooked(resourceId, start, end) {
   });
 }
 
+// True when the room already has an Early Check-In arriving on the same day
+// this selection would check out (12 noon). The early guest can be in from
+// ~1 AM that day, so a stay ending at noon overlaps it - block before the
+// Add Booking modal even opens.
+function calendarSelectionEarlyCheckInConflict(resourceId, end) {
+  const calendar = getCalendar();
+  if (!calendar || !resourceId || !end) return null;
+
+  const endDate = (end instanceof Date) ? end : new Date(end);
+  if (isNaN(endDate)) return null;
+  // A drag that stops in a PM slot lands on 00:00 of the next day - the real
+  // checkout day is the day before.
+  const checkoutDay = endDate.getHours() === 0
+    ? new Date(endDate.getTime() - 1)
+    : endDate;
+  const coMs = toLocalDayStartMs(checkoutDay);
+  const rid = String(resourceId);
+
+  const hit = calendar.getEvents().find(function(ev) {
+    const evResource = ev.getResources()[0];
+    if (!evResource || String(evResource.id) !== rid) return false;
+    const status = String(ev.extendedProps?.bookingStatus || '').toLowerCase();
+    if (['cancelled', 'canceled', 'void', 'no-show', 'no show', 'maintenance'].includes(status)) return false;
+    if (Number(ev.extendedProps?.checkInStatus) !== 2) return false;
+    if (!ev.start) return false;
+    return toLocalDayStartMs(ev.start) === coMs;
+  });
+  return hit || null;
+}
+
 // =============================================================================
 // EXPORT FUNCTIONS FOR USE IN OTHER MODULES
 // =============================================================================
 
 // Make functions globally available
 window.isCalendarSlotBooked = isCalendarSlotBooked;
+window.calendarSelectionEarlyCheckInConflict = calendarSelectionEarlyCheckInConflict;
 window.getCSRFToken = getCSRFToken;
 window.getBookingColor = getBookingColor;
 window.getCalendar = getCalendar;

@@ -198,15 +198,18 @@
                                         <i class="fa fa-credit-card"></i> Proceed to Payment
                                     </button>
                                     <div class="voucher-action-wrap">
+                                        <!-- SEND temporarily disabled - print only for now -->
                                         <div class="voucher-action-menu" id="printReceiptActionMenu" hidden style="display: none;" onclick="event.stopPropagation()">
                                             <button type="button" class="btn btn-sm btn-light voucher-action-btn" onclick="window.printBillingReceipt()">
                                                 <i class="fa fa-print me-1"></i>Print
                                             </button>
+                                            <!--
                                             <button type="button" class="btn btn-sm btn-primary voucher-action-btn" onclick="window.sendBillingReceipt()">
                                                 <i class="fa fa-paper-plane me-1"></i>Send
                                             </button>
+                                            -->
                                         </div>
-                                        <button type="button" class="btn btn-print" onclick="window.toggleActionPopup('printReceiptActionMenu', event)">
+                                        <button type="button" class="btn btn-print" onclick="window.printBillingReceipt()">
                                             <i class="fa fa-print"></i> Print Receipt
                                         </button>
                                     </div>
