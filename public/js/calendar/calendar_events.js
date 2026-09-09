@@ -571,6 +571,34 @@ function applyPickupIndicator(event, el) {
   }
 }
 
+// Guest-name overlay drawn on the un-skewed harness ABOVE the edge caps, so the
+// name always sits IN FRONT of the blue / orange cap instead of behind it.
+function syncEventNameOverlay(event, el) {
+  try {
+    const harness = el.closest('.fc-timeline-event-harness') || el;
+    let ov = harness.querySelector(':scope > .event-name-overlay');
+    const want = el.classList.contains('has-late-checkout-end')
+      || el.classList.contains('has-late-checkin-start')
+      || el.classList.contains('has-early-checkin-start')
+      || el.classList.contains('has-reservation-fee-start');
+
+    if (!want) {
+      if (ov) ov.remove();
+      el.classList.remove('has-name-overlay');
+      return;
+    }
+    if (!ov) {
+      ov = document.createElement('div');
+      ov.className = 'event-name-overlay';
+      harness.appendChild(ov);
+    }
+    ov.textContent = event.title || '';
+    el.classList.add('has-name-overlay');
+  } catch (e) {
+    // ignore
+  }
+}
+
 // Solid blue cap over the END (checkout edge) of every Late Check-Out booking
 // bar. Mounted on the un-skewed .fc-timeline-event-harness wrapper (NOT on the
 // skewed, overflow:hidden .fc-event) so it can fully cover the bar's slanted
@@ -639,6 +667,34 @@ function applyLateCheckInStartMarker(event, el) {
   }
 }
 
+// Fuchsia cap over the START (left) edge of every booking that has a reservation
+// fee paid (partial payment) - same shape as the orange late-check-in cap.
+function applyReservationFeeStartMarker(event, el) {
+  try {
+    const harness = el.closest('.fc-timeline-event-harness') || el;
+    const status = String(event.extendedProps?.bookingStatus || '').toLowerCase();
+    const isResFee = getPaymentStatusNormalized(event) === 'partial';
+
+    const existing = harness.querySelector(':scope > .reservation-fee-start-marker');
+
+    if (!isResFee || status === 'cancelled' || status === 'maintenance') {
+      if (existing) existing.remove();
+      el.classList.remove('has-reservation-fee-start');
+      return;
+    }
+
+    el.classList.add('has-reservation-fee-start');
+    if (!existing) {
+      const marker = document.createElement('div');
+      marker.className = 'reservation-fee-start-marker';
+      marker.title = 'Reservation Fee Paid';
+      harness.appendChild(marker);
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
 // Pixels this bar spans per calendar day, from its own rendered geometry
 // (pixel width / duration in days) - no dependency on slot DOM layout timing.
 function oneDayWidthForBar(event, el) {
@@ -650,10 +706,39 @@ function oneDayWidthForBar(event, el) {
   return 40;
 }
 
-// Black cap on the check-in edge of every Early Check-In bar. The bar's real
-// start stays at 3 PM (so drag/resize math is unaffected); the cap is drawn
-// EXTENDING LEFT past the bar edge to the day's first gridline, so it reads as
-// "the bar starts in the first box of the day". Purely visual.
+// Right edge (viewport px) of the nearest earlier bar (incl. its blue late-
+// checkout cap) in the SAME room row - used to butt the Early Check-In black
+// block right against a previous stay, which reads as a back-to-back booking.
+function prevBarRightEdge(harness, myEl, myLeft) {
+  try {
+    const scope = harness.closest('.fc-timeline-lane, .fc-timeline-lane-frame')
+      || harness.parentElement;
+    if (!scope) return null;
+    let best = null;
+    scope.querySelectorAll('.fc-timeline-event-harness').forEach(h => {
+      if (h === harness) return;
+      const ev = h.querySelector('.fc-event');
+      if (!ev || ev === myEl) return;
+      if (ev.classList.contains('fc-event-cancelled') || h.style.zIndex === '1') return;
+      const r = ev.getBoundingClientRect();
+      if (r.width === 0) return;
+      let right = r.right;
+      const cap = h.querySelector('.late-checkout-end-marker');
+      if (cap) right = Math.max(right, cap.getBoundingClientRect().right);
+      if (right <= myLeft + 4 && (best === null || right > best)) best = right;
+    });
+    return best;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Black block for every Early Check-In bar. The red bar keeps its real start
+// (3 PM of the check-in day, so drag/resize math is untouched). The black marks
+// the day BEFORE check-in - one full day column ("no booking allowed" day) -
+// sitting flush against the red bar. When the previous stay in that room ends
+// just before it (back-to-back), the black stretches left to butt against that
+// stay's end / its blue late-checkout cap so the two connect visually.
 function applyEarlyCheckInStartMarker(event, el) {
   try {
     const harness = el.closest('.fc-timeline-event-harness') || el;
@@ -661,9 +746,7 @@ function applyEarlyCheckInStartMarker(event, el) {
     const hpRaw = event.extendedProps?.holdPending;
     const isHoldPending = hpRaw === 1 || hpRaw === '1' || hpRaw === true
       || String(hpRaw).toLowerCase() === 'true';
-    const isEarly = !isHoldPending && (
-      Number(event.extendedProps?.checkInStatus) === 2
-    );
+    const isEarly = !isHoldPending && Number(event.extendedProps?.checkInStatus) === 2;
 
     const existing = harness.querySelector(':scope > .early-checkin-start-marker');
 
@@ -672,6 +755,7 @@ function applyEarlyCheckInStartMarker(event, el) {
       el.classList.remove('has-early-checkin-start');
       el.style.removeProperty('--early-ci-cap-w');
       el.style.removeProperty('--early-ci-cap-left');
+      el.style.removeProperty('--early-ci-cap-inset');
       return;
     }
 
@@ -685,21 +769,32 @@ function applyEarlyCheckInStartMarker(event, el) {
     }
 
     const sizeCap = () => {
-      const dayW = oneDayWidthForBar(event, el);      // px per calendar day
-      const preStart = Math.max(0, dayW * (15 / 24)); // 3 PM start -> gridline gap
-      const left = -(preStart + 3);
-      // Fill the first day column: from the 00:00 gridline to end of that day.
-      const width = Math.max(16, dayW);
-      // How far the cap actually reaches over the coloured bar (right of the bar edge).
-      const inset = Math.max(10, width + left);
-      el.style.setProperty('--early-ci-cap-left', left + 'px');
+      const dayW = oneDayWidthForBar(event, el);   // px per calendar day
+      const rightRel = 2;                          // black right edge: 2px into the bar (no gap)
+      // Default: one full day column ("no booking allowed" day) before check-in.
+      let leftRel = -(dayW - rightRel);
+
+      // Back-to-back: if a stay ends within ~1 box of the black's left edge,
+      // pull the black's left edge over to butt against it (its blue cap incl.).
+      const barLeft = el.getBoundingClientRect().left;
+      const prevRight = prevBarRightEdge(harness, el, barLeft);
+      if (prevRight !== null) {
+        const prevRel = prevRight - barLeft;       // negative = left of the bar
+        if (prevRel <= rightRel && prevRel >= leftRel - dayW * 0.6) {
+          leftRel = prevRel - 1;                   // 1px overlap so they connect cleanly
+        }
+      }
+
+      const width = rightRel - leftRel;
+      el.style.setProperty('--early-ci-cap-left', leftRel + 'px');
       el.style.setProperty('--early-ci-cap-w', width + 'px');
-      el.style.setProperty('--early-ci-cap-inset', inset + 'px');
-      marker.style.left = left + 'px';
+      el.style.setProperty('--early-ci-cap-inset', '0px');   // never covers the bar
+      marker.style.left = leftRel + 'px';
       marker.style.width = width + 'px';
     };
     sizeCap();
-    requestAnimationFrame(sizeCap); // re-measure once layout settles
+    requestAnimationFrame(sizeCap);
+    setTimeout(sizeCap, 80);   // re-measure after sibling bars finish mounting
   } catch (e) {
     // ignore
   }
@@ -731,6 +826,113 @@ function getEventsByResourceIdMap(calendarApi) {
   __overlapCacheEventsRef = events;
   __overlapCacheEventsLength = events.length;
   return map;
+}
+
+// ---------------------------------------------------------------------------
+// HOVER TOOLTIP - full booking breakdown, so a tiny single-day bar can still
+// carry Late C/I + Reservation fee + Late C/O + Pick-up etc. without stacking
+// unreadable markers on the bar itself.
+//
+// NOT released yet - OFF by default. To preview without a code change, run in
+// the browser console:  localStorage.setItem('calendarBookingTooltip', 'on')
+// then reload. Flip EVENT_TOOLTIP_DEFAULT_ON to true to ship it to everyone.
+// ---------------------------------------------------------------------------
+const EVENT_TOOLTIP_DEFAULT_ON = true;
+
+function isEventTooltipEnabled() {
+  try {
+    const v = localStorage.getItem('calendarBookingTooltip');
+    if (v === 'on') return true;
+    if (v === 'off') return false;
+  } catch (e) { /* ignore */ }
+  return EVENT_TOOLTIP_DEFAULT_ON;
+}
+
+function fmtTooltipDate(d) {
+  if (!d) return '-';
+  try {
+    return new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch (e) {
+    return '-';
+  }
+}
+
+function buildEventTooltipHtml(event) {
+  const p = event.extendedProps || {};
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
+  ));
+
+  const rows = [];
+  const add = (label, value, accent) => {
+    if (value == null || value === '') return;
+    const dot = accent ? `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${accent};margin-right:6px;vertical-align:middle"></span>` : '';
+    rows.push(`<div style="display:flex;gap:8px;line-height:1.5;white-space:nowrap"><span style="opacity:.65;min-width:74px;flex:none">${esc(label)}</span><span style="font-weight:600">${dot}${esc(value)}</span></div>`);
+  };
+
+  const res = event.getResources && event.getResources()[0];
+  const roomNo = res ? res.title : '';
+
+  const status = String(p.bookingStatus || '').toLowerCase();
+  if (status === 'cancelled') {
+    return `<div style="font-weight:700;margin-bottom:4px">${esc(event.title || 'Booking')}</div>`
+      + `<div style="opacity:.7">Cancelled${p.cancellationReason ? ' - ' + esc(p.cancellationReason) : ''}</div>`;
+  }
+  if (status === 'maintenance') {
+    return `<div style="font-weight:700;margin-bottom:4px">Maintenance - Room ${esc(roomNo)}</div>`
+      + (p.maintenanceReason ? `<div style="opacity:.7">${esc(p.maintenanceReason)}</div>` : '');
+  }
+
+  const ci = Number(p.checkInStatus);
+  const ciText = ci === 2 ? 'Early Check-In' : (ci === 0 ? 'Late Check-In (after 12mn)' : 'Regular (3:00 PM)');
+  const ciAccent = ci === 2 ? '#000' : (ci === 0 ? '#FB8C00' : null);
+
+  const lateCO = Number(p.checkOutStatus) === 1;
+  const coText = lateCO ? 'Late Check-Out (11:00 PM)' : 'Regular (12:00 noon)';
+  const coAccent = lateCO ? '#1A3FA0' : null;
+
+  const pay = String(p.paymentStatus || '').toLowerCase().replace('partial_paid', 'partial');
+  const payText = pay === 'paid' ? 'Fully paid'
+    : pay === 'partial' ? 'Reservation fee paid (partial)'
+    : 'Unpaid';
+  const payAccent = pay === 'partial' ? '#D500F9' : null;
+
+  add('Room', roomNo);
+  add('Check-in', `${fmtTooltipDate(event.start)} - ${ciText}`, ciAccent);
+  add('Check-out', `${fmtTooltipDate(event.end)} - ${coText}`, coAccent);
+  add('Payment', payText, payAccent);
+  if (p.totalCost != null) add('Total', '₱' + Number(p.totalCost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+  if (p.hasPickup) add('Transport', '✈ Pick-up / Drop-off');
+  if (p.isLongTermStay) add('Note', 'Long-term stay');
+  if (p.isBackToBack) add('Note', 'Back-to-back');
+  if (p.holdPending) add('Note', 'Hold pending');
+  const channel = String(p.bookingChannel || '').trim();
+  if (channel && channel.toLowerCase() !== 'walk-in') add('Channel', channel);
+
+  return `<div style="font-weight:700;margin-bottom:5px;font-size:12.5px">${esc(event.title || 'Booking')}</div>`
+    + `<div style="display:flex;flex-direction:column;gap:2px;font-size:11.5px">${rows.join('')}</div>`;
+}
+
+function attachEventTooltip(event, el) {
+  try {
+    if (el._tippy) el._tippy.destroy();
+    if (!isEventTooltipEnabled()) return;
+    if (typeof window.tippy !== 'function') return;
+    window.tippy(el, {
+      content: buildEventTooltipHtml(event),
+      allowHTML: true,
+      theme: 'light',
+      placement: 'top',
+      arrow: true,
+      delay: [140, 0],
+      duration: [120, 80],
+      maxWidth: 'none',
+      offset: [0, 8],
+      appendTo: () => document.body
+    });
+  } catch (e) {
+    // ignore
+  }
 }
 
 function handleEventDidMount(info) {
@@ -783,6 +985,9 @@ function handleEventDidMount(info) {
   applyLateCheckoutEndMarker(info.event, info.el);
   applyLateCheckInStartMarker(info.event, info.el);
   applyEarlyCheckInStartMarker(info.event, info.el);
+  applyReservationFeeStartMarker(info.event, info.el);
+  syncEventNameOverlay(info.event, info.el);
+  attachEventTooltip(info.event, info.el);
 
   // Control visual overlay: allow only if either event is checkout
   try {

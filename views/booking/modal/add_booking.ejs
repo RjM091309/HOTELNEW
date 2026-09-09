@@ -300,8 +300,7 @@
                                 <div class="form-group">
                                   <label class="form-label">Check-In Status</label>
                                   <select class="form-select" name="checkInStatus" id="checkInStatus" required>
-                                    <option value="" disabled selected>Check-In Status</option>
-                                    <option value="1">Regular Check In</option>
+                                    <option value="1" selected>Regular Check In</option>
                                     <option value="0">Late Check In</option>
                                     <option value="2">Early Check In</option>
                                   </select>
@@ -496,8 +495,9 @@
 						const prefOut = localStorage.getItem('bookingCheckoutPref');
 						const inField = document.getElementById('checkInStatus');
 						const outField = document.getElementById('checkOutStatus');
-                        if (inField && (prefIn === 'R/I' || prefIn === 'L/I')) {
-                            inField.value = (prefIn === 'R/I') ? '1' : '0';
+                        // Check-In Status always starts on Regular for a new booking.
+                        if (inField) {
+                            inField.value = '1';
                             inField.dispatchEvent(new Event('change'));
                         }
                         if (outField && (prefOut === 'R/O' || prefOut === 'L/O')) {
@@ -516,8 +516,8 @@
 							const prefOut2 = localStorage.getItem('bookingCheckoutPref');
 							const inField2 = document.getElementById('checkInStatus');
 							const outField2 = document.getElementById('checkOutStatus');
-                            if (inField2 && (prefIn2 === 'R/I' || prefIn2 === 'L/I')) {
-                                inField2.value = (prefIn2 === 'R/I') ? '1' : '0';
+                            if (inField2 && !inField2.value) {
+                                inField2.value = '1';
                             }
                             if (outField2 && (prefOut2 === 'R/O' || prefOut2 === 'L/O')) {
                                 outField2.value = (prefOut2 === 'R/O') ? '0' : '1';
@@ -542,12 +542,7 @@
 					try {
 						const inFieldP = document.getElementById('checkInStatus');
 						const outFieldP = document.getElementById('checkOutStatus');
-						if (inFieldP) {
-							inFieldP.addEventListener('change', function(){
-								const code = this.value === '1' ? 'R/I' : 'L/I';
-								localStorage.setItem('bookingCheckinPref', code);
-							});
-						}
+						// Check-In Status is NOT remembered - every new booking starts on Regular.
 						if (outFieldP) {
 							outFieldP.addEventListener('change', function(){
 								const code = this.value === '0' ? 'R/O' : 'L/O';

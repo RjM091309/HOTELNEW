@@ -137,7 +137,7 @@
             </div>
             <div class="filter-btn-group paid-modal-shift-group">
               <button type="button" class="filter-btn active" data-paid-shift="all">All Shifts</button>
-              <button type="button" class="filter-btn" data-paid-shift="1">Shift 1 &middot; 7AM&ndash;4PM</button>
+              <button type="button" class="filter-btn" data-paid-shift="1">Shift 1 &middot; 7AM&ndash;12NN</button>
               <button type="button" class="filter-btn" data-paid-shift="2">Shift 2 &middot; 1PM&ndash;10PM</button>
               <button type="button" class="filter-btn" data-paid-shift="3">Shift 3 &middot; 10PM&ndash;7AM</button>
             </div>
@@ -498,13 +498,13 @@
 
   // Shift windows keyed by the hour of PAYMENT_DATE. Shift 3 wraps past midnight.
   const PAID_SHIFT_LABELS = {
-    '1': 'Shift 1 (7AM–4PM)',
+    '1': 'Shift 1 (7AM–12NN)',
     '2': 'Shift 2 (1PM–10PM)',
     '3': 'Shift 3 (10PM–7AM)'
   };
 
   function paidShiftPredicate(shift) {
-    if (shift === '1') return h => h >= 7 && h < 16;
+    if (shift === '1') return h => h >= 7 && h < 12;
     if (shift === '2') return h => h >= 13 && h < 22;
     if (shift === '3') return h => h >= 22 || h < 7;
     return null; // 'all'

@@ -541,9 +541,8 @@
     white-space: nowrap;
     /* Enhanced shadow for better depth */
     box-shadow: none !important;
-    /* Parallelogram look only — do NOT scaleX. Scaling shortens long stays
-       (e.g. Aug 31–Sep 29 looked like it ended on the 27th). */
-    transform: skew(-18deg) !important;
+    /* Straight rectangular bars (no skew / parallelogram lean). */
+    transform: none !important;
     transform-origin: center !important;
     transform-style: flat !important;
     backface-visibility: visible !important;
@@ -568,9 +567,9 @@
   #calendar .fc-timeline-event-harness { top: 5px !important; height: 18px !important; }
   #calendar td.fc-timeline-lane .fc-timeline-events { min-height: 18px !important; height: 18px !important; }
   
-  /* Counter the bar skew so labels stay upright and crystal clear */
+  /* Bars are no longer skewed, so children need no counter-skew. */
   .fc-event > * {
-    transform: skew(18deg) !important;
+    transform: none !important;
     transform-origin: center !important;
     transform-style: flat !important;
     backface-visibility: visible !important;

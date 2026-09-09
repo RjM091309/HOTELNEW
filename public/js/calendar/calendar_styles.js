@@ -157,7 +157,7 @@ function injectDragStyles() {
       z-index: 26;
       line-height: 1;
       /* Counter the bar's skew(-18deg) so the car stays upright */
-      transform: translateY(-50%) skew(18deg) !important;
+      transform: translateY(-50%) !important;
       transform-style: flat !important;
       backface-visibility: visible !important;
     }
@@ -168,8 +168,9 @@ function injectDragStyles() {
 
     /* Solid blue cap over the checkout (right) end of every Late Check-Out
        booking bar. Mounted on the un-skewed .fc-timeline-event-harness wrapper
-       (not the skewed, overflow:hidden .fc-event), so it can fully cover the
-       bar's slanted tip - blue all the way, nothing of the bar colour left. */
+       (not the skewed, overflow:hidden .fc-event) and skewed to match, so it
+       fully covers the bar's slanted tip. The guest name is drawn on top of it
+       by .event-name-overlay, so a wide cap no longer hides the name. */
     .fc-timeline-event-harness > .late-checkout-end-marker {
       position: absolute;
       right: -3px;
@@ -179,14 +180,8 @@ function injectDragStyles() {
       background: #1A3FA0;   /* matches the late-check-out / BTB deep blue accent */
       pointer-events: none;
       z-index: 20;
-      /* match the bar's parallelogram slant */
-      transform: skewX(-18deg);
+      transform: none;
       transform-origin: right center;
-    }
-
-    .fc-event.has-late-checkout-end .event-title-chip {
-      /* keep the title clear of the blue cap */
-      padding-right: 26px;
     }
 
     /* Mirror on the START (check-in / left) edge for every Late Check-In bar,
@@ -200,13 +195,8 @@ function injectDragStyles() {
       background: #FB8C00;   /* matches the late-check-in orange accent */
       pointer-events: none;
       z-index: 20;
-      transform: skewX(-18deg);
+      transform: none;
       transform-origin: left center;
-    }
-
-    .fc-event.has-late-checkin-start .event-title-chip {
-      /* keep the title clear of the orange cap */
-      padding-left: 26px;
     }
 
     /* The orange cap sits above the bar, hiding the pick-up plane that lives at
@@ -214,15 +204,68 @@ function injectDragStyles() {
     .fc-event.has-late-checkin-start .pickup-service-indicator {
       left: 30px;
     }
-    .fc-event.has-late-checkin-start.has-pickup-service .event-title-chip {
-      left: 24px;
-      padding-left: 44px;
+
+    /* Fuchsia cap on the START (left) edge for every booking with a reservation
+       fee paid (partial payment) - same shape as the orange late-check-in cap. */
+    .fc-timeline-event-harness > .reservation-fee-start-marker {
+      position: absolute;
+      left: -3px;
+      top: 0;
+      bottom: 0;
+      width: 26px;
+      background: #D500F9;   /* electric fuchsia */
+      pointer-events: none;
+      z-index: 21;
+      transform: none;
+      transform-origin: left center;
     }
 
-    /* Black cap on the check-in edge of every Early Check-In bar. left + width
-       are set in JS (vars on the .fc-event): the cap extends LEFT past the bar
-       edge to the day's first gridline, so the bar reads as starting in the
-       first box of the day. */
+    /* When a bar has BOTH the orange Late Check-In cap and the Reservation Fee
+       cap, share ONE cap slot split VERTICALLY: orange on the left half,
+       fuchsia on the right half. */
+    .fc-timeline-event-harness > .fc-event.has-late-checkin-start.has-reservation-fee-start ~ .late-checkin-start-marker {
+      width: 13px;
+    }
+    .fc-timeline-event-harness > .fc-event.has-late-checkin-start.has-reservation-fee-start ~ .reservation-fee-start-marker {
+      left: 10px;
+      width: 13px;
+    }
+
+    .fc-event.has-reservation-fee-start .pickup-service-indicator {
+      left: 30px;
+    }
+
+    /* Guest-name overlay: harness-level (un-skewed) layer drawn ABOVE the edge
+       caps (z-index 20), so the name always reads in FRONT of the blue / orange
+       cap. Replaces the in-bar .event-title-chip whenever a cap is present. */
+    .fc-timeline-event-harness > .event-name-overlay {
+      position: absolute;
+      left: 6px;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      text-align: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: #fff;
+      text-shadow:
+        -1px -1px 0 rgba(0, 0, 0, 0.55), 1px -1px 0 rgba(0, 0, 0, 0.55),
+        -1px 1px 0 rgba(0, 0, 0, 0.55), 1px 1px 0 rgba(0, 0, 0, 0.55),
+        0 1px 3px rgba(0, 0, 0, 0.9);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      pointer-events: none;
+      z-index: 25;
+    }
+
+    .fc-event.has-name-overlay .event-title-chip {
+      visibility: hidden;
+    }
+
+    /* Black cap on the check-in edge of every Early Check-In bar - left + width
+       set in JS (vars on the .fc-event): extends LEFT past the bar edge to the
+       day's first gridline and fills the WHOLE first day column ("double black"). */
     .fc-timeline-event-harness > .early-checkin-start-marker {
       position: absolute;
       left: var(--early-ci-cap-left, -3px);
@@ -232,15 +275,13 @@ function injectDragStyles() {
       background: #000;
       pointer-events: none;
       z-index: 20;
-      transform: skewX(-18deg);
+      transform: none;
       transform-origin: left center;
     }
-
     .fc-event.has-early-checkin-start .event-title-chip {
       /* keep the title clear of the part of the cap that covers the bar */
       padding-left: calc(var(--early-ci-cap-inset, 20px) + 4px);
     }
-
     .fc-event.has-early-checkin-start .pickup-service-indicator {
       left: calc(var(--early-ci-cap-inset, 20px) + 6px);
     }
@@ -254,7 +295,9 @@ function injectDragStyles() {
        bar doesn't reach them on its own). */
     .fc-timeline-event-harness > .fc-event.legend-dimmed ~ .late-checkout-end-marker,
     .fc-timeline-event-harness > .fc-event.legend-dimmed ~ .late-checkin-start-marker,
-    .fc-timeline-event-harness > .fc-event.legend-dimmed ~ .early-checkin-start-marker {
+    .fc-timeline-event-harness > .fc-event.legend-dimmed ~ .early-checkin-start-marker,
+    .fc-timeline-event-harness > .fc-event.legend-dimmed ~ .reservation-fee-start-marker,
+    .fc-timeline-event-harness > .fc-event.legend-dimmed ~ .event-name-overlay {
       opacity: 0.45 !important;
     }
   `;

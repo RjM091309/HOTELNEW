@@ -2665,21 +2665,17 @@ function applyIncomingHighlight() {
             const r = bgEl.getBoundingClientRect();
             const overlay = document.createElement('div');
             overlay.className = 'calendar-highlight-overlay-pulse';
-            // match booking bar skew from calendar.css (.fc-event has skew -18deg)
-            // compute extra width to compensate so tips are not cropped
-            const skewDeg = 18; // keep in sync with CSS
-            const skewRad = skewDeg * Math.PI / 180;
-            const extra = Math.tan(skewRad) * (r.height / 2);
+            // Bars are straight rectangles now - no skew to match.
             const pad = 6; // border/blur breathing room
-            const left = r.left - extra - pad;
-            const width = r.width + extra * 2 + pad * 2;
+            const left = r.left - pad;
+            const width = r.width + pad * 2;
             const top = r.top - pad;
             const height = r.height + pad * 2;
             overlay.style.left = Math.max(0, left) + 'px';
             overlay.style.top = Math.max(0, top) + 'px';
             overlay.style.width = Math.max(0, width) + 'px';
             overlay.style.height = Math.max(0, height) + 'px';
-            overlay.style.transform = 'skew(-18deg)';
+            overlay.style.transform = 'none';
             // inner white fill to mimic event highlight interior
             const fill = document.createElement('div');
             fill.style.position = 'absolute';
