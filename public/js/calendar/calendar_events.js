@@ -919,7 +919,17 @@ function attachEventTooltip(event, el) {
     if (!isEventTooltipEnabled()) return;
     if (typeof window.tippy !== 'function') return;
     window.tippy(el, {
-      content: buildEventTooltipHtml(event),
+      // Build the content on every open from the CURRENT event state (dates, room,
+      // status) instead of freezing a string at mount time. Keeps the tooltip
+      // correct after an in-place drag / resize / room transfer / socket update
+      // without re-attaching anything.
+      content: '',
+      onShow(instance) {
+        const live = (window.calendar && typeof window.calendar.getEventById === 'function')
+          ? (window.calendar.getEventById(event.id) || event)
+          : event;
+        instance.setContent(buildEventTooltipHtml(live));
+      },
       allowHTML: true,
       theme: 'light',
       placement: 'top',

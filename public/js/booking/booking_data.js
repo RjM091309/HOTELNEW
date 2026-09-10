@@ -33,6 +33,8 @@ $(document).ready(function () {
             url: initialUrl,
             type: 'GET',
             dataSrc: function (json) {
+                // Admin flag drives the "Delete" action on checked-out rows.
+                window.__bookingListIsAdmin = !!json.isAdmin;
                 return json.data.map(item => {
                     const formatDate = (dateString) => {
                         const date = new Date(dateString); // Parse the date string
@@ -388,6 +390,14 @@ $(document).ready(function () {
                     html += `
                         <span class="label label-sm label-danger ms-1" title="Cancelled" style="opacity:.6; cursor:not-allowed; margin:0 2px; display:inline-block;">
                             <i class="fa fa-ban"></i>
+                        </span>`;
+                }
+
+                // Delete action - admin only, checked-out bookings only (soft delete)
+                if (bookingStatus === 'check-out' && window.__bookingListIsAdmin) {
+                    html += `
+                        <span class="label label-sm label-danger ms-1" onclick="deleteCheckedOutBooking(${row.BookingID})" title="Delete Booking" style="cursor:pointer; margin:0 2px; display:inline-block;">
+                            <i class="fa fa-trash"></i>
                         </span>`;
                 }
 
@@ -1180,3 +1190,47 @@ function showBilling(bookingID) {
     if (window.showBilling) return window.showBilling(bookingID);
     console.error('Global showBilling is not available');
 }
+
+// Admin-only: soft-delete an already checked-out booking. The booking is hidden
+// from every list (ACTIVE = 0) while its billing / payment history is kept.
+function deleteCheckedOutBooking(bookingId) {
+    if (!bookingId) return;
+
+    Swal.fire({
+        icon: 'warning',
+        title: 'Delete this booking?',
+        html: 'This removes the checked-out booking from all lists.<br>'
+            + 'Its payment and billing history stays on record.<br><br>'
+            + 'This action cannot be undone from the app.',
+        showCancelButton: true,
+        confirmButtonText: 'Delete',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#d9534f',
+        focusCancel: true
+    }).then((result) => {
+        if (!result.isConfirmed) return;
+
+        $.ajax({
+            url: '/booking/delete',
+            type: 'POST',
+            data: { bookingId },
+            success: function (res) {
+                if (res && res.success) {
+                    if ($.fn.DataTable && $.fn.DataTable.isDataTable('#booking_tbl')) {
+                        $('#booking_tbl').DataTable().ajax.reload(null, false);
+                    }
+                    Swal.fire('Deleted', res.message || 'Booking deleted.', 'success');
+                } else {
+                    Swal.fire('Error', (res && res.message) || 'Failed to delete booking.', 'error');
+                }
+            },
+            error: function (xhr) {
+                const msg = xhr && xhr.responseJSON && xhr.responseJSON.message
+                    ? xhr.responseJSON.message
+                    : 'Failed to delete booking.';
+                Swal.fire('Error', msg, 'error');
+            }
+        });
+    });
+}
+window.deleteCheckedOutBooking = deleteCheckedOutBooking;

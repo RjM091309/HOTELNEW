@@ -480,7 +480,8 @@ class BookingController {
         draw,
         recordsTotal: result.totalRecords,
         recordsFiltered: result.filteredRecords,
-        data: result.rows
+        data: result.rows,
+        isAdmin: Number(req.user?.PERMISSIONS) === 1
       });
 
     } catch (error) {
@@ -561,12 +562,15 @@ class BookingController {
   // New: Checkout endpoint (supports individual or group scope)
   static async checkoutBookings(req, res) {
     try {
-      const { bookingId, scope = 'individual', hasRefund = false, refundAmount = 0, penaltyAmount = 0, applyDiscount = false } = req.body;
+      const { bookingId, scope = 'individual', hasRefund = false, refundAmount = 0, penaltyAmount = 0, applyDiscount = false, checkoutDateMode = 'now' } = req.body;
       const encodedBy = req.user?.userId;
 
       if (!bookingId) {
         return res.status(400).json({ success: false, message: 'bookingId is required' });
       }
+
+      // Only two valid modes; anything else falls back to the safe default (stamp today).
+      const normalizedCheckoutDateMode = checkoutDateMode === 'scheduled' ? 'scheduled' : 'now';
 
       let bookingIds = [bookingId];
       if (scope === 'group') {
@@ -577,13 +581,14 @@ class BookingController {
         }
       }
 
-      const out = await BookingModel.checkoutBookings({ 
-        bookingIds, 
+      const out = await BookingModel.checkoutBookings({
+        bookingIds,
         encodedBy,
         refundBookingId: bookingId,
         refundAmount: hasRefund ? parseFloat(refundAmount) || 0 : 0,
         penaltyAmount: parseFloat(penaltyAmount) || 0,
-        applyDiscount: applyDiscount === true || applyDiscount === 'true'
+        applyDiscount: applyDiscount === true || applyDiscount === 'true',
+        checkoutDateMode: normalizedCheckoutDateMode
       });
       
       // Emit Socket.IO event for calendar real-time updates
@@ -2403,10 +2408,30 @@ class BookingController {
         });
       }
 
-      res.status(500).json({ 
-        success: false, 
-        message: 'Failed to cancel booking.' 
+      res.status(500).json({
+        success: false,
+        message: 'Failed to cancel booking.'
       });
+    }
+  }
+
+  // Admin-only soft delete of an already checked-out booking (ACTIVE = 0).
+  static async deleteCheckedOutBooking(req, res) {
+    try {
+      if (Number(req.user?.PERMISSIONS) !== 1) {
+        return res.status(403).json({ success: false, message: 'Access denied. Admin only.' });
+      }
+
+      const { bookingId } = req.body;
+      if (!bookingId) {
+        return res.status(400).json({ success: false, message: 'bookingId is required.' });
+      }
+
+      const result = await BookingModel.softDeleteCheckedOutBooking(bookingId);
+      return res.status(result.success ? 200 : 400).json(result);
+    } catch (error) {
+      console.error('Delete checked-out booking error:', error);
+      return res.status(500).json({ success: false, message: 'Failed to delete booking.' });
     }
   }
 

@@ -116,6 +116,7 @@ router.post('/update_group_booking', BookingController.updateGroupBooking);
 router.get('/bookings', BookingController.getBookings);
 router.get('/rooms', BookingController.getRooms);
 router.post('/cancel', BookingController.cancelBooking);
+router.post('/delete', BookingController.deleteCheckedOutBooking);
 router.post('/set-maintenance', BookingController.setBookingMaintenance);
 router.post('/reopen-maintenance', BookingController.reopenMaintenanceBooking);
 router.post('/complete-maintenance', BookingController.completeMaintenanceBooking);

@@ -911,12 +911,12 @@ class BookingModel {
 
   // Prorate booking_extension rows when guest checks out before using all extended days.
   // Mirrors frontend computeCheckoutContext(): extensionDaysUsed = max(0, min(actualDays - originalRoomDays, totalExtensionDays))
-  static async prorateExtensionsOnEarlyCheckout(connection, bookingIds, encodedBy = 'system') {
+  static async prorateExtensionsOnEarlyCheckout(connection, bookingIds, encodedBy = 'system', effDateExpr = 'DATE(NOW())') {
     for (const bookingId of bookingIds) {
       const billingRows = await new Promise((resolve, reject) => {
         connection.query(
           `SELECT
-             GREATEST(1, DATEDIFF(DATE(NOW()), DATE(b.CHECK_IN_DATE))) AS calendarActualDays,
+             GREATEST(1, DATEDIFF(${effDateExpr}, DATE(b.CHECK_IN_DATE))) AS calendarActualDays,
              COALESCE(bill.ORIGINAL_QTY, bill.QTY) AS originalRoomDays
            FROM billing bill
            JOIN booking b ON bill.BOOKING_ID = b.IDNo
@@ -991,12 +991,24 @@ class BookingModel {
   }
 
   // New: Checkout bookings now (set CHECK_OUT_DATE=NOW, status to check-Out, update room status)
-  static async checkoutBookings({ bookingIds, encodedBy, refundBookingId = null, refundAmount = 0, penaltyAmount = 0, applyDiscount = false }) {
+  // checkoutDateMode:
+  //   'now'       -> emergency checkout: CHECK_OUT_DATE is stamped with the current date/time
+  //   'scheduled' -> "designated date" checkout for bookings that were not checked out on time:
+  //                  keep the booking's own scheduled CHECK_OUT_DATE (capped at NOW so a future
+  //                  schedule can never be recorded) so the calendar bar does not stretch over
+  //                  later bookings. ACTUAL_CHECK_OUT_DT still records the real time of the action.
+  static async checkoutBookings({ bookingIds, encodedBy, refundBookingId = null, refundAmount = 0, penaltyAmount = 0, applyDiscount = false, checkoutDateMode = 'now' }) {
     if (!bookingIds || bookingIds.length === 0) {
       throw new Error('No bookings to checkout');
     }
 
     const ids = Array.isArray(bookingIds) ? bookingIds : [bookingIds];
+
+    // Server-chosen literal SQL expressions (never user input) for the effective checkout moment.
+    const useScheduled = checkoutDateMode === 'scheduled';
+    // COALESCE guards a missing schedule; LEAST(..., NOW()) makes a future schedule impossible to record.
+    const checkOutTsSql = useScheduled ? 'LEAST(COALESCE(CHECK_OUT_DATE, NOW()), NOW())' : 'NOW()';
+    const effDateExpr = useScheduled ? 'DATE(LEAST(COALESCE(b.CHECK_OUT_DATE, NOW()), NOW()))' : 'DATE(NOW())';
 
     const connection = await new Promise((resolve, reject) => {
       pool.getConnection((err, conn) => (err ? reject(err) : resolve(conn)));
@@ -1010,7 +1022,7 @@ class BookingModel {
       // Update bookings: status and checkout timestamp
       const updateBookingSql = `
         UPDATE booking
-        SET BOOKING_STATUS = 'check-Out', CHECK_OUT_DATE = NOW(), ACTUAL_CHECK_OUT_DT = NOW()
+        SET BOOKING_STATUS = 'check-Out', CHECK_OUT_DATE = ${checkOutTsSql}, ACTUAL_CHECK_OUT_DT = NOW()
         WHERE IDNo IN (?) AND ACTIVE = 1
       `;
       await new Promise((resolve, reject) => {
@@ -1034,7 +1046,7 @@ class BookingModel {
         JOIN booking b ON bill.BOOKING_ID = b.IDNo
         SET bill.ORIGINAL_QTY = COALESCE(bill.ORIGINAL_QTY, bill.QTY),
             bill.QTY = GREATEST(1, LEAST(
-              DATEDIFF(DATE(NOW()), DATE(b.CHECK_IN_DATE)),
+              DATEDIFF(${effDateExpr}, DATE(b.CHECK_IN_DATE)),
               COALESCE(bill.ORIGINAL_QTY, bill.QTY)
             ))
         WHERE b.IDNo IN (?) AND bill.ACTIVE = 1
@@ -1044,7 +1056,7 @@ class BookingModel {
       });
 
       // Prorate unused extension days so billing receipt matches early checkout
-      await BookingModel.prorateExtensionsOnEarlyCheckout(connection, ids, encodedBy);
+      await BookingModel.prorateExtensionsOnEarlyCheckout(connection, ids, encodedBy, effDateExpr);
 
       // Remove discount from billing and payments if applyDiscount is false (early checkout without discount)
       if (!applyDiscount) {
@@ -1253,7 +1265,7 @@ class BookingModel {
           b.IDNo AS bookingId,
           DATE(b.CHECK_IN_DATE) AS checkInDate,
           DATE(b.CHECK_OUT_DATE) AS plannedCheckOut,
-          DATEDIFF(DATE(NOW()), DATE(b.CHECK_IN_DATE)) AS actualDays,
+          DATEDIFF(${effDateExpr}, DATE(b.CHECK_IN_DATE)) AS actualDays,
           COALESCE(bill.ORIGINAL_QTY, bill.QTY) AS originalDays
         FROM booking b
         LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo AND bill.ACTIVE = 1
@@ -1302,6 +1314,33 @@ class BookingModel {
       console.error('Error in cancelBooking:', error);
       throw error;
     }
+  }
+
+  // Soft-delete a checked-out booking (ACTIVE = 0). The row drops out of every
+  // list while its billing / payment history stays in the database. Restricted to
+  // check-Out status so an in-house or pending stay can never be removed this way.
+  static async softDeleteCheckedOutBooking(bookingId) {
+    const rows = await queryDatabasePromise(
+      `SELECT BOOKING_STATUS FROM booking WHERE IDNo = ? AND ACTIVE = 1`,
+      [bookingId]
+    );
+    if (!rows || rows.length === 0) {
+      return { success: false, message: 'Booking not found or already removed.' };
+    }
+    if (String(rows[0].BOOKING_STATUS || '').toLowerCase() !== 'check-out') {
+      return { success: false, message: 'Only checked-out bookings can be deleted.' };
+    }
+
+    const result = await queryDatabasePromise(
+      `UPDATE booking
+         SET ACTIVE = 0, EDITED_DT = NOW()
+       WHERE IDNo = ? AND ACTIVE = 1 AND BOOKING_STATUS = 'check-Out'`,
+      [bookingId]
+    );
+    if (!result || result.affectedRows === 0) {
+      return { success: false, message: 'Booking could not be deleted. Please refresh and try again.' };
+    }
+    return { success: true, message: 'Booking deleted.' };
   }
 
   // Get booking details by ID

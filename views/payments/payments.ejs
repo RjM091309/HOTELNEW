@@ -130,18 +130,6 @@
       <div class="modal-header">
         <div class="d-flex align-items-start justify-content-between w-100 flex-wrap gap-2">
           <h5 class="modal-title mb-0" id="todayPaidModalLabel">Paid Payments</h5>
-          <div class="d-flex flex-column align-items-end gap-1">
-            <div class="filter-btn-group paid-modal-filter-group">
-              <button type="button" class="filter-btn active" data-paid-range="today">Today</button>
-              <button type="button" class="filter-btn" data-paid-range="last7days">Last 7 Days</button>
-            </div>
-            <div class="filter-btn-group paid-modal-shift-group">
-              <button type="button" class="filter-btn active" data-paid-shift="all">All Shifts</button>
-              <button type="button" class="filter-btn" data-paid-shift="1">Shift 1 &middot; 7AM&ndash;12NN</button>
-              <button type="button" class="filter-btn" data-paid-shift="2">Shift 2 &middot; 1PM&ndash;10PM</button>
-              <button type="button" class="filter-btn" data-paid-shift="3">Shift 3 &middot; 10PM&ndash;7AM</button>
-            </div>
-          </div>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
@@ -226,6 +214,9 @@
       $(this).addClass('active');
       currentFilter = $(this).data('filter');
       table.ajax.reload();
+      if (typeof updateSummaryCardsForFilter === 'function') {
+        updateSummaryCardsForFilter(currentFilter);
+      }
     });
   });
 
@@ -252,54 +243,154 @@
   }
   loadSalesSummary();
 
+  /* ----------------------------------------------------------------------
+   * Shift view for the summary cards.
+   * When the top "Today" filter is active the 3 summary cards switch from
+   * Daily / Weekly / Monthly sales to Shift 1 / Shift 2 / Shift 3, each
+   * showing that shift's collected sales for today (Total / Cash / Non-cash).
+   * Shift windows are gapless so the three cards always sum to the day total:
+   *   Shift 1  7AM – 1PM   (hour 7..12)
+   *   Shift 2  1PM – 10PM  (hour 13..21)
+   *   Shift 3  10PM – 7AM  (hour 22..23, 0..6)
+   * -------------------------------------------------------------------- */
+  const SUMMARY_CARDS = [
+    { sel: '.payment-sales-card--daily',   shift: 1, title: 'Shift 1 (7AM–1PM)',  icon: 'fa-sun',          ids: ['daily-total', 'daily-paid', 'daily-unpaid'] },
+    { sel: '.payment-sales-card--weekly',  shift: 2, title: 'Shift 2 (1PM–10PM)', icon: 'fa-cloud-sun',    ids: ['weekly-total', 'weekly-paid', 'weekly-unpaid'] },
+    { sel: '.payment-sales-card--monthly', shift: 3, title: 'Shift 3 (10PM–7AM)', icon: 'fa-moon',         ids: ['monthly-total', 'monthly-paid', 'monthly-unpaid'] }
+  ];
+  const SHIFT_STAT_LABELS = ['Total', 'Cash', 'Non-cash'];
+  let summaryMode = 'default';
+  let originalCardMarkup = null;
+
+  function shiftOfHour(h) {
+    if (h >= 7 && h < 13) return 1;
+    if (h >= 13 && h < 22) return 2;
+    return 3; // 22..23 and 0..6
+  }
+
+  function formatShiftMoney(val) {
+    return Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function captureOriginalCardMarkup() {
+    if (originalCardMarkup) return;
+    originalCardMarkup = {};
+    SUMMARY_CARDS.forEach(function (c) {
+      const card = document.querySelector(c.sel);
+      if (!card) return;
+      const footer = card.querySelector('.payment-sales-card__footer');
+      originalCardMarkup[c.sel] = {
+        title: card.querySelector('.payment-sales-card__title').innerHTML,
+        labels: Array.prototype.map.call(card.querySelectorAll('.payment-sales-card__label'), function (l) { return l.innerHTML; }),
+        footer: footer ? footer.innerHTML : null
+      };
+    });
+  }
+
+  function restoreDefaultSummaryCards() {
+    SUMMARY_CARDS.forEach(function (c) {
+      const card = document.querySelector(c.sel);
+      const orig = originalCardMarkup && originalCardMarkup[c.sel];
+      if (!card || !orig) return;
+      card.querySelector('.payment-sales-card__title').innerHTML = orig.title;
+      const labels = card.querySelectorAll('.payment-sales-card__label');
+      Array.prototype.forEach.call(labels, function (l, i) {
+        if (orig.labels[i] !== undefined) l.innerHTML = orig.labels[i];
+      });
+      const footer = card.querySelector('.payment-sales-card__footer');
+      if (footer && orig.footer !== null) footer.innerHTML = orig.footer;
+      card.classList.remove('payment-sales-card--shift');
+      delete card.dataset.shift;
+    });
+    summaryMode = 'default';
+    loadSalesSummary();
+  }
+
+  function applyShiftSummaryCards() {
+    summaryMode = 'shift';
+    SUMMARY_CARDS.forEach(function (c) {
+      const card = document.querySelector(c.sel);
+      if (!card) return;
+      card.querySelector('.payment-sales-card__title').innerHTML =
+        '<i class="fas ' + c.icon + '"></i> ' + c.title;
+      const labels = card.querySelectorAll('.payment-sales-card__label');
+      Array.prototype.forEach.call(labels, function (l, i) {
+        if (SHIFT_STAT_LABELS[i]) l.textContent = SHIFT_STAT_LABELS[i];
+      });
+      const footer = card.querySelector('.payment-sales-card__footer');
+      if (footer) footer.textContent = '';
+      card.classList.add('payment-sales-card--shift');
+      card.dataset.shift = String(c.shift);
+      c.ids.forEach(function (id) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '…';
+      });
+    });
+    loadShiftSummary();
+  }
+
+  function updateSummaryCardsForFilter(filter) {
+    captureOriginalCardMarkup();
+    if (filter === 'today') {
+      applyShiftSummaryCards();
+    } else if (summaryMode === 'shift') {
+      restoreDefaultSummaryCards();
+    }
+  }
+  window.updateSummaryCardsForFilter = updateSummaryCardsForFilter;
+
+  function loadShiftSummary() {
+    fetch('/payments/today-paid?range=today')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data || !data.success || summaryMode !== 'shift') return;
+        const rows = [].concat(data.payments || [], data.receipts || []);
+        const buckets = { 1: { total: 0, cash: 0, noncash: 0 }, 2: { total: 0, cash: 0, noncash: 0 }, 3: { total: 0, cash: 0, noncash: 0 } };
+        rows.forEach(function (row) {
+          if (!row.PAYMENT_DATE) return;
+          const amt = Number(row.AMOUNT_PAID || 0);
+          if (!amt) return;
+          const bucket = buckets[shiftOfHour(new Date(row.PAYMENT_DATE).getHours())];
+          const isCash = String(row.PAYMENT_METHOD || '').trim().toLowerCase() === 'cash';
+          bucket.total += amt;
+          if (isCash) bucket.cash += amt; else bucket.noncash += amt;
+        });
+        SUMMARY_CARDS.forEach(function (c) {
+          const b = buckets[c.shift];
+          const vals = [b.total, b.cash, b.noncash];
+          c.ids.forEach(function (id, i) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = formatShiftMoney(vals[i]);
+          });
+        });
+      })
+      .catch(function (err) { console.error('Error loading shift summary:', err); });
+  }
+
   let currentPaidRange = 'today';
   let currentPaidShift = 'all';
   let loadedPaidData = null;
   let currentBreakdownBookingId = null;
 
-  // Shift filters only make sense for a single day, so hide them for the 7-day view.
-  function updateShiftGroupVisibility() {
-    if (currentPaidRange === 'today') {
-      $('.paid-modal-shift-group').show();
-    } else {
-      $('.paid-modal-shift-group').hide();
-    }
-  }
-
   function resetPaidShift() {
     currentPaidShift = 'all';
-    $('.paid-modal-shift-group .filter-btn').removeClass('active');
-    $('.paid-modal-shift-group .filter-btn[data-paid-shift="all"]').addClass('active');
   }
 
-  // The whole Daily Sales card opens the collected-sales modal (not just the "Paid" number).
+  // The whole Daily Sales card opens the collected-sales modal (all of today).
   $(document).on('click', '.payment-sales-card--daily', function () {
+    if (summaryMode === 'shift') return; // handled by the shift-card handler below
     currentPaidRange = 'today';
-    $('.paid-modal-filter-group .filter-btn').removeClass('active');
-    $('.paid-modal-filter-group .filter-btn[data-paid-range="today"]').addClass('active');
     resetPaidShift();
-    updateShiftGroupVisibility();
     showTodayPaidModal('today');
   });
 
-  $(document).on('click', '.paid-modal-filter-group .filter-btn', function () {
-    const range = $(this).data('paid-range');
-    if (!range || range === currentPaidRange) return;
-    currentPaidRange = range;
-    $('.paid-modal-filter-group .filter-btn').removeClass('active');
-    $(this).addClass('active');
-    resetPaidShift();
-    updateShiftGroupVisibility();
-    loadTodayPaidPayments(range);
-  });
-
-  $(document).on('click', '.paid-modal-shift-group .filter-btn', function () {
-    const shift = String($(this).data('paid-shift'));
-    if (!shift || shift === currentPaidShift) return;
+  // In "Today" (shift) mode each card opens the Collected Sales modal scoped to its shift.
+  $(document).on('click', '.payment-sales-card--shift', function () {
+    const shift = String(this.dataset.shift || '');
+    if (!shift) return;
+    currentPaidRange = 'today';
     currentPaidShift = shift;
-    $('.paid-modal-shift-group .filter-btn').removeClass('active');
-    $(this).addClass('active');
-    renderPaidCollections();
+    showTodayPaidModal('today');
   });
 
   $(document).on('click', '.confirmation-link', function(e){
@@ -470,14 +561,12 @@
 
   function showTodayPaidModal(range = 'today') {
     currentPaidRange = range;
-    updateShiftGroupVisibility();
     $('#todayPaidModal').modal('show');
     loadTodayPaidPayments(range);
   }
 
   function loadTodayPaidPayments(range = 'today') {
     $('#todayPaidContent').html('<div class="text-center"><div class="spinner-border" role="status"><span class="sr-only">Loading...</span></div></div>');
-    updateShiftGroupVisibility();
 
     fetch(`/payments/today-paid?range=${encodeURIComponent(range)}`)
       .then(r => r.json())
@@ -498,13 +587,14 @@
 
   // Shift windows keyed by the hour of PAYMENT_DATE. Shift 3 wraps past midnight.
   const PAID_SHIFT_LABELS = {
-    '1': 'Shift 1 (7AM–12NN)',
+    '1': 'Shift 1 (7AM–1PM)',
     '2': 'Shift 2 (1PM–10PM)',
     '3': 'Shift 3 (10PM–7AM)'
   };
 
+  // Gapless windows: every payment hour lands in exactly one shift.
   function paidShiftPredicate(shift) {
-    if (shift === '1') return h => h >= 7 && h < 12;
+    if (shift === '1') return h => h >= 7 && h < 13;
     if (shift === '2') return h => h >= 13 && h < 22;
     if (shift === '3') return h => h >= 22 || h < 7;
     return null; // 'all'
@@ -799,22 +889,24 @@
     box-shadow: 0 0 0 1px #64b5f6;
   }
 
-  .paid-modal-filter-group .filter-btn.active {
-    background: #6f9c40;
-    border-color: #6f9c40;
-    color: #fff;
-    font-weight: 600;
+  /* Shift view (top "Today" filter): all three cards are clickable and share one accent */
+  .payment-sales-card.payment-sales-card--shift {
+    cursor: pointer;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
   }
 
-  .paid-modal-shift-group .filter-btn {
-    font-size: 12px;
+  .payment-sales-card.payment-sales-card--shift:hover {
+    border-color: #ce93d8;
+    box-shadow: 0 0 0 1px #ce93d8;
   }
 
-  .paid-modal-shift-group .filter-btn.active {
-    background: #3f7cad;
-    border-color: #3f7cad;
-    color: #fff;
-    font-weight: 600;
+  .payment-sales-card.payment-sales-card--shift .payment-sales-card__title {
+    color: #ce93d8;
+  }
+
+  /* Re-purpose the third stat slot (normally "Unpaid"/red) as "Non-cash" */
+  .payment-sales-card.payment-sales-card--shift .payment-sales-card__value--unpaid {
+    color: #4dd0e1;
   }
 
   #todayPaidModal .modal-body {

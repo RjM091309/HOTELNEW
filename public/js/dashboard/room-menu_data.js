@@ -1151,7 +1151,9 @@ async function createDynamicRoomModalFromEvent(bookingId, event) {
     checkInDate,
     checkOutDate,
     daysDiff,
-    isFromCalendar: true
+    isFromCalendar: true,
+    // Checkout opened from the calendar offers the emergency / designated-date choice.
+    emergencyCheckoutChoice: true
   });
 }
 
@@ -1335,6 +1337,25 @@ async function createDynamicRoomModal(bookingId, event, options) {
     ? 'transition: none; opacity: 0.6 !important; cursor: not-allowed; pointer-events: none;'
     : 'transition: none; opacity: 1 !important;';
 
+  // Emergency / designated-date checkout choice (calendar only). Carried on the
+  // Checkout button as data-* attributes and read back by triggerCheckout().
+  let emergencyCheckoutAttrs = '';
+  if (options && options.emergencyCheckoutChoice) {
+    const rawScheduled =
+      (event && event.extendedProps && event.extendedProps.checkOutDate) || checkOutDate;
+    const scheduled = new Date(rawScheduled);
+    let scheduledStr = '';
+    let isOverdue = false;
+    if (!isNaN(scheduled.getTime())) {
+      scheduled.setHours(0, 0, 0, 0);
+      const midnightToday = new Date();
+      midnightToday.setHours(0, 0, 0, 0);
+      scheduledStr = `${scheduled.getFullYear()}-${String(scheduled.getMonth() + 1).padStart(2, '0')}-${String(scheduled.getDate()).padStart(2, '0')}`;
+      isOverdue = scheduled < midnightToday;
+    }
+    emergencyCheckoutAttrs = ` data-ec-choice="1" data-ec-scheduled="${scheduledStr}" data-ec-overdue="${isOverdue ? '1' : '0'}"`;
+  }
+
   const statusLower = String(bookingStatus || '').toLowerCase();
   // Cancelled bookings open this modal purely as a read-only detail view: every
   // action is disabled except "Reopen Reservation" / "Remove" in the header.
@@ -1406,7 +1427,7 @@ async function createDynamicRoomModal(bookingId, event, options) {
                     </button>
 
 
-                    <button type="button" class="btn btn-danger btn-sm room-toolbar-btn" ${checkoutButtonAttributes} onclick="triggerCheckout('${bookingId}')" style="${checkoutButtonStyle}">
+                    <button type="button" id="btnCheckout-${bookingId}" class="btn btn-danger btn-sm room-toolbar-btn" ${checkoutButtonAttributes}${emergencyCheckoutAttrs} onclick="triggerCheckout('${bookingId}')" style="${checkoutButtonStyle}">
                         <i class="fas fa-sign-out-alt"></i> Checkout
                     </button>
                     ${isMaintenance ? `
@@ -4705,6 +4726,62 @@ function buildCheckoutIntroHtml() {
     `;
 }
 
+// Emergency vs designated (scheduled) checkout-date choice. Only rendered when the
+// checkout was opened from the calendar (dateChoice is non-null). When overdue, the
+// scheduled-date option is pre-selected so a forgotten checkout does not stretch the
+// calendar bar over later bookings; otherwise "today" is pre-selected.
+function buildCheckoutDateChoiceHtml(dateChoice) {
+    if (!dateChoice) return '';
+
+    const overdue = !!dateChoice.overdue;
+    let scheduledPretty = 'the scheduled date';
+    if (dateChoice.scheduled) {
+        const d = new Date(`${dateChoice.scheduled}T00:00:00`);
+        if (!isNaN(d.getTime())) {
+            scheduledPretty = d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+    }
+    const todayPretty = new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+
+    const schedSelected = overdue;
+    const opt = (value, selected, title, desc) => `
+        <label class="csd-option${selected ? ' csd-option-selected' : ''}">
+            <input type="radio" name="checkoutDateMode" value="${value}" ${selected ? 'checked' : ''}>
+            <span class="csd-option-label">
+                <strong>${title}</strong>
+                <span class="csd-option-desc">${desc}</span>
+            </span>
+        </label>`;
+
+    return `
+        <div id="checkoutDateChoiceSection" style="margin:12px 0; padding:12px; background:#fff8e1; border:1px solid #ffe0a3; border-radius:6px; text-align:left;">
+            <div style="font-weight:600; color:#8a6d3b; margin-bottom:10px; font-size:0.78rem; text-transform:uppercase; letter-spacing:0.5px;">
+                <i class="fas fa-triangle-exclamation"></i> Checkout Date
+            </div>
+            ${opt('scheduled', schedSelected,
+                `Use scheduled checkout date (${scheduledPretty})`,
+                'For a booking that was not checked out on time. Records the checkout on its scheduled date so later bookings on this room don\'t overlap.')}
+            ${opt('now', !schedSelected,
+                `Emergency checkout – today (${todayPretty})`,
+                'The guest is actually leaving now (earlier or later than planned). Records today\'s date as the checkout.')}
+        </div>
+    `;
+}
+
+function setupCheckoutDateChoiceControls() {
+    const section = document.getElementById('checkoutDateChoiceSection');
+    if (!section) return;
+    const radios = section.querySelectorAll('input[name="checkoutDateMode"]');
+    const sync = () => {
+        radios.forEach((r) => {
+            const opt = r.closest('.csd-option');
+            if (opt) opt.classList.toggle('csd-option-selected', r.checked);
+        });
+    };
+    radios.forEach((r) => r.addEventListener('change', sync));
+    sync();
+}
+
 function buildCheckoutSummaryHtml(checkoutContext, unpaidBalance) {
     if (!checkoutContext) return '';
     const amountDue = checkoutContext.grossTotal - checkoutContext.reservationFee;
@@ -5016,7 +5093,13 @@ async function runCheckoutPreConfirm(bookingId, depositInfo, { allowScopeSelecti
     }
 
     const applyDiscount = window._applyDiscount !== undefined ? window._applyDiscount : false;
-    return { hasRefund, amount, scope, penaltyAmount: cancellationFee, applyDiscount };
+
+    // Emergency vs designated-date checkout (calendar only). Absent -> 'now' (unchanged behaviour).
+    let checkoutDateMode = 'now';
+    const dateModeSel = document.querySelector('input[name="checkoutDateMode"]:checked');
+    if (dateModeSel && dateModeSel.value === 'scheduled') checkoutDateMode = 'scheduled';
+
+    return { hasRefund, amount, scope, penaltyAmount: cancellationFee, applyDiscount, checkoutDateMode };
 }
 
 function restoreCheckoutModalFocus(focusState) {
@@ -5037,10 +5120,12 @@ async function openConfirmCheckoutDialog(bookingId, {
     checkoutContext,
     depositInfo,
     depositUnpaidBalance,
-    focusState = {}
+    focusState = {},
+    dateChoice = null
 }) {
     const modalHtml = `
         ${buildCheckoutIntroHtml()}
+        ${buildCheckoutDateChoiceHtml(dateChoice)}
         ${buildCheckoutDetailsHtml(checkoutContext)}
         ${groupHtml}
         ${buildCheckoutOverpaymentHtml(checkoutContext)}
@@ -5076,6 +5161,7 @@ async function openConfirmCheckoutDialog(bookingId, {
             }
             setupCheckoutOverpaymentControls(bookingId, checkoutContextCache);
             window._checkoutContextCache = checkoutContextCache;
+            setupCheckoutDateChoiceControls();
         },
         preConfirm: () => runCheckoutPreConfirm(bookingId, depositInfo, { allowScopeSelection })
     });
@@ -5166,7 +5252,8 @@ function storePendingRoomMenuCheckout(bookingId, checkoutParams) {
         amount: checkoutParams.amount || 0,
         scope: checkoutParams.scope || 'individual',
         penaltyAmount: checkoutParams.penaltyAmount || 0,
-        applyDiscount: checkoutParams.applyDiscount || false
+        applyDiscount: checkoutParams.applyDiscount || false,
+        checkoutDateMode: checkoutParams.checkoutDateMode === 'scheduled' ? 'scheduled' : 'now'
     };
 }
 
@@ -5191,7 +5278,8 @@ async function finalizeRoomMenuCheckoutAfterPayment() {
         amount,
         scope,
         penaltyAmount,
-        applyDiscount
+        applyDiscount,
+        checkoutDateMode
     } = pending;
     window._pendingRoomMenuCheckout = null;
     window.onPaymentConfirmed = null;
@@ -5203,7 +5291,8 @@ async function finalizeRoomMenuCheckoutAfterPayment() {
         scope || 'individual',
         penaltyAmount || 0,
         applyDiscount || false,
-        null
+        null,
+        checkoutDateMode || 'now'
     );
 }
 
@@ -5395,6 +5484,15 @@ function triggerCheckout(bookingId) {
 
     const focusState = { openBsModal, bsModalInstance, prevFocusCfg, focustrapDeactivated };
 
+    // Emergency / designated-date choice: only present when checkout was opened from the calendar.
+    const checkoutBtn = document.getElementById(`btnCheckout-${bookingId}`);
+    const dateChoice = (checkoutBtn && checkoutBtn.getAttribute('data-ec-choice') === '1')
+        ? {
+            scheduled: checkoutBtn.getAttribute('data-ec-scheduled') || '',
+            overdue: checkoutBtn.getAttribute('data-ec-overdue') === '1'
+        }
+        : null;
+
     fetch(`/payments/group-breakdown/${bookingId}`, { method: 'GET', headers: { 'Content-Type': 'application/json' } })
         .then(r => r.ok ? r.json() : null)
         .then(async (groupData) => {
@@ -5419,7 +5517,8 @@ function triggerCheckout(bookingId) {
                 checkoutContext,
                 depositInfo,
                 depositUnpaidBalance,
-                focusState
+                focusState,
+                dateChoice
             });
         })
         .catch(async () => {
@@ -5430,13 +5529,14 @@ function triggerCheckout(bookingId) {
                 checkoutContext,
                 depositInfo,
                 depositUnpaidBalance,
-                focusState
+                focusState,
+                dateChoice
             });
         });
 }
 
 // Handle checkout process
-function startCheckoutProcess(bookingId, hasRefund, refundAmount = 0, scope = 'individual', penaltyAmount = 0, applyDiscount = false, depositSelection = null) {
+function startCheckoutProcess(bookingId, hasRefund, refundAmount = 0, scope = 'individual', penaltyAmount = 0, applyDiscount = false, depositSelection = null, checkoutDateMode = 'now') {
     const showProcessing = () => {
         Swal.fire({
             title: 'Processing Checkout...',
@@ -5451,7 +5551,7 @@ function startCheckoutProcess(bookingId, hasRefund, refundAmount = 0, scope = 'i
     const runCheckoutApi = () => fetch('/booking/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId, scope, hasRefund, refundAmount, penaltyAmount, applyDiscount })
+        body: JSON.stringify({ bookingId, scope, hasRefund, refundAmount, penaltyAmount, applyDiscount, checkoutDateMode })
     })
         .then(r => {
             if (!r.ok) {
