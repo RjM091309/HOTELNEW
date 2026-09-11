@@ -17,24 +17,42 @@
                     Security deposit already recorded: <strong id="sdExistingAmount">₱0.00</strong>
                 </div>
 
-                <div id="sdDepositForm">
-                    <div class="mb-3">
-                        <label for="sdDepositAmount" class="form-label fw-semibold">
-                            <i class="fas fa-money-bill-wave me-1"></i>Deposit Amount <span class="text-muted">(optional)</span>
-                        </label>
-                        <div class="input-group">
-                            <span class="input-group-text">₱</span>
-                            <input type="text" class="form-control" id="sdDepositAmount" inputmode="decimal" placeholder="Enter deposit amount" autocomplete="off">
-                        </div>
+                <div id="sdDepositAmountBlock" class="mb-3">
+                    <label for="sdDepositAmount" class="form-label fw-semibold">
+                        <i class="fas fa-money-bill-wave me-1"></i>Deposit Amount <span class="text-muted">(optional)</span>
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text">₱</span>
+                        <input type="text" class="form-control" id="sdDepositAmount" inputmode="decimal" placeholder="Enter deposit amount" autocomplete="off" data-lpignore="true" data-1p-ignore>
                     </div>
+                </div>
 
-                    <input type="hidden" id="sdPaymentMethod" value="cash">
+                <input type="hidden" id="sdPaymentMethod" value="cash">
 
-                    <div class="mb-3">
-                        <label for="sdRemarks" class="form-label fw-semibold">
-                            <i class="fas fa-sticky-note me-1"></i>Remarks <span class="text-muted">(optional)</span>
+                <div id="sdRemarksSection" class="mb-3">
+                    <label for="sdRemarks" class="form-label fw-semibold">
+                        <i class="fas fa-sticky-note me-1"></i>Remarks <span class="text-muted">(optional)</span>
+                    </label>
+                    <input type="text" class="form-control" id="sdRemarks">
+                </div>
+
+                <!-- Early Check-In Fee - only shown when this booking's check-in status is Early.
+                     Toggled independently from the deposit fields so it stays visible even when a
+                     deposit is already on file and the deposit amount/remarks fields are hidden. -->
+                <div id="sdEarlyFeeSection" class="mb-3" style="display: none;">
+                    <label for="sdEarlyFeeAmount" class="form-label fw-semibold">
+                        <i class="fas fa-clock me-1"></i>Early Check-In Fee <span class="text-muted">(optional)</span>
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text">₱</span>
+                        <input type="text" class="form-control" id="sdEarlyFeeAmount" inputmode="decimal" placeholder="0.00" autocomplete="off" data-lpignore="true" data-1p-ignore>
+                    </div>
+                    <div class="form-text" id="sdEarlyFeeHint"></div>
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" id="sdWaiveEarlyFee">
+                        <label class="form-check-label" for="sdWaiveEarlyFee">
+                            Waive this fee <span class="text-muted">(no early check-in charge applied)</span>
                         </label>
-                        <input type="text" class="form-control" id="sdRemarks">
                     </div>
                 </div>
 
@@ -43,9 +61,50 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-success" id="sdConfirmBtn">
-                    <i class="fas fa-check me-1"></i><span id="sdConfirmBtnText">Record Deposit & Check In</span>
+                    <i class="fas fa-check me-1"></i><span id="sdConfirmBtnText">Apply & Check In</span>
                 </button>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+/* The Deposit Amount / Early Check-In Fee inputs are plain amount fields, but
+   some browsers still apply their own autofill/payment-suggestion styling
+   (a faded overlay tint) once you start typing digits into them. Neutralize
+   it without touching this app's own look - this only cancels the BROWSER's
+   autofill repaint, it doesn't add any color of its own. */
+#securityDepositModal input:-webkit-autofill,
+#securityDepositModal input:-webkit-autofill:hover,
+#securityDepositModal input:-webkit-autofill:focus,
+#securityDepositModal input:-webkit-autofill:active {
+    transition: background-color 600000s 0s, color 600000s 0s !important;
+    -webkit-text-fill-color: #212529 !important;
+}
+
+/* Force a solid, high-contrast text color for whatever is actually typed/set in
+   these fields - some ambient style on this page was rendering the value the
+   same faded gray as the placeholder, making a real amount look unset. */
+#securityDepositModal .form-control {
+    color: #212529 !important;
+}
+
+/* Keep the "focused" blue highlight on the auto-calculated Early Check-In Fee
+   at all times (not just while the cursor is in it), so it stands out as the
+   one value worth double-checking before confirming. */
+#sdEarlyFeeAmount {
+    border-color: #0d6efd !important;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.2) !important;
+}
+
+#sdEarlyFeeAmount:disabled {
+    background-color: #e9ecef !important;
+    border-color: #ced4da !important;
+    box-shadow: none !important;
+    color: #6c757d !important;
+}
+
+#sdWaiveEarlyFee ~ .form-check-label {
+    color: #dee2e6;
+}
+</style>

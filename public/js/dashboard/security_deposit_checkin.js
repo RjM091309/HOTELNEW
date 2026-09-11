@@ -9,6 +9,12 @@
     // Early check-in: standard check-in is 3:00 PM. Guests arriving earlier are
     // charged EARLY_CHECKIN_RATE per whole hour before 3 PM. The actual arrival
     // time is rounded UP to the next hour first (10:30 -> counts as 11:00).
+    //
+    // Whether the fee section shows at all is based on the REAL clock time at
+    // the moment staff clicks Check In - not the booking's stored check-in-status
+    // flag - so it reflects what's actually happening right now: 6:00 AM-2:59 PM
+    // shows the fee (staff can still waive/zero it), 3:00 PM onward never shows it.
+    const EARLY_CHECKIN_WINDOW_START_HOUR = 6;
     const EARLY_CHECKIN_STANDARD_HOUR = 15;
     const EARLY_CHECKIN_RATE = 200;
     let earlyCheckInState = { isEarly: false, fee: 0 };
@@ -17,64 +23,18 @@
         return document.getElementById('securityDepositModal');
     }
 
+    function isWithinEarlyCheckInWindow(now) {
+        const d = now instanceof Date ? now : new Date();
+        const hour = d.getHours();
+        return hour >= EARLY_CHECKIN_WINDOW_START_HOUR && hour < EARLY_CHECKIN_STANDARD_HOUR;
+    }
+
     function computeEarlyCheckInFee(now) {
         const d = now instanceof Date ? now : new Date();
         let hour = d.getHours();
         if (d.getMinutes() > 0 || d.getSeconds() > 0) hour += 1; // round up to next hour
         const hoursEarly = Math.max(0, EARLY_CHECKIN_STANDARD_HOUR - hour);
         return { hoursEarly, fee: hoursEarly * EARLY_CHECKIN_RATE };
-    }
-
-    async function fetchIsEarlyCheckIn(bookingId) {
-        try {
-            const res = await fetch('/booking/booking_details/' + bookingId);
-            if (!res.ok) return false;
-            const data = await res.json();
-            return String(data.CHECK_IN_STATUS) === '2';
-        } catch (e) {
-            return false;
-        }
-    }
-
-    // SweetAlert prompt with the auto-calculated early check-in fee, editable.
-    // Resolves with a number (>= 0) to proceed, or null to abort check-in.
-    function promptEarlyCheckInFee() {
-        const { hoursEarly, fee } = computeEarlyCheckInFee();
-        if (typeof Swal === 'undefined') return Promise.resolve(fee);
-
-        return Swal.fire({
-            title: 'Early Check-In Fee',
-            html:
-                '<p style="margin-bottom:10px;color:#555;">Guest is checking in <strong>' + hoursEarly +
-                ' hour' + (hoursEarly === 1 ? '' : 's') + '</strong> before the 3:00 PM standard time ' +
-                '(₱' + EARLY_CHECKIN_RATE + '/hour). Adjust the amount if needed.</p>' +
-                '<input id="sdEarlyFeeInput" type="number" min="0" step="0.01" class="swal2-input" ' +
-                'style="width:70%;" value="' + fee + '">',
-            showCancelButton: true,
-            confirmButtonText: 'Confirm & Check In',
-            cancelButtonText: 'Cancel',
-            confirmButtonColor: '#6f9c40',
-            allowOutsideClick: false,
-            focusConfirm: false,
-            customClass: { container: 'sd-early-fee-swal-container' },
-            didRender: () => {
-                const c = document.querySelector('.sd-early-fee-swal-container');
-                if (c) c.style.zIndex = '20000';
-            },
-            didOpen: () => {
-                const el = document.getElementById('sdEarlyFeeInput');
-                if (el) { el.focus(); el.select(); }
-            },
-            preConfirm: () => {
-                const raw = document.getElementById('sdEarlyFeeInput')?.value;
-                const n = parseFloat(String(raw).replace(/,/g, ''));
-                if (!Number.isFinite(n) || n < 0) {
-                    Swal.showValidationMessage('Enter a valid amount (0 or more).');
-                    return false;
-                }
-                return n;
-            }
-        }).then((result) => (result.isConfirmed ? Number(result.value) : null));
     }
 
     function parseAmountInput(value) {
@@ -101,10 +61,10 @@
         return formattedInt;
     }
 
-    function setupAmountInput() {
+    function setupAmountInput(inputId) {
         const modalEl = getModalEl();
         if (!modalEl) return;
-        const amountInput = modalEl.querySelector('#sdDepositAmount');
+        const amountInput = modalEl.querySelector('#' + inputId);
         if (!amountInput || amountInput.dataset.formatted) return;
         amountInput.dataset.formatted = 'true';
 
@@ -153,7 +113,7 @@
         btn.disabled = isLoading;
         btn.innerHTML = isLoading
             ? '<i class="fas fa-spinner fa-spin me-1"></i>Processing...'
-            : '<i class="fas fa-check me-1"></i><span id="sdConfirmBtnText">' + (btn.dataset.label || 'Record Deposit & Check In') + '</span>';
+            : '<i class="fas fa-check me-1"></i><span id="sdConfirmBtnText">' + (btn.dataset.label || 'Apply & Check In') + '</span>';
     }
 
     function resetForm() {
@@ -164,9 +124,17 @@
         const amountInput = modalEl.querySelector('#sdDepositAmount');
         const remarksInput = modalEl.querySelector('#sdRemarks');
         const methodInput = modalEl.querySelector('#sdPaymentMethod');
+        const earlyFeeInput = modalEl.querySelector('#sdEarlyFeeAmount');
+        const waiveCheckbox = modalEl.querySelector('#sdWaiveEarlyFee');
         if (amountInput) amountInput.value = '';
         if (remarksInput) remarksInput.value = '';
         if (methodInput) methodInput.value = 'cash';
+        if (earlyFeeInput) {
+            earlyFeeInput.value = '';
+            earlyFeeInput.disabled = false;
+            delete earlyFeeInput.dataset.savedValue;
+        }
+        if (waiveCheckbox) waiveCheckbox.checked = false;
     }
 
     async function fetchExistingDeposit(bookingId) {
@@ -179,8 +147,10 @@
     async function submitCheckIn(bookingId, depositInfo) {
         const payload = { BookingID: bookingId };
 
-        if (earlyCheckInState.isEarly && earlyCheckInState.fee > 0) {
-            payload.earlyCheckInFee = earlyCheckInState.fee;
+        if (earlyCheckInState.isEarly) {
+            const waived = document.getElementById('sdWaiveEarlyFee')?.checked;
+            const earlyFee = waived ? 0 : parseAmountInput(document.getElementById('sdEarlyFeeAmount')?.value);
+            if (earlyFee > 0) payload.earlyCheckInFee = earlyFee;
         }
 
         if (!depositInfo.exists) {
@@ -222,19 +192,29 @@
         if (!modalEl || modalEl.dataset.initialized) return;
         modalEl.dataset.initialized = 'true';
 
-        setupAmountInput();
+        setupAmountInput('sdDepositAmount');
+        setupAmountInput('sdEarlyFeeAmount');
+
+        // Waive checkbox: disables the fee input and zeroes it out while checked,
+        // restoring whatever was there before if the staff unchecks it again.
+        document.getElementById('sdWaiveEarlyFee')?.addEventListener('change', function () {
+            const feeInput = document.getElementById('sdEarlyFeeAmount');
+            if (!feeInput) return;
+            if (this.checked) {
+                feeInput.dataset.savedValue = feeInput.value;
+                feeInput.value = '0.00';
+                feeInput.disabled = true;
+            } else {
+                feeInput.disabled = false;
+                feeInput.value = feeInput.dataset.savedValue || '';
+                delete feeInput.dataset.savedValue;
+            }
+        });
 
         document.getElementById('sdConfirmBtn')?.addEventListener('click', async function () {
             hideError();
             const bookingId = document.getElementById('sdBookingId')?.value;
             const depositExists = this.dataset.depositExists === 'true';
-
-            // Early Check In: ask for the (auto-calculated, editable) fee first.
-            if (earlyCheckInState.isEarly) {
-                const fee = await promptEarlyCheckInFee();
-                if (fee === null) return; // staff cancelled - do not check in
-                earlyCheckInState.fee = fee;
-            }
 
             const result = await submitCheckIn(bookingId, { exists: depositExists });
             if (!result) return;
@@ -275,30 +255,51 @@
 
         pendingCallbacks = { onSuccess, onCancel };
         resetForm();
-        earlyCheckInState = { isEarly: await fetchIsEarlyCheckIn(bookingId), fee: 0 };
+        earlyCheckInState = { isEarly: isWithinEarlyCheckInWindow(), fee: 0 };
 
         document.getElementById('sdBookingId').value = bookingId;
         document.getElementById('sdRoomInfo').textContent =
             `Room ${roomNumber} — Collect security deposit before checking in the guest.`;
 
+        // Early Check-In Fee: shown inline (same modal, same style as the other
+        // fields) instead of a second popup, pre-filled with the auto-calculated
+        // amount but editable before confirming.
+        const earlyFeeSection = document.getElementById('sdEarlyFeeSection');
+        const earlyFeeInput = document.getElementById('sdEarlyFeeAmount');
+        const earlyFeeHint = document.getElementById('sdEarlyFeeHint');
+        if (earlyCheckInState.isEarly) {
+            const { hoursEarly, fee } = computeEarlyCheckInFee();
+            if (earlyFeeInput) earlyFeeInput.value = formatAmountInput(String(fee));
+            if (earlyFeeHint) {
+                earlyFeeHint.textContent = `Guest is checking in ${hoursEarly} hour${hoursEarly === 1 ? '' : 's'} `
+                    + `before the 3:00 PM standard time (₱${EARLY_CHECKIN_RATE}/hour). Adjust if needed.`;
+            }
+            if (earlyFeeSection) earlyFeeSection.style.display = 'block';
+        } else if (earlyFeeSection) {
+            earlyFeeSection.style.display = 'none';
+        }
+
         const depositInfo = await fetchExistingDeposit(bookingId);
         const existingAlert = document.getElementById('sdExistingDepositAlert');
-        const depositForm = document.getElementById('sdDepositForm');
+        const depositAmountBlock = document.getElementById('sdDepositAmountBlock');
+        const remarksSection = document.getElementById('sdRemarksSection');
         const confirmBtn = document.getElementById('sdConfirmBtn');
 
         if (depositInfo.exists) {
             existingAlert.style.display = 'block';
             document.getElementById('sdExistingAmount').textContent = formatCurrency(depositInfo.amount);
-            depositForm.style.display = 'none';
+            if (depositAmountBlock) depositAmountBlock.style.display = 'none';
+            if (remarksSection) remarksSection.style.display = 'none';
             confirmBtn.dataset.depositExists = 'true';
             confirmBtn.dataset.label = 'Check In Guest';
             confirmBtn.innerHTML = '<i class="fas fa-check me-1"></i>Check In Guest';
         } else {
             existingAlert.style.display = 'none';
-            depositForm.style.display = 'block';
+            if (depositAmountBlock) depositAmountBlock.style.display = 'block';
+            if (remarksSection) remarksSection.style.display = 'block';
             confirmBtn.dataset.depositExists = 'false';
-            confirmBtn.dataset.label = 'Record Deposit & Check In';
-            confirmBtn.innerHTML = '<i class="fas fa-check me-1"></i>Record Deposit & Check In';
+            confirmBtn.dataset.label = 'Apply & Check In';
+            confirmBtn.innerHTML = '<i class="fas fa-check me-1"></i>Apply & Check In';
         }
 
         modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);

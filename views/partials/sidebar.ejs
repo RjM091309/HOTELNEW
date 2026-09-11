@@ -104,7 +104,7 @@
 					</a>
 				</li>
 
-				<% const bookingPages = ['booking', 'unassigned-rooms', 'room-checker', 'check-in-notifier', 'breakfast-list', 'cancelled-booking']; %>
+				<% const bookingPages = ['booking', 'unassigned-rooms', 'room-checker', 'check-in-notifier', 'breakfast-list', 'cancelled-booking', 'flight_schedule', 'pickup_drop']; %>
 				<li class="nav-item <%= bookingPages.includes(activePage) ? 'open' : '' %>">
 					<a class="nav-link nav-toggle nav-main-link-submenu <%= bookingPages.includes(activePage) ? 'active' : '' %>" data-toggle="submenu" aria-haspopup="true"
 						aria-expanded="<%= bookingPages.includes(activePage) ? 'true' : 'false' %>" href="#">
@@ -120,24 +120,6 @@
 							</a>
 						</li>
 						<li class="nav-item">
-							<a href="/calendar/unassigned-rooms" class="nav-link <%= activePage === 'unassigned-rooms' ? 'active' : '' %>">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Unassigned Rooms</span>
-							</a>
-						</li>
-						<li class="nav-item">
-							<a href="/calendar/room-checker" class="nav-link <%= activePage === 'room-checker' ? 'active' : '' %>">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Room Checker</span>
-							</a>
-						</li>
-						<li class="nav-item">
-							<a href="/booking/check-in-notifier" class="nav-link <%= activePage === 'check-in-notifier' ? 'active' : '' %>">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Check-in Notifier</span>
-							</a>
-						</li>
-						<li class="nav-item">
 							<a href="/booking/breakfast-list" class="nav-link <%= activePage === 'breakfast-list' ? 'active' : '' %>">
 								<i class="fa fa-genderless"></i>
 								<span class="title">Breakfast List</span>
@@ -149,183 +131,10 @@
 								<span class="title">Cancelled Bookings</span>
 							</a>
 						</li>
-						<!-- Rooms and Guest moved to Management -->
-					</ul>
-				</li>
-
-				<% const paymentPages = ['daily_settlement', 'payments', 'credit', 'deposits', 'receipts']; %>
-				<li class="nav-item <%= paymentPages.includes(activePage) ? 'open' : '' %>" data-section="payment-management">
-					<a class="nav-link nav-toggle nav-main-link-submenu <%= paymentPages.includes(activePage) ? 'active' : '' %>" data-toggle="submenu" aria-haspopup="true"
-						aria-expanded="<%= paymentPages.includes(activePage) ? 'true' : 'false' %>" href="#">
-						<i class="material-icons">payment</i>
-						<span class="title">Payment</span>
-						<span class="arrow <%= paymentPages.includes(activePage) ? 'open' : '' %>"></span>
-					</a>
-					<ul class="sub-menu <%= paymentPages.includes(activePage) ? 'show' : '' %>" <% if (paymentPages.includes(activePage)) { %>style="display: block;"<% } %>>
 						<li class="nav-item">
-							<a href="/telegram/settlement" class="nav-link <%= activePage === 'daily_settlement' ? 'active' : '' %>">
+							<a href="/booking/check-in-notifier" class="nav-link <%= activePage === 'check-in-notifier' ? 'active' : '' %>">
 								<i class="fa fa-genderless"></i>
-								<span class="title">Daily Settlement</span>
-							</a>
-						</li>
-						<li class="nav-item">
-							<a href="/payments" class="nav-link <%= activePage === 'payments' ? 'active' : '' %>">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Payment</span>
-							</a>
-						</li>
-						<li class="nav-item">
-							<a href="/credit" class="nav-link <%= activePage === 'credit' ? 'active' : '' %>">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Credit</span>
-							</a>
-						</li>
-						<li class="nav-item">
-							<a href="/deposits" class="nav-link <%= activePage === 'deposits' ? 'active' : '' %>">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Deposits</span>
-							</a>
-						</li>
-						<li class="nav-item">
-							<a href="/agency" class="nav-link <%= activePage === 'agency' ? 'active' : '' %>" onclick="localStorage.setItem('agencySection','payment')">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Agency</span>
-							</a>
-						</li>
-						<li class="nav-item">
-							<a href="/payments/receipts" class="nav-link <%= activePage === 'receipts' ? 'active' : '' %>">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Receipt</span>
-							</a>
-						</li>
-					</ul>
-				</li>
-
-
-				<% const managementPages = ['expenses', 'guest', 'room_clearance', 'employee', 'user_info', 'vehicle_monitoring', 'activity_log']; %>
-				<li class="nav-item <%= managementPages.includes(activePage) ? 'open' : '' %>">
-					<a class="nav-link nav-toggle nav-main-link-submenu <%= managementPages.includes(activePage) ? 'active' : '' %>" data-toggle="submenu" aria-haspopup="true"
-						aria-expanded="<%= managementPages.includes(activePage) ? 'true' : 'false' %>" href="#">
-						<i class="material-icons">assessment</i>
-						<span class="title">Management</span>
-						<span class="arrow <%= managementPages.includes(activePage) ? 'open' : '' %>"></span>
-					</a>
-					<ul class="sub-menu <%= managementPages.includes(activePage) ? 'show' : '' %>" <% if (managementPages.includes(activePage)) { %>style="display: block;"<% } %>>
-						<li class="nav-item">
-							<a href="/expenses" class="nav-link <%= activePage === 'expenses' ? 'active' : '' %>">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Expenses</span>
-							</a>
-						</li>
-					
-						<li class="nav-item">
-							<a href="/guest" class="nav-link <%= activePage === 'guest' ? 'active' : '' %>">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Guest Profile</span>
-							</a>
-						</li>
-						<li class="nav-item">
-							<a href="/room_clearance" class="nav-link <%= activePage === 'room_clearance' ? 'active' : '' %>">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Room Clearance</span>
-							</a>
-						</li>
-						<li class="nav-item">
-							<a href="/employee" class="nav-link <%= activePage === 'employee' ? 'active' : '' %>">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Employee</span>
-							</a>
-						</li>
-						<li class="nav-item">
-							<a href="/vehicle/monitoring" class="nav-link <%= activePage === 'vehicle_monitoring' ? 'active' : '' %>">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Vehicle Monitoring</span>
-							</a>
-						</li>
-					
-						<li class="nav-item">
-							<a href="/user_info" class="nav-link <%= activePage === 'user_info' ? 'active' : '' %>">
-								<i class="fa fa-genderless"></i>
-								<span class="title">User Info</span>
-							</a>
-						</li>
-						<li class="nav-item">
-							<a href="/activity-log" class="nav-link <%= activePage === 'activity_log' ? 'active' : '' %>">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Activity Log</span>
-							</a>
-						</li>
-					</ul>
-				</li>
-
-				<!-- Settings Section -->
-				<% const settingsPages = ['integration', 'card_writer', 'telegram_settings', 'booking_channel', 'vehicle', 'room', 'room_rates', 'services', 'flight_schedule', 'pickup_drop']; %>
-				<li class="nav-item <%= settingsPages.includes(activePage) ? 'open' : '' %>" data-section="settings">
-					<a class="nav-link nav-toggle nav-main-link-submenu <%= settingsPages.includes(activePage) ? 'active' : '' %>" data-toggle="submenu" aria-haspopup="true"
-						aria-expanded="<%= settingsPages.includes(activePage) ? 'true' : 'false' %>" href="#">
-						<i class="material-icons">settings</i>
-						<span class="title">Settings</span>
-						<span class="arrow <%= settingsPages.includes(activePage) ? 'open' : '' %>"></span>
-					</a>
-					<ul class="sub-menu <%= settingsPages.includes(activePage) ? 'show' : '' %>" <% if (settingsPages.includes(activePage)) { %>style="display: block;"<% } %>>
-						<li class="nav-item">
-							<a class="nav-link <%= activePage === 'agency' ? 'active' : '' %>" href="/agency" onclick="localStorage.setItem('agencySection','settings')">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Agency</span>
-							</a>
-						</li>
-						<li class="nav-item">
-							<a class="nav-link <%= activePage === 'booking_channel' ? 'active' : '' %>" href="/booking_channel">
-								<i class="fa fa-genderless"></i>
-								<span class="title">OTA</span>
-							</a>
-						</li>
-						<li class="nav-item">
-							<a class="nav-link <%= activePage === 'vehicle' ? 'active' : '' %>" href="/vehicle">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Vehicle Management</span>
-							</a>
-						</li>
-						<li class="nav-item">
-							<a class="nav-link <%= activePage === 'room' ? 'active' : '' %>" href="/room">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Rooms</span>
-							</a>
-						</li>
-						<li class="nav-item">
-							<a class="nav-link <%= activePage === 'room_rates' ? 'active' : '' %>" href="/room-rates">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Room Rates</span>
-							</a>
-						</li>
-						<li class="nav-item">
-							<a class="nav-link <%= activePage === 'services' ? 'active' : '' %>" href="/services">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Services</span>
-							</a>
-						</li>
-						<li class="nav-item">
-							<a class="nav-link <%= activePage === 'integration' ? 'active' : '' %>" href="/integration">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Integration</span>
-							</a>
-						</li>
-						<li class="nav-item">
-							<a class="nav-link <%= activePage === 'card_writer' ? 'active' : '' %>" href="/integration/card-writer">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Card Writer</span>
-							</a>
-						</li>
-						<li class="nav-item">
-							<a class="nav-link <%= activePage === 'telegram_settings' ? 'active' : '' %>" href="/telegram/settings">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Telegram | Kakao</span>
-							</a>
-						</li>
-						<li class="nav-item">
-							<a class="nav-link <%= activePage === 'channex_settings' ? 'active' : '' %>" href="/channex/settings">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Channex</span>
+								<span class="title">Check-in Notifier</span>
 							</a>
 						</li>
 						<li class="nav-item">
@@ -340,53 +149,194 @@
 								<span class="title">Pick Up & Drop</span>
 							</a>
 						</li>
+						<li class="nav-item">
+							<a href="/calendar/room-checker" class="nav-link <%= activePage === 'room-checker' ? 'active' : '' %>">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Room Checker</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a href="/calendar/unassigned-rooms" class="nav-link <%= activePage === 'unassigned-rooms' ? 'active' : '' %>">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Unassigned Rooms</span>
+							</a>
+						</li>
+						<!-- Rooms and Guest moved to Management -->
 					</ul>
 				</li>
-				<% if (user && user.PERMISSIONS == 1) { %>
-				<li class="nav-item">
-					<a href="#" id="navDeleteTestData" class="nav-link">
-						<i class="material-icons">delete_forever</i>
-						<span class="title">Delete Data</span>
-					</a>
-				</li>
-				<% } %>
 
-				<script>
-					(function() {
-						try {
-							var activePage = '<%= activePage %>';
-							if (activePage !== 'agency') return;
-							var pref = localStorage.getItem('agencySection') || 'payment';
-							var paymentLi = document.querySelector('[data-section="payment-management"]');
-							var settingsLi = document.querySelector('[data-section="settings"]');
-							var targets = [paymentLi, settingsLi];
-							targets.forEach(function(li) {
-								if (!li) return;
-								li.classList.remove('open', 'active');
-								var link = li.querySelector('.nav-link');
-								if (link) link.classList.remove('active');
-								var sub = li.querySelector('.sub-menu');
-								if (sub) {
-									sub.classList.remove('show');
-									sub.style.display = '';
-								}
-							});
-							var targetLi = pref === 'settings' ? settingsLi : paymentLi;
-							if (targetLi) {
-								targetLi.classList.add('open');
-								var tlink = targetLi.querySelector('.nav-link');
-								if (tlink) tlink.classList.add('active');
-								var tsub = targetLi.querySelector('.sub-menu');
-								if (tsub) {
-									tsub.classList.add('show');
-									tsub.style.display = 'block';
-								}
-							}
-						} catch (e) {
-							// fail silently
-						}
-					})();
-				</script>
+				<% const paymentPages = ['daily_settlement', 'payments', 'credit', 'deposits', 'receipts', 'expenses', 'agency']; %>
+				<li class="nav-item <%= paymentPages.includes(activePage) ? 'open' : '' %>">
+					<a class="nav-link nav-toggle nav-main-link-submenu <%= paymentPages.includes(activePage) ? 'active' : '' %>" data-toggle="submenu" aria-haspopup="true"
+						aria-expanded="<%= paymentPages.includes(activePage) ? 'true' : 'false' %>" href="#">
+						<i class="material-icons">payment</i>
+						<span class="title">Payment</span>
+						<span class="arrow <%= paymentPages.includes(activePage) ? 'open' : '' %>"></span>
+					</a>
+					<ul class="sub-menu <%= paymentPages.includes(activePage) ? 'show' : '' %>" <% if (paymentPages.includes(activePage)) { %>style="display: block;"<% } %>>
+						<li class="nav-item">
+							<a href="/agency" class="nav-link <%= activePage === 'agency' ? 'active' : '' %>">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Agency</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a href="/credit" class="nav-link <%= activePage === 'credit' ? 'active' : '' %>">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Credit</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a href="/telegram/settlement" class="nav-link <%= activePage === 'daily_settlement' ? 'active' : '' %>">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Daily Settlement</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a href="/deposits" class="nav-link <%= activePage === 'deposits' ? 'active' : '' %>">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Deposits</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a href="/expenses" class="nav-link <%= activePage === 'expenses' ? 'active' : '' %>">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Expenses</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a href="/payments" class="nav-link <%= activePage === 'payments' ? 'active' : '' %>">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Payment</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a href="/payments/receipts" class="nav-link <%= activePage === 'receipts' ? 'active' : '' %>">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Receipt</span>
+							</a>
+						</li>
+					</ul>
+				</li>
+
+
+				<% const managementPages = ['guest', 'employee', 'user_info', 'vehicle_monitoring', 'activity_log']; %>
+				<li class="nav-item <%= managementPages.includes(activePage) ? 'open' : '' %>">
+					<a class="nav-link nav-toggle nav-main-link-submenu <%= managementPages.includes(activePage) ? 'active' : '' %>" data-toggle="submenu" aria-haspopup="true"
+						aria-expanded="<%= managementPages.includes(activePage) ? 'true' : 'false' %>" href="#">
+						<i class="material-icons">assessment</i>
+						<span class="title">Management</span>
+						<span class="arrow <%= managementPages.includes(activePage) ? 'open' : '' %>"></span>
+					</a>
+					<!-- Room Clearance hidden for now - not needed at the moment. Route/page still exist, just unlinked. -->
+					<ul class="sub-menu <%= managementPages.includes(activePage) ? 'show' : '' %>" <% if (managementPages.includes(activePage)) { %>style="display: block;"<% } %>>
+						<li class="nav-item">
+							<a href="/activity-log" class="nav-link <%= activePage === 'activity_log' ? 'active' : '' %>">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Activity Log</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a href="/employee" class="nav-link <%= activePage === 'employee' ? 'active' : '' %>">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Employee</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a href="/guest" class="nav-link <%= activePage === 'guest' ? 'active' : '' %>">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Guest Profile</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a href="/user_info" class="nav-link <%= activePage === 'user_info' ? 'active' : '' %>">
+								<i class="fa fa-genderless"></i>
+								<span class="title">User Info</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a href="/vehicle/monitoring" class="nav-link <%= activePage === 'vehicle_monitoring' ? 'active' : '' %>">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Vehicle Monitoring</span>
+							</a>
+						</li>
+					</ul>
+				</li>
+
+				<!-- Settings Section -->
+				<% const settingsPages = ['integration', 'card_writer', 'telegram_settings', 'booking_channel', 'vehicle', 'room', 'room_rates', 'services']; %>
+				<li class="nav-item <%= settingsPages.includes(activePage) ? 'open' : '' %>">
+					<a class="nav-link nav-toggle nav-main-link-submenu <%= settingsPages.includes(activePage) ? 'active' : '' %>" data-toggle="submenu" aria-haspopup="true"
+						aria-expanded="<%= settingsPages.includes(activePage) ? 'true' : 'false' %>" href="#">
+						<i class="material-icons">settings</i>
+						<span class="title">Settings</span>
+						<span class="arrow <%= settingsPages.includes(activePage) ? 'open' : '' %>"></span>
+					</a>
+					<ul class="sub-menu <%= settingsPages.includes(activePage) ? 'show' : '' %>" <% if (settingsPages.includes(activePage)) { %>style="display: block;"<% } %>>
+						<li class="nav-item">
+							<a class="nav-link <%= activePage === 'card_writer' ? 'active' : '' %>" href="/integration/card-writer">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Card Writer</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link <%= activePage === 'channex_settings' ? 'active' : '' %>" href="/channex/settings">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Channex</span>
+							</a>
+						</li>
+						<% if (user && user.PERMISSIONS == 1) { %>
+						<li class="nav-item">
+							<a href="#" id="navDeleteTestData" class="nav-link">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Delete Data</span>
+							</a>
+						</li>
+						<% } %>
+						<li class="nav-item">
+							<a class="nav-link <%= activePage === 'integration' ? 'active' : '' %>" href="/integration">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Integration</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link <%= activePage === 'booking_channel' ? 'active' : '' %>" href="/booking_channel">
+								<i class="fa fa-genderless"></i>
+								<span class="title">OTA</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link <%= activePage === 'room_rates' ? 'active' : '' %>" href="/room-rates">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Room Rates</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link <%= activePage === 'room' ? 'active' : '' %>" href="/room">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Rooms</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link <%= activePage === 'services' ? 'active' : '' %>" href="/services">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Services</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link <%= activePage === 'telegram_settings' ? 'active' : '' %>" href="/telegram/settings">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Telegram | Kakao</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link <%= activePage === 'vehicle' ? 'active' : '' %>" href="/vehicle">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Vehicle Management</span>
+							</a>
+						</li>
+					</ul>
+				</li>
 			</ul>
 		</div>
 	</div>
