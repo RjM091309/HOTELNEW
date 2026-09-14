@@ -1676,6 +1676,18 @@ class DashboardModel {
     }
   }
 
+  // Bulk room status update (e.g. "Clean All Rooms" - move every room in the
+  // Cleaning Room tab to Available in one call instead of one at a time).
+  static async updateRoomStatusBulk(roomIds, status) {
+    try {
+      const query = 'UPDATE room SET ROOM_STATUS = ? WHERE IDNo IN (?) AND ACTIVE = 1';
+      const result = await queryDatabasePromise(query, [status, roomIds]);
+      return result.affectedRows;
+    } catch (error) {
+      throw error;
+    }
+  }
+
   // Move to occupied
   static async moveToOccupied() {
     try {

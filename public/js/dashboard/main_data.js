@@ -112,6 +112,62 @@ function goToCleaningRoom(roomNumber) {
     }
 }
 
+// --- Jump to the Today Check-in tab and blink the matching booking card ---
+// Reached via ?checkin=<bookingId> - the calendar's pending-reservation popup
+// links here so staff can find the right guest fast instead of hunting
+// through a long Today Check-in list.
+function goToCheckInCard(bookingId) {
+    document.querySelectorAll('.tabs_three').forEach(tab => tab.classList.remove('is-active'));
+    const checkinTab = document.querySelector('.tabs_three[data-target="checked-in-content"]');
+    if (checkinTab) {
+        checkinTab.classList.add('is-active');
+    }
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.style.display = 'none';
+        content.classList.remove('active-tab');
+    });
+    const checkinContent = document.getElementById('checked-in-content');
+    if (!checkinContent) {
+        return;
+    }
+    checkinContent.style.display = 'block';
+    checkinContent.classList.add('active-tab');
+    localStorage.setItem('activeTab', 'checked-in-content');
+
+    const targetCard = checkinContent.querySelector(`.card[data-booking-id="${CSS.escape(String(bookingId))}"]`);
+    if (targetCard) {
+        document.querySelectorAll('.room-card-blink').forEach(el => el.classList.remove('room-card-blink'));
+        targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        void targetCard.offsetWidth; // restart the animation if it's already blinking
+        targetCard.classList.add('room-card-blink');
+        setTimeout(() => targetCard.classList.remove('room-card-blink'), 4600);
+    }
+}
+
+// If the page was opened as /dashboard?checkin=<bookingId>, jump straight to
+// that booking's card in the Today Check-in tab, then clean the URL so a
+// refresh or back-navigation doesn't re-trigger the jump.
+// NOTE: this script is injected dynamically (see dashboard.ejs) after the
+// document's own DOMContentLoaded has already fired, so - same as
+// initializeTabs() above - a plain DOMContentLoaded listener here would never
+// run; check document.readyState instead.
+function initCheckinDeepLink() {
+    const params = new URLSearchParams(window.location.search);
+    const checkinId = params.get('checkin');
+    if (!checkinId) return;
+
+    setTimeout(() => goToCheckInCard(checkinId), 150);
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete('checkin');
+    window.history.replaceState({}, '', url.toString());
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCheckinDeepLink);
+} else {
+    initCheckinDeepLink();
+}
+
 // --- Tab Switching and Tab Order ---
 function initializeTabs() {
     // Ensure chat sidebar functionality is preserved
@@ -930,6 +986,13 @@ $(document).ready(function() {
             $('#sort-button').show();
         } else {
             $('#sort-button').hide();
+        }
+
+        // Clean All Rooms button - only show on the Cleaning Room tab
+        if (activeTabId === 'cleaning-content') {
+            $('#cleanAllRoomsBtn').show();
+        } else {
+            $('#cleanAllRoomsBtn').hide();
         }
     }
     
@@ -1810,6 +1873,80 @@ $(document).ready(function() {
                 }
             });
         }
+    });
+
+    // CLEAN ALL ROOMS (bulk) - moves every room currently in the Cleaning
+    // Room tab to Available in one click, instead of one at a time.
+    $(document).on('click', '#cleanAllRoomsBtn', function () {
+        const cleaningContent = document.getElementById('cleaning-content');
+        if (!cleaningContent) return;
+
+        const roomIds = Array.from(cleaningContent.querySelectorAll('.cleaning-container[data-room-id]'))
+            .map((el) => el.getAttribute('data-room-id'))
+            .filter(Boolean);
+
+        if (!roomIds.length) {
+            PMSCore.showError('No Rooms', 'There are no rooms currently under cleaning.');
+            return;
+        }
+
+        Swal.fire({
+            title: 'Clean All Rooms?',
+            text: `Move all ${roomIds.length} room(s) in the Cleaning Room list to Available Room?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#28a745',
+            confirmButtonText: `Yes, clean all ${roomIds.length}`,
+            cancelButtonText: 'No, cancel',
+            allowOutsideClick: false
+        }).then((result) => {
+            if (!result.isConfirmed) return;
+
+            Swal.fire({
+                title: 'Cleaning All Rooms...',
+                text: 'Please wait while we move the rooms to Available Room.',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            $.ajax({
+                url: '/dashboard/room_maintenance/updateStatusBulk',
+                type: 'PUT',
+                contentType: 'application/json',
+                data: JSON.stringify({ roomIds, status: 1 }), // 1 = Available
+                success: function (response) {
+                    Swal.close();
+
+                    const updatedCount = response.updatedCount || roomIds.length;
+                    PMSCore.showSuccess('Rooms Cleaned!', `${updatedCount} room(s) moved to Available Room.`);
+
+                    // Remove the now-cleaned cards from the Cleaning Room tab
+                    roomIds.forEach((id) => {
+                        const container = cleaningContent.querySelector(`.cleaning-container[data-room-id="${id}"]`);
+                        const card = container ? container.closest('.card') : null;
+                        if (card) card.remove();
+                    });
+
+                    if (typeof dashboardSocket !== 'undefined') {
+                        dashboardSocket.emit('dashboard-updated', {
+                            action: 'room-status-updated',
+                            message: `${roomIds.length} room(s) moved to available`,
+                            data: { roomIds }
+                        });
+                    }
+
+                    setTimeout(() => {
+                        reloadDashboardData();
+                    }, 1000);
+                },
+                error: function () {
+                    Swal.close();
+                    PMSCore.showError('Error!', 'An error occurred while cleaning all rooms.');
+                }
+            });
+        });
     });
 
 

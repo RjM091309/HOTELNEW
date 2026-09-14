@@ -10,22 +10,23 @@
 
 async function checkForOverlaps(newStart, newEnd, roomId, excludeEventId) {
   try {
-    // Use backend overlap detection for better performance
-    const response = await fetch('/calendar/api/bookings/check-overlaps', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': getCSRFToken(),
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      credentials: 'include',
-      body: JSON.stringify({
-        start: newStart.toISOString(),
-        end: newEnd.toISOString(),
-        roomId: roomId,
-        excludeEventId: excludeEventId,
-        _csrf: getCSRFToken()
-      })
+    // Use backend overlap detection for better performance. The route
+    // (routes/r_calendar.js) is registered GET and its controller reads
+    // roomId/checkIn/checkOut/excludeBookingId from the query string - match
+    // that here (this used to POST a JSON body with different field names,
+    // which 404'd on every call and silently fell through to the frontend
+    // fallback below every time).
+    const params = new URLSearchParams({
+      roomId: roomId,
+      checkIn: newStart.toISOString(),
+      checkOut: newEnd.toISOString()
+    });
+    if (excludeEventId) params.set('excludeBookingId', excludeEventId);
+
+    const response = await fetch(`/calendar/api/bookings/check-overlaps?${params.toString()}`, {
+      method: 'GET',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      credentials: 'include'
     });
 
     if (response.ok) {

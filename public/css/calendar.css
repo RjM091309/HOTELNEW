@@ -411,7 +411,10 @@
   100% { transform: scale(1.02); opacity: 0; }
 }
 
-/* Steady gold glow after closing a schedule-bar modal (~3s via JS) */
+/* Steady gold glow after closing a schedule-bar modal (~3s via JS).
+   No filter: brightness()/saturate() here on purpose - that washes out
+   whatever text/label sits inside the bar (e.g. the guest name) right when
+   it lights up. The box-shadow halo alone is the attention-grabbing part. */
 .fc-event.schedule-bar-glow,
 .fc-timeline-event-harness.schedule-bar-glow .fc-event {
   position: relative !important;
@@ -422,12 +425,12 @@
     0 0 18px rgba(255, 215, 0, 0.95),
     0 0 36px rgba(255, 193, 7, 0.9),
     0 0 56px rgba(218, 165, 32, 0.75);
-  filter: brightness(1.25) saturate(1.15);
 }
 
 .fc-event.schedule-bar-glow::after {
   content: "";
   position: absolute;
+  z-index: 1; /* stay below .event-title-chip (z-index: 2) so the halo never covers the guest name */
   left: -5px;
   right: -5px;
   top: -5px;
@@ -581,6 +584,10 @@
   /* Title chip text container - crisp text rendering without blur */
   .fc-event .event-title-chip {
     position: absolute;
+    /* Must outrank .schedule-bar-glow::after (generated content paints after
+       real children by spec, so without this the glow's border/halo overlay
+       covers the guest name whenever a bar is glowing). */
+    z-index: 2;
     left: 8px;
     right: 8px;
     top: 0;

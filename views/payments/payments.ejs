@@ -144,23 +144,28 @@
 </div>
 
 <script>
+  // Shared with the shift-card click handlers further below: clicking a Shift
+  // card filters this same table by hour range instead of opening a modal.
+  let currentFilter = 'all';
+  let currentShift = 'all';
+  let table;
+
   $(document).ready(function () {
-    let currentFilter = 'all';
-    let table = $('#payments_tbl').DataTable({
-      rowId: 'BOOKING_ID',
+    table = $('#payments_tbl').DataTable({
+      rowId: 'PAYMENT_ID', // one row per payment transaction now, not per booking
       processing: true,
       serverSide: true,
-      ajax: { 
-        url: '/payments/payments_data', 
+      ajax: {
+        url: '/payments/payments_data',
         type: 'GET',
-        data: function(d){ d.filter = currentFilter; },
+        data: function(d){ d.filter = currentFilter; d.shift = currentShift; },
         error: function (_xhr, status, err) {
           console.error('Payments table load failed:', status, err);
         }
       },
       columns: [
         { data: 'BOOKING_ID', visible: false },
-        { data: 'LAST_PAYMENT_ID', visible: false },
+        { data: 'PAYMENT_ID', visible: false },
         { data: null, orderable: false, searchable: false, className: 'center' },
         { data: 'GUEST_NAME', className: 'center' },
         { data: 'ROOM_NUMBER', className: 'center' },
@@ -213,6 +218,8 @@
       $('.dashboard-card .filter-btn-group .filter-btn').removeClass('active');
       $(this).addClass('active');
       currentFilter = $(this).data('filter');
+      currentShift = 'all';
+      $('.payment-sales-card--shift').removeClass('payment-sales-card--shift-active');
       table.ajax.reload();
       if (typeof updateSummaryCardsForFilter === 'function') {
         updateSummaryCardsForFilter(currentFilter);
@@ -299,7 +306,7 @@
       });
       const footer = card.querySelector('.payment-sales-card__footer');
       if (footer && orig.footer !== null) footer.innerHTML = orig.footer;
-      card.classList.remove('payment-sales-card--shift');
+      card.classList.remove('payment-sales-card--shift', 'payment-sales-card--shift-active');
       delete card.dataset.shift;
     });
     summaryMode = 'default';
@@ -320,6 +327,7 @@
       const footer = card.querySelector('.payment-sales-card__footer');
       if (footer) footer.textContent = '';
       card.classList.add('payment-sales-card--shift');
+      card.classList.remove('payment-sales-card--shift-active');
       card.dataset.shift = String(c.shift);
       c.ids.forEach(function (id) {
         const el = document.getElementById(id);
@@ -384,13 +392,24 @@
     showTodayPaidModal('today');
   });
 
-  // In "Today" (shift) mode each card opens the Collected Sales modal scoped to its shift.
+  // In "Today" (shift) mode, clicking a card filters the table below by that
+  // shift's hour range instead of opening a modal. Clicking the same card
+  // again clears the shift filter back to all of today.
   $(document).on('click', '.payment-sales-card--shift', function () {
     const shift = String(this.dataset.shift || '');
-    if (!shift) return;
-    currentPaidRange = 'today';
-    currentPaidShift = shift;
-    showTodayPaidModal('today');
+    if (!shift || typeof table === 'undefined' || !table) return;
+
+    const isSameShift = currentShift === shift;
+    $('.payment-sales-card--shift').removeClass('payment-sales-card--shift-active');
+
+    if (isSameShift) {
+      currentShift = 'all';
+    } else {
+      currentShift = shift;
+      $(this).addClass('payment-sales-card--shift-active');
+    }
+
+    table.ajax.reload();
   });
 
   $(document).on('click', '.confirmation-link', function(e){
@@ -907,6 +926,13 @@
   /* Re-purpose the third stat slot (normally "Unpaid"/red) as "Non-cash" */
   .payment-sales-card.payment-sales-card--shift .payment-sales-card__value--unpaid {
     color: #4dd0e1;
+  }
+
+  /* Selected shift - the table below is filtered to this card's hour range */
+  .payment-sales-card.payment-sales-card--shift-active {
+    border-color: #ce93d8;
+    box-shadow: 0 0 0 2px #ce93d8;
+    background: rgba(206, 147, 216, 0.08);
   }
 
   #todayPaidModal .modal-body {

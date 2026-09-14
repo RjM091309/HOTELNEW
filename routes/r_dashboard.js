@@ -25,6 +25,7 @@ router.post('/booking/update_status', DashboardController.updateBookingStatus);
 
 // Room maintenance routes
 router.put('/room_maintenance/updateStatus/:roomId', DashboardController.updateRoomStatus);
+router.put('/room_maintenance/updateStatusBulk', DashboardController.updateRoomStatusBulk);
 
 // Room monitoring routes
 router.get('/room-monitoring', DashboardController.getRoomMonitoring);

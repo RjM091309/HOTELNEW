@@ -108,6 +108,10 @@ function injectDragStyles() {
        clip-path is removed to prevent Chromium font rasterization blur. */
     .fc-event .event-title-chip {
       position: absolute;
+      /* Must outrank .schedule-bar-glow::after (generated content paints after
+         real children by spec, so without this the glow's border/halo overlay
+         covers the guest name whenever a bar is glowing). */
+      z-index: 2;
       left: 8px;
       right: 8px;
       top: 0;
@@ -256,7 +260,13 @@ function injectDragStyles() {
       overflow: hidden;
       text-overflow: ellipsis;
       pointer-events: none;
-      z-index: 25;
+      /* Must outrank the glowing bar's own z-index (35, !important, set in
+         calendar.css .schedule-bar-glow) - this overlay is a HARNESS SIBLING
+         of .fc-event, not a child of it, so it doesn't share that element's
+         local stacking context. Without this, the glowing bar's own solid
+         background paints over this overlay and the guest name disappears
+         for the whole ~3s glow on any early/late/reservation-fee-marked bar. */
+      z-index: 40;
     }
 
     .fc-event.has-name-overlay .event-title-chip {

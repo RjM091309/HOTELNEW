@@ -6,6 +6,19 @@ const RoomModel = require('../models/roomModel');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const axios = require('axios');
+
+// ---- Home Assistant integration (guest room relays: cleaning request / DND) ----
+// Single source of truth for the URL/token/timeout instead of re-declaring them
+// in every method below. A short timeout keeps a slow/unreachable HA box from
+// hanging a request instead of failing fast.
+const HOME_ASSISTANT_URL = 'http://124.105.224.223:8010';
+const HA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIxZWNmMDhkNTU5MDA0YzUyYmRiNmU0YTRmY2ZjMzJlNSIsImlhdCI6MTc1OTQ2NzM4OSwiZXhwIjoyMDc0ODI3Mzg5fQ.KbfztQqa68H6XWrkPlmvN5E45sIPHgLHg0bU-NHfwKI';
+const HOME_ASSISTANT_TIMEOUT_MS = 5000;
+const haRequestConfig = () => ({
+  headers: { Authorization: `Bearer ${HA_TOKEN}` },
+  timeout: HOME_ASSISTANT_TIMEOUT_MS
+});
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -931,20 +944,13 @@ class RoomController {
   // Toggle cleaning relay (switch.relay_1)
   static async toggleCleaning(req, res) {
     try {
-      const axios = require('axios');
-      
-      const HOME_ASSISTANT_URL = 'http://124.105.224.223:8010';
-      const HA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIxZWNmMDhkNTU5MDA0YzUyYmRiNmU0YTRmY2ZjMzJlNSIsImlhdCI6MTc1OTQ2NzM4OSwiZXhwIjoyMDc0ODI3Mzg5fQ.KbfztQqa68H6XWrkPlmvN5E45sIPHgLHg0bU-NHfwKI';
-      
       const { action } = req.body;
-      
+
       // Get current state of cleaning relay
-      const currentStateResponse = await axios.get(`${HOME_ASSISTANT_URL}/api/states/switch.relay_1`, {
-        headers: { Authorization: `Bearer ${HA_TOKEN}` }
-      });
-      
+      const currentStateResponse = await axios.get(`${HOME_ASSISTANT_URL}/api/states/switch.relay_1`, haRequestConfig());
+
       const currentState = currentStateResponse.data.state;
-      
+
       // Determine action to take
       let newState;
       if (action === 'ON' || action === 'turn_on') {
@@ -955,16 +961,14 @@ class RoomController {
         // Toggle current state
         newState = currentState === 'on' ? 'off' : 'on';
       }
-      
+
       const service = newState === 'on' ? 'turn_on' : 'turn_off';
-      
+
       // Call Home Assistant service
       const response = await axios.post(`${HOME_ASSISTANT_URL}/api/services/switch/${service}`, {
         entity_id: 'switch.relay_1'
-      }, {
-        headers: { Authorization: `Bearer ${HA_TOKEN}` }
-      });
-      
+      }, haRequestConfig());
+
       if (response.status === 200) {
         // Emit socket event to notify housekeeping clients of guest action
         const io = req.app.get('io');
@@ -991,7 +995,7 @@ class RoomController {
         throw new Error(`Failed to toggle cleaning relay`);
       }
     } catch (error) {
-      console.error('Error toggling cleaning:', error);
+      console.error('Error toggling cleaning:', error.message);
       res.status(500).json({
         success: false,
         error: error.message
@@ -1002,21 +1006,14 @@ class RoomController {
   // Get cleaning relay status
   static async getCleaningStatus(req, res) {
     try {
-      const axios = require('axios');
-      
-      const HOME_ASSISTANT_URL = 'http://124.105.224.223:8010';
-      const HA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIxZWNmMDhkNTU5MDA0YzUyYmRiNmU0YTRmY2ZjMzJlNSIsImlhdCI6MTc1OTQ2NzM4OSwiZXhwIjoyMDc0ODI3Mzg5fQ.KbfztQqa68H6XWrkPlmvN5E45sIPHgLHg0bU-NHfwKI';
-      
-      const response = await axios.get(`${HOME_ASSISTANT_URL}/api/states/switch.relay_1`, {
-        headers: { Authorization: `Bearer ${HA_TOKEN}` }
-      });
-      
+      const response = await axios.get(`${HOME_ASSISTANT_URL}/api/states/switch.relay_1`, haRequestConfig());
+
       res.json({
         success: true,
         state: response.data.state.toUpperCase()
       });
     } catch (error) {
-      console.error('Error getting cleaning status:', error);
+      console.error('Error getting cleaning status:', error.message);
       res.status(500).json({
         success: false,
         error: error.message
@@ -1027,20 +1024,13 @@ class RoomController {
   // Toggle DND relay (switch.relay_4)
   static async toggleDND(req, res) {
     try {
-      const axios = require('axios');
-      
-      const HOME_ASSISTANT_URL = 'http://124.105.224.223:8010';
-      const HA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIxZWNmMDhkNTU5MDA0YzUyYmRiNmU0YTRmY2ZjMzJlNSIsImlhdCI6MTc1OTQ2NzM4OSwiZXhwIjoyMDc0ODI3Mzg5fQ.KbfztQqa68H6XWrkPlmvN5E45sIPHgLHg0bU-NHfwKI';
-      
       const { action } = req.body;
-      
+
       // Get current state of DND relay
-      const currentStateResponse = await axios.get(`${HOME_ASSISTANT_URL}/api/states/switch.relay_4`, {
-        headers: { Authorization: `Bearer ${HA_TOKEN}` }
-      });
-      
+      const currentStateResponse = await axios.get(`${HOME_ASSISTANT_URL}/api/states/switch.relay_4`, haRequestConfig());
+
       const currentState = currentStateResponse.data.state;
-      
+
       // Determine action to take
       let newState;
       if (action === 'ON' || action === 'turn_on') {
@@ -1051,16 +1041,14 @@ class RoomController {
         // Toggle current state
         newState = currentState === 'on' ? 'off' : 'on';
       }
-      
+
       const service = newState === 'on' ? 'turn_on' : 'turn_off';
-      
+
       // Call Home Assistant service
       const response = await axios.post(`${HOME_ASSISTANT_URL}/api/services/switch/${service}`, {
         entity_id: 'switch.relay_4'
-      }, {
-        headers: { Authorization: `Bearer ${HA_TOKEN}` }
-      });
-      
+      }, haRequestConfig());
+
       if (response.status === 200) {
         res.json({
           success: true,
@@ -1071,7 +1059,7 @@ class RoomController {
         throw new Error(`Failed to toggle DND relay`);
       }
     } catch (error) {
-      console.error('Error toggling DND:', error);
+      console.error('Error toggling DND:', error.message);
       res.status(500).json({
         success: false,
         error: error.message
@@ -1082,21 +1070,14 @@ class RoomController {
   // Get DND relay status
   static async getDNDStatus(req, res) {
     try {
-      const axios = require('axios');
-      
-      const HOME_ASSISTANT_URL = 'http://124.105.224.223:8010';
-      const HA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIxZWNmMDhkNTU5MDA0YzUyYmRiNmU0YTRmY2ZjMzJlNSIsImlhdCI6MTc1OTQ2NzM4OSwiZXhwIjoyMDc0ODI3Mzg5fQ.KbfztQqa68H6XWrkPlmvN5E45sIPHgLHg0bU-NHfwKI';
-      
-      const response = await axios.get(`${HOME_ASSISTANT_URL}/api/states/switch.relay_4`, {
-        headers: { Authorization: `Bearer ${HA_TOKEN}` }
-      });
-      
+      const response = await axios.get(`${HOME_ASSISTANT_URL}/api/states/switch.relay_4`, haRequestConfig());
+
       res.json({
         success: true,
         state: response.data.state.toUpperCase()
       });
     } catch (error) {
-      console.error('Error getting DND status:', error);
+      console.error('Error getting DND status:', error.message);
       res.status(500).json({
         success: false,
         error: error.message
@@ -1107,21 +1088,12 @@ class RoomController {
   // Get all rooms cleaning status for housekeeping
   static async getAllRoomsCleaningStatus(req, res) {
     try {
-      const axios = require('axios');
-      
-      const HOME_ASSISTANT_URL = 'http://124.105.224.223:8010';
-      const HA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIxZWNmMDhkNTU5MDA0YzUyYmRiNmU0YTRmY2ZjMzJlNSIsImlhdCI6MTc1OTQ2NzM4OSwiZXhwIjoyMDc0ODI3Mzg5fQ.KbfztQqa68H6XWrkPlmvN5E45sIPHgLHg0bU-NHfwKI';
-      
       // Check cleaning relay status (switch.relay_1)
-      const cleaningResponse = await axios.get(`${HOME_ASSISTANT_URL}/api/states/switch.relay_1`, {
-        headers: { Authorization: `Bearer ${HA_TOKEN}` }
-      });
-      
+      const cleaningResponse = await axios.get(`${HOME_ASSISTANT_URL}/api/states/switch.relay_1`, haRequestConfig());
+
       // Check DND relay status (switch.relay_4)
-      const dndResponse = await axios.get(`${HOME_ASSISTANT_URL}/api/states/switch.relay_4`, {
-        headers: { Authorization: `Bearer ${HA_TOKEN}` }
-      });
-      
+      const dndResponse = await axios.get(`${HOME_ASSISTANT_URL}/api/states/switch.relay_4`, haRequestConfig());
+
       // Prepare response data
       const cleaningStatus = cleaningResponse.data.state;
       const dndStatus = dndResponse.data.state;
@@ -1159,7 +1131,7 @@ class RoomController {
         }
       });
     } catch (error) {
-      console.error('Error getting all rooms cleaning status:', error);
+      console.error('Error getting all rooms cleaning status:', error.message);
       res.status(500).json({
         success: false,
         error: error.message
@@ -1170,20 +1142,13 @@ class RoomController {
   // Mark room as cleaned and turn off cleaning relay
   static async markRoomCleaned(req, res) {
     try {
-      const axios = require('axios');
-      
-      const HOME_ASSISTANT_URL = 'http://124.105.224.223:8010';
-      const HA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIxZWNmMDhkNTU5MDA0YzUyYmRiNmU0YTRmY2ZjMzJlNSIsImlhdCI6MTc1OTQ2NzM4OSwiZXhwIjoyMDc0ODI3Mzg5fQ.KbfztQqa68H6XWrkPlmvN5E45sIPHgLHg0bU-NHfwKI';
-      
       const { roomNumber } = req.body;
-      
+
       // Turn OFF cleaning relay (switch.relay_1)
       const response = await axios.post(`${HOME_ASSISTANT_URL}/api/services/switch/turn_off`, {
         entity_id: 'switch.relay_1'
-      }, {
-        headers: { Authorization: `Bearer ${HA_TOKEN}` }
-      });
-      
+      }, haRequestConfig());
+
       if (response.status === 200) {
         // Emit socket event to notify all housekeeping clients
         const io = req.app.get('io');
@@ -1209,7 +1174,7 @@ class RoomController {
         throw new Error(`Failed to turn off cleaning relay for room ${roomNumber}`);
       }
     } catch (error) {
-      console.error('Error marking room as cleaned:', error);
+      console.error('Error marking room as cleaned:', error.message);
       res.status(500).json({
         success: false,
         error: error.message

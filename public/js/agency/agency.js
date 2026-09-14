@@ -19,6 +19,38 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ========================================
+// AGENCY BOOKINGS TABLE - CLICK ANYWHERE ON A ROW TO SELECT IT
+// ========================================
+// The checkbox is a small target; clicking the rest of the row toggles it too
+// (same "click the whole card, not just the tiny control" pattern already
+// used for the payment-method cards below). Skipped for disabled checkboxes
+// (e.g. already-paid bookings) and for clicks on the checkbox itself, which
+// already toggles natively.
+if (!document.getElementById('agency-booking-row-clickable-style')) {
+    const style = document.createElement('style');
+    style.id = 'agency-booking-row-clickable-style';
+    style.textContent = `
+        #agency-bookings-table tbody tr.booking-row-clickable { cursor: pointer; }
+        #agency-bookings-table tbody tr.booking-row-clickable:hover { background-color: rgba(255, 255, 255, 0.05); }
+        #agencies_tbl tbody tr[data-id] { cursor: pointer; }
+        #agencies_tbl tbody tr[data-id]:hover { background-color: rgba(255, 255, 255, 0.05); }
+        #agencies_tbl tbody tr[data-id] .btn,
+        #agencies_tbl tbody tr[data-id] a { cursor: pointer; }
+    `;
+    document.head.appendChild(style);
+}
+
+$(document).on('click', '#agency-bookings-table tbody tr[data-booking-id]', function (e) {
+    if ($(e.target).is('input, a, button') || $(e.target).closest('input, a, button').length) {
+        return;
+    }
+    const checkbox = this.querySelector('.booking-select');
+    if (!checkbox || checkbox.disabled) return;
+    checkbox.checked = !checkbox.checked;
+    checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+});
+
+// ========================================
 // DATA LOADING
 // ========================================
 
@@ -89,6 +121,20 @@ function initializeEventListeners() {
             const agencyId = btn.getAttribute('data-id');
             const agencyName = btn.getAttribute('data-name') || 'Agency';
             fetchAgencyBookings(agencyId, agencyName);
+            return;
+        }
+
+        // Click anywhere else on an agency row (aside from the action
+        // buttons: edit/voucher/delete) opens the same Agency Bookings modal
+        // as clicking the small Bookings count - the whole row is the target.
+        const agencyRow = event.target.closest('#agencies_tbl tbody tr[data-id]');
+        if (agencyRow && !event.target.closest('button, a, input')) {
+            const viewBookingsBtn = agencyRow.querySelector('.view-bookings');
+            if (viewBookingsBtn) {
+                const agencyId = viewBookingsBtn.getAttribute('data-id');
+                const agencyName = viewBookingsBtn.getAttribute('data-name') || 'Agency';
+                fetchAgencyBookings(agencyId, agencyName);
+            }
         }
     });
     
@@ -545,7 +591,7 @@ function renderAgencyBookings(bookings) {
             const room = b.ROOM_NUMBER || '-';
             const conf = b.CONFIRMATION_NUMBER || '-';
             return `
-                <tr data-booking-id="${b.bookingId}" data-payment-status="${(b.PAYMENT_STATUS || '').toLowerCase()}">
+                <tr class="booking-row-clickable" data-booking-id="${b.bookingId}" data-payment-status="${(b.PAYMENT_STATUS || '').toLowerCase()}">
                     <td class="text-center">
                       <input type="checkbox" class="form-check-input booking-select" data-booking-id="${b.bookingId}">
                     </td>

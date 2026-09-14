@@ -113,16 +113,18 @@ const paymentsController = {
 
   tableData: async (req, res) => {
     try {
-      const { start = 0, length = 10, search = { value: '' }, order = [{ column: 1, dir: 'desc' }], filter = 'all' } = req.query;
+      const { start = 0, length = 10, search = { value: '' }, order = [{ column: 1, dir: 'desc' }], filter = 'all', shift = 'all' } = req.query;
       const searchValue = search.value || '';
       const orderColumn = order[0]?.column || 1;
       const orderDir = order[0]?.dir || 'desc';
 
+      // NOTE: one row per payment transaction now (see paymentsModel.fetchDatatable),
+      // so date/shift/order all key off the payment's own p.PAYMENT_DATE.
       const columns = [
-        'BOOKING_ID', 'LAST_PAYMENT_ID', 'BOOKING_ID', 'GUEST_NAME', 'ROOM_NUMBER', 'CONFIRMATION_NUMBER',
+        'BOOKING_ID', 'PAYMENT_ID', 'BOOKING_ID', 'GUEST_NAME', 'ROOM_NUMBER', 'CONFIRMATION_NUMBER',
         'TOTAL_AMOUNT', 'TOTAL_PAID', 'LAST_PAYMENT_AMOUNT', 'BALANCE', 'PAYMENT_STATUS', 'PAYMENT_METHOD', 'LAST_PAYMENT_DATE', 'PROCESSED_BY_NAME'
       ];
-      const orderBy = columns[orderColumn] || 'LAST_PAYMENT_ID';
+      const orderBy = columns[orderColumn] || 'PAYMENT_ID';
 
       let searchCondition = '';
       let searchParams = [];
@@ -132,30 +134,42 @@ const paymentsController = {
         searchParams = [p, p, p, p];
       }
 
-      // Date filter based on last payment date (matches PAYMENT DATE column in the table)
+      // Date filter based on each payment's own date (matches PAYMENT DATE column in the table)
       let dateCondition = '';
       if (filter === 'today') {
-        dateCondition = `AND DATE(lp.LAST_PAYMENT_DATE) = CURRENT_DATE()`;
+        dateCondition = `AND DATE(p.PAYMENT_DATE) = CURRENT_DATE()`;
       } else if (filter === 'last3days') {
         dateCondition = `
-          AND DATE(lp.LAST_PAYMENT_DATE) >= DATE_SUB(CURRENT_DATE(), INTERVAL 2 DAY)
-          AND DATE(lp.LAST_PAYMENT_DATE) <= CURRENT_DATE()
+          AND DATE(p.PAYMENT_DATE) >= DATE_SUB(CURRENT_DATE(), INTERVAL 2 DAY)
+          AND DATE(p.PAYMENT_DATE) <= CURRENT_DATE()
         `;
       } else if (filter === 'thisWeek') {
         // Week starts on Sunday (same logic as Weekly Sales summary cards)
         dateCondition = `
-          AND DATE(lp.LAST_PAYMENT_DATE) >= DATE_SUB(CURRENT_DATE(), INTERVAL (DAYOFWEEK(CURRENT_DATE()) - 1) DAY)
-          AND DATE(lp.LAST_PAYMENT_DATE) <= CURRENT_DATE()
+          AND DATE(p.PAYMENT_DATE) >= DATE_SUB(CURRENT_DATE(), INTERVAL (DAYOFWEEK(CURRENT_DATE()) - 1) DAY)
+          AND DATE(p.PAYMENT_DATE) <= CURRENT_DATE()
         `;
       } else if (filter === 'thisMonth') {
         dateCondition = `
-          AND MONTH(lp.LAST_PAYMENT_DATE) = MONTH(CURRENT_DATE())
-          AND YEAR(lp.LAST_PAYMENT_DATE) = YEAR(CURRENT_DATE())
+          AND MONTH(p.PAYMENT_DATE) = MONTH(CURRENT_DATE())
+          AND YEAR(p.PAYMENT_DATE) = YEAR(CURRENT_DATE())
         `;
       }
 
       if (dateCondition) {
         searchCondition += ` ${dateCondition}`;
+      }
+
+      // Shift refinement (only meaningful alongside the "Today" date filter -
+      // matches the gapless windows used by the Shift 1/2/3 summary cards).
+      if (filter === 'today' && shift && shift !== 'all') {
+        if (shift === '1') {
+          searchCondition += ` AND HOUR(p.PAYMENT_DATE) >= 7 AND HOUR(p.PAYMENT_DATE) < 13`;
+        } else if (shift === '2') {
+          searchCondition += ` AND HOUR(p.PAYMENT_DATE) >= 13 AND HOUR(p.PAYMENT_DATE) < 22`;
+        } else if (shift === '3') {
+          searchCondition += ` AND (HOUR(p.PAYMENT_DATE) >= 22 OR HOUR(p.PAYMENT_DATE) < 7)`;
+        }
       }
 
       const totalRecords = await paymentsModel.countDatatable(searchCondition, searchParams);

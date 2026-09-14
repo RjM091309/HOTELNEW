@@ -500,6 +500,34 @@ async function runRoomRatesMigrations() {
 
   // Swap the unique key to include ROOM_TYPE_ID instead of BED_TYPE.
   try {
+    // Two previously-distinct BED_TYPE rows (king/queen) can collapse onto the
+    // same ROOM_TYPE_ID once backfilled above (e.g. when king/queen couldn't be
+    // told apart and both fell back to the same room type), which would violate
+    // the new key below. Keep the highest-IDNo row per (CATEGORY, DAY_RANGE,
+    // ROOM_TYPE_ID, BREAKFAST) and drop the rest first.
+    //
+    // NOTE: this used to be a self-join (t1 JOIN t2 ON ... AND t1.IDNo < t2.IDNo)
+    // comparing every row against every other row. That's fine at seed-table
+    // size, but while uq_room_rate was missing (a prior run's ALTER failed
+    // after the DROP INDEX already succeeded, see the warning below) unguarded
+    // re-seeding on every restart could balloon this table by thousands of rows,
+    // and a self-join over a table that size takes a full-table lock for
+    // minutes and starves every other query with "Lock wait timeout exceeded".
+    // A GROUP BY (single aggregate pass) + indexed join on the primary key
+    // scales to that case instead of blowing up combinatorially.
+    const dupes = await queryDatabasePromise(
+      `DELETE r FROM room_rates r
+       LEFT JOIN (
+         SELECT MAX(IDNo) AS keep_id
+           FROM room_rates
+          GROUP BY CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST
+       ) keep ON r.IDNo = keep.keep_id
+       WHERE keep.keep_id IS NULL`
+    );
+    if (dupes.affectedRows) {
+      console.log(`✅ Removed ${dupes.affectedRows} duplicate room_rates row(s) merged onto the same room type (kept the most recent rate)`);
+    }
+
     if (await indexExists('room_rates', 'uq_room_rate')) {
       const idxCols = await queryDatabasePromise(
         `SELECT COLUMN_NAME FROM information_schema.STATISTICS

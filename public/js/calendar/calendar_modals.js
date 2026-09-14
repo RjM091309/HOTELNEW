@@ -376,7 +376,7 @@ function showPendingModal(event) {
   const modalConfig = {
     title: `Room ${roomNumber} - ${isHoldPending2 ? 'Hold Pending' : 'Pending Reservation'}`,
     html: `
-      <div class="text-left" style="padding: 20px 0;">
+      <div class="text-left" style="padding: 20px 0 4px 0;">
         <div style="margin-bottom: 20px;">
           <div style="display: flex; align-items: center; margin-bottom: 15px;">
             <div style="width: 8px; height: 8px; background-color: ${accentColor}; border-radius: 50%; margin-right: 12px;"></div>
@@ -429,6 +429,12 @@ function showPendingModal(event) {
             </span>
           </div>`
         }
+        ${(!isHoldPending2 && canCheckIn) ? `
+        <div style="text-align:center; margin-top:10px;">
+          <button id="btn-goto-checkin" type="button" class="swal2-styled" style="background-color:#28a745; border:none; padding:10px 20px; border-radius:4px; color:#fff; cursor:pointer; font-weight:500;">
+            <i class="fas fa-door-open" style="margin-right:6px;"></i>Check In
+          </button>
+        </div>` : ''}
       </div>
     `,
     icon: 'info',
@@ -456,7 +462,7 @@ function showPendingModal(event) {
   // Add check-in button only if check-in is available
   if (canCheckIn) {
     modalConfig.footer = `
-      <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+      <div style="display: flex; gap: 10px; justify-content: center; margin-top: 4px;">
         <button id="btn-view-details" class="swal2-styled" style="background-color: #28a745; border: none; padding: 10px 20px; border-radius: 4px; color: white; cursor: pointer; font-weight: 500;">
           General Info
         </button>
@@ -518,6 +524,16 @@ function showPendingModal(event) {
     if (closeBtn) {
       closeBtn.addEventListener('click', () => {
         Swal.close();
+      });
+    }
+
+    // Check In button - jumps to the Dashboard's Today Check-in tab and
+    // blinks the matching card, so staff can find the right guest quickly
+    // even when there are a lot of pending bookings.
+    const gotoCheckInBtn = document.getElementById('btn-goto-checkin');
+    if (gotoCheckInBtn) {
+      gotoCheckInBtn.addEventListener('click', () => {
+        window.location.href = `/dashboard?checkin=${encodeURIComponent(bookingId)}`;
       });
     }
 

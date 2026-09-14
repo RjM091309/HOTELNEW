@@ -2,18 +2,18 @@ const { queryDatabasePromise, pool } = require('../config/database');
 
 const PAYMENTS_TABLE_ORDER_MAP = {
   BOOKING_ID: 'b.IDNo',
-  LAST_PAYMENT_ID: 'lp.LAST_PAYMENT_ID',
+  PAYMENT_ID: 'p.IDNo',
   GUEST_NAME: 'c.NAME',
   ROOM_NUMBER: 'r.ROOM_NUMBER',
   CONFIRMATION_NUMBER: 'b.CONFIRMATION_NUMBER',
   TOTAL_AMOUNT: 'TOTAL_AMOUNT',
   TOTAL_PAID: 'TOTAL_PAID',
   DISCOUNT_AMOUNT: 'DISCOUNT_AMOUNT',
-  LAST_PAYMENT_AMOUNT: 'lp.LAST_PAYMENT_AMOUNT',
+  LAST_PAYMENT_AMOUNT: 'p.AMOUNT_PAID',
   BALANCE: 'BALANCE',
   PAYMENT_STATUS: 'bill.PAYMENT_STATUS',
-  PAYMENT_METHOD: 'bill.PAYMENT_METHOD',
-  LAST_PAYMENT_DATE: 'lp.LAST_PAYMENT_DATE',
+  PAYMENT_METHOD: 'p.PAYMENT_METHOD',
+  LAST_PAYMENT_DATE: 'p.PAYMENT_DATE',
   PROCESSED_BY_NAME: 'u.FULLNAME'
 };
 
@@ -60,24 +60,22 @@ const paymentsModel = {
     return rows;
   },
 
+  // NOTE: one row per PAYMENT TRANSACTION (not per booking) - a booking with
+  // multiple payments (e.g. part card, part cash) shows one line per payment,
+  // each with its own method/date/processor. TOTAL_AMOUNT/TOTAL_PAID/BALANCE/
+  // PAYMENT_STATUS are booking-level and repeat identically across every row
+  // for that booking - only AMOUNT_PAID/PAYMENT_METHOD/PAYMENT_DATE/
+  // PROCESSED_BY_NAME are specific to the one payment on that row.
   countDatatable: async (searchCondition, searchParams) => {
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM booking b
+      FROM payments p
+      JOIN booking b ON b.IDNo = p.BOOKING_ID
       LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
       LEFT JOIN room r ON r.IDNo = b.ROOM_ID
       LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
-      LEFT JOIN (
-        SELECT p.BOOKING_ID, p.IDNo AS LAST_PAYMENT_ID, p.PAYMENT_DATE AS LAST_PAYMENT_DATE, p.AMOUNT_PAID AS LAST_PAYMENT_AMOUNT
-        FROM payments p
-        INNER JOIN (
-          SELECT BOOKING_ID, MAX(IDNo) AS MAX_ID
-          FROM payments
-          GROUP BY BOOKING_ID
-        ) latest ON p.IDNo = latest.MAX_ID
-      ) lp ON lp.BOOKING_ID = b.IDNo
-      WHERE b.ACTIVE = 1 
-      AND (SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')) > 0
+      WHERE b.ACTIVE = 1
+        AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')
       ${searchCondition}
     `;
     const [countResult] = await pool.promise().query(countQuery, searchParams);
@@ -86,24 +84,24 @@ const paymentsModel = {
 
   fetchDatatable: async (searchCondition, searchParams, orderBy, orderDir, length, start) => {
     const sortDir = String(orderDir).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
-    const sortColumn = PAYMENTS_TABLE_ORDER_MAP[orderBy] || 'lp.LAST_PAYMENT_ID';
+    const sortColumn = PAYMENTS_TABLE_ORDER_MAP[orderBy] || 'p.IDNo';
     const dataQuery = `
-      SELECT 
+      SELECT
         b.IDNo AS BOOKING_ID,
+        p.IDNo AS PAYMENT_ID,
         b.CONFIRMATION_NUMBER,
         c.NAME AS GUEST_NAME,
         r.ROOM_NUMBER,
         bill.PAYMENT_STATUS,
-        bill.PAYMENT_METHOD,
+        p.PAYMENT_METHOD AS PAYMENT_METHOD,
         EXISTS (
           SELECT 1 FROM payments p_credit
           WHERE p_credit.BOOKING_ID = b.IDNo
             AND p_credit.PAYMENT_METHOD IN ('credit', 'marker')
             AND p_credit.SETTLED_DATE IS NULL
         ) AS HAS_UNSETTLED_CREDIT,
-        lp.LAST_PAYMENT_ID,
-        lp.LAST_PAYMENT_DATE,
-        lp.LAST_PAYMENT_AMOUNT,
+        p.PAYMENT_DATE AS LAST_PAYMENT_DATE,
+        p.AMOUNT_PAID AS LAST_PAYMENT_AMOUNT,
         u.FULLNAME AS PROCESSED_BY_NAME,
         (
           COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) +
@@ -114,7 +112,7 @@ const paymentsModel = {
           COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
         ) AS TOTAL_AMOUNT,
         COALESCE(bill.DISCOUNT_AMOUNT, 0) AS DISCOUNT_AMOUNT,
-        COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')), 0) AS TOTAL_PAID,
+        COALESCE((SELECT SUM(p2.AMOUNT_PAID) FROM payments p2 WHERE p2.BOOKING_ID = b.IDNo AND p2.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')), 0) AS TOTAL_PAID,
         (
           COALESCE(bill.ROOM_CHARGE * bill.QTY, 0) +
           COALESCE(bill.AMENITIES_CHARGE, 0) +
@@ -122,26 +120,18 @@ const paymentsModel = {
           COALESCE(bill.CANCELLATION_PENALTY, 0) +
           COALESCE((SELECT SUM(bs.TOTAL_COST) FROM booking_service bs WHERE bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1), 0) +
           COALESCE((SELECT SUM(be.COST * be.QTY) FROM booking_extension be WHERE be.BOOKING_ID = b.IDNo AND be.ACTIVE = 1), 0)
-        ) - COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')), 0) - COALESCE(bill.DISCOUNT_AMOUNT, 0) AS BALANCE,
+        ) - COALESCE((SELECT SUM(p2.AMOUNT_PAID) FROM payments p2 WHERE p2.BOOKING_ID = b.IDNo AND p2.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')), 0) - COALESCE(bill.DISCOUNT_AMOUNT, 0) AS BALANCE,
         b.ENCODED_DT AS BOOKING_DATE
-      FROM booking b
+      FROM payments p
+      JOIN booking b ON b.IDNo = p.BOOKING_ID
       LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
       LEFT JOIN room r ON r.IDNo = b.ROOM_ID
       LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
-      LEFT JOIN (
-        SELECT p.BOOKING_ID, p.IDNo AS LAST_PAYMENT_ID, p.PAYMENT_DATE AS LAST_PAYMENT_DATE, p.AMOUNT_PAID AS LAST_PAYMENT_AMOUNT, p.ENCODED_BY
-        FROM payments p
-        INNER JOIN (
-          SELECT BOOKING_ID, MAX(IDNo) AS MAX_ID
-          FROM payments
-          GROUP BY BOOKING_ID
-        ) latest ON p.IDNo = latest.MAX_ID
-      ) lp ON lp.BOOKING_ID = b.IDNo
-      LEFT JOIN user_info u ON u.IDNo = lp.ENCODED_BY
-      WHERE b.ACTIVE = 1 
-      AND (SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = b.IDNo AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')) > 0
+      LEFT JOIN user_info u ON u.IDNo = p.ENCODED_BY
+      WHERE b.ACTIVE = 1
+        AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')
       ${searchCondition}
-      ORDER BY ${sortColumn} ${sortDir}, lp.LAST_PAYMENT_ID ${sortDir}
+      ORDER BY ${sortColumn} ${sortDir}, p.IDNo ${sortDir}
       LIMIT ? OFFSET ?
     `;
     const dataParams = [...searchParams, parseInt(length), parseInt(start)];

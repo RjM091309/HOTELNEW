@@ -450,6 +450,34 @@ class DashboardController {
     }
   }
 
+  // Bulk room status update ("Clean All Rooms" button on the Cleaning Room tab)
+  static async updateRoomStatusBulk(req, res) {
+    try {
+      const { roomIds, status } = req.body;
+
+      if (!Array.isArray(roomIds) || roomIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'roomIds must be a non-empty array'
+        });
+      }
+
+      const updatedCount = await DashboardModel.updateRoomStatusBulk(roomIds, status);
+
+      res.json({
+        success: true,
+        message: `${updatedCount} room(s) updated to status ${status}`,
+        updatedCount
+      });
+    } catch (error) {
+      console.error('Error updating room status in bulk:', error.message);
+      res.status(500).json({
+        success: false,
+        message: 'Server error'
+      });
+    }
+  }
+
   // Room monitoring controller
   static async getRoomMonitoring(req, res) {
     try {
