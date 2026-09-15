@@ -113,7 +113,7 @@ const paymentsController = {
 
   tableData: async (req, res) => {
     try {
-      const { start = 0, length = 10, search = { value: '' }, order = [{ column: 1, dir: 'desc' }], filter = 'all', shift = 'all' } = req.query;
+      const { start = 0, length = 10, search = { value: '' }, order = [{ column: 1, dir: 'desc' }], filter = 'all', shift = 'all', method = 'all' } = req.query;
       const searchValue = search.value || '';
       const orderColumn = order[0]?.column || 1;
       const orderDir = order[0]?.dir || 'desc';
@@ -172,14 +172,24 @@ const paymentsController = {
         }
       }
 
+      // Cash / Non-cash refinement - clicking a shift card's Cash or
+      // Non-cash stat narrows the table to just that payment method.
+      if (method === 'cash') {
+        searchCondition += ` AND LOWER(p.PAYMENT_METHOD) = 'cash'`;
+      } else if (method === 'noncash') {
+        searchCondition += ` AND LOWER(p.PAYMENT_METHOD) != 'cash'`;
+      }
+
       const totalRecords = await paymentsModel.countDatatable(searchCondition, searchParams);
       const rows = await paymentsModel.fetchDatatable(searchCondition, searchParams, orderBy, orderDir, length, start);
+      const totalAmount = await paymentsModel.sumFilteredAmount(searchCondition, searchParams);
 
       res.json({
         draw: parseInt(req.query.draw) || 1,
         recordsTotal: totalRecords,
         recordsFiltered: totalRecords,
-        data: rows
+        data: rows,
+        totalAmount
       });
     } catch (err) {
       console.error('Error fetching payments data:', err);

@@ -99,6 +99,13 @@
           </tr>
         </thead>
         <tbody></tbody>
+        <tfoot>
+          <tr id="payments-total-row" style="display:none;">
+            <td colspan="14" style="text-align:right; font-weight:600; color:#ce93d8; padding:8px 14px;">
+              Total Amount Paid: <span id="payments-total-amount">0</span>
+            </td>
+          </tr>
+        </tfoot>
       </table>
     </div>
   </div>
@@ -148,6 +155,9 @@
   // card filters this same table by hour range instead of opening a modal.
   let currentFilter = 'all';
   let currentShift = 'all';
+  // Sub-filter within a shift: clicking the Cash / Non-cash stat on a shift
+  // card narrows the table further by payment method. 'all' = no method filter.
+  let currentMethod = 'all';
   let table;
 
   $(document).ready(function () {
@@ -158,7 +168,11 @@
       ajax: {
         url: '/payments/payments_data',
         type: 'GET',
-        data: function(d){ d.filter = currentFilter; d.shift = currentShift; },
+        data: function(d){ d.filter = currentFilter; d.shift = currentShift; d.method = currentMethod; },
+        dataSrc: function (json) {
+          updatePaymentsTotalRow(json.totalAmount);
+          return json.data;
+        },
         error: function (_xhr, status, err) {
           console.error('Payments table load failed:', status, err);
         }
@@ -219,11 +233,14 @@
       $(this).addClass('active');
       currentFilter = $(this).data('filter');
       currentShift = 'all';
+      currentMethod = 'all';
       $('.payment-sales-card--shift').removeClass('payment-sales-card--shift-active');
+      $('.payment-sales-card__value--method-active').removeClass('payment-sales-card__value--method-active');
       table.ajax.reload();
       if (typeof updateSummaryCardsForFilter === 'function') {
         updateSummaryCardsForFilter(currentFilter);
       }
+      updateShiftMethodBadge();
     });
   });
 
@@ -395,12 +412,18 @@
   // In "Today" (shift) mode, clicking a card filters the table below by that
   // shift's hour range instead of opening a modal. Clicking the same card
   // again clears the shift filter back to all of today.
-  $(document).on('click', '.payment-sales-card--shift', function () {
+  $(document).on('click', '.payment-sales-card--shift', function (e) {
+    // Clicks on the Cash / Non-cash stat are handled by the more specific
+    // handler below - don't also toggle the whole-card shift filter for them.
+    if ($(e.target).closest('.payment-sales-card__value--paid, .payment-sales-card__value--unpaid').length) return;
+
     const shift = String(this.dataset.shift || '');
     if (!shift || typeof table === 'undefined' || !table) return;
 
     const isSameShift = currentShift === shift;
     $('.payment-sales-card--shift').removeClass('payment-sales-card--shift-active');
+    $('.payment-sales-card__value--method-active').removeClass('payment-sales-card__value--method-active');
+    currentMethod = 'all';
 
     if (isSameShift) {
       currentShift = 'all';
@@ -410,7 +433,71 @@
     }
 
     table.ajax.reload();
+    updateShiftMethodBadge();
   });
+
+  // Clicking the Cash or Non-cash stat on a shift card narrows the table to
+  // just that payment method within that shift. Clicking it again clears the
+  // method sub-filter but keeps the shift itself selected.
+  $(document).on('click', '.payment-sales-card--shift .payment-sales-card__value--paid, .payment-sales-card--shift .payment-sales-card__value--unpaid', function (e) {
+    e.stopPropagation();
+    const card = this.closest('.payment-sales-card--shift');
+    if (!card || typeof table === 'undefined' || !table) return;
+
+    const shift = String(card.dataset.shift || '');
+    if (!shift) return;
+    const method = this.classList.contains('payment-sales-card__value--paid') ? 'cash' : 'noncash';
+    const isSameMethod = currentShift === shift && currentMethod === method;
+
+    $('.payment-sales-card--shift').removeClass('payment-sales-card--shift-active');
+    $('.payment-sales-card__value--method-active').removeClass('payment-sales-card__value--method-active');
+
+    currentShift = shift;
+    $(card).addClass('payment-sales-card--shift-active');
+
+    if (isSameMethod) {
+      currentMethod = 'all';
+    } else {
+      currentMethod = method;
+      $(this).addClass('payment-sales-card__value--method-active');
+    }
+
+    table.ajax.reload();
+    updateShiftMethodBadge();
+  });
+
+  // Small badge shown next to the "Show N entries" control while a shift's
+  // Cash / Non-cash stat is filtering the table, so it's clear at a glance
+  // which method is being viewed (not just which shift).
+  function updateShiftMethodBadge() {
+    const $length = $('#payments_tbl_wrapper .dataTables_length');
+    if (!$length.length) return;
+    let $badge = $('#shift-method-badge');
+
+    if (currentFilter === 'today' && currentShift !== 'all' && currentMethod !== 'all') {
+      if (!$badge.length) {
+        $badge = $('<span id="shift-method-badge" class="shift-method-badge"></span>');
+        $length.append($badge);
+      }
+      const isCash = currentMethod === 'cash';
+      const methodLabel = isCash ? 'Cash' : 'Non-cash';
+      $badge
+        .removeClass('shift-method-badge--cash shift-method-badge--noncash')
+        .addClass(isCash ? 'shift-method-badge--cash' : 'shift-method-badge--noncash')
+        .text('Shift ' + currentShift + ' · ' + methodLabel)
+        .show();
+    } else if ($badge.length) {
+      $badge.hide();
+    }
+  }
+
+  // Sum of AMOUNT PAID across every row matching the current filters (not
+  // just the current page), shown as a footer row under the table.
+  function updatePaymentsTotalRow(total) {
+    const amt = Number(total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    $('#payments-total-amount').text(amt);
+    $('#payments-total-row').show();
+  }
 
   $(document).on('click', '.confirmation-link', function(e){
     e.preventDefault();
@@ -817,6 +904,14 @@
     box-sizing: border-box;
   }
 
+  /* These cards are clickable divs, so a click leaves them focused and the
+     browser draws its own default blue focus ring on top - remove it
+     everywhere so only the intentional --shift-active ring reads as "selected". */
+  .payment-sales-card:focus,
+  .payment-sales-card:focus-visible {
+    outline: none;
+  }
+
   .payment-sales-card__title {
     text-align: center;
     margin-bottom: 14px;
@@ -894,29 +989,22 @@
 
   .sales-paid-clickable:hover {
     opacity: 0.8;
-    text-decoration: underline;
   }
 
-  /* Whole Daily Sales card is clickable */
+  /* Whole Daily Sales card is clickable. No :hover border/glow here on
+     purpose (see the --shift note below) - this same element also becomes
+     the Shift 1 card, so any hover ring defined here would show up there too. */
   .payment-sales-card--daily {
     cursor: pointer;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
   }
 
-  .payment-sales-card--daily:hover {
-    border-color: #64b5f6;
-    box-shadow: 0 0 0 1px #64b5f6;
-  }
-
-  /* Shift view (top "Today" filter): all three cards are clickable and share one accent */
+  /* Shift view (top "Today" filter): all three cards are clickable and share one accent.
+     No :hover border/glow here on purpose - it looked almost identical to the
+     "selected" state below, making it unclear whether a card was actually
+     filtering the table or you were just hovering over it. cursor:pointer
+     alone still signals it's clickable. */
   .payment-sales-card.payment-sales-card--shift {
     cursor: pointer;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  }
-
-  .payment-sales-card.payment-sales-card--shift:hover {
-    border-color: #ce93d8;
-    box-shadow: 0 0 0 1px #ce93d8;
   }
 
   .payment-sales-card.payment-sales-card--shift .payment-sales-card__title {
@@ -933,6 +1021,50 @@
     border-color: #ce93d8;
     box-shadow: 0 0 0 2px #ce93d8;
     background: rgba(206, 147, 216, 0.08);
+  }
+
+  /* Cash / Non-cash stat on a shift card, clicked to narrow the table further
+     by payment method within that shift. */
+  .payment-sales-card.payment-sales-card--shift .payment-sales-card__value--paid,
+  .payment-sales-card.payment-sales-card--shift .payment-sales-card__value--unpaid {
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.15s ease;
+  }
+
+  /* Cash sub-filter active - matches the Cash stat's own green */
+  .payment-sales-card__value--method-active.payment-sales-card__value--paid {
+    background: rgba(102, 187, 106, 0.18);
+    box-shadow: 0 0 0 1px #66bb6a;
+  }
+
+  /* Non-cash sub-filter active - matches the Non-cash stat's own cyan */
+  .payment-sales-card__value--method-active.payment-sales-card__value--unpaid {
+    background: rgba(77, 208, 225, 0.18);
+    box-shadow: 0 0 0 1px #4dd0e1;
+  }
+
+  /* Indicator next to "Show N entries" while a Cash / Non-cash sub-filter is active */
+  .shift-method-badge {
+    display: none;
+    margin-left: 10px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    vertical-align: middle;
+  }
+
+  .shift-method-badge--cash {
+    background: rgba(102, 187, 106, 0.18);
+    border: 1px solid #66bb6a;
+    color: #66bb6a;
+  }
+
+  .shift-method-badge--noncash {
+    background: rgba(77, 208, 225, 0.18);
+    border: 1px solid #4dd0e1;
+    color: #4dd0e1;
   }
 
   #todayPaidModal .modal-body {

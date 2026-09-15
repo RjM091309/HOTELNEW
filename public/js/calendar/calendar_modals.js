@@ -529,11 +529,15 @@ function showPendingModal(event) {
 
     // Check In button - jumps to the Dashboard's Today Check-in tab and
     // blinks the matching card, so staff can find the right guest quickly
-    // even when there are a lot of pending bookings.
+    // even when there are a lot of pending bookings. Opened in the same
+    // named tab the sidebar's Dashboard link uses, so if that tab is already
+    // open (e.g. in another browser tab) it's reused and brought to front
+    // instead of navigating away from Calendar.
     const gotoCheckInBtn = document.getElementById('btn-goto-checkin');
     if (gotoCheckInBtn) {
       gotoCheckInBtn.addEventListener('click', () => {
-        window.location.href = `/dashboard?checkin=${encodeURIComponent(bookingId)}`;
+        const dashboardWindow = window.open(`/dashboard?checkin=${encodeURIComponent(bookingId)}`, 'hotel_dashboard_tab');
+        if (dashboardWindow) dashboardWindow.focus();
       });
     }
 

@@ -82,6 +82,22 @@ const paymentsModel = {
     return countResult[0].total;
   },
 
+  sumFilteredAmount: async (searchCondition, searchParams) => {
+    const sumQuery = `
+      SELECT COALESCE(SUM(p.AMOUNT_PAID), 0) as total
+      FROM payments p
+      JOIN booking b ON b.IDNo = p.BOOKING_ID
+      LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
+      LEFT JOIN room r ON r.IDNo = b.ROOM_ID
+      LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
+      WHERE b.ACTIVE = 1
+        AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')
+      ${searchCondition}
+    `;
+    const [sumResult] = await pool.promise().query(sumQuery, searchParams);
+    return sumResult[0].total;
+  },
+
   fetchDatatable: async (searchCondition, searchParams, orderBy, orderDir, length, start) => {
     const sortDir = String(orderDir).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
     const sortColumn = PAYMENTS_TABLE_ORDER_MAP[orderBy] || 'p.IDNo';
