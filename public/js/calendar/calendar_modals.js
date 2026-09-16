@@ -189,6 +189,12 @@ function showLateCheckInModal(event) {
             </span>
           </div>`
         }
+        ${canCheckIn ? `
+        <div style="text-align:center; margin-top:10px;">
+          <button id="btn-goto-checkin" type="button" class="swal2-styled" style="background-color:#28a745; border:none; padding:10px 20px; border-radius:4px; color:#fff; cursor:pointer; font-weight:500;">
+            <i class="fas fa-door-open" style="margin-right:6px;"></i>Check In
+          </button>
+        </div>` : ''}
       </div>
     `,
     icon: 'warning',
@@ -278,6 +284,17 @@ function showLateCheckInModal(event) {
     if (closeBtn) {
       closeBtn.addEventListener('click', () => {
         Swal.close();
+      });
+    }
+
+    // Check In button - same Dashboard-navigation behavior as the regular/early
+    // pending modal (showPendingModal), just missing here until now since Late
+    // Check-In pending bookings render through this separate function.
+    const gotoCheckInBtn = document.getElementById('btn-goto-checkin');
+    if (gotoCheckInBtn) {
+      gotoCheckInBtn.addEventListener('click', () => {
+        const dashboardWindow = window.open(`/dashboard?checkin=${encodeURIComponent(bookingId)}`, 'hotel_dashboard_tab');
+        if (dashboardWindow) dashboardWindow.focus();
       });
     }
 

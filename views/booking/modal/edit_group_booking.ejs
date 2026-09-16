@@ -82,12 +82,16 @@
           <div class="row p-t-20">
             <div class="col-lg-4">
               <div class="form-group">
-                <label class="form-label">Booking Resources</label>
+                <label class="form-label">Room Rate</label>
                 <select class="form-select" id="editGroupBookingRoute" name="groupBookingRoute" required>
                   <option value="" disabled>Select Booking Resource</option>
                   <option value="walk-in">Walk-in</option>
                   <option value="agency">Agency</option>
-                  <option value="booking-channel">OTA</option>
+                  <option value="tenant">Tenant (15%)</option>
+                  <option value="vip">VIP (20%)</option>
+                  <option value="employee">Employee (30%)</option>
+                  <option value="senior_special">Senior / Special 20%</option>
+                  <option value="booking-channel">OTA / Channel</option>
                 </select>
               </div>
             </div>
@@ -268,20 +272,19 @@
                 <label class="form-check-label" for="editGroupIncludeBreakfast">Add Breakfast</label>
               </div>
               <div id="editGroupBreakfastFields" class="group-breakfast-fields d-none">
-                <div class="form-check mb-2">
-                  <input class="form-check-input" type="checkbox" id="editGroupBreakfastIndividual">
-                  <label class="form-check-label" for="editGroupBreakfastIndividual">Individual (per room)</label>
-                </div>
+                <!-- Breakfast is priced into each room's rate (same "no/one/two"
+                     breakfast tier from room_rates single booking uses), not a
+                     separate service charge - just set how many guests get
+                     breakfast per room; no price to type in. -->
                 <div class="group-quantity-wrapper">
-                  <input type="number" class="form-control" id="editGroupBreakfastAdultQty" name="groupBreakfastAdultQty" placeholder="Adult Qty" style="max-width: 90px;">
-                  <input type="number" class="form-control" id="editGroupBreakfastAdultPrice" name="groupBreakfastAdultPrice" placeholder="Adult Price" min="0" step="0.01">
+                  <input type="number" class="form-control" id="editGroupBreakfastAdultQty" name="groupBreakfastAdultQty" placeholder="Adults (per room)" min="0" step="1" style="max-width: 140px;">
+                  <input type="number" class="form-control" id="editGroupBreakfastKidQty" name="groupBreakfastKidQty" placeholder="Kids (per room)" min="0" step="1" style="max-width: 130px;">
                   <input type="hidden" id="editGroupBreakfastAdultId" name="groupBreakfastAdultId">
-                </div>
-                <div class="group-quantity-wrapper">
-                  <input type="number" class="form-control" id="editGroupBreakfastKidQty" name="groupBreakfastKidQty" placeholder="Kid Qty" style="max-width: 90px;">
-                  <input type="number" class="form-control" id="editGroupBreakfastKidPrice" name="groupBreakfastKidPrice" placeholder="Kid Price" min="0" step="0.01">
                   <input type="hidden" id="editGroupBreakfastKidId" name="groupBreakfastKidId">
+                  <input type="hidden" id="editGroupBreakfastAdultPrice" name="groupBreakfastAdultPrice" value="0">
+                  <input type="hidden" id="editGroupBreakfastKidPrice" name="groupBreakfastKidPrice" value="0">
                 </div>
+                <div id="editGroupBreakfastRateNote" class="group-breakfast-note" style="display:none;"></div>
               </div>
             </div>
             <div class="col-lg-4">
@@ -571,6 +574,49 @@
 
 .group-breakfast-fields.d-none {
   display: none !important;
+}
+
+/* Same visual language as single booking's #breakfastRateNote - confirms the
+   room rate already absorbed the breakfast tier bump, no separate charge. */
+#modal-edit-group-booking .group-breakfast-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(111, 156, 64, 0.14), rgba(111, 156, 64, 0.05));
+  border: 1px solid rgba(111, 156, 64, 0.35);
+  font-size: 11px;
+  line-height: 1.45;
+  color: #dff0d4;
+}
+
+#modal-edit-group-booking .group-breakfast-note::before {
+  content: "\2713";
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  margin-top: 1px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 800;
+  background: #6f9c40;
+  color: #10210a;
+}
+
+#modal-edit-group-booking .group-breakfast-note--warn {
+  background: linear-gradient(180deg, rgba(230, 169, 75, 0.12), rgba(230, 169, 75, 0.05));
+  border-color: rgba(230, 169, 75, 0.30);
+  color: #f0e4cf;
+}
+
+#modal-edit-group-booking .group-breakfast-note--warn::before {
+  content: "i";
+  background: #e6a94b;
+  color: #221a0c;
 }
 
 .group-quantity-wrapper {
@@ -868,6 +914,88 @@ window.editGroupAddedServicesMap = {};
     return bookingRoute;
   }
 
+  // Room Rate dropdown value -> room_rates.CATEGORY, same mapping single
+  // booking's Room Rate select and Add Group Booking use - OTA/Channel is
+  // priced as walk-in.
+  const EDIT_GROUP_RATE_OPT_CAT = {
+    'walk-in': 'walk_in', 'agency': 'agency', 'tenant': 'tenant',
+    'vip': 'vip', 'employee': 'employee', 'senior_special': 'senior_special',
+    'booking-channel': 'walk_in'
+  };
+
+  // Auto room rate for one night, sourced from room.ROOM_RATES - the same
+  // room_rates matrix (category x weekday/weekend x breakfast) single booking
+  // and Add Group Booking use, attached per room by the backend
+  // (BookingModel.findConsecutiveRoomsEdit via RoomRatesModel.getRatesForRoomType).
+  // Falls back to the legacy SEASONAL_PRICES/RESOLVED_PRICE data for rooms the
+  // room_rates matrix has no entry for.
+  // Breakfast persons (per room) -> room_rates.BREAKFAST tier, same mapping
+  // single booking and Add Group Booking use. Breakfast is priced INTO the
+  // room rate here too (no separate per-person charge).
+  function editGroupBreakfastKey() {
+    if (!$('#editGroupIncludeBreakfast').is(':checked')) return 'no';
+    const persons = (parseInt($('#editGroupBreakfastAdultQty').val(), 10) || 0)
+      + (parseInt($('#editGroupBreakfastKidQty').val(), 10) || 0);
+    if (persons >= 2) return 'two';
+    if (persons === 1) return 'one';
+    return 'no';
+  }
+
+  function updateEditGroupBreakfastNote() {
+    const $n = $('#editGroupBreakfastRateNote');
+    if (!$n.length) return;
+    if (!$('#editGroupIncludeBreakfast').is(':checked')) { $n.hide().empty(); return; }
+    const k = editGroupBreakfastKey();
+    if (k === 'no') {
+      $n.removeClass('group-breakfast-note--active').addClass('group-breakfast-note--warn')
+        .html('<div>Set the number of persons per room. Breakfast is <b>priced into the room rate</b> (not a separate fee) &mdash; base is <u>No Breakfast</u>, and adding breakfast moves every selected room\'s nightly rate to the <u>1</u> or <u>2</u> breakfast tier (higher amount).</div>')
+        .show();
+    } else {
+      const tier = k === 'two' ? '2-breakfast' : '1-breakfast';
+      $n.removeClass('group-breakfast-note--warn').addClass('group-breakfast-note--active')
+        .html(`<div>Every selected room's nightly rate is now on the <b><u>${tier}</u></b> tier &mdash; higher than the No-BF base. This is already inside the Room Rate total; no separate breakfast charge is added.</div>`)
+        .show();
+    }
+  }
+
+  function resolveEditGroupRoomPrice(room, checkInDate) {
+    const cat = EDIT_GROUP_RATE_OPT_CAT[getEditGroupPriceBookingType()] || 'walk_in';
+    const rr = room.ROOM_RATES || {};
+    const bf = editGroupBreakfastKey();
+    const checkMoment = checkInDate ? new Date(checkInDate) : null;
+    const day = checkMoment ? checkMoment.getDay() : null;
+    const isWeekend = day === 5 || day === 6 || day === 0;
+    const range = isWeekend ? 'weekend' : 'weekday';
+    const otherRange = range === 'weekend' ? 'weekday' : 'weekend';
+
+    const amt = (rr[cat] && rr[cat][range] && rr[cat][range][bf])
+      || (rr[cat] && rr[cat][otherRange] && rr[cat][otherRange][bf])
+      || (rr.walk_in && rr.walk_in[range] && rr.walk_in[range][bf])
+      || (rr.walk_in && rr.walk_in[otherRange] && rr.walk_in[otherRange][bf])
+      || 0;
+
+    if (amt > 0) return Number(amt);
+
+    if (typeof room.RESOLVED_PRICE === 'number' && room.RESOLVED_PRICE > 0) {
+      return room.RESOLVED_PRICE;
+    }
+
+    const seasonalPrices = room.SEASONAL_PRICES || [];
+    if (checkInDate && seasonalPrices.length > 0) {
+      const bookingType = getEditGroupPriceBookingType();
+      const bedCount = parseInt(room.ROOM_BED, 10) || 1;
+      const seasonId = getSeasonIdForDate(checkInDate, seasonalPrices);
+      const match = seasonalPrices.find(price =>
+        parseInt(price.bedCount, 10) === bedCount &&
+        price.bookingType === bookingType &&
+        parseInt(price.seasonId, 10) === parseInt(seasonId, 10)
+      );
+      if (match) return parseFloat(match.price) || 0;
+    }
+
+    return 0;
+  }
+
   function updateEditGroupAgencyPayerHint() {
     const payer = $('input[name="editGroupAgencyPayer"]:checked').val();
     const hint = payer === 'guest' ? 'Regular Rate' : 'Agency Rate';
@@ -1114,20 +1242,7 @@ window.editGroupAddedServicesMap = {};
         return;
       }
 
-      const bookingType = getEditGroupPriceBookingType();
-      const computedPrices = [];
-      block.forEach(room => {
-        const price = typeof room.RESOLVED_PRICE === 'number'
-          ? room.RESOLVED_PRICE
-          : (() => {
-              const seasonalPrices = room.SEASONAL_PRICES || [];
-              const bedCount = parseInt(room.ROOM_BED, 10);
-              const seasonId = getSeasonIdForDate(dates.start, seasonalPrices);
-              const match = seasonalPrices.find(price => parseInt(price.bedCount, 10) === bedCount && price.bookingType === bookingType && parseInt(price.seasonId, 10) === parseInt(seasonId, 10));
-              return match ? parseFloat(match.price) : 0;
-            })();
-        computedPrices.push(price);
-      });
+      const computedPrices = block.map(room => resolveEditGroupRoomPrice(room, dates.start));
 
       const selectedIds = block.map(room => room.IDNo);
       const selectedNumbers = block.map(room => room.ROOM_NUMBER);
@@ -1492,6 +1607,8 @@ window.editGroupAddedServicesMap = {};
       $('#editGroupBreakfastFields').addClass('d-none');
       $('#editGroupBreakfastAdultQty, #editGroupBreakfastKidQty').val('');
     }
+    updateEditGroupBreakfastNote();
+    refreshEditGroupRoomPricing();
     computeEditGroupTotal();
   });
 
@@ -1793,32 +1910,11 @@ window.editGroupAddedServicesMap = {};
       window.editGroupManualSelectedRooms.includes(parseInt(room.IDNo))
     );
     const dates = getEditSelectedDateRange();
-    const bookingType = getEditGroupPriceBookingType();
 
     // For originally selected rooms that might not have complete data, use a default price
     const computedBasePrices = selectedRooms.map(room => {
-      if (typeof room.RESOLVED_PRICE === 'number' && room.RESOLVED_PRICE > 0) {
-        return room.RESOLVED_PRICE;
-      }
-
-      // Try to calculate from seasonal prices
-      if (dates && room.SEASONAL_PRICES && room.SEASONAL_PRICES.length > 0) {
-        const bedCount = parseInt(room.ROOM_BED, 10) || 1;
-        const seasonId = getSeasonIdForDate(dates.start, room.SEASONAL_PRICES);
-        if (seasonId !== null) {
-          const match = room.SEASONAL_PRICES.find(price =>
-            parseInt(price.bedCount, 10) === bedCount &&
-            price.bookingType === bookingType &&
-            parseInt(price.seasonId, 10) === parseInt(seasonId, 10)
-          );
-          if (match) {
-            return parseFloat(match.price);
-          }
-        }
-      }
-
-      // Default fallback price
-      return 1000; // Default room price
+      const price = resolveEditGroupRoomPrice(room, dates ? dates.start : null);
+      return price > 0 ? price : 1000; // Default fallback price
     });
 
     $('#editGroupSelectedRooms').val(selectedRooms.map(room => room.IDNo).join(','));
@@ -1999,6 +2095,13 @@ window.editGroupAddedServicesMap = {};
     // Auto-compute total when breakfast quantities or prices change
     $('#editGroupBreakfastAdultQty, #editGroupBreakfastAdultPrice, #editGroupBreakfastKidQty, #editGroupBreakfastKidPrice').on('input change', function() {
       computeEditGroupTotal();
+    });
+
+    // Breakfast persons drive the room_rates breakfast tier, not a separate
+    // charge - re-resolve every selected room's price when the count changes.
+    $('#editGroupBreakfastAdultQty, #editGroupBreakfastKidQty').on('input change', function() {
+      updateEditGroupBreakfastNote();
+      refreshEditGroupRoomPricing();
     });
 
     // Auto-compute total when pickup/dropoff prices change

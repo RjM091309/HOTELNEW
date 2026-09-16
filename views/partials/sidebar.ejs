@@ -248,12 +248,14 @@
 								<span class="title">Guest Profile</span>
 							</a>
 						</li>
+						<% if (user && user.PERMISSIONS == 1) { %>
 						<li class="nav-item">
 							<a href="/user_info" class="nav-link <%= activePage === 'user_info' ? 'active' : '' %>">
 								<i class="fa fa-genderless"></i>
 								<span class="title">User Info</span>
 							</a>
 						</li>
+						<% } %>
 						<li class="nav-item">
 							<a href="/vehicle/monitoring" class="nav-link <%= activePage === 'vehicle_monitoring' ? 'active' : '' %>">
 								<i class="fa fa-genderless"></i>

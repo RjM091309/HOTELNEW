@@ -609,11 +609,14 @@ class BookingModel {
   }
 
   // All cancelled bookings with their general details, for the
-  // Booking > Cancelled Bookings list page.
+  // Booking > Cancelled Bookings list page. Deliberately NOT filtered by
+  // b.ACTIVE - "Remove" on a cancelled calendar bar sets ACTIVE = 0, but the
+  // cancellation record should still show up here for history/reporting.
   static async getCancelledBookings() {
     const query = `
       SELECT
         b.IDNo                              AS BOOKING_ID,
+        b.ACTIVE,
         b.CONFIRMATION_NUMBER,
         b.GROUP_BOOKING_ID,
         c.NAME                              AS GUEST_NAME,
@@ -648,8 +651,7 @@ class BookingModel {
           ORDER BY bc2.IDNo DESC LIMIT 1
         )
       LEFT JOIN user_info u  ON u.IDNo = bc.ENCODED_BY
-      WHERE b.ACTIVE = 1
-        AND b.BOOKING_STATUS = 'cancelled'
+      WHERE b.BOOKING_STATUS = 'cancelled'
       ORDER BY b.CANCELLED_AT DESC, b.IDNo DESC
     `;
     const rows = await queryDatabasePromise(query);
@@ -10424,6 +10426,29 @@ class BookingModel {
         }
       }
 
+      // Attach the room_rates matrix per room (same source single booking's
+      // Room Rate dropdown uses), so this calendar-direct-selection path gets
+      // the same Walk-in/Agency/Tenant/VIP/Employee/Senior/OTA pricing as the
+      // regular Search Rooms flow (see findConsecutiveRooms above).
+      const roomRatesMap = {};
+      if (foundIds.length > 0) {
+        const RoomRatesModel = require('./roomRatesModel');
+        const rateSliceCache = {};
+        for (const room of rooms) {
+          const key = String(room.ROOM_TYPE_ID || '0');
+          if (!(key in rateSliceCache)) {
+            try {
+              const slice = await RoomRatesModel.getRatesForRoomType(room.ROOM_TYPE_ID);
+              rateSliceCache[key] = (slice && slice.rates) ? slice.rates : {};
+            } catch (e) {
+              console.warn('checkRoomsAvailability: could not load ROOM_RATES:', e.message);
+              rateSliceCache[key] = {};
+            }
+          }
+          roomRatesMap[room.IDNo] = rateSliceCache[key];
+        }
+      }
+
       const resultRooms = rooms.map(room => ({
         IDNo: room.IDNo,
         ROOM_NUMBER: room.ROOM_NUMBER,
@@ -10432,6 +10457,7 @@ class BookingModel {
         ROOM_VIEW: room.ROOM_VIEW,
         ROOM_PRICE: null,
         SEASONAL_PRICES: seasonalPricesMap[room.IDNo] || [],
+        ROOM_RATES: roomRatesMap[room.IDNo] || {},
         isAvailable: !room.HAS_CONFLICT
       }));
 
@@ -10682,6 +10708,25 @@ class BookingModel {
       filteredRooms.forEach(room => {
         room.SEASONAL_PRICES = seasonalPricesMap[room.IDNo] || [];
       });
+
+      // Attach the room_rates matrix per room, same as findConsecutiveRooms
+      // above, so editing a group booking gets the same
+      // Walk-in/Agency/Tenant/VIP/Employee/Senior/OTA pricing the initial
+      // Add Group Booking search uses.
+      try {
+        const RoomRatesModel = require("./roomRatesModel");
+        const rateSliceCache = {};
+        for (const room of filteredRooms) {
+          const key = String(room.ROOM_TYPE_ID || "0");
+          if (!(key in rateSliceCache)) {
+            const slice = await RoomRatesModel.getRatesForRoomType(room.ROOM_TYPE_ID);
+            rateSliceCache[key] = (slice && slice.rates) ? slice.rates : {};
+          }
+          room.ROOM_RATES = rateSliceCache[key];
+        }
+      } catch (e) {
+        console.warn("findConsecutiveRoomsEdit: could not attach ROOM_RATES:", e.message);
+      }
 
       const resolveSeasonalPrice = (room, checkInDate) => {
         const seasonalPrices = room.SEASONAL_PRICES || [];

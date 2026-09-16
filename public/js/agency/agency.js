@@ -370,21 +370,24 @@ function submitAgency(url, agencyData, loadingText, successMessage) {
 
 function addAgencyToTable(agency) {
     if (!agenciesDataTable) return;
-    
+
     const bookingsBtn = `
         <button class="btn btn-link p-0 view-bookings" data-id="${agency.IDNo}" data-name="${agency.NAME}">
             ${Number(agency.totalBookings || 0)}
         </button>
     `;
+    const balanceSpan = `<span class="agency-balance" data-id="${agency.IDNo}">-</span>`;
     const rowData = [
         agency.NAME,
         agency.CONTACT_NUMBER || '-',
         bookingsBtn,
+        balanceSpan,
         createActionButtons(agency.IDNo)
     ];
-    
+
     const newRow = agenciesDataTable.row.add(rowData).draw();
     newRow.node().setAttribute('data-id', agency.IDNo);
+    computeAgencyBalance(agency.IDNo, newRow.node());
 }
 
 function updateAgencyInTable(agency) {
@@ -406,14 +409,18 @@ function updateAgencyInTable(agency) {
                 ${Number(agency.totalBookings || 0)}
             </button>
         `;
+        const balanceSpan = `<span class="agency-balance" data-id="${agency.IDNo}">-</span>`;
         const rowData = [
             agency.NAME,
             agency.CONTACT_NUMBER || '-',
             bookingsBtn,
+            balanceSpan,
             createActionButtons(agency.IDNo)
         ];
-        
-        agenciesDataTable.row(rowIndex).data(rowData).draw();
+
+        const updatedRow = agenciesDataTable.row(rowIndex).data(rowData).draw();
+        updatedRow.node().setAttribute('data-id', agency.IDNo);
+        computeAgencyBalance(agency.IDNo, updatedRow.node());
     }
 }
 

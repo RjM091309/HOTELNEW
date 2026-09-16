@@ -434,10 +434,15 @@
         const room = r.ROOM_NUMBER ? esc(r.ROOM_NUMBER) : '-';
         const groupTag = r.GROUP_BOOKING_ID
           ? ' <span class="cb-badge cb-pay-other">GROUP</span>' : '';
+        // "Remove" on the calendar's cancelled bar sets ACTIVE = 0 but this
+        // list still shows the record for history - flag that it's gone
+        // from the calendar itself so staff aren't confused looking for it there.
+        const removedTag = Number(r.ACTIVE) === 0
+          ? ' <span class="cb-badge cb-pay-cancelled" title="Removed from the calendar view; this record is kept here for history.">REMOVED</span>' : '';
         return `
           <tr data-booking-id="${esc(r.BOOKING_ID)}">
             <td>${i + 1}</td>
-            <td>${esc(r.CONFIRMATION_NUMBER || '-')}${groupTag}</td>
+            <td>${esc(r.CONFIRMATION_NUMBER || '-')}${groupTag}${removedTag}</td>
             <td>
               ${esc(r.GUEST_NAME || 'N/A')}
               <span class="cb-sub">${esc(r.GUEST_CONTACT || '')}</span>

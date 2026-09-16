@@ -22,6 +22,20 @@ function getRoleNameById(roleId) {
 }
 
 // ========================================
+// DATE FORMATTING
+// ========================================
+
+const DATE_CREATED_MONTH_ABBR = ['Jan.', 'Feb.', 'Mar.', 'Apr.', 'May.', 'Jun.', 'Jul.', 'Aug.', 'Sep.', 'Oct.', 'Nov.', 'Dec.'];
+
+// Formats a date as "Feb. 21, 2026"
+function formatDateCreated(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return `${DATE_CREATED_MONTH_ABBR[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
+// ========================================
 // STATUS LABEL FUNCTIONS
 // ========================================
 
@@ -140,8 +154,8 @@ function initializeDataTable() {
 
     dataTable = $("#usersTable").DataTable({
         columnDefs: [
-            { targets: [4], className: "text-center" },
-            { targets: [4], orderable: false, searchable: false }
+            { targets: [5], className: "text-center" },
+            { targets: [5], orderable: false, searchable: false }
         ],
         pageLength: 10,
         lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
@@ -212,6 +226,7 @@ function reloadData() {
                             user.USERNAME || '',
                             roleDisplay,
                             status,
+                            formatDateCreated(user.ENCODED_DT),
                             actions
                         ]);
                     });
