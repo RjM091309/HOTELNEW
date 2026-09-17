@@ -50,208 +50,49 @@
 		<div class="top-menu">
 			<ul class="nav navbar-nav pull-right">
 				<!-- start notification dropdown -->
+				<!-- Today's Check-in / Pick-up / Check-out schedule - real data,
+				     polled from /dashboard/navbar-notifications (see script below),
+				     not the hardcoded demo content this used to show. -->
 				<li class="dropdown dropdown-extended dropdown-notification" id="header_notification_bar">
 					<a href="javascript:;" class="dropdown-toggle" data-bs-toggle="dropdown" data-hover="dropdown"
 						data-close-others="true">
 						<i class="fa fa-bell-o"></i>
-						<span class="badge headerBadgeColor1"> 6 </span>
+						<span id="notification-count-bell" class="badge headerBadgeColor1" style="display:none;">0</span>
 					</a>
-					<ul class="dropdown-menu animated swing">
+					<ul class="dropdown-menu navbar-notif-dropdown">
 						<li class="external">
-							<h3><span class="bold">Notifications</span></h3>
-							<span class="notification-label purple-bgcolor">New 6</span>
+							<h3><span class="bold">Today's Schedule</span></h3>
+							<span id="notification-label-bell" class="notification-label purple-bgcolor" style="display:none;">New 0</span>
 						</li>
 						<li>
-							<ul class="dropdown-menu-list small-slimscroll-style" data-handle-color="#637283">
-								<li>
-									<a href="javascript:;">
-										<span class="time">just now</span>
-										<span class="details">
-											<span class="notification-icon circle deepPink-bgcolor"><i
-													class="fa fa-check"></i></span> Congratulations!. </span>
-									</a>
-								</li>
-								<li>
-									<a href="javascript:;">
-										<span class="time">3 mins</span>
-										<span class="details">
-											<span class="notification-icon circle purple-bgcolor"><i
-													class="fa fa-user o"></i></span>
-											<b>John Micle </b>is now following you. </span>
-									</a>
-								</li>
-								<li>
-									<a href="javascript:;">
-										<span class="time">7 mins</span>
-										<span class="details">
-											<span class="notification-icon circle blue-bgcolor"><i
-													class="fa fa-comments-o"></i></span>
-											<b>Sneha Jogi </b>sent you a message. </span>
-									</a>
-								</li>
-								<li>
-									<a href="javascript:;">
-										<span class="time">12 mins</span>
-										<span class="details">
-											<span class="notification-icon circle pink"><i
-													class="fa fa-heart"></i></span>
-											<b>Ravi Patel </b>like your photo. </span>
-									</a>
-								</li>
-								<li>
-									<a href="javascript:;">
-										<span class="time">15 mins</span>
-										<span class="details">
-											<span class="notification-icon circle yellow"><i
-													class="fa fa-warning"></i></span> Warning! </span>
-									</a>
-								</li>
-								<li>
-									<a href="javascript:;">
-										<span class="time">10 hrs</span>
-										<span class="details">
-											<span class="notification-icon circle red"><i
-													class="fa fa-times"></i></span> Application error. </span>
-									</a>
-								</li>
+							<ul id="notification-list-bell" class="dropdown-menu-list small-slimscroll-style" data-handle-color="#637283">
+								<li class="notification-empty"><a href="javascript:;">Loading...</a></li>
 							</ul>
-							<div class="dropdown-menu-footer">
-								<a href="javascript:void(0)"> All notifications </a>
-							</div>
 						</li>
 					</ul>
 				</li>
 				<!-- end notification dropdown -->
-				
-				<!-- Cleaning Notifications -->
+
+				<!-- Cleaning Notifications - rooms currently in cleaning status, real data. -->
 				<li class="dropdown dropdown-extended dropdown-notification" id="header_notification_bar_broom">
 					<a href="javascript:;" class="dropdown-toggle" data-bs-toggle="dropdown">
 						<i class="fas fa-broom"></i>
 						<span id="notification-count-broom" class="badge notification-badge" style="display: none;">0</span>
 					</a>
-					<ul class="dropdown-menu">
+					<ul class="dropdown-menu navbar-notif-dropdown">
 						<li class="external">
 							<h3 class="notification-header">Cleaning Notifications</h3>
 						</li>
 						<li>
 							<ul id="notification-list-broom" class="dropdown-menu-list">
-								<!-- Notifications will be dynamically added here -->
+								<li class="notification-empty"><a href="javascript:;">Loading...</a></li>
 							</ul>
-						</li>
-						<li class="dropdown-menu-footer">
-							<a href="#" class="view-all-notifications" data-bs-toggle="modal" data-bs-target="#allNotificationsModal">
-								View All Notifications
-							</a>
 						</li>
 					</ul>
 				</li>
-				
-				<!-- Modal for View All Notifications (centered) -->
-				<div class="modal fade" id="allNotificationsModal" tabindex="-1" aria-labelledby="allNotificationsModalLabel" aria-hidden="true" data-bs-backdrop="false">
-					<div class="modal-dialog modal-lg modal-dialog-centered">
-						<div class="modal-content">
-							<div class="modal-header">
-								<h5 class="modal-title" id="allNotificationsModalLabel">Cleaning Notifications</h5>
-								<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-							</div>
-							<div class="modal-body">
-								<ul class="list-group">
-									<!-- Notifications will be dynamically added here -->
-								</ul>
-							</div>
-							<div class="modal-footer">
-								<button type="button" class="btn btn-primary" id="viewAllNotificationsButton">
-									View All Notifications
-								</button>
-								<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-							</div>
-						</div>
-					</div>
-				</div>
-				
-				<!-- start message dropdown -->
-				<li class="dropdown dropdown-extended dropdown-inbox" id="header_inbox_bar">
-					<a href="javascript:;" class="dropdown-toggle" data-bs-toggle="dropdown" data-hover="dropdown"
-						data-close-others="true">
-						<i class="fa fa-envelope-o"></i>
-						<span class="badge headerBadgeColor2"> 2 </span>
-					</a>
-					<ul class="dropdown-menu animated slideInDown">
-						<li class="external">
-							<h3><span class="bold">Messages</span></h3>
-							<span class="notification-label cyan-bgcolor">New 2</span>
-						</li>
-						<li>
-							<ul class="dropdown-menu-list small-slimscroll-style" data-handle-color="#637283">
-								<li>
-									<a href="#">
-										<span class="photo">
-											<img src="/img/user/user2.jpg" class="img-circle" alt="">
-										</span>
-										<span class="subject">
-											<span class="from"> Sarah Smith </span>
-											<span class="time">Just Now </span>
-										</span>
-										<span class="message"> Jatin I found you on LinkedIn... </span>
-									</a>
-								</li>
-								<li>
-									<a href="#">
-										<span class="photo">
-											<img src="/img/user/user3.jpg" class="img-circle" alt="">
-										</span>
-										<span class="subject">
-											<span class="from"> John Deo </span>
-											<span class="time">16 mins </span>
-										</span>
-										<span class="message"> Fwd: Important Notice Regarding Your Domain
-											Name... </span>
-									</a>
-								</li>
-								<li>
-									<a href="#">
-										<span class="photo">
-											<img src="/img/user/user1.jpg" class="img-circle" alt="">
-										</span>
-										<span class="subject">
-											<span class="from"> Rajesh </span>
-											<span class="time">2 hrs </span>
-										</span>
-										<span class="message"> pls take a print of attachments. </span>
-									</a>
-								</li>
-								<li>
-									<a href="#">
-										<span class="photo">
-											<img src="/img/user/user8.jpg" class="img-circle" alt="">
-										</span>
-										<span class="subject">
-											<span class="from"> Lina Smith </span>
-											<span class="time">40 mins </span>
-										</span>
-										<span class="message"> Apply for Ortho Surgeon </span>
-									</a>
-								</li>
-								<li>
-									<a href="#">
-										<span class="photo">
-											<img src="/img/user/user5.jpg" class="img-circle" alt="">
-										</span>
-										<span class="subject">
-											<span class="from"> Jacob Ryan </span>
-											<span class="time">46 mins </span>
-										</span>
-										<span class="message"> Request for leave application. </span>
-									</a>
-								</li>
-							</ul>
-							<div class="dropdown-menu-footer">
-								<a href="#"> All Messages </a>
-							</div>
-						</li>
-					</ul>
-				</li>
-				<!-- end message dropdown -->
+
+				<!-- Messages icon removed - no real messaging feature exists, and
+				     an always-empty dropdown wasn't worth keeping around. -->
 				<!-- start manage user dropdown -->
 				<li class="dropdown dropdown-user">
 					<a href="javascript:;" class="dropdown-toggle" data-bs-toggle="dropdown" data-hover="dropdown"
@@ -530,6 +371,19 @@ height: 34px;
     border: 2px solid #ccc;
     border-radius: 50%;
     background-color: transparent;
+}
+
+/* Notifications / Cleaning Notifications dropdown open animation - a quiet
+   fade + slight slide-down instead of the admin theme's bouncy "animated
+   swing" effect (elastic overshoot), which read as dated/cheap. */
+.navbar-notif-dropdown {
+    animation: navbarDropdownFadeIn 0.16s ease-out;
+    transform-origin: top right;
+}
+
+@keyframes navbarDropdownFadeIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 </style>
@@ -2773,6 +2627,178 @@ function timeAgo(date) {
     const days = Math.floor(hours / 24);
     return `${days} day${days !== 1 ? 's' : ''} ago`;
 }
+
+// ========================================
+// NAVBAR NOTIFICATIONS (bell + broom) - real data, polled from every page
+// since this partial is shared site-wide, not just on the Dashboard.
+// ========================================
+
+function navbarEscapeHtml(str) {
+    return String(str == null ? '' : str).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+}
+
+function navbarFormatTime(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+// Opens (or refocuses) the same shared Dashboard tab the Calendar's Check In
+// button and other deep-links already use, instead of navigating the current
+// page away from wherever the navbar is being viewed from.
+function navbarGotoDashboard(url) {
+    const win = window.open(url, 'hotel_dashboard_tab');
+    if (win) win.focus();
+}
+window.navbarGotoDashboard = navbarGotoDashboard;
+
+// The bell's badge is an "unread" counter (like email) - it clears once you
+// open the dropdown, even though the schedule items themselves stay in the
+// list. It only comes back once the underlying data actually changes (a new
+// booking, a cancellation, etc.), tracked by comparing signatures below - not
+// simply on every 60s poll re-rendering the same items. Cleaning's badge is
+// the opposite: an always-live count of rooms that currently need cleaning,
+// so it never gets this dismiss treatment (see renderBroomNotifications).
+let bellSeenSignature = null;
+let bellDismissed = false;
+let lastBellSignature = '';
+
+function renderBellNotifications(data) {
+    const list = document.getElementById('notification-list-bell');
+    const badge = document.getElementById('notification-count-bell');
+    const label = document.getElementById('notification-label-bell');
+    if (!list) return;
+
+    const items = [];
+    (data.checkIns || []).forEach(function (b) {
+        items.push({
+            key: 'checkin-' + b.BookingID,
+            icon: 'fa-sign-in-alt', color: 'blue-bgcolor',
+            text: '<b>' + navbarEscapeHtml(b.GuestName || 'Guest') + '</b> checking in &middot; Room ' + navbarEscapeHtml(b.RoomNumber || '-'),
+            time: navbarFormatTime(b.ScheduleTime),
+            url: '/dashboard?checkin=' + encodeURIComponent(b.BookingID)
+        });
+    });
+    (data.pickups || []).forEach(function (b) {
+        items.push({
+            key: 'pickup-' + b.BookingID,
+            icon: 'fa-shuttle-van', color: 'yellow',
+            text: '<b>' + navbarEscapeHtml(b.GuestName || 'Guest') + '</b> pick-up' + (b.FlightNumber ? ' &middot; ' + navbarEscapeHtml(b.FlightNumber) : ''),
+            time: navbarFormatTime(b.ScheduleTime),
+            url: '/pickup-drop'
+        });
+    });
+    (data.checkOuts || []).forEach(function (b) {
+        items.push({
+            key: 'checkout-' + b.BookingID,
+            icon: 'fa-sign-out-alt', color: 'deepPink-bgcolor',
+            text: '<b>' + navbarEscapeHtml(b.GuestName || 'Guest') + '</b> checking out &middot; Room ' + navbarEscapeHtml(b.RoomNumber || '-'),
+            time: navbarFormatTime(b.ScheduleTime),
+            url: '/dashboard?checkout=' + encodeURIComponent(b.BookingID)
+        });
+    });
+
+    // Chronological instead of grouped by type, so the dropdown reads like an
+    // actual timeline of what's happening today.
+    items.sort(function (a, b) { return (a.time || '').localeCompare(b.time || ''); });
+
+    // Signature = the set of items currently shown. If it changed since the
+    // last time the bell was opened, something new happened - un-dismiss.
+    const signature = items.map(function (item) { return item.key; }).sort().join(',');
+    lastBellSignature = signature;
+    if (signature !== bellSeenSignature) {
+        bellDismissed = false;
+    }
+
+    if (badge) {
+        if (items.length > 0 && !bellDismissed) { badge.textContent = items.length; badge.style.display = 'inline-block'; }
+        else badge.style.display = 'none';
+    }
+    if (label) {
+        if (items.length > 0 && !bellDismissed) { label.textContent = 'New ' + items.length; label.style.display = 'inline-block'; }
+        else label.style.display = 'none';
+    }
+
+    if (!items.length) {
+        list.innerHTML = '<li class="notification-empty"><a href="javascript:;">Nothing scheduled for today.</a></li>';
+        return;
+    }
+
+    list.innerHTML = items.map(function (item) {
+        return '<li><a href="javascript:;" onclick="navbarGotoDashboard(\'' + item.url + '\')">'
+            + '<span class="time">' + item.time + '</span>'
+            + '<span class="details"><span class="notification-icon circle ' + item.color + '"><i class="fa ' + item.icon + '"></i></span>' + item.text + '</span>'
+            + '</a></li>';
+    }).join('');
+}
+
+// Opening the dropdown marks whatever's currently showing as "seen" - badge
+// stays hidden until the underlying schedule actually changes again (tracked
+// via lastBellSignature, refreshed on every render in renderBellNotifications
+// above). Bootstrap 5 fires dropdown events on the toggle element itself and
+// they bubble, so listening directly on it is enough.
+function initBellDismissOnOpen() {
+    const bellToggle = document.querySelector('#header_notification_bar .dropdown-toggle');
+    if (!bellToggle) return;
+    bellToggle.addEventListener('shown.bs.dropdown', function () {
+        bellDismissed = true;
+        bellSeenSignature = lastBellSignature;
+        const badge = document.getElementById('notification-count-bell');
+        const label = document.getElementById('notification-label-bell');
+        if (badge) badge.style.display = 'none';
+        if (label) label.style.display = 'none';
+    });
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initBellDismissOnOpen);
+} else {
+    initBellDismissOnOpen();
+}
+
+function renderBroomNotifications(rooms) {
+    const list = document.getElementById('notification-list-broom');
+    const badge = document.getElementById('notification-count-broom');
+    if (!list) return;
+
+    rooms = rooms || [];
+
+    if (badge) {
+        if (rooms.length > 0) { badge.textContent = rooms.length; badge.style.display = 'inline-block'; }
+        else badge.style.display = 'none';
+    }
+
+    if (!rooms.length) {
+        list.innerHTML = '<li class="notification-empty"><a href="javascript:;">No rooms currently cleaning.</a></li>';
+        return;
+    }
+
+    list.innerHTML = rooms.map(function (room) {
+        const since = room.SinceDT ? timeAgo(room.SinceDT) : '';
+        const floor = room.RoomFloor ? ' &middot; Floor ' + navbarEscapeHtml(room.RoomFloor) : '';
+        return '<li><a href="javascript:;" onclick="navbarGotoDashboard(\'/dashboard?cleaning=' + encodeURIComponent(room.RoomNumber) + '\')">'
+            + '<span class="time">' + since + '</span>'
+            + '<span class="details"><span class="notification-icon circle blue-bgcolor"><i class="fas fa-broom"></i></span>'
+            + 'Room <b>' + navbarEscapeHtml(room.RoomNumber) + '</b>' + floor + ' needs cleaning</span>'
+            + '</a></li>';
+    }).join('');
+}
+
+function fetchNavbarNotifications() {
+    fetch('/dashboard/navbar-notifications')
+        .then(function (r) { return r.json(); })
+        .then(function (json) {
+            if (!json || !json.success) return;
+            renderBellNotifications(json);
+            renderBroomNotifications(json.cleaningRooms);
+        })
+        .catch(function () { /* silent - navbar polling shouldn't surface errors to staff */ });
+}
+
+fetchNavbarNotifications();
+setInterval(fetchNavbarNotifications, 60000);
 
 //logout
 function logout() {

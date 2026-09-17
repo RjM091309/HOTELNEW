@@ -144,6 +144,37 @@ function goToCheckInCard(bookingId) {
     }
 }
 
+// --- Jump to the Today Check-out tab and blink the matching booking card ---
+// Reached via ?checkout=<bookingId> - the navbar's Notifications dropdown
+// links here, same pattern as goToCheckInCard above.
+function goToCheckOutCard(bookingId) {
+    document.querySelectorAll('.tabs_three').forEach(tab => tab.classList.remove('is-active'));
+    const checkoutTab = document.querySelector('.tabs_three[data-target="checkout-content"]');
+    if (checkoutTab) {
+        checkoutTab.classList.add('is-active');
+    }
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.style.display = 'none';
+        content.classList.remove('active-tab');
+    });
+    const checkoutContent = document.getElementById('checkout-content');
+    if (!checkoutContent) {
+        return;
+    }
+    checkoutContent.style.display = 'block';
+    checkoutContent.classList.add('active-tab');
+    localStorage.setItem('activeTab', 'checkout-content');
+
+    const targetCard = checkoutContent.querySelector(`.card[data-booking-id="${CSS.escape(String(bookingId))}"]`);
+    if (targetCard) {
+        document.querySelectorAll('.room-card-blink').forEach(el => el.classList.remove('room-card-blink'));
+        targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        void targetCard.offsetWidth; // restart the animation if it's already blinking
+        targetCard.classList.add('room-card-blink');
+        setTimeout(() => targetCard.classList.remove('room-card-blink'), 4600);
+    }
+}
+
 // If the page was opened as /dashboard?checkin=<bookingId>, jump straight to
 // that booking's card in the Today Check-in tab, then clean the URL so a
 // refresh or back-navigation doesn't re-trigger the jump.
@@ -154,13 +185,31 @@ function goToCheckInCard(bookingId) {
 function initCheckinDeepLink() {
     const params = new URLSearchParams(window.location.search);
     const checkinId = params.get('checkin');
-    if (!checkinId) return;
+    if (checkinId) {
+        setTimeout(() => goToCheckInCard(checkinId), 150);
+        const url = new URL(window.location.href);
+        url.searchParams.delete('checkin');
+        window.history.replaceState({}, '', url.toString());
+    }
 
-    setTimeout(() => goToCheckInCard(checkinId), 150);
+    // ?checkout=<bookingId> - same idea, Today Check-out tab.
+    const checkoutId = params.get('checkout');
+    if (checkoutId) {
+        setTimeout(() => goToCheckOutCard(checkoutId), 150);
+        const url = new URL(window.location.href);
+        url.searchParams.delete('checkout');
+        window.history.replaceState({}, '', url.toString());
+    }
 
-    const url = new URL(window.location.href);
-    url.searchParams.delete('checkin');
-    window.history.replaceState({}, '', url.toString());
+    // ?cleaning=<roomNumber> - Cleaning Room tab, from the navbar's Cleaning
+    // Notifications dropdown.
+    const cleaningRoom = params.get('cleaning');
+    if (cleaningRoom) {
+        setTimeout(() => goToCleaningRoom(cleaningRoom), 150);
+        const url = new URL(window.location.href);
+        url.searchParams.delete('cleaning');
+        window.history.replaceState({}, '', url.toString());
+    }
 }
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initCheckinDeepLink);

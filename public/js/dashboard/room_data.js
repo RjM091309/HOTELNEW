@@ -127,23 +127,12 @@ function renderFloorRooms(floor, rooms) {
     
     groupArray.forEach(rn => {
       const found = rooms.find(r => parseInt(r.ROOM_NUMBER) === parseInt(rn));
+      // No placeholder for a slot with no active room (deleted, or never
+      // existed) - the grid just reflows without it, matching how deleted
+      // rooms already behave everywhere else in the dashboard instead of
+      // leaving a blank/unlabeled box that reads as broken.
       if(found) {
         rowDiv.appendChild(createRoomElement(found));
-      } else {
-        // Create empty room placeholder
-        const emptyRoom = document.createElement('div');
-        emptyRoom.classList.add('room', 'empty-room');
-        emptyRoom.style.backgroundColor = '#f0f0f0';
-        emptyRoom.style.border = '1px solid #ddd';
-        emptyRoom.style.color = '#999';
-        
-        const roomNumber = document.createElement('span');
-        roomNumber.classList.add('room-number');
-        roomNumber.textContent = rn;
-        roomNumber.style.color = '#999';
-        emptyRoom.appendChild(roomNumber);
-        
-        rowDiv.appendChild(emptyRoom);
       }
     });
     container.appendChild(rowDiv);

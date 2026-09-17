@@ -391,10 +391,11 @@ async function runRoomRatesMigrations() {
   const { seedRows } = require('../config/roomRates');
 
   // Fresh installs get the final shape directly: keyed by ROOM_TYPE_ID
-  // (FK -> room_type.IDNo), no BED_TYPE column.
+  // (FK -> room_type.IDNo) and SEASON, no BED_TYPE column.
   await queryDatabasePromise(`
     CREATE TABLE IF NOT EXISTS room_rates (
       IDNo INT NOT NULL AUTO_INCREMENT,
+      SEASON VARCHAR(10) NOT NULL DEFAULT 'lean',
       CATEGORY VARCHAR(40) NOT NULL,
       DAY_RANGE VARCHAR(10) NOT NULL,
       ROOM_TYPE_ID INT NULL DEFAULT NULL,
@@ -403,9 +404,16 @@ async function runRoomRatesMigrations() {
       UPDATED_BY INT NULL DEFAULT NULL,
       UPDATED_DT DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       PRIMARY KEY (IDNo),
-      UNIQUE KEY uq_room_rate (CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST)
+      UNIQUE KEY uq_room_rate (SEASON, CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
   `);
+
+  // Existing installs: add the SEASON column (defaults every current row to
+  // 'lean', since that's what today's rates actually represent).
+  if (!(await columnExists('room_rates', 'SEASON'))) {
+    await ensureColumn('room_rates', 'SEASON', "SEASON VARCHAR(10) NOT NULL DEFAULT 'lean'", 'IDNo');
+    console.log('✅ room_rates.SEASON added (existing rows default to lean)');
+  }
 
   // Legacy per-type base price is unused; relax it so room-type INSERTs that
   // omit it don't fail.
@@ -485,13 +493,14 @@ async function runRoomRatesMigrations() {
 
   // Seed missing cells from the printed rate sheet (INSERT IGNORE - never
   // overwrites edited amounts). Skipped for a slug with no matching room type.
+  // seedRows() tags every row season: 'lean' - this sheet is the Lean season.
   const seed = seedRows().filter((r) => slugToType[r.bedSlug] != null);
   if (seed.length) {
-    const values = seed.map(() => '(?, ?, ?, ?, ?)').join(', ');
+    const values = seed.map(() => '(?, ?, ?, ?, ?, ?)').join(', ');
     const params = [];
-    seed.forEach((r) => params.push(r.category, r.dayRange, slugToType[r.bedSlug], r.breakfast, r.amount));
+    seed.forEach((r) => params.push(r.season, r.category, r.dayRange, slugToType[r.bedSlug], r.breakfast, r.amount));
     await queryDatabasePromise(
-      `INSERT IGNORE INTO room_rates (CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST, AMOUNT)
+      `INSERT IGNORE INTO room_rates (SEASON, CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST, AMOUNT)
        VALUES ${values}`,
       params
     );
@@ -520,7 +529,7 @@ async function runRoomRatesMigrations() {
        LEFT JOIN (
          SELECT MAX(IDNo) AS keep_id
            FROM room_rates
-          GROUP BY CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST
+          GROUP BY SEASON, CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST
        ) keep ON r.IDNo = keep.keep_id
        WHERE keep.keep_id IS NULL`
     );
@@ -528,25 +537,45 @@ async function runRoomRatesMigrations() {
       console.log(`✅ Removed ${dupes.affectedRows} duplicate room_rates row(s) merged onto the same room type (kept the most recent rate)`);
     }
 
+    // Target shape includes SEASON now (Lean/Peak season rows share the same
+    // CATEGORY/DAY_RANGE/ROOM_TYPE_ID/BREAKFAST cell, so without SEASON in the
+    // key a Peak row would collide with its Lean counterpart).
     if (await indexExists('room_rates', 'uq_room_rate')) {
       const idxCols = await queryDatabasePromise(
         `SELECT COLUMN_NAME FROM information_schema.STATISTICS
           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'room_rates' AND INDEX_NAME = 'uq_room_rate'`
       );
-      if (idxCols.map((c) => c.COLUMN_NAME).includes('BED_TYPE')) {
+      const cols = idxCols.map((c) => c.COLUMN_NAME);
+      if (cols.includes('BED_TYPE') || !cols.includes('SEASON')) {
         await queryDatabasePromise(`ALTER TABLE room_rates DROP INDEX uq_room_rate`);
         await queryDatabasePromise(
-          `ALTER TABLE room_rates ADD UNIQUE KEY uq_room_rate (CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST)`
+          `ALTER TABLE room_rates ADD UNIQUE KEY uq_room_rate (SEASON, CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST)`
         );
-        console.log('✅ room_rates unique key -> (CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST)');
+        console.log('✅ room_rates unique key -> (SEASON, CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST)');
       }
     } else {
       await queryDatabasePromise(
-        `ALTER TABLE room_rates ADD UNIQUE KEY uq_room_rate (CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST)`
+        `ALTER TABLE room_rates ADD UNIQUE KEY uq_room_rate (SEASON, CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST)`
       );
     }
   } catch (e) {
     console.warn('⚠️ room_rates unique key swap:', e.message);
+  }
+
+  // Seed Peak season as a visible, easy-to-verify placeholder (Lean + ₱500
+  // flat) until an admin sets real Peak pricing on the Room Rates page.
+  // INSERT IGNORE against the (SEASON, ...) unique key above - never
+  // overwrites a Peak amount that's already been edited, and is safe to
+  // re-run on every restart.
+  try {
+    await queryDatabasePromise(
+      `INSERT IGNORE INTO room_rates (SEASON, CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST, AMOUNT)
+       SELECT 'peak', CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST, AMOUNT + 500
+         FROM room_rates WHERE SEASON = 'lean'`
+    );
+    console.log('✅ Ensured seed: room_rates peak season (Lean + ₱500 placeholder)');
+  } catch (e) {
+    console.warn('⚠️ room_rates peak season seed:', e.message);
   }
 
   // FK room_rates.ROOM_TYPE_ID -> room_type.IDNo.
@@ -597,6 +626,36 @@ async function runRoomRatesMigrations() {
   } catch (e) {
     console.warn('⚠️ dropping BED_TYPE columns:', e.message);
   }
+}
+
+// Which of the 12 calendar months is Lean vs Peak season - a fixed, recurring
+// (year-agnostic) assignment, not a date range. Every booking's room rate
+// resolves its season from this table via the check-in date's month, no
+// manual per-booking season picker (see RoomRatesModel.getSeasonMonthMap).
+async function runRoomRateSeasonMonthsMigration() {
+  await queryDatabasePromise(`
+    CREATE TABLE IF NOT EXISTS room_rate_season_months (
+      MONTH_NO TINYINT NOT NULL,
+      SEASON VARCHAR(10) NOT NULL DEFAULT 'lean',
+      UPDATED_BY INT NULL DEFAULT NULL,
+      UPDATED_DT DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (MONTH_NO)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  // Seed all 12 months as Lean (INSERT IGNORE - never overwrites an admin's
+  // existing month assignment). Matches "no Peak season assigned yet".
+  const values = [];
+  const params = [];
+  for (let m = 1; m <= 12; m++) {
+    values.push('(?, ?)');
+    params.push(m, 'lean');
+  }
+  await queryDatabasePromise(
+    `INSERT IGNORE INTO room_rate_season_months (MONTH_NO, SEASON) VALUES ${values.join(', ')}`,
+    params
+  );
+  console.log('✅ Ensured table + seed: room_rate_season_months (12 months, default lean)');
 }
 
 // room.ROOM_TYPE_ID has always been a plain int with no constraint. Every row
@@ -845,6 +904,7 @@ async function runStartupMigrations() {
   await runHoldPendingStatusBackfill();
   await runBookingActualTimesMigration();
   await runRoomRatesMigrations();
+  await runRoomRateSeasonMonthsMigration();
   await runRoomTypeFkMigration();
   await runFlightScheduleMigrations();
   await runPickupDropMigrations();

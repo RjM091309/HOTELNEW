@@ -76,6 +76,8 @@
                   <option value="employee">Employee (30%)</option>
                   <option value="senior_special">Senior / Special 20%</option>
                   <option value="booking-channel">OTA / Channel</option>
+                  <option value="manual_rate">Manual Price</option>
+                  <option value="percentage">Manual Percent</option>
                 </select>
               </div>
             </div>
@@ -86,6 +88,16 @@
               <div class="form-group">
                 <label class="form-label">Booking ID</label>
                 <input type="text" class="form-control" id="groupChannelBookingId" name="groupChannelBookingId" placeholder="Enter OTA booking ID" autocomplete="off">
+              </div>
+            </div>
+            <div class="col-lg-4" id="groupPercentageRateWrapper" style="display: none;">
+              <div class="form-group">
+                <label class="form-label">Discount %</label>
+                <div class="input-group">
+                  <input type="number" class="form-control" id="groupPercentageRateInput" min="0" max="100" step="0.01" placeholder="e.g. 7" autocomplete="off">
+                  <span class="input-group-text">%</span>
+                </div>
+                <small class="text-muted d-block" style="font-size: 11px; margin-top: 2px;">Off Walk-in rate, applied to every selected room</small>
               </div>
             </div>
           </div>
@@ -344,10 +356,20 @@
                 <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                   <b>Selected Room Prices</b>
                   <div class="d-flex align-items-center gap-3 flex-wrap">
-                    <div class="form-check mb-0">
+                    <!-- Manual Room Rates is no longer a staff-facing toggle for
+                         every category (matches single booking) - it's now
+                         driven automatically by the Room Rate dropdown, only
+                         ever turned on when OTA / Channel is selected (see
+                         attachBookingRouteHandler). Left in the DOM, hidden,
+                         since a lot of existing pricing code still reads its
+                         checked state. -->
+                    <div class="form-check mb-0" style="display:none;">
                       <input class="form-check-input" type="checkbox" id="groupEnableManualRates" name="groupEnableManualRates">
                       <label class="form-check-label" for="groupEnableManualRates">Manual Room Rates</label>
                     </div>
+                    <span class="text-muted" id="groupOtaManualNote" style="font-size: 12px; display: none;">
+                      <i class="fas fa-pen"></i> Manually entered (OTA / Channel rate)
+                    </span>
                     <div class="form-check mb-0" id="groupWeekendPriceToggleWrapper" style="display: none;">
                       <input class="form-check-input" type="checkbox" id="groupWeekendPriceToggle" name="groupWeekendPriceToggle">
                       <label class="form-check-label" for="groupWeekendPriceToggle">Separate Weekend Rate</label>
@@ -1765,6 +1787,28 @@
     return day === 5 || day === 6 || day === 0;
   }
 
+  // Month-of-year (1-12) -> 'lean'/'peak', fetched once and cached (same
+  // pattern single booking uses). Defaults to every month being Lean until
+  // the fetch resolves.
+  let groupSeasonMonthMap = { 1: 'lean', 2: 'lean', 3: 'lean', 4: 'lean', 5: 'lean', 6: 'lean', 7: 'lean', 8: 'lean', 9: 'lean', 10: 'lean', 11: 'lean', 12: 'lean' };
+  fetch('/room-rates/season-months')
+    .then((r) => r.json())
+    .then((json) => {
+      if (json && json.success && json.seasonMonths) {
+        Object.assign(groupSeasonMonthMap, json.seasonMonths);
+        refreshGroupRoomPricing();
+      }
+    })
+    .catch(() => {});
+
+  // Group booking prices the whole stay from the check-in date's season only
+  // (not per-night splitting) - same deliberate simplification already in
+  // place here for weekday/weekend on the automatic (non-manual-rate) path.
+  function groupSeasonForNight(date) {
+    const month = date.getMonth() + 1;
+    return groupSeasonMonthMap[month] || 'lean';
+  }
+
   function getGroupNightBreakdown() {
     const { checkIn, checkOut } = parseGroupStayDates();
     let weekday = 0;
@@ -1898,7 +1942,7 @@
   const GROUP_RATE_OPT_CAT = {
     'walk-in': 'walk_in', 'agency': 'agency', 'tenant': 'tenant',
     'vip': 'vip', 'employee': 'employee', 'senior_special': 'senior_special',
-    'booking-channel': 'walk_in'
+    'booking-channel': 'walk_in', 'manual_rate': 'walk_in', 'percentage': 'walk_in'
   };
 
   function groupRateCategory() {
@@ -1949,11 +1993,28 @@
     const checkMoment = checkInDate ? new Date(checkInDate) : null;
     const range = (checkMoment && isGroupWeekendNight(checkMoment)) ? 'weekend' : 'weekday';
     const otherRange = range === 'weekend' ? 'weekday' : 'weekend';
+    // Check-in date's season only, applied to the whole stay - see
+    // groupSeasonForNight's comment for why this doesn't split per-night.
+    const season = groupSeasonForNight(checkMoment || new Date());
+    const rrS = rr[season] || {};
 
-    const amt = (rr[cat] && rr[cat][range] && rr[cat][range][bf])
-      || (rr[cat] && rr[cat][otherRange] && rr[cat][otherRange][bf])
-      || (rr.walk_in && rr.walk_in[range] && rr.walk_in[range][bf])
-      || (rr.walk_in && rr.walk_in[otherRange] && rr.walk_in[otherRange][bf])
+    // Percentage: like the other %-off categories, but the discount is a
+    // staff-typed percent taken off the Walk-in rate instead of a preset
+    // room_rates row - computed here so every selected room gets it
+    // automatically (no per-room manual typing needed, unlike Manual Rate/OTA).
+    if ($('#groupBookingRoute').val() === 'percentage') {
+      const pct = Math.max(0, Math.min(100, parseFloat($('#groupPercentageRateInput').val()) || 0));
+      const factor = 1 - (pct / 100);
+      const walkAmt = (rrS.walk_in && rrS.walk_in[range] && rrS.walk_in[range][bf])
+        || (rrS.walk_in && rrS.walk_in[otherRange] && rrS.walk_in[otherRange][bf])
+        || 0;
+      if (walkAmt > 0) return Number(walkAmt) * factor;
+    }
+
+    const amt = (rrS[cat] && rrS[cat][range] && rrS[cat][range][bf])
+      || (rrS[cat] && rrS[cat][otherRange] && rrS[cat][otherRange][bf])
+      || (rrS.walk_in && rrS.walk_in[range] && rrS.walk_in[range][bf])
+      || (rrS.walk_in && rrS.walk_in[otherRange] && rrS.walk_in[otherRange][bf])
       || 0;
 
     if (amt > 0) return Number(amt);
@@ -2202,6 +2263,13 @@
     $('#groupChannelBookingIdWrapper').toggle(isBookingChannel);
   }
 
+  function toggleGroupPercentageFields(isPercentage) {
+    $('#groupPercentageRateWrapper').toggle(isPercentage);
+    if (!isPercentage) {
+      $('#groupPercentageRateInput').val('');
+    }
+  }
+
   function syncGroupChannelBookingId() {
     const value = ($('#groupChannelBookingId').val() || '').trim();
     $('#groupChannelBookingIdHidden').val(value);
@@ -2266,6 +2334,8 @@
     $('#groupChannelBookingIdWrapper').hide();
     $('#groupChannelBookingId').val('');
     $('#groupChannelBookingIdHidden').val('');
+    $('#groupPercentageRateWrapper').hide();
+    $('#groupPercentageRateInput').val('');
     $('#groupRoomsList').empty();
     $('#groupManualRoomsContainer').hide();
     $('#groupManualSelectionInfo').hide();
@@ -4126,13 +4196,42 @@
 
   function attachBookingRouteHandler() {
     $('#groupBookingRoute').on('change', function() {
+      const isOta = this.value === 'booking-channel';
+      const isManualRate = this.value === 'manual_rate';
+      const isPercentage = this.value === 'percentage';
       toggleGroupAgencyFields(this.value === 'agency');
-      toggleGroupChannelFields(this.value === 'booking-channel');
+      toggleGroupChannelFields(isOta);
+      toggleGroupPercentageFields(isPercentage);
+
+      // Manual Room Rates is no longer a staff-facing toggle for every
+      // category (matches single booking's OTA/Manual Rate-only manual
+      // entry) - only ever turned on automatically when OTA / Channel or
+      // Manual Rate is selected, off for every other category (Percentage
+      // included - that one prices itself automatically, see
+      // resolveGroupRoomPrice). Reuses the existing manual-rate-editor
+      // infrastructure (per-room inputs), just driven by this dropdown
+      // instead of a checkbox staff would otherwise have to remember to toggle.
+      const shouldManual = isOta || isManualRate;
+      const manualCheckbox = document.getElementById('groupEnableManualRates');
+      if (manualCheckbox.checked !== shouldManual) {
+        manualCheckbox.checked = shouldManual;
+        $(manualCheckbox).trigger('change');
+      }
+      $('#groupOtaManualNote')
+        .toggle(shouldManual)
+        .html(`<i class="fas fa-pen"></i> Manually entered (${isManualRate ? 'Manual Price' : 'OTA / Channel rate'})`);
+
       refreshGroupRoomPricing();
     });
 
     $(document).on('input', '#groupChannelBookingId', function() {
       syncGroupChannelBookingId();
+    });
+
+    $('#groupPercentageRateInput').on('input', function() {
+      if ($('#groupBookingRoute').val() === 'percentage') {
+        refreshGroupRoomPricing();
+      }
     });
 
     $('input[name="groupAgencyPayer"]').on('change', function () {

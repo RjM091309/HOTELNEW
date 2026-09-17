@@ -1625,6 +1625,7 @@ class BookingModel {
       isDirectReservation,
       reservationFee,
       discount,
+      discountRemarks,
       seniorPwdDiscountPercent = 0, // Senior/PWD discount percentage
       lateCheckoutFee,
       isLongTermStay,
@@ -1775,6 +1776,10 @@ class BookingModel {
           (BOOKING_ID, ROOM_CHARGE, ROOM_PRICE, AMENITIES_CHARGE, SERVICES_CHARGE, LATE_CHECKOUT_CHARGE, EARLY_CHECK_IN_CHARGE, QTY, PAYMENT_STATUS, PAYMENT_METHOD, REMARKS, ENCODED_BY, ENCODED_DT, ACTIVE, RESERVATION_FEE, DISCOUNT_AMOUNT, DISCOUNT_APPLIED, SENIOR_PWD_DISCOUNT_PERCENT)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
+        const processedDiscountRemarks = (discountRemarks && String(discountRemarks).trim() !== '')
+          ? String(discountRemarks).trim()
+          : '';
+
         const billingValues = [
           bookingId,
           numericRoomPrice, // ROOM_CHARGE (per-night stored as charge)
@@ -1784,7 +1789,7 @@ class BookingModel {
           diffindays,
           paymentStatus,
           'cash',
-          '',
+          processedDiscountRemarks,
           encodedBy,
           date,
           1,
@@ -1849,6 +1854,21 @@ class BookingModel {
                 resolve();
               }
             });
+          });
+        }
+
+        // Mirror the discount remark into the remarks table too (CATEGORY =
+        // 'Discount'), the same place BookingModel.applyDiscount writes it
+        // when a discount is added after checkout - keeps both entry points
+        // consistent for anything reading from the remarks table directly.
+        if (parseFloat(discount) > 0 && processedDiscountRemarks !== '') {
+          await new Promise((resolve, reject) => {
+            connection.query(
+              `INSERT INTO remarks (BOOKING_ID, CATEGORY, REMARK_TEXT, ENCODED_BY, EDITDED_BY)
+               VALUES (?, 'Discount', ?, ?, ?)`,
+              [bookingId, processedDiscountRemarks, encodedBy, encodedBy],
+              (err) => (err ? reject(err) : resolve())
+            );
           });
         }
 

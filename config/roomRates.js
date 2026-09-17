@@ -2,6 +2,31 @@
 // controller. Each category is priced by day range (weekday / weekend), bed type
 // (king / queen) and breakfast option (no / one / two) -> 12 amounts per category.
 
+// Lean/Peak season - which one applies to a booking is resolved automatically
+// from the check-in date's calendar month (see room_rate_season_months / the
+// month->season assignment on the Room Rates admin page), not picked manually
+// per booking.
+const SEASONS = [
+  { key: 'lean', label: 'Lean Season' },
+  { key: 'peak', label: 'Peak Season' }
+];
+const DEFAULT_SEASON = 'lean';
+
+const MONTHS = [
+  { num: 1, label: 'January' },
+  { num: 2, label: 'February' },
+  { num: 3, label: 'March' },
+  { num: 4, label: 'April' },
+  { num: 5, label: 'May' },
+  { num: 6, label: 'June' },
+  { num: 7, label: 'July' },
+  { num: 8, label: 'August' },
+  { num: 9, label: 'September' },
+  { num: 10, label: 'October' },
+  { num: 11, label: 'November' },
+  { num: 12, label: 'December' }
+];
+
 const DAY_RANGES = [
   { key: 'weekday', label: 'Monday - Thursday' },
   { key: 'weekend', label: 'Friday - Sunday' }
@@ -63,24 +88,27 @@ const SEED = {
   }
 };
 
+const SEASON_KEYS = new Set(SEASONS.map((s) => s.key));
 const CATEGORY_KEYS = new Set(CATEGORIES.map((c) => c.key));
 const DAY_RANGE_KEYS = new Set(DAY_RANGES.map((d) => d.key));
 const BED_TYPE_KEYS = new Set(BED_TYPES.map((b) => b.key));
 const BREAKFAST_KEYS = new Set(BREAKFAST_OPTIONS.map((b) => b.key));
 
-// Validate the three fixed axes. Room type is validated against the DB, not here.
-function isValidAxes(category, dayRange, breakfast) {
-  return CATEGORY_KEYS.has(category)
+// Validate the four fixed axes. Room type is validated against the DB, not here.
+function isValidAxes(season, category, dayRange, breakfast) {
+  return SEASON_KEYS.has(season)
+    && CATEGORY_KEYS.has(category)
     && DAY_RANGE_KEYS.has(dayRange)
     && BREAKFAST_KEYS.has(breakfast);
 }
 
-// Backward-compatible: old signature (category, dayRange, bedType, breakfast).
+// Backward-compatible: old signature (category, dayRange, bedType, breakfast) -
+// no season, defaults to 'lean'.
 function isValidCell(category, dayRange, bedTypeOrBreakfast, breakfast) {
   if (arguments.length >= 4) {
-    return isValidAxes(category, dayRange, breakfast) && BED_TYPE_KEYS.has(bedTypeOrBreakfast);
+    return isValidAxes(DEFAULT_SEASON, category, dayRange, breakfast) && BED_TYPE_KEYS.has(bedTypeOrBreakfast);
   }
-  return isValidAxes(category, dayRange, bedTypeOrBreakfast);
+  return isValidAxes(DEFAULT_SEASON, category, dayRange, bedTypeOrBreakfast);
 }
 
 // Flatten SEED into [{category, dayRange, bedSlug, breakfast, amount}]. The
@@ -92,6 +120,7 @@ function seedRows() {
       for (const bedSlug of BED_SLUGS) {
         for (const { key: breakfast } of BREAKFAST_OPTIONS) {
           rows.push({
+            season: DEFAULT_SEASON,
             category,
             dayRange,
             bedSlug,
@@ -106,6 +135,10 @@ function seedRows() {
 }
 
 module.exports = {
+  SEASONS,
+  SEASON_KEYS,
+  DEFAULT_SEASON,
+  MONTHS,
   DAY_RANGES,
   BED_TYPES,
   BED_SLUGS,

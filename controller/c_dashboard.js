@@ -163,6 +163,18 @@ class DashboardController {
     }
   }
 
+  // Real data for the navbar's Notifications (bell) and Cleaning Notifications
+  // (broom) dropdowns - polled from navbar.ejs on every page, not just Dashboard.
+  static async getNavbarNotifications(req, res) {
+    try {
+      const data = await DashboardModel.getNavbarNotifications();
+      res.json({ success: true, ...data });
+    } catch (error) {
+      console.error('Error fetching navbar notifications:', error);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  }
+
   // Complaints/Requests/Remarks summary counts
   static async getComplaintRequestSummary(req, res) {
     try {

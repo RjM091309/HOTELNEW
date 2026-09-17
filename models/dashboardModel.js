@@ -995,6 +995,64 @@ class DashboardModel {
     }
   }
 
+  // Real data for the navbar's Notifications (bell) and Cleaning Notifications
+  // (broom) dropdowns - today's check-ins/pickups/check-outs still pending,
+  // and rooms currently in the cleaning ROOM_STATUS (4). Deliberately lean
+  // queries (not the full booking-detail ones the dashboard tabs use) since
+  // this powers a shared navbar polled from every page.
+  static async getNavbarNotifications() {
+    try {
+      const [checkIns, checkOuts, pickups, cleaningRooms] = await Promise.all([
+        queryDatabasePromise(`
+          SELECT b.IDNo AS BookingID, c.NAME AS GuestName, r.ROOM_NUMBER AS RoomNumber,
+                 b.CHECK_IN_DATE AS ScheduleTime
+          FROM booking b
+          LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
+          LEFT JOIN room r ON r.IDNo = b.ROOM_ID
+          WHERE b.ACTIVE = 1 AND b.BOOKING_STATUS = 'pending'
+            AND DATE(b.CHECK_IN_DATE) = CURDATE()
+          ORDER BY b.CHECK_IN_DATE ASC
+        `),
+        queryDatabasePromise(`
+          SELECT b.IDNo AS BookingID, c.NAME AS GuestName, r.ROOM_NUMBER AS RoomNumber,
+                 b.CHECK_OUT_DATE AS ScheduleTime
+          FROM booking b
+          LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
+          LEFT JOIN room r ON r.IDNo = b.ROOM_ID
+          WHERE b.ACTIVE = 1 AND b.BOOKING_STATUS = 'check-In'
+            AND DATE(b.CHECK_OUT_DATE) = CURDATE()
+          ORDER BY b.CHECK_OUT_DATE ASC
+        `),
+        queryDatabasePromise(`
+          SELECT b.IDNo AS BookingID, c.NAME AS GuestName, r.ROOM_NUMBER AS RoomNumber,
+                 b.PICKUP_DATE AS ScheduleTime, b.FLIGHT_NUMBER AS FlightNumber
+          FROM booking b
+          LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
+          LEFT JOIN room r ON r.IDNo = b.ROOM_ID
+          INNER JOIN booking_service bs ON bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1
+          INNER JOIN services s ON s.IDNo = bs.SERVICE_ID AND s.SERVICE_CATEGORY = 'Pick & Drop'
+              AND LOWER(s.SERVICE_NAME) LIKE '%pick%'
+          WHERE b.ACTIVE = 1
+            AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
+            AND b.PICKUP_DATE IS NOT NULL
+            AND DATE(b.PICKUP_DATE) = CURDATE()
+          GROUP BY b.IDNo, c.NAME, r.ROOM_NUMBER, b.PICKUP_DATE, b.FLIGHT_NUMBER
+          ORDER BY b.PICKUP_DATE ASC
+        `),
+        queryDatabasePromise(`
+          SELECT IDNo AS RoomID, ROOM_NUMBER AS RoomNumber, ROOM_FLOOR AS RoomFloor, EDITED_DT AS SinceDT
+          FROM room
+          WHERE ACTIVE = 1 AND ROOM_STATUS = 4
+          ORDER BY ROOM_NUMBER ASC
+        `)
+      ]);
+
+      return { checkIns, checkOuts, pickups, cleaningRooms };
+    } catch (error) {
+      throw error;
+    }
+  }
+
   // Get cleanup notifications
   static async getCleanupNotifications() {
     try {
@@ -1483,27 +1541,45 @@ class DashboardModel {
         return { success: false, message: 'Failed to update booking status.' };
       }
 
-      // Early check-in fee: for an "Early Check In" booking (CHECK_IN_STATUS = 2),
-      // add the staff-confirmed fee as a booking_service row (SERVICE_ID 70) so it
-      // lists under Extra Services and rolls into the bill - same as Late Check Out.
+      // Early check-in fee: paid on the spot at check-in (unlike adding "Early
+      // Check In" as a service afterward via Edit Details, which stays unpaid
+      // until checkout - that path is untouched). Still tracked as a
+      // booking_service row (SERVICE_ID 70) so it correctly rolls into the
+      // booking's Total Amount, but inserted/updated as 'paid' immediately
+      // with a matching payments row - same pattern Add Booking already uses
+      // for a pre-paid Late Checkout fee - so it shows on the Payments page
+      // right away and the guest's balance doesn't move because of it.
+      // Not gated to CHECK_IN_STATUS = 2 - the fee section itself is shown by
+      // real clock time regardless of the booking's Regular/Late/Early flag,
+      // so saving it needs to match that.
       const earlyFeeNum = Math.max(0, parseFloat(earlyCheckInFee) || 0);
-      if (String(bookingRows[0].CHECK_IN_STATUS) === '2' && earlyFeeNum > 0) {
+      if (earlyFeeNum > 0) {
         const existing = await queryDatabasePromise(
           `SELECT IDNo FROM booking_service WHERE BOOKING_ID = ? AND SERVICE_ID = 70 AND ACTIVE = 1 LIMIT 1`,
           [bookingId]
         );
+
+        let bookingServiceId;
         if (existing.length) {
+          bookingServiceId = existing[0].IDNo;
           await queryDatabasePromise(
-            `UPDATE booking_service SET TOTAL_COST = ?, ENCODED_DT = NOW() WHERE IDNo = ?`,
-            [earlyFeeNum, existing[0].IDNo]
+            `UPDATE booking_service SET TOTAL_COST = ?, STATUS = 'paid', ENCODED_DT = NOW() WHERE IDNo = ?`,
+            [earlyFeeNum, bookingServiceId]
           );
         } else {
-          await queryDatabasePromise(
+          const insertResult = await queryDatabasePromise(
             `INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE)
-             VALUES (?, 70, 1, ?, 'unpaid', ?, NOW(), 1)`,
+             VALUES (?, 70, 1, ?, 'paid', ?, NOW(), 1)`,
             [bookingId, earlyFeeNum, encodedBy]
           );
+          bookingServiceId = insertResult.insertId;
         }
+
+        await queryDatabasePromise(
+          `INSERT INTO payments (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, REMARKS, ENCODED_BY)
+           VALUES (?, ?, ?, 'cash', 'service', NOW(), 'Early check-in fee', ?)`,
+          [bookingId, bookingServiceId, earlyFeeNum, encodedBy]
+        );
       }
 
       await queryDatabasePromise('COMMIT');

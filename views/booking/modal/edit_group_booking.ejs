@@ -923,6 +923,26 @@ window.editGroupAddedServicesMap = {};
     'booking-channel': 'walk_in'
   };
 
+  // Month-of-year (1-12) -> 'lean'/'peak', fetched once and cached (same
+  // pattern single booking and Add Group Booking use).
+  let editGroupSeasonMonthMap = { 1: 'lean', 2: 'lean', 3: 'lean', 4: 'lean', 5: 'lean', 6: 'lean', 7: 'lean', 8: 'lean', 9: 'lean', 10: 'lean', 11: 'lean', 12: 'lean' };
+  fetch('/room-rates/season-months')
+    .then((r) => r.json())
+    .then((json) => {
+      if (json && json.success && json.seasonMonths) {
+        Object.assign(editGroupSeasonMonthMap, json.seasonMonths);
+        refreshEditGroupRoomPricing();
+      }
+    })
+    .catch(() => {});
+
+  // Group booking prices the whole stay from the check-in date's season only
+  // (not per-night splitting) - same simplification Add Group Booking uses.
+  function editGroupSeasonForNight(date) {
+    const month = date.getMonth() + 1;
+    return editGroupSeasonMonthMap[month] || 'lean';
+  }
+
   // Auto room rate for one night, sourced from room.ROOM_RATES - the same
   // room_rates matrix (category x weekday/weekend x breakfast) single booking
   // and Add Group Booking use, attached per room by the backend
@@ -967,11 +987,13 @@ window.editGroupAddedServicesMap = {};
     const isWeekend = day === 5 || day === 6 || day === 0;
     const range = isWeekend ? 'weekend' : 'weekday';
     const otherRange = range === 'weekend' ? 'weekday' : 'weekend';
+    const season = editGroupSeasonForNight(checkMoment || new Date());
+    const rrS = rr[season] || {};
 
-    const amt = (rr[cat] && rr[cat][range] && rr[cat][range][bf])
-      || (rr[cat] && rr[cat][otherRange] && rr[cat][otherRange][bf])
-      || (rr.walk_in && rr.walk_in[range] && rr.walk_in[range][bf])
-      || (rr.walk_in && rr.walk_in[otherRange] && rr.walk_in[otherRange][bf])
+    const amt = (rrS[cat] && rrS[cat][range] && rrS[cat][range][bf])
+      || (rrS[cat] && rrS[cat][otherRange] && rrS[cat][otherRange][bf])
+      || (rrS.walk_in && rrS.walk_in[range] && rrS.walk_in[range][bf])
+      || (rrS.walk_in && rrS.walk_in[otherRange] && rrS.walk_in[otherRange][bf])
       || 0;
 
     if (amt > 0) return Number(amt);

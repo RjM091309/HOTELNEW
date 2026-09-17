@@ -740,6 +740,7 @@ class BookingController {
       directReservationFlag,
       reservationFee,
       discount,
+      discountRemarks,
       seniorPwdDiscount = 0, // Senior/PWD discount amount
       seniorPwdDiscountPercent = 0, // Senior/PWD discount percentage
         lateCheckoutFee,
@@ -937,6 +938,7 @@ class BookingController {
         isDirectReservation,
         reservationFee,
         discount: totalDiscountNum, // Pass combined discount (seniorPwdDiscount + discount)
+        discountRemarks: discountRemarks && String(discountRemarks).trim() !== '' ? String(discountRemarks).trim() : null,
         seniorPwdDiscountPercent, // Pass percentage for storage
         lateCheckoutFee,
         isLongTermStay: isLongTermStay == 1 || isLongTermStay === 'true' || isLongTermStay === true,

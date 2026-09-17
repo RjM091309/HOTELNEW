@@ -18,49 +18,80 @@
       </div>
 
       <div class="dashboard-card-body">
+        <div class="season-tabs" id="seasonTabs" role="tablist">
+          <% seasons.forEach(function(season, idx) { %>
+            <button type="button" class="season-tab-btn <%= idx === 0 ? 'active' : '' %>" data-season-tab="<%= season.key %>"><%= season.label %></button>
+          <% }); %>
+        </div>
+
+        <div class="season-months-card">
+          <div class="season-months-title" id="seasonMonthsTitle">Assign Months to <%= seasons[0].label %></div>
+          <p class="room-rates-note season-months-note" id="seasonMonthsNote">
+            Checked months belong to this season - a month can only belong to one season, so unchecking it here moves it to the other one.
+          </p>
+          <div class="season-months-row" id="seasonMonthsRow">
+            <% months.forEach(function(m) { %>
+              <label class="season-month-toggle">
+                <input type="checkbox" class="season-month-input" data-month="<%= m.num %>">
+                <span><%= m.label %></span>
+              </label>
+            <% }); %>
+          </div>
+          <div class="season-months-actions">
+            <span class="room-rates-dirty" id="seasonMonthsDirty" style="display:none;">Unsaved changes</span>
+            <button type="button" class="btn room-rates-save-btn" id="seasonMonthsSaveBtn" disabled>Save month assignment</button>
+          </div>
+        </div>
+
         <div id="roomRatesGrid">
-          <% categories.forEach(function(cat) { %>
-            <div class="rate-category">
-              <div class="rate-category-title"><%= cat.label %></div>
-              <div class="table-scrollable">
-                <table class="table table-bordered rate-table">
-                  <thead>
-                    <tr>
-                      <th rowspan="2" class="rate-bf-col">Breakfast</th>
-                      <% dayRanges.forEach(function(dr) { %>
-                        <th colspan="<%= roomTypes.length %>" class="text-center rate-day-head"><%= dr.label %></th>
-                      <% }); %>
-                    </tr>
-                    <tr>
-                      <% dayRanges.forEach(function(dr) { %>
-                        <% roomTypes.forEach(function(rt) { %>
-                          <th class="text-center rate-bed-head"><%= rt.name %></th>
-                        <% }); %>
-                      <% }); %>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <% breakfastOptions.forEach(function(bf) { %>
-                      <tr>
-                        <td class="rate-bf-label"><%= bf.label %></td>
-                        <% dayRanges.forEach(function(dr) { %>
-                          <% roomTypes.forEach(function(rt) { %>
-                            <td class="rate-cell">
-                              <input type="number" min="0" step="1" inputmode="numeric"
-                                class="rate-input"
-                                data-cat="<%= cat.key %>"
-                                data-day="<%= dr.key %>"
-                                data-rt="<%= rt.id %>"
-                                data-bf="<%= bf.key %>"
-                                value="">
-                            </td>
+          <% seasons.forEach(function(season, idx) { %>
+            <div class="season-section" data-season="<%= season.key %>" style="<%= idx === 0 ? '' : 'display:none;' %>">
+              <div class="season-section-title"><%= season.label %></div>
+              <% categories.forEach(function(cat) { %>
+                <div class="rate-category">
+                  <div class="rate-category-title"><%= cat.label %></div>
+                  <div class="table-scrollable">
+                    <table class="table table-bordered rate-table">
+                      <thead>
+                        <tr>
+                          <th rowspan="2" class="rate-bf-col">Breakfast</th>
+                          <% dayRanges.forEach(function(dr) { %>
+                            <th colspan="<%= roomTypes.length %>" class="text-center rate-day-head"><%= dr.label %></th>
                           <% }); %>
+                        </tr>
+                        <tr>
+                          <% dayRanges.forEach(function(dr) { %>
+                            <% roomTypes.forEach(function(rt) { %>
+                              <th class="text-center rate-bed-head"><%= rt.name %></th>
+                            <% }); %>
+                          <% }); %>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <% breakfastOptions.forEach(function(bf) { %>
+                          <tr>
+                            <td class="rate-bf-label"><%= bf.label %></td>
+                            <% dayRanges.forEach(function(dr) { %>
+                              <% roomTypes.forEach(function(rt) { %>
+                                <td class="rate-cell">
+                                  <input type="number" min="0" step="1" inputmode="numeric"
+                                    class="rate-input"
+                                    data-season="<%= season.key %>"
+                                    data-cat="<%= cat.key %>"
+                                    data-day="<%= dr.key %>"
+                                    data-rt="<%= rt.id %>"
+                                    data-bf="<%= bf.key %>"
+                                    value="">
+                                </td>
+                              <% }); %>
+                            <% }); %>
+                          </tr>
                         <% }); %>
-                      </tr>
-                    <% }); %>
-                  </tbody>
-                </table>
-              </div>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              <% }); %>
             </div>
           <% }); %>
         </div>
@@ -113,6 +144,110 @@
   .room-rates-save-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  /* Lean/Peak tab switcher - only one season's rate tables (and month
+     checkboxes' meaning) shows at a time, instead of both stacked always
+     visible, which doubled the page length. */
+  .season-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .season-tab-btn {
+    padding: 8px 20px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: #232a2e;
+    color: #aeb9c0;
+    font-weight: 700;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  .season-tab-btn:hover {
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+  .season-tab-btn.active {
+    background: #0c2a42;
+    border-color: #2196f3;
+    color: #ffffff;
+  }
+
+  /* Assign Months to <active season> - a single checkbox per month, meaning
+     flips with the active tab (checked = this season), so a month can never
+     end up assigned to both or neither. */
+  .season-months-card {
+    background: #232a2e;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 22px;
+  }
+  .season-months-title {
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .season-months-note {
+    margin-top: 4px;
+    margin-bottom: 12px;
+  }
+  .season-months-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .season-month-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: #1c2225;
+    color: #cdd6dc;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+  }
+  .season-month-toggle:has(.season-month-input:checked) {
+    border-color: #e6a94b;
+    background: rgba(230, 169, 75, 0.14);
+    color: #ffd694;
+  }
+  .season-month-input {
+    accent-color: #e6a94b;
+    cursor: pointer;
+  }
+  .season-months-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  /* Peak Season's block of category tables reuses the exact same
+     .rate-category markup as Lean - just wrapped one level deeper per
+     season, with its own divider title. */
+  .season-section {
+    margin-bottom: 10px;
+  }
+  .season-section-title {
+    color: #ffffff;
+    font-weight: 800;
+    font-size: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    padding: 10px 2px;
+    border-bottom: 2px solid rgba(111, 156, 64, 0.4);
+    margin-bottom: 16px;
+    margin-top: 8px;
   }
 
   .rate-category {
@@ -253,6 +388,36 @@
     color: #9ca3af;
   }
 
+  [data-theme="white"] .season-tab-btn {
+    background: #ffffff;
+    border-color: #d1d5db;
+    color: #374151;
+  }
+  [data-theme="white"] .season-tab-btn.active {
+    background: #2196f3;
+    border-color: #1976d2;
+    color: #ffffff;
+  }
+
+  [data-theme="white"] .season-months-card {
+    background: #ffffff;
+    border-color: #e5e7eb;
+  }
+  [data-theme="white"] .season-months-title,
+  [data-theme="white"] .season-section-title {
+    color: #111827;
+  }
+  [data-theme="white"] .season-month-toggle {
+    background: #f9fafb;
+    border-color: #d1d5db;
+    color: #374151;
+  }
+  [data-theme="white"] .season-month-toggle:has(.season-month-input:checked) {
+    border-color: #d97706;
+    background: #fffbeb;
+    color: #92400e;
+  }
+
   [data-theme="white"] .rate-category {
     background: #ffffff;
     border-color: #e5e7eb;
@@ -296,7 +461,7 @@
     const inputs = Array.from(grid.querySelectorAll('.rate-input'));
 
     function keyOf(el) {
-      return [el.dataset.cat, el.dataset.day, el.dataset.rt, el.dataset.bf].join('|');
+      return [el.dataset.season, el.dataset.cat, el.dataset.day, el.dataset.rt, el.dataset.bf].join('|');
     }
 
     function refreshDirty() {
@@ -313,7 +478,7 @@
 
     function fill(rates) {
       inputs.forEach((el) => {
-        const v = rates?.[el.dataset.cat]?.[el.dataset.day]?.[el.dataset.rt]?.[el.dataset.bf];
+        const v = rates?.[el.dataset.season]?.[el.dataset.cat]?.[el.dataset.day]?.[el.dataset.rt]?.[el.dataset.bf];
         const val = (v === undefined || v === null) ? '' : String(Math.round(Number(v)));
         el.value = val;
         el.dataset.original = val;
@@ -325,7 +490,10 @@
       fetch('/room-rates/data')
         .then((r) => r.json())
         .then((json) => {
-          if (json && json.success) fill(json.rates || {});
+          if (json && json.success) {
+            fill(json.rates || {});
+            fillSeasonMonths(json.seasonMonths || {});
+          }
         })
         .catch(() => {
           if (typeof Swal !== 'undefined') {
@@ -345,6 +513,7 @@
       const updates = inputs
         .filter((el) => String(el.value).trim() !== String(el.dataset.original ?? ''))
         .map((el) => ({
+          season: el.dataset.season,
           category: el.dataset.cat,
           dayRange: el.dataset.day,
           roomTypeId: Number(el.dataset.rt),
@@ -381,5 +550,113 @@
     });
 
     load();
+
+    // ---- Lean/Peak tab switcher - only one season's rate tables show at a
+    // time. Switching tabs never discards unsaved rate-amount edits (the
+    // hidden season's inputs stay in the DOM, just visually hidden). ----
+    const tabButtons = Array.from(document.querySelectorAll('.season-tab-btn'));
+    const seasonSections = Array.from(document.querySelectorAll('.season-section'));
+    const seasonLabels = {};
+    tabButtons.forEach((btn) => { seasonLabels[btn.dataset.seasonTab] = btn.textContent.trim(); });
+    let activeSeasonTab = tabButtons.length ? tabButtons[0].dataset.seasonTab : 'lean';
+
+    function otherSeasonKey(season) {
+      const other = tabButtons.map((b) => b.dataset.seasonTab).find((k) => k !== season);
+      return other || (season === 'lean' ? 'peak' : 'lean');
+    }
+
+    function activateSeasonTab(season) {
+      activeSeasonTab = season;
+      tabButtons.forEach((btn) => btn.classList.toggle('active', btn.dataset.seasonTab === season));
+      seasonSections.forEach((sec) => { sec.style.display = sec.dataset.season === season ? '' : 'none'; });
+      document.getElementById('seasonMonthsTitle').textContent = 'Assign Months to ' + (seasonLabels[season] || season);
+      renderMonthCheckboxes();
+    }
+
+    tabButtons.forEach((btn) => {
+      btn.addEventListener('click', function () { activateSeasonTab(btn.dataset.seasonTab); });
+    });
+
+    // ---- Assign Months to <active season> - its own load/dirty/save cycle,
+    // independent of the rate-amount grid above so the two edits don't
+    // interfere with each other's dirty-tracking. currentSeasonMonths is the
+    // single source of truth (every month always belongs to exactly one
+    // season); the checkbox row is just a tab-scoped view onto it - checking
+    // a month assigns it to the active tab's season, unchecking moves it to
+    // the other one (a month can never end up in both or neither). ----
+    const seasonMonthsRow = document.getElementById('seasonMonthsRow');
+    const seasonMonthsSaveBtn = document.getElementById('seasonMonthsSaveBtn');
+    const seasonMonthsDirtyTag = document.getElementById('seasonMonthsDirty');
+    const monthInputs = Array.from(seasonMonthsRow.querySelectorAll('.season-month-input'));
+
+    let originalSeasonMonths = {};
+    let currentSeasonMonths = {};
+
+    function refreshSeasonMonthsDirty() {
+      let changed = 0;
+      monthInputs.forEach((el) => {
+        const month = Number(el.dataset.month);
+        if (currentSeasonMonths[month] !== originalSeasonMonths[month]) changed++;
+      });
+      seasonMonthsSaveBtn.disabled = changed === 0;
+      seasonMonthsDirtyTag.style.display = changed > 0 ? 'inline' : 'none';
+      seasonMonthsDirtyTag.textContent = changed + ' unsaved change' + (changed === 1 ? '' : 's');
+    }
+
+    // Re-renders the checkbox row's checked state from currentSeasonMonths
+    // for whichever season is now active - does NOT touch the underlying
+    // data, so switching tabs back and forth never loses an edit.
+    function renderMonthCheckboxes() {
+      monthInputs.forEach((el) => {
+        const month = Number(el.dataset.month);
+        el.checked = currentSeasonMonths[month] === activeSeasonTab;
+      });
+    }
+
+    function fillSeasonMonths(seasonMonths) {
+      originalSeasonMonths = Object.assign({}, seasonMonths);
+      currentSeasonMonths = Object.assign({}, seasonMonths);
+      renderMonthCheckboxes();
+      refreshSeasonMonthsDirty();
+    }
+
+    monthInputs.forEach((el) => {
+      el.addEventListener('change', function () {
+        const month = Number(el.dataset.month);
+        currentSeasonMonths[month] = el.checked ? activeSeasonTab : otherSeasonKey(activeSeasonTab);
+        refreshSeasonMonthsDirty();
+      });
+    });
+
+    seasonMonthsSaveBtn.addEventListener('click', function () {
+      const months = Object.keys(currentSeasonMonths).map((month) => ({
+        month: Number(month),
+        season: currentSeasonMonths[month]
+      }));
+
+      seasonMonthsSaveBtn.disabled = true;
+      fetch('/room-rates/save-season-months', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ months })
+      })
+        .then((r) => r.json())
+        .then((json) => {
+          if (json && json.success) {
+            originalSeasonMonths = Object.assign({}, currentSeasonMonths);
+            refreshSeasonMonthsDirty();
+            if (typeof Swal !== 'undefined') {
+              Swal.fire({ icon: 'success', title: 'Saved', text: 'Month assignment updated.', timer: 1600, showConfirmButton: false });
+            }
+          } else {
+            seasonMonthsSaveBtn.disabled = false;
+            if (typeof Swal !== 'undefined') Swal.fire('Error', (json && json.message) || 'Save failed.', 'error');
+          }
+        })
+        .catch(() => {
+          seasonMonthsSaveBtn.disabled = false;
+          if (typeof Swal !== 'undefined') Swal.fire('Error', 'Save failed.', 'error');
+        });
+    });
   })();
 </script>

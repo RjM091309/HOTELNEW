@@ -159,6 +159,7 @@ $(document).ready(function () {
       const seniorPwdDiscount = $('#includeSeniorPwdDiscount').is(':checked') ? parseFloat($('#seniorPwdDiscount').val()) || 0 : 0;
       const seniorPwdDiscountPercent = $('#includeSeniorPwdDiscount').is(':checked') ? parseFloat($('#seniorPwdDiscountPercent').val()) || 20 : 0;
       const discountAmount = $('#includeDiscount').is(':checked') ? $('#discountAmount').val() : 0;
+      const discountRemarks = $('#includeDiscount').is(':checked') ? ($('#discountRemarks').val() || '') : '';
       const reservationFeeAmount = $('#includeReservationFee').is(':checked') ? $('#reservationFeeAmount').val() : 0;
       const lateCheckoutFee = $('#lateCheckoutFee').val();
       const isLongTermStay = $('#includeLongTermStay').is(':checked') ? 1 : 0;
@@ -233,7 +234,7 @@ $(document).ready(function () {
           breakfastKidQty, breakfastKidPrice, breakfastKidId,
           pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
           flightNumber, dropoffFlightNumber, pickupDate, passengerCount,
-          discount: discountAmount, seniorPwdDiscount, seniorPwdDiscountPercent, reservationFee: reservationFeeAmount, lateCheckoutFee,
+          discount: discountAmount, discountRemarks, seniorPwdDiscount, seniorPwdDiscountPercent, reservationFee: reservationFeeAmount, lateCheckoutFee,
           isLongTermStay, roomChangeNote
         },
         success: function (response) {

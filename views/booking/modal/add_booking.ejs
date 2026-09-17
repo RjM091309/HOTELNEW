@@ -84,6 +84,8 @@
                                       <option value="employee" data-base-label="Employee (30%)">Employee (30%)</option>
                                       <option value="senior_special" data-base-label="Senior / Special 20%">Senior / Special 20%</option>
                                       <option value="booking-channel" data-base-label="OTA / Channel">OTA / Channel</option>
+                                      <option value="manual_rate" data-base-label="Manual Price">Manual Price</option>
+                                      <option value="percentage" data-base-label="Manual Percent">Manual Percent</option>
                                   </select>
                               </div>
                           </div>
@@ -93,6 +95,17 @@
                             <div class="form-group">
                                 <label class="form-label">Booking ID</label>
                                 <input type="text" class="form-control" id="channelBookingId" name="channelBookingId" placeholder="Enter OTA booking ID" autocomplete="off">
+                            </div>
+                        </div>
+
+                        <div id="percentageRateWrapper" class="col-lg-4" style="display: none;">
+                            <div class="form-group">
+                                <label class="form-label">Discount %</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="percentageRateInput" min="0" max="100" step="0.01" placeholder="e.g. 7" autocomplete="off">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                                <small class="text-muted d-block" style="font-size: 11px; margin-top: 2px;">Off Walk-in rate</small>
                             </div>
                         </div>
                       
@@ -150,11 +163,16 @@
                               <div id="singleRateWrapper">
                                 <label class="form-label">Rate / Per Night</label>
                                 <input class="form-control" type="text" id="price" name="price" readonly>
-                                <small class="text-muted d-block" style="font-size: 11px; margin-top: 4px;">Auto from Room Rates</small>
+                                <small class="text-muted d-block" id="priceRateNote" style="font-size: 11px; margin-top: 4px;">Auto from Room Rates</small>
                               </div>
                               <!-- Manual price + weekend split removed - each night bills at its own room_rates amount -->
                               <input type="hidden" id="weekdayRate">
                               <input type="hidden" id="weekendRate">
+                              <!-- The OTHER season's rates (whichever of Lean/Peak isn't the check-in date's
+                                   season) - lets a stay crossing a season boundary bill each night at its
+                                   own actual rate instead of one flat rate for the whole stay. -->
+                              <input type="hidden" id="otherSeasonWeekdayRate">
+                              <input type="hidden" id="otherSeasonWeekendRate">
                               <!-- Walk-in (undiscounted) reference rates, for the discount breakdown -->
                               <input type="hidden" id="walkinWeekdayRate">
                               <input type="hidden" id="walkinWeekendRate">
@@ -367,9 +385,9 @@
                                 </div>
                               </div>
 
-                              <!-- Discount Section - hidden in Add Booking (optional, handled elsewhere). Inputs kept for JS compatibility. -->
+                              <!-- Senior/PWD Discount - hidden in Add Booking (optional, handled elsewhere). Inputs kept for JS compatibility. -->
                               <div class="row p-t-20" style="display: none;">
-                                <div class="col-lg-6">
+                                <div class="col-lg-12">
                                   <div class="form-check mb-2">
                                     <input class="form-check-input" type="checkbox" id="includeSeniorPwdDiscount">
                                     <label class="form-check-label" for="includeSeniorPwdDiscount">Senior/PWD Discount</label>
@@ -382,14 +400,35 @@
                                     </div>
                                   </div>
                                 </div>
-                                <div class="col-lg-6">
-                                  <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" id="includeDiscount">
-                                    <label class="form-check-label" for="includeDiscount">Additional Discount</label>
+                              </div>
+
+                              <!-- Additional Discount - same Per Night / Manual Price modes and
+                                   applied-discount summary line as the Room Reservation Details
+                                   (general details) modal's Discount section. -->
+                              <div class="row p-t-20">
+                                <div class="col-lg-12">
+                                  <div class="discount-section-inline" id="addBookingDiscountSection">
+                                    <label class="form-label d-block mb-2">Discount</label>
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                      <button type="button" class="btn btn-sm btn-outline-success discount-mode-btn" id="addBookingDiscountPerNightBtn">Per Night</button>
+                                      <button type="button" class="btn btn-sm btn-outline-primary discount-mode-btn" id="addBookingDiscountManualBtn">Manual Price</button>
+                                      <input type="number" min="0" step="0.01" id="addBookingDiscountInput" class="form-control form-control-sm" placeholder="Amount / night" data-mode="pernight" style="max-width: 140px; display: none;">
+                                      <input type="text" id="addBookingDiscountRemarksInput" class="form-control form-control-sm" placeholder="Remarks (optional)" style="max-width: 260px; display: none;">
+                                      <button type="button" class="btn btn-sm btn-success" id="addBookingDiscountApplyBtn" style="display: none;">Apply</button>
+                                      <button type="button" class="btn btn-sm btn-outline-danger" id="addBookingDiscountRemoveBtn" style="display: none;">
+                                        <i class="fas fa-times"></i> Remove discount
+                                      </button>
+                                    </div>
+                                    <div id="addBookingDiscountHint" class="text-muted small mt-1" style="display: none;">Per-night discount &mdash; multiplied by the number of nights.</div>
+                                    <div id="addBookingDiscountRow" class="mt-2" style="display: none;">
+                                      <span class="text-danger fw-bold" id="addBookingDiscountRowAmount">-₱0.00</span>
+                                      <span class="text-muted small ms-2" id="addBookingDiscountRowRemarks"></span>
+                                    </div>
                                   </div>
-                                  <div id="discountWrapper" class="mt-2" style="display: none;">
-                                    <input type="number" class="form-control" id="discountAmount" name="discountAmount" placeholder="Enter Discount Amount" step="1" min="0">
-                                  </div>
+                                  <!-- Actual submitted discount fields - driven by the UI above, not shown directly -->
+                                  <input type="checkbox" id="includeDiscount" style="display: none;">
+                                  <input type="number" id="discountAmount" name="discountAmount" style="display: none;">
+                                  <input type="hidden" id="discountRemarks" name="discountRemarks">
                                 </div>
                               </div>
 
@@ -471,7 +510,7 @@
 		document.body.appendChild(bookingScript);
 		bookingScript.onload = function() {
 			var bookingBillingScript = document.createElement('script');
-			bookingBillingScript.src = '/js/booking/add_booking.js?v=early-ci-conflict-1';
+			bookingBillingScript.src = '/js/booking/add_booking.js?v=add-discount-1';
 			document.body.appendChild(bookingBillingScript);
 		};
 
@@ -1002,6 +1041,26 @@
     text-align: right; text-transform: none; letter-spacing: 0;
 }
 #modal-addbooking .rbc-table .rbc-foot-disc .rbc-dim { color: #d98b83; font-weight: 500; }
+
+/* Additional Discount - Per Night / Manual Price mode buttons, same style
+   as the Room Reservation Details modal's Discount section. */
+#modal-addbooking .discount-section-inline .btn-outline-success {
+    background-color: #198754 !important; color: #fff !important; border-color: #198754 !important;
+}
+#modal-addbooking .discount-section-inline .btn-outline-primary {
+    background-color: #0d6efd !important; color: #fff !important; border-color: #0d6efd !important;
+}
+#modal-addbooking .discount-section-inline .discount-mode-btn {
+    opacity: 0.55;
+}
+#modal-addbooking .discount-section-inline .discount-mode-btn.discount-mode-active {
+    opacity: 1;
+    box-shadow: 0 0 0 2px rgba(0,0,0,0.15) inset;
+}
+#modal-addbooking .discount-section-inline #addBookingDiscountRow {
+    background: #fdf3f2; border: 1px solid #f1d6d2; border-radius: 6px;
+    padding: 6px 10px;
+}
 
 #modal-addbooking .booking-note {
     display: flex; gap: 8px; align-items: flex-start;

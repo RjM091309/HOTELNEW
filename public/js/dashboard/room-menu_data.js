@@ -33,18 +33,42 @@ window.triggerTransferFromMenu = triggerTransferFromMenu;
 window.openRoomMenuModal = openRoomMenuModal;
 window.createDynamicRoomModal = createDynamicRoomModal;
 // Discount helpers
-window.toggleDiscountInput = function(bookingId){
+// Two entry modes share one input: 'pernight' (amount x nights, matches the
+// long-standing per-night behavior) and 'manual' (flat total amount, as it
+// worked before per-night was added). Clicking the same mode button again
+// while it's open collapses the row instead of re-opening it.
+window.toggleDiscountInput = function(bookingId, mode){
+    mode = mode === 'manual' ? 'manual' : 'pernight';
     const input = document.getElementById(`discountAmountManual-${bookingId}`);
     const remarks = document.getElementById(`discountRemarks-${bookingId}`);
     const applyBtn = document.getElementById(`applyDiscountBtn-${bookingId}`);
-    if (!input || !applyBtn) return;
-    const willShow = input.style.display === 'none' || input.style.display === '';
-    input.style.display = willShow ? 'block' : 'none';
-    if (remarks) remarks.style.display = willShow ? 'block' : 'none';
-    applyBtn.style.display = willShow ? 'inline-block' : 'none';
     const hint = document.getElementById(`discount-pernight-hint-${bookingId}`);
-    if (hint) hint.style.display = willShow ? 'block' : 'none';
-    if (willShow) setTimeout(() => input.focus(), 0);
+    const perNightBtn = document.getElementById(`discountModePerNightBtn-${bookingId}`);
+    const manualBtn = document.getElementById(`discountModeManualBtn-${bookingId}`);
+    if (!input || !applyBtn) return;
+
+    const isOpen = input.style.display === 'block';
+    const currentMode = input.getAttribute('data-mode') || 'pernight';
+
+    if (isOpen && currentMode === mode) {
+        input.style.display = 'none';
+        if (remarks) remarks.style.display = 'none';
+        applyBtn.style.display = 'none';
+        if (hint) hint.style.display = 'none';
+        if (perNightBtn) perNightBtn.classList.remove('discount-mode-active');
+        if (manualBtn) manualBtn.classList.remove('discount-mode-active');
+        return;
+    }
+
+    input.setAttribute('data-mode', mode);
+    input.placeholder = mode === 'pernight' ? 'Amount / night' : 'Amount';
+    input.style.display = 'block';
+    if (remarks) remarks.style.display = 'block';
+    applyBtn.style.display = 'inline-block';
+    if (hint) hint.style.display = mode === 'pernight' ? 'block' : 'none';
+    if (perNightBtn) perNightBtn.classList.toggle('discount-mode-active', mode === 'pernight');
+    if (manualBtn) manualBtn.classList.toggle('discount-mode-active', mode === 'manual');
+    setTimeout(() => input.focus(), 0);
 };
 
 window.applyManualDiscount = function(bookingId){
@@ -56,10 +80,11 @@ window.applyManualDiscount = function(bookingId){
         toastWarning('Validation', 'Please enter a valid discount amount.');
         return;
     }
+    const mode = amountInput.getAttribute('data-mode') || 'pernight';
     fetch('/booking/apply-discount', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-        body: new URLSearchParams({ bookingId: bookingId, amount: amount, perNight: '1', remarks: (remarksInput ? remarksInput.value : '') }).toString()
+        body: new URLSearchParams({ bookingId: bookingId, amount: amount, perNight: mode === 'pernight' ? '1' : '0', remarks: (remarksInput ? remarksInput.value : '') }).toString()
     })
     .then(res => {
         if (!res.ok) throw new Error('Failed to apply discount');
@@ -1655,8 +1680,9 @@ async function createDynamicRoomModal(bookingId, event, options) {
                             <div class="section-header">Discount</div>
                             <div class="section-body">
                                 <div class="d-flex align-items-center gap-2 flex-wrap">
-                                    <button type="button" class="btn btn-sm btn-outline-success" onclick="toggleDiscountInput('${bookingId}')">Discount</button>
-                                    <input type="number" min="0" step="0.01" id="discountAmountManual-${bookingId}" class="form-control form-control-sm" placeholder="Amount / night" style="max-width: 140px; display: none;">
+                                    <button type="button" class="btn btn-sm btn-outline-success discount-mode-btn" id="discountModePerNightBtn-${bookingId}" onclick="toggleDiscountInput('${bookingId}', 'pernight')">Per Night</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary discount-mode-btn" id="discountModeManualBtn-${bookingId}" onclick="toggleDiscountInput('${bookingId}', 'manual')">Manual Price</button>
+                                    <input type="number" min="0" step="0.01" id="discountAmountManual-${bookingId}" class="form-control form-control-sm" placeholder="Amount / night" data-mode="pernight" style="max-width: 140px; display: none;">
                                     <input type="text" id="discountRemarks-${bookingId}" class="form-control form-control-sm" placeholder="Remarks (optional)" style="max-width: 260px; display: none;">
                                     <button type="button" class="btn btn-sm btn-success" id="applyDiscountBtn-${bookingId}" style="display: none;" onclick="applyManualDiscount('${bookingId}')">Apply</button>
                                     <button type="button" class="btn btn-sm btn-outline-danger" id="removeDiscountBtn-${bookingId}" style="display: none;" onclick="removeManualDiscount('${bookingId}')">
@@ -2305,6 +2331,21 @@ modalStyle.textContent = `
     }
     #dynamicRoomModal_${bookingId} .discount-section .btn-outline-success:hover{
         filter: brightness(0.95);
+    }
+    /* Manual Amount mode button */
+    #dynamicRoomModal_${bookingId} .discount-section .btn-outline-primary{
+        background-color:#0d6efd !important; color:#fff !important; border-color:#0d6efd !important;
+    }
+    #dynamicRoomModal_${bookingId} .discount-section .btn-outline-primary:hover{
+        filter: brightness(0.95);
+    }
+    /* Highlight whichever discount mode is currently open */
+    #dynamicRoomModal_${bookingId} .discount-section .discount-mode-btn{
+        opacity: 0.55;
+    }
+    #dynamicRoomModal_${bookingId} .discount-section .discount-mode-btn.discount-mode-active{
+        opacity: 1;
+        box-shadow: 0 0 0 2px rgba(0,0,0,0.15) inset;
     }
     /* Remarks section styling */
     #dynamicRoomModal_${bookingId} .remarks-section{

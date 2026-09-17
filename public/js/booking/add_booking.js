@@ -94,31 +94,81 @@ function isWeekendNight(date) {
     return day === 5 || day === 6 || day === 0; // Fri, Sat, Sun
 }
 
+// Month-of-year (1-12) -> 'lean'/'peak', fetched once and cached. Defaults to
+// every month being Lean until the fetch resolves (same pattern group
+// booking already uses for its cached room list) - a booking created in the
+// brief window before this resolves would price as Lean, correcting itself
+// on the very next recalc once the map is in.
+let SEASON_MONTH_MAP = { 1: 'lean', 2: 'lean', 3: 'lean', 4: 'lean', 5: 'lean', 6: 'lean', 7: 'lean', 8: 'lean', 9: 'lean', 10: 'lean', 11: 'lean', 12: 'lean' };
+let seasonMonthMapLoaded = false;
+
+function loadSeasonMonthMap() {
+    if (seasonMonthMapLoaded) return;
+    seasonMonthMapLoaded = true;
+    fetch('/room-rates/season-months')
+        .then((r) => r.json())
+        .then((json) => {
+            if (json && json.success && json.seasonMonths) {
+                Object.assign(SEASON_MONTH_MAP, json.seasonMonths);
+                refreshSeasonalPrice();
+            }
+        })
+        .catch(() => {});
+}
+loadSeasonMonthMap();
+
+// Which season a given night falls under, per the admin-assigned month map.
+function seasonForNight(date) {
+    const month = date.getMonth() + 1;
+    return SEASON_MONTH_MAP[month] || 'lean';
+}
+window.seasonForNight = seasonForNight;
+
 function countNightBreakdown() {
     const { checkIn, checkOut } = parseStayDateRange();
     let weekday = 0;
     let weekend = 0;
+    // Per-season-and-day-range night counts, so a stay crossing a season
+    // boundary (e.g. Oct 31 -> Nov 1) bills each night at its own actual
+    // rate instead of one flat rate for the whole stay.
+    let leanWeekday = 0, leanWeekend = 0, peakWeekday = 0, peakWeekend = 0;
     const nights = [];
+    let refSeason = null; // check-in night's season - used as the "reference" rate to display
 
     if (checkIn && checkOut && checkOut > checkIn) {
         const cursor = new Date(checkIn);
         const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
         while (cursor < checkOut) {
             const isWeekend = isWeekendNight(cursor);
+            const season = seasonForNight(cursor);
+            if (refSeason === null) refSeason = season;
             nights.push({
                 date: new Date(cursor),
                 label: `${dayNames[cursor.getDay()]} ${cursor.getMonth() + 1}/${cursor.getDate()}`,
-                type: isWeekend ? 'weekend' : 'weekday'
+                type: isWeekend ? 'weekend' : 'weekday',
+                season
             });
             if (isWeekend) weekend += 1;
             else weekday += 1;
+            if (season === 'peak') {
+                if (isWeekend) peakWeekend += 1; else peakWeekday += 1;
+            } else {
+                if (isWeekend) leanWeekend += 1; else leanWeekday += 1;
+            }
             cursor.setDate(cursor.getDate() + 1);
         }
     } else {
         weekday = getStayNights();
+        refSeason = seasonForNight(checkIn || new Date());
+        leanWeekday = refSeason === 'peak' ? 0 : weekday;
+        peakWeekday = refSeason === 'peak' ? weekday : 0;
     }
 
-    return { weekday, weekend, total: weekday + weekend, nights };
+    return {
+        weekday, weekend, total: weekday + weekend, nights,
+        refSeason: refSeason || 'lean',
+        leanWeekday, leanWeekend, peakWeekday, peakWeekend
+    };
 }
 window.countNightBreakdown = countNightBreakdown;
 
@@ -212,13 +262,26 @@ function getRoomRateDetails() {
     const breakdown = countNightBreakdown();
 
     // Each night bills at its own room_rates amount: Mon-Thu = weekday rate,
-    // Fri-Sun = weekend rate. Falls back to the single base rate if the split
-    // rates aren't populated yet.
+    // Fri-Sun = weekend rate, AND its own season's rate (Lean vs Peak).
+    // #weekdayRate/#weekendRate hold the check-in night's season (the
+    // "reference" rate shown in the UI); #otherSeasonWeekdayRate/
+    // #otherSeasonWeekendRate hold whichever season ISN'T the reference one,
+    // only actually used when the stay crosses a season boundary. Falls back
+    // to the single base rate if the split rates aren't populated yet.
     const base = parseMoney($('#baseprice').val());
     const weekdayRate = parseMoney($('#weekdayRate').val()) || base;
     const weekendRate = parseMoney($('#weekendRate').val()) || weekdayRate;
+    const otherWeekdayRate = parseMoney($('#otherSeasonWeekdayRate').val()) || weekdayRate;
+    const otherWeekendRate = parseMoney($('#otherSeasonWeekendRate').val()) || weekendRate;
 
-    const roomCharges = (weekdayRate * breakdown.weekday) + (weekendRate * breakdown.weekend);
+    const refIsPeak = breakdown.refSeason === 'peak';
+    const refWeekdayNights = refIsPeak ? breakdown.peakWeekday : breakdown.leanWeekday;
+    const refWeekendNights = refIsPeak ? breakdown.peakWeekend : breakdown.leanWeekend;
+    const otherWeekdayNights = refIsPeak ? breakdown.leanWeekday : breakdown.peakWeekday;
+    const otherWeekendNights = refIsPeak ? breakdown.leanWeekend : breakdown.peakWeekend;
+
+    const roomCharges = (weekdayRate * refWeekdayNights) + (weekendRate * refWeekendNights)
+        + (otherWeekdayRate * otherWeekdayNights) + (otherWeekendRate * otherWeekendNights);
     const avgRate = nights > 0 ? roomCharges / nights : weekdayRate;
 
     return {
@@ -227,6 +290,7 @@ function getRoomRateDetails() {
         nights,
         breakdown,
         weekendEnabled: breakdown.weekend > 0 && weekendRate !== weekdayRate,
+        seasonCrossing: otherWeekdayNights > 0 || otherWeekendNights > 0,
         weekdayRate,
         weekendRate
     };
@@ -237,6 +301,13 @@ function toggleChannelBookingIdFields(isBookingChannel) {
     $('#channelBookingIdWrapper').toggle(!!isBookingChannel);
     if (!isBookingChannel) {
         $('#channelBookingId').val('');
+    }
+}
+
+function togglePercentageRateFields(isPercentage) {
+    $('#percentageRateWrapper').toggle(!!isPercentage);
+    if (!isPercentage) {
+        $('#percentageRateInput').val('');
     }
 }
 
@@ -265,6 +336,109 @@ function handleBookingRouteDependentFields(routeValue) {
     const value = routeValue || $('#bookingRoute').val();
     toggleAgencyFields(value === 'agency');
     toggleChannelBookingIdFields(value === 'booking-channel');
+    togglePercentageRateFields(value === 'percentage');
+}
+
+// Additional Discount - Per Night / Manual Price modes, mirroring the
+// Room Reservation Details (general details) modal's Discount section
+// (public/js/dashboard/room-menu_data.js toggleDiscountInput /
+// applyManualDiscount). Drives the existing #includeDiscount/#discountAmount
+// fields computeTotal()/booking_submit.js already read, so nothing else
+// needs to change to have the discount flow into the total/balance and the
+// create-booking payload.
+function addBookingDiscountNights() {
+    return Math.max(1, parseInt($('#diffindays').val(), 10) || 1);
+}
+
+function toggleAddBookingDiscountInput(mode) {
+    mode = mode === 'manual' ? 'manual' : 'pernight';
+    const input = $('#addBookingDiscountInput');
+    const remarks = $('#addBookingDiscountRemarksInput');
+    const applyBtn = $('#addBookingDiscountApplyBtn');
+    const hint = $('#addBookingDiscountHint');
+    const perNightBtn = $('#addBookingDiscountPerNightBtn');
+    const manualBtn = $('#addBookingDiscountManualBtn');
+    if (!input.length) return;
+
+    const isOpen = input.css('display') === 'block';
+    const currentMode = input.attr('data-mode') || 'pernight';
+
+    if (isOpen && currentMode === mode) {
+        input.hide();
+        remarks.hide();
+        applyBtn.hide();
+        hint.hide();
+        perNightBtn.removeClass('discount-mode-active');
+        manualBtn.removeClass('discount-mode-active');
+        return;
+    }
+
+    input.attr('data-mode', mode);
+    input.attr('placeholder', mode === 'pernight' ? 'Amount / night' : 'Amount');
+    input.show();
+    remarks.show();
+    applyBtn.show();
+    hint.toggle(mode === 'pernight');
+    perNightBtn.toggleClass('discount-mode-active', mode === 'pernight');
+    manualBtn.toggleClass('discount-mode-active', mode === 'manual');
+    setTimeout(() => input.trigger('focus'), 0);
+}
+
+function applyAddBookingDiscount() {
+    const amount = parseMoney($('#addBookingDiscountInput').val());
+    if (!(amount > 0)) {
+        if (typeof toastWarning === 'function') {
+            toastWarning('Validation', 'Please enter a valid discount amount.');
+        } else {
+            alert('Please enter a valid discount amount.');
+        }
+        return;
+    }
+    const mode = $('#addBookingDiscountInput').attr('data-mode') || 'pernight';
+    let finalAmount = amount;
+    let finalRemarks = $('#addBookingDiscountRemarksInput').val() || '';
+
+    if (mode === 'pernight') {
+        const nights = addBookingDiscountNights();
+        finalAmount = Math.round(amount * nights * 100) / 100;
+        const tag = `₱${amount.toLocaleString('en-US')}/night × ${nights} night${nights > 1 ? 's' : ''}`;
+        finalRemarks = finalRemarks ? `${tag} — ${finalRemarks}` : tag;
+    }
+
+    $('#includeDiscount').prop('checked', true).trigger('change');
+    $('#discountAmount').val(finalAmount.toFixed(2)).trigger('input');
+    $('#discountRemarks').val(finalRemarks);
+
+    $('#addBookingDiscountRowAmount').text(`-₱${finalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
+    $('#addBookingDiscountRowRemarks').text(finalRemarks);
+    $('#addBookingDiscountRow').show();
+
+    if (typeof toastSuccess === 'function') {
+        toastSuccess('Discount applied', `-₱${finalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
+    }
+}
+
+function removeAddBookingDiscount() {
+    $('#includeDiscount').prop('checked', false).trigger('change');
+    $('#discountAmount').val('0').trigger('input');
+    $('#discountRemarks').val('');
+    $('#addBookingDiscountInput').val('');
+    $('#addBookingDiscountRemarksInput').val('');
+    $('#addBookingDiscountRow').hide();
+}
+
+function resetAddBookingDiscountUI() {
+    $('#includeDiscount').prop('checked', false);
+    $('#discountAmount').val('0');
+    $('#discountRemarks').val('');
+    $('#addBookingDiscountInput').val('').attr('data-mode', 'pernight').hide();
+    $('#addBookingDiscountRemarksInput').val('').hide();
+    $('#addBookingDiscountApplyBtn').hide();
+    $('#addBookingDiscountHint').hide();
+    $('#addBookingDiscountPerNightBtn, #addBookingDiscountManualBtn').removeClass('discount-mode-active');
+    $('#addBookingDiscountRow').hide();
+    $('#addBookingDiscountRowAmount').text('-₱0.00');
+    $('#addBookingDiscountRowRemarks').text('');
 }
 
 function refreshSeasonalPrice() {
@@ -1063,6 +1237,17 @@ $(document).ready(function () {
         computeTotal(); // Recalculate total
     });
 
+    $('#addBookingDiscountPerNightBtn').on('click', function () { toggleAddBookingDiscountInput('pernight'); });
+    $('#addBookingDiscountManualBtn').on('click', function () { toggleAddBookingDiscountInput('manual'); });
+    $('#addBookingDiscountApplyBtn').on('click', applyAddBookingDiscount);
+    $('#addBookingDiscountRemoveBtn').on('click', removeAddBookingDiscount);
+
+    // Reset the discount UI each time the modal opens fresh, so a previous
+    // booking's applied discount doesn't linger visually on the next one.
+    $(document).on('shown.bs.modal', '#modal-addbooking', function () {
+        resetAddBookingDiscountUI();
+    });
+
     // Auto-disable reservation fee when payment status is "Paid"
     $('#paymentStatus').on('change', function() {
         const paymentStatus = $(this).val();
@@ -1423,14 +1608,15 @@ $(document).ready(function () {
                     if (persons === 1) return 'one';
                     return 'no';
                 }
-                function rateForCatDay(cat, dayRange) {
+                function rateForCatDay(cat, dayRange, season) {
+                    const se = season || (countNightBreakdown().refSeason || 'lean');
                     const bf = breakfastKey();
-                    const m = (room.ROOM_RATES && room.ROOM_RATES[cat] && room.ROOM_RATES[cat][dayRange]) || {};
+                    const m = (room.ROOM_RATES && room.ROOM_RATES[se] && room.ROOM_RATES[se][cat] && room.ROOM_RATES[se][cat][dayRange]) || {};
                     const val = m[bf];
                     return Number.isFinite(Number(val)) ? Number(val) : 0;
                 }
-                function rateFor(dayRange) {
-                    return rateForCatDay(rateCategory(), dayRange);
+                function rateFor(dayRange, season) {
+                    return rateForCatDay(rateCategory(), dayRange, season);
                 }
 
                 // Show the resolved room_rates price beside each category in the
@@ -1439,29 +1625,48 @@ $(document).ready(function () {
                 const RATE_OPT_CAT = {
                     'walk-in': 'walk_in', 'agency': 'agency', 'tenant': 'tenant',
                     'vip': 'vip', 'employee': 'employee', 'senior_special': 'senior_special',
-                    'booking-channel': 'walk_in'
+                    'booking-channel': 'walk_in', 'manual_rate': 'walk_in', 'percentage': 'walk_in'
                 };
                 function refreshRateOptionLabels() {
                     const bf = breakfastKey();
                     const bd = countNightBreakdown();
-                    // Mixed weekday + weekend stay has no single nightly rate, so
-                    // don't show a (misleading) price on the category options.
-                    const mixed = bd.weekday > 0 && bd.weekend > 0;
+                    // Mixed weekday+weekend, or mixed lean+peak season, has no
+                    // single nightly rate, so don't show a (misleading) price on
+                    // the category options.
+                    const mixedDayRange = bd.weekday > 0 && bd.weekend > 0;
+                    const mixedSeason = (bd.leanWeekday + bd.leanWeekend) > 0 && (bd.peakWeekday + bd.peakWeekend) > 0;
+                    const mixed = mixedDayRange || mixedSeason;
                     const range = (bd.weekend > 0 && bd.weekday === 0) ? 'weekend' : 'weekday';
+                    const season = bd.refSeason || 'lean';
                     $('#bookingRoute option').each(function () {
                         const $o = $(this);
                         const val = $o.attr('value');
                         if (!val) return;
                         let base = $o.data('base-label');
                         if (!base) { base = $o.text().replace(/\s+[—-]\s+₱.*$/, '').trim(); $o.data('base-label', base); }
-                        if (mixed) { $o.text(base); return; }
+                        if (mixed || val === 'percentage' || val === 'manual_rate') { $o.text(base); return; }
                         const cat = RATE_OPT_CAT[val] || 'walk_in';
-                        const rr = room.ROOM_RATES && room.ROOM_RATES[cat];
+                        const rr = room.ROOM_RATES && room.ROOM_RATES[season] && room.ROOM_RATES[season][cat];
                         let amt = 0;
                         if (rr) {
                             amt = Number((rr[range] && rr[range][bf])
                                 || (rr.weekday && rr.weekday[bf])
                                 || (rr.weekend && rr.weekend[bf]) || 0);
+                        }
+                        // Agency has no fixed discount % (unlike Tenant/VIP/
+                        // Employee/Senior, which bake a preset % into their
+                        // base label) - compute it live off the Walk-in rate
+                        // so the dropdown reads the same way as those do.
+                        if (val === 'agency' && amt > 0) {
+                            const wiRR = room.ROOM_RATES && room.ROOM_RATES[season] && room.ROOM_RATES[season]['walk_in'];
+                            const wiAmt = wiRR ? Number((wiRR[range] && wiRR[range][bf])
+                                || (wiRR.weekday && wiRR.weekday[bf])
+                                || (wiRR.weekend && wiRR.weekend[bf]) || 0) : 0;
+                            if (wiAmt > amt) {
+                                const pct = Math.round(((wiAmt - amt) / wiAmt) * 100);
+                                $o.text(`${base} (${pct}%) — ₱${amt.toLocaleString('en-US')}`);
+                                return;
+                            }
                         }
                         $o.text(amt > 0 ? `${base} — ₱${amt.toLocaleString('en-US')}` : base);
                     });
@@ -1489,11 +1694,135 @@ $(document).ready(function () {
                     updateBreakfastNote();
                 }
 
+                // OTA / Channel and Manual Rate don't have their own rate
+                // category (both are normally priced as Walk-in - see
+                // RATE_OPT_CAT) - selecting either switches Rate / Per Night to
+                // a manual, staff-typed amount instead: OTA rates are
+                // negotiated per booking/channel, and Manual Rate exists
+                // specifically so staff can type any one-off price, neither of
+                // which follows the fixed room_rates categories.
+                function isManualEntryPricing() {
+                    const v = $('#bookingRoute').val();
+                    return v === 'booking-channel' || v === 'manual_rate';
+                }
+
+                // Feeds a flat manual rate into the same weekday/weekend/season
+                // hidden fields the automatic path uses, so computeTotal()'s
+                // existing per-night math (getRoomRateDetails) just sees one
+                // uniform rate for every night without needing its own branch.
+                // Called on EVERY keystroke - must never itself rewrite #price
+                // (that's the field being typed into) or a fallback/reformat
+                // would fight the user's typing / block clearing the field.
+                function syncManualEntryPrice() {
+                    const manual = parseMoney($('#price').val()) || 0;
+                    $('#price').data('base-price', manual);
+                    $('#baseprice').val(manual.toFixed(2));
+                    $('#weekdayRate').val(manual.toFixed(2));
+                    $('#weekendRate').val(manual.toFixed(2));
+                    $('#otherSeasonWeekdayRate').val(manual.toFixed(2));
+                    $('#otherSeasonWeekendRate').val(manual.toFixed(2));
+                    $('#walkinWeekdayRate').val(manual.toFixed(2));
+                    $('#walkinWeekendRate').val(manual.toFixed(2));
+
+                    computeTotal();
+                    // Deliberately NOT calling calculateTotalPrice() here - it
+                    // unconditionally rewrites #price FROM #baseprice, which is
+                    // the opposite of what should happen while typing: #price
+                    // is the thing being typed into, #baseprice just mirrors it.
+                    // Calling it here reformatted/reset the field on every
+                    // keystroke, making manual typing effectively impossible.
+                }
+
+                // Runs ONCE, only when switching the Room Rate dropdown TO
+                // OTA / Channel or Manual Rate - unlocks the field and, only if
+                // it's still empty/0 (e.g. this was the very first category
+                // picked, before any auto-priced category ever ran), pre-fills
+                // it with the Walk-in rate as a helpful starting point. Never
+                // runs again from typing, so it can't fight the user clearing
+                // the field to type a fresh number.
+                function activateManualEntryPricing() {
+                    $('#price').prop('readonly', false);
+                    const isManualRateOpt = $('#bookingRoute').val() === 'manual_rate';
+                    $('#priceRateNote').text(isManualRateOpt ? 'Manually entered (Manual Price)' : 'Manually entered (OTA / Channel rate)');
+
+                    if ((parseMoney($('#price').val()) || 0) <= 0) {
+                        const refSeason = countNightBreakdown().refSeason || 'lean';
+                        const fallback = rateForCatDay('walk_in', 'weekday', refSeason) || rateForCatDay('walk_in', 'weekend', refSeason) || 0;
+                        if (fallback > 0) $('#price').val(fallback.toFixed(2));
+                    }
+                    syncManualEntryPrice();
+                }
+
+                $('#price').off('input.otaManual').on('input.otaManual', function () {
+                    if (isManualEntryPricing()) syncManualEntryPrice();
+                });
+
+                // Percentage: like the fixed %-off categories (Tenant/VIP/...),
+                // but the discount is a staff-typed percent taken off the
+                // Walk-in rate instead of a preset room_rates row - computed
+                // per night/season the same way the automatic categories are,
+                // so it stays accurate across a weekday/weekend or
+                // lean/peak-crossing stay.
+                function isPercentagePricing() {
+                    return $('#bookingRoute').val() === 'percentage';
+                }
+
+                function applyPercentagePricing() {
+                    $('#price').prop('readonly', true);
+                    const pct = Math.max(0, Math.min(100, parseFloat($('#percentageRateInput').val()) || 0));
+                    $('#priceRateNote').text(pct > 0 ? `${pct}% off Walk-in rate` : 'Percentage off Walk-in rate');
+
+                    const refSeason = countNightBreakdown().refSeason || 'lean';
+                    const otherSeason = refSeason === 'peak' ? 'lean' : 'peak';
+                    const factor = 1 - (pct / 100);
+
+                    const walkWeekdayRef = rateForCatDay('walk_in', 'weekday', refSeason);
+                    const walkWeekendRef = rateForCatDay('walk_in', 'weekend', refSeason);
+                    const walkWeekdayOther = rateForCatDay('walk_in', 'weekday', otherSeason);
+                    const walkWeekendOther = rateForCatDay('walk_in', 'weekend', otherSeason);
+
+                    const weekdayRate = walkWeekdayRef * factor;
+                    const weekendRate = walkWeekendRef * factor;
+                    const basePerNight = weekdayRate || weekendRate || 0;
+
+                    $('#weekdayRate').val((weekdayRate || basePerNight).toFixed(2));
+                    $('#weekendRate').val((weekendRate || basePerNight).toFixed(2));
+                    $('#otherSeasonWeekdayRate').val(((walkWeekdayOther * factor) || weekdayRate).toFixed(2));
+                    $('#otherSeasonWeekendRate').val(((walkWeekendOther * factor) || weekendRate).toFixed(2));
+                    $('#walkinWeekdayRate').val((walkWeekdayRef || weekdayRate).toFixed(2));
+                    $('#walkinWeekendRate').val((walkWeekendRef || weekendRate).toFixed(2));
+
+                    $('#price').data('base-price', basePerNight);
+                    $('#baseprice').val(basePerNight.toFixed(2));
+                    $('#price').val(basePerNight.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+
+                    computeTotal();
+                    if (typeof calculateTotalPrice === 'function') calculateTotalPrice();
+                }
+
+                $('#percentageRateInput').off('input.pctRate change.pctRate').on('input.pctRate change.pctRate', function () {
+                    if (isPercentagePricing()) applyPercentagePricing();
+                });
+
                 function updateSeasonalPrice() {
                     if ($('#manualPriceToggle').is(':checked')) return;
 
-                    const weekdayRate = rateFor('weekday');
-                    const weekendRate = rateFor('weekend');
+                    if (isManualEntryPricing()) {
+                        activateManualEntryPricing();
+                        return;
+                    }
+                    if (isPercentagePricing()) {
+                        applyPercentagePricing();
+                        return;
+                    }
+                    $('#price').prop('readonly', true);
+                    $('#priceRateNote').text('Auto from Room Rates');
+
+                    const refSeason = countNightBreakdown().refSeason || 'lean';
+                    const otherSeason = refSeason === 'peak' ? 'lean' : 'peak';
+
+                    const weekdayRate = rateFor('weekday', refSeason);
+                    const weekendRate = rateFor('weekend', refSeason);
                     const basePerNight = weekdayRate || weekendRate || 0;
 
                     // Always expose both rates so the total can bill each night at
@@ -1501,11 +1830,19 @@ $(document).ready(function () {
                     $('#weekdayRate').val((weekdayRate || basePerNight).toFixed(2));
                     $('#weekendRate').val((weekendRate || basePerNight).toFixed(2));
 
+                    // The OTHER season's rates, only actually used by
+                    // getRoomRateDetails() when the stay crosses a season
+                    // boundary - falls back to the reference rates otherwise.
+                    const otherWeekdayRate = rateFor('weekday', otherSeason) || weekdayRate;
+                    const otherWeekendRate = rateFor('weekend', otherSeason) || weekendRate;
+                    $('#otherSeasonWeekdayRate').val(otherWeekdayRate.toFixed(2));
+                    $('#otherSeasonWeekendRate').val(otherWeekendRate.toFixed(2));
+
                     // Walk-in reference rates so the breakdown can show the
                     // discount when a %-off category (tenant / vip / employee /
                     // senior) is selected.
-                    $('#walkinWeekdayRate').val((rateForCatDay('walk_in', 'weekday') || weekdayRate).toFixed(2));
-                    $('#walkinWeekendRate').val((rateForCatDay('walk_in', 'weekend') || weekendRate).toFixed(2));
+                    $('#walkinWeekdayRate').val((rateForCatDay('walk_in', 'weekday', refSeason) || weekdayRate).toFixed(2));
+                    $('#walkinWeekendRate').val((rateForCatDay('walk_in', 'weekend', refSeason) || weekendRate).toFixed(2));
 
                     $('#price').data('base-price', basePerNight);
                     $('#baseprice').val(basePerNight.toFixed(2));
