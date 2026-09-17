@@ -129,6 +129,7 @@ $(document).ready(function () {
     const seniorPwdDiscountPercent = $('#groupIncludeSeniorPwdDiscount').is(':checked') ? parseFloat($('#groupSeniorPwdDiscountPercent').val()) || 20 : 0;
     const seniorPwdRoomCount = $('#groupIncludeSeniorPwdDiscount').is(':checked') ? parseInt($('#groupSeniorPwdRoomCount').val()) || 0 : 0;
     const discount = parseFloat(state.discount) || 0;
+    const discountRemarks = state.discountRemarks || '';
     const paidAmount = parseFloat($('#groupPaidAmount').val()) || 0;
 
     // Get individual billing flag (inverted logic - checked = individual, unchecked = consolidated)
@@ -255,6 +256,7 @@ $(document).ready(function () {
       seniorPwdRoomCount,
       paidAmount,
       discount,
+      discountRemarks,
       individualBilling: individualBilling ? 'on' : '', // Inverted logic
       perRoomDiscounts,
       lateCheckoutFee,

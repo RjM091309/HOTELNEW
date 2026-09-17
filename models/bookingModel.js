@@ -10902,6 +10902,7 @@ class BookingModel {
       flightNumber,
       passengerCount,
       discount = 0,
+      discountRemarks = null,
       consolidatedBilling: consolidatedBillingParam = true, // Default: Master Billing (changed from false to true)
       perRoomDiscounts = [],
       lateCheckoutFee = 0,
@@ -11336,6 +11337,15 @@ class BookingModel {
           quantityForBilling = nightsCount; // Number of nights
         }
 
+        // Only the row that actually carries the discount (the main booking
+        // in consolidated billing, or this room's own row in individual
+        // billing) gets the remark - mirrors single booking's addBooking,
+        // so opening this booking's general details shows the same
+        // "Discount Remarks" line the post-checkout Apply Discount flow does.
+        const billingRemarksText = (discountForBilling > 0 && discountRemarks && String(discountRemarks).trim() !== '')
+          ? String(discountRemarks).trim()
+          : '';
+
         const billingValues = [
           bookingId,
           roomRatePerNight,          // ROOM_CHARGE (per-night charge applied in billing)
@@ -11346,7 +11356,7 @@ class BookingModel {
           quantityForBilling,        // QTY should be number of nights
           paymentStatus,
           'cash',
-          '',
+          billingRemarksText,
           encodedBy,
           date,
           1,
@@ -11354,6 +11364,14 @@ class BookingModel {
           discountForBilling
         ];
         const [billResult] = await connection.promise().query(billingQuery, billingValues);
+
+        if (discountForBilling > 0 && billingRemarksText !== '') {
+          await connection.promise().query(
+            `INSERT INTO remarks (BOOKING_ID, CATEGORY, REMARK_TEXT, ENCODED_BY, EDITDED_BY)
+             VALUES (?, 'Discount', ?, ?, ?)`,
+            [bookingId, billingRemarksText, encodedBy, encodedBy]
+          );
+        }
 
         // Log final billing for this booking
         // Both consolidated and individual billing now have roomChargeForBilling already including nights

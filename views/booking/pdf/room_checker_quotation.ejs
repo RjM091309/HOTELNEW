@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Quotation</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 13px; margin: 0; padding: 10px 20px; }
+    .quote-box { border: 2px solid #000; }
+    .header { text-align: center; padding: 14px 10px 0; }
+    .header img { height: 90px; width: auto; object-fit: contain; image-rendering: -webkit-optimize-contrast; }
+    .hotel-name { font-size: 22px; font-weight: bold; margin-top: 4px; }
+    .sub-header { text-align: center; font-size: 12px; padding: 4px 10px 12px; }
+
+    .bar-row { border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 6px 10px; font-weight: bold; }
+    .bar-date { background: #ffffff; }
+    .bar-title { background: #cfe2f3; text-align: center; font-size: 22px; letter-spacing: 1px; }
+    .bar-billed { background: #e8dcb5; }
+
+    table.quote-table { width: 100%; border-collapse: collapse; }
+    table.quote-table th, table.quote-table td {
+      border: 1px solid #000; padding: 8px; text-align: center; vertical-align: middle;
+    }
+    table.quote-table thead th { background: #d9ead3; font-weight: bold; }
+    table.quote-table td.desc-cell { text-align: left; }
+    table.quote-table td.total-cell, table.quote-table th.total-header { background: #f4cccc; }
+
+    .subtotal-row { text-align: right; padding: 4px 10px; font-weight: bold; font-size: 13px; }
+    .subtotal-row.discount-row { color: #cc0000; }
+    .grand-total-row { text-align: right; padding: 8px 10px; font-weight: bold; color: #cc0000; font-size: 16px; }
+
+    .payment-section { padding: 12px 10px 0; font-size: 12px; }
+    .payment-title { font-weight: bold; margin-bottom: 6px; }
+    .payment-details { line-height: 1.6; }
+
+    .policy { padding: 14px 10px 0; font-size: 12px; }
+    .policy-title { font-weight: bold; text-decoration: underline; margin-bottom: 4px; }
+    .policy div { margin-bottom: 2px; }
+
+    .prepared-by { text-align: right; font-weight: bold; padding: 16px 10px 14px; }
+  </style>
+</head>
+<body>
+  <div class="quote-box">
+    <div class="header">
+      <% if (imageUrl) { %><img src="<%= imageUrl %>" alt="Logo"><% } %>
+      <div class="hotel-name">MAIN STAY HOTEL</div>
+    </div>
+    <div class="sub-header">
+      Clark Terrace Building, Lot 2 Block 1, The Villages, Prince Balagtas Avenue, Clark Freeport Zone, Pampanga, 2023<br>
+      Clark Freeport Zone, Pampanga, 2023
+    </div>
+
+    <%
+      const fmtQuoteDate = (d) => new Date(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase();
+      const fmtTableDate = (d) => new Date(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase();
+      const peso = (n) => 'PHP ' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+      const breakfastLabel = breakfastTier === 'two'
+        ? 'TWO (2) BREAKFAST INCLUDED EACH ROOM'
+        : breakfastTier === 'one'
+          ? 'ONE (1) BREAKFAST INCLUDED EACH ROOM'
+          : 'NO BREAKFAST INCLUDED';
+    %>
+
+    <div class="bar-row bar-date">DATE: <%= fmtQuoteDate(quotationDate) %></div>
+    <div class="bar-row bar-title">QUOTATION</div>
+    <div class="bar-row bar-billed">BILLED TO:</div>
+
+    <table class="quote-table">
+      <thead>
+        <tr>
+          <th style="width: 18%;">DATE</th>
+          <th style="width: 34%;">DESCRIPTION</th>
+          <th style="width: 12%;">NO. OF ROOMS</th>
+          <th style="width: 18%;">RATE</th>
+          <th class="total-header" style="width: 18%;">TOTAL</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% rows.forEach(function(row) { %>
+          <tr>
+            <td>
+              <%= fmtTableDate(checkInDate) %><br>TO<br><%= fmtTableDate(checkOutDate) %>
+            </td>
+            <td class="desc-cell">
+              <%= row.bedLabel %> SIZE BEDROOM<br><%= breakfastLabel %>
+            </td>
+            <td><%= row.qty %> ROOM<%= row.qty > 1 ? 'S' : '' %></td>
+            <td>
+              <% if (row.weNights > 0) { %><%= peso(row.weRate) %><br>(WEEKEND RATE)<% } %>
+              <% if (row.wdNights > 0 && row.weNights > 0) { %><br><% } %>
+              <% if (row.wdNights > 0) { %><%= peso(row.wdRate) %><br>(WEEKDAY RATE)<% } %>
+            </td>
+            <td class="total-cell"><%= peso(row.total) %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+
+    <% if (discountAmount > 0) { %>
+      <div class="subtotal-row">SUB TOTAL &nbsp;=&nbsp; <%= peso(subTotal) %></div>
+      <div class="subtotal-row discount-row">DISCOUNT &nbsp;=&nbsp; -<%= peso(discountAmount) %></div>
+    <% } %>
+    <div class="grand-total-row">GRAND TOTAL &nbsp;=&nbsp; <%= peso(grandTotal) %></div>
+
+    <div class="payment-section">
+      <div class="payment-title">MODE OF PAYMENT: &nbsp;CHINA BANKING CORPORATION</div>
+      <div class="payment-details">
+        ACCOUNT NUMBER: 159100017155<br>
+        NAME: MAIN STAY HOTEL CORP<br>
+        ADDRESS: CLARK TERRACE BUILDING, THE VILLAGES ZONE, CLARK FREEPORT, MABALACAT CITY, 2023
+      </div>
+    </div>
+
+    <div class="policy">
+      <div class="policy-title">Cancellation Refund Policy:</div>
+      <div>- 1 night penalty for cancellation 20 days before check-in</div>
+      <div>- 2 nights penalty for cancellation 10 days before check-in</div>
+      <div>- Full penalty for cancellation 5 days before check-in</div>
+    </div>
+
+    <div class="prepared-by">PREPARED BY: <%= preparedBy %></div>
+  </div>
+</body>
+</html>

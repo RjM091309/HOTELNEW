@@ -157,7 +157,15 @@ function resetRoomCheckerSummary() {
   document.getElementById('rateSummaryExtraBreakfastQty').value = 0;
   document.getElementById('rateSummaryExtraBreakfastQtyGroup').style.display = 'none';
   document.getElementById('rateSummaryExtraBreakfastToggle').classList.remove('active');
-  document.getElementById('rateSummaryDiscount').value = 0;
+  const discountInput = document.getElementById('rateSummaryDiscount');
+  discountInput.value = 0;
+  discountInput.setAttribute('data-mode', 'pernight');
+  const discountLabel = document.getElementById('rateSummaryDiscountLabel');
+  if (discountLabel) discountLabel.textContent = 'Discount per Room, per Night';
+  const discountPerNightBtn = document.getElementById('rateSummaryDiscountPerNightBtn');
+  const discountManualBtn = document.getElementById('rateSummaryDiscountManualBtn');
+  if (discountPerNightBtn) discountPerNightBtn.classList.add('active');
+  if (discountManualBtn) discountManualBtn.classList.remove('active');
   document.getElementById('rateSummaryIncludeLateCheckout').checked = false;
   document.getElementById('rateSummaryLateCheckoutTotalRow').style.display = 'none';
   document.getElementById('rateSummaryDateRange').textContent = 'Select a range on the calendar';
@@ -184,6 +192,9 @@ $(document).ready(function () {
 
   const proceedBtn = document.getElementById('roomCheckerProceedBookingBtn');
   if (proceedBtn) proceedBtn.addEventListener('click', proceedRoomCheckerBooking);
+
+  const quotationBtn = document.getElementById('roomCheckerQuotationBtn');
+  if (quotationBtn) quotationBtn.addEventListener('click', generateRoomCheckerQuotation);
 
   // Clicking prev/next re-renders both calendars (the other one via
   // syncRoomCheckerCompanionMonth) - a month with a different week-row count
@@ -373,6 +384,18 @@ function fetchRoomCheckerRangeAvailability() {
       // separately. See recomputeRateSummaryTotals's bakedInBreakfastTotal.
       window.__rateSummaryKingNoBreakfastTotal = data.success ? (data.kingNoBreakfastTotal || 0) : 0;
       window.__rateSummaryQueenNoBreakfastTotal = data.success ? (data.queenNoBreakfastTotal || 0) : 0;
+      // Tier-INCLUSIVE weekday/weekend rate + night counts (unlike the
+      // no-breakfast breakdown above) - only used by the Quotation PDF
+      // (generateRoomCheckerQuotation), which needs to show the actual rate
+      // for whichever breakfast tier is selected, not the room-only one.
+      window.__rateSummaryKingWeekdayRate = data.success ? (data.kingWeekdayRate || 0) : 0;
+      window.__rateSummaryKingWeekendRate = data.success ? (data.kingWeekendRate || 0) : 0;
+      window.__rateSummaryKingWeekdayNights = data.success ? (data.kingWeekdayNights || 0) : 0;
+      window.__rateSummaryKingWeekendNights = data.success ? (data.kingWeekendNights || 0) : 0;
+      window.__rateSummaryQueenWeekdayRate = data.success ? (data.queenWeekdayRate || 0) : 0;
+      window.__rateSummaryQueenWeekendRate = data.success ? (data.queenWeekendRate || 0) : 0;
+      window.__rateSummaryQueenWeekdayNights = data.success ? (data.queenWeekdayNights || 0) : 0;
+      window.__rateSummaryQueenWeekendNights = data.success ? (data.queenWeekendNights || 0) : 0;
       recomputeRateSummaryTotals();
     })
     .catch((err) => {
@@ -386,6 +409,14 @@ function fetchRoomCheckerRangeAvailability() {
       window.__rateSummaryQueenBreakdown = null;
       window.__rateSummaryKingNoBreakfastTotal = 0;
       window.__rateSummaryQueenNoBreakfastTotal = 0;
+      window.__rateSummaryKingWeekdayRate = 0;
+      window.__rateSummaryKingWeekendRate = 0;
+      window.__rateSummaryKingWeekdayNights = 0;
+      window.__rateSummaryKingWeekendNights = 0;
+      window.__rateSummaryQueenWeekdayRate = 0;
+      window.__rateSummaryQueenWeekendRate = 0;
+      window.__rateSummaryQueenWeekdayNights = 0;
+      window.__rateSummaryQueenWeekendNights = 0;
       recomputeRateSummaryTotals();
     });
 }
@@ -603,6 +634,30 @@ function wireRoomCheckerBreakfastPresets() {
   });
 }
 
+// Discount mode - "Per Night" (per room, per night, matching the pattern
+// already used for the booking-form discounts) or "Manual Price" (flat
+// total, entered as-is). No remarks needed here (unlike those booking-form
+// discounts) since this is just a live quote, not something saved anywhere.
+function wireRoomCheckerDiscountModeButtons() {
+  const input = document.getElementById('rateSummaryDiscount');
+  const label = document.getElementById('rateSummaryDiscountLabel');
+  const perNightBtn = document.getElementById('rateSummaryDiscountPerNightBtn');
+  const manualBtn = document.getElementById('rateSummaryDiscountManualBtn');
+  if (!input || !perNightBtn || !manualBtn) return;
+
+  const setMode = (mode) => {
+    input.setAttribute('data-mode', mode);
+    if (label) label.textContent = mode === 'manual' ? 'Discount (Manual Price)' : 'Discount per Room, per Night';
+    input.title = mode === 'manual' ? 'Flat total discount, applied once' : 'Applied to every room, every night';
+    perNightBtn.classList.toggle('active', mode === 'pernight');
+    manualBtn.classList.toggle('active', mode === 'manual');
+    recomputeRateSummaryTotals();
+  };
+
+  perNightBtn.addEventListener('click', () => setMode('pernight'));
+  manualBtn.addEventListener('click', () => setMode('manual'));
+}
+
 function initRateSummary() {
   const categorySelect = document.getElementById('rateSummaryCategory');
   const discountInput = document.getElementById('rateSummaryDiscount');
@@ -635,6 +690,7 @@ function initRateSummary() {
   });
   document.getElementById('rateSummaryIncludeLateCheckout').addEventListener('change', recomputeRateSummaryTotals);
   wireRoomCheckerBreakfastPresets();
+  wireRoomCheckerDiscountModeButtons();
 
   fetchRateSummary();
   fetchRoomCheckerExtraBedRate();
@@ -785,13 +841,16 @@ function recomputeRateSummaryTotals() {
 
   const subTotal = totalRoomRate + breakfastTotal + extraBedTotal + lateCheckoutFee;
 
-  // Per room, per night - same scaling as Total Room Rate above, so a bulk
-  // quote's discount grows with the room count instead of staying a single
-  // flat amount no matter how many rooms are booked.
+  // Two modes (see the Per Night / Manual Price buttons in room_checker.ejs,
+  // matching the same two-mode pattern already used for the booking-form
+  // discount UIs): "pernight" scales the typed amount by room count and
+  // nights (a bulk quote's discount grows with more rooms/nights instead of
+  // staying flat); "manual" takes the typed amount as the flat total as-is.
   const discountInput = document.getElementById('rateSummaryDiscount');
-  const discountPerNight = Math.max(0, parseFloat(discountInput.value) || 0);
+  const discountRaw = Math.max(0, parseFloat(discountInput.value) || 0);
+  const discountMode = discountInput.getAttribute('data-mode') || 'pernight';
   const totalRooms = kingQty + queenQty;
-  const discount = discountPerNight * nights * totalRooms;
+  const discount = discountMode === 'manual' ? discountRaw : (discountRaw * nights * totalRooms);
 
   const grandTotal = Math.max(0, subTotal - discount);
 
@@ -1049,6 +1108,79 @@ function roomCheckerFormatDisplayDate(date) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+// "Quotation" - posts the committed date range + King/Queen counts/rates to a
+// printable PDF (server-rendered, see BookingController.generateRoomCheckerQuotation),
+// opened in a new tab the same way the booking modals' own Voucher buttons work.
+// Unlike Proceed Booking, this doesn't touch any modal - it's a standalone
+// price quote for a guest, generated straight from what's already on screen.
+function generateRoomCheckerQuotation() {
+  if (!roomCheckerHasCommittedSelection) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'Select dates first',
+      text: 'Pick a date range on the calendar and click Save before generating a quotation.'
+    });
+    return;
+  }
+
+  const kingQty = Math.max(0, parseInt(document.getElementById('rateSummaryKingQty').value, 10) || 0);
+  const queenQty = Math.max(0, parseInt(document.getElementById('rateSummaryQueenQty').value, 10) || 0);
+
+  if (kingQty + queenQty < 1) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'Select room count',
+      text: 'Enter at least 1 King or Queen room before generating a quotation.'
+    });
+    return;
+  }
+
+  const range = window.__rateSummaryRange;
+  const start = new Date(range.start);
+  const checkoutDate = new Date(start);
+  checkoutDate.setDate(checkoutDate.getDate() + range.nights);
+
+  // Same mode-aware discount math as proceedRoomCheckerBooking - the PDF's
+  // Grand Total needs to match the live Summary panel's Grand Total exactly.
+  const totalRooms = kingQty + queenQty;
+  const discountInputEl = document.getElementById('rateSummaryDiscount');
+  const discountRaw = Math.max(0, parseFloat(discountInputEl.value) || 0);
+  const discountMode = discountInputEl.getAttribute('data-mode') || 'pernight';
+  const totalDiscount = discountMode === 'manual' ? discountRaw : (discountRaw * range.nights * totalRooms);
+
+  const payload = {
+    checkInDate: start.toISOString(),
+    checkOutDate: checkoutDate.toISOString(),
+    kingQty,
+    queenQty,
+    breakfastTier: window.__rateSummaryBreakfastTier || 'no',
+    kingWeekdayRate: window.__rateSummaryKingWeekdayRate || 0,
+    kingWeekendRate: window.__rateSummaryKingWeekendRate || 0,
+    kingWeekdayNights: window.__rateSummaryKingWeekdayNights || 0,
+    kingWeekendNights: window.__rateSummaryKingWeekendNights || 0,
+    queenWeekdayRate: window.__rateSummaryQueenWeekdayRate || 0,
+    queenWeekendRate: window.__rateSummaryQueenWeekendRate || 0,
+    queenWeekdayNights: window.__rateSummaryQueenWeekdayNights || 0,
+    queenWeekendNights: window.__rateSummaryQueenWeekendNights || 0,
+    discount: totalDiscount
+  };
+
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/booking/generate-quotation';
+  form.target = '_blank';
+  Object.keys(payload).forEach((key) => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = key;
+    input.value = payload[key];
+    form.appendChild(input);
+  });
+  document.body.appendChild(form);
+  form.submit();
+  form.remove();
+}
+
 // "Proceed Booking" - opens the single Add Booking modal for exactly 1 room, or the
 // Add Group Booking modal for more than 1, prefilled with the committed date range
 // (and King/Queen counts for the group case). Room Checker only tracks bed-type
@@ -1085,13 +1217,15 @@ function proceedRoomCheckerBooking() {
   checkoutDate.setDate(checkoutDate.getDate() + range.nights);
   const dateRangeStr = `${roomCheckerFormatDisplayDate(start)} to ${roomCheckerFormatDisplayDate(checkoutDate)} (${range.nights} night/s)`;
 
-  // Room Checker's Discount field is per room, per night; both booking modals take
-  // a flat total discount amount (subtracted once) - convert here, matching the
-  // same per-room x per-night scaling used in recomputeRateSummaryTotals, so a
-  // discount already set in the Rate Summary panel actually carries over instead
-  // of silently resetting to 0 (or under-counting rooms) in whichever modal opens.
-  const discountPerNight = Math.max(0, parseFloat(document.getElementById('rateSummaryDiscount').value) || 0);
-  const totalDiscount = discountPerNight * range.nights * totalRooms;
+  // Room Checker's Discount field can be Per Night (per room, per night) or
+  // Manual Price (flat total, entered as-is) - both booking modals take a
+  // flat total discount amount (subtracted once), so Per Night mode still
+  // needs the same per-room x per-night scaling used in
+  // recomputeRateSummaryTotals; Manual Price carries over unscaled.
+  const discountInputEl = document.getElementById('rateSummaryDiscount');
+  const discountRaw = Math.max(0, parseFloat(discountInputEl.value) || 0);
+  const discountMode = discountInputEl.getAttribute('data-mode') || 'pernight';
+  const totalDiscount = discountMode === 'manual' ? discountRaw : (discountRaw * range.nights * totalRooms);
 
   // The None/One/Two TIER is baked into the King/Queen rate itself (a
   // room_rates column - see window.__rateSummaryBreakfastTier), so it isn't
@@ -1210,6 +1344,16 @@ function openRoomCheckerGroupBooking(dateRangeStr, nights, start, checkoutDate, 
           groupIncludeDiscount.dispatchEvent(new Event('change', { bubbles: true }));
         }
         if (groupDiscount) groupDiscount.value = totalDiscount.toFixed(2);
+
+        // Keep the Additional Discount summary line (add_group_booking.ejs)
+        // in sync too - it's driven by applyGroupDiscount()'s own Apply
+        // click, which this handoff bypasses by setting the fields directly.
+        const groupDiscountRow = document.getElementById('groupDiscountRow');
+        const groupDiscountRowAmount = document.getElementById('groupDiscountRowAmount');
+        if (groupDiscountRow && groupDiscountRowAmount) {
+          groupDiscountRowAmount.textContent = `-₱${totalDiscount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+          groupDiscountRow.style.display = 'block';
+        }
       }
 
       if (breakfastCount > 0) {

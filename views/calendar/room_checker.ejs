@@ -125,6 +125,25 @@
     background: #f1f1f1;
   }
 
+  /* Quotation button - plain Bootstrap btn-outline-secondary is unreadable
+     against this page's dark background (gray-on-dark-gray, effectively
+     invisible except for its border) - styled explicitly instead, same
+     pattern as #roomCheckerTodayBtn above. */
+  #roomCheckerQuotationBtn {
+    background: transparent;
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 4px;
+    padding: 6px 18px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  #roomCheckerQuotationBtn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.6);
+  }
+
   /* Bigger date numbers - the default 12px/22px circle (fullcalendar.css) reads
      too small against this page's larger day cells. */
   #room-checker-months .fc-day-number {
@@ -833,9 +852,13 @@
             <span id="rateSummarySubTotal">&#8369;0.00</span>
           </div>
 
-          <div class="rate-summary-row">
-            <span>Discount per Room, per Night</span>
-            <input type="number" id="rateSummaryDiscount" class="rate-summary-discount-input" value="0" min="0" step="10" title="Applied to every room, every night">
+          <div class="rate-summary-row rate-summary-discount-row" style="flex-wrap: wrap;">
+            <span id="rateSummaryDiscountLabel">Discount per Room, per Night</span>
+            <span style="display: flex; gap: 6px;">
+              <button type="button" class="rate-summary-preset-btn active" id="rateSummaryDiscountPerNightBtn" data-mode="pernight">Per Night</button>
+              <button type="button" class="rate-summary-preset-btn" id="rateSummaryDiscountManualBtn" data-mode="manual">Manual Price</button>
+            </span>
+            <input type="number" id="rateSummaryDiscount" class="rate-summary-discount-input" value="0" min="0" step="10" data-mode="pernight" title="Applied to every room, every night">
           </div>
 
           <div class="rate-summary-row rate-summary-grand-total">
@@ -867,7 +890,8 @@
             </div>
           </div>
 
-          <div class="rate-summary-row rate-summary-proceed-row" style="border-bottom: none; justify-content: flex-end;">
+          <div class="rate-summary-row rate-summary-proceed-row" style="border-bottom: none; justify-content: flex-end; gap: 8px;">
+            <button type="button" id="roomCheckerQuotationBtn" class="btn">Quotation</button>
             <button type="button" id="roomCheckerProceedBookingBtn" class="btn btn-primary">Proceed Booking</button>
           </div>
         </div>
@@ -884,4 +908,4 @@
 <script src="/plugins/fullcalendar/packages/interaction/main.min.js"></script>
 <script src="/plugins/fullcalendar/packages/daygrid/main.min.js"></script>
 <script src="/plugins/fullcalendar/packages/timegrid/main.min.js"></script>
-<script src="/js/calendar/room_checker.js?v=47"></script>
+<script src="/js/calendar/room_checker.js?v=50"></script>

@@ -1836,6 +1836,7 @@ class BookingController {
         flightNumber,
         passengerCount,
         discount,
+        discountRemarks,
         seniorPwdDiscount = 0, // Senior/PWD discount (computed amount)
         seniorPwdDiscountPercent = 0, // Senior/PWD discount percentage
         seniorPwdRoomCount = 0, // Number of rooms with Senior/PWD discount
@@ -1961,6 +1962,7 @@ class BookingController {
         flightNumber,
         passengerCount,
         discount: totalDiscountNum, // Pass combined discount (seniorPwdDiscount + discount)
+        discountRemarks: discountRemarks && String(discountRemarks).trim() !== '' ? String(discountRemarks).trim() : null,
         seniorPwdDiscountPercent, // Pass percentage for storage
         seniorPwdRoomCount,       // Number of rooms with Senior/PWD discount
         consolidatedBilling,
@@ -3116,6 +3118,107 @@ class BookingController {
     } catch (error) {
       console.error('Voucher Preview Error:', error);
       res.status(500).send('Voucher preview failed.');
+    }
+  }
+
+  // Room Checker "Quotation" - a standalone printable price quote generated
+  // straight from whatever's on screen in the Rate Summary panel, before any
+  // actual booking exists. No bookingId/guest involved, unlike the Voucher/
+  // Invoice PDFs above - it's the hotel's own quotation letterhead format,
+  // with only the date, the King/Queen rate rows, and the preparer changing.
+  static async generateRoomCheckerQuotation(req, res) {
+    try {
+      const {
+        checkInDate, checkOutDate, kingQty, queenQty, breakfastTier,
+        kingWeekdayRate, kingWeekendRate, kingWeekdayNights, kingWeekendNights,
+        queenWeekdayRate, queenWeekendRate, queenWeekdayNights, queenWeekendNights,
+        discount
+      } = req.body;
+
+      if (!checkInDate || !checkOutDate) {
+        return res.status(400).send('Missing check-in/check-out date.');
+      }
+
+      const user = req.user ? { FULLNAME: req.user.FULLNAME } : { FULLNAME: 'System User' };
+
+      const buildRow = (bedLabel, qty, weekdayRate, weekendRate, weekdayNights, weekendNights) => {
+        const wdRate = parseFloat(weekdayRate) || 0;
+        const weRate = parseFloat(weekendRate) || 0;
+        const wdNights = parseInt(weekdayNights, 10) || 0;
+        const weNights = parseInt(weekendNights, 10) || 0;
+        const total = ((wdRate * wdNights) + (weRate * weNights)) * qty;
+        return { bedLabel, qty, wdRate, weRate, wdNights, weNights, total };
+      };
+
+      const rows = [];
+      const kQty = parseInt(kingQty, 10) || 0;
+      const qQty = parseInt(queenQty, 10) || 0;
+      if (kQty > 0) {
+        rows.push(buildRow('KING', kQty, kingWeekdayRate, kingWeekendRate, kingWeekdayNights, kingWeekendNights));
+      }
+      if (qQty > 0) {
+        rows.push(buildRow('QUEEN', qQty, queenWeekdayRate, queenWeekendRate, queenWeekdayNights, queenWeekendNights));
+      }
+
+      if (!rows.length) {
+        return res.status(400).send('At least one King or Queen room is required.');
+      }
+
+      const subTotal = rows.reduce((sum, r) => sum + r.total, 0);
+      const discountAmount = Math.max(0, parseFloat(discount) || 0);
+      const grandTotal = Math.max(0, subTotal - discountAmount);
+
+      const path = require('path');
+      const ejs = require('ejs');
+      const fs = require('fs').promises;
+      const { chromium } = require('playwright');
+
+      const logoPath = path.join(__dirname, '../public/img/Logo-Black.png');
+      let imageUrl = '';
+      try {
+        if (require('fs').existsSync(logoPath)) {
+          const imageBase64 = require('fs').readFileSync(logoPath, 'base64');
+          imageUrl = `data:image/png;base64,${imageBase64}`;
+        }
+      } catch (error) {
+        console.error('❌ [QUOTATION] Error loading logo:', error);
+      }
+
+      const templatePath = path.join(__dirname, '../views/booking/pdf/room_checker_quotation.ejs');
+      const templateContent = await fs.readFile(templatePath, 'utf-8');
+
+      const html = await ejs.render(templateContent, {
+        imageUrl,
+        quotationDate: new Date(),
+        checkInDate,
+        checkOutDate,
+        breakfastTier: breakfastTier || 'no',
+        rows,
+        subTotal,
+        discountAmount,
+        grandTotal,
+        preparedBy: user.FULLNAME
+      });
+
+      const browser = await chromium.launch();
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle' });
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '0', bottom: '0', left: '0', right: '0' }
+      });
+      await browser.close();
+
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': 'inline; filename="quotation.pdf"',
+        'Content-Length': pdfBuffer.length.toString()
+      });
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error('❌ Error generating Room Checker quotation:', error);
+      res.status(500).send('Failed to generate quotation.');
     }
   }
 

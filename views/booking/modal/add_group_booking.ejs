@@ -325,13 +325,32 @@
               </div>
             </div>
             <div class="col-lg-4">
-              <div class="form-check mb-2">
-                <input class="form-check-input" type="checkbox" id="groupIncludeDiscount">
-                <label class="form-check-label" for="groupIncludeDiscount">Additional Discount</label>
+              <!-- Additional Discount - same Per Night / Manual Price modes as
+                   single booking's Add Booking form / general details. -->
+              <div class="discount-section-inline" id="groupDiscountSection">
+                <label class="form-label d-block mb-2">Additional Discount</label>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <button type="button" class="btn btn-sm btn-outline-success discount-mode-btn" id="groupDiscountPerNightBtn">Per Night</button>
+                  <button type="button" class="btn btn-sm btn-outline-primary discount-mode-btn" id="groupDiscountManualBtn">Manual Price</button>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap mt-2">
+                  <input type="number" min="0" step="0.01" id="groupDiscountInput" class="form-control form-control-sm" placeholder="Amount / room / night" data-mode="pernight" style="max-width: 150px; display: none;">
+                  <input type="text" id="groupDiscountRemarksInput" class="form-control form-control-sm" placeholder="Remarks (optional)" style="max-width: 200px; display: none;">
+                  <button type="button" class="btn btn-sm btn-success" id="groupDiscountApplyBtn" style="display: none;">Apply</button>
+                  <button type="button" class="btn btn-sm btn-outline-danger" id="groupDiscountRemoveBtn" style="display: none;">
+                    <i class="fas fa-times"></i> Remove
+                  </button>
+                </div>
+                <div id="groupDiscountHint" class="text-muted small mt-1" style="display: none;">Per-night discount &mdash; multiplied by the number of rooms and nights.</div>
+                <div id="groupDiscountRow" class="mt-2" style="display: none;">
+                  <span class="text-danger fw-bold" id="groupDiscountRowAmount">-₱0.00</span>
+                  <span class="text-muted small ms-2" id="groupDiscountRowRemarks"></span>
+                </div>
               </div>
-              <div id="groupDiscountWrapper" class="mt-2" style="display: none;">
-                <input type="number" class="form-control" id="groupDiscount" name="groupDiscount" min="0" value="0">
-              </div>
+              <!-- Actual submitted discount fields - driven by the UI above, not shown directly -->
+              <input type="checkbox" id="groupIncludeDiscount" style="display: none;">
+              <input type="number" id="groupDiscount" name="groupDiscount" min="0" value="0" style="display: none;">
+              <input type="hidden" id="groupDiscountRemarks" name="groupDiscountRemarks">
             </div>
             <div class="col-lg-4">
               <div class="form-check mb-2">
@@ -1712,6 +1731,26 @@
   background-color: #f9fafb !important;
 }
 
+/* Additional Discount - Per Night / Manual Price mode buttons, same style
+   as single booking's Add Booking form and general details. */
+#modal-add-group-booking .discount-section-inline .btn-outline-success {
+  background-color: #198754 !important; color: #fff !important; border-color: #198754 !important;
+}
+#modal-add-group-booking .discount-section-inline .btn-outline-primary {
+  background-color: #0d6efd !important; color: #fff !important; border-color: #0d6efd !important;
+}
+#modal-add-group-booking .discount-section-inline .discount-mode-btn {
+  opacity: 0.55;
+}
+#modal-add-group-booking .discount-section-inline .discount-mode-btn.discount-mode-active {
+  opacity: 1;
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.15) inset;
+}
+#modal-add-group-booking .discount-section-inline #groupDiscountRow {
+  background: #fdf3f2; border: 1px solid #f1d6d2; border-radius: 6px;
+  padding: 6px 10px;
+}
+
 </style>
 
 <script src="/plugins/flatpicker/flatpickr.min.js"></script>
@@ -2274,6 +2313,103 @@
     const value = ($('#groupChannelBookingId').val() || '').trim();
     $('#groupChannelBookingIdHidden').val(value);
     return value;
+  }
+
+  // Additional Discount - Per Night / Manual Price modes, same UX as single
+  // booking's Add Booking form and the Room Reservation Details modal.
+  // Drives the existing #groupIncludeDiscount/#groupDiscount fields
+  // updateGroupChargeBreakdown()/computeGroupTotal() already read, so
+  // nothing else needs to change to have the discount flow into the total.
+  // "Per Night" here means per ROOM per night (the amount typed x number of
+  // rooms x number of nights), matching how the group's own room charges are
+  // totalled (rooms x nights) - a flat per-night-only multiply would
+  // under-discount a multi-room group.
+  function toggleGroupDiscountInput(mode) {
+    mode = mode === 'manual' ? 'manual' : 'pernight';
+    const input = $('#groupDiscountInput');
+    const remarks = $('#groupDiscountRemarksInput');
+    const applyBtn = $('#groupDiscountApplyBtn');
+    const hint = $('#groupDiscountHint');
+    const perNightBtn = $('#groupDiscountPerNightBtn');
+    const manualBtn = $('#groupDiscountManualBtn');
+    if (!input.length) return;
+
+    const isOpen = input.css('display') === 'block';
+    const currentMode = input.attr('data-mode') || 'pernight';
+
+    if (isOpen && currentMode === mode) {
+      input.hide();
+      remarks.hide();
+      applyBtn.hide();
+      hint.hide();
+      perNightBtn.removeClass('discount-mode-active');
+      manualBtn.removeClass('discount-mode-active');
+      return;
+    }
+
+    input.attr('data-mode', mode);
+    input.attr('placeholder', mode === 'pernight' ? 'Amount / room / night' : 'Amount');
+    input.show();
+    remarks.show();
+    applyBtn.show();
+    hint.toggle(mode === 'pernight');
+    perNightBtn.toggleClass('discount-mode-active', mode === 'pernight');
+    manualBtn.toggleClass('discount-mode-active', mode === 'manual');
+    setTimeout(() => input.trigger('focus'), 0);
+  }
+
+  function applyGroupDiscount() {
+    const amount = parseFloat($('#groupDiscountInput').val()) || 0;
+    if (!(amount > 0)) {
+      if (typeof toastWarning === 'function') {
+        toastWarning('Validation', 'Please enter a valid discount amount.');
+      } else {
+        alert('Please enter a valid discount amount.');
+      }
+      return;
+    }
+    const mode = $('#groupDiscountInput').attr('data-mode') || 'pernight';
+    let finalAmount = amount;
+    let finalRemarks = $('#groupDiscountRemarksInput').val() || '';
+
+    if (mode === 'pernight') {
+      const nights = Math.max(1, parseInt($('#groupNights').val(), 10) || 1);
+      const roomCount = Math.max(1, getGroupSelectedRoomCount() || parseInt($('#groupNumberOfRooms').val(), 10) || 1);
+      finalAmount = Math.round(amount * nights * roomCount * 100) / 100;
+      const tag = `₱${amount.toLocaleString('en-US')}/room/night × ${roomCount} room${roomCount > 1 ? 's' : ''} × ${nights} night${nights > 1 ? 's' : ''}`;
+      finalRemarks = finalRemarks ? `${tag} — ${finalRemarks}` : tag;
+    }
+
+    $('#groupIncludeDiscount').prop('checked', true).trigger('change');
+    $('#groupDiscount').val(finalAmount.toFixed(2)).trigger('input');
+    $('#groupDiscountRemarks').val(finalRemarks);
+
+    $('#groupDiscountRowAmount').text(`-₱${finalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
+    $('#groupDiscountRowRemarks').text(finalRemarks);
+    $('#groupDiscountRow').show();
+  }
+
+  function removeGroupDiscount() {
+    $('#groupIncludeDiscount').prop('checked', false).trigger('change');
+    $('#groupDiscount').val('0').trigger('input');
+    $('#groupDiscountRemarks').val('');
+    $('#groupDiscountInput').val('');
+    $('#groupDiscountRemarksInput').val('');
+    $('#groupDiscountRow').hide();
+  }
+
+  function resetGroupDiscountUI() {
+    $('#groupIncludeDiscount').prop('checked', false);
+    $('#groupDiscount').val('0');
+    $('#groupDiscountRemarks').val('');
+    $('#groupDiscountInput').val('').attr('data-mode', 'pernight').hide();
+    $('#groupDiscountRemarksInput').val('').hide();
+    $('#groupDiscountApplyBtn').hide();
+    $('#groupDiscountHint').hide();
+    $('#groupDiscountPerNightBtn, #groupDiscountManualBtn').removeClass('discount-mode-active');
+    $('#groupDiscountRow').hide();
+    $('#groupDiscountRowAmount').text('-₱0.00');
+    $('#groupDiscountRowRemarks').text('');
   }
 
   function refreshGroupRoomPricing() {
@@ -4253,7 +4389,8 @@
 
   function getGroupBookingState() {
     return {
-      discount: $('#groupIncludeDiscount').prop('checked') ? (parseFloat($('#groupDiscount').val()) || 0) : 0
+      discount: $('#groupIncludeDiscount').prop('checked') ? (parseFloat($('#groupDiscount').val()) || 0) : 0,
+      discountRemarks: $('#groupIncludeDiscount').prop('checked') ? ($('#groupDiscountRemarks').val() || '') : ''
     };
   }
 
@@ -4380,7 +4517,6 @@
     });
 
     $('#groupIncludeDiscount').on('change', function() {
-      $('#groupDiscountWrapper').toggle(this.checked);
       if (!this.checked) { $('#groupDiscount').val('0'); }
       updateGroupChargeBreakdown();
       computeGroupTotal();
@@ -4389,6 +4525,17 @@
     $('#groupDiscount').on('input', function() {
       updateGroupChargeBreakdown();
       computeGroupTotal();
+    });
+
+    $('#groupDiscountPerNightBtn').on('click', function() { toggleGroupDiscountInput('pernight'); });
+    $('#groupDiscountManualBtn').on('click', function() { toggleGroupDiscountInput('manual'); });
+    $('#groupDiscountApplyBtn').on('click', applyGroupDiscount);
+    $('#groupDiscountRemoveBtn').on('click', removeGroupDiscount);
+
+    // Reset the discount UI each time the modal opens fresh, so a previous
+    // group booking's applied discount doesn't linger visually on the next one.
+    $(document).on('shown.bs.modal', '#modal-add-group-booking', function() {
+      resetGroupDiscountUI();
     });
 
     // Handle individual billing checkbox (inverted logic)
@@ -4728,5 +4875,5 @@
 })();
 </script>
 <script src="/js/booking/contact_channel.js?v=2"></script>
-<script src="/js/booking/group_booking_submit.js?v=early-ci-conflict-1"></script>
+<script src="/js/booking/group_booking_submit.js?v=discount-fix-1"></script>
 
