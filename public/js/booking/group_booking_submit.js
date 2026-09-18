@@ -125,9 +125,6 @@ $(document).ready(function () {
       ? window.getGroupBookingState()
       : { discount: 0 };
 
-    const seniorPwdDiscount = $('#groupIncludeSeniorPwdDiscount').is(':checked') ? parseFloat($('#groupSeniorPwdDiscount').val()) || 0 : 0;
-    const seniorPwdDiscountPercent = $('#groupIncludeSeniorPwdDiscount').is(':checked') ? parseFloat($('#groupSeniorPwdDiscountPercent').val()) || 20 : 0;
-    const seniorPwdRoomCount = $('#groupIncludeSeniorPwdDiscount').is(':checked') ? parseInt($('#groupSeniorPwdRoomCount').val()) || 0 : 0;
     const discount = parseFloat(state.discount) || 0;
     const discountRemarks = state.discountRemarks || '';
     const paidAmount = parseFloat($('#groupPaidAmount').val()) || 0;
@@ -180,40 +177,10 @@ $(document).ready(function () {
       return;
     }
 
-    // Compute per-room discounts for Senior/PWD when individual billing
-    function computeSeniorPerRoomDiscounts(pricesRaw, nights, percent, roomCount) {
-      const prices = pricesRaw
-        ? pricesRaw.split('|').map(p => parseFloat(p) || 0)
-        : [];
-      const nNights = parseInt(nights, 10) || 0;
-      const discountDecimal = (parseFloat(percent) || 0) / 100;
-      const count = parseInt(roomCount, 10) || 0;
-
-      // Base array aligned to room order
-      const discounts = prices.map(() => 0);
-      if (count <= 0 || discountDecimal <= 0 || nNights <= 0 || prices.length === 0) {
-        return discounts;
-      }
-
-      // Sort by price desc keeping original index
-      const sorted = prices
-        .map((price, idx) => ({ price, idx }))
-        .sort((a, b) => b.price - a.price);
-
-      for (let i = 0; i < Math.min(count, sorted.length); i++) {
-        const { price, idx } = sorted[i];
-        const disc = price * nNights * discountDecimal;
-        discounts[idx] = disc;
-      }
-      return discounts;
-    }
-
-    const perRoomDiscounts = computeSeniorPerRoomDiscounts(
-      $('#groupSelectedRoomPrices').val(),
-      qty,
-      seniorPwdDiscountPercent,
-      seniorPwdRoomCount
-    );
+    // Senior/PWD Discount used to populate this (per-room, for Individual
+    // Billing) - removed as redundant with Additional Discount. Sent empty;
+    // the backend already treats a missing/short entry as 0 per room.
+    const perRoomDiscounts = [];
 
     // Check if joining existing group
     const existingGroupId = $('#groupBookingId').val();
@@ -251,9 +218,6 @@ $(document).ready(function () {
       dropoffPrice,
       flightNumber,
       passengerCount,
-      seniorPwdDiscount,
-      seniorPwdDiscountPercent,
-      seniorPwdRoomCount,
       paidAmount,
       discount,
       discountRemarks,

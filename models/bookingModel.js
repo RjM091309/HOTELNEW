@@ -109,27 +109,42 @@ class BookingModel {
               - COALESCE(bill.RESERVATION_FEE, 0)
               - COALESCE(bill.DISCOUNT_AMOUNT, 0)
             ` : `
-            CASE 
+            CASE
               WHEN b.GROUP_BOOKING_ID IS NOT NULL THEN
                 -- For group bookings, check if it's master billing
-                CASE 
+                CASE
                   WHEN (SELECT gb.BILLING_TYPE FROM group_booking gb WHERE gb.IDNo = b.GROUP_BOOKING_ID) = 1 THEN
                     -- Master Billing: Only main booking (minimum IDNo) shows group total, others show 0
-                    CASE 
+                    CASE
                       WHEN b.IDNo = (SELECT MIN(b2.IDNo) FROM booking b2 WHERE b2.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID AND b2.ACTIVE = 1) THEN
-                        -- Main booking: show group total
+                        -- Main booking: show group total. Sums bill2.ROOM_PRICE (each
+                        -- room's OWN true per-night rate, populated for every room
+                        -- regardless of billing type - see addGroupBooking) x
+                        -- bill2.QTY (each room's own current night count) across every
+                        -- room, rather than bill2.ROOM_CHARGE x QTY gated to only the
+                        -- main room. Under Master/Consolidated Billing, ROOM_CHARGE is
+                        -- 0 for every non-main room by design (all charges are meant to
+                        -- live on the main row) - so an early checkout that prorates a
+                        -- NON-main room's QTY multiplied against its own ROOM_CHARGE
+                        -- (0) never changed the group sum at all, no matter how the
+                        -- CHECKOUT_REFUND/ORIGINAL_QTY fallback below it was written.
+                        -- ROOM_PRICE is never zeroed for any room, so this reflects an
+                        -- early checkout on ANY room in the group immediately, main or
+                        -- not - matches the ROOM_PRICE * QTY pattern already used for
+                        -- per-room proration elsewhere (see the group refund proration
+                        -- in checkoutBookings' proportional-split lookup above).
                         (
-                          SELECT 
+                          SELECT
                             COALESCE(SUM(
-                              (bill2.ROOM_CHARGE * (CASE WHEN COALESCE(bill2.CHECKOUT_REFUND,0) > 0 THEN bill2.QTY ELSE COALESCE(bill2.ORIGINAL_QTY, bill2.QTY) END)) + 
+                              (bill2.ROOM_PRICE * bill2.QTY) +
                               COALESCE((
-                                SELECT SUM(bs.TOTAL_COST) 
-                                FROM booking_service bs 
+                                SELECT SUM(bs.TOTAL_COST)
+                                FROM booking_service bs
                                 WHERE bs.BOOKING_ID = b2.IDNo AND bs.ACTIVE = 1
                               ), 0) +
                               COALESCE((
-                                SELECT SUM(be.COST * be.QTY) 
-                                FROM booking_extension be 
+                                SELECT SUM(be.COST * be.QTY)
+                                FROM booking_extension be
                                 WHERE be.BOOKING_ID = b2.IDNo AND be.ACTIVE = 1
                               ), 0) +
                               COALESCE(bill2.CANCELLATION_PENALTY, 0)
@@ -150,7 +165,7 @@ class BookingModel {
                     (
                       SELECT 
                         COALESCE(SUM(
-                          (bill2.ROOM_CHARGE * (CASE WHEN COALESCE(bill2.CHECKOUT_REFUND,0) > 0 THEN bill2.QTY ELSE COALESCE(bill2.ORIGINAL_QTY, bill2.QTY) END)) + 
+                          (bill2.ROOM_PRICE * bill2.QTY) +
                           COALESCE((
                             SELECT SUM(bs.TOTAL_COST) 
                             FROM booking_service bs 
@@ -222,7 +237,7 @@ class BookingModel {
                             -- Group Grand Total
                             SELECT 
                             COALESCE(SUM(
-                                (bill2.ROOM_CHARGE * (CASE WHEN COALESCE(bill2.CHECKOUT_REFUND,0) > 0 THEN bill2.QTY ELSE COALESCE(bill2.ORIGINAL_QTY, bill2.QTY) END)) + 
+                                (bill2.ROOM_PRICE * bill2.QTY) +
                                 COALESCE((
                                   SELECT SUM(bs.TOTAL_COST) 
                                   FROM booking_service bs 
@@ -263,7 +278,7 @@ class BookingModel {
                         -- Group Grand Total
                         SELECT 
                         COALESCE(SUM(
-                            (bill2.ROOM_CHARGE * (CASE WHEN COALESCE(bill2.CHECKOUT_REFUND,0) > 0 THEN bill2.QTY ELSE COALESCE(bill2.ORIGINAL_QTY, bill2.QTY) END)) + 
+                            (bill2.ROOM_PRICE * bill2.QTY) +
                             COALESCE((
                               SELECT SUM(bs.TOTAL_COST) 
                               FROM booking_service bs 
@@ -3186,7 +3201,8 @@ class BookingModel {
           bi.DISCOUNT_APPLIED,
           COALESCE(bi.REMARKS, '') AS BILLING_REMARKS,
           COALESCE(rt.NAME, 'Unassigned Room') AS ROOM_TYPE,
-          r.ROOM_NUMBER
+          r.ROOM_NUMBER,
+          b.GROUP_BOOKING_ID
         FROM booking b
         JOIN billing bi ON b.IDNo = bi.BOOKING_ID
         LEFT JOIN room r ON b.ROOM_ID = r.IDNo
@@ -3208,6 +3224,44 @@ class BookingModel {
       const bookingStatus = (b.BOOKING_STATUS || '').toLowerCase();
       const isCancelled = bookingStatus === 'cancelled';
       const isCheckedOut = bookingStatus === 'check-out' || bookingStatus === 'checkout';
+
+      // Group-aware room total: for the MAIN booking of a Master/Consolidated
+      // billing group, billing.ROOM_CHARGE is a static snapshot taken once at
+      // group-creation time and never recalculated as the group changes
+      // afterward (a room's early checkout/extension, rooms added/removed) -
+      // so it silently goes stale. Recompute it live here from every active
+      // room's own ROOM_PRICE (never zeroed, unlike ROOM_CHARGE which is 0 for
+      // every non-main room under Consolidated Billing by design) x QTY,
+      // matching the same fix already applied to the group Total/Balance
+      // queries in getBookingDataEnhanced/getGroupBookingData/etc. Left null
+      // (falls back to the plain roomRate * roomDaysBilled below) for
+      // standalone bookings, non-main group rows, and Individual Billing
+      // groups, where the stored ROOM_CHARGE is already correct as-is.
+      let groupAwareRoomAmount = null;
+      if (b.GROUP_BOOKING_ID) {
+        const groupRows = await queryDatabasePromise(
+          `SELECT BILLING_TYPE FROM group_booking WHERE IDNo = ?`,
+          [b.GROUP_BOOKING_ID]
+        );
+        const isConsolidated = parseInt(groupRows[0]?.BILLING_TYPE, 10) === 1;
+        if (isConsolidated) {
+          const mainRows = await queryDatabasePromise(
+            `SELECT MIN(IDNo) AS mainId FROM booking WHERE GROUP_BOOKING_ID = ? AND ACTIVE = 1`,
+            [b.GROUP_BOOKING_ID]
+          );
+          const isMain = parseInt(mainRows[0]?.mainId, 10) === parseInt(bookingId, 10);
+          if (isMain) {
+            const groupTotalRows = await queryDatabasePromise(
+              `SELECT COALESCE(SUM(bill2.ROOM_PRICE * bill2.QTY), 0) AS groupRoomTotal
+                 FROM booking b2
+                 LEFT JOIN billing bill2 ON bill2.BOOKING_ID = b2.IDNo
+                WHERE b2.GROUP_BOOKING_ID = ? AND b2.ACTIVE = 1`,
+              [b.GROUP_BOOKING_ID]
+            );
+            groupAwareRoomAmount = parseFloat(groupTotalRows[0]?.groupRoomTotal) || 0;
+          }
+        }
+      }
 
       // Billed room days: only reduce when guest left before original room period ended
       let roomDaysBilled = billingQty;
@@ -3232,7 +3286,7 @@ class BookingModel {
       const paymentsData = await queryDatabasePromise(paymentsQuery, [bookingId]);
       
       // Calculate room amount and get billing values
-      const roomAmount = roomRate * roomDaysBilled;
+      const roomAmount = groupAwareRoomAmount !== null ? groupAwareRoomAmount : (roomRate * roomDaysBilled);
       const reservationFee = parseFloat(b.RESERVATION_FEE) || 0;
       const discountAmount = parseFloat(b.DISCOUNT_AMOUNT) || 0;
       const checkoutRefund = parseFloat(b.CHECKOUT_REFUND) || 0;
@@ -3283,13 +3337,15 @@ class BookingModel {
         roomStatus = 'partial';
       }
 
-      // Base room billing
+      // Base room billing. subTotal uses roomAmount (not roomRate *
+      // roomDaysBilled again) so the group-aware override above is reflected
+      // consistently here too.
       const roomItems = [{
         date: b.CHECK_IN_DATE,
         description: `${b.ROOM_TYPE}`,
         basePrice: roomRate,
         qty: roomDaysBilled,
-        subTotal: roomRate * roomDaysBilled,
+        subTotal: roomAmount,
         status: roomStatus
       }];
 
@@ -4593,10 +4649,14 @@ class BookingModel {
           ) AS remarks_count,
           GROUP_CONCAT(r.ROOM_NUMBER ORDER BY r.ROOM_NUMBER SEPARATOR ', ') AS room_numbers,
           COUNT(b.IDNo) AS total_bookings,
-          -- Calculate total payment including services, then subtract group discount and reservation fee
+          -- Calculate total payment including services, then subtract group discount and reservation fee.
+          -- Sums bill.ROOM_PRICE (each room's own rate, never zeroed) x bill.QTY per
+          -- room rather than bill.ROOM_CHARGE (0 for every non-main room under Master/
+          -- Consolidated Billing) - see the matching fix + comment in
+          -- getBookingDataEnhanced's group TOTAL_COST/BALANCE above for why.
           (
             COALESCE(SUM(
-              (bill.ROOM_CHARGE * bill.QTY) + 
+              (bill.ROOM_PRICE * bill.QTY) +
               COALESCE((
                 SELECT SUM(bs.TOTAL_COST) 
                 FROM booking_service bs 
@@ -4737,10 +4797,13 @@ class BookingModel {
 
       const results = await queryDatabasePromise(bookingQuery, [groupId]);
 
-      // Compute group-level summary: rooms, services, extensions, discount, reservation fee, grand total
+      // Compute group-level summary: rooms, services, extensions, discount, reservation fee, grand total.
+      // ROOM_PRICE (each room's own rate) x QTY, not ROOM_CHARGE (0 for every
+      // non-main room under Master/Consolidated Billing) - see the matching fix
+      // in getBookingDataEnhanced's group TOTAL_COST/BALANCE.
       const summaryQuery = `
-        SELECT 
-          COALESCE(SUM(bill.ROOM_CHARGE * bill.QTY), 0) AS room_total,
+        SELECT
+          COALESCE(SUM(bill.ROOM_PRICE * bill.QTY), 0) AS room_total,
           COALESCE((
             SELECT SUM(bs.TOTAL_COST)
             FROM booking_service bs
@@ -5222,9 +5285,12 @@ class BookingModel {
       const roomCount = roomsResult?.[0]?.room_count || 0;
       const roomNumbers = `${roomCount} Room${roomCount === 1 ? '' : 's'}`;
 
-      // Calculate room charges (sum of all room charges)
+      // Calculate room charges (sum of all room charges). ROOM_PRICE (each
+      // room's own rate) x QTY, not ROOM_CHARGE (0 for every non-main room
+      // under Master/Consolidated Billing) - see the matching fix in
+      // getBookingDataEnhanced's group TOTAL_COST/BALANCE.
       const roomChargesQuery = `
-        SELECT COALESCE(SUM(bill.ROOM_CHARGE * bill.QTY), 0) AS roomCharges
+        SELECT COALESCE(SUM(bill.ROOM_PRICE * bill.QTY), 0) AS roomCharges
         FROM booking b
         JOIN group_booking gb ON b.GROUP_BOOKING_ID = gb.IDNo
         LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID

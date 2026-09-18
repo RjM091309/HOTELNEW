@@ -1059,6 +1059,9 @@ function formatPaidAmount(input) {
 
 // Compute total for edit group booking form
 function computeEditGroupTotal() {
+    if (typeof window.syncEditGroupLongTermRateDropdown === 'function') {
+        window.syncEditGroupLongTermRateDropdown();
+    }
     // Get main nights (for bookings without individual dates)
     const mainNights = parseInt($('#editGroupNights').val(), 10) || 0;
     const pricesRaw = $('#editGroupSelectedRoomPrices').val();
@@ -1160,42 +1163,29 @@ function computeEditGroupTotal() {
     // Always calculate the full total in frontend for user visibility
     const subtotal = roomSubtotal + servicesTotal + lateCheckoutFeeTotal + extraServicesTotal;
     
-    // Senior/PWD Discount (percentage-based)
-    const seniorPwdDiscountChecked = $('#editGroupIncludeSeniorPwdDiscount').prop('checked');
+    // Senior/PWD Discount - no longer staff-editable (read-only display only,
+    // see editGroupSeniorPwdReadOnly in edit_group_booking.ejs). The gate is
+    // now "does this booking already have one stored" (from the hidden
+    // percent/room-count fields, only ever populated on initial load) instead
+    // of a checkbox, so a discount already on the booking before this change
+    // keeps applying/showing, but there's no way to newly add one here.
+    const storedSeniorPwdPercent = parseFloat($('#editGroupSeniorPwdDiscountPercent').val()) || 0;
+    const storedSeniorPwdRoomCount = parseInt($('#editGroupSeniorPwdRoomCount').val()) || 0;
+    const hasStoredSeniorPwdDiscount = storedSeniorPwdPercent > 0 && storedSeniorPwdRoomCount > 0;
     let seniorPwdDiscountAmount = 0;
-    
+
     // Get number of rooms (reuse existing variables if already declared)
     const editSelectedRooms = $('#editGroupSelectedRooms').val();
     const editNumRooms = editSelectedRooms ? editSelectedRooms.split(',').length : 1;
-    
+
     // Update total rooms display
     $('#editGroupTotalRoomsDisplay').text(editNumRooms);
-    
+
     // Calculate Senior/PWD discount (percentage of ROOM CHARGES ONLY, not services)
-    if (seniorPwdDiscountChecked && roomSubtotal > 0 && editNumRooms > 0) {
-        let discountPercent = parseFloat($('#editGroupSeniorPwdDiscountPercent').val()) || 20; // Default to 20%
-        let seniorPwdRoomCount = parseInt($('#editGroupSeniorPwdRoomCount').val()) || 0;
-        
-        // Enforce maximum of 100%
-        if (discountPercent > 100) {
-            discountPercent = 100;
-            $('#editGroupSeniorPwdDiscountPercent').val(100);
-        }
-        if (discountPercent < 0) {
-            discountPercent = 0;
-            $('#editGroupSeniorPwdDiscountPercent').val(0);
-        }
-        
-        // Ensure Senior/PWD room count doesn't exceed total rooms
-        if (seniorPwdRoomCount > editNumRooms) {
-            seniorPwdRoomCount = editNumRooms;
-            $('#editGroupSeniorPwdRoomCount').val(editNumRooms);
-        }
-        if (seniorPwdRoomCount < 0) {
-            seniorPwdRoomCount = 0;
-            $('#editGroupSeniorPwdRoomCount').val(0);
-        }
-        
+    if (hasStoredSeniorPwdDiscount && roomSubtotal > 0 && editNumRooms > 0) {
+        const discountPercent = Math.min(100, Math.max(0, storedSeniorPwdPercent));
+        const seniorPwdRoomCount = Math.min(Math.max(0, storedSeniorPwdRoomCount), editNumRooms);
+
         // Calculate discount only for Senior/PWD rooms
         // Since room prices can differ (1-bed vs 2-bed), we apply discount to the most expensive rooms first
         // Sort prices from highest to lowest and apply discount to top N rooms (where N = seniorPwdRoomCount)
@@ -1205,11 +1195,13 @@ function computeEditGroupTotal() {
         const seniorPwdRoomCharges = seniorPwdRoomChargesPerNight * nights; // Total charges for Senior/PWD rooms
         const discountDecimal = discountPercent / 100; // Convert percentage to decimal
         seniorPwdDiscountAmount = seniorPwdRoomCharges * discountDecimal; // Apply only to Senior/PWD room charges
-        
+
         $('#editGroupSeniorPwdDiscount').val(seniorPwdDiscountAmount.toFixed(2));
         $('#editGroupSeniorPwdDiscountAmount').val('₱' + seniorPwdDiscountAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-        $('#editGroupSeniorPwdDiscountDisplay').show();
-        
+        $('#editGroupSeniorPwdRoomCountDisplay').text(seniorPwdRoomCount);
+        $('#editGroupSeniorPwdPercentDisplay').text(discountPercent);
+        $('#editGroupSeniorPwdReadOnly').show();
+
         // If Senior/PWD discount is 100%, automatically disable Additional Discount
         if (discountPercent >= 100) {
             $('#editGroupIncludeDiscount').prop('checked', false);
@@ -1219,7 +1211,7 @@ function computeEditGroupTotal() {
     } else {
         $('#editGroupSeniorPwdDiscount').val(0);
         $('#editGroupSeniorPwdDiscountAmount').val('');
-        $('#editGroupSeniorPwdDiscountDisplay').hide();
+        $('#editGroupSeniorPwdReadOnly').hide();
     }
     
     const discount = $('#editGroupIncludeDiscount').prop('checked') ? (parseFloat($('#editGroupDiscount').val()) || 0) : 0;
@@ -1524,21 +1516,20 @@ function populateEditGroupForm(booking) {
     }
 
     // ================= SENIOR/PWD DISCOUNT (EDIT) =================
-    // If there is a stored Senior/PWD discount percentage on the group,
-    // enable the Senior/PWD section and prefill the percentage.
+    // No longer staff-editable (see editGroupSeniorPwdReadOnly) - if this
+    // booking already has one stored from before that change, load it into
+    // the hidden fields so it's preserved (read-only display, computed in
+    // computeEditGroupTotal) instead of silently getting zeroed on save.
     const seniorPercent = parseFloat(booking.seniorPwdDiscountPercent) || 0;
     const seniorCountFromDb = parseInt(booking.seniorPwdRoomCount, 10) || 0;
 
-    if (seniorPercent > 0) {
-        $('#editGroupIncludeSeniorPwdDiscount').prop('checked', true);
-        $('#editGroupSeniorPwdDiscountDisplay').show();
+    if (seniorPercent > 0 && seniorCountFromDb > 0) {
         $('#editGroupSeniorPwdDiscountPercent').val(seniorPercent);
-        // Use stored room count; default to 1 if somehow 0
-        $('#editGroupSeniorPwdRoomCount').val(seniorCountFromDb > 0 ? seniorCountFromDb : 1);
+        $('#editGroupSeniorPwdRoomCount').val(seniorCountFromDb);
     } else {
-        $('#editGroupIncludeSeniorPwdDiscount').prop('checked', false);
-        $('#editGroupSeniorPwdDiscountDisplay').hide();
-        $('#editGroupSeniorPwdDiscountPercent').val(20);
+        $('#editGroupSeniorPwdReadOnly').hide();
+        $('#editGroupSeniorPwdDiscountPercent').val(0);
+        $('#editGroupSeniorPwdRoomCount').val(0);
         $('#editGroupSeniorPwdDiscountAmount').val('');
         $('#editGroupSeniorPwdDiscount').val('0');
     }

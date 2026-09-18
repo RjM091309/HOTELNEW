@@ -878,6 +878,18 @@ function recomputeRateSummaryTotals() {
   document.getElementById('rateSummaryGrandTotal').textContent = formatPeso(grandTotal);
 
   updateRoomCheckerSummaryChip(nights, kingQty, queenQty, includeLateCheckout, lateCheckoutWaived);
+  updateRoomCheckerQuotationButtonVisibility(kingQty, queenQty);
+}
+
+// Quotation only makes sense once there's an actual committed date range AND
+// at least one King/Queen room typed in (the same two conditions
+// generateRoomCheckerQuotation itself validates before posting) - hidden
+// until both are true instead of always showing and erroring on click.
+function updateRoomCheckerQuotationButtonVisibility(kingQty, queenQty) {
+  const btn = document.getElementById('roomCheckerQuotationBtn');
+  if (!btn) return;
+  const hasRooms = (kingQty + queenQty) > 0;
+  btn.style.display = (roomCheckerHasCommittedSelection && hasRooms) ? '' : 'none';
 }
 
 // "How was this price arrived at" - turns a weekday/weekend rate + night-

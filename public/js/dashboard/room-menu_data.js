@@ -4431,7 +4431,7 @@ function buildCheckoutOverpaymentHtml(checkoutContext) {
 
     let helpText = 'Enter a cancellation fee if applicable.';
     if (hasOverpayment) {
-        helpText = 'Overpayment detected. Keep as penalty or check "With refund" to return excess to guest.';
+        helpText = 'Overpayment detected - refunding the excess to the guest by default. Uncheck "With refund" to keep it as a penalty instead.';
     } else if (isEarlyCheckout) {
         helpText = 'No overpayment from early checkout. You may still add a manual cancellation fee if needed.';
     }
@@ -4454,7 +4454,7 @@ function buildCheckoutOverpaymentHtml(checkoutContext) {
             <div id="cancellationFeeWrap" style="margin-top:10px; text-align:left;">
                 <label for="cancellationFeeInput" class="form-label" style="margin-bottom:4px;">Cancellation Fee / Penalty</label>
                 <input type="number" min="0" step="0.01" id="cancellationFeeInput" class="swal2-input" placeholder="0.00" style="width:100%; box-sizing:border-box; margin:0;">
-                <small id="cancellationFeeHelp" class="text-muted" style="display:block; margin-top:6px;">${hasOverpayment ? 'Auto-filled from overpayment. Edit if keeping a partial penalty.' : 'Optional. Added to the guest balance if entered.'}</small>
+                <small id="cancellationFeeHelp" class="text-muted" style="display:block; margin-top:6px;">${hasOverpayment ? '₱0 since the overpayment is being refunded above. Uncheck "With refund" (or lower the refund amount) to keep some of it as a penalty instead.' : 'Optional. Added to the guest balance if entered.'}</small>
             </div>
         </div>
     `;
@@ -4961,7 +4961,17 @@ function setupCheckoutOverpaymentControls(bookingId, checkoutContextCache) {
             chk.checked = false;
             if (wrap) wrap.style.display = 'none';
         } else {
+            // Default to refunding the overpayment (e.g. a guest who already
+            // paid in full and then checks out early) rather than quietly
+            // keeping it as a penalty - staff can still uncheck this to fall
+            // back to the old penalty behavior for an actual cancellation fee.
             chk.disabled = false;
+            chk.checked = true;
+            if (wrap) wrap.style.display = 'block';
+            if (input) {
+                input.value = formatInputNumber(currentOverpayment);
+                input.setAttribute('max', currentOverpayment);
+            }
         }
         chk.addEventListener('change', () => {
             if (!chk.disabled) {
@@ -5024,7 +5034,10 @@ function setupCheckoutOverpaymentControls(bookingId, checkoutContextCache) {
     }
 
     if (currentOverpayment > 0) {
-        cancellationFeeInput.value = formatInputNumber(currentOverpayment);
+        // "With refund" now defaults to checked above, so this should reflect
+        // that (cancellation fee = overpayment - refund = 0), not the old
+        // always-penalty default - syncCancellationFee() already does that math.
+        syncCancellationFee();
     } else {
         cancellationFeeInput.value = '';
     }
@@ -8337,16 +8350,43 @@ function initializeLateCheckoutModal() {
         });
     });
     
+    // Hotel policy: stays of 3+ nights get late check-out for free, no
+    // staff decision involved. Reads the "No. of Nights" value the general
+    // details modal (createDynamicRoomModal) already renders into
+    // #total-days-${bookingId} (from its own daysDiff, computed once
+    // regardless of which page the modal was opened from) - NOT a
+    // [data-booking-id] room card's data-checkin/data-checkout, since those
+    // attributes only exist on the Dashboard's own card grid
+    // (views/partials/booking-card.ejs) and are missing on every other page
+    // this same "Late C/O" button appears on (Booking, Agency, Calendar,
+    // etc.), which made the free-waiver silently never trigger there.
+    // Returns null (never waives) if the value can't be read, so the prompt
+    // still shows rather than silently guessing free.
+    function getLateCheckoutStayNights(bookingId) {
+        const el = document.getElementById(`total-days-${bookingId}`);
+        if (!el) return null;
+        const nights = parseInt(String(el.textContent || '').trim(), 10);
+        return Number.isFinite(nights) && nights > 0 ? nights : null;
+    }
+
     // ✅ Function to open late checkout modal
     window.openLateCheckoutModal = async function(roomId, checkoutDate, bookingId) {
         let lateCheckoutFee = 0;
-        try {
-            if (typeof window.promptLateCheckoutFee === 'function') {
-                lateCheckoutFee = await window.promptLateCheckoutFee({ defaultAmount: 2000 });
+        const nights = getLateCheckoutStayNights(bookingId);
+        const isFreeByPolicy = nights !== null && nights >= 3;
+
+        if (!isFreeByPolicy) {
+            try {
+                if (typeof window.promptLateCheckoutFee === 'function') {
+                    lateCheckoutFee = await window.promptLateCheckoutFee({ defaultAmount: 2000 });
+                }
+            } catch (_) {
+                return;
             }
-        } catch (_) {
-            return;
         }
+        // 3+ nights: skip the Free/Amount prompt entirely and go straight to
+        // fee = 0 - the existing "Apply free late check-out..." confirmation
+        // (processLateCheckout) still shows, it just already knows the answer.
 
         window.globalLateCheckoutRoomId = roomId;
         window.globalLateCheckoutBookingId = bookingId;

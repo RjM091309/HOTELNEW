@@ -18,7 +18,6 @@
           <input type="hidden" id="groupNights" name="groupNights" value="0">
           <input type="hidden" id="groupPaidAmountHidden" name="groupPaidAmountHidden" value="0">
           <input type="hidden" id="groupLateCheckoutFee" name="groupLateCheckoutFee" value="0">
-          <input type="hidden" id="groupSeniorPwdDiscount" name="groupSeniorPwdDiscount" value="0">
           <input type="hidden" id="groupChannelBookingIdHidden" name="channelBookingId" value="">
 
           <div class="group-two-col">
@@ -78,6 +77,11 @@
                   <option value="booking-channel">OTA / Channel</option>
                   <option value="manual_rate">Manual Price</option>
                   <option value="percentage">Manual Percent</option>
+                  <!-- Not manually pickable (disabled + hidden from the open list) - matches
+                       single booking's add_booking.ejs: only ever shown by
+                       syncGroupLongTermRateDropdown() once the stay hits 10+ nights, so the
+                       box reflects which rate is actually being charged. -->
+                  <option value="long_term" disabled style="display: none;">Long Term Stay</option>
                 </select>
               </div>
             </div>
@@ -306,27 +310,12 @@
           </div>
 
           <div class="row p-t-20">
-            <div class="col-lg-4">
-              <div class="form-check mb-2">
-                <input class="form-check-input" type="checkbox" id="groupIncludeSeniorPwdDiscount">
-                <label class="form-check-label" for="groupIncludeSeniorPwdDiscount">Senior/PWD Discount</label>
-              </div>
-              <div id="groupSeniorPwdDiscountDisplay" class="mt-2" style="display: none;">
-                <div class="mb-2">
-                  <label class="form-label mb-1" style="font-size: 12px;">Number of Senior/PWD Rooms:</label>
-                  <input type="number" class="form-control" id="groupSeniorPwdRoomCount" name="groupSeniorPwdRoomCount" placeholder="0" min="0" step="1" value="0" style="max-width: 120px;">
-                  <small class="text-muted" style="font-size: 11px;">Out of <span id="groupTotalRoomsDisplay">0</span> total rooms</small>
-                </div>
-                <div class="d-flex gap-2 align-items-center">
-                  <input type="number" class="form-control" id="groupSeniorPwdDiscountPercent" name="groupSeniorPwdDiscountPercent" placeholder="%" min="0" max="100" step="1" value="20" style="max-width: 80px;" oninput="if(this.value > 100) this.value = 100; if(this.value < 0) this.value = 0;">
-                  <label class="form-label mb-0" style="font-size: 12px;">%</label>
-                  <input type="text" class="form-control" id="groupSeniorPwdDiscountAmount" name="groupSeniorPwdDiscountAmount" placeholder="Auto-calculated" readonly style="background-color: #2a3135; color: #6f9c40; font-weight: bold; flex: 1;">
-                </div>
-              </div>
-            </div>
-            <div class="col-lg-4">
+            <div class="col-lg-6">
               <!-- Additional Discount - same Per Night / Manual Price modes as
-                   single booking's Add Booking form / general details. -->
+                   single booking's Add Booking form / general details. Senior/PWD
+                   Discount used to be a separate control here - removed as
+                   redundant now that this covers manual/per-night discounting
+                   generically (staff can just type the Senior/PWD amount here). -->
               <div class="discount-section-inline" id="groupDiscountSection">
                 <label class="form-label d-block mb-2">Additional Discount</label>
                 <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -352,7 +341,7 @@
               <input type="number" id="groupDiscount" name="groupDiscount" min="0" value="0" style="display: none;">
               <input type="hidden" id="groupDiscountRemarks" name="groupDiscountRemarks">
             </div>
-            <div class="col-lg-4">
+            <div class="col-lg-6">
               <div class="form-check mb-2">
                 <input class="form-check-input" type="checkbox" id="groupIndividualBilling">
                 <label class="form-check-label" for="groupIndividualBilling">Individual Billing</label>
@@ -422,10 +411,6 @@
               <div class="group-summary-line" id="groupSummaryLateCheckoutLine" style="display: none;">
                 <span>Late Checkout Fee</span>
                 <span id="groupSummaryLateCheckoutTotal">0.00</span>
-              </div>
-              <div class="group-summary-line" id="groupSummarySeniorPwdLine" style="display: none;">
-                <span>Senior/PWD Discount</span>
-                <span id="groupSummarySeniorPwdTotal">0.00</span>
               </div>
               <div class="group-summary-line" id="groupSummaryDiscountLine" style="display: none;">
                 <span>Additional Discount</span>
@@ -1716,11 +1701,6 @@
   color: #0e7490 !important;
 }
 
-[data-theme="white"] #modal-add-group-booking #groupSeniorPwdDiscountAmount {
-  background-color: #f3f4f6 !important;
-  color: #4f7a2a !important;
-}
-
 [data-theme="white"] #modal-group-flight-arrivals .modal-content {
   background-color: #ffffff !important;
   color: #111827 !important;
@@ -1984,8 +1964,57 @@
     'booking-channel': 'walk_in', 'manual_rate': 'walk_in', 'percentage': 'walk_in'
   };
 
+  // Long Term Stay promo bands (see config/roomRates.js LONG_TERM_BANDS, same
+  // source of truth - duplicated here since this is a browser script and
+  // can't require() that Node module). Each band is its own room_rates
+  // category with its own flat per-night rate.
+  const GROUP_LONG_TERM_BANDS = [
+    { min: 10, max: 14, category: 'long_term' },
+    { min: 15, max: 19, category: 'long_term_15' },
+    { min: 20, max: 24, category: 'long_term_20' },
+    { min: 25, max: 29, category: 'long_term_25' },
+    { min: 30, max: 31, category: 'long_term_30' },
+    { min: 32, max: null, category: 'long_term_over30' }
+  ];
+  function groupLongTermCategoryForNights(nights) {
+    const n = parseInt(nights, 10) || 0;
+    for (const band of GROUP_LONG_TERM_BANDS) {
+      if (n >= band.min && (band.max === null || n <= band.max)) return band.category;
+    }
+    return null;
+  }
+
+  // Long Term Stay (10+ nights) automatically overrides whichever category is
+  // selected, same as single booking's rateCategory() - resolved from the
+  // stay length rather than picked manually.
+  function isGroupLongTermStayRate() {
+    return (parseInt($('#groupNights').val(), 10) || 0) >= 10;
+  }
+
   function groupRateCategory() {
+    const longTermCat = groupLongTermCategoryForNights($('#groupNights').val());
+    if (longTermCat) return longTermCat;
     return GROUP_RATE_OPT_CAT[getGroupPriceBookingType()] || 'walk_in';
+  }
+
+  // Makes the "Room Rate" box itself show "Long Term Stay" once the override
+  // actually applies, instead of silently pricing every room at that rate
+  // while still showing whatever category was picked before - same fix as
+  // single booking's syncLongTermRateDropdown() in add_booking.js. Skipped
+  // for OTA / Manual Price / Percentage, which are explicit staff overrides.
+  function syncGroupLongTermRateDropdown() {
+    const select = document.getElementById('groupBookingRoute');
+    if (!select) return;
+    const currentVal = select.value;
+    if (currentVal === 'booking-channel' || currentVal === 'manual_rate' || currentVal === 'percentage') return;
+    if (isGroupLongTermStayRate() && currentVal !== 'long_term') {
+      select.value = 'long_term';
+      // .value doesn't fire 'change', so the dependent field toggles (which
+      // only listen for that event) need to be nudged manually.
+      toggleGroupAgencyFields(false);
+      toggleGroupChannelFields(false);
+      toggleGroupPercentageFields(false);
+    }
   }
 
   // Auto room rate for one night, sourced from room.ROOM_RATES - the same
@@ -2387,6 +2416,7 @@
     $('#groupDiscountRowAmount').text(`-₱${finalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
     $('#groupDiscountRowRemarks').text(finalRemarks);
     $('#groupDiscountRow').show();
+    $('#groupDiscountRemoveBtn').show();
   }
 
   function removeGroupDiscount() {
@@ -2396,6 +2426,7 @@
     $('#groupDiscountInput').val('');
     $('#groupDiscountRemarksInput').val('');
     $('#groupDiscountRow').hide();
+    $('#groupDiscountRemoveBtn').hide();
   }
 
   function resetGroupDiscountUI() {
@@ -2405,6 +2436,7 @@
     $('#groupDiscountInput').val('').attr('data-mode', 'pernight').hide();
     $('#groupDiscountRemarksInput').val('').hide();
     $('#groupDiscountApplyBtn').hide();
+    $('#groupDiscountRemoveBtn').hide();
     $('#groupDiscountHint').hide();
     $('#groupDiscountPerNightBtn, #groupDiscountManualBtn').removeClass('discount-mode-active');
     $('#groupDiscountRow').hide();
@@ -2413,6 +2445,7 @@
   }
 
   function refreshGroupRoomPricing() {
+    syncGroupLongTermRateDropdown();
     // Keep already-picked rooms. Re-running Search Rooms when switching to
     // Booking Channel used to drop extra rooms (e.g. 303) from the submit payload.
     const hasSelectedRooms = groupManualSelectedRooms.length > 0 || readCheckedRoomIdsFromDOM().length > 0;
@@ -2505,12 +2538,7 @@
     $('#groupFlightNumber, #groupPassengerCount').val('');
     $('#groupRoomBreakdown').removeClass('d-none');
     $('.consolidated-indicator').remove();
-    $('#groupIncludeSeniorPwdDiscount').prop('checked', false);
-    $('#groupSeniorPwdDiscountDisplay').hide();
-    $('#groupSeniorPwdDiscountPercent').val('20'); // Reset to default 20%
-    $('#groupSeniorPwdDiscountAmount').val('');
-    $('#groupSeniorPwdDiscount').val('0');
-    
+
     // Reset group name and contact fields (remove readonly and restore styling)
     $('#groupName').prop('readonly', false).css('background-color', '');
     if (window.ContactChannel) {
@@ -2548,6 +2576,7 @@
           $('#groupNights').val(nights);
           instance.input.value = `${dateStr} (${nights} night/s)`;
           updateGroupWeekendToggleVisibility();
+          syncGroupLongTermRateDropdown();
           if (getGroupSelectedRoomsForPricing().length) {
             updateManualSelectedRoomValues();
           }
@@ -2828,6 +2857,7 @@
   }
 
   function computeGroupTotal() {
+    syncGroupLongTermRateDropdown();
     const nights = parseInt($('#groupNights').val(), 10) || 0;
 
     // Always rebuild selection from checked boxes when the room list is visible
@@ -2907,66 +2937,7 @@
 
     // Always calculate the full total in frontend for user visibility
     const subtotal = roomSubtotal + servicesTotal + lateCheckoutFeeTotal;
-    
-    // Senior/PWD Discount (percentage-based)
-    const seniorPwdDiscountChecked = $('#groupIncludeSeniorPwdDiscount').prop('checked');
-    let seniorPwdDiscountAmount = 0;
-    
-    // Update total rooms display
-    $('#groupTotalRoomsDisplay').text(numRooms);
-    
-    // Calculate Senior/PWD discount (percentage of ROOM CHARGES ONLY, not services)
-    if (seniorPwdDiscountChecked && roomSubtotal > 0 && numRooms > 0) {
-        let discountPercent = parseFloat($('#groupSeniorPwdDiscountPercent').val()) || 20; // Default to 20%
-        let seniorPwdRoomCount = parseInt($('#groupSeniorPwdRoomCount').val()) || 0;
-        
-        // Enforce maximum of 100%
-        if (discountPercent > 100) {
-            discountPercent = 100;
-            $('#groupSeniorPwdDiscountPercent').val(100);
-        }
-        if (discountPercent < 0) {
-            discountPercent = 0;
-            $('#groupSeniorPwdDiscountPercent').val(0);
-        }
-        
-        // Ensure Senior/PWD room count doesn't exceed total rooms
-        if (seniorPwdRoomCount > numRooms) {
-            seniorPwdRoomCount = numRooms;
-            $('#groupSeniorPwdRoomCount').val(numRooms);
-        }
-        if (seniorPwdRoomCount < 0) {
-            seniorPwdRoomCount = 0;
-            $('#groupSeniorPwdRoomCount').val(0);
-        }
-        
-        // Calculate discount only for Senior/PWD rooms
-        // Since room prices can differ (1-bed vs 2-bed), we apply discount to the most expensive rooms first
-        // Sort prices from highest to lowest and apply discount to top N rooms (where N = seniorPwdRoomCount)
-        const sortedPrices = [...prices].sort((a, b) => b - a); // Sort descending (highest first)
-        const seniorPwdPrices = sortedPrices.slice(0, seniorPwdRoomCount); // Get top N most expensive rooms
-        const seniorPwdRoomChargesPerNight = seniorPwdPrices.reduce((sum, price) => sum + price, 0);
-        const seniorPwdRoomCharges = seniorPwdRoomChargesPerNight * nights; // Total charges for Senior/PWD rooms
-        const discountDecimal = discountPercent / 100; // Convert percentage to decimal
-        seniorPwdDiscountAmount = seniorPwdRoomCharges * discountDecimal; // Apply only to Senior/PWD room charges
-        
-        $('#groupSeniorPwdDiscount').val(seniorPwdDiscountAmount.toFixed(2));
-        $('#groupSeniorPwdDiscountAmount').val('₱' + seniorPwdDiscountAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-        $('#groupSeniorPwdDiscountDisplay').show();
-        
-        // If Senior/PWD discount is 100%, automatically disable Additional Discount
-        if (discountPercent >= 100) {
-            $('#groupIncludeDiscount').prop('checked', false);
-            $('#groupDiscountWrapper').hide();
-            $('#groupDiscount').val('0');
-        }
-    } else {
-        $('#groupSeniorPwdDiscount').val(0);
-        $('#groupSeniorPwdDiscountAmount').val('');
-        $('#groupSeniorPwdDiscountDisplay').hide();
-    }
-    
-    // Read discount AFTER Senior/PWD discount check (so it reflects the auto-disable if 100%)
+
     const discount = $('#groupIncludeDiscount').prop('checked') ? (parseFloat($('#groupDiscount').val()) || 0) : 0;
 
     // Itemized add-on/discount lines in the Summary card - each only shown once
@@ -2991,12 +2962,10 @@
     $('#groupSummaryExtraBedTotal').text(summaryLineFmt(extraBedTotal));
     $('#groupSummaryLateCheckoutLine').toggle(lateCheckoutFeeTotal > 0);
     $('#groupSummaryLateCheckoutTotal').text(summaryLineFmt(lateCheckoutFeeTotal));
-    $('#groupSummarySeniorPwdLine').toggle(seniorPwdDiscountAmount > 0);
-    $('#groupSummarySeniorPwdTotal').text('-' + summaryLineFmt(seniorPwdDiscountAmount));
     $('#groupSummaryDiscountLine').toggle(discount > 0);
     $('#groupSummaryDiscountTotal').text('-' + summaryLineFmt(discount));
 
-    let finalBalance = subtotal - seniorPwdDiscountAmount - discount;
+    let finalBalance = subtotal - discount;
     
     // Ensure finalBalance is not negative
     if (finalBalance < 0) {
@@ -4272,6 +4241,7 @@
   }
 
   function updateManualSelectedRoomValues() {
+    syncGroupLongTermRateDropdown();
     const selectedRooms = getGroupSelectedRoomsForPricing();
     const { prices, pricing } = syncGroupSelectedRoomPrices();
 
@@ -4281,6 +4251,7 @@
   }
 
   function updateManualSelectedRoomValuesWithoutRecreating() {
+    syncGroupLongTermRateDropdown();
     const selectedRooms = getGroupSelectedRoomsForPricing();
     const { prices, pricing } = syncGroupSelectedRoomPrices();
 
@@ -4460,11 +4431,6 @@
     }
 
     $('#groupBookingForm').on('input change', computeGroupTotal);
-    
-    // Senior/PWD discount change handler
-    $('#groupIncludeSeniorPwdDiscount').on('change', function() {
-      computeGroupTotal();
-    });
 
     // Paid amount formatting and update handler
     $('#groupPaidAmount').on('blur', function() {
@@ -4498,24 +4464,6 @@
     });
 
     // Toggle wrappers and recalc
-    $('#groupIncludeSeniorPwdDiscount').on('change', function() {
-      computeGroupTotal();
-    });
-
-    // Recalculate when percentage changes
-    $('#groupSeniorPwdDiscountPercent').on('input change', function() {
-      if ($('#groupIncludeSeniorPwdDiscount').prop('checked')) {
-        computeGroupTotal();
-      }
-    });
-    
-    // Recalculate when number of Senior/PWD rooms changes
-    $('#groupSeniorPwdRoomCount').on('input change', function() {
-      if ($('#groupIncludeSeniorPwdDiscount').prop('checked')) {
-        computeGroupTotal();
-      }
-    });
-
     $('#groupIncludeDiscount').on('change', function() {
       if (!this.checked) { $('#groupDiscount').val('0'); }
       updateGroupChargeBreakdown();
@@ -4852,7 +4800,6 @@
         balance: numericBalance,
         checkOutStatus: $('#groupCheckOutStatus').val() || 0,
         lateCheckoutFee: parseFloat($('#groupLateCheckoutFee').val()) || 0,
-        seniorPwdDiscount: $('#groupIncludeSeniorPwdDiscount').is(':checked') ? parseFloat($('#groupSeniorPwdDiscount').val()) || 0 : 0,
         discount: $('#groupIncludeDiscount').is(':checked') ? (parseFloat($('#groupDiscount').val()) || 0) : 0,
         reservationFee: 0, // Default to 0 for group bookings
         roomCharges: roomCharges.toFixed(2),
@@ -4875,5 +4822,5 @@
 })();
 </script>
 <script src="/js/booking/contact_channel.js?v=2"></script>
-<script src="/js/booking/group_booking_submit.js?v=discount-fix-1"></script>
+<script src="/js/booking/group_booking_submit.js?v=remove-senior-pwd-1"></script>
 

@@ -86,6 +86,11 @@
                                       <option value="booking-channel" data-base-label="OTA / Channel">OTA / Channel</option>
                                       <option value="manual_rate" data-base-label="Manual Price">Manual Price</option>
                                       <option value="percentage" data-base-label="Manual Percent">Manual Percent</option>
+                                      <!-- Not manually pickable (disabled + hidden from the open list) - this
+                                           only ever gets shown by syncLongTermRateDropdown() once the stay
+                                           hits 10+ nights, so the box reflects which rate is actually being
+                                           charged instead of still showing whatever was selected before. -->
+                                      <option value="long_term" data-base-label="Long Term Stay" disabled style="display: none;">Long Term Stay</option>
                                   </select>
                               </div>
                           </div>
@@ -510,7 +515,7 @@
 		document.body.appendChild(bookingScript);
 		bookingScript.onload = function() {
 			var bookingBillingScript = document.createElement('script');
-			bookingBillingScript.src = '/js/booking/add_booking.js?v=add-discount-1';
+			bookingBillingScript.src = '/js/booking/add_booking.js?v=long-term-bands-1';
 			document.body.appendChild(bookingBillingScript);
 		};
 

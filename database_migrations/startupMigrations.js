@@ -566,16 +566,51 @@ async function runRoomRatesMigrations() {
   // flat) until an admin sets real Peak pricing on the Room Rates page.
   // INSERT IGNORE against the (SEASON, ...) unique key above - never
   // overwrites a Peak amount that's already been edited, and is safe to
-  // re-run on every restart.
+  // re-run on every restart. Every Long Term Stay band (long_term,
+  // long_term_15/20/25/30/over30) is excluded here - each is a flat,
+  // guest-independent-of-season rate (see the block right below), not a
+  // seasonal rate sheet that needs a Peak variant at all.
   try {
     await queryDatabasePromise(
       `INSERT IGNORE INTO room_rates (SEASON, CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST, AMOUNT)
        SELECT 'peak', CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST, AMOUNT + 500
-         FROM room_rates WHERE SEASON = 'lean'`
+         FROM room_rates WHERE SEASON = 'lean' AND CATEGORY NOT LIKE 'long_term%'`
     );
     console.log('✅ Ensured seed: room_rates peak season (Lean + ₱500 placeholder)');
   } catch (e) {
     console.warn('⚠️ room_rates peak season seed:', e.message);
+  }
+
+  // Every Long Term Stay band (10+ nights) is one flat rate regardless of
+  // season - Peak gets the exact same amount as Lean (not the +500
+  // placeholder every other category gets above), since a long-term guest's
+  // rate isn't meant to move with Lean/Peak at all. INSERT IGNORE seeds each
+  // band once; the UPDATE right after corrects any Peak rows an earlier
+  // version of this migration mistakenly seeded at +500 before these
+  // categories were excluded above - harmless once already matching, and
+  // never touches Lean.
+  try {
+    await queryDatabasePromise(
+      `INSERT IGNORE INTO room_rates (SEASON, CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST, AMOUNT)
+       SELECT 'peak', CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST, AMOUNT
+         FROM room_rates WHERE SEASON = 'lean' AND CATEGORY LIKE 'long_term%'`
+    );
+    const fixed = await queryDatabasePromise(
+      `UPDATE room_rates peak
+         JOIN room_rates lean
+           ON lean.SEASON = 'lean' AND lean.CATEGORY = peak.CATEGORY
+          AND lean.CATEGORY LIKE 'long_term%'
+          AND lean.DAY_RANGE = peak.DAY_RANGE AND lean.ROOM_TYPE_ID = peak.ROOM_TYPE_ID
+          AND lean.BREAKFAST = peak.BREAKFAST
+          SET peak.AMOUNT = lean.AMOUNT
+        WHERE peak.SEASON = 'peak' AND peak.CATEGORY LIKE 'long_term%'
+          AND peak.AMOUNT != lean.AMOUNT`
+    );
+    if (fixed.affectedRows) {
+      console.log(`✅ Corrected ${fixed.affectedRows} Long Term Stay Peak row(s) to match Lean (flat, season-independent rate)`);
+    }
+  } catch (e) {
+    console.warn('⚠️ room_rates long_term peak seed:', e.message);
   }
 
   // FK room_rates.ROOM_TYPE_ID -> room_type.IDNo.

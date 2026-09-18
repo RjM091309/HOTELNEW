@@ -43,6 +43,42 @@ function getStayNights() {
 }
 window.getStayNights = getStayNights;
 
+// Long Term Stay promo bands (see config/roomRates.js LONG_TERM_BANDS, same
+// source of truth - duplicated here since this is a browser script and can't
+// require() that Node module). Each band is its own room_rates category with
+// its own flat per-night rate; the printed promo card's numbers don't reduce
+// to one clean discount formula across bands, so this is a lookup table, not
+// a percentage calculation.
+const LONG_TERM_BANDS = [
+    { min: 10, max: 14, category: 'long_term' },
+    { min: 15, max: 19, category: 'long_term_15' },
+    { min: 20, max: 24, category: 'long_term_20' },
+    { min: 25, max: 29, category: 'long_term_25' },
+    { min: 30, max: 31, category: 'long_term_30' },
+    { min: 32, max: null, category: 'long_term_over30' }
+];
+function longTermCategoryForNights(nights) {
+    const n = parseInt(nights, 10) || 0;
+    for (const band of LONG_TERM_BANDS) {
+        if (n >= band.min && (band.max === null || n <= band.max)) return band.category;
+    }
+    return null;
+}
+
+// Auto-checks (never auto-unchecks, in case staff checked it manually for a
+// shorter stay for an unrelated reason) the existing "Long-Term Stay"
+// checkbox once the stay hits 10+ nights - same threshold that flips the
+// Room Rate over to the Long Term Stay rate (see rateCategory() further
+// down), so the flag on the booking record matches the rate actually applied.
+function syncLongTermStayCheckbox() {
+    const checkbox = document.getElementById('includeLongTermStay');
+    if (!checkbox || checkbox.checked) return;
+    if (getStayNights() >= 10) {
+        checkbox.checked = true;
+        checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+}
+
 function parseDisplayDate(dateStr) {
     if (!dateStr) return null;
     const trimmed = dateStr.trim();
@@ -412,6 +448,7 @@ function applyAddBookingDiscount() {
     $('#addBookingDiscountRowAmount').text(`-₱${finalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
     $('#addBookingDiscountRowRemarks').text(finalRemarks);
     $('#addBookingDiscountRow').show();
+    $('#addBookingDiscountRemoveBtn').show();
 
     if (typeof toastSuccess === 'function') {
         toastSuccess('Discount applied', `-₱${finalAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`);
@@ -425,6 +462,7 @@ function removeAddBookingDiscount() {
     $('#addBookingDiscountInput').val('');
     $('#addBookingDiscountRemarksInput').val('');
     $('#addBookingDiscountRow').hide();
+    $('#addBookingDiscountRemoveBtn').hide();
 }
 
 function resetAddBookingDiscountUI() {
@@ -434,6 +472,7 @@ function resetAddBookingDiscountUI() {
     $('#addBookingDiscountInput').val('').attr('data-mode', 'pernight').hide();
     $('#addBookingDiscountRemarksInput').val('').hide();
     $('#addBookingDiscountApplyBtn').hide();
+    $('#addBookingDiscountRemoveBtn').hide();
     $('#addBookingDiscountHint').hide();
     $('#addBookingDiscountPerNightBtn, #addBookingDiscountManualBtn').removeClass('discount-mode-active');
     $('#addBookingDiscountRow').hide();
@@ -526,6 +565,7 @@ function initializeFlatpickr() {
                 // Also update base price calculation if needed
                 updateWeekendPriceUI();
                 computeTotal();
+                syncLongTermStayCheckbox();
             }
         }
     });
@@ -660,6 +700,17 @@ async function handleLateCheckoutStatusChange(previousStatus) {
     const status = $status.val();
 
     if (status == 1) {
+        // Hotel policy: stays of 3+ nights get late check-out for free, no
+        // staff decision involved - same threshold as the existing booking's
+        // "Late C/O" button (room-menu_data.js's getLateCheckoutStayNights).
+        // Skips the Free/Amount prompt entirely and goes straight to ₱0.
+        if (getStayNights() >= 3) {
+            $('#lateCheckoutFee').val(0);
+            $('#lateCheckoutFeeInput').val(0);
+            $('#lateCheckoutFeeDisplay').show();
+            computeTotal();
+            return;
+        }
         try {
             const existingFee = parseFloat($('#lateCheckoutFee').val()) || 0;
             const fee = await window.promptLateCheckoutFee({
@@ -1591,7 +1642,19 @@ $(document).ready(function () {
                 // NEW pricing source: room_rates matrix (room.ROOM_RATES), keyed by
                 // category (booking route) x day range (weekday/weekend) x breakfast.
                 // room.ROOM_PRICE / room_type.BASE_PRICE are no longer used.
+                // Long Term Stay (10+ nights) automatically overrides whichever
+                // category is selected in the dropdown - matches how Lean/Peak
+                // season is resolved automatically from the date rather than
+                // picked manually. Only the automatic path is overridden: OTA /
+                // Manual Price / Percentage never call rateCategory() at all
+                // (they return before it in updateSeasonalPrice()), so a staff
+                // member who explicitly typed/percented a price keeps full control.
+                function isLongTermStayRate() {
+                    return getStayNights() >= 10;
+                }
                 function rateCategory() {
+                    const longTermCat = longTermCategoryForNights(getStayNights());
+                    if (longTermCat) return longTermCat;
                     const t = getPriceBookingType();               // 'walk-in' | 'agency' | ...
                     if (t === 'agency') return 'agency';
                     if (t === 'tenant') return 'tenant';
@@ -1599,6 +1662,30 @@ $(document).ready(function () {
                     if (t === 'employee') return 'employee';
                     if (t === 'senior' || t === 'senior_special') return 'senior_special';
                     return 'walk_in';
+                }
+
+                // Makes the "Room Rate" box itself show "Long Term Stay" once the
+                // override actually applies, instead of silently charging that
+                // rate while still showing whatever category was picked before -
+                // the dropdown option is disabled/hidden (see add_booking.ejs) so
+                // staff can't pick it directly, only ever land on it via this.
+                // Skipped for Manual Price / Percentage - those are explicit
+                // staff overrides and should keep showing their own label.
+                function syncLongTermRateDropdown() {
+                    const select = document.getElementById('bookingRoute');
+                    if (!select) return;
+                    if (isManualEntryPricing() || isPercentagePricing()) return;
+                    if (isLongTermStayRate() && select.value !== 'long_term') {
+                        select.value = 'long_term';
+                        // Setting .value directly doesn't fire 'change', so the
+                        // Agency/Channel/Percentage field toggles (which only
+                        // listen for that event) need to be nudged manually -
+                        // otherwise e.g. the Agency picker could stay visible
+                        // under a booking that's now showing Long Term Stay.
+                        if (typeof handleBookingRouteDependentFields === 'function') {
+                            handleBookingRouteDependentFields('long_term');
+                        }
+                    }
                 }
                 function breakfastKey() {
                     if (!$('#includeBreakfast').is(':checked')) return 'no';
@@ -1625,7 +1712,8 @@ $(document).ready(function () {
                 const RATE_OPT_CAT = {
                     'walk-in': 'walk_in', 'agency': 'agency', 'tenant': 'tenant',
                     'vip': 'vip', 'employee': 'employee', 'senior_special': 'senior_special',
-                    'booking-channel': 'walk_in', 'manual_rate': 'walk_in', 'percentage': 'walk_in'
+                    'booking-channel': 'walk_in', 'manual_rate': 'walk_in', 'percentage': 'walk_in',
+                    'long_term': 'long_term'
                 };
                 function refreshRateOptionLabels() {
                     const bf = breakfastKey();
@@ -1645,7 +1733,14 @@ $(document).ready(function () {
                         let base = $o.data('base-label');
                         if (!base) { base = $o.text().replace(/\s+[—-]\s+₱.*$/, '').trim(); $o.data('base-label', base); }
                         if (mixed || val === 'percentage' || val === 'manual_rate') { $o.text(base); return; }
-                        const cat = RATE_OPT_CAT[val] || 'walk_in';
+                        // 10+ nights: every automatic category resolves to
+                        // whichever Long Term Stay band the night count falls
+                        // into (see rateCategory()), so every option previews
+                        // that same band's price instead of its own normal
+                        // one - picking any of them ends up charging the same
+                        // amount anyway.
+                        const longTermCat = longTermCategoryForNights(getStayNights());
+                        const cat = longTermCat || (RATE_OPT_CAT[val] || 'walk_in');
                         const rr = room.ROOM_RATES && room.ROOM_RATES[season] && room.ROOM_RATES[season][cat];
                         let amt = 0;
                         if (rr) {
@@ -1657,7 +1752,7 @@ $(document).ready(function () {
                         // Employee/Senior, which bake a preset % into their
                         // base label) - compute it live off the Walk-in rate
                         // so the dropdown reads the same way as those do.
-                        if (val === 'agency' && amt > 0) {
+                        if (val === 'agency' && amt > 0 && !isLongTermStayRate()) {
                             const wiRR = room.ROOM_RATES && room.ROOM_RATES[season] && room.ROOM_RATES[season]['walk_in'];
                             const wiAmt = wiRR ? Number((wiRR[range] && wiRR[range][bf])
                                 || (wiRR.weekday && wiRR.weekday[bf])
@@ -1689,9 +1784,11 @@ $(document).ready(function () {
                     }
                 }
                 function recalcRates() {
+                    syncLongTermRateDropdown();
                     updateSeasonalPrice();
                     refreshRateOptionLabels();
                     updateBreakfastNote();
+                    syncLongTermStayCheckbox();
                 }
 
                 // OTA / Channel and Manual Rate don't have their own rate
@@ -1816,7 +1913,10 @@ $(document).ready(function () {
                         return;
                     }
                     $('#price').prop('readonly', true);
-                    $('#priceRateNote').text('Auto from Room Rates');
+                    const activeLongTermBand = LONG_TERM_BANDS.find((b) => b.category === longTermCategoryForNights(getStayNights()));
+                    $('#priceRateNote').text(activeLongTermBand
+                        ? `Long Term Stay rate (${activeLongTermBand.max === null ? activeLongTermBand.min + '+' : activeLongTermBand.min + '-' + activeLongTermBand.max} nights)`
+                        : 'Auto from Room Rates');
 
                     const refSeason = countNightBreakdown().refSeason || 'lean';
                     const otherSeason = refSeason === 'peak' ? 'lean' : 'peak';
