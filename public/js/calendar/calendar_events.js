@@ -903,6 +903,7 @@ function buildEventTooltipHtml(event) {
   add('Payment', payText, payAccent);
   if (p.totalCost != null) add('Total', '₱' + Number(p.totalCost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
   if (p.hasPickup) add('Transport', '✈ Pick-up / Drop-off');
+  if (p.breakfastQty > 0) add('Breakfast', `🍳 ${p.breakfastQty}`);
   if (p.isLongTermStay) add('Note', 'Long-term stay');
   if (p.isBackToBack) add('Note', 'Back-to-back');
   if (p.holdPending) add('Note', 'Hold pending');

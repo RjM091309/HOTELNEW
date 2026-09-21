@@ -382,6 +382,10 @@
                       <input class="form-check-input" type="checkbox" id="groupWeekendPriceToggle" name="groupWeekendPriceToggle">
                       <label class="form-check-label" for="groupWeekendPriceToggle">Separate Weekend Rate</label>
                     </div>
+                    <div class="form-check mb-0">
+                      <input class="form-check-input" type="checkbox" id="groupIncludeContractedRate" name="groupIncludeContractedRate">
+                      <label class="form-check-label" for="groupIncludeContractedRate">Contracted Rate (-₱200/night, all rooms)</label>
+                    </div>
                   </div>
                 </div>
                 <div id="groupWeekendNightBreakdown" class="text-muted mb-2" style="font-size: 11px; display: none;"></div>
@@ -2054,7 +2058,19 @@
     }
   }
 
+  // Contracted Rate: fixed -₱200/night, applied on top of whatever the
+  // category/day/breakfast/season lookup (or legacy fallback) resolves to.
+  const GROUP_CONTRACTED_RATE_PER_NIGHT = 200;
+
   function resolveGroupRoomPrice(room, checkInDate) {
+    const base = resolveGroupRoomPriceBase(room, checkInDate);
+    if ($('#groupIncludeContractedRate').is(':checked')) {
+      return Math.max(0, base - GROUP_CONTRACTED_RATE_PER_NIGHT);
+    }
+    return base;
+  }
+
+  function resolveGroupRoomPriceBase(room, checkInDate) {
     const cat = groupRateCategory();
     const rr = room.ROOM_RATES || {};
     const bf = groupBreakfastKey();
@@ -3296,6 +3312,15 @@
   }
 
   function attachManualRateHandlers() {
+    $(document).off('change.groupContractedRate', '#groupIncludeContractedRate');
+    $(document).on('change.groupContractedRate', '#groupIncludeContractedRate', function() {
+      // Rebuild #groupSelectedRoomPrices from whatever's currently checked in
+      // the DOM so the -₱200/night takes effect immediately, same as toggling
+      // Manual Rates / Separate Weekend Rate does below.
+      syncGroupSelectionFromDOM();
+      computeGroupTotal();
+    });
+
     $(document).off('change.groupPricingToggles', '#groupEnableManualRates, #groupWeekendPriceToggle');
     $(document).on('change.groupPricingToggles', '#groupEnableManualRates, #groupWeekendPriceToggle', function() {
       const selectedRooms = getGroupSelectedRoomsForPricing();

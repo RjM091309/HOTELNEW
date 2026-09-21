@@ -128,8 +128,15 @@
         };
     };
     
-    // Allow MaterialTabs to work but with error handling
-    window.MaterialTabs = function(element) {
+    // Allow MaterialTabs to work but with error handling.
+    // Kept as a local reference (SafeMaterialTabs), not just window.MaterialTabs -
+    // the real material.min.js loads AFTER this file (see scripts.ejs) and
+    // unconditionally does its own "window.MaterialTabs = MaterialTabs;" on
+    // load, clobbering this safe version on the global. Assigning it to
+    // window.MaterialTabs too (below) is harmless/for compatibility, but the
+    // tab-init code further down must call SafeMaterialTabs directly so it
+    // isn't silently using the real, buggy constructor after that clobber.
+    const SafeMaterialTabs = function(element) {
         return {
             init: function() {
                 try {
@@ -168,7 +175,8 @@
             toggle: function() {}
         };
     };
-    
+    window.MaterialTabs = SafeMaterialTabs;
+
     // Store original componentHandler before overriding
     window.addEventListener('load', function() {
         try {
@@ -200,21 +208,23 @@
                     }
                 });
                 
-                // Initialize tabs
+                // Initialize tabs - always use this file's own safe MaterialTabs
+                // (defined above), never the real material.min.js component.
+                // That real one only supports <a href="#panel"> tabs and calls
+                // this.tab_.getAttribute('href').charAt(0) unconditionally -
+                // this app's tabs are plain <div data-target="..."> (see
+                // dashboard.ejs's Real-Time Booking Monitor tab bar), so
+                // getAttribute('href') returns null and .charAt(0) throws.
+                // That throw happens inside the tab's own click handler, set
+                // up asynchronously after this init call returns, so it was
+                // never actually caught by the try/catch below - it surfaced
+                // as an uncaught error on every tab click regardless.
                 tabs.forEach(function(tab) {
                     try {
-                        if (window.originalComponentHandler && window.originalComponentHandler.upgradeElement) {
-                            window.originalComponentHandler.upgradeElement(tab, 'MaterialTabs');
-                        } else {
-                            // Fallback: initialize manually
-                            const tabComponent = new window.MaterialTabs(tab);
-                            tabComponent.init();
-                        }
+                        const tabComponent = new SafeMaterialTabs(tab);
+                        tabComponent.init();
                     } catch (error) {
                         console.warn('Tab initialization error prevented:', error);
-                        // Fallback: initialize manually
-                        const tabComponent = new window.MaterialTabs(tab);
-                        tabComponent.init();
                     }
                 });
             }, 500);

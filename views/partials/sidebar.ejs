@@ -104,7 +104,7 @@
 					</a>
 				</li>
 
-				<% const bookingPages = ['booking', 'unassigned-rooms', 'room-checker', 'check-in-notifier', 'breakfast-list', 'cancelled-booking', 'flight_schedule', 'pickup_drop']; %>
+				<% const bookingPages = ['booking', 'unassigned-rooms', 'room-checker', 'check-in-notifier', 'breakfast-list', 'cancelled-booking', 'flight_schedule', 'pickup_drop', 'quotation']; %>
 				<li class="nav-item <%= bookingPages.includes(activePage) ? 'open' : '' %>">
 					<a class="nav-link nav-toggle nav-main-link-submenu <%= bookingPages.includes(activePage) ? 'active' : '' %>" data-toggle="submenu" aria-haspopup="true"
 						aria-expanded="<%= bookingPages.includes(activePage) ? 'true' : 'false' %>" href="#">
@@ -159,6 +159,12 @@
 							<a href="/calendar/unassigned-rooms" class="nav-link <%= activePage === 'unassigned-rooms' ? 'active' : '' %>">
 								<i class="fa fa-genderless"></i>
 								<span class="title">Unassigned Rooms</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a href="/booking/quotation" class="nav-link <%= activePage === 'quotation' ? 'active' : '' %>">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Quotation</span>
 							</a>
 						</li>
 						<!-- Rooms and Guest moved to Management -->

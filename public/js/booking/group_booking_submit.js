@@ -224,6 +224,7 @@ $(document).ready(function () {
       individualBilling: individualBilling ? 'on' : '', // Inverted logic
       perRoomDiscounts,
       lateCheckoutFee,
+      isContractedRate: $('#groupIncludeContractedRate').is(':checked') ? 1 : 0,
       existingGroupId: isJoiningGroup ? existingGroupId : null // Include existing group ID if joining
     };
 

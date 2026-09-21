@@ -194,6 +194,20 @@ async function runLongTermStayMigrations() {
   );
 }
 
+async function runContractedRateMigrations() {
+  if (!(await tableExists('booking'))) {
+    console.warn('⚠️ booking table not found, skipping contracted rate column migration');
+    return;
+  }
+
+  await ensureColumn(
+    'booking',
+    'IS_CONTRACTED_RATE',
+    `IS_CONTRACTED_RATE TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'Contracted rate applied - room rate reduced by a fixed amount per night'`,
+    'ROOM_CHANGE_NOTE'
+  );
+}
+
 async function indexExists(tableName, indexName) {
   const rows = await queryDatabasePromise(
     `SELECT COUNT(*) AS cnt
@@ -945,6 +959,7 @@ async function runStartupMigrations() {
   await runPickupDropMigrations();
   await runReceiptMigrations();
   await runLongTermStayMigrations();
+  await runContractedRateMigrations();
   await runHoldPendingMigrations();
   await runChannelBookingIdMigrations();
   await runCalendarPerformanceMigrations();

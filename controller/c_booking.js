@@ -112,6 +112,28 @@ class BookingController {
     }
   }
 
+  static async renderQuotationPage(req, res) {
+    try {
+      const user = req.user ? {
+        FULLNAME: req.user.FULLNAME,
+        PERMISSIONS: req.user.PERMISSIONS
+      } : null;
+
+      res.render('booking/quotation', {
+        title: 'Quotation',
+        subTitle: 'Quotation',
+        activePage: 'quotation',
+        user
+      });
+    } catch (error) {
+      console.error('Error rendering quotation page:', error);
+      res.status(500).render('error/500', {
+        title: 'Server Error',
+        subTitle: '500 Error'
+      });
+    }
+  }
+
   static async getBreakfastListData(req, res) {
     try {
       // 'today'   -> breakfast served this morning (guests who slept last night)
@@ -746,6 +768,7 @@ class BookingController {
         lateCheckoutFee,
         isLongTermStay,
         roomChangeNote,
+        isContractedRate,
         isMaintenance,
         channelBookingId
     } = req.body;
@@ -943,6 +966,7 @@ class BookingController {
         lateCheckoutFee,
         isLongTermStay: isLongTermStay == 1 || isLongTermStay === 'true' || isLongTermStay === true,
         roomChangeNote: roomChangeNote && String(roomChangeNote).trim() !== '' ? String(roomChangeNote).trim() : null,
+        isContractedRate: isContractedRate == 1 || isContractedRate === 'true' || isContractedRate === true,
         channelBookingId: String(channelBookingId || '').trim() || null
       });
 
@@ -1844,6 +1868,7 @@ class BookingController {
         perRoomDiscounts,
         directReservationFlag,
         lateCheckoutFee = 0,
+        isContractedRate,
         existingGroupId = null // ID of existing group to join (if joining)
       } = req.body;
 
@@ -1968,6 +1993,7 @@ class BookingController {
         consolidatedBilling,
         perRoomDiscounts,
         lateCheckoutFee,
+        isContractedRate: isContractedRate == 1 || isContractedRate === 'true' || isContractedRate === true,
         encodedBy,
         date,
         isDirectReservation: directReservationFlag === 'true',
@@ -2091,6 +2117,7 @@ class BookingController {
         individualBilling: individualBillingValue,
         perRoomDiscounts,
         lateCheckoutFee = 0,
+        isContractedRate,
         individualBookingDates = null // Individual booking dates if they differ from main date range
       } = req.body;
 
@@ -2171,6 +2198,7 @@ class BookingController {
         perRoomDiscounts,
         consolidatedBilling: individualBillingValue !== 'on', // Inverted logic: unchecked = consolidated
         lateCheckoutFee: lateCheckoutFeeNum,
+        isContractedRate: isContractedRate == 1 || isContractedRate === 'true' || isContractedRate === true,
         encodedBy,
         date
       });

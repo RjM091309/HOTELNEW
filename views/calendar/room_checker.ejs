@@ -493,6 +493,18 @@
     color: #fff !important;
   }
 
+  /* #roomCheckerQuotationBtn (above) is styled white-text-on-transparent for
+     the dark page background - in light theme that's white text on a white
+     page, effectively an empty box. */
+  [data-theme="white"] #roomCheckerQuotationBtn {
+    color: #111827;
+    border-color: rgba(0, 0, 0, 0.3);
+  }
+  [data-theme="white"] #roomCheckerQuotationBtn:hover {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.5);
+  }
+
   /* Selection recap chip next to Proceed Booking - see updateRoomCheckerSummaryChip
      in room_checker.js. Same blue used everywhere else on this page (range
      highlight, active presets) so it reads as "this is what you selected". */

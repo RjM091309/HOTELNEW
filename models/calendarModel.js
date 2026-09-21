@@ -323,6 +323,13 @@ class CalendarModel {
               )
             )
           ) AS hasPickup,
+          COALESCE((
+            SELECT SUM(bs.QTY)
+            FROM booking_service bs
+            WHERE bs.BOOKING_ID = b.IDNo
+              AND bs.ACTIVE = 1
+              AND bs.SERVICE_ID IN (74, 75)
+          ), 0) AS breakfastQty,
           -- Pre-calculated composite status for styling
           CASE
             WHEN b.BOOKING_STATUS = 'pending' AND COALESCE(b.HOLD_PENDING, 0) = 1 THEN 'none'
@@ -399,6 +406,7 @@ class CalendarModel {
             compositeStatus: row.compositeStatus,
             isLongTermStay: !!row.isLongTermStay,
             hasPickup: !!row.hasPickup,
+            breakfastQty: Number(row.breakfastQty) || 0,
             cancellationReason: row.cancellationReason || '',
             maintenanceReason: row.maintenanceReason || '',
             maintenanceGuestName

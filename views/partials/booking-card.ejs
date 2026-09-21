@@ -73,6 +73,9 @@
                 <% if (typeof booking.EXTENDED !== 'undefined' && booking.EXTENDED === 1) { %>
                     <span class="badge badge-warning">EXT</span>
                 <% } %>
+                <% if (booking.IS_CONTRACTED_RATE === 1) { %>
+                    <span class="badge badge-info" title="Contracted Rate (-₱200/night)">CR</span>
+                <% } %>
             <% } %>
         </div>
 

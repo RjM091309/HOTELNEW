@@ -375,6 +375,11 @@ function checkOutTimeBadge(lateCheckout) {
   return isLate ? { label: 'Late Check-Out', cls: 'bg-warning text-dark' } : null;
 }
 
+function contractedRateBadge(isContractedRate) {
+  const isContracted = isContractedRate === 1 || isContractedRate === '1' || isContractedRate === true;
+  return isContracted ? { label: 'Contracted Rate (-₱200/night)', cls: 'bg-info text-dark' } : null;
+}
+
 function appendStayTimeBadge(elementId, badge) {
   const el = document.getElementById(elementId);
   if (!el) return;
@@ -2803,6 +2808,7 @@ fetch(`/booking/booking_details/${bookingIdValue}`)
         let roomRate = parseFloat(data.ROOM_RATE) || 0;
         const roomRateElement = document.getElementById(`room-rate-${bookingId}`);
         if (roomRateElement) roomRateElement.textContent = `₱${roomRate.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+        appendStayTimeBadge(`room-rate-${bookingId}`, contractedRateBadge(data.IS_CONTRACTED_RATE));
 
         // Total Days: original + extended
         let totalDays = parseInt(data.TOTAL_DAYS, 10) || 0;

@@ -1031,6 +1031,17 @@ body.header-white .page-header.navbar input#datePicker {
     background: #f9fafb;
     border-color: #e5e7eb;
 }
+/* table.css has an unconditional, theme-blind ".modal .modal-body { background-
+   color: #2a3135; color: #e0e0e0 }" that applies to every modal site-wide -
+   the generic light-theme fallback above never actually included .modal-body
+   at all, so any modal relying purely on plain Bootstrap markup (no per-modal
+   override of its own, e.g. Edit Agency, Credit Breakdown, several "generic"
+   view-only detail modals) kept a dark body under a light header/footer.
+   !important to reliably beat that compound-class sitewide rule. */
+[data-theme="white"] .modal-body {
+    background: #ffffff !important;
+    color: #111827 !important;
+}
 [data-theme="white"] .modal-title { color: #111827; }
 [data-theme="white"] .close, [data-theme="white"] .modal-header .close { color: #111827; opacity: 0.6; }
 [data-theme="white"] .close:hover, [data-theme="white"] .modal-header .close:hover { opacity: 1; }
@@ -3396,6 +3407,289 @@ body.header-white .page-header.navbar input#datePicker {
     background-color: #ffffff !important;
     border: 1px solid #d1d5db !important;
 }
+
+/* Edit Booking Modal Light Theme - same treatment as Add Booking above;
+   edit_booking.ejs's own <style> block (background-color: #2a3135, #41474c,
+   etc.) is dark-only with no theme awareness, so every one of those needs
+   an explicit override here. */
+[data-theme="white"] #modal-editbooking .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #modal-editbooking .modal-body {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #modal-editbooking .modal-header {
+    background-color: #2196f3 !important;
+    color: #ffffff !important;
+    border-bottom: 1px solid #1976d2 !important;
+}
+
+[data-theme="white"] #modal-editbooking .modal-title {
+    color: #ffffff !important;
+}
+
+[data-theme="white"] #modal-editbooking .btn-close {
+    filter: invert(1) !important;
+}
+
+[data-theme="white"] #modal-editbooking .btn-close:hover {
+    filter: invert(0.85) !important;
+}
+
+[data-theme="white"] #modal-editbooking input[type="text"],
+[data-theme="white"] #modal-editbooking input[type="number"],
+[data-theme="white"] #modal-editbooking input[type="email"],
+[data-theme="white"] #modal-editbooking select,
+[data-theme="white"] #modal-editbooking textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #d1d5db !important;
+}
+
+[data-theme="white"] #modal-editbooking input::placeholder,
+[data-theme="white"] #modal-editbooking textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+[data-theme="white"] #modal-editbooking select option {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #modal-editbooking label,
+[data-theme="white"] #modal-editbooking .form-label,
+[data-theme="white"] #modal-editbooking .mdl-textfield__label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #modal-editbooking h3,
+[data-theme="white"] #modal-editbooking h5 {
+    color: #111827 !important;
+}
+
+[data-theme="white"] #modal-editbooking input[type="checkbox"] + label,
+[data-theme="white"] #modal-editbooking .form-check-label {
+    color: #374151 !important;
+}
+
+[data-theme="white"] #modal-editbooking .btn-primary:hover,
+[data-theme="white"] #modal-editbooking .btn-success:hover {
+    color: #ffffff !important;
+}
+
+[data-theme="white"] #modal-editbooking #edit_discountAmount {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #d1d5db !important;
+}
+
+/* Payment Status field - two-ID selector in edit_booking.ejs's own <style>
+   outweighs the generic input override above, so it needs its own override
+   here too (same as #modal-addbooking #paymentStatus above). Status colors
+   (paid/partial/unpaid) already carry !important in the source stylesheet
+   and read fine on white, so only the neutral background/border need fixing. */
+[data-theme="white"] #modal-editbooking #edit_paymentStatus {
+    background-color: #f3f4f6 !important;
+    color: #111827 !important;
+    border: 1px solid #d1d5db !important;
+}
+
+/* Senior/PWD readout + flight-number dropdowns - inline-styled dark
+   backgrounds (edit_booking.ejs), same attribute-selector pattern as
+   #modal-addbooking above. */
+[data-theme="white"] #modal-editbooking #edit_seniorPwdDiscountAmount,
+[data-theme="white"] #modal-editbooking input[style*="background-color: #2a3135"] {
+    background-color: #f3f4f6 !important;
+    color: #15803d !important;
+}
+[data-theme="white"] #modal-editbooking #edit_flightNumberDropdown,
+[data-theme="white"] #modal-editbooking #edit_dropoffFlightNumberDropdown {
+    background-color: #ffffff !important;
+    border: 1px solid #d1d5db !important;
+}
+
+/* Voucher Details Modal Light Theme - this modal ID is reused verbatim in
+   booking.ejs, agency_booking.ejs and all_booking.ejs, each with the same
+   dark-only <style> block (background-color: #2a3135/#41474c/#0c2a42) and no
+   theme awareness, so one override here covers all three pages at once. */
+[data-theme="white"] #modal-voucher-details .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #modal-voucher-details .modal-header {
+    background-color: #2196f3 !important;
+    color: #ffffff !important;
+    border-bottom: 1px solid #1976d2 !important;
+}
+
+[data-theme="white"] #modal-voucher-details .modal-title {
+    color: #ffffff !important;
+}
+
+[data-theme="white"] #modal-voucher-details .btn-close {
+    filter: invert(1) !important;
+}
+[data-theme="white"] #modal-voucher-details .btn-close:hover {
+    filter: invert(0.85) !important;
+}
+
+[data-theme="white"] #modal-voucher-details .table,
+[data-theme="white"] #modal-voucher-details .table th,
+[data-theme="white"] #modal-voucher-details .table td {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border-color: #e5e7eb !important;
+}
+
+[data-theme="white"] #modal-voucher-details .table-striped > tbody > tr:nth-of-type(odd) > td {
+    background-color: #f9fafb !important;
+}
+
+[data-theme="white"] #modal-voucher-details .bg-light {
+    background-color: #f3f4f6 !important;
+    color: #111827 !important;
+}
+
+/* TOTAL BALANCE row (.bg-secondary / .table-secondary) - light blue accent
+   instead of dark navy, still visually "highlighted" vs. the plain rows. */
+[data-theme="white"] #modal-voucher-details .bg-secondary,
+[data-theme="white"] #modal-voucher-details .table-secondary,
+[data-theme="white"] #modal-voucher-details .table-secondary th,
+[data-theme="white"] #modal-voucher-details .table-secondary td,
+[data-theme="white"] #modal-voucher-details tr.table-secondary th,
+[data-theme="white"] #modal-voucher-details tr.table-secondary td,
+[data-theme="white"] #modal-voucher-details tr.table-secondary th.bg-secondary,
+[data-theme="white"] #modal-voucher-details tr.table-secondary td.fw-bold,
+[data-theme="white"] #modal-voucher-details .modal-content .table-responsive .table tbody tr.table-secondary th,
+[data-theme="white"] #modal-voucher-details .modal-content .table-responsive .table tbody tr.table-secondary td {
+    background-color: #e3f2fd !important;
+    background: #e3f2fd !important;
+    color: #0d47a1 !important;
+}
+
+[data-theme="white"] #modal-voucher-details .modal-footer {
+    background-color: #f9fafb !important;
+    border-top: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #modal-voucher-details .btn-secondary {
+    background-color: #e5e7eb !important;
+    border-color: #d1d5db !important;
+    color: #111827 !important;
+}
+[data-theme="white"] #modal-voucher-details .btn-secondary:hover {
+    background-color: #d1d5db !important;
+    border-color: #9ca3af !important;
+    color: #111827 !important;
+}
+
+[data-theme="white"] #modal-voucher-details .btn-info {
+    background-color: #2196f3 !important;
+    border-color: #1976d2 !important;
+    color: #ffffff !important;
+}
+[data-theme="white"] #modal-voucher-details .btn-info:hover {
+    background-color: #1976d2 !important;
+    border-color: #1565c0 !important;
+    color: #ffffff !important;
+}
+
+/* Dashboard Remarks/Complaints/Requests modals - entirely inline-styled
+   (dashboard.ejs), no <style> block, no !important of their own. Since these
+   modals live inside .page-content, the universal
+   [data-theme="white"] .page-content * { color: #1f2937 !important } rule
+   elsewhere in this file already overrides their inline white text to dark
+   gray (that rule has !important, the inline color doesn't - !important
+   always wins regardless of specificity) while their inline dark
+   backgrounds stay untouched (the generic .modal-header/.modal-footer
+   override above has no !important, so inline wins there) - dark gray text
+   on a dark background, unreadable. Commit fully to light instead. */
+[data-theme="white"] #remarksModal .modal-header,
+[data-theme="white"] #complaintsModal .modal-header,
+[data-theme="white"] #requestsModal .modal-header,
+[data-theme="white"] #remarksListModal .modal-header {
+    background: #2196f3 !important;
+    border-bottom: 1px solid #1976d2 !important;
+}
+[data-theme="white"] #remarksModal .modal-title,
+[data-theme="white"] #complaintsModal .modal-title,
+[data-theme="white"] #requestsModal .modal-title,
+[data-theme="white"] #remarksListModal .modal-title,
+[data-theme="white"] #remarksModal .modal-title *,
+[data-theme="white"] #complaintsModal .modal-title *,
+[data-theme="white"] #requestsModal .modal-title *,
+[data-theme="white"] #remarksListModal .modal-title * {
+    color: #ffffff !important;
+}
+[data-theme="white"] #remarksModal .modal-body,
+[data-theme="white"] #complaintsModal .modal-body,
+[data-theme="white"] #requestsModal .modal-body,
+[data-theme="white"] #remarksListModal .modal-body {
+    background: #ffffff !important;
+    color: #111827 !important;
+}
+[data-theme="white"] #remarksModal .modal-footer {
+    background: #f9fafb !important;
+    border-top: 1px solid #e5e7eb !important;
+}
+[data-theme="white"] #remarksModal .remarks-content-box {
+    background: #f9fafb !important;
+    border: 1px solid #e5e7eb !important;
+}
+[data-theme="white"] #remarksModal #fullRemarksText {
+    color: #111827 !important;
+}
+
+/* Edit Complaint/Request popup - built as a raw JS template string and
+   appended straight to document.body (not .page-content), so the universal
+   rule above never reaches it; it just stays permanently dark regardless of
+   theme. The numeric-suffixed id needs a prefix-attribute selector. */
+[data-theme="white"] .modal[id^="editComplaintModal_"] .modal-content,
+[data-theme="white"] .modal[id^="editRequestModal_"] .modal-content {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+}
+[data-theme="white"] .modal[id^="editComplaintModal_"] .modal-header,
+[data-theme="white"] .modal[id^="editRequestModal_"] .modal-header {
+    background-color: #2196f3 !important;
+    border-bottom: 1px solid #1976d2 !important;
+}
+[data-theme="white"] .modal[id^="editComplaintModal_"] .modal-title,
+[data-theme="white"] .modal[id^="editRequestModal_"] .modal-title {
+    color: #ffffff !important;
+}
+[data-theme="white"] .modal[id^="editComplaintModal_"] .modal-body,
+[data-theme="white"] .modal[id^="editRequestModal_"] .modal-body {
+    background-color: #ffffff !important;
+}
+[data-theme="white"] .modal[id^="editComplaintModal_"] .modal-body label,
+[data-theme="white"] .modal[id^="editRequestModal_"] .modal-body label {
+    color: #374151 !important;
+}
+[data-theme="white"] .modal[id^="editComplaintModal_"] select,
+[data-theme="white"] .modal[id^="editComplaintModal_"] textarea,
+[data-theme="white"] .modal[id^="editRequestModal_"] select,
+[data-theme="white"] .modal[id^="editRequestModal_"] textarea {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #d1d5db !important;
+}
+[data-theme="white"] .modal[id^="editComplaintModal_"] .modal-footer,
+[data-theme="white"] .modal[id^="editRequestModal_"] .modal-footer {
+    background-color: #f9fafb !important;
+    border-top: 1px solid #e5e7eb !important;
+}
+
 /* =====================
    Light theme: Unassigned Rooms Side Panel
    ===================== */

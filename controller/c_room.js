@@ -1014,7 +1014,13 @@ class RoomController {
       });
     } catch (error) {
       console.error('Error getting cleaning status:', error.message);
-      res.status(500).json({
+      // 200 (not 500): the caller (dashboard.ejs) already treats this as a
+      // best-effort, silently-ignored check via data.success - a 500 here
+      // just makes the browser log a bright red network error on every page
+      // load whenever the Home Assistant device isn't reachable (e.g.
+      // developing outside the hotel's local network), for a failure the
+      // app already handles gracefully either way.
+      res.json({
         success: false,
         error: error.message
       });

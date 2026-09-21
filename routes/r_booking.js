@@ -40,6 +40,9 @@ router.get('/breakfast-list/data', BookingController.getBreakfastListData);
 router.get('/cancelled', BookingController.renderCancelledBookingPage);
 router.get('/cancelled/data', BookingController.getCancelledBookingData);
 
+// Quotation builder page (build + print, no persistence)
+router.get('/quotation', BookingController.renderQuotationPage);
+
 // API Routes for booking data
 router.get('/booking_data', BookingController.getBookingDataEnhanced);
 router.get('/booking_details/:bookingID', BookingController.getBookingDetails);

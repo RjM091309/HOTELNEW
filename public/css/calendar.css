@@ -2287,18 +2287,18 @@ body.white-sidebar-color .legend-color-mountain-view {
 }
 
 /* ============================================================================
-   Floor (3 / 4 / 5) grouping rows: gray band (#00000029) across entire row
+   Floor (3 / 4 / 5) grouping rows: solid black band across entire row
    ============================================================================ */
 /* Left side: Rooms column datagrid cell for floor */
 #calendar .fc-datagrid-cell[data-is-floor],
 #calendar .fc-datagrid-cell[data-is-floor] .fc-datagrid-cell-frame,
 #calendar .fc-datagrid-cell[data-is-floor] .fc-datagrid-cell-cushion {
-  background-color: #00000029 !important;
+  background-color: #000000 !important;
 }
 
 /* Right side: Timeline lane ONLY for floor */
 #calendar td.fc-timeline-lane.fc-floor-lane {
-  background-color: #00000029 !important;
+  background-color: #000000 !important;
   position: relative !important;
 }
 
@@ -2311,7 +2311,7 @@ body.white-sidebar-color .legend-color-mountain-view {
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
-  background-color: #00000029 !important;
+  background-color: #000000 !important;
   z-index: 5 !important;
   pointer-events: none !important;
 }

@@ -283,5 +283,33 @@
 #agency-bookings-modal textarea::placeholder {
   color: #666 !important;
 }
+
+/* Light theme - .bulk-payment-card is a plain dark-gray card (#484b50) with
+   no theme awareness of its own, so it stays a dark island even though the
+   summary-item/pay-option cards inside it are already light-styled. And
+   .tab-item here has no !important on its own dark background, while the
+   generic [data-theme="white"] .tab-item DOES have !important on color only
+   (not background) - so inactive tabs end up dark-gray text on this file's
+   still-dark background, unreadable. Both need explicit ID-scoped overrides. */
+[data-theme="white"] #agency-bookings-modal .bulk-payment-card {
+  background: #f3f4f6 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: none !important;
+}
+[data-theme="white"] #agency-bookings-modal .tab-item {
+  background: #ffffff !important;
+  color: #374151 !important;
+  border-color: #d1d5db !important;
+}
+[data-theme="white"] #agency-bookings-modal .tab-item:hover {
+  background: #f3f4f6 !important;
+  color: #111827 !important;
+  border-color: #9ca3af !important;
+}
+[data-theme="white"] #agency-bookings-modal .tab-item.is-active {
+  background: #2196f3 !important;
+  color: #ffffff !important;
+  border-color: #1976d2 !important;
+}
 </style>
 

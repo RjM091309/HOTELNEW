@@ -200,6 +200,10 @@
               </div>
               <div id="editGroupRoomsList" class="room-list-container"></div>
               <div class="mt-2 text-warning" id="editGroupAvailabilityWarning" style="display: none;"></div>
+              <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" id="editGroupIncludeContractedRate" name="editGroupIncludeContractedRate">
+                <label class="form-check-label" for="editGroupIncludeContractedRate">Contracted Rate (-₱200/night, all rooms)</label>
+              </div>
               <div id="editGroupRoomBreakdown" class="mt-3"></div>
             </div>
           </div>
@@ -871,6 +875,257 @@
 
 /* Payment Status input base styling (dynamic colors handled in JS) */
 #editGroupPaymentStatus { background-color: #2a3135; color: #ffffff; }
+
+/* ============================================================
+   Light theme - mirrors #modal-add-group-booking's own light-theme
+   block (add_group_booking.ejs) almost 1:1, since this modal reuses the
+   same classes/markup. Was missing entirely before, same gap as
+   #modal-editbooking had vs #modal-addbooking.
+   ============================================================ */
+[data-theme="white"] #modal-edit-group-booking .modal-content {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .modal-header {
+  background-color: #2196f3 !important;
+  color: #ffffff !important;
+  border-bottom: 1px solid #1976d2 !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .modal-title {
+  color: #ffffff !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .modal-header .btn-close {
+  filter: invert(1) !important;
+}
+[data-theme="white"] #modal-edit-group-booking .modal-header .btn-close:hover {
+  filter: invert(0.85) !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .modal-body {
+  background-color: #f3f4f6 !important;
+  color: #111827 !important;
+  border-top: 1px solid #e5e7eb !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .modal-footer {
+  background: #f9fafb !important;
+  border-top: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .btn-close {
+  filter: none !important;
+  opacity: 0.6 !important;
+}
+[data-theme="white"] #modal-edit-group-booking .btn-close:hover {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .group-field-card,
+[data-theme="white"] #modal-edit-group-booking .group-summary-card {
+  background-color: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="white"] #modal-edit-group-booking .group-room-breakdown,
+[data-theme="white"] #modal-edit-group-booking .room-filter-section,
+[data-theme="white"] #modal-edit-group-booking .room-list-container {
+  background-color: #f9fafb !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .group-field-card-title {
+  color: #6b7280 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  padding-bottom: 10px !important;
+  margin-bottom: 14px !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .group-summary-line {
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .group-summary-line span {
+  color: #374151 !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .group-summary-line h3 {
+  color: #111827 !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .group-summary-line:has(#editGroupComputedTotal) {
+  border-bottom: none !important;
+  padding-top: 14px;
+}
+
+[data-theme="white"] #modal-edit-group-booking #editGroupComputedTotal,
+[data-theme="white"] #modal-edit-group-booking #editGroupComputedTotal * {
+  color: #1565c0 !important;
+  font-size: 20px;
+}
+
+[data-theme="white"] #modal-edit-group-booking #editGroupComputedPaidAmount,
+[data-theme="white"] #modal-edit-group-booking #editGroupComputedPaidAmount * {
+  color: #28a745 !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking #editGroupComputedBalance,
+[data-theme="white"] #modal-edit-group-booking #editGroupComputedBalance * {
+  color: #fd7e14 !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .form-label {
+  color: #6b7280 !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking input[type="text"],
+[data-theme="white"] #modal-edit-group-booking input[type="number"],
+[data-theme="white"] #modal-edit-group-booking input[type="email"],
+[data-theme="white"] #modal-edit-group-booking .group-room-count-display,
+[data-theme="white"] #modal-edit-group-booking select,
+[data-theme="white"] #modal-edit-group-booking textarea {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #d1d5db !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking input::placeholder,
+[data-theme="white"] #modal-edit-group-booking textarea::placeholder {
+  color: #9ca3af !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking select option {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking h3,
+[data-theme="white"] #modal-edit-group-booking h5,
+[data-theme="white"] #modal-edit-group-booking label {
+  color: #111827 !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .form-check-label {
+  color: #374151 !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .room-option {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .room-option .bed-badge,
+[data-theme="white"] #modal-edit-group-booking .manual-rate-item .bed-badge,
+[data-theme="white"] #modal-edit-group-booking .bed-based-rate-item .bed-badge {
+  background: rgba(111, 156, 64, 0.12) !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .room-option .bed-badge i,
+[data-theme="white"] #modal-edit-group-booking .manual-rate-item .bed-badge i,
+[data-theme="white"] #modal-edit-group-booking .bed-based-rate-item .bed-badge i {
+  color: #4f7a2a !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .room-option:hover {
+  background: rgba(111, 156, 64, 0.08) !important;
+  border-color: rgba(111, 156, 64, 0.4) !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .room-option .form-check-input:checked + .form-check-label {
+  color: #4f7a2a !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .room-option:has(.form-check-input:checked) {
+  background: rgba(111, 156, 64, 0.12) !important;
+  border-color: #6f9c40 !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking hr {
+  border-color: #e5e7eb !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .rate-type-toggle .btn-group {
+  background: #f3f4f6 !important;
+  border-color: #e5e7eb !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .rate-type-toggle .btn {
+  color: #6b7280 !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .rate-type-toggle .btn:hover {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #374151 !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .rate-type-toggle .btn-check:checked + .btn {
+  background-color: #6f9c40 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .manual-rate-item,
+[data-theme="white"] #modal-edit-group-booking .bed-based-rate-item {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .manual-rate-item:hover,
+[data-theme="white"] #modal-edit-group-booking .bed-based-rate-item:hover {
+  background: rgba(111, 156, 64, 0.08) !important;
+  border-color: rgba(111, 156, 64, 0.3) !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .manual-rate-item .room-number,
+[data-theme="white"] #modal-edit-group-booking .bed-based-rate-item .bed-label {
+  color: #111827 !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .manual-rate-item .rate-field-row label,
+[data-theme="white"] #modal-edit-group-booking .bed-based-rate-item .room-count {
+  color: #6b7280 !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .filter-radio-group .form-check-label,
+[data-theme="white"] #modal-edit-group-booking .room-filter-section label,
+[data-theme="white"] #modal-edit-group-booking .room-filter-section #editGroupRoomCount {
+  color: #111827 !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .consolidated-indicator {
+  background: rgba(111, 156, 64, 0.08) !important;
+  border-color: rgba(111, 156, 64, 0.3) !important;
+  color: #374151 !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking .bed-availability-summary {
+  background-color: rgba(0, 0, 0, 0.03) !important;
+  border-color: #e5e7eb !important;
+  color: #374151 !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking #editGroupPaymentStatus {
+  background-color: #f3f4f6 !important;
+  color: #111827 !important;
+  border: 1px solid #d1d5db !important;
+}
+
+[data-theme="white"] #modal-edit-group-booking #editGroupPaymentStatus.status-partial {
+  color: #0e7490 !important;
+}
+
+/* Senior/PWD read-only readout - inline dark background (edit_group_booking.ejs) */
+[data-theme="white"] #modal-edit-group-booking #editGroupSeniorPwdDiscountAmount,
+[data-theme="white"] #modal-edit-group-booking input[style*="background-color: #2a3135"] {
+  background-color: #f3f4f6 !important;
+  color: #15803d !important;
+}
 </style>
 
 <script src="/plugins/flatpicker/flatpickr.min.js"></script>
@@ -1003,7 +1258,19 @@ window.editGroupAddedServicesMap = {};
     return (parseInt($('#editGroupNights').val(), 10) || 0) >= 10;
   }
 
+  // Contracted Rate: fixed -₱200/night, applied on top of whatever the
+  // category/day/breakfast/season lookup (or legacy fallback) resolves to.
+  const EDIT_GROUP_CONTRACTED_RATE_PER_NIGHT = 200;
+
   function resolveEditGroupRoomPrice(room, checkInDate) {
+    const base = resolveEditGroupRoomPriceBase(room, checkInDate);
+    if ($('#editGroupIncludeContractedRate').is(':checked')) {
+      return Math.max(0, base - EDIT_GROUP_CONTRACTED_RATE_PER_NIGHT);
+    }
+    return base;
+  }
+
+  function resolveEditGroupRoomPriceBase(room, checkInDate) {
     const longTermCat = editGroupLongTermCategoryForNights($('#editGroupNights').val());
     const cat = longTermCat || (EDIT_GROUP_RATE_OPT_CAT[getEditGroupPriceBookingType()] || 'walk_in');
     const rr = room.ROOM_RATES || {};
@@ -1128,7 +1395,7 @@ window.editGroupAddedServicesMap = {};
     $('#editGroupCreditDisplay').hide();
     $('#editGroupCreditAmount').text('₱0.00');
     $('#editGroupBreakfastFields').addClass('d-none');
-    $('#editGroupIncludeBreakfast, #editGroupIncludePickup, #editGroupIncludeDropoff, #editGroupIncludeDiscount, #editGroupIndividualBilling').prop('checked', false); // Default to Master Billing (unchecked)
+    $('#editGroupIncludeBreakfast, #editGroupIncludePickup, #editGroupIncludeDropoff, #editGroupIncludeDiscount, #editGroupIndividualBilling, #editGroupIncludeContractedRate').prop('checked', false); // Default to Master Billing (unchecked)
     $('#editGroupBreakfastIndividual').prop('checked', false); // Default breakfast to group (not individual)
     $('#editGroupBreakfastAdultQty, #editGroupBreakfastKidQty').val('');
     $('#editGroupPickupWrapper, #editGroupDropoffWrapper, #editGroupDiscountWrapper').hide();
@@ -1684,6 +1951,11 @@ window.editGroupAddedServicesMap = {};
     computeEditGroupTotal();
   });
 
+  $('#editGroupIncludeContractedRate').on('change', function() {
+    refreshEditGroupRoomPricing();
+    computeEditGroupTotal();
+  });
+
   $('#editGroupIncludePickup').on('change', function() {
     if (this.checked) {
       $('#editGroupPickupWrapper').show();
@@ -1788,7 +2060,8 @@ window.editGroupAddedServicesMap = {};
       perRoomDiscounts: [],
       discount: $('#editGroupDiscount').val(),
       individualBilling: $('#editGroupIndividualBilling').is(':checked') ? 'on' : '', // Inverted logic
-      lateCheckoutFee: parseFloat($('#editGroupLateCheckoutFee').val()) || 0
+      lateCheckoutFee: parseFloat($('#editGroupLateCheckoutFee').val()) || 0,
+      isContractedRate: $('#editGroupIncludeContractedRate').is(':checked') ? 1 : 0
     };
 
     // Collect individual booking dates if they exist

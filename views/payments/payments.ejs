@@ -987,6 +987,20 @@
     transition: opacity 0.2s ease;
   }
 
+  /* Light theme - these summary cards (and the Shift 1/2/3 cards, which
+     reuse the same classes via applyShiftSummaryCards()) had no theme
+     awareness at all, so they stayed a permanently dark floating card. */
+  [data-theme="white"] .payment-sales-card {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+  }
+  [data-theme="white"] .payment-sales-card__label {
+    color: #6b7280;
+  }
+  [data-theme="white"] .payment-sales-card__footer {
+    color: #6b7280;
+  }
+
   .sales-paid-clickable:hover {
     opacity: 0.8;
   }

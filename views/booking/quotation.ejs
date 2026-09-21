@@ -1,0 +1,412 @@
+<div class="row quotation-page">
+  <div class="col-xl-12 col-12">
+    <div class="dashboard-card quotation-card">
+      <div class="dashboard-card-header quotation-toolbar no-print">
+        <div>
+          <h4 class="mb-0">Quotation</h4>
+          <p class="quotation-note mb-0">Everything below is editable &mdash; click any text to change it, then print or save as PDF.</p>
+          <p class="quotation-note quotation-color-hint mb-0">
+            <i class="fa fa-exclamation-triangle"></i>
+            To print with colors: in the print dialog, open <strong>More settings</strong> and check <strong>Background graphics</strong> &mdash; Chrome hides colors by default to save ink.
+          </p>
+        </div>
+        <div class="quotation-controls">
+          <button type="button" class="btn quotation-add-row-btn" id="quotationAddRowBtn"><i class="fa fa-plus"></i> Add Row</button>
+          <button type="button" class="btn quotation-reset-btn" id="quotationResetBtn"><i class="fa fa-undo"></i> Reset</button>
+          <button type="button" class="btn quotation-print-btn" id="quotationPrintBtn"><i class="fa fa-print"></i> Print / Save as PDF</button>
+        </div>
+      </div>
+
+      <div class="dashboard-card-body">
+        <div class="quotation-sheet" id="quotationSheet">
+          <div class="quotation-header">
+            <img src="/img/Logo-Black.png" class="quotation-logo" alt="Main Stay Hotel">
+            <h2 contenteditable="true">MAIN STAY HOTEL</h2>
+            <p class="quotation-address" contenteditable="true">Clark Terrace Building, Lot 2 Block 1, The Villages, Prince Balagtas Avenue, Clark Freeport Zone, Pampanga, 2023<br>Clark Freeport Zone, Pampanga, 2023</p>
+          </div>
+
+          <div class="quotation-date-row">
+            <strong>DATE:</strong> <span contenteditable="true" id="quotationDate"></span>
+          </div>
+
+          <div class="quotation-title-banner" contenteditable="true">QUOTATION</div>
+
+          <div class="quotation-billed-to">
+            <strong>BILLED TO:</strong> <span contenteditable="true" id="quotationBilledTo">&nbsp;</span>
+          </div>
+
+          <table class="quotation-table" id="quotationTable">
+            <thead>
+              <tr>
+                <th class="qcol-date" contenteditable="true">DATE</th>
+                <th class="qcol-desc" contenteditable="true">DESCRIPTION</th>
+                <th class="qcol-rooms" contenteditable="true">NO. OF ROOMS</th>
+                <th class="qcol-rate" contenteditable="true">RATE</th>
+                <th class="qcol-total" contenteditable="true">TOTAL</th>
+                <th class="qcol-remove no-print"></th>
+              </tr>
+            </thead>
+            <tbody id="quotationRows">
+              <tr>
+                <td contenteditable="true">SEPTEMBER 24, 2026<br>TO<br>SEPTEMBER 25, 2026</td>
+                <td contenteditable="true">KING SIZE BEDROOM<br>NO BREAKFAST INCLUDED</td>
+                <td contenteditable="true">1 ROOM</td>
+                <td contenteditable="true" class="quotation-rate-cell">PHP 3,300<br>(WEEKDAY RATE)</td>
+                <td contenteditable="true" class="quotation-row-total">PHP 3,300</td>
+                <td class="no-print qcol-actions">
+                  <button type="button" class="quotation-add-row-inline" title="Add row below">&plus;</button>
+                  <button type="button" class="quotation-remove-row" title="Remove row">&times;</button>
+                </td>
+              </tr>
+              <tr>
+                <td contenteditable="true">SEPTEMBER 24, 2026<br>TO<br>SEPTEMBER 25, 2026</td>
+                <td contenteditable="true">QUEEN SIZE BEDROOM<br>NO BREAKFAST INCLUDED</td>
+                <td contenteditable="true">1 ROOM</td>
+                <td contenteditable="true" class="quotation-rate-cell">PHP 3,700<br>(WEEKDAY RATE)</td>
+                <td contenteditable="true" class="quotation-row-total">PHP 3,700</td>
+                <td class="no-print qcol-actions">
+                  <button type="button" class="quotation-add-row-inline" title="Add row below">&plus;</button>
+                  <button type="button" class="quotation-remove-row" title="Remove row">&times;</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="quotation-grand-total">
+            GRAND TOTAL&nbsp;=&nbsp;<span id="quotationGrandTotal" contenteditable="true">PHP 7,000</span>
+          </div>
+
+          <div class="quotation-payment" contenteditable="true">
+            <div><strong>MODE OF PAYMENT:</strong>&nbsp;CHINA BANKING CORPORATION</div>
+            <div><strong>ACCOUNT NUMBER:</strong>&nbsp;159100017155</div>
+            <div><strong>NAME:</strong>&nbsp;MAIN STAY HOTEL CORP</div>
+            <div><strong>ADDRESS:</strong>&nbsp;CLARK TERRACE BUILDING, THE VILLAGES ZONE, CLARK FREEPORT, MABALACAT CITY, 2023</div>
+          </div>
+
+          <div class="quotation-policy">
+            <strong>Cancellation Refund Policy:</strong>
+            <ul contenteditable="true" id="quotationPolicyList">
+              <li>1 night penalty for cancellation 20 days before check-in</li>
+              <li>2 nights penalty for cancellation 10 days before check-in</li>
+              <li>Full penalty for cancellation 5 days before check-in</li>
+            </ul>
+          </div>
+
+          <div class="quotation-prepared">
+            PREPARED BY:&nbsp;<span contenteditable="true" id="quotationPreparedBy"><%= (typeof user !== 'undefined' && user && user.FULLNAME) ? user.FULLNAME : '' %></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style id="quotationStyles">
+  .quotation-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .quotation-note { color: var(--text-muted, #8a8a8a); font-size: 12px; }
+  .quotation-color-hint { color: #e0a800; margin-top: 4px; }
+  .quotation-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+  .quotation-controls .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    padding: 6px 14px;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: #2a3135;
+    color: #e2e2e2;
+    cursor: pointer;
+  }
+  .quotation-print-btn { background: #6f9c40 !important; border-color: #6f9c40 !important; color: #fff !important; }
+  .quotation-add-row-btn:hover, .quotation-reset-btn:hover { filter: brightness(1.15); }
+
+  /* The sheet always renders as a white printable page, regardless of the
+     app's own light/dark theme, since this is a WYSIWYG preview of what
+     actually prints. */
+  .quotation-sheet {
+    background: #fff;
+    color: #000;
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 24px 28px;
+    border: 2px solid #000;
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+  }
+  .quotation-header { text-align: center; margin-bottom: 8px; }
+  .quotation-header .quotation-logo { height: 70px; width: auto; object-fit: contain; }
+  .quotation-header h2 { margin: 4px 0 2px; font-size: 20px; font-weight: bold; letter-spacing: 1px; }
+  .quotation-address { font-size: 11px; margin: 0 0 10px; }
+  .quotation-date-row { font-weight: bold; margin-bottom: 10px; }
+  .quotation-title-banner {
+    background: #cfe2f3;
+    text-align: center;
+    font-weight: bold;
+    font-size: 20px;
+    padding: 8px;
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+  }
+  .quotation-billed-to {
+    background: #f4d9a0;
+    padding: 6px 10px;
+    font-weight: bold;
+    margin-bottom: 10px;
+  }
+  .quotation-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+  .quotation-table th, .quotation-table td {
+    border: 1px solid #000;
+    padding: 6px 8px;
+    text-align: center;
+    vertical-align: middle;
+    font-size: 12px;
+    line-height: 1.3;
+  }
+  .quotation-table thead th { font-weight: bold; }
+  .qcol-date, .qcol-desc { background: #d9ead3; }
+  .qcol-rooms, .qcol-rate { background: #f4d9a0; }
+  .qcol-total { background: #f4cccc; }
+  .quotation-row-total { background: #fbe4e4; font-weight: bold; }
+  .quotation-table td.qcol-remove, .quotation-table th.qcol-remove { border: none; padding: 0; width: 26px; }
+  .qcol-actions {
+    border: none !important;
+    padding: 0 !important;
+    width: 50px;
+    white-space: nowrap;
+  }
+  .quotation-add-row-inline,
+  .quotation-remove-row {
+    background: transparent;
+    border: none;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px;
+  }
+  .quotation-add-row-inline { color: #2a7a2a; }
+  .quotation-remove-row { color: #c00; }
+  .quotation-grand-total {
+    text-align: right;
+    font-weight: bold;
+    font-size: 16px;
+    color: #c00;
+    margin-bottom: 14px;
+  }
+  .quotation-payment { margin-bottom: 12px; line-height: 1.6; }
+  .quotation-policy { font-size: 11px; margin-bottom: 16px; }
+  .quotation-policy ul { margin: 4px 0 0; padding-left: 20px; }
+  .quotation-prepared { font-weight: bold; text-align: right; }
+
+  /* Chrome/Edge/Firefox strip background colors from print output by default
+     (to save ink) unless a page opts back in - the header banner, billed-to
+     bar, and table header/total colors would otherwise all print plain white. */
+  .quotation-sheet, .quotation-sheet * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  [contenteditable="true"] { caret-color: #d32f2f; }
+  [contenteditable="true"]:hover { outline: 1px dashed #999; cursor: text; }
+  [contenteditable="true"]:focus { outline: 2px solid #1a73e8; outline-offset: -1px; background: #fffde7; }
+
+  @media print {
+    .sidebar, .navbar, .app-header, .app-sidebar, .quotation-toolbar, .no-print { display: none !important; }
+    /* The app's dark theme colors the whole layout chain (body -> page-wrapper
+       -> page-container -> page-content-wrapper -> page-content), not just
+       the card - with "Background graphics" on, every one of those would
+       otherwise print its actual dark background around the white sheet. */
+    html, body, .page-wrapper, .page-container, .page-content-wrapper, .page-content,
+    .quotation-card, .dashboard-card, .dashboard-card-header, .dashboard-card-body {
+      background: #fff !important;
+    }
+    .quotation-sheet { border: 2px solid #000; box-shadow: none; max-width: 100%; }
+    [contenteditable="true"]:hover, [contenteditable="true"]:focus { outline: none !important; background: none !important; }
+  }
+</style>
+
+<script>
+(function () {
+  const sheet = document.getElementById('quotationSheet');
+  const rowsBody = document.getElementById('quotationRows');
+  const grandTotalEl = document.getElementById('quotationGrandTotal');
+  const dateEl = document.getElementById('quotationDate');
+
+  if (dateEl && !dateEl.textContent.trim()) {
+    dateEl.textContent = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }).toUpperCase();
+  }
+
+  function parseMoney(text) {
+    const match = String(text || '').replace(/,/g, '').match(/-?\d+(\.\d+)?/);
+    return match ? parseFloat(match[0]) : 0;
+  }
+
+  function formatMoney(n) {
+    return 'PHP ' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  }
+
+  function recalcGrandTotal() {
+    let sum = 0;
+    rowsBody.querySelectorAll('.quotation-row-total').forEach((cell) => {
+      sum += parseMoney(cell.textContent);
+    });
+    grandTotalEl.textContent = formatMoney(sum);
+  }
+
+  function blankRow() {
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td contenteditable="true">&nbsp;</td>' +
+      '<td contenteditable="true">&nbsp;</td>' +
+      '<td contenteditable="true">&nbsp;</td>' +
+      '<td contenteditable="true" class="quotation-rate-cell">&nbsp;</td>' +
+      '<td contenteditable="true" class="quotation-row-total">PHP 0</td>' +
+      '<td class="no-print qcol-actions">' +
+        '<button type="button" class="quotation-add-row-inline" title="Add row below">&plus;</button>' +
+        '<button type="button" class="quotation-remove-row" title="Remove row">&times;</button>' +
+      '</td>';
+    return tr;
+  }
+
+  function focusFirstCell(row) {
+    const firstCell = row.querySelector('td[contenteditable="true"]');
+    if (!firstCell) return;
+    firstCell.focus();
+    const range = document.createRange();
+    range.selectNodeContents(firstCell);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  // Event delegation - covers both the sample rows already in the page and
+  // any row added later, so buttons never need re-wiring after a clone/insert.
+  rowsBody.addEventListener('click', function (e) {
+    const addBtn = e.target.closest('.quotation-add-row-inline');
+    if (addBtn) {
+      const row = addBtn.closest('tr');
+      const newRow = row ? row.cloneNode(true) : blankRow();
+      if (row && row.nextSibling) {
+        rowsBody.insertBefore(newRow, row.nextSibling);
+      } else {
+        rowsBody.appendChild(newRow);
+      }
+      focusFirstCell(newRow);
+      recalcGrandTotal();
+      return;
+    }
+
+    const removeBtn = e.target.closest('.quotation-remove-row');
+    if (removeBtn) {
+      const row = removeBtn.closest('tr');
+      if (row) row.remove();
+      recalcGrandTotal();
+    }
+  });
+
+  // 'input' (not 'blur') so the Grand Total updates live as each digit is
+  // typed, not only after clicking away from the cell.
+  rowsBody.addEventListener('input', function (e) {
+    if (e.target && e.target.classList && e.target.classList.contains('quotation-row-total')) {
+      recalcGrandTotal();
+    }
+  });
+
+  document.getElementById('quotationAddRowBtn').addEventListener('click', function () {
+    const lastRow = rowsBody.querySelector('tr:last-child');
+    const newRow = lastRow ? lastRow.cloneNode(true) : blankRow();
+    rowsBody.appendChild(newRow);
+    focusFirstCell(newRow);
+    recalcGrandTotal();
+  });
+
+  const defaultSheetHtml = sheet.innerHTML;
+  document.getElementById('quotationResetBtn').addEventListener('click', function () {
+    Swal.fire({
+      title: 'Reset quotation?',
+      text: 'This clears all your edits and restores the default sample rows.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, reset',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#dc3545'
+    }).then((result) => {
+      if (!result.isConfirmed) return;
+      sheet.innerHTML = defaultSheetHtml;
+      location.reload();
+    });
+  });
+
+  // Printing the live dashboard page directly kept picking up the app's dark
+  // theme background around the white sheet (fighting it with @media print
+  // overrides, then inline-style overrides, both lost to the theme
+  // stylesheet or timing quirks in Chrome's print preview). Instead, print a
+  // brand-new, self-contained document that never loads the dashboard's CSS
+  // or theme at all - it can't turn dark because nothing dark is ever loaded
+  // into it. Same tactic this app's voucher/invoice printing already uses.
+  document.getElementById('quotationPrintBtn').addEventListener('click', function () {
+    const stylesEl = document.getElementById('quotationStyles');
+    const printWindow = window.open('', '_blank', 'width=900,height=1100');
+    if (!printWindow) {
+      Swal.fire('Popup blocked', 'Please allow pop-ups for this site, then try printing again.', 'warning');
+      return;
+    }
+    printWindow.document.open();
+    printWindow.document.write(
+      '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Quotation</title>' +
+      '<style>' +
+        '@page { size: letter; margin: 0.35in; }' +
+        'body{margin:0;padding:0;background:#fff;}' +
+        (stylesEl ? stylesEl.textContent : '') +
+      '</style>' +
+      '</head><body><div id="printFit">' + sheet.outerHTML + '</div></body></html>'
+    );
+    printWindow.document.close();
+    printWindow.onload = function () {
+      // Shrink the whole sheet down to fit one page's printable area - a lot
+      // of rows/long text would otherwise spill onto a second sheet. Uses
+      // "zoom" rather than "transform: scale" - a CSS transform only affects
+      // painting, not the element's actual layout size, so the print
+      // engine's page-break logic still saw (and paginated across) the full
+      // pre-shrink height. "zoom" genuinely reflows the content smaller,
+      // which is what page-break math needs to see. Chrome-only, which is
+      // fine here since printWindow.print() itself is being driven from
+      // Chrome. Only ever shrinks, never enlarges past natural size.
+      const fitEl = printWindow.document.getElementById('printFit');
+      if (fitEl) {
+        // 0.35in margin on Letter (8.5x11in) at 96dpi -> printable area.
+        const pageWidthPx = (8.5 - 0.7) * 96;
+        const pageHeightPx = (11 - 0.7) * 96;
+        const rect = fitEl.getBoundingClientRect();
+        let scale = Math.min(1, pageWidthPx / rect.width, pageHeightPx / rect.height);
+        // Re-measure after zooming, since a zoomed element's own reflowed
+        // height (e.g. from text re-wrapping at a smaller size) can differ
+        // slightly from a naive linear guess - nudge down a couple more
+        // times if it's still taller than one page.
+        for (let i = 0; i < 4 && scale < 1; i++) {
+          fitEl.style.zoom = scale;
+          const newRect = fitEl.getBoundingClientRect();
+          if (newRect.height <= pageHeightPx && newRect.width <= pageWidthPx) break;
+          scale *= Math.min(pageWidthPx / newRect.width, pageHeightPx / newRect.height);
+        }
+      }
+      printWindow.focus();
+      printWindow.print();
+    };
+    // Close the popup itself once the print dialog is dismissed (printed or
+    // cancelled) instead of leaving an empty "Quotation" tab sitting around.
+    printWindow.onafterprint = function () {
+      printWindow.close();
+    };
+  });
+
+  recalcGrandTotal();
+})();
+</script>

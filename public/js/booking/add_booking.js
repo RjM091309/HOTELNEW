@@ -281,6 +281,10 @@ function updateWeekendPriceUI() {
 }
 window.updateWeekendPriceUI = updateWeekendPriceUI;
 
+// Contracted Rate: fixed per-night deduction, not a percentage - see
+// #includeContractedRate handling in computeTotal().
+const CONTRACTED_RATE_PER_NIGHT = 200;
+
 // %-off categories vs the Walk-in rate (the amounts in room_rates are already
 // discounted; this is only for showing how much was taken off).
 const RATE_DISCOUNT_PCT = { tenant: 15, vip: 20, employee: 30, senior_special: 20 };
@@ -748,9 +752,22 @@ function computeTotal() {
     if ($('#groupBookingCheckbox').is(':checked')) return;
 
     const rateDetails = getRoomRateDetails();
+    // Contracted Rate: flat -₱200/night off the resolved room rate, applied
+    // before anything below reads roomRate/roomCharges so the reduction
+    // flows into the on-screen total AND the #baseprice/#price fields that
+    // get submitted as this booking's per-night rate.
+    if ($('#includeContractedRate').is(':checked')) {
+        rateDetails.roomRate = Math.max(0, rateDetails.roomRate - CONTRACTED_RATE_PER_NIGHT);
+        rateDetails.roomCharges = rateDetails.roomRate * rateDetails.nights;
+    }
     const roomRate = rateDetails.roomRate;
     const nights = rateDetails.nights;
     $('#diffindays').val(nights);
+    // Keep the submitted per-night rate in sync even when the weekend-split
+    // breakdown UI isn't shown (that branch below only updates these two
+    // fields when weekendEnabled is true).
+    $('#baseprice').val(roomRate.toFixed(2));
+    $('#price').val(Math.round(roomRate).toLocaleString('en-US'));
 
     const bd = rateDetails.breakdown || { weekday: 0, weekend: 0 };
     const peso = (n) => '₱' + Math.round(n).toLocaleString('en-US');
@@ -1270,6 +1287,10 @@ $(document).ready(function () {
     });
 
     $('#includeSeniorPwdDiscount').on('change', function () {
+        computeTotal();
+    });
+
+    $('#includeContractedRate').on('change', function () {
         computeTotal();
     });
 

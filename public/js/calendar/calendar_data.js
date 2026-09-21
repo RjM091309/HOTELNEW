@@ -4221,6 +4221,10 @@ function createLegendOverlay() {
         <span class="calendar-legend-text">Early Check-In</span>
         <span class="calendar-legend-count" id="legend-count-early-checkin">0</span>
       </div>
+      <div class="calendar-legend-item legend-item-nocolor" data-legend-key="back-to-back">
+        <span class="calendar-legend-text">Back to Back</span>
+        <span class="calendar-legend-count" id="legend-count-back-to-back">0</span>
+      </div>
     </div>
     <div class="calendar-legend-header">
       <h3 class="calendar-legend-title">Room View</h3>
@@ -4284,7 +4288,8 @@ function classifyEventForLegend(event) {
     'late-checkout': (typeof isLateCheckout === 'function' && isLateCheckout(event)) || event.extendedProps?.checkOutStatus === 1 || event.extendedProps?.checkOutStatus === '1',
     'reservation-fee-paid': paymentStatus === 'partial',
     'late-checkin': typeof isLateCheckIn === 'function' && isLateCheckIn(event),
-    'early-checkin': !isHoldPending && Number(event.extendedProps?.checkInStatus) === 2
+    'early-checkin': !isHoldPending && Number(event.extendedProps?.checkInStatus) === 2,
+    'back-to-back': !!event.extendedProps?.isBackToBack
   };
 
   if (status === 'cancelled' || status === 'maintenance') {
@@ -4344,7 +4349,8 @@ function updateLegendCounts() {
     'late-checkout': 0,
     'reservation-fee-paid': 0,
     'late-checkin': 0,
-    'early-checkin': 0
+    'early-checkin': 0,
+    'back-to-back': 0
   };
 
   events.forEach(event => {
@@ -4403,7 +4409,7 @@ const LEGEND_FILTER_GROUPS = {
     'checkout-unpaid',
     'cancelled'
   ]),
-  sideIndicator: new Set(['late-checkout-btb', 'late-checkout', 'reservation-fee-paid', 'late-checkin', 'early-checkin']),
+  sideIndicator: new Set(['late-checkout-btb', 'late-checkout', 'reservation-fee-paid', 'late-checkin', 'early-checkin', 'back-to-back']),
   other: new Set([]),
   roomView: new Set(['condo-view', 'mountain-view'])
 };

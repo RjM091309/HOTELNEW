@@ -294,7 +294,14 @@ function calculateCardVariables(booking) {
 			<div class="dashboard-card-body">
 				<!-- Tab Panel -->
 				 <div>
-					<div class="mdl-tabs mdl-js-tabs">
+					<!-- mdl-js-tabs deliberately omitted: these tabs are plain <div data-target="...">
+					     elements, not the <a href="#panel"> structure MDL's own tab component expects,
+					     and public/js/dashboard/main_data.js already handles clicking/switching them
+					     independently. Keeping mdl-js-tabs registered MDL's own click handler on top of
+					     that, which tried to treat these divs as anchors and threw
+					     (material.min.js, "Cannot read properties of null/undefined") every time a tab
+					     was clicked. -->
+					<div class="mdl-tabs">
 						<div class="mdl-tabs__tab-bar tab-left-side mb-4" id="tabBar">
 							<% 
 							let defaultTabs = [

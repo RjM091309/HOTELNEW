@@ -104,6 +104,7 @@ class DashboardModel {
           b.REMARKS,
           b.CHECK_IN_STATUS,
           b.LATE_CHECKOUT,
+          COALESCE(b.IS_CONTRACTED_RATE, 0) AS IS_CONTRACTED_RATE,
           bill.QTY,
           (
             COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
@@ -337,6 +338,7 @@ class DashboardModel {
           b.BOOKING_CHANNEL,
           b.AGENCY_PAYER,
           b.LATE_CHECKOUT,
+          COALESCE(b.IS_CONTRACTED_RATE, 0) AS IS_CONTRACTED_RATE,
           b.REMARKS,
           bill.QTY,
           (
@@ -432,6 +434,7 @@ class DashboardModel {
           b.AGENCY_PAYER,
           b.TRANSFER,
           b.LATE_CHECKOUT,
+          COALESCE(b.IS_CONTRACTED_RATE, 0) AS IS_CONTRACTED_RATE,
           b.EXTENDED,
           bill.QTY,
           bill.PAYMENT_STATUS,
@@ -524,6 +527,7 @@ class DashboardModel {
           b.TRANSFER,
           b.TRANSFER_FROM,
           b.LATE_CHECKOUT,
+          COALESCE(b.IS_CONTRACTED_RATE, 0) AS IS_CONTRACTED_RATE,
           bill.QTY,
           (
             COALESCE(bill.ROOM_CHARGE * bill.QTY, 0)
@@ -805,6 +809,7 @@ class DashboardModel {
             b.TRANSFER,
             b.TRANSFER_FROM,
             b.LATE_CHECKOUT,
+            COALESCE(b.IS_CONTRACTED_RATE, 0) AS IS_CONTRACTED_RATE,
             bill.QTY,
             b.IS_OCCUPIED,
             bill.PAYMENT_STATUS,

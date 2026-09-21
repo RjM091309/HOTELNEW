@@ -1481,7 +1481,10 @@ function populateEditGroupForm(booking) {
     }
 
     $('#editGroupRemarks').val(booking.remarks);
-    
+
+    const isContractedRate = booking.isContractedRate === 1 || booking.isContractedRate === '1' || booking.isContractedRate === true;
+    $('#editGroupIncludeContractedRate').prop('checked', isContractedRate);
+
     // Set late checkout fee
     const lateCheckoutFee = parseFloat(booking.lateCheckoutFee) || 0;
     $('#editGroupLateCheckoutFee').val(lateCheckoutFee);
