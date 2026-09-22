@@ -244,6 +244,20 @@ async function runCalendarPerformanceMigrations() {
   }
 }
 
+async function runUserProfilePhotoMigration() {
+  if (!(await tableExists('user_info'))) {
+    console.warn('⚠️ user_info table not found, skipping profile photo column migration');
+    return;
+  }
+
+  await ensureColumn(
+    'user_info',
+    'PROFILE_PHOTO',
+    `PROFILE_PHOTO VARCHAR(255) NULL DEFAULT NULL COMMENT 'Uploaded avatar filename (WebP), relative to public/uploads/avatars/'`,
+    'FULLNAME'
+  );
+}
+
 async function runHoldPendingMigrations() {
   if (!(await tableExists('booking'))) {
     console.warn('⚠️ booking table not found, skipping hold pending column migration');
@@ -960,6 +974,7 @@ async function runStartupMigrations() {
   await runReceiptMigrations();
   await runLongTermStayMigrations();
   await runContractedRateMigrations();
+  await runUserProfilePhotoMigration();
   await runHoldPendingMigrations();
   await runChannelBookingIdMigrations();
   await runCalendarPerformanceMigrations();

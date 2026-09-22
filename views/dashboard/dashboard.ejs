@@ -247,9 +247,15 @@ function calculateCardVariables(booking) {
 
 <div class="dashboard-btn-row-item mb-4">
 	<div class="col-xl-12 col-md-12 col-12 " >
-		<div class="dashboard-card" >
-			<div class="dashboard-card-header" style="padding: 20px 25px; min-height: 80px; display: flex; justify-content: space-between; align-items: center;">
-				<div class="dashboard-card-header-title">Real-Time Booking Monitor</div>
+		<div class="dashboard-card" id="rtBookingMonitorCard">
+			<div class="dashboard-card-header rt-header" style="padding: 20px 25px; min-height: 80px; display: flex; justify-content: space-between; align-items: center;">
+				<div class="rt-header-left">
+					<span class="rt-header-icon"><i class="fa fa-calendar-check-o"></i></span>
+					<div class="rt-header-titles">
+						<div class="dashboard-card-header-title">Real-Time Booking Monitor</div>
+						<div class="rt-header-subtitle">Live room status and current bookings</div>
+					</div>
+				</div>
 				<div class="filter-btn-group" >
 				
 					<!-- Filter Group Buttons -->
@@ -765,9 +771,15 @@ function calculateCardVariables(booking) {
 
 <div class="dashboard-btn-row-item">
 	<div class="col-xl-12 col-md-12 col-12">
-		<div class="dashboard-card">
-			<div class="dashboard-card-header" style="padding: 20px 25px; min-height: 80px; display: flex; justify-content: space-between; align-items: center;">
-				<div class="dashboard-card-header-title">Real-Time Room Status</div>
+		<div class="dashboard-card" id="rtRoomStatusCard">
+			<div class="dashboard-card-header rt-header" style="padding: 20px 25px; min-height: 80px; display: flex; justify-content: space-between; align-items: center;">
+				<div class="rt-header-left">
+					<span class="rt-header-icon"><i class="fa fa-th-large"></i></span>
+					<div class="rt-header-titles">
+						<div class="dashboard-card-header-title">Real-Time Room Status</div>
+						<div class="rt-header-subtitle">Live overview of all rooms</div>
+					</div>
+				</div>
 				<div class="tab-bar">
 					<div class="tab-item is-active" data-target="3rd-floor-content">3rd Floor</div>
 					<div class="tab-item" data-target="4th-floor-content">4th Floor</div>
@@ -2515,6 +2527,85 @@ async function deleteRequestFromModal(id) {
 [data-theme="white"] .mdl-tabs.is-upgraded .mdl-tabs__tab.tabs_three.is-active:after,
 [data-theme="white"] .mdl-tabs .mdl-tabs.is-upgraded .mdl-tabs__tab.tabs_three.is-active:after {
   display: none !important;
+}
+
+/* Light mode: gradient header treatment for Real-Time Booking Monitor and
+   Real-Time Room Status - dark theme keeps its existing look untouched,
+   scoped to these two cards specifically (not every .dashboard-card). */
+[data-theme="white"] #rtBookingMonitorCard > .rt-header,
+[data-theme="white"] #rtRoomStatusCard > .rt-header {
+  background: linear-gradient(135deg, #8ba4e8 0%, #c39fd9 100%) !important;
+  border-radius: 16px 16px 0 0 !important;
+}
+/* Dark mode: same gradient treatment, darkened way down (deep navy to deep
+   plum) so it reads as "dark mode" rather than a lit-up banner, instead of
+   the flat card-dark header these two cards had before. */
+[data-theme="dark"] #rtBookingMonitorCard > .rt-header,
+[data-theme="dark"] #rtRoomStatusCard > .rt-header {
+  background: linear-gradient(135deg, #232a4d 0%, #3c2a52 100%) !important;
+  border-radius: 16px 16px 0 0 !important;
+}
+.rt-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.rt-header-icon {
+  display: none; /* only shown in light mode, see below */
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  flex: none;
+}
+[data-theme="white"] .rt-header-icon {
+  display: flex;
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+.rt-header-subtitle {
+  display: none;
+}
+[data-theme="white"] #rtBookingMonitorCard .rt-header-subtitle,
+[data-theme="white"] #rtRoomStatusCard .rt-header-subtitle {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 2px;
+}
+[data-theme="white"] #rtBookingMonitorCard .dashboard-card-header-title,
+[data-theme="white"] #rtRoomStatusCard .dashboard-card-header-title {
+  color: #fff !important;
+}
+/* Action buttons/tabs inside these two headers become translucent white
+   "glass" pills in light mode, readable against the purple/blue gradient
+   instead of the gray-chip treatment used elsewhere. */
+[data-theme="white"] #rtBookingMonitorCard .filter-btn-group .filter-btn,
+[data-theme="white"] #rtBookingMonitorCard .filter-btn-group .dropdown-toggle {
+  background: rgba(255, 255, 255, 0.18) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+}
+[data-theme="white"] #rtBookingMonitorCard .filter-btn-group .filter-btn:hover,
+[data-theme="white"] #rtBookingMonitorCard .filter-btn-group .dropdown-toggle:hover {
+  background: rgba(255, 255, 255, 0.3) !important;
+  color: #fff !important;
+}
+[data-theme="white"] #rtRoomStatusCard .tab-bar .tab-item {
+  background: rgba(255, 255, 255, 0.18) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+}
+[data-theme="white"] #rtRoomStatusCard .tab-bar .tab-item:hover {
+  background: rgba(255, 255, 255, 0.3) !important;
+}
+[data-theme="white"] #rtRoomStatusCard .tab-bar .tab-item.is-active {
+  background: #fff !important;
+  color: #8b6fb5 !important;
+  border-color: #fff !important;
 }
 
 /* Responsive tweaks for very narrow widths */

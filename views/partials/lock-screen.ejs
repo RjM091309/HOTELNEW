@@ -1,0 +1,203 @@
+<!-- System lock overlay. Hidden by default; shown via the body.system-locked
+     class (see the inline script right after <body> opens in layout.ejs,
+     and lockSystem()/unlockSystem() in lock-screen.js). This is a client-side
+     UI lock, not a session invalidation - the JWT/session stay fully valid
+     underneath so unlocking just resumes exactly where the user left off. -->
+<div id="lockScreenOverlay">
+  <div class="lock-screen-blob lock-screen-blob-1"></div>
+  <div class="lock-screen-blob lock-screen-blob-2"></div>
+  <div class="lock-screen-blob lock-screen-blob-3"></div>
+  <div class="lock-screen-card">
+    <img
+      id="lockScreenAvatar"
+      class="lock-screen-avatar"
+      src="<%= (typeof user !== 'undefined' && user && user.PROFILE_PHOTO) ? '/uploads/avatars/' + user.PROFILE_PHOTO : '/img/dp.png' %>"
+      alt=""
+    >
+    <div class="lock-screen-name" id="lockScreenName"><%= (typeof user !== 'undefined' && user && user.FULLNAME) ? user.FULLNAME : 'Guest' %></div>
+    <div class="lock-screen-sub">System locked - enter your password to continue</div>
+    <form id="lockScreenForm" autocomplete="off">
+      <input type="password" id="lockScreenPassword" class="form-control" placeholder="Password" autocomplete="current-password" required>
+      <div id="lockScreenError" class="lock-screen-error" hidden>Incorrect password.</div>
+      <button type="submit" class="btn btn-primary lock-screen-unlock-btn">
+        <i class="icon-lock"></i> Unlock
+      </button>
+    </form>
+    <a href="javascript:;" class="lock-screen-logout-link" onclick="logout()">Log out instead</a>
+  </div>
+</div>
+
+<style>
+  /* display stays "flex" always (rather than toggling none/flex) so opacity/
+     transform can actually transition - "display" itself can't animate, so
+     visibility+opacity+pointer-events carry the show/hide instead. This is
+     what makes both the lock-in and the post-password unlock fade/scale
+     smoothly rather than snapping instantly. */
+  #lockScreenOverlay {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 20000;
+    /* Semi-transparent instead of a solid color, so the actual blurred app
+       behind it (.page-wrapper, dimmed via filter:blur below) shows through
+       as the backdrop - a solid gradient here was hiding it entirely. */
+    background: rgba(8, 10, 16, 0.45);
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.35s ease, visibility 0s linear 0.35s;
+  }
+  body.system-locked #lockScreenOverlay {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.35s ease, visibility 0s linear 0s;
+  }
+  body.system-locked .page-wrapper {
+    filter: blur(10px);
+    pointer-events: none;
+    user-select: none;
+  }
+  .page-wrapper {
+    transition: filter 0.4s ease;
+  }
+
+  /* Soft colorful blurred orbs behind the glass card - the classic
+     glassmorphism backdrop, since the blurred app UI alone reads as flat gray. */
+  .lock-screen-blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(70px);
+    opacity: 0.55;
+    pointer-events: none;
+  }
+  .lock-screen-blob-1 {
+    width: 420px;
+    height: 420px;
+    top: -120px;
+    left: -100px;
+    background: radial-gradient(circle, #6f8bff 0%, transparent 70%);
+  }
+  .lock-screen-blob-2 {
+    width: 380px;
+    height: 380px;
+    bottom: -140px;
+    right: -80px;
+    background: radial-gradient(circle, #a855f7 0%, transparent 70%);
+  }
+  .lock-screen-blob-3 {
+    width: 300px;
+    height: 300px;
+    bottom: 10%;
+    left: 8%;
+    background: radial-gradient(circle, #22d3ee 0%, transparent 70%);
+  }
+
+  /* The glass card itself */
+  .lock-screen-card {
+    position: relative;
+    width: 340px;
+    max-width: 90vw;
+    text-align: center;
+    color: #fff;
+    padding: 40px 32px 32px;
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    transform: scale(0.92) translateY(8px);
+    opacity: 0;
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+  }
+  body.system-locked .lock-screen-card {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+  .lock-screen-avatar {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    margin-bottom: 14px;
+  }
+  .lock-screen-name {
+    font-size: 19px;
+    font-weight: 700;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  }
+  .lock-screen-sub {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.65);
+    margin: 6px 0 22px;
+  }
+  #lockScreenForm .form-control,
+  #lockScreenForm .form-control:focus {
+    text-align: center;
+    margin-bottom: 12px;
+    background: rgba(255, 255, 255, 0.10) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    color: #fff !important;
+    border-radius: 12px;
+    padding: 10px 16px;
+    backdrop-filter: blur(8px);
+  }
+  #lockScreenForm .form-control::placeholder {
+    color: rgba(255, 255, 255, 0.55);
+  }
+  #lockScreenForm .form-control:focus {
+    border-color: rgba(255, 255, 255, 0.5) !important;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08) !important;
+  }
+  .lock-screen-error {
+    color: #ff8a8a;
+    font-size: 12px;
+    margin: -4px 0 10px;
+  }
+  .lock-screen-unlock-btn {
+    width: 100%;
+    border: none;
+    border-radius: 12px;
+    padding: 10px 0;
+    font-weight: 600;
+    background: linear-gradient(135deg, #6f8bff, #a855f7);
+    box-shadow: 0 4px 16px rgba(111, 139, 255, 0.35);
+    transition: background 0.2s ease, box-shadow 0.2s ease;
+  }
+  .lock-screen-unlock-btn:hover {
+    background: linear-gradient(135deg, #5f7bff, #9845f0);
+  }
+  /* Brief "Unlocked" confirmation before the card fades out, instead of an
+     instant disappear right on submit. */
+  .lock-screen-unlock-btn--success {
+    background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+    box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4) !important;
+  }
+  .lock-screen-shake {
+    animation: lockScreenShake 0.4s;
+  }
+  @keyframes lockScreenShake {
+    10%, 90% { transform: translateX(-2px); }
+    20%, 80% { transform: translateX(4px); }
+    30%, 50%, 70% { transform: translateX(-8px); }
+    40%, 60% { transform: translateX(8px); }
+  }
+  .lock-screen-logout-link {
+    display: inline-block;
+    margin-top: 18px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.55);
+    text-decoration: underline;
+  }
+  .lock-screen-logout-link:hover {
+    color: #fff;
+  }
+</style>
+
+<script src="/js/lock-screen.js"></script>

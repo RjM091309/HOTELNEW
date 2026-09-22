@@ -1020,16 +1020,33 @@ body.header-white .page-header.navbar input#datePicker {
     color: #111827 !important;
 }
 
-/* Modals */
+/* Modals - !important on all four: table.css has unconditional, theme-blind
+   ".modal .modal-content/.modal-header/.modal-footer" rules (2-class
+   specificity, same tier as the bare-class selectors below), so without
+   !important the outcome is a same-specificity coin flip that was in
+   practice still landing on table.css's dark colors for any modal with no
+   ID-scoped override of its own - same root cause .modal-body already
+   needed !important for below, just not caught here at the time. */
 [data-theme="white"] .modal-content {
-    background: #ffffff;
-    color: #111827;
-    border: 1px solid #e5e7eb;
+    background: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
 }
 [data-theme="white"] .modal-header,
 [data-theme="white"] .modal-footer {
-    background: #f9fafb;
-    border-color: #e5e7eb;
+    background: #f9fafb !important;
+    border-color: #e5e7eb !important;
+}
+/* table.css has an unconditional ".modal .btn-close { filter: invert(1)
+   !important }" that forces the X icon white everywhere, for dark headers -
+   against this generic light gray header it's a white icon on near-white,
+   genuinely invisible (not just low-contrast). Reset it back to Bootstrap's
+   default dark X here; modals with their own ID-scoped override (e.g.
+   #modal-addbooking, whose light-theme header is blue and needs to KEEP a
+   white icon) still win via specificity, so this only affects generic
+   modals with no such override of their own. */
+[data-theme="white"] .modal-header .btn-close {
+    filter: none !important;
 }
 /* table.css has an unconditional, theme-blind ".modal .modal-body { background-
    color: #2a3135; color: #e0e0e0 }" that applies to every modal site-wide -

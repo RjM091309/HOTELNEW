@@ -3,6 +3,12 @@
 // ========================================
 
 const UserModel = require('../models/userModels');
+const bcrypt = require('bcryptjs');
+const fs = require('fs');
+const path = require('path');
+const sharp = require('sharp');
+
+const AVATAR_DIR = path.join(__dirname, '../public/uploads/avatars');
 
 class UserController {
   
@@ -302,6 +308,160 @@ class UserController {
         message: 'Error fetching current user',
         error: error.message
       });
+    }
+  }
+
+  // ========================================
+  // SELF-SERVICE PROFILE (any logged-in user, own account only)
+  // ========================================
+
+  static async renderProfilePage(req, res) {
+    try {
+      const userId = req.user ? req.user.userId : null;
+      if (!userId) return res.redirect('/login');
+
+      const profile = await UserModel.getUserById(userId);
+      if (!profile) return res.redirect('/login');
+
+      res.render('user/profile', {
+        title: 'My Profile',
+        subTitle: 'My Profile',
+        activePage: 'profile',
+        hideBreadcrumb: false,
+        user: req.user,
+        userId,
+        tabOrder: req.user?.TAB_ORDER || null,
+        profile
+      });
+    } catch (error) {
+      console.error('Error loading profile page:', error);
+      res.status(500).render('error/500', {
+        title: 'Server Error',
+        subTitle: '500 Error'
+      });
+    }
+  }
+
+  static async updateOwnProfile(req, res) {
+    try {
+      const userId = req.user ? req.user.userId : null;
+      if (!userId) {
+        return res.status(401).json({ success: false, message: 'Not authenticated' });
+      }
+
+      const fullname = (req.body.fullname || '').trim();
+      if (!fullname) {
+        return res.status(400).json({ success: false, message: 'Full name is required' });
+      }
+
+      await UserModel.updateOwnFullname(userId, fullname);
+      res.json({ success: true, message: 'Profile updated successfully', data: { fullname } });
+    } catch (error) {
+      console.error('Error updating own profile:', error);
+      res.status(500).json({ success: false, message: 'Error updating profile', error: error.message });
+    }
+  }
+
+  static async changeOwnPassword(req, res) {
+    try {
+      const userId = req.user ? req.user.userId : null;
+      if (!userId) {
+        return res.status(401).json({ success: false, message: 'Not authenticated' });
+      }
+
+      const { currentPassword, newPassword, confirmPassword } = req.body;
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        return res.status(400).json({ success: false, message: 'All password fields are required' });
+      }
+      if (newPassword !== confirmPassword) {
+        return res.status(400).json({ success: false, message: 'New passwords do not match' });
+      }
+      if (newPassword.length < 6) {
+        return res.status(400).json({ success: false, message: 'New password must be at least 6 characters' });
+      }
+
+      const storedHash = await UserModel.getPasswordHash(userId);
+      if (!storedHash) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+
+      const isMatch = await bcrypt.compare(currentPassword, storedHash);
+      if (!isMatch) {
+        return res.status(400).json({ success: false, message: 'Current password is incorrect' });
+      }
+
+      await UserModel.updateOwnPassword(userId, newPassword);
+      res.json({ success: true, message: 'Password changed successfully' });
+    } catch (error) {
+      console.error('Error changing own password:', error);
+      res.status(500).json({ success: false, message: 'Error changing password', error: error.message });
+    }
+  }
+
+  // Lock screen unlock check - verifies the CURRENTLY logged-in user's own
+  // password, does not change anything or touch the session/JWT. The lock
+  // itself is a client-side overlay (see lock-screen.js); this just answers
+  // "was that the right password" so it can be dismissed.
+  static async verifyOwnPassword(req, res) {
+    try {
+      const userId = req.user ? req.user.userId : null;
+      if (!userId) {
+        return res.status(401).json({ success: false, message: 'Not authenticated' });
+      }
+
+      const { password } = req.body;
+      if (!password) {
+        return res.status(400).json({ success: false, message: 'Password is required' });
+      }
+
+      const storedHash = await UserModel.getPasswordHash(userId);
+      if (!storedHash) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+
+      const isMatch = await bcrypt.compare(password, storedHash);
+      res.json({ success: isMatch, message: isMatch ? 'Unlocked' : 'Incorrect password' });
+    } catch (error) {
+      console.error('Error verifying own password:', error);
+      res.status(500).json({ success: false, message: 'Error verifying password', error: error.message });
+    }
+  }
+
+  static async uploadOwnPhoto(req, res) {
+    try {
+      const userId = req.user ? req.user.userId : null;
+      if (!userId) {
+        return res.status(401).json({ success: false, message: 'Not authenticated' });
+      }
+      if (!req.file) {
+        return res.status(400).json({ success: false, message: 'No photo uploaded' });
+      }
+
+      fs.mkdirSync(AVATAR_DIR, { recursive: true });
+
+      const filename = `${userId}-${Date.now()}.webp`;
+      const filePath = path.join(AVATAR_DIR, filename);
+
+      // Square-crop to a small avatar size and convert to WebP - keeps
+      // uploads (which could be multi-MB phone photos) down to a few KB.
+      await sharp(req.file.buffer)
+        .resize(256, 256, { fit: 'cover' })
+        .webp({ quality: 80 })
+        .toFile(filePath);
+
+      const previous = await UserModel.getUserById(userId);
+      await UserModel.updateOwnPhoto(userId, filename);
+
+      // Clean up the old avatar file now that the DB points at the new one.
+      if (previous && previous.PROFILE_PHOTO) {
+        const oldPath = path.join(AVATAR_DIR, previous.PROFILE_PHOTO);
+        fs.unlink(oldPath, () => {});
+      }
+
+      res.json({ success: true, message: 'Photo updated successfully', data: { photoUrl: `/uploads/avatars/${filename}` } });
+    } catch (error) {
+      console.error('Error uploading own photo:', error);
+      res.status(500).json({ success: false, message: 'Error uploading photo', error: error.message });
     }
   }
 

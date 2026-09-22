@@ -4,7 +4,19 @@
 
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const UserController = require('../controller/c_user');
+
+// Memory storage - the controller processes the buffer with sharp before
+// ever touching disk, so there's no need for a temp file here.
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    if (/^image\/(jpeg|png|webp|gif)$/.test(file.mimetype)) return cb(null, true);
+    cb(new Error('Only JPEG, PNG, WebP, or GIF images are allowed'));
+  }
+});
 
 // Only Admin (PERMISSIONS === 1) may view or manage the user directory.
 function requireAdminPage(req, res, next) {
@@ -51,5 +63,14 @@ router.delete('/api/users/:id', requireAdminApi, UserController.deleteUser);
 // current-user is polled by session-handler.js on every page for all roles.
 router.post('/api/users/check-username', UserController.checkUsernameAvailability);
 router.get('/api/current-user', UserController.getCurrentUser);
+
+// ========================================
+// SELF-SERVICE PROFILE (any logged-in user, own account only - no admin gate)
+// ========================================
+router.get('/profile', UserController.renderProfilePage);
+router.post('/profile/update', UserController.updateOwnProfile);
+router.post('/profile/change-password', UserController.changeOwnPassword);
+router.post('/profile/photo', avatarUpload.single('photo'), UserController.uploadOwnPhoto);
+router.post('/profile/verify-password', UserController.verifyOwnPassword);
 
 module.exports = router;

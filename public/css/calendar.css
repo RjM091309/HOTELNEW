@@ -2287,18 +2287,21 @@ body.white-sidebar-color .legend-color-mountain-view {
 }
 
 /* ============================================================================
-   Floor (3 / 4 / 5) grouping rows: solid black band across entire row
+   Floor (3 / 4 / 5) grouping rows: light-medium gray band across entire row,
+   with the grid lines still faintly visible through it (per reference
+   screenshot) - lighter than the earlier 50% dark attempt, closer to (but a
+   touch more visible than) the original barely-there #00000029.
    ============================================================================ */
 /* Left side: Rooms column datagrid cell for floor */
 #calendar .fc-datagrid-cell[data-is-floor],
 #calendar .fc-datagrid-cell[data-is-floor] .fc-datagrid-cell-frame,
 #calendar .fc-datagrid-cell[data-is-floor] .fc-datagrid-cell-cushion {
-  background-color: #000000 !important;
+  background-color: rgba(0, 0, 0, 0.18) !important;
 }
 
 /* Right side: Timeline lane ONLY for floor */
 #calendar td.fc-timeline-lane.fc-floor-lane {
-  background-color: #000000 !important;
+  background-color: rgba(0, 0, 0, 0.18) !important;
   position: relative !important;
 }
 
@@ -2311,7 +2314,7 @@ body.white-sidebar-color .legend-color-mountain-view {
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
-  background-color: #000000 !important;
+  background-color: rgba(0, 0, 0, 0.18) !important;
   z-index: 5 !important;
   pointer-events: none !important;
 }

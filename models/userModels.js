@@ -28,19 +28,47 @@ class UserModel {
   // Get user by ID
   static async getUserById(id) {
     const query = `
-      SELECT 
+      SELECT
         IDno,
-        FULLNAME, 
-        USERNAME, 
+        FULLNAME,
+        USERNAME,
         PERMISSIONS,
         ROOM_ID,
+        PROFILE_PHOTO,
         ENCODED_BY,
         ENCODED_DT,
         ACTIVE
-      FROM user_info 
+      FROM user_info
       WHERE IDno = ? AND ACTIVE = 1`;
     const results = await queryDatabasePromise(query, [id]);
     return results[0] || null;
+  }
+
+  // Self-service profile: rename only (username/role/room untouched)
+  static async updateOwnFullname(userId, fullname) {
+    const query = `UPDATE user_info SET FULLNAME = ? WHERE IDno = ? AND ACTIVE = 1`;
+    return await queryDatabasePromise(query, [fullname, userId]);
+  }
+
+  // Self-service password change - returns the stored hash so the caller can
+  // verify the current password before allowing the change.
+  static async getPasswordHash(userId) {
+    const query = `SELECT PASSWORD FROM user_info WHERE IDno = ? AND ACTIVE = 1`;
+    const results = await queryDatabasePromise(query, [userId]);
+    return results[0]?.PASSWORD || null;
+  }
+
+  static async updateOwnPassword(userId, newPasswordPlain) {
+    const hashedPassword = await bcrypt.hash(newPasswordPlain, 10);
+    const query = `UPDATE user_info SET PASSWORD = ? WHERE IDno = ? AND ACTIVE = 1`;
+    return await queryDatabasePromise(query, [hashedPassword, userId]);
+  }
+
+  // Self-service avatar - photoFilename is just the stored filename (e.g.
+  // "12-1700000000000.webp"), relative to public/uploads/avatars/.
+  static async updateOwnPhoto(userId, photoFilename) {
+    const query = `UPDATE user_info SET PROFILE_PHOTO = ? WHERE IDno = ? AND ACTIVE = 1`;
+    return await queryDatabasePromise(query, [photoFilename, userId]);
   }
 
   // Create new user

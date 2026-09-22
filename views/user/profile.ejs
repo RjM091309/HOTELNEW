@@ -1,0 +1,169 @@
+<div class="row profile-page">
+  <div class="col-xl-8 col-lg-10 col-12 mx-auto">
+
+    <div class="profile-card mb-3">
+      <div class="profile-card-header">My Profile</div>
+      <div class="profile-card-body">
+        <div class="profile-photo-row">
+          <div class="profile-avatar-wrap">
+            <img
+              id="profilePhotoPreview"
+              class="profile-avatar"
+              src="<%= profile.PROFILE_PHOTO ? '/uploads/avatars/' + profile.PROFILE_PHOTO : '/img/dp.png' %>"
+              alt="Profile photo"
+            >
+          </div>
+          <div>
+            <input type="file" id="profilePhotoInput" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+            <button type="button" class="btn profile-btn-outline" id="profilePhotoChooseBtn">
+              <i class="fa fa-camera"></i> Change Photo
+            </button>
+            <p class="profile-photo-hint">JPG, PNG, WebP or GIF. Square photos look best - resized to 256&times;256 and saved as WebP.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="profile-card mb-3">
+      <div class="profile-card-header">Account Details</div>
+      <div class="profile-card-body">
+        <form id="profileNameForm">
+          <div class="row">
+            <div class="col-lg-6">
+              <div class="form-group">
+                <label class="form-label">Full Name</label>
+                <input type="text" class="form-control" id="profileFullname" value="<%= profile.FULLNAME %>" required>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="form-group">
+                <label class="form-label">Username</label>
+                <input type="text" class="form-control" value="<%= profile.USERNAME %>" disabled>
+              </div>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary mt-2">Save Changes</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="profile-card mb-3">
+      <div class="profile-card-header">Change Password</div>
+      <div class="profile-card-body">
+        <form id="profilePasswordForm">
+          <div class="row">
+            <div class="col-lg-4">
+              <div class="form-group">
+                <label class="form-label">Current Password</label>
+                <input type="password" class="form-control" id="profileCurrentPassword" autocomplete="current-password" required>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="form-group">
+                <label class="form-label">New Password</label>
+                <input type="password" class="form-control" id="profileNewPassword" autocomplete="new-password" minlength="6" required>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="form-group">
+                <label class="form-label">Confirm New Password</label>
+                <input type="password" class="form-control" id="profileConfirmPassword" autocomplete="new-password" minlength="6" required>
+              </div>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary mt-2">Change Password</button>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<style>
+  /* Own compact card, not .dashboard-card - that one is built for equal-
+     height grid tiles (height:100% stretches to fill a grid row) and has a
+     permanent dark-only gradient background with no light-theme variant,
+     both wrong for a plain stacked settings form. */
+  .profile-card {
+    background: #2a3135;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+  }
+  .profile-card-header {
+    padding: 12px 20px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .profile-card-body {
+    padding: 20px;
+  }
+  /* style.css's base "body { color: rgba(0,0,0,0.87) }" assumes a light page
+     and .form-label never overrides it, so labels were inheriting near-black
+     text against this dark card - unreadable. */
+  .profile-card .form-label {
+    color: #cfcfcf;
+  }
+  [data-theme="white"] .profile-card .form-label {
+    color: #374151;
+  }
+
+  .profile-photo-row {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .profile-avatar-wrap {
+    width: 96px;
+    height: 96px;
+    flex: none;
+  }
+  .profile-avatar {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid rgba(111, 156, 64, 0.4);
+  }
+  .profile-btn-outline {
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: transparent;
+    color: #e0e0e0;
+    padding: 6px 16px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  .profile-btn-outline:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .profile-photo-hint {
+    font-size: 12px;
+    color: var(--text-muted, #8a8a8a);
+    margin: 8px 0 0;
+    max-width: 360px;
+  }
+
+  [data-theme="white"] .profile-card {
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e5e7eb;
+  }
+  [data-theme="white"] .profile-card-header {
+    color: #111827;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  [data-theme="white"] .profile-btn-outline {
+    border-color: rgba(0, 0, 0, 0.25);
+    color: #374151;
+  }
+  [data-theme="white"] .profile-btn-outline:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
+</style>
+
+<script src="/js/user/profile.js?v=1"></script>

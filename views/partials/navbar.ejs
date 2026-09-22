@@ -97,28 +97,23 @@
 				<li class="dropdown dropdown-user">
 					<a href="javascript:;" class="dropdown-toggle" data-bs-toggle="dropdown" data-hover="dropdown"
 						data-close-others="true">
-						<img alt="" class="img-circle " src="/img/dp.png" />
+						<img alt="" class="img-circle " src="/img/dp.png" id="navbarAvatarImg" />
 						<span class="username username-hide-on-mobile"> <%= user ? user.FULLNAME : 'Guest' %> </span>
 						<i class="fa fa-angle-down"></i>
 					</a>
-					<ul class="dropdown-menu dropdown-menu-default animated jello">
+					<ul class="dropdown-menu dropdown-menu-default navbar-user-dropdown">
 						<li>
-							<a href="user_profile.html">
+							<a href="/user_info/profile">
 								<i class="icon-user"></i> Profile </a>
 						</li>
 						<li>
-							<a href="#">
-								<i class="icon-settings"></i> Settings
-							</a>
-						</li>
-						<li>
-							<a href="#">
+							<a href="javascript:;" data-bs-toggle="modal" data-bs-target="#navbarHelpModal">
 								<i class="icon-directions"></i> Help
 							</a>
 						</li>
 						<li class="divider"> </li>
 						<li>
-							<a href="lock_screen.html">
+							<a href="javascript:;" onclick="window.lockSystem && window.lockSystem()">
 								<i class="icon-lock"></i> Lock
 							</a>
 						</li>
@@ -141,10 +136,126 @@
 </div>
 <!-- end header -->
 
+<!-- Help modal - basic booking how-to + quick links, triggered from the
+     dropdown above. Was previously sitting directly inside <ul class="nav
+     navbar-nav pull-right"> as a <div> child - invalid HTML (a <ul> can only
+     directly contain <li>), which browsers "fix" during parsing by
+     relocating/reparenting the offending markup, landing the modal's actual
+     DOM position somewhere the CSS/JS never intended - explaining why its own
+     buttons stopped responding to clicks despite looking fine. Moved here,
+     outside all nav/list structure, matching how add_booking's modal below
+     is already included at this same top level. -->
+<div class="modal fade" id="navbarHelpModal" tabindex="-1" aria-labelledby="navbarHelpModalLabel" aria-hidden="true">
+	<div class="modal-dialog modal-dialog-centered">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="navbarHelpModalLabel"><i class="icon-directions"></i> Help - Getting Started with Booking</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" id="navbarHelpCloseX"></button>
+			</div>
+			<div class="modal-body">
+				<p class="text-muted" style="font-size: 13px;">A quick guide to the basics. More topics will be added here later.</p>
+				<div class="navbar-help-steps">
+					<a href="/calendar/room-checker" class="navbar-help-step">
+						<span class="navbar-help-step-icon"><i class="fa fa-search"></i></span>
+						<span class="navbar-help-step-text"><strong>Check availability first.</strong> Use Room Checker to see open rooms and rates for any date range before quoting a guest.</span>
+					</a>
+					<a href="/booking" class="navbar-help-step">
+						<span class="navbar-help-step-icon"><i class="fa fa-plus-circle"></i></span>
+						<span class="navbar-help-step-text"><strong>Create a booking.</strong> Add a single room from the Booking page, or click an open slot on Calendar to start one there.</span>
+					</a>
+					<a href="/booking" class="navbar-help-step">
+						<span class="navbar-help-step-icon"><i class="fa fa-users"></i></span>
+						<span class="navbar-help-step-text"><strong>Multiple rooms, one party?</strong> Use Create Group Booking instead of adding each room one by one.</span>
+					</a>
+					<a href="/calendar/unassigned-rooms" class="navbar-help-step">
+						<span class="navbar-help-step-icon"><i class="fa fa-question-circle"></i></span>
+						<span class="navbar-help-step-text"><strong>No room assigned yet?</strong> Reservations without a room show up under Unassigned Rooms until one is picked.</span>
+					</a>
+					<a href="/booking/quotation" class="navbar-help-step">
+						<span class="navbar-help-step-icon"><i class="fa fa-file-text-o"></i></span>
+						<span class="navbar-help-step-text"><strong>Sending a price quote?</strong> Build one in Quotation before the guest confirms - fully editable, printable.</span>
+					</a>
+					<a href="/booking/breakfast-list" class="navbar-help-step">
+						<span class="navbar-help-step-icon"><i class="fa fa-coffee"></i></span>
+						<span class="navbar-help-step-text"><strong>Checking who has breakfast today?</strong> See Breakfast List.</span>
+					</a>
+				</div>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="navbarHelpCloseBtn">Close</button>
+			</div>
+		</div>
+	</div>
+</div>
+
 <%- include('../booking/modal/add_booking') %>
 
 <!-- Styles for the new components -->
 <style>
+
+/* Profile dropdown - replaces animate.css's bouncy "jello" wobble with a
+   subtle, professional fade + slide-down. Bootstrap 5 toggles the .show
+   class on open/close, and re-adding .show after the element leaves the
+   render tree (display:none) naturally replays a CSS animation each time,
+   same mechanism the old jello class relied on. */
+.navbar-user-dropdown {
+	transform-origin: top right;
+}
+.navbar-user-dropdown.show {
+	animation: navbarDropdownIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes navbarDropdownIn {
+	from {
+		opacity: 0;
+		transform: translateY(-6px) scale(0.98);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+
+/* Help modal - clickable step cards */
+.navbar-help-steps {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.navbar-help-step {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	padding: 10px 12px;
+	border-radius: 8px;
+	border: 1px solid rgba(0, 0, 0, 0.08);
+	text-decoration: none;
+	color: inherit;
+	transition: background 0.15s ease, border-color 0.15s ease;
+}
+.navbar-help-step:hover {
+	background: rgba(33, 150, 243, 0.08);
+	border-color: rgba(33, 150, 243, 0.3);
+	color: inherit;
+}
+.navbar-help-step-icon {
+	flex: none;
+	width: 34px;
+	height: 34px;
+	border-radius: 50%;
+	background: rgba(33, 150, 243, 0.12);
+	color: #2196f3;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 14px;
+}
+.navbar-help-step-text {
+	font-size: 13px;
+	line-height: 1.5;
+}
+[data-theme="white"] .navbar-help-step {
+	border-color: #e5e7eb;
+}
 
 /* Scrollable Container */
 .scrollable-containers {
