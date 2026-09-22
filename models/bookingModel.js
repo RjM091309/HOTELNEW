@@ -740,13 +740,24 @@ class BookingModel {
         if (status === 'check-In') {
           // Hotel day rolls over at 6 AM, not midnight. A booking marked
           // Late Check-In that's actually checked in between 12:00 AM and
-          // 5:59 AM is still arriving for the PREVIOUS hotel-day - so the
-          // recorded date rolls back one day while the actual time-of-day
-          // is kept as-is (DATE_SUB(NOW(), INTERVAL 1 DAY) shifts the whole
-          // timestamp back 24h, not just the date part, which is exactly
-          // what's wanted here). Regular/Early check-ins, and any Late
-          // Check-In outside that window, are unaffected and just use
-          // NOW() as before.
+          // 5:59 AM (hotel LOCAL time) is still arriving for the PREVIOUS
+          // hotel-day - so the recorded date rolls back one day while the
+          // actual time-of-day is kept as-is (DATE_SUB(NOW(), INTERVAL 1
+          // DAY) shifts the whole timestamp back 24h, not just the date
+          // part, which is exactly what's wanted here). Regular/Early
+          // check-ins, and any Late Check-In outside that window, are
+          // unaffected and just use NOW() as before.
+          // NOTE: confirmed via a direct DB query (with mysql2's
+          // dateStrings:true, to avoid its default Date-object conversion
+          // which reports everything in UTC/ISO notation regardless of
+          // what's actually stored) that NOW() and all DATETIME columns
+          // here are plain naive local wall-clock values (session/global
+          // time_zone = SYSTEM) - no UTC storage or conversion happening
+          // at the DB layer at all. So HOUR(NOW()) directly reads the
+          // local hour with no offset needed. If this ever looks off
+          // again, suspect the *display* layer's own date parsing before
+          // re-adding a timezone shift here - that's where a real bug
+          // was found once already.
           updateBookingQuery = `
             UPDATE booking
             SET BOOKING_STATUS = ?, ACTUAL_CHECK_IN_DT = COALESCE(

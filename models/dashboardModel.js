@@ -1363,8 +1363,12 @@ class DashboardModel {
       // Hotel day rolls over at 6 AM: a Late Check-In (CHECK_IN_STATUS = 0)
       // actually arriving 12:00 AM-5:59 AM is still arriving for the
       // PREVIOUS hotel-day, so the recorded date rolls back one day (same
-      // time-of-day kept) via DATE_SUB(NOW(), INTERVAL 1 DAY). See the
-      // identical logic in bookingModel.js/updateBookingStatus.
+      // time-of-day kept) via DATE_SUB(NOW(), INTERVAL 1 DAY). NOW() and
+      // all DATETIME columns are plain naive local wall-clock values
+      // (confirmed: session/global time_zone = SYSTEM, no UTC conversion
+      // at the DB layer), so HOUR(NOW()) already reads the local hour
+      // directly - no timezone offset needed here.
+      // See the identical logic in bookingModel.js/updateBookingStatus.
       let tsSet = '';
       if (status === 'check-In') tsSet = `, ACTUAL_CHECK_IN_DT = COALESCE(
         ACTUAL_CHECK_IN_DT,
