@@ -738,9 +738,25 @@ class BookingModel {
         let queryParams;
 
         if (status === 'check-In') {
+          // Hotel day rolls over at 6 AM, not midnight. A booking marked
+          // Late Check-In that's actually checked in between 12:00 AM and
+          // 5:59 AM is still arriving for the PREVIOUS hotel-day - so the
+          // recorded date rolls back one day while the actual time-of-day
+          // is kept as-is (DATE_SUB(NOW(), INTERVAL 1 DAY) shifts the whole
+          // timestamp back 24h, not just the date part, which is exactly
+          // what's wanted here). Regular/Early check-ins, and any Late
+          // Check-In outside that window, are unaffected and just use
+          // NOW() as before.
           updateBookingQuery = `
             UPDATE booking
-            SET BOOKING_STATUS = ?, ACTUAL_CHECK_IN_DT = COALESCE(ACTUAL_CHECK_IN_DT, NOW())
+            SET BOOKING_STATUS = ?, ACTUAL_CHECK_IN_DT = COALESCE(
+              ACTUAL_CHECK_IN_DT,
+              CASE
+                WHEN CHECK_IN_STATUS = 0 AND HOUR(NOW()) BETWEEN 0 AND 5
+                  THEN DATE_SUB(NOW(), INTERVAL 1 DAY)
+                ELSE NOW()
+              END
+            )
             WHERE IDNo = ? AND ACTIVE = 1;
           `;
           queryParams = [status, bookingID];

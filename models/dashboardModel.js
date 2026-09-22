@@ -1360,8 +1360,20 @@ class DashboardModel {
       const previousStatus = prevRows[0]?.BOOKING_STATUS;
 
       // Stamp the actual check-in / check-out time when the status moves there.
+      // Hotel day rolls over at 6 AM: a Late Check-In (CHECK_IN_STATUS = 0)
+      // actually arriving 12:00 AM-5:59 AM is still arriving for the
+      // PREVIOUS hotel-day, so the recorded date rolls back one day (same
+      // time-of-day kept) via DATE_SUB(NOW(), INTERVAL 1 DAY). See the
+      // identical logic in bookingModel.js/updateBookingStatus.
       let tsSet = '';
-      if (status === 'check-In') tsSet = ', ACTUAL_CHECK_IN_DT = COALESCE(ACTUAL_CHECK_IN_DT, NOW())';
+      if (status === 'check-In') tsSet = `, ACTUAL_CHECK_IN_DT = COALESCE(
+        ACTUAL_CHECK_IN_DT,
+        CASE
+          WHEN CHECK_IN_STATUS = 0 AND HOUR(NOW()) BETWEEN 0 AND 5
+            THEN DATE_SUB(NOW(), INTERVAL 1 DAY)
+          ELSE NOW()
+        END
+      )`;
       else if (status === 'check-Out') tsSet = ', ACTUAL_CHECK_OUT_DT = NOW()';
 
       let query = `UPDATE booking SET BOOKING_STATUS = ?${tsSet} WHERE IDNo = ? AND ACTIVE = 1`;
@@ -1537,7 +1549,14 @@ class DashboardModel {
       }
 
       const updateResult = await queryDatabasePromise(
-        `UPDATE booking SET BOOKING_STATUS = 'check-In', ACTUAL_CHECK_IN_DT = COALESCE(ACTUAL_CHECK_IN_DT, NOW()), EDITED_DT = NOW() WHERE IDNo = ? AND ACTIVE = 1`,
+        `UPDATE booking SET BOOKING_STATUS = 'check-In', ACTUAL_CHECK_IN_DT = COALESCE(
+          ACTUAL_CHECK_IN_DT,
+          CASE
+            WHEN CHECK_IN_STATUS = 0 AND HOUR(NOW()) BETWEEN 0 AND 5
+              THEN DATE_SUB(NOW(), INTERVAL 1 DAY)
+            ELSE NOW()
+          END
+        ), EDITED_DT = NOW() WHERE IDNo = ? AND ACTIVE = 1`,
         [bookingId]
       );
 

@@ -1599,7 +1599,14 @@ class CalendarModel {
         UPDATE booking
         SET BOOKING_STATUS = 'check-In',
             IS_OCCUPIED = 1,
-            ACTUAL_CHECK_IN_DT = COALESCE(ACTUAL_CHECK_IN_DT, NOW()),
+            ACTUAL_CHECK_IN_DT = COALESCE(
+              ACTUAL_CHECK_IN_DT,
+              CASE
+                WHEN CHECK_IN_STATUS = 0 AND HOUR(NOW()) BETWEEN 0 AND 5
+                  THEN DATE_SUB(NOW(), INTERVAL 1 DAY)
+                ELSE NOW()
+              END
+            ),
             EDITED_DT = NOW()
         WHERE IDNo = ? AND ACTIVE = 1
       `;
