@@ -347,11 +347,24 @@ function formatActualTimeOnly(ts) {
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
-// Scheduled date + actual event time when available: "09/03/26 · 9:58 AM"
+// Actual event's own date + time when available, otherwise the scheduled
+// date only: "09/22/26 · 3:04 AM". Deliberately uses the actual timestamp's
+// OWN date (not the scheduled date) - a Late Check-In actually arriving
+// 12:00 AM-5:59 AM gets rolled back to the previous day in the database
+// (see bookingModel.js/updateBookingStatus), so the actual and scheduled
+// dates can legitimately differ. Previously this always showed the
+// scheduled date and only borrowed the time from actualTs, which silently
+// hid that rollback.
 function formatStayDateWithActual(scheduledValue, actualTs) {
-  const base = formatStayDateOnly(scheduledValue);
-  const t = formatActualTimeOnly(actualTs);
-  return t ? `${base} · ${t}` : base;
+  if (actualTs) {
+    const d = new Date(String(actualTs).replace(' ', 'T'));
+    if (!Number.isNaN(d.getTime())) {
+      const datePart = d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
+      const timePart = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      return `${datePart} · ${timePart}`;
+    }
+  }
+  return formatStayDateOnly(scheduledValue);
 }
 
 function setInfoText(elementId, value, fallback = '-') {

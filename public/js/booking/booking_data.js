@@ -55,10 +55,28 @@ $(document).ready(function () {
                             hour: 'numeric', minute: '2-digit', hour12: true
                         }).format(d);
                     };
+                    // Uses the actual timestamp's OWN date (not the scheduled
+                    // date) when available - a Late Check-In actually arriving
+                    // 12:00 AM-5:59 AM gets rolled back to the previous day in
+                    // the database (see bookingModel.js/updateBookingStatus),
+                    // so the actual and scheduled dates can legitimately
+                    // differ. Previously this always showed the scheduled
+                    // date and only borrowed the time from actualTs, which
+                    // silently hid that rollback.
                     const withActualTime = (scheduledStr, actualTs) => {
-                        const base = formatDate(scheduledStr);
-                        const t = formatActualTime(actualTs);
-                        return t ? `${base} · ${t}` : base;
+                        if (actualTs) {
+                            const d = new Date(String(actualTs).replace(' ', 'T'));
+                            if (!isNaN(d.getTime())) {
+                                const datePart = new Intl.DateTimeFormat('en-US', {
+                                    month: 'short', day: 'numeric', year: 'numeric'
+                                }).format(d);
+                                const timePart = new Intl.DateTimeFormat('en-US', {
+                                    hour: 'numeric', minute: '2-digit', hour12: true
+                                }).format(d);
+                                return `${datePart} · ${timePart}`;
+                            }
+                        }
+                        return formatDate(scheduledStr);
                     };
                     const isCancelled = (item.BookingStatus || '').toLowerCase() === 'cancelled' || item.IS_CANCELLED === 1;
 
