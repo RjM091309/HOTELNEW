@@ -2120,19 +2120,15 @@ body.white-sidebar-color .legend-color-mountain-view {
   color: #000000 !important;
 }
 
-/* Light theme: weekend shading similar to dark theme */
-[data-theme="white"] .saturday-border {
-  background: rgba(0,0,0,0.16) !important; /* darker gray for Saturday */
-}
-
-[data-theme="white"] .sunday-border {
-  background: rgba(0,0,0,0.16) !important; /* darker gray for Sunday */
-}
-
-/* Light theme: also shade weekend header cells */
+/* Light theme: kept flat/plain (no weekend column shading) per request -
+   the 0.16 opacity gray banding made the grid look busy/messy once the
+   row-separator lines were also visible; the wanted look is plain white
+   with just grid lines and the current-day highlight below. */
+[data-theme="white"] .saturday-border,
+[data-theme="white"] .sunday-border,
 [data-theme="white"] .fc-timeline-header .saturday-border,
 [data-theme="white"] .fc-timeline-header .sunday-border {
-  background: rgba(0,0,0,0.16) !important;
+  background: transparent !important;
 }
 
 /* Light theme: current day shading in header as well */
