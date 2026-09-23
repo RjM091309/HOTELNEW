@@ -18,10 +18,6 @@ router.get('/sales-summary', paymentsController.salesSummary);
 // Today's collected payments list
 router.get('/today-paid', paymentsController.todayPaidPayments);
 
-// FO-controlled payment shifts
-router.get('/current-shift', paymentsController.currentShift);
-router.post('/end-shift', paymentsController.endShift);
-
 // Get payments by booking ID
 router.get('/get-payments/:bookingId', paymentsController.getPaymentsByBooking);
 
