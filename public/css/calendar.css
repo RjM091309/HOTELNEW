@@ -1893,22 +1893,24 @@ body.white-sidebar-color .fc-datagrid-body th {
   border-top: 1px solid rgba(0,0,0,0.08) !important;
 }
 
-/* Force visible horizontal hairline inside each lane (even if events overlap borders) */
-[data-theme="white"] td.fc-timeline-lane {
-  position: relative !important;
+/* Room-row separator lines (light theme). DevTools investigation confirmed:
+   - .fc-timeline-slot is NOT a per-room-row cell - it's one giant column
+     per day spanning the full height of every room combined, so a border
+     on it only ever appears once, at the very bottom of the whole grid.
+   - The real per-room element on the timeline side is
+     td.fc-timeline-lane.fc-resource (one per room row); the matching
+     element on the left is .fc-datagrid-cell.fc-resource.
+   - box-shadow (not border-bottom) is used because this table has
+     border-collapse: collapse, which lets an adjacent row's own border
+     silently win a conflict and eat a plain border-bottom regardless of
+     value; box-shadow isn't part of the border model at all, so it can't
+     be absorbed that way. */
+[data-theme="white"] #calendar td.fc-timeline-lane.fc-resource {
+  box-shadow: inset 0 -2px 0 0 rgba(0, 0, 0, 0.35) !important;
 }
 
-/* Draw a 1px separator above events with subtle low opacity */
-[data-theme="white"] td.fc-timeline-lane::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1px;
-  background: rgba(0,0,0,0.08);
-  pointer-events: none;
-  z-index: 20; /* higher than .fc-event (z-index:10) */
+[data-theme="white"] #calendar .fc-datagrid-cell.fc-resource {
+  box-shadow: inset 0 -2px 0 0 rgba(0, 0, 0, 0.35) !important;
 }
 
 [data-theme="white"] .fc-timeline-slot-cushion {
