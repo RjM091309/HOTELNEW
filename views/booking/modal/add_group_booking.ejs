@@ -2683,7 +2683,6 @@
   }
 
   function displayGroupRoomResults({ consecutiveBlocks, nonConsecutiveBlocks, availableRooms, unassignedConflicts }, priority, hasEnoughRooms = true) {
-    // REMOVED: Auto-suggested blocks logic - manual selection only
     const list = $('#groupRoomsList');
     const summaryContainer = $('#groupBedAvailabilitySummary');
     list.empty();
@@ -4142,8 +4141,6 @@
       const roomId = normalizeRoomId($(this).data('room-id'));
       const room = groupAvailableRooms.find(r => normalizeRoomId(r.IDNo) === roomId);
       const bedType = room ? parseInt(room.ROOM_BED, 10) : null;
-
-      // REMOVED: shouldDisableRoomForManualSelection check - causing over-disabling
 
       // Only disable rooms that are NOT needed
       if (groupRequiredBed2 === 0 && bedType === 2) {
