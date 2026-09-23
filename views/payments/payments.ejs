@@ -7,8 +7,8 @@
       </div>
       <div style="display:flex; align-items:center; justify-content: center; width:100%; margin-bottom: 12px;">
         <div class="filter-btn-group">
-          <button type="button" class="filter-btn active" data-filter="all">All</button>
-          <button type="button" class="filter-btn" data-filter="today">Today</button>
+          <button type="button" class="filter-btn" data-filter="all">All</button>
+          <button type="button" class="filter-btn active" data-filter="today">Today</button>
           <button type="button" class="filter-btn" data-filter="last3days">Last 3 Days</button>
           <button type="button" class="filter-btn" data-filter="thisWeek">This Week</button>
           <button type="button" class="filter-btn" data-filter="thisMonth">This Month</button>
@@ -18,7 +18,10 @@
   </div>
   <div class="dashboard-card-body">
    
-    <!-- Sales Summary Cards -->
+    <!-- Sales Summary Cards. Under "Today" (the default) these 3 show
+         Shift 1/2/3 with a per-card End Shift button - see applyTodayShiftCards()/
+         renderShiftEndButtons() below. Under any other date filter they show
+         plain Daily/Weekly/Monthly totals with no button. -->
     <div class="payment-sales-summary-grid">
       <div class="payment-sales-card payment-sales-card--daily">
         <div class="payment-sales-card__title"><i class="fas fa-calendar-day"></i> Daily Sales</div>
@@ -37,6 +40,9 @@
           </div>
         </div>
         <div class="payment-sales-card__footer" id="daily-sales-breakdown"></div>
+        <button type="button" class="shift-end-btn" data-shift="1" style="display:none;">
+          <i class="fas fa-door-open"></i> End Shift
+        </button>
       </div>
 
       <div class="payment-sales-card payment-sales-card--weekly">
@@ -56,6 +62,9 @@
           </div>
         </div>
         <div class="payment-sales-card__footer" aria-hidden="true">&nbsp;</div>
+        <button type="button" class="shift-end-btn" data-shift="2" style="display:none;">
+          <i class="fas fa-door-open"></i> End Shift
+        </button>
       </div>
 
       <div class="payment-sales-card payment-sales-card--monthly">
@@ -75,40 +84,10 @@
           </div>
         </div>
         <div class="payment-sales-card__footer" aria-hidden="true">&nbsp;</div>
-      </div>
-
-      <div class="payment-sales-card payment-sales-card--shift-current">
-        <div class="payment-sales-card__title">
-          <i class="fas fa-user-clock"></i> Current Shift <span id="shift-number-badge">Shift 1</span>
-        </div>
-        <div class="payment-sales-card__stats">
-          <div>
-            <div class="payment-sales-card__value payment-sales-card__value--total" id="shift-total">0</div>
-            <div class="payment-sales-card__label">Total</div>
-          </div>
-          <div>
-            <div class="payment-sales-card__value payment-sales-card__value--paid" id="shift-cash">0</div>
-            <div class="payment-sales-card__label">Cash</div>
-          </div>
-          <div>
-            <div class="payment-sales-card__value payment-sales-card__value--unpaid" id="shift-noncash">0</div>
-            <div class="payment-sales-card__label">Non-cash</div>
-          </div>
-        </div>
-        <div class="payment-sales-card__footer" id="shift-started-footer">&nbsp;</div>
-        <button type="button" class="shift-end-btn" id="end-shift-btn">
+        <button type="button" class="shift-end-btn" data-shift="3" style="display:none;">
           <i class="fas fa-door-open"></i> End Shift
         </button>
       </div>
-    </div>
-
-    <!-- Past shifts today - collapsed by default, shown once at least one
-         shift has actually been closed today. -->
-    <div class="past-shifts-panel" id="past-shifts-panel" style="display:none;">
-      <button type="button" class="past-shifts-toggle" id="past-shifts-toggle">
-        <i class="fas fa-chevron-down"></i> Earlier shifts today
-      </button>
-      <div class="past-shifts-list" id="past-shifts-list" style="display:none;"></div>
     </div>
 
     <div class="table-scrollable">
@@ -184,7 +163,7 @@
 </div>
 
 <script>
-  let currentFilter = 'all';
+  let currentFilter = 'today'; // matches the "Today" filter button's default active state
   // Set by clicking a Shift 1/2/3 card (only shown under the "Today" date
   // filter) to narrow the table to that shift's real time window.
   let currentShiftFilter = 'all';
@@ -298,7 +277,10 @@
       })
       .catch(err => console.error('Error loading sales summary:', err));
   }
-  loadSalesSummary();
+  // "Today" is the default active filter, so land straight on the Shift
+  // 1/2/3 view instead of Daily/Weekly/Monthly (applyTodayShiftCards calls
+  // loadTodayShiftSummary itself; loadSalesSummary isn't needed on load).
+  applyTodayShiftCards();
 
   /* ----------------------------------------------------------------------
    * Shift view for the Daily/Weekly/Monthly cards (restored, now backed by
@@ -352,6 +334,8 @@
       if (footer && orig.footer !== null) footer.innerHTML = orig.footer;
       card.classList.remove('payment-sales-card--shift', 'payment-sales-card--shift-active', 'payment-sales-card--shift-disabled');
       delete card.dataset.shift;
+      const btn = card.querySelector('.shift-end-btn');
+      if (btn) btn.style.display = 'none';
     });
     summaryMode = 'default';
     loadSalesSummary();
@@ -376,6 +360,8 @@
       });
       const footer = card.querySelector('.payment-sales-card__footer');
       if (footer) footer.textContent = '';
+      const btn = card.querySelector('.shift-end-btn');
+      if (btn) { btn.style.display = ''; btn.disabled = true; btn.classList.remove('shift-end-btn--active'); }
     });
     loadTodayShiftSummary();
   }
@@ -390,6 +376,7 @@
         const byNumber = {};
         byNumber[data.shift.SHIFT_NUMBER] = data.shift;
         (data.pastShifts || []).forEach(function (s) { byNumber[s.SHIFT_NUMBER] = s; });
+        const openShiftNumber = data.shift.SHIFT_NUMBER;
 
         SHIFT_CARD_SELECTORS.forEach(function (sel, idx) {
           const card = document.querySelector(sel);
@@ -398,14 +385,18 @@
           const s = byNumber[shiftNum];
           const ids = SHIFT_CARD_IDS[idx];
           const footer = card.querySelector('.payment-sales-card__footer');
+          const btn = card.querySelector('.shift-end-btn');
 
           if (!s) {
-            // Hasn't happened yet today - dimmed placeholder, not clickable.
+            // Hasn't happened yet today - dimmed placeholder, button shown
+            // but disabled (matches the other two shifts' button so the
+            // whole day's progression reads consistently), not clickable.
             ids.forEach(function (id) { const el = document.getElementById(id); if (el) el.textContent = '-'; });
             if (footer) footer.textContent = 'Not started yet';
             card.classList.add('payment-sales-card--shift-disabled');
             card.classList.remove('payment-sales-card--shift');
             delete card.dataset.shift;
+            if (btn) { btn.disabled = true; btn.classList.remove('shift-end-btn--active'); }
             return;
           }
 
@@ -419,6 +410,13 @@
               ? (formatShiftTime(s.STARTED_AT) + '–' + formatShiftTime(s.ENDED_AT))
               : (formatShiftTime(s.STARTED_AT) + '–now');
           }
+          // Only the currently-open shift's button is actually clickable -
+          // an already-closed shift can't be re-ended.
+          const isOpen = shiftNum === openShiftNumber && !s.ENDED_AT;
+          if (btn) {
+            btn.disabled = !isOpen;
+            btn.classList.toggle('shift-end-btn--active', isOpen);
+          }
         });
       })
       .catch(function (err) { console.error('Error loading today shift summary:', err); });
@@ -427,7 +425,7 @@
   // Clicking a Shift card (only present under the "Today" filter) filters
   // the table below by that shift's real time window.
   $(document).on('click', '.payment-sales-card--shift', function (e) {
-    if ($(e.target).closest('.payment-sales-card__value--paid, .payment-sales-card__value--unpaid').length) return;
+    if ($(e.target).closest('.payment-sales-card__value--paid, .payment-sales-card__value--unpaid, .shift-end-btn').length) return;
     const shift = String(this.dataset.shift || '');
     if (!shift || typeof table === 'undefined' || !table) return;
 
@@ -489,11 +487,12 @@
   }
 
   /* ----------------------------------------------------------------------
-   * FO-controlled payment shifts (Current Shift card).
-   * One click on "End Shift" closes whichever shift is open and immediately
-   * opens the next one (1 -> 2 -> 3 -> 1, a fresh cycle = a new business
-   * day). No separate "start shift" step - the first payment of a new
-   * business day auto-opens Shift 1 server-side.
+   * End Shift button, one per shift card (see applyTodayShiftCards() /
+   * loadTodayShiftSummary() above - only the currently-open shift's button
+   * is ever enabled). One click closes whichever shift is open and
+   * immediately opens the next one (1 -> 2 -> 3 -> 1, a fresh cycle = a
+   * new business day). No separate "start shift" step - the first payment
+   * of a new business day auto-opens Shift 1 server-side.
    * -------------------------------------------------------------------- */
   function formatShiftPeso(val) {
     return Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -506,55 +505,13 @@
     return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   }
 
-  function renderPastShifts(pastShifts) {
-    const panel = document.getElementById('past-shifts-panel');
-    const list = document.getElementById('past-shifts-list');
-    if (!panel || !list) return;
-
-    if (!pastShifts || pastShifts.length === 0) {
-      panel.style.display = 'none';
-      return;
-    }
-
-    panel.style.display = 'block';
-    list.innerHTML = pastShifts.map(function (s) {
-      return `<div class="past-shift-card">
-        <div class="past-shift-card__title">Shift ${s.SHIFT_NUMBER} &middot; ${formatShiftTime(s.STARTED_AT)}&ndash;${formatShiftTime(s.ENDED_AT)}</div>
-        <div class="past-shift-card__row"><span>Total</span><span>₱${formatShiftPeso(s.total)}</span></div>
-        <div class="past-shift-card__row"><span>Cash</span><span>₱${formatShiftPeso(s.cash)}</span></div>
-        <div class="past-shift-card__row"><span>Non-cash</span><span>₱${formatShiftPeso(s.nonCash)}</span></div>
-      </div>`;
-    }).join('');
-  }
-
-  function loadCurrentShift() {
-    fetch('/payments/current-shift')
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        if (!data || !data.success) return;
-        const shift = data.shift;
-        document.getElementById('shift-number-badge').textContent = 'Shift ' + shift.SHIFT_NUMBER;
-        document.getElementById('shift-total').textContent = formatShiftPeso(shift.total);
-        document.getElementById('shift-cash').textContent = formatShiftPeso(shift.cash);
-        document.getElementById('shift-noncash').textContent = formatShiftPeso(shift.nonCash);
-        document.getElementById('shift-started-footer').textContent =
-          'Started ' + formatShiftTime(shift.STARTED_AT) + ' · ' + shift.count + ' transaction' + (shift.count === 1 ? '' : 's');
-        renderPastShifts(data.pastShifts);
-      })
-      .catch(function (err) { console.error('Error loading current shift:', err); });
-  }
-  loadCurrentShift();
-
-  document.getElementById('past-shifts-toggle').addEventListener('click', function () {
-    const list = document.getElementById('past-shifts-list');
-    const icon = this.querySelector('i');
-    const showing = list.style.display !== 'none';
-    list.style.display = showing ? 'none' : 'grid';
-    if (icon) icon.className = showing ? 'fas fa-chevron-down' : 'fas fa-chevron-up';
-  });
-
-  document.getElementById('end-shift-btn').addEventListener('click', function () {
+  // Delegated (the buttons exist from page load, just shown/hidden/enabled)
+  // so this doesn't need re-binding every time loadTodayShiftSummary runs.
+  $(document).on('click', '.shift-end-btn', function (e) {
+    e.stopPropagation(); // don't also trigger the card's click-to-filter handler
+    if (this.disabled) return;
     const btn = this;
+
     fetch('/payments/current-shift')
       .then(function (r) { return r.json(); })
       .then(function (data) {
@@ -583,14 +540,14 @@
               return;
             }
             Swal.fire('Shift Ended', `Shift ${data.closedShift.SHIFT_NUMBER} closed with ₱${formatShiftPeso(data.closedShift.total)} collected. Shift ${data.newShift.SHIFT_NUMBER} is now open.`, 'success');
-            loadCurrentShift();
+            // Refresh all 3 cards - the newly-open shift's button lights up.
+            if (summaryMode === 'shift') loadTodayShiftSummary();
           });
       })
       .catch(function (err) {
         console.error('Error ending shift:', err);
         Swal.fire('Error', 'Something went wrong ending the shift.', 'error');
-      })
-      .finally(function () { btn.disabled = false; });
+      });
   });
 
   let currentPaidRange = 'today';
@@ -1050,13 +1007,9 @@
     color: #4dd0e1;
   }
 
-  .payment-sales-card--shift-current .payment-sales-card__title {
-    color: #ce93d8;
-  }
-
-  /* Shift view (top "Today" filter): the Daily/Weekly/Monthly cards become
-     Shift 1/2/3, clickable, sharing one accent. No :hover border/glow on
-     purpose - it looked almost identical to the "selected" state below,
+  /* Shift view (the default "Today" filter): the Daily/Weekly/Monthly cards
+     become Shift 1/2/3, clickable, sharing one accent. No :hover border/glow
+     on purpose - it looked almost identical to the "selected" state below,
      making it unclear whether a card was filtering the table or you were
      just hovering. cursor:pointer alone still signals it's clickable. */
   .payment-sales-card.payment-sales-card--shift {
@@ -1133,83 +1086,33 @@
     color: #4dd0e1;
   }
 
-  #shift-number-badge {
-    display: inline-block;
-    margin-left: 4px;
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-size: 11px;
-    font-weight: 700;
-    background: rgba(206, 147, 216, 0.18);
-    border: 1px solid #ce93d8;
-    vertical-align: middle;
-  }
-
+  /* End Shift button - one per shift card. Shown on all 3 under "Today"
+     (matching the reference mockup) but only ever enabled on whichever
+     card is the currently-open shift; the other two show it disabled/dim,
+     since a closed or not-yet-started shift can't be ended. */
   .shift-end-btn {
     margin-top: 10px;
     width: 100%;
     padding: 8px 10px;
-    border: none;
+    border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 6px;
-    background: #ce93d8;
-    color: #1f2528;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.35);
     font-size: 13px;
     font-weight: 700;
-    cursor: pointer;
+    cursor: default;
     transition: filter 0.15s ease;
   }
 
-  .shift-end-btn:hover {
-    filter: brightness(1.1);
-  }
-
-  .shift-end-btn:disabled {
-    opacity: 0.6;
-    cursor: default;
-  }
-
-  .past-shifts-panel {
-    margin: -6px 0 16px;
-  }
-
-  .past-shifts-toggle {
-    background: none;
-    border: none;
-    color: rgba(255, 255, 255, 0.6);
-    font-size: 12px;
+  .shift-end-btn--active {
+    border-color: #ce93d8;
+    background: #ce93d8;
+    color: #1f2528;
     cursor: pointer;
-    padding: 4px 2px;
   }
 
-  .past-shifts-toggle:hover {
-    color: rgba(255, 255, 255, 0.85);
-  }
-
-  .past-shifts-list {
-    margin-top: 8px;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 10px;
-  }
-
-  .past-shift-card {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 10px 12px;
-    font-size: 12px;
-  }
-
-  .past-shift-card__title {
-    font-weight: 700;
-    margin-bottom: 4px;
-    color: #ce93d8;
-  }
-
-  .past-shift-card__row {
-    display: flex;
-    justify-content: space-between;
-    color: rgba(255, 255, 255, 0.75);
+  .shift-end-btn--active:hover {
+    filter: brightness(1.1);
   }
 
   .payment-sales-card__stats {
