@@ -7186,6 +7186,108 @@ body.white-sidebar-color .legend-color-mountain-view {
     background-color: #2E7D32 !important;
 }
 
+/* ============================================================
+   "Booking" sidebar menu - unified gradient header, reusing the
+   Dashboard's Real-Time Booking Monitor / Real-Time Room Status
+   palette (see views/dashboard/dashboard.ejs, #rtBookingMonitorCard
+   / #rtRoomStatusCard .rt-header). Opt in per-page by adding
+   class="gradient-header" to that page's .dashboard-card-header
+   (or, for the two calendar-style pages, .card-head).
+
+   Every selector below pairs .gradient-header with the element's
+   own base class (.card-head or .dashboard-card-header) rather than
+   using .gradient-header alone. A bare .gradient-header background
+   rule ties in specificity with the existing [data-theme="white"]
+   .card-head background rule above, and relying on "later in the
+   file wins the tie" turned out not to hold up in practice - pairing
+   the classes makes this one strictly more specific instead, so it
+   wins outright regardless of source order. */
+[data-theme="white"] .gradient-header.card-head,
+[data-theme="white"] .gradient-header.dashboard-card-header {
+  background: linear-gradient(135deg, #8ba4e8 0%, #c39fd9 100%) !important;
+}
+[data-theme="dark"] .gradient-header.card-head,
+[data-theme="dark"] .gradient-header.dashboard-card-header {
+  background: linear-gradient(135deg, #232a4d 0%, #3c2a52 100%) !important;
+}
+.dashboard-card-header.gradient-header {
+  border-radius: 16px 16px 0 0 !important;
+}
+
+/* Title text - whatever tag/class a given page happens to use for it
+   (a bare <header>, an <h4>, or .dashboard-card-header-title). */
+.gradient-header .dashboard-card-header-title,
+.gradient-header > header,
+.gradient-header h4,
+.gradient-header h5,
+[data-theme="white"] .gradient-header.card-head header {
+  color: #fff !important;
+}
+
+/* Muted note/subtitle paragraphs under a title. */
+.gradient-header .cb-note,
+.gradient-header .breakfast-list-note,
+.gradient-header .quotation-note,
+[data-theme="white"] .gradient-header .breakfast-discount-label {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+/* ...except Quotation's amber print tip, which stays a warning color -
+   just lightened so it still reads on the gradient. */
+.gradient-header .quotation-color-hint {
+  color: #ffd76a !important;
+}
+
+/* Tab bar (Single/Group/Agency/Pick Up/Drop Off/...) - translucent glass
+   pills instead of whatever accent color the page normally uses. The
+   [href^="/booking"] variants specifically out-specificity the existing
+   blue-accent /booking tab rules above (same selector shape, plus
+   .gradient-header). */
+.gradient-header .tab-bar .tab-item,
+[data-theme="white"] .gradient-header .tab-bar a.tab-item[href^="/booking"] {
+  color: rgba(255, 255, 255, 0.75) !important;
+  background-color: rgba(255, 255, 255, 0.12) !important;
+}
+.gradient-header .tab-bar .tab-item:hover,
+.gradient-header .tab-bar .tab-item.is-active,
+[data-theme="white"] .gradient-header .tab-bar a.tab-item[href^="/booking"]:hover,
+[data-theme="white"] .gradient-header .tab-bar a.tab-item[href^="/booking"].is-active {
+  color: #fff !important;
+  background-color: rgba(255, 255, 255, 0.28) !important;
+}
+.gradient-header .tab-bar .tab-item.is-active::after,
+[data-theme="white"] .gradient-header .tab-bar a.tab-item[href^="/booking"].is-active::after {
+  background-color: #fff !important;
+}
+
+/* Filter pills (All/Today/Last 3 Days/...) - same translucent glass style.
+   The .dashboard-card-header:has(...) variant out-specificities the
+   existing blue-accent version above for the 6 /booking list pages. */
+.gradient-header .filter-btn-group .filter-btn,
+.gradient-header .filter-btn-group .dropdown-toggle,
+[data-theme="white"] .dashboard-card-header.gradient-header:has(.tab-bar a.tab-item[href^="/booking"]) .filter-btn-group .filter-btn {
+  background: rgba(255, 255, 255, 0.14) !important;
+  border: 1px solid rgba(255, 255, 255, 0.32) !important;
+  color: #fff !important;
+}
+.gradient-header .filter-btn-group .filter-btn:hover,
+.gradient-header .filter-btn-group .dropdown-toggle:hover,
+[data-theme="white"] .dashboard-card-header.gradient-header:has(.tab-bar a.tab-item[href^="/booking"]) .filter-btn-group .filter-btn:hover {
+  background: rgba(255, 255, 255, 0.26) !important;
+}
+.gradient-header .filter-btn-group .filter-btn.active,
+[data-theme="white"] .dashboard-card-header.gradient-header:has(.tab-bar a.tab-item[href^="/booking"]) .filter-btn-group .filter-btn.active {
+  background: #ffffff !important;
+  border-color: #ffffff !important;
+  color: #4a3a68 !important;
+}
+
+/* Search icons sitting directly on the gradient - the fields themselves
+   are opaque white pills already and read fine as-is. */
+.gradient-header .cb-search-field i,
+.gradient-header .date-picker-icon {
+  color: #6b7280 !important;
+}
+
 
 
 

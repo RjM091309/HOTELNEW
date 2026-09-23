@@ -317,139 +317,6 @@ const paymentsModel = {
     };
   },
 
-  // -------------------------------------------------------------------
-  // FO-controlled payment shifts. No FK on payments/payment_receipt rows
-  // (there are 20+ INSERT sites for `payments` alone across the codebase -
-  // stamping every one would be exactly the complexity being avoided
-  // here). A shift is just a [STARTED_AT, ENDED_AT] window; its totals
-  // are computed by filtering existing payment rows into that window.
-  // -------------------------------------------------------------------
-
-  // Hotel day rolls over at 6 AM, not midnight (same convention as the
-  // late-check-in rollback logic in bookingModel.js).
-  _businessDateFor: (d) => {
-    const businessDay = new Date(d);
-    if (businessDay.getHours() < 6) businessDay.setDate(businessDay.getDate() - 1);
-    const y = businessDay.getFullYear();
-    const m = String(businessDay.getMonth() + 1).padStart(2, '0');
-    const day = String(businessDay.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  },
-
-  // Real time window [STARTED_AT, ENDED_AT] for a given shift number on a
-  // given business date, or null if that shift hasn't happened (yet) that
-  // day. Used to filter the payments table to just that shift's rows -
-  // replaces the old fixed 7AM/1PM/10PM HOUR() buckets with the FO's
-  // actual cutoff times. DESC + LIMIT 1 in case shift numbers ever repeat
-  // within one business date (more than 3 cutoffs in a day).
-  getShiftWindow: async (shiftNumber, businessDate) => {
-    const [rows] = await pool.promise().query(
-      `SELECT STARTED_AT, ENDED_AT FROM payment_shifts
-       WHERE SHIFT_NUMBER = ? AND BUSINESS_DATE = ?
-       ORDER BY IDNo DESC LIMIT 1`,
-      [shiftNumber, businessDate]
-    );
-    return rows[0] || null;
-  },
-
-  // Returns the currently open shift, auto-creating Shift 1 if none is
-  // open yet (e.g. first payment of a fresh business day).
-  getCurrentShift: async () => {
-    const [openRows] = await pool.promise().query(
-      `SELECT * FROM payment_shifts WHERE ENDED_AT IS NULL ORDER BY IDNo DESC LIMIT 1`
-    );
-    if (openRows.length > 0) return openRows[0];
-
-    const now = new Date();
-    const [result] = await pool.promise().query(
-      `INSERT INTO payment_shifts (SHIFT_NUMBER, BUSINESS_DATE, STARTED_AT) VALUES (1, ?, NOW())`,
-      [paymentsModel._businessDateFor(now)]
-    );
-    const [rows] = await pool.promise().query(`SELECT * FROM payment_shifts WHERE IDNo = ?`, [result.insertId]);
-    return rows[0];
-  },
-
-  // Closes the currently open shift and immediately opens the next one
-  // (shift number cycles 1 -> 2 -> 3 -> 1; a fresh cycle is a new
-  // business day, regardless of what the 6 AM rule alone would compute,
-  // since Shift 3 is explicitly the "night shift" that always hands off
-  // to the next day's Shift 1). One click, both steps, no separate
-  // "start shift" action for the FO to remember.
-  endCurrentShiftAndOpenNext: async (endedByUserId) => {
-    const current = await paymentsModel.getCurrentShift();
-
-    await pool.promise().query(
-      `UPDATE payment_shifts SET ENDED_AT = NOW(), ENDED_BY = ? WHERE IDNo = ? AND ENDED_AT IS NULL`,
-      [endedByUserId || null, current.IDNo]
-    );
-
-    const nextShiftNumber = (current.SHIFT_NUMBER % 3) + 1;
-    const now = new Date();
-    const [result] = await pool.promise().query(
-      `INSERT INTO payment_shifts (SHIFT_NUMBER, BUSINESS_DATE, STARTED_AT) VALUES (?, ?, NOW())`,
-      [nextShiftNumber, paymentsModel._businessDateFor(now)]
-    );
-    const [rows] = await pool.promise().query(`SELECT * FROM payment_shifts WHERE IDNo = ?`, [result.insertId]);
-    return { closed: current, opened: rows[0] };
-  },
-
-  // Totals collected during a given shift window (Total / Cash / Non-cash),
-  // combining booking payments (`payments`) and standalone receipts
-  // (`payment_receipt`) - same two sources the existing sales-summary
-  // cards already combine.
-  getShiftTotals: async (shift) => {
-    const endExpr = shift.ENDED_AT ? '?' : 'NOW()';
-    const params = shift.ENDED_AT ? [shift.STARTED_AT, shift.ENDED_AT] : [shift.STARTED_AT];
-
-    const collectedCase = `CASE WHEN p.PAYMENT_METHOD NOT IN ('credit', 'marker') OR p.SETTLED_DATE IS NOT NULL THEN p.AMOUNT_PAID ELSE 0 END`;
-
-    const [paymentRows] = await pool.promise().query(
-      `SELECT
-         COALESCE(SUM(${collectedCase}), 0) AS total,
-         COALESCE(SUM(CASE WHEN p.PAYMENT_METHOD = 'cash' THEN (${collectedCase}) ELSE 0 END), 0) AS cash,
-         COUNT(*) AS count
-       FROM payments p
-       WHERE p.PAYMENT_DATE >= ? AND p.PAYMENT_DATE < ${endExpr}
-         AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')`,
-      params
-    );
-
-    const [receiptRows] = await pool.promise().query(
-      `SELECT
-         COALESCE(SUM(AMOUNT_PAID), 0) AS total,
-         COALESCE(SUM(CASE WHEN PAYMENT_METHOD = 'cash' THEN AMOUNT_PAID ELSE 0 END), 0) AS cash,
-         COUNT(*) AS count
-       FROM payment_receipt
-       WHERE ACTIVE = 1 AND RECEIPT_DATE >= ? AND RECEIPT_DATE < ${endExpr}`,
-      params
-    );
-
-    const total = parseFloat(paymentRows[0].total) + parseFloat(receiptRows[0].total);
-    const cash = parseFloat(paymentRows[0].cash) + parseFloat(receiptRows[0].cash);
-
-    return {
-      total,
-      cash,
-      nonCash: total - cash,
-      count: paymentRows[0].count + receiptRows[0].count
-    };
-  },
-
-  // Closed shifts for a given business date (for the "past shifts today"
-  // list), most recent first, each with its own totals attached.
-  getShiftsForBusinessDate: async (businessDate) => {
-    const [rows] = await pool.promise().query(
-      `SELECT * FROM payment_shifts WHERE BUSINESS_DATE = ? ORDER BY IDNo DESC`,
-      [businessDate]
-    );
-    const withTotals = [];
-    for (const shift of rows) {
-      const totals = await paymentsModel.getShiftTotals(shift);
-      withTotals.push({ ...shift, ...totals });
-    }
-    return withTotals;
-  },
-
   bookingBreakdown: async (bookingId) => {
     const [rows] = await pool.promise().query(
       `SELECT 
@@ -660,7 +527,7 @@ const paymentsModel = {
        ORDER BY p.PAYMENT_DATE DESC, p.IDNo DESC`, [groupId]
     );
 
-    return { 
+    return {
       isGroup: true,
       groupId: groupInfoRow?.GROUP_ID,
       groupName: groupInfoRow?.GROUP_NAME,
@@ -671,6 +538,142 @@ const paymentsModel = {
       extensions,
       payments
     };
+  },
+
+  // ------------------------------------------------------------------
+  // FO-controlled payment shifts. Shift 1/2/3 are no longer fixed clock
+  // hours - the front office ends a shift manually (End Shift button)
+  // and the next one opens immediately. A shift's totals/table rows
+  // are computed by filtering existing payments/payment_receipt rows
+  // by PAYMENT_DATE/RECEIPT_DATE falling within [STARTED_AT, ENDED_AT].
+  // ------------------------------------------------------------------
+
+  // Hotel day rolls over at 6 AM, not midnight (same convention as the
+  // late-check-in rollback logic in bookingModel.js).
+  _businessDateFor: (d) => {
+    const businessDay = new Date(d);
+    if (businessDay.getHours() < 6) businessDay.setDate(businessDay.getDate() - 1);
+    const y = businessDay.getFullYear();
+    const m = String(businessDay.getMonth() + 1).padStart(2, '0');
+    const day = String(businessDay.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  },
+
+  // Real time window [STARTED_AT, ENDED_AT] for a given shift number on a
+  // given business date, or null if that shift hasn't happened (yet) that
+  // day. Used to filter the payments table to just that shift's rows.
+  // DESC + LIMIT 1 in case shift numbers ever repeat within one business
+  // date (more than 3 cutoffs in a day).
+  getShiftWindow: async (shiftNumber, businessDate) => {
+    const [rows] = await pool.promise().query(
+      `SELECT STARTED_AT, ENDED_AT FROM payment_shifts
+       WHERE SHIFT_NUMBER = ? AND BUSINESS_DATE = ?
+       ORDER BY IDNo DESC LIMIT 1`,
+      [shiftNumber, businessDate]
+    );
+    return rows[0] || null;
+  },
+
+  // Returns the currently open shift, auto-creating Shift 1 if none is
+  // open yet (e.g. first payment of a fresh business day).
+  getCurrentShift: async () => {
+    const [openRows] = await pool.promise().query(
+      `SELECT * FROM payment_shifts WHERE ENDED_AT IS NULL ORDER BY IDNo DESC LIMIT 1`
+    );
+    if (openRows.length > 0) return openRows[0];
+
+    const now = new Date();
+    const businessDate = paymentsModel._businessDateFor(now);
+    // Back-dated to the start of the business day (6 AM - the same
+    // hotel-day rollover _businessDateFor uses) rather than NOW().
+    // Shift 1 auto-creates lazily, whenever this is first called for a
+    // fresh business date (e.g. the FO opening the Payments page) - using
+    // NOW() here would leave any payment collected earlier that day
+    // (before that first call) permanently outside every shift's window.
+    // Shifts 2/3 and the next day's Shift 1 don't have this problem since
+    // endCurrentShiftAndOpenNext() opens them at the exact moment of an
+    // explicit End Shift click, which is correctly NOW().
+    const startedAt = `${businessDate} 06:00:00`;
+    const [result] = await pool.promise().query(
+      `INSERT INTO payment_shifts (SHIFT_NUMBER, BUSINESS_DATE, STARTED_AT) VALUES (1, ?, ?)`,
+      [businessDate, startedAt]
+    );
+    const [rows] = await pool.promise().query(`SELECT * FROM payment_shifts WHERE IDNo = ?`, [result.insertId]);
+    return rows[0];
+  },
+
+  // Closes the currently open shift and immediately opens the next one
+  // (shift number cycles 1 -> 2 -> 3 -> 1; a fresh cycle is a new business
+  // day, regardless of what the 6 AM rule alone would compute, since
+  // Shift 3 is explicitly the "night shift" that always hands off to the
+  // next day's Shift 1). One click, both steps, no separate "start shift"
+  // action for the FO to remember.
+  endCurrentShiftAndOpenNext: async (endedByUserId) => {
+    const current = await paymentsModel.getCurrentShift();
+
+    await pool.promise().query(
+      `UPDATE payment_shifts SET ENDED_AT = NOW(), ENDED_BY = ? WHERE IDNo = ? AND ENDED_AT IS NULL`,
+      [endedByUserId || null, current.IDNo]
+    );
+
+    const nextShiftNumber = (current.SHIFT_NUMBER % 3) + 1;
+    const now = new Date();
+    const [result] = await pool.promise().query(
+      `INSERT INTO payment_shifts (SHIFT_NUMBER, BUSINESS_DATE, STARTED_AT) VALUES (?, ?, NOW())`,
+      [nextShiftNumber, paymentsModel._businessDateFor(now)]
+    );
+    const [rows] = await pool.promise().query(`SELECT * FROM payment_shifts WHERE IDNo = ?`, [result.insertId]);
+    return { closed: current, opened: rows[0] };
+  },
+
+  // Totals collected during a given shift window (Total / Cash / Non-cash),
+  // combining booking payments (`payments`) and standalone receipts
+  // (`payment_receipt`) - same two sources the sales-summary cards combine.
+  getShiftTotals: async (shift) => {
+    const endExpr = shift.ENDED_AT ? '?' : 'NOW()';
+    const params = shift.ENDED_AT ? [shift.STARTED_AT, shift.ENDED_AT] : [shift.STARTED_AT];
+
+    const collectedCase = `CASE WHEN p.PAYMENT_METHOD NOT IN ('credit', 'marker') OR p.SETTLED_DATE IS NOT NULL THEN p.AMOUNT_PAID ELSE 0 END`;
+
+    const [paymentRows] = await pool.promise().query(
+      `SELECT
+         COALESCE(SUM(${collectedCase}), 0) AS total,
+         COALESCE(SUM(CASE WHEN p.PAYMENT_METHOD = 'cash' THEN (${collectedCase}) ELSE 0 END), 0) AS cash
+       FROM payments p
+       WHERE p.PAYMENT_DATE >= ? AND p.PAYMENT_DATE < ${endExpr}
+         AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')`,
+      params
+    );
+
+    const [receiptRows] = await pool.promise().query(
+      `SELECT
+         COALESCE(SUM(AMOUNT_PAID), 0) AS total,
+         COALESCE(SUM(CASE WHEN PAYMENT_METHOD = 'cash' THEN AMOUNT_PAID ELSE 0 END), 0) AS cash
+       FROM payment_receipt
+       WHERE ACTIVE = 1 AND RECEIPT_DATE >= ? AND RECEIPT_DATE < ${endExpr}`,
+      params
+    );
+
+    const total = parseFloat(paymentRows[0].total) + parseFloat(receiptRows[0].total);
+    const cash = parseFloat(paymentRows[0].cash) + parseFloat(receiptRows[0].cash);
+
+    return { total, cash, nonCash: total - cash };
+  },
+
+  // Closed + open shifts for a given business date, most recent first,
+  // each with its own totals attached (used to fill in a shift card that
+  // isn't the currently-open one, e.g. Shift 1 after Shift 2 has opened).
+  getShiftsForBusinessDate: async (businessDate) => {
+    const [rows] = await pool.promise().query(
+      `SELECT * FROM payment_shifts WHERE BUSINESS_DATE = ? ORDER BY IDNo DESC`,
+      [businessDate]
+    );
+    const withTotals = [];
+    for (const shift of rows) {
+      const totals = await paymentsModel.getShiftTotals(shift);
+      withTotals.push({ ...shift, ...totals });
+    }
+    return withTotals;
   }
 };
 

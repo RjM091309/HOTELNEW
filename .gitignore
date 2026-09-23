@@ -58,3 +58,6 @@ jspm_packages/
 ehthumbs.db
 Thumbs.db 
 debug_invoice.html
+
+# User-uploaded runtime content - not versioned, differs per environment
+public/uploads/
