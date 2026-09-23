@@ -328,6 +328,29 @@ async function runCheckInNotifierMigrations() {
   console.log('✅ Ensured table: check_in_notifier_log');
 }
 
+async function runPaymentShiftMigrations() {
+  // FO-controlled cash-out shifts. Deliberately just start/end timestamps -
+  // no FK on individual payment rows (there are 20+ INSERT sites for
+  // `payments` across the codebase; stamping every one would be exactly
+  // the "complicated" thing being avoided here). A shift's totals are
+  // instead computed by filtering existing payments/payment_receipt rows
+  // by PAYMENT_DATE/RECEIPT_DATE falling within [STARTED_AT, ENDED_AT].
+  await queryDatabasePromise(`
+    CREATE TABLE IF NOT EXISTS payment_shifts (
+      IDNo INT NOT NULL AUTO_INCREMENT,
+      SHIFT_NUMBER TINYINT NOT NULL,
+      BUSINESS_DATE DATE NOT NULL COMMENT 'Hotel day this shift belongs to (6 AM rollover, see bookingModel.js late-check-in logic for the same convention)',
+      STARTED_AT DATETIME NOT NULL,
+      ENDED_AT DATETIME NULL DEFAULT NULL COMMENT 'NULL while the shift is still open',
+      ENDED_BY INT NULL DEFAULT NULL COMMENT 'user.IDNo of the FO who closed this shift',
+      PRIMARY KEY (IDNo),
+      KEY idx_payment_shifts_business_date (BUSINESS_DATE),
+      KEY idx_payment_shifts_ended_at (ENDED_AT)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+  console.log('✅ Ensured table: payment_shifts');
+}
+
 async function runActivityLogMigrations() {
   // Lean, staff-facing audit trail. Column order: when -> source -> action ->
   // booking -> summary -> amount -> outcome -> who -> before/after JSON.
@@ -980,6 +1003,7 @@ async function runStartupMigrations() {
   await runCalendarPerformanceMigrations();
   await runChannexMigrations();
   await runCheckInNotifierMigrations();
+  await runPaymentShiftMigrations();
 
   console.log('✅ Startup database migrations complete');
 }
