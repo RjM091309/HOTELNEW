@@ -160,15 +160,23 @@ const paymentsController = {
         searchCondition += ` ${dateCondition}`;
       }
 
-      // Shift refinement (only meaningful alongside the "Today" date filter -
-      // matches the gapless windows used by the Shift 1/2/3 summary cards).
+      // Shift refinement (only meaningful alongside the "Today" date filter):
+      // looks up that shift's real [STARTED_AT, ENDED_AT] window (the FO's
+      // own actual cutoff times) instead of a fixed clock-hour bucket.
       if (filter === 'today' && shift && shift !== 'all') {
-        if (shift === '1') {
-          searchCondition += ` AND HOUR(p.PAYMENT_DATE) >= 7 AND HOUR(p.PAYMENT_DATE) < 13`;
-        } else if (shift === '2') {
-          searchCondition += ` AND HOUR(p.PAYMENT_DATE) >= 13 AND HOUR(p.PAYMENT_DATE) < 22`;
-        } else if (shift === '3') {
-          searchCondition += ` AND (HOUR(p.PAYMENT_DATE) >= 22 OR HOUR(p.PAYMENT_DATE) < 7)`;
+        const businessDate = paymentsModel._businessDateFor(new Date());
+        const window = await paymentsModel.getShiftWindow(shift, businessDate);
+        if (window) {
+          if (window.ENDED_AT) {
+            searchCondition += ` AND p.PAYMENT_DATE >= ? AND p.PAYMENT_DATE < ?`;
+            searchParams.push(window.STARTED_AT, window.ENDED_AT);
+          } else {
+            searchCondition += ` AND p.PAYMENT_DATE >= ?`;
+            searchParams.push(window.STARTED_AT);
+          }
+        } else {
+          // That shift hasn't happened today - no rows can match.
+          searchCondition += ` AND 1 = 0`;
         }
       }
 

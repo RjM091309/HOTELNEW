@@ -336,6 +336,22 @@ const paymentsModel = {
     return `${y}-${m}-${day}`;
   },
 
+  // Real time window [STARTED_AT, ENDED_AT] for a given shift number on a
+  // given business date, or null if that shift hasn't happened (yet) that
+  // day. Used to filter the payments table to just that shift's rows -
+  // replaces the old fixed 7AM/1PM/10PM HOUR() buckets with the FO's
+  // actual cutoff times. DESC + LIMIT 1 in case shift numbers ever repeat
+  // within one business date (more than 3 cutoffs in a day).
+  getShiftWindow: async (shiftNumber, businessDate) => {
+    const [rows] = await pool.promise().query(
+      `SELECT STARTED_AT, ENDED_AT FROM payment_shifts
+       WHERE SHIFT_NUMBER = ? AND BUSINESS_DATE = ?
+       ORDER BY IDNo DESC LIMIT 1`,
+      [shiftNumber, businessDate]
+    );
+    return rows[0] || null;
+  },
+
   // Returns the currently open shift, auto-creating Shift 1 if none is
   // open yet (e.g. first payment of a fresh business day).
   getCurrentShift: async () => {

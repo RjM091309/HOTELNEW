@@ -185,6 +185,12 @@
 
 <script>
   let currentFilter = 'all';
+  // Set by clicking a Shift 1/2/3 card (only shown under the "Today" date
+  // filter) to narrow the table to that shift's real time window.
+  let currentShiftFilter = 'all';
+  // Sub-filter within a shift: clicking its Cash / Non-cash stat narrows
+  // further by payment method.
+  let currentMethodFilter = 'all';
   let table;
 
   $(document).ready(function () {
@@ -195,7 +201,7 @@
       ajax: {
         url: '/payments/payments_data',
         type: 'GET',
-        data: function(d){ d.filter = currentFilter; },
+        data: function(d){ d.filter = currentFilter; d.shift = currentShiftFilter; d.method = currentMethodFilter; },
         dataSrc: function (json) {
           updatePaymentsTotalRow(json.totalAmount);
           return json.data;
@@ -259,7 +265,15 @@
       $('.dashboard-card .filter-btn-group .filter-btn').removeClass('active');
       $(this).addClass('active');
       currentFilter = $(this).data('filter');
+      currentShiftFilter = 'all';
+      currentMethodFilter = 'all';
       table.ajax.reload();
+      if (currentFilter === 'today') {
+        applyTodayShiftCards();
+      } else {
+        restoreDefaultSummaryCards();
+      }
+      updateShiftMethodBadge();
     });
   });
 
@@ -285,6 +299,194 @@
       .catch(err => console.error('Error loading sales summary:', err));
   }
   loadSalesSummary();
+
+  /* ----------------------------------------------------------------------
+   * Shift view for the Daily/Weekly/Monthly cards (restored, now backed by
+   * real FO-controlled shift data instead of fixed clock hours).
+   * Under the "Today" date filter, these 3 cards switch to Shift 1/2/3,
+   * each showing that shift's real Total/Cash/Non-cash. Clicking a shift
+   * card filters the table below to just that shift's real time window
+   * (the FO's own actual cutoff times); clicking its Cash/Non-cash stat
+   * narrows further by payment method. A shift that hasn't happened yet
+   * today shows as a dimmed, non-clickable placeholder.
+   * The separate "Current Shift" card (with the End Shift button) always
+   * shows the live open shift regardless of this filter.
+   * -------------------------------------------------------------------- */
+  const SHIFT_CARD_SELECTORS = ['.payment-sales-card--daily', '.payment-sales-card--weekly', '.payment-sales-card--monthly'];
+  const SHIFT_CARD_IDS = [
+    ['daily-total', 'daily-paid', 'daily-unpaid'],
+    ['weekly-total', 'weekly-paid', 'weekly-unpaid'],
+    ['monthly-total', 'monthly-paid', 'monthly-unpaid']
+  ];
+  const SHIFT_CARD_ICONS = ['fa-sun', 'fa-cloud-sun', 'fa-moon'];
+  let summaryMode = 'default';
+  let originalCardMarkup = null;
+
+  function captureOriginalCardMarkup() {
+    if (originalCardMarkup) return;
+    originalCardMarkup = {};
+    SHIFT_CARD_SELECTORS.forEach(function (sel) {
+      const card = document.querySelector(sel);
+      if (!card) return;
+      const footer = card.querySelector('.payment-sales-card__footer');
+      originalCardMarkup[sel] = {
+        title: card.querySelector('.payment-sales-card__title').innerHTML,
+        labels: Array.prototype.map.call(card.querySelectorAll('.payment-sales-card__label'), function (l) { return l.innerHTML; }),
+        footer: footer ? footer.innerHTML : null
+      };
+    });
+  }
+
+  function restoreDefaultSummaryCards() {
+    if (summaryMode !== 'shift') return;
+    SHIFT_CARD_SELECTORS.forEach(function (sel) {
+      const card = document.querySelector(sel);
+      const orig = originalCardMarkup && originalCardMarkup[sel];
+      if (!card || !orig) return;
+      card.querySelector('.payment-sales-card__title').innerHTML = orig.title;
+      const labels = card.querySelectorAll('.payment-sales-card__label');
+      Array.prototype.forEach.call(labels, function (l, i) {
+        if (orig.labels[i] !== undefined) l.innerHTML = orig.labels[i];
+      });
+      const footer = card.querySelector('.payment-sales-card__footer');
+      if (footer && orig.footer !== null) footer.innerHTML = orig.footer;
+      card.classList.remove('payment-sales-card--shift', 'payment-sales-card--shift-active', 'payment-sales-card--shift-disabled');
+      delete card.dataset.shift;
+    });
+    summaryMode = 'default';
+    loadSalesSummary();
+  }
+
+  function applyTodayShiftCards() {
+    captureOriginalCardMarkup();
+    summaryMode = 'shift';
+    SHIFT_CARD_SELECTORS.forEach(function (sel, idx) {
+      const card = document.querySelector(sel);
+      if (!card) return;
+      const shiftNum = idx + 1;
+      card.querySelector('.payment-sales-card__title').innerHTML =
+        '<i class="fas ' + SHIFT_CARD_ICONS[idx] + '"></i> Shift ' + shiftNum;
+      const labels = card.querySelectorAll('.payment-sales-card__label');
+      const labelText = ['Total', 'Cash', 'Non-cash'];
+      Array.prototype.forEach.call(labels, function (l, i) { if (labelText[i]) l.textContent = labelText[i]; });
+      card.dataset.shift = String(shiftNum);
+      SHIFT_CARD_IDS[idx].forEach(function (id) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '…';
+      });
+      const footer = card.querySelector('.payment-sales-card__footer');
+      if (footer) footer.textContent = '';
+    });
+    loadTodayShiftSummary();
+  }
+
+  function loadTodayShiftSummary() {
+    fetch('/payments/current-shift')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data || !data.success || summaryMode !== 'shift') return;
+        // Combine the currently-open shift + today's already-closed shifts
+        // into one lookup by shift number.
+        const byNumber = {};
+        byNumber[data.shift.SHIFT_NUMBER] = data.shift;
+        (data.pastShifts || []).forEach(function (s) { byNumber[s.SHIFT_NUMBER] = s; });
+
+        SHIFT_CARD_SELECTORS.forEach(function (sel, idx) {
+          const card = document.querySelector(sel);
+          if (!card) return;
+          const shiftNum = idx + 1;
+          const s = byNumber[shiftNum];
+          const ids = SHIFT_CARD_IDS[idx];
+          const footer = card.querySelector('.payment-sales-card__footer');
+
+          if (!s) {
+            // Hasn't happened yet today - dimmed placeholder, not clickable.
+            ids.forEach(function (id) { const el = document.getElementById(id); if (el) el.textContent = '-'; });
+            if (footer) footer.textContent = 'Not started yet';
+            card.classList.add('payment-sales-card--shift-disabled');
+            card.classList.remove('payment-sales-card--shift');
+            delete card.dataset.shift;
+            return;
+          }
+
+          card.classList.add('payment-sales-card--shift');
+          card.classList.remove('payment-sales-card--shift-disabled');
+          document.getElementById(ids[0]).textContent = formatShiftPeso(s.total);
+          document.getElementById(ids[1]).textContent = formatShiftPeso(s.cash);
+          document.getElementById(ids[2]).textContent = formatShiftPeso(s.nonCash);
+          if (footer) {
+            footer.textContent = s.ENDED_AT
+              ? (formatShiftTime(s.STARTED_AT) + '–' + formatShiftTime(s.ENDED_AT))
+              : (formatShiftTime(s.STARTED_AT) + '–now');
+          }
+        });
+      })
+      .catch(function (err) { console.error('Error loading today shift summary:', err); });
+  }
+
+  // Clicking a Shift card (only present under the "Today" filter) filters
+  // the table below by that shift's real time window.
+  $(document).on('click', '.payment-sales-card--shift', function (e) {
+    if ($(e.target).closest('.payment-sales-card__value--paid, .payment-sales-card__value--unpaid').length) return;
+    const shift = String(this.dataset.shift || '');
+    if (!shift || typeof table === 'undefined' || !table) return;
+
+    const isSameShift = currentShiftFilter === shift;
+    $('.payment-sales-card--shift').removeClass('payment-sales-card--shift-active');
+    $('.payment-sales-card__value--method-active').removeClass('payment-sales-card__value--method-active');
+    currentMethodFilter = 'all';
+    currentShiftFilter = isSameShift ? 'all' : shift;
+    if (!isSameShift) $(this).addClass('payment-sales-card--shift-active');
+
+    table.ajax.reload();
+    updateShiftMethodBadge();
+  });
+
+  // Clicking the Cash or Non-cash stat on a shift card narrows the table to
+  // just that payment method within that shift.
+  $(document).on('click', '.payment-sales-card--shift .payment-sales-card__value--paid, .payment-sales-card--shift .payment-sales-card__value--unpaid', function (e) {
+    e.stopPropagation();
+    const card = this.closest('.payment-sales-card--shift');
+    if (!card || typeof table === 'undefined' || !table) return;
+
+    const shift = String(card.dataset.shift || '');
+    if (!shift) return;
+    const method = this.classList.contains('payment-sales-card__value--paid') ? 'cash' : 'noncash';
+    const isSameMethod = currentShiftFilter === shift && currentMethodFilter === method;
+
+    $('.payment-sales-card--shift').removeClass('payment-sales-card--shift-active');
+    $('.payment-sales-card__value--method-active').removeClass('payment-sales-card__value--method-active');
+    currentShiftFilter = shift;
+    $(card).addClass('payment-sales-card--shift-active');
+    currentMethodFilter = isSameMethod ? 'all' : method;
+    if (!isSameMethod) $(this).addClass('payment-sales-card__value--method-active');
+
+    table.ajax.reload();
+    updateShiftMethodBadge();
+  });
+
+  // Small badge next to "Show N entries" while a shift's Cash/Non-cash stat
+  // is filtering the table, so it's clear which method is being viewed.
+  function updateShiftMethodBadge() {
+    const $length = $('#payments_tbl_wrapper .dataTables_length');
+    if (!$length.length) return;
+    let $badge = $('#shift-method-badge');
+
+    if (currentFilter === 'today' && currentShiftFilter !== 'all' && currentMethodFilter !== 'all') {
+      if (!$badge.length) {
+        $badge = $('<span id="shift-method-badge" class="shift-method-badge"></span>');
+        $length.append($badge);
+      }
+      const isCash = currentMethodFilter === 'cash';
+      $badge
+        .removeClass('shift-method-badge--cash shift-method-badge--noncash')
+        .addClass(isCash ? 'shift-method-badge--cash' : 'shift-method-badge--noncash')
+        .text('Shift ' + currentShiftFilter + ' · ' + (isCash ? 'Cash' : 'Non-cash'))
+        .show();
+    } else if ($badge.length) {
+      $badge.hide();
+    }
+  }
 
   /* ----------------------------------------------------------------------
    * FO-controlled payment shifts (Current Shift card).
@@ -402,6 +604,7 @@
 
   // The whole Daily Sales card opens the collected-sales modal (all of today).
   $(document).on('click', '.payment-sales-card--daily', function () {
+    if (summaryMode === 'shift') return; // handled by the shift-card handler above
     currentPaidRange = 'today';
     resetPaidShift();
     showTodayPaidModal('today');
@@ -849,6 +1052,85 @@
 
   .payment-sales-card--shift-current .payment-sales-card__title {
     color: #ce93d8;
+  }
+
+  /* Shift view (top "Today" filter): the Daily/Weekly/Monthly cards become
+     Shift 1/2/3, clickable, sharing one accent. No :hover border/glow on
+     purpose - it looked almost identical to the "selected" state below,
+     making it unclear whether a card was filtering the table or you were
+     just hovering. cursor:pointer alone still signals it's clickable. */
+  .payment-sales-card.payment-sales-card--shift {
+    cursor: pointer;
+  }
+
+  .payment-sales-card.payment-sales-card--shift .payment-sales-card__title {
+    color: #ce93d8;
+  }
+
+  /* Re-purpose the third stat slot (normally "Unpaid"/red) as "Non-cash" */
+  .payment-sales-card.payment-sales-card--shift .payment-sales-card__value--unpaid {
+    color: #4dd0e1;
+  }
+
+  /* Selected shift - the table below is filtered to this card's window */
+  .payment-sales-card.payment-sales-card--shift-active {
+    border-color: #ce93d8;
+    box-shadow: 0 0 0 2px #ce93d8;
+    background: rgba(206, 147, 216, 0.08);
+  }
+
+  /* Cash / Non-cash stat on a shift card, clicked to narrow the table
+     further by payment method within that shift. */
+  .payment-sales-card.payment-sales-card--shift .payment-sales-card__value--paid,
+  .payment-sales-card.payment-sales-card--shift .payment-sales-card__value--unpaid {
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.15s ease;
+  }
+
+  /* Cash sub-filter active - matches the Cash stat's own green */
+  .payment-sales-card__value--method-active.payment-sales-card__value--paid {
+    background: rgba(102, 187, 106, 0.18);
+    box-shadow: 0 0 0 1px #66bb6a;
+  }
+
+  /* Non-cash sub-filter active - matches the Non-cash stat's own cyan */
+  .payment-sales-card__value--method-active.payment-sales-card__value--unpaid {
+    background: rgba(77, 208, 225, 0.18);
+    box-shadow: 0 0 0 1px #4dd0e1;
+  }
+
+  /* A shift slot that hasn't happened yet today (e.g. it's still Shift 1,
+     so Shift 2/3 have no data yet) - dimmed, not clickable. */
+  .payment-sales-card--shift-disabled {
+    opacity: 0.5;
+  }
+
+  .payment-sales-card--shift-disabled .payment-sales-card__title {
+    color: rgba(255, 255, 255, 0.5) !important;
+  }
+
+  /* Indicator next to "Show N entries" while a Cash / Non-cash sub-filter is active */
+  .shift-method-badge {
+    display: none;
+    margin-left: 10px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    vertical-align: middle;
+  }
+
+  .shift-method-badge--cash {
+    background: rgba(102, 187, 106, 0.18);
+    border: 1px solid #66bb6a;
+    color: #66bb6a;
+  }
+
+  .shift-method-badge--noncash {
+    background: rgba(77, 208, 225, 0.18);
+    border: 1px solid #4dd0e1;
+    color: #4dd0e1;
   }
 
   #shift-number-badge {
