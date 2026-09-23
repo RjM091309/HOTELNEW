@@ -160,15 +160,23 @@ const paymentsController = {
         searchCondition += ` ${dateCondition}`;
       }
 
-      // Shift refinement (only meaningful alongside the "Today" date filter -
-      // matches the gapless windows used by the Shift 1/2/3 summary cards).
+      // Shift refinement (only meaningful alongside the "Today" date filter):
+      // looks up that shift's real [STARTED_AT, ENDED_AT] window (the FO's
+      // own actual cutoff times) instead of a fixed clock-hour bucket.
       if (filter === 'today' && shift && shift !== 'all') {
-        if (shift === '1') {
-          searchCondition += ` AND HOUR(p.PAYMENT_DATE) >= 7 AND HOUR(p.PAYMENT_DATE) < 13`;
-        } else if (shift === '2') {
-          searchCondition += ` AND HOUR(p.PAYMENT_DATE) >= 13 AND HOUR(p.PAYMENT_DATE) < 22`;
-        } else if (shift === '3') {
-          searchCondition += ` AND (HOUR(p.PAYMENT_DATE) >= 22 OR HOUR(p.PAYMENT_DATE) < 7)`;
+        const businessDate = paymentsModel._businessDateFor(new Date());
+        const window = await paymentsModel.getShiftWindow(shift, businessDate);
+        if (window) {
+          if (window.ENDED_AT) {
+            searchCondition += ` AND p.PAYMENT_DATE >= ? AND p.PAYMENT_DATE < ?`;
+            searchParams.push(window.STARTED_AT, window.ENDED_AT);
+          } else {
+            searchCondition += ` AND p.PAYMENT_DATE >= ?`;
+            searchParams.push(window.STARTED_AT);
+          }
+        } else {
+          // That shift hasn't happened today - no rows can match.
+          searchCondition += ` AND 1 = 0`;
         }
       }
 
@@ -245,6 +253,45 @@ const paymentsController = {
     } catch (err) {
       console.error('Error fetching sales summary:', err);
       res.status(500).json({ success: false, message: 'Failed to fetch sales summary' });
+    }
+  },
+
+  // Current open shift (auto-creates Shift 1 if none is open yet) plus its
+  // running total, and the day's already-closed shifts with their totals.
+  currentShift: async (req, res) => {
+    try {
+      const shift = await paymentsModel.getCurrentShift();
+      const totals = await paymentsModel.getShiftTotals(shift);
+      const pastShifts = await paymentsModel.getShiftsForBusinessDate(shift.BUSINESS_DATE);
+
+      res.json({
+        success: true,
+        shift: { ...shift, ...totals },
+        // Exclude the still-open current shift from the "past" list.
+        pastShifts: pastShifts.filter((s) => s.IDNo !== shift.IDNo)
+      });
+    } catch (err) {
+      console.error('Error fetching current payment shift:', err);
+      res.status(500).json({ success: false, message: 'Failed to fetch current shift' });
+    }
+  },
+
+  // One click: closes whichever shift is currently open and immediately
+  // opens the next one (1 -> 2 -> 3 -> 1).
+  endShift: async (req, res) => {
+    try {
+      const endedBy = req.user?.userId || null;
+      const { closed, opened } = await paymentsModel.endCurrentShiftAndOpenNext(endedBy);
+      const closedTotals = await paymentsModel.getShiftTotals(closed);
+
+      res.json({
+        success: true,
+        closedShift: { ...closed, ...closedTotals },
+        newShift: opened
+      });
+    } catch (err) {
+      console.error('Error ending payment shift:', err);
+      res.status(500).json({ success: false, message: 'Failed to end shift' });
     }
   },
 
