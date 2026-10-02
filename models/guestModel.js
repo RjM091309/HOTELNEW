@@ -14,14 +14,14 @@ class GuestModel {
   }
 
   // Fetch all active guests
-  static async getAllGuests() {
+  static async getAllGuests(propertyId) {
     try {
       const query = `
-        SELECT 
-          c.IDNo, 
-          c.NAME, 
-          c.CONTACTNo, 
-          c.TYPE, 
+        SELECT
+          c.IDNo,
+          c.NAME,
+          c.CONTACTNo,
+          c.TYPE,
           c.LEVEL,
           c.IS_GROUP,
           c.ENCODED_DT AS CREATED_AT,
@@ -33,11 +33,11 @@ class GuestModel {
         LEFT JOIN guest_type gt ON c.TYPE = gt.IDNo
         LEFT JOIN guest_level gl ON c.LEVEL = gl.IDNo
         LEFT JOIN booking b ON c.IDNo = b.CUSTOMER_ID AND b.ACTIVE = 1
-        WHERE c.ACTIVE = 1
+        WHERE c.ACTIVE = 1 AND c.PROPERTY_ID = ?
         GROUP BY c.IDNo
         ORDER BY c.NAME ASC
       `;
-      const result = await queryDatabasePromise(query);
+      const result = await queryDatabasePromise(query, [propertyId]);
       return result;
     } catch (error) {
       throw error;
@@ -45,14 +45,14 @@ class GuestModel {
   }
 
   // Fetch guest by ID
-  static async getGuestById(id) {
+  static async getGuestById(id, propertyId) {
     try {
       const query = `
-        SELECT 
-          c.IDNo, 
-          c.NAME, 
-          c.CONTACTNo, 
-          c.TYPE, 
+        SELECT
+          c.IDNo,
+          c.NAME,
+          c.CONTACTNo,
+          c.TYPE,
           c.LEVEL,
           c.IS_GROUP,
           c.ENCODED_DT AS CREATED_AT,
@@ -61,9 +61,9 @@ class GuestModel {
         FROM customer c
         LEFT JOIN guest_type gt ON c.TYPE = gt.IDNo
         LEFT JOIN guest_level gl ON c.LEVEL = gl.IDNo
-        WHERE c.IDNo = ? AND c.ACTIVE = 1
+        WHERE c.IDNo = ? AND c.ACTIVE = 1 AND c.PROPERTY_ID = ?
       `;
-      const result = await queryDatabasePromise(query, [id]);
+      const result = await queryDatabasePromise(query, [id, propertyId]);
       return result[0];
     } catch (error) {
       throw error;
@@ -93,48 +93,48 @@ class GuestModel {
   }
 
   // Fetch guest statistics
-  static async getGuestStatistics() {
+  static async getGuestStatistics(propertyId) {
     try {
       const queries = {
         totalGuests: `
           SELECT COUNT(*) AS totalGuests
-          FROM customer 
-          WHERE ACTIVE = 1
+          FROM customer
+          WHERE ACTIVE = 1 AND PROPERTY_ID = ?
         `,
         activeBookings: `
           SELECT COUNT(DISTINCT c.IDNo) AS activeBookings
           FROM customer c
           JOIN booking b ON c.IDNo = b.CUSTOMER_ID
-          WHERE c.ACTIVE = 1 AND b.ACTIVE = 1 AND b.BOOKING_STATUS = 'check-In'
+          WHERE c.ACTIVE = 1 AND c.PROPERTY_ID = ? AND b.ACTIVE = 1 AND b.BOOKING_STATUS = 'check-In'
         `,
         vipGuests: `
           SELECT COUNT(*) AS vipGuests
-          FROM customer 
-          WHERE ACTIVE = 1 AND LEVEL = 1
+          FROM customer
+          WHERE ACTIVE = 1 AND PROPERTY_ID = ? AND LEVEL = 1
         `,
         groupGuests: `
           SELECT COUNT(*) AS groupGuests
-          FROM customer 
-          WHERE ACTIVE = 1 AND IS_GROUP = 1
+          FROM customer
+          WHERE ACTIVE = 1 AND PROPERTY_ID = ? AND IS_GROUP = 1
         `,
         newGuestsThisMonth: `
           SELECT COUNT(*) AS newGuestsThisMonth
-          FROM customer 
-          WHERE ACTIVE = 1 
+          FROM customer
+          WHERE ACTIVE = 1 AND PROPERTY_ID = ?
           AND MONTH(ENCODED_DT) = MONTH(CURDATE())
           AND YEAR(ENCODED_DT) = YEAR(CURDATE())
         `,
         guestTypes: `
           SELECT gt.TYPE, COUNT(c.IDNo) AS count
           FROM guest_type gt
-          LEFT JOIN customer c ON gt.IDNo = c.TYPE AND c.ACTIVE = 1
+          LEFT JOIN customer c ON gt.IDNo = c.TYPE AND c.ACTIVE = 1 AND c.PROPERTY_ID = ?
           GROUP BY gt.IDNo
           ORDER BY count DESC
         `,
         guestLevels: `
           SELECT gl.TYPE, COUNT(c.IDNo) AS count
           FROM guest_level gl
-          LEFT JOIN customer c ON gl.IDNo = c.LEVEL AND c.ACTIVE = 1
+          LEFT JOIN customer c ON gl.IDNo = c.LEVEL AND c.ACTIVE = 1 AND c.PROPERTY_ID = ?
           GROUP BY gl.IDNo
           ORDER BY count DESC
         `
@@ -142,9 +142,9 @@ class GuestModel {
 
       const results = {};
       for (const [key, query] of Object.entries(queries)) {
-        results[key] = await queryDatabasePromise(query);
+        results[key] = await queryDatabasePromise(query, [propertyId]);
       }
-      
+
       return results;
     } catch (error) {
       throw error;
@@ -152,7 +152,7 @@ class GuestModel {
   }
 
   // Fetch guest booking details
-  static async getGuestBookings(guestId) {
+  static async getGuestBookings(guestId, propertyId) {
     try {
       const query = `
         SELECT 
@@ -209,10 +209,10 @@ class GuestModel {
         LEFT JOIN room r ON b.ROOM_ID = r.IDNo
         LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
         LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID
-        WHERE b.CUSTOMER_ID = ? AND b.ACTIVE = 1
+        WHERE b.CUSTOMER_ID = ? AND b.ACTIVE = 1 AND b.PROPERTY_ID = ?
         ORDER BY b.CHECK_IN_DATE DESC
       `;
-      const result = await queryDatabasePromise(query, [guestId]);
+      const result = await queryDatabasePromise(query, [guestId, propertyId]);
       return result;
     } catch (error) {
       throw error;
@@ -220,13 +220,13 @@ class GuestModel {
   }
 
   // Create new guest
-  static async createGuest(NAME, CONTACTNo, TYPE, LEVEL) {
+  static async createGuest(NAME, CONTACTNo, TYPE, LEVEL, propertyId) {
     try {
       const query = `
-        INSERT INTO customer (NAME, CONTACTNo, TYPE, LEVEL, ACTIVE, ENCODED_DT, ENCODED_BY) 
-        VALUES (?, ?, ?, ?, 1, NOW(), 'system')
+        INSERT INTO customer (NAME, CONTACTNo, TYPE, LEVEL, ACTIVE, ENCODED_DT, ENCODED_BY, PROPERTY_ID)
+        VALUES (?, ?, ?, ?, 1, NOW(), 'system', ?)
       `;
-      const result = await queryDatabasePromise(query, [NAME, CONTACTNo, TYPE, LEVEL]);
+      const result = await queryDatabasePromise(query, [NAME, CONTACTNo, TYPE, LEVEL, propertyId]);
       return result.insertId;
     } catch (error) {
       throw error;
@@ -234,10 +234,10 @@ class GuestModel {
   }
 
   // Update guest
-  static async updateGuest(IDNo, NAME, CONTACTNo, TYPE, LEVEL) {
+  static async updateGuest(IDNo, NAME, CONTACTNo, TYPE, LEVEL, propertyId) {
     try {
-      const query = 'UPDATE customer SET NAME = ?, CONTACTNo = ?, TYPE = ?, LEVEL = ? WHERE IDNo = ? AND ACTIVE = 1';
-      const result = await queryDatabasePromise(query, [NAME, CONTACTNo, TYPE, LEVEL, IDNo]);
+      const query = 'UPDATE customer SET NAME = ?, CONTACTNo = ?, TYPE = ?, LEVEL = ? WHERE IDNo = ? AND ACTIVE = 1 AND PROPERTY_ID = ?';
+      const result = await queryDatabasePromise(query, [NAME, CONTACTNo, TYPE, LEVEL, IDNo, propertyId]);
       return result.affectedRows > 0;
     } catch (error) {
       throw error;
@@ -245,10 +245,10 @@ class GuestModel {
   }
 
   // Delete guest (soft delete)
-  static async deleteGuest(IDNo) {
+  static async deleteGuest(IDNo, propertyId) {
     try {
-      const query = 'UPDATE customer SET ACTIVE = 0 WHERE IDNo = ? AND ACTIVE = 1';
-      const result = await queryDatabasePromise(query, [IDNo]);
+      const query = 'UPDATE customer SET ACTIVE = 0 WHERE IDNo = ? AND ACTIVE = 1 AND PROPERTY_ID = ?';
+      const result = await queryDatabasePromise(query, [IDNo, propertyId]);
       return result.affectedRows > 0;
     } catch (error) {
       throw error;

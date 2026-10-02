@@ -1,5 +1,22 @@
 const AuthModel = require('../models/authModel');
 const SessionModel = require('../models/sessionModel');
+const PropertyModel = require('../models/propertyModel');
+
+// Resolves which property (Main Hotel / Pool Villa / ...) the current
+// request is scoped to, from the "current_property" cookie set by the
+// switcher (POST /property/switch - see routes/r_property.js), and attaches
+// it the same way req.user is attached: available to every controller via
+// req.propertyId, and to every EJS view via res.locals.currentProperty /
+// res.locals.allProperties (so the switcher UI in partials/navbar.ejs needs
+// no per-controller render() changes). Falls back to the default property
+// (Main Hotel) when the cookie is missing/invalid - never leaves
+// req.propertyId pointing at nothing while the property table has rows.
+async function attachProperty(req, res) {
+  const property = await PropertyModel.resolveFromCookie(req.cookies?.current_property);
+  req.propertyId = property ? property.IDNo : null;
+  res.locals.currentProperty = property;
+  res.locals.allProperties = await PropertyModel.getAllActive();
+}
 
 class AuthMiddleware {
   // Check if user is authenticated (for API routes)
@@ -32,6 +49,7 @@ class AuthMiddleware {
       }
       
       req.user = decoded;
+      await attachProperty(req, res);
       next();
     } catch (error) {
       console.error('Auth middleware error:', error);
@@ -108,6 +126,7 @@ class AuthMiddleware {
           const isValid = await SessionModel.isTokenValid(decoded.userId, token);
           if (isValid) {
             req.user = decoded;
+            await attachProperty(req, res);
           }
         }
       } catch (error) {
@@ -141,6 +160,7 @@ class AuthMiddleware {
       }
       
       req.user = decoded;
+      await attachProperty(req, res);
       next();
     } catch (error) {
       console.error('Auth middleware error:', error);

@@ -15,7 +15,56 @@
 		}
 	</style>
 	<meta name="theme-color" content="#0b0e11" />
-	<script>(function(){try{var t=localStorage.getItem('ui_data_theme')||'dark';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+	<!-- data-property-theme records which property is active, purely for
+	     public/css/theme-color.css's [data-property-theme="pool_villa"]
+	     rules to recolor specific elements (the Real-Time Booking Monitor/
+	     Room Status header gradient) - it does NOT override the viewer's
+	     own dark/light theme choice. An earlier version of this forced
+	     light theme on for Pool Villa; that was reverted per explicit
+	     request - Pool Villa must stay in whichever theme the viewer
+	     already has, with only the header color changing, same as it
+	     already does for a light-theme viewer. -->
+	<script>(function(){
+		var propertyCode = '<%= typeof currentProperty !== "undefined" && currentProperty ? currentProperty.CODE : "main" %>';
+		try { document.documentElement.setAttribute('data-theme', localStorage.getItem('ui_data_theme') || 'dark'); } catch(e) { document.documentElement.setAttribute('data-theme', 'dark'); }
+		document.documentElement.setAttribute('data-property-theme', propertyCode);
+	})();</script>
+	<!-- The reload after a property switch (views/partials/navbar.ejs's
+	     propertyToggleBtn handler) briefly shows raw unstyled HTML before
+	     every stylesheet/script finishes loading - more noticeable
+	     switching to whichever property has more data to render (e.g.
+	     Main Hotel's much larger room/booking grid vs Pool Villa's 4
+	     rooms). Rather than chase render timing, just hide the page until
+	     it's actually ready and fade it in - this runs as early as
+	     possible (before anything paints) so there's nothing to flash.
+	     Only engages right after a property switch (sessionStorage flag
+	     set by navbar.ejs immediately before reload, cleared below once
+	     used) - a normal page load/navigation is unaffected. -->
+	<script>(function(){
+		var revealed = false;
+		function reveal() {
+			if (revealed) return;
+			revealed = true;
+			try { sessionStorage.removeItem('property_switching'); } catch (e) {}
+			document.documentElement.style.transition = 'opacity 0.2s ease';
+			document.documentElement.style.opacity = '0';
+			document.documentElement.style.visibility = 'visible';
+			requestAnimationFrame(function () {
+				document.documentElement.style.opacity = '1';
+			});
+		}
+		try {
+			if (sessionStorage.getItem('property_switching') === '1') {
+				document.documentElement.style.visibility = 'hidden';
+				window.addEventListener('load', reveal);
+				// Safety net - never leave the page stuck hidden if "load"
+				// is somehow delayed or never fires (a hung request, etc.).
+				setTimeout(reveal, 2000);
+			}
+		} catch (e) {
+			document.documentElement.style.visibility = 'visible';
+		}
+	})();</script>
 	<!-- icons -->
 	<link href="/plugins/simple-line-icons/simple-line-icons.min.css" rel="stylesheet" type="text/css" />
 	<link href="/plugins/font-awesome/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
@@ -42,7 +91,7 @@
 	<link rel="stylesheet" href="/css/card.css?v=no-shine-sweep-1"  type="text/css" />
 	<link rel="stylesheet" href="/css/room.css"  type="text/css" />
 	<link href="/css/responsive.css" rel="stylesheet" type="text/css" />
-	<link href="/css/theme-color.css?v=gradient-header-booking-menu-1" rel="stylesheet" type="text/css" />
+	<link href="/css/theme-color.css?v=pool-villa-event-bar-4" rel="stylesheet" type="text/css" />
 	<!-- Date Time item CSS -->
 	<link rel="stylesheet" href="/plugins/flatpicker/flatpickr.min.css">
 	<!-- DataTables CSS -->

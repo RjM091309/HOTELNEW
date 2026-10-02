@@ -77,7 +77,7 @@ class DashboardModel {
   }
 
   // Get today check-in details
-  static async getTodayCheckInDetails() {
+  static async getTodayCheckInDetails(propertyId) {
     try {
       const details = await queryDatabasePromise(`
         SELECT 
@@ -161,12 +161,13 @@ class DashboardModel {
           WHERE ACTIVE = 1 
           GROUP BY BOOKING_ID
         ) rm ON b.IDNo = rm.BOOKING_ID
-        WHERE b.ACTIVE = 1  
+        WHERE b.ACTIVE = 1
+          AND b.PROPERTY_ID = ?
           AND DATE(b.CHECK_IN_DATE) <= CURDATE()
           AND b.IS_OCCUPIED = 0
           AND b.BOOKING_STATUS IN ('pending', 'check-In')
         ORDER BY r.ROOM_NUMBER ASC
-      `);
+      `, [propertyId]);
       return details;
     } catch (error) {
       throw error;
@@ -174,7 +175,7 @@ class DashboardModel {
   }
 
   // Get group booking details
-  static async getGroupBookingDetails() {
+  static async getGroupBookingDetails(propertyId) {
     try {
       const details = await queryDatabasePromise(`
         SELECT 
@@ -254,20 +255,21 @@ class DashboardModel {
           WHERE ACTIVE = 1 
           GROUP BY BOOKING_ID
         ) rm ON b.IDNo = rm.BOOKING_ID
-       WHERE b.ACTIVE = 1 
+       WHERE b.ACTIVE = 1
+         AND b.PROPERTY_ID = ?
          AND r.ROOM_STATUS IN (2, 4)  -- Include Occupied (2) and Cleaning (4) rooms
          AND (
            -- Show all bookings that are still checked in (haven't checked out yet)
            b.BOOKING_STATUS = 'check-In'
-           OR 
+           OR
            -- OR show only check-out bookings from TODAY
            (b.BOOKING_STATUS = 'check-Out' AND DATE(b.CHECK_OUT_DATE) = CURRENT_DATE())
          )
-         AND b.IS_OCCUPIED = 1   
+         AND b.IS_OCCUPIED = 1
          AND c.IS_GROUP = 1
          AND r.ROOM_STATUS != 1  -- Exclude rooms that are already cleaned (Available = 1)
         ORDER BY b.GROUP_BOOKING_ID ASC, r.ROOM_NUMBER ASC
-      `);
+      `, [propertyId]);
       return details;
     } catch (error) {
       throw error;
@@ -275,7 +277,7 @@ class DashboardModel {
   }
 
   // Get late in/out details
-  static async getLateInOutDetails() {
+  static async getLateInOutDetails(propertyId) {
     try {
       const details = await queryDatabasePromise(`
         SELECT 
@@ -303,12 +305,12 @@ class DashboardModel {
           AND DATE(b2.CHECK_IN_DATE) = DATE(b1.CHECK_OUT_DATE)
           AND b2.ACTIVE = 1
         LEFT JOIN customer c2 ON b2.CUSTOMER_ID = c2.IDNo
-        WHERE 
+        WHERE
           b1.LATE_CHECKOUT = 1
           AND b2.CHECK_IN_STATUS = 0
-          AND b1.ACTIVE = 1 AND (DATE(b2.CHECK_IN_STATUS) = CURDATE() OR DATE(b1.CHECK_OUT_DATE) = CURDATE()) 
+          AND b1.ACTIVE = 1 AND b1.PROPERTY_ID = ? AND (DATE(b2.CHECK_IN_STATUS) = CURDATE() OR DATE(b1.CHECK_OUT_DATE) = CURDATE())
         ORDER BY r.ROOM_NUMBER ASC
-      `);
+      `, [propertyId]);
       return details;
     } catch (error) {
       throw error;
@@ -316,7 +318,7 @@ class DashboardModel {
   }
 
   // Get today checked out details
-  static async getTodayCheckedOutDetails() {
+  static async getTodayCheckedOutDetails(propertyId) {
     try {
       const details = await queryDatabasePromise(`
         SELECT 
@@ -396,15 +398,16 @@ class DashboardModel {
           WHERE ACTIVE = 1 
           GROUP BY BOOKING_ID
         ) rm ON b.IDNo = rm.BOOKING_ID
-        WHERE b.ACTIVE = 1 
+        WHERE b.ACTIVE = 1
+          AND b.PROPERTY_ID = ?
           AND (
             (b.BOOKING_STATUS = 'check-In' AND DATE(b.CHECK_OUT_DATE) <= CURDATE())
-            OR 
+            OR
             (b.BOOKING_STATUS = 'check-Out' AND DATE(b.CHECK_OUT_DATE) = CURDATE())
           )
             AND r.ROOM_STATUS != 1
         ORDER BY r.ROOM_NUMBER ASC
-      `);
+      `, [propertyId]);
       return details;
     } catch (error) {
       throw error;
@@ -412,7 +415,7 @@ class DashboardModel {
   }
 
   // Get extended details
-  static async getExtendedDetails() {
+  static async getExtendedDetails(propertyId) {
     try {
       const details = await queryDatabasePromise(`
         SELECT 
@@ -493,9 +496,9 @@ class DashboardModel {
           WHERE ACTIVE = 1 
           GROUP BY BOOKING_ID
         ) rm ON b.IDNo = rm.BOOKING_ID
-        WHERE b.ACTIVE = 1 AND r.ROOM_STATUS = 2 AND b.BOOKING_STATUS = 'check-In' AND b.EXTENDED = 1
+        WHERE b.ACTIVE = 1 AND b.PROPERTY_ID = ? AND r.ROOM_STATUS = 2 AND b.BOOKING_STATUS = 'check-In' AND b.EXTENDED = 1
         ORDER BY r.ROOM_NUMBER ASC
-      `);
+      `, [propertyId]);
       return details;
     } catch (error) {
       throw error;
@@ -503,7 +506,7 @@ class DashboardModel {
   }
 
   // Get late checkout details
-  static async getLateCheckOutDetails() {
+  static async getLateCheckOutDetails(propertyId) {
     try {
       const details = await queryDatabasePromise(`
         SELECT 
@@ -584,9 +587,9 @@ class DashboardModel {
           WHERE ACTIVE = 1 
           GROUP BY BOOKING_ID
         ) rm ON b.IDNo = rm.BOOKING_ID
-        WHERE b.ACTIVE = 1 AND (DATE(b.CHECK_OUT_DATE) = CURDATE()) AND b.BOOKING_STATUS = 'check-In' AND b.LATE_CHECKOUT = 1 
+        WHERE b.ACTIVE = 1 AND b.PROPERTY_ID = ? AND (DATE(b.CHECK_OUT_DATE) = CURDATE()) AND b.BOOKING_STATUS = 'check-In' AND b.LATE_CHECKOUT = 1
         ORDER BY r.ROOM_NUMBER ASC
-      `);
+      `, [propertyId]);
       return details;
     } catch (error) {
       throw error;
@@ -594,89 +597,103 @@ class DashboardModel {
   }
 
   // Get dashboard counts
-  static async getDashboardCounts() {
+  static async getDashboardCounts(propertyId) {
     try {
       const queries = {
-        bookingToday: `
+        bookingToday: {
+          sql: `
           SELECT COUNT(*) AS totalBookingsToday
           FROM booking
           WHERE DATE(CHECK_IN_DATE) <= CURDATE()
             AND BOOKING_STATUS IN ('pending', 'check-In')
             AND IS_OCCUPIED = 0
             AND ACTIVE = 1
-        `,
-        todayCheckedIn: `
+            AND PROPERTY_ID = ?
+        `, params: [propertyId] },
+        todayCheckedIn: {
+          sql: `
           SELECT COUNT(*) AS TODAY_CHECKEDIN
           FROM booking
-          WHERE ACTIVE = 1 AND BOOKING_STATUS = 'check-In' AND IS_OCCUPIED = 1
-        `,
-        todayCheckedOut: `
+          WHERE ACTIVE = 1 AND BOOKING_STATUS = 'check-In' AND IS_OCCUPIED = 1 AND PROPERTY_ID = ?
+        `, params: [propertyId] },
+        todayCheckedOut: {
+          sql: `
           SELECT COUNT(*) AS TODAY_CHECKEDOUT
           FROM booking
           WHERE DATE(CHECK_OUT_DATE) = CURDATE()
             AND ACTIVE = 1
-        `,
-        extended: `
+            AND PROPERTY_ID = ?
+        `, params: [propertyId] },
+        extended: {
+          sql: `
           SELECT COUNT(*) AS EXTENDED
           FROM booking
-          WHERE ACTIVE = 1 AND BOOKING_STATUS = 'check-In' AND EXTENDED = 1
-        `,
-        lateInOut: `
+          WHERE ACTIVE = 1 AND BOOKING_STATUS = 'check-In' AND EXTENDED = 1 AND PROPERTY_ID = ?
+        `, params: [propertyId] },
+        lateInOut: {
+          sql: `
           SELECT COUNT(*) AS TotalLateInOut
           FROM booking b1
           JOIN room r ON b1.ROOM_ID = r.IDNo
           LEFT JOIN customer c1 ON b1.CUSTOMER_ID = c1.IDNo
-          LEFT JOIN booking b2 ON b1.ROOM_ID = b2.ROOM_ID 
-            AND DATE(b2.CHECK_IN_DATE) = DATE(b1.CHECK_OUT_DATE) 
+          LEFT JOIN booking b2 ON b1.ROOM_ID = b2.ROOM_ID
+            AND DATE(b2.CHECK_IN_DATE) = DATE(b1.CHECK_OUT_DATE)
             AND b2.ACTIVE = 1
           LEFT JOIN customer c2 ON b2.CUSTOMER_ID = c2.IDNo
-          WHERE 
+          WHERE
             b1.LATE_CHECKOUT = 1
             AND b2.CHECK_IN_STATUS = 0
             AND (DATE(b2.CHECK_IN_STATUS) = CURDATE() OR DATE(b1.CHECK_OUT_DATE) = CURDATE())
             AND b1.ACTIVE = 1
-        `,
-        bookingMonthly: `
-          SELECT 
+            AND b1.PROPERTY_ID = ?
+        `, params: [propertyId] },
+        bookingMonthly: {
+          sql: `
+          SELECT
             COUNT(*) AS totalBookingsMonthly,
-            SUM(CASE 
+            SUM(CASE
               WHEN DATE(CHECK_IN_DATE) < CURDATE()
               THEN 1
-              ELSE 0 
+              ELSE 0
             END) AS completedBookingsMonthly,
-            SUM(CASE 
-              WHEN DATE(CHECK_IN_DATE) >= CURDATE() 
+            SUM(CASE
+              WHEN DATE(CHECK_IN_DATE) >= CURDATE()
               THEN 1
-              ELSE 0 
+              ELSE 0
             END) AS pendingBookingsMonthly
           FROM booking
           WHERE MONTH(CHECK_IN_DATE) = MONTH(CURDATE())
             AND YEAR(CHECK_IN_DATE) = YEAR(CURDATE())
             AND ACTIVE = 1
-        `,
-        totalSales: `
-          SELECT SUM((ROOM_CHARGE * QTY) + AMENITIES_CHARGE) AS totalSales
-          FROM billing
-          WHERE PAYMENT_STATUS = 'paid'
-        `,
-        lateCheckOut: `
+            AND PROPERTY_ID = ?
+        `, params: [propertyId] },
+        totalSales: {
+          sql: `
+          SELECT SUM((bl.ROOM_CHARGE * bl.QTY) + bl.AMENITIES_CHARGE) AS totalSales
+          FROM billing bl
+          JOIN booking b ON b.IDNo = bl.BOOKING_ID
+          WHERE bl.PAYMENT_STATUS = 'paid' AND b.PROPERTY_ID = ?
+        `, params: [propertyId] },
+        lateCheckOut: {
+          sql: `
           SELECT COUNT(*) AS LATE_CHECKOUT
           FROM booking
           WHERE LATE_CHECKOUT = 1
-          AND ACTIVE = 1 AND BOOKING_STATUS = 'check-In' AND DATE(CHECK_OUT_DATE) = CURDATE()
-        `,
-        occupiedNotMove: `
-          SELECT COUNT(*) AS OccupiedNotMove 
-          FROM booking 
-          WHERE BOOKING_STATUS = 'check-In' AND IS_OCCUPIED = 0
-        `
+          AND ACTIVE = 1 AND BOOKING_STATUS = 'check-In' AND DATE(CHECK_OUT_DATE) = CURDATE() AND PROPERTY_ID = ?
+        `, params: [propertyId] },
+        occupiedNotMove: {
+          sql: `
+          SELECT COUNT(*) AS OccupiedNotMove
+          FROM booking
+          WHERE BOOKING_STATUS = 'check-In' AND IS_OCCUPIED = 0 AND PROPERTY_ID = ?
+        `, params: [propertyId] }
       };
 
       const results = {};
-      for (const [key, query] of Object.entries(queries)) {
-        results[key] = await queryDatabasePromise(query);
+      for (const [key, { sql, params }] of Object.entries(queries)) {
+        results[key] = await queryDatabasePromise(sql, params);
       }
-      
+
       return results;
     } catch (error) {
       throw error;
@@ -684,18 +701,18 @@ class DashboardModel {
   }
 
   // Get room statuses
-  static async getRoomStatuses() {
+  static async getRoomStatuses(propertyId) {
     try {
       const statuses = await queryDatabasePromise(`
-        SELECT 
+        SELECT
           COUNT(*) AS totalRooms,
           SUM(CASE WHEN ROOM_STATUS = 1 THEN 1 ELSE 0 END) AS availableRooms,
           SUM(CASE WHEN ROOM_STATUS = 2 THEN 1 ELSE 0 END) AS occupiedRooms,
           SUM(CASE WHEN ROOM_STATUS = 3 THEN 1 ELSE 0 END) AS underMaintenanceRooms,
           SUM(CASE WHEN ROOM_STATUS = 4 THEN 1 ELSE 0 END) AS cleaningRooms
         FROM room
-        WHERE ACTIVE = 1
-      `);
+        WHERE ACTIVE = 1 AND PROPERTY_ID = ?
+      `, [propertyId]);
       return statuses;
     } catch (error) {
       throw error;
@@ -703,83 +720,83 @@ class DashboardModel {
   }
 
   // Get room details
-  static async getRoomDetails() {
+  static async getRoomDetails(propertyId) {
     try {
       const queries = {
-        available: `
+        available: { sql: `
           SELECT
-            R.ROOM_NUMBER, 
-            RT.NAME AS ROOM_TYPE, 
-            R.ROOM_MAX, 
-            R.ROOM_BED, 
-            R.ROOM_SIZE, 
+            R.ROOM_NUMBER,
+            RT.NAME AS ROOM_TYPE,
+            R.ROOM_MAX,
+            R.ROOM_BED,
+            R.ROOM_SIZE,
             R.ROOM_FLOOR,
             NULL AS FINAL_PRICE,
             GROUP_CONCAT(A.NAME SEPARATOR ', ') AS AMENITIES
-          FROM 
-            room R 
-          JOIN 
-            room_type RT ON R.ROOM_TYPE_ID = RT.IDNo 
-          LEFT JOIN 
+          FROM
+            room R
+          JOIN
+            room_type RT ON R.ROOM_TYPE_ID = RT.IDNo
+          LEFT JOIN
             room_amenities RA ON R.IDNo = RA.ROOM_ID AND RA.ACTIVE = 1
-          LEFT JOIN 
-            amenity A ON RA.AMENITY_ID = A.IDNo 
-          WHERE 
-            R.ACTIVE = 1 AND R.ROOM_STATUS = 1 
-          GROUP BY 
+          LEFT JOIN
+            amenity A ON RA.AMENITY_ID = A.IDNo
+          WHERE
+            R.ACTIVE = 1 AND R.ROOM_STATUS = 1 AND R.PROPERTY_ID = ?
+          GROUP BY
             R.IDNo
             ORDER BY R.ROOM_NUMBER ASC
-        `,
-        underMaintenance: `
+        `, params: [propertyId] },
+        underMaintenance: { sql: `
           SELECT
-            R.ROOM_NUMBER, 
-            RT.NAME AS ROOM_TYPE, 
-            R.ROOM_MAX, 
-            R.ROOM_BED, 
-            R.ROOM_SIZE, 
+            R.ROOM_NUMBER,
+            RT.NAME AS ROOM_TYPE,
+            R.ROOM_MAX,
+            R.ROOM_BED,
+            R.ROOM_SIZE,
             R.ROOM_FLOOR,
             NULL AS FINAL_PRICE,
             GROUP_CONCAT(A.NAME SEPARATOR ', ') AS AMENITIES
-          FROM 
-            room R 
-          JOIN 
-            room_type RT ON R.ROOM_TYPE_ID = RT.IDNo 
-          LEFT JOIN 
+          FROM
+            room R
+          JOIN
+            room_type RT ON R.ROOM_TYPE_ID = RT.IDNo
+          LEFT JOIN
             room_amenities RA ON R.IDNo = RA.ROOM_ID AND RA.ACTIVE = 1
-          LEFT JOIN 
-            amenity A ON RA.AMENITY_ID = A.IDNo 
-          WHERE 
-            R.ACTIVE = 1 AND R.ROOM_STATUS = 3 
-          GROUP BY 
+          LEFT JOIN
+            amenity A ON RA.AMENITY_ID = A.IDNo
+          WHERE
+            R.ACTIVE = 1 AND R.ROOM_STATUS = 3 AND R.PROPERTY_ID = ?
+          GROUP BY
             R.IDNo
             ORDER BY R.ROOM_NUMBER ASC
-        `,
-        cleaning: `
+        `, params: [propertyId] },
+        cleaning: { sql: `
           SELECT
             R.IDNo AS ROOM_ID,
-            R.ROOM_NUMBER, 
-            RT.NAME AS ROOM_TYPE, 
-            R.ROOM_MAX, 
-            R.ROOM_BED, 
-            R.ROOM_SIZE, 
+            R.ROOM_NUMBER,
+            RT.NAME AS ROOM_TYPE,
+            R.ROOM_MAX,
+            R.ROOM_BED,
+            R.ROOM_SIZE,
             R.ROOM_FLOOR,
             NULL AS FINAL_PRICE,
             GROUP_CONCAT(A.NAME SEPARATOR ', ') AS AMENITIES
-          FROM 
-            room R 
-          JOIN 
-            room_type RT ON R.ROOM_TYPE_ID = RT.IDNo 
-          LEFT JOIN 
+          FROM
+            room R
+          JOIN
+            room_type RT ON R.ROOM_TYPE_ID = RT.IDNo
+          LEFT JOIN
             room_amenities RA ON R.IDNo = RA.ROOM_ID AND RA.ACTIVE = 1
-          LEFT JOIN 
-            amenity A ON RA.AMENITY_ID = A.IDNo 
-          WHERE 
-            R.ACTIVE = 1 AND R.ROOM_STATUS = 4 
-          GROUP BY 
+          LEFT JOIN
+            amenity A ON RA.AMENITY_ID = A.IDNo
+          WHERE
+            R.ACTIVE = 1 AND R.ROOM_STATUS = 4 AND R.PROPERTY_ID = ?
+          GROUP BY
             R.IDNo
             ORDER BY R.ROOM_NUMBER ASC
-        `,
-        occupied: `
+        `, params: [propertyId] },
+        occupied: { sql: `
           SELECT 
             b.IDNo AS BookingID,
             b.CUSTOMER_ID,
@@ -868,10 +885,10 @@ class DashboardModel {
             WHERE ACTIVE = 1 
             GROUP BY BOOKING_ID
           ) rm ON b.IDNo = rm.BOOKING_ID
-          WHERE b.ACTIVE = 1 AND r.ROOM_STATUS = 2 AND b.BOOKING_STATUS = 'check-In' AND b.IS_OCCUPIED = 1 
+          WHERE b.ACTIVE = 1 AND b.PROPERTY_ID = ? AND r.ROOM_STATUS = 2 AND b.BOOKING_STATUS = 'check-In' AND b.IS_OCCUPIED = 1
           ORDER BY r.ROOM_NUMBER ASC
-        `,
-        transferred: `
+        `, params: [propertyId] },
+        transferred: { sql: `
           SELECT 
             b.IDNo AS BookingID,
             b.CUSTOMER_ID,
@@ -951,16 +968,16 @@ class DashboardModel {
             WHERE ACTIVE = 1 
             GROUP BY BOOKING_ID
           ) rm ON b.IDNo = rm.BOOKING_ID
-          WHERE b.ACTIVE = 1 AND r.ROOM_STATUS = 2 AND b.BOOKING_STATUS = 'check-In' AND b.TRANSFER != 0 
+          WHERE b.ACTIVE = 1 AND b.PROPERTY_ID = ? AND r.ROOM_STATUS = 2 AND b.BOOKING_STATUS = 'check-In' AND b.TRANSFER != 0
           ORDER BY r.ROOM_NUMBER ASC
-        `
+        `, params: [propertyId] }
       };
 
       const results = {};
-      for (const [key, query] of Object.entries(queries)) {
-        results[key] = await queryDatabasePromise(query);
+      for (const [key, { sql, params }] of Object.entries(queries)) {
+        results[key] = await queryDatabasePromise(sql, params);
       }
-      
+
       return results;
     } catch (error) {
       throw error;
@@ -968,20 +985,20 @@ class DashboardModel {
   }
 
   // Get room data
-  static async getRoomData() {
+  static async getRoomData(propertyId) {
     try {
       const rooms = await queryDatabasePromise(`
-        SELECT 
-          r.ROOM_NUMBER, 
-          r.ROOM_TYPE_ID, 
-          rt.NAME AS ROOM_TYPE_NAME, 
-          r.ROOM_STATUS, 
-          r.ROOM_MAINTENANCE_STATUS 
+        SELECT
+          r.ROOM_NUMBER,
+          r.ROOM_TYPE_ID,
+          rt.NAME AS ROOM_TYPE_NAME,
+          r.ROOM_STATUS,
+          r.ROOM_MAINTENANCE_STATUS
         FROM room r
         LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
-        WHERE r.ACTIVE = 1
+        WHERE r.ACTIVE = 1 AND r.PROPERTY_ID = ?
         ORDER BY r.ROOM_NUMBER ASC
-      `);
+      `, [propertyId]);
       return rooms;
     } catch (error) {
       throw error;
@@ -989,11 +1006,11 @@ class DashboardModel {
   }
 
   // Get floors
-  static async getFloors() {
+  static async getFloors(propertyId) {
     try {
       const floors = await queryDatabasePromise(`
-        SELECT DISTINCT ROOM_FLOOR AS floor FROM room WHERE ACTIVE = 1
-      `);
+        SELECT DISTINCT ROOM_FLOOR AS floor FROM room WHERE ACTIVE = 1 AND PROPERTY_ID = ?
+      `, [propertyId]);
       return floors;
     } catch (error) {
       throw error;
@@ -1005,7 +1022,7 @@ class DashboardModel {
   // and rooms currently in the cleaning ROOM_STATUS (4). Deliberately lean
   // queries (not the full booking-detail ones the dashboard tabs use) since
   // this powers a shared navbar polled from every page.
-  static async getNavbarNotifications() {
+  static async getNavbarNotifications(propertyId) {
     try {
       const [checkIns, checkOuts, pickups, cleaningRooms] = await Promise.all([
         queryDatabasePromise(`
@@ -1015,9 +1032,10 @@ class DashboardModel {
           LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
           LEFT JOIN room r ON r.IDNo = b.ROOM_ID
           WHERE b.ACTIVE = 1 AND b.BOOKING_STATUS = 'pending'
+            AND b.PROPERTY_ID = ?
             AND DATE(b.CHECK_IN_DATE) = CURDATE()
           ORDER BY b.CHECK_IN_DATE ASC
-        `),
+        `, [propertyId]),
         queryDatabasePromise(`
           SELECT b.IDNo AS BookingID, c.NAME AS GuestName, r.ROOM_NUMBER AS RoomNumber,
                  b.CHECK_OUT_DATE AS ScheduleTime
@@ -1025,9 +1043,10 @@ class DashboardModel {
           LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
           LEFT JOIN room r ON r.IDNo = b.ROOM_ID
           WHERE b.ACTIVE = 1 AND b.BOOKING_STATUS = 'check-In'
+            AND b.PROPERTY_ID = ?
             AND DATE(b.CHECK_OUT_DATE) = CURDATE()
           ORDER BY b.CHECK_OUT_DATE ASC
-        `),
+        `, [propertyId]),
         queryDatabasePromise(`
           SELECT b.IDNo AS BookingID, c.NAME AS GuestName, r.ROOM_NUMBER AS RoomNumber,
                  b.PICKUP_DATE AS ScheduleTime, b.FLIGHT_NUMBER AS FlightNumber
@@ -1038,18 +1057,19 @@ class DashboardModel {
           INNER JOIN services s ON s.IDNo = bs.SERVICE_ID AND s.SERVICE_CATEGORY = 'Pick & Drop'
               AND LOWER(s.SERVICE_NAME) LIKE '%pick%'
           WHERE b.ACTIVE = 1
+            AND b.PROPERTY_ID = ?
             AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
             AND b.PICKUP_DATE IS NOT NULL
             AND DATE(b.PICKUP_DATE) = CURDATE()
           GROUP BY b.IDNo, c.NAME, r.ROOM_NUMBER, b.PICKUP_DATE, b.FLIGHT_NUMBER
           ORDER BY b.PICKUP_DATE ASC
-        `),
+        `, [propertyId]),
         queryDatabasePromise(`
           SELECT IDNo AS RoomID, ROOM_NUMBER AS RoomNumber, ROOM_FLOOR AS RoomFloor, EDITED_DT AS SinceDT
           FROM room
-          WHERE ACTIVE = 1 AND ROOM_STATUS = 4
+          WHERE ACTIVE = 1 AND ROOM_STATUS = 4 AND PROPERTY_ID = ?
           ORDER BY ROOM_NUMBER ASC
-        `)
+        `, [propertyId])
       ]);
 
       return { checkIns, checkOuts, pickups, cleaningRooms };
@@ -1100,6 +1120,12 @@ class DashboardModel {
   }
 
   // Get all complaints with booking details
+  // NOTE: not property-scoped - complaint_request has no PROPERTY_ID column
+  // (it's outside the Phase 1 schema change) and cr.BOOKING_ID can be NULL
+  // (a general complaint not tied to any booking), so filtering via the
+  // booking join would wrongly hide those. Left as-is per the "ambiguous ->
+  // don't guess" rule; revisit if Complaints/Requests/Remarks get their own
+  // PROPERTY_ID in a later phase.
   static async getAllComplaints() {
     try {
       const complaints = await queryDatabasePromise(`
@@ -1136,6 +1162,7 @@ class DashboardModel {
   }
 
   // Get all requests with booking details
+  // NOTE: not property-scoped - same reasoning as getAllComplaints above.
   static async getAllRequests() {
     try {
       const requests = await queryDatabasePromise(`
@@ -1172,6 +1199,8 @@ class DashboardModel {
   }
 
   // Get all remarks with booking details
+  // NOTE: not property-scoped - same reasoning as getAllComplaints above
+  // (remarks has no PROPERTY_ID either, and r.BOOKING_ID can be NULL).
   static async getAllRemarks() {
     try {
       const remarks = await queryDatabasePromise(`
@@ -1793,26 +1822,29 @@ class DashboardModel {
   }
 
   // Move to occupied
-  static async moveToOccupied() {
+  static async moveToOccupied(propertyId) {
     try {
       // First, get all the rooms that need to be updated
       const roomsToUpdate = await queryDatabasePromise(`
-        SELECT DISTINCT b.ROOM_ID 
-        FROM booking b 
-        WHERE b.BOOKING_STATUS = 'check-In' 
-        AND b.IS_OCCUPIED = 0 
+        SELECT DISTINCT b.ROOM_ID
+        FROM booking b
+        WHERE b.BOOKING_STATUS = 'check-In'
+        AND b.IS_OCCUPIED = 0
         AND b.ACTIVE = 1
-      `);
+        AND b.PROPERTY_ID = ?
+      `, [propertyId]);
 
-      // Update booking status to occupied
+      // Update booking status to occupied - scoped to this property only,
+      // otherwise this would also flip the other property's pending check-ins.
       const bookingQuery = `
-        UPDATE booking 
-        SET IS_OCCUPIED = 1 
-        WHERE BOOKING_STATUS = 'check-In' 
-        AND IS_OCCUPIED = 0 
+        UPDATE booking
+        SET IS_OCCUPIED = 1
+        WHERE BOOKING_STATUS = 'check-In'
+        AND IS_OCCUPIED = 0
         AND ACTIVE = 1
+        AND PROPERTY_ID = ?
       `;
-      const bookingResult = await queryDatabasePromise(bookingQuery);
+      const bookingResult = await queryDatabasePromise(bookingQuery, [propertyId]);
 
       // Update room status to occupied (status = 2)
       if (roomsToUpdate.length > 0) {
@@ -1833,15 +1865,16 @@ class DashboardModel {
   }
 
   // Get check-in bookings count
-  static async getCheckInBookings() {
+  static async getCheckInBookings(propertyId) {
     try {
       const result = await queryDatabasePromise(`
-        SELECT COUNT(*) as count 
-        FROM booking 
-        WHERE BOOKING_STATUS = 'check-In' 
-        AND IS_OCCUPIED = 0 
+        SELECT COUNT(*) as count
+        FROM booking
+        WHERE BOOKING_STATUS = 'check-In'
+        AND IS_OCCUPIED = 0
         AND ACTIVE = 1
-      `);
+        AND PROPERTY_ID = ?
+      `, [propertyId]);
       return result[0]?.count || 0;
     } catch (error) {
       throw error;
@@ -1849,14 +1882,14 @@ class DashboardModel {
   }
 
   // Get room monitoring data
-  static async getRoomMonitoringData() {
+  static async getRoomMonitoringData(propertyId) {
     try {
       const rooms = await queryDatabasePromise(`
         SELECT r.IDNo, r.ROOM_NUMBER, r.ROOM_FLOOR, r.ROOM_STATUS, r.ROOM_BED, r.ROOM_MAX, r.ROOM_TYPE_ID, r.ACTIVE
         FROM room r
-        WHERE r.ROOM_FLOOR IN (3, 4, 5, 6) AND r.ACTIVE = 1
+        WHERE r.ROOM_FLOOR IN (3, 4, 5, 6) AND r.ACTIVE = 1 AND r.PROPERTY_ID = ?
         ORDER BY r.ROOM_FLOOR ASC, r.ROOM_NUMBER ASC
-      `);
+      `, [propertyId]);
 
       const floors = { 3: [], 4: [], 5: [], 6: [] };
 
@@ -1880,7 +1913,7 @@ class DashboardModel {
   }
 
   // Get available rooms for transfer
-  static async getAvailableRoomsForTransfer(currentRoom, checkOutDate, bookingId = null) {
+  static async getAvailableRoomsForTransfer(currentRoom, checkOutDate, bookingId = null, propertyId) {
     try {
       // Look up the transferred booking's own stay so we can exclude any room that
       // already has an overlapping reservation (a room can be physically vacant now
@@ -1948,8 +1981,9 @@ class DashboardModel {
           AND r.IDNo != ?
           AND r.ROOM_FLOOR IN (3, 4, 5, 6)
           ${availabilityFilter}
+          AND r.PROPERTY_ID = ?
         ORDER BY r.ROOM_FLOOR ASC, r.ROOM_NUMBER ASC
-      `, params);
+      `, [...params, propertyId]);
 
       return rooms;
     } catch (error) {
@@ -2111,7 +2145,7 @@ class DashboardModel {
   }
 
   // Check late check-out room availability
-  static async checkLateCheckRoom(roomId, checkoutDate, currentBookingId) {
+  static async checkLateCheckRoom(roomId, checkoutDate, currentBookingId, propertyId) {
     try {
       const formattedCheckoutDate = new Date(checkoutDate).toISOString().split('T')[0];
 
@@ -2143,14 +2177,15 @@ class DashboardModel {
             NULL AS ROOM_RATE
           FROM room r
           LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
-          WHERE r.ACTIVE = 1 
-            AND r.ROOM_STATUS = 1 
+          WHERE r.ACTIVE = 1
+            AND r.ROOM_STATUS = 1
             AND r.IDNo != ?
             AND r.ROOM_FLOOR IN (3, 4, 5, 6)
+            AND r.PROPERTY_ID = ?
           ORDER BY r.ROOM_FLOOR ASC, r.ROOM_NUMBER ASC
         `;
 
-        const availableRooms = await queryDatabasePromise(availableRoomsQuery, [roomId]);
+        const availableRooms = await queryDatabasePromise(availableRoomsQuery, [roomId, propertyId]);
 
         return {
           needRoomChange: true,
@@ -2238,7 +2273,7 @@ class DashboardModel {
   }
 
   // Check room availability for extension
-  static async checkExtendRoom(roomId, checkoutDate, daysToExtend) {
+  static async checkExtendRoom(roomId, checkoutDate, daysToExtend, propertyId) {
     try {
       // Calculate new checkout date
       const currentCheckout = new Date(checkoutDate);
@@ -2286,10 +2321,11 @@ class DashboardModel {
             NULL AS ROOM_RATE
           FROM room r
           JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
-          WHERE r.ACTIVE = 1 
+          WHERE r.ACTIVE = 1
           AND r.ROOM_STATUS = 1
           AND r.IDNo != ?
           AND r.ROOM_FLOOR IN (3, 4, 5, 6)
+          AND r.PROPERTY_ID = ?
           AND NOT EXISTS (
             SELECT 1 FROM booking b2
             WHERE b2.ROOM_ID = r.IDNo
@@ -2303,9 +2339,10 @@ class DashboardModel {
           )
           ORDER BY r.ROOM_FLOOR ASC, r.ROOM_NUMBER ASC
         `;
-        
+
         const availableRooms = await queryDatabasePromise(availableRoomsQuery, [
           roomId,
+          propertyId,
           formattedCurrentCheckout, formattedCurrentCheckout,
           formattedNewCheckout, formattedNewCheckout,
           formattedCurrentCheckout, formattedNewCheckout

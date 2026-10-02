@@ -47,7 +47,7 @@ class CalendarController {
         return res.status(400).json({ success: false, message: 'Missing start or end date.' });
       }
 
-      const events = await CalendarModel.getBookingsForCalendar(start, end);
+      const events = await CalendarModel.getBookingsForCalendar(start, end, req.propertyId);
       res.json(events);
     } catch (error) {
       console.error('Error fetching bookings for calendar:', error);
@@ -67,7 +67,7 @@ class CalendarController {
       // Using optimized booking endpoint
       
       // If no date range provided, get all bookings (like original endpoint)
-      const events = await CalendarModel.getOptimizedBookingsForCalendar(start, end);
+      const events = await CalendarModel.getOptimizedBookingsForCalendar(start, end, req.propertyId);
       res.json(events);
     } catch (error) {
       console.error('Error fetching optimized bookings for calendar:', error);
@@ -90,7 +90,7 @@ class CalendarController {
 
       // console.log(`Fetching bookings for date: ${date}`); // Debugging
 
-      const bookings = await CalendarModel.getDetailedBookings(date);
+      const bookings = await CalendarModel.getDetailedBookings(date, req.propertyId);
       res.json({ success: true, bookings });
     } catch (error) {
       console.error('Error fetching detailed bookings:', error);
@@ -152,7 +152,8 @@ class CalendarController {
           isRoomTransfer: Boolean(isRoomTransfer),
           oldRoomNumber: oldRoomNumber || null,
           newRoomId: newRoomId || null
-        }
+        },
+        req.propertyId
       );
       
       if (result && result.success) {
@@ -321,7 +322,7 @@ class CalendarController {
   // Get available rooms
   static async getAvailableRooms(req, res) {
     try {
-      const rooms = await CalendarModel.getAvailableRooms();
+      const rooms = await CalendarModel.getAvailableRooms(req.propertyId);
       res.json({ success: true, rooms });
     } catch (error) {
       console.error('Error fetching available rooms:', error);
@@ -335,7 +336,7 @@ class CalendarController {
   // Get rooms
   static async getRooms(req, res) {
     try {
-      const rooms = await CalendarModel.getAllRooms();
+      const rooms = await CalendarModel.getAllRooms(req.propertyId);
       // console.log('📅 Rooms data:', rooms);
       // console.log('📅 Rooms data type:', typeof rooms);
       // console.log('📅 Rooms is array:', Array.isArray(rooms));
@@ -349,7 +350,7 @@ class CalendarController {
   // Get bookings
   static async getBookings(req, res) {
     try {
-      const bookings = await CalendarModel.getAllBookings();
+      const bookings = await CalendarModel.getAllBookings(null, req.propertyId);
       // console.log('📅 Bookings data:', bookings);
       res.json(bookings);
     } catch (error) {
@@ -371,7 +372,7 @@ class CalendarController {
       }
 
       // Get available rooms for transfer using the same logic as dashboard
-      const availableRooms = await CalendarModel.getTransferAvailableRooms(currentRoom, checkOutDate);
+      const availableRooms = await CalendarModel.getTransferAvailableRooms(currentRoom, checkOutDate, req.propertyId);
       res.json(availableRooms);
     } catch (error) {
       console.error('Error fetching transfer available rooms:', error);
@@ -399,7 +400,7 @@ class CalendarController {
       const beforeSnapshot = await snapshotBooking(bookingId);
 
       // Process room transfer using the same logic as dashboard
-      const result = await CalendarModel.transferRoom(bookingId, oldRoomNumber, newRoomId, transferDate);
+      const result = await CalendarModel.transferRoom(bookingId, oldRoomNumber, newRoomId, transferDate, req.propertyId);
 
       if (result.success) {
         await logActivity(req, {
@@ -505,7 +506,7 @@ class CalendarController {
         });
       }
 
-      const result = await CalendarModel.checkExtendRoom(roomId, checkoutDate, daysToExtend);
+      const result = await CalendarModel.checkExtendRoom(roomId, checkoutDate, daysToExtend, req.propertyId);
       res.json(result);
     } catch (error) {
       console.error('Error checking room availability for extension:', error);
@@ -671,7 +672,7 @@ class CalendarController {
         });
       }
 
-      const result = await CalendarModel.checkLateCheckRoom(roomId, checkoutDate, currentBookingId);
+      const result = await CalendarModel.checkLateCheckRoom(roomId, checkoutDate, currentBookingId, req.propertyId);
       res.json(result);
     } catch (error) {
       console.error('Error checking late check-out room availability:', error);
@@ -1083,9 +1084,9 @@ class CalendarController {
         floors,
         calendarStats
       ] = await Promise.all([
-        CalendarModel.getAllRooms(),
-        CalendarModel.getFloors(),
-        CalendarModel.getCalendarStats()
+        CalendarModel.getAllRooms(req.propertyId),
+        CalendarModel.getFloors(req.propertyId),
+        CalendarModel.getCalendarStats(req.propertyId)
       ]);
 
       // Process room data to include status and CSS classes
@@ -1177,7 +1178,13 @@ class CalendarController {
       const type = bookingType === 'agency' ? 'agency' : 'walk-in';
       const targetDate = date ? new Date(date) : new Date();
 
-      const summary = await RoomModel.getSeasonalRateSummary(type, targetDate);
+      // NOTE: RoomModel.getSeasonalRateSummary lives in roomModel.js (owned by a
+      // different agent's slice of this plan, not this file). It currently scans
+      // rooms/room-types system-wide to pick "the" King/Queen rate - the exact
+      // risk the plan flags for Pool Villa. req.propertyId is passed through
+      // here so the call is ready the moment that function accepts it; until
+      // then this extra argument is simply ignored.
+      const summary = await RoomModel.getSeasonalRateSummary(type, targetDate, req.propertyId);
       res.json({ success: true, ...summary });
     } catch (error) {
       console.error('Error fetching room rate summary:', error);
@@ -1194,7 +1201,7 @@ class CalendarController {
         return res.status(400).json({ success: false, message: 'Missing start or end date.' });
       }
 
-      const events = await CalendarModel.getUnassignedRoomsForCalendar(start, end);
+      const events = await CalendarModel.getUnassignedRoomsForCalendar(start, end, req.propertyId);
       res.json(events);
     } catch (error) {
       console.error('Error fetching unassigned rooms for calendar:', error);
@@ -1214,7 +1221,7 @@ class CalendarController {
         return res.status(400).json({ success: false, message: 'Missing start or end date.' });
       }
 
-      const availability = await CalendarModel.getRoomBedAvailabilityForCalendar(start, end);
+      const availability = await CalendarModel.getRoomBedAvailabilityForCalendar(start, end, req.propertyId);
       res.json({ success: true, availability });
     } catch (error) {
       console.error('Error fetching room bed availability for calendar:', error);
@@ -1236,7 +1243,7 @@ class CalendarController {
       }
 
     
-      const result = await CalendarModel.getDetailedUnassignedRooms(date);
+      const result = await CalendarModel.getDetailedUnassignedRooms(date, req.propertyId);
       
       if (result.success) {
         res.json({ success: true, bookings: result.bookings });

@@ -1,4 +1,18 @@
 const DashboardModel = require('../models/dashboardModel');
+const PropertyModel = require('../models/propertyModel');
+
+// A handful of endpoints below (guest app / housekeeping app integrations,
+// mounted in routes/r_api.js) are deliberately reachable with no auth
+// middleware, so req.propertyId is never attached for them the way it is
+// for everything under /dashboard. This resolves the same cookie
+// requireAuth would (falling back to the default/Main Hotel property) so
+// those endpoints still show one consistent property's data instead of
+// every property's rows mixed together.
+async function resolvePropertyId(req) {
+  if (req.propertyId) return req.propertyId;
+  const property = await PropertyModel.resolveFromCookie(req.cookies?.current_property);
+  return property ? property.IDNo : null;
+}
 
 class DashboardController {
   // Main dashboard controller
@@ -26,17 +40,17 @@ class DashboardController {
         cleanupNotifications
       ] = await Promise.all([
         DashboardModel.getEmployees(),
-        DashboardModel.getTodayCheckInDetails(),
-        DashboardModel.getGroupBookingDetails(),
-        DashboardModel.getLateInOutDetails(),
-        DashboardModel.getTodayCheckedOutDetails(),
-        DashboardModel.getExtendedDetails(),
-        DashboardModel.getLateCheckOutDetails(),
-        DashboardModel.getDashboardCounts(),
-        DashboardModel.getRoomStatuses(),
-        DashboardModel.getRoomDetails(),
-        DashboardModel.getRoomData(),
-        DashboardModel.getFloors(),
+        DashboardModel.getTodayCheckInDetails(req.propertyId),
+        DashboardModel.getGroupBookingDetails(req.propertyId),
+        DashboardModel.getLateInOutDetails(req.propertyId),
+        DashboardModel.getTodayCheckedOutDetails(req.propertyId),
+        DashboardModel.getExtendedDetails(req.propertyId),
+        DashboardModel.getLateCheckOutDetails(req.propertyId),
+        DashboardModel.getDashboardCounts(req.propertyId),
+        DashboardModel.getRoomStatuses(req.propertyId),
+        DashboardModel.getRoomDetails(req.propertyId),
+        DashboardModel.getRoomData(req.propertyId),
+        DashboardModel.getFloors(req.propertyId),
         DashboardModel.getCleanupNotifications()
       ]);
 
@@ -167,7 +181,7 @@ class DashboardController {
   // (broom) dropdowns - polled from navbar.ejs on every page, not just Dashboard.
   static async getNavbarNotifications(req, res) {
     try {
-      const data = await DashboardModel.getNavbarNotifications();
+      const data = await DashboardModel.getNavbarNotifications(req.propertyId);
       res.json({ success: true, ...data });
     } catch (error) {
       console.error('Error fetching navbar notifications:', error);
@@ -222,7 +236,7 @@ class DashboardController {
   // Check move to occupied controller
   static async checkMoveToOccupied(req, res) {
     try {
-      const count = await DashboardModel.getCheckInBookings();
+      const count = await DashboardModel.getCheckInBookings(req.propertyId);
       res.json({
         success: true,
         message: 'Move to occupied check completed',
@@ -241,7 +255,7 @@ class DashboardController {
   // Move to occupied controller
   static async moveToOccupied(req, res) {
     try {
-      const affectedRows = await DashboardModel.moveToOccupied();
+      const affectedRows = await DashboardModel.moveToOccupied(req.propertyId);
       
       // Get the io instance from the app
       const io = req.app.get('io');
@@ -493,7 +507,8 @@ class DashboardController {
   // Room monitoring controller
   static async getRoomMonitoring(req, res) {
     try {
-      const floors = await DashboardModel.getRoomMonitoringData();
+      const propertyId = await resolvePropertyId(req);
+      const floors = await DashboardModel.getRoomMonitoringData(propertyId);
       res.json({ floors });
     } catch (error) {
       console.error('Error getting room monitoring data:', error);
@@ -516,7 +531,7 @@ class DashboardController {
         });
       }
 
-      const availableRooms = await DashboardModel.getAvailableRoomsForTransfer(currentRoom, checkOutDate, bookingId || null);
+      const availableRooms = await DashboardModel.getAvailableRoomsForTransfer(currentRoom, checkOutDate, bookingId || null, req.propertyId);
       
       res.json(availableRooms);
     } catch (error) {
@@ -612,8 +627,8 @@ class DashboardController {
         dashboardCounts,
         roomStatusesResults
       ] = await Promise.all([
-        DashboardModel.getDashboardCounts(),
-        DashboardModel.getRoomStatuses()
+        DashboardModel.getDashboardCounts(req.propertyId),
+        DashboardModel.getRoomStatuses(req.propertyId)
       ]);
 
       // Extract counts from dashboard counts
@@ -691,7 +706,7 @@ class DashboardController {
         });
       }
 
-      const result = await DashboardModel.checkLateCheckRoom(roomId, checkoutDate, currentBookingId);
+      const result = await DashboardModel.checkLateCheckRoom(roomId, checkoutDate, currentBookingId, req.propertyId);
       res.json(result);
     } catch (error) {
       console.error('Error checking late check-out room availability:', error);
@@ -752,7 +767,7 @@ class DashboardController {
         });
       }
 
-      const result = await DashboardModel.checkExtendRoom(roomId, checkoutDate, daysToExtend);
+      const result = await DashboardModel.checkExtendRoom(roomId, checkoutDate, daysToExtend, req.propertyId);
       res.json(result);
     } catch (error) {
       console.error('Error checking room availability for extension:', error);
@@ -818,7 +833,7 @@ class DashboardController {
   // Get extended data for real-time updates
   static async getExtendedData(req, res) {
     try {
-      const extendedDetails = await DashboardModel.getExtendedDetails();
+      const extendedDetails = await DashboardModel.getExtendedDetails(req.propertyId);
       
       res.json({
         success: true,
@@ -837,7 +852,8 @@ class DashboardController {
   // Get today checkout details (API endpoint)
   static async getTodayCheckoutDetails(req, res) {
     try {
-      const todayCheckedOutDetails = await DashboardModel.getTodayCheckedOutDetails();
+      const propertyId = await resolvePropertyId(req);
+      const todayCheckedOutDetails = await DashboardModel.getTodayCheckedOutDetails(propertyId);
       res.json({
         success: true,
         data: todayCheckedOutDetails,
@@ -856,7 +872,8 @@ class DashboardController {
   // Get occupied rooms (API endpoint)
   static async getOccupiedRoomsAPI(req, res) {
     try {
-      const roomDetails = await DashboardModel.getRoomDetails();
+      const propertyId = await resolvePropertyId(req);
+      const roomDetails = await DashboardModel.getRoomDetails(propertyId);
       const occupiedRooms = roomDetails.occupied || [];
       res.json({
         success: true,
@@ -876,7 +893,8 @@ class DashboardController {
   // Get cleaning rooms (API endpoint)
   static async getCleaningRoomsAPI(req, res) {
     try {
-      const roomDetails = await DashboardModel.getRoomDetails();
+      const propertyId = await resolvePropertyId(req);
+      const roomDetails = await DashboardModel.getRoomDetails(propertyId);
       const cleaningRooms = roomDetails.cleaning || [];
       res.json({
         success: true,
@@ -896,14 +914,15 @@ class DashboardController {
   // Get housekeeping summary (for housekeeping app)
   static async getHousekeepingSummary(req, res) {
     try {
+      const propertyId = await resolvePropertyId(req);
       // Get all required data in parallel
       const [
         todayCheckedOutDetails,
         roomDetails,
         complaintRequestSummary
       ] = await Promise.all([
-        DashboardModel.getTodayCheckedOutDetails(),
-        DashboardModel.getRoomDetails(),
+        DashboardModel.getTodayCheckedOutDetails(propertyId),
+        DashboardModel.getRoomDetails(propertyId),
         DashboardModel.getComplaintRequestSummary().catch(() => ({ complaintsPending: 0, requestsPending: 0 }))
       ]);
 
@@ -941,7 +960,8 @@ class DashboardController {
 
   static async getOccupiedRooms(req, res) {
     try {
-      const roomDetails = await DashboardModel.getRoomDetails();
+      const propertyId = await resolvePropertyId(req);
+      const roomDetails = await DashboardModel.getRoomDetails(propertyId);
       const occupiedRooms = roomDetails.occupied || [];
       
       // Format the data for the guest app

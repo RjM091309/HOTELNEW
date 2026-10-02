@@ -31,6 +31,7 @@ const pickupDropRoutes = require('./r_pickup_drop');
 const depositsRoutes = require('./r_deposits');
 const channexRoutes = require('./r_channex');
 const roomRatesRoutes = require('./r_room_rates');
+const propertyRoutes = require('./r_property');
 
 // Auth middleware
 const AuthMiddleware = require('../middleware/m_auth');
@@ -75,6 +76,7 @@ router.use('/pickup-drop', AuthMiddleware.requireAuth, pickupDropRoutes);
 router.use('/delete-data', AuthMiddleware.requireAuth, deleteDataRoutes);
 router.use('/activity-log', AuthMiddleware.requireAuth, activityLogRoutes);
 router.use('/channex', AuthMiddleware.requireAuth, channexRoutes);
+router.use('/property', AuthMiddleware.requireAuth, propertyRoutes);
 
 // Redirect root to dashboard if authenticated, otherwise to login
 router.get('/', AuthMiddleware.redirectIfAuthenticated, (req, res) => {

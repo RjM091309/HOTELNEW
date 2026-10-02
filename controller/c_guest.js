@@ -16,10 +16,10 @@ class GuestController {
         guestLevels,
         guestStats
       ] = await Promise.all([
-        GuestModel.getAllGuests(),
+        GuestModel.getAllGuests(req.propertyId),
         GuestModel.getGuestTypes(),
         GuestModel.getGuestLevels(),
-        GuestModel.getGuestStatistics()
+        GuestModel.getGuestStatistics(req.propertyId)
       ]);
 
       // Process guest data (following dashboard pattern)
@@ -52,7 +52,7 @@ class GuestController {
   // API endpoint to get all guests for DataTable
   static async getAllGuests(req, res) {
     try {
-      const guests = await GuestModel.getAllGuests();
+      const guests = await GuestModel.getAllGuests(req.propertyId);
       res.json({
         success: true,
         data: guests
@@ -71,7 +71,7 @@ class GuestController {
   static async getGuestById(req, res) {
     try {
       const { id } = req.params;
-      const guest = await GuestModel.getGuestById(id);
+      const guest = await GuestModel.getGuestById(id, req.propertyId);
       if (guest) {
         res.json({
           success: true,
@@ -97,7 +97,7 @@ class GuestController {
   static async getGuestBookings(req, res) {
     try {
       const { id } = req.params;
-      const bookings = await GuestModel.getGuestBookings(id);
+      const bookings = await GuestModel.getGuestBookings(id, req.propertyId);
       res.json({
         success: true,
         data: bookings
@@ -124,7 +124,7 @@ class GuestController {
         });
       }
 
-      const result = await GuestModel.updateGuest(IDNo, NAME, CONTACTNo, TYPE, LEVEL);
+      const result = await GuestModel.updateGuest(IDNo, NAME, CONTACTNo, TYPE, LEVEL, req.propertyId);
       
       if (result) {
         res.json({
@@ -159,7 +159,7 @@ class GuestController {
         });
       }
 
-      const result = await GuestModel.createGuest(NAME, CONTACTNo, TYPE, LEVEL);
+      const result = await GuestModel.createGuest(NAME, CONTACTNo, TYPE, LEVEL, req.propertyId);
       
       if (result) {
         res.json({
@@ -187,8 +187,8 @@ class GuestController {
   static async deleteGuest(req, res) {
     try {
       const { id } = req.params;
-      
-      const result = await GuestModel.deleteGuest(id);
+
+      const result = await GuestModel.deleteGuest(id, req.propertyId);
       
       if (result) {
         res.json({
@@ -214,7 +214,7 @@ class GuestController {
   // API endpoint to get guest statistics
   static async getGuestStatistics(req, res) {
     try {
-      const stats = await GuestModel.getGuestStatistics();
+      const stats = await GuestModel.getGuestStatistics(req.propertyId);
       res.json({
         success: true,
         data: stats

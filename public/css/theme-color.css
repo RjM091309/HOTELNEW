@@ -7288,6 +7288,149 @@ body.white-sidebar-color .legend-color-mountain-view {
   color: #6b7280 !important;
 }
 
+/* ============================================================
+   Pool Villa theme. Pool Villa does NOT force a theme switch - the
+   viewer's own dark/light choice (views/partials/head.ejs,
+   views/layout/layout.ejs, public/js/theme-color.js) is left completely
+   alone. The only thing that changes per property is the Real-Time
+   Booking Monitor/Room Status header gradient, recolored to teal via
+   [data-property-theme="pool_villa"] (set by those same scripts,
+   read-only here) - once for whichever theme the viewer already has.
+   The light-theme variant happens to land on the Dashboard's existing
+   pastel stat-card accent classes (.card-accent-blue/orange/violet/teal/
+   rose, ~line 2468 above) too, since those only ever show up under
+   [data-theme="white"] regardless of property - nothing Pool-Villa-
+   specific needed there, they just look that way for any light-theme
+   viewer already. Paired with [data-theme="..."] explicitly in every
+   rule below (not [data-property-theme="pool_villa"] alone) so each is
+   unambiguously MORE specific than the matching base rule above, rather
+   than tied with it and depending on source order to win - that exact
+   mistake (a tied-specificity override silently losing in the live app
+   despite being correct on paper) already bit this file once earlier in
+   this project; not repeating it. */
+[data-theme="white"][data-property-theme="pool_villa"] #rtBookingMonitorCard > .rt-header,
+[data-theme="white"][data-property-theme="pool_villa"] #rtRoomStatusCard > .rt-header {
+  background: linear-gradient(135deg, #99d9cb 0%, #9bb8d9 100%) !important;
+}
+[data-theme="white"][data-property-theme="pool_villa"] #rtRoomStatusCard .tab-bar .tab-item.is-active {
+  color: #3f8f80 !important; /* muted teal, was #8b6fb5 (purple) */
+}
+
+/* Dark-theme variant - same idea (deep teal/blue instead of the normal
+   deep navy/plum), kept at the same darkness level as the base dark
+   gradient (#232a4d/#3c2a52, dashboard.ejs ~line 2545) so it reads as
+   "dark theme, teal accent" rather than a bright patch on an otherwise
+   dark page. */
+[data-theme="dark"][data-property-theme="pool_villa"] #rtBookingMonitorCard > .rt-header,
+[data-theme="dark"][data-property-theme="pool_villa"] #rtRoomStatusCard > .rt-header {
+  background: linear-gradient(135deg, #1a3f3a 0%, #1e3a5f 100%) !important;
+}
+
+/* The pastel stat cards only ever show their accent colors in light theme
+   already (see comment above) - this just darkens the page background
+   and strengthens the card shadow a touch, light-theme only, so they
+   "float" against the page the same way the reference image did, rather
+   than blending into an almost-identical white. Not touched for dark
+   theme - dark theme's own existing card shadow/background was never
+   reported as a problem. */
+[data-theme="white"][data-property-theme="pool_villa"] .page-content {
+  background: #e7ecf3 !important;
+}
+[data-theme="white"][data-property-theme="pool_villa"] .dashboard-card,
+[data-theme="white"][data-property-theme="pool_villa"] .payment-sales-card {
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.14), 0 2px 6px rgba(15, 23, 42, 0.08) !important;
+}
+
+/* Payments' Daily/Weekly/Monthly sales cards have no per-card color today
+   (views/payments/payments.ejs adds card-accent-* classes to them,
+   matching dashboard's pattern) - reuses the exact same accent gradients,
+   not new colors, so Pool Villa's palette stays internally consistent. */
+[data-property-theme="pool_villa"][data-theme="white"] .payment-sales-card.card-accent-blue .payment-sales-card__title {
+  color: #2563eb !important;
+}
+[data-property-theme="pool_villa"][data-theme="white"] .payment-sales-card.card-accent-orange .payment-sales-card__title {
+  color: #d97706 !important;
+}
+[data-property-theme="pool_villa"][data-theme="white"] .payment-sales-card.card-accent-violet .payment-sales-card__title {
+  color: #7c3aed !important;
+}
+[data-property-theme="pool_villa"][data-theme="white"] .payment-sales-card.card-accent-blue {
+  background: linear-gradient(135deg, #dbeafe, #eff6ff) !important;
+}
+[data-property-theme="pool_villa"][data-theme="white"] .payment-sales-card.card-accent-orange {
+  background: linear-gradient(135deg, #fef3c7, #fffbeb) !important;
+}
+[data-property-theme="pool_villa"][data-theme="white"] .payment-sales-card.card-accent-violet {
+  background: linear-gradient(135deg, #ede9fe, #f5f3ff) !important;
+}
+
+/* Calendar - Pool Villa only has a handful of rooms, so
+   public/js/calendar/calendar_data.js sets expandRows:true (Pool Villa
+   only) to stretch those few rows to fill the calendar's height instead
+   of staying at their tiny Main-Hotel-sized default. Scale the content
+   inside each row to match, so it's bigger content filling a bigger row,
+   not tiny content floating in empty space. Baseline sizes (not scaled):
+   event bar 18px tall/11px text (calendar.css ~line 570-599), room
+   number 13.5px (calendar.css ~line 745). Main Hotel is completely
+   unaffected - every rule here is scoped to [data-property-theme="pool_villa"]. */
+/* expandRows (Pool Villa only) stretches each row to fill the calendar's
+   height, which varies with viewport/zoom - a fixed top:Npx guess leaves an
+   uneven gap below the bar once the real row is taller than guessed.
+   Center the bar in the row regardless of its actual height instead. */
+[data-property-theme="pool_villa"] #calendar .fc-timeline-event-harness {
+  top: 50% !important;
+  height: 60px !important;
+  transform: translateY(-50%) !important;
+}
+[data-property-theme="pool_villa"] #calendar td.fc-timeline-lane .fc-timeline-events {
+  min-height: 72px !important;
+  height: 72px !important;
+}
+/* The event box itself (calendar.css ~line 525-532) is pinned to
+   height:18px/line-height:18px via a bare .fc-event selector - scaling the
+   harness/lane around it wasn't enough, the bar's own box was still 18px
+   tall inside the bigger lane. Must override it directly here. */
+[data-property-theme="pool_villa"] #calendar .fc-event {
+  height: 60px !important;
+  line-height: 60px !important;
+}
+[data-property-theme="pool_villa"] #calendar .fc-event .event-title-chip {
+  top: 0 !important;
+  height: 60px !important;
+  line-height: 60px !important;
+  font-size: 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+[data-property-theme="pool_villa"] #calendar .calendar-room-number {
+  font-size: 18px !important;
+}
+[data-property-theme="pool_villa"] #calendar .calendar-room-beds,
+[data-property-theme="pool_villa"] #calendar .calendar-bed-icon {
+  font-size: 14px !important;
+}
+[data-property-theme="pool_villa"] #calendar .fc-datagrid-cell[data-is-floor] .fc-resource-bold {
+  font-size: 15px !important;
+}
+
+/* Floor separator rows - removed at the data level for Pool Villa, see
+   processRoomsData() in calendar_data.js. (A pure-CSS display:none on the
+   row was tried first and broke the whole grid - FullCalendar manages
+   row heights/positions in JS, especially with expandRows active, and a
+   row it doesn't know is hidden throws its internal sync off entirely.) */
+
+/* #calendar has min-height:100vh in the base styling (calendar.css ~line
+   516), sized for Main Hotel's dense multi-floor view. CSS min-height
+   always wins over a smaller height, so calendar_data.js's
+   height:'420px' (Pool Villa only) was being floored straight back up to
+   full viewport height regardless - that's why reducing it had no
+   visible effect. Lifting the floor for Pool Villa only is what actually
+   lets the smaller height apply. */
+[data-property-theme="pool_villa"] #calendar {
+  min-height: auto !important;
+}
+
 
 
 

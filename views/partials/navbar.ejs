@@ -15,8 +15,36 @@
 		
 		<!-- Date Picker for Available Rooms -->
 		<div class="col-lg-6 col-md-4 col-sm-4 col-4">
-			<div class="nav navbar-nav navbar-left" style="margin-top: 13px !important;">
+			<div class="nav navbar-nav navbar-left" style="margin-top: 13px !important; display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: center;">
 				<input type="text" id="datePicker" placeholder="Available Rooms" />
+
+				<!-- Property switcher (Main Hotel / Pool Villa). currentProperty/
+				     allProperties come from res.locals, set by attachProperty() in
+				     middleware/m_auth.js on every authenticated request - no
+				     per-controller render() changes needed. Only shown once a
+				     second property actually exists.
+				     One solid-color button, not a dropdown - its own color/icon
+				     per property so which one is active is obvious at a glance.
+				     Click cycles to the next property in the list and reloads -
+				     a straight toggle for 2 properties, and still works (cycles
+				     through all of them) if a 3rd is ever added. -->
+				<% if (typeof allProperties !== 'undefined' && allProperties && allProperties.length > 1) {
+					const PROPERTY_STYLES = {
+						main: { bg: '#4361ee', icon: 'fa-hotel' },
+						pool_villa: { bg: '#0ca678', icon: 'fa-water' }
+					};
+					const curCode = currentProperty ? currentProperty.CODE : '';
+					const curStyle = PROPERTY_STYLES[curCode] || { bg: '#6c757d', icon: 'fa-building' };
+				%>
+				<button type="button" id="propertyToggleBtn" class="property-toggle-btn"
+					style="background-color: <%= curStyle.bg %>;"
+					data-properties='<%- JSON.stringify(allProperties.map(function(p){ return { code: p.CODE, name: p.NAME }; })) %>'
+					data-current-code="<%= curCode %>"
+					title="Click to switch property">
+					<i class="fas <%= curStyle.icon %>"></i>
+					<span id="propertyToggleLabel"><%= currentProperty ? currentProperty.NAME : 'Select Property' %></span>
+				</button>
+				<% } %>
 			</div>
 		</div>
 		
@@ -93,6 +121,73 @@
 
 				<!-- Messages icon removed - no real messaging feature exists, and
 				     an always-empty dropdown wasn't worth keeping around. -->
+
+				<style>
+					.property-toggle-btn {
+						display: inline-flex;
+						align-items: center;
+						gap: 7px;
+						padding: 7px 16px;
+						margin-left: 12px;
+						border: none;
+						border-radius: 6px;
+						color: #fff;
+						font-size: 13px;
+						font-weight: 700;
+						letter-spacing: 0.2px;
+						cursor: pointer;
+						transition: filter 0.15s ease, transform 0.1s ease;
+						white-space: nowrap;
+					}
+					.property-toggle-btn:hover { filter: brightness(1.12); }
+					.property-toggle-btn:active { transform: scale(0.97); }
+					.property-toggle-btn i { font-size: 13px; }
+				</style>
+				<script>
+					(function () {
+						const PROPERTY_STYLES = {
+							main: { bg: '#4361ee', icon: 'fa-hotel' },
+							pool_villa: { bg: '#0ca678', icon: 'fa-water' }
+						};
+						const DEFAULT_STYLE = { bg: '#6c757d', icon: 'fa-building' };
+						const btn = document.getElementById('propertyToggleBtn');
+						if (!btn) return;
+
+						btn.addEventListener('click', function () {
+							if (btn.disabled) return;
+							const properties = JSON.parse(btn.dataset.properties || '[]');
+							if (!properties.length) return;
+							const currentIndex = properties.findIndex(function (p) { return p.code === btn.dataset.currentCode; });
+							const next = properties[(currentIndex + 1) % properties.length] || properties[0];
+
+							btn.disabled = true;
+							fetch('/property/switch', {
+								method: 'POST',
+								headers: { 'Content-Type': 'application/json' },
+								body: JSON.stringify({ code: next.code })
+							})
+								.then(function (r) { return r.json(); })
+								.then(function (data) {
+									if (data && data.success) {
+										// See views/partials/head.ejs - this flag makes the
+										// reloaded page hide itself until fully loaded, then
+										// fade in, instead of flashing raw unstyled content
+										// while everything finishes loading.
+										try { sessionStorage.setItem('property_switching', '1'); } catch (e) {}
+										window.location.reload();
+									} else {
+										btn.disabled = false;
+										alert((data && data.message) || 'Failed to switch property.');
+									}
+								})
+								.catch(function () {
+									btn.disabled = false;
+									alert('Failed to switch property.');
+								});
+						});
+					})();
+				</script>
+
 				<!-- start manage user dropdown -->
 				<li class="dropdown dropdown-user">
 					<a href="javascript:;" class="dropdown-toggle" data-bs-toggle="dropdown" data-hover="dropdown"
@@ -1410,7 +1505,7 @@ function openDirectReservationModal(formattedDateRange, nights) {
                     // Create bed count label
                     const bedCountLabel = document.createElement('label');
                     bedCountLabel.htmlFor = 'bedCountDirect';
-                    bedCountLabel.textContent = 'Bed Count:';
+                    bedCountLabel.textContent = 'Bed Type:';
                    
                    
                     // Create bed count select
@@ -1494,7 +1589,7 @@ function openDirectReservationModal(formattedDateRange, nights) {
                     
                     const bedCountLabel = document.createElement('label');
                     bedCountLabel.htmlFor = 'bedCountDirect';
-                    bedCountLabel.textContent = 'Bed Count:';
+                    bedCountLabel.textContent = 'Bed Type:';
                     bedCountLabel.style.fontWeight = 'bold';
                     bedCountLabel.style.color = '#333';
                     
@@ -2520,8 +2615,8 @@ function initializeAddBookingHandler() {
             const bedCountValue = window.selectedBedCount || $('#bedCountDirect').val();
             if (!bedCountValue || bedCountValue === '') {
                 Swal.fire({
-                    title: 'Bed Count Required',
-                    text: 'Please select a Bed Count to calculate the room price.',
+                    title: 'Bed Type Required',
+                    text: 'Please select a Bed Type to calculate the room price.',
                     icon: 'warning',
                     confirmButtonText: 'OK'
                 });
@@ -2533,7 +2628,7 @@ function initializeAddBookingHandler() {
             if (priceValue <= 0) {
                 Swal.fire({
                     title: 'Price Not Set',
-                    text: 'Please select a Bed Count to automatically calculate the room price.',
+                    text: 'Please select a Bed Type to automatically calculate the room price.',
                     icon: 'warning',
                     confirmButtonText: 'OK'
                 });

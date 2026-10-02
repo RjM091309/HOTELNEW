@@ -47,7 +47,7 @@ class ActivityLogModel {
       bookingStatus: 'Booking Status',
       checkInStatus: 'Check-in Status',
       guests: 'Guests',
-      bedCount: 'Bed Count',
+      bedCount: 'Bed Type',
       remarks: 'Remarks',
       roomRate: 'Room Rate',
       discount: 'Discount',

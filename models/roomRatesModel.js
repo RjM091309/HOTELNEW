@@ -4,10 +4,23 @@ const { isValidAxes } = require('../config/roomRates');
 class RoomRatesModel {
   // Returns all rate cells as a nested map:
   //   rates[season][category][dayRange][roomTypeId][breakfast] = amount
-  static async getAll() {
+  // room_rates has no PROPERTY_ID of its own - scoped transitively via
+  // ROOM_TYPE_ID -> room_type.PROPERTY_ID (join below). propertyId is optional
+  // since the Room Rates admin page's controller (c_room_rates.js) is outside
+  // this slice's scope and hasn't been threaded yet; passing it engages the filter.
+  static async getAll(propertyId) {
+    const params = [];
+    let propertyFilter = '';
+    if (propertyId) {
+      propertyFilter = 'WHERE rt.PROPERTY_ID = ?';
+      params.push(propertyId);
+    }
     const rows = await queryDatabasePromise(
-      `SELECT SEASON, CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST, AMOUNT
-       FROM room_rates`
+      `SELECT rr.SEASON, rr.CATEGORY, rr.DAY_RANGE, rr.ROOM_TYPE_ID, rr.BREAKFAST, rr.AMOUNT
+       FROM room_rates rr
+       JOIN room_type rt ON rt.IDNo = rr.ROOM_TYPE_ID
+       ${propertyFilter}`,
+      params
     );
 
     const map = {};
@@ -98,8 +111,19 @@ class RoomRatesModel {
   // startup migration uses to seed ROOM_TYPE_ID (see startupMigrations.js) -
   // so a King/Queen bed-type aggregate (Room Checker only tracks counts, not
   // specific room types) can look up a rate keyed by ROOM_TYPE_ID.
-  static async getBedRoomTypeIds() {
-    const rows = await queryDatabasePromise(`SELECT IDNo, NAME FROM room_type WHERE ACTIVE = 1 ORDER BY IDNo`);
+  // Previously scanned ALL room_types system-wide with no property filter -
+  // once Pool Villa room_types exist this would blend both properties' king/
+  // queen rates into one. propertyId is optional since the only caller chain
+  // (bookingModel.js's Room Checker, outside this slice's scope) hasn't been
+  // threaded yet; passing it scopes the scan to one property.
+  static async getBedRoomTypeIds(propertyId) {
+    const params = [];
+    let propertyFilter = '';
+    if (propertyId) {
+      propertyFilter = 'AND PROPERTY_ID = ?';
+      params.push(propertyId);
+    }
+    const rows = await queryDatabasePromise(`SELECT IDNo, NAME FROM room_type WHERE ACTIVE = 1 ${propertyFilter} ORDER BY IDNo`, params);
     let kingTypeId = null;
     let queenTypeId = null;
     for (const t of rows) {
@@ -184,9 +208,9 @@ class RoomRatesModel {
   // Also returns the weekday/weekend rate + night-count breakdown behind
   // each total, so the UI can show staff how the (possibly mixed) average
   // was actually arrived at instead of just the blended number.
-  static async getRoomCheckerRates({ startDate, endDate, category, breakfast }) {
+  static async getRoomCheckerRates({ startDate, endDate, category, breakfast, propertyId }) {
     const [{ kingTypeId, queenTypeId }, monthSeasonMap] = await Promise.all([
-      this.getBedRoomTypeIds(),
+      this.getBedRoomTypeIds(propertyId),
       this.getSeasonMonthMap()
     ]);
     // Also fetch the "no breakfast" baseline for the same room/category/range

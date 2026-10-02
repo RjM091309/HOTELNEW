@@ -6,7 +6,7 @@ const RoomRatesController = {
   // Settings -> Room Rates page
   renderPage: async (req, res) => {
     try {
-      const roomTypes = await RoomModel.getRoomTypes();
+      const roomTypes = await RoomModel.getRoomTypes(req.propertyId);
       res.render('room_rates/room_rates', {
         title: 'Room Rates',
         subTitle: 'Room Rates',
@@ -30,7 +30,7 @@ const RoomRatesController = {
   getData: async (req, res) => {
     try {
       const [rates, seasonMonths] = await Promise.all([
-        RoomRatesModel.getAll(),
+        RoomRatesModel.getAll(req.propertyId),
         RoomRatesModel.getSeasonMonthMap()
       ]);
       res.json({ success: true, rates, seasonMonths });

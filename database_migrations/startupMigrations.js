@@ -978,6 +978,68 @@ async function runBookingActualTimesMigration() {
   }
 }
 
+// Multi-property support (Phase 1: Dashboard, Calendar, Booking, Rooms/Room
+// Rates, Payments/Billing/Receipts, Guest profiles). `property` is the new
+// root scoping table; PROPERTY_ID is added directly to the tables that can't
+// derive their property via a JOIN (room, room_type, booking, customer,
+// payment_receipt, payment_shifts, receipt_settings) - everything else
+// (billing, payments, room_rates, room_season_price) derives scope via
+// BOOKING_ID -> booking.PROPERTY_ID or ROOM_ID/ROOM_TYPE_ID -> room(_type).PROPERTY_ID
+// and needs no column of its own. See models/propertyModel.js and
+// middleware/m_auth.js for how req.propertyId gets resolved per-request.
+async function runPropertyMigrations() {
+  const created = await ensureTable('property', `
+    CREATE TABLE property (
+      IDNo INT NOT NULL AUTO_INCREMENT,
+      CODE VARCHAR(20) NOT NULL COMMENT 'short slug used in the switcher cookie, e.g. "main", "pool_villa"',
+      NAME VARCHAR(100) NOT NULL COMMENT 'display name, e.g. "Main Hotel", "Pool Villa"',
+      IS_DEFAULT TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'fallback property when the switcher cookie is missing/invalid',
+      ACTIVE TINYINT(1) NOT NULL DEFAULT 1,
+      ENCODED_BY INT NULL DEFAULT NULL,
+      ENCODED_DT DATETIME NULL DEFAULT NULL,
+      PRIMARY KEY (IDNo),
+      UNIQUE KEY uq_property_code (CODE)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  if (created) {
+    await queryDatabasePromise(
+      `INSERT INTO property (CODE, NAME, IS_DEFAULT, ACTIVE) VALUES ('main', 'Main Hotel', 1, 1)`
+    );
+    await queryDatabasePromise(
+      `INSERT INTO property (CODE, NAME, IS_DEFAULT, ACTIVE) VALUES ('pool_villa', 'Pool Villa', 0, 1)`
+    );
+    console.log('✅ Seeded property: Main Hotel (default), Pool Villa');
+  }
+
+  const [mainProperty] = await queryDatabasePromise(`SELECT IDNo FROM property WHERE CODE = 'main' LIMIT 1`);
+  const mainId = mainProperty?.IDNo;
+  if (!mainId) {
+    console.warn('⚠️ property table has no "main" row - skipping PROPERTY_ID backfill');
+    return;
+  }
+
+  // Own-column tables. NULL-able first so the ALTER is instant even on a
+  // large `booking` table; backfilled below; NOT NULL tightening is a
+  // deliberate separate follow-up (ensureColumn only supports ADD COLUMN).
+  const ownColumnTables = ['room', 'room_type', 'booking', 'customer', 'payment_receipt', 'payment_shifts', 'receipt_settings'];
+  for (const table of ownColumnTables) {
+    if (!(await tableExists(table))) {
+      console.warn(`⚠️ ${table} table not found, skipping PROPERTY_ID migration for it`);
+      continue;
+    }
+    await ensureColumn(table, 'PROPERTY_ID', `PROPERTY_ID INT NULL DEFAULT NULL COMMENT 'FK -> property.IDNo'`);
+    await queryDatabasePromise(`UPDATE ${table} SET PROPERTY_ID = ? WHERE PROPERTY_ID IS NULL`, [mainId]);
+  }
+
+  if (await tableExists('booking')) {
+    await ensureIndex('booking', 'idx_booking_property_active_dates', 'PROPERTY_ID, ACTIVE, CHECK_IN_DATE, CHECK_OUT_DATE');
+  }
+  if (await tableExists('room')) {
+    await ensureIndex('room', 'idx_room_property_active', 'PROPERTY_ID, ACTIVE');
+  }
+}
+
 async function runStartupMigrations() {
   console.log('🔄 Running startup database migrations...');
 
@@ -1004,6 +1066,7 @@ async function runStartupMigrations() {
   await runChannexMigrations();
   await runCheckInNotifierMigrations();
   await runPaymentShiftMigrations();
+  await runPropertyMigrations();
 
   console.log('✅ Startup database migrations complete');
 }

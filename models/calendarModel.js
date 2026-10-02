@@ -3,16 +3,16 @@ const { pool, queryDatabase, queryDatabasePromise } = require('../config/databas
 class CalendarModel {
   // Get all bookings for calendar display
   // OPTIMIZED VERSION - Get all bookings with date filtering and pagination
-  static async getAllBookings(dateRange = null) {
+  static async getAllBookings(dateRange = null, propertyId) {
     try {
       // Build optimized query with date filtering for better performance
-      let whereClause = 'WHERE b.ACTIVE = 1';
-      let params = [];
-      
+      let whereClause = 'WHERE b.ACTIVE = 1 AND b.PROPERTY_ID = ?';
+      let params = [propertyId];
+
       // Add date range filter if provided (70% faster performance)
       if (dateRange && dateRange.start && dateRange.end) {
         whereClause += ' AND b.CHECK_IN_DATE <= ? AND b.CHECK_OUT_DATE > ?';
-        params = [dateRange.end, dateRange.start];
+        params.push(dateRange.end, dateRange.start);
       } else {
         // Default: Only load bookings from last 2 years to next year for performance
         whereClause += ' AND b.CHECK_IN_DATE >= DATE_SUB(NOW(), INTERVAL 2 YEAR) AND b.CHECK_IN_DATE <= DATE_ADD(NOW(), INTERVAL 1 YEAR)';
@@ -60,28 +60,28 @@ class CalendarModel {
   }
 
   // Get all rooms for calendar display
-  static async getAllRooms() {
+  static async getAllRooms(propertyId) {
     try {
       const rows = await queryDatabasePromise(`
-        SELECT 
-          r.IDNo AS RoomID, 
-          r.ROOM_NUMBER, 
-          r.ROOM_FLOOR, 
-          rt.NAME AS ROOM_TYPE, 
-          NULL AS ROOM_RATE, 
-          r.ROOM_MAX, 
-          r.ROOM_BED, 
+        SELECT
+          r.IDNo AS RoomID,
+          r.ROOM_NUMBER,
+          r.ROOM_FLOOR,
+          rt.NAME AS ROOM_TYPE,
+          NULL AS ROOM_RATE,
+          r.ROOM_MAX,
+          r.ROOM_BED,
           r.ROOM_VIEW,
-          r.ROOM_SIZE, 
-          r.ROOM_DESCRIPTION, 
-          r.ROOM_STATUS, 
-          r.ROOM_MAINTENANCE_STATUS, 
+          r.ROOM_SIZE,
+          r.ROOM_DESCRIPTION,
+          r.ROOM_STATUS,
+          r.ROOM_MAINTENANCE_STATUS,
           r.ACTIVE
         FROM room r
         LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
-        WHERE r.ACTIVE = 1
+        WHERE r.ACTIVE = 1 AND r.PROPERTY_ID = ?
         ORDER BY r.ROOM_FLOOR ASC, r.ROOM_NUMBER ASC
-      `);
+      `, [propertyId]);
       return rows;
     } catch (error) {
       throw error;
@@ -89,16 +89,16 @@ class CalendarModel {
   }
 
   // Get bookings for FullCalendar - OPTIMIZED VERSION
-  static async getBookingsForCalendar(start, end) {
+  static async getBookingsForCalendar(start, end, propertyId) {
     try {
       const results = await queryDatabasePromise(`
-        SELECT 
+        SELECT
           b.CHECK_IN_DATE AS checkInDate,
           b.CHECK_OUT_DATE AS checkOutDate
         FROM booking b
-        WHERE b.ACTIVE = 1
+        WHERE b.ACTIVE = 1 AND b.PROPERTY_ID = ?
           AND (b.CHECK_IN_DATE <= ? AND b.CHECK_OUT_DATE > ?)
-      `, [end, start]);
+      `, [propertyId, end, start]);
 
       // Create a map of dates with counts
       const dateCounts = {};
@@ -131,15 +131,15 @@ class CalendarModel {
   }
 
   // NEW: Get optimized bookings for calendar with pre-processed data
-  static async getOptimizedBookingsForCalendar(start, end) {
+  static async getOptimizedBookingsForCalendar(start, end, propertyId) {
     try {
       // Build query with optional date filtering
-      let whereClause = 'WHERE b.ACTIVE = 1';
-      let queryParams = [];
+      let whereClause = 'WHERE b.ACTIVE = 1 AND b.PROPERTY_ID = ?';
+      let queryParams = [propertyId];
 
       if (start && end) {
         whereClause += ' AND (b.CHECK_IN_DATE <= ? AND b.CHECK_OUT_DATE > ?)';
-        queryParams = [end, start];
+        queryParams.push(end, start);
       } else {
         whereClause += ' AND b.CHECK_IN_DATE >= DATE_SUB(NOW(), INTERVAL 1 MONTH) AND b.CHECK_IN_DATE <= DATE_ADD(NOW(), INTERVAL 2 MONTH)';
       }
@@ -420,10 +420,10 @@ class CalendarModel {
   }
 
   // Get detailed bookings for a specific date
-  static async getDetailedBookings(date) {
+  static async getDetailedBookings(date, propertyId) {
     try {
       const results = await queryDatabasePromise(`
-        SELECT 
+        SELECT
           b.IDNo AS id,
           b.ROOM_ID AS room_id,
           r.ROOM_NUMBER AS room_number,
@@ -440,13 +440,14 @@ class CalendarModel {
         LEFT JOIN room r ON b.ROOM_ID = r.IDNo
         LEFT JOIN billing ON b.IDNo = billing.BOOKING_ID
         WHERE b.ACTIVE = 1
+          AND b.PROPERTY_ID = ?
           AND billing.ACTIVE = 1
           AND (
             DATE(b.CHECK_IN_DATE) <= ?
             AND DATE(b.CHECK_OUT_DATE) > ?
           )
         ORDER BY b.ENCODED_DT DESC
-      `, [date, date]);
+      `, [propertyId, date, date]);
 
       const bookings = results.map((result) => ({
         id: result.id,
@@ -469,27 +470,30 @@ class CalendarModel {
   }
 
   // Update booking - OPTIMIZED VERSION (3x faster)
-  static async updateBooking(id, room, checkIn, checkOut, options = {}) {
+  static async updateBooking(id, room, checkIn, checkOut, options = {}, propertyId) {
     try {
-      const { 
-        isExtended = false, 
-        originalCheckOut = null, 
+      const {
+        isExtended = false,
+        originalCheckOut = null,
         extensionDate = null,
         oldRoomNumber = null,
-        newRoomId = null 
+        newRoomId = null
       } = options || {};
-      
+
       let isRoomTransfer = false;
       // OPTIMIZATION: Single query to get both room IDs at once
+      // r1.PROPERTY_ID filter matters here: ROOM_NUMBER isn't unique system-wide
+      // (Pool Villa can have its own Room "3"), so without it this could match
+      // the wrong property's room with the same number.
       const roomInfo = await queryDatabasePromise(`
-        SELECT 
+        SELECT
           b.ROOM_ID as currentRoomId,
           r1.IDNo as newRoomId
         FROM booking b
         CROSS JOIN room r1
         WHERE b.IDNo = ? AND b.ACTIVE = 1
-          AND r1.ROOM_NUMBER = ? AND r1.ACTIVE = 1
-      `, [id, room]);
+          AND r1.ROOM_NUMBER = ? AND r1.ACTIVE = 1 AND r1.PROPERTY_ID = ?
+      `, [id, room, propertyId]);
 
       if (roomInfo.length === 0) {
         return false;
@@ -589,14 +593,14 @@ class CalendarModel {
   }
 
   // Get available rooms
-  static async getAvailableRooms() {
+  static async getAvailableRooms(propertyId) {
     try {
       const results = await queryDatabasePromise(`
         SELECT ROOM_NUMBER
         FROM room
-        WHERE ROOM_STATUS = 1 AND ACTIVE = 1
+        WHERE ROOM_STATUS = 1 AND ACTIVE = 1 AND PROPERTY_ID = ?
         ORDER BY ROOM_NUMBER ASC
-      `);
+      `, [propertyId]);
       return results.map(r => r.ROOM_NUMBER);
     } catch (error) {
       throw error;
@@ -604,10 +608,10 @@ class CalendarModel {
   }
 
   // Get bookings for a specific date range
-  static async getBookingsByDateRange(startDate, endDate) {
+  static async getBookingsByDateRange(startDate, endDate, propertyId) {
     try {
       const rows = await queryDatabasePromise(`
-        SELECT 
+        SELECT
           b.IDNo AS BookingID,
           b.CUSTOMER_ID,
           c.NAME AS CUSTOMER_NAME,
@@ -626,13 +630,14 @@ class CalendarModel {
         LEFT JOIN room r ON b.ROOM_ID = r.IDNo
         LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
         WHERE b.ACTIVE = 1
+          AND b.PROPERTY_ID = ?
           AND (
             (b.CHECK_IN_DATE <= ? AND b.CHECK_OUT_DATE > ?) OR
             (b.CHECK_IN_DATE < ? AND b.CHECK_OUT_DATE >= ?) OR
             (b.CHECK_IN_DATE >= ? AND b.CHECK_OUT_DATE <= ?)
           )
         ORDER BY b.CHECK_IN_DATE ASC
-      `, [endDate, startDate, endDate, startDate, startDate, endDate]);
+      `, [propertyId, endDate, startDate, endDate, startDate, startDate, endDate]);
       return rows;
     } catch (error) {
       throw error;
@@ -640,32 +645,32 @@ class CalendarModel {
   }
 
   // Get room availability for a specific date range
-  static async getRoomAvailability(startDate, endDate) {
+  static async getRoomAvailability(startDate, endDate, propertyId) {
     try {
       const rows = await queryDatabasePromise(`
-        SELECT 
+        SELECT
           r.IDNo AS RoomID,
           r.ROOM_NUMBER,
           r.ROOM_FLOOR,
           r.ROOM_STATUS,
           r.ROOM_MAINTENANCE_STATUS,
-          CASE 
+          CASE
             WHEN b.IDNo IS NOT NULL THEN 'occupied'
             WHEN r.ROOM_MAINTENANCE_STATUS = 'maintenance' THEN 'maintenance'
             WHEN r.ROOM_STATUS = 'cleaning' THEN 'cleaning'
             ELSE 'available'
           END AS availability_status
         FROM room r
-        LEFT JOIN booking b ON r.IDNo = b.ROOM_ID 
+        LEFT JOIN booking b ON r.IDNo = b.ROOM_ID
           AND b.ACTIVE = 1
           AND (
             (b.CHECK_IN_DATE <= ? AND b.CHECK_OUT_DATE > ?) OR
             (b.CHECK_IN_DATE < ? AND b.CHECK_OUT_DATE >= ?) OR
             (b.CHECK_IN_DATE >= ? AND b.CHECK_OUT_DATE <= ?)
           )
-        WHERE r.ACTIVE = 1
+        WHERE r.ACTIVE = 1 AND r.PROPERTY_ID = ?
         ORDER BY r.ROOM_FLOOR ASC, r.ROOM_NUMBER ASC
-      `, [endDate, startDate, endDate, startDate, startDate, endDate]);
+      `, [endDate, startDate, endDate, startDate, startDate, endDate, propertyId]);
       return rows;
     } catch (error) {
       throw error;
@@ -709,10 +714,10 @@ class CalendarModel {
   }
 
   // Get rooms by floor
-  static async getRoomsByFloor(floorNumber) {
+  static async getRoomsByFloor(floorNumber, propertyId) {
     try {
       const rows = await queryDatabasePromise(`
-        SELECT 
+        SELECT
           r.IDNo AS RoomID,
           r.ROOM_NUMBER,
           r.ROOM_FLOOR,
@@ -722,9 +727,9 @@ class CalendarModel {
           r.ROOM_MAINTENANCE_STATUS
         FROM room r
         LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
-        WHERE r.ACTIVE = 1 AND r.ROOM_FLOOR = ?
+        WHERE r.ACTIVE = 1 AND r.ROOM_FLOOR = ? AND r.PROPERTY_ID = ?
         ORDER BY r.ROOM_NUMBER ASC
-      `, [floorNumber]);
+      `, [floorNumber, propertyId]);
       return rows;
     } catch (error) {
       throw error;
@@ -732,14 +737,14 @@ class CalendarModel {
   }
 
   // Get floors for dropdown
-  static async getFloors() {
+  static async getFloors(propertyId) {
     try {
       const rows = await queryDatabasePromise(`
         SELECT DISTINCT ROOM_FLOOR as floor_number
-        FROM room 
-        WHERE ACTIVE = 1
+        FROM room
+        WHERE ACTIVE = 1 AND PROPERTY_ID = ?
         ORDER BY ROOM_FLOOR ASC
-      `);
+      `, [propertyId]);
       return rows;
     } catch (error) {
       throw error;
@@ -811,15 +816,15 @@ class CalendarModel {
   }
 
   // Get calendar statistics
-  static async getCalendarStats() {
+  static async getCalendarStats(propertyId) {
     try {
       const today = new Date().toISOString().split('T')[0];
-      
+
       const [totalBookings, todayCheckIns, todayCheckOuts, availableRooms] = await Promise.all([
-        queryDatabasePromise('SELECT COUNT(*) as count FROM booking WHERE ACTIVE = 1'),
-        queryDatabasePromise('SELECT COUNT(*) as count FROM booking WHERE DATE(CHECK_IN_DATE) = ? AND ACTIVE = 1', [today]),
-        queryDatabasePromise('SELECT COUNT(*) as count FROM booking WHERE DATE(CHECK_OUT_DATE) = ? AND ACTIVE = 1', [today]),
-        queryDatabasePromise('SELECT COUNT(*) as count FROM room WHERE ACTIVE = 1 AND ROOM_STATUS = "available"')
+        queryDatabasePromise('SELECT COUNT(*) as count FROM booking WHERE ACTIVE = 1 AND PROPERTY_ID = ?', [propertyId]),
+        queryDatabasePromise('SELECT COUNT(*) as count FROM booking WHERE DATE(CHECK_IN_DATE) = ? AND ACTIVE = 1 AND PROPERTY_ID = ?', [today, propertyId]),
+        queryDatabasePromise('SELECT COUNT(*) as count FROM booking WHERE DATE(CHECK_OUT_DATE) = ? AND ACTIVE = 1 AND PROPERTY_ID = ?', [today, propertyId]),
+        queryDatabasePromise('SELECT COUNT(*) as count FROM room WHERE ACTIVE = 1 AND ROOM_STATUS = "available" AND PROPERTY_ID = ?', [propertyId])
       ]);
 
       return {
@@ -834,17 +839,17 @@ class CalendarModel {
   }
 
   // Get available rooms for transfer (copied from dashboard logic)
-  static async getTransferAvailableRooms(currentRoom, checkOutDate) {
+  static async getTransferAvailableRooms(currentRoom, checkOutDate, propertyId) {
     try {
       // Get the current date (transferDate) in YYYY-MM-DD format
       const transferDate = new Date().toISOString().split('T')[0];
       const formattedCheckOutDate = new Date(checkOutDate).toISOString().split('T')[0];
 
       const rows = await queryDatabasePromise(`
-        SELECT 
-          r.IDNo AS ROOM_ID, 
-          r.ROOM_NUMBER, 
-          r.ROOM_STATUS, 
+        SELECT
+          r.IDNo AS ROOM_ID,
+          r.ROOM_NUMBER,
+          r.ROOM_STATUS,
           r.ROOM_FLOOR,
           (SELECT DATE(b.CHECK_OUT_DATE)
             FROM booking b
@@ -862,7 +867,8 @@ class CalendarModel {
             )
           )
           AND r.ROOM_STATUS != 3
-      `, [transferDate, currentRoom, transferDate, formattedCheckOutDate]);
+          AND r.PROPERTY_ID = ?
+      `, [transferDate, currentRoom, transferDate, formattedCheckOutDate, propertyId]);
 
       return rows;
     } catch (error) {
@@ -871,14 +877,15 @@ class CalendarModel {
   }
 
   // Transfer room (copied from dashboard logic)
-  static async transferRoom(bookingId, oldRoomNumber, newRoomId, transferDate) {
+  static async transferRoom(bookingId, oldRoomNumber, newRoomId, transferDate, propertyId) {
     try {
       console.log('🔄 Calendar transfer started:', { bookingId, oldRoomNumber, newRoomId, transferDate });
-      
-      // Get the old room ID from room number
+
+      // Get the old room ID from room number - PROPERTY_ID filter matters since
+      // ROOM_NUMBER isn't unique system-wide (see updateBooking's same lookup).
       const oldRoomResult = await queryDatabasePromise(`
-        SELECT IDNo FROM room WHERE ROOM_NUMBER = ?
-      `, [oldRoomNumber]);
+        SELECT IDNo FROM room WHERE ROOM_NUMBER = ? AND PROPERTY_ID = ?
+      `, [oldRoomNumber, propertyId]);
 
       if (oldRoomResult.length === 0) {
         console.log('❌ Old room not found:', oldRoomNumber);
@@ -991,7 +998,7 @@ class CalendarModel {
   }
 
   // Check room availability for extension (copied from dashboard logic)
-  static async checkExtendRoom(roomId, checkoutDate, daysToExtend) {
+  static async checkExtendRoom(roomId, checkoutDate, daysToExtend, propertyId) {
     try {
       const checkoutDateObj = new Date(checkoutDate);
       if (isNaN(checkoutDateObj) || !daysToExtend) {
@@ -1029,6 +1036,7 @@ class CalendarModel {
           FROM room r
           JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
           WHERE r.ACTIVE = 1
+          AND r.PROPERTY_ID = ?
           AND NOT EXISTS (
             SELECT 1 FROM booking b
             WHERE b.ROOM_ID = r.IDNo
@@ -1040,6 +1048,7 @@ class CalendarModel {
           )
         `;
         availableRooms = await queryDatabasePromise(availableRoomsQuery, [
+          propertyId,
           extendedEndDate.toISOString().slice(0, 19).replace("T", " "),
           checkoutDateObj.toISOString().slice(0, 19).replace("T", " "),
         ]);
@@ -1289,7 +1298,7 @@ class CalendarModel {
   }
 
   // Check late check-out room availability (copied from dashboard logic)
-  static async checkLateCheckRoom(roomId, checkoutDate, currentBookingId) {
+  static async checkLateCheckRoom(roomId, checkoutDate, currentBookingId, propertyId) {
     try {
       // Convert checkoutDate to ISO 8601 format for logging and consistency
       const formattedCheckoutDate = new Date(checkoutDate).toISOString();
@@ -1318,15 +1327,16 @@ class CalendarModel {
           SELECT r.IDNo AS ROOM_ID, r.ROOM_NUMBER, r.ROOM_FLOOR, rt.NAME AS RoomType
           FROM room r
           JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
-          WHERE r.ACTIVE = 1 
+          WHERE r.ACTIVE = 1
+          AND r.PROPERTY_ID = ?
           AND NOT EXISTS (
             SELECT 1 FROM booking b
             WHERE b.ROOM_ID = r.IDNo
             AND b.CHECK_IN_DATE <= DATE_ADD(?, INTERVAL 1 DAY) -- Includes check-ins on the same day
-            AND b.CHECK_OUT_DATE > ? 
+            AND b.CHECK_OUT_DATE > ?
           )
         `;
-        const availableRooms = await queryDatabasePromise(availableRoomsQuery, [formattedCheckoutDate, formattedCheckoutDate]);
+        const availableRooms = await queryDatabasePromise(availableRoomsQuery, [propertyId, formattedCheckoutDate, formattedCheckoutDate]);
 
         return {
           needRoomChange: true,
@@ -1651,13 +1661,14 @@ class CalendarModel {
   // Remaining rooms per bed type (Single = ROOM_BED 1, Double = ROOM_BED 2) for every
   // day in the visible calendar range, so the front desk can see both counts at once
   // instead of checking each date one at a time.
-  static async getRoomBedAvailabilityForCalendar(start, end) {
+  static async getRoomBedAvailabilityForCalendar(start, end, propertyId) {
     try {
       const totalsRows = await queryDatabasePromise(
         `SELECT ROOM_BED, COUNT(*) AS total
          FROM room
-         WHERE ACTIVE = 1 AND ROOM_STATUS != 3
-         GROUP BY ROOM_BED`
+         WHERE ACTIVE = 1 AND ROOM_STATUS != 3 AND PROPERTY_ID = ?
+         GROUP BY ROOM_BED`,
+        [propertyId]
       );
       const totals = {};
       totalsRows.forEach((row) => {
@@ -1671,10 +1682,11 @@ class CalendarModel {
          FROM booking b
          JOIN room r ON b.ROOM_ID = r.IDNo AND r.ACTIVE = 1
          WHERE b.ACTIVE = 1
+           AND b.PROPERTY_ID = ?
            AND b.BOOKING_STATUS != 'cancelled'
            AND b.CHECK_IN_DATE < ?
            AND b.CHECK_OUT_DATE > ?`,
-        [end, start]
+        [propertyId, end, start]
       );
 
       // occupiedByDate[dateKey][bedType] = Set of room IDs occupied that day
@@ -1713,12 +1725,12 @@ class CalendarModel {
   }
 
   // Get Unassigned Rooms for FullCalendar
-  static async getUnassignedRoomsForCalendar(start, end) {
+  static async getUnassignedRoomsForCalendar(start, end, propertyId) {
     try {
       console.log('🔍 Model: getUnassignedRoomsForCalendar called with:', { start, end });
-      
+
       const query = `
-        SELECT 
+        SELECT
           DATE_FORMAT(b.CHECK_IN_DATE, '%Y-%m-%d') AS checkInDateKey,
           b.CHECK_IN_DATE AS checkInDate,
           b.CHECK_OUT_DATE AS checkOutDate,
@@ -1731,6 +1743,7 @@ class CalendarModel {
         LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
         LEFT JOIN room r ON b.ROOM_ID = r.IDNo AND r.ACTIVE = 1
         WHERE b.ACTIVE = 1
+          AND b.PROPERTY_ID = ?
           AND b.BED_COUNT IN (1, 2)
           AND (
             -- Currently unassigned direct reservations
@@ -1743,7 +1756,7 @@ class CalendarModel {
       `;
 
       // console.log('🔍 Executing query with parameters:', [end, start]);
-      const results = await queryDatabasePromise(query, [end, start]);
+      const results = await queryDatabasePromise(query, [propertyId, end, start]);
       // console.log('🔍 Query results:', results);
 
       // Create a map of dates with counts and unassigned info
@@ -1786,7 +1799,7 @@ class CalendarModel {
   }
 
   // Get detailed Unassigned Rooms for a specific date
-  static async getDetailedUnassignedRooms(date) {
+  static async getDetailedUnassignedRooms(date, propertyId) {
     try {
       const query = `
         SELECT
@@ -1809,6 +1822,7 @@ class CalendarModel {
         LEFT JOIN room r ON b.ROOM_ID = r.IDNo AND r.ACTIVE = 1
         LEFT JOIN billing ON b.IDNo = billing.BOOKING_ID AND billing.ACTIVE = 1
         WHERE b.ACTIVE = 1
+          AND b.PROPERTY_ID = ?
           AND b.BED_COUNT IN (1, 2)
           AND (
             -- Currently unassigned direct reservations
@@ -1821,7 +1835,7 @@ class CalendarModel {
         ORDER BY b.ENCODED_DT DESC
       `;
 
-      const results = await queryDatabasePromise(query, [date]);
+      const results = await queryDatabasePromise(query, [propertyId, date]);
 
       const bookings = results.map((result) => ({
         id: result.id,

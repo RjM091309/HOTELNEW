@@ -2438,8 +2438,37 @@ const views = {
 // =============================================================================
 
 function processRoomsData(roomsData) {
+  const roomObjFor = (room) => ({
+    id: String(room.RoomID),
+    title: `${room.ROOM_NUMBER}`.trim(),
+    roomNumber: room.ROOM_NUMBER,
+    bedCount: room.ROOM_BED,
+    roomView: parseInt(room.ROOM_VIEW, 10) || null
+  });
+  const byRoomNumber = (a, b) => {
+    const numA = parseInt(String(a.roomNumber).replace(/[^\d]/g, ''), 10);
+    const numB = parseInt(String(b.roomNumber).replace(/[^\d]/g, ''), 10);
+    return numA - numB;
+  };
+
+  // Pool Villa has only a handful of rooms - the floor-group header rows
+  // exist to organize 100+ Main Hotel rooms across multiple floors and
+  // are pure clutter at that scale, so return a flat list of room
+  // resources (no floor parents) instead. A CSS-only attempt to just
+  // hide the floor row broke the whole grid (FullCalendar manages row
+  // layout in JS, especially with expandRows active, and a row it
+  // doesn't know is hidden throws its sync off) - removing it from the
+  // actual resource data, as done here, is the correct way. See
+  // getFlatRoomResources() below, used by applyBedFilter() and
+  // updateRoomViewLegendCounts() - both previously assumed every
+  // resource had a .children array (only true for floor-group
+  // resources), which this flat shape doesn't have.
+  if (document.documentElement.getAttribute('data-property-theme') === 'pool_villa') {
+    return roomsData.map(roomObjFor).sort(byRoomNumber);
+  }
+
   const floors = {};
-  
+
   roomsData.forEach(room => {
     const floorName = `Floor ${room.ROOM_FLOOR}`;
     if (!floors[floorName]) {
@@ -2450,31 +2479,37 @@ function processRoomsData(roomsData) {
         children: []
       };
     }
-    
-    const roomObj = {
-      id: String(room.RoomID),
-      title: `${room.ROOM_NUMBER}`.trim(),
-      roomNumber: room.ROOM_NUMBER,
-      bedCount: room.ROOM_BED,
-      roomView: parseInt(room.ROOM_VIEW, 10) || null
-    };
-    floors[floorName].children.push(roomObj);
+    floors[floorName].children.push(roomObjFor(room));
   });
 
   // Sort floors and rooms
   const sortedFloors = Object.values(floors).sort((a, b) =>
     Number(a.id.match(/\d+/)) - Number(b.id.match(/\d+/))
   );
-  
+
   sortedFloors.forEach(floor => {
-    floor.children.sort((a, b) => {
-      const numA = parseInt(String(a.roomNumber).replace(/[^\d]/g, ''), 10);
-      const numB = parseInt(String(b.roomNumber).replace(/[^\d]/g, ''), 10);
-      return numA - numB;
-    });
+    floor.children.sort(byRoomNumber);
   });
 
   return sortedFloors;
+}
+
+// Normalizes window.allCalendarFloors into a flat list of room resources,
+// regardless of whether it's floor-grouped (Main Hotel - entries have
+// .children) or already flat (Pool Villa - entries ARE rooms, see
+// processRoomsData() above). Used anywhere that needs to iterate "every
+// room" without caring how they're organized for display.
+function getFlatRoomResources(floorsOrRooms) {
+  const list = floorsOrRooms || [];
+  const out = [];
+  list.forEach(entry => {
+    if (Array.isArray(entry.children)) {
+      out.push(...entry.children);
+    } else {
+      out.push(entry);
+    }
+  });
+  return out;
 }
 
 function buildCalendarRoomLabel(arg) {
@@ -3159,15 +3194,29 @@ const findHeader = setInterval(() => {
   currentWeekStart.setHours(0, 0, 0, 0);
 
   // Initialize calendar
+  const isPoolVillaCalendar = document.documentElement.getAttribute('data-property-theme') === 'pool_villa';
   calendar = new FullCalendar.Calendar(calendarEl, {
     initialView: 'month',
     initialDate: today,
     resourceAreaHeaderContent: 'Rooms',
-    resourceAreaWidth: "70px",
+    resourceAreaWidth: isPoolVillaCalendar ? "110px" : "70px",
     // The horizontal scrollbar is a position:fixed <body> child pinned to the
     // viewport bottom, so it doesn't consume grid height; #calendar has
     // padding-bottom so its last row stays clear of the fixed bar.
-    height: '850px',
+    // Pool Villa's handful of rooms get a much shorter container - with
+    // expandRows (below) stretching rows to fill whatever height is given,
+    // the full 850px across only 3-4 rooms produced ~200px-tall rows (and
+    // some background effect never designed for a row that tall started
+    // visibly banding/tiling) - 420px keeps each row roughly half that.
+    height: isPoolVillaCalendar ? '420px' : '850px',
+    // Rows stay at their tiny content-driven height by default (FullCalendar's
+    // own default is expandRows:false), leaving a huge empty gap below a
+    // handful of rooms instead of filling the available height. Only Pool
+    // Villa (a handful of rooms) benefits from stretching rows to fill the
+    // space - Main Hotel's 100+ rooms already fill it on their own, and
+    // stretching there would make rows inconsistently sized depending on
+    // room count.
+    expandRows: isPoolVillaCalendar,
     eventOverlap: true,
     editable: true,
     eventResourceEditable: true,
@@ -3668,19 +3717,24 @@ function applyBedFilter() {
   if (!calendar || !window.allCalendarFloors) return;
 
   const roomViewFilters = getActiveRoomViewFilters();
+  const matchesFilters = (room) => {
+    if (activeBedFilter && String(room.bedCount) !== activeBedFilter) return false;
+    if (roomViewFilters && roomViewFilters.length) {
+      const view = parseInt(room.roomView, 10);
+      if (!roomViewFilters.includes(view)) return false;
+    }
+    return true;
+  };
+
+  // window.allCalendarFloors is either floor-grouped (Main Hotel - entries
+  // have .children) or flat rooms (Pool Villa - entries ARE rooms, see
+  // processRoomsData()). Filter each shape correctly instead of assuming
+  // every entry has .children.
   const filteredFloors = window.allCalendarFloors
-    .map(floor => ({
-      ...floor,
-      children: (floor.children || []).filter(room => {
-        if (activeBedFilter && String(room.bedCount) !== activeBedFilter) return false;
-        if (roomViewFilters && roomViewFilters.length) {
-          const view = parseInt(room.roomView, 10);
-          if (!roomViewFilters.includes(view)) return false;
-        }
-        return true;
-      })
-    }))
-    .filter(floor => floor.children.length > 0);
+    .map(entry => Array.isArray(entry.children)
+      ? { ...entry, children: entry.children.filter(matchesFilters) }
+      : entry)
+    .filter(entry => Array.isArray(entry.children) ? entry.children.length > 0 : matchesFilters(entry));
 
   calendar.setOption('resources', filteredFloors);
 
@@ -4371,15 +4425,12 @@ function updateLegendCounts() {
 }
 
 function updateRoomViewLegendCounts() {
-  const floors = window.allCalendarFloors || [];
   let condo = 0;
   let mountain = 0;
-  floors.forEach(floor => {
-    (floor.children || []).forEach(room => {
-      const view = parseInt(room.roomView, 10);
-      if (view === 1) condo += 1;
-      else if (view === 2) mountain += 1;
-    });
+  getFlatRoomResources(window.allCalendarFloors).forEach(room => {
+    const view = parseInt(room.roomView, 10);
+    if (view === 1) condo += 1;
+    else if (view === 2) mountain += 1;
   });
   updateLegendCount('legend-count-condo-view', condo);
   updateLegendCount('legend-count-mountain-view', mountain);

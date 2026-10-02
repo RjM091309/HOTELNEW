@@ -19,11 +19,12 @@ const PAYMENTS_TABLE_ORDER_MAP = {
 
 const paymentsModel = {
   listPayments: async (filters = {}, limit = 200) => {
-    const { bookingId, type, method, from, to } = filters;
+    const { bookingId, type, method, from, to, propertyId } = filters;
     const clauses = [];
     const params = [];
     // Security deposits live in their own table — never return legacy rows from payments
     clauses.push("p.PAYMENT_TYPE NOT IN ('security_deposit')");
+    if (propertyId) { clauses.push('b.PROPERTY_ID = ?'); params.push(propertyId); }
     if (bookingId) { clauses.push('p.BOOKING_ID = ?'); params.push(bookingId); }
     if (type) { clauses.push('p.PAYMENT_TYPE = ?'); params.push(type); }
     if (method) { clauses.push('p.PAYMENT_METHOD = ?'); params.push(method); }
@@ -66,7 +67,7 @@ const paymentsModel = {
   // PAYMENT_STATUS are booking-level and repeat identically across every row
   // for that booking - only AMOUNT_PAID/PAYMENT_METHOD/PAYMENT_DATE/
   // PROCESSED_BY_NAME are specific to the one payment on that row.
-  countDatatable: async (searchCondition, searchParams) => {
+  countDatatable: async (searchCondition, searchParams, propertyId) => {
     const countQuery = `
       SELECT COUNT(*) as total
       FROM payments p
@@ -75,14 +76,15 @@ const paymentsModel = {
       LEFT JOIN room r ON r.IDNo = b.ROOM_ID
       LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
       WHERE b.ACTIVE = 1
+        AND b.PROPERTY_ID = ?
         AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')
       ${searchCondition}
     `;
-    const [countResult] = await pool.promise().query(countQuery, searchParams);
+    const [countResult] = await pool.promise().query(countQuery, [propertyId, ...searchParams]);
     return countResult[0].total;
   },
 
-  sumFilteredAmount: async (searchCondition, searchParams) => {
+  sumFilteredAmount: async (searchCondition, searchParams, propertyId) => {
     const sumQuery = `
       SELECT COALESCE(SUM(p.AMOUNT_PAID), 0) as total
       FROM payments p
@@ -91,14 +93,15 @@ const paymentsModel = {
       LEFT JOIN room r ON r.IDNo = b.ROOM_ID
       LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
       WHERE b.ACTIVE = 1
+        AND b.PROPERTY_ID = ?
         AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')
       ${searchCondition}
     `;
-    const [sumResult] = await pool.promise().query(sumQuery, searchParams);
+    const [sumResult] = await pool.promise().query(sumQuery, [propertyId, ...searchParams]);
     return sumResult[0].total;
   },
 
-  fetchDatatable: async (searchCondition, searchParams, orderBy, orderDir, length, start) => {
+  fetchDatatable: async (searchCondition, searchParams, orderBy, orderDir, length, start, propertyId) => {
     const sortDir = String(orderDir).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
     const sortColumn = PAYMENTS_TABLE_ORDER_MAP[orderBy] || 'p.IDNo';
     const dataQuery = `
@@ -145,17 +148,18 @@ const paymentsModel = {
       LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
       LEFT JOIN user_info u ON u.IDNo = p.ENCODED_BY
       WHERE b.ACTIVE = 1
+        AND b.PROPERTY_ID = ?
         AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')
       ${searchCondition}
       ORDER BY ${sortColumn} ${sortDir}, p.IDNo ${sortDir}
       LIMIT ? OFFSET ?
     `;
-    const dataParams = [...searchParams, parseInt(length), parseInt(start)];
+    const dataParams = [propertyId, ...searchParams, parseInt(length), parseInt(start)];
     const [rows] = await pool.promise().query(dataQuery, dataParams);
     return rows;
   },
 
-  getCollectedPayments: async (range = 'today') => {
+  getCollectedPayments: async (range = 'today', propertyId) => {
     let dateCondition = 'DATE(p.PAYMENT_DATE) = CURRENT_DATE()';
     if (range === 'last7days') {
       dateCondition = `
@@ -177,19 +181,21 @@ const paymentsModel = {
          b.CONFIRMATION_NUMBER,
          u.FULLNAME AS PROCESSED_BY_NAME
        FROM payments p
-       LEFT JOIN booking b ON b.IDNo = p.BOOKING_ID
+       JOIN booking b ON b.IDNo = p.BOOKING_ID
        LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
        LEFT JOIN room r ON r.IDNo = b.ROOM_ID
        LEFT JOIN user_info u ON u.IDNo = p.ENCODED_BY
        WHERE ${dateCondition}
+         AND b.PROPERTY_ID = ?
          AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')
          AND (p.PAYMENT_METHOD NOT IN ('credit', 'marker') OR p.SETTLED_DATE IS NOT NULL)
-       ORDER BY p.IDNo DESC`
+       ORDER BY p.IDNo DESC`,
+      [propertyId]
     );
     return rows;
   },
 
-  getCollectedReceipts: async (range = 'today', dateStr = null) => {
+  getCollectedReceipts: async (range = 'today', dateStr = null, propertyId) => {
     let dateCondition = 'DATE(pr.RECEIPT_DATE) = CURRENT_DATE()';
     const params = [];
 
@@ -202,6 +208,7 @@ const paymentsModel = {
         AND DATE(pr.RECEIPT_DATE) <= CURRENT_DATE()
       `;
     }
+    params.push(propertyId);
 
     const [rows] = await pool.promise().query(
       `SELECT
@@ -215,14 +222,14 @@ const paymentsModel = {
          pr.RECEIVED_BY AS PROCESSED_BY_NAME,
          pr.PURPOSE
        FROM payment_receipt pr
-       WHERE pr.ACTIVE = 1 AND ${dateCondition}
+       WHERE pr.ACTIVE = 1 AND ${dateCondition} AND pr.PROPERTY_ID = ?
        ORDER BY pr.IDNo DESC`,
       params
     );
     return rows;
   },
 
-  salesSummary: async (todayStr, weekStartStr, monthStartStr) => {
+  salesSummary: async (todayStr, weekStartStr, monthStartStr, propertyId) => {
     // Sales based on PAYMENT_DATE (kailan talaga pumasok ang bayad)
     // Discount entries are excluded (PAYMENT_TYPE != 'discount')
     // "Paid" excludes credit/marker entries that haven't been settled yet (see creditModel),
@@ -234,9 +241,11 @@ const paymentsModel = {
          COALESCE(SUM(p.AMOUNT_PAID), 0) AS totalAmount,
          COALESCE(SUM(${collectedCase}), 0) AS paidAmount
        FROM payments p
+       JOIN booking b ON b.IDNo = p.BOOKING_ID
        WHERE DATE(p.PAYMENT_DATE) = ?
+         AND b.PROPERTY_ID = ?
          AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')`,
-      [todayStr]
+      [todayStr, propertyId]
     );
 
     const [weekly] = await pool.promise().query(
@@ -244,9 +253,11 @@ const paymentsModel = {
          COALESCE(SUM(p.AMOUNT_PAID), 0) AS totalAmount,
          COALESCE(SUM(${collectedCase}), 0) AS paidAmount
        FROM payments p
+       JOIN booking b ON b.IDNo = p.BOOKING_ID
        WHERE DATE(p.PAYMENT_DATE) >= ?
+         AND b.PROPERTY_ID = ?
          AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')`,
-      [weekStartStr]
+      [weekStartStr, propertyId]
     );
 
     const [monthly] = await pool.promise().query(
@@ -254,31 +265,33 @@ const paymentsModel = {
          COALESCE(SUM(p.AMOUNT_PAID), 0) AS totalAmount,
          COALESCE(SUM(${collectedCase}), 0) AS paidAmount
        FROM payments p
+       JOIN booking b ON b.IDNo = p.BOOKING_ID
        WHERE DATE(p.PAYMENT_DATE) >= ?
+         AND b.PROPERTY_ID = ?
          AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')`,
-      [monthStartStr]
+      [monthStartStr, propertyId]
     );
 
     // Standalone receipts (Receipt menu) — income only, not guest booking balance
     const [dailyReceipts] = await pool.promise().query(
       `SELECT COALESCE(SUM(AMOUNT_PAID), 0) AS amount
        FROM payment_receipt
-       WHERE ACTIVE = 1 AND DATE(RECEIPT_DATE) = ?`,
-      [todayStr]
+       WHERE ACTIVE = 1 AND DATE(RECEIPT_DATE) = ? AND PROPERTY_ID = ?`,
+      [todayStr, propertyId]
     );
 
     const [weeklyReceipts] = await pool.promise().query(
       `SELECT COALESCE(SUM(AMOUNT_PAID), 0) AS amount
        FROM payment_receipt
-       WHERE ACTIVE = 1 AND DATE(RECEIPT_DATE) >= ?`,
-      [weekStartStr]
+       WHERE ACTIVE = 1 AND DATE(RECEIPT_DATE) >= ? AND PROPERTY_ID = ?`,
+      [weekStartStr, propertyId]
     );
 
     const [monthlyReceipts] = await pool.promise().query(
       `SELECT COALESCE(SUM(AMOUNT_PAID), 0) AS amount
        FROM payment_receipt
-       WHERE ACTIVE = 1 AND DATE(RECEIPT_DATE) >= ?`,
-      [monthStartStr]
+       WHERE ACTIVE = 1 AND DATE(RECEIPT_DATE) >= ? AND PROPERTY_ID = ?`,
+      [monthStartStr, propertyId]
     );
 
     const dailyReceiptAmount = parseFloat(dailyReceipts[0]?.amount || 0);
@@ -317,9 +330,9 @@ const paymentsModel = {
     };
   },
 
-  bookingBreakdown: async (bookingId) => {
+  bookingBreakdown: async (bookingId, propertyId) => {
     const [rows] = await pool.promise().query(
-      `SELECT 
+      `SELECT
          b.IDNo AS BOOKING_ID,
          b.CONFIRMATION_NUMBER,
          c.NAME AS GUEST_NAME,
@@ -360,8 +373,8 @@ const paymentsModel = {
        LEFT JOIN room r ON r.IDNo = b.ROOM_ID
        LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
        LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
-       WHERE b.IDNo = ? AND b.ACTIVE = 1`,
-      [bookingId]
+       WHERE b.IDNo = ? AND b.PROPERTY_ID = ? AND b.ACTIVE = 1`,
+      [bookingId, propertyId]
     );
 
     const booking = rows[0];
@@ -408,11 +421,11 @@ const paymentsModel = {
   },
 
   // Get group booking breakdown - for all bookings in a group
-  groupBookingBreakdown: async (bookingId) => {
+  groupBookingBreakdown: async (bookingId, propertyId) => {
     // First, get the group_id from the booking
     const [groupInfo] = await pool.promise().query(
-      `SELECT GROUP_BOOKING_ID FROM booking WHERE IDNo = ? AND ACTIVE = 1`,
-      [bookingId]
+      `SELECT GROUP_BOOKING_ID FROM booking WHERE IDNo = ? AND PROPERTY_ID = ? AND ACTIVE = 1`,
+      [bookingId, propertyId]
     );
 
     const groupId = groupInfo[0]?.GROUP_BOOKING_ID;
@@ -564,21 +577,26 @@ const paymentsModel = {
   // day. Used to filter the payments table to just that shift's rows.
   // DESC + LIMIT 1 in case shift numbers ever repeat within one business
   // date (more than 3 cutoffs in a day).
-  getShiftWindow: async (shiftNumber, businessDate) => {
+  getShiftWindow: async (shiftNumber, businessDate, propertyId) => {
     const [rows] = await pool.promise().query(
       `SELECT STARTED_AT, ENDED_AT FROM payment_shifts
-       WHERE SHIFT_NUMBER = ? AND BUSINESS_DATE = ?
+       WHERE SHIFT_NUMBER = ? AND BUSINESS_DATE = ? AND PROPERTY_ID = ?
        ORDER BY IDNo DESC LIMIT 1`,
-      [shiftNumber, businessDate]
+      [shiftNumber, businessDate, propertyId]
     );
     return rows[0] || null;
   },
 
-  // Returns the currently open shift, auto-creating Shift 1 if none is
-  // open yet (e.g. first payment of a fresh business day).
-  getCurrentShift: async () => {
+  // Returns the currently open shift for the given property, auto-creating
+  // Shift 1 if none is open yet (e.g. first payment of a fresh business
+  // day). Each property tracks its own independent shift timeline -
+  // without PROPERTY_ID here, ending one property's shift would end
+  // whichever shift happened to be globally "current", including another
+  // property's.
+  getCurrentShift: async (propertyId) => {
     const [openRows] = await pool.promise().query(
-      `SELECT * FROM payment_shifts WHERE ENDED_AT IS NULL ORDER BY IDNo DESC LIMIT 1`
+      `SELECT * FROM payment_shifts WHERE ENDED_AT IS NULL AND PROPERTY_ID = ? ORDER BY IDNo DESC LIMIT 1`,
+      [propertyId]
     );
     if (openRows.length > 0) return openRows[0];
 
@@ -595,8 +613,8 @@ const paymentsModel = {
     // explicit End Shift click, which is correctly NOW().
     const startedAt = `${businessDate} 06:00:00`;
     const [result] = await pool.promise().query(
-      `INSERT INTO payment_shifts (SHIFT_NUMBER, BUSINESS_DATE, STARTED_AT) VALUES (1, ?, ?)`,
-      [businessDate, startedAt]
+      `INSERT INTO payment_shifts (SHIFT_NUMBER, BUSINESS_DATE, STARTED_AT, PROPERTY_ID) VALUES (1, ?, ?, ?)`,
+      [businessDate, startedAt, propertyId]
     );
     const [rows] = await pool.promise().query(`SELECT * FROM payment_shifts WHERE IDNo = ?`, [result.insertId]);
     return rows[0];
@@ -607,9 +625,10 @@ const paymentsModel = {
   // day, regardless of what the 6 AM rule alone would compute, since
   // Shift 3 is explicitly the "night shift" that always hands off to the
   // next day's Shift 1). One click, both steps, no separate "start shift"
-  // action for the FO to remember.
-  endCurrentShiftAndOpenNext: async (endedByUserId) => {
-    const current = await paymentsModel.getCurrentShift();
+  // action for the FO to remember. Scoped to one property's shift
+  // timeline - ending Pool Villa's shift never touches the Main Hotel's.
+  endCurrentShiftAndOpenNext: async (endedByUserId, propertyId) => {
+    const current = await paymentsModel.getCurrentShift(propertyId);
 
     await pool.promise().query(
       `UPDATE payment_shifts SET ENDED_AT = NOW(), ENDED_BY = ? WHERE IDNo = ? AND ENDED_AT IS NULL`,
@@ -619,8 +638,8 @@ const paymentsModel = {
     const nextShiftNumber = (current.SHIFT_NUMBER % 3) + 1;
     const now = new Date();
     const [result] = await pool.promise().query(
-      `INSERT INTO payment_shifts (SHIFT_NUMBER, BUSINESS_DATE, STARTED_AT) VALUES (?, ?, NOW())`,
-      [nextShiftNumber, paymentsModel._businessDateFor(now)]
+      `INSERT INTO payment_shifts (SHIFT_NUMBER, BUSINESS_DATE, STARTED_AT, PROPERTY_ID) VALUES (?, ?, NOW(), ?)`,
+      [nextShiftNumber, paymentsModel._businessDateFor(now), propertyId]
     );
     const [rows] = await pool.promise().query(`SELECT * FROM payment_shifts WHERE IDNo = ?`, [result.insertId]);
     return { closed: current, opened: rows[0] };
@@ -631,7 +650,7 @@ const paymentsModel = {
   // (`payment_receipt`) - same two sources the sales-summary cards combine.
   getShiftTotals: async (shift) => {
     const endExpr = shift.ENDED_AT ? '?' : 'NOW()';
-    const params = shift.ENDED_AT ? [shift.STARTED_AT, shift.ENDED_AT] : [shift.STARTED_AT];
+    const windowParams = shift.ENDED_AT ? [shift.STARTED_AT, shift.ENDED_AT] : [shift.STARTED_AT];
 
     const collectedCase = `CASE WHEN p.PAYMENT_METHOD NOT IN ('credit', 'marker') OR p.SETTLED_DATE IS NOT NULL THEN p.AMOUNT_PAID ELSE 0 END`;
 
@@ -640,9 +659,11 @@ const paymentsModel = {
          COALESCE(SUM(${collectedCase}), 0) AS total,
          COALESCE(SUM(CASE WHEN p.PAYMENT_METHOD = 'cash' THEN (${collectedCase}) ELSE 0 END), 0) AS cash
        FROM payments p
+       JOIN booking b ON b.IDNo = p.BOOKING_ID
        WHERE p.PAYMENT_DATE >= ? AND p.PAYMENT_DATE < ${endExpr}
+         AND b.PROPERTY_ID = ?
          AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit')`,
-      params
+      [...windowParams, shift.PROPERTY_ID]
     );
 
     const [receiptRows] = await pool.promise().query(
@@ -650,8 +671,8 @@ const paymentsModel = {
          COALESCE(SUM(AMOUNT_PAID), 0) AS total,
          COALESCE(SUM(CASE WHEN PAYMENT_METHOD = 'cash' THEN AMOUNT_PAID ELSE 0 END), 0) AS cash
        FROM payment_receipt
-       WHERE ACTIVE = 1 AND RECEIPT_DATE >= ? AND RECEIPT_DATE < ${endExpr}`,
-      params
+       WHERE ACTIVE = 1 AND RECEIPT_DATE >= ? AND RECEIPT_DATE < ${endExpr} AND PROPERTY_ID = ?`,
+      [...windowParams, shift.PROPERTY_ID]
     );
 
     const total = parseFloat(paymentRows[0].total) + parseFloat(receiptRows[0].total);
@@ -663,10 +684,10 @@ const paymentsModel = {
   // Closed + open shifts for a given business date, most recent first,
   // each with its own totals attached (used to fill in a shift card that
   // isn't the currently-open one, e.g. Shift 1 after Shift 2 has opened).
-  getShiftsForBusinessDate: async (businessDate) => {
+  getShiftsForBusinessDate: async (businessDate, propertyId) => {
     const [rows] = await pool.promise().query(
-      `SELECT * FROM payment_shifts WHERE BUSINESS_DATE = ? ORDER BY IDNo DESC`,
-      [businessDate]
+      `SELECT * FROM payment_shifts WHERE BUSINESS_DATE = ? AND PROPERTY_ID = ? ORDER BY IDNo DESC`,
+      [businessDate, propertyId]
     );
     const withTotals = [];
     for (const shift of rows) {

@@ -11,10 +11,16 @@ class RoomModel {
   // ========================================
   
   // Fetch all active rooms with related data
-  static async getAllRooms() {
+  static async getAllRooms(propertyId) {
     try {
+      const params = [];
+      let propertyFilter = '';
+      if (propertyId) {
+        propertyFilter = 'AND r.PROPERTY_ID = ?';
+        params.push(propertyId);
+      }
       const query = `
-        SELECT 
+        SELECT
           r.IDNo,
           r.ROOM_TYPE_ID,
           rt.NAME AS ROOM_TYPE_NAME,
@@ -35,10 +41,10 @@ class RoomModel {
           r.ACTIVE
         FROM room r
         LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
-        WHERE r.ACTIVE = 1
+        WHERE r.ACTIVE = 1 ${propertyFilter}
         ORDER BY r.ROOM_NUMBER ASC
       `;
-      const rooms = await queryDatabasePromise(query);
+      const rooms = await queryDatabasePromise(query, params);
       
       // Get amenities for each room
       for (let room of rooms) {
@@ -60,10 +66,16 @@ class RoomModel {
   }
 
   // Fetch room by ID
-  static async getRoomById(id) {
+  static async getRoomById(id, propertyId) {
     try {
+      const params = [id];
+      let propertyFilter = '';
+      if (propertyId) {
+        propertyFilter = 'AND r.PROPERTY_ID = ?';
+        params.push(propertyId);
+      }
       const query = `
-        SELECT 
+        SELECT
           r.IDNo,
           r.ROOM_TYPE_ID,
           rt.NAME AS ROOM_TYPE_NAME,
@@ -84,9 +96,9 @@ class RoomModel {
           r.ACTIVE
         FROM room r
         LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
-        WHERE r.IDNo = ? AND r.ACTIVE = 1
+        WHERE r.IDNo = ? AND r.ACTIVE = 1 ${propertyFilter}
       `;
-      const result = await queryDatabasePromise(query, [id]);
+      const result = await queryDatabasePromise(query, params);
       
       if (result.length > 0) {
         const room = result[0];
@@ -114,14 +126,22 @@ class RoomModel {
   }
 
   // Fetch room by room number
-  static async getRoomByNumber(roomNumber) {
+  // NOTE: superseded by the ROOM CONTROL METHODS section's getRoomByNumber
+  // below (same class, later definition wins) - kept in sync for clarity.
+  static async getRoomByNumber(roomNumber, propertyId) {
     try {
+      const params = [roomNumber];
+      let propertyFilter = '';
+      if (propertyId) {
+        propertyFilter = 'AND PROPERTY_ID = ?';
+        params.push(propertyId);
+      }
       const query = `
         SELECT IDNo, ROOM_NUMBER
         FROM room
-        WHERE ROOM_NUMBER = ? AND ACTIVE = 1
+        WHERE ROOM_NUMBER = ? AND ACTIVE = 1 ${propertyFilter}
       `;
-      const result = await queryDatabasePromise(query, [roomNumber]);
+      const result = await queryDatabasePromise(query, params);
       return result[0];
     } catch (error) {
       throw error;
@@ -131,19 +151,19 @@ class RoomModel {
   // Create new room  (pricing lives in room_rates - no per-room price / seasonal price)
   static async createRoom(ROOM_TYPE_ID, ROOM_NUMBER, ROOM_STATUS,
                          ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW,
-                         ROOM_DESCRIPTION, ROOM_IMAGE = null, AMENITIES = [], encodedBy) {
+                         ROOM_DESCRIPTION, ROOM_IMAGE = null, AMENITIES = [], encodedBy, propertyId) {
     try {
       const query = `
         INSERT INTO room (
           ROOM_TYPE_ID, ROOM_NUMBER, ROOM_STATUS,
           ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW,
-          ROOM_DESCRIPTION, ROOM_IMAGE, ENCODED_BY, ENCODED_DT, ACTIVE
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 1)
+          ROOM_DESCRIPTION, ROOM_IMAGE, ENCODED_BY, ENCODED_DT, ACTIVE, PROPERTY_ID
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 1, ?)
       `;
       const result = await queryDatabasePromise(query, [
         ROOM_TYPE_ID, ROOM_NUMBER, ROOM_STATUS,
         ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW,
-        ROOM_DESCRIPTION, ROOM_IMAGE, encodedBy
+        ROOM_DESCRIPTION, ROOM_IMAGE, encodedBy, propertyId
       ]);
 
       const roomId = result.insertId;
@@ -167,7 +187,7 @@ class RoomModel {
   // Update room  (pricing lives in room_rates - no per-room price / seasonal price)
   static async updateRoom(IDNo, ROOM_TYPE_ID, ROOM_NUMBER, ROOM_STATUS,
                          ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW,
-                         ROOM_DESCRIPTION, ROOM_IMAGE = null, AMENITIES = [], editedBy) {
+                         ROOM_DESCRIPTION, ROOM_IMAGE = null, AMENITIES = [], editedBy, propertyId) {
     try {
       // Build update query dynamically based on whether image is provided
       let query = `
@@ -182,16 +202,21 @@ class RoomModel {
         ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW,
         ROOM_DESCRIPTION, editedBy
       ];
-      
+
       // Add image to update if provided
       if (ROOM_IMAGE) {
         query += ', ROOM_IMAGE = ?';
         params.push(ROOM_IMAGE);
       }
-      
-      query += ' WHERE IDNo = ? AND ACTIVE = 1';
+
+      let propertyFilter = '';
+      if (propertyId) {
+        propertyFilter = ' AND PROPERTY_ID = ?';
+      }
+      query += ` WHERE IDNo = ? AND ACTIVE = 1${propertyFilter}`;
       params.push(IDNo);
-      
+      if (propertyId) params.push(propertyId);
+
       const result = await queryDatabasePromise(query, params);
       
       if (result.affectedRows === 0) {
@@ -224,10 +249,16 @@ class RoomModel {
 
 
   // Delete room (soft delete)
-  static async deleteRoom(id, editedBy) {
+  static async deleteRoom(id, editedBy, propertyId) {
     try {
-      const query = 'UPDATE room SET ACTIVE = 0, EDITED_BY = ?, EDITED_DT = NOW() WHERE IDNo = ? AND ACTIVE = 1';
-      const result = await queryDatabasePromise(query, [editedBy, id]);
+      const params = [editedBy, id];
+      let propertyFilter = '';
+      if (propertyId) {
+        propertyFilter = ' AND PROPERTY_ID = ?';
+        params.push(propertyId);
+      }
+      const query = `UPDATE room SET ACTIVE = 0, EDITED_BY = ?, EDITED_DT = NOW() WHERE IDNo = ? AND ACTIVE = 1${propertyFilter}`;
+      const result = await queryDatabasePromise(query, params);
       return result.affectedRows > 0;
     } catch (error) {
       throw error;
@@ -239,10 +270,16 @@ class RoomModel {
   // ========================================
   
   // Get room type by ID
-  static async getRoomTypeById(id) {
+  static async getRoomTypeById(id, propertyId) {
     try {
-      const query = 'SELECT IDNo, NAME, DESCRIPTION, BASE_PRICE FROM room_type WHERE IDNo = ? AND ACTIVE = 1';
-      const result = await queryDatabasePromise(query, [id]);
+      const params = [id];
+      let propertyFilter = '';
+      if (propertyId) {
+        propertyFilter = ' AND PROPERTY_ID = ?';
+        params.push(propertyId);
+      }
+      const query = `SELECT IDNo, NAME, DESCRIPTION, BASE_PRICE FROM room_type WHERE IDNo = ? AND ACTIVE = 1${propertyFilter}`;
+      const result = await queryDatabasePromise(query, params);
       return result[0];
     } catch (error) {
       throw error;
@@ -251,13 +288,13 @@ class RoomModel {
 
   // Create room type. BASE_PRICE no longer used - pricing lives in room_rates,
   // keyed by room_rates.ROOM_TYPE_ID -> room_type.IDNo.
-  static async createRoomType(NAME, DESCRIPTION, encodedBy) {
+  static async createRoomType(NAME, DESCRIPTION, encodedBy, propertyId) {
     try {
       const query = `
-        INSERT INTO room_type (NAME, DESCRIPTION, ENCODED_BY, ENCODED_DT, ACTIVE)
-        VALUES (?, ?, ?, NOW(), 1)
+        INSERT INTO room_type (NAME, DESCRIPTION, ENCODED_BY, ENCODED_DT, ACTIVE, PROPERTY_ID)
+        VALUES (?, ?, ?, NOW(), 1, ?)
       `;
-      const result = await queryDatabasePromise(query, [NAME, DESCRIPTION, encodedBy]);
+      const result = await queryDatabasePromise(query, [NAME, DESCRIPTION, encodedBy, propertyId]);
       return result.insertId;
     } catch (error) {
       throw error;
@@ -266,14 +303,20 @@ class RoomModel {
 
   // Update room type. BASE_PRICE no longer used - pricing lives in room_rates,
   // keyed by room_rates.ROOM_TYPE_ID -> room_type.IDNo.
-  static async updateRoomType(IDNo, NAME, DESCRIPTION, editedBy) {
+  static async updateRoomType(IDNo, NAME, DESCRIPTION, editedBy, propertyId) {
     try {
+      const params = [NAME, DESCRIPTION, editedBy, IDNo];
+      let propertyFilter = '';
+      if (propertyId) {
+        propertyFilter = ' AND PROPERTY_ID = ?';
+        params.push(propertyId);
+      }
       const query = `
         UPDATE room_type
         SET NAME = ?, DESCRIPTION = ?, EDITED_BY = ?, EDITED_DT = NOW()
-        WHERE IDNo = ? AND ACTIVE = 1
+        WHERE IDNo = ? AND ACTIVE = 1${propertyFilter}
       `;
-      const result = await queryDatabasePromise(query, [NAME, DESCRIPTION, editedBy, IDNo]);
+      const result = await queryDatabasePromise(query, params);
       return result.affectedRows > 0;
     } catch (error) {
       throw error;
@@ -281,17 +324,26 @@ class RoomModel {
   }
 
   // Delete room type (soft delete)
-  static async deleteRoomType(id, editedBy) {
+  static async deleteRoomType(id, editedBy, propertyId) {
     try {
-      const query = 'UPDATE room_type SET ACTIVE = 0, EDITED_BY = ?, EDITED_DT = NOW() WHERE IDNo = ? AND ACTIVE = 1';
-      const result = await queryDatabasePromise(query, [editedBy, id]);
+      const params = [editedBy, id];
+      let propertyFilter = '';
+      if (propertyId) {
+        propertyFilter = ' AND PROPERTY_ID = ?';
+        params.push(propertyId);
+      }
+      const query = `UPDATE room_type SET ACTIVE = 0, EDITED_BY = ?, EDITED_DT = NOW() WHERE IDNo = ? AND ACTIVE = 1${propertyFilter}`;
+      const result = await queryDatabasePromise(query, params);
       return result.affectedRows > 0;
     } catch (error) {
       throw error;
     }
   }
 
-  // Room types with their available (active, not under maintenance) room count, for Channex sync
+  // Room types with their available (active, not under maintenance) room count, for Channex sync.
+  // Deliberately NOT property-scoped yet - Channex/OTA sync is explicitly deferred
+  // in Phase 1 (see plan's Risks section); flagged there as "worth a quick manual
+  // check before Pool Villa's rooms go in, not a code change in this phase."
   static async getRoomTypesForChannexSync() {
     try {
       const query = `
@@ -331,7 +383,9 @@ class RoomModel {
   // ========================================
   // AMENITY CRUD OPERATIONS
   // ========================================
-  
+  // NOTE: amenity is a shared catalog across properties (confirmed with owner,
+  // see plan's "No change" list) - intentionally NOT scoped by PROPERTY_ID.
+
   // Get amenity by ID
   static async getAmenityById(id) {
     try {
@@ -388,10 +442,16 @@ class RoomModel {
   // ========================================
   
   // Get room types for dropdown
-  static async getRoomTypes() {
+  static async getRoomTypes(propertyId) {
     try {
-      const query = 'SELECT IDNo, NAME, DESCRIPTION, BASE_PRICE FROM room_type WHERE ACTIVE = 1 ORDER BY NAME ASC';
-      const result = await queryDatabasePromise(query);
+      const params = [];
+      let propertyFilter = '';
+      if (propertyId) {
+        propertyFilter = ' AND PROPERTY_ID = ?';
+        params.push(propertyId);
+      }
+      const query = `SELECT IDNo, NAME, DESCRIPTION, BASE_PRICE FROM room_type WHERE ACTIVE = 1${propertyFilter} ORDER BY NAME ASC`;
+      const result = await queryDatabasePromise(query, params);
       return result;
     } catch (error) {
       throw error;
@@ -423,7 +483,12 @@ class RoomModel {
   // ========================================
   // SEASON CRUD OPERATIONS
   // ========================================
-  
+  // NOTE: the `season` table (date-range definitions feeding room_season_price)
+  // has no PROPERTY_ID column and isn't part of the migration's scoped-table
+  // list - treated as shared/global, same as room_rate_season_months.
+  // Intentionally left unscoped here; only the per-room room_season_price
+  // rows (see getSeasonalRateSummary below) carry property-specific data.
+
   // Get all seasons
   static async getAllSeasons() {
     try {
@@ -538,10 +603,19 @@ class RoomModel {
   // ========================================
 
   // Get room by room number
-  static async getRoomByNumber(roomNumber) {
+  // Room numbers aren't unique system-wide (e.g. Pool Villa's rooms 3/13/14/15
+  // can collide with Main Hotel numbers) - propertyId scopes the lookup to one
+  // property so each property's own numbering is checked independently.
+  static async getRoomByNumber(roomNumber, propertyId) {
     try {
+      const params = [roomNumber];
+      let propertyFilter = '';
+      if (propertyId) {
+        propertyFilter = 'AND r.PROPERTY_ID = ?';
+        params.push(propertyId);
+      }
       const query = `
-        SELECT 
+        SELECT
           r.IDNo,
           r.ROOM_TYPE_ID,
           rt.NAME AS ROOM_TYPE_NAME,
@@ -562,9 +636,9 @@ class RoomModel {
           r.ACTIVE
         FROM room r
         LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
-        WHERE r.ROOM_NUMBER = ? AND r.ACTIVE = 1
+        WHERE r.ROOM_NUMBER = ? AND r.ACTIVE = 1 ${propertyFilter}
       `;
-      const result = await queryDatabasePromise(query, [roomNumber]);
+      const result = await queryDatabasePromise(query, params);
       return result[0] || null;
     } catch (error) {
       throw error;
@@ -572,10 +646,18 @@ class RoomModel {
   }
 
   // Get current booking by room number
-  static async getCurrentBookingByRoom(roomNumber) {
+  // Scoped by propertyId for the same reason as getRoomByNumber above - without
+  // it, a same-numbered room at the other property could match instead.
+  static async getCurrentBookingByRoom(roomNumber, propertyId) {
     try {
+      const params = [roomNumber];
+      let propertyFilter = '';
+      if (propertyId) {
+        propertyFilter = 'AND r.PROPERTY_ID = ?';
+        params.push(propertyId);
+      }
       const query = `
-        SELECT 
+        SELECT
           b.IDNo AS BookingID,
           c.NAME AS CUSTOMER_NAME,
           b.CHECK_IN_DATE,
@@ -586,15 +668,16 @@ class RoomModel {
         FROM booking b
         INNER JOIN room r ON b.ROOM_ID = r.IDNo
         LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
-        WHERE r.ROOM_NUMBER = ? 
+        WHERE r.ROOM_NUMBER = ?
           AND b.BOOKING_STATUS IN ('Confirmed', 'Check-In', 'Extended')
           AND b.CHECK_IN_DATE <= CURDATE()
           AND b.CHECK_OUT_DATE >= CURDATE()
           AND b.ACTIVE = 1
+          ${propertyFilter}
         ORDER BY b.CHECK_IN_DATE DESC
         LIMIT 1
       `;
-      const result = await queryDatabasePromise(query, [roomNumber]);
+      const result = await queryDatabasePromise(query, params);
       return result[0] || null;
     } catch (error) {
       throw error;
@@ -669,7 +752,13 @@ class RoomModel {
   // stored per-room, but every room sharing a bed count charges the same rate for a
   // given season/booking type (confirmed uniform across all 120 rooms per group), so
   // there's no single "the" room to key off of - MIN(PRICE) picks that one shared value.
-  static async getSeasonalRateSummary(bookingType, date) {
+  // room_season_price has no PROPERTY_ID of its own - scoped transitively via
+  // ROOM_ID -> room.PROPERTY_ID (join below) so Pool Villa's rooms don't blend
+  // into the Main Hotel's king/queen rate (or vice versa) once Pool Villa rooms
+  // exist. propertyId is optional here since the only current caller (Calendar's
+  // Room Checker, out of this slice's scope) hasn't been threaded yet; once it
+  // passes req.propertyId the filter engages automatically.
+  static async getSeasonalRateSummary(bookingType, date, propertyId) {
     try {
       const seasons = await queryDatabasePromise('SELECT IDNo, START_DATE, END_DATE FROM season WHERE ACTIVE = 1');
       const seasonId = this._findSeasonIdForDate(date, seasons);
@@ -677,12 +766,19 @@ class RoomModel {
         return { kingRate: 0, queenRate: 0, seasonId: null };
       }
 
+      const params = [bookingType, seasonId];
+      let propertyFilter = '';
+      if (propertyId) {
+        propertyFilter = 'AND r.PROPERTY_ID = ?';
+        params.push(propertyId);
+      }
       const rows = await queryDatabasePromise(
-        `SELECT ROOM_BED, MIN(PRICE) AS PRICE
-         FROM room_season_price
-         WHERE ACTIVE = 1 AND BOOKING_TYPE = ? AND SEASON_ID = ? AND ROOM_BED IN (1, 2)
-         GROUP BY ROOM_BED`,
-        [bookingType, seasonId]
+        `SELECT rsp.ROOM_BED, MIN(rsp.PRICE) AS PRICE
+         FROM room_season_price rsp
+         JOIN room r ON r.IDNo = rsp.ROOM_ID
+         WHERE rsp.ACTIVE = 1 AND rsp.BOOKING_TYPE = ? AND rsp.SEASON_ID = ? AND rsp.ROOM_BED IN (1, 2) ${propertyFilter}
+         GROUP BY rsp.ROOM_BED`,
+        params
       );
 
       const kingRow = rows.find(r => Number(r.ROOM_BED) === 1);

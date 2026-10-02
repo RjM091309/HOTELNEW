@@ -90,7 +90,7 @@ class RoomController {
   // Get all rooms
   static async getAllRooms(req, res) {
     try {
-      const rooms = await RoomModel.getAllRooms();
+      const rooms = await RoomModel.getAllRooms(req.propertyId);
       res.json({
         success: true,
         data: rooms
@@ -109,7 +109,7 @@ class RoomController {
   static async getRoomById(req, res) {
     try {
       const { id } = req.params;
-      const room = await RoomModel.getRoomById(id);
+      const room = await RoomModel.getRoomById(id, req.propertyId);
       
       if (room) {
         res.json({
@@ -163,8 +163,9 @@ class RoomController {
           });
         }
 
-        // Check if room number already exists
-        const existingRoom = await RoomModel.getRoomByNumber(ROOM_NUMBER);
+        // Check if room number already exists (scoped to this property - the
+        // same room number can exist independently at another property)
+        const existingRoom = await RoomModel.getRoomByNumber(ROOM_NUMBER, req.propertyId);
         if (existingRoom) {
           return res.status(400).json({
             success: false,
@@ -183,7 +184,7 @@ class RoomController {
         const result = await RoomModel.createRoom(
           ROOM_TYPE_ID, ROOM_NUMBER, ROOM_STATUS,
           ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW,
-          ROOM_DESCRIPTION, ROOM_IMAGE, parsedAmenities, encodedBy
+          ROOM_DESCRIPTION, ROOM_IMAGE, parsedAmenities, encodedBy, req.propertyId
         );
         
         if (result) {
@@ -241,8 +242,9 @@ class RoomController {
           });
         }
 
-        // Check if room number already exists for other rooms
-        const existingRoom = await RoomModel.getRoomByNumber(ROOM_NUMBER);
+        // Check if room number already exists for other rooms (scoped to this
+        // property - the same room number can exist independently at another property)
+        const existingRoom = await RoomModel.getRoomByNumber(ROOM_NUMBER, req.propertyId);
         if (existingRoom && existingRoom.IDNo != IDNo) {
           return res.status(400).json({
             success: false,
@@ -261,7 +263,7 @@ class RoomController {
         const result = await RoomModel.updateRoom(
           IDNo, ROOM_TYPE_ID, ROOM_NUMBER, ROOM_STATUS,
           ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW,
-          ROOM_DESCRIPTION, ROOM_IMAGE, parsedAmenities, editedBy
+          ROOM_DESCRIPTION, ROOM_IMAGE, parsedAmenities, editedBy, req.propertyId
         );
         
         if (result) {
@@ -293,7 +295,7 @@ class RoomController {
     try {
       const { id } = req.params;
       const editedBy = req.user ? req.user.userId : req.session.userId;
-      const result = await RoomModel.deleteRoom(id, editedBy);
+      const result = await RoomModel.deleteRoom(id, editedBy, req.propertyId);
       
       if (result) {
         res.json({
@@ -324,7 +326,7 @@ class RoomController {
   static async getRoomTypeById(req, res) {
     try {
       const { id } = req.params;
-      const roomType = await RoomModel.getRoomTypeById(id);
+      const roomType = await RoomModel.getRoomTypeById(id, req.propertyId);
       
       if (roomType) {
         res.json({
@@ -361,7 +363,7 @@ class RoomController {
       }
 
       const encodedBy = req.user ? req.user.userId : req.session.userId;
-      const result = await RoomModel.createRoomType(NAME, DESCRIPTION, encodedBy);
+      const result = await RoomModel.createRoomType(NAME, DESCRIPTION, encodedBy, req.propertyId);
       
       if (result) {
         res.json({
@@ -398,7 +400,7 @@ class RoomController {
       }
 
       const editedBy = req.user ? req.user.userId : req.session.userId;
-      const result = await RoomModel.updateRoomType(IDNo, NAME, DESCRIPTION, editedBy);
+      const result = await RoomModel.updateRoomType(IDNo, NAME, DESCRIPTION, editedBy, req.propertyId);
       
       if (result) {
         res.json({
@@ -426,7 +428,7 @@ class RoomController {
     try {
       const { id } = req.params;
       const editedBy = req.user ? req.user.userId : req.session.userId;
-      const result = await RoomModel.deleteRoomType(id, editedBy);
+      const result = await RoomModel.deleteRoomType(id, editedBy, req.propertyId);
       
       if (result) {
         res.json({
@@ -588,7 +590,7 @@ class RoomController {
   // Get room types for dropdown
   static async getRoomTypes(req, res) {
     try {
-      const roomTypes = await RoomModel.getRoomTypes();
+      const roomTypes = await RoomModel.getRoomTypes(req.propertyId);
       res.json({
         success: true,
         data: roomTypes
@@ -785,8 +787,8 @@ class RoomController {
         });
       }
 
-      const room = await RoomModel.getRoomByNumber(roomNumber);
-      
+      const room = await RoomModel.getRoomByNumber(roomNumber, req.propertyId);
+
       if (!room) {
         return res.status(404).json({
           success: false,
@@ -795,7 +797,7 @@ class RoomController {
       }
 
       // Get current booking for this room
-      const currentBooking = await RoomModel.getCurrentBookingByRoom(roomNumber);
+      const currentBooking = await RoomModel.getCurrentBookingByRoom(roomNumber, req.propertyId);
       
       const roomControlData = {
         roomId: room.IDNo,

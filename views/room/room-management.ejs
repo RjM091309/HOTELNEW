@@ -33,7 +33,7 @@
                                 <th>Room Number</th>
                                 <th>Room Type</th>
                                 <th>Max Occupants</th>
-                                <th>Bed Count</th>
+                                <th>Bed Type</th>
                                 <th>Room Size</th>
                                 <th>Room View</th>
                                 <th>Amenities</th>
@@ -121,10 +121,11 @@
                                 <label for="addRoomBed" class="pull-right margin-0">
                                     <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
                                 </label>
-                                <label for="addRoomBed" class="mdl-textfield__label">Bed Count</label>
+                                <label for="addRoomBed" class="mdl-textfield__label">Bed Type</label>
                                 <ul data-mdl-for="addRoomBed" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
                                     <li class="mdl-menu__item" data-val="1">King Bedroom</li>
                                     <li class="mdl-menu__item" data-val="2">Queen Bedroom</li>
+                                    <li class="mdl-menu__item" data-val="3">Standard</li>
                                 </ul>
                             </div>
                         </div>
@@ -260,10 +261,11 @@
                                 <label for="editRoomBed" class="pull-right margin-0">
                                     <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
                                 </label>
-                                <label for="editRoomBed" class="mdl-textfield__label">Bed Count</label>
+                                <label for="editRoomBed" class="mdl-textfield__label">Bed Type</label>
                                 <ul data-mdl-for="editRoomBed" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
                                     <li class="mdl-menu__item" data-val="1">King Bedroom</li>
                                     <li class="mdl-menu__item" data-val="2">Queen Bedroom</li>
+                                    <li class="mdl-menu__item" data-val="3">Standard</li>
                                 </ul>
                             </div>
                         </div>
@@ -409,7 +411,41 @@
     .modal-backdrop + .mdl-menu__container {
         z-index: 9999 !important;
     }
-    
+
+    /* Add/Edit Room input text was invisible in dark mode (default theme) -
+       every color rule for these two modals in theme-color.css/card.css is
+       scoped to [data-theme="white"]/body.white-sidebar-color only, so dark
+       mode fell back to the browser/Bootstrap default (near-black) text
+       color on these dark fields. Same fix/colors already used successfully
+       in the Add Booking modal (views/booking/modal/add_booking.ejs). */
+    #addRoomModal input[type="text"],
+    #addRoomModal input[type="number"],
+    #addRoomModal input[type="email"],
+    #addRoomModal select,
+    #addRoomModal textarea,
+    #editRoomModal input[type="text"],
+    #editRoomModal input[type="number"],
+    #editRoomModal input[type="email"],
+    #editRoomModal select,
+    #editRoomModal textarea {
+        background-color: #41474c;
+        color: #ffffff;
+        border: 1px solid #41474c;
+        border-bottom: 1px solid #a6aeb1 !important;
+    }
+
+    #addRoomModal input::placeholder,
+    #addRoomModal textarea::placeholder,
+    #editRoomModal input::placeholder,
+    #editRoomModal textarea::placeholder {
+        color: #bbbbbb;
+    }
+
+    #addRoomModal select option,
+    #editRoomModal select option {
+        background-color: #41474c;
+        color: #ffffff;
+    }
 
 </style>
 

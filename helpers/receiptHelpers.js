@@ -12,8 +12,8 @@ async function loadReceiptLogo() {
   }
 }
 
-async function loadReceiptTemplateSettings() {
-  const settings = await ReceiptSettingsModel.getOrCreate();
+async function loadReceiptTemplateSettings(propertyId) {
+  const settings = await ReceiptSettingsModel.getOrCreate(propertyId);
   return {
     hotelName: settings.HOTEL_NAME || 'MAIN STAY HOTEL',
     receiptTitle: settings.RECEIPT_TITLE || 'Payment Receipt',
@@ -74,8 +74,8 @@ function mapBlankReceiptViewData() {
   };
 }
 
-async function getReceiptRenderContext(viewData, embed) {
-  const templateSettings = await loadReceiptTemplateSettings();
+async function getReceiptRenderContext(viewData, embed, propertyId) {
+  const templateSettings = await loadReceiptTemplateSettings(propertyId);
   const logoUrl = templateSettings.showLogo ? await loadReceiptLogo() : '';
   return {
     layout: false,

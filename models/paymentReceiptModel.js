@@ -1,7 +1,7 @@
 const { queryDatabasePromise } = require('../config/database');
 
 class PaymentReceiptModel {
-  static async getAll() {
+  static async getAll(propertyId) {
     return await queryDatabasePromise(
       `SELECT
         pr.IDNo,
@@ -21,17 +21,18 @@ class PaymentReceiptModel {
         u.FULLNAME AS ENCODED_BY_NAME
       FROM payment_receipt pr
       LEFT JOIN user_info u ON u.IDNo = pr.ENCODED_BY
-      WHERE pr.ACTIVE = 1
-      ORDER BY pr.RECEIPT_DATE DESC, pr.IDNo DESC`
+      WHERE pr.ACTIVE = 1 AND pr.PROPERTY_ID = ?
+      ORDER BY pr.RECEIPT_DATE DESC, pr.IDNo DESC`,
+      [propertyId]
     );
   }
 
-  static async getById(id) {
+  static async getById(id, propertyId) {
     const rows = await queryDatabasePromise(
       `SELECT *
        FROM payment_receipt
-       WHERE IDNo = ? AND ACTIVE = 1`,
-      [id]
+       WHERE IDNo = ? AND PROPERTY_ID = ? AND ACTIVE = 1`,
+      [id, propertyId]
     );
     return rows[0] || null;
   }
@@ -40,8 +41,8 @@ class PaymentReceiptModel {
     const query = `
       INSERT INTO payment_receipt
       (RECEIPT_NO, ROOM_NO, RECEIPT_DATE, RECEIVED_FROM, AMOUNT_PAID, PAYMENT_METHOD,
-       PAYMENT_METHOD_OTHER, PURPOSE, RECEIVED_BY, ENCODED_BY, ENCODED_DT, ACTIVE)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+       PAYMENT_METHOD_OTHER, PURPOSE, RECEIVED_BY, ENCODED_BY, ENCODED_DT, ACTIVE, PROPERTY_ID)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
     `;
     const result = await queryDatabasePromise(query, [
       data.RECEIPT_NO,
@@ -54,7 +55,8 @@ class PaymentReceiptModel {
       data.PURPOSE,
       data.RECEIVED_BY,
       data.ENCODED_BY,
-      data.ENCODED_DT
+      data.ENCODED_DT,
+      data.PROPERTY_ID
     ]);
     return { id: result.insertId, ...data };
   }
@@ -98,18 +100,18 @@ class PaymentReceiptModel {
     ]);
   }
 
-  static async delete(id, editedBy) {
+  static async delete(id, editedBy, propertyId) {
     return await queryDatabasePromise(
       `UPDATE payment_receipt
        SET ACTIVE = 0, EDITED_BY = ?, EDITED_DT = NOW()
-       WHERE IDNo = ? AND ACTIVE = 1`,
-      [editedBy, id]
+       WHERE IDNo = ? AND PROPERTY_ID = ? AND ACTIVE = 1`,
+      [editedBy, id, propertyId]
     );
   }
 
-  static async searchBookedGuests(searchQuery = '') {
+  static async searchBookedGuests(searchQuery = '', propertyId) {
     const term = String(searchQuery || '').trim();
-    const params = [];
+    const params = [propertyId];
     let searchCondition = '';
 
     if (term) {
@@ -135,6 +137,7 @@ class PaymentReceiptModel {
       INNER JOIN customer c ON c.IDNo = b.CUSTOMER_ID
       LEFT JOIN room r ON r.IDNo = b.ROOM_ID
       WHERE b.ACTIVE = 1
+        AND b.PROPERTY_ID = ?
         AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
         ${searchCondition}
       ORDER BY b.CHECK_IN_DATE DESC, c.NAME ASC

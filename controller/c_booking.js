@@ -494,7 +494,8 @@ class BookingController {
         groupCondition,
         searchCondition,
         searchParams,
-        useIndividualCalculation // Pass flag to use individual calculation for group bookings in single view
+        useIndividualCalculation, // Pass flag to use individual calculation for group bookings in single view
+        propertyId: req.propertyId
       });
 
 
@@ -517,7 +518,7 @@ class BookingController {
     try {
       const bookingID = req.params.bookingID;
 
-      const bookingDetails = await BookingModel.getBookingDetails(bookingID);
+      const bookingDetails = await BookingModel.getBookingDetails(bookingID, req.propertyId);
 
       if (!bookingDetails) {
         return res.status(404).json({ error: 'Booking not found' });
@@ -564,7 +565,8 @@ class BookingController {
         bookingID: BookingID,
         status,
         lateCheckOut,
-        roomStatus
+        roomStatus,
+        propertyId: req.propertyId
       });
 
       res.json({ 
@@ -597,7 +599,7 @@ class BookingController {
       let bookingIds = [bookingId];
       if (scope === 'group') {
         // Find all bookings within the same group as the provided bookingId
-        const result = await BookingModel.getGroupBookingIdsByBooking(bookingId);
+        const result = await BookingModel.getGroupBookingIdsByBooking(bookingId, req.propertyId);
         if (result && Array.isArray(result) && result.length > 0) {
           bookingIds = result;
         }
@@ -610,7 +612,8 @@ class BookingController {
         refundAmount: hasRefund ? parseFloat(refundAmount) || 0 : 0,
         penaltyAmount: parseFloat(penaltyAmount) || 0,
         applyDiscount: applyDiscount === true || applyDiscount === 'true',
-        checkoutDateMode: normalizedCheckoutDateMode
+        checkoutDateMode: normalizedCheckoutDateMode,
+        propertyId: req.propertyId
       });
       
       // Emit Socket.IO event for calendar real-time updates
@@ -620,7 +623,7 @@ class BookingController {
           // Fetch updated booking details for each checked out booking
           const updatedBookings = [];
           for (const id of bookingIds) {
-            const bookingDetails = await BookingModel.getBookingDetails(id);
+            const bookingDetails = await BookingModel.getBookingDetails(id, req.propertyId);
             if (bookingDetails) {
               updatedBookings.push({
                 bookingId: id,
@@ -668,7 +671,7 @@ class BookingController {
   // Get floors for dropdown
   static async getFloorsForDropdown(req, res) {
     try {
-      const floors = await BookingModel.getFloorsForDropdown();
+      const floors = await BookingModel.getFloorsForDropdown(req.propertyId);
       res.json(floors);
     } catch (error) {
       console.error('Error fetching floors:', error);
@@ -685,7 +688,7 @@ class BookingController {
         return res.status(400).json({ error: 'Floor parameter is required' });
       }
 
-      const rooms = await BookingModel.getRoomsByFloor(floor);
+      const rooms = await BookingModel.getRoomsByFloor(floor, req.propertyId);
       res.json(rooms);
     } catch (error) {
       console.error('Error fetching rooms for floor:', error);
@@ -967,7 +970,8 @@ class BookingController {
         isLongTermStay: isLongTermStay == 1 || isLongTermStay === 'true' || isLongTermStay === true,
         roomChangeNote: roomChangeNote && String(roomChangeNote).trim() !== '' ? String(roomChangeNote).trim() : null,
         isContractedRate: isContractedRate == 1 || isContractedRate === 'true' || isContractedRate === true,
-        channelBookingId: String(channelBookingId || '').trim() || null
+        channelBookingId: String(channelBookingId || '').trim() || null,
+        propertyId: req.propertyId
       });
 
 
@@ -977,7 +981,8 @@ class BookingController {
           bookingId: result.bookingId,
           reason: bookingRemarks || '',
           guestName: fullname || 'Maintenance',
-          encodedBy
+          encodedBy,
+          propertyId: req.propertyId
         });
       }
 
@@ -1044,7 +1049,7 @@ class BookingController {
         });
       }
 
-      const bookingDetails = await BookingModel.getBookingByConfirmationNumber(confirmationNumber);
+      const bookingDetails = await BookingModel.getBookingByConfirmationNumber(confirmationNumber, req.propertyId);
 
       if (!bookingDetails) {
         return res.status(404).json({ 
@@ -1308,7 +1313,7 @@ class BookingController {
         });
       }
 
-      const receiptData = await BookingModel.getBilling(id);
+      const receiptData = await BookingModel.getBilling(id, req.propertyId);
 
       if (!receiptData) {
         return res.status(404).json({ 
@@ -1330,7 +1335,7 @@ class BookingController {
   // Get notifications
   static async getNotifications(req, res) {
     try {
-      const notifications = await BookingModel.getNotifications();
+      const notifications = await BookingModel.getNotifications(req.propertyId);
 
       res.json(notifications);
 
@@ -1343,7 +1348,7 @@ class BookingController {
   // Mark notifications as read
   static async markNotificationsAsRead(req, res) {
     try {
-      const result = await BookingModel.markNotificationsAsRead();
+      const result = await BookingModel.markNotificationsAsRead(req.propertyId);
 
       res.json({ 
         success: true, 
@@ -1420,7 +1425,8 @@ class BookingController {
 
       const result = await BookingModel.lateCheckout({
         bookingId,
-        hours
+        hours,
+        propertyId: req.propertyId
       });
 
       res.json({
@@ -1499,7 +1505,7 @@ class BookingController {
         return res.json([]);
       }
 
-      const customers = await BookingModel.searchCustomer(query);
+      const customers = await BookingModel.searchCustomer(query, req.propertyId);
 
       res.json(customers);
 
@@ -1523,7 +1529,8 @@ class BookingController {
 
       const result = await BookingModel.getAvailableRooms({
         startDate,
-        endDate
+        endDate,
+        propertyId: req.propertyId
       });
 
       res.json({ 
@@ -1553,7 +1560,7 @@ class BookingController {
         });
       }
 
-      const roomDetails = await BookingModel.getRoomDetails(roomId);
+      const roomDetails = await BookingModel.getRoomDetails(roomId, req.propertyId);
 
       if (!roomDetails) {
         return res.json({ 
@@ -1595,7 +1602,8 @@ class BookingController {
 
       const result = await BookingModel.updateRoomPaymentStatus({
         bookingId,
-        status
+        status,
+        propertyId: req.propertyId
       });
 
       // console.log("✅ Payment status updated successfully in the database.");
@@ -1646,7 +1654,8 @@ class BookingController {
 
       const result = await BookingModel.updateExtendPaymentStatus({
         bookingId,
-        status
+        status,
+        propertyId: req.propertyId
       });
 
       // console.log("✅ Extend payment status updated successfully in the database.");
@@ -1706,7 +1715,8 @@ class BookingController {
         bookingRoute: normalizedBookingRoute,
         checkInStatus,
         checkOutStatus,
-        excludeGroupBookingId
+        excludeGroupBookingId,
+        propertyId: req.propertyId
       });
 
       res.json(result);
@@ -1739,7 +1749,8 @@ class BookingController {
         checkOutStatus,
         floorNumber,
         category,
-        breakfast
+        breakfast,
+        propertyId: req.propertyId
       });
 
       res.json(result);
@@ -1770,7 +1781,8 @@ class BookingController {
       const result = await BookingModel.checkRoomsAvailability({
         roomIds: parsedRoomIds,
         startDate,
-        endDate
+        endDate,
+        propertyId: req.propertyId
       });
 
       res.json(result);
@@ -1811,7 +1823,8 @@ class BookingController {
         checkInStatus,
         checkOutStatus,
         excludeGroupBookingId,
-        currentGroupBookingId
+        currentGroupBookingId,
+        propertyId: req.propertyId
       });
 
       res.json(result);
@@ -1997,7 +2010,8 @@ class BookingController {
         encodedBy,
         date,
         isDirectReservation: directReservationFlag === 'true',
-        existingGroupId: existingGroupId ? parseInt(existingGroupId, 10) : null // Pass existing group ID if joining
+        existingGroupId: existingGroupId ? parseInt(existingGroupId, 10) : null, // Pass existing group ID if joining
+        propertyId: req.propertyId
       });
 
       return res.json(result);
@@ -2019,7 +2033,7 @@ class BookingController {
         });
       }
 
-      const groupInfo = await BookingModel.getGroupInfo(groupId);
+      const groupInfo = await BookingModel.getGroupInfo(groupId, req.propertyId);
 
       if (!groupInfo) {
         return res.status(404).json({
@@ -2053,7 +2067,7 @@ class BookingController {
         });
       }
 
-      const groupBookingDetails = await BookingModel.getEditGroupBookingDetails(groupBookingId);
+      const groupBookingDetails = await BookingModel.getEditGroupBookingDetails(groupBookingId, req.propertyId);
 
       if (!groupBookingDetails) {
         return res.status(404).json({
@@ -2200,7 +2214,8 @@ class BookingController {
         lateCheckoutFee: lateCheckoutFeeNum,
         isContractedRate: isContractedRate == 1 || isContractedRate === 'true' || isContractedRate === true,
         encodedBy,
-        date
+        date,
+        propertyId: req.propertyId
       });
 
 
@@ -2223,7 +2238,7 @@ class BookingController {
       const dateTo = req.query.dateTo;
       const groupId = req.query.groupId || req.query.highlight || null;
 
-      const groupBookingData = await BookingModel.getGroupBookingData(filter, dateFrom, dateTo, groupId);
+      const groupBookingData = await BookingModel.getGroupBookingData(filter, dateFrom, dateTo, groupId, req.propertyId);
 
       res.json(groupBookingData);
 
@@ -2246,7 +2261,7 @@ class BookingController {
         });
       }
 
-      const details = await BookingModel.getGroupBookingDetails(groupId);
+      const details = await BookingModel.getGroupBookingDetails(groupId, req.propertyId);
 
       if (!details || !details.bookingDetails || details.bookingDetails.length === 0) {
         return res.status(404).json({ 
@@ -2275,7 +2290,7 @@ class BookingController {
         });
       }
 
-      const billingDetails = await BookingModel.getGroupBillingDetails(groupId);
+      const billingDetails = await BookingModel.getGroupBillingDetails(groupId, req.propertyId);
 
       if (!billingDetails.roomBillingDetails.length && !billingDetails.serviceBillingDetails.length) {
         return res.status(404).json({ 
@@ -2304,7 +2319,7 @@ class BookingController {
         });
       }
 
-      const paymentStatus = await BookingModel.checkGroupPaymentStatus(groupId);
+      const paymentStatus = await BookingModel.checkGroupPaymentStatus(groupId, req.propertyId);
 
       res.json({ 
         allPaid: paymentStatus.allPaid 
@@ -2330,12 +2345,13 @@ class BookingController {
         });
       }
 
-      const result = await BookingModel.groupPayment({ 
-        bookingIDs, 
-        amountPaid, 
-        paymentMethod, 
+      const result = await BookingModel.groupPayment({
+        bookingIDs,
+        amountPaid,
+        paymentMethod,
         paymentNotes,
-        encodedBy 
+        encodedBy,
+        propertyId: req.propertyId
       });
 
       res.json({ 
@@ -2354,7 +2370,7 @@ class BookingController {
   // Get all bookings
   static async getBookings(req, res) {
     try {
-      const bookings = await BookingModel.getBookings();
+      const bookings = await BookingModel.getBookings(req.propertyId);
       res.json(bookings);
 
     } catch (error) {
@@ -2368,7 +2384,7 @@ class BookingController {
   // Get all rooms
   static async getRooms(req, res) {
     try {
-      const rooms = await BookingModel.getRooms();
+      const rooms = await BookingModel.getRooms(req.propertyId);
       res.json(rooms);
 
     } catch (error) {
@@ -2408,12 +2424,13 @@ class BookingController {
         });
       }
 
-      const result = await BookingModel.cancelBooking({ 
-        bookingId, 
-        reason, 
+      const result = await BookingModel.cancelBooking({
+        bookingId,
+        reason,
         manualRefund: parsedRefund,
         manualCancellationFee: parsedFee,
-        encodedBy 
+        encodedBy,
+        propertyId: req.propertyId
       });
 
 
@@ -2459,7 +2476,7 @@ class BookingController {
         return res.status(400).json({ success: false, message: 'bookingId is required.' });
       }
 
-      const result = await BookingModel.softDeleteCheckedOutBooking(bookingId);
+      const result = await BookingModel.softDeleteCheckedOutBooking(bookingId, req.propertyId);
       return res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       console.error('Delete checked-out booking error:', error);
@@ -2484,7 +2501,8 @@ class BookingController {
         bookingId,
         reason,
         guestName,
-        encodedBy
+        encodedBy,
+        propertyId: req.propertyId
       });
 
       res.json({
@@ -2518,7 +2536,8 @@ class BookingController {
         bookingId,
         encodedBy,
         guestName,
-        bookingStatus
+        bookingStatus,
+        propertyId: req.propertyId
       });
 
       res.json({
@@ -2552,7 +2571,8 @@ class BookingController {
 
       const result = await BookingModel.completeMaintenanceBooking({
         bookingId,
-        encodedBy
+        encodedBy,
+        propertyId: req.propertyId
       });
 
       res.json({
@@ -2589,12 +2609,13 @@ class BookingController {
         });
       }
 
-      const result = await BookingModel.cancelGroupBooking({ 
+      const result = await BookingModel.cancelGroupBooking({
         groupId,
         reason,
         cancellationFee,
         encodedBy,
-        bookingIds
+        bookingIds,
+        propertyId: req.propertyId
       });
 
       res.json({ 
@@ -2692,7 +2713,7 @@ class BookingController {
         });
       }
 
-      const invoiceData = await BookingModel.generateInvoice({ bookingId, user });
+      const invoiceData = await BookingModel.generateInvoice({ bookingId, user, propertyId: req.propertyId });
       
       // Use confirmation number for filename (same as voucher)
       const filename = `invoice-${invoiceData.confirmationNumber}.pdf`;
@@ -2725,7 +2746,7 @@ class BookingController {
 
       // If bookingId is provided instead of full voucher data, fetch it from database
       if (!data.voucherNo && data.bookingId) {
-        const voucherData = await BookingModel.getVoucherData(data.bookingId);
+        const voucherData = await BookingModel.getVoucherData(data.bookingId, req.propertyId);
         
         if (!voucherData) {
           return res.status(404).send('Booking not found');
@@ -2746,7 +2767,7 @@ class BookingController {
         
         // Get billing data for totals FIRST - we'll get breakfast/pickup/dropoff from here
         console.log('🔍 [VOUCHER] Fetching billing data for bookingId:', data.bookingId);
-        const billingData = await BookingModel.getBilling(data.bookingId);
+        const billingData = await BookingModel.getBilling(data.bookingId, req.propertyId);
         
         if (!billingData) {
           console.error('❌ [VOUCHER] Billing data not found for bookingId:', data.bookingId);
@@ -3260,7 +3281,7 @@ class BookingController {
         return res.status(400).json({ error: 'Group ID is required' });
       }
 
-      const invoiceData = await BookingModel.generateGroupInvoice({ groupId, user });
+      const invoiceData = await BookingModel.generateGroupInvoice({ groupId, user, propertyId: req.propertyId });
 
       const filename = `group-invoice-${invoiceData.confirmationNumber || 'unknown'}.pdf`;
 
@@ -3358,7 +3379,7 @@ class BookingController {
         });
       }
 
-      const availableRooms = await BookingModel.getAvailableRoomsByBedCount(startDate, endDate, bedCount);
+      const availableRooms = await BookingModel.getAvailableRoomsByBedCount(startDate, endDate, bedCount, req.propertyId);
       
       res.json({
         success: true,
@@ -3396,7 +3417,8 @@ class BookingController {
         floor,
         paymentStatus,
         paidAmount,
-        encodedBy
+        encodedBy,
+        propertyId: req.propertyId
       });
 
       if (result.success) {
@@ -3431,7 +3453,7 @@ class BookingController {
         });
       }
 
-      const bookingDetails = await BookingModel.getDirectReservationDetails(bookingId);
+      const bookingDetails = await BookingModel.getDirectReservationDetails(bookingId, req.propertyId);
 
       if (!bookingDetails) {
         return res.status(404).json({
@@ -3481,7 +3503,7 @@ class BookingController {
     try {
       const bookingId = req.params.id;
 
-      const bookingDetails = await BookingModel.getEditBookingDetails(bookingId);
+      const bookingDetails = await BookingModel.getEditBookingDetails(bookingId, req.propertyId);
 
       if (!bookingDetails) {
         return res.status(404).json({ success: false, message: 'Booking not found' });
@@ -3608,7 +3630,8 @@ class BookingController {
         seniorPwdDiscountPercent, // Pass percentage for storage
         lateCheckoutFee,
         editedBy,
-        channelBookingId: String(channelBookingId || '').trim() || null
+        channelBookingId: String(channelBookingId || '').trim() || null,
+        propertyId: req.propertyId
       });
 
       res.json({ 
@@ -3643,7 +3666,8 @@ class BookingController {
         floor,
         checkInDate,
         checkOutDate,
-        excludeBookingId
+        excludeBookingId,
+        propertyId: req.propertyId
       });
 
       // console.log('Available rooms response:', availableRooms);
@@ -3737,7 +3761,7 @@ class BookingController {
       const { groupId } = req.params;
       if (!groupId) return res.status(400).json({ success: false, message: 'Group ID is required' });
 
-      const remarks = await BookingModel.getGroupRemarksByGroup(groupId);
+      const remarks = await BookingModel.getGroupRemarksByGroup(groupId, req.propertyId);
       return res.json({ success: true, remarks });
     } catch (err) {
       console.error('Error fetching group remarks:', err);
@@ -3753,7 +3777,7 @@ class BookingController {
       if (!groupId || !category || !remarkText) {
         return res.status(400).json({ success: false, message: 'groupId, category and remarkText are required' });
       }
-      const result = await BookingModel.addGroupRemark({ groupId, category, remarkText, encodedBy });
+      const result = await BookingModel.addGroupRemark({ groupId, category, remarkText, encodedBy, propertyId: req.propertyId });
       if (result.success) return res.json(result);
       return res.status(500).json({ success: false, message: result.message || 'Failed to add group remark' });
     } catch (err) {
@@ -3851,7 +3875,7 @@ class BookingController {
         });
       }
 
-      const voucherData = await BookingModel.getVoucherData(bookingId);
+      const voucherData = await BookingModel.getVoucherData(bookingId, req.propertyId);
 
       if (!voucherData) {
         return res.status(404).json({
@@ -3886,7 +3910,7 @@ class BookingController {
         });
       }
 
-      const voucherData = await BookingModel.getGroupVoucherData(groupId);
+      const voucherData = await BookingModel.getGroupVoucherData(groupId, req.propertyId);
 
       if (!voucherData) {
         return res.status(404).json({
@@ -3922,7 +3946,7 @@ class BookingController {
         });
       }
 
-      const voucherData = await BookingModel.getVoucherData(bookingId);
+      const voucherData = await BookingModel.getVoucherData(bookingId, req.propertyId);
 
       if (!voucherData) {
         return res.status(404).json({
@@ -3951,7 +3975,7 @@ class BookingController {
       
       // Get billing data for totals FIRST - we'll get pickup/dropoff/breakfast from here
       console.log('🔍 [VOUCHER PDF] Fetching billing data for bookingId:', bookingId);
-      const billingData = await BookingModel.getBilling(bookingId);
+      const billingData = await BookingModel.getBilling(bookingId, req.propertyId);
       
         // Get breakfast, pickup, and dropoff from billingData.items (more reliable than getVoucherData query)
         let breakfastAdult = 0;

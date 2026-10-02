@@ -76,7 +76,7 @@ class ReceiptController {
 
   static async getAll(req, res) {
     try {
-      const data = await PaymentReceiptModel.getAll();
+      const data = await PaymentReceiptModel.getAll(req.propertyId);
       res.json({ success: true, data });
     } catch (error) {
       console.error('Error fetching receipts:', error);
@@ -91,7 +91,7 @@ class ReceiptController {
   static async searchBookedGuests(req, res) {
     try {
       const q = (req.query.q || '').trim();
-      const data = await PaymentReceiptModel.searchBookedGuests(q);
+      const data = await PaymentReceiptModel.searchBookedGuests(q, req.propertyId);
       res.json({ success: true, data });
     } catch (error) {
       console.error('Error fetching booked guests:', error);
@@ -105,7 +105,7 @@ class ReceiptController {
 
   static async getById(req, res) {
     try {
-      const data = await PaymentReceiptModel.getById(req.params.id);
+      const data = await PaymentReceiptModel.getById(req.params.id, req.propertyId);
       if (!data) {
         return res.status(404).json({ success: false, message: 'Receipt not found' });
       }
@@ -137,12 +137,13 @@ class ReceiptController {
         return res.status(400).json({ success: false, message: 'Please specify the other payment method' });
       }
 
-      const settings = await ReceiptSettingsModel.getOrCreate();
+      const settings = await ReceiptSettingsModel.getOrCreate(req.propertyId);
       const prefix = (settings.RECEIPT_PREFIX || 'RCP').trim() || 'RCP';
 
       payload.RECEIPT_NO = `${prefix}-TEMP`;
       payload.ENCODED_BY = req.user?.userId || null;
       payload.ENCODED_DT = new Date();
+      payload.PROPERTY_ID = req.propertyId;
 
       const result = await PaymentReceiptModel.create(payload);
 
@@ -172,14 +173,14 @@ class ReceiptController {
         return res.status(400).json({ success: false, message: 'Receipt ID is required' });
       }
 
-      const existing = await PaymentReceiptModel.getById(id);
+      const existing = await PaymentReceiptModel.getById(id, req.propertyId);
       if (!existing) {
         return res.status(404).json({ success: false, message: 'Receipt not found' });
       }
 
       const payload = parseReceiptPayload(req.body);
       payload.IDNo = id;
-      payload.RECEIPT_NO = existing.RECEIPT_NO || `${(await ReceiptSettingsModel.getOrCreate()).RECEIPT_PREFIX || 'RCP'}-${id}`;
+      payload.RECEIPT_NO = existing.RECEIPT_NO || `${(await ReceiptSettingsModel.getOrCreate(req.propertyId)).RECEIPT_PREFIX || 'RCP'}-${id}`;
       payload.EDITED_BY = req.user?.userId || null;
       payload.EDITED_DT = new Date();
 
@@ -211,7 +212,7 @@ class ReceiptController {
   static async delete(req, res) {
     try {
       const { id } = req.params;
-      const result = await PaymentReceiptModel.delete(id, req.user?.userId || null);
+      const result = await PaymentReceiptModel.delete(id, req.user?.userId || null, req.propertyId);
 
       if (!result?.affectedRows) {
         return res.status(404).json({ success: false, message: 'Receipt not found' });
@@ -230,11 +231,11 @@ class ReceiptController {
 
   static async printReceipt(req, res) {
     try {
-      const record = await PaymentReceiptModel.getById(req.params.id);
+      const record = await PaymentReceiptModel.getById(req.params.id, req.propertyId);
       if (!record) return res.status(404).send('Receipt not found');
 
       const viewData = mapReceiptRecordToViewData(record);
-      const context = await getReceiptRenderContext(viewData, req.query.embed);
+      const context = await getReceiptRenderContext(viewData, req.query.embed, req.propertyId);
       res.render('payments/payment_receipt', context);
     } catch (error) {
       console.error('Error printing receipt:', error);
@@ -255,7 +256,7 @@ class ReceiptController {
 
       const records = [];
       for (const id of ids) {
-        const record = await PaymentReceiptModel.getById(id);
+        const record = await PaymentReceiptModel.getById(id, req.propertyId);
         if (record) records.push(record);
       }
 
@@ -270,7 +271,8 @@ class ReceiptController {
       for (const record of records) {
         const context = await getReceiptRenderContext(
           mapReceiptRecordToViewData(record),
-          true
+          true,
+          req.propertyId
         );
         const html = await ejs.renderFile(templatePath, context);
 
@@ -333,7 +335,7 @@ class ReceiptController {
   static async blankReceipt(req, res) {
     try {
       const viewData = mapBlankReceiptViewData();
-      const context = await getReceiptRenderContext(viewData, req.query.embed);
+      const context = await getReceiptRenderContext(viewData, req.query.embed, req.propertyId);
       res.render('payments/payment_receipt', context);
     } catch (error) {
       console.error('Error rendering blank receipt:', error);

@@ -103,7 +103,7 @@ const paymentsController = {
   list: async (req, res) => {
     try {
       const { bookingId, type, method, from, to, limit } = req.query;
-      const data = await paymentsModel.listPayments({ bookingId, type, method, from, to }, limit);
+      const data = await paymentsModel.listPayments({ bookingId, type, method, from, to, propertyId: req.propertyId }, limit);
       res.json({ success: true, data });
     } catch (err) {
       console.error('Error listing payments:', err);
@@ -165,7 +165,7 @@ const paymentsController = {
       // own actual cutoff times) instead of a fixed clock-hour bucket.
       if (filter === 'today' && shift && shift !== 'all') {
         const businessDate = paymentsModel._businessDateFor(new Date());
-        const window = await paymentsModel.getShiftWindow(shift, businessDate);
+        const window = await paymentsModel.getShiftWindow(shift, businessDate, req.propertyId);
         if (window) {
           if (window.ENDED_AT) {
             searchCondition += ` AND p.PAYMENT_DATE >= ? AND p.PAYMENT_DATE < ?`;
@@ -188,9 +188,9 @@ const paymentsController = {
         searchCondition += ` AND LOWER(p.PAYMENT_METHOD) != 'cash'`;
       }
 
-      const totalRecords = await paymentsModel.countDatatable(searchCondition, searchParams);
-      const rows = await paymentsModel.fetchDatatable(searchCondition, searchParams, orderBy, orderDir, length, start);
-      const totalAmount = await paymentsModel.sumFilteredAmount(searchCondition, searchParams);
+      const totalRecords = await paymentsModel.countDatatable(searchCondition, searchParams, req.propertyId);
+      const rows = await paymentsModel.fetchDatatable(searchCondition, searchParams, orderBy, orderDir, length, start, req.propertyId);
+      const totalAmount = await paymentsModel.sumFilteredAmount(searchCondition, searchParams, req.propertyId);
 
       res.json({
         draw: parseInt(req.query.draw) || 1,
@@ -229,7 +229,8 @@ const paymentsController = {
       const { daily, weekly, monthly } = await paymentsModel.salesSummary(
         todayStr,
         weekStartStr,
-        monthStartStr
+        monthStartStr,
+        req.propertyId
       );
 
       res.json({
@@ -260,9 +261,9 @@ const paymentsController = {
   // running total, and the day's already-closed shifts with their totals.
   currentShift: async (req, res) => {
     try {
-      const shift = await paymentsModel.getCurrentShift();
+      const shift = await paymentsModel.getCurrentShift(req.propertyId);
       const totals = await paymentsModel.getShiftTotals(shift);
-      const pastShifts = await paymentsModel.getShiftsForBusinessDate(shift.BUSINESS_DATE);
+      const pastShifts = await paymentsModel.getShiftsForBusinessDate(shift.BUSINESS_DATE, req.propertyId);
 
       res.json({
         success: true,
@@ -281,7 +282,7 @@ const paymentsController = {
   endShift: async (req, res) => {
     try {
       const endedBy = req.user?.userId || null;
-      const { closed, opened } = await paymentsModel.endCurrentShiftAndOpenNext(endedBy);
+      const { closed, opened } = await paymentsModel.endCurrentShiftAndOpenNext(endedBy, req.propertyId);
       const closedTotals = await paymentsModel.getShiftTotals(closed);
 
       res.json({
@@ -298,8 +299,8 @@ const paymentsController = {
   todayPaidPayments: async (req, res) => {
     try {
       const range = req.query.range === 'last7days' ? 'last7days' : 'today';
-      const payments = await paymentsModel.getCollectedPayments(range);
-      const receipts = await paymentsModel.getCollectedReceipts(range);
+      const payments = await paymentsModel.getCollectedPayments(range, req.propertyId);
+      const receipts = await paymentsModel.getCollectedReceipts(range, null, req.propertyId);
 
       const paymentsTotal = payments.reduce((sum, row) => sum + Number(row.AMOUNT_PAID || 0), 0);
       const receiptsTotal = receipts.reduce((sum, row) => sum + Number(row.AMOUNT_PAID || 0), 0);
@@ -322,7 +323,7 @@ const paymentsController = {
   breakdown: async (req, res) => {
     try {
       const bookingId = req.params.bookingId;
-      const result = await paymentsModel.bookingBreakdown(bookingId);
+      const result = await paymentsModel.bookingBreakdown(bookingId, req.propertyId);
       if (!result) return res.status(404).json({ success: false, message: 'Booking not found' });
       res.json({ success: true, ...result });
     } catch (err) {
@@ -334,7 +335,7 @@ const paymentsController = {
   breakdownReceipt: async (req, res) => {
     try {
       const bookingId = req.params.bookingId;
-      const result = await paymentsModel.bookingBreakdown(bookingId);
+      const result = await paymentsModel.bookingBreakdown(bookingId, req.propertyId);
       if (!result) return res.status(404).send('Booking not found');
 
       const paymentIdsParam = req.query.paymentIds || '';
@@ -359,7 +360,7 @@ const paymentsController = {
         req.user?.FULLNAME || ''
       );
 
-      const context = await getReceiptRenderContext(receiptData, req.query.embed);
+      const context = await getReceiptRenderContext(receiptData, req.query.embed, req.propertyId);
       res.render('payments/payment_receipt', context);
     } catch (err) {
       console.error('Error rendering breakdown receipt:', err);
@@ -370,7 +371,7 @@ const paymentsController = {
   getPaymentsByBooking: async (req, res) => {
     try {
       const { bookingId } = req.params;
-      const data = await paymentsModel.listPayments({ bookingId });
+      const data = await paymentsModel.listPayments({ bookingId, propertyId: req.propertyId });
       res.json({ success: true, data });
     } catch (err) {
       console.error('Error getting payments by booking:', err);
@@ -381,7 +382,7 @@ const paymentsController = {
   groupBreakdown: async (req, res) => {
     try {
       const bookingId = req.params.bookingId;
-      const result = await paymentsModel.groupBookingBreakdown(bookingId);
+      const result = await paymentsModel.groupBookingBreakdown(bookingId, req.propertyId);
       if (!result) {
         // Not a group booking, or booking not found - return 200 with flag
         return res.json({ success: false, isGroup: false, message: 'Not a group booking or booking not found' });

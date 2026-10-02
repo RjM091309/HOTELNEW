@@ -40,7 +40,8 @@ class BookingModel {
           groupCondition,
           searchCondition = '',
           searchParams = [],
-          useIndividualCalculation = false // Flag to use individual calculation for group bookings
+          useIndividualCalculation = false, // Flag to use individual calculation for group bookings
+          propertyId
         } = params;
 
         const countJoins = `
@@ -53,6 +54,7 @@ class BookingModel {
 
         const baseWhere = `
           WHERE b.ACTIVE = 1
+            AND b.PROPERTY_ID = ?
             ${groupCondition || ''}
             ${dateCondition}
             ${channelCondition}`;
@@ -403,6 +405,7 @@ class BookingModel {
               GROUP BY p.BOOKING_ID
             ) actual_payments ON b.IDNo = actual_payments.BOOKING_ID
           WHERE b.ACTIVE = 1
+            AND b.PROPERTY_ID = ?
             ${groupCondition || ''}
             ${dateCondition}
             ${channelCondition}
@@ -412,17 +415,17 @@ class BookingModel {
         `;
   
         // First get the total count
-        const countResults = await queryDatabasePromise(countQuery, []);
+        const countResults = await queryDatabasePromise(countQuery, [propertyId]);
         const totalRecords = countResults[0]?.total || 0;
 
         let filteredRecords = totalRecords;
         if (searchCondition) {
-          const filteredCountResults = await queryDatabasePromise(filteredCountQuery, searchParams);
+          const filteredCountResults = await queryDatabasePromise(filteredCountQuery, [propertyId, ...searchParams]);
           filteredRecords = filteredCountResults[0]?.total || 0;
         }
-  
+
         // Now fetch the page of data
-        const rows = await queryDatabasePromise(dataQuery, searchParams);
+        const rows = await queryDatabasePromise(dataQuery, [propertyId, ...searchParams]);
   
         return {
           totalRecords,
@@ -436,6 +439,8 @@ class BookingModel {
       }
     }
 
+  // NOTE: not property-scoped - feeds the Check-in Notifier page, which is
+  // explicitly deferred to a later phase per the multi-property plan.
   static async getUpcomingCheckIns(filter = 'all') {
     try {
       const normalizedFilter = String(filter || 'all').toLowerCase();
@@ -520,6 +525,7 @@ class BookingModel {
     }
   }
 
+  // NOTE: not property-scoped - also part of the deferred Check-in Notifier feature.
   static async logCheckInNotifications(bookingIds, notifyWindow = 'all', encodedBy = null) {
     const allowedWindows = new Set(['1day', '3day', '7day', 'all']);
     const normalizedWindow = allowedWindows.has(String(notifyWindow || '').toLowerCase())
@@ -553,10 +559,14 @@ class BookingModel {
   }
 
   // Get booking by ID
-  static async getBookingById(bookingId) {
+  // NOTE: propertyId is optional for backward compatibility - this is
+  // currently only called from c_card_writer.js (out of scope for this
+  // Booking pass), so the filter only applies when a caller supplies
+  // propertyId, to avoid breaking that not-yet-scoped call site.
+  static async getBookingById(bookingId, propertyId) {
     try {
       const query = `
-        SELECT 
+        SELECT
           b.*,
           c.NAME as CUSTOMER_NAME,
           r.ROOM_NUMBER,
@@ -565,10 +575,10 @@ class BookingModel {
           LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
           LEFT JOIN room r ON b.ROOM_ID = r.IDNo
           LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
-        WHERE b.IDNo = ? AND b.ACTIVE = 1
+        WHERE b.IDNo = ? AND b.ACTIVE = 1 ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
       `;
-      
-      const results = await queryDatabasePromise(query, [bookingId]);
+
+      const results = await queryDatabasePromise(query, propertyId ? [bookingId, propertyId] : [bookingId]);
       return results[0] || null;
     } catch (error) {
       console.error('Error in getBookingById:', error);
@@ -577,9 +587,13 @@ class BookingModel {
   }
 
   // Helper: get all booking IDs in the same group as a given booking
-  static async getGroupBookingIdsByBooking(bookingId) {
-    const q1 = `SELECT GROUP_BOOKING_ID FROM booking WHERE IDNo = ? AND ACTIVE = 1 LIMIT 1`;
-    const [row] = await pool.promise().query(q1, [bookingId]);
+  // NOTE: propertyId is optional for backward compatibility with existing
+  // callers; when supplied it scopes the initial lookup so a cross-property
+  // bookingId can't be used to pull in another property's group.
+  static async getGroupBookingIdsByBooking(bookingId, propertyId) {
+    const q1 = `SELECT GROUP_BOOKING_ID FROM booking WHERE IDNo = ? AND ACTIVE = 1 ${propertyId ? 'AND PROPERTY_ID = ?' : ''} LIMIT 1`;
+    const q1Params = propertyId ? [bookingId, propertyId] : [bookingId];
+    const [row] = await pool.promise().query(q1, q1Params);
     const groupId = row?.[0]?.GROUP_BOOKING_ID;
     if (!groupId) return [];
     const q2 = `SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ? AND ACTIVE = 1`;
@@ -591,6 +605,8 @@ class BookingModel {
   // breakfast add-on who slept the night before that date (i.e. they eat breakfast
   // that morning). Breakfast is SERVICE_ID 74 / 75, or any service whose name /
   // custom name contains "breakfast".
+  // NOTE: not property-scoped - feeds the Breakfast List page, which is
+  // explicitly deferred to a later phase per the multi-property plan.
   static async getBreakfastList(servingDateStr) {
     const query = `
       SELECT
@@ -627,6 +643,8 @@ class BookingModel {
   // Booking > Cancelled Bookings list page. Deliberately NOT filtered by
   // b.ACTIVE - "Remove" on a cancelled calendar bar sets ACTIVE = 0, but the
   // cancellation record should still show up here for history/reporting.
+  // NOTE: also not property-scoped - the Cancelled Bookings page is
+  // explicitly deferred to a later phase per the multi-property plan.
   static async getCancelledBookings() {
     const query = `
       SELECT
@@ -712,8 +730,11 @@ class BookingModel {
   }
 
   // Update booking status and room status with transaction
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it scopes both the booking update and the dependent room-status update
+  // below, so this can never touch a booking/room from another property.
   static async updateBookingStatus(params) {
-    const { bookingID, status, lateCheckOut, roomStatus } = params;
+    const { bookingID, status, lateCheckOut, roomStatus, propertyId } = params;
     
     try {
       // Get connection from pool for transaction
@@ -768,32 +789,32 @@ class BookingModel {
                 ELSE NOW()
               END
             )
-            WHERE IDNo = ? AND ACTIVE = 1;
+            WHERE IDNo = ? AND ACTIVE = 1 ${propertyId ? 'AND PROPERTY_ID = ?' : ''};
           `;
-          queryParams = [status, bookingID];
+          queryParams = propertyId ? [status, bookingID, propertyId] : [status, bookingID];
 
         } else if (status === 'check-Out') {
           if (lateCheckOut == 1) {
             updateBookingQuery = `
               UPDATE booking
               SET BOOKING_STATUS = ?, CHECK_OUT_DATE = NOW(), ACTUAL_CHECK_OUT_DT = NOW()
-              WHERE IDNo = ? AND ACTIVE = 1;
+              WHERE IDNo = ? AND ACTIVE = 1 ${propertyId ? 'AND PROPERTY_ID = ?' : ''};
             `;
           } else {
             updateBookingQuery = `
               UPDATE booking
               SET BOOKING_STATUS = ?, ACTUAL_CHECK_OUT_DT = NOW()
-              WHERE IDNo = ? AND ACTIVE = 1;
+              WHERE IDNo = ? AND ACTIVE = 1 ${propertyId ? 'AND PROPERTY_ID = ?' : ''};
             `;
           }
-          queryParams = [status, bookingID];
+          queryParams = propertyId ? [status, bookingID, propertyId] : [status, bookingID];
         } else {
           updateBookingQuery = `
             UPDATE booking
             SET BOOKING_STATUS = ?
-            WHERE IDNo = ? AND ACTIVE = 1;
+            WHERE IDNo = ? AND ACTIVE = 1 ${propertyId ? 'AND PROPERTY_ID = ?' : ''};
           `;
-          queryParams = [status, bookingID];
+          queryParams = propertyId ? [status, bookingID, propertyId] : [status, bookingID];
         }
 
         // console.log("Executing updateBookingQuery:", updateBookingQuery, queryParams);
@@ -811,11 +832,12 @@ class BookingModel {
           const updateRoomQuery = `
             UPDATE room
             SET ROOM_STATUS = ?
-            WHERE IDNo = (SELECT ROOM_ID FROM booking WHERE IDNo = ?);
+            WHERE IDNo = (SELECT ROOM_ID FROM booking WHERE IDNo = ? ${propertyId ? 'AND PROPERTY_ID = ?' : ''});
           `;
-          
+          const updateRoomParams = propertyId ? [roomStatus, bookingID, propertyId] : [roomStatus, bookingID];
+
           await new Promise((resolve, reject) => {
-            connection.query(updateRoomQuery, [roomStatus, bookingID], (err, result) => {
+            connection.query(updateRoomQuery, updateRoomParams, (err, result) => {
               if (err) reject(err);
               else resolve(result);
             });
@@ -855,15 +877,20 @@ class BookingModel {
   }
 
   // Check if room is occupied (has active checked-in booking)
-  static async checkRoomOccupied(bookingId) {
+  // NOTE: propertyId is optional - this is currently only called from
+  // c_dashboard.js (out of scope for this Booking pass), so the filter only
+  // applies when a caller supplies propertyId, to avoid breaking that
+  // not-yet-scoped call site.
+  static async checkRoomOccupied(bookingId, propertyId) {
     try {
       // First, get the room ID for this booking
       const getRoomQuery = `
-        SELECT ROOM_ID 
-        FROM booking 
-        WHERE IDNo = ? AND ACTIVE = 1
+        SELECT ROOM_ID
+        FROM booking
+        WHERE IDNo = ? AND ACTIVE = 1 ${propertyId ? 'AND PROPERTY_ID = ?' : ''}
       `;
-      const roomResult = await queryDatabasePromise(getRoomQuery, [bookingId]);
+      const roomParams = propertyId ? [bookingId, propertyId] : [bookingId];
+      const roomResult = await queryDatabasePromise(getRoomQuery, roomParams);
       
       if (roomResult.length === 0) {
         return { 
@@ -1041,7 +1068,7 @@ class BookingModel {
   //                  keep the booking's own scheduled CHECK_OUT_DATE (capped at NOW so a future
   //                  schedule can never be recorded) so the calendar bar does not stretch over
   //                  later bookings. ACTUAL_CHECK_OUT_DT still records the real time of the action.
-  static async checkoutBookings({ bookingIds, encodedBy, refundBookingId = null, refundAmount = 0, penaltyAmount = 0, applyDiscount = false, checkoutDateMode = 'now' }) {
+  static async checkoutBookings({ bookingIds, encodedBy, refundBookingId = null, refundAmount = 0, penaltyAmount = 0, applyDiscount = false, checkoutDateMode = 'now', propertyId }) {
     if (!bookingIds || bookingIds.length === 0) {
       throw new Error('No bookings to checkout');
     }
@@ -1053,6 +1080,20 @@ class BookingModel {
     // COALESCE guards a missing schedule; LEAST(..., NOW()) makes a future schedule impossible to record.
     const checkOutTsSql = useScheduled ? 'LEAST(COALESCE(CHECK_OUT_DATE, NOW()), NOW())' : 'NOW()';
     const effDateExpr = useScheduled ? 'DATE(LEAST(COALESCE(b.CHECK_OUT_DATE, NOW()), NOW()))' : 'DATE(NOW())';
+
+    // Guard: every booking ID touched below must belong to the current
+    // property - everything downstream in this transaction reuses these
+    // already-validated IDs without re-checking PROPERTY_ID (same pattern
+    // as paymentsModel.bookingBreakdown's one-time check up front).
+    if (propertyId) {
+      const ownershipRows = await queryDatabasePromise(
+        `SELECT COUNT(*) AS cnt FROM booking WHERE IDNo IN (?) AND ACTIVE = 1 AND PROPERTY_ID = ?`,
+        [ids, propertyId]
+      );
+      if ((ownershipRows[0]?.cnt || 0) !== ids.length) {
+        throw new Error('One or more bookings do not belong to the current property');
+      }
+    }
 
     const connection = await new Promise((resolve, reject) => {
       pool.getConnection((err, conn) => (err ? reject(err) : resolve(conn)));
@@ -1342,17 +1383,20 @@ class BookingModel {
   }
 
   // Cancel booking
-  static async cancelBooking(bookingId, reason) {
+  // NOTE: propertyId is optional for backward compatibility with any
+  // not-yet-updated caller; when supplied it keeps this update from ever
+  // touching a booking that belongs to a different property.
+  static async cancelBooking(bookingId, reason, propertyId) {
     try {
       const query = `
-        UPDATE booking 
-        SET BOOKING_STATUS = 'cancelled', 
+        UPDATE booking
+        SET BOOKING_STATUS = 'cancelled',
             IS_CANCELLED = 1,
             UPDATED_DT = NOW()
-        WHERE IDNo = ? AND ACTIVE = 1
+        WHERE IDNo = ? AND ACTIVE = 1 ${propertyId ? 'AND PROPERTY_ID = ?' : ''}
       `;
-      
-      const result = await queryDatabasePromise(query, [bookingId]);
+      const params = propertyId ? [bookingId, propertyId] : [bookingId];
+      const result = await queryDatabasePromise(query, params);
       return result.affectedRows > 0;
     } catch (error) {
       console.error('Error in cancelBooking:', error);
@@ -1363,10 +1407,10 @@ class BookingModel {
   // Soft-delete a checked-out booking (ACTIVE = 0). The row drops out of every
   // list while its billing / payment history stays in the database. Restricted to
   // check-Out status so an in-house or pending stay can never be removed this way.
-  static async softDeleteCheckedOutBooking(bookingId) {
+  static async softDeleteCheckedOutBooking(bookingId, propertyId) {
     const rows = await queryDatabasePromise(
-      `SELECT BOOKING_STATUS FROM booking WHERE IDNo = ? AND ACTIVE = 1`,
-      [bookingId]
+      `SELECT BOOKING_STATUS FROM booking WHERE IDNo = ? AND ACTIVE = 1 ${propertyId ? 'AND PROPERTY_ID = ?' : ''}`,
+      propertyId ? [bookingId, propertyId] : [bookingId]
     );
     if (!rows || rows.length === 0) {
       return { success: false, message: 'Booking not found or already removed.' };
@@ -1378,8 +1422,8 @@ class BookingModel {
     const result = await queryDatabasePromise(
       `UPDATE booking
          SET ACTIVE = 0, EDITED_DT = NOW()
-       WHERE IDNo = ? AND ACTIVE = 1 AND BOOKING_STATUS = 'check-Out'`,
-      [bookingId]
+       WHERE IDNo = ? AND ACTIVE = 1 AND BOOKING_STATUS = 'check-Out' ${propertyId ? 'AND PROPERTY_ID = ?' : ''}`,
+      propertyId ? [bookingId, propertyId] : [bookingId]
     );
     if (!result || result.affectedRows === 0) {
       return { success: false, message: 'Booking could not be deleted. Please refresh and try again.' };
@@ -1388,7 +1432,9 @@ class BookingModel {
   }
 
   // Get booking details by ID
-  static async getBookingDetails(bookingID) {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it prevents looking up a booking that belongs to a different property.
+  static async getBookingDetails(bookingID, propertyId) {
     try {
       const query = `
         SELECT 
@@ -1536,10 +1582,10 @@ class BookingModel {
         LEFT JOIN agency a ON b.AGENCY_ID = a.IDNo
         LEFT JOIN user_info u ON b.ENCODED_BY = u.IDNo
         LEFT JOIN group_booking gb ON b.GROUP_BOOKING_ID = gb.IDNo
-        WHERE b.IDNo = ? AND b.ACTIVE = 1
+        WHERE b.IDNo = ? AND b.ACTIVE = 1 ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
       `;
-      
-      const results = await queryDatabasePromise(query, [bookingID]);
+
+      const results = await queryDatabasePromise(query, propertyId ? [bookingID, propertyId] : [bookingID]);
       const row = results[0] || null;
       if (row && String(row.BOOKING_STATUS || '').toLowerCase() === 'maintenance') {
         row.MAINTENANCE_GUEST_NAME = '';
@@ -1560,16 +1606,19 @@ class BookingModel {
   }
 
   // Get floors for dropdown
-  static async getFloorsForDropdown() {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it restricts the floor list to rooms belonging to the current property
+  // (Pool Villa shouldn't see Main Hotel's floors in the room picker).
+  static async getFloorsForDropdown(propertyId) {
     try {
       const query = `
         SELECT DISTINCT ROOM_FLOOR AS floor_number
         FROM room
-        WHERE ACTIVE = 1
+        WHERE ACTIVE = 1 ${propertyId ? 'AND PROPERTY_ID = ?' : ''}
         ORDER BY ROOM_FLOOR;
       `;
-      
-      const results = await queryDatabasePromise(query);
+
+      const results = await queryDatabasePromise(query, propertyId ? [propertyId] : []);
       return results;
     } catch (error) {
       console.error('Error in getFloorsForDropdown:', error);
@@ -1578,21 +1627,24 @@ class BookingModel {
   }
 
   // Get rooms by floor
-  static async getRoomsByFloor(floor) {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it keeps the room picker from offering another property's rooms.
+  static async getRoomsByFloor(floor, propertyId) {
     try {
       const query = `
-        SELECT 
-          IDNo AS room_id, 
+        SELECT
+          IDNo AS room_id,
           ROOM_NUMBER
-        FROM 
+        FROM
           room
-        WHERE 
-          ACTIVE = 1 
-          AND ROOM_STATUS != 3 
-          AND ROOM_FLOOR = ?;
+        WHERE
+          ACTIVE = 1
+          AND ROOM_STATUS != 3
+          AND ROOM_FLOOR = ?
+          ${propertyId ? 'AND PROPERTY_ID = ?' : ''};
       `;
-      
-      const results = await queryDatabasePromise(query, [floor]);
+
+      const results = await queryDatabasePromise(query, propertyId ? [floor, propertyId] : [floor]);
       return results;
     } catch (error) {
       console.error('Error in getRoomsByFloor:', error);
@@ -1674,7 +1726,8 @@ class BookingModel {
       isLongTermStay,
       roomChangeNote,
       isContractedRate,
-      channelBookingId
+      channelBookingId,
+      propertyId
     } = bookingData;
 
     const holdPendingFlag = (holdPending === true || holdPending === 1 || holdPending === '1' || holdPending === 'true') ? 1 : 0;
@@ -1757,8 +1810,8 @@ class BookingModel {
         // Create booking
         const bookingQuery = `
           INSERT INTO booking
-          (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, CHANNEL_BOOKING_ID, GUESTS_COUNT, REMARKS, CONFIRMATION_NUMBER, NOTIFICATION_READ, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, LATE_CHECKOUT, HOLD_PENDING, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, BED_COUNT, FLIGHT_NUMBER, DROPOFF_FLIGHT_NUMBER, PICKUP_DATE, PASSENGER_COUNT, IS_LONG_TERM_STAY, ROOM_CHANGE_NOTE, IS_CONTRACTED_RATE)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, CHANNEL_BOOKING_ID, GUESTS_COUNT, REMARKS, CONFIRMATION_NUMBER, NOTIFICATION_READ, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, LATE_CHECKOUT, HOLD_PENDING, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, BED_COUNT, FLIGHT_NUMBER, DROPOFF_FLIGHT_NUMBER, PICKUP_DATE, PASSENGER_COUNT, IS_LONG_TERM_STAY, ROOM_CHANGE_NOTE, IS_CONTRACTED_RATE, PROPERTY_ID)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const directReservationFlag = isDirectReservation ? 1 : 0;
         // Handle empty agencyID - set to NULL if empty
@@ -1803,7 +1856,8 @@ class BookingModel {
           (pickupServiceId || dropoffServiceId) ? (parseInt(passengerCount) || null) : null,
           isLongTermStay ? 1 : 0,
           isLongTermStay ? (roomChangeNote || null) : null,
-          isContractedRate ? 1 : 0
+          isContractedRate ? 1 : 0,
+          propertyId || null
         ];
 
         const bookingResult = await new Promise((resolve, reject) => {
@@ -2227,7 +2281,13 @@ class BookingModel {
   }
 
   // Get booking details by confirmation number
-  static async getBookingByConfirmationNumber(confirmationNumber) {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it matters a lot here - confirmation numbers are partly derived from
+  // the room number, and room numbers are NOT unique system-wide (Pool
+  // Villa's rooms 3/13/14/15 can collide with Main Hotel's), so without
+  // this filter two properties could resolve the same confirmation number
+  // to the wrong booking.
+  static async getBookingByConfirmationNumber(confirmationNumber, propertyId) {
     try {
       const query = `
         SELECT
@@ -2248,9 +2308,10 @@ class BookingModel {
         LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID
         WHERE b.CONFIRMATION_NUMBER = ?
           AND b.ACTIVE = 1
+          ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
       `;
-      
-      const results = await queryDatabasePromise(query, [confirmationNumber]);
+
+      const results = await queryDatabasePromise(query, propertyId ? [confirmationNumber, propertyId] : [confirmationNumber]);
       return results[0] || null;
     } catch (error) {
       console.error('Error in getBookingByConfirmationNumber:', error);
@@ -2832,7 +2893,9 @@ class BookingModel {
   }
 
   // Get direct reservation details (Hotel_Old compatibility)
-  static async getDirectReservationDetails(bookingId) {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it prevents looking up a direct reservation from a different property.
+  static async getDirectReservationDetails(bookingId, propertyId) {
     try {
       const query = `
         SELECT 
@@ -2864,10 +2927,10 @@ class BookingModel {
         LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
         LEFT JOIN guest_level gl ON gl.IDNo = c.LEVEL
         LEFT JOIN guest_type gt ON gt.IDNo = c.TYPE
-        WHERE b.IDNo = ? AND b.IS_DIRECT_RESERVATION = 1
+        WHERE b.IDNo = ? AND b.IS_DIRECT_RESERVATION = 1 ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
       `;
 
-      const results = await queryDatabasePromise(query, [bookingId]);
+      const results = await queryDatabasePromise(query, propertyId ? [bookingId, propertyId] : [bookingId]);
       return results.length ? results[0] : null;
     } catch (error) {
       console.error('Error in getDirectReservationDetails:', error);
@@ -3203,7 +3266,9 @@ class BookingModel {
   }
 
   // Get billing information
-  static async getBilling(bookingId) {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it prevents looking up billing for a booking from a different property.
+  static async getBilling(bookingId, propertyId) {
     try {
       // Get booking and billing data
       const bookingQuery = `
@@ -3237,10 +3302,10 @@ class BookingModel {
         JOIN billing bi ON b.IDNo = bi.BOOKING_ID
         LEFT JOIN room r ON b.ROOM_ID = r.IDNo
         LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
-        WHERE b.IDNo = ?
+        WHERE b.IDNo = ? ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
       `;
 
-      const bookingData = await queryDatabasePromise(bookingQuery, [bookingId]);
+      const bookingData = await queryDatabasePromise(bookingQuery, propertyId ? [bookingId, propertyId] : [bookingId]);
 
       if (bookingData.length === 0) {
         return null;
@@ -3561,10 +3626,12 @@ class BookingModel {
   }
 
   // Get notifications
-  static async getNotifications() {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it keeps the notification bell from showing another property's bookings.
+  static async getNotifications(propertyId) {
     try {
       const query = `
-        SELECT 
+        SELECT
           b.IDNo AS id,
           b.ROOM_ID AS room_id,
           r.ROOM_NUMBER AS room_number,
@@ -3578,12 +3645,12 @@ class BookingModel {
         FROM booking b
         LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
         LEFT JOIN room r ON b.ROOM_ID = r.IDNo
-        WHERE b.ACTIVE = 1
+        WHERE b.ACTIVE = 1 ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
         ORDER BY b.ENCODED_DT DESC
         LIMIT 10
       `;
-      
-      const results = await queryDatabasePromise(query);
+
+      const results = await queryDatabasePromise(query, propertyId ? [propertyId] : []);
 
       const notifications = results.map(row => ({
         id: row.id,
@@ -3608,15 +3675,17 @@ class BookingModel {
   }
 
   // Mark notifications as read
-  static async markNotificationsAsRead() {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it keeps this from marking another property's notifications as read.
+  static async markNotificationsAsRead(propertyId) {
     try {
       const query = `
-        UPDATE booking 
-        SET NOTIFICATION_READ = 1 
-        WHERE NOTIFICATION_READ = 0 AND ACTIVE = 1
+        UPDATE booking
+        SET NOTIFICATION_READ = 1
+        WHERE NOTIFICATION_READ = 0 AND ACTIVE = 1 ${propertyId ? 'AND PROPERTY_ID = ?' : ''}
       `;
-      
-      const result = await queryDatabasePromise(query);
+
+      const result = await queryDatabasePromise(query, propertyId ? [propertyId] : []);
       return result;
     } catch (error) {
       console.error('Error in markNotificationsAsRead:', error);
@@ -4215,8 +4284,10 @@ class BookingModel {
   }
 
   // Late check-out
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it prevents extending the checkout of a booking from another property.
   static async lateCheckout(params) {
-    const { bookingId, hours } = params;
+    const { bookingId, hours, propertyId } = params;
 
     try {
       // Default check-out time
@@ -4226,10 +4297,10 @@ class BookingModel {
       const query = `
         UPDATE booking
         SET CHECK_OUT_DATE = CONCAT(DATE(CHECK_OUT_DATE), ' ', TIME(DATE_ADD(TIME(?), INTERVAL ? HOUR)))
-        WHERE IDNo = ?
+        WHERE IDNo = ? ${propertyId ? 'AND PROPERTY_ID = ?' : ''}
       `;
 
-      const result = await queryDatabasePromise(query, [defaultCheckOutTime, hours, bookingId]);
+      const result = await queryDatabasePromise(query, propertyId ? [defaultCheckOutTime, hours, bookingId, propertyId] : [defaultCheckOutTime, hours, bookingId]);
 
       if (result.affectedRows === 0) {
         throw new Error('Booking not found or inactive.');
@@ -4315,7 +4386,10 @@ class BookingModel {
   }
 
   // Search customer
-  static async searchCustomer(searchQuery) {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it keeps the guest search from surfacing another property's customers
+  // (customer records are per-property - see propertyModel.js plan).
+  static async searchCustomer(searchQuery, propertyId) {
     try {
       const query = `
         SELECT
@@ -4328,12 +4402,13 @@ class BookingModel {
         FROM customer
         LEFT JOIN guest_level ON guest_level.IDNo = customer.LEVEL
         LEFT JOIN guest_type ON guest_type.IDNo = customer.TYPE
-        WHERE customer.NAME LIKE ? 
-          AND (customer.IS_GROUP IS NULL OR customer.IS_GROUP != 1) 
+        WHERE customer.NAME LIKE ?
+          AND (customer.IS_GROUP IS NULL OR customer.IS_GROUP != 1)
+          ${propertyId ? 'AND customer.PROPERTY_ID = ?' : ''}
         LIMIT 10
       `;
 
-      const results = await queryDatabasePromise(query, [`%${searchQuery}%`]);
+      const results = await queryDatabasePromise(query, propertyId ? [`%${searchQuery}%`, propertyId] : [`%${searchQuery}%`]);
 
       return results;
 
@@ -4344,8 +4419,12 @@ class BookingModel {
   }
 
   // Get available rooms
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it keeps the room picker and unassigned-direct-reservation list scoped
+  // to the current property (otherwise staff could assemble a booking
+  // using a room, or see a direct reservation, from the wrong property).
   static async getAvailableRooms(params) {
-    const { startDate, endDate } = params;
+    const { startDate, endDate, propertyId } = params;
 
     try {
       // Format dates to YYYY-MM-DD
@@ -4399,6 +4478,7 @@ class BookingModel {
             AND DATE(b.CHECK_OUT_DATE) > ?
         WHERE r.ROOM_STATUS !=3
           AND (b.ROOM_ID IS NULL OR DATE(b.CHECK_OUT_DATE) = ?)
+          ${propertyId ? 'AND r.PROPERTY_ID = ?' : ''}
         ORDER BY r.ROOM_NUMBER ASC;
       `;
 
@@ -4428,28 +4508,33 @@ class BookingModel {
         FROM booking b
         LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
         LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo
-        WHERE b.ACTIVE = 1 
+        WHERE b.ACTIVE = 1
           AND b.IS_DIRECT_RESERVATION = 1
           AND b.ROOM_ID = 0
           AND DATE(b.CHECK_IN_DATE) < ?
           AND DATE(b.CHECK_OUT_DATE) > ?
+          ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
         ORDER BY b.CHECK_IN_DATE ASC;
       `;
 
       // Execute both queries
-      const roomsResults = await queryDatabasePromise(roomsQuery, [
-        startDateFormatted, 
-        startDateFormatted, 
-        endDateFormatted, 
-        endDateFormatted, 
-        startDateFormatted, 
+      const roomsParams = [
+        startDateFormatted,
+        startDateFormatted,
+        endDateFormatted,
+        endDateFormatted,
+        startDateFormatted,
         startDateFormatted
-      ]);
+      ];
+      if (propertyId) roomsParams.push(propertyId);
+      const roomsResults = await queryDatabasePromise(roomsQuery, roomsParams);
 
-      const unassignedBookingsResults = await queryDatabasePromise(unassignedBookingsQuery, [
-        endDateFormatted, 
+      const unassignedParams = [
+        endDateFormatted,
         startDateFormatted
-      ]);
+      ];
+      if (propertyId) unassignedParams.push(propertyId);
+      const unassignedBookingsResults = await queryDatabasePromise(unassignedBookingsQuery, unassignedParams);
 
       return {
         rooms: roomsResults,
@@ -4463,7 +4548,9 @@ class BookingModel {
   }
 
   // Get room details
-  static async getRoomDetails(roomId) {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it prevents looking up a room from a different property.
+  static async getRoomDetails(roomId, propertyId) {
     try {
       const query = `
         SELECT
@@ -4478,11 +4565,11 @@ class BookingModel {
         JOIN room_type ON room.ROOM_TYPE_ID = room_type.IDNo
         LEFT JOIN room_amenities ON room.IDNo = room_amenities.ROOM_ID
         LEFT JOIN amenity ON room_amenities.AMENITY_ID = amenity.IDNo
-        WHERE room.IDNo = ?
+        WHERE room.IDNo = ? ${propertyId ? 'AND room.PROPERTY_ID = ?' : ''}
         GROUP BY room.ROOM_NUMBER
       `;
 
-      const results = await queryDatabasePromise(query, [roomId]);
+      const results = await queryDatabasePromise(query, propertyId ? [roomId, propertyId] : [roomId]);
 
       if (results.length === 0) {
         return null;
@@ -4522,15 +4609,23 @@ class BookingModel {
 
   // Update room payment status
   static async updateRoomPaymentStatus(params) {
-    const { bookingId, status } = params;
+    const { bookingId, status, propertyId } = params;
 
     try {
       // console.log("🔹 Running Query: UPDATE billing SET PAYMENT_STATUS = ? WHERE BOOKING_ID = ?");
       // console.log("🔹 Query Parameters:", [status, bookingId]);
 
-      const query = `UPDATE billing SET PAYMENT_STATUS = ? WHERE BOOKING_ID = ?`;
+      // Joined through booking so a crafted/stale bookingId from the wrong
+      // property can't flip payment status here - billing has no PROPERTY_ID
+      // of its own (derived via BOOKING_ID -> booking.PROPERTY_ID, same as
+      // everywhere else in this file).
+      const query = `
+        UPDATE billing bl
+        JOIN booking b ON b.IDNo = bl.BOOKING_ID
+        SET bl.PAYMENT_STATUS = ?
+        WHERE bl.BOOKING_ID = ? AND b.PROPERTY_ID = ?`;
 
-      const result = await queryDatabasePromise(query, [status, bookingId]);
+      const result = await queryDatabasePromise(query, [status, bookingId, propertyId]);
 
       // If this booking is part of a group with Master Billing, 
       // sync payment_status for all group members to match the current booking's status
@@ -4617,15 +4712,20 @@ class BookingModel {
 
   // Update extend payment status
   static async updateExtendPaymentStatus(params) {
-    const { bookingId, status } = params;
+    const { bookingId, status, propertyId } = params;
 
     try {
       // console.log("🔹 Running Query: UPDATE billing SET EXTEND_PAYMENT_STATUS = ? WHERE BOOKING_ID = ?");
       // console.log("🔹 Query Parameters:", [status, bookingId]);
 
-      const query = `UPDATE billing SET EXTEND_PAYMENT_STATUS = ? WHERE BOOKING_ID = ?`;
+      // Same property guard as updateRoomPaymentStatus above.
+      const query = `
+        UPDATE billing bl
+        JOIN booking b ON b.IDNo = bl.BOOKING_ID
+        SET bl.EXTEND_PAYMENT_STATUS = ?
+        WHERE bl.BOOKING_ID = ? AND b.PROPERTY_ID = ?`;
 
-      const result = await queryDatabasePromise(query, [status, bookingId]);
+      const result = await queryDatabasePromise(query, [status, bookingId, propertyId]);
 
       return result;
 
@@ -4636,7 +4736,7 @@ class BookingModel {
   }
 
   // Get group booking data
-  static async getGroupBookingData(filter, dateFrom, dateTo, groupId = null) {
+  static async getGroupBookingData(filter, dateFrom, dateTo, groupId = null, propertyId = null) {
     try {
       let dateCondition = '';
       
@@ -4769,13 +4869,14 @@ class BookingModel {
         LEFT JOIN user_info u ON gb.ENCODED_BY = u.IDNo
         LEFT JOIN user_info u2 ON gb.EDITED_BY = u2.IDNo
         WHERE b.GROUP_BOOKING_ID IS NOT NULL
+          ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
           ${dateCondition}
           ${groupIdCondition}
         GROUP BY gb.IDNo
         ORDER BY gb.IDNo DESC
       `;
 
-      const results = await queryDatabasePromise(query);
+      const results = await queryDatabasePromise(query, propertyId ? [propertyId] : []);
 
       return results;
 
@@ -4786,7 +4887,11 @@ class BookingModel {
   }
 
   // Get group booking details
-  static async getGroupBookingDetails(groupId) {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it keeps the initial booking-rows lookup from returning another
+  // property's group (everything else below reuses this already-validated
+  // groupId, same pattern as paymentsModel.bookingBreakdown).
+  static async getGroupBookingDetails(groupId, propertyId) {
     try {
       const bookingQuery = `
         SELECT 
@@ -4821,11 +4926,11 @@ class BookingModel {
         LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID
         LEFT JOIN booking_service bs ON b.IDNo = bs.BOOKING_ID
         LEFT JOIN services s ON bs.SERVICE_ID = s.IDNo AND bs.SERVICE_ID != -1 -- Fetch the correct service name (exclude custom services from join)
-        WHERE b.GROUP_BOOKING_ID = ?
+        WHERE b.GROUP_BOOKING_ID = ? ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
         GROUP BY b.IDNo, c.NAME, r.ROOM_NUMBER, b.CHECK_IN_DATE, b.CHECK_OUT_DATE, b.BOOKING_STATUS
       `;
 
-      const results = await queryDatabasePromise(bookingQuery, [groupId]);
+      const results = await queryDatabasePromise(bookingQuery, propertyId ? [groupId, propertyId] : [groupId]);
 
       // Compute group-level summary: rooms, services, extensions, discount, reservation fee, grand total.
       // ROOM_PRICE (each room's own rate) x QTY, not ROOM_CHARGE (0 for every
@@ -4893,12 +4998,14 @@ class BookingModel {
   }
 
   // Aggregate remarks for a whole group
-  static async getGroupRemarksByGroup(groupId) {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it keeps this from reading another property's group remarks.
+  static async getGroupRemarksByGroup(groupId, propertyId) {
     try {
       // First booking id
       const firstBookingRows = await queryDatabasePromise(
-        `SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ? ORDER BY IDNo ASC LIMIT 1`,
-        [groupId]
+        `SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ? ${propertyId ? 'AND PROPERTY_ID = ?' : ''} ORDER BY IDNo ASC LIMIT 1`,
+        propertyId ? [groupId, propertyId] : [groupId]
       );
 
       // Collect remarks from remarks table across all group bookings
@@ -4909,9 +5016,9 @@ class BookingModel {
          FROM remarks r
          LEFT JOIN user_info u1 ON r.ENCODED_BY = u1.IDno
          LEFT JOIN user_info u2 ON r.EDITDED_BY = u2.IDno
-         WHERE r.ACTIVE = 1 AND r.BOOKING_ID IN (SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ?)
+         WHERE r.ACTIVE = 1 AND r.BOOKING_ID IN (SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ? ${propertyId ? 'AND PROPERTY_ID = ?' : ''})
          ORDER BY r.ENCODED_DT DESC`,
-        [groupId]
+        propertyId ? [groupId, propertyId] : [groupId]
       );
 
       // Include group_booking.REMARKS as a virtual row at the top if present
@@ -4948,11 +5055,13 @@ class BookingModel {
   }
 
   // Add a remark for a group (attach to first booking and update group_booking.REMARKS)
-  static async addGroupRemark({ groupId, category, remarkText, encodedBy }) {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it keeps this from attaching a remark to another property's group.
+  static async addGroupRemark({ groupId, category, remarkText, encodedBy, propertyId }) {
     try {
       const firstRows = await queryDatabasePromise(
-        `SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ? ORDER BY IDNo ASC LIMIT 1`,
-        [groupId]
+        `SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ? ${propertyId ? 'AND PROPERTY_ID = ?' : ''} ORDER BY IDNo ASC LIMIT 1`,
+        propertyId ? [groupId, propertyId] : [groupId]
       );
       const firstBookingId = firstRows[0]?.IDNo;
       if (!firstBookingId) return { success: false, message: 'No booking found for group' };
@@ -4977,7 +5086,11 @@ class BookingModel {
   }
 
   // Get edit group booking details
-  static async getEditGroupBookingDetails(groupBookingId) {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it scopes the per-booking fetch below so editing can't pull in another
+  // property's group (everything after that reuses this validated set of
+  // booking rows, same pattern as paymentsModel.bookingBreakdown).
+  static async getEditGroupBookingDetails(groupBookingId, propertyId) {
     try {
       // Get group booking info
       const groupQuery = `
@@ -5046,11 +5159,11 @@ class BookingModel {
         JOIN customer c ON b.CUSTOMER_ID = c.IDNo
         JOIN room r ON b.ROOM_ID = r.IDNo
         LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID
-        WHERE b.GROUP_BOOKING_ID = ?
+        WHERE b.GROUP_BOOKING_ID = ? ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
         ORDER BY b.IDNo
       `;
 
-      const bookingsResult = await queryDatabasePromise(bookingsQuery, [groupBookingId]);
+      const bookingsResult = await queryDatabasePromise(bookingsQuery, propertyId ? [groupBookingId, propertyId] : [groupBookingId]);
 
       // Get total paid across the group (room + service payments)
       const paidSumQuery = `
@@ -5239,7 +5352,9 @@ class BookingModel {
   }
 
   // Get group info for joining existing group
-  static async getGroupInfo(groupId) {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it prevents joining a group that belongs to a different property.
+  static async getGroupInfo(groupId, propertyId) {
     try {
       const query = `
         SELECT
@@ -5256,11 +5371,11 @@ class BookingModel {
         FROM group_booking gb
         LEFT JOIN booking b ON gb.IDNo = b.GROUP_BOOKING_ID AND b.ACTIVE = 1
         LEFT JOIN room r ON b.ROOM_ID = r.IDNo
-        WHERE gb.IDNo = ?
+        WHERE gb.IDNo = ? ${propertyId ? 'AND (b.PROPERTY_ID = ? OR b.PROPERTY_ID IS NULL)' : ''}
         GROUP BY gb.IDNo, gb.GROUP_NAME, gb.CONTACT_NO, gb.NUMBER_OF_ROOMS, gb.BILLING_TYPE, gb.REMARKS
       `;
 
-      const result = await queryDatabasePromise(query, [groupId]);
+      const result = await queryDatabasePromise(query, propertyId ? [groupId, propertyId] : [groupId]);
 
       if (!result || result.length === 0) {
         return null;
@@ -5274,7 +5389,11 @@ class BookingModel {
   }
 
   // Get group voucher data
-  static async getGroupVoucherData(groupId) {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it scopes the initial group lookup below (everything else in this
+  // function reuses the already-validated groupId, same pattern as
+  // paymentsModel.bookingBreakdown).
+  static async getGroupVoucherData(groupId, propertyId) {
     try {
       // Get group booking info with confirmation number from first booking
       const groupQuery = `
@@ -5294,11 +5413,11 @@ class BookingModel {
            LIMIT 1) AS confirmationNumber
         FROM group_booking gb
         JOIN booking b ON gb.IDNo = b.GROUP_BOOKING_ID
-        WHERE gb.IDNo = ? AND b.ACTIVE = 1
+        WHERE gb.IDNo = ? AND b.ACTIVE = 1 ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
         GROUP BY gb.IDNo
       `;
 
-      const groupResult = await queryDatabasePromise(groupQuery, [groupId]);
+      const groupResult = await queryDatabasePromise(groupQuery, propertyId ? [groupId, propertyId] : [groupId]);
 
       if (!groupResult || groupResult.length === 0) {
         return null;
@@ -5457,7 +5576,8 @@ class BookingModel {
       seniorPwdRoomCount = 0,
       perRoomDiscounts = [],
       isContractedRate = false,
-      individualBookingDates = null // Individual booking dates if they differ from main date range
+      individualBookingDates = null, // Individual booking dates if they differ from main date range
+      propertyId
     } = data;
 
     const holdPendingFlag = (holdPending === true || holdPending === 1 || holdPending === '1' || holdPending === 'true') ? 1 : 0;
@@ -5520,8 +5640,11 @@ class BookingModel {
       ]);
 
       // Get existing bookings for this group
-      const existingBookingsQuery = `SELECT IDNo, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE FROM booking WHERE GROUP_BOOKING_ID = ? ORDER BY IDNo ASC`;
-      const [existingBookings] = await connection.promise().query(existingBookingsQuery, [groupBookingId]);
+      // propertyId (when supplied) keeps this edit from ever touching another
+      // property's group - everything below reuses these already-validated
+      // booking rows (same pattern as paymentsModel.bookingBreakdown).
+      const existingBookingsQuery = `SELECT IDNo, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE FROM booking WHERE GROUP_BOOKING_ID = ? ${propertyId ? 'AND PROPERTY_ID = ?' : ''} ORDER BY IDNo ASC`;
+      const [existingBookings] = await connection.promise().query(existingBookingsQuery, propertyId ? [groupBookingId, propertyId] : [groupBookingId]);
       const existingRoomIds = existingBookings.map(b => b.ROOM_ID);
       // IMPORTANT: Use the ORIGINAL first booking (lowest ID) as the main booking for consolidated entries
       // This ensures that joined bookings don't become the main booking
@@ -5933,12 +6056,13 @@ class BookingModel {
 
           // Insert booking
           const [bookResult] = await connection.promise().query(`
-            INSERT INTO booking (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, LATE_CHECKOUT, HOLD_PENDING, REMARKS, CONFIRMATION_NUMBER, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, GROUP_BOOKING_ID, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, IS_CONTRACTED_RATE)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO booking (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, LATE_CHECKOUT, HOLD_PENDING, REMARKS, CONFIRMATION_NUMBER, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, GROUP_BOOKING_ID, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, IS_CONTRACTED_RATE, PROPERTY_ID)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `, [
             guestID, roomId, checkInDate, checkOutDate, 'pending', bookingRoute, 1,
             checkOutStatus, holdPendingFlag, index === 0 ? remarks : '', confirmationNumber, encodedBy, date, 1,
-            checkInStatus, groupBookingId, processedAgencyId, processedAgencyPayer, 0, isContractedRate ? 1 : 0
+            checkInStatus, groupBookingId, processedAgencyId, processedAgencyPayer, 0, isContractedRate ? 1 : 0,
+            propertyId || null
           ]);
 
           const bookingId = bookResult.insertId;
@@ -6002,8 +6126,8 @@ class BookingModel {
 
       // Handle services update (delete existing form-managed services and add new)
       // Get all booking IDs for this group
-      const allBookingIdsQuery = `SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ? ORDER BY IDNo`;
-      const [allBookings] = await connection.promise().query(allBookingIdsQuery, [groupBookingId]);
+      const allBookingIdsQuery = `SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ? ${propertyId ? 'AND PROPERTY_ID = ?' : ''} ORDER BY IDNo`;
+      const [allBookings] = await connection.promise().query(allBookingIdsQuery, propertyId ? [groupBookingId, propertyId] : [groupBookingId]);
       const targetBookingIds = allBookings.map(b => b.IDNo);
 
       // Delete only form-managed services (breakfast, pickup, dropoff, late checkout)
@@ -6115,8 +6239,8 @@ class BookingModel {
       // Handle payments for reservation fees and discounts
       if (firstBookingId) {
         // Get current bookings in the group (after updates/additions/removals)
-        const currentBookingsQuery = `SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ?`;
-        const [currentBookings] = await connection.promise().query(currentBookingsQuery, [groupBookingId]);
+        const currentBookingsQuery = `SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ? ${propertyId ? 'AND PROPERTY_ID = ?' : ''}`;
+        const [currentBookings] = await connection.promise().query(currentBookingsQuery, propertyId ? [groupBookingId, propertyId] : [groupBookingId]);
         const allBookingIds = currentBookings.map(b => b.IDNo);
         
         // Delete existing reservation fee and discount payments for all bookings in the group
@@ -6203,8 +6327,8 @@ class BookingModel {
         
         if (paidAmount > 0 && firstBookingId) {
           // Get all booking IDs for this group
-          const allBookingIdsQuery = `SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ? ORDER BY IDNo`;
-          const [allBookingsResult] = await connection.promise().query(allBookingIdsQuery, [groupBookingId]);
+          const allBookingIdsQuery = `SELECT IDNo FROM booking WHERE GROUP_BOOKING_ID = ? ${propertyId ? 'AND PROPERTY_ID = ?' : ''} ORDER BY IDNo`;
+          const [allBookingsResult] = await connection.promise().query(allBookingIdsQuery, propertyId ? [groupBookingId, propertyId] : [groupBookingId]);
           const allBookingIds = allBookingsResult.map(b => b.IDNo);
           
           if (allBookingIds.length > 0) {
@@ -6773,17 +6897,21 @@ class BookingModel {
   }
 
   // Get group billing details
-  static async getGroupBillingDetails(groupId) {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it scopes the initial room-billing fetch below (everything else in this
+  // function reuses this already-validated groupId, same pattern as
+  // paymentsModel.bookingBreakdown).
+  static async getGroupBillingDetails(groupId, propertyId) {
     try {
       // Query for Room Charges ONLY (prevents duplication)
       // For Master Billing, we'll consolidate later, so get all room numbers
       const roomBillingQuery = `
-        SELECT 
+        SELECT
           b.IDNo AS BOOKING_ID,
           b.CONFIRMATION_NUMBER AS invoiceNumber,
           DATE(bill.ENCODED_DT) AS date,
-          gb.GROUP_NAME,  
-          r.ROOM_NUMBER,  
+          gb.GROUP_NAME,
+          r.ROOM_NUMBER,
           'Room Charge' AS description,
           bill.ROOM_CHARGE AS charges,
           bill.QTY AS room_qty,
@@ -6792,9 +6920,9 @@ class BookingModel {
           gb.BILLING_TYPE
         FROM billing bill
         JOIN booking b ON bill.BOOKING_ID = b.IDNo
-        JOIN group_booking gb ON b.GROUP_BOOKING_ID = gb.IDNo  
-        JOIN room r ON b.ROOM_ID = r.IDNo  
-        WHERE b.GROUP_BOOKING_ID = ? AND bill.ACTIVE = 1
+        JOIN group_booking gb ON b.GROUP_BOOKING_ID = gb.IDNo
+        JOIN room r ON b.ROOM_ID = r.IDNo
+        WHERE b.GROUP_BOOKING_ID = ? AND bill.ACTIVE = 1 ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
         GROUP BY bill.BOOKING_ID, gb.GROUP_NAME, r.ROOM_NUMBER, bill.ROOM_CHARGE, bill.QTY, bill.PAYMENT_STATUS, gb.BILLING_TYPE
         ORDER BY r.ROOM_NUMBER ASC, bill.BOOKING_ID ASC
       `;
@@ -6830,7 +6958,7 @@ class BookingModel {
 
       // Execute both queries
       const [roomResults, serviceResults] = await Promise.all([
-        queryDatabasePromise(roomBillingQuery, [groupId]),
+        queryDatabasePromise(roomBillingQuery, propertyId ? [groupId, propertyId] : [groupId]),
         queryDatabasePromise(serviceBillingQuery, [groupId])
       ]);
 
@@ -6996,10 +7124,10 @@ class BookingModel {
 
   // Generate group invoice PDF
   static async generateGroupInvoice(params) {
-    const { groupId, user } = params;
+    const { groupId, user, propertyId } = params;
     try {
       // Reuse existing aggregation
-      const details = await BookingModel.getGroupBillingDetails(groupId);
+      const details = await BookingModel.getGroupBillingDetails(groupId, propertyId);
 
       const path = require('path');
       const fs = require('fs');
@@ -7069,21 +7197,26 @@ class BookingModel {
   }
 
   // Check group payment status
-  static async checkGroupPaymentStatus(groupId) {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it keeps this from reporting on another property's group.
+  static async checkGroupPaymentStatus(groupId, propertyId) {
     try {
       const query = `
-        SELECT 
+        SELECT
           (SELECT COUNT(*) FROM billing bill
            JOIN booking b ON bill.BOOKING_ID = b.IDNo
-           WHERE b.GROUP_BOOKING_ID = ? 
+           WHERE b.GROUP_BOOKING_ID = ? ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
            AND bill.PAYMENT_STATUS != 'paid') AS unpaid_rooms,
           (SELECT COUNT(*) FROM booking_service bs
            JOIN booking b ON bs.BOOKING_ID = b.IDNo
-           WHERE b.GROUP_BOOKING_ID = ? 
+           WHERE b.GROUP_BOOKING_ID = ? ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
            AND bs.STATUS != 'paid') AS unpaid_services
       `;
 
-      const results = await queryDatabasePromise(query, [groupId, groupId]);
+      const results = await queryDatabasePromise(
+        query,
+        propertyId ? [groupId, propertyId, groupId, propertyId] : [groupId, groupId]
+      );
 
       const unpaidRooms = results[0].unpaid_rooms || 0;
       const unpaidServices = results[0].unpaid_services || 0;
@@ -7100,8 +7233,21 @@ class BookingModel {
 
   // Process group payment
   static async groupPayment(params) {
-    const { bookingIDs, amountPaid, paymentMethod, paymentNotes, encodedBy } = params;
-    
+    const { bookingIDs, amountPaid, paymentMethod, paymentNotes, encodedBy, propertyId } = params;
+
+    // Guard: every booking ID touched below must belong to the current
+    // property - everything downstream reuses these already-validated IDs
+    // without re-checking PROPERTY_ID (same pattern as checkoutBookings).
+    if (propertyId && Array.isArray(bookingIDs) && bookingIDs.length > 0) {
+      const ownershipRows = await queryDatabasePromise(
+        `SELECT COUNT(*) AS cnt FROM booking WHERE IDNo IN (?) AND PROPERTY_ID = ?`,
+        [bookingIDs, propertyId]
+      );
+      if ((ownershipRows[0]?.cnt || 0) !== bookingIDs.length) {
+        throw new Error('One or more bookings do not belong to the current property');
+      }
+    }
+
     try {
       // Get connection from pool for transaction
       const connection = await new Promise((resolve, reject) => {
@@ -7314,7 +7460,9 @@ class BookingModel {
   }
 
   // Get all bookings
-  static async getBookings() {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it scopes this legacy "all bookings" list to the current property.
+  static async getBookings(propertyId) {
     try {
       const query = `
         SELECT 
@@ -7343,12 +7491,13 @@ class BookingModel {
         LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID
         LEFT JOIN room r ON b.ROOM_ID = r.IDNo
         LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
-        WHERE b.ACTIVE = 1 
+        WHERE b.ACTIVE = 1
           AND b.GROUP_BOOKING_ID IS NULL
+          ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
         ORDER BY r.ROOM_NUMBER ASC
       `;
 
-      const results = await queryDatabasePromise(query);
+      const results = await queryDatabasePromise(query, propertyId ? [propertyId] : []);
       return results;
 
     } catch (error) {
@@ -7358,7 +7507,9 @@ class BookingModel {
   }
 
   // Get all rooms
-  static async getRooms() {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it scopes this legacy "all rooms" list to the current property.
+  static async getRooms(propertyId) {
     try {
       const query = `
         SELECT 
@@ -7376,11 +7527,11 @@ class BookingModel {
           r.ACTIVE
         FROM room r
         LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
-        WHERE r.ACTIVE = 1
+        WHERE r.ACTIVE = 1 ${propertyId ? 'AND r.PROPERTY_ID = ?' : ''}
         ORDER BY r.ROOM_FLOOR ASC, r.ROOM_NUMBER ASC
       `;
 
-      const results = await queryDatabasePromise(query);
+      const results = await queryDatabasePromise(query, propertyId ? [propertyId] : []);
       return results;
 
     } catch (error) {
@@ -7390,9 +7541,12 @@ class BookingModel {
   }
 
   // Cancel booking
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it scopes the initial booking lookup below so this can never cancel a
+  // booking belonging to a different property.
   static async cancelBooking(params) {
-    const { bookingId, reason, manualRefund, manualCancellationFee, encodedBy } = params;
-    
+    const { bookingId, reason, manualRefund, manualCancellationFee, encodedBy, propertyId } = params;
+
     try {
       const refundAmount = parseFloat(manualRefund);
       if (!Number.isFinite(refundAmount) || refundAmount < 0) {
@@ -7415,11 +7569,11 @@ class BookingModel {
       try {
         // Fetch booking details
         const fetchBookingQuery = `
-          SELECT IDNo 
-          FROM booking 
-          WHERE IDNo = ?
+          SELECT IDNo
+          FROM booking
+          WHERE IDNo = ? ${propertyId ? 'AND PROPERTY_ID = ?' : ''}
         `;
-        const bookingRows = await queryDatabasePromise(fetchBookingQuery, [bookingId], connection);
+        const bookingRows = await queryDatabasePromise(fetchBookingQuery, propertyId ? [bookingId, propertyId] : [bookingId], connection);
 
       if (bookingRows.length === 0) {
         connection.release();
@@ -7621,8 +7775,11 @@ class BookingModel {
   }
 
   // Mark booking as maintenance (black bar + guest name Maintenance)
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it scopes the initial booking lookup below so a booking from another
+  // property can never be put into Maintenance from here.
   static async setBookingMaintenance(params) {
-    const { bookingId, reason, guestName: guestNameFromUi, encodedBy } = params;
+    const { bookingId, reason, guestName: guestNameFromUi, encodedBy, propertyId } = params;
 
     const isGenericGuestName = (name) => {
       const normalized = String(name || '').trim().toLowerCase();
@@ -7658,8 +7815,8 @@ class BookingModel {
          FROM booking b
          LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
          LEFT JOIN room r ON r.IDNo = b.ROOM_ID
-         WHERE b.IDNo = ? AND b.ACTIVE = 1`,
-        [bookingId],
+         WHERE b.IDNo = ? AND b.ACTIVE = 1 ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}`,
+        propertyId ? [bookingId, propertyId] : [bookingId],
         connection
       );
 
@@ -7885,8 +8042,10 @@ class BookingModel {
   }
 
   // Reopen maintenance booking and restore previous data
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it scopes the initial booking lookup below.
   static async reopenMaintenanceBooking(params) {
-    const { bookingId, encodedBy, guestName, bookingStatus } = params;
+    const { bookingId, encodedBy, guestName, bookingStatus, propertyId } = params;
 
     const connection = await new Promise((resolve, reject) => {
       pool.getConnection((err, conn) => {
@@ -7903,8 +8062,8 @@ class BookingModel {
       const bookingRows = await queryDatabasePromise(
         `SELECT b.IDNo, b.CUSTOMER_ID, b.ROOM_ID, b.BOOKING_STATUS
          FROM booking b
-         WHERE b.IDNo = ? AND b.ACTIVE = 1`,
-        [bookingId],
+         WHERE b.IDNo = ? AND b.ACTIVE = 1 ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}`,
+        propertyId ? [bookingId, propertyId] : [bookingId],
         connection
       );
 
@@ -7990,8 +8149,10 @@ class BookingModel {
   }
 
   // Mark maintenance as fixed — remove booking from calendar entirely (no restore)
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it scopes the initial booking lookup below.
   static async completeMaintenanceBooking(params) {
-    const { bookingId, encodedBy } = params;
+    const { bookingId, encodedBy, propertyId } = params;
 
     const connection = await new Promise((resolve, reject) => {
       pool.getConnection((err, conn) => {
@@ -8019,8 +8180,8 @@ class BookingModel {
          FROM booking b
          LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
          LEFT JOIN room r ON r.IDNo = b.ROOM_ID
-         WHERE b.IDNo = ? AND b.ACTIVE = 1`,
-        [bookingId],
+         WHERE b.IDNo = ? AND b.ACTIVE = 1 ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}`,
+        propertyId ? [bookingId, propertyId] : [bookingId],
         connection
       );
 
@@ -8091,9 +8252,14 @@ class BookingModel {
   }
 
   // Cancel group booking
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it scopes the initial group fetch below so this can never cancel
+  // bookings belonging to a different property (everything else in this
+  // function reuses this already-validated set, same pattern as
+  // paymentsModel.bookingBreakdown).
   static async cancelGroupBooking(params) {
-    const { groupId, reason, cancellationFee, encodedBy, bookingIds } = params;
-    
+    const { groupId, reason, cancellationFee, encodedBy, bookingIds, propertyId } = params;
+
     try {
       // Get connection from pool for transaction
       const connection = await new Promise((resolve, reject) => {
@@ -8110,9 +8276,9 @@ class BookingModel {
                  b.IDNo as BOOKING_ID, b.CHECK_IN_DATE, b.CHECK_OUT_DATE, b.BOOKING_STATUS
           FROM group_booking gb
           LEFT JOIN booking b ON gb.IDNo = b.GROUP_BOOKING_ID
-          WHERE gb.IDNo = ? AND gb.ACTIVE = 1
+          WHERE gb.IDNo = ? AND gb.ACTIVE = 1 ${propertyId ? 'AND (b.PROPERTY_ID = ? OR b.PROPERTY_ID IS NULL)' : ''}
         `;
-        const groupRows = await queryDatabasePromise(fetchGroupQuery, [groupId], connection);
+        const groupRows = await queryDatabasePromise(fetchGroupQuery, propertyId ? [groupId, propertyId] : [groupId], connection);
 
         if (groupRows.length === 0) {
           connection.release();
@@ -8417,6 +8583,9 @@ class BookingModel {
   }
 
   // Get booking summary for Telegram bot
+  // NOTE: not property-scoped - this feeds the Telegram settlement summary
+  // (`/booking/summary`), which is explicitly deferred to a later phase per
+  // the multi-property plan (see "Everything else... Telegram settlement").
   static async getBookingSummary() {
     try {
       // Main summary query
@@ -8508,6 +8677,10 @@ class BookingModel {
   }
 
   // Get all agencies
+  // NOTE: not property-scoped - `agency` has no PROPERTY_ID column per the
+  // multi-property plan (it's not listed among tables getting their own
+  // column or a derived-via-join scope), so agencies are shared across
+  // properties, same as guest_type/guest_level.
   static async getAgency() {
     try {
       const query = `
@@ -8527,8 +8700,10 @@ class BookingModel {
   }
 
   // Generate invoice PDF
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it prevents generating an invoice for a booking from another property.
   static async generateInvoice(params) {
-    const { bookingId, user } = params;
+    const { bookingId, user, propertyId } = params;
     
     try {
       // Complex invoice query with all calculations
@@ -8637,11 +8812,11 @@ class BookingModel {
       LEFT JOIN room r ON b.ROOM_ID = r.IDNo
       LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
       LEFT JOIN billing bill ON b.IDNo = bill.BOOKING_ID
-      WHERE b.IDNo = ? AND b.ACTIVE = 1
+      WHERE b.IDNo = ? AND b.ACTIVE = 1 ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
       GROUP BY b.IDNo;
       `;
 
-      const rows = await queryDatabasePromise(query, [bookingId]);
+      const rows = await queryDatabasePromise(query, propertyId ? [bookingId, propertyId] : [bookingId]);
 
       if (rows.length === 0) {
         throw new Error('Booking not found');
@@ -9012,7 +9187,10 @@ class BookingModel {
   }
 
   // Get available rooms by bed count for direct reservations
-  static async getAvailableRoomsByBedCount(startDate, endDate, bedCount) {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it keeps this room-availability lookup (used for direct-reservation
+  // room assignment) from offering a room from another property.
+  static async getAvailableRoomsByBedCount(startDate, endDate, bedCount, propertyId) {
     try {
       // Format dates to YYYY-MM-DD
       const formatDate = (date) => {
@@ -9043,6 +9221,7 @@ class BookingModel {
     WHERE r.ROOM_STATUS != 3
       AND (b.ROOM_ID IS NULL OR DATE(b.CHECK_OUT_DATE) = ?)
       ${bedCount ? 'AND r.ROOM_BED = ?' : ''}
+      ${propertyId ? 'AND r.PROPERTY_ID = ?' : ''}
     ORDER BY r.ROOM_NUMBER ASC;
       `;
 
@@ -9050,7 +9229,10 @@ class BookingModel {
       if (bedCount) {
         queryParams.push(bedCount);
       }
-      
+      if (propertyId) {
+        queryParams.push(propertyId);
+      }
+
       const results = await queryDatabasePromise(query, queryParams);
       return results;
     } catch (error) {
@@ -9060,18 +9242,39 @@ class BookingModel {
   }
 
   // Assign room to direct reservation
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it guards against assigning a booking to a room from a different
+  // property (and vice versa) - this is a real correctness issue, not just
+  // a visibility one, since it would leave a booking pointed at a room it
+  // doesn't belong with.
   static async assignRoomToDirectReservation(params) {
-  const { bookingId, roomId, roomNumber, roomType, bedCount, price, floor, paymentStatus, paidAmount, encodedBy } = params;
-    
+  const { bookingId, roomId, roomNumber, roomType, bedCount, price, floor, paymentStatus, paidAmount, encodedBy, propertyId } = params;
+
     try {
       // Start transaction
       await queryDatabasePromise('START TRANSACTION');
 
+      if (propertyId) {
+        const ownershipRows = await queryDatabasePromise(
+          `SELECT
+             (SELECT COUNT(*) FROM booking WHERE IDNo = ? AND PROPERTY_ID = ? AND ACTIVE = 1) AS bookingOk,
+             (SELECT COUNT(*) FROM room WHERE IDNo = ? AND PROPERTY_ID = ? AND ACTIVE = 1) AS roomOk`,
+          [bookingId, propertyId, roomId, propertyId]
+        );
+        if (!ownershipRows[0]?.bookingOk || !ownershipRows[0]?.roomOk) {
+          await queryDatabasePromise('ROLLBACK');
+          return {
+            success: false,
+            message: 'Booking or room does not belong to the current property'
+          };
+        }
+      }
+
       // Update the booking to assign the room
       // Note: EDITED_BY and EDITED_DT are NOT updated here since this is just room assignment, not booking edit
       const updateBookingQuery = `
-        UPDATE booking 
-        SET ROOM_ID = ?, 
+        UPDATE booking
+        SET ROOM_ID = ?,
             IS_DIRECT_RESERVATION = 0
         WHERE IDNo = ? AND ACTIVE = 1
       `;
@@ -9387,7 +9590,9 @@ class BookingModel {
   // ==================== EDIT BOOKING METHODS ====================
 
   // Get booking details for editing
-  static async getEditBookingDetails(bookingId) {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it prevents loading the edit form for a booking from another property.
+  static async getEditBookingDetails(bookingId, propertyId) {
     try {
       const query = `
         SELECT 
@@ -9465,17 +9670,17 @@ class BookingModel {
         LEFT JOIN booking_service bs_late_checkout ON bs_late_checkout.BOOKING_ID = b.IDNo AND bs_late_checkout.SERVICE_ID = 72 AND bs_late_checkout.ACTIVE = 1
         LEFT JOIN agency ag ON b.AGENCY_ID = ag.IDNo
         LEFT JOIN group_booking gb ON b.GROUP_BOOKING_ID = gb.IDNo
-        WHERE b.IDNo = ? AND b.ACTIVE = 1
+        WHERE b.IDNo = ? AND b.ACTIVE = 1 ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
       `;
 
-      const results = await queryDatabasePromise(query, [bookingId]);
-      
+      const results = await queryDatabasePromise(query, propertyId ? [bookingId, propertyId] : [bookingId]);
+
       if (results.length === 0) {
         return null;
       }
 
       const booking = results[0];
-      
+
       // Format dates for frontend
       const moment = require('moment');
       const checkInDate = moment(booking.CHECK_IN_DATE).format('MMM DD, YYYY');
@@ -9525,7 +9730,7 @@ class BookingModel {
         pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
         flightNumber, dropoffFlightNumber, pickupDate, passengerCount,
         discount, seniorPwdDiscountPercent = 0, lateCheckoutFee, editedBy,
-        channelBookingId
+        channelBookingId, propertyId
       } = params;
 
       const holdPendingFlag = (holdPending === true || holdPending === 1 || holdPending === '1' || holdPending === 'true') ? 1 : 0;
@@ -9572,6 +9777,24 @@ class BookingModel {
           }
 
           try {
+            // Guard: this booking (and, if being moved, its target room) must
+            // belong to the current property - everything below reuses this
+            // already-validated bookingId without re-checking PROPERTY_ID
+            // (same pattern as checkoutBookings/groupPayment above).
+            if (propertyId) {
+              const [ownershipRows] = await connection.promise().query(
+                `SELECT
+                   (SELECT COUNT(*) FROM booking WHERE IDNo = ? AND PROPERTY_ID = ? AND ACTIVE = 1) AS bookingOk,
+                   (SELECT COUNT(*) FROM room WHERE IDNo = ? AND PROPERTY_ID = ?) AS roomOk`,
+                [bookingId, propertyId, room_id, propertyId]
+              );
+              if (!ownershipRows[0]?.bookingOk || (room_id && !ownershipRows[0]?.roomOk)) {
+                connection.rollback();
+                connection.release();
+                return reject(new Error('Booking or room does not belong to the current property'));
+              }
+            }
+
             // 1. Update customer information
             // Handle empty guestType and guestLevel - set to NULL if empty
             const processedGuestType = (guestType && guestType.trim() !== '') ? guestType : null;
@@ -10030,9 +10253,12 @@ class BookingModel {
   }
 
   // Get available rooms by floor for edit booking
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it keeps this room-picker query from offering a room from another
+  // property.
   static async getAvailableRoomsByFloor(params) {
     try {
-      const { floor, checkInDate, checkOutDate, excludeBookingId } = params;
+      const { floor, checkInDate, checkOutDate, excludeBookingId, propertyId } = params;
 
       let query = `
         SELECT
@@ -10049,6 +10275,7 @@ class BookingModel {
         LEFT JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
         WHERE r.ROOM_FLOOR = ?
         AND r.ACTIVE = 1
+        ${propertyId ? 'AND r.PROPERTY_ID = ?' : ''}
         AND (
           r.IDNo NOT IN (
             SELECT DISTINCT b.ROOM_ID
@@ -10071,7 +10298,9 @@ class BookingModel {
         ORDER BY r.ROOM_NUMBER ASC
       `;
 
-      const queryParams = [floor, checkInDate, checkInDate, checkOutDate, checkOutDate, checkInDate, checkOutDate, excludeBookingId];
+      const queryParams = [floor];
+      if (propertyId) queryParams.push(propertyId);
+      queryParams.push(checkInDate, checkInDate, checkOutDate, checkOutDate, checkInDate, checkOutDate, excludeBookingId);
 
       console.log('Executing query:', query);
       console.log('With parameters:', queryParams);
@@ -10095,7 +10324,7 @@ class BookingModel {
   // compatibility filtered. Without this being shared, a count Room Checker
   // quotes as available can silently stop being available by the time staff
   // proceed to Add Group Booking's own (stricter) search.
-  static async _findAvailableRoomsForRange(connection, { formattedStartDate, formattedEndDate, floorNumber, checkInStatus, checkOutStatus }) {
+  static async _findAvailableRoomsForRange(connection, { formattedStartDate, formattedEndDate, floorNumber, checkInStatus, checkOutStatus, propertyId }) {
     const roomsQuery = `
       SELECT r.IDNo, r.ROOM_NUMBER, r.ROOM_FLOOR, r.ROOM_BED, r.ROOM_VIEW,
              NULL AS FINAL_PRICE,
@@ -10130,6 +10359,7 @@ class BookingModel {
       FROM room r
       JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
       WHERE r.ROOM_STATUS != 3
+        ${propertyId ? 'AND r.PROPERTY_ID = ?' : ''}
         AND NOT EXISTS (
           SELECT 1 FROM booking b
           WHERE b.ROOM_ID = r.IDNo
@@ -10138,7 +10368,15 @@ class BookingModel {
             AND (DATE(b.CHECK_IN_DATE) < ? AND DATE(b.CHECK_OUT_DATE) > ?)
         )`;
 
-    const roomParams = [formattedStartDate, formattedEndDate, formattedEndDate, formattedStartDate];
+    // Placeholder order in roomsQuery: checkoutType subquery, checkinType
+    // subquery, [PROPERTY_ID filter inserted right after WHERE r.ROOM_STATUS],
+    // then the NOT EXISTS date-overlap check - propertyId goes in the middle,
+    // not at either end.
+    const roomParams = [formattedStartDate, formattedEndDate];
+    if (propertyId) {
+      roomParams.push(propertyId);
+    }
+    roomParams.push(formattedEndDate, formattedStartDate);
 
     if (floorNumber) {
       roomParams.push(floorNumber);
@@ -10159,9 +10397,12 @@ class BookingModel {
         AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
         AND DATE(b.CHECK_IN_DATE) < ?
         AND DATE(b.CHECK_OUT_DATE) > ?
+        ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
     `;
 
-    const [unassignedRows] = await connection.query(unassignedQuery, [formattedEndDate, formattedStartDate]);
+    const unassignedParams = [formattedEndDate, formattedStartDate];
+    if (propertyId) unassignedParams.push(propertyId);
+    const [unassignedRows] = await connection.query(unassignedQuery, unassignedParams);
 
     const reservedBeds = unassignedRows.reduce((acc, booking) => {
       const bedCount = parseInt(booking.REQUIRED_BEDS, 10) || 0;
@@ -10241,7 +10482,7 @@ class BookingModel {
   // helper) - so a quote is guaranteed still bookable when staff proceed from
   // Room Checker into that modal.
   static async getRangeAvailabilityCounts(params) {
-    const { startDate, endDate, checkInStatus, checkOutStatus, floorNumber, category, breakfast } = params;
+    const { startDate, endDate, checkInStatus, checkOutStatus, floorNumber, category, breakfast, propertyId } = params;
 
     const connection = await pool.promise().getConnection();
     try {
@@ -10251,7 +10492,7 @@ class BookingModel {
       const formattedEndDate = moment(endDate, 'YYYY-MM-DD').format('YYYY-MM-DD');
 
       const { filteredRooms } = await BookingModel._findAvailableRoomsForRange(connection, {
-        formattedStartDate, formattedEndDate, floorNumber, checkInStatus, checkOutStatus
+        formattedStartDate, formattedEndDate, floorNumber, checkInStatus, checkOutStatus, propertyId
       });
 
       // Room Checker is used as an actual guest quotation, so the King/Queen
@@ -10302,7 +10543,7 @@ class BookingModel {
   }
 
   static async findConsecutiveRooms(params) {
-    const { startDate, endDate, neededRooms, floorNumber, bed1Needed = 0, bed2Needed = 0, bookingRoute, checkInStatus, checkOutStatus, excludeGroupBookingId } = params;
+    const { startDate, endDate, neededRooms, floorNumber, bed1Needed = 0, bed2Needed = 0, bookingRoute, checkInStatus, checkOutStatus, excludeGroupBookingId, propertyId } = params;
 
     const connection = await pool.promise().getConnection();
     try {
@@ -10312,7 +10553,7 @@ class BookingModel {
       const formattedEndDate = moment(endDate, 'MMM DD, YYYY').format('YYYY-MM-DD');
 
       const { filteredRooms, reservedBeds } = await BookingModel._findAvailableRoomsForRange(connection, {
-        formattedStartDate, formattedEndDate, floorNumber, checkInStatus, checkOutStatus
+        formattedStartDate, formattedEndDate, floorNumber, checkInStatus, checkOutStatus, propertyId
       });
 
       const conflicts = [];
@@ -10483,7 +10724,10 @@ class BookingModel {
   // Returns the same room shape find_consecutive_rooms uses (IDNo, ROOM_NUMBER,
   // ROOM_BED, ROOM_PRICE, SEASONAL_PRICES) plus an isAvailable flag per room, so the
   // frontend can flag any room that got booked by someone else in the meantime.
-  static async checkRoomsAvailability({ roomIds, startDate, endDate }) {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it keeps this from reporting availability for a room from a different
+  // property, even if a tampered/stale roomIds list included one.
+  static async checkRoomsAvailability({ roomIds, startDate, endDate, propertyId }) {
     const connection = await pool.promise().getConnection();
 
     try {
@@ -10506,10 +10750,13 @@ class BookingModel {
         JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
         WHERE r.IDNo IN (?)
           AND r.ROOM_STATUS != 3
+          ${propertyId ? 'AND r.PROPERTY_ID = ?' : ''}
         ORDER BY CAST(r.ROOM_NUMBER AS UNSIGNED)
       `;
 
-      const [rooms] = await connection.query(roomsQuery, [formattedEndDate, formattedStartDate, roomIds]);
+      const roomsParams = [formattedEndDate, formattedStartDate, roomIds];
+      if (propertyId) roomsParams.push(propertyId);
+      const [rooms] = await connection.query(roomsQuery, roomsParams);
 
       const foundIds = rooms.map(r => r.IDNo);
       const seasonalPricesMap = {};
@@ -10595,7 +10842,7 @@ class BookingModel {
   }
 
   static async findConsecutiveRoomsEdit(params) {
-    const { startDate, endDate, neededRooms, floorNumber, bed1Needed = 0, bed2Needed = 0, bookingRoute, checkInStatus, checkOutStatus, excludeGroupBookingId, currentGroupBookingId } = params;
+    const { startDate, endDate, neededRooms, floorNumber, bed1Needed = 0, bed2Needed = 0, bookingRoute, checkInStatus, checkOutStatus, excludeGroupBookingId, currentGroupBookingId, propertyId } = params;
     
     try {
       const connection = await pool.promise().getConnection();
@@ -10648,6 +10895,7 @@ class BookingModel {
         FROM room r
         JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
         WHERE r.ROOM_STATUS != 3
+          ${propertyId ? 'AND r.PROPERTY_ID = ?' : ''}
           AND (
             -- Only include rooms that are currently assigned to the excluded group booking
             EXISTS (
@@ -10669,12 +10917,15 @@ class BookingModel {
 
       const roomParams = [
         formattedEndDate, formattedStartDate,  // For currentGroupBookingId subquery
-        formattedStartDate,                    // For checkoutType subquery  
+        formattedStartDate,                    // For checkoutType subquery
         formattedEndDate,                      // For checkinType subquery
+      ];
+      if (propertyId) roomParams.push(propertyId); // For WHERE r.PROPERTY_ID filter
+      roomParams.push(
         currentGroupBookingId,                 // For EXISTS clause
         formattedEndDate, formattedStartDate,  // For NOT EXISTS clause
         formattedEndDate, formattedStartDate   // For subquery in OR condition
-      ];
+      );
 
       if (floorNumber) {
         roomParams.push(floorNumber);
@@ -10695,9 +10946,12 @@ class BookingModel {
           AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
           AND DATE(b.CHECK_IN_DATE) < ?
           AND DATE(b.CHECK_OUT_DATE) > ?
+          ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
       `;
 
-      const [unassignedRows] = await connection.query(unassignedQuery, [formattedEndDate, formattedStartDate]);
+      const unassignedParams = [formattedEndDate, formattedStartDate];
+      if (propertyId) unassignedParams.push(propertyId);
+      const [unassignedRows] = await connection.query(unassignedQuery, unassignedParams);
 
       const reservedBeds = unassignedRows.reduce((acc, booking) => {
         const bedCount = parseInt(booking.REQUIRED_BEDS, 10) || 0;
@@ -11013,7 +11267,8 @@ class BookingModel {
       isDirectReservation,
       seniorPwdDiscountPercent = 0,
       seniorPwdRoomCount = 0,
-      existingGroupId = null // ID of existing group to join
+      existingGroupId = null, // ID of existing group to join
+      propertyId
     } = data;
 
     const holdPendingFlag = (holdPending === true || holdPending === 1 || holdPending === '1' || holdPending === 'true') ? 1 : 0;
@@ -11102,7 +11357,21 @@ class BookingModel {
         }
         
         const existingGroupData = existingGroup[0];
-        
+
+        // Guard: the group being joined must belong to the current property
+        // (group_booking itself has no PROPERTY_ID column per the
+        // multi-property plan, so this is checked via its existing booking
+        // rows - an empty group has none yet, so nothing to mismatch).
+        if (propertyId) {
+          const [mismatchRows] = await connection.promise().query(
+            'SELECT COUNT(*) AS mismatched FROM booking WHERE GROUP_BOOKING_ID = ? AND PROPERTY_ID != ?',
+            [existingGroupId, propertyId]
+          );
+          if ((mismatchRows[0]?.mismatched || 0) > 0) {
+            throw new Error('Existing group does not belong to the current property.');
+          }
+        }
+
         // Validate group name and contact match (IMPROVEMENT #3)
         if (existingGroupData.GROUP_NAME !== groupName) {
           throw new Error(`Group name mismatch. Expected: "${existingGroupData.GROUP_NAME}", Got: "${groupName}". Please ensure you're joining the correct group.`);
@@ -11340,8 +11609,8 @@ class BookingModel {
 
         // booking
         const bookingQuery = `
-          INSERT INTO booking (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, LATE_CHECKOUT, HOLD_PENDING, REMARKS, CONFIRMATION_NUMBER, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, GROUP_BOOKING_ID, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, FLIGHT_NUMBER, PASSENGER_COUNT, IS_CONTRACTED_RATE)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO booking (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, LATE_CHECKOUT, HOLD_PENDING, REMARKS, CONFIRMATION_NUMBER, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, GROUP_BOOKING_ID, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, FLIGHT_NUMBER, PASSENGER_COUNT, IS_CONTRACTED_RATE, PROPERTY_ID)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const processedAgencyPayer = (bookingRoute === 'agency' && agencyPayer)
           ? (agencyPayer === 'guest' ? 'guest' : 'agency')
@@ -11368,7 +11637,8 @@ class BookingModel {
           0,
           (pickupServiceId || dropoffServiceId) ? (flightNumber || null) : null,
           (pickupServiceId || dropoffServiceId) ? (parseInt(passengerCount) || null) : null,
-          isContractedRate ? 1 : 0
+          isContractedRate ? 1 : 0,
+          propertyId || null
         ];
         const [bookResult] = await connection.promise().query(bookingQuery, bookingValues);
         const bookingId = bookResult.insertId;
@@ -12103,7 +12373,9 @@ class BookingModel {
 
 
   // Get voucher data for modal display
-  static async getVoucherData(bookingId) {
+  // NOTE: propertyId is optional for backward compatibility; when supplied
+  // it prevents generating a voucher for a booking from another property.
+  static async getVoucherData(bookingId, propertyId) {
     try {
       const query = `
         SELECT 
@@ -12191,10 +12463,10 @@ class BookingModel {
           -- Late Checkout (Service ID = 72)
           LEFT JOIN booking_service bs_late ON b.IDNo = bs_late.BOOKING_ID 
             AND bs_late.SERVICE_ID = 72 AND bs_late.ACTIVE = 1
-        WHERE b.IDNo = ? AND b.ACTIVE = 1
+        WHERE b.IDNo = ? AND b.ACTIVE = 1 ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
       `;
 
-      const results = await queryDatabasePromise(query, [bookingId]);
+      const results = await queryDatabasePromise(query, propertyId ? [bookingId, propertyId] : [bookingId]);
       return results[0] || null;
 
     } catch (error) {
