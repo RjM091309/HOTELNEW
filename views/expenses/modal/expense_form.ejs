@@ -1,0 +1,61 @@
+<!-- Add / edit expense: the cage system's form (main / sub category, vehicle + ODO for a
+     vehicle category, description, in-charge, amount, receipt photo). The date is the day
+     it is keyed in. -->
+<div class="modal fade xp-modal" id="xp-expense-modal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="xp-expense-form" novalidate>
+        <div class="modal-header">
+          <h5 class="modal-title" id="xp-expense-title">Add Expense</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="xp-expense-id">
+          <div class="xp-field">
+            <label class="xp-label" for="xp-main">Main category <span class="xp-req">*</span></label>
+            <select class="xp-input" id="xp-main" name="mainCategory" required></select>
+          </div>
+          <div class="xp-field xp-hidden" id="xp-sub-wrap">
+            <label class="xp-label" for="xp-sub">Sub category</label>
+            <select class="xp-input" id="xp-sub" name="subCategory"></select>
+          </div>
+          <div class="xp-field-row xp-hidden" id="xp-vehicle-wrap">
+            <div class="xp-field">
+              <label class="xp-label" for="xp-vehicle">Vehicle</label>
+              <select class="xp-input" id="xp-vehicle" name="vehicleId"></select>
+            </div>
+            <div class="xp-field">
+              <label class="xp-label" for="xp-odo">ODO (kilometers)</label>
+              <input class="xp-input xp-money" type="text" inputmode="decimal" autocomplete="off" id="xp-odo" name="odo" placeholder="0">
+            </div>
+          </div>
+          <div class="xp-field">
+            <label class="xp-label" for="xp-details">Description <span class="xp-req">*</span></label>
+            <textarea class="xp-input" id="xp-details" name="details" rows="3" required></textarea>
+          </div>
+          <div class="xp-field">
+            <label class="xp-label" for="xp-incharge">In-Charge</label>
+            <input class="xp-input" type="text" id="xp-incharge" name="inCharge">
+          </div>
+          <div class="xp-field">
+            <label class="xp-label" for="xp-amount">Amount <span class="xp-req">*</span></label>
+            <input class="xp-input xp-money" type="text" inputmode="decimal" autocomplete="off" id="xp-amount" name="amount" placeholder="0.00" required>
+          </div>
+          <div class="xp-field">
+            <label class="xp-label" for="xp-photo">Receipt photo</label>
+            <input class="xp-input xp-file" type="file" id="xp-photo" name="receiptPhoto" accept="image/*">
+            <div class="xp-photo-note xp-hidden" id="xp-photo-note">
+              <span>A receipt photo is saved.</span>
+              <button type="button" class="xp-link-danger" id="xp-photo-remove">Remove</button>
+            </div>
+            <input type="hidden" id="xp-remove-photo" name="removePhoto" value="0">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Save</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

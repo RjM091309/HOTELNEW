@@ -1,0 +1,70 @@
+<!-- Vehicles (cage system's vehicle window on a vehicle category): the same vehicles as
+     Vehicle Management, with add / edit / delete. The list and the form swap in one window. -->
+<div class="modal fade xp-modal" id="xp-vehicles-modal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="xp-vehicles-title">Vehicles</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <!-- list -->
+      <div id="xp-vehicles-list-view">
+        <div class="modal-body">
+          <div id="xp-vehicles-list" class="xp-vehicle-list"><div class="xp-muted xp-small">Loading…</div></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" id="xp-vehicle-add">Add</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+
+      <!-- form -->
+      <form id="xp-vehicle-form" class="xp-hidden" novalidate>
+        <div class="modal-body">
+          <input type="hidden" id="xp-vehicle-id" name="vehicleId">
+          <!-- Sent back unchanged: the vehicle update clears the GPS device when it is left out. -->
+          <input type="hidden" id="xp-vehicle-gps" name="gpsDeviceId">
+          <div class="xp-field-row">
+            <div class="xp-field">
+              <label class="xp-label" for="xp-v-plate">Plate number <span class="xp-req">*</span></label>
+              <input class="xp-input" type="text" id="xp-v-plate" name="plateNumber" required>
+            </div>
+            <div class="xp-field">
+              <label class="xp-label" for="xp-v-model">Model <span class="xp-req">*</span></label>
+              <input class="xp-input" type="text" id="xp-v-model" name="modelName" required>
+            </div>
+          </div>
+          <div class="xp-field-row">
+            <div class="xp-field">
+              <label class="xp-label" for="xp-v-type">Vehicle type <span class="xp-req">*</span></label>
+              <select class="xp-input" id="xp-v-type" name="vehicleType" required>
+                <option value="">Select…</option>
+                <option>Sedan</option><option>SUV</option><option>Truck</option><option>Van</option><option>Motorcycle</option>
+              </select>
+            </div>
+            <div class="xp-field">
+              <label class="xp-label" for="xp-v-fuel">Fuel type <span class="xp-req">*</span></label>
+              <select class="xp-input" id="xp-v-fuel" name="fuelType" required>
+                <option value="">Select…</option>
+                <option>Gasoline</option><option>Diesel</option><option>Electric</option><option>Hybrid</option>
+              </select>
+            </div>
+          </div>
+          <div class="xp-field">
+            <label class="xp-label" for="xp-v-color">Color <span class="xp-req">*</span></label>
+            <input class="xp-input" type="text" id="xp-v-color" name="color" required>
+          </div>
+          <div class="xp-field">
+            <label class="xp-label" for="xp-v-remarks">Remarks</label>
+            <textarea class="xp-input" id="xp-v-remarks" name="remarks" rows="2" placeholder="Optional"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Save</button>
+          <button type="button" class="btn btn-secondary" id="xp-vehicle-back">Back</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

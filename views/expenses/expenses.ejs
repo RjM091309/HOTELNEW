@@ -1,217 +1,122 @@
 <!-- start page content -->
-<style>
-  /* Date of Expense field (flatpickr). Underline look to match the MDL fields. */
-  .expense-plain-field {
-    display: flex;
-    flex-direction: column;
-    margin-top: 8px;
-  }
-  .expense-plain-label {
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.6);
-    margin-bottom: 4px;
-  }
-  .expense-plain-input,
-  input.expense-plain-input,
-  input.expense-plain-input[readonly],
-  input.expense-plain-input.flatpickr-input {
-    background: transparent !important;
-    background-color: transparent !important;
-    border: none !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.35) !important;
-    border-radius: 0 !important;
-    color: #ffffff !important;
-    -webkit-text-fill-color: #ffffff !important;
-    font-size: 15px !important;
-    padding: 4px 0 !important;
-    outline: none !important;
-    box-shadow: none !important;
-    width: 100% !important;
-    opacity: 1 !important;
-    cursor: pointer !important;   /* whole field is clickable to open the calendar */
-  }
-  .expense-plain-input:focus,
-  .expense-plain-input.active {
-    border-bottom-color: #6f9c40 !important;
-  }
-  .expense-plain-input::placeholder { color: rgba(255, 255, 255, 0.45) !important; }
+<!--
+  Expenses, laid out like the cage system's expense page (data entry only, no settlement):
+  date range | total expenses / return money / net | selected total + breakdown by category |
+  main category | sub category | expenses table. Return money ("sukli") is its own green main category.
+-->
+<link rel="stylesheet" href="/css/expenses.css?v=cage-concept-1">
 
-  [data-theme="white"] .expense-plain-label { color: #6c757d; }
-  [data-theme="white"] .expense-plain-input,
-  [data-theme="white"] input.expense-plain-input[readonly],
-  [data-theme="white"] input.expense-plain-input.flatpickr-input {
-    color: #212529 !important;
-    -webkit-text-fill-color: #212529 !important;
-    border-bottom-color: #ced4da !important;
-  }
-
-  /* --- flatpickr calendar: clean, subtle, light card (matches the mockup) --- */
-  .flatpickr-calendar {
-    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18) !important;
-    border: 1px solid rgba(0, 0, 0, 0.06) !important;
-    border-radius: 10px !important;
-    padding: 4px !important;
-  }
-  .flatpickr-calendar .flatpickr-months {
-    padding-top: 4px;
-  }
-  .flatpickr-calendar .flatpickr-current-month {
-    font-size: 15px;
-    font-weight: 600;
-  }
-  .flatpickr-calendar .flatpickr-weekday {
-    color: #9aa0a6;
-    font-weight: 600;
-    font-size: 11px;
-    text-transform: none;
-  }
-  .flatpickr-calendar .flatpickr-day {
-    border-radius: 50%;
-    max-width: 38px;
-    height: 38px;
-    line-height: 38px;
-    color: #3c4043;
-  }
-  .flatpickr-calendar .flatpickr-day.prevMonthDay,
-  .flatpickr-calendar .flatpickr-day.nextMonthDay,
-  .flatpickr-calendar .flatpickr-day.flatpickr-disabled {
-    color: #cfd4da;
-  }
-  .flatpickr-calendar .flatpickr-day:hover {
-    background: #f1f3f4;
-    border-color: #f1f3f4;
-  }
-  .flatpickr-calendar .flatpickr-day.today {
-    border: 1px solid #6f9c40;
-    color: #3c4043;
-  }
-  .flatpickr-calendar .flatpickr-day.today:hover {
-    background: #6f9c40;
-    border-color: #6f9c40;
-    color: #ffffff;
-  }
-  .flatpickr-calendar .flatpickr-day.selected,
-  .flatpickr-calendar .flatpickr-day.selected:hover {
-    background: #6f9c40;
-    border-color: #6f9c40;
-    color: #ffffff;
-  }
-  .flatpickr-calendar .flatpickr-monthDropdown-months,
-  .flatpickr-calendar .numInputWrapper span { display: none; }
-</style>
-<div class="row">
-    <div class="col-xl-12 col-md-12 col-12">
-        <div class="dashboard-card">
-            <div class="dashboard-card-header">
-                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-                    <div class="tab-bar">
-                        <a class="tab-item is-active" href="/expenses">All Expenses</a>
-                    </div>        
-                    
-                    <div style="flex: 0 0 auto;">
-                        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#new-expense-modal">
-                            <i class="fa fa-plus"></i> Add Expense
-                        </button>
-                        <button id="exportToExcel" class="btn btn-primary" style="margin-left: 10px;">
-                            <i class="fa fa-download"></i> Export to Excel
-                        </button>
-                    </div>
-                </div>
-            </div>
-            <div class="dashboard-card-body">
-                <div class="table-scrollable">
-                    <table id="expenses_tbl" class="table table-hover table-bordered full-width">
-                        <thead>
-                            <tr>
-                                <th>Date of Expense</th>
-                                <th>Company Name</th>
-                                <th>Details of Expense</th>
-                                <th>SI No.</th>
-                                <th>Amount</th>
-                                <th>Encoded By</th>
-                                <th>Encoded Date</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Data will be loaded via JavaScript -->
-                        </tbody>
-                        <tfoot>
-                            <tr>
-                                <td colspan="4" class="text-right font-weight-bold"><strong>Grand Total:</strong></td>
-                                <td id="expenses-grand-total" class="font-weight-bold"></td>
-                                <td colspan="3"></td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-            </div>
-        </div>
+<div class="xp">
+  <!-- Date range + export -->
+  <div class="xp-card xp-bar">
+    <span class="xp-caption">Date range</span>
+    <div class="xp-range">
+      <i class="far fa-calendar-alt xp-range__icon"></i>
+      <input type="text" id="xp-range" class="xp-range__input" placeholder="Any date" readonly>
+      <button type="button" id="xp-range-clear" class="xp-range__clear" title="Any date" aria-label="Any date"><i class="fa fa-times"></i></button>
     </div>
+    <button id="exportToExcel" type="button" class="btn btn-primary xp-bar__export">
+      <i class="fa fa-download"></i> Export
+    </button>
+  </div>
+
+  <!-- Total expenses, return money and the net -->
+  <div class="xp-kpis">
+    <div class="xp-card xp-kpi">
+      <span class="xp-kpi__icon"><i class="fa fa-wallet"></i></span>
+      <div class="xp-kpi__text">
+        <div class="xp-kpi__label">Total expenses</div>
+        <div class="xp-kpi__value" id="xp-total">₱0.00</div>
+      </div>
+      <div class="xp-kpi__meta" id="xp-total-meta"></div>
+    </div>
+    <div class="xp-card xp-kpi xp-kpi--return">
+      <span class="xp-kpi__icon"><i class="fa fa-undo"></i></span>
+      <div class="xp-kpi__text">
+        <div class="xp-kpi__label">Total return money</div>
+        <div class="xp-kpi__value" id="xp-returned">₱0.00</div>
+      </div>
+      <div class="xp-kpi__meta" id="xp-returned-meta"></div>
+    </div>
+    <div class="xp-card xp-kpi">
+      <span class="xp-kpi__icon"><i class="fa fa-calculator"></i></span>
+      <div class="xp-kpi__text">
+        <div class="xp-kpi__label">Net expenses</div>
+        <div class="xp-kpi__value" id="xp-net">₱0.00</div>
+      </div>
+      <div class="xp-kpi__meta" id="xp-net-meta"></div>
+    </div>
+  </div>
+
+  <!-- Selected total + breakdown by main category -->
+  <div class="xp-summary">
+    <div class="xp-card xp-kpi xp-kpi--tall" id="xp-selected-card">
+      <span class="xp-kpi__icon"><i class="fa fa-filter"></i></span>
+      <div class="xp-kpi__text">
+        <div class="xp-kpi__label">Selected total</div>
+        <div class="xp-kpi__value" id="xp-selected">₱0.00</div>
+        <div class="xp-kpi__sub" id="xp-selected-meta">All categories</div>
+      </div>
+    </div>
+    <div class="xp-card xp-breakdown">
+      <div class="xp-breakdown__head">
+        <div class="xp-caption">Expense breakdown</div>
+        <div class="xp-muted">By category</div>
+      </div>
+      <div id="xp-breakdown-body"><div class="xp-muted xp-small">No expense data yet.</div></div>
+    </div>
+  </div>
+
+  <!-- Main category | Sub category | expenses -->
+  <div class="xp-explorer">
+    <div class="xp-card xp-panel xp-panel--main">
+      <div class="xp-panel__head">
+        <span class="xp-caption">Main category</span>
+        <button type="button" class="xp-icon-btn" id="xp-add-main" title="Add main category" aria-label="Add main category"><i class="fa fa-plus"></i></button>
+      </div>
+      <div class="xp-panel__body" id="xp-main-list"></div>
+    </div>
+    <div class="xp-card xp-panel xp-panel--sub">
+      <div class="xp-panel__head">
+        <span class="xp-caption">Sub category</span>
+        <button type="button" class="xp-icon-btn" id="xp-add-sub" title="Add sub category" aria-label="Add sub category" disabled><i class="fa fa-plus"></i></button>
+      </div>
+      <div class="xp-panel__body" id="xp-sub-list"></div>
+    </div>
+    <div class="xp-card xp-table-panel">
+      <div class="xp-table-panel__head">
+        <span class="xp-table-panel__title">Expenses <span class="xp-muted xp-small" id="xp-table-scope"></span></span>
+        <div class="xp-table-panel__actions">
+          <!-- As in the cage system, the buttons follow the selected main category. -->
+          <button type="button" class="btn btn-outline-secondary btn-sm xp-hidden" id="xp-btn-vehicles"><i class="fa fa-car"></i> Vehicles</button>
+          <button type="button" class="btn btn-success btn-sm xp-hidden" id="xp-btn-return"><i class="fa fa-undo"></i> Return money</button>
+          <button type="button" class="btn btn-primary btn-sm xp-hidden" id="xp-btn-new"><i class="fa fa-plus"></i> New expense</button>
+        </div>
+      </div>
+      <div class="table-scrollable xp-table-wrap">
+        <table id="expenses_tbl" class="table table-hover full-width xp-table">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Description</th>
+              <th>In-Charge</th>
+              <th class="text-end">Amount</th>
+              <th>Date &amp; Time</th>
+              <th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <%- include('modal/expense_form') %>
+  <%- include('modal/return_money') %>
+  <%- include('modal/vehicles') %>
+  <%- include('modal/breakdown') %>
 </div>
-
-<style>
-/* Table styling - exactly matching booking table design */
-[data-theme="white"] #expenses_tbl thead th {
-    background: rgba(33, 150, 243, 0.08) !important;
-    color: #1565c0 !important;
-    border-color: rgba(33, 150, 243, 0.25) !important;
-    font-weight: 700;
-}
-
-[data-theme="white"] #expenses_tbl tbody td,
-[data-theme="white"] #expenses_tbl tbody th,
-[data-theme="white"] #expenses_tbl tfoot td,
-[data-theme="white"] #expenses_tbl tfoot th {
-    border-color: rgba(33, 150, 243, 0.15) !important;
-    vertical-align: middle;
-}
-
-[data-theme="white"] #expenses_tbl.table-hover tbody tr:hover,
-[data-theme="white"] #expenses_tbl.table-hover tbody tr:hover td {
-    background: rgba(33, 150, 243, 0.06) !important;
-    color: #111827 !important;
-}
-
-[data-theme="white"] #expenses_tbl tfoot tr {
-    background: rgba(33, 150, 243, 0.04) !important;
-}
-
-[data-theme="white"] #expenses_tbl_wrapper .dataTables_paginate ul.pagination .page-item .page-link:hover {
-    background: rgba(33, 150, 243, 0.1) !important;
-    border-color: rgba(33, 150, 243, 0.3) !important;
-    color: #1565c0 !important;
-}
-
-[data-theme="white"] #expenses_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link,
-[data-theme="white"] #expenses_tbl_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link:hover {
-    background: #2196f3 !important;
-    border-color: #2196f3 !important;
-    color: #ffffff !important;
-}
-
-/* Tab bar blue accent matching booking tab */
-[data-theme="white"] .tab-bar a.tab-item[href^="/expenses"] {
-    color: #495057 !important;
-    background-color: transparent !important;
-}
-
-[data-theme="white"] .tab-bar a.tab-item[href^="/expenses"]:hover,
-[data-theme="white"] .tab-bar a.tab-item[href^="/expenses"].is-active {
-    color: #1565c0 !important;
-    background-color: rgba(33, 150, 243, 0.1) !important;
-}
-
-[data-theme="white"] .tab-bar a.tab-item[href^="/expenses"].is-active::after {
-    background-color: #2196f3 !important;
-}
-</style>
-
-<%- include('modal/new_expenses') %>
-<%- include('modal/edit_expenses') %>
 
 <!-- ExcelJS: styled Excel export (fills / bold / number formats) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
-
-<!-- Include external JavaScript file -->
-<script src="/js/expenses/expenses.js?v=expense-excel-format-2"></script>
+<script src="/js/expenses/expenses.js?v=cage-concept-2"></script>

@@ -1,0 +1,29 @@
+<!-- Return money: the change ("sukli") given back from cash taken out for expenses.
+     The cage system's form: amount and description. -->
+<div class="modal fade xp-modal" id="xp-return-modal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="xp-return-form" novalidate>
+        <div class="modal-header">
+          <h5 class="modal-title" id="xp-return-title">Add Return Money</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="xp-return-id">
+          <div class="xp-field">
+            <label class="xp-label" for="xp-return-amount">Amount <span class="xp-req">*</span></label>
+            <input class="xp-input xp-money" type="text" inputmode="decimal" autocomplete="off" id="xp-return-amount" placeholder="0.00" required>
+          </div>
+          <div class="xp-field">
+            <label class="xp-label" for="xp-return-details">Description</label>
+            <textarea class="xp-input" id="xp-return-details" rows="3"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-success">Save</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

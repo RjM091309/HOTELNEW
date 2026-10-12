@@ -1,0 +1,36 @@
+<!-- Category Breakdown (cage system): the entries of one main category, sortable, with the grand total. -->
+<div class="modal fade xp-modal" id="xp-breakdown-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title">Category Breakdown: <span id="xp-bd-name"></span></h5>
+          <div class="xp-muted xp-small" id="xp-bd-sub"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="xp-bd-wrap">
+          <table class="xp-bd-table">
+            <thead>
+              <tr>
+                <th data-sort="details">Description <span class="xp-sort"></span></th>
+                <th data-sort="inCharge">In-Charge <span class="xp-sort"></span></th>
+                <th data-sort="amount" class="text-end">Amount <span class="xp-sort"></span></th>
+                <th data-sort="date">Date &amp; Time <span class="xp-sort"></span></th>
+              </tr>
+            </thead>
+            <tbody id="xp-bd-body"></tbody>
+            <tfoot>
+              <tr>
+                <td colspan="2" class="text-end">Grand Total</td>
+                <td class="text-end" id="xp-bd-total"></td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

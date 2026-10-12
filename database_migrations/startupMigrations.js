@@ -872,6 +872,48 @@ async function runExpensesRevampMigration() {
   // existing ReceiptNo column; details reuse Description.
   await ensureColumn('expenses', 'EXPENSE_DATE', `EXPENSE_DATE DATE NULL DEFAULT NULL`, 'IDNo');
   await ensureColumn('expenses', 'COMPANY_NAME', `COMPANY_NAME VARCHAR(255) NULL DEFAULT NULL`, 'EXPENSE_DATE');
+
+  // Cage-style expenses (same concept as K Grand's Expenses page, no settlement):
+  // the category is kept by name (Group_Category = main, Category = sub), plus
+  // who is in charge, the vehicle and its ODO for a vehicle category, and the
+  // receipt photo (file name under public/uploads/expense_receipts).
+  await ensureColumn('expenses', 'IN_CHARGE', `IN_CHARGE VARCHAR(255) NULL DEFAULT NULL`, 'Amount');
+  await ensureColumn('expenses', 'VEHICLE_ID', `VEHICLE_ID INT NULL DEFAULT NULL`, 'IN_CHARGE');
+  await ensureColumn('expenses', 'ODO', `ODO DECIMAL(12,1) NULL DEFAULT NULL`, 'VEHICLE_ID');
+  await ensureColumn('expenses', 'RECEIPT_PHOTO', `RECEIPT_PHOTO VARCHAR(255) NULL DEFAULT NULL`, 'ODO');
+
+  // Main and sub categories (PARENT_ID = the main's IDNo).
+  await ensureTable('expense_category', `
+    CREATE TABLE expense_category (
+      IDNo INT NOT NULL AUTO_INCREMENT,
+      CATEGORY VARCHAR(255) NOT NULL,
+      PARENT_ID INT NULL DEFAULT NULL,
+      ENCODED_BY VARCHAR(255) NULL DEFAULT NULL,
+      ENCODED_DT DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+      EDITED_BY VARCHAR(255) NULL DEFAULT NULL,
+      EDITED_DT DATETIME NULL DEFAULT NULL,
+      ACTIVE TINYINT(1) NOT NULL DEFAULT 1,
+      PRIMARY KEY (IDNo),
+      KEY idx_expense_category_parent (PARENT_ID)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
+  // Return money: the change ("sukli") given back from cash taken out for
+  // expenses; taken off the expenses to give the net.
+  await ensureTable('expense_return_money', `
+    CREATE TABLE expense_return_money (
+      IDNo INT NOT NULL AUTO_INCREMENT,
+      RETURN_DATE DATE NULL DEFAULT NULL,
+      DESCRIPTION TEXT NULL,
+      AMOUNT DECIMAL(12,2) NOT NULL,
+      ENCODED_BY VARCHAR(255) NULL DEFAULT NULL,
+      ENCODED_DT DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+      EDITED_BY VARCHAR(255) NULL DEFAULT NULL,
+      EDITED_DT DATETIME NULL DEFAULT NULL,
+      ACTIVE TINYINT(1) NOT NULL DEFAULT 1,
+      PRIMARY KEY (IDNo)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
 }
 
 async function runLateCheckoutServiceBackfill() {
