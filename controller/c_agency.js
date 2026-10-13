@@ -31,7 +31,7 @@ class AgencyController {
   // API endpoint to get agencies data
   static async getAgenciesData(req, res) {
     try {
-      const agencies = await AgencyModel.getAllAgencies();
+      const agencies = await AgencyModel.getAllAgencies(req.propertyId);
       res.json({ 
         success: true, 
         agencies: agencies 
@@ -71,14 +71,14 @@ class AgencyController {
       }
 
       // Check if agency name already exists
-      const nameExists = await AgencyModel.checkAgencyNameExists(name);
+      const nameExists = await AgencyModel.checkAgencyNameExists(name, null, req.propertyId);
       if (nameExists) {
         return res.json({ success: false, message: 'Agency name already exists.' });
       }
 
       // Use JWT userId (numeric) to match ENCODED_BY int column
       const encodedBy = req.user ? req.user.userId : null;
-      const result = await AgencyModel.addAgency(name.trim(), contactNumber, encodedBy);
+      const result = await AgencyModel.addAgency(name.trim(), contactNumber, encodedBy, req.propertyId);
       
       if (result.success) {
         // Fetch the newly created agency to return complete data
@@ -130,7 +130,7 @@ class AgencyController {
       }
 
       // Check if agency name already exists (excluding current agency)
-      const nameExists = await AgencyModel.checkAgencyNameExists(name, id);
+      const nameExists = await AgencyModel.checkAgencyNameExists(name, id, req.propertyId);
       if (nameExists) {
         return res.json({ success: false, message: 'Agency name already exists.' });
       }

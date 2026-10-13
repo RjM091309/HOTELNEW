@@ -1882,8 +1882,28 @@ class DashboardModel {
   }
 
   // Get room monitoring data
-  static async getRoomMonitoringData(propertyId) {
+  // singlePanel (Pool Villa): its rooms have no floor, so instead of the 3rd-6th
+  // floor grouping every active room of the property comes back under one
+  // 'villa' key.
+  static async getRoomMonitoringData(propertyId, singlePanel = false) {
     try {
+      if (singlePanel) {
+        const all = await queryDatabasePromise(`
+          SELECT r.ROOM_NUMBER, r.ROOM_STATUS, r.ROOM_BED, r.ROOM_TYPE_ID
+          FROM room r
+          WHERE r.ACTIVE = 1 AND r.PROPERTY_ID = ?
+          ORDER BY r.ROOM_NUMBER ASC
+        `, [propertyId]);
+        return {
+          villa: all.map(room => ({
+            ROOM_NUMBER: room.ROOM_NUMBER,
+            ROOM_STATUS: room.ROOM_STATUS,
+            ROOM_BED: room.ROOM_BED || 1,
+            ROOM_TYPE_ID: room.ROOM_TYPE_ID
+          }))
+        };
+      }
+
       const rooms = await queryDatabasePromise(`
         SELECT r.IDNo, r.ROOM_NUMBER, r.ROOM_FLOOR, r.ROOM_STATUS, r.ROOM_BED, r.ROOM_MAX, r.ROOM_TYPE_ID, r.ACTIVE
         FROM room r

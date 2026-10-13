@@ -119,11 +119,18 @@ class BookingController {
         PERMISSIONS: req.user.PERMISSIONS
       } : null;
 
+      // Pool Villa quotes by season x category x guest count (pool_villa_rates),
+      // not by room type - hand the rate card to the page as a staff reference.
+      const isPoolVilla = !!(res.locals.currentProperty && res.locals.currentProperty.CODE === 'pool_villa');
+      const poolVillaRates = isPoolVilla ? await require('../models/poolVillaRatesModel').getAll() : null;
+
       res.render('booking/quotation', {
         title: 'Quotation',
         subTitle: 'Quotation',
         activePage: 'quotation',
-        user
+        user,
+        isPoolVilla,
+        poolVillaRates
       });
     } catch (error) {
       console.error('Error rendering quotation page:', error);
@@ -146,7 +153,7 @@ class BookingController {
         String(base.getMonth() + 1).padStart(2, '0') + '-' +
         String(base.getDate()).padStart(2, '0');
 
-      const rows = await BookingModel.getBreakfastList(servingDate);
+      const rows = await BookingModel.getBreakfastList(servingDate, req.propertyId);
 
       const totals = rows.reduce((acc, r) => {
         acc.total += Number(r.BREAKFAST_COUNT) || 0;
@@ -2688,7 +2695,7 @@ class BookingController {
   // Get all agencies
   static async getAgency(req, res) {
     try {
-      const agencies = await BookingModel.getAgency();
+      const agencies = await BookingModel.getAgency(req.propertyId);
       res.json(agencies);
 
     } catch (error) {

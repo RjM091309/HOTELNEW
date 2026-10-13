@@ -156,25 +156,40 @@ function proceedWithUpdate(info, newStart, newEnd, targetRoom, bookingId) {
           
           // Update overlap detection immediately
           globalOverlapCheck(info.view.calendar);
-          
-          // FAST UPDATE: Only update the specific event instead of full calendar reload
-          updateSingleEvent(info.event, newStart, newEnd, targetRoom);
-          
+
+          // Reload from the server instead of patching the dragged event's
+          // Date objects in place - see the plain date-change branch below
+          // for why (updateSingleEvent/event.setDates was found to render
+          // the event a day later than its real saved dates after a drag).
+          // This calendar's events are loaded via its own
+          // removeAllEvents()+addEventSource() cycle (applyCalendarBookings
+          // in calendar_data.js), not FullCalendar's own declarative event
+          // source - calendar.refetchEvents() has nothing registered to
+          // refetch from and just re-renders the same stale array, which
+          // left the old dragged element and the freshly "refetched" stale
+          // one overlapping on screen. refreshCalendarBookings() is this
+          // app's real reload path (does an actual fetch + full replace).
+          if (typeof refreshCalendarBookings === 'function') {
+            refreshCalendarBookings();
+          } else {
+            updateSingleEvent(info.event, newStart, newEnd, targetRoom);
+          }
+
           // Clean up any remaining drag artifacts
           clearDragPreviews();
-          
+
           // AGGRESSIVE CLEANUP: Remove any duplicates that might have been created
           setTimeout(() => {
             removeDuplicateEvents();
           }, 100);
-          
+
           // Clear the drop flag
           delete info.event._wasDropped;
-          
+
         } else {
           // Close the loading modal first
           Swal.close();
-          
+
           // Error from server - show detailed validation errors
           let errorMessage = data.message || 'Failed to transfer room and update dates. Please try again.';
           
@@ -351,24 +366,39 @@ function proceedWithUpdate(info, newStart, newEnd, targetRoom, bookingId) {
         
         // Update overlap detection immediately
         globalOverlapCheck(info.view.calendar);
-        
-        // FAST UPDATE: Only update the specific event instead of full calendar reload
-        updateSingleEvent(info.event, newStart, newEnd, targetRoom);
-        
+
+        // Reload from the server instead of patching the dragged event's
+        // Date objects in place (updateSingleEvent/event.setDates). The DB
+        // save itself is correct (verified directly), but that client-side
+        // patch path was found to render the event a day later than its
+        // real saved dates after a drag. calendar.refetchEvents() is the
+        // wrong tool here - this calendar's events are loaded via its own
+        // removeAllEvents()+addEventSource() cycle (applyCalendarBookings in
+        // calendar_data.js), not FullCalendar's own declarative event
+        // source, so refetchEvents() just re-renders the same stale array
+        // instead of pulling fresh data - which left the old dragged element
+        // and the "refetched" stale one overlapping on screen.
+        // refreshCalendarBookings() is this app's real reload path.
+        if (typeof refreshCalendarBookings === 'function') {
+          refreshCalendarBookings();
+        } else {
+          updateSingleEvent(info.event, newStart, newEnd, targetRoom);
+        }
+
         // Clean up any remaining drag artifacts
         clearDragPreviews();
-        
+
         // AGGRESSIVE CLEANUP: Remove any duplicates that might have been created
         setTimeout(() => {
           removeDuplicateEvents();
         }, 100);
-        
+
         // Clear the drop flag
         delete info.event._wasDropped;
       } else {
         // Close the loading modal first
         Swal.close();
-        
+
         // Error from server - show detailed validation errors
         let errorMessage = data.message || 'Failed to update booking. Please try again.';
         

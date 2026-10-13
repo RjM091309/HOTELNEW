@@ -37,18 +37,35 @@ class RoomRatesModel {
 
   // Month-of-year (1-12) -> season ('lean'/'peak'), a fixed recurring
   // assignment (not tied to any specific year). Every missing month
-  // defensively defaults to 'lean'.
+  // defensively defaults to 'lean'. map[month] stays a plain season string
+  // for backward compatibility with every existing caller (client-side
+  // copies included) - the optional mid-month override lives in the
+  // sibling `splits` object instead, so code that never learned about it
+  // keeps working exactly as before (whole-month assignment only).
   static async getSeasonMonthMap() {
-    const rows = await queryDatabasePromise(`SELECT MONTH_NO, SEASON FROM room_rate_season_months`);
+    const rows = await queryDatabasePromise(`SELECT MONTH_NO, SEASON, SPLIT_DAY, SPLIT_SEASON FROM room_rate_season_months`);
     const map = {};
     for (let m = 1; m <= 12; m++) map[m] = 'lean';
-    for (const r of rows) map[r.MONTH_NO] = r.SEASON;
+    const splits = {};
+    for (const r of rows) {
+      map[r.MONTH_NO] = r.SEASON;
+      if (r.SPLIT_DAY && r.SPLIT_SEASON) {
+        splits[r.MONTH_NO] = { day: Number(r.SPLIT_DAY), season: r.SPLIT_SEASON };
+      }
+    }
+    map.splits = splits;
     return map;
   }
 
-  // Which season a given date's month belongs to, per the admin-assigned map.
+  // Which season a given date falls under, per the admin-assigned map - the
+  // month's base SEASON, unless that month has a split (see
+  // getSeasonMonthMap) and this date's day-of-month has reached the split
+  // day, in which case the split's season takes over for the rest of the
+  // month.
   static seasonForDate(date, monthSeasonMap) {
     const month = date.getMonth() + 1;
+    const split = monthSeasonMap && monthSeasonMap.splits && monthSeasonMap.splits[month];
+    if (split && date.getDate() >= split.day) return split.season;
     return (monthSeasonMap && monthSeasonMap[month]) || 'lean';
   }
 
@@ -292,16 +309,27 @@ class RoomRatesModel {
     return { updated: clean.length };
   }
 
-  // Assigns each of the 12 calendar months to a season.
-  // pairs: [{ month, season }]. Every month is always written (1-12 required
-  // elsewhere), so this always upserts all 12 rows.
+  // Assigns each of the 12 calendar months to a season, with an optional
+  // mid-month split (from splitDay onward, the month's days belong to
+  // splitSeason instead - e.g. Peak starting Oct 27 instead of the whole
+  // month). pairs: [{ month, season, splitDay?, splitSeason? }]. Every month
+  // is always written (1-12 required elsewhere), so this always upserts all
+  // 12 rows. splitDay/splitSeason are cleared (set NULL) whenever not given
+  // or invalid, so removing a split is just omitting it on the next save.
   static async saveSeasonMonths(pairs, userId = null) {
     const { SEASON_KEYS } = require('../config/roomRates');
     const clean = (Array.isArray(pairs) ? pairs : [])
-      .map((p) => ({
-        month: parseInt(p.month, 10),
-        season: String(p.season || 'lean')
-      }))
+      .map((p) => {
+        const splitDay = parseInt(p.splitDay, 10);
+        const splitSeason = String(p.splitSeason || '');
+        const hasValidSplit = Number.isInteger(splitDay) && splitDay >= 1 && splitDay <= 31 && SEASON_KEYS.has(splitSeason);
+        return {
+          month: parseInt(p.month, 10),
+          season: String(p.season || 'lean'),
+          splitDay: hasValidSplit ? splitDay : null,
+          splitSeason: hasValidSplit ? splitSeason : null
+        };
+      })
       .filter((p) =>
         Number.isInteger(p.month) && p.month >= 1 && p.month <= 12
         && SEASON_KEYS.has(p.season)
@@ -309,15 +337,17 @@ class RoomRatesModel {
 
     if (!clean.length) return { updated: 0 };
 
-    const placeholders = clean.map(() => '(?, ?, ?)').join(', ');
+    const placeholders = clean.map(() => '(?, ?, ?, ?, ?)').join(', ');
     const params = [];
-    clean.forEach((p) => params.push(p.month, p.season, userId));
+    clean.forEach((p) => params.push(p.month, p.season, p.splitDay, p.splitSeason, userId));
 
     await queryDatabasePromise(
-      `INSERT INTO room_rate_season_months (MONTH_NO, SEASON, UPDATED_BY)
+      `INSERT INTO room_rate_season_months (MONTH_NO, SEASON, SPLIT_DAY, SPLIT_SEASON, UPDATED_BY)
        VALUES ${placeholders}
        ON DUPLICATE KEY UPDATE
          SEASON = VALUES(SEASON),
+         SPLIT_DAY = VALUES(SPLIT_DAY),
+         SPLIT_SEASON = VALUES(SPLIT_SEASON),
          UPDATED_BY = VALUES(UPDATED_BY),
          UPDATED_DT = CURRENT_TIMESTAMP`,
       params

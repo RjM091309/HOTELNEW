@@ -1,5 +1,14 @@
 <!-- Edit Group Booking Modal -->
 <link rel="stylesheet" href="/plugins/flatpicker/flatpickr.min.css">
+<%
+  // Same Pool Villa guest-count pricing used by add_booking.ejs - see
+  // models/poolVillaRatesModel.js. NOTE: unlike Add Group Booking, this
+  // modal has no per-room manual-rate UI to attach a guest-count input to
+  // (resolveEditGroupRoomPriceBase just auto-recomputes already-selected
+  // rooms' prices, no editable per-room rows exist here) - only the
+  // category dropdown restriction below is applied for Pool Villa.
+  const isPoolVillaBooking = typeof currentProperty !== 'undefined' && currentProperty && currentProperty.CODE === 'pool_villa';
+%>
 
 <div class="modal fade" id="modal-edit-group-booking" tabindex="-1" role="dialog" aria-labelledby="modalEditGroupBookingLabel" aria-hidden="true" data-bs-backdrop="static">
   <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
@@ -86,11 +95,16 @@
                   <option value="" disabled>Select Booking Resource</option>
                   <option value="walk-in">Walk-in</option>
                   <option value="agency">Agency</option>
+                  <!-- Only Walk-in/Agency are real Pool Villa categories (see add_booking.ejs). -->
+                  <% if (!isPoolVillaBooking) { %>
                   <option value="tenant">Tenant (15%)</option>
                   <option value="vip">VIP (20%)</option>
                   <option value="employee">Employee (30%)</option>
                   <option value="senior_special">Senior / Special 20%</option>
+                  <% } %>
+                  <% if (!isPoolVillaBooking) { %>
                   <option value="booking-channel">OTA / Channel</option>
+                  <% } %>
                   <!-- Not manually pickable (disabled + hidden) - only ever shown by
                        syncEditGroupLongTermRateDropdown() once the stay hits 10+ nights. -->
                   <option value="long_term" disabled style="display: none;">Long Term Stay</option>
@@ -1191,8 +1205,12 @@ window.editGroupAddedServicesMap = {};
 
   // Group booking prices the whole stay from the check-in date's season only
   // (not per-night splitting) - same simplification Add Group Booking uses.
+  // Still honors a mid-month split (e.g. Peak starting the 27th) for
+  // whichever single date is actually passed in.
   function editGroupSeasonForNight(date) {
     const month = date.getMonth() + 1;
+    const split = editGroupSeasonMonthMap.splits && editGroupSeasonMonthMap.splits[month];
+    if (split && date.getDate() >= split.day) return split.season;
     return editGroupSeasonMonthMap[month] || 'lean';
   }
 

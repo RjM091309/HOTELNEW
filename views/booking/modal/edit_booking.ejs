@@ -1,5 +1,10 @@
 <!-- Date Time item CSS -->
 <link rel="stylesheet" href="/plugins/flatpicker/flatpickr.min.css">
+<%
+  // Same Pool Villa guest-count pricing used by add_booking.ejs - see
+  // models/poolVillaRatesModel.js.
+  const isPoolVillaBooking = typeof currentProperty !== 'undefined' && currentProperty && currentProperty.CODE === 'pool_villa';
+%>
 
 <div class="modal fade" id="modal-editbooking" tabindex="-1" role="dialog" aria-labelledby="editBookingModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
@@ -30,12 +35,16 @@
                                     <input class="form-control flatpickr-input" type="text" id="edit_daterange" name="daterange" required>
                                 </div>
                             </div>
+                            <% if (!isPoolVillaBooking) { %>
                             <div id="edit_divroom_type" class="col-lg-3">
                                 <div class="form-group">
                                     <label class="form-label">Room View</label>
                                     <input class="form-control" type="text" id="edit_room_type" name="room_type" readonly>
                                 </div>
                             </div>
+                            <% } else { %>
+                            <input type="hidden" id="edit_room_type" name="room_type">
+                            <% } %>
                             <div id="edit_divbedCount" class="col-lg-3">
                                 <div class="form-group">
                                     <label class="form-label">Bed Type</label>
@@ -71,11 +80,17 @@
                                     <select class="form-select" id="edit_bookingRoute" name="bookingRoute">
                                         <option value="walk-in" selected>Walk-in</option>
                                         <option value="agency">Agency</option>
+                                        <!-- Only Walk-in/Agency are real Pool Villa categories (see
+                                             add_booking.ejs for the same restriction). -->
+                                        <% if (!isPoolVillaBooking) { %>
                                         <option value="tenant">Tenant (15%)</option>
                                         <option value="vip">VIP (20%)</option>
                                         <option value="employee">Employee (30%)</option>
                                         <option value="senior_special">Senior / Special 20%</option>
+                                        <% } %>
+                                        <% if (!isPoolVillaBooking) { %>
                                         <option value="booking-channel">OTA / Channel</option>
+                                        <% } %>
                                     </select>
                                 </div>
                             </div>
@@ -89,10 +104,14 @@
                         </div>
 
                         <!-- ROOM DETAILS -->
-                        <div id="edit_divmaxOccupants" class="col-lg-4" style="display: none;">
+                        <div id="edit_divmaxOccupants" class="col-lg-4" <% if (!isPoolVillaBooking) { %>style="display: none;"<% } %>>
                             <div class="form-group">
-                                <label class="form-label">Max Occupants</label>
+                                <label class="form-label"><%= isPoolVillaBooking ? 'Number of Guests' : 'Max Occupants' %></label>
+                                <% if (isPoolVillaBooking) { %>
+                                <input class="form-control" type="number" id="edit_maxOccupants" name="maxOccupants" min="1" max="31" placeholder="e.g. 4">
+                                <% } else { %>
                                 <input class="form-control" type="text" id="edit_maxOccupants" name="maxOccupants" readonly>
+                                <% } %>
                             </div>
                         </div>
                     
@@ -671,6 +690,77 @@ function getEditPriceBookingType() {
     return bookingRoute;
 }
 
+// Pool Villa prices by season x category (walk_in/agency only) x guest
+// count - see models/poolVillaRatesModel.js and the matching add_booking.js
+// setup this mirrors. Edit Booking has no shared season infrastructure of
+// its own (computeEditSeasonalPrice above uses an older, unrelated
+// SEASONAL_PRICES shape), so this is a self-contained copy - same
+// "each modal keeps its own copy" convention already used for Group
+// Booking's groupSeasonMonthMap/editGroupSeasonMonthMap.
+function editIsPoolVillaActive() {
+    return document.documentElement.getAttribute('data-property-theme') === 'pool_villa';
+}
+
+let EDIT_SEASON_MONTH_MAP = { 1: 'lean', 2: 'lean', 3: 'lean', 4: 'lean', 5: 'lean', 6: 'lean', 7: 'lean', 8: 'lean', 9: 'lean', 10: 'lean', 11: 'lean', 12: 'lean' };
+let EDIT_POOL_VILLA_RATES = {};
+let editPoolVillaDataLoaded = false;
+
+function loadEditPoolVillaData() {
+    if (editPoolVillaDataLoaded || !editIsPoolVillaActive()) return;
+    editPoolVillaDataLoaded = true;
+    fetch('/room-rates/season-months')
+        .then((r) => r.json())
+        .then((json) => {
+            if (json && json.success && json.seasonMonths) Object.assign(EDIT_SEASON_MONTH_MAP, json.seasonMonths);
+        })
+        .catch(() => {});
+    fetch('/room-rates/pool-villa-rates')
+        .then((r) => r.json())
+        .then((json) => {
+            if (json && json.success && json.poolVillaRates) EDIT_POOL_VILLA_RATES = json.poolVillaRates;
+        })
+        .catch(() => {});
+}
+loadEditPoolVillaData();
+
+function editSeasonForNight(date) {
+    const month = date.getMonth() + 1;
+    const split = EDIT_SEASON_MONTH_MAP.splits && EDIT_SEASON_MONTH_MAP.splits[month];
+    if (split && date.getDate() >= split.day) return split.season;
+    return EDIT_SEASON_MONTH_MAP[month] || 'lean';
+}
+
+function editPoolVillaCategory() {
+    return getEditPriceBookingType() === 'agency' ? 'agency' : 'walk_in';
+}
+
+// null = "not offered" (e.g. 3 guests in Peak season) - distinct from a real 0 rate.
+function editPoolVillaRateFor(season, category, guestCount) {
+    const v = EDIT_POOL_VILLA_RATES && EDIT_POOL_VILLA_RATES[season] && EDIT_POOL_VILLA_RATES[season][category]
+        ? EDIT_POOL_VILLA_RATES[season][category][guestCount]
+        : undefined;
+    return Number.isFinite(Number(v)) ? Number(v) : null;
+}
+
+// Pool Villa equivalent of computeEditSeasonalPrice() - check-in date's
+// season only (matches that function's own single-rate-per-night shape;
+// Edit Booking doesn't do the per-night season-crossing split Add Booking
+// does). Returns the same { price, matched } shape so refreshEditRoomRate's
+// existing preserveIfNoMatch logic keeps working unchanged.
+function computeEditPoolVillaPrice() {
+    const guestCount = parseInt($('#edit_maxOccupants').val(), 10);
+    if (!Number.isInteger(guestCount) || guestCount < 1) return { price: 0, matched: false };
+
+    const daterange = $('#edit_daterange').val() || '';
+    const [startDateStr] = daterange.split(' to ');
+    const checkIn = startDateStr ? new Date(startDateStr) : new Date();
+    const season = editSeasonForNight(isNaN(checkIn.getTime()) ? new Date() : checkIn);
+    const category = editPoolVillaCategory();
+
+    const rate = editPoolVillaRateFor(season, category, guestCount);
+    return { price: rate === null ? 0 : rate, matched: rate !== null };
+}
+
 function computeEditSeasonalPrice(room) {
     if (!room) return null;
     const seasonalPrices = room.SEASONAL_PRICES || [];
@@ -737,7 +827,12 @@ function cacheEditRoomDetails(roomId) {
 function refreshEditRoomRate(preserveIfNoMatch = false) {
     const applyPrice = (room) => {
         if (!room) return;
-        const { price: pricePerNight, matched } = computeEditSeasonalPrice(room);
+        // Pool Villa ignores the room entirely for pricing (season x
+        // category x guest count only) - computeEditSeasonalPrice's
+        // room.SEASONAL_PRICES/bedCount matching doesn't apply there.
+        const { price: pricePerNight, matched } = editIsPoolVillaActive()
+            ? computeEditPoolVillaPrice()
+            : computeEditSeasonalPrice(room);
         const currentPrice = parseFloat(($('#edit_price').val() || '').toString().replace(/,/g, ''));
         if (preserveIfNoMatch && !matched && isFinite(currentPrice) && currentPrice > 0) {
             return;
@@ -897,10 +992,10 @@ $(document).ready(function() {
                     const roomDropdown = $('#edit_addroom');
                     const preserveRoomId = $('#edit_addFloor').data('preserve-room'); // Get room to preserve
                     $('#edit_addFloor').removeData('preserve-room'); // Clear the data after use
-                    
+
                     roomDropdown.empty().append('<option value="" disabled>Select Room</option>');
-                    
-                    if (data.length === 0) {
+
+                    if (!Array.isArray(data) || data.length === 0) {
                         roomDropdown.append('<option value="" disabled>No available rooms for selected dates</option>');
                     } else {
                         let foundPreservedRoom = false;
@@ -909,11 +1004,29 @@ $(document).ready(function() {
                             if (isSelected) foundPreservedRoom = true;
                             roomDropdown.append(`<option value="${room.room_id}" ${isSelected}>${room.ROOM_NUMBER}</option>`);
                         });
-                        
+
                         // If preserved room was found and selected, trigger change to update room details
                         if (foundPreservedRoom && preserveRoomId) {
                             roomDropdown.val(preserveRoomId).trigger('change');
                         }
+                    }
+
+                    // The room this booking already had must never be silently
+                    // dropped - if the refreshed "available rooms" list no
+                    // longer includes it (e.g. an adjacency conflict freshly
+                    // introduced by a Late Check-out change), re-add it
+                    // manually and warn instead of leaving the dropdown blank,
+                    // which previously let a booking get saved with no room
+                    // (shows as "Unassigned Room" and vanishes off the
+                    // calendar) without the user ever intending to unassign it.
+                    if (preserveRoomId && !roomDropdown.find(`option[value="${preserveRoomId}"]`).length) {
+                        roomDropdown.append(`<option value="${preserveRoomId}" selected>${preserveRoomId} (Current - may now conflict)</option>`);
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Room Still Selected',
+                            text: 'The previously assigned room no longer appears in the available list for these dates/status, but it has been kept selected so the booking is not left unassigned. Please double check it before saving.',
+                            confirmButtonText: 'OK'
+                        });
                     }
                 },
                 error: function (err) {
@@ -939,7 +1052,13 @@ $(document).ready(function() {
 
             const roomViewText = room.ROOM_VIEW === 1 ? 'Condo View' : (room.ROOM_VIEW === 2 ? 'Mountain View' : 'N/A');
             $('#edit_room_type').val(roomViewText);
-            $('#edit_maxOccupants').val(room.ROOM_MAX);
+            // Pool Villa: #edit_maxOccupants is the staff-entered guest
+            // count that drives the price - never overwrite it with the
+            // newly selected room's capacity (see add_booking.ejs for the
+            // same guard on the Add Booking side).
+            if (!editIsPoolVillaActive()) {
+                $('#edit_maxOccupants').val(room.ROOM_MAX);
+            }
             $('#edit_bedCount').val(room.ROOM_BED === 1 ? '1' : room.ROOM_BED === 2 ? '2' : 'N/A');
             $('#edit_amenities').val(room.AMENITIES || '');
             $('#edit_room_type_hidden').val(room.ROOM_TYPE);
@@ -951,6 +1070,12 @@ $(document).ready(function() {
     $('input[name="edit_agencyPayer"]').on('change', function () {
         updateEditAgencyPayerHint();
         refreshEditRoomRate(true);
+    });
+
+    // Pool Villa only: changing the guest count must recompute the price the
+    // same way changing the room/category/payer already does.
+    $('#edit_maxOccupants').off('input.poolVillaGuestCount').on('input.poolVillaGuestCount', function () {
+        if (editIsPoolVillaActive()) refreshEditRoomRate();
     });
 
     // Fetch breakfast and transport prices using shared utility
@@ -1000,7 +1125,39 @@ $(document).ready(function() {
             $('#edit_breakfastAdultTotal').css('display', 'none').val('');
             $('#edit_breakfastKidTotal').css('display', 'none').val('');
         } else {
-            // When checked, trigger total calculation if values exist
+            // populateEditForm() clears #edit_breakfastAdultId/#edit_breakfastKidId
+            // to '' for any booking that didn't already have breakfast (see its
+            // "Explicitly reset if no breakfast" branch) - the page-load fetch
+            // above that would normally fill them only ran once, before this
+            // specific booking was even loaded. Without a real service ID here,
+            // the save silently skips writing a breakfast row no matter what
+            // qty/price is typed, with no error shown - so make sure it's set
+            // (or re-set) the moment the box is actually checked.
+            getBreakfastPrices().then(serviceData => {
+                if (!Array.isArray(serviceData)) return;
+                if (!$('#edit_breakfastAdultId').val()) {
+                    const adult = serviceData.find(s => s.SERVICE_NAME.includes('Adult'));
+                    if (adult) {
+                        $('#edit_breakfastAdultId').val(adult.IDNo);
+                        if (!$('#edit_breakfastAdultPrice').val()) {
+                            $('#edit_breakfastAdultPrice').val(adult.SERVICE_COST);
+                        }
+                    }
+                }
+                if (!$('#edit_breakfastKidId').val()) {
+                    const kid = serviceData.find(s => s.SERVICE_NAME.includes('Kids'));
+                    if (kid) {
+                        $('#edit_breakfastKidId').val(kid.IDNo);
+                        if (!$('#edit_breakfastKidPrice').val()) {
+                            $('#edit_breakfastKidPrice').val(kid.SERVICE_COST);
+                        }
+                    }
+                }
+                toggleEditBreakfastTotalDisplay();
+                computeEditTotal();
+            });
+            // Trigger total calculation immediately with whatever's already there
+            // too, so the UI isn't waiting on the (cached, usually instant) fetch.
             toggleEditBreakfastTotalDisplay();
         }
         computeEditTotal();
@@ -1345,6 +1502,24 @@ $(document).ready(function() {
                 icon: 'error',
                 title: 'Flight Info Required',
                 text: 'Please enter the Number of Passengers for Pick-up/Drop-off.',
+            });
+            return;
+        }
+
+        // Guard against silently saving a room-assigned booking as unassigned.
+        // populateEditForm() recorded whether this booking had a real room
+        // when the modal opened; if it did and the dropdown has since ended
+        // up empty (several different background room-list refreshes have
+        // been found doing this, particularly for Pool Villa rooms which
+        // have no floor set), block the save instead of wiping ROOM_ID.
+        const editHadRoom = $('#edit_bookingId').data('hadRoom') === true;
+        const editRoomIdNow = $('#edit_addroom').val();
+        if (editHadRoom && (!editRoomIdNow || editRoomIdNow === '0')) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Room Selection Lost',
+                html: 'This booking\'s room selection was cleared by a background refresh and would be saved as <b>unassigned</b>. Please reopen the Room dropdown and pick the room again before saving.',
+                confirmButtonText: 'OK'
             });
             return;
         }
@@ -2422,7 +2597,14 @@ function populateEditForm(booking) {
     }
     
     // Set room selection if not direct reservation
-    if (!booking.IS_DIRECT_RESERVATION && booking.ROOM_ID) {
+    // Remembered for the submit-time guard below - a booking that starts out
+    // with a real room assigned must never be allowed to save with an empty
+    // room_id (several different async paths populating #edit_addroom have
+    // been found doing that silently; this is the last line of defense
+    // regardless of which one is responsible in a given case).
+    const editBookingHadRoom = !booking.IS_DIRECT_RESERVATION && !!booking.ROOM_ID;
+    $('#edit_bookingId').data('hadRoom', editBookingHadRoom);
+    if (editBookingHadRoom) {
         populateEditRoomSelection(booking.ROOM_ID, booking.ROOM_FLOOR);
         cacheEditRoomDetails(booking.ROOM_ID);
     }
@@ -2546,9 +2728,21 @@ function populateEditForm(booking) {
 
 // Function to populate room selection in edit form
 function populateEditRoomSelection(roomId, floorNumber) {
+    // Seed the dropdown with the room this booking already has, synchronously,
+    // before anything async runs. The modal is clickable the instant it's
+    // shown, but the real room list below only arrives after a network round
+    // trip - until now that left the <select> on its static placeholder
+    // (<option value="" disabled selected>Select Room</option>) the whole
+    // time, so saving quickly (e.g. just flipping Check-in/out status) could
+    // submit an empty room_id and wipe the booking's room. Pre-selecting here
+    // closes that gap; the fetch below still refreshes the list afterward.
+    if (roomId) {
+        $('#edit_addroom').empty().append(`<option value="${roomId}" selected>${roomId} (Current)</option>`);
+    }
+
     // Set floor
     $('#edit_addFloor').val(floorNumber);
-    
+
     // Get current dates for filtering
     const daterange = $('#edit_daterange').val();
     if (!daterange) return;
@@ -2582,8 +2776,24 @@ function populateEditRoomSelection(roomId, floorNumber) {
 
         console.log('Available rooms response:', data); // Debug log
 
-        if (data.length === 0) {
+        // /booking/get_available_rooms_by_floor requires a truthy floor and
+        // responds with an HTTP 400 {error: '...'} object (not an array)
+        // when it's missing/null - which every Pool Villa room always is.
+        // fetch() doesn't reject on a 400, so without this check data.forEach
+        // below would throw on that error object and land in .catch(),
+        // leaving the dropdown on just the placeholder above with nothing
+        // selected. Treat "not an array" the same as "zero rooms returned".
+        if (!Array.isArray(data) || data.length === 0) {
+            // Rooms with no ROOM_FLOOR set (e.g. every Pool Villa room - this
+            // endpoint queries by floor, and Pool Villa rooms don't have one)
+            // always land here, even for the room this booking already has.
+            // Re-add it instead of leaving the dropdown on just the disabled
+            // placeholder, which silently saves the booking with no room at
+            // all (shows as "Unassigned Room" and drops off the calendar).
             roomDropdown.append('<option value="" disabled>No available rooms for selected dates</option>');
+            if (roomId) {
+                roomDropdown.append(`<option value="${roomId}" selected>${roomId} (Current)</option>`);
+            }
         } else {
             let currentRoomFound = false;
             data.forEach(room => {

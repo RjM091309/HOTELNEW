@@ -103,11 +103,11 @@
 }
 .dashboard-btn-row {
   position: relative;
-  height: 45px;
+  min-height: 45px;
   width: 100%;
   font-weight: 500;
   font-size: 14px;
-  line-height: 45px;
+  line-height: 1.25;
   color: #ffffff !important;
   display: flex;
   border-bottom: 1px solid rgba(255,255,255,0.1);
@@ -136,7 +136,14 @@
 .dashboard-btn-row:hover::after {
   width: 100%;
 }
+/* Long labels (e.g. "Late Check-out/Check-in") wrap to 2 lines inside the row, centered, instead of overflowing it. */
+.dashboard-btn-row-item {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 6px 8px 6px 0;
+}
 .dashboard-btn-row-metric {
+  flex: 0 0 auto;
   color: #6f9c40 !important;
   font-weight: 700;
   font-size: 18px;

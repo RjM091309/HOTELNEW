@@ -139,6 +139,18 @@ function renderFloorRooms(floor, rooms) {
   });
 }
 
+// Pool Villa: one flat panel with every room (no floors) - see
+// DashboardModel.getRoomMonitoringData(singlePanel).
+function renderVillaRooms(rooms) {
+  const container = document.getElementById('floor-layout-villa');
+  if (!container) return;
+  container.innerHTML = '';
+  const rowDiv = document.createElement('div');
+  rowDiv.classList.add('rooms-row', 'row1');
+  rooms.forEach(room => rowDiv.appendChild(createRoomElement(room)));
+  container.appendChild(rowDiv);
+}
+
 function checkForStatusChanges(newData) {
   if (!oldData) return [];
   const changedRooms = [];
@@ -163,6 +175,11 @@ function checkForStatusChanges(newData) {
 function triggerVisualAlarm(changedRooms) {
   const uniqueFloors = [...new Set(changedRooms.map(cr => cr.floor))];
   uniqueFloors.forEach(floor => {
+    if (floor === 'villa') {
+      const villaTab = document.querySelector('.tab-item[data-target="villa-content"]');
+      if (villaTab) villaTab.classList.add('dot-alarm-tab');
+      return;
+    }
     let suffix = "th";
     if (floor === "3") suffix = "rd";
     if (floor === "4") suffix = "th";
@@ -210,6 +227,7 @@ function fetchData() {
         if(data.floors['4']) renderFloorRooms(4, data.floors['4']);
         if(data.floors['5']) renderFloorRooms(5, data.floors['5']);
         if(data.floors['6']) renderFloorRooms(6, data.floors['6']);
+        if(data.floors['villa']) renderVillaRooms(data.floors['villa']);
         handleDataUpdate(data);
       } else {
         console.warn('No floor data received');

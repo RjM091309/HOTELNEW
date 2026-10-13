@@ -130,7 +130,7 @@ class PickupDropController {
 
   static async getAll(req, res) {
     try {
-      const data = await PickupDropModel.getAll();
+      const data = await PickupDropModel.getAll(req.propertyId);
       res.json({ success: true, data });
     } catch (error) {
       console.error('Error fetching pickup & drop records:', error);

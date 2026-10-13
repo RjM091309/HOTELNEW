@@ -677,7 +677,7 @@ class TelegramController {
     static async getDailySettlement(req, res) {
         try {
             const DailySettlementModel = require('../models/dailySettlementModel');
-            const settlement = await DailySettlementModel.getDailySettlement();
+            const settlement = await DailySettlementModel.getDailySettlement(req.propertyId);
             res.json({ success: true, data: settlement });
         } catch (error) {
             console.error('Error getting daily settlement:', error);

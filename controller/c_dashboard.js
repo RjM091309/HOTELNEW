@@ -508,7 +508,8 @@ class DashboardController {
   static async getRoomMonitoring(req, res) {
     try {
       const propertyId = await resolvePropertyId(req);
-      const floors = await DashboardModel.getRoomMonitoringData(propertyId);
+      const isPoolVilla = !!(res.locals.currentProperty && res.locals.currentProperty.CODE === 'pool_villa');
+      const floors = await DashboardModel.getRoomMonitoringData(propertyId, isPoolVilla);
       res.json({ floors });
     } catch (error) {
       console.error('Error getting room monitoring data:', error);

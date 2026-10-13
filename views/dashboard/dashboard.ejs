@@ -781,14 +781,23 @@ function calculateCardVariables(booking) {
 					</div>
 				</div>
 				<div class="tab-bar">
+					<% if (typeof currentProperty !== 'undefined' && currentProperty && currentProperty.CODE === 'pool_villa') { %>
+					<div class="tab-item is-active" data-target="villa-content">Villa Rooms</div>
+					<% } else { %>
 					<div class="tab-item is-active" data-target="3rd-floor-content">3rd Floor</div>
 					<div class="tab-item" data-target="4th-floor-content">4th Floor</div>
 					<div class="tab-item" data-target="5th-floor-content">5th Floor</div>
 					<div class="tab-item" data-target="6th-floor-content">6th Floor</div>
+					<% } %>
 				</div>
 			</div>
 			<div class="dashboard-card-body">
-				<div class="tab-panel is-active" id="3rd-floor-content">
+				<% if (typeof currentProperty !== 'undefined' && currentProperty && currentProperty.CODE === 'pool_villa') { %>
+				<div class="tab-panel is-active" id="villa-content">
+					<div id="floor-layout-villa" class="single-floor"></div>
+				</div>
+				<% } %>
+				<div class="tab-panel <%= (typeof currentProperty !== 'undefined' && currentProperty && currentProperty.CODE === 'pool_villa') ? '' : 'is-active' %>" id="3rd-floor-content">
 					<div id="floor-layout-3" class="single-floor"></div>
 				</div>
 				<div class="tab-panel" id="4th-floor-content">
@@ -847,7 +856,7 @@ function calculateCardVariables(booking) {
 		
 		// Load room_data.js immediately - this is critical for room display
 		var roomScript = document.createElement('script');
-		roomScript.src = '/js/dashboard/room_data.js?v=no-empty-slot-1';
+		roomScript.src = '/js/dashboard/room_data.js?v=villa-panel-1';
 		document.body.appendChild(roomScript);
 		
 		// Load main_data.js

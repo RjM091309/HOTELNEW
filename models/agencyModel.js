@@ -2,7 +2,7 @@ const { queryDatabasePromise, pool } = require('../config/database');
 
 class AgencyModel {
   // Get all active agencies with booking counts
-  static async getAllAgencies() {
+  static async getAllAgencies(propertyId = null) {
     try {
       const query = `
         SELECT 
@@ -23,9 +23,10 @@ class AgencyModel {
           GROUP BY AGENCY_ID
         ) bk ON bk.AGENCY_ID = a.IDNo
         WHERE a.ACTIVE = 1 
+          ${propertyId ? 'AND a.PROPERTY_ID = ?' : ''}
         ORDER BY a.NAME ASC
       `;
-      return await queryDatabasePromise(query);
+      return await queryDatabasePromise(query, propertyId ? [propertyId] : []);
     } catch (error) {
       console.error('Error in getAllAgencies:', error);
       throw error;
@@ -64,13 +65,13 @@ class AgencyModel {
   }
 
   // Add new agency
-  static async addAgency(name, contactNumber, encodedBy) {
+  static async addAgency(name, contactNumber, encodedBy, propertyId = null) {
     try {
       const query = `
-        INSERT INTO agency (NAME, CONTACT_NUMBER, ENCODED_BY, ENCODED_DT, ACTIVE)
-        VALUES (?, ?, ?, NOW(), 1)
+        INSERT INTO agency (NAME, CONTACT_NUMBER, ENCODED_BY, ENCODED_DT, ACTIVE, PROPERTY_ID)
+        VALUES (?, ?, ?, NOW(), 1, ?)
       `;
-      const result = await queryDatabasePromise(query, [name, contactNumber || null, encodedBy]);
+      const result = await queryDatabasePromise(query, [name, contactNumber || null, encodedBy, propertyId]);
       return { success: true, id: result.insertId };
     } catch (error) {
       console.error('Error in addAgency:', error);
@@ -133,7 +134,7 @@ class AgencyModel {
   }
 
   // Check if agency name already exists (for validation)
-  static async checkAgencyNameExists(name, excludeId = null) {
+  static async checkAgencyNameExists(name, excludeId = null, propertyId = null) {
     try {
       let query = `
         SELECT COUNT(*) as count 
@@ -141,6 +142,11 @@ class AgencyModel {
         WHERE NAME = ? AND ACTIVE = 1
       `;
       const params = [name];
+
+      if (propertyId) {
+        query += ' AND PROPERTY_ID = ?';
+        params.push(propertyId);
+      }
       
       if (excludeId) {
         query += ' AND IDNo != ?';

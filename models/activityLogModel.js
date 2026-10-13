@@ -252,7 +252,8 @@ class ActivityLogModel {
         status = 'SUCCESS',
         errorMessage = null,
         userId = null,
-        userName = null
+        userName = null,
+        propertyId = null
       } = entry;
 
       if (!action) {
@@ -274,11 +275,19 @@ class ActivityLogModel {
         if (Number.isFinite(n)) amt = n;
       }
 
+      // Property: the booking's own property wins (so a log always follows its
+      // booking); otherwise the property the request was made under; else NULL = general.
+      let resolvedPropertyId = this._toId(propertyId);
+      if (resolvedBookingId) {
+        const rows = await queryDatabasePromise('SELECT PROPERTY_ID FROM booking WHERE IDNo = ? LIMIT 1', [resolvedBookingId]);
+        if (rows && rows[0] && rows[0].PROPERTY_ID) resolvedPropertyId = rows[0].PROPERTY_ID;
+      }
+
       await queryDatabasePromise(
         `INSERT INTO activity_log
            (MODULE, ACTION, BOOKING_ID, DESCRIPTION, AMOUNT,
-            STATUS, ERROR_MESSAGE, USER_ID, USER_NAME, OLD_DATA, NEW_DATA)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            STATUS, ERROR_MESSAGE, USER_ID, USER_NAME, OLD_DATA, NEW_DATA, PROPERTY_ID)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           this._clip(module, 50),
           this._clip(action, 60),
@@ -290,7 +299,8 @@ class ActivityLogModel {
           userId || null,
           this._clip(userName, 150),
           this._toText(oldData),
-          this._toText(newData)
+          this._toText(newData),
+          resolvedPropertyId
         ]
       );
     } catch (err) {
@@ -306,10 +316,12 @@ class ActivityLogModel {
    */
   static async getLogs(filters = {}) {
     try {
-      const { module, action, bookingId, userId, status, search, dateFrom, dateTo } = filters;
+      const { module, action, bookingId, userId, status, search, dateFrom, dateTo, propertyId } = filters;
       const where = [];
       const params = [];
 
+      const propertyIdNum = this._toId(propertyId);
+      if (propertyIdNum) { where.push('(al.PROPERTY_ID = ? OR al.PROPERTY_ID IS NULL)'); params.push(propertyIdNum); }
       if (module) { where.push('al.MODULE = ?'); params.push(module); }
       if (action) { where.push('al.ACTION = ?'); params.push(action); }
       const bookingIdNum = this._toId(bookingId);

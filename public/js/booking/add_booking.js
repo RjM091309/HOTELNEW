@@ -145,6 +145,9 @@ function loadSeasonMonthMap() {
         .then((r) => r.json())
         .then((json) => {
             if (json && json.success && json.seasonMonths) {
+                // .splits rides along inside seasonMonths (see
+                // RoomRatesModel.getSeasonMonthMap) - Object.assign copies it
+                // onto SEASON_MONTH_MAP same as every numeric month key.
                 Object.assign(SEASON_MONTH_MAP, json.seasonMonths);
                 refreshSeasonalPrice();
             }
@@ -153,12 +156,60 @@ function loadSeasonMonthMap() {
 }
 loadSeasonMonthMap();
 
-// Which season a given night falls under, per the admin-assigned month map.
+// Which season a given night falls under, per the admin-assigned month map -
+// the month's base season, unless that month has a mid-month split (e.g.
+// Peak starting the 27th instead of the whole month) and this date has
+// reached the split day.
 function seasonForNight(date) {
     const month = date.getMonth() + 1;
+    const split = SEASON_MONTH_MAP.splits && SEASON_MONTH_MAP.splits[month];
+    if (split && date.getDate() >= split.day) return split.season;
     return SEASON_MONTH_MAP[month] || 'lean';
 }
 window.seasonForNight = seasonForNight;
+
+// Pool Villa prices by season x category (walk_in/agency only) x guest
+// count - nothing to do with room_rates/room type/weekday-weekend/breakfast
+// (see models/poolVillaRatesModel.js). Loaded the same cached-once pattern
+// as SEASON_MONTH_MAP above, only actually fetched when Pool Villa is the
+// active property.
+function isPoolVillaActive() {
+    return document.documentElement.getAttribute('data-property-theme') === 'pool_villa';
+}
+
+let POOL_VILLA_RATES = {};
+let poolVillaRatesLoaded = false;
+
+function loadPoolVillaRates() {
+    if (poolVillaRatesLoaded || !isPoolVillaActive()) return;
+    poolVillaRatesLoaded = true;
+    fetch('/room-rates/pool-villa-rates')
+        .then((r) => r.json())
+        .then((json) => {
+            if (json && json.success && json.poolVillaRates) {
+                POOL_VILLA_RATES = json.poolVillaRates;
+                refreshSeasonalPrice();
+            }
+        })
+        .catch(() => {});
+}
+loadPoolVillaRates();
+
+// Pool Villa's "category" is just walk-in or agency - every other booking
+// route (tenant/vip/employee/senior) is removed from the dropdown for Pool
+// Villa (see add_booking.ejs), so this only ever needs to tell those two apart.
+function poolVillaCategory() {
+    return getPriceBookingType() === 'agency' ? 'agency' : 'walk_in';
+}
+
+// null = "not offered" (e.g. 3 guests in Peak season, which the owner's
+// rate card simply has no row for) - distinct from a real 0 rate.
+function poolVillaRateFor(season, category, guestCount) {
+    const v = POOL_VILLA_RATES && POOL_VILLA_RATES[season] && POOL_VILLA_RATES[season][category]
+        ? POOL_VILLA_RATES[season][category][guestCount]
+        : undefined;
+    return Number.isFinite(Number(v)) ? Number(v) : null;
+}
 
 function countNightBreakdown() {
     const { checkIn, checkOut } = parseStayDateRange();
@@ -1261,7 +1312,10 @@ $(document).ready(function () {
     $('#includeBreakfast').on('change', function () {
         $('#breakfastInputs').toggle(this.checked);
         if (this.checked && !$('#breakfastAdultQty').val()) {
-            $('#breakfastAdultQty').val(1);          // sensible default: 1 pax
+            // Main Hotel: 1 pax. Pool Villa: breakfast count follows the number of guests.
+            const poolGuests = isPoolVillaActive() ? parseInt($('#maxOccupants').val(), 10) : NaN;
+            $('#breakfastAdultQty').val(Number.isInteger(poolGuests) && poolGuests > 0 ? poolGuests : 1);
+            if (isPoolVillaActive()) $('#breakfastAdultQty').data('autoFromGuests', true);
         }
         if (!this.checked) {
             $('#breakfastRateNote').hide().empty();
@@ -1631,7 +1685,14 @@ $(document).ready(function () {
                       room.ROOM_VIEW === 2 ? 'Mountain View' : 'N/A';
 
                 $('#room_type').val(roomViewText);
-                $('#maxOccupants').val(room.ROOM_MAX);
+                // Pool Villa: #maxOccupants is the staff-entered guest count
+                // that actually drives the price, not an auto-echoed room
+                // capacity - never overwrite whatever the staff already
+                // typed when switching rooms. Main Hotel: unchanged, always
+                // mirrors the newly selected room's capacity.
+                if (!isPoolVillaActive()) {
+                    $('#maxOccupants').val(room.ROOM_MAX);
+                }
                 $('#bedCount').val(room.ROOM_BED);
                 $('#amenities').val(room.AMENITIES);
                 $('#room_type_hidden').val(room.ROOM_TYPE);
@@ -1792,6 +1853,13 @@ $(document).ready(function () {
                     if (!$n.length) return;
                     const on = $('#includeBreakfast').is(':checked');
                     if (!on) { $n.hide().empty(); return; }
+                    if (isPoolVillaActive()) {
+                        const pax = parseInt($('#breakfastAdultQty').val(), 10) || 0;
+                        $n.removeClass('booking-note--warn').addClass('booking-note--active')
+                          .html(`<div>Breakfast for <b>${pax}</b> guest${pax === 1 ? '' : 's'} &mdash; follows the number of guests and goes on the Breakfast List. Pool Villa rates have no breakfast tier, so this does not change the villa rate.</div>`)
+                          .show();
+                        return;
+                    }
                     const k = breakfastKey();
                     if (k === 'no') {
                         $n.removeClass('booking-note--active').addClass('booking-note--warn')
@@ -1922,6 +1990,66 @@ $(document).ready(function () {
                     if (isPercentagePricing()) applyPercentagePricing();
                 });
 
+                // Pool Villa has no weekday/weekend split and no room-type/
+                // breakfast axes - just season x category x guest count. Still
+                // writes into the SAME #weekdayRate/#weekendRate/
+                // #otherSeasonWeekdayRate/#otherSeasonWeekendRate hidden fields
+                // Main Hotel's path uses (weekday rate = weekend rate here),
+                // so getRoomRateDetails()/computeTotal()'s existing per-night,
+                // season-crossing-aware averaging logic is reused completely
+                // unchanged - no second total-computation path to maintain.
+                function updatePoolVillaSeasonalPrice() {
+                    const guestCount = parseInt($('#maxOccupants').val(), 10);
+                    const category = poolVillaCategory();
+
+                    if (!Number.isInteger(guestCount) || guestCount < 1) {
+                        $('#price').prop('readonly', true);
+                        $('#price').val('');
+                        $('#priceRateNote').text('Enter Number of Guests to see the rate');
+                        $('#price').data('base-price', 0);
+                        $('#baseprice').val('0.00');
+                        return;
+                    }
+
+                    const refSeason = countNightBreakdown().refSeason || 'lean';
+                    const otherSeason = refSeason === 'peak' ? 'lean' : 'peak';
+
+                    const refRate = poolVillaRateFor(refSeason, category, guestCount);
+                    if (refRate === null) {
+                        $('#price').prop('readonly', true);
+                        $('#price').val('');
+                        const seasonLabel = refSeason === 'peak' ? 'Peak' : 'Off';
+                        $('#priceRateNote').text(`No rate for ${guestCount} guests in ${seasonLabel} Season - use Manual Price`);
+                        $('#price').data('base-price', 0);
+                        $('#baseprice').val('0.00');
+                        computeTotal();
+                        if (typeof calculateTotalPrice === 'function') calculateTotalPrice();
+                        return;
+                    }
+
+                    $('#price').prop('readonly', true);
+                    $('#priceRateNote').text('Auto from Pool Villa Rates');
+
+                    const otherRate = poolVillaRateFor(otherSeason, category, guestCount);
+                    const otherRateOrRef = otherRate === null ? refRate : otherRate;
+                    const walkinRefRate = poolVillaRateFor(refSeason, 'walk_in', guestCount);
+                    const walkinRefRateOrRef = walkinRefRate === null ? refRate : walkinRefRate;
+
+                    $('#weekdayRate').val(refRate.toFixed(2));
+                    $('#weekendRate').val(refRate.toFixed(2));
+                    $('#otherSeasonWeekdayRate').val(otherRateOrRef.toFixed(2));
+                    $('#otherSeasonWeekendRate').val(otherRateOrRef.toFixed(2));
+                    $('#walkinWeekdayRate').val(walkinRefRateOrRef.toFixed(2));
+                    $('#walkinWeekendRate').val(walkinRefRateOrRef.toFixed(2));
+
+                    $('#price').data('base-price', refRate);
+                    $('#baseprice').val(refRate.toFixed(2));
+                    $('#price').val(refRate.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+
+                    computeTotal();
+                    if (typeof calculateTotalPrice === 'function') calculateTotalPrice();
+                }
+
                 function updateSeasonalPrice() {
                     if ($('#manualPriceToggle').is(':checked')) return;
 
@@ -1933,6 +2061,12 @@ $(document).ready(function () {
                         applyPercentagePricing();
                         return;
                     }
+
+                    if (isPoolVillaActive()) {
+                        updatePoolVillaSeasonalPrice();
+                        return;
+                    }
+
                     $('#price').prop('readonly', true);
                     const activeLongTermBand = LONG_TERM_BANDS.find((b) => b.category === longTermCategoryForNights(getStayNights()));
                     $('#priceRateNote').text(activeLongTermBand
@@ -1988,6 +2122,25 @@ $(document).ready(function () {
                 });
 
                 $('input[name="agencyPayer"]').off('change.priceUpdate').on('change.priceUpdate', recalcRates);
+
+                // Pool Villa only: #maxOccupants is the actual guest-count
+                // price driver here (see updatePoolVillaSeasonalPrice), not a
+                // readonly room-capacity echo, so changing it must recompute
+                // the rate the same way changing the room/category/dates does.
+                $('#maxOccupants').off('input.poolVillaGuestCount').on('input.poolVillaGuestCount', function () {
+                    if (isPoolVillaActive()) {
+                        // Breakfast pax follows the guest count while it hasn't been hand-edited.
+                        const $bf = $('#breakfastAdultQty');
+                        const guests = parseInt($(this).val(), 10);
+                        if ($('#includeBreakfast').is(':checked') && $bf.data('autoFromGuests') && Number.isInteger(guests) && guests > 0) {
+                            $bf.val(guests);
+                        }
+                        recalcRates();
+                    }
+                });
+                $('#breakfastAdultQty').off('input.poolVillaBfManual').on('input.poolVillaBfManual', function (e) {
+                    if (isPoolVillaActive() && e.originalEvent) $(this).data('autoFromGuests', false);
+                });
 
                 // Breakfast selection now affects the room_rates rate.
                 $('#includeBreakfast, #breakfastAdultQty, #breakfastKidQty')

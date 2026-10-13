@@ -742,6 +742,46 @@ async function runRoomRateSeasonMonthsMigration() {
     params
   );
   console.log('✅ Ensured table + seed: room_rate_season_months (12 months, default lean)');
+
+  // Optional mid-month season switch - e.g. a month assigned to Lean/Off
+  // season but where Peak actually kicks in partway through (Oct 1-26 Off,
+  // Oct 27-31 Peak) rather than exactly on the 1st. NULL SPLIT_DAY (the
+  // default) means "no split - the whole month uses SEASON, same as before
+  // this column existed."
+  if (!(await columnExists('room_rate_season_months', 'SPLIT_DAY'))) {
+    await queryDatabasePromise(
+      `ALTER TABLE room_rate_season_months ADD COLUMN SPLIT_DAY TINYINT NULL DEFAULT NULL AFTER SEASON`
+    );
+    console.log('✅ Added room_rate_season_months.SPLIT_DAY');
+  }
+  if (!(await columnExists('room_rate_season_months', 'SPLIT_SEASON'))) {
+    await queryDatabasePromise(
+      `ALTER TABLE room_rate_season_months ADD COLUMN SPLIT_SEASON VARCHAR(10) NULL DEFAULT NULL AFTER SPLIT_DAY`
+    );
+    console.log('✅ Added room_rate_season_months.SPLIT_SEASON');
+  }
+}
+
+// Pool Villa prices stays completely differently from Main Hotel - by
+// season x category (walk_in/agency only) x number of guests, with no
+// room-type/weekday-weekend/breakfast axes at all (confirmed against the
+// owner's printed rate card: room type never changes the price, and Peak
+// season simply has no 3-guest rate - see models/poolVillaRatesModel.js).
+// No seed rows; the admin fills this in via Settings > Room Rates while
+// Pool Villa is the active property.
+async function runPoolVillaRatesMigration() {
+  await queryDatabasePromise(`
+    CREATE TABLE IF NOT EXISTS pool_villa_rates (
+      SEASON VARCHAR(10) NOT NULL,
+      CATEGORY VARCHAR(20) NOT NULL,
+      GUEST_COUNT TINYINT NOT NULL,
+      AMOUNT DECIMAL(10,2) NOT NULL DEFAULT 0,
+      UPDATED_BY INT NULL DEFAULT NULL,
+      UPDATED_DT DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (SEASON, CATEGORY, GUEST_COUNT)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+  console.log('✅ Ensured table: pool_villa_rates');
 }
 
 // room.ROOM_TYPE_ID has always been a plain int with no constraint. Every row
@@ -1064,7 +1104,7 @@ async function runPropertyMigrations() {
   // Own-column tables. NULL-able first so the ALTER is instant even on a
   // large `booking` table; backfilled below; NOT NULL tightening is a
   // deliberate separate follow-up (ensureColumn only supports ADD COLUMN).
-  const ownColumnTables = ['room', 'room_type', 'booking', 'customer', 'payment_receipt', 'payment_shifts', 'receipt_settings'];
+  const ownColumnTables = ['room', 'room_type', 'booking', 'customer', 'payment_receipt', 'payment_shifts', 'receipt_settings', 'expenses', 'agency'];
   for (const table of ownColumnTables) {
     if (!(await tableExists(table))) {
       console.warn(`⚠️ ${table} table not found, skipping PROPERTY_ID migration for it`);
@@ -1072,6 +1112,19 @@ async function runPropertyMigrations() {
     }
     await ensureColumn(table, 'PROPERTY_ID', `PROPERTY_ID INT NULL DEFAULT NULL COMMENT 'FK -> property.IDNo'`);
     await queryDatabasePromise(`UPDATE ${table} SET PROPERTY_ID = ? WHERE PROPERTY_ID IS NULL`, [mainId]);
+  }
+
+  // activity_log: PROPERTY_ID is nullable on purpose - rows with no booking and no
+  // known property (older system/settings entries) stay NULL = "general" and show
+  // under every property. Existing booking-linked rows are backfilled once, when
+  // the column is first added.
+  if (await tableExists('activity_log')) {
+    const added = await ensureColumn('activity_log', 'PROPERTY_ID', `PROPERTY_ID INT NULL DEFAULT NULL COMMENT 'FK -> property.IDNo; NULL = general'`);
+    if (added) {
+      await queryDatabasePromise(
+        `UPDATE activity_log al INNER JOIN booking b ON b.IDNo = al.BOOKING_ID SET al.PROPERTY_ID = b.PROPERTY_ID WHERE al.PROPERTY_ID IS NULL`
+      );
+    }
   }
 
   if (await tableExists('booking')) {
@@ -1095,6 +1148,7 @@ async function runStartupMigrations() {
   await runBookingActualTimesMigration();
   await runRoomRatesMigrations();
   await runRoomRateSeasonMonthsMigration();
+  await runPoolVillaRatesMigration();
   await runRoomTypeFkMigration();
   await runFlightScheduleMigrations();
   await runPickupDropMigrations();

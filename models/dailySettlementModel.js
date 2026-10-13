@@ -2,12 +2,21 @@ const { queryDatabasePromise } = require('../config/database');
 const moment = require('moment');
 
 class DailySettlementModel {
+
+    // Optional per-property filter, inlined as a sanitized integer so no query's
+    // param order changes. propertyId null/undefined = all properties (the
+    // Telegram scheduled report still calls these without one).
+    static _pf(alias, propertyId) {
+        const id = parseInt(propertyId, 10);
+        if (!Number.isInteger(id) || id <= 0) return '';
+        return `AND ${alias ? alias + '.' : ''}PROPERTY_ID = ${id}`;
+    }
     
     /**
      * Get daily settlement data
      * Period: Yesterday 7:00 AM to Today 6:59 AM
      */
-    static async getDailySettlement() {
+    static async getDailySettlement(propertyId = null) {
         try {
             // Calculate date range: Yesterday 7:00 AM to Today 6:59 AM
             const today = moment();
@@ -17,40 +26,40 @@ class DailySettlementModel {
             const periodEnd = today.clone().set({ hour: 6, minute: 59, second: 59, millisecond: 999 });
             
             // Get check-ins during the period
-            const checkIns = await this.getCheckIns(periodStart, periodEnd);
+            const checkIns = await this.getCheckIns(periodStart, periodEnd, propertyId);
             
             // Get check-outs during the period
-            const checkOuts = await this.getCheckOuts(periodStart, periodEnd);
+            const checkOuts = await this.getCheckOuts(periodStart, periodEnd, propertyId);
             
             // Get pending bookings during the period
-            const pending = await this.getPending(periodStart, periodEnd);
+            const pending = await this.getPending(periodStart, periodEnd, propertyId);
             
             // Get expected room availability for today
-            const roomAvailability = await this.getExpectedRoomAvailability(today);
+            const roomAvailability = await this.getExpectedRoomAvailability(today, propertyId);
             
             // Get expected check-ins/out for today (detailed lists)
-            const expectedCheckInsToday = await this.getExpectedCheckInsToday(today);
-            const expectedCheckOutsToday = await this.getExpectedCheckOutsToday(today);
+            const expectedCheckInsToday = await this.getExpectedCheckInsToday(today, propertyId);
+            const expectedCheckOutsToday = await this.getExpectedCheckOutsToday(today, propertyId);
             
             // Align counts with detailed data
             roomAvailability.expectedCheckIns = expectedCheckInsToday.count;
             roomAvailability.expectedCheckOuts = expectedCheckOutsToday.count;
             
             // Get total bookings today
-            const totalBookingsToday = await this.getTotalBookingsToday(today);
+            const totalBookingsToday = await this.getTotalBookingsToday(today, propertyId);
             
             // Get total booked rooms today
-            const totalBookedRoomsToday = await this.getTotalBookedRoomsToday(today);
+            const totalBookedRoomsToday = await this.getTotalBookedRoomsToday(today, propertyId);
             
             // Get occupancy rates
-            const occupancyRateOfMonth = await this.getOccupancyRateOfMonth(today);
-            const expectedOccupancyRateOfMonth = await this.getExpectedOccupancyRateOfMonth(today);
+            const occupancyRateOfMonth = await this.getOccupancyRateOfMonth(today, propertyId);
+            const expectedOccupancyRateOfMonth = await this.getExpectedOccupancyRateOfMonth(today, propertyId);
             
             // Get sales/revenue data
-            const sales = await this.getSalesRevenue(periodStart, periodEnd);
+            const sales = await this.getSalesRevenue(periodStart, periodEnd, propertyId);
             
             // Get monthly sales/revenue data
-            const monthlySales = await this.getMonthlySalesRevenue(today);
+            const monthlySales = await this.getMonthlySalesRevenue(today, propertyId);
             
             return {
                 period: {
@@ -82,7 +91,7 @@ class DailySettlementModel {
     /**
      * Get check-ins during the period
      */
-    static async getCheckIns(periodStart, periodEnd) {
+    static async getCheckIns(periodStart, periodEnd, propertyId) {
         try {
             const query = `
                 SELECT 
@@ -103,7 +112,7 @@ class DailySettlementModel {
                 FROM booking b
                 LEFT JOIN room r ON b.ROOM_ID = r.IDNo
                 LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
-                WHERE b.ACTIVE = 1
+                WHERE b.ACTIVE = 1 ${this._pf('b', propertyId)}
                     AND b.BOOKING_STATUS = 'check-In'
                     AND b.CHECK_IN_DATE >= ?
                     AND b.CHECK_IN_DATE <= ?
@@ -128,7 +137,7 @@ class DailySettlementModel {
     /**
      * Get check-outs during the period
      */
-    static async getCheckOuts(periodStart, periodEnd) {
+    static async getCheckOuts(periodStart, periodEnd, propertyId) {
         try {
             const query = `
                 SELECT 
@@ -150,7 +159,7 @@ class DailySettlementModel {
                 FROM booking b
                 LEFT JOIN room r ON b.ROOM_ID = r.IDNo
                 LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
-                WHERE b.ACTIVE = 1
+                WHERE b.ACTIVE = 1 ${this._pf('b', propertyId)}
                     AND b.BOOKING_STATUS = 'check-Out'
                     AND b.CHECK_OUT_DATE >= ?
                     AND b.CHECK_OUT_DATE <= ?
@@ -175,7 +184,7 @@ class DailySettlementModel {
     /**
      * Get pending bookings during the period
      */
-    static async getPending(periodStart, periodEnd) {
+    static async getPending(periodStart, periodEnd, propertyId) {
         try {
             const query = `
                 SELECT 
@@ -192,7 +201,7 @@ class DailySettlementModel {
                 FROM booking b
                 LEFT JOIN room r ON b.ROOM_ID = r.IDNo
                 LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
-                WHERE b.ACTIVE = 1
+                WHERE b.ACTIVE = 1 ${this._pf('b', propertyId)}
                     AND b.BOOKING_STATUS = 'pending'
                     AND b.CHECK_IN_DATE >= ?
                     AND b.CHECK_IN_DATE <= ?
@@ -217,7 +226,7 @@ class DailySettlementModel {
     /**
      * Get expected check-ins today (detailed)
      */
-    static async getExpectedCheckInsToday(today) {
+    static async getExpectedCheckInsToday(today, propertyId) {
         try {
             const query = `
                 SELECT 
@@ -233,7 +242,7 @@ class DailySettlementModel {
                 FROM booking b
                 LEFT JOIN room r ON b.ROOM_ID = r.IDNo
                 LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
-                WHERE b.ACTIVE = 1
+                WHERE b.ACTIVE = 1 ${this._pf('b', propertyId)}
                     AND b.BOOKING_STATUS = 'pending'
                     AND DATE(b.CHECK_IN_DATE) = DATE(?)
                 ORDER BY b.CHECK_IN_DATE ASC
@@ -256,7 +265,7 @@ class DailySettlementModel {
     /**
      * Get expected check-outs today (detailed)
      */
-    static async getExpectedCheckOutsToday(today) {
+    static async getExpectedCheckOutsToday(today, propertyId) {
         try {
             const query = `
                 SELECT 
@@ -273,7 +282,7 @@ class DailySettlementModel {
                 FROM booking b
                 LEFT JOIN room r ON b.ROOM_ID = r.IDNo
                 LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
-                WHERE b.ACTIVE = 1
+                WHERE b.ACTIVE = 1 ${this._pf('b', propertyId)}
                     AND b.BOOKING_STATUS = 'check-In'
                     AND DATE(b.CHECK_OUT_DATE) = DATE(?)
                 ORDER BY b.CHECK_OUT_DATE ASC
@@ -296,7 +305,7 @@ class DailySettlementModel {
     /**
      * Get total bookings today (all bookings encoded today based on ENCODED_DT)
      */
-    static async getTotalBookingsToday(today) {
+    static async getTotalBookingsToday(today, propertyId) {
         try {
             const query = `
                 SELECT 
@@ -312,7 +321,7 @@ class DailySettlementModel {
                 FROM booking b
                 LEFT JOIN room r ON b.ROOM_ID = r.IDNo
                 LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
-                WHERE b.ACTIVE = 1
+                WHERE b.ACTIVE = 1 ${this._pf('b', propertyId)}
                     AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
                     AND DATE(b.ENCODED_DT) = DATE(?)
                 ORDER BY b.ENCODED_DT ASC
@@ -335,7 +344,7 @@ class DailySettlementModel {
     /**
      * Get total booked rooms today (unique rooms occupied today based on stay overlap)
      */
-    static async getTotalBookedRoomsToday(today) {
+    static async getTotalBookedRoomsToday(today, propertyId) {
         try {
             const query = `
                 SELECT 
@@ -351,7 +360,7 @@ class DailySettlementModel {
                 FROM booking b
                 LEFT JOIN room r ON b.ROOM_ID = r.IDNo
                 LEFT JOIN customer c ON b.CUSTOMER_ID = c.IDNo
-                WHERE b.ACTIVE = 1
+                WHERE b.ACTIVE = 1 ${this._pf('b', propertyId)}
                     AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
                     AND DATE(?) >= DATE(b.CHECK_IN_DATE)
                     AND DATE(?) < DATE(b.CHECK_OUT_DATE)
@@ -378,7 +387,7 @@ class DailySettlementModel {
     /**
      * Get occupancy rate of month (current month)
      */
-    static async getOccupancyRateOfMonth(today) {
+    static async getOccupancyRateOfMonth(today, propertyId) {
         try {
             const monthStart = today.clone().startOf('month');
             const monthEnd = today.clone().endOf('month');
@@ -388,7 +397,7 @@ class DailySettlementModel {
             const totalRoomsQuery = `
                 SELECT COUNT(*) AS TOTAL_ROOMS
                 FROM room
-                WHERE ACTIVE = 1 AND (ROOM_STATUS != 3 OR ROOM_STATUS IS NULL)
+                WHERE ACTIVE = 1 ${this._pf('', propertyId)} AND (ROOM_STATUS != 3 OR ROOM_STATUS IS NULL)
             `;
             const totalRoomsResult = await queryDatabasePromise(totalRoomsQuery);
             const totalRooms = totalRoomsResult[0]?.TOTAL_ROOMS || 0;
@@ -403,7 +412,7 @@ class DailySettlementModel {
                         ))
                     ) AS OCCUPIED_NIGHTS
                 FROM booking b
-                WHERE b.ACTIVE = 1
+                WHERE b.ACTIVE = 1 ${this._pf('b', propertyId)}
                     AND b.BOOKING_STATUS IN ('check-In', 'check-Out')
                     AND DATE(b.CHECK_IN_DATE) <= DATE(?)
                     AND (DATE(b.CHECK_OUT_DATE) >= DATE(?) OR b.CHECK_OUT_DATE IS NULL)
@@ -434,7 +443,7 @@ class DailySettlementModel {
     /**
      * Get expected occupancy rate of month (based on bookings)
      */
-    static async getExpectedOccupancyRateOfMonth(today) {
+    static async getExpectedOccupancyRateOfMonth(today, propertyId) {
         try {
             const monthStart = today.clone().startOf('month');
             const monthEnd = today.clone().endOf('month');
@@ -444,7 +453,7 @@ class DailySettlementModel {
             const totalRoomsQuery = `
                 SELECT COUNT(*) AS TOTAL_ROOMS
                 FROM room
-                WHERE ACTIVE = 1 AND (ROOM_STATUS != 3 OR ROOM_STATUS IS NULL)
+                WHERE ACTIVE = 1 ${this._pf('', propertyId)} AND (ROOM_STATUS != 3 OR ROOM_STATUS IS NULL)
             `;
             const totalRoomsResult = await queryDatabasePromise(totalRoomsQuery);
             const totalRooms = totalRoomsResult[0]?.TOTAL_ROOMS || 0;
@@ -459,7 +468,7 @@ class DailySettlementModel {
                         ))
                     ) AS BOOKED_NIGHTS
                 FROM booking b
-                WHERE b.ACTIVE = 1
+                WHERE b.ACTIVE = 1 ${this._pf('b', propertyId)}
                     AND b.BOOKING_STATUS NOT IN ('cancelled', 'void', 'no-show')
                     AND DATE(b.CHECK_IN_DATE) <= DATE(?)
                     AND DATE(b.CHECK_OUT_DATE) >= DATE(?)
@@ -490,13 +499,13 @@ class DailySettlementModel {
     /**
      * Get expected room availability for today
      */
-    static async getExpectedRoomAvailability(today) {
+    static async getExpectedRoomAvailability(today, propertyId) {
         try {
             // Get total active rooms (including all statuses)
             const totalRoomsQuery = `
                 SELECT COUNT(*) AS TOTAL_ROOMS
                 FROM room
-                WHERE ACTIVE = 1
+                WHERE ACTIVE = 1 ${this._pf('', propertyId)}
             `;
             const totalRoomsResult = await queryDatabasePromise(totalRoomsQuery);
             const totalRooms = totalRoomsResult[0]?.TOTAL_ROOMS || 0;
@@ -505,7 +514,7 @@ class DailySettlementModel {
             const occupiedRoomsQuery = `
                  SELECT COUNT(*) AS OCCUPIED_ROOMS
                 FROM room
-                WHERE ACTIVE = 1 AND ROOM_STATUS = 2
+                WHERE ACTIVE = 1 ${this._pf('', propertyId)} AND ROOM_STATUS = 2
                    
             `;
             const occupiedResult = await queryDatabasePromise(occupiedRoomsQuery, [
@@ -518,7 +527,7 @@ class DailySettlementModel {
             const cleaningRoomsQuery = `
                 SELECT COUNT(*) AS CLEANING_ROOMS
                 FROM room
-                WHERE ACTIVE = 1 AND ROOM_STATUS = 4
+                WHERE ACTIVE = 1 ${this._pf('', propertyId)} AND ROOM_STATUS = 4
             `;
             const cleaningResult = await queryDatabasePromise(cleaningRoomsQuery);
             const cleaningRooms = cleaningResult[0]?.CLEANING_ROOMS || 0;
@@ -527,7 +536,7 @@ class DailySettlementModel {
             const maintenanceRoomsQuery = `
                 SELECT COUNT(*) AS MAINTENANCE_ROOMS
                 FROM room
-                WHERE ACTIVE = 1 AND ROOM_STATUS = 3
+                WHERE ACTIVE = 1 ${this._pf('', propertyId)} AND ROOM_STATUS = 3
             `;
             const maintenanceResult = await queryDatabasePromise(maintenanceRoomsQuery);
             const maintenanceRooms = maintenanceResult[0]?.MAINTENANCE_ROOMS || 0;
@@ -536,7 +545,7 @@ class DailySettlementModel {
             const availableRoomsQuery = `
                 SELECT COUNT(*) AS AVAILABLE_ROOMS
                 FROM room
-                WHERE ACTIVE = 1 AND ROOM_STATUS = 1
+                WHERE ACTIVE = 1 ${this._pf('', propertyId)} AND ROOM_STATUS = 1
             `;
             const availableRoomsResult = await queryDatabasePromise(availableRoomsQuery);
             const availableRooms = availableRoomsResult[0]?.AVAILABLE_ROOMS || 0;
@@ -545,7 +554,7 @@ class DailySettlementModel {
             const expectedCheckInsQuery = `
                 SELECT COUNT(*) AS EXPECTED_CHECK_INS
                 FROM booking
-                WHERE ACTIVE = 1
+                WHERE ACTIVE = 1 ${this._pf('', propertyId)}
                     AND BOOKING_STATUS = 'pending'
                     AND DATE(CHECK_IN_DATE) = DATE(?)
             `;
@@ -558,7 +567,7 @@ class DailySettlementModel {
             const expectedCheckOutsQuery = `
                 SELECT COUNT(*) AS EXPECTED_CHECK_OUTS
                 FROM booking
-                WHERE ACTIVE = 1
+                WHERE ACTIVE = 1 ${this._pf('', propertyId)}
                     AND BOOKING_STATUS = 'check-In'
                     AND DATE(CHECK_OUT_DATE) = DATE(?)
             `;
@@ -591,7 +600,7 @@ class DailySettlementModel {
      * Sales Revenue: Payments with PAYMENT_TYPE = 'service', 'pickdrop', etc.
      * Total Revenue: Room + Services minus refunds
      */
-    static async getSalesRevenue(periodStart, periodEnd) {
+    static async getSalesRevenue(periodStart, periodEnd, propertyId) {
         try {
             // Get Room Revenue - payments made for room charges and extensions during the period
             // Include discounts only if booking is fully paid AND no refund exists (refund already includes discount)
@@ -644,7 +653,7 @@ class DailySettlementModel {
                 WHERE p.PAYMENT_TYPE IN ('room', 'extended', 'discount', 'refund')
                     AND p.PAYMENT_DATE >= ?
                     AND p.PAYMENT_DATE <= ?
-                    AND b.ACTIVE = 1
+                    AND b.ACTIVE = 1 ${this._pf('b', propertyId)}
             `;
             
             const roomRevenueResult = await queryDatabasePromise(roomRevenueQuery, [
@@ -664,7 +673,7 @@ class DailySettlementModel {
                 WHERE p.PAYMENT_TYPE IN ('service', 'pickdrop')
                     AND p.PAYMENT_DATE >= ?
                     AND p.PAYMENT_DATE <= ?
-                    AND b.ACTIVE = 1
+                    AND b.ACTIVE = 1 ${this._pf('b', propertyId)}
             `;
             
             const salesRevenueResult = await queryDatabasePromise(salesRevenueQuery, [
@@ -683,7 +692,7 @@ class DailySettlementModel {
                 WHERE p.PAYMENT_TYPE = 'refund'
                     AND p.PAYMENT_DATE >= ?
                     AND p.PAYMENT_DATE <= ?
-                    AND b.ACTIVE = 1
+                    AND b.ACTIVE = 1 ${this._pf('b', propertyId)}
             `;
             
             const refundsResult = await queryDatabasePromise(refundsQuery, [
@@ -717,7 +726,7 @@ class DailySettlementModel {
      * Sales Revenue: Payments with PAYMENT_TYPE = 'service', 'pickdrop', etc.
      * Total Revenue: Room + Services minus refunds
      */
-    static async getMonthlySalesRevenue(today) {
+    static async getMonthlySalesRevenue(today, propertyId) {
         try {
             // Get start of current month
             const monthStart = today.clone().startOf('month').set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
@@ -774,7 +783,7 @@ class DailySettlementModel {
                 WHERE p.PAYMENT_TYPE IN ('room', 'extended', 'discount', 'refund')
                     AND p.PAYMENT_DATE >= ?
                     AND p.PAYMENT_DATE <= ?
-                    AND b.ACTIVE = 1
+                    AND b.ACTIVE = 1 ${this._pf('b', propertyId)}
             `;
             
             const roomRevenueResult = await queryDatabasePromise(roomRevenueQuery, [
@@ -794,7 +803,7 @@ class DailySettlementModel {
                 WHERE p.PAYMENT_TYPE IN ('service', 'pickdrop')
                     AND p.PAYMENT_DATE >= ?
                     AND p.PAYMENT_DATE <= ?
-                    AND b.ACTIVE = 1
+                    AND b.ACTIVE = 1 ${this._pf('b', propertyId)}
             `;
             
             const salesRevenueResult = await queryDatabasePromise(salesRevenueQuery, [
@@ -813,7 +822,7 @@ class DailySettlementModel {
                 WHERE p.PAYMENT_TYPE = 'refund'
                     AND p.PAYMENT_DATE >= ?
                     AND p.PAYMENT_DATE <= ?
-                    AND b.ACTIVE = 1
+                    AND b.ACTIVE = 1 ${this._pf('b', propertyId)}
             `;
             
             const refundsResult = await queryDatabasePromise(refundsQuery, [

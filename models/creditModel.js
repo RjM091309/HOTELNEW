@@ -1,7 +1,7 @@
 const { pool } = require('../config/database');
 
 const creditModel = {
-  countDatatable: async (searchCondition, searchParams) => {
+  countDatatable: async (searchCondition, searchParams, propertyId = null) => {
     const countQuery = `
       SELECT COUNT(*) as total FROM (
         SELECT 1
@@ -11,18 +11,19 @@ const creditModel = {
         LEFT JOIN room r ON r.IDNo = b.ROOM_ID
         LEFT JOIN agency a ON a.IDNo = b.AGENCY_ID
         WHERE p.PAYMENT_METHOD IN ('credit', 'marker')
+        ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
         ${searchCondition}
         GROUP BY p.BOOKING_ID, DATE(p.PAYMENT_DATE)
       ) grouped
     `;
-    const [countResult] = await pool.promise().query(countQuery, searchParams);
+    const [countResult] = await pool.promise().query(countQuery, propertyId ? [propertyId, ...searchParams] : searchParams);
     return countResult[0].total;
   },
 
   // Rows are grouped by BOOKING_ID + calendar date so multiple credit/marker
   // entries for the same booking on the same day collapse into one line;
   // the individual entries are fetched separately for the breakdown modal.
-  fetchDatatable: async (searchCondition, searchParams, orderBy, orderDir, length, start) => {
+  fetchDatatable: async (searchCondition, searchParams, orderBy, orderDir, length, start, propertyId = null) => {
     const dataQuery = `
       SELECT
         CONCAT(p.BOOKING_ID, '_', DATE(p.PAYMENT_DATE)) AS GROUP_KEY,
@@ -42,12 +43,13 @@ const creditModel = {
       LEFT JOIN room r ON r.IDNo = b.ROOM_ID
       LEFT JOIN agency a ON a.IDNo = b.AGENCY_ID
       WHERE p.PAYMENT_METHOD IN ('credit', 'marker')
+      ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
       ${searchCondition}
       GROUP BY p.BOOKING_ID, DATE(p.PAYMENT_DATE)
       ORDER BY ${orderBy} ${orderDir}
       LIMIT ? OFFSET ?
     `;
-    const dataParams = [...searchParams, parseInt(length), parseInt(start)];
+    const dataParams = [...(propertyId ? [propertyId] : []), ...searchParams, parseInt(length), parseInt(start)];
     const [rows] = await pool.promise().query(dataQuery, dataParams);
     return rows;
   },
@@ -87,9 +89,13 @@ const creditModel = {
     return rows;
   },
 
-  totalOutstandingCredit: async () => {
+  totalOutstandingCredit: async (propertyId = null) => {
     const [rows] = await pool.promise().query(
-      `SELECT COALESCE(SUM(p.AMOUNT_PAID), 0) AS total FROM payments p WHERE p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL`
+      `SELECT COALESCE(SUM(p.AMOUNT_PAID), 0) AS total FROM payments p
+       ${propertyId ? 'INNER JOIN booking b ON b.IDNo = p.BOOKING_ID' : ''}
+       WHERE p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL
+       ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}`,
+      propertyId ? [propertyId] : []
     );
     return rows[0].total || 0;
   },

@@ -1,4 +1,9 @@
 <link rel="stylesheet" href="/plugins/flatpicker/flatpickr.min.css">
+<%
+  // Same Pool Villa guest-count pricing used by add_booking.ejs - see
+  // models/poolVillaRatesModel.js.
+  const isPoolVillaBooking = typeof currentProperty !== 'undefined' && currentProperty && currentProperty.CODE === 'pool_villa';
+%>
 
 <div class="modal fade" id="modal-add-group-booking" tabindex="-1" role="dialog" aria-labelledby="modalAddGroupBookingLabel" aria-hidden="true" data-bs-backdrop="static">
   <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
@@ -70,11 +75,16 @@
                   <option value="" disabled>Select Booking Resource</option>
                   <option value="walk-in" selected>Walk-in</option>
                   <option value="agency">Agency</option>
+                  <!-- Only Walk-in/Agency are real Pool Villa categories (see add_booking.ejs). -->
+                  <% if (!isPoolVillaBooking) { %>
                   <option value="tenant">Tenant (15%)</option>
                   <option value="vip">VIP (20%)</option>
                   <option value="employee">Employee (30%)</option>
                   <option value="senior_special">Senior / Special 20%</option>
+                  <% } %>
+                  <% if (!isPoolVillaBooking) { %>
                   <option value="booking-channel">OTA / Channel</option>
+                  <% } %>
                   <option value="manual_rate">Manual Price</option>
                   <option value="percentage">Manual Percent</option>
                   <!-- Not manually pickable (disabled + hidden from the open list) - matches
@@ -440,8 +450,12 @@
             <h6 class="group-field-card-title">Manual / Weekend Rates</h6>
             <small class="text-muted manual-rate-subtitle">(Override default rates &middot; weekend = Fri, Sat &amp; Sun)</small>
 
-            <!-- Rate Type Toggle -->
-            <div class="rate-type-toggle mb-3">
+            <!-- Rate Type Toggle. Bed-based pricing doesn't apply to Pool
+                 Villa (no bed-type pricing there), so the toggle itself is
+                 hidden and "individual" (already the default/checked option)
+                 is effectively the only choice - the radios stay in the DOM
+                 since JS elsewhere reads $('input[name="rateType"]:checked'). -->
+            <div class="rate-type-toggle mb-3" <% if (isPoolVillaBooking) { %>style="display:none;"<% } %>>
               <div class="btn-group" role="group">
                 <input type="radio" class="btn-check" name="rateType" id="individualRates" value="individual" checked>
                 <label class="btn btn-outline-success" for="individualRates">Individual Rooms</label>
@@ -1827,9 +1841,48 @@
   // Group booking prices the whole stay from the check-in date's season only
   // (not per-night splitting) - same deliberate simplification already in
   // place here for weekday/weekend on the automatic (non-manual-rate) path.
+  // Still honors a mid-month split (e.g. Peak starting the 27th) for
+  // whichever single date is actually passed in.
   function groupSeasonForNight(date) {
     const month = date.getMonth() + 1;
+    const split = groupSeasonMonthMap.splits && groupSeasonMonthMap.splits[month];
+    if (split && date.getDate() >= split.day) return split.season;
     return groupSeasonMonthMap[month] || 'lean';
+  }
+
+  // Pool Villa prices by season x category (walk_in/agency only) x guest
+  // count - nothing to do with room_rates/room type/weekday-weekend/
+  // breakfast (see models/poolVillaRatesModel.js and the matching
+  // add_booking.js setup this mirrors). Each selected room gets its own
+  // guest count (groupRoomGuestCounts, keyed by room IDNo) via the input
+  // added to its row in displayManualRateInputs().
+  function groupIsPoolVillaActive() {
+    return document.documentElement.getAttribute('data-property-theme') === 'pool_villa';
+  }
+
+  let groupPoolVillaRates = {};
+  let groupRoomGuestCounts = {};
+
+  fetch('/room-rates/pool-villa-rates')
+    .then((r) => r.json())
+    .then((json) => {
+      if (json && json.success && json.poolVillaRates) {
+        groupPoolVillaRates = json.poolVillaRates;
+        refreshGroupRoomPricing();
+      }
+    })
+    .catch(() => {});
+
+  function groupPoolVillaCategory() {
+    return getGroupPriceBookingType() === 'agency' ? 'agency' : 'walk_in';
+  }
+
+  // null = "not offered" (e.g. 3 guests in Peak season) - distinct from a real 0 rate.
+  function groupPoolVillaRateFor(season, category, guestCount) {
+    const v = groupPoolVillaRates && groupPoolVillaRates[season] && groupPoolVillaRates[season][category]
+      ? groupPoolVillaRates[season][category][guestCount]
+      : undefined;
+    return Number.isFinite(Number(v)) ? Number(v) : null;
   }
 
   function getGroupNightBreakdown() {
@@ -2071,6 +2124,21 @@
   }
 
   function resolveGroupRoomPriceBase(room, checkInDate) {
+    // Pool Villa ignores the room/room-type entirely for pricing - season x
+    // category x this specific room's guest count (set via the per-room
+    // input added in displayManualRateInputs). No guest count picked yet,
+    // or no rate for that count/season (e.g. 3 guests in Peak), both
+    // resolve to 0 - staff can still type a rate manually via the existing
+    // manual-rate-input, same escape hatch as every other category here.
+    if (groupIsPoolVillaActive()) {
+      const guestCount = groupRoomGuestCounts[room.IDNo];
+      if (!guestCount) return 0;
+      const checkMoment = checkInDate ? new Date(checkInDate) : new Date();
+      const season = groupSeasonForNight(checkMoment);
+      const rate = groupPoolVillaRateFor(season, groupPoolVillaCategory(), guestCount);
+      return rate === null ? 0 : rate;
+    }
+
     const cat = groupRateCategory();
     const rr = room.ROOM_RATES || {};
     const bf = groupBreakfastKey();
@@ -3130,8 +3198,22 @@
         ? getWeekendRateForRoom(roomId)
         : weekdayRate;
       const weekdayReadonly = !manualEnabled ? 'readonly' : '';
-      
+
+      // Pool Villa: this room's own guest count, which is what actually
+      // drives defaultRate above via resolveGroupRoomPriceBase. Staff can
+      // still overwrite the resulting rate manually afterward through the
+      // existing rate input, same as every other category.
+      const guestCountField = groupIsPoolVillaActive()
+        ? `<div class="rate-field-row">
+             <label>Guests</label>
+             <input type="number" class="form-control group-guest-count-input"
+                    data-room-id="${roomId}" min="1" max="31"
+                    value="${groupRoomGuestCounts[roomId] || ''}" placeholder="#">
+           </div>`
+        : '';
+
       let rateFields = `
+        ${guestCountField}
         <div class="rate-fields">
           <div class="rate-field-row">
             <label>${weekendEnabled ? 'Weekday' : 'Rate'}</label>
@@ -3380,6 +3462,29 @@
       }
     });
     
+    // Pool Villa only: picking/changing a room's guest count recomputes its
+    // suggested rate from pool_villa_rates and writes it into that same
+    // room's existing manual-rate-input, same way resolveGroupRoomPrice
+    // already seeds it initially - staff can still type over it afterward.
+    $(document).off('input.groupGuestCount', '.group-guest-count-input');
+    $(document).on('input.groupGuestCount', '.group-guest-count-input', function() {
+      const roomId = normalizeRoomId($(this).data('room-id'));
+      const guestCount = parseInt($(this).val(), 10);
+      groupRoomGuestCounts[roomId] = Number.isInteger(guestCount) && guestCount >= 1 ? guestCount : undefined;
+
+      const dates = getSelectedDateRange();
+      const newRate = dates ? resolveGroupRoomPrice({ IDNo: roomId }, dates.start) : 0;
+      setManualRateForRoom(roomId, newRate);
+      setWeekendRateForRoom(roomId, newRate);
+
+      const $rateInput = $(`.manual-rate-item[data-room-id="${roomId}"] .manual-rate-input`);
+      if ($rateInput.length) $rateInput.val(newRate);
+      const $weekendInput = $(`.manual-rate-item[data-room-id="${roomId}"] .manual-weekend-rate-input`);
+      if ($weekendInput.length) $weekendInput.val(newRate);
+
+      computeGroupTotal();
+    });
+
     $(document).off('input.groupBedRate', '.bed-based-rate-input, .bed-based-weekend-rate-input');
     $(document).on('input.groupBedRate', '.bed-based-rate-input, .bed-based-weekend-rate-input', function() {
       const bedCount = parseInt($(this).data('bed-count'), 10);

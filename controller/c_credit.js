@@ -35,9 +35,9 @@ const creditController = {
         searchParams = [p, p, p, p, p];
       }
 
-      const totalRecords = await creditModel.countDatatable(searchCondition, searchParams);
-      const rows = await creditModel.fetchDatatable(searchCondition, searchParams, orderBy, orderDir, length, start);
-      const totalOutstandingCredit = await creditModel.totalOutstandingCredit();
+      const totalRecords = await creditModel.countDatatable(searchCondition, searchParams, req.propertyId);
+      const rows = await creditModel.fetchDatatable(searchCondition, searchParams, orderBy, orderDir, length, start, req.propertyId);
+      const totalOutstandingCredit = await creditModel.totalOutstandingCredit(req.propertyId);
 
       res.json({
         draw: parseInt(req.query.draw) || 1,

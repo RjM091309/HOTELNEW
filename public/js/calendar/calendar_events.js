@@ -897,12 +897,20 @@ function buildEventTooltipHtml(event) {
     : 'Unpaid';
   const payAccent = pay === 'partial' ? '#D500F9' : null;
 
+  // Guest count (not room type) is what actually drives Pool Villa's price
+  // (see models/poolVillaRatesModel.js), so it's worth surfacing in the
+  // tooltip there - shown ALONGSIDE Breakfast, not instead of it (Breakfast
+  // still only shows when the booking actually has one, same condition as
+  // Main Hotel already uses).
+  const isPoolVillaCalendar = document.documentElement.getAttribute('data-property-theme') === 'pool_villa';
+
   add('Room', roomNo);
   add('Check-in', `${fmtTooltipDate(event.start)} - ${ciText}`, ciAccent);
   add('Check-out', `${fmtTooltipDate(event.end)} - ${coText}`, coAccent);
   add('Payment', payText, payAccent);
   if (p.totalCost != null) add('Total', '₱' + Number(p.totalCost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
   if (p.hasPickup) add('Transport', '✈ Pick-up / Drop-off');
+  if (isPoolVillaCalendar && p.guestsCount) add('Guests', `${p.guestsCount} person${Number(p.guestsCount) === 1 ? '' : 's'}`);
   if (p.breakfastQty > 0) add('Breakfast', `🍳 ${p.breakfastQty}`);
   if (p.isLongTermStay) add('Note', 'Long-term stay');
   if (p.isBackToBack) add('Note', 'Back-to-back');
@@ -1028,15 +1036,28 @@ function handleEventDidMount(info) {
       defaultTitle.style.display = 'none';
     }
 
+    // syncEventNameOverlay() above already decided whether a harness-level
+    // .event-name-overlay is showing this event's title instead (late
+    // check-in/out, early check-in, reservation-fee caps) and set
+    // has-name-overlay on info.el accordingly. The CSS rule that's supposed
+    // to hide this chip in that case (.fc-event.has-name-overlay
+    // .event-title-chip { visibility: hidden }) depends on stylesheet load
+    // order/specificity winning out, which this app has repeatedly tripped
+    // on elsewhere - set it inline here too so the two never render their
+    // text on top of each other regardless of any CSS cascade issue.
+    const hasOverlay = info.el.classList.contains('has-name-overlay');
+
     const existing = info.el.querySelector('.event-title-chip');
     if (!existing) {
       const chip = document.createElement('div');
       chip.className = 'event-title-chip';
+      chip.style.visibility = hasOverlay ? 'hidden' : '';
       const span = document.createElement('span');
       span.textContent = info.event.title || '';
       chip.appendChild(span);
       info.el.appendChild(chip);
     } else {
+      existing.style.visibility = hasOverlay ? 'hidden' : '';
       const span = existing.querySelector('span') || document.createElement('span');
       span.textContent = info.event.title || '';
       if (!existing.contains(span)) existing.appendChild(span);

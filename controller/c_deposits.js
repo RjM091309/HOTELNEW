@@ -21,8 +21,8 @@ class DepositsController {
   static async getAll(req, res) {
     try {
       const [data, summary] = await Promise.all([
-        DepositsModel.getAll(),
-        DepositsModel.getSummary()
+        DepositsModel.getAll(req.propertyId),
+        DepositsModel.getSummary(req.propertyId)
       ]);
 
       res.json({

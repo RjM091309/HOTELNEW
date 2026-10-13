@@ -452,7 +452,8 @@ function auditTrail(opts = {}) {
             oldData: changes ? beforeSnapshot : null,
             newData: Object.keys(newData).length ? newData : null,
             userId: meta.userId,
-            userName: meta.userName
+            userName: meta.userName,
+            propertyId: req.propertyId || null
           });
         } catch (e) {
           console.error('⚠️ auditTrail middleware failed:', e.message);

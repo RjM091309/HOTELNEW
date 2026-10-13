@@ -18,11 +18,37 @@
       </div>
 
       <div class="dashboard-card-body">
+        <% if (isPoolVilla) {
+             const rateRef = poolVillaRates || {};
+             const seasonLabels = { lean: 'Off Season', peak: 'Peak Season' };
+             const catLabels = { walk_in: 'Walk-in', agency: 'Agency' };
+             const money = (n) => 'PHP ' + Number(n).toLocaleString('en-US');
+        %>
+        <div class="no-print" style="margin-bottom:16px; padding:12px 14px; border-radius:8px; background:rgba(111,156,64,0.10); border:1px solid rgba(111,156,64,0.35);">
+          <strong>Pool Villa rate card</strong> <span style="opacity:.7">(per night, by number of guests &mdash; for reference while filling the quotation)</span>
+          <table class="table table-sm" style="margin:8px 0 0; max-width:620px;">
+            <thead><tr><th>Season</th><th>Category</th><th>Guests &rarr; Rate</th></tr></thead>
+            <tbody>
+            <% ['lean', 'peak'].forEach(function (season) { ['walk_in', 'agency'].forEach(function (cat) {
+                 const tiers = (rateRef[season] && rateRef[season][cat]) || {};
+                 const keys = Object.keys(tiers).map(Number).sort(function (a, b) { return a - b; }); %>
+              <tr><td><%= seasonLabels[season] %></td><td><%= catLabels[cat] %></td>
+                  <td><%= keys.length ? keys.map(function (k) { return k + ' guests: ' + money(tiers[k]); }).join('  |  ') : 'no rates set' %></td></tr>
+            <% }); }); %>
+            </tbody>
+          </table>
+        </div>
+        <% } %>
         <div class="quotation-sheet" id="quotationSheet">
           <div class="quotation-header">
+            <% if (!isPoolVilla) { %>
             <img src="/img/Logo-Black.png" class="quotation-logo" alt="Main Stay Hotel">
             <h2 contenteditable="true">MAIN STAY HOTEL</h2>
             <p class="quotation-address" contenteditable="true">Clark Terrace Building, Lot 2 Block 1, The Villages, Prince Balagtas Avenue, Clark Freeport Zone, Pampanga, 2023<br>Clark Freeport Zone, Pampanga, 2023</p>
+            <% } else { %>
+            <h2 contenteditable="true">POOL VILLA</h2>
+            <p class="quotation-address" contenteditable="true">[Pool Villa address &mdash; click to edit]</p>
+            <% } %>
           </div>
 
           <div class="quotation-date-row">
@@ -47,6 +73,19 @@
               </tr>
             </thead>
             <tbody id="quotationRows">
+              <% if (isPoolVilla) { %>
+              <tr>
+                <td contenteditable="true">&nbsp;</td>
+                <td contenteditable="true">VILLA &mdash; NO. OF GUESTS: ___<br>(OFF / PEAK SEASON)</td>
+                <td contenteditable="true">1 VILLA</td>
+                <td contenteditable="true" class="quotation-rate-cell">PHP 0<br>(PER NIGHT)</td>
+                <td contenteditable="true" class="quotation-row-total">PHP 0</td>
+                <td class="no-print qcol-actions">
+                  <button type="button" class="quotation-add-row-inline" title="Add row below">&plus;</button>
+                  <button type="button" class="quotation-remove-row" title="Remove row">&times;</button>
+                </td>
+              </tr>
+              <% } else { %>
               <tr>
                 <td contenteditable="true">SEPTEMBER 24, 2026<br>TO<br>SEPTEMBER 25, 2026</td>
                 <td contenteditable="true">KING SIZE BEDROOM<br>NO BREAKFAST INCLUDED</td>
@@ -69,18 +108,26 @@
                   <button type="button" class="quotation-remove-row" title="Remove row">&times;</button>
                 </td>
               </tr>
+              <% } %>
             </tbody>
           </table>
 
           <div class="quotation-grand-total">
-            GRAND TOTAL&nbsp;=&nbsp;<span id="quotationGrandTotal" contenteditable="true">PHP 7,000</span>
+            GRAND TOTAL&nbsp;=&nbsp;<span id="quotationGrandTotal" contenteditable="true"><%= isPoolVilla ? 'PHP 0' : 'PHP 7,000' %></span>
           </div>
 
           <div class="quotation-payment" contenteditable="true">
+            <% if (isPoolVilla) { %>
+            <div><strong>MODE OF PAYMENT:</strong>&nbsp;[bank / e-wallet &mdash; click to edit]</div>
+            <div><strong>ACCOUNT NUMBER:</strong>&nbsp;[account number]</div>
+            <div><strong>NAME:</strong>&nbsp;[account name]</div>
+            <div><strong>ADDRESS:</strong>&nbsp;[address]</div>
+            <% } else { %>
             <div><strong>MODE OF PAYMENT:</strong>&nbsp;CHINA BANKING CORPORATION</div>
             <div><strong>ACCOUNT NUMBER:</strong>&nbsp;159100017155</div>
             <div><strong>NAME:</strong>&nbsp;MAIN STAY HOTEL CORP</div>
             <div><strong>ADDRESS:</strong>&nbsp;CLARK TERRACE BUILDING, THE VILLAGES ZONE, CLARK FREEPORT, MABALACAT CITY, 2023</div>
+            <% } %>
           </div>
 
           <div class="quotation-policy">

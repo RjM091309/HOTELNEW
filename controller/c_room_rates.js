@@ -1,5 +1,6 @@
 const RoomRatesModel = require('../models/roomRatesModel');
 const RoomModel = require('../models/roomModel');
+const PoolVillaRatesModel = require('../models/poolVillaRatesModel');
 const { SEASONS, MONTHS, CATEGORIES, DAY_RANGES, BREAKFAST_OPTIONS } = require('../config/roomRates');
 
 const RoomRatesController = {
@@ -27,13 +28,16 @@ const RoomRatesController = {
 
   // Current amounts as a nested map: rates[season][category][dayRange][roomTypeId][breakfast],
   // plus the month->season assignment so the admin page can load both in one round trip.
+  // poolVillaRates rides along too (cheap to always fetch) - the admin page
+  // only renders it when the active property is actually Pool Villa.
   getData: async (req, res) => {
     try {
-      const [rates, seasonMonths] = await Promise.all([
+      const [rates, seasonMonths, poolVillaRates] = await Promise.all([
         RoomRatesModel.getAll(req.propertyId),
-        RoomRatesModel.getSeasonMonthMap()
+        RoomRatesModel.getSeasonMonthMap(),
+        PoolVillaRatesModel.getAll()
       ]);
-      res.json({ success: true, rates, seasonMonths });
+      res.json({ success: true, rates, seasonMonths, poolVillaRates });
     } catch (error) {
       console.error('Error fetching room rates:', error);
       res.status(500).json({ success: false, message: 'Failed to load room rates' });
@@ -50,6 +54,19 @@ const RoomRatesController = {
     } catch (error) {
       console.error('Error fetching season months:', error);
       res.status(500).json({ success: false, message: 'Failed to load season months' });
+    }
+  },
+
+  // Pool Villa's season x category x guest-count rate table - used by the
+  // Add/Edit (Group) Booking modals to price Pool Villa stays, without
+  // pulling Main Hotel's whole room_rates grid.
+  getPoolVillaRates: async (req, res) => {
+    try {
+      const poolVillaRates = await PoolVillaRatesModel.getAll();
+      res.json({ success: true, poolVillaRates });
+    } catch (error) {
+      console.error('Error fetching Pool Villa rates:', error);
+      res.status(500).json({ success: false, message: 'Failed to load Pool Villa rates' });
     }
   },
 
@@ -82,6 +99,24 @@ const RoomRatesController = {
     } catch (error) {
       console.error('Error saving season months:', error);
       res.status(500).json({ success: false, message: 'Failed to save season months' });
+    }
+  },
+
+  // Body: { rates: [{ season, category, guestCount, amount }, ...] }
+  // An entry with amount null/blank removes that guest-count tier entirely
+  // (see PoolVillaRatesModel.saveMany) rather than zeroing it.
+  savePoolVillaRates: async (req, res) => {
+    try {
+      const rates = req.body && Array.isArray(req.body.rates) ? req.body.rates : [];
+      if (!rates.length) {
+        return res.status(400).json({ success: false, message: 'No rate changes to save.' });
+      }
+      const userId = req.user?.userId || null;
+      const result = await PoolVillaRatesModel.saveMany(rates, userId);
+      res.json({ success: true, updated: result.updated, deleted: result.deleted });
+    } catch (error) {
+      console.error('Error saving Pool Villa rates:', error);
+      res.status(500).json({ success: false, message: 'Failed to save Pool Villa rates' });
     }
   }
 };

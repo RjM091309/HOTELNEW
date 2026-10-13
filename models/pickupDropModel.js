@@ -1,7 +1,7 @@
 const { queryDatabasePromise } = require('../config/database');
 
 class PickupDropModel {
-  static async getAll() {
+  static async getAll(propertyId = null) {
     const query = `
       SELECT
         b.IDNo AS BOOKING_ID,
@@ -22,6 +22,7 @@ class PickupDropModel {
       INNER JOIN booking_service bs ON bs.BOOKING_ID = b.IDNo AND bs.ACTIVE = 1
       INNER JOIN services s ON s.IDNo = bs.SERVICE_ID
       WHERE b.ACTIVE = 1
+        ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
         AND s.SERVICE_CATEGORY = 'Pick & Drop'
       GROUP BY
         b.IDNo,
@@ -37,7 +38,7 @@ class PickupDropModel {
         b.PICKUP_DROP_SPECIAL_NOTES
       ORDER BY b.CHECK_IN_DATE DESC, b.IDNo DESC
     `;
-    return await queryDatabasePromise(query);
+    return await queryDatabasePromise(query, propertyId ? [propertyId] : []);
   }
 
   static async getByBookingId(bookingId) {

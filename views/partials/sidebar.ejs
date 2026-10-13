@@ -131,12 +131,14 @@
 								<span class="title">Cancelled Bookings</span>
 							</a>
 						</li>
+						<% if (!currentProperty || currentProperty.CODE !== 'pool_villa') { %>
 						<li class="nav-item">
 							<a href="/booking/check-in-notifier" class="nav-link <%= activePage === 'check-in-notifier' ? 'active' : '' %>">
 								<i class="fa fa-genderless"></i>
 								<span class="title">Check-in Notifier</span>
 							</a>
 						</li>
+						<% } %>
 						<li class="nav-item">
 							<a class="nav-link <%= activePage === 'flight_schedule' ? 'active' : '' %>" href="/flight-schedule">
 								<i class="fa fa-genderless"></i>
@@ -149,18 +151,22 @@
 								<span class="title">Pick Up & Drop</span>
 							</a>
 						</li>
+						<% if (!currentProperty || currentProperty.CODE !== 'pool_villa') { %>
 						<li class="nav-item">
 							<a href="/calendar/room-checker" class="nav-link <%= activePage === 'room-checker' ? 'active' : '' %>">
 								<i class="fa fa-genderless"></i>
 								<span class="title">Room Checker</span>
 							</a>
 						</li>
+						<% } %>
+						<% if (!currentProperty || currentProperty.CODE !== 'pool_villa') { %>
 						<li class="nav-item">
 							<a href="/calendar/unassigned-rooms" class="nav-link <%= activePage === 'unassigned-rooms' ? 'active' : '' %>">
 								<i class="fa fa-genderless"></i>
 								<span class="title">Unassigned Rooms</span>
 							</a>
 						</li>
+						<% } %>
 						<li class="nav-item">
 							<a href="/booking/quotation" class="nav-link <%= activePage === 'quotation' ? 'active' : '' %>">
 								<i class="fa fa-genderless"></i>
@@ -171,7 +177,7 @@
 					</ul>
 				</li>
 
-				<% const paymentPages = ['daily_settlement', 'payments', 'credit', 'deposits', 'receipts', 'expenses', 'agency']; %>
+				<% const paymentPages = ['daily_settlement', 'payments', 'credit', 'deposits', 'receipts', 'agency']; %>
 				<li class="nav-item <%= paymentPages.includes(activePage) ? 'open' : '' %>">
 					<a class="nav-link nav-toggle nav-main-link-submenu <%= paymentPages.includes(activePage) ? 'active' : '' %>" data-toggle="submenu" aria-haspopup="true"
 						aria-expanded="<%= paymentPages.includes(activePage) ? 'true' : 'false' %>" href="#">
@@ -205,12 +211,6 @@
 							</a>
 						</li>
 						<li class="nav-item">
-							<a href="/expenses" class="nav-link <%= activePage === 'expenses' ? 'active' : '' %>">
-								<i class="fa fa-genderless"></i>
-								<span class="title">Expenses</span>
-							</a>
-						</li>
-						<li class="nav-item">
 							<a href="/payments" class="nav-link <%= activePage === 'payments' ? 'active' : '' %>">
 								<i class="fa fa-genderless"></i>
 								<span class="title">Payment</span>
@@ -226,7 +226,7 @@
 				</li>
 
 
-				<% const managementPages = ['guest', 'employee', 'user_info', 'vehicle_monitoring', 'activity_log']; %>
+				<% const managementPages = ['guest', 'employee', 'user_info', 'vehicle_monitoring', 'activity_log', 'expenses']; %>
 				<li class="nav-item <%= managementPages.includes(activePage) ? 'open' : '' %>">
 					<a class="nav-link nav-toggle nav-main-link-submenu <%= managementPages.includes(activePage) ? 'active' : '' %>" data-toggle="submenu" aria-haspopup="true"
 						aria-expanded="<%= managementPages.includes(activePage) ? 'true' : 'false' %>" href="#">
@@ -242,18 +242,28 @@
 								<span class="title">Activity Log</span>
 							</a>
 						</li>
+						<% if (!currentProperty || currentProperty.CODE !== 'pool_villa') { %>
 						<li class="nav-item">
 							<a href="/employee" class="nav-link <%= activePage === 'employee' ? 'active' : '' %>">
 								<i class="fa fa-genderless"></i>
 								<span class="title">Employee</span>
 							</a>
 						</li>
+						<% } %>
+						<li class="nav-item">
+							<a href="/expenses" class="nav-link <%= activePage === 'expenses' ? 'active' : '' %>">
+								<i class="fa fa-genderless"></i>
+								<span class="title">Expenses</span>
+							</a>
+						</li>
+						<% if (!currentProperty || currentProperty.CODE !== 'pool_villa') { %>
 						<li class="nav-item">
 							<a href="/guest" class="nav-link <%= activePage === 'guest' ? 'active' : '' %>">
 								<i class="fa fa-genderless"></i>
 								<span class="title">Guest Profile</span>
 							</a>
 						</li>
+						<% } %>
 						<% if (user && user.PERMISSIONS == 1) { %>
 						<li class="nav-item">
 							<a href="/user_info" class="nav-link <%= activePage === 'user_info' ? 'active' : '' %>">
@@ -262,12 +272,14 @@
 							</a>
 						</li>
 						<% } %>
+						<% if (!currentProperty || currentProperty.CODE !== 'pool_villa') { %>
 						<li class="nav-item">
 							<a href="/vehicle/monitoring" class="nav-link <%= activePage === 'vehicle_monitoring' ? 'active' : '' %>">
 								<i class="fa fa-genderless"></i>
 								<span class="title">Vehicle Monitoring</span>
 							</a>
 						</li>
+						<% } %>
 					</ul>
 				</li>
 
@@ -281,6 +293,7 @@
 						<span class="arrow <%= settingsPages.includes(activePage) ? 'open' : '' %>"></span>
 					</a>
 					<ul class="sub-menu <%= settingsPages.includes(activePage) ? 'show' : '' %>" <% if (settingsPages.includes(activePage)) { %>style="display: block;"<% } %>>
+						<% if (!currentProperty || currentProperty.CODE !== 'pool_villa') { %>
 						<li class="nav-item">
 							<a class="nav-link <%= activePage === 'card_writer' ? 'active' : '' %>" href="/integration/card-writer">
 								<i class="fa fa-genderless"></i>
@@ -293,6 +306,7 @@
 								<span class="title">Channex</span>
 							</a>
 						</li>
+						<% } %>
 						<% if (user && user.PERMISSIONS == 1) { %>
 						<li class="nav-item">
 							<a href="#" id="navDeleteTestData" class="nav-link">
@@ -337,12 +351,14 @@
 								<span class="title">Telegram | Kakao</span>
 							</a>
 						</li>
+						<% if (!currentProperty || currentProperty.CODE !== 'pool_villa') { %>
 						<li class="nav-item">
 							<a class="nav-link <%= activePage === 'vehicle' ? 'active' : '' %>" href="/vehicle">
 								<i class="fa fa-genderless"></i>
 								<span class="title">Vehicle Management</span>
 							</a>
 						</li>
+						<% } %>
 					</ul>
 				</li>
 			</ul>

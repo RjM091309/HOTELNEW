@@ -907,7 +907,12 @@ function escapeHtml(value) {
 const attr = escapeHtml;
 
 function toast(message) {
-    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: message, timer: 1800, showConfirmButton: false });
+    // Use the system-wide toast (footer.ejs showSuccess -> jQuery toast) so notifications look the same on every page.
+    if (typeof window.showSuccess === 'function') {
+        window.showSuccess('Success', message);
+    } else {
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: message, timer: 1800, showConfirmButton: false });
+    }
 }
 
 function showError(message) {

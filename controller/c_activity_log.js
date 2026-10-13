@@ -32,7 +32,8 @@ const ActivityLogController = {
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
         limit: limit || 200,
-        offset: offset || 0
+        offset: offset || 0,
+        propertyId: req.propertyId
       });
 
       res.json({ success: true, count: rows.length, rows });

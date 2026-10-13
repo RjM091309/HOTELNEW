@@ -1,5 +1,12 @@
 <!-- Date Time item CSS -->
 <link rel="stylesheet" href="/plugins/flatpicker/flatpickr.min.css">
+<%
+  // Pool Villa prices by guest count, not room type/day-range/breakfast -
+  // see models/poolVillaRatesModel.js and views/room_rates/room_rates.ejs.
+  // Only Walk-in/Agency are real categories there (confirmed with the
+  // owner); Tenant/VIP/Employee/Senior-PWD don't apply.
+  const isPoolVillaBooking = typeof currentProperty !== 'undefined' && currentProperty && currentProperty.CODE === 'pool_villa';
+%>
 
 <div class="modal fade" id="modal-addbooking" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
@@ -39,12 +46,16 @@
                                 <input class="form-control flatpickr-input" type="text" id="daterange" name="daterange" required>
                             </div>
                         </div>
+                        <% if (!isPoolVillaBooking) { %>
                         <div id="divroom_type" class="col-lg-3">
                             <div class="form-group">
                                 <label class="form-label">Room View</label>
                                 <input class="form-control" type="text" id="room_type" name="room_type" readonly>
                             </div>
                         </div>
+                        <% } else { %>
+                        <input type="hidden" id="room_type" name="room_type">
+                        <% } %>
                         <div id="divbedCount" class="col-lg-3">
                             <div class="form-group">
                                 <label class="form-label">Bed Type</label>
@@ -79,11 +90,22 @@
                                   <select class="form-select" id="bookingRoute" name="bookingRoute">
                                       <option value="walk-in" selected data-base-label="Walk-in">Walk-in</option>
                                       <option value="agency" data-base-label="Agency">Agency</option>
+                                      <!-- Tenant/VIP/Employee/Senior-PWD don't apply to Pool Villa's rate
+                                           card (confirmed with the owner - only Walk-in/Agency are real
+                                           categories there), so they're left out of the dropdown entirely
+                                           rather than just hidden, same as every other Pool-Villa-only
+                                           UI change this session (sidebar.ejs, room_rates.ejs). -->
+                                      <% if (!isPoolVillaBooking) { %>
                                       <option value="tenant" data-base-label="Tenant (15%)">Tenant (15%)</option>
                                       <option value="vip" data-base-label="VIP (20%)">VIP (20%)</option>
                                       <option value="employee" data-base-label="Employee (30%)">Employee (30%)</option>
                                       <option value="senior_special" data-base-label="Senior / Special 20%">Senior / Special 20%</option>
+                                      <% } %>
+                                      <!-- Pool Villa doesn't take OTA/Channel bookings either (confirmed
+                                           with the owner) - Walk-in/Agency/Manual Price/Manual Percent only. -->
+                                      <% if (!isPoolVillaBooking) { %>
                                       <option value="booking-channel" data-base-label="OTA / Channel">OTA / Channel</option>
+                                      <% } %>
                                       <option value="manual_rate" data-base-label="Manual Price">Manual Price</option>
                                       <option value="percentage" data-base-label="Manual Percent">Manual Percent</option>
                                       <!-- Not manually pickable (disabled + hidden from the open list) - this
@@ -118,10 +140,19 @@
                       
                           
 
-                        <div id="divmaxOccupants" class="col-lg-4" style="display: none;">
+                        <!-- Main Hotel: hidden, readonly, auto-echoes the selected room's
+                             ROOM_MAX - unchanged. Pool Villa: this is the actual price driver
+                             (season x category x guest count), so it's shown, editable, and
+                             relabeled - see public/js/booking/add_booking.js's Pool Villa
+                             price path, which reads this field's value as guestCount. -->
+                        <div id="divmaxOccupants" class="col-lg-4" <% if (!isPoolVillaBooking) { %>style="display: none;"<% } %>>
                             <div class="form-group">
-                                <label class="form-label">Max Occupants</label>
+                                <label class="form-label"><%= isPoolVillaBooking ? 'Number of Guests' : 'Max Occupants' %></label>
+                                <% if (isPoolVillaBooking) { %>
+                                <input class="form-control" type="number" id="maxOccupants" name="maxOccupants" min="1" max="31" placeholder="e.g. 4">
+                                <% } else { %>
                                 <input class="form-control" type="text" id="maxOccupants" name="maxOccupants" readonly>
+                                <% } %>
                             </div>
                         </div>
                     
@@ -522,7 +553,7 @@
 		document.body.appendChild(bookingScript);
 		bookingScript.onload = function() {
 			var bookingBillingScript = document.createElement('script');
-			bookingBillingScript.src = '/js/booking/add_booking.js?v=long-term-bands-1';
+			bookingBillingScript.src = '/js/booking/add_booking.js?v=pool-villa-bf-1';
 			document.body.appendChild(bookingBillingScript);
 		};
 

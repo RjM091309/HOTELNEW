@@ -607,7 +607,8 @@ class BookingModel {
   // custom name contains "breakfast".
   // NOTE: not property-scoped - feeds the Breakfast List page, which is
   // explicitly deferred to a later phase per the multi-property plan.
-  static async getBreakfastList(servingDateStr) {
+  static async getBreakfastList(servingDateStr, propertyId) {
+    const propertyFilter = propertyId ? 'AND b.PROPERTY_ID = ?' : '';
     const query = `
       SELECT
         b.IDNo AS BOOKING_ID,
@@ -623,6 +624,7 @@ class BookingModel {
       WHERE bs.ACTIVE = 1
         AND b.ACTIVE = 1
         AND b.BOOKING_STATUS = 'check-In'
+        ${propertyFilter}
         AND (bs.STATUS IS NULL OR bs.STATUS <> 'cancelled')
         AND (
           bs.SERVICE_ID IN (74, 75)
@@ -635,16 +637,19 @@ class BookingModel {
       HAVING BREAKFAST_COUNT > 0
       ORDER BY r.ROOM_FLOOR ASC, r.ROOM_NUMBER ASC
     `;
-    const rows = await queryDatabasePromise(query, [servingDateStr, servingDateStr]);
+    const params = propertyId ? [propertyId, servingDateStr, servingDateStr] : [servingDateStr, servingDateStr];
+    const rows = await queryDatabasePromise(query, params);
     return rows;
   }
 
   // All cancelled bookings with their general details, for the
   // Booking > Cancelled Bookings list page. Deliberately NOT filtered by
   // b.ACTIVE - "Remove" on a cancelled calendar bar sets ACTIVE = 0, but the
-  // cancellation record should still show up here for history/reporting.
-  // NOTE: also not property-scoped - the Cancelled Bookings page is
-  // explicitly deferred to a later phase per the multi-property plan.
+  // cancellation record must still show up here as a permanent log, even
+  // after it's gone from the calendar and the main Booking list (confirmed:
+  // this is the intended behavior, not a bug).
+  // NOTE: also not property-scoped - applies identically to every property
+  // (Main Hotel and Pool Villa both go through this same shared query/page).
   static async getCancelledBookings() {
     const query = `
       SELECT
@@ -8677,20 +8682,19 @@ class BookingModel {
   }
 
   // Get all agencies
-  // NOTE: not property-scoped - `agency` has no PROPERTY_ID column per the
-  // multi-property plan (it's not listed among tables getting their own
-  // column or a derived-via-join scope), so agencies are shared across
-  // properties, same as guest_type/guest_level.
-  static async getAgency() {
+  // Property-scoped: `agency` has its own PROPERTY_ID column (Main Hotel and
+  // Pool Villa each keep their own agency list).
+  static async getAgency(propertyId = null) {
     try {
       const query = `
         SELECT IDNo, NAME 
         FROM agency 
         WHERE ACTIVE = 1 
+          ${propertyId ? 'AND PROPERTY_ID = ?' : ''}
         ORDER BY NAME
       `;
 
-      const results = await queryDatabasePromise(query);
+      const results = await queryDatabasePromise(query, propertyId ? [propertyId] : []);
       return results;
 
     } catch (error) {
@@ -9792,6 +9796,27 @@ class BookingModel {
                 connection.rollback();
                 connection.release();
                 return reject(new Error('Booking or room does not belong to the current property'));
+              }
+            }
+
+            // Guard: never let an edit silently wipe a room a booking already
+            // has. The edit modal's room dropdown has been found getting left
+            // empty by a background refresh in several different ways
+            // (particularly for rooms with no ROOM_FLOOR set, e.g. every
+            // Pool Villa room) - when that happens the save still looks
+            // successful but ROOM_ID gets written as NULL/0, and the booking
+            // shows "Unassigned Room" and vanishes off the calendar. The
+            // frontend now blocks this before submitting, but this is the
+            // backend backstop in case any such path is still missed.
+            if (!room_id) {
+              const [currentRoomRows] = await connection.promise().query(
+                'SELECT ROOM_ID FROM booking WHERE IDNo = ?',
+                [bookingId]
+              );
+              if (currentRoomRows[0]?.ROOM_ID) {
+                connection.rollback();
+                connection.release();
+                return reject(new Error('This booking already has a room assigned - refusing to save it as unassigned. Please reselect the room and try again.'));
               }
             }
 

@@ -1,3 +1,14 @@
+<%
+  // "Lean Season" reads oddly for Pool Villa's owner, who thinks of it as
+  // "Off Season" instead - the underlying season.key ('lean') is unchanged
+  // (it's what's actually stored/matched against in the DB), only this
+  // display label differs per property.
+  const isPoolVilla = typeof currentProperty !== 'undefined' && currentProperty && currentProperty.CODE === 'pool_villa';
+  function seasonDisplayLabel(season) {
+    if (isPoolVilla && season.key === 'lean') return 'Off Season';
+    return season.label;
+  }
+%>
 <div class="row room-rates-page">
   <div class="col-12">
     <div class="dashboard-card">
@@ -6,10 +17,14 @@
           <div>
             <h4 class="mb-0">Room Rates</h4>
             <p class="room-rates-note mb-0">
-              Edit any amount, then Save. Priced by day range, room type and breakfast.
+              <% if (isPoolVilla) { %>
+                Edit any amount below, then Save. Priced by season, category and number of guests only - room type doesn't affect the rate.
+              <% } else { %>
+                Edit any amount, then Save. Priced by day range, room type and breakfast.
+              <% } %>
             </p>
           </div>
-          <div class="room-rates-actions">
+          <div class="room-rates-actions" <% if (isPoolVilla) { %>style="display:none;"<% } %>>
             <span class="room-rates-dirty" id="roomRatesDirty" style="display:none;">Unsaved changes</span>
             <button type="button" class="btn room-rates-reset-btn" id="roomRatesResetBtn">Reset</button>
             <button type="button" class="btn room-rates-save-btn" id="roomRatesSaveBtn" disabled>Save changes</button>
@@ -20,21 +35,38 @@
       <div class="dashboard-card-body">
         <div class="season-tabs" id="seasonTabs" role="tablist">
           <% seasons.forEach(function(season, idx) { %>
-            <button type="button" class="season-tab-btn <%= idx === 0 ? 'active' : '' %>" data-season-tab="<%= season.key %>"><%= season.label %></button>
+            <button type="button" class="season-tab-btn <%= idx === 0 ? 'active' : '' %>" data-season-tab="<%= season.key %>"><%= seasonDisplayLabel(season) %></button>
           <% }); %>
         </div>
 
         <div class="season-months-card">
-          <div class="season-months-title" id="seasonMonthsTitle">Assign Months to <%= seasons[0].label %></div>
+          <div class="season-months-title" id="seasonMonthsTitle">Assign Months to <%= seasonDisplayLabel(seasons[0]) %></div>
           <p class="room-rates-note season-months-note" id="seasonMonthsNote">
             Checked months belong to this season - a month can only belong to one season, so unchecking it here moves it to the other one.
           </p>
           <div class="season-months-row" id="seasonMonthsRow">
             <% months.forEach(function(m) { %>
-              <label class="season-month-toggle">
-                <input type="checkbox" class="season-month-input" data-month="<%= m.num %>">
-                <span><%= m.label %></span>
-              </label>
+              <div class="season-month-group">
+                <label class="season-month-toggle">
+                  <input type="checkbox" class="season-month-input" data-month="<%= m.num %>">
+                  <span><%= m.label %></span>
+                  <!-- Only functional once the month above is checked - opens
+                       a day-picker to make this month's season switch
+                       partway through instead of only on the 1st (e.g. Peak
+                       actually starts Oct 27, not Oct 1). Hidden pill-clutter
+                       by default; a small badge appears here once a split day
+                       is actually set. -->
+                  <button type="button" class="season-split-dots-btn" data-month="<%= m.num %>" title="Split this month on a specific day">&#8942;</button>
+                </label>
+                <div class="season-split-popover" data-month="<%= m.num %>" style="display:none;">
+                  <div class="season-split-popover-title">Split <%= m.label %> on day...</div>
+                  <div class="season-split-popover-grid" data-month="<%= m.num %>"></div>
+                  <div class="season-split-popover-footer">
+                    <span class="season-split-popover-summary"></span>
+                    <button type="button" class="season-split-popover-clear">Clear</button>
+                  </div>
+                </div>
+              </div>
             <% }); %>
           </div>
           <div class="season-months-actions">
@@ -43,10 +75,16 @@
           </div>
         </div>
 
-        <div id="roomRatesGrid">
+        <!-- Main Hotel's room-type/day-range/breakfast grid. Kept present in
+             the DOM (just visually hidden) rather than conditionally removed
+             for Pool Villa, because the script below does
+             document.getElementById('roomRatesGrid').querySelectorAll(...)
+             unconditionally on load - removing the element outright would
+             throw and take the season-assignment logic further down with it. -->
+        <div id="roomRatesGrid" <% if (isPoolVilla) { %>style="display:none;"<% } %>>
           <% seasons.forEach(function(season, idx) { %>
             <div class="season-section" data-season="<%= season.key %>" style="<%= idx === 0 ? '' : 'display:none;' %>">
-              <div class="season-section-title"><%= season.label %></div>
+              <div class="season-section-title"><%= seasonDisplayLabel(season) %></div>
               <% categories.forEach(function(cat) { %>
                 <div class="rate-category">
                   <div class="rate-category-title"><%= cat.label %></div>
@@ -94,6 +132,39 @@
               <% }); %>
             </div>
           <% }); %>
+        </div>
+
+        <!-- Pool Villa's rate grid - season x category (Walk-in/Agency only)
+             x number of guests, nothing else (room type doesn't affect
+             price). Reuses the same .season-section/data-season markup as
+             the Main Hotel grid above so the existing season-tab switcher
+             (further down in the script) shows/hides this alongside it for
+             free, no separate tab logic needed. Guest-count rows are
+             rendered dynamically in JS (fillPoolVillaRates) since there's no
+             fixed set of guest counts, unlike Main Hotel's fixed room-type
+             columns. -->
+        <div id="poolVillaRatesGrid" <% if (!isPoolVilla) { %>style="display:none;"<% } %>>
+          <% seasons.forEach(function(season, idx) { %>
+            <div class="season-section pv-season-section" data-season="<%= season.key %>" style="<%= idx === 0 ? '' : 'display:none;' %>">
+              <div class="season-section-title"><%= seasonDisplayLabel(season) %></div>
+              <div class="pv-rate-columns">
+                <div class="pv-rate-column">
+                  <div class="pv-rate-column-title">Walk-in</div>
+                  <div class="pv-rate-rows" data-season="<%= season.key %>" data-category="walk_in"></div>
+                  <button type="button" class="pv-add-row-btn" data-season="<%= season.key %>" data-category="walk_in">+ Add guest count</button>
+                </div>
+                <div class="pv-rate-column">
+                  <div class="pv-rate-column-title">Agency (AG)</div>
+                  <div class="pv-rate-rows" data-season="<%= season.key %>" data-category="agency"></div>
+                  <button type="button" class="pv-add-row-btn" data-season="<%= season.key %>" data-category="agency">+ Add guest count</button>
+                </div>
+              </div>
+            </div>
+          <% }); %>
+          <div class="season-months-actions">
+            <span class="room-rates-dirty" id="poolVillaRatesDirty" style="display:none;">Unsaved changes</span>
+            <button type="button" class="btn room-rates-save-btn" id="poolVillaRatesSaveBtn" disabled>Save Pool Villa rates</button>
+          </div>
         </div>
       </div>
     </div>
@@ -170,10 +241,18 @@
   .season-tab-btn:hover {
     border-color: rgba(255, 255, 255, 0.3);
   }
-  .season-tab-btn.active {
+  /* Matches the month pills below: Off Season (lean) = gold, Peak Season =
+     blue, so the active tab's color always matches the season it's showing
+     instead of a generic unrelated blue regardless of which tab. */
+  .season-tab-btn.active[data-season-tab="lean"] {
+    background: #3a2a0c;
+    border-color: #e6a94b;
+    color: #ffd694;
+  }
+  .season-tab-btn.active[data-season-tab="peak"] {
     background: #0c2a42;
-    border-color: #2196f3;
-    color: #ffffff;
+    border-color: #4f9eff;
+    color: #bcdcff;
   }
 
   /* Assign Months to <active season> - a single checkbox per month, meaning
@@ -216,15 +295,258 @@
     cursor: pointer;
     user-select: none;
   }
-  .season-month-toggle:has(.season-month-input:checked) {
+  /* Which season a month belongs to is shown by color, not just a generic
+     "checked" highlight - Off Season stays the original gold, Peak Season
+     gets its own distinct blue, and a month with a mid-month split (see
+     the "..." day-picker) shows BOTH as a half-gold/half-blue pill so a
+     split month reads as split at a glance instead of only discoverable by
+     opening its popover. Applied via JS (renderMonthCheckboxes) since the
+     color depends on which season a month is actually assigned to, not
+     just whether its checkbox happens to be checked for the active tab. */
+  .season-month-toggle.season-color-lean {
     border-color: #e6a94b;
     background: rgba(230, 169, 75, 0.14);
+    color: #ffd694;
+  }
+  .season-month-toggle.season-color-peak {
+    border-color: #4f9eff;
+    background: rgba(79, 158, 255, 0.14);
+    color: #bcdcff;
+  }
+  .season-month-toggle.season-color-split {
+    border-color: #e6a94b;
+    background: linear-gradient(90deg, rgba(230, 169, 75, 0.32) 50%, rgba(79, 158, 255, 0.32) 50%);
     color: #ffd694;
   }
   .season-month-input {
     accent-color: #e6a94b;
     cursor: pointer;
   }
+  .season-month-group {
+    position: relative;
+    display: inline-flex;
+  }
+  /* Small "..." button living inside the pill - opens the day-picker
+     popover. Dim/inert until the month is actually checked. */
+  .season-split-dots-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    margin-left: 2px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    opacity: 0.45;
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .season-month-toggle:has(.season-month-input:checked) .season-split-dots-btn {
+    opacity: 0.85;
+  }
+  .season-split-dots-btn:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.12);
+  }
+  /* Small gold dot badge on the "..." button once a split day is actually
+     set for that month - the only thing visible per-month at rest, so the
+     grid stays clean unless a month actually has a split. */
+  .season-split-dots-btn.has-split::after {
+    content: '';
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #e6a94b;
+    box-shadow: 0 0 0 1px #1c2225;
+  }
+
+  .season-split-popover {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 30;
+    width: 220px;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: #1c2225;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  }
+  .season-split-popover-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #cdd6dc;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 8px;
+  }
+  .season-split-popover-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+  }
+  .season-split-day-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 24px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    background: #12161a;
+    color: #cdd6dc;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .season-split-day-cell:hover {
+    border-color: rgba(230, 169, 75, 0.5);
+  }
+  .season-split-day-cell.is-selected {
+    background: #e6a94b;
+    border-color: #e6a94b;
+    color: #1c2225;
+    font-weight: 700;
+  }
+  .season-split-popover-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-size: 11px;
+  }
+  .season-split-popover-summary {
+    color: #ffd694;
+    font-weight: 600;
+  }
+  .season-split-popover-clear {
+    background: none;
+    border: none;
+    color: #9aa5ab;
+    font-size: 11px;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0;
+  }
+  .season-split-popover-clear:hover {
+    color: #ffffff;
+  }
+
+  /* Pool Villa rate grid - season x category x guest-count, no room type */
+  .pv-rate-columns {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .pv-rate-column {
+    flex: 1 1 260px;
+    min-width: 240px;
+    background: #1c2225;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .pv-rate-column-title {
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 10px;
+  }
+  .pv-rate-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .pv-rate-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .pv-rate-row-label {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #cdd6dc;
+    font-size: 13px;
+  }
+  .pv-rate-row-guest-input {
+    width: 44px;
+    background: #0f1316;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 4px;
+    color: #ffd694;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: center;
+    padding: 4px 0;
+  }
+  .pv-rate-row-amount-input {
+    width: 110px;
+    background: #0f1316;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 4px;
+    color: #cdd6dc;
+    font-size: 13px;
+    text-align: right;
+    padding: 5px 8px;
+  }
+  .pv-rate-row-remove {
+    background: none;
+    border: none;
+    color: #9aa5ab;
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 2px 4px;
+  }
+  .pv-rate-row-remove:hover {
+    color: #e5534b;
+  }
+  .pv-add-row-btn {
+    margin-top: 10px;
+    background: none;
+    border: 1px dashed rgba(255, 255, 255, 0.25);
+    border-radius: 6px;
+    color: #9aa5ab;
+    font-size: 12px;
+    padding: 6px 10px;
+    cursor: pointer;
+    width: 100%;
+  }
+  .pv-add-row-btn:hover {
+    color: #ffd694;
+    border-color: #e6a94b;
+  }
+  [data-theme="white"] .pv-rate-column {
+    background: #f9fafb;
+    border-color: #e5e7eb;
+  }
+  [data-theme="white"] .pv-rate-column-title {
+    color: #111827;
+  }
+  [data-theme="white"] .pv-rate-row-label {
+    color: #374151;
+  }
+  [data-theme="white"] .pv-rate-row-guest-input,
+  [data-theme="white"] .pv-rate-row-amount-input {
+    background: #ffffff;
+    border-color: #d1d5db;
+    color: #92400e;
+  }
+  [data-theme="white"] .pv-add-row-btn {
+    border-color: #d1d5db;
+    color: #6b7280;
+  }
+
   .season-months-actions {
     display: flex;
     align-items: center;
@@ -393,9 +715,14 @@
     border-color: #d1d5db;
     color: #374151;
   }
-  [data-theme="white"] .season-tab-btn.active {
-    background: #2196f3;
-    border-color: #1976d2;
+  [data-theme="white"] .season-tab-btn.active[data-season-tab="lean"] {
+    background: #d97706;
+    border-color: #b45309;
+    color: #ffffff;
+  }
+  [data-theme="white"] .season-tab-btn.active[data-season-tab="peak"] {
+    background: #2563eb;
+    border-color: #1d4ed8;
     color: #ffffff;
   }
 
@@ -412,10 +739,44 @@
     border-color: #d1d5db;
     color: #374151;
   }
-  [data-theme="white"] .season-month-toggle:has(.season-month-input:checked) {
+  [data-theme="white"] .season-month-toggle.season-color-lean {
     border-color: #d97706;
     background: #fffbeb;
     color: #92400e;
+  }
+  [data-theme="white"] .season-month-toggle.season-color-peak {
+    border-color: #2563eb;
+    background: #eff6ff;
+    color: #1e40af;
+  }
+  [data-theme="white"] .season-month-toggle.season-color-split {
+    border-color: #d97706;
+    background: linear-gradient(90deg, #fffbeb 50%, #eff6ff 50%);
+    color: #92400e;
+  }
+  [data-theme="white"] .season-split-popover {
+    background: #ffffff;
+    border-color: #e5e7eb;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+  }
+  [data-theme="white"] .season-split-popover-title {
+    color: #374151;
+  }
+  [data-theme="white"] .season-split-day-cell {
+    background: #f9fafb;
+    border-color: #e5e7eb;
+    color: #374151;
+  }
+  [data-theme="white"] .season-split-day-cell.is-selected {
+    background: #d97706;
+    border-color: #d97706;
+    color: #ffffff;
+  }
+  [data-theme="white"] .season-split-popover-summary {
+    color: #92400e;
+  }
+  [data-theme="white"] .season-split-dots-btn.has-split::after {
+    box-shadow: 0 0 0 1px #ffffff;
   }
 
   [data-theme="white"] .rate-category {
@@ -493,6 +854,7 @@
           if (json && json.success) {
             fill(json.rates || {});
             fillSeasonMonths(json.seasonMonths || {});
+            fillPoolVillaRates(json.poolVillaRates || {});
           }
         })
         .catch(() => {
@@ -588,34 +950,120 @@
     const seasonMonthsSaveBtn = document.getElementById('seasonMonthsSaveBtn');
     const seasonMonthsDirtyTag = document.getElementById('seasonMonthsDirty');
     const monthInputs = Array.from(seasonMonthsRow.querySelectorAll('.season-month-input'));
+    const splitDotsBtns = Array.from(seasonMonthsRow.querySelectorAll('.season-split-dots-btn'));
+    const splitPopovers = Array.from(seasonMonthsRow.querySelectorAll('.season-split-popover'));
 
     let originalSeasonMonths = {};
     let currentSeasonMonths = {};
+    // month -> split day (1-31) or null/undefined for "no split". Kept
+    // separate from currentSeasonMonths (which must stay a plain
+    // month->season string map, same shape the save payload and every
+    // other page's copy of this map expects).
+    let originalSeasonSplits = {};
+    let currentSeasonSplits = {};
 
     function refreshSeasonMonthsDirty() {
       let changed = 0;
       monthInputs.forEach((el) => {
         const month = Number(el.dataset.month);
         if (currentSeasonMonths[month] !== originalSeasonMonths[month]) changed++;
+        else if ((currentSeasonSplits[month] || null) !== (originalSeasonSplits[month] || null)) changed++;
       });
       seasonMonthsSaveBtn.disabled = changed === 0;
       seasonMonthsDirtyTag.style.display = changed > 0 ? 'inline' : 'none';
       seasonMonthsDirtyTag.textContent = changed + ' unsaved change' + (changed === 1 ? '' : 's');
     }
 
+    // One 1-31 day grid built once per month popover (a plain day-of-month
+    // picker, not a real calendar - the season assignment is year-agnostic,
+    // so there's no real weekday/month-length to lay out against).
+    splitPopovers.forEach((pop) => {
+      const grid = pop.querySelector('.season-split-popover-grid');
+      for (let d = 1; d <= 31; d++) {
+        const cell = document.createElement('div');
+        cell.className = 'season-split-day-cell';
+        cell.dataset.day = d;
+        cell.textContent = d;
+        grid.appendChild(cell);
+      }
+    });
+
+    function closeAllSplitPopovers() {
+      splitPopovers.forEach((pop) => { pop.style.display = 'none'; });
+    }
+
     // Re-renders the checkbox row's checked state from currentSeasonMonths
     // for whichever season is now active - does NOT touch the underlying
-    // data, so switching tabs back and forth never loses an edit.
+    // data, so switching tabs back and forth never loses an edit. Also
+    // enables/disables each month's split button to match (a split only
+    // makes sense on a month that's actually in the active tab's season),
+    // and updates the gold "has a split" badge dot + popover contents.
     function renderMonthCheckboxes() {
       monthInputs.forEach((el) => {
         const month = Number(el.dataset.month);
-        el.checked = currentSeasonMonths[month] === activeSeasonTab;
+        const baseSeason = currentSeasonMonths[month];
+        const splitDay = currentSeasonSplits[month];
+        // A split on day 1 (or earlier) leaves nothing of the base season
+        // in this month - every day already falls on/after the split, so
+        // it's effectively a solid month of the split season, not a real
+        // half-and-half. Only treat it as a real split when some of the
+        // base season actually remains (day 2 or later).
+        const hasRealSplit = !!splitDay && splitDay > 1;
+        // A split month partially belongs to BOTH seasons, so its checkbox
+        // shows checked under either tab - not just the base season's tab -
+        // since e.g. October (base Off, split into Peak from the 28th)
+        // really does belong to Peak Season too, just not for the whole month.
+        el.checked = baseSeason === activeSeasonTab
+          || (hasRealSplit && otherSeasonKey(baseSeason) === activeSeasonTab);
+
+        // Color reflects which season(s) the month is actually in - gold
+        // for lean, blue for peak, half-and-half for a split month -
+        // independent of which tab happens to be active right now, so a
+        // month's color never changes just from switching tabs.
+        const toggle = el.closest('.season-month-toggle');
+        if (toggle) {
+          toggle.classList.remove('season-color-lean', 'season-color-peak', 'season-color-split');
+          if (hasRealSplit) {
+            toggle.classList.add('season-color-split');
+          } else if (baseSeason === 'peak' || (splitDay && splitDay <= 1)) {
+            toggle.classList.add('season-color-peak');
+          } else {
+            toggle.classList.add('season-color-lean');
+          }
+        }
       });
+      const otherSeason = otherSeasonKey(activeSeasonTab);
+      const otherLabel = seasonLabels[otherSeason] || otherSeason;
+      splitDotsBtns.forEach((btn) => {
+        const month = Number(btn.dataset.month);
+        const isChecked = currentSeasonMonths[month] === activeSeasonTab;
+        btn.style.visibility = isChecked ? 'visible' : 'hidden';
+        btn.classList.toggle('has-split', isChecked && !!currentSeasonSplits[month]);
+      });
+      splitPopovers.forEach((pop) => {
+        const month = Number(pop.dataset.month);
+        const day = currentSeasonSplits[month] || null;
+        pop.querySelectorAll('.season-split-day-cell').forEach((cell) => {
+          cell.classList.toggle('is-selected', day === Number(cell.dataset.day));
+        });
+        const summary = pop.querySelector('.season-split-popover-summary');
+        if (summary) summary.textContent = day ? ('from ' + day + ' → ' + otherLabel) : 'No split';
+      });
+      closeAllSplitPopovers();
     }
 
     function fillSeasonMonths(seasonMonths) {
-      originalSeasonMonths = Object.assign({}, seasonMonths);
-      currentSeasonMonths = Object.assign({}, seasonMonths);
+      const splits = seasonMonths.splits || {};
+      const plainMonths = {};
+      for (let m = 1; m <= 12; m++) plainMonths[m] = seasonMonths[m];
+      originalSeasonMonths = Object.assign({}, plainMonths);
+      currentSeasonMonths = Object.assign({}, plainMonths);
+      originalSeasonSplits = {};
+      currentSeasonSplits = {};
+      Object.keys(splits).forEach((m) => {
+        originalSeasonSplits[m] = splits[m].day;
+        currentSeasonSplits[m] = splits[m].day;
+      });
       renderMonthCheckboxes();
       refreshSeasonMonthsDirty();
     }
@@ -624,15 +1072,66 @@
       el.addEventListener('change', function () {
         const month = Number(el.dataset.month);
         currentSeasonMonths[month] = el.checked ? activeSeasonTab : otherSeasonKey(activeSeasonTab);
+        // A split only makes sense relative to the month's current base
+        // season - clear it when the whole month moves to a different
+        // season so a stale split day doesn't silently carry over.
+        currentSeasonSplits[month] = null;
+        renderMonthCheckboxes();
         refreshSeasonMonthsDirty();
       });
     });
 
+    splitDotsBtns.forEach((btn) => {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const month = Number(btn.dataset.month);
+        if (currentSeasonMonths[month] !== activeSeasonTab) return; // inert until checked
+        const pop = splitPopovers.find((p) => Number(p.dataset.month) === month);
+        const wasOpen = pop && pop.style.display !== 'none';
+        closeAllSplitPopovers();
+        if (pop) pop.style.display = wasOpen ? 'none' : 'block';
+      });
+    });
+
+    splitPopovers.forEach((pop) => {
+      pop.addEventListener('click', function (e) { e.stopPropagation(); });
+
+      pop.querySelector('.season-split-popover-grid').addEventListener('click', function (e) {
+        const cell = e.target.closest('.season-split-day-cell');
+        if (!cell) return;
+        const month = Number(pop.dataset.month);
+        currentSeasonSplits[month] = Number(cell.dataset.day);
+        renderMonthCheckboxes();
+        refreshSeasonMonthsDirty();
+      });
+
+      pop.querySelector('.season-split-popover-clear').addEventListener('click', function () {
+        const month = Number(pop.dataset.month);
+        currentSeasonSplits[month] = null;
+        renderMonthCheckboxes();
+        refreshSeasonMonthsDirty();
+      });
+    });
+
+    // Click anywhere outside an open popover closes it (and Escape).
+    document.addEventListener('click', closeAllSplitPopovers);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeAllSplitPopovers();
+    });
+
     seasonMonthsSaveBtn.addEventListener('click', function () {
-      const months = Object.keys(currentSeasonMonths).map((month) => ({
-        month: Number(month),
-        season: currentSeasonMonths[month]
-      }));
+      const months = monthInputs.map((el) => {
+        const month = Number(el.dataset.month);
+        const season = currentSeasonMonths[month];
+        const splitDay = currentSeasonSplits[month] || null;
+        return {
+          month,
+          season,
+          splitDay,
+          splitSeason: splitDay ? otherSeasonKey(season) : null
+        };
+      });
 
       seasonMonthsSaveBtn.disabled = true;
       fetch('/room-rates/save-season-months', {
@@ -644,6 +1143,7 @@
         .then((json) => {
           if (json && json.success) {
             originalSeasonMonths = Object.assign({}, currentSeasonMonths);
+            originalSeasonSplits = Object.assign({}, currentSeasonSplits);
             refreshSeasonMonthsDirty();
             if (typeof Swal !== 'undefined') {
               Swal.fire({ icon: 'success', title: 'Saved', text: 'Month assignment updated.', timer: 1600, showConfirmButton: false });
@@ -658,5 +1158,182 @@
           if (typeof Swal !== 'undefined') Swal.fire('Error', 'Save failed.', 'error');
         });
     });
+
+    // ---- Pool Villa rates (season x category x guest-count) - its own
+    // load/dirty/save cycle, same independence-from-other-sections pattern
+    // as "Assign Months" above. No fixed grid of cells like Main Hotel's
+    // room-type matrix - guest-count tiers are freely added/removed per
+    // season/category, so dirty-tracking just deep-compares the whole
+    // nested map instead of diffing individual DOM inputs. ----
+    const pvGrid = document.getElementById('poolVillaRatesGrid');
+    const pvRowsContainers = pvGrid ? Array.from(pvGrid.querySelectorAll('.pv-rate-rows')) : [];
+    const pvAddButtons = pvGrid ? Array.from(pvGrid.querySelectorAll('.pv-add-row-btn')) : [];
+    const pvSaveBtn = document.getElementById('poolVillaRatesSaveBtn');
+    const pvDirtyTag = document.getElementById('poolVillaRatesDirty');
+
+    let originalPoolVillaRates = {};
+    let currentPoolVillaRates = {};
+
+    function pvSerialize(map) {
+      const out = {};
+      Object.keys(map || {}).sort().forEach((season) => {
+        out[season] = {};
+        Object.keys(map[season] || {}).sort().forEach((cat) => {
+          out[season][cat] = {};
+          Object.keys(map[season][cat] || {}).sort((a, b) => Number(a) - Number(b)).forEach((gc) => {
+            out[season][cat][gc] = Number(map[season][cat][gc]);
+          });
+        });
+      });
+      return JSON.stringify(out);
+    }
+
+    function refreshPoolVillaRatesDirty() {
+      if (!pvSaveBtn) return;
+      const changed = pvSerialize(currentPoolVillaRates) !== pvSerialize(originalPoolVillaRates);
+      pvSaveBtn.disabled = !changed;
+      if (pvDirtyTag) {
+        pvDirtyTag.style.display = changed ? 'inline' : 'none';
+        pvDirtyTag.textContent = changed ? 'Unsaved changes' : '';
+      }
+    }
+
+    function renderPoolVillaRows() {
+      pvRowsContainers.forEach((container) => {
+        const season = container.dataset.season;
+        const category = container.dataset.category;
+        const tiers = (currentPoolVillaRates[season] && currentPoolVillaRates[season][category]) || {};
+        const guestCounts = Object.keys(tiers).map(Number).sort((a, b) => a - b);
+
+        container.innerHTML = '';
+        guestCounts.forEach((gc) => {
+          const row = document.createElement('div');
+          row.className = 'pv-rate-row';
+          row.dataset.guestCount = gc;
+          row.innerHTML =
+            '<span class="pv-rate-row-label">' +
+              '<input type="number" class="pv-rate-row-guest-input" min="1" max="31" value="' + gc + '">' +
+              ' people - ₱' +
+            '</span>' +
+            '<input type="number" class="pv-rate-row-amount-input" min="0" step="1" value="' + tiers[gc] + '">' +
+            '<button type="button" class="pv-rate-row-remove" title="Remove this guest-count tier">&times;</button>';
+          container.appendChild(row);
+        });
+      });
+    }
+
+    function fillPoolVillaRates(poolVillaRates) {
+      originalPoolVillaRates = JSON.parse(JSON.stringify(poolVillaRates || {}));
+      currentPoolVillaRates = JSON.parse(JSON.stringify(poolVillaRates || {}));
+      renderPoolVillaRows();
+      refreshPoolVillaRatesDirty();
+    }
+
+    pvAddButtons.forEach((btn) => {
+      btn.addEventListener('click', function () {
+        const season = btn.dataset.season;
+        const category = btn.dataset.category;
+        currentPoolVillaRates[season] = currentPoolVillaRates[season] || {};
+        currentPoolVillaRates[season][category] = currentPoolVillaRates[season][category] || {};
+        const existing = Object.keys(currentPoolVillaRates[season][category]).map(Number);
+        const nextGuestCount = existing.length ? Math.max(...existing) + 1 : 1;
+        currentPoolVillaRates[season][category][nextGuestCount] = 0;
+        renderPoolVillaRows();
+        refreshPoolVillaRatesDirty();
+      });
+    });
+
+    pvRowsContainers.forEach((container) => {
+      const season = container.dataset.season;
+      const category = container.dataset.category;
+
+      container.addEventListener('click', function (e) {
+        const removeBtn = e.target.closest('.pv-rate-row-remove');
+        if (!removeBtn) return;
+        const row = removeBtn.closest('.pv-rate-row');
+        const gc = Number(row.dataset.guestCount);
+        if (currentPoolVillaRates[season] && currentPoolVillaRates[season][category]) {
+          delete currentPoolVillaRates[season][category][gc];
+        }
+        renderPoolVillaRows();
+        refreshPoolVillaRatesDirty();
+      });
+
+      container.addEventListener('input', function (e) {
+        const row = e.target.closest('.pv-rate-row');
+        if (!row) return;
+        const oldGc = Number(row.dataset.guestCount);
+        const tiers = currentPoolVillaRates[season][category];
+
+        if (e.target.classList.contains('pv-rate-row-amount-input')) {
+          tiers[oldGc] = parseFloat(e.target.value) || 0;
+          refreshPoolVillaRatesDirty();
+        } else if (e.target.classList.contains('pv-rate-row-guest-input')) {
+          const newGc = parseInt(e.target.value, 10);
+          if (Number.isInteger(newGc) && newGc >= 1 && newGc <= 31 && newGc !== oldGc) {
+            const amount = tiers[oldGc];
+            delete tiers[oldGc];
+            tiers[newGc] = amount;
+            row.dataset.guestCount = newGc;
+            refreshPoolVillaRatesDirty();
+          }
+        }
+      });
+    });
+
+    if (pvSaveBtn) {
+      pvSaveBtn.addEventListener('click', function () {
+        const rates = [];
+        // Anything in original but missing from current (removed rows) must
+        // be sent with amount: null so the server deletes it, not just skips it.
+        const allKeys = new Set([...Object.keys(originalPoolVillaRates), ...Object.keys(currentPoolVillaRates)]);
+        allKeys.forEach((season) => {
+          const origCats = originalPoolVillaRates[season] || {};
+          const curCats = currentPoolVillaRates[season] || {};
+          const allCatKeys = new Set([...Object.keys(origCats), ...Object.keys(curCats)]);
+          allCatKeys.forEach((category) => {
+            const origTiers = origCats[category] || {};
+            const curTiers = curCats[category] || {};
+            const allGcKeys = new Set([...Object.keys(origTiers), ...Object.keys(curTiers)]);
+            allGcKeys.forEach((gcStr) => {
+              const guestCount = Number(gcStr);
+              const inCurrent = Object.prototype.hasOwnProperty.call(curTiers, gcStr);
+              rates.push({
+                season,
+                category,
+                guestCount,
+                amount: inCurrent ? curTiers[gcStr] : null
+              });
+            });
+          });
+        });
+
+        if (!rates.length) return;
+
+        pvSaveBtn.disabled = true;
+        fetch('/room-rates/save-pool-villa-rates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rates })
+        })
+          .then((r) => r.json())
+          .then((json) => {
+            if (json && json.success) {
+              originalPoolVillaRates = JSON.parse(JSON.stringify(currentPoolVillaRates));
+              refreshPoolVillaRatesDirty();
+              if (typeof Swal !== 'undefined') {
+                Swal.fire({ icon: 'success', title: 'Saved', text: 'Pool Villa rates updated.', timer: 1600, showConfirmButton: false });
+              }
+            } else {
+              pvSaveBtn.disabled = false;
+              if (typeof Swal !== 'undefined') Swal.fire('Error', (json && json.message) || 'Save failed.', 'error');
+            }
+          })
+          .catch(() => {
+            pvSaveBtn.disabled = false;
+            if (typeof Swal !== 'undefined') Swal.fire('Error', 'Save failed.', 'error');
+          });
+      });
+    }
   })();
 </script>

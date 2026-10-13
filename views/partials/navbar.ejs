@@ -23,27 +23,35 @@
 				     middleware/m_auth.js on every authenticated request - no
 				     per-controller render() changes needed. Only shown once a
 				     second property actually exists.
-				     One solid-color button, not a dropdown - its own color/icon
-				     per property so which one is active is obvious at a glance.
-				     Click cycles to the next property in the list and reloads -
-				     a straight toggle for 2 properties, and still works (cycles
-				     through all of them) if a 3rd is ever added. -->
+				     One button PER property (like the Shift 1/2/3 cards), not a
+				     single cycling toggle - with only one button it wasn't clear
+				     whether it showed the property you were IN or the one you'd
+				     switch TO. Now the active property's button is solid/filled
+				     and disabled; the other one is outlined and clicking it
+				     switches straight to it. -->
 				<% if (typeof allProperties !== 'undefined' && allProperties && allProperties.length > 1) {
 					const PROPERTY_STYLES = {
 						main: { bg: '#4361ee', icon: 'fa-hotel' },
 						pool_villa: { bg: '#0ca678', icon: 'fa-water' }
 					};
 					const curCode = currentProperty ? currentProperty.CODE : '';
-					const curStyle = PROPERTY_STYLES[curCode] || { bg: '#6c757d', icon: 'fa-building' };
 				%>
-				<button type="button" id="propertyToggleBtn" class="property-toggle-btn"
-					style="background-color: <%= curStyle.bg %>;"
-					data-properties='<%- JSON.stringify(allProperties.map(function(p){ return { code: p.CODE, name: p.NAME }; })) %>'
-					data-current-code="<%= curCode %>"
-					title="Click to switch property">
-					<i class="fas <%= curStyle.icon %>"></i>
-					<span id="propertyToggleLabel"><%= currentProperty ? currentProperty.NAME : 'Select Property' %></span>
-				</button>
+				<div class="property-switcher-group" id="propertySwitcherGroup">
+					<% allProperties.forEach(function(p) {
+						const pStyle = PROPERTY_STYLES[p.CODE] || { bg: '#6c757d', icon: 'fa-building' };
+						const isActive = p.CODE === curCode;
+					%>
+					<button type="button" class="property-toggle-btn <%= isActive ? 'is-active' : 'is-inactive' %>"
+						style="<%= isActive ? ('background-color: ' + pStyle.bg + '; box-shadow: 0 0 0 3px ' + pStyle.bg + '40, 0 2px 10px ' + pStyle.bg + '90;') : ('color: ' + pStyle.bg + '; border-color: ' + pStyle.bg + ';') %>"
+						data-code="<%= p.CODE %>"
+						<%= isActive ? 'disabled' : '' %>
+						title="<%= isActive ? (p.NAME + ' - currently viewing') : ('Switch to ' + p.NAME) %>">
+						<% if (isActive) { %><i class="fas fa-circle-check" style="font-size: 11px;"></i><% } %>
+						<i class="fas <%= pStyle.icon %>"></i>
+						<span><%= p.NAME %></span>
+					</button>
+					<% }); %>
+				</div>
 				<% } %>
 			</div>
 		</div>
@@ -123,67 +131,84 @@
 				     an always-empty dropdown wasn't worth keeping around. -->
 
 				<style>
+					.property-switcher-group {
+						display: inline-flex;
+						align-items: center;
+						gap: 6px;
+						margin-left: 12px;
+					}
 					.property-toggle-btn {
 						display: inline-flex;
 						align-items: center;
 						gap: 7px;
-						padding: 7px 16px;
-						margin-left: 12px;
-						border: none;
+						padding: 6.5px 16px;
+						border: 1.5px solid transparent;
 						border-radius: 6px;
-						color: #fff;
+						background: transparent;
 						font-size: 13px;
 						font-weight: 700;
 						letter-spacing: 0.2px;
 						cursor: pointer;
-						transition: filter 0.15s ease, transform 0.1s ease;
+						transition: filter 0.15s ease, transform 0.1s ease, background-color 0.15s ease, opacity 0.15s ease;
 						white-space: nowrap;
 					}
-					.property-toggle-btn:hover { filter: brightness(1.12); }
-					.property-toggle-btn:active { transform: scale(0.97); }
+					.property-toggle-btn.is-active {
+						color: #fff;
+						/* box-shadow glow ring (set inline per-property color) is what
+						   signals "this is the one you're in" at a glance - border alone
+						   wasn't enough contrast against the outlined inactive button. */
+					}
+					.property-toggle-btn.is-active:hover { filter: brightness(1.12); }
+					.property-toggle-btn.is-active:active { transform: scale(0.97); }
+					.property-toggle-btn.is-inactive {
+						/* Noticeably more muted than .is-active so the active one reads
+						   as "lit up" and this one reads as "just a switch option". */
+						opacity: 0.45;
+					}
+					.property-toggle-btn.is-inactive:hover {
+						opacity: 1;
+						background: rgba(255, 255, 255, 0.08);
+					}
+					.property-toggle-btn.is-inactive:active { transform: scale(0.97); }
+					.property-toggle-btn:disabled { cursor: default; }
 					.property-toggle-btn i { font-size: 13px; }
 				</style>
 				<script>
 					(function () {
-						const PROPERTY_STYLES = {
-							main: { bg: '#4361ee', icon: 'fa-hotel' },
-							pool_villa: { bg: '#0ca678', icon: 'fa-water' }
-						};
-						const DEFAULT_STYLE = { bg: '#6c757d', icon: 'fa-building' };
-						const btn = document.getElementById('propertyToggleBtn');
-						if (!btn) return;
+						const group = document.getElementById('propertySwitcherGroup');
+						if (!group) return;
+						const buttons = Array.prototype.slice.call(group.querySelectorAll('.property-toggle-btn'));
 
-						btn.addEventListener('click', function () {
-							if (btn.disabled) return;
-							const properties = JSON.parse(btn.dataset.properties || '[]');
-							if (!properties.length) return;
-							const currentIndex = properties.findIndex(function (p) { return p.code === btn.dataset.currentCode; });
-							const next = properties[(currentIndex + 1) % properties.length] || properties[0];
+						buttons.forEach(function (btn) {
+							btn.addEventListener('click', function () {
+								if (btn.disabled) return;
+								const code = btn.dataset.code;
 
-							btn.disabled = true;
-							fetch('/property/switch', {
-								method: 'POST',
-								headers: { 'Content-Type': 'application/json' },
-								body: JSON.stringify({ code: next.code })
-							})
-								.then(function (r) { return r.json(); })
-								.then(function (data) {
-									if (data && data.success) {
-										// See views/partials/head.ejs - this flag makes the
-										// reloaded page hide itself until fully loaded, then
-										// fade in, instead of flashing raw unstyled content
-										// while everything finishes loading.
-										try { sessionStorage.setItem('property_switching', '1'); } catch (e) {}
-										window.location.reload();
-									} else {
-										btn.disabled = false;
-										alert((data && data.message) || 'Failed to switch property.');
-									}
+								buttons.forEach(function (b) { b.disabled = true; });
+								fetch('/property/switch', {
+									method: 'POST',
+									headers: { 'Content-Type': 'application/json' },
+									body: JSON.stringify({ code: code })
 								})
-								.catch(function () {
-									btn.disabled = false;
-									alert('Failed to switch property.');
-								});
+									.then(function (r) { return r.json(); })
+									.then(function (data) {
+										if (data && data.success) {
+											// See views/partials/head.ejs - this flag makes the
+											// reloaded page hide itself until fully loaded, then
+											// fade in, instead of flashing raw unstyled content
+											// while everything finishes loading.
+											try { sessionStorage.setItem('property_switching', '1'); } catch (e) {}
+											window.location.reload();
+										} else {
+											buttons.forEach(function (b) { b.disabled = b.classList.contains('is-active'); });
+											alert((data && data.message) || 'Failed to switch property.');
+										}
+									})
+									.catch(function () {
+										buttons.forEach(function (b) { b.disabled = b.classList.contains('is-active'); });
+										alert('Failed to switch property.');
+									});
+							});
 						});
 					})();
 				</script>

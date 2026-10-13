@@ -1,7 +1,7 @@
 const { queryDatabasePromise } = require('../config/database');
 
 class DepositsModel {
-  static async getAll() {
+  static async getAll(propertyId = null) {
     const query = `
       SELECT
         sd.IDNo,
@@ -28,21 +28,24 @@ class DepositsModel {
       LEFT JOIN user_info u ON u.IDNo = sd.ENCODED_BY
       LEFT JOIN user_info ru ON ru.IDNo = sd.REFUNDED_BY
       WHERE sd.ACTIVE = 1
+        ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
       ORDER BY LAST_ACTIVITY_AT DESC, sd.IDNo DESC
     `;
-    return await queryDatabasePromise(query);
+    return await queryDatabasePromise(query, propertyId ? [propertyId] : []);
   }
 
-  static async getSummary() {
+  static async getSummary(propertyId = null) {
     const rows = await queryDatabasePromise(`
       SELECT
         COUNT(*) AS TOTAL_COUNT,
-        COALESCE(SUM(CASE WHEN STATUS = 'held' THEN AMOUNT ELSE 0 END), 0) AS HELD_AMOUNT,
-        COALESCE(SUM(CASE WHEN STATUS = 'refunded' THEN AMOUNT ELSE 0 END), 0) AS REFUNDED_AMOUNT,
-        COALESCE(SUM(AMOUNT), 0) AS TOTAL_AMOUNT
-      FROM security_deposits
-      WHERE ACTIVE = 1
-    `);
+        COALESCE(SUM(CASE WHEN sd.STATUS = 'held' THEN sd.AMOUNT ELSE 0 END), 0) AS HELD_AMOUNT,
+        COALESCE(SUM(CASE WHEN sd.STATUS = 'refunded' THEN sd.AMOUNT ELSE 0 END), 0) AS REFUNDED_AMOUNT,
+        COALESCE(SUM(sd.AMOUNT), 0) AS TOTAL_AMOUNT
+      FROM security_deposits sd
+      INNER JOIN booking b ON b.IDNo = sd.BOOKING_ID
+      WHERE sd.ACTIVE = 1
+        ${propertyId ? 'AND b.PROPERTY_ID = ?' : ''}
+    `, propertyId ? [propertyId] : []);
     return rows[0] || {
       TOTAL_COUNT: 0,
       HELD_AMOUNT: 0,

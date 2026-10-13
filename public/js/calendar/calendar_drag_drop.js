@@ -187,14 +187,16 @@ function handleEventDragStart(info) {
   }
   
   // ENHANCED DRAG VISUAL FEEDBACK
-  // Make the dragged event fade out and float above everything
-  info.el.style.opacity = '0.3';
-  info.el.style.zIndex = '9999';
+  // info.el is the SOURCE element, left sitting at its original position for
+  // the whole drag - FullCalendar shows its own separate "mirror" element
+  // following the cursor/drop target. Fading the source to 0.3 opacity still
+  // left it visible, so whenever the drop target landed close to the source
+  // (e.g. just one day over), the faded source and the mirror overlapped,
+  // showing doubled/offset guest-name text while actively dragging. Hide the
+  // source completely so only FullCalendar's own mirror is visible.
+  info.el.style.opacity = '0';
   info.el.style.pointerEvents = 'none';
-  info.el.style.transform = 'scale(1.05)';
-  info.el.style.transition = 'all 0.2s ease';
-  info.el.style.boxShadow = '0 8px 25px rgba(0,0,0,0.3)';
-  
+
   // Add a special class for dragged events
   info.el.classList.add('event-being-dragged');
   
@@ -484,8 +486,13 @@ function handleEventResizeStop(info) {
 
 function clearDragPreviews() {
   try {
-    // Remove any FullCalendar drag preview elements
-    const dragPreviews = document.querySelectorAll('.fc-event-dragging, .fc-event-selected, .fc-event-drag-preview');
+    // Remove any FullCalendar drag preview elements. .fc-event-mirror is
+    // FullCalendar v6's own ghost/mirror element that follows the cursor
+    // during a drag - it isn't part of calendar.getEvents() (so
+    // removeDuplicateEvents() below can't catch it) and was being left
+    // behind, rendering on top of the real event afterward and producing
+    // doubled/overlapping guest-name text.
+    const dragPreviews = document.querySelectorAll('.fc-event-dragging, .fc-event-selected, .fc-event-drag-preview, .fc-event-mirror');
     dragPreviews.forEach(preview => {
       if (preview !== document.activeElement) {
         preview.remove();
@@ -504,8 +511,9 @@ function clearDragPreviews() {
 
 function clearResizePreviews() {
   try {
-    // Remove any FullCalendar resize preview elements
-    const resizePreviews = document.querySelectorAll('.fc-event-resizing, .fc-event-selected, .fc-event-resize-preview');
+    // Remove any FullCalendar resize preview elements (.fc-event-mirror is
+    // FullCalendar v6's ghost/mirror element - see clearDragPreviews above)
+    const resizePreviews = document.querySelectorAll('.fc-event-resizing, .fc-event-selected, .fc-event-resize-preview, .fc-event-mirror');
     resizePreviews.forEach(preview => {
       if (preview !== document.activeElement) {
         preview.remove();

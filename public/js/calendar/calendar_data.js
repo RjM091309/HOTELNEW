@@ -4297,6 +4297,18 @@ function createLegendOverlay() {
     </div>
   `;
   
+  // Pool Villa has no Condo/Mountain view distinction - drop the "Room View"
+  // legend section (the last header + content pair) for that property only.
+  if (document.documentElement.getAttribute('data-property-theme') === 'pool_villa') {
+    const legendHeaders = legendOverlay.querySelectorAll('.calendar-legend-header');
+    const roomViewHeader = Array.from(legendHeaders).find((h) => /room view/i.test(h.textContent));
+    if (roomViewHeader) {
+      const roomViewContent = roomViewHeader.nextElementSibling;
+      if (roomViewContent && roomViewContent.classList.contains('calendar-legend-content')) roomViewContent.remove();
+      roomViewHeader.remove();
+    }
+  }
+
   document.body.appendChild(legendOverlay);
 
   // Add drag functionality to legend
