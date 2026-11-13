@@ -1279,6 +1279,13 @@ async function runStartupMigrations() {
   await runCheckInNotifierMigrations();
   await runPaymentShiftMigrations();
   await runPropertyMigrations();
+  // Clark Central was created by hand on the dev database: create it once from seed_clark_central.json when this database has no such property.
+  // Never stops the app from starting (the import is one transaction, so a failure leaves nothing half-made).
+  try {
+    await require('./seed_clark_central').importSeed();
+  } catch (error) {
+    console.error('⚠️ Clark Central seed failed (app keeps starting):', error.message);
+  }
 
   console.log('✅ Startup database migrations complete');
 }
