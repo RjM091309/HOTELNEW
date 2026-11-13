@@ -2452,6 +2452,7 @@ function processRoomsData(roomsData) {
     roomNumber: room.ROOM_NUMBER,
     bedCount: room.ROOM_BED,
     roomView: parseInt(room.ROOM_VIEW, 10) || null,
+    isVip: /vip/i.test(String(room.ROOM_TYPE || '')),   // the room type is named VIP: the room number is gold on the calendar
     outOfOrder: String(room.ROOM_STATUS) === '3'     // the room status "Out of order" (Rooms menu): continuous, not a date range
   });
   const byRoomNumber = (a, b) => {
@@ -2555,6 +2556,7 @@ function buildCalendarRoomLabel(arg) {
 
   const num = document.createElement('span');
   num.className = 'calendar-room-number';
+  if (arg.resource.extendedProps?.isVip) { num.classList.add('is-vip'); num.title = 'VIP room'; }
   num.textContent = arg.resource.title;
   wrap.appendChild(num);
 

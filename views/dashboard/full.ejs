@@ -209,7 +209,7 @@
       tile('Check out', 'fa-sign-out-alt', pad(r.checkOut.total), 'info', r.checkOut.done ? r.checkOut.done + ' already out' : 'still to leave', '/calendar?focus=departures') + '</div>' +
       '<div class="fd-sec">Housekeeping</div><div class="fd-tiles">' +
       tile('Available', 'fa-check-circle', pad(h.available), 'good', 'ready to sell') +
-      tile('Dirty', 'fa-broom', pad(h.dirty), 'warn', h.dirty ? 'to clean' : 'all clean') +
+      tile('Dirty', 'fa-broom', pad(h.dirty), 'warn', h.dirty ? 'to clean' : 'all clean', h.dirty ? '/calendar?cleaning=all' : '') +
       tile('Out of order', 'fa-ban', pad(h.outOfOrder), 'bad', h.outOfOrder ? 'maintenance' : 'none') + '</div>';
   }
 
@@ -310,7 +310,8 @@
   }
   // The Booking details open right here on the dashboard: the calendar page is loaded invisibly in a frame (?embed=1 shows only its modal),
   // so every button of the details (Edit, Move room, Billing, Payment, Check in...) works as in the calendar, and the dashboard stays.
-  function openBookingHere(id) {
+  function openBookingHere(id, kind) {
+    kind = kind || 'openBooking';   // 'cleaning' = the Cleaning Rooms list instead of a booking (id is the room number)
     if (document.getElementById('bdFrameWrap')) return;
     var wrap = document.createElement('div'); wrap.id = 'bdFrameWrap';
     wrap.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(2,6,16,.55)';
@@ -329,8 +330,8 @@
       else if (e.data.type === 'bd-failed') close(false);
     }
     window.addEventListener('message', onMsg);
-    var guard = setTimeout(function () { close(false); calendarTab('/calendar', '?openBooking=' + encodeURIComponent(id)); }, 20000); // frame never answered: the shared calendar tab opens it (this tab stays the dashboard)
-    frame.src = '/calendar?embed=1&openBooking=' + encodeURIComponent(id);
+    var guard = setTimeout(function () { close(false); calendarTab('/calendar', '?' + kind + '=' + encodeURIComponent(id)); }, 20000); // frame never answered: the shared calendar tab opens it (this tab stays the dashboard)
+    frame.src = '/calendar?embed=1&' + kind + '=' + encodeURIComponent(id);
   }
   // Check in / Check out open the calendar in the SAME tab the sidebar's Calendar uses (openInOwnTab, footer.ejs): never a second calendar tab.
   document.addEventListener('click', function (e) {
@@ -353,7 +354,7 @@
     window.Building3D.render(el, D.building, { name: PNAME, mode: 'full', animate: !!animate, onRoom: function (r) {
       if (r.bookingId) openBookingHere(r.bookingId);
       // a room with no booking (clean and empty, to be cleaned, out of order) goes to the shared calendar tab, never away from the dashboard
-      else if (String(r.status) === '4') calendarTab('/calendar', '?cleaning=' + encodeURIComponent(r.no));
+      else if (String(r.status) === '4') openBookingHere(r.no, 'cleaning');
       else calendarTab('/calendar', '?room=' + encodeURIComponent(r.no));
     } });
   }
