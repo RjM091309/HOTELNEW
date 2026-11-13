@@ -24,6 +24,9 @@ function openInOwnTab(path, query) {
     // Already inside that tab: nothing to open - only load the query if one was asked for.
     // (The tab keeps its name when you move to another page inside it, e.g. Calendar -> Credit. Then the link must
     // simply go to the page, otherwise the click would do nothing at all.)
+    // A dashboard is never turned into that tab: a tab that was the Calendar and then went to the Dashboard still carries the name,
+    // so it gives the name up and the calendar opens in its own tab.
+    if (window.name === name && /^\/dashboard/.test(window.location.pathname)) window.name = '';
     if (window.name === name) {
         if (window.location.pathname !== path || query) window.location.href = path + query;
         return true;

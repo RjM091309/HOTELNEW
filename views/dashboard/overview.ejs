@@ -344,7 +344,15 @@
     opening = true;
     fetch('/property/switch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: card.getAttribute('data-code') }) })
       .then(function (r) { return r.json(); })
-      .then(function (j) { if (j && j.success) window.location.href = '/calendar?focus=' + tile.getAttribute('data-focus'); else opening = false; })
+      .then(function (j) {
+        opening = false;
+        if (!j || !j.success) return;
+        // the calendar opens in its own shared tab; this tab stays on the overview
+        var q = '?focus=' + encodeURIComponent(tile.getAttribute('data-focus'));
+        var ok = false;
+        try { ok = typeof openInOwnTab === 'function' && openInOwnTab('/calendar', q); } catch (e) { ok = false; }
+        if (!ok) { var w = window.open('/calendar' + q, '_blank'); if (!w) window.location.href = '/calendar' + q; }
+      })
       .catch(function () { opening = false; });
   }
   grid.addEventListener('click', function (e) {
