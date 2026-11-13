@@ -256,7 +256,8 @@
 							</a>
 						</li>
 						<% } %>
-						<% if (typeof hideMenu !== 'function' || !hideMenu('vehicle-monitoring')) { %>
+						<%# Vehicle Monitoring hidden from Management (Vehicle Management is under Settings) - set to true to show again %>
+						<% if (false && (typeof hideMenu !== 'function' || !hideMenu('vehicle-monitoring'))) { %>
 						<li class="nav-item">
 							<a href="/vehicle/monitoring" class="nav-link <%= activePage === 'vehicle_monitoring' ? 'active' : '' %>">
 								<i class="fa fa-genderless"></i>

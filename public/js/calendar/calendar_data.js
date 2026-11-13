@@ -4984,6 +4984,9 @@ window.toggleLegend = toggleLegend;
 
 
 
+// Loaded inside the Dashboard's frame (?embed=1): show only the Booking details modal over a transparent page.
+if (window.parent !== window && /[?&]embed=1/.test(window.location.search)) document.documentElement.setAttribute('data-bd-embed', '1');
+
 // Links from the notification bell: /calendar?cleaning=<room> opens the Cleaning Rooms list, /calendar?openBooking=<id> opens that booking's details.
 (function () {
   function run() {
@@ -4991,11 +4994,24 @@ window.toggleLegend = toggleLegend;
       const params = new URLSearchParams(window.location.search);
       const cleaning = params.get('cleaning'), bookingId = params.get('openBooking');
       if (!cleaning && !bookingId) return;
+      // ?embed=1 = loaded inside a frame on the Dashboard: only the modal shows (see calendar.css), and the parent is told when it opened / closed
+      const embed = params.get('embed') === '1' && window.parent !== window;
+      if (embed) document.documentElement.setAttribute('data-bd-embed', '1');
+      const tell = (type) => { try { window.parent.postMessage({ type }, window.location.origin); } catch (e) { /* ignore */ } };
       const url = new URL(window.location.href); url.searchParams.delete('cleaning'); url.searchParams.delete('openBooking');
       window.history.replaceState({}, '', url.toString());
       setTimeout(function () {
         if (cleaning && typeof openCleaningRoomsDialog === 'function') openCleaningRoomsDialog();
         else if (bookingId && typeof window.openRoomMenuModal === 'function') window.openRoomMenuModal(bookingId);
+        if (embed) {
+          let seen = false, gone = 0, waited = 0;
+          const timer = setInterval(function () {
+            const open = document.querySelectorAll('.modal.show, .swal2-container').length > 0;
+            if (open) { gone = 0; if (!seen) { seen = true; tell('bd-ready'); } return; }
+            if (seen) { if (++gone >= 3) { clearInterval(timer); tell('bd-closed'); } }
+            else if (++waited > 40) { clearInterval(timer); tell('bd-failed'); } // nothing opened (booking not found)
+          }, 300);
+        }
       }, 900);
     } catch (e) { console.warn('calendar deep link failed', e); }
   }

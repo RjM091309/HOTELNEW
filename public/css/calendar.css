@@ -2561,3 +2561,14 @@ body.calendar-drag-active {
    and the neon bars center their own name, so that layer showed up as a second, blurry copy of the name. Neon bars use their own name again. */
 #calendar .fc-timeline-event-harness > .fc-event.neon-bar.has-name-overlay ~ .event-name-overlay { display: none !important; }
 #calendar .fc-event.neon-bar.has-name-overlay .event-title-chip { visibility: visible !important; }
+
+/* Booking details opened from the Dashboard (?embed=1, inside a frame): hide the whole page and keep only the modals, on a transparent background. */
+html[data-bd-embed], html[data-bd-embed] body { background: transparent !important; }
+html[data-bd-embed] .page-wrapper { visibility: hidden !important; }
+html[data-bd-embed] .page-wrapper .modal, html[data-bd-embed] .page-wrapper .modal * { visibility: visible; }
+html[data-bd-embed] .page-wrapper .modal:not(.show), html[data-bd-embed] .page-wrapper .modal:not(.show) * { visibility: hidden; }
+html[data-bd-embed] .modal-backdrop.show { opacity: .55; }
+
+/* The room asked for from the Dashboard (?room=606): its row glows for a moment. */
+#calendar .cal-room-flash { animation: calRoomFlash .8s ease-in-out 4; position: relative; z-index: 4; }
+@keyframes calRoomFlash { 50% { background-color: rgba(232, 89, 12, .38) !important; box-shadow: inset 0 0 0 2px #e8590c, 0 0 14px rgba(232, 89, 12, .7); } }

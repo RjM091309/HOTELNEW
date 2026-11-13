@@ -2,6 +2,28 @@
    Highlights today's check-ins (or check-outs) on the calendar and dims every other booking, with a bar on top that lists them
    (one chip per room, one per group) and a "Show all" button. The list is taken once when it starts: a booking stays lit after it has
    been checked in / out from here. Same idea as the Tape Chart of KGrand. */
+/* /calendar?room=606  (from a room of the Dashboard's building that has no booking)
+   Scrolls the calendar to that room's row and makes the row glow for a moment. */
+(function () {
+  var room = new URLSearchParams(window.location.search).get('room');
+  if (!room) return;
+  var tries = 0, timer = setInterval(function () {
+    tries++;
+    var res = window.calendar && window.calendar.getResources ? window.calendar.getResources().find(function (r) { return String(r.title).trim() === String(room).trim(); }) : null;
+    var cells = res ? document.querySelectorAll('#calendar [data-resource-id="' + String(res.id).replace(/"/g, '') + '"]') : [];
+    if (res && cells.length) {
+      clearInterval(timer);
+      setTimeout(function () {
+        var first = document.querySelector('#calendar .fc-datagrid-body [data-resource-id="' + res.id + '"]') || cells[0];
+        first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        document.querySelectorAll('#calendar [data-resource-id="' + res.id + '"]').forEach(function (el) {
+          el.classList.add('cal-room-flash'); setTimeout(function () { el.classList.remove('cal-room-flash'); }, 3200);
+        });
+      }, 400);
+    } else if (tries > 80) clearInterval(timer);
+  }, 250);
+})();
+
 (function () {
   var params = new URLSearchParams(window.location.search);
   var kind = params.get('focus');

@@ -197,7 +197,7 @@
   function hue(s) { var h = 0; String(s || '').split('').forEach(function (c) { h = (h * 31 + c.charCodeAt(0)) >>> 0; }); return HUES[h % HUES.length]; }
 
   function tile(label, icon, value, tone, sub, href) {
-    var tag = href ? 'a href="' + href + '" title="Open on the calendar" ' : 'div ';
+    var tag = href ? 'a href="' + href + '" target="_blank" title="Open on the calendar (the same calendar tab as the sidebar)" data-own-tab="1" ' : 'div ';
     return '<' + tag + 'class="fd-tile t-' + tone + (href ? ' is-link' : '') + '"><div class="fd-tile-l"><span>' + label + '</span><i class="fas ' + icon + '"></i></div><div class="fd-tile-v">' + value + '</div><div class="fd-tile-s">' + (sub || '') + '</div></' + (href ? 'a' : 'div') + '>';
   }
 
@@ -308,12 +308,53 @@
       '<span><i class="fd-sd" style="background:' + B.ARRIVE + '"></i>Arriving today <b>' + c.arriving + '</b></span>' +
       '<span><i class="fd-sd" style="background:' + B.LEAVE + '"></i>Leaving today <b>' + c.leaving + '</b></span></div>';
   }
+  // The Booking details open right here on the dashboard: the calendar page is loaded invisibly in a frame (?embed=1 shows only its modal),
+  // so every button of the details (Edit, Move room, Billing, Payment, Check in...) works as in the calendar, and the dashboard stays.
+  function openBookingHere(id) {
+    if (document.getElementById('bdFrameWrap')) return;
+    var wrap = document.createElement('div'); wrap.id = 'bdFrameWrap';
+    wrap.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(2,6,16,.55)';
+    wrap.innerHTML = '<div id="bdFrameSpin" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#e8ecef;font:600 14px Poppins,sans-serif">Opening booking&hellip;</div>' +
+      '<iframe title="Booking details" style="position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent;opacity:0" allowtransparency="true"></iframe>';
+    document.body.appendChild(wrap);
+    var frame = wrap.querySelector('iframe'), done = false;
+    function close(reload) {
+      if (done) return; done = true; window.removeEventListener('message', onMsg); clearTimeout(guard);
+      wrap.remove(); if (reload !== false) { try { load(); } catch (e) {} }
+    }
+    function onMsg(e) {
+      if (e.origin !== window.location.origin || !e.data || e.source !== frame.contentWindow) return;
+      if (e.data.type === 'bd-ready') { clearTimeout(guard); frame.style.opacity = '1'; var sp = document.getElementById('bdFrameSpin'); if (sp) sp.remove(); wrap.style.background = 'transparent'; }
+      else if (e.data.type === 'bd-closed') close(true);
+      else if (e.data.type === 'bd-failed') close(false);
+    }
+    window.addEventListener('message', onMsg);
+    var guard = setTimeout(function () { close(false); calendarTab('/calendar', '?openBooking=' + encodeURIComponent(id)); }, 20000); // frame never answered: the shared calendar tab opens it (this tab stays the dashboard)
+    frame.src = '/calendar?embed=1&openBooking=' + encodeURIComponent(id);
+  }
+  // Check in / Check out open the calendar in the SAME tab the sidebar's Calendar uses (openInOwnTab, footer.ejs): never a second calendar tab.
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest && e.target.closest('a[data-own-tab]'); if (!t || typeof openInOwnTab !== 'function') return;
+    var q = t.getAttribute('href').split('?');
+    if (openInOwnTab(q[0], q[1] ? '?' + q[1] : '')) e.preventDefault();
+  });
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a.fd-link[href^="/calendar?openBooking="]'); if (!a) return;
+    e.preventDefault(); openBookingHere(decodeURIComponent(a.getAttribute('href').split('=')[1]));
+  });
+
+  function calendarTab(path, query) {
+    if (typeof openInOwnTab === 'function' && openInOwnTab(path, query)) return;
+    window.open(path + query, '_blank');
+  }
+
   function paintBld(animate) {
     var el = document.getElementById('fdBld'); if (!el || !D.building) return;
     window.Building3D.render(el, D.building, { name: PNAME, mode: 'full', animate: !!animate, onRoom: function (r) {
-      if (r.bookingId) window.location.href = '/calendar?openBooking=' + encodeURIComponent(r.bookingId);
-      else if (String(r.status) === '4') window.location.href = '/calendar?cleaning=' + encodeURIComponent(r.no);
-      else window.location.href = '/calendar';
+      if (r.bookingId) openBookingHere(r.bookingId);
+      // a room with no booking (clean and empty, to be cleaned, out of order) goes to the shared calendar tab, never away from the dashboard
+      else if (String(r.status) === '4') calendarTab('/calendar', '?cleaning=' + encodeURIComponent(r.no));
+      else calendarTab('/calendar', '?room=' + encodeURIComponent(r.no));
     } });
   }
 
