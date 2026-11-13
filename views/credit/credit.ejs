@@ -12,9 +12,9 @@
     <!-- Total Credit Summary -->
     <div class="row" style="margin-bottom:16px">
       <div class="col-md-4 offset-md-4">
-        <div style="background: linear-gradient(145deg, #2a3135, #1f2528); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); padding: 18px;">
-          <div class="text-center mb-2"><h5 class="mb-0" style="color:#5bc0de;"><i class="fas fa-flag"></i> Total Outstanding Credit</h5></div>
-          <div class="text-center"><h4 class="mb-0" id="total-credit" style="color:#5bc0de;">0</h4></div>
+        <div class="credit-total-card" style="background: linear-gradient(145deg, #2a3135, #1f2528); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); padding: 18px;">
+          <div class="text-center mb-2"><h5 class="mb-0 credit-total-title"><i class="fas fa-flag"></i> Total Outstanding Credit</h5></div>
+          <div class="text-center"><h4 class="mb-0 credit-total-amount" id="total-credit">0</h4></div>
         </div>
       </div>
     </div>
@@ -71,13 +71,16 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-primary" id="credit-breakdown-mark-selected-btn" disabled>Mark Selected as Paid</button>
-        <button type="button" class="btn btn-success" id="credit-breakdown-mark-all-btn">Mark All as Paid</button>
+        <button type="button" class="btn btn-primary" id="credit-breakdown-mark-selected-btn" disabled>Receive Payment (Selected)</button>
+        <button type="button" class="btn btn-success" id="credit-breakdown-mark-all-btn">Receive Payment (All)</button>
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
 </div>
+
+<!-- The Payment window: the guest pays the credit here (cash, bank, card...), the money counts today -->
+<%- include('../booking/modal/payment') %>
 
 <script>
   $(document).ready(function () {
@@ -193,11 +196,11 @@
           : '<span class="label label-warning">Outstanding</span>';
         const actionHtml = row.SETTLED_DATE
           ? '-'
-          : `<button type="button" class="btn btn-sm btn-success settle-credit-btn" data-payment-id="${row.PAYMENT_ID}">Mark as Paid</button>`;
+          : `<button type="button" class="btn btn-sm btn-success settle-credit-btn" data-payment-id="${row.PAYMENT_ID}" data-amount="${row.AMOUNT_PAID}">Receive payment</button>`;
 
         const checkboxHtml = row.SETTLED_DATE
           ? ''
-          : `<input type="checkbox" class="credit-row-checkbox" data-payment-id="${row.PAYMENT_ID}">`;
+          : `<input type="checkbox" class="credit-row-checkbox" data-payment-id="${row.PAYMENT_ID}" data-amount="${row.AMOUNT_PAID}">`;
 
         $tbody.append(`
           <tr>
@@ -265,38 +268,44 @@
       });
     });
 
+    // The guest pays (part of) the credit: the normal Payment window opens (cash, bank transfer, card...). The money is received
+    // NOW - it is recorded as a payment of today, in today's shift, under the real payment method.
+    function openCreditPayment(paymentIds, amount) {
+      const modalEl = document.getElementById('modal-payment');
+      if (!modalEl || !currentGroupBookingId || !(amount > 0)) return;
+      const guest = $('#credit-breakdown-guest').text() || '';
+      const hidden = document.getElementById('hiddenBookingId');
+      if (hidden) hidden.value = currentGroupBookingId;
+      const bid = document.getElementById('bookingID');
+      if (bid) bid.value = currentGroupBookingId;
+      if (window.PaymentDepositSection && typeof window.PaymentDepositSection.hide === 'function') window.PaymentDepositSection.hide();
+      window.__creditSettleIds = paymentIds;
+      if (typeof updatePaymentSummaryCard === 'function') {
+        updatePaymentSummaryCard(amount, { roomNumber: guest });
+      } else {
+        const amt = document.getElementById('paymentAmountInput');
+        if (amt) amt.value = amount;
+      }
+      modalEl.dataset.skipPaymentStep = 'false';
+      modalEl.dataset.creditSettlement = '1';
+      $(modalEl).find('.payment-amount-group, .payment-method-group, .payment-details-section').show();
+      window.onPaymentConfirmed = function () { table.ajax.reload(null, false); };
+      const onHidden = function () {
+        modalEl.removeEventListener('hidden.bs.modal', onHidden);
+        delete modalEl.dataset.creditSettlement;
+        window.__creditSettleIds = null;
+      };
+      modalEl.addEventListener('hidden.bs.modal', onHidden);
+      const show = function () { bootstrap.Modal.getOrCreateInstance(modalEl).show(); };
+      if ($('#credit-breakdown-modal').hasClass('show')) {
+        $('#credit-breakdown-modal').one('hidden.bs.modal', show).modal('hide');
+      } else {
+        show();
+      }
+    }
+
     $('#credit-breakdown-table').on('click', '.settle-credit-btn', function(){
-      const paymentId = $(this).data('payment-id');
-      const $btn = $(this);
-      Swal.fire({
-        title: 'Mark as Paid?',
-        text: 'Confirm that the guest has settled this credit amount.',
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'Yes, mark as paid',
-        cancelButtonText: 'Cancel'
-      }).then((result) => {
-        if (!result.isConfirmed) return;
-        $.ajax({
-          url: `/credit/settle/${paymentId}`,
-          type: 'POST',
-          success: function(response){
-            if (response.success) {
-              const $row = $btn.closest('tr');
-              $row.find('td:eq(0)').html('');
-              $row.find('td:eq(6)').html('<span class="label label-success">Paid</span>');
-              $row.find('td:eq(7)').html('-');
-              updateMarkSelectedBtn();
-              table.ajax.reload(null, false);
-            } else {
-              Swal.fire('Error', response.message || 'Failed to settle credit.', 'error');
-            }
-          },
-          error: function(){
-            Swal.fire('Error', 'Failed to settle credit.', 'error');
-          }
-        });
-      });
+      openCreditPayment([$(this).data('payment-id')], parseFloat($(this).data('amount')) || 0);
     });
 
     $('#credit-breakdown-select-all').on('change', function(){
@@ -314,67 +323,28 @@
     });
 
     $('#credit-breakdown-mark-selected-btn').on('click', function(){
-      const paymentIds = $('.credit-row-checkbox:checked').map(function(){
-        return $(this).data('payment-id');
-      }).get();
-      if (paymentIds.length === 0) return;
-
-      Swal.fire({
-        title: 'Mark selected as paid?',
-        text: `Confirm that the guest has settled ${paymentIds.length} selected credit entr${paymentIds.length === 1 ? 'y' : 'ies'}.`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'Yes, mark as paid',
-        cancelButtonText: 'Cancel'
-      }).then((result) => {
-        if (!result.isConfirmed) return;
-        $.ajax({
-          url: '/credit/settle-selected',
-          type: 'POST',
-          data: { paymentIds },
-          success: function(response){
-            if (response.success) {
-              loadBreakdown(currentGroupBookingId, currentGroupDate);
-              table.ajax.reload(null, false);
-            } else {
-              Swal.fire('Error', response.message || 'Failed to settle selected credit entries.', 'error');
-            }
-          },
-          error: function(){
-            Swal.fire('Error', 'Failed to settle selected credit entries.', 'error');
-          }
-        });
-      });
+      const $boxes = $('.credit-row-checkbox:checked');
+      const ids = $boxes.map(function(){ return $(this).data('payment-id'); }).get();
+      const amount = $boxes.map(function(){ return parseFloat($(this).data('amount')) || 0; }).get().reduce((x, y) => x + y, 0);
+      if (!ids.length) return;
+      openCreditPayment(ids, Math.round(amount * 100) / 100);
     });
 
     $('#credit-breakdown-mark-all-btn').on('click', function(){
-      if (!currentGroupBookingId || !currentGroupDate) return;
-      Swal.fire({
-        title: 'Mark all as paid?',
-        text: 'Confirm that all outstanding credit entries for this booking on this date have been settled.',
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'Yes, mark all as paid',
-        cancelButtonText: 'Cancel'
-      }).then((result) => {
-        if (!result.isConfirmed) return;
-        $.ajax({
-          url: '/credit/settle-group',
-          type: 'POST',
-          data: { bookingId: currentGroupBookingId, date: currentGroupDate },
-          success: function(response){
-            if (response.success) {
-              loadBreakdown(currentGroupBookingId, currentGroupDate);
-              table.ajax.reload(null, false);
-            } else {
-              Swal.fire('Error', response.message || 'Failed to settle credit entries.', 'error');
-            }
-          },
-          error: function(){
-            Swal.fire('Error', 'Failed to settle credit entries.', 'error');
-          }
-        });
-      });
+      const $boxes = $('.credit-row-checkbox');
+      const ids = $boxes.map(function(){ return $(this).data('payment-id'); }).get();
+      const amount = $boxes.map(function(){ return parseFloat($(this).data('amount')) || 0; }).get().reduce((x, y) => x + y, 0);
+      if (!ids.length) return;
+      openCreditPayment(ids, Math.round(amount * 100) / 100);
     });
   });
 </script>
+<style>
+  /* the total stays a dark card in both themes: its text is forced light so the light theme cannot turn it dark-on-dark */
+  html[data-theme] .dashboard-card-body .credit-total-card h5.credit-total-title, html[data-theme] .dashboard-card-body .credit-total-card h5.credit-total-title i { color: #8fd6ea !important; font-weight: 600; }
+  html[data-theme] .dashboard-card-body .credit-total-card h4.credit-total-amount { color: #ffffff !important; font-weight: 700; }
+  /* light theme: a light card with dark text */
+  html[data-theme="white"] .dashboard-card-body .credit-total-card { background: #ffffff !important; border: 1px solid #cfe6ee !important; box-shadow: 0 4px 14px rgba(15, 80, 110, 0.12) !important; }
+  html[data-theme="white"] .dashboard-card-body .credit-total-card h5.credit-total-title, html[data-theme="white"] .dashboard-card-body .credit-total-card h5.credit-total-title i { color: #0b6f8c !important; }
+  html[data-theme="white"] .dashboard-card-body .credit-total-card h4.credit-total-amount { color: #0f2a36 !important; }
+</style>

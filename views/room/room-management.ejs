@@ -1,3 +1,53 @@
+<style>
+  /* readable text in both themes: set explicitly, never inherited */
+  .rg-floors, .rg-toolbar { --rg-text: #e8edf3; --rg-muted: #a7b2c0; }
+  [data-theme="white"] .rg-floors, [data-theme="white"] .rg-toolbar { --rg-text: #1e293b; --rg-muted: #64748b; }
+  .rg-num, .rg-desc, .rg-search { color: var(--rg-text) !important; }
+  .rg-type, .rg-count { color: var(--rg-muted) !important; opacity: 1 !important; }
+  .rg-search::placeholder { color: var(--rg-muted); opacity: 1; }
+  .rg-floor-title small { color: var(--rg-muted) !important; opacity: 1 !important; }
+  .rg-toolbar { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+  .rg-search { width: 280px; max-width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(148,163,184,.35); background: rgba(148,163,184,.08); color: inherit; font-size: 13px; }
+  .rg-count { font-size: 12px; opacity: .65; }
+  .rg-floors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 26px; align-items: start; }
+  @media (max-width: 1100px) { .rg-floors { grid-template-columns: 1fr; } }
+  .rg-floor { padding: 12px 14px 14px; border-radius: 12px; border: 1px solid rgba(148,163,184,.22); background: rgba(148,163,184,.04); border-top: 3px solid var(--property-accent, #f59e0b); }
+  .rg-floor-title { padding-bottom: 8px; border-bottom: 1px solid rgba(148,163,184,.25); display: flex; align-items: baseline; gap: 8px; margin: 0 0 10px; font-size: 13px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--property-accent, #f59e0b); }
+  .rg-floor-title small { font-weight: 500; opacity: .6; text-transform: none; letter-spacing: 0; color: inherit; }
+  .rg-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .rg-card { position: relative; padding: 10px 12px 8px; border-radius: 10px; background: rgba(148,163,184,.10); border: 1px solid rgba(148,163,184,.18); min-width: 0; }
+  .rg-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .rg-num { font-size: 15px; font-weight: 800; }
+  .rg-badge { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 6px; white-space: nowrap; }
+  .rg-type { font-size: 11px; opacity: .65; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rg-desc { font-size: 12px; font-weight: 700; margin-top: 4px; }
+  .rg-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(148,163,184,.18); }
+  .rg-actions button { width: 26px; height: 26px; border: 0; border-radius: 50%; color: #fff; font-size: 11px; cursor: pointer; background: #6c757d; }
+  .rg-actions button.rg-del { background: #f97316; }
+  .rg-s1 .rg-badge { background: rgba(34,197,94,.18); color: #22c55e; }
+  .rg-s2 .rg-badge { background: rgba(239,68,68,.18); color: #ef4444; }
+  .rg-s3 .rg-badge { background: rgba(239,68,68,.22); color: #f87171; }
+  .rg-s3 { background: repeating-linear-gradient(135deg, rgba(148,163,184,.14) 0 7px, rgba(148,163,184,.04) 7px 14px); }
+  .rg-s4 .rg-badge { background: rgba(245,158,11,.20); color: #f59e0b; }
+  [data-theme="white"] .rg-floor { background: #fff; border-color: #e2e8f0; border-top-color: var(--property-accent, #f59e0b); }
+  [data-theme="white"] .rg-card { background: #f8fafc; border-color: #e2e8f0; }
+  [data-theme="white"] .rg-s1 .rg-badge { color: #15803d; }
+  [data-theme="white"] .rg-s4 .rg-badge { color: #b45309; }
+  [data-theme="white"] .rg-s2 .rg-badge, [data-theme="white"] .rg-s3 .rg-badge { color: #b91c1c; }
+</style>
+<%
+  const hideMax = typeof hideRoomField === 'function' && hideRoomField('max_occupants');
+  const hideBed = typeof hideRoomField === 'function' && hideRoomField('bed_type');
+  const hideSize = typeof hideRoomField === 'function' && hideRoomField('room_size');
+%>
+<style>
+  .room-image-field { display: block; width: 100%; }
+  .room-image-field .room-image-label { display: block; margin: 0 0 6px; font-size: 12px; color: #9aa4ad; font-weight: 500; }
+  .room-image-field .room-image-input { display: block; width: 100%; padding: 6px 0; border: 0; border-bottom: 1px solid rgba(255,255,255,.35); background: transparent; color: inherit; font-size: 14px; }
+  .room-image-field .room-image-input::file-selector-button { margin-right: 10px; padding: 5px 12px; border: 0; border-radius: 4px; background: #6c757d; color: #fff; cursor: pointer; }
+  .room-image-field .room-image-hint { display: block; margin-top: 6px; font-size: 12px; color: #9aa4ad; }
+</style>
+<script>window.__hiddenRoomFields = <%- JSON.stringify([hideMax ? 'max_occupants' : null, hideBed ? 'bed_type' : null, hideSize ? 'room_size' : null].filter(Boolean)) %>;</script>
 <!-- ======================================== -->
 <!-- ROOM MANAGEMENT PAGE -->
 <!-- ======================================== -->
@@ -24,29 +74,12 @@
             <div class="dashboard-card-body">
                
                 
-                <!-- Main Room Table -->
-                <div class="table-scrollable">
-                    <table id="roomTable" class="table table-hover table-bordered full-width">
-                        <thead>
-                            <tr>
-                                <th>Image</th>
-                                <th>Room Number</th>
-                                <th>Room Type</th>
-                                <th>Max Occupants</th>
-                                <th>Bed Type</th>
-                                <th>Room Size</th>
-                                <th>Room View</th>
-                                <th>Amenities</th>
-                                <th>Status</th>
-                                <th>Description</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Data loaded dynamically -->
-                        </tbody>
-                    </table>
+                <!-- Rooms by floor (cards) -->
+                <div class="rg-toolbar">
+                    <input type="search" id="roomGridSearch" class="rg-search" placeholder="Search room, type, status..." autocomplete="off">
+                    <span class="rg-count" id="roomGridCount"></span>
                 </div>
+                <div id="roomGrid" class="rg-floors"></div>
             </div>
         </div>
     </div>
@@ -100,7 +133,7 @@
                                 <ul data-mdl-for="addRoomStatus" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
                                     <li class="mdl-menu__item" data-val="1">Available</li>
                                     <li class="mdl-menu__item" data-val="2">Occupied</li>
-                                    <li class="mdl-menu__item" data-val="3">Maintenance</li>
+                                    <li class="mdl-menu__item" data-val="3">Out of order</li>
                                     <li class="mdl-menu__item" data-val="4">Cleaning</li>
                                 </ul>
                             </div>
@@ -109,15 +142,15 @@
 
                     <!-- Capacity and Bed Information -->
                     <div class="row">
-                        <div class="col-lg-6 p-t-20">
+                        <div class="col-lg-6 p-t-20"<% if (hideMax) { %> style="display:none;"<% } %>>
                             <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
-                                <input class="mdl-textfield__input" type="number" id="addRoomMax" name="ROOM_MAX" required>
+                                <input class="mdl-textfield__input" type="number" id="addRoomMax" name="ROOM_MAX" <% if (!hideMax) { %>required<% } %>>
                                 <label class="mdl-textfield__label">Max Occupants</label>
                             </div>
                         </div>
-                        <div class="col-lg-6 p-t-20">
+                        <div class="col-lg-6 p-t-20"<% if (hideBed) { %> style="display:none;"<% } %>>
                             <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
-                                <input class="mdl-textfield__input" type="text" id="addRoomBed" name="ROOM_BED" value="" readonly tabIndex="-1" required>
+                                <input class="mdl-textfield__input" type="text" id="addRoomBed" name="ROOM_BED" value="" readonly tabIndex="-1" <% if (!hideBed) { %>required<% } %>>
                                 <label for="addRoomBed" class="pull-right margin-0">
                                     <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
                                 </label>
@@ -133,9 +166,9 @@
                     
                     <!-- Size and View Information -->
                     <div class="row">
-                        <div class="col-lg-6 p-t-20">
+                        <div class="col-lg-6 p-t-20"<% if (hideSize) { %> style="display:none;"<% } %>>
                             <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
-                                <input class="mdl-textfield__input" type="number" id="addRoomSize" name="ROOM_SIZE" required>
+                                <input class="mdl-textfield__input" type="number" id="addRoomSize" name="ROOM_SIZE" <% if (!hideSize) { %>required<% } %>>
                                 <label class="mdl-textfield__label">Room Size</label>
                             </div>
                         </div>
@@ -160,16 +193,6 @@
                             <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
                                 <textarea class="mdl-textfield__input" type="text" rows="3" id="addRoomDescription" name="ROOM_DESCRIPTION"></textarea>
                                 <label class="mdl-textfield__label">Description</label>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Room Image Upload -->
-                    <div class="row">
-                        <div class="col-lg-12 p-t-20">
-                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
-                                <input class="mdl-textfield__input" type="file" id="addRoomImage" name="ROOM_IMAGE" accept="image/*">
-                                <label class="mdl-textfield__label">Room Image</label>
                             </div>
                         </div>
                     </div>
@@ -240,7 +263,7 @@
                                 <ul data-mdl-for="editRoomStatus" class="mdl-menu mdl-menu--bottom-left mdl-js-menu">
                                     <li class="mdl-menu__item" data-val="1">Available</li>
                                     <li class="mdl-menu__item" data-val="2">Occupied</li>
-                                    <li class="mdl-menu__item" data-val="3">Maintenance</li>
+                                    <li class="mdl-menu__item" data-val="3">Out of order</li>
                                     <li class="mdl-menu__item" data-val="4">Cleaning</li>
                                 </ul>
                             </div>
@@ -249,15 +272,15 @@
 
                     <!-- Capacity and Bed Information -->
                     <div class="row">
-                        <div class="col-lg-6 p-t-20">
+                        <div class="col-lg-6 p-t-20"<% if (hideMax) { %> style="display:none;"<% } %>>
                             <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
-                                <input class="mdl-textfield__input" type="number" id="editRoomMax" name="ROOM_MAX" required>
+                                <input class="mdl-textfield__input" type="number" id="editRoomMax" name="ROOM_MAX" <% if (!hideMax) { %>required<% } %>>
                                 <label class="mdl-textfield__label">Max Occupants</label>
                             </div>
                         </div>
-                        <div class="col-lg-6 p-t-20">
+                        <div class="col-lg-6 p-t-20"<% if (hideBed) { %> style="display:none;"<% } %>>
                             <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label getmdl-select getmdl-select__fix-height txt-full-width">
-                                <input class="mdl-textfield__input" type="text" id="editRoomBed" name="ROOM_BED" value="" readonly tabIndex="-1" required>
+                                <input class="mdl-textfield__input" type="text" id="editRoomBed" name="ROOM_BED" value="" readonly tabIndex="-1" <% if (!hideBed) { %>required<% } %>>
                                 <label for="editRoomBed" class="pull-right margin-0">
                                     <i class="mdl-icon-toggle__label material-icons">keyboard_arrow_down</i>
                                 </label>
@@ -273,9 +296,9 @@
                     
                     <!-- Size and View Information -->
                     <div class="row">
-                        <div class="col-lg-6 p-t-20">
+                        <div class="col-lg-6 p-t-20"<% if (hideSize) { %> style="display:none;"<% } %>>
                             <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
-                                <input class="mdl-textfield__input" type="number" id="editRoomSize" name="ROOM_SIZE" required>
+                                <input class="mdl-textfield__input" type="number" id="editRoomSize" name="ROOM_SIZE" <% if (!hideSize) { %>required<% } %>>
                                 <label class="mdl-textfield__label">Room Size</label>
                             </div>
                         </div>
@@ -300,17 +323,6 @@
                             <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
                                 <textarea class="mdl-textfield__input" type="text" rows="3" id="editRoomDescription" name="ROOM_DESCRIPTION"></textarea>
                                 <label class="mdl-textfield__label">Description</label>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Room Image Upload -->
-                    <div class="row">
-                        <div class="col-lg-12 p-t-20">
-                            <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label txt-full-width">
-                                <input class="mdl-textfield__input" type="file" id="editRoomImage" name="ROOM_IMAGE" accept="image/*">
-                                <label class="mdl-textfield__label">Room Image</label>
-                                <small class="form-text text-muted">Leave empty to keep current image</small>
                             </div>
                         </div>
                     </div>
@@ -454,7 +466,7 @@
         // Load scripts with proper timing
         setTimeout(function() {
             var roomScript = document.createElement('script');
-            roomScript.src = '/js/room/room_data.js?v=room-rates-3';
+            roomScript.src = '/js/room/room_data.js?v=grid-3';
             document.body.appendChild(roomScript);
 
             setTimeout(function() {

@@ -32,6 +32,43 @@ window.openExtendModal = openExtendModal;
 window.triggerTransferFromMenu = triggerTransferFromMenu;
 window.openRoomMenuModal = openRoomMenuModal;
 window.createDynamicRoomModal = createDynamicRoomModal;
+// Dark theme for the windows opened from the booking details: Remarks, Complaint / Request and their edit windows (one stylesheet, added once)
+(function () {
+    const X = 'html[data-theme="dark"] :is([id^="remarksModal_"], [id^="complaintRequestModal_"], [id^="editRemarkModal_"], [id^="editComplaintRequestModal_"])';
+    const A = 'var(--property-accent, #e8590c)';
+    const AL = 'color-mix(in srgb, var(--property-accent, #e8590c) 78%, #ffffff)';
+    const css = `
+    ${X} .modal-content { background: #11141d !important; border: 1px solid color-mix(in srgb, ${A} 30%, #2a2f3d) !important; border-image: none !important; color: #e8ecf5 !important; }
+    ${X} .modal-header, ${X} .modal-footer { background: #0d1018 !important; border-color: #262b3a !important; }
+    ${X} .modal-title, ${X} .modal-title strong { color: ${AL} !important; }
+    ${X} .modal-body { background: #11141d !important; color: #e8ecf5 !important; }
+    ${X} .card { background: linear-gradient(135deg, color-mix(in srgb, ${A} 10%, #181c28) 0%, #141824 62%) !important; border: 1px solid color-mix(in srgb, ${A} 26%, #2a3042) !important; color: #e8ecf5 !important; }
+    ${X} .card-header { background: color-mix(in srgb, ${A} 12%, #181c28) !important; border-bottom: 1px solid color-mix(in srgb, ${A} 30%, transparent) !important; }
+    ${X} .card-header h6, ${X} .text-primary, ${X} .text-success { color: ${AL} !important; }
+    ${X} .form-label, ${X} label { color: #b4bccd !important; }
+    ${X} .form-control, ${X} .form-select, ${X} textarea, ${X} select { background-color: #151a27 !important; color: #e8ecf5 !important; border-color: #323a50 !important; color-scheme: dark; }
+    ${X} option { background: #151a27 !important; color: #e8ecf5 !important; }
+    ${X} .form-control::placeholder { color: #7f889c !important; }
+    ${X} .form-control:focus, ${X} .form-select:focus { border-color: ${A} !important; box-shadow: 0 0 0 .15rem color-mix(in srgb, ${A} 25%, transparent) !important; }
+    ${X} table { background: transparent !important; color: #e8ecf5 !important; --bs-table-bg: transparent; --bs-table-color: #e8ecf5; --bs-table-hover-bg: #1a2030; --bs-table-hover-color: #ffffff; --bs-table-border-color: #262b3a; }
+    ${X} thead { background: #1a2030 !important; }
+    ${X} thead th { background: #1a2030 !important; color: #dfe5f2 !important; border-color: #262b3a !important; }
+    ${X} tbody { background: transparent !important; color: #e8ecf5 !important; }
+    ${X} tbody td, ${X} tbody th { background: transparent !important; color: #e8ecf5 !important; border-color: #262b3a !important; }
+    ${X} .text-muted { color: #8b93a7 !important; }
+    ${X} .btn-close { filter: invert(1) grayscale(1) brightness(1.8); }
+    ${X} .btn-secondary { background: #222838 !important; border-color: #323a50 !important; color: #dfe5f2 !important; }
+    ${X} .btn-primary { background: ${A} !important; border-color: ${A} !important; color: #fff !important; }
+    `;
+    const add = () => {
+        if (document.getElementById('bd-dark-submodals-css')) return;
+        const st = document.createElement('style');
+        st.id = 'bd-dark-submodals-css';
+        st.textContent = css;
+        document.head.appendChild(st);
+    };
+    if (document.head) add(); else document.addEventListener('DOMContentLoaded', add);
+})();
 // Discount helpers
 // Two entry modes share one input: 'pernight' (amount x nights, matches the
 // long-standing per-night behavior) and 'manual' (flat total amount, as it
@@ -71,6 +108,54 @@ window.toggleDiscountInput = function(bookingId, mode){
     setTimeout(() => input.focus(), 0);
 };
 
+// Live preview of the discount: while the amount is typed (before Apply) the Grand Total and the Balance already show what they
+// will be. Nothing is saved until Apply; the real numbers come back from the server after that (calculateBalance).
+(function () {
+    const peso = (n) => '₱' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const num = (txt) => { const m = String(txt == null ? '' : txt).replace(/,/g, '').match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : 0; };
+    const state = {};   // bookingId -> { grand, balance, discount, shownGrand }
+    function paint(bookingId, grandEl, balEl, st, on) {
+        [grandEl, balEl].forEach((el) => { if (!el) return; el.style.textDecoration = on ? 'underline dotted' : ''; el.style.textUnderlineOffset = on ? '3px' : ''; el.title = on ? 'Preview: press Apply to save this discount' : ''; });
+    }
+    function preview(bookingId) {
+        const input = document.getElementById(`discountAmountManual-${bookingId}`);
+        const grandEl = document.getElementById(`grand-total-${bookingId}`);
+        const balEl = document.getElementById(`Balance-${bookingId}`);
+        if (!input || !grandEl || !balEl) return;
+        let st = state[bookingId];
+        // the numbers on screen are not the ones this preview drew: they are the real ones (page just loaded / refreshed), take them again
+        if (!st || grandEl.textContent !== st.shownGrand) {
+            const row = document.getElementById(`discount-row-${bookingId}`);
+            const shown = row && row.style.display !== 'none' ? num((document.getElementById(`discount-amount-${bookingId}`) || {}).textContent) : 0;
+            st = state[bookingId] = { grand: num(grandEl.textContent), balance: num(balEl.textContent), discount: Math.abs(shown), shownGrand: null };
+        }
+        const raw = String(input.value || '').trim();
+        if (raw === '') { grandEl.textContent = peso(st.grand); balEl.textContent = peso(st.balance); st.shownGrand = grandEl.textContent; paint(bookingId, grandEl, balEl, st, false); return; }
+        const amount = Math.max(0, parseFloat(raw) || 0);
+        const mode = input.getAttribute('data-mode') || 'pernight';
+        const nights = Math.max(1, parseInt((document.getElementById(`total-days-${bookingId}`) || {}).textContent, 10) || 1);
+        const base = st.grand + st.discount;                                   // the price with no discount at all
+        const wanted = mode === 'pernight' ? amount * nights : amount;       // Apply replaces the discount that is already there
+        const applied = Math.min(wanted, base);
+        grandEl.textContent = peso(base - applied);
+        balEl.textContent = peso(Math.max(0, st.balance + st.discount - applied));
+        st.shownGrand = grandEl.textContent;
+        paint(bookingId, grandEl, balEl, st, true);
+    }
+    window.__discPreviewReset = (id) => { delete state[id]; const g = document.getElementById(`grand-total-${id}`), b = document.getElementById(`Balance-${id}`); paint(id, g, b, null, false); };
+    document.addEventListener('input', (e) => {
+        const el = e.target;
+        if (el && typeof el.id === 'string' && el.id.indexOf('discountAmountManual-') === 0) preview(el.id.slice('discountAmountManual-'.length));
+    });
+    // changing the mode (per night / manual price) changes the preview too
+    document.addEventListener('click', (e) => {
+        const b = e.target.closest && e.target.closest('.discount-mode-btn');
+        if (!b || typeof b.id !== 'string') return;
+        const id = b.id.replace(/^discountMode(PerNight|Manual)Btn-/, '');
+        setTimeout(() => preview(id), 0);
+    });
+})();
+
 window.applyManualDiscount = function(bookingId){
     const amountInput = document.getElementById(`discountAmountManual-${bookingId}`);
     const remarksInput = document.getElementById(`discountRemarks-${bookingId}`);
@@ -95,6 +180,7 @@ window.applyManualDiscount = function(bookingId){
         toastSuccess('Success', applied != null
             ? `Discount applied: ₱${Number(applied).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
             : 'Discount applied');
+        if (window.__discPreviewReset) window.__discPreviewReset(bookingId);
         calculateBalance(bookingId, bookingId);
     })
     .catch(err => {
@@ -119,6 +205,7 @@ window.removeManualDiscount = function(bookingId){
             if (amt) amt.value = '';
             const rem = document.getElementById(`discountRemarks-${bookingId}`);
             if (rem) rem.value = '';
+            if (window.__discPreviewReset) window.__discPreviewReset(bookingId);
             calculateBalance(bookingId, bookingId);
         })
         .catch(err => {
@@ -197,6 +284,7 @@ function formatBookingChannelLabel(channel) {
   if (normalized === 'booking-channel' || normalized === 'booking channel') {
     return 'OTA';
   }
+  if (normalized === 'contracted') return 'Contracted';
   return String(channel);
 }
 
@@ -1319,7 +1407,9 @@ async function createDynamicRoomModal(bookingId, event, options) {
     isCheckedOut = bookingStatus === 'check-Out';
     const isMaintenanceBooking = String(bookingStatus || '').toLowerCase() === 'maintenance';
     
-    shouldDisableCheckout = isCheckoutToday || isPending || isCheckedOut || isMaintenanceBooking;
+    // Check-out now happens here in the calendar's booking details, so a booking due today can be checked out too
+    // (it used to be disabled because the dashboard's Today Check Out tab handled it). isCheckoutToday is kept for reference.
+    shouldDisableCheckout = isPending || isCheckedOut || isMaintenanceBooking;
   } else {
     // Find the room card to get booking data using the BookingID (dashboard context)
     const roomCard = document.querySelector(`[data-booking-id="${bookingId}"]`);
@@ -1403,7 +1493,16 @@ async function createDynamicRoomModal(bookingId, event, options) {
   // Cancelled bookings open this modal purely as a read-only detail view: every
   // action is disabled except "Reopen Reservation" / "Remove" in the header.
   const isCancelledView = statusLower === 'cancelled';
-  const canCancelBooking = statusLower === 'pending' || statusLower === 'check-in';
+  const canCancelBooking = statusLower === 'pending';
+  const showCheckoutButton = statusLower === 'check-in';
+  const bdCheckoutLabel = (() => {
+    const out = new Date(checkOutDate);
+    if (isNaN(out.getTime())) return 'Checkout';
+    out.setHours(0, 0, 0, 0);
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return out > now ? 'Early checkout' : 'Checkout';
+  })();
   const isMaintenance = statusLower === 'maintenance';
 
   if (isCancelledView) {
@@ -1417,6 +1516,10 @@ async function createDynamicRoomModal(bookingId, event, options) {
     ? 'transition: none; opacity: 0.6 !important; cursor: not-allowed; pointer-events: none;'
     : 'transition: none; opacity: 1 !important;';
 
+  // Header badge text (display only)
+  const bdStatusMap = { 'pending': ['reserved', 'Reserved'], 'check-in': ['checkedin', 'Checked in'], 'check-out': ['checkedout', 'Checked out'], 'cancelled': ['cancelled', 'Cancelled'], 'maintenance': ['maintenance', 'Maintenance'] };
+  const bdStatus = bdStatusMap[statusLower] || ['reserved', 'Reserved'];
+
   // Create modal HTML
   const modalHTML = `
 <div class="modal fade${isCancelledView ? ' room-modal-readonly' : ''}" id="dynamicRoomModal_${bookingId}" tabindex="-1" aria-labelledby="dynamicRoomModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="true">
@@ -1429,65 +1532,64 @@ async function createDynamicRoomModal(bookingId, event, options) {
 ">
 
             <!-- Modal Header -->
-            <div class="modal-header room-modal-top-header" style="background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%); border-bottom: 1px solid #eeeeee;">
+            <div class="modal-header room-modal-top-header bd-header" style="background: #ffffff; border-bottom: 1px solid #eeeeee;">
                 <h6 class="modal-title mb-0 room-modal-title">
-                    <span class="room-modal-title-label">Room</span>
-                    <span class="room-modal-title-number">${roomNumber}</span>
+                    <span class="room-modal-title-label">Booking details</span>
+                    <span class="bd-dot">&middot;</span>
+                    <span class="room-modal-title-number">Room ${roomNumber}</span>
+                    <span class="bd-status bd-status--${bdStatus[0]}">${bdStatus[1]}</span>
                     ${isCancelledView ? `<span class="room-modal-cancelled-badge">Cancelled &middot; View Only</span>` : ''}
                 </h6>
-                <div class="room-modal-header-actions">
-                    ${isCancelledView ? `
-                    <button type="button" class="btn btn-sm btn-dark room-toolbar-btn" onclick="reopenCancelledFromRoomMenu('${bookingId}')" title="Reopen Reservation">
-                        <i class="fas fa-undo"></i> Reopen Reservation
-                    </button>
-                    <button type="button" class="btn btn-sm btn-danger room-toolbar-btn" onclick="removeCancelledFromRoomMenu('${bookingId}')" title="Remove Reservation">
-                        <i class="fas fa-trash"></i> Remove
-                    </button>
-                    ` : `
-                    ${canCancelBooking ? `
-                    <button type="button" class="btn btn-sm room-toolbar-btn room-cancel-btn" id="btnCancelBooking-${bookingId}" onclick="openCancelBookingFromRoomMenu('${bookingId}')" title="Cancel Booking">
-                        <i class="fas fa-times"></i> Cancel
-                    </button>` : ''}
-
-                    <!-- Register Card Button -->
-                    <button class="btn btn-sm btn-info text-white room-toolbar-btn"
-                            id="btnRegisterCard-${bookingId}"
-                            ${actionButtonAttributes}
-                            onclick="registerGuestCard('${bookingId}', '${roomId}', '${roomNumber}', '${guestName}')"
-                            style="${actionButtonStyle}">
-                        <i class="fas fa-credit-card"></i> Register Card
-                    </button>
-
-                    <!-- Late Checkout Button - will be updated dynamically after services load -->
-                    <button class="btn btn-sm btn-secondary room-toolbar-btn" id="lateCheckoutBtn-${bookingId}" ${actionButtonAttributes} onclick="openLateCheckoutModal('${roomId}', '${checkOutDate}', '${bookingId}')" style="${actionButtonStyle}" data-checked-out="${isCheckedOut}">Late C/O</button>
-
-                    <button class="btn btn-sm btn-success room-toolbar-btn"
-                            id="btnExtend"
-                            ${actionButtonAttributes}
-                            onclick="openExtendModal('${roomId}', '${checkOutDate}', '${bookingId}', '${roomNumber}')"
-                            style="${actionButtonStyle}">
-                        <i class="fas fa-plus-circle"></i> Extend
-                    </button>
-
-
-                    <button type="button" id="btnCheckout-${bookingId}" class="btn btn-danger btn-sm room-toolbar-btn" ${checkoutButtonAttributes}${emergencyCheckoutAttrs} onclick="triggerCheckout('${bookingId}')" style="${checkoutButtonStyle}">
-                        <i class="fas fa-sign-out-alt"></i> Checkout
-                    </button>
-                    ${isMaintenance ? `
-                    <button type="button" class="btn btn-dark btn-sm room-toolbar-btn" onclick="reopenMaintenanceFromRoomMenu('${bookingId}')" title="Reopen Booking">
-                        <i class="fas fa-undo"></i> Reopen
-                    </button>` : ''}
-                    <button class="btn btn-sm btn-primary room-toolbar-btn" ${actionButtonAttributes} onclick="triggerTransferFromMenu('${roomId}')" style="${actionButtonStyle}">
-                        <i class="fas fa-exchange-alt"></i> Transfer
-                    </button>
-                    `}
-                </div>
+                <button type="button" class="bd-close" data-bs-dismiss="modal">Close</button>
             </div>
-            
+
             <!-- Modal Body -->
             <div class="modal-body p-3" style="background-color: #ffffff; color: #495057;">
+                <!-- Action bar: group tag on the left, the booking's actions on the right -->
+                <div class="bd-actionbar">
+                    <span class="bd-grouptag" id="bd-grouptag-${bookingId}" style="display: none;"></span>
+                    <div class="room-modal-header-actions bd-actions">
+                        ${isCancelledView ? `
+                        <button type="button" class="btn btn-sm btn-dark room-toolbar-btn" onclick="reopenCancelledFromRoomMenu('${bookingId}')" title="Reopen Reservation">
+                            <i class="fas fa-undo"></i> Reopen Reservation
+                        </button>
+                        <button type="button" class="btn btn-sm btn-danger room-toolbar-btn" onclick="removeCancelledFromRoomMenu('${bookingId}')" title="Remove Reservation">
+                            <i class="fas fa-trash"></i> Remove
+                        </button>
+                        ` : `
+                        ${String(bookingStatus || "").toLowerCase() === "pending" ? `<button type="button" class="btn btn-sm room-toolbar-btn" onclick="window.bdEditBooking('${bookingId}')" title="Edit the reservation details">
+                            <i class="fas fa-pen"></i> Edit
+                        </button>` : ''}
+                        <button type="button" class="btn btn-sm room-toolbar-btn" ${actionButtonAttributes} onclick="triggerTransferFromMenu('${roomId}')" style="${actionButtonStyle}" title="Move this booking to another room">
+                            <i class="fas fa-exchange-alt"></i> Move room
+                        </button>
+                        <button type="button" class="btn btn-sm room-toolbar-btn" id="btnExtend" ${actionButtonAttributes} onclick="openExtendModal('${roomId}', '${checkOutDate}', '${bookingId}', '${roomNumber}')" style="${actionButtonStyle}" title="Extend the stay">
+                            <i class="fas fa-calendar-plus"></i> Extend stay
+                        </button>
+                        ${canCancelBooking ? `
+                        <button type="button" class="btn btn-sm room-toolbar-btn room-cancel-btn" id="btnCancelBooking-${bookingId}" onclick="openCancelBookingFromRoomMenu('${bookingId}')" title="Cancel Booking">
+                            <i class="fas fa-times-circle"></i> Cancel booking
+                        </button>` : ''}
+                        ${showCheckoutButton ? `
+                        <button type="button" id="btnCheckout-${bookingId}" class="btn btn-danger btn-sm room-toolbar-btn" ${checkoutButtonAttributes}${emergencyCheckoutAttrs} onclick="triggerCheckout('${bookingId}')" style="${checkoutButtonStyle}">
+                            <i class="fas fa-sign-out-alt"></i> ${bdCheckoutLabel}
+                        </button>` : ''}
+                        ${isMaintenance ? `
+                        <button type="button" class="btn btn-dark btn-sm room-toolbar-btn" onclick="reopenMaintenanceFromRoomMenu('${bookingId}')" title="Reopen Booking">
+                            <i class="fas fa-undo"></i> Reopen
+                        </button>` : ''}
+                        <button type="button" class="btn btn-sm room-toolbar-btn" onclick="window.showBilling('${bookingId}')" title="Billing / receipt">
+                            <i class="fas fa-receipt"></i> Billing
+                        </button>
+                        <button type="button" class="btn btn-sm room-toolbar-btn bd-icon-btn" onclick="window.toggleBdPrintMenu('${bookingId}', event)" title="Print" aria-haspopup="true">
+                            <i class="fas fa-print"></i>
+                        </button>
+                        `}
+                    </div>
+                </div>
                 <!-- Hidden booking ID -->
                 <input type="hidden" id="bookingID-${bookingId}" value="${bookingId}">
+                <input type="hidden" id="late-co-args-${bookingId}" data-room-id="${roomId}" data-checkout="${checkOutDate}">
                 
                 <!-- Transfer History Section (will be populated dynamically) -->
                 <div id="transfer-history-${bookingId}" style="display: none;">
@@ -1501,30 +1603,14 @@ async function createDynamicRoomModal(bookingId, event, options) {
                 
                 <!-- Room Reservation Details -->
                 <div class="card shadow-sm mb-3" style="background-color: #ffffff; border: 1px solid #dee2e6;">
-                    <div class="card-header room-details-card-header" style="background-color: #ffffff; border-bottom: 1px solid #dee2e6; color: #495057;">
-                        <h6 class="mb-0 room-details-card-title">Room Reservation Details</h6>
-                        <div class="room-modal-card-actions">
-                            <button class="btn btn-sm room-toolbar-btn ${remarksButtonClass}" onclick="openRemarksModal('${bookingId}')">
-                                <i class="fas fa-sticky-note"></i> Remarks
-                            </button>
-                            <button type="button" class="btn btn-warning btn-sm room-toolbar-btn position-relative" id="crButton_${bookingId}" onclick="openComplaintRequestModal('${bookingId}')" style="overflow: visible; z-index: 1;">
-                                <i class="fas fa-exclamation-circle"></i> Complaint/Request
-                                <span id="crCount_${bookingId}" class="badge rounded-pill bg-danger" style="display:none; position:absolute; top:-8px; right:-10px; transform:none; min-width:20px; height:20px; padding:2px 7px; font-size:11px; font-weight:bold; line-height:16px; z-index:3; box-shadow:0 0 0 2px rgba(255,255,255,0.8); pointer-events:none; text-align:center; align-items:center; justify-content:center;">0</span>
-                            </button>
-                            <button type="button" class="btn btn-info btn-sm room-toolbar-btn" onclick="showPayments('${bookingId}')" style="transition: none; opacity: 1 !important;">
-                                <i class="fas fa-credit-card"></i> Payments
-                            </button>
-                        </div>
-                    </div>
                     <div class="card-body p-2" style="background-color: #ffffff;">
                         <div class="row align-items-stretch g-2">
                             <!-- Left Column - Guest Information -->
                             <div class="col-md-6 d-flex">
-                                <div class="info-section flex-fill mb-0">
-                                    <h6 class="text-primary mb-0 info-section-heading" style="border-bottom: 2px solid #007bff;">
-                                        <i class="fas fa-user me-1"></i>Guest Info
-                                    </h6>
-                                    <div class="info-item mb-1">
+                                <div class="info-section bd-card flex-fill mb-0">
+                                    <h6 class="bd-card-title"><span class="bd-icon"><i class="fas fa-user"></i></span>Guest Info</h6>
+                                    <div class="bd-grid">
+                                    <div class="info-item mb-1 bd-span-3">
                                         <label class="text-muted small mb-0">Guest Name</label>
                                         <div class="info-value info-value-guest-name" id="guest-name-${bookingId}">${guestName}</div>
                                     </div>
@@ -1544,11 +1630,12 @@ async function createDynamicRoomModal(bookingId, event, options) {
                                         <label class="text-muted small mb-0">Contact No</label>
                                         <div class="info-value" id="guest-contact-${bookingId}">-</div>
                                     </div>
-                                    <div class="info-item mb-1">
+                                    <!-- Guest Type / Guest Level are no longer shown (the elements stay hidden because other code fills them) -->
+                                    <div class="info-item mb-1" style="display:none;">
                                         <label class="text-muted small mb-0">Guest Type</label>
                                         <div class="info-value" id="guest-type-${bookingId}">${customerType || 'Day/s'}</div>
                                     </div>
-                                    <div class="info-item mb-1">
+                                    <div class="info-item mb-1" style="display:none;">
                                         <label class="text-muted small mb-0">Guest Level</label>
                                         <div class="info-value" id="guest-level-${bookingId}">${customerLevel || 'Standard'}</div>
                                     </div>
@@ -1556,15 +1643,15 @@ async function createDynamicRoomModal(bookingId, event, options) {
                                         <label class="text-muted small mb-0">Paid By</label>
                                         <div class="info-value" id="agency-payer-value-${bookingId}" style="color: ${agencyPayer === 'guest' ? '#f0ad4e' : '#5bc0de'}; font-weight: 600;">${formatAgencyPayerLabel(agencyPayer)}</div>
                                     </div>
+                                    </div>
                                 </div>
                             </div>
                             
                             <!-- Right Column - Room Information -->
                             <div class="col-md-6 d-flex">
-                                <div class="info-section flex-fill mb-0">
-                                    <h6 class="text-success mb-0 info-section-heading" style="border-bottom: 2px solid #28a745;">
-                                        <i class="fas fa-bed me-1"></i>Room Info
-                                    </h6>
+                                <div class="info-section bd-card flex-fill mb-0">
+                                    <h6 class="bd-card-title"><span class="bd-icon"><i class="fas fa-bed"></i></span>Room Info</h6>
+                                    <div class="bd-grid">
                                     <div class="info-item mb-1">
                                         <label class="text-muted small mb-0">Room No</label>
                                         <div class="info-value" id="room-number-${bookingId}">${roomNumber}</div>
@@ -1576,6 +1663,10 @@ async function createDynamicRoomModal(bookingId, event, options) {
                                     <div class="info-item mb-1">
                                         <label class="text-muted small mb-0">Room Rate</label>
                                         <div class="info-value" id="room-rate-${bookingId}">₱3,500.00</div>
+                                    </div>
+                                    <div class="info-item mb-1">
+                                        <label class="text-muted small mb-0">Rate per Night</label>
+                                        <div class="info-value" id="room-night-rate-${bookingId}">-</div>
                                     </div>
                                     <div class="info-item mb-1">
                                         <label class="text-muted small mb-0">No. of Nights</label>
@@ -1596,61 +1687,39 @@ async function createDynamicRoomModal(bookingId, event, options) {
                                             <span class="badge bg-success ms-1 room-cost-status-badge">Paid</span>
                                         </div>
                                     </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Stay Summary (available system fields from reservation sheet) -->
-                        <div class="info-section mb-0 stay-summary-section">
-                            <h6 class="text-secondary mb-0 info-section-heading" style="border-bottom: 2px solid #6c757d;">
-                                <i class="fas fa-clipboard-list me-1"></i>Stay Summary
-                            </h6>
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <div class="info-item mb-1">
-                                        <label class="text-muted small mb-0">Pick-up</label>
-                                        <div class="info-value" id="pickup-summary-${bookingId}">-</div>
-                                    </div>
-                                    <div class="info-item mb-1">
-                                        <label class="text-muted small mb-0">Drop-off</label>
-                                        <div class="info-value" id="dropoff-summary-${bookingId}">-</div>
-                                    </div>
-                                    <div class="info-item mb-1">
-                                        <label class="text-muted small mb-0">Breakfast</label>
-                                        <div class="info-value" id="breakfast-summary-${bookingId}">-</div>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="info-item mb-1">
-                                        <label class="text-muted small mb-0">Late Check-Out</label>
-                                        <div class="info-value" id="late-checkout-summary-${bookingId}">-</div>
-                                    </div>
-                                    <div class="info-item mb-1">
-                                        <label class="text-muted small mb-0">Payment Method</label>
-                                        <div class="info-value" id="payment-method-summary-${bookingId}">-</div>
-                                    </div>
-                                    <div class="info-item mb-1">
-                                        <label class="text-muted small mb-0">Reservation Fee</label>
-                                        <div class="info-value" id="reservation-fee-summary-${bookingId}">-</div>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="info-item mb-1">
-                                        <label class="text-muted small mb-0">Reserved By</label>
-                                        <div class="info-value" id="encoded-by-summary-${bookingId}">-</div>
-                                    </div>
-                                    <div class="info-item mb-1">
-                                        <label class="text-muted small mb-0">Reserved Time</label>
-                                        <div class="info-value" id="encoded-date-summary-${bookingId}">-</div>
-                                    </div>
-                                    <div class="info-item mb-1">
-                                        <label class="text-muted small mb-0">Status</label>
-                                        <div class="info-value" id="booking-status-summary-${bookingId}">-</div>
-                                    </div>
+                        <!-- Stay Summary (KGrand order) -->
+                        <div class="info-section bd-card mb-0 stay-summary-section">
+                            <h6 class="bd-card-title"><span class="bd-icon"><i class="fas fa-clipboard-list"></i></span>Stay Summary</h6>
+                            <div class="bd-grid bd-grid-6">
+                                <div class="info-item"><label class="text-muted small mb-0">Pick-up</label><div class="info-value" id="pickup-summary-${bookingId}">-</div></div>
+                                <div class="info-item"><label class="text-muted small mb-0">Late Check-Out</label><div class="info-value" id="late-checkout-summary-${bookingId}">-</div></div>
+                                <div class="info-item"><label class="text-muted small mb-0">Reserved By</label><div class="info-value" id="encoded-by-summary-${bookingId}">-</div></div>
+                                <div class="info-item"><label class="text-muted small mb-0">Drop-off</label><div class="info-value" id="dropoff-summary-${bookingId}">-</div></div>
+                                <div class="info-item"><label class="text-muted small mb-0">Payment Method</label><div class="info-value" id="payment-method-summary-${bookingId}">-</div></div>
+                                <div class="info-item"><label class="text-muted small mb-0">Reserved Time</label><div class="info-value" id="encoded-date-summary-${bookingId}">-</div></div>
+                                <div class="info-item"><label class="text-muted small mb-0">Breakfast</label><div class="info-value" id="breakfast-summary-${bookingId}">-</div></div>
+                                <div class="info-item"><label class="text-muted small mb-0">Reservation Fee</label><div class="info-value" id="reservation-fee-summary-${bookingId}">-</div></div>
+                                <div class="info-item"><label class="text-muted small mb-0">Status</label><div class="info-value" id="booking-status-summary-${bookingId}">-</div></div>
+                            </div>
+                            <div class="bd-messages">
+                                <span class="bd-messages-label">Messages &amp; reports</span>
+                                <div class="bd-messages-btns">
+                                    <button class="btn btn-sm room-toolbar-btn ${remarksButtonClass}" onclick="openRemarksModal('${bookingId}')" style="transition: none; opacity: 1 !important;">
+                                        <i class="fas fa-sticky-note"></i> Remarks
+                                    </button>
+                                    <button type="button" class="btn btn-warning btn-sm room-toolbar-btn position-relative" id="crButton_${bookingId}" onclick="openComplaintRequestModal('${bookingId}')" style="overflow: visible; z-index: 1; transition: none; opacity: 1 !important;">
+                                        <i class="fas fa-exclamation-circle"></i> Complaint/Request
+                                        <span id="crCount_${bookingId}" class="badge rounded-pill bg-danger" style="display:none; position:absolute; top:-8px; right:-10px; transform:none; min-width:20px; height:20px; padding:2px 7px; font-size:11px; font-weight:bold; line-height:16px; z-index:3; box-shadow:0 0 0 2px rgba(255,255,255,0.8); pointer-events:none; text-align:center; align-items:center; justify-content:center;">0</span>
+                                    </button>
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Special Notes Section -->
                         <div class="remarks-section mb-3" id="remarks-section-${bookingId}" style="display: none;">
                             <div class="section-header">
@@ -1664,10 +1733,11 @@ async function createDynamicRoomModal(bookingId, event, options) {
                         </div>
                         
                         <!-- Extra Services Section -->
-                        <div class="extra-services-section mb-2" style="background: #ffffff !important; border-radius: 6px; padding: 10px; border: 1px solid #e9ecef; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                            <h6 class="text-warning mb-2" style="border-bottom: 2px solid #ffc107; padding-bottom: 4px;">
-                                <i class="fas fa-plus-circle me-1"></i>Extra Services
-                                <span id="extra-services-total-${bookingId}" class="ms-2 fw-bold" style="color: #495057; font-size: 0.95rem;">₱0.00</span>
+                        <div class="extra-services-section bd-card">
+                            <h6 class="bd-card-title">
+                                <span class="bd-icon"><i class="fas fa-concierge-bell"></i></span>Extra Services
+                                <span id="extra-services-total-${bookingId}" class="bd-chip">₱0.00</span>
+                                <button type="button" id="group-remove-btn-${bookingId}" class="btn btn-sm btn-outline-danger float-end" style="display: none; font-size: 0.75rem; padding: 1px 8px;" title="Take services off the rooms' bills, a room or a service at a time" onclick="openGroupRemoveDialog('${bookingId}')"><i class="fa fa-trash-alt me-1"></i>Remove services</button>
                             </h6>
                             <div class="d-flex align-items-center mb-2 flex-wrap">
                                 <select id="extra-service-select-${bookingId}" class="form-select form-select-sm me-2" style="max-width: 180px;">
@@ -1675,8 +1745,12 @@ async function createDynamicRoomModal(bookingId, event, options) {
                                 </select>
                                 <input type="text" id="custom-service-name-${bookingId}" class="form-control form-select-sm me-2" placeholder="Custom Service Name" style="width: 150px; display: none;">
                                 <input type="number" id="service-quantity-${bookingId}" class="form-control form-select-sm me-2" min="1" value="1" style="width: 60px;">
+                                <select id="extra-service-scope-${bookingId}" class="form-select form-select-sm me-2" style="max-width: 160px; display: none;" title="Where to add this service">
+                                    <option value="this">This room</option>
+                                    <option value="all">All rooms in group</option>
+                                </select>
                                 <input type="number" id="service-cost-${bookingId}" class="form-control form-select-sm me-2" min="0" step="1" placeholder="Cost" style="width: 150px; display: none;">
-                                <div class="form-check me-2">
+                                <div class="form-check me-2" style="display: none;">
                                     <input class="form-check-input" type="checkbox" id="custom-cost-checkbox-${bookingId}" onchange="window.toggleCustomCost('${bookingId}')">
                                     <label class="form-check-label" for="custom-cost-checkbox-${bookingId}">Manual Cost</label>
                                 </div>
@@ -1693,6 +1767,18 @@ async function createDynamicRoomModal(bookingId, event, options) {
                             </div>
                         </div>
                         
+                        <!-- Guest Bill (same idea as KGrand's drawer): the bill and every transaction, so Billing need not be opened -->
+                        <div class="guest-bill-section bd-card" id="guest-bill-${bookingId}">
+                            <h6 class="bd-card-title">
+                                <span class="bd-icon"><i class="fas fa-file-invoice"></i></span>Guest Bill
+                                <span class="gb-actions float-end"><button type="button" class="btn btn-sm gb-btn gb-toggle" onclick="window.toggleGuestBill('${bookingId}')" title="Collapse / expand the bill"><i class="fas fa-chevron-up"></i></button>
+                                    <button type="button" class="btn btn-sm gb-btn" onclick="(window.printBillingReceiptFor || window.showBilling)('${bookingId}')" title="Print the billing receipt"><i class="fas fa-print me-1"></i>Receipt</button>
+                                    <button type="button" class="btn btn-sm gb-btn gb-btn-pay" ${actionButtonAttributes} onclick="window.showBilling('${bookingId}')" style="${actionButtonStyle}" title="Billing receipt, then Proceed to Payment"><i class="fas fa-plus me-1"></i>Payment</button>
+                                </span>
+                            </h6>
+                            <div class="gb-lines" id="guest-bill-lines-${bookingId}"><div class="gb-line text-muted">Loading bill…</div></div>
+                        </div>
+
                         <!-- Discount Section (boxed) -->
                         <div class="discount-section mb-3" id="discount-section-${bookingId}">
                             <div class="section-header">Discount</div>
@@ -1778,46 +1864,6 @@ async function createDynamicRoomModal(bookingId, event, options) {
                 </div>
             </div>
             
-            <!-- Modal Footer -->
-            <div class="modal-footer py-2" style="background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%); border-top: 1px solid #495057;">
-                <button type="button" class="btn btn-primary" onclick="window.showBilling('${bookingId}')">Billing</button>
-                <div class="voucher-action-wrap" id="invoiceActionWrap_${bookingId}">
-                    <!-- SEND temporarily disabled - print only for now -->
-                    <div class="voucher-action-menu" id="invoiceActionMenu_${bookingId}" hidden style="display: none;" onclick="event.stopPropagation()">
-                        <button type="button" class="btn btn-sm btn-light voucher-action-btn" onclick="window.printInvoice('${bookingId}')">
-                            <i class="fas fa-print me-1"></i>Print
-                        </button>
-                        <!--
-                        <button type="button" class="btn btn-sm btn-primary voucher-action-btn" onclick="window.sendInvoice('${bookingId}')">
-                            <i class="fas fa-paper-plane me-1"></i>Send
-                        </button>
-                        -->
-                    </div>
-                    <button type="button" class="btn btn-info text-white" onclick="window.printInvoice('${bookingId}')">
-                        <i class="fas fa-file-pdf me-2"></i>Generate Invoice
-                    </button>
-                </div>
-                <div class="voucher-action-wrap" id="voucherActionWrap_${bookingId}">
-                    <!-- SEND temporarily disabled - print only for now -->
-                    <div class="voucher-action-menu" id="voucherActionMenu_${bookingId}" hidden style="display: none;" onclick="event.stopPropagation()">
-                        <button type="button" class="btn btn-sm btn-light voucher-action-btn" onclick="window.printVoucher('${bookingId}')">
-                            <i class="fas fa-print me-1"></i>Print
-                        </button>
-                        <!--
-                        <button type="button" class="btn btn-sm btn-primary voucher-action-btn" onclick="window.sendVoucher('${bookingId}')">
-                            <i class="fas fa-paper-plane me-1"></i>Send
-                        </button>
-                        -->
-                    </div>
-                    <button type="button" class="btn btn-danger" onclick="window.printVoucher('${bookingId}')">
-                        <i class="fas fa-file-pdf me-2"></i>Voucher
-                    </button>
-                </div>
-                <button type="button" class="btn btn-secondary" onclick="viewFullBookingDetails('${bookingId}')">
-                    <i class="fas fa-file-alt me-2"></i>View Details
-                </button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
         </div>
     </div>
 </div>
@@ -1967,6 +2013,14 @@ modalStyle.textContent = `
         gap: 4px !important;
         min-width: 0;
         margin-left: auto;
+    }
+
+    #dynamicRoomModal_${bookingId} .room-modal-header-actions { gap: 8px !important; }
+    #dynamicRoomModal_${bookingId} .room-modal-header-actions .room-toolbar-btn {
+        height: 30px !important;
+        min-height: 30px !important;
+        padding: 0 16px !important;
+        font-size: 12px !important;
     }
 
     #dynamicRoomModal_${bookingId} .room-details-card-header {
@@ -2440,6 +2494,219 @@ modalStyle.textContent = `
         text-transform: uppercase;
         vertical-align: middle;
     }
+
+    /* ===== Booking details layout (KGrand style): cards with icon headers, grids, one action bar, totals bar ===== */
+    #dynamicRoomModal_${bookingId} .bd-header .room-modal-title { gap: 6px; }
+    #dynamicRoomModal_${bookingId} .bd-dot { opacity: .45; }
+    #dynamicRoomModal_${bookingId} .bd-status { font-size: .68rem; font-weight: 700; padding: 3px 10px; border-radius: 6px; margin-left: 6px; letter-spacing: .02em; background: #e7f1ff; color: #0a58ca; }
+    #dynamicRoomModal_${bookingId} .bd-status--checkedin { background: #e6f4ea; color: #1e7e34; }
+    #dynamicRoomModal_${bookingId} .bd-status--checkedout { background: #eceff1; color: #546e7a; }
+    #dynamicRoomModal_${bookingId} .bd-status--cancelled { background: #fdecea; color: #c62828; }
+    #dynamicRoomModal_${bookingId} .bd-status--maintenance { background: #fff4e0; color: #b26a00; }
+    #dynamicRoomModal_${bookingId} .bd-close { margin-left: auto; border: 1px solid #ced4da; background: #fff; color: #495057; border-radius: 6px; padding: 3px 14px; font-size: 12px; cursor: pointer; }
+    #dynamicRoomModal_${bookingId} .bd-close:hover { background: #f1f3f5; }
+
+    #dynamicRoomModal_${bookingId} .bd-actionbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+    #dynamicRoomModal_${bookingId} .bd-grouptag { background: #eaf5ef; border: 1px solid #cfe5d8; color: #2f6b4f; border-radius: 8px; padding: 4px 11px; font-size: .78rem; font-weight: 600; }
+    #dynamicRoomModal_${bookingId} .bd-actions { flex-wrap: wrap !important; justify-content: flex-end !important; }
+    #dynamicRoomModal_${bookingId} .bd-actions .room-toolbar-btn { height: 30px !important; min-height: 30px !important; padding: 0 12px !important; font-size: 12px !important; background: #fff; border: 1px solid #ced4da !important; color: #343a40; }
+    #dynamicRoomModal_${bookingId} .bd-actions .room-toolbar-btn:hover:not(:disabled) { background: #f1f3f5; }
+    #dynamicRoomModal_${bookingId} .bd-actions .room-toolbar-btn:disabled { opacity: .55; }
+    #dynamicRoomModal_${bookingId} .bd-actions .room-toolbar-btn i { font-size: 11px; }
+    #dynamicRoomModal_${bookingId} .bd-actions .btn-danger.room-toolbar-btn { background: #dc3545; border-color: #dc3545 !important; color: #fff; }
+    #dynamicRoomModal_${bookingId} .bd-actions .btn-danger.room-toolbar-btn:hover:not(:disabled) { background: #bb2d3b; }
+    #dynamicRoomModal_${bookingId} .bd-actions .room-cancel-btn { background: #fff !important; border: 1px solid #dc3545 !important; color: #dc3545 !important; text-transform: none; font-weight: 600 !important; }
+    #dynamicRoomModal_${bookingId} .bd-actions .room-cancel-btn:hover { background: #fdecea !important; }
+    #dynamicRoomModal_${bookingId} .bd-icon-btn { padding: 0 10px !important; }
+
+    /* the old outer card around the details is only a wrapper now */
+    #dynamicRoomModal_${bookingId} .modal-body > .card.shadow-sm { border: none !important; box-shadow: none !important; background: transparent !important; margin-bottom: 0 !important; }
+    #dynamicRoomModal_${bookingId} .modal-body > .card.shadow-sm > .card-body { background: transparent !important; padding: 0 !important; }
+
+    /* Check in footer (under the Total / Paid / Balance bar) */
+    #dynamicRoomModal_${bookingId} .bd-footer { display: flex; justify-content: flex-end; padding: 10px 16px; border-top: 1px solid #dee2e6; background: #ffffff; }
+    #dynamicRoomModal_${bookingId} .bd-checkin-btn { height: 34px; padding: 0 18px !important; font-size: 13px !important; font-weight: 700; background: #2f7d32 !important; border: 1px solid #2f7d32 !important; color: #fff !important; border-radius: 6px; transform: none !important; transition: none !important; }
+    #dynamicRoomModal_${bookingId} .bd-footer { align-items: center; gap: 8px; flex-wrap: wrap; }
+    #dynamicRoomModal_${bookingId} .bd-footer-note { margin-right: auto; font-size: 12px; color: #495057; }
+    #dynamicRoomModal_${bookingId} .bd-checkin-alt { background: #fff !important; color: #2f7d32 !important; }
+    #dynamicRoomModal_${bookingId} .bd-checkin-alt:hover:not(:disabled) { background: #eaf5ea !important; }
+    #dynamicRoomModal_${bookingId} .bd-checkin-btn:hover:not(:disabled) { background: #276a2a !important; }
+    #dynamicRoomModal_${bookingId} .bd-checkin-btn:disabled { opacity: .6 !important; }
+    #dynamicRoomModal_${bookingId} .bd-checkin-btn::before, #dynamicRoomModal_${bookingId} .bd-checkin-btn::after { display: none !important; }
+    /* Guest Bill lines */
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-actions { margin-left: auto; display: inline-flex; gap: 6px; text-transform: none; letter-spacing: 0; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-btn { height: 26px; padding: 0 10px !important; font-size: 12px !important; background: #fff; border: 1px solid #ced4da !important; color: #343a40; display: inline-flex; align-items: center; transform: none !important; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-btn.gb-btn-pay { background: #5b8435; border-color: #5b8435 !important; color: #fff; font-weight: 600; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-btn::before { display: none !important; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line { display: flex; justify-content: space-between; gap: 12px; padding: 6px 2px; border-top: 1px solid #eef0f2; font-size: 13px; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line:first-child { border-top: none; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line .gb-label { color: #6c757d; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line .gb-label small { color: #adb5bd; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line .gb-amt { color: #212529; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line .gb-label { color: #343a40; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-note { font-size: 11px; color: #868e96; margin-top: 1px; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-st { font-weight: 700; border-radius: 8px; padding: 0 6px; font-size: 10px; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-st-paid { background: #d3f9d8; color: #2b8a3e !important; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-st-unpaid { background: #ffe8cc; color: #d9480f !important; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-toggle { display: none !important; padding: 0 8px !important; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section[data-gb-group] .gb-toggle { display: inline-flex !important; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section.gb-collapsed .gb-line:not(.gb-total):not(.gb-state) { display: none !important; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section.gb-collapsed .gb-note { display: none !important; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-roomhead .gb-chev { font-size: 10px; color: #868e96; margin-right: 4px; transition: transform .15s; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-roomhead.gb-closed .gb-chev { transform: rotate(-90deg); }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-roomhead { background: #f8f9fa; border-top: 1px solid #dee2e6; padding-left: 6px; padding-right: 6px; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-roomhead .gb-amt { font-weight: 700; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-roomhead.gb-room-main { background: #e3f0fb; border-left: 4px solid #0d6efd; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-roomhead.gb-room-main .gb-amt { color: #0b5ed7; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-roomhead.gb-room-mate { background: #e8f6ec; border-left: 4px solid #2f9e5b; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-roomhead.gb-room-mate .gb-amt { color: #237a45; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line.gb-grand { background: #0c2a42; color: #fff; border-radius: 6px; padding: 10px 10px; margin-top: 8px; font-size: 15px; font-weight: 800; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line.gb-grand .gb-label, #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line.gb-grand .gb-amt { color: #fff; font-weight: 800; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line.gb-grand .gb-label small { color: #bcd0e0; font-weight: 400; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line.gb-void .gb-label, #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line.gb-void .gb-amt { color: #9aa1a8; font-weight: 400; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-st.gb-st-void { background: #eceff1; color: #6c757d; border-radius: 8px; padding: 1px 7px; font-size: 10px; text-decoration: none; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line.gb-penalty .gb-label, #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line.gb-penalty .gb-amt { color: #b45309; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-child { padding-left: 26px; border-top: 1px dashed #eef0f2; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-total { font-weight: 700; color: #b7791f; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-neg { color: #a12b2b; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-pay .gb-label { color: #2f7d32; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-pay .gb-amt { color: #2f7d32; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-state { font-weight: 700; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-state.owed { color: #a12b2b; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-state.paid { color: #2f7d32; }
+    #dynamicRoomModal_${bookingId} .guest-bill-section .gb-state.refund { color: #b7791f; }
+    #dynamicRoomModal_${bookingId} .bd-card,
+    #dynamicRoomModal_${bookingId} .info-section.bd-card,
+    #dynamicRoomModal_${bookingId} .guest-bill-section.bd-card,
+    #dynamicRoomModal_${bookingId} .extra-services-section.bd-card,
+    #dynamicRoomModal_${bookingId} .stay-summary-section.bd-card { background: #ffffff !important; border: 1px solid #dee2e6; border-radius: 10px; padding: 10px 14px; margin-bottom: 10px; box-shadow: none; }
+    #dynamicRoomModal_${bookingId} .bd-card-title { display: flex; align-items: center; gap: 8px; font-size: .78rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: #495057; border-bottom: 1px solid #eef0f2; padding-bottom: 8px; margin: 0 0 10px; }
+    #dynamicRoomModal_${bookingId} .bd-icon { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; background: #f8f1dc; color: #a9791c; font-size: 12px; flex: none; }
+    #dynamicRoomModal_${bookingId} .bd-chip { background: #f1f3f5; color: #495057; border-radius: 6px; padding: 1px 9px; font-size: .78rem; font-weight: 700; letter-spacing: 0; text-transform: none; }
+    #dynamicRoomModal_${bookingId} .bd-card-title #group-remove-btn-${bookingId} { margin-left: auto; text-transform: none; letter-spacing: 0; }
+
+    #dynamicRoomModal_${bookingId} .bd-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 18px; }
+    #dynamicRoomModal_${bookingId} .bd-grid-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px 14px; }
+    #dynamicRoomModal_${bookingId} .bd-grid .info-item { border-bottom: none !important; padding: 0 !important; margin: 0 !important; }
+    #dynamicRoomModal_${bookingId} .bd-span-3 { grid-column: 1 / -1; }
+    #dynamicRoomModal_${bookingId} .bd-grid .info-value { font-size: .85rem; }
+    #dynamicRoomModal_${bookingId} .bd-grid .info-value-guest-name { font-size: 1.15rem; }
+    @media (max-width: 760px) { #dynamicRoomModal_${bookingId} .bd-grid-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+    #dynamicRoomModal_${bookingId} .bd-messages { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 12px; padding-top: 10px; border-top: 1px solid #eef0f2; }
+    #dynamicRoomModal_${bookingId} .bd-messages-label { font-size: .7rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #6c757d; }
+    #dynamicRoomModal_${bookingId} .bd-messages-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    /* The global ".btn::before" shine effect (from the billing/payment modal styles) is parked at left:-100%,
+       i.e. over the NEIGHBOUR button, and Complaint/Request has overflow:visible - so it caught the mouse
+       meant for Remarks and the hover kept jumping between the two. Remove it here. */
+    #dynamicRoomModal_${bookingId} .bd-messages-btns .room-toolbar-btn::before,
+    #dynamicRoomModal_${bookingId} .bd-messages-btns .room-toolbar-btn::after {
+        display: none !important;
+        content: none !important;
+        pointer-events: none !important;
+    }
+    /* No hover movement/animation on these buttons: a button that shifts away from the cursor on hover
+       makes the hover flip on and off, which looked like rapid clicking. */
+    #dynamicRoomModal_${bookingId} .bd-messages-btns .room-toolbar-btn,
+    #dynamicRoomModal_${bookingId} .bd-messages-btns .room-toolbar-btn:hover,
+    #dynamicRoomModal_${bookingId} .bd-messages-btns .room-toolbar-btn:focus,
+    #dynamicRoomModal_${bookingId} .bd-messages-btns .room-toolbar-btn:active {
+        transform: none !important;
+        animation: none !important;
+        transition: none !important;
+        opacity: 1 !important;  /* beats the generic ".btn:hover { opacity: .9 }" rule above */
+        filter: none !important;
+    }
+
+    /* totals: one bar at the bottom of the window, Total / Paid / Balance in a row */
+    #dynamicRoomModal_${bookingId} .summary-section { position: sticky; bottom: -10px; z-index: 6; background: #ffffff; border-top: 1px solid #dee2e6; margin: 8px -12px -10px; padding: 8px 18px; box-shadow: 0 -6px 12px rgba(0,0,0,.05); }
+    #dynamicRoomModal_${bookingId} .summary-section .summary-item { display: flex; align-items: baseline; justify-content: center; gap: 8px; padding: 2px 0; }
+    #dynamicRoomModal_${bookingId} .summary-section .summary-item label { margin: 0; font-size: .74rem; }
+    #dynamicRoomModal_${bookingId} .summary-section .summary-value { font-size: 1.05rem; }
+    /* The booking details window keeps its header and footer on screen: only the middle (the body) scrolls, so the Grand Total / Paid /
+       Balance line and the Check in button are always visible, like the KGrand booking window. */
+    #dynamicRoomModal_${bookingId} .modal-dialog { margin-top: 1rem !important; margin-bottom: 1rem !important; max-height: calc(100vh - 2rem); }
+    #dynamicRoomModal_${bookingId} .modal-content { display: flex; flex-direction: column; max-height: calc(100vh - 2rem); overflow: hidden; }
+    #dynamicRoomModal_${bookingId} .modal-header, #dynamicRoomModal_${bookingId} .bd-footer { flex: 0 0 auto; }
+    #dynamicRoomModal_${bookingId} .summary-section.bd-sum-fixed { position: static !important; flex: 0 0 auto; margin: 0 !important; padding: 8px 18px; max-height: 34vh; overflow-y: auto; border-top: 1px solid #dee2e6; box-shadow: 0 -6px 14px rgba(0,0,0,.07); }
+    #dynamicRoomModal_${bookingId} .modal-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+
+    /* ===== DARK THEME: the booking details window follows the dark mode, its headers use the property color (--property-accent) ===== */
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .modal-content { background: #11141d !important; border: 1px solid color-mix(in srgb, var(--property-accent, #e8590c) 30%, #2a2f3d) !important; border-image: none !important; color: #e8ecf5 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .modal-header, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .room-modal-top-header { background: transparent !important; border-bottom: 1px solid #262b3a !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .modal-body { background: #11141d !important; color: #e8ecf5 !important; scrollbar-color: #3a4156 transparent; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .room-modal-title, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .room-modal-title-label, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .room-modal-title-number { color: #f1f4fb !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-dot { color: #6b7388 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-close { background: transparent !important; color: #c9d0e0 !important; border: 1px solid #333a4d !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-close:hover { background: #1c2232 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-card, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .info-section.bd-card, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section.bd-card, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .extra-services-section.bd-card, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .stay-summary-section.bd-card, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .discount-section, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .remarks-section {
+        background: linear-gradient(135deg, color-mix(in srgb, var(--property-accent, #e8590c) 10%, #181c28) 0%, #141824 62%) !important;
+        border: 1px solid color-mix(in srgb, var(--property-accent, #e8590c) 26%, #2a3042) !important; color: #e8ecf5 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-card-title, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .info-section-heading, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .extra-services-section h6, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .info-section > h6, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .discount-section .section-header {
+        color: color-mix(in srgb, var(--property-accent, #e8590c) 78%, #ffffff) !important; border-bottom-color: color-mix(in srgb, var(--property-accent, #e8590c) 34%, transparent) !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-icon { background: color-mix(in srgb, var(--property-accent, #e8590c) 20%, transparent) !important; color: color-mix(in srgb, var(--property-accent, #e8590c) 75%, #ffffff) !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .info-item label, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-messages-label, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .text-muted, html[data-theme="dark"] #dynamicRoomModal_${bookingId} small.text-muted { color: #8b93a7 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .info-value, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-grid .info-value { color: #eef1f8 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .info-value-guest-name, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-grid .info-value-guest-name { color: color-mix(in srgb, var(--property-accent, #e8590c) 78%, #ffffff) !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-chip { background: #222838 !important; color: #dfe5f2 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-messages { border-top-color: #262b3a !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-actions .room-toolbar-btn, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-messages-btns .room-toolbar-btn.btn-outline-secondary { background: #1a1f2d !important; border-color: #323a50 !important; color: #dfe5f2 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-actions .room-toolbar-btn:hover:not(:disabled) { background: #232a3c !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-actions .room-cancel-btn { background: transparent !important; border-color: #ef4444 !important; color: #ff7b7b !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-actions .room-cancel-btn:hover { background: rgba(239,68,68,.14) !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .form-control, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .form-select, html[data-theme="dark"] #dynamicRoomModal_${bookingId} select, html[data-theme="dark"] #dynamicRoomModal_${bookingId} textarea { background-color: #151a27 !important; color: #e8ecf5 !important; border-color: #323a50 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .form-control::placeholder { color: #7f889c !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .form-control:focus, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .form-select:focus { border-color: var(--property-accent, #e8590c) !important; box-shadow: 0 0 0 .15rem color-mix(in srgb, var(--property-accent, #e8590c) 25%, transparent) !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .form-check-label { color: #c9d0e0 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .extra-services-section .badge, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .extra-services-section h6 .badge { background: #222838 !important; color: #dfe5f2 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .discount-remarks-box { background: #151a27 !important; color: #c9d0e0 !important; border-color: #323a50 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line { border-top-color: #232838 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line .gb-label { color: #b4bccd !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line .gb-label small { color: #7f889c !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line .gb-amt { color: #f1f4fb !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-note { color: #8b93a7 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-child { border-top-color: #232838 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-roomhead { background: #1a2030 !important; border-top-color: #262b3a !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-roomhead.gb-room-main { background: rgba(59,130,246,.14) !important; border-left-color: #3b82f6 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-roomhead.gb-room-main .gb-amt { color: #7fb2ff !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-roomhead.gb-room-mate { background: rgba(34,197,94,.12) !important; border-left-color: #22c55e !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-roomhead.gb-room-mate .gb-amt { color: #6ee7a0 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line.gb-grand { background: color-mix(in srgb, var(--property-accent, #e8590c) 30%, #0e111a) !important; border: 1px solid color-mix(in srgb, var(--property-accent, #e8590c) 55%, transparent); }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line.gb-grand .gb-label small { color: #f3d9c9 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-total { color: color-mix(in srgb, var(--property-accent, #e8590c) 78%, #ffffff) !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-btn { background: #1a1f2d !important; border-color: #323a50 !important; color: #dfe5f2 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-btn.gb-btn-pay { background: #3c8a3e !important; border-color: #3c8a3e !important; color: #fff !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-st-paid { background: rgba(34,197,94,.18) !important; color: #6ee7a0 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-st-unpaid { background: rgba(251,146,60,.18) !important; color: #ffb072 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-st.gb-st-void { background: #222838 !important; color: #8b93a7 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-state.owed, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-neg { color: #ff7b7b !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-state.paid, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-pay .gb-label, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-pay .gb-amt { color: #6ee7a0 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-state.refund { color: #f4c363 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line.gb-penalty .gb-label, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line.gb-penalty .gb-amt { color: #fbbf6a !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line.gb-void .gb-label, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .guest-bill-section .gb-line.gb-void .gb-amt { color: #7f889c !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .summary-section.bd-sum-fixed { background: #0d1018 !important; border-top: 1px solid color-mix(in srgb, var(--property-accent, #e8590c) 35%, #262b3a) !important; box-shadow: 0 -8px 18px rgba(0,0,0,.35) !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .summary-section .summary-item label { color: #8b93a7 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} #grand-total-${bookingId} { color: color-mix(in srgb, var(--property-accent, #e8590c) 78%, #ffffff) !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} #Paid-${bookingId} { color: #6ee7a0 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} #Balance-${bookingId} { color: #ff7b7b !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-footer { background: #0d1018 !important; border-top: 1px solid #262b3a !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-footer-note { color: #b4bccd !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-checkin-alt { background: transparent !important; color: #6ee7a0 !important; border-color: #2f7d32 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-checkin-alt:hover:not(:disabled) { background: rgba(34,197,94,.14) !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .remarks-section .section-header { color: color-mix(in srgb, var(--property-accent, #e8590c) 78%, #ffffff) !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .remarks-section .section-body, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .remarks-box { background: #151a27 !important; color: #e8ecf5 !important; border-color: #323a50 !important; }
+    /* the service picker and its open list (the browser's own dropdown list is dark too), the service rows under it */
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} select, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .form-select, html[data-theme="dark"] #dynamicRoomModal_${bookingId} #extra-service-select-${bookingId}, html[data-theme="dark"] #dynamicRoomModal_${bookingId} #service-quantity-${bookingId}, html[data-theme="dark"] #dynamicRoomModal_${bookingId} #service-cost-${bookingId}, html[data-theme="dark"] #dynamicRoomModal_${bookingId} #custom-service-name-${bookingId} { background-color: #151a27 !important; color: #e8ecf5 !important; border-color: #323a50 !important; color-scheme: dark; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} select option, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .form-select option, html[data-theme="dark"] #dynamicRoomModal_${bookingId} #extra-service-select-${bookingId} option { background: #151a27 !important; color: #e8ecf5 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} #extra-service-select-${bookingId}:focus, html[data-theme="dark"] #dynamicRoomModal_${bookingId} #service-quantity-${bookingId}:focus { border-color: var(--property-accent, #e8590c) !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .service-item { background: linear-gradient(135deg, color-mix(in srgb, var(--property-accent, #e8590c) 7%, #181d2b) 0%, #151a27 70%) !important; color: #e8ecf5 !important; border: 1px solid #2a3042 !important; box-shadow: none !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .service-item span[style*="#495057"], html[data-theme="dark"] #dynamicRoomModal_${bookingId} .service-item span[style*="#333333"], html[data-theme="dark"] #dynamicRoomModal_${bookingId} .service-item span[style*="#333"] { color: #e8ecf5 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .service-item span[style*="#28a745"] { color: #6ee7a0 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .service-item .badge { border: 1px solid #3a4156; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .service-item .badge.bg-success { background: rgba(34,197,94,.18) !important; color: #6ee7a0 !important; border-color: rgba(34,197,94,.4); }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .service-item .badge.bg-warning { background: rgba(251,146,60,.18) !important; color: #ffb072 !important; border-color: rgba(251,146,60,.4); }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} .service-item .badge.bg-secondary, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .service-item .badge.bg-dark { background: #222838 !important; color: #b4bccd !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} #added-services-list-${bookingId}, html[data-theme="dark"] #dynamicRoomModal_${bookingId} #added-services-list-${bookingId} .text-muted, html[data-theme="dark"] #dynamicRoomModal_${bookingId} #added-services-list-${bookingId} .no-services { color: #8b93a7 !important; }
 `;
 
 document.head.appendChild(modalStyle);
@@ -2485,6 +2752,45 @@ if (options?.isFromCalendar) {
     window.attachCalendarGlowOnBootstrapModal(modal, bookingId);
   }
 }
+
+// Check in (KGrand style): a footer under the totals, only for a pending (Reserved) booking whose check-in day has come.
+// The rules stay the same as before - occupied / under-cleaning rooms are refused, then the security deposit + early
+// check-in fee window (SecurityDepositCheckIn) records the check-in on the server.
+try {
+    const stNow = String(bookingStatus || "").toLowerCase();
+    const ciDay = new Date(checkInDate);
+    const todayDay = new Date(Date.now() - 6 * 3600 * 1000); // hotel day rolls over at 6:00 AM (12 AM - 5:59 AM still belongs to yesterday)
+    ciDay.setHours(0, 0, 0, 0);
+    todayDay.setHours(0, 0, 0, 0);
+    const hp = event && event.extendedProps ? event.extendedProps.holdPending : null;
+    const onHold = hp === 1 || hp === "1" || hp === true; // a hold-pending booking is not checked in (same as the calendar popup)
+    const canArrive = !onHold && !isNaN(ciDay) && ciDay <= todayDay; // never before the booked day (a late arrival after midnight still counts)
+    const content = modal && modal.querySelector(".modal-content");
+    // Grand Total / Paid / Balance: moved out of the scrolling body into the window's fixed bottom (above the Check in bar),
+    // so they are always on screen. The elements keep their ids, so everything that fills them keeps working.
+    const sumSec = modal && modal.querySelector(".summary-section");
+    if (content && sumSec) { sumSec.classList.add("bd-sum-fixed"); content.appendChild(sumSec); }
+    // Check-in is done from the calendar only; the booking / dashboard pages show the same details window for viewing.
+    const onCalendar = !!document.getElementById("calendar");
+    if (content && onCalendar && stNow === "pending" && canArrive && !isCancelledView) {
+        const bar = document.createElement("div");
+        bar.className = "bd-footer";
+        bar.innerHTML = `<button type="button" class="btn bd-checkin-btn" id="bd-checkin-${bookingId}"><i class="fas fa-sign-in-alt me-1"></i>Check in</button>`;
+        content.appendChild(bar);
+        bar.querySelector("button").addEventListener("click", () => window.bdCheckIn(bookingId, roomNumber, event));
+        // A group with one shared bill: offer "this room only" or "the whole group" (the deposit goes on the main booking).
+        fetch(`/booking/group-summary/${bookingId}?_=${Date.now()}`).then((r) => r.json()).then((g) => {
+            if (!g || !g.success || !g.isMaster || !Array.isArray(g.rooms)) return;
+            const pend = g.rooms.filter((x) => String(x.status || "").toLowerCase() === "pending");
+            if (pend.length < 2) return;
+            bar.innerHTML = `<span class="bd-footer-note">Group <b>${g.groupName || ""}</b> · ${pend.length} rooms waiting to check in</span>`
+                + `<button type="button" class="btn bd-checkin-btn bd-checkin-alt" id="bd-checkin-${bookingId}"><i class="fas fa-sign-in-alt me-1"></i>Check in this room only</button>`
+                + `<button type="button" class="btn bd-checkin-btn" id="bd-checkin-all-${bookingId}"><i class="fas fa-users me-1"></i>Check in whole group</button>`;
+            bar.querySelector(`#bd-checkin-${bookingId}`).addEventListener("click", () => window.bdCheckIn(bookingId, roomNumber, event, g));
+            bar.querySelector(`#bd-checkin-all-${bookingId}`).addEventListener("click", () => window.bdCheckInGroup(bookingId, g));
+        }).catch(() => { /* a single booking: keep the one button */ });
+    }
+} catch (e) { console.warn("Check in footer failed:", e); }
 
 // Load services and booking details after modal is shown
 setTimeout(() => {
@@ -2621,7 +2927,13 @@ fetch('/booking/get-services')
     .then(response => response.json())
     .then(services => {
         serviceSelect.innerHTML = '<option value="" style="background-color: #2a3135; color: #e0e0e0;">Select a service</option>';
-        services.forEach(service => {
+        // Early check-in (70) and Late check-in (87) are not picked here: the early check-in fee is charged
+        // automatically when the guest really checks in before 3 PM. Late Check-out is what belongs in this list.
+        const listed = services.filter((s) => ![70, 87].includes(parseInt(s.IDNo, 10)));
+        if (!listed.some((s) => parseInt(s.IDNo, 10) === 72)) {
+            listed.push({ IDNo: 72, SERVICE_NAME: 'Late Check-out', SERVICE_COST: 2000 });
+        }
+        listed.forEach(service => {
             const option = document.createElement('option');
             // Check if service requires manual cost (SERVICE_COST = 0 or specific service IDs)
             const requiresManualCost = parseFloat(service.SERVICE_COST) === 0 || 
@@ -2668,11 +2980,22 @@ function handleServiceSelectionChange(bookingId) {
             quantityInput.disabled = false;
             quantityInput.value = '1';
         }
+        refreshServiceScope(bookingId);
         return;
     }
     
     try {
         const service = JSON.parse(serviceSelect.value);
+        if (parseInt(service.SERVICE_ID, 10) === 72) {
+            // Late Check-out has its own window (fee / free by policy), so no price or quantity here
+            if (customCostInput) { customCostInput.style.display = 'none'; customCostInput.disabled = true; customCostInput.value = ''; }
+            if (customCostCheckbox) customCostCheckbox.checked = false;
+            if (quantityInput) { quantityInput.value = '1'; quantityInput.disabled = true; }
+            const scopeSel = document.getElementById(`extra-service-scope-${bookingId}`);
+            if (scopeSel) { scopeSel.value = 'this'; scopeSel.style.display = 'none'; }
+            return;
+        }
+        if (quantityInput) quantityInput.disabled = false;
         const requiresManualCost = service.REQUIRES_MANUAL_COST || 
                                   parseFloat(service.SERVICE_COST) === 0 ||
                                   service.SERVICE_ID === 71 ||
@@ -2707,9 +3030,9 @@ function handleServiceSelectionChange(bookingId) {
                 customCostInput.placeholder = `Default: ₱${serviceCost.toLocaleString()}`;
                 customCostInput.style.borderColor = '';
                 customCostInput.required = false;
-                customCostInput.disabled = true; // Make read-only when Manual Cost is not checked
-                customCostInput.style.backgroundColor = '#e9ecef'; // Gray background to indicate read-only
-                customCostInput.style.cursor = 'not-allowed';
+                customCostInput.disabled = false; // default price is pre-filled but can be edited directly
+                customCostInput.style.backgroundColor = '#ffffff';
+                customCostInput.style.cursor = 'text';
             } else {
                 // Clear for services that require manual cost
                 customCostInput.value = '';
@@ -2733,12 +3056,63 @@ function handleServiceSelectionChange(bookingId) {
                 customCostInput.focus();
             }
         } else if (customCostCheckbox) {
-            // Uncheck for services with default cost (user can still check to override)
-            customCostCheckbox.checked = false;
+            // The price box is always editable now (hidden Manual Cost stays on so the typed price is used)
+            customCostCheckbox.checked = true;
         }
+        refreshServiceScope(bookingId);
     } catch (error) {
         console.error('Error parsing service data:', error);
     }
+}
+
+// "This room / All rooms in group" - only shown for group bookings with more than one room.
+const __groupRoomCountCache = {};
+function refreshServiceScope(bookingId) {
+    const sel = document.getElementById(`extra-service-scope-${bookingId}`);
+    if (!sel) return;
+    const serviceSelect = document.getElementById(`extra-service-select-${bookingId}`);
+    const customChk = document.getElementById(`custom-service-checkbox-${bookingId}`);
+    const active = !!((serviceSelect && serviceSelect.value) || (customChk && customChk.checked));
+    const show = (rooms) => {
+        const visible = active && rooms > 1;
+        sel.style.display = visible ? 'inline-block' : 'none';
+        if (!visible) sel.value = 'this';
+    };
+    if (!active) { show(0); return; }
+    const idInput = document.getElementById(`bookingID-${bookingId}`);
+    const realId = idInput && idInput.value ? idInput.value : bookingId;
+    if (realId in __groupRoomCountCache) { show(__groupRoomCountCache[realId]); return; }
+    fetch(`/payments/group-breakdown/${realId}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+            const n = d && d.isGroup && Array.isArray(d.bookings) ? d.bookings.length : 0;
+            __groupRoomCountCache[realId] = n;
+            show(n);
+        })
+        .catch(() => { __groupRoomCountCache[realId] = 0; show(0); });
+}
+
+// If "All rooms in group" was picked, add the same service (qty + price) to the group's other rooms too.
+function applyServiceScope(bookingId, service) {
+    const sel = document.getElementById(`extra-service-scope-${bookingId}`);
+    if (!sel) return;
+    setTimeout(() => refreshServiceScope(bookingId), 0); // the form resets right after this call
+    if (sel.value !== 'all') return;
+    sel.value = 'this';
+    sel.style.display = 'none';
+    const idInput = document.getElementById(`bookingID-${bookingId}`);
+    const realId = idInput && idInput.value ? idInput.value : bookingId;
+    fetch('/booking/add-service-to-group-rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId: realId, service })
+    })
+        .then((r) => r.json())
+        .then((d) => {
+            if (!d.success) throw new Error(d.error || 'Could not add to the other rooms.');
+            toastSuccess('Success', `Also added to ${d.count} other room${d.count === 1 ? '' : 's'}.`);
+        })
+        .catch((e) => toastError('Error', e.message || 'Could not add to the other rooms.'));
 }
 
 // Load booking details
@@ -2822,6 +3196,10 @@ fetch(`/booking/booking_details/${bookingIdValue}`)
         const roomRateElement = document.getElementById(`room-rate-${bookingId}`);
         if (roomRateElement) roomRateElement.textContent = `₱${roomRate.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
         appendStayTimeBadge(`room-rate-${bookingId}`, contractedRateBadge(data.IS_CONTRACTED_RATE));
+        // Rate per night of THIS room (the Room Rate above is the room charge on the bill, which for a group's main room covers every room).
+        const nightRate = parseFloat(data.ROOM_NIGHT_RATE);
+        const nightRateElement = document.getElementById(`room-night-rate-${bookingId}`);
+        if (nightRateElement) nightRateElement.textContent = Number.isFinite(nightRate) && nightRate > 0 ? `₱${nightRate.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '-';
 
         // Total Days: original + extended
         let totalDays = parseInt(data.TOTAL_DAYS, 10) || 0;
@@ -3158,6 +3536,10 @@ if (roomServices.length === 0) {
         if (service.HIDDEN_FOR_UI) {
             return;
         }
+        // Group extra-breakfast lines are summarised in ONE row (edited in a pop-up)
+        if (isExtraBfService(service)) {
+            return;
+        }
         // Validate and ensure proper numeric values
         const serviceCost = parseFloat(service.SERVICE_COST) || 0;
         const quantity = parseInt(service.QUANTITY) || 0;
@@ -3176,7 +3558,9 @@ if (roomServices.length === 0) {
             : `₱${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
         let statusDisplay;
-        if (service.STATUS === 'unpaid') {
+        if (!isNaN(totalCost) && totalCost === 0) {
+            statusDisplay = '';
+        } else if (service.STATUS === 'unpaid') {
             statusDisplay = `<span class="badge bg-warning">UNPAID</span>`;
         } else if (service.STATUS === 'paid') {
             statusDisplay = `<span class="badge bg-success">PAID</span>`;
@@ -3199,6 +3583,12 @@ if (roomServices.length === 0) {
             : `<button class="btn btn-sm" disabled title="Paid item cannot be removed" style="background-color: #6c757d; border: none; border-radius: 50%; width: 28px; height: 28px; padding: 0; color: #fff; opacity: 0.6; cursor: not-allowed; display: flex; align-items: center; justify-content: center;">
                 <i class="fa fa-trash-alt" style="font-size: 10px;"></i>
                </button>`;
+
+        // Group "Extra Breakfast" lines (one per room) can also be reduced by one at a time.
+        const isExtraBfLine = service.SERVICE_ID === -1 && service.BS_ID && /^Extra Breakfast/i.test(service.SERVICE_NAME || '');
+        const reduceButton = (isExtraBfLine && service.STATUS !== 'paid')
+            ? `<button class="btn btn-sm" onclick="reduceExtraService(${index}, '${bookingId}')" title="Take 1 off" style="background-color: #ffc107; border: none; border-radius: 50%; width: 28px; height: 28px; padding: 0; color: #212529; font-weight: 700; line-height: 1; display: flex; align-items: center; justify-content: center;">&minus;</button>`
+            : '';
 
         const serviceRow = document.createElement('div');
         serviceRow.className = 'service-item mb-1';
@@ -3231,12 +3621,14 @@ if (roomServices.length === 0) {
                     ${statusDisplay}
                 </div>
                 <div class="col-2 text-center">
-                    ${deleteButton}
+                    <div class="d-flex gap-1 justify-content-center">${reduceButton}${deleteButton}</div>
                 </div>
             </div>
         `;
         serviceList.appendChild(serviceRow);
     });
+
+    appendExtraBfSummaryRow(serviceList, bookingId, roomServices);
 }
 
 updateExtraServicesTotalDisplay(bookingId);
@@ -3315,6 +3707,7 @@ function toggleCustomService(bookingId) {
             customCostCheckbox.disabled = false;
         }
     }
+    refreshServiceScope(bookingId);
 }
 
 // Function to toggle custom cost input for services
@@ -3450,6 +3843,27 @@ const bookingIdInput = document.getElementById(`bookingID-${bookingId}`);
 // Check if custom service mode is enabled
 const isCustomService = customServiceCheckbox && customServiceCheckbox.checked;
 
+// Late Check-out is applied through its own window (it sets the late check-out on the booking, not just a charge)
+if (!isCustomService && selectedService) {
+    try {
+        const picked = JSON.parse(selectedService);
+        if (parseInt(picked.SERVICE_ID, 10) === 72) {
+            const already = (addedServicesMap[bookingId] || []).some((s) => parseInt(s.SERVICE_ID, 10) === 72);
+            serviceSelect.value = '';
+            if (quantityInput) { quantityInput.disabled = false; quantityInput.value = '1'; }
+            handleServiceSelectionChange(bookingId);
+            if (already) { toastWarning('Late Check-out', 'Late Check-out has already been applied to this booking.'); return; }
+            const args = document.getElementById(`late-co-args-${bookingId}`);
+            if (args && typeof window.openLateCheckoutModal === 'function') {
+                window.openLateCheckoutModal(args.getAttribute('data-room-id'), args.getAttribute('data-checkout'), bookingId);
+            } else {
+                toastError('Error', 'Late Check-out is not available right now.');
+            }
+            return;
+        }
+    } catch (e) { /* not JSON: fall through to the normal flow */ }
+}
+
 if (isCustomService) {
     // Handle custom service
     const customServiceName = customServiceNameInput ? customServiceNameInput.value.trim() : '';
@@ -3521,6 +3935,8 @@ if (isCustomService) {
         calculateBalance(bookingId, bookingId);
     });
     
+    applyServiceScope(bookingId, { SERVICE_ID: -1, SERVICE_NAME: customServiceName, QUANTITY: quantity, CUSTOM_COST: customCost, IS_CUSTOM: true });
+
     // Reset the form
     customServiceNameInput.value = '';
     quantityInput.value = '1';
@@ -3644,6 +4060,8 @@ if (isCustomService) {
         // Still update balance even if save fails, to show current state
         calculateBalance(bookingId, bookingId);
     });
+
+    applyServiceScope(bookingId, { SERVICE_ID: service.SERVICE_ID, SERVICE_NAME: service.SERVICE_NAME, QUANTITY: quantity, CUSTOM_COST: serviceCost });
 
     // Reset the dropdown and quantity
     serviceSelect.value = '';
@@ -3822,6 +4240,7 @@ fetch('/booking/save-booking-services', {
                             QUANTITY: quantity,
                             STATUS: service.STATUS || "unpaid",
                             IS_CUSTOM: service.SERVICE_ID === -1,
+                            BS_ID: service.BS_ID,
                             ALREADY_SAVED: true // Mark as already saved to prevent duplicate saves
                         });
                     }
@@ -3845,7 +4264,8 @@ fetch('/booking/save-booking-services', {
 }
 
 // Remove service
-function removeService(index, bookingId) {
+function removeService(index, bookingId, opts) {
+const reopenExtraBf = !!(opts && opts.reopen);
 let roomServices = addedServicesMap[bookingId];
 const serviceToRemove = roomServices[index];
 if (!serviceToRemove || !serviceToRemove.SERVICE_ID) {
@@ -3857,6 +4277,7 @@ if (!serviceToRemove || !serviceToRemove.SERVICE_ID) {
     return;
 }
 
+const removeFocusState = suspendBsFocusTrap();
 Swal.fire({
     title: 'Remove Service',
     text: "Please provide a reason for removing this service:",
@@ -3897,6 +4318,10 @@ Swal.fire({
         }, 200);
     }
 }).then((result) => {
+    restoreCheckoutModalFocus(removeFocusState);
+    if (!result.isConfirmed && reopenExtraBf) {
+        openExtraBfPopup(bookingId);
+    }
     if (result.isConfirmed) {
         const removalReason = result.value;
         const bookingIdInput = document.getElementById(`bookingID-${bookingId}`);
@@ -3912,6 +4337,7 @@ Swal.fire({
             body: JSON.stringify({
                 bookingId: bookingIdValue,
                 serviceId: serviceToRemove.SERVICE_ID,
+                bookingServiceId: serviceToRemove.BS_ID || null,
                 isExtension: isExtension,
                 isTransport: isTransport,
                 removalReason: removalReason
@@ -3924,14 +4350,365 @@ Swal.fire({
             calculateTotalCost(bookingId);
             calculateBalance(bookingId, bookingIdValue);
             toastSuccess('Removed', 'Service removed successfully!');
+            if (reopenExtraBf) openExtraBfPopup(bookingId);
         })
         .catch(error => {
             console.error('Error removing service:', error);
             toastError('Error', 'Failed to remove the service. Please try again.');
+            if (reopenExtraBf) openExtraBfPopup(bookingId);
         });
     }
 });
 }
+
+// ---- Group "Remove services" window (rooms + services, tick what to remove) ----
+function groupServiceChipKey(name) {
+    // "Extra Breakfast (Adult) · Room 312" -> one chip per service, across the rooms
+    return String(name || '').replace(/\s*·\s*Room.*$/i, '').trim();
+}
+
+// Shows the "Remove services" button only for a group booking with more than one open room.
+// "Main booking of group X · N rooms" / "Part of group X · N rooms" beside the action buttons (display only)
+function fillGroupTag(bookingId) {
+    const tag = document.getElementById(`bd-grouptag-${bookingId}`);
+    if (!tag) return;
+    const idInput = document.getElementById(`bookingID-${bookingId}`);
+    const realId = idInput && idInput.value ? idInput.value : bookingId;
+    fetch(`/payments/group-breakdown/${realId}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+            if (!d || !d.isGroup || !Array.isArray(d.bookings) || d.bookings.length < 2) { tag.style.display = 'none'; return; }
+            const mainId = Math.min.apply(null, d.bookings.map((b) => parseInt(b.BOOKING_ID, 10)));
+            const isMain = mainId === parseInt(realId, 10);
+            const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+            tag.innerHTML = (isMain ? 'Main booking of group' : 'Part of group') + ' <b>' + esc(d.groupName || '') + '</b> <span style="opacity:.7;">&middot; ' + d.bookings.length + ' rooms</span>';
+            tag.style.display = 'inline-block';
+        })
+        .catch(() => { tag.style.display = 'none'; });
+}
+
+function refreshGroupRemoveButton(bookingId) {
+    const btn = document.getElementById(`group-remove-btn-${bookingId}`);
+    if (!btn) return;
+    const modalEl = document.getElementById(`dynamicRoomModal_${bookingId}`);
+    if (modalEl && modalEl.classList.contains('room-modal-readonly')) { btn.style.display = 'none'; return; }
+    const idInput = document.getElementById(`bookingID-${bookingId}`);
+    const realId = idInput && idInput.value ? idInput.value : bookingId;
+    const show = (n) => { btn.style.display = n > 1 ? 'inline-block' : 'none'; };
+    if (realId in __groupRoomCountCache) { show(__groupRoomCountCache[realId]); return; }
+    fetch(`/payments/group-breakdown/${realId}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+            const n = d && d.isGroup && Array.isArray(d.bookings) ? d.bookings.length : 0;
+            __groupRoomCountCache[realId] = n;
+            show(n);
+        })
+        .catch(() => { __groupRoomCountCache[realId] = 0; show(0); });
+}
+
+async function openGroupRemoveDialog(bookingId, preselectPrefix) {
+    const idInput = document.getElementById(`bookingID-${bookingId}`);
+    const realId = idInput && idInput.value ? idInput.value : bookingId;
+    let data;
+    try {
+        const r = await fetch(`/booking/group-services/${realId}`);
+        data = await r.json();
+    } catch (e) { data = null; }
+    if (!data || !data.success) { toastError('Error', 'Could not load the services.'); return; }
+    if (!data.rooms.length) { toastInfo('Info', 'No room of this group has a service that can be removed.'); return; }
+
+    const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const money = (n) => '₱' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const all = data.rooms.flatMap((r) => r.lines.map((l) => ({ ...l, bookingId: r.bookingId })));
+    const picked = new Set();
+    if (preselectPrefix) all.filter((l) => String(l.name).indexOf(preselectPrefix) === 0).forEach((l) => picked.add(l.id));
+    let filter = '';
+    const isOn = (ids) => ids.length > 0 && ids.every((id) => picked.has(id));
+    const chipOn = 'border:1px solid #e5484d;background:rgba(229,72,77,.12);color:#c0332f;';
+    const chipOff = 'border:1px solid #ced4da;background:#fff;color:#495057;';
+    // the rooms that match the search box (every chip / "Select all" works on these)
+    const visibleRooms = () => {
+        const f = filter.trim().toLowerCase();
+        if (!f) return data.rooms;
+        return data.rooms.filter((r) => String(r.roomNo).toLowerCase().indexOf(f) !== -1 || String(r.groupName || '').toLowerCase().indexOf(f) !== -1);
+    };
+    const visibleLines = () => visibleRooms().flatMap((r) => r.lines.map((l) => ({ ...l, bookingId: r.bookingId })));
+    const keysOf = () => {
+        const vl = visibleLines();
+        return [...new Set(vl.map((l) => groupServiceChipKey(l.name)))].map((k) => {
+            const mine = vl.filter((l) => groupServiceChipKey(l.name) === k);
+            return { key: k, ids: mine.map((l) => l.id), rooms: new Set(mine.map((l) => l.bookingId)).size };
+        });
+    };
+
+    const render = () => {
+        const keys = keysOf();
+        const vr = visibleRooms();
+        const chips = keys.map((k, i) => `<button type="button" data-chip="${i}" aria-pressed="${isOn(k.ids)}" style="${isOn(k.ids) ? chipOn : chipOff}border-radius:6px;padding:3px 10px;font-size:12px;font-weight:500;margin:0 6px 6px 0;cursor:pointer;">${esc(k.key)} <span style="opacity:.7;font-weight:400;">· ${k.rooms} room${k.rooms === 1 ? '' : 's'}</span></button>`).join('');
+        const rooms = vr.map((r, ri) => {
+            const ids = r.lines.map((l) => l.id);
+            const sum = r.lines.reduce((t, l) => t + l.total, 0);
+            const lines = r.lines.map((l) => `<label style="display:flex;justify-content:space-between;gap:8px;margin:2px 0;color:#6c757d;cursor:pointer;"><span><input type="checkbox" data-line="${l.id}" ${picked.has(l.id) ? 'checked' : ''} style="margin-right:8px;">${esc(groupServiceChipKey(l.name))}${l.qty > 1 ? ` <small>×${l.qty}</small>` : ''}</span><span>${money(l.total)}</span></label>`).join('');
+            return `<div style="padding:8px 12px;border-top:${ri ? '1px solid #e9ecef' : '0'};text-align:left;">
+                <label style="font-weight:600;cursor:pointer;"><input type="checkbox" data-room="${r.bookingId}" ${isOn(ids) ? 'checked' : ''} style="margin-right:8px;">#${esc(r.roomNo)} <span style="font-weight:400;color:#868e96;">· ${r.lines.length} service${r.lines.length === 1 ? '' : 's'} · ${money(sum)}</span></label>
+                <div style="padding-left:24px;">${lines}</div></div>`;
+        }).join('');
+        return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                <span style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#868e96;text-transform:uppercase;">By service, in every room</span>
+                <span style="font-size:12px;"><a href="#" data-act="all" style="margin-right:12px;">Select all</a><a href="#" data-act="clear">Clear</a></span>
+            </div>
+            <div style="text-align:left;margin-bottom:8px;">${chips || '<span style="color:#868e96;font-size:12px;">No room matches.</span>'}</div>
+            <div style="max-height:40vh;overflow-y:auto;border:1px solid #e9ecef;border-radius:8px;font-size:13px;">${rooms}</div>`;
+    };
+    const summaryText = () => {
+        if (!picked.size) return 'Tick what to remove';
+        const sel = all.filter((l) => picked.has(l.id));
+        const sum = sel.reduce((t, l) => t + l.total, 0);
+        const roomsN = new Set(sel.map((l) => l.bookingId)).size;
+        return `${picked.size} selected · ${roomsN} room${roomsN === 1 ? '' : 's'} · ${money(sum)}`;
+    };
+
+    const focusState = suspendBsFocusTrap();
+    const result = await Swal.fire({
+        title: 'Remove services',
+        html: `<div style="font-size:12px;color:#868e96;margin:-6px 0 8px;">${esc(data.groupName || '')}</div>
+               <input id="grpRemoveSearch" type="text" placeholder="Search room number..." style="width:100%;box-sizing:border-box;border:1px solid #ced4da;border-radius:6px;padding:5px 10px;font-size:13px;margin-bottom:8px;">
+               <div id="grpRemoveRoot"></div>`,
+        width: 680,
+        input: 'text',
+        inputPlaceholder: 'Reason for removing (required)',
+        inputValidator: (v) => {
+            if (!picked.size) return 'Tick at least one service to remove.';
+            if (!v || !v.trim()) return 'You need to provide a reason!';
+            return undefined;
+        },
+        footer: `<span id="grpRemoveSummary">${summaryText()}</span>`,
+        showCancelButton: true,
+        confirmButtonText: 'Remove',
+        confirmButtonColor: '#e5484d',
+        allowOutsideClick: false,
+        showLoaderOnConfirm: true,
+        didOpen: () => {
+            const root = document.getElementById('grpRemoveRoot');
+            const refresh = () => {
+                root.innerHTML = render();
+                const s = document.getElementById('grpRemoveSummary');
+                if (s) s.textContent = summaryText();
+            };
+            const toggle = (ids, on) => ids.forEach((id) => (on ? picked.add(id) : picked.delete(id)));
+            document.getElementById('grpRemoveSearch').addEventListener('input', (e) => { filter = e.target.value; refresh(); });
+            root.addEventListener('click', (e) => {
+                const chip = e.target.closest('[data-chip]');
+                if (chip) { const k = keysOf()[parseInt(chip.getAttribute('data-chip'), 10)]; if (k) { toggle(k.ids, !isOn(k.ids)); refresh(); } return; }
+                const act = e.target.closest('[data-act]');
+                if (act) { e.preventDefault(); if (act.getAttribute('data-act') === 'all') toggle(visibleLines().map((l) => l.id), true); else picked.clear(); refresh(); }
+            });
+            root.addEventListener('change', (e) => {
+                const line = e.target.closest('[data-line]');
+                if (line) { toggle([parseInt(line.getAttribute('data-line'), 10)], line.checked); refresh(); return; }
+                const room = e.target.closest('[data-room]');
+                if (room) {
+                    const r = data.rooms.find((x) => String(x.bookingId) === room.getAttribute('data-room'));
+                    if (r) { toggle(r.lines.map((l) => l.id), room.checked); refresh(); }
+                }
+            });
+            refresh();
+        },
+        preConfirm: async (reason) => {
+            try {
+                const r = await fetch('/booking/remove-group-services', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bookingId: realId, ids: [...picked], reason })
+                });
+                const d = await r.json();
+                if (!d.success) throw new Error(d.error || 'Could not remove the services.');
+                return d;
+            } catch (err) {
+                Swal.showValidationMessage(err.message || 'Could not remove the services.');
+                return false;
+            }
+        }
+    });
+    restoreCheckoutModalFocus(focusState);
+    if (result.isConfirmed && result.value) {
+        toastSuccess('Removed', `${result.value.removed} service${result.value.removed === 1 ? '' : 's'} removed (${money(result.value.amount)}).`);
+        loadExistingServicesForModal(bookingId);
+    }
+}
+window.openGroupRemoveDialog = openGroupRemoveDialog;
+
+// ---- Group "Extra Breakfast" lines: one summary row in Extra Services + a pop-up table to edit ----
+function isExtraBfService(service) {
+    return !!(service && service.SERVICE_ID === -1 && service.BS_ID && /^Extra Breakfast/i.test(service.SERVICE_NAME || ''));
+}
+
+// The single summary row shown in the Extra Services list (the per-room lines live in the pop-up).
+function appendExtraBfSummaryRow(serviceList, bookingId, roomServices) {
+    const lines = roomServices.filter(isExtraBfService);
+    if (lines.length === 0) return;
+    const guests = lines.reduce((s, l) => s + (parseInt(l.QUANTITY, 10) || 0), 0);
+    const total = lines.reduce((s, l) => s + (parseFloat(l.SERVICE_COST) || 0) * (parseInt(l.QUANTITY, 10) || 0), 0);
+    const rooms = new Set(lines.map(l => (l.SERVICE_NAME || '').split('·')[1] || l.SERVICE_NAME)).size;
+    const anyUnpaid = lines.some(l => l.STATUS !== 'paid');
+    const status = anyUnpaid ? '<span class="badge bg-warning">UNPAID</span>' : '<span class="badge bg-success">PAID</span>';
+    const row = document.createElement('div');
+    row.className = 'service-item mb-1';
+    row.style.cssText = 'background: #ffffff; color: #333333; border: 1px solid #e9ecef; border-radius: 6px; padding: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);';
+    row.innerHTML = `
+        <div class="row align-items-center">
+            <div class="col-4"><span style="font-weight: 600; color: #495057; font-size: 0.9rem;">Extra Breakfast <small class="text-muted">(${rooms} room${rooms === 1 ? '' : 's'})</small></span></div>
+            <div class="col-2 text-center"><span style="font-weight: 600; color: #333333; font-size: 0.9rem;">${guests}</span></div>
+            <div class="col-2 text-center"><span style="font-weight: 600; color: #28a745; font-size: 0.9rem;">₱${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+            <div class="col-2 text-center">${status}</div>
+            <div class="col-2 text-center">${anyUnpaid ? `<button class="btn btn-sm" onclick="openGroupRemoveDialog('${bookingId}', 'Extra Breakfast')" title="Remove extra breakfast (choose the rooms)" style="background-color: #f96332; border: none; border-radius: 50%; width: 28px; height: 28px; padding: 0; color: #fff; box-shadow: 0px 2px 8px rgba(249, 99, 50, 0.3); display: inline-flex; align-items: center; justify-content: center;"><i class="fa fa-trash-alt" style="font-size: 10px;"></i></button>` : ''}</div>
+        </div>`;
+    serviceList.appendChild(row);
+}
+
+function openExtraBfPopup(bookingId) {
+    const roomServices = addedServicesMap[bookingId] || [];
+    const lines = roomServices.map((s, i) => ({ s, i })).filter(x => isExtraBfService(x.s));
+    if (lines.length === 0) { if (window.Swal) Swal.close(); return; }
+    const money = (n) => '₱' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const total = lines.reduce((s, x) => s + (parseFloat(x.s.SERVICE_COST) || 0) * (parseInt(x.s.QUANTITY, 10) || 0), 0);
+    const btn = 'border:none;border-radius:50%;width:26px;height:26px;padding:0;line-height:1;display:inline-flex;align-items:center;justify-content:center;';
+    const modalEl = document.getElementById('dynamicRoomModal_' + bookingId);
+    const readonlyBf = !!(modalEl && modalEl.classList.contains('room-modal-readonly'));
+    const rowsHtml = lines.map(({ s, i }) => {
+        const m = (s.SERVICE_NAME || '').match(/Extra Breakfast \((Adult|Kid)\)\s*·\s*Room\s*(.+)$/i);
+        const type = m ? m[1] : '';
+        const room = m ? m[2] : s.SERVICE_NAME;
+        const qty = parseInt(s.QUANTITY, 10) || 0;
+        const amount = (parseFloat(s.SERVICE_COST) || 0) * qty;
+        const paid = s.STATUS === 'paid';
+        const actions = (readonlyBf || paid)
+            ? (paid ? '<span class="badge bg-success">PAID</span>' : '')
+            : `<button type="button" data-act="reduce" data-idx="${i}" title="Take 1 off" style="${btn}background:#ffc107;color:#212529;font-weight:700;">&minus;</button>
+               <button type="button" data-act="remove" data-idx="${i}" title="Remove this room's extra" style="${btn}background:#f96332;color:#fff;"><i class="fa fa-trash-alt" style="font-size:10px;"></i></button>`;
+        return `<tr>
+            <td style="text-align:left;font-weight:600;">Room ${room}</td>
+            <td>${type}</td>
+            <td>${qty}</td>
+            <td style="color:#28a745;font-weight:600;">${money(amount)}</td>
+            <td style="white-space:nowrap;">${actions}</td>
+        </tr>`;
+    }).join('');
+    Swal.fire({
+        title: 'Extra Breakfast',
+        width: 620,
+        html: `<div style="font-size:0.85rem;color:#6c757d;margin-bottom:6px;">${readonlyBf ?'Checked out · view only' : 'Above 2 per room · remove or take 1 off for a room with fewer guests'}</div>
+            <div style="max-height:55vh;overflow-y:auto;">
+              <table class="table table-sm align-middle" style="font-size:0.9rem;margin:0;text-align:center;">
+                <thead><tr><th style="text-align:left;">Room</th><th>Type</th><th>Qty</th><th>Amount</th><th></th></tr></thead>
+                <tbody>${rowsHtml}</tbody>
+              </table>
+            </div>
+            <div style="text-align:right;margin-top:8px;font-weight:700;">Total: ${money(total)}</div>`,
+        showConfirmButton: true,
+        confirmButtonText: 'Close',
+        didOpen: () => {
+            Swal.getHtmlContainer().querySelectorAll('button[data-act]').forEach((el) => {
+                el.addEventListener('click', () => {
+                    const idx = parseInt(el.getAttribute('data-idx'), 10);
+                    const act = el.getAttribute('data-act');
+                    Swal.close();
+                    // let the pop-up finish closing before the reason prompt opens
+                    setTimeout(() => {
+                        if (act === 'reduce') reduceExtraService(idx, bookingId, { reopen: true });
+                        else removeService(idx, bookingId, { reopen: true });
+                    }, 150);
+                });
+            });
+        }
+    });
+}
+window.openExtraBfPopup = openExtraBfPopup;
+
+// The room modal's Bootstrap focus trap steals focus from a Swal prompt opened on top of it (typing is
+// impossible). Same workaround as the checkout dialog: pause the trap, and restore it when the prompt closes.
+function suspendBsFocusTrap() {
+    const openBsModal = document.querySelector('.modal.show');
+    let bsModalInstance = null;
+    let prevFocusCfg = null;
+    let focustrapDeactivated = false;
+    if (openBsModal && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        try {
+            bsModalInstance = bootstrap.Modal.getInstance(openBsModal);
+            if (bsModalInstance && bsModalInstance._config) {
+                prevFocusCfg = bsModalInstance._config.focus;
+                bsModalInstance._config.focus = false;
+            }
+            openBsModal.setAttribute('data-bs-focus', 'false');
+            if (bsModalInstance && bsModalInstance._focustrap && typeof bsModalInstance._focustrap.deactivate === 'function') {
+                bsModalInstance._focustrap.deactivate();
+                focustrapDeactivated = true;
+            }
+        } catch (e) { /* ignore */ }
+    }
+    return { openBsModal, bsModalInstance, prevFocusCfg, focustrapDeactivated };
+}
+
+// Take one off a group's "Extra Breakfast" line (that room has fewer guests than the group's extra count)
+function reduceExtraService(index, bookingId, opts) {
+    const reopen = !!(opts && opts.reopen);
+    const roomServices = addedServicesMap[bookingId] || [];
+    const svc = roomServices[index];
+    if (!svc || !svc.BS_ID) {
+        Swal.fire({ icon: 'warning', title: 'Service not found.', confirmButtonText: 'OK' });
+        return;
+    }
+    const unit = parseFloat(svc.SERVICE_COST) || 0;
+    const focusState = suspendBsFocusTrap();
+    Swal.fire({
+        title: 'Remove 1 extra breakfast',
+        html: `${svc.SERVICE_NAME}<br>₱${unit.toLocaleString('en-US', { minimumFractionDigits: 2 })} will be taken off the bill.`,
+        input: 'text',
+        inputPlaceholder: 'Reason...',
+        inputValidator: (value) => (!value || value.trim() === '') ? 'You need to provide a reason!' : undefined,
+        showCancelButton: true,
+        confirmButtonText: 'Remove 1',
+        icon: 'question',
+        allowOutsideClick: false,
+        focusConfirm: false,
+        didOpen: () => {
+            setTimeout(() => { const input = Swal.getInput(); if (input) input.focus(); }, 100);
+        }
+    }).then((result) => {
+        restoreCheckoutModalFocus(focusState);
+        if (!result.isConfirmed) {
+            if (reopen) openExtraBfPopup(bookingId);
+            return;
+        }
+        const bookingIdInput = document.getElementById(`bookingID-${bookingId}`);
+        const bookingIdValue = bookingIdInput ? bookingIdInput.value : bookingId;
+        fetch('/booking/reduce-service', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bookingId: bookingIdValue, bookingServiceId: svc.BS_ID, reduceBy: 1, reason: result.value })
+        })
+        .then((response) => response.json())
+        .then((data) => {
+            if (!data.success) throw new Error(data.error || 'Could not remove.');
+            if (data.qty <= 0) {
+                roomServices.splice(index, 1);
+            } else {
+                svc.QUANTITY = data.qty;
+            }
+            updateAddedServicesList(bookingId);
+            calculateTotalCost(bookingId);
+            calculateBalance(bookingId, bookingIdValue);
+            toastSuccess('Removed', '1 extra breakfast removed.');
+            if (reopen) openExtraBfPopup(bookingId);
+        })
+        .catch((error) => {
+            console.error('Error reducing service:', error);
+            toastError('Error', error.message || 'Failed to remove. Please try again.');
+            if (reopen) openExtraBfPopup(bookingId);
+        });
+    });
+}
+window.reduceExtraService = reduceExtraService;
 
 // Calculate total cost
 async function calculateTotalCost(bookingId) {
@@ -4001,6 +4778,397 @@ async function calculateTotalCost(bookingId) {
 
 }
 
+// Guest Bill card of the booking window (KGrand style): room, extensions, services, total, discount,
+// every payment, total paid and what is still owed - from the billing + payments already fetched by
+// calculateBalance(), so it always agrees with the Total / Paid / Balance bar below it.
+function renderGuestBill(bookingId, d) {
+    const box = document.getElementById(`guest-bill-lines-${bookingId}`);
+    if (!box) return;
+    const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const money = (n) => '₱' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const line = (label, amount, cls, attrs) => `<div class="gb-line ${cls || ''}" ${attrs || ''}><span class="gb-label">${label}</span><span class="gb-amt">${amount}</span></div>`;
+    let items = Array.isArray(d.billingData && d.billingData.items) ? d.billingData.items : [];
+    let html = '';
+
+    const stat = (st) => {
+        const k = String(st || '').toLowerCase();
+        if (!k || k === 'penalty') return '';
+        return ` <small class="gb-st gb-st-${k === 'paid' ? 'paid' : 'unpaid'}">${k === 'paid' ? 'Paid' : (k === 'partial' ? 'Partial' : 'Unpaid')}</small>`;
+    };
+    // A group's main booking carries the other rooms' services, tagged "... · Room 304" by the server.
+    // Those are listed room by room (header: room, number of services, subtotal), like the "remove services" window.
+    const roomTag = /(?:\s*·\s*)?\bRoom\s+(\S+)\s*$/i;
+    // Breakfast, kept short: the free breakfast lines of a room ("Breakfast (Adult) 3 x 500 Free" + "Breakfast (Kids) 2 x 350 Free") become ONE line,
+    // "Breakfast x 2  Free" (the 2 per room that are inside the room rate), and the extras above that ("Extra Breakfast (Adult) / (Kid)")
+    // become ONE line "Extra breakfast - 1 adult, 2 kids" with their amount. A breakfast line that does carry a charge (older bookings) is left as it is.
+    (function () {
+        const inclRe = /^Breakfast \((Adult|Kids?)\)$/i, extraRe = /^Extra Breakfast \((Adult|Kids?)\)$/i;
+        const slot = new Map();
+        const out = [];
+        items.forEach((it, i) => {
+            const desc0 = String(it.description || '');
+            const tag = desc0.match(roomTag);
+            const clean = tag ? desc0.replace(roomTag, '').trim() : desc0;
+            const sub = parseFloat(it.subTotal) || 0;
+            let kind = null;
+            if (i > 0 && inclRe.test(clean) && sub === 0) kind = 'incl';
+            else if (i > 0 && extraRe.test(clean)) kind = 'extra';
+            if (!kind) { out.push(it); return; }
+            const key = kind + '|' + (tag ? tag[1] : '');
+            let syn = slot.get(key);
+            if (!syn) {
+                syn = { _bf: kind, description: (kind === 'incl' ? 'Breakfast' : 'Extra breakfast') + (tag ? ' · Room ' + tag[1] : ''), qty: '-', basePrice: 0, subTotal: 0, status: '', _a: 0, _k: 0, _paid: true };
+                slot.set(key, syn);
+                out.push(syn);
+            }
+            const who = /adult/i.test(clean) ? '_a' : '_k';
+            syn[who] += Number(it.qty) || 0;
+            syn.subTotal += sub;
+            if (String(it.status || '').toLowerCase() !== 'paid') syn._paid = false;
+        });
+        items = out;
+    })();
+    const isService = (it, i) => i > 0 && (it.status !== 'penalty' || roomTag.test(String(it.description || ''))) && (!/\(Extended\)$/i.test(String(it.description || '')) || roomTag.test(String(it.description || '')));
+    const masterRooms = Array.isArray(d.billingData && d.billingData.masterRooms) ? d.billingData.masterRooms : [];
+    const grouped = masterRooms.length > 0 || items.some((it, i) => isService(it, i) && roomTag.test(String(it.description || '')));
+    const byRoom = new Map();
+    const ownRoom = String((d.billingData && d.billingData.roomNumber) || '');
+
+    const itemLine = (it, i, cleanDesc, indent) => { // indent: the room number of a grouped service, or false
+        const sub = parseFloat(it.subTotal) || 0;
+        const base = parseFloat(it.basePrice) || 0;
+        const hasQty = it.qty !== '-' && it.qty != null && Number(it.qty) > 0;
+        const n = hasQty ? Number(it.qty) : 1;
+        const desc = cleanDesc != null ? cleanDesc : String(it.description || '');
+        if (it.status === 'penalty') return line(`${esc(desc || 'Cancellation Fee')} <small>· Penalty</small>`, money(sub), indent ? 'gb-child gb-penalty' : 'gb-penalty', indent ? `data-gb-room="${esc(indent)}"` : '');
+        if (it._bf) {
+            const cls = indent ? 'gb-child' : '';
+            const attr = indent ? `data-gb-room="${esc(indent)}"` : '';
+            if (it._bf === 'incl') {
+                const included = Math.min(2, (it._a || 0) + (it._k || 0));
+                return line(`Breakfast × ${included} <small class="gb-st gb-st-paid">Free</small>`, money(0), cls, attr);
+            }
+            const parts = [];
+            if (it._a) parts.push(`${it._a} adult${it._a === 1 ? '' : 's'}`);
+            if (it._k) parts.push(`${it._k} kid${it._k === 1 ? '' : 's'}`);
+            return line(`Extra breakfast <small>· ${parts.join(', ')}</small>${stat(it._paid ? 'paid' : 'unpaid')}`, money(it.subTotal), cls, attr);
+        }
+        if (it._roomRow) return line(`Room (${n} × ${money(base)}) <small>· ${esc(it.roomType || '')}</small>`, money(sub), indent ? 'gb-child' : '', indent ? `data-gb-room="${esc(indent)}"` : '');
+        if (i === 0) {
+            // A group's main room: the first line carries every room, so show only this room's share here.
+            const mateSum = masterRooms.reduce((t, m) => t + m.price * m.nights, 0);
+            if (mateSum > 0) {
+                const own = Math.max(0, sub - mateSum);
+                return line(`Room (${n} × ${money(n ? own / n : own)}) <small>· ${esc(desc)}</small>${stat(it.status)}`, money(own));
+            }
+            return line(`Room (${n} × ${money(base)}) <small>· ${esc(desc)}</small>${stat(it.status)}`, money(sub));
+        }
+        if (/\(Extended\)$/i.test(desc)) return line(`Extended stay (${n} × ${money(base)})${stat(it.status)}`, money(sub));
+        return line(`${esc(desc || 'Service')}${hasQty ? ` <small>· ${n} × ${money(base)}</small>` : ''}${Number(it.subTotal) === 0 ? ' <small class="gb-st gb-st-paid">Free</small>' : stat(it.status)}`, money(sub), indent ? 'gb-child' : '', indent ? `data-gb-room="${esc(indent)}"` : '');
+    };
+
+    const mateRoomSum = masterRooms.reduce((t, m) => t + m.price * m.nights, 0);
+    let ownHtml = '';
+    let ownSum = 0;
+    const roomTypeName = (items[0] && String(items[0].description || '')) || '';
+    items.forEach((it, i) => {
+        if (grouped && isService(it, i) && !(masterRooms.length && !roomTag.test(String(it.description || '')))) {
+            const desc = String(it.description || '');
+            const m = desc.match(roomTag);
+            const room = m ? m[1] : ownRoom;
+            if (!byRoom.has(room)) byRoom.set(room, []);
+            byRoom.get(room).push([it, i, m ? desc.replace(roomTag, '').trim() : desc]);
+        } else {
+            const own = (i === 0 && mateRoomSum > 0) ? Math.max(0, (parseFloat(it.subTotal) || 0) - mateRoomSum) : (parseFloat(it.subTotal) || 0);
+            ownSum += own;
+            ownHtml += itemLine(it, i, null, masterRooms.length ? (ownRoom || '-') : false);
+        }
+    });
+    // Extended nights released by an early check-out: shown crossed out, not counted.
+    const voided = Array.isArray(d.billingData && d.billingData.voidedExtensions) ? d.billingData.voidedExtensions : [];
+    const voidLine = (v, indent) => line(`<s>Extended stay (${v.qty} × ${money(v.cost)})</s> <small class="gb-st gb-st-void">Not stayed</small>`, `<s>${money(v.qty * v.cost)}</s>`, `gb-void${indent ? ' gb-child' : ''}`, indent ? `data-gb-room="${esc(indent)}"` : '');
+    voided.filter((v) => v.isOwn).forEach((v) => { ownHtml += voidLine(v, masterRooms.length ? (ownRoom || '-') : false); });
+    // One-bill group: list the rooms one by one (this room first), each with its own night(s), extension and services.
+    masterRooms.forEach((m) => {
+        const key = String(m.roomNo);
+        if (!byRoom.has(key)) byRoom.set(key, []);
+        voided.filter((v) => !v.isOwn && String(v.roomNo) === key).forEach((v) => byRoom.get(key).push([{ _void: v }, 1, '']));
+        byRoom.get(key).unshift([{ _roomRow: true, basePrice: m.price, qty: m.nights, subTotal: m.price * m.nights, roomType: roomTypeName }, 1, 'Room']);
+    });
+    // The main room's own services that the server tags with its room number ("... · Room 405", e.g. its extra breakfast) belong to the
+    // main room block: one "Room #405" header with everything of that room, not a second "Room #405" header below it.
+    const ownTagged = masterRooms.length ? (byRoom.get(ownRoom) || []).filter((r) => !r[0]._roomRow && !r[0]._void) : [];
+    const ownTaggedSum = ownTagged.reduce((t2, r) => t2 + (parseFloat(r[0].subTotal) || 0), 0);
+    const ownTaggedHtml = ownTagged.map((r) => itemLine(r[0], r[1], r[2], ownRoom || '-')).join('');
+    if (masterRooms.length) {
+        html += line(`<i class="fas fa-chevron-down gb-chev"></i> <b>Room #${esc(ownRoom)}</b> <small>· main room</small>`, money(ownSum + ownTaggedSum), 'gb-roomhead gb-room-main', `data-gb-head="${esc(ownRoom || '-')}" onclick="window.toggleGuestBillRoom('${bookingId}', this.getAttribute('data-gb-head'))" style="cursor:pointer;"`) + ownHtml + ownTaggedHtml;
+    } else {
+        html += ownHtml;
+    }
+    if (grouped) {
+        const rooms = [...byRoom.keys()].sort((a, b) => (a === ownRoom ? -1 : b === ownRoom ? 1 : parseInt(a, 10) - parseInt(b, 10)));
+        rooms.forEach((room) => {
+            if (masterRooms.length && room === ownRoom && ownTagged.length) {
+                // the main room's tagged lines are already inside its main block (above); only anything else of it still goes here
+                const rest = byRoom.get(room).filter((r) => r[0]._roomRow || r[0]._void);
+                if (!rest.length) return;
+            }
+            const rows = (masterRooms.length && room === ownRoom && ownTagged.length) ? byRoom.get(room).filter((r) => r[0]._roomRow || r[0]._void) : byRoom.get(room);
+            const sum = rows.reduce((t, r) => t + (r[0]._void ? 0 : (parseFloat(r[0].subTotal) || 0)), 0);
+            const extra = rows.filter((r) => !r[0]._roomRow && !r[0]._void).length;
+            html += line(`<i class="fas fa-chevron-down gb-chev"></i> <b>Room #${esc(room)}</b> <small>· ${masterRooms.length ? (extra ? `room + ${extra} extra${extra === 1 ? '' : 's'}` : 'room only') : `${rows.length} service${rows.length === 1 ? '' : 's'}`}</small>`, money(sum), 'gb-roomhead gb-room-mate', `data-gb-head="${esc(room || ownRoom || '-')}" onclick="window.toggleGuestBillRoom('${bookingId}', this.getAttribute('data-gb-head'))" style="cursor:pointer;"`);
+            rows.forEach((r) => { html += r[0]._void ? voidLine(r[0]._void, room || ownRoom || '-') : itemLine(r[0], r[1], r[2], room || ownRoom || '-'); });
+        });
+    }
+
+    html += masterRooms.length
+        ? line('GRAND TOTAL <small>· all rooms</small>', money(d.grossTotal), 'gb-total gb-grand')
+        : line('Total', money(d.grossTotal), 'gb-total');
+    if (d.discountAmount > 0) {
+        html += line(`Discount${d.discountRemarks ? ` <small>· ${esc(d.discountRemarks)}</small>` : ''}`, '-' + money(d.discountAmount), 'gb-neg');
+    }
+    if (d.reservationFee > 0) {
+        html += line('Reservation fee (deducted)', '-' + money(d.reservationFee), 'gb-neg');
+    }
+
+    const skip = ['reservation_fee', 'discount', 'security_deposit', 'security_deposit_refund'];
+    const pays = (Array.isArray(d.paymentsData) ? d.paymentsData : [])
+        .filter((p) => !skip.includes(p.PAYMENT_TYPE))
+        .slice()
+        .sort((a, b) => new Date(a.PAYMENT_DATE) - new Date(b.PAYMENT_DATE) || (a.IDNo - b.IDNo));
+    // Credit left unpaid at check-out is ONE amount for the booking (or the whole group), however many bill items it was split over:
+    // the credit rows made together (same minute, same note) are shown as a single line.
+    const merged = [];
+    const creditAt = new Map();
+    pays.forEach((p) => {
+        if (!isUnsettledCredit(p)) { merged.push(p); return; }
+        const when = p.PAYMENT_DATE ? String(p.PAYMENT_DATE).slice(0, 16) : '';
+        const key = when + '|' + String(p.REMARKS || '');
+        if (creditAt.has(key)) {
+            const first = creditAt.get(key);
+            first.AMOUNT_PAID = (parseFloat(first.AMOUNT_PAID) || 0) + (parseFloat(p.AMOUNT_PAID) || 0);
+        } else {
+            const copy = Object.assign({}, p, { PAYMENT_TYPE: '', ROOM_NUMBER: null });
+            creditAt.set(key, copy);
+            merged.push(copy);
+        }
+    });
+    merged.forEach((p) => {
+        const amt = parseFloat(p.AMOUNT_PAID) || 0;
+        const dt = p.PAYMENT_DATE ? new Date(p.PAYMENT_DATE) : null;
+        const when = dt && !isNaN(dt)
+            ? dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' ' + dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+            : '';
+        const isRefund = p.PAYMENT_TYPE === 'refund' || amt < 0;
+        const onCredit = isUnsettledCredit(p);
+        const label = `${isRefund ? 'Refund' : (onCredit ? 'Credit (not paid yet)' : 'Payment')}${!onCredit && p.PAYMENT_METHOD ? ' · ' + esc(p.PAYMENT_METHOD) : ''}`
+            + `${p.ROOM_NUMBER && String(p.BOOKING_ID) !== String(d.bookingId) ? ' · Room ' + esc(p.ROOM_NUMBER) : ''}`
+            + `<small>${p.PAYMENT_TYPE ? ' · ' + esc(String(p.PAYMENT_TYPE).replace(/_/g, ' ')) : ''}${when ? ' · ' + esc(when) : ''}${p.NAME ? ' · ' + esc(p.NAME) : ''}</small>`
+            + (p.REMARKS ? `<div class="gb-note">${isRefund ? 'Reason: ' : 'Note: '}${esc(p.REMARKS)}</div>` : '');
+        html += line(label, onCredit ? money(Math.abs(amt)) : ((isRefund ? '' : '-') + money(Math.abs(amt)).replace(/^/, isRefund ? '+' : '')), onCredit ? 'gb-penalty' : (isRefund ? 'gb-neg' : 'gb-pay'));
+    });
+
+    if (pays.length) html += line('Total paid', money(d.totalPaid));
+
+    const left = d.netBalance - d.totalPaid;
+    if (left > 0.005) html += line('Balance still owed', money(left), 'gb-state owed');
+    else if (left < -0.005) html += line('Refund due to the guest', money(-left), 'gb-state refund');
+    else html += line('Fully paid', '✓', 'gb-state paid');
+
+    box.innerHTML = html;
+    if (grouped) markGuestBillGroup(bookingId);
+    applyGuestBillRooms(bookingId);
+    applyMateRoomLine(bookingId);
+    applyGuestBillPayButton(bookingId, d, left);
+}
+window.renderGuestBill = renderGuestBill;
+
+// The "+ Payment" button of the Guest Bill is greyed out once the guest is checked out - EXCEPT when something is still owed:
+// the guest can still settle it. If what is owed is credit (left unpaid at check-out) the button settles that credit;
+// anything else owed opens the normal billing / payment window.
+function applyGuestBillPayButton(bookingId, d, left) {
+    try {
+        const btn = document.querySelector(`#guest-bill-${bookingId} .gb-btn-pay`);
+        if (!btn || btn.style.display === 'none') return;
+        if (btn.getAttribute('data-orig-disabled') == null) btn.setAttribute('data-orig-disabled', btn.disabled ? '1' : '0');
+        if (btn.getAttribute('data-orig-html') == null) btn.setAttribute('data-orig-html', btn.innerHTML);
+        if (btn.getAttribute('data-orig-onclick') == null) btn.setAttribute('data-orig-onclick', btn.getAttribute('onclick') || '');
+        const cancelled = !!(d.billingData && d.billingData.isCancelled);
+        const credit = (Array.isArray(d.paymentsData) ? d.paymentsData : []).filter((p) => isUnsettledCredit(p));
+        const creditSum = credit.reduce((sum, p) => sum + (parseFloat(p.AMOUNT_PAID) || 0), 0);
+        const owed = left > 0.005 || creditSum > 0.005;
+        if (cancelled || !owed) {
+            // back to how the page built it
+            if (btn.getAttribute('data-bd-enabled') === '1') {
+                btn.innerHTML = btn.getAttribute('data-orig-html');
+                btn.setAttribute('onclick', btn.getAttribute('data-orig-onclick'));
+                btn.removeAttribute('data-bd-enabled');
+            }
+            if (btn.getAttribute('data-orig-disabled') === '1') { btn.disabled = true; btn.setAttribute('aria-disabled', 'true'); btn.style.opacity = '0.6'; btn.style.pointerEvents = 'none'; btn.style.cursor = 'not-allowed'; }
+            return;
+        }
+        btn.disabled = false;
+        btn.removeAttribute('aria-disabled');
+        btn.removeAttribute('tabindex');
+        btn.style.opacity = '1';
+        btn.style.pointerEvents = '';
+        btn.style.cursor = '';
+        btn.setAttribute('data-bd-enabled', '1');
+        if (creditSum > 0.005) {
+            window.__bdCreditToSettle = window.__bdCreditToSettle || {};
+            window.__bdCreditToSettle[bookingId] = { amount: creditSum, ids: credit.map((p) => p.IDNo), note: credit[0] && credit[0].REMARKS || '' };
+            btn.innerHTML = '<i class="fas fa-hand-holding-usd me-1"></i>Settle credit';
+            btn.setAttribute('onclick', `window.bdSettleCredit('${bookingId}')`);
+            btn.title = 'The guest pays the credit that was left at check-out';
+        } else {
+            btn.innerHTML = btn.getAttribute('data-orig-html');
+            btn.setAttribute('onclick', btn.getAttribute('data-orig-onclick'));
+        }
+    } catch (e) { /* the button just stays as it was */ }
+}
+
+// The guest pays (all or part of) the credit left at check-out, in the normal Payment window.
+// The money counts as received NOW (today's shift, the real method), see creditModel.payCredit.
+window.bdSettleCredit = async function (bookingId) {
+    const c = (window.__bdCreditToSettle || {})[bookingId];
+    const modalEl = document.getElementById('modal-payment');
+    if (!c || !c.ids.length) return;
+    if (!modalEl || typeof bootstrap === 'undefined') return window.bdSettleCreditQuick(bookingId);
+    const idInput = document.getElementById(`bookingID-${bookingId}`);
+    const realId = idInput && idInput.value ? idInput.value : bookingId;
+    const hidden = document.getElementById('hiddenBookingId');
+    if (hidden) hidden.value = realId;
+    const bidInput = document.getElementById('bookingID');
+    if (bidInput) bidInput.value = realId;
+    if (window.PaymentDepositSection) window.PaymentDepositSection.hide();
+    const roomNo = (document.getElementById(`room-number-${bookingId}`) || {}).textContent || '';
+    if (hidden) hidden.dataset.roomNumber = roomNo;
+    if (typeof updatePaymentSummaryCard === 'function') {
+        updatePaymentSummaryCard(c.amount, { roomNumber: roomNo });
+    } else {
+        const amountInput = document.getElementById('paymentAmountInput');
+        if (amountInput) amountInput.value = c.amount;
+    }
+    window.__creditSettleIds = null; // all of the credit of this booking / group
+    modalEl.dataset.skipPaymentStep = 'false';
+    modalEl.dataset.creditSettlement = '1';
+    if (typeof $ !== 'undefined') $(modalEl).find('.payment-amount-group, .payment-method-group, .payment-details-section').show();
+    const refresh = async () => {
+        delete window.__bdCreditToSettle[bookingId];
+        await calculateBalance(bookingId, realId);
+        try { if (typeof scheduleCalendarRefresh === 'function') scheduleCalendarRefresh(); } catch (e) { /* no-op */ }
+    };
+    window.onPaymentConfirmed = function onCreditPaid() { refresh(); };
+    const onHidden = function () {
+        modalEl.removeEventListener('hidden.bs.modal', onHidden);
+        delete modalEl.dataset.creditSettlement;
+        if (window.onPaymentConfirmed === onCreditPaidRef) window.onPaymentConfirmed = null;
+    };
+    const onCreditPaidRef = window.onPaymentConfirmed;
+    modalEl.addEventListener('hidden.bs.modal', onHidden);
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+};
+
+// Quick fallback (no Payment window on the page): marks the credit entries as settled, same as on the Credit page.
+window.bdSettleCreditQuick = async function (bookingId) {
+    const c = (window.__bdCreditToSettle || {})[bookingId];
+    if (!c || !c.ids.length) return;
+    const money = (n) => '₱' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const r = await Swal.fire({
+        icon: 'question',
+        title: 'Settle credit',
+        html: `<p style="margin-bottom:6px;">The guest pays <b>${money(c.amount)}</b> now.</p>${c.note ? `<p style="font-size:.85rem;color:#6c757d;">${String(c.note).replace(/[<>&]/g, '')}</p>` : ''}`,
+        showCancelButton: true,
+        confirmButtonText: 'Yes, it is paid',
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#5b8435',
+        heightAuto: false
+    });
+    if (!r.isConfirmed) return;
+    try {
+        const res = await fetch('/credit/settle-selected', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentIds: c.ids }) });
+        const j = await res.json();
+        if (!res.ok || !j || !j.success) throw new Error((j && j.message) || 'Could not settle the credit');
+        try { if (typeof toastSuccess === 'function') toastSuccess('Credit', `${money(c.amount)} settled.`); } catch (e) { /* no-op */ }
+        delete window.__bdCreditToSettle[bookingId];
+        const idInput = document.getElementById(`bookingID-${bookingId}`);
+        await calculateBalance(bookingId, idInput && idInput.value ? idInput.value : bookingId);
+        try { if (typeof scheduleCalendarRefresh === 'function') scheduleCalendarRefresh(); } catch (e) { /* no-op */ }
+    } catch (e) {
+        Swal.fire({ icon: 'error', title: 'Not settled', text: e.message, heightAuto: false });
+    }
+};
+
+// A room that is not the main booking of a one-bill group has no room charge of its own (the main carries it), so its bill
+// would start at "Room 1 x P0.00". Show the room's own night(s) at its nightly rate instead, and count them in its Total.
+function applyMateRoomLine(bookingId) {
+    const mate = (window.__gbMate || {})[bookingId];
+    const box = document.getElementById(`guest-bill-lines-${bookingId}`);
+    if (!mate || !box || !(mate.rate > 0) || !(mate.nights > 0)) return;
+    const first = box.querySelector('.gb-line');
+    const total = box.querySelector('.gb-line.gb-total');
+    if (!first || !total || first.hasAttribute('data-mate-room')) return;
+    const money = (n) => '₱' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const amt = mate.rate * mate.nights;
+    const label = first.querySelector('.gb-label');
+    const firstAmt = first.querySelector('.gb-amt');
+    const isRoomLine = label && /^\s*Room\s*\(/i.test(label.textContent || '') && firstAmt && /^₱0\.00$/.test((firstAmt.textContent || '').trim());
+    if (isRoomLine) {
+        label.innerHTML = `Room (${mate.nights} × ${money(mate.rate)}) <small>· ${mate.type || ''}</small>`;
+        firstAmt.textContent = money(amt);
+    } else {
+        first.insertAdjacentHTML('beforebegin', `<div class="gb-line" data-mate-room="1"><span class="gb-label">Room (${mate.nights} × ${money(mate.rate)}) <small>· ${mate.type || ''}</small></span><span class="gb-amt">${money(amt)}</span></div>`);
+    }
+    first.setAttribute('data-mate-room', '1');
+    const totAmt = total.querySelector('.gb-amt');
+    const cur = parseFloat(String(totAmt.textContent).replace(/[^0-9.\-]/g, '')) || 0;
+    totAmt.textContent = money(cur + amt);
+}
+window.applyMateRoomLine = applyMateRoomLine;
+
+// Collapse / expand: the whole bill (only Total and what is owed stay), or one room's services of a group.
+// The state is kept per booking window, so it survives the bill being redrawn after a payment or a new service.
+window.__gbCollapsedRooms = window.__gbCollapsedRooms || {};
+// Only a group booking gets the collapse (a single booking is always shown in full). It starts collapsed, once.
+function markGuestBillGroup(bookingId) {
+    const card = document.getElementById(`guest-bill-${bookingId}`);
+    if (!card || card.hasAttribute("data-gb-group")) return;
+    card.setAttribute("data-gb-group", "1");
+    card.classList.add("gb-collapsed");
+    const icon = card.querySelector(".gb-toggle i");
+    if (icon) icon.className = "fas fa-chevron-down";
+}
+window.markGuestBillGroup = markGuestBillGroup;
+function applyGuestBillRooms(bookingId) {
+    const box = document.getElementById(`guest-bill-lines-${bookingId}`);
+    if (!box) return;
+    const set = window.__gbCollapsedRooms[bookingId] || new Set();
+    box.querySelectorAll('[data-gb-head]').forEach((h) => {
+        const closed = set.has(h.getAttribute('data-gb-head'));
+        h.classList.toggle('gb-closed', closed);
+    });
+    box.querySelectorAll('[data-gb-room]').forEach((c) => { c.style.display = set.has(c.getAttribute('data-gb-room')) ? 'none' : ''; });
+}
+window.toggleGuestBillRoom = function (bookingId, room) {
+    const set = window.__gbCollapsedRooms[bookingId] || (window.__gbCollapsedRooms[bookingId] = new Set());
+    if (set.has(room)) set.delete(room); else set.add(room);
+    applyGuestBillRooms(bookingId);
+};
+window.toggleGuestBill = function (bookingId) {
+    const card = document.getElementById(`guest-bill-${bookingId}`);
+    if (!card) return;
+    const collapsed = card.classList.toggle('gb-collapsed');
+    const icon = card.querySelector('.gb-toggle i');
+    if (icon) icon.className = collapsed ? 'fas fa-chevron-down' : 'fas fa-chevron-up';
+};
+
+// A payment made with "credit" (or a marker) that has not been settled yet = the guest still owes it.
+function isUnsettledCredit(payment) {
+    const m = String((payment && payment.PAYMENT_METHOD) || '').toLowerCase();
+    return (m === 'credit' || m === 'marker') && !(payment && payment.SETTLED_DATE) && (parseFloat(payment && payment.AMOUNT_PAID) || 0) > 0;
+}
+window.isUnsettledCredit = isUnsettledCredit;
+
 // Calculate balance
 async function calculateBalance(bookingId, currentBookingId) {
     try {
@@ -4022,6 +5190,8 @@ async function calculateBalance(bookingId, currentBookingId) {
             if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount' || payment.PAYMENT_TYPE === 'security_deposit' || payment.PAYMENT_TYPE === 'security_deposit_refund') {
                 return sum;
             }
+            // Credit (a balance left unpaid on purpose) is not money received yet: it stays in the balance until it is settled.
+            if (isUnsettledCredit(payment)) return sum;
             return sum + parseFloat(payment.AMOUNT_PAID);
         }, 0) : 0;
         
@@ -4217,8 +5387,16 @@ async function calculateBalance(bookingId, currentBookingId) {
             console.error(`❌ Balance element not found: Balance-${bookingId}`);
         }
 
+        try {
+            renderGuestBill(bookingId, {
+                bookingId, billingData, paymentsData, grossTotal, netBalance,
+                discountAmount, discountRemarks, reservationFee,
+                totalPaid: totalPaymentsMade
+            });
+        } catch (e) { console.warn('Guest Bill render failed:', e); }
+
         // Hide/Show Discount Section based on payment status
-        const discountSection = document.getElementById(`discount-section-${bookingId}`) || 
+        const discountSection = document.getElementById(`discount-section-${bookingId}`) ||
                                document.querySelector(`#dynamicRoomModal_${bookingId} .discount-section`);
         
         if (discountSection) {
@@ -4231,9 +5409,79 @@ async function calculateBalance(bookingId, currentBookingId) {
             }
         }
         
+        applyMasterGroupSummary(bookingId);
     } catch (error) {
         console.error('❌ Error calculating balance:', error);
     }
+}
+
+// Master Billing (like KGrand): a room that is NOT the main booking has no bill of its own - its window shows the
+// group's single Total / Paid / Balance and says where the payments are recorded (the main booking).
+async function applyMasterGroupSummary(bookingId) {
+    try {
+        const idInput = document.getElementById(`bookingID-${bookingId}`);
+        const realId = idInput && idInput.value ? idInput.value : bookingId;
+        const r = await fetch(`/booking/group-summary/${realId}?_=${Date.now()}`);
+        const d = await r.json();
+        const old = document.getElementById(`group-note-${bookingId}`);
+        if (d && d.success && d.isMaster) markGuestBillGroup(bookingId);
+        if (!d || !d.success || !d.isMaster || d.isMain) { if (old) old.remove(); return; }
+        const money = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const grand = document.getElementById(`grand-total-${bookingId}`);
+        if (grand) grand.innerHTML = `<span class="text-primary"><strong>₱${money(d.total)}</strong></span>`;
+        const paid = document.getElementById(`Paid-${bookingId}`);
+        if (paid) paid.innerHTML = `<span class="text-success"><strong>₱${money(d.paid)}</strong></span>`;
+        const bal = document.getElementById(`Balance-${bookingId}`);
+        if (bal) bal.innerHTML = d.balance > 0 ? `<span class="text-danger"><strong>₱${money(d.balance)}</strong></span>` : '<span class="text-success"><strong>₱0.00</strong></span>';
+        const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        const html = `Part of group <b>${esc(d.groupName)}</b>. The group's bill, payments and refunds are on the main booking (Room ${esc(d.mainRoomNo || '')}). <a href="#" data-open-main="${d.mainBookingId}" style="font-weight:600;">Open main booking</a>`;
+        let note = old;
+        if (!note) {
+            note = document.createElement('div');
+            note.id = `group-note-${bookingId}`;
+            note.style.cssText = 'margin-top:8px;padding:8px 12px;border-radius:6px;background:#f1f3f5;color:#495057;font-size:0.8rem;text-align:left;';
+            const row = document.getElementById(`summary-totals-row-${bookingId}`);
+            if (row && row.parentNode) row.parentNode.insertBefore(note, row.nextSibling);
+        }
+        // Guest Bill card of a room that is not the main booking (KGrand): the group's figures replace this
+        // room's own "balance" line, and paying is done on the main booking, so the Payment button goes.
+        const gbLines = document.getElementById(`guest-bill-lines-${bookingId}`);
+        if (gbLines) {
+            gbLines.querySelectorAll('.gb-state, .gb-group').forEach((el) => el.remove());
+            // Only this room's own bill is listed here (its night(s), extension, services). The group's totals, payments and
+            // balance live on the main booking, so just point there.
+            try {
+                const bd = await fetch(`/booking/booking_details/${realId}?_=${Date.now()}`).then((x) => x.json());
+                window.__gbMate = window.__gbMate || {};
+                window.__gbMate[bookingId] = { rate: parseFloat(bd.ROOM_NIGHT_RATE) || 0, nights: parseInt(bd.ORIGINAL_DAYS, 10) || 1, type: bd.ROOM_TYPE || '' };
+                applyMateRoomLine(bookingId);
+            } catch (e) { /* the bill simply keeps its lines */ }
+            // This room's own bill is shown open (a main booking's group bill starts collapsed).
+            const gbCard = document.getElementById(`guest-bill-${bookingId}`);
+            if (gbCard) {
+                gbCard.classList.remove('gb-collapsed');
+                const gbIcon = gbCard.querySelector('.gb-toggle i');
+                if (gbIcon) gbIcon.className = 'fas fa-chevron-up';
+            }
+            gbLines.insertAdjacentHTML('beforeend',
+                `<div class="gb-note gb-group" style="padding:6px 2px;">The group's full bill, payments and refunds are on the main booking (Room ${esc(d.mainRoomNo || '')}). <a href="#" data-gb-main="${d.mainBookingId}" style="font-weight:600;">Open main booking</a></div>`);
+            const gbLink = gbLines.querySelector('[data-gb-main]');
+            if (gbLink) gbLink.addEventListener('click', (e) => { e.preventDefault(); const l = document.querySelector(`#group-note-${bookingId} [data-open-main]`); if (l) l.click(); });
+        }
+        const gbPay = document.querySelector(`#guest-bill-${bookingId} .gb-btn-pay`);
+        if (gbPay) gbPay.style.display = 'none';
+        note.innerHTML = html;
+        const link = note.querySelector('[data-open-main]');
+        if (link) link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const mainId = link.getAttribute('data-open-main');
+            const modalEl = document.getElementById(`dynamicRoomModal_${bookingId}`);
+            const opener = window.createDynamicRoomModalFromBookingApi || (typeof createDynamicRoomModalFromBookingApi === 'function' ? createDynamicRoomModalFromBookingApi : null);
+            if (!opener) return;
+            if (modalEl && window.bootstrap) { const inst = bootstrap.Modal.getInstance(modalEl); if (inst) inst.hide(); }
+            setTimeout(() => opener(mainId), 350);
+        });
+    } catch (e) { /* the room keeps showing its own numbers */ }
 }
 
 // Parse billing line items into room, extension, and service charges
@@ -4323,8 +5571,10 @@ async function computeCheckoutContext(bookingId) {
         }
 
         const totalBookedDays = originalQty + extensionDays;
-        const isEarlyRoomCheckout = calendarActualDays < originalQty;
-        const isEarlyExtensionCheckout = extensionDays > 0 && calendarActualDays < totalBookedDays;
+        // "No refund" picked in the new check-out window: the guest still pays every night booked.
+        const keepAllNights = window.__bdKeepNights === true;
+        const isEarlyRoomCheckout = !keepAllNights && calendarActualDays < originalQty;
+        const isEarlyExtensionCheckout = !keepAllNights && extensionDays > 0 && calendarActualDays < totalBookedDays;
         const isEarlyCheckout = isEarlyRoomCheckout || isEarlyExtensionCheckout;
 
         const billedRoomDays = isEarlyRoomCheckout ? calendarActualDays : originalQty;
@@ -4456,7 +5706,7 @@ function buildCheckoutOverpaymentHtml(checkoutContext) {
     }
 
     return `
-        <div id="checkoutOverpaymentSection" style="margin-top:15px; padding:12px; background:#f8f9fa; border-radius:6px; border:1px solid #dee2e6; text-align:left;">
+        <div id="checkoutOverpaymentSection" style="${(isEarlyCheckout || hasOverpayment) ? '' : 'display:none; '}margin-top:15px; padding:12px; background:#f8f9fa; border-radius:6px; border:1px solid #dee2e6; text-align:left;">
             <div style="font-weight:600; color:#495057; margin-bottom:10px; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.5px;">
                 <i class="fas fa-receipt"></i> Overpayment / Cancellation
             </div>
@@ -4498,6 +5748,27 @@ function getEffectiveUnpaidBalance(checkoutContextCache, depositInfo) {
         appliedToBalance = Math.min(Math.max(0, depositInfo.amount - deductAmount), balance);
     }
     return Math.max(0, balance - appliedToBalance);
+}
+
+// What is still unpaid at check-out is left as the guest's credit; it needs the name of whoever approved it.
+async function askCreditForBalance(remaining) {
+    const formatted = `₱${parseFloat(remaining).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const r = await Swal.fire({
+        icon: 'warning',
+        title: 'Balance left unpaid',
+        html: `<p style="margin-bottom:8px;"><b>${formatted}</b> is still unpaid.</p><p style="margin-bottom:10px;font-size:.9rem;color:#6c757d;">It will be left as the guest's <b>credit</b>, and the guest is checked out.</p>`,
+        input: 'text',
+        inputLabel: 'Approved by',
+        inputPlaceholder: 'Who approved leaving this unpaid?',
+        inputValidator: (v) => (String(v || '').trim() ? null : 'Enter who approved this.'),
+        showCancelButton: true,
+        confirmButtonText: 'Put on credit & check out',
+        cancelButtonText: 'Go back',
+        confirmButtonColor: '#0c2a42',
+        cancelButtonColor: '#6c757d',
+        heightAuto: false
+    });
+    return r.isConfirmed ? String(r.value).trim() : null;
 }
 
 async function confirmUnpaidBalanceCheckout(remainingBalance) {
@@ -4792,6 +6063,11 @@ function buildCheckoutIntroHtml() {
 // calendar bar over later bookings; otherwise "today" is pre-selected.
 function buildCheckoutDateChoiceHtml(dateChoice) {
     if (!dateChoice) return '';
+
+    // A booking that is due today is checked out straight away: the date choice is only for an early / overdue checkout.
+    const t = new Date();
+    const todayKey = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+    if (dateChoice.scheduled === todayKey) return '';
 
     const overdue = !!dateChoice.overdue;
     let scheduledPretty = 'the scheduled date';
@@ -5092,10 +6368,7 @@ async function runCheckoutPreConfirm(bookingId, depositInfo, { allowScopeSelecti
             Swal.showValidationMessage('Please enter a valid refund amount.');
             return false;
         }
-        if (amount === 0) {
-            Swal.showValidationMessage('Please enter a refund amount greater than 0.');
-            return false;
-        }
+        // 0 is allowed: the hotel keeps the whole overpayment as a penalty (no refund) - same as unticking "With refund".
 
         try {
             const context = await ensureCheckoutContext();
@@ -5172,7 +6445,8 @@ async function runCheckoutPreConfirm(bookingId, depositInfo, { allowScopeSelecti
     const dateModeSel = document.querySelector('input[name="checkoutDateMode"]:checked');
     if (dateModeSel && dateModeSel.value === 'scheduled') checkoutDateMode = 'scheduled';
 
-    return { hasRefund, amount, scope, penaltyAmount: cancellationFee, applyDiscount, checkoutDateMode };
+    // A refund of 0 is a checkout with no refund (the overpayment stays as the penalty).
+    return { hasRefund: hasRefund && amount > 0, amount, scope, penaltyAmount: cancellationFee, applyDiscount, checkoutDateMode };
 }
 
 function restoreCheckoutModalFocus(focusState) {
@@ -5294,6 +6568,19 @@ function getCheckoutPaymentBalanceFromContext(checkoutContext, applyDiscount = f
     return Math.max(0, checkoutContext.grossTotal - checkoutContext.reservationFee - discount - checkoutContext.totalPaid);
 }
 
+// A single booking leaving early with "No refund" (the nights not stayed are still billed) or a penalty: bd_checkout.js sets
+// window.__bdSingleExtra = { bookingId, extra } so the Payment window asks for that amount too.
+function getCheckoutSingleExtra(bookingId) {
+    const x = window.__bdSingleExtra;
+    return (x && String(x.bookingId) === String(bookingId)) ? (Number(x.extra) || 0) : 0;
+}
+
+function getCheckoutPaymentBalanceForBooking(bookingId, checkoutContext, applyDiscount = false) {
+    if (!checkoutContext) return 0;
+    const discount = applyDiscount ? (checkoutContext.discountAmount || 0) : 0;
+    return Math.max(0, checkoutContext.grossTotal + getCheckoutSingleExtra(bookingId) - checkoutContext.reservationFee - discount - checkoutContext.totalPaid);
+}
+
 function buildCheckoutPaymentBreakdown(checkoutContext, applyDiscount = false) {
     if (!checkoutContext) {
         return {
@@ -5335,12 +6622,36 @@ async function finalizeRoomMenuCheckoutAfterPayment() {
     if (!pending) return;
 
     const checkoutContext = await computeCheckoutContext(pending.bookingId);
-    const remainingBalance = getCheckoutPaymentBalanceFromContext(checkoutContext, pending.applyDiscount);
+    let remainingBalance = getCheckoutPaymentBalanceForBooking(pending.bookingId, checkoutContext, pending.applyDiscount);
+    // A one-bill group's main room: what is left is the GROUP's balance, after the nights released by this check-out.
+    const gp = (window.__bdGroupPay && String(window.__bdGroupPay.bookingId) === String(pending.bookingId)) ? window.__bdGroupPay : null;
+    if (gp) {
+        try {
+            const gs = await fetch(`/booking/group-summary/${pending.bookingId}?_=${Date.now()}`).then((x) => x.json());
+            remainingBalance = Math.max(0, Math.round(((Number(gs && gs.balance) || 0) - (Number(gp.released) || 0)) * 100) / 100);
+        } catch (e) { remainingBalance = 0; }
+    }
 
-    if (remainingBalance > 0) {
-        const confirmed = await confirmUnpaidBalanceCheckout(remainingBalance);
-        if (!confirmed) {
+    // Something is still unpaid after the payment: it is left as the guest's credit (approved by someone), then the check-out goes on.
+    if (remainingBalance > 0.005) {
+        const approver = await askCreditForBalance(remainingBalance);
+        if (!approver) {
             window._pendingRoomMenuCheckout = null;
+            window.__bdGroupPay = null;
+            return;
+        }
+        try {
+            const pr = await fetch('/booking/process-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bookingId: pending.bookingId, paymentAmount: remainingBalance, paymentMethod: 'credit', paymentNotes: `Credit approved by: ${approver}.` })
+            });
+            const pj = await pr.json();
+            if (!pr.ok || !(pj && pj.success)) throw new Error((pj && (pj.message || pj.error)) || 'Credit could not be recorded');
+        } catch (e) {
+            window._pendingRoomMenuCheckout = null;
+            window.__bdGroupPay = null;
+            Swal.fire({ icon: 'error', title: 'Not checked out', text: `The balance could not be put on credit (${e.message}).`, heightAuto: false });
             return;
         }
     }
@@ -5356,6 +6667,8 @@ async function finalizeRoomMenuCheckoutAfterPayment() {
     } = pending;
     window._pendingRoomMenuCheckout = null;
     window.onPaymentConfirmed = null;
+    window.__bdGroupPay = null;
+    window.__bdSingleExtra = null;
 
     startCheckoutProcess(
         bookingId,
@@ -5397,8 +6710,11 @@ async function openRoomMenuCheckoutPaymentModal(bookingId, paymentBalance, check
     }
     if (hiddenBookingIdInput) hiddenBookingIdInput.dataset.roomNumber = roomNumber;
 
-    const breakdown = buildCheckoutPaymentBreakdown(checkoutContext, applyDiscount);
-    const grossBalance = getCheckoutPaymentBalanceFromContext(checkoutContext, applyDiscount);
+    // A one-bill group's main room pays for the whole group (set by bd_checkout.js): its numbers replace this room's own.
+    const groupPay = (window.__bdGroupPay && String(window.__bdGroupPay.bookingId) === String(bookingId)) ? window.__bdGroupPay : null;
+    const breakdown = groupPay ? Object.assign({}, buildCheckoutPaymentBreakdown(checkoutContext, applyDiscount), groupPay.breakdown) : buildCheckoutPaymentBreakdown(checkoutContext, applyDiscount);
+    if (!groupPay) breakdown.roomAmount = (breakdown.roomAmount || 0) + getCheckoutSingleExtra(bookingId);
+    const grossBalance = groupPay ? groupPay.balance : getCheckoutPaymentBalanceForBooking(bookingId, checkoutContext, applyDiscount);
 
     if (depositInfo?.exists && window.PaymentDepositSection) {
         window.PaymentDepositSection.configure({
@@ -5453,9 +6769,11 @@ async function openRoomMenuCheckoutPaymentModal(bookingId, paymentBalance, check
         confirmBtn.classList.add('btn-success');
     }
 
-    window.onPaymentConfirmed = function onCheckoutPaymentConfirmed() {
+    // kept in a variable: the hidden handler below compares against it (a function expression's own name is not visible outside it)
+    const onCheckoutPaymentConfirmed = function () {
         finalizeRoomMenuCheckoutAfterPayment();
     };
+    window.onPaymentConfirmed = onCheckoutPaymentConfirmed;
 
     const onHidden = function onCheckoutPaymentModalHidden() {
         paymentModalEl.removeEventListener('hidden.bs.modal', onHidden);
@@ -5463,6 +6781,8 @@ async function openRoomMenuCheckoutPaymentModal(bookingId, paymentBalance, check
         if (window.onPaymentConfirmed === onCheckoutPaymentConfirmed) {
             window.onPaymentConfirmed = null;
             window._pendingRoomMenuCheckout = null;
+            window.__bdGroupPay = null;
+            window.__bdSingleExtra = null;
         }
         if (window.PaymentDepositSection) {
             window.PaymentDepositSection.hide();
@@ -5485,7 +6805,8 @@ async function beginCheckoutPaymentFlow(bookingId, checkoutParams, depositInfo) 
     }
     window._checkoutContextCache = checkoutContext;
 
-    const paymentBalance = getCheckoutPaymentBalanceFromContext(checkoutContext, checkoutParams.applyDiscount);
+    const groupPay = (window.__bdGroupPay && String(window.__bdGroupPay.bookingId) === String(bookingId)) ? window.__bdGroupPay : null;
+    const paymentBalance = groupPay ? groupPay.balance : getCheckoutPaymentBalanceForBooking(bookingId, checkoutContext, checkoutParams.applyDiscount);
     storePendingRoomMenuCheckout(bookingId, checkoutParams);
 
     if (paymentBalance > 0 || depositInfo?.exists) {
@@ -5504,6 +6825,14 @@ async function beginCheckoutPaymentFlow(bookingId, checkoutParams, depositInfo) 
 
 // Trigger checkout: use SweetAlert with a refund checkbox and amount input
 function triggerCheckout(bookingId) {
+    // Calendar: the simple KGrand-style check-out window (bd_checkout.js). It hands the cases it does not cover yet
+    // (the whole group, groups with a bill per room) back to the old dialog below.
+    if (!window.__bdLegacyCheckout && typeof window.bdCheckoutOpen === 'function' && document.getElementById('calendar')) {
+        return window.bdCheckoutOpen(bookingId, () => {
+            window.__bdLegacyCheckout = true;
+            try { triggerCheckout(bookingId); } finally { window.__bdLegacyCheckout = false; }
+        });
+    }
     // Inject one-time styles for prettier Swal
     if (!document.getElementById('swal-checkout-styles')) {
         const style = document.createElement('style');
@@ -5570,7 +6899,13 @@ function triggerCheckout(bookingId) {
         .then(r => r.ok ? r.json() : null)
         .then(async (groupData) => {
             const isGroupBooking = !!(groupData && groupData.success && groupData.isGroup);
-            const groupHtml = isGroupBooking ? `
+            // The user already picked "the whole group" in the new check-out window -> don't ask the scope again.
+            const forcedScope = window.__bdForceScope || null;
+            window.__bdForceScope = null;
+            const groupHtml = (isGroupBooking && (forcedScope === 'group' || forcedScope === 'individual')) ? `
+                <div style="display:none;"><input type="radio" name="checkoutScope" value="${forcedScope}" checked></div>
+                <p style="text-align:center; margin:8px 0 0; font-weight:600; color:#0c2a42;">${forcedScope === 'group' ? 'Checking out the whole group' : 'Checking out this room only'}</p>
+            ` : isGroupBooking ? `
                 <div style="text-align:left; margin-top:10px;">
                     <label class="form-label" style="margin-bottom:4px;">Checkout Scope</label>
                     <div class="form-check">
@@ -5624,7 +6959,7 @@ function startCheckoutProcess(bookingId, hasRefund, refundAmount = 0, scope = 'i
     const runCheckoutApi = () => fetch('/booking/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId, scope, hasRefund, refundAmount, penaltyAmount, applyDiscount, checkoutDateMode })
+        body: JSON.stringify({ bookingId, scope, hasRefund, refundAmount, penaltyAmount, applyDiscount, checkoutDateMode, keepBookedNights: window.__bdKeepNights === true })
     })
         .then(r => {
             if (!r.ok) {
@@ -6966,7 +8301,7 @@ function openExtendModal(roomId, checkoutDate, bookingId, roomNumber) {
                 <label for="costPerDay_${bookingId}" class="form-label" style="color: #495057;">
                   <i class="fas fa-dollar-sign me-2"></i>Cost Per Day
                 </label>
-                <input type="number" id="costPerDay_${bookingId}" class="form-control" min="0" step="0.01" placeholder="Enter cost per day" onchange="calculateExtensionCost('${bookingId}')" style="background-color: #ffffff; border: 1px solid #ced4da; color: #495057;">
+                <input type="number" id="costPerDay_${bookingId}" class="form-control" min="0" step="0.01" placeholder="Enter cost per day" oninput="calculateExtensionCost('${bookingId}')" onchange="calculateExtensionCost('${bookingId}')" style="background-color: #ffffff; border: 1px solid #ced4da; color: #495057;">
           
               </div>
             </div>
@@ -9623,6 +10958,8 @@ function viewFullBookingDetails(bookingId) {
 
 // Function to load existing services from database for the dynamic modal
 function loadExistingServicesForModal(bookingId) {
+    refreshGroupRemoveButton(bookingId);
+    fillGroupTag(bookingId);
     fetch(`/booking/get-booking-services/${bookingId}`)
         .then(response => response.json())
         .then(response => {
@@ -9676,6 +11013,7 @@ function loadExistingServicesForModal(bookingId) {
                         QUANTITY: quantity,
                         STATUS: service.STATUS || 'unpaid',
                         IS_CUSTOM: service.SERVICE_ID === -1,
+                        BS_ID: service.BS_ID,
                         ALREADY_SAVED: true // Mark as already saved since it came from database
                     });
                 });
@@ -9817,7 +11155,7 @@ function createRemarksModal(bookingId) {
                         </div>
                         <div class="card-body p-0">
                             <div class="table-responsive">
-                                <table class="table table-hover mb-0" id="remarksTable_${bookingId}" style="background-color: white;">
+                                <table class="table table-hover mb-0" id="remarksTable_${bookingId}" data-remarks="1">
                                     <thead style="background-color: #6c757d; color: white;">
                                         <tr>
                                             <th style="width: 45%; color: white;">Remark</th>
@@ -9827,7 +11165,7 @@ function createRemarksModal(bookingId) {
                                             <th style="width: 10%; color: white;">Actions</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="remarksTableBody_${bookingId}" style="background-color: white; color: black;">
+                                    <tbody id="remarksTableBody_${bookingId}">
                                         <!-- Remarks will be populated here -->
                                     </tbody>
                                 </table>
@@ -10012,25 +11350,23 @@ function updateRemarksTable(bookingId) {
     // Add each remark to table
     remarks.forEach(remark => {
         const row = document.createElement('tr');
-        row.style.backgroundColor = 'white';
-        row.style.color = 'black';
         row.innerHTML = `
-            <td style="background-color: white; color: #6c757d;">
+            <td class="rm-td">
                 <div style="max-width: 300px; word-wrap: break-word;">
                     ${remark.REMARK_TEXT}
                 </div>
             </td>
-            <td style="background-color: white; color: #6c757d;">
+            <td class="rm-td">
                 ${remark.CATEGORY}
             </td>
-            <td style="background-color: white; color: #6c757d;">${remark.EDITDED_BY_NAME || remark.EDITDED_BY || remark.ENCODED_BY_NAME || remark.ENCODED_BY}</td>
-            <td style="background-color: white; color: #6c757d;">
-                <small style="color: #6c757d;">
+            <td class="rm-td">${remark.EDITDED_BY_NAME || remark.EDITDED_BY || remark.ENCODED_BY_NAME || remark.ENCODED_BY}</td>
+            <td class="rm-td">
+                <small class="rm-small">
                     ${new Date(remark.EDITDED_DT || remark.ENCODED_DT).toLocaleDateString()}<br>
                     ${new Date(remark.EDITDED_DT || remark.ENCODED_DT).toLocaleTimeString()}
                 </small>
             </td>
-            <td style="background-color: white; color: black;">
+            <td class="rm-td">
                 <i class="fas fa-edit text-primary me-2" onclick="editRemark('${bookingId}', ${remark.IDNo})" title="Edit Remark" style="cursor: pointer; font-size: 16px;"></i>
                 <i class="fas fa-trash text-danger" onclick="deleteRemark('${bookingId}', ${remark.IDNo})" title="Delete Remark" style="cursor: pointer; font-size: 16px;"></i>
             </td>
@@ -10525,10 +11861,10 @@ function renderComplaintRequests(bookingId, rows) {
             : `<i class=\"fas fa-check-circle text-success\" title=\"Mark Completed\" style=\"cursor:pointer;\" onclick=\"toggleComplaintRequestStatus(${r.IDNo}, 1, '${bookingId}')\"></i>`;
         tr.innerHTML = `
             <td style="background-color: white; color: #6c757d; max-width:380px; word-wrap:break-word;">${r.DETAILS}</td>
-            <td style="background-color: white; color: #6c757d;">${type}</td>
+            <td class="rm-td">${type}</td>
             <td style="background-color: white;">${badge}</td>
-            <td style="background-color: white; color: #6c757d;">${(r.EDITDED_BY_NAME || r.EDITDED_BY) ? (r.EDITDED_BY_NAME || r.EDITDED_BY) : (r.ENCODED_BY_NAME || r.ENCODED_BY || '')}</td>
-            <td style="background-color: white; color: #6c757d;">${when}</td>
+            <td class="rm-td">${(r.EDITDED_BY_NAME || r.EDITDED_BY) ? (r.EDITDED_BY_NAME || r.EDITDED_BY) : (r.ENCODED_BY_NAME || r.ENCODED_BY || '')}</td>
+            <td class="rm-td">${when}</td>
             <td style="background-color: white;">
                 <i class=\"fas fa-edit text-primary me-2\" title=\"Edit\" style=\"cursor:pointer;\" onclick=\"editComplaintRequest(${r.IDNo}, '${bookingId}', '${String(r.TYPE).toLowerCase()}', \`${(r.DETAILS || '').replace(/`/g, '\\`').replace(/\\/g, '\\\\')}\`)\"></i>
                 ${markAction}
@@ -10708,3 +12044,218 @@ window.updateComplaintRequest = updateComplaintRequest;
 
 // Function to load services
 
+
+
+// Print menu of the Booking details action bar: Voucher / Quotation (the billing receipt is the Receipt button of the Guest Bill card)
+(function initBdPrintMenu() {
+    if (window.toggleBdPrintMenu) return;
+    function closeMenu() {
+        const m = document.getElementById('bd-print-menu');
+        if (m) m.remove();
+    }
+    window.closeBdPrintMenu = closeMenu;
+    window.toggleBdPrintMenu = function (bookingId, ev) {
+        if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+        const existing = document.getElementById('bd-print-menu');
+        if (existing) { existing.remove(); return; }
+        const btn = ev && ev.currentTarget;
+        if (!btn) return;
+        const r = btn.getBoundingClientRect();
+        const menu = document.createElement('div');
+        menu.id = 'bd-print-menu';
+        menu.style.cssText = 'position:fixed;z-index:200000;min-width:190px;background:#fff;border:1px solid #ced4da;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:4px;font-size:13px;';
+        const items = [
+            ['fa-file-pdf', 'Voucher', () => window.printVoucher(bookingId)],
+            ['fa-file-invoice', 'Quotation', () => window.open('/booking/quotation?bookingId=' + encodeURIComponent(bookingId), '_blank')]
+        ];
+        items.forEach(([icon, label, fn]) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.style.cssText = 'display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px;border:0;background:transparent;color:#343a40;text-align:left;border-radius:6px;cursor:pointer;';
+            b.innerHTML = '<i class="fas ' + icon + '" style="width:14px;color:#6c757d"></i><span>' + label + '</span>';
+            b.onmouseenter = () => { b.style.background = '#f1f3f5'; };
+            b.onmouseleave = () => { b.style.background = 'transparent'; };
+            b.onclick = (e) => { e.stopPropagation(); closeMenu(); fn(); };
+            menu.appendChild(b);
+        });
+        document.body.appendChild(menu);
+        const w = menu.offsetWidth;
+        menu.style.top = (r.bottom + 4) + 'px';
+        menu.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w)) + 'px';
+        setTimeout(() => {
+            document.addEventListener('click', closeMenu, { once: true });
+        }, 0);
+    };
+})();
+
+// Check in from the booking details window.
+window.bdCheckIn = async function (bookingId, roomNumber, event, group) {
+    const btn = document.getElementById(`bd-checkin-${bookingId}`);
+    const fail = (title, html) => {
+        if (window.Swal) Swal.fire({ icon: "error", title, html, confirmButtonColor: "#dc3545", confirmButtonText: "OK", allowOutsideClick: false, heightAuto: false });
+        else alert(String(html).replace(/<[^>]+>/g, ""));
+    };
+    if (btn) btn.disabled = true;
+    try {
+        const res = await fetch("/dashboard/booking/check_room_occupied", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ BookingID: bookingId })
+        });
+        const r = await res.json();
+        if (r && r.success && r.isCleaning) {
+            fail("Cannot check in", `Room ${roomNumber} is under cleaning. Mark it clean first (Cleaning Rooms button on the calendar), then check the guest in.`);
+            if (btn) btn.disabled = false;
+            return;
+        }
+        if (r && r.success && r.isOccupied) {
+            fail("Cannot check in", `Room ${roomNumber} is still occupied.${r.data ? ` Currently checked in: <b>${r.data.CustomerName || "another guest"}</b>.` : ""}`);
+            if (btn) btn.disabled = false;
+            return;
+        }
+    } catch (e) {
+        fail("Error", "Could not check the room status. Please try again.");
+        if (btn) btn.disabled = false;
+        return;
+    }
+    if (group && !group.isMain) {
+        // Group room (not the main booking): no deposit here - it is held on the main booking. Just check the room in.
+        const ok = await window.bdCheckInPlain(bookingId);
+        if (ok) window.bdCheckInDone(bookingId, `Room ${roomNumber} checked in.`);
+        else if (btn) btn.disabled = false;
+        return;
+    }
+    if (typeof SecurityDepositCheckIn === "undefined") {
+        fail("Error", "The check-in module is not loaded. Please refresh the page.");
+        if (btn) btn.disabled = false;
+        return;
+    }
+    SecurityDepositCheckIn.open({
+        bookingId,
+        roomNumber,
+        onSuccess: (response) => {
+            const dep = response && response.data && response.data.securityDeposit
+                ? ` Security deposit: ₱${parseFloat(response.data.securityDeposit).toLocaleString("en-US", { minimumFractionDigits: 2 })} recorded.` : "";
+            try { if (typeof PMSCore !== "undefined") PMSCore.showSuccess("Check-In Successful!", `The guest has been checked in.${dep}`); } catch (e) { /* no-op */ }
+            const m = document.getElementById(`dynamicRoomModal_${bookingId}`);
+            try { if (m && window.bootstrap) { const inst = bootstrap.Modal.getInstance(m); if (inst) inst.hide(); } } catch (e) { /* no-op */ }
+            try { if (typeof scheduleCalendarRefresh === "function") scheduleCalendarRefresh(); else if (typeof refreshCalendarBookings === "function") refreshCalendarBookings(); } catch (e) { /* no-op */ }
+            try {
+                if (typeof dashboardSocket !== "undefined" && dashboardSocket) {
+                    dashboardSocket.emit("dashboard-updated", { action: "calendar-checkin", message: `Booking ${bookingId} checked in`, data: response && response.data });
+                }
+            } catch (e) { /* no-op */ }
+        },
+        onCancel: () => { if (btn) btn.disabled = false; }
+    });
+    // The deposit window is part of the page, the booking details window is added later: put it above every open modal.
+    const liftDeposit = () => {
+        const dm = document.getElementById("securityDepositModal");
+        if (!dm) return;
+        if (dm.parentElement !== document.body) document.body.appendChild(dm);
+        let maxZ = 1055;
+        document.querySelectorAll(".modal.show").forEach((m) => {
+            if (m === dm) return;
+            const z = parseInt(window.getComputedStyle(m).zIndex, 10);
+            if (Number.isFinite(z)) maxZ = Math.max(maxZ, z);
+        });
+        dm.style.setProperty("z-index", String(maxZ + 20), "important");
+        const bds = document.querySelectorAll(".modal-backdrop");
+        if (bds.length) { const b = bds[bds.length - 1]; b.style.setProperty("z-index", String(maxZ + 15), "important"); b.style.setProperty("opacity", ".35", "important"); }
+    };
+    const dmEl = document.getElementById("securityDepositModal");
+    if (dmEl) { dmEl.addEventListener("show.bs.modal", () => { if (dmEl.parentElement !== document.body) document.body.appendChild(dmEl); }, { once: true }); dmEl.addEventListener("shown.bs.modal", liftDeposit, { once: true }); }
+    setTimeout(liftDeposit, 60);
+};
+// Shared finish for the check-in buttons: toast, close the details window, refresh the calendar, tell other screens.
+window.bdCheckInDone = function (bookingId, message, data) {
+    try { if (typeof PMSCore !== "undefined") PMSCore.showSuccess("Check-In Successful!", message); } catch (e) { /* no-op */ }
+    const m = document.getElementById(`dynamicRoomModal_${bookingId}`);
+    try { if (m && window.bootstrap) { const inst = bootstrap.Modal.getInstance(m); if (inst) inst.hide(); } } catch (e) { /* no-op */ }
+    try { if (typeof scheduleCalendarRefresh === "function") scheduleCalendarRefresh(); else if (typeof refreshCalendarBookings === "function") refreshCalendarBookings(); } catch (e) { /* no-op */ }
+    try { if (typeof dashboardSocket !== "undefined" && dashboardSocket) dashboardSocket.emit("dashboard-updated", { action: "calendar-checkin", message: `Booking ${bookingId} checked in`, data }); } catch (e) { /* no-op */ }
+};
+
+// Check a booking in with no deposit and no early fee (the other rooms of a group: the deposit is on the main booking).
+window.bdCheckInPlain = async function (id) {
+    try {
+        const res = await fetch("/dashboard/booking/check-in-with-deposit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ BookingID: id }) });
+        const r = await res.json();
+        if (!r || !r.success) {
+            if (window.Swal) Swal.fire({ icon: "error", title: "Check-in failed", text: (r && r.message) || "Could not check the room in.", heightAuto: false });
+            return false;
+        }
+        return true;
+    } catch (e) {
+        if (window.Swal) Swal.fire({ icon: "error", title: "Error", text: "Could not check the room in.", heightAuto: false });
+        return false;
+    }
+};
+
+// Check in the whole group: every room must be ready first; the deposit (and early fee) is asked once, on the main booking.
+window.bdCheckInGroup = async function (bookingId, g) {
+    const pend = (g.rooms || []).filter((x) => String(x.status || "").toLowerCase() === "pending");
+    const bad = [];
+    for (const x of pend) {
+        try {
+            const res = await fetch("/dashboard/booking/check_room_occupied", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ BookingID: x.id }) });
+            const r = await res.json();
+            if (r && r.success && r.isCleaning) bad.push(`Room ${x.roomNo} is under cleaning`);
+            else if (r && r.success && r.isOccupied) bad.push(`Room ${x.roomNo} is still occupied`);
+        } catch (e) { bad.push(`Room ${x.roomNo}: could not check its status`); }
+    }
+    if (bad.length) {
+        if (window.Swal) Swal.fire({ icon: "error", title: "Cannot check in the whole group", html: bad.join("<br>") + "<br><br>Fix these rooms first, or check in the ready rooms one by one.", heightAuto: false });
+        return;
+    }
+    const doRest = async (skipId) => {
+        let failed = 0;
+        for (const x of pend) { if (String(x.id) === String(skipId)) continue; if (!(await window.bdCheckInPlain(x.id))) failed++; }
+        return failed;
+    };
+    const mainPending = pend.find((x) => String(x.id) === String(g.mainBookingId));
+    if (!mainPending) {
+        const failed = await doRest(null);
+        if (!failed) window.bdCheckInDone(bookingId, `${pend.length} room(s) checked in.`);
+        return;
+    }
+    if (typeof SecurityDepositCheckIn === "undefined") {
+        if (window.Swal) Swal.fire({ icon: "error", title: "Error", text: "The check-in module is not loaded. Please refresh the page.", heightAuto: false });
+        return;
+    }
+    SecurityDepositCheckIn.open({
+        bookingId: g.mainBookingId,
+        roomNumber: g.mainRoomNo,
+        onSuccess: async (response) => {
+            const failed = await doRest(g.mainBookingId);
+            if (failed && window.Swal) Swal.fire({ icon: "warning", title: "Some rooms were not checked in", text: `${failed} room(s) failed - check them in one by one.`, heightAuto: false });
+            window.bdCheckInDone(bookingId, `The whole group (${pend.length} rooms) is checked in.`, response && response.data);
+        }
+    });
+    setTimeout(() => { const dm = document.getElementById("securityDepositModal"); if (dm) dm.style.setProperty("z-index", "1200", "important"); const b = document.querySelectorAll(".modal-backdrop"); if (b.length) b[b.length - 1].style.setProperty("z-index", "1195", "important"); }, 60);
+};
+
+// Edit the reservation from the booking details window: close the details first so the edit form is not stacked under it.
+window.bdEditBooking = function (bookingId) {
+    const m = document.getElementById(`dynamicRoomModal_${bookingId}`);
+    try { if (m && window.bootstrap) { const inst = bootstrap.Modal.getInstance(m); if (inst) inst.hide(); } } catch (e) { /* no-op */ }
+    const editOne = () => {
+        if (typeof window.editBookingFromCalendar === "function") window.editBookingFromCalendar(bookingId);
+        else if (typeof window.editBooking === "function") window.editBooking(bookingId);
+    };
+    // A booking of a group opens the edit form of the WHOLE group (all its rooms, like the reservation); a single booking opens its own form.
+    fetch(`/payments/group-breakdown/${bookingId}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+            if (d && d.isGroup && d.groupId && Array.isArray(d.bookings) && d.bookings.length > 1) {
+                if (typeof window.editGroupBooking === "function" && document.getElementById("modal-edit-group-booking")) {
+                    setTimeout(() => window.editGroupBooking(d.groupId), 250);          // the pop-up, over the page that is open
+                } else {
+                    window.location.href = `/booking/group?editGroup=${encodeURIComponent(d.groupId)}`;   // a page without the pop-up
+                }
+            } else {
+                setTimeout(editOne, 250);
+            }
+        })
+        .catch(() => setTimeout(editOne, 250));
+};

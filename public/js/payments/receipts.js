@@ -228,7 +228,48 @@ function setReceiptPickerDate(id, value) {
   }
 }
 
+// ---- E-signature: staff upload an image of the signature; it is shrunk in the browser and stored with the receipt ----
+function setReceiptSignature(prefix, dataUrl) {
+  $('#' + prefix + 'Signature').val(dataUrl || '');
+  const $p = $('#' + prefix + 'SigPreview');
+  if (dataUrl) {
+    $p.empty().append($('<img>').attr('src', dataUrl).css({ maxHeight: '70px', maxWidth: '100%', background: '#fff', padding: '4px', borderRadius: '4px' }));
+  } else {
+    $p.html('<span class="text-muted">No signature - the receipt prints a blank line for handwritten signing.</span>');
+  }
+  $('#' + prefix + 'SigClear').toggle(!!dataUrl);
+  $('#' + prefix + 'SigFile').val('');
+}
+
+function handleReceiptSignatureFile(prefix, file) {
+  if (!file) return;
+  if (!/^image\/(png|jpeg|webp)$/.test(file.type)) {
+    Swal.fire('Invalid file', 'Please upload a PNG, JPG or WEBP image of the signature.', 'warning');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function () {
+    const img = new Image();
+    img.onload = function () {
+      const maxW = 400, maxH = 160;
+      const scale = Math.min(1, maxW / img.width, maxH / img.height);
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.width * scale));
+      c.height = Math.max(1, Math.round(img.height * scale));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); // PNG keeps a transparent background transparent
+      setReceiptSignature(prefix, c.toDataURL('image/png'));
+    };
+    img.onerror = function () { Swal.fire('Invalid file', 'That image could not be read.', 'error'); };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 function setupReceiptHandlers() {
+  ['add', 'edit'].forEach(function (prefix) {
+    $('#' + prefix + 'SigFile').on('change', function () { handleReceiptSignatureFile(prefix, this.files && this.files[0]); });
+    $('#' + prefix + 'SigClear').on('click', function () { setReceiptSignature(prefix, ''); });
+  });
   setupGuestSearch('add');
   setupGuestSearch('edit');
   setupReceiptDatePickers();
@@ -241,6 +282,7 @@ function setupReceiptHandlers() {
     }
     toggleOtherMethod('add');
     hideGuestSearchResults('add');
+    setReceiptSignature('add', ''); // a fresh receipt starts without a signature
     $('#addReceiptModal').modal('show');
   });
 
@@ -383,7 +425,8 @@ function buildReceiptPayload(prefix) {
     paymentMethod: $('#' + prefix + 'PaymentMethod').val(),
     paymentMethodOther: $('#' + prefix + 'PaymentMethodOther').val(),
     purpose: $('#' + prefix + 'Purpose').val(),
-    receivedBy: $('#' + prefix + 'ReceivedBy').val()
+    receivedBy: $('#' + prefix + 'ReceivedBy').val(),
+    signature: $('#' + prefix + 'Signature').val() || ''
   };
 }
 
@@ -431,6 +474,7 @@ function openEditReceiptModal(id) {
       $('#editPurpose').val(receipt.PURPOSE || '');
       toggleOtherMethod('edit');
       hideGuestSearchResults('edit');
+      setReceiptSignature('edit', receipt.SIGNATURE || '');
       $('#editReceiptModal').modal('show');
     },
     error: function () {

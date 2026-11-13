@@ -730,10 +730,11 @@
             <select id="rateSummaryCategory" class="rate-summary-discount-input" style="width: auto; min-width: 160px;">
               <option value="walk_in" selected>Walk-in</option>
               <option value="agency">Agency</option>
-              <option value="tenant">Tenant (15%)</option>
-              <option value="vip">VIP (20%)</option>
-              <option value="employee">Employee (30%)</option>
-              <option value="senior_special">Senior/Special (20%)</option>
+              <% if (!(typeof hideRate === 'function' && hideRate('contracted'))) { %><option value="contracted">Contracted</option><% } %><% (typeof customRates !== 'undefined' ? customRates : []).forEach(function (r) { %><option value="<%= r.key %>" data-base-label="<%= r.label %>"><%= r.label %></option><% }); %>
+              <% if (!(typeof hideRate === 'function' && hideRate('tenant'))) { %><option value="tenant">Tenant (15%)</option><% } %>
+              <% if (!(typeof hideRate === 'function' && hideRate('vip'))) { %><option value="vip">VIP (20%)</option><% } %>
+              <% if (!(typeof hideRate === 'function' && hideRate('employee'))) { %><option value="employee">Employee (30%)</option><% } %>
+              <% if (!(typeof hideRate === 'function' && hideRate('senior_special'))) { %><option value="senior_special">Senior/Special (20%)</option><% } %>
             </select>
           </div>
 

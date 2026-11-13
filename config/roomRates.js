@@ -53,6 +53,8 @@ const BREAKFAST_OPTIONS = [
 const CATEGORIES = [
   { key: 'walk_in', label: 'Walk-in Rate' },
   { key: 'agency', label: 'Agency Rate' },
+  // Contracted Rate: its own price list where a property has one (a property that does not offers it via HIDDEN_RATE_OPTIONS)
+  { key: 'contracted', label: 'Contracted Rate' },
   { key: 'tenant', label: '세입자 (15%) — Tenant' },
   { key: 'vip', label: 'VIP (20%)' },
   { key: 'employee', label: '임직원 (30%) — Employee' },
@@ -159,9 +161,12 @@ const BED_TYPE_KEYS = new Set(BED_TYPES.map((b) => b.key));
 const BREAKFAST_KEYS = new Set(BREAKFAST_OPTIONS.map((b) => b.key));
 
 // Validate the four fixed axes. Room type is validated against the DB, not here.
+// Custom rate categories ("Promos"...) made on the Room Rates page are stored as 'custom_<id>' (table rate_category).
+const isCustomCategory = (key) => /^custom_\d+$/.test(String(key || ''));
+
 function isValidAxes(season, category, dayRange, breakfast) {
   return SEASON_KEYS.has(season)
-    && CATEGORY_KEYS.has(category)
+    && (CATEGORY_KEYS.has(category) || isCustomCategory(category))
     && DAY_RANGE_KEYS.has(dayRange)
     && BREAKFAST_KEYS.has(breakfast);
 }
@@ -180,6 +185,8 @@ function isValidCell(category, dayRange, bedTypeOrBreakfast, breakfast) {
 function seedRows() {
   const rows = [];
   for (const { key: category } of CATEGORIES) {
+    // A category with no printed Main Hotel sheet (e.g. 'contracted', priced per property) has nothing to seed.
+    if (!SEED[category]) continue;
     for (const { key: dayRange } of DAY_RANGES) {
       for (const bedSlug of BED_SLUGS) {
         for (const { key: breakfast } of BREAKFAST_OPTIONS) {
@@ -212,6 +219,7 @@ module.exports = {
   LONG_TERM_BANDS,
   longTermCategoryForNights,
   isValidAxes,
+  isCustomCategory,
   isValidCell,
   seedRows
 };

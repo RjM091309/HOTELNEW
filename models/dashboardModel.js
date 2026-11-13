@@ -117,7 +117,7 @@ class DashboardModel {
           COALESCE((
             SELECT SUM(p.AMOUNT_PAID)
             FROM payments p
-            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
+            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund') AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL)
               AND (
                 p.BOOKING_ID = b.IDNo
                 OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -136,7 +136,7 @@ class DashboardModel {
             - COALESCE((
               SELECT SUM(p.AMOUNT_PAID)
               FROM payments p
-              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund') AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL)
                 AND (
                   p.BOOKING_ID = b.IDNo
                   OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -211,7 +211,7 @@ class DashboardModel {
           COALESCE((
             SELECT SUM(p.AMOUNT_PAID)
             FROM payments p
-            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
+            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund') AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL)
               AND (
                 p.BOOKING_ID = b.IDNo
                 OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -230,7 +230,7 @@ class DashboardModel {
             - COALESCE((
               SELECT SUM(p.AMOUNT_PAID)
               FROM payments p
-              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund') AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL)
                 AND (
                   p.BOOKING_ID = b.IDNo
                   OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -354,7 +354,7 @@ class DashboardModel {
           COALESCE((
             SELECT SUM(p.AMOUNT_PAID)
             FROM payments p
-            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
+            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund') AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL)
               AND (
                 p.BOOKING_ID = b.IDNo
                 OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -373,7 +373,7 @@ class DashboardModel {
             - COALESCE((
               SELECT SUM(p.AMOUNT_PAID)
               FROM payments p
-              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund') AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL)
                 AND (
                   p.BOOKING_ID = b.IDNo
                   OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -452,7 +452,7 @@ class DashboardModel {
           COALESCE((
             SELECT SUM(p.AMOUNT_PAID)
             FROM payments p
-            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
+            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund') AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL)
               AND (
                 p.BOOKING_ID = b.IDNo
                 OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -471,7 +471,7 @@ class DashboardModel {
             - COALESCE((
               SELECT SUM(p.AMOUNT_PAID)
               FROM payments p
-              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund') AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL)
                 AND (
                   p.BOOKING_ID = b.IDNo
                   OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -543,7 +543,7 @@ class DashboardModel {
           COALESCE((
             SELECT SUM(p.AMOUNT_PAID)
             FROM payments p
-            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
+            WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund') AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL)
               AND (
                 p.BOOKING_ID = b.IDNo
                 OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -562,7 +562,7 @@ class DashboardModel {
             - COALESCE((
               SELECT SUM(p.AMOUNT_PAID)
               FROM payments p
-              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund') AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL)
                 AND (
                   p.BOOKING_ID = b.IDNo
                   OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -843,7 +843,7 @@ class DashboardModel {
             COALESCE((
               SELECT SUM(p.AMOUNT_PAID)
               FROM payments p
-              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund') AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL)
                 AND (
                   p.BOOKING_ID = b.IDNo
                   OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -862,7 +862,7 @@ class DashboardModel {
               - COALESCE((
                 SELECT SUM(p.AMOUNT_PAID)
                 FROM payments p
-                WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
+                WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund') AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL)
                   AND (
                     p.BOOKING_ID = b.IDNo
                     OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -924,7 +924,7 @@ class DashboardModel {
             COALESCE((
               SELECT SUM(p.AMOUNT_PAID)
               FROM payments p
-              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
+              WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund') AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL)
                 AND (
                   p.BOOKING_ID = b.IDNo
                   OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -943,7 +943,7 @@ class DashboardModel {
               - COALESCE((
                 SELECT SUM(p.AMOUNT_PAID)
                 FROM payments p
-                WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund')
+                WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'refund') AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL)
                   AND (
                     p.BOOKING_ID = b.IDNo
                     OR p.BOOKING_EXTENSION_ID IN (SELECT IDNo FROM booking_extension be2 WHERE be2.BOOKING_ID = b.IDNo AND be2.ACTIVE = 1)
@@ -1409,15 +1409,35 @@ class DashboardModel {
       )`;
       else if (status === 'check-Out') tsSet = ', ACTUAL_CHECK_OUT_DT = NOW()';
 
-      let query = `UPDATE booking SET BOOKING_STATUS = ?${tsSet} WHERE IDNo = ? AND ACTIVE = 1`;
+      // Checked in = occupied; undoing a check-in (back to pending) = not occupied again.
+      // check-Out leaves IS_OCCUPIED alone (the checkout flow handles the room).
+      const occSet = status === 'check-In' ? ', IS_OCCUPIED = 1' : status === 'pending' ? ', IS_OCCUPIED = 0' : '';
+      let query = `UPDATE booking SET BOOKING_STATUS = ?${occSet}${tsSet} WHERE IDNo = ? AND ACTIVE = 1`;
       let params = [status, bookingId];
 
       if (lateCheckOut !== null && lateCheckOut !== '') {
-        query = `UPDATE booking SET BOOKING_STATUS = ?, LATE_CHECKOUT = ?${tsSet} WHERE IDNo = ? AND ACTIVE = 1`;
+        query = `UPDATE booking SET BOOKING_STATUS = ?, LATE_CHECKOUT = ?${occSet}${tsSet} WHERE IDNo = ? AND ACTIVE = 1`;
         params = [status, lateCheckOut, bookingId];
       }
 
       const result = await queryDatabasePromise(query, params);
+
+      if (result.affectedRows > 0 && (status === 'check-In' || (status === 'pending' && previousStatus === 'check-In'))) {
+        const roomRows = await queryDatabasePromise(`SELECT ROOM_ID FROM booking WHERE IDNo = ? LIMIT 1`, [bookingId]);
+        const roomId = roomRows[0] && roomRows[0].ROOM_ID;
+        if (roomId) {
+          if (status === 'check-In') {
+            await queryDatabasePromise(`UPDATE room SET ROOM_STATUS = 2 WHERE IDNo = ? AND ACTIVE = 1`, [roomId]);
+          } else {
+            // Undo: free the room only when no other checked-in guest is still in it.
+            await queryDatabasePromise(
+              `UPDATE room SET ROOM_STATUS = 1 WHERE IDNo = ? AND ACTIVE = 1 AND ROOM_STATUS = 2
+               AND NOT EXISTS (SELECT 1 FROM booking WHERE ROOM_ID = ? AND ACTIVE = 1 AND BOOKING_STATUS = 'check-In')`,
+              [roomId, roomId]
+            );
+          }
+        }
+      }
 
       if (result.affectedRows > 0 && previousStatus === 'check-Out' && status === 'check-In') {
         await DashboardModel.revertSecurityDepositRefund(bookingId, encodedBy);
@@ -1537,12 +1557,12 @@ class DashboardModel {
   }
 
   // Record security deposit and check in guest (atomic)
-  static async checkInWithSecurityDeposit(bookingId, { depositAmount, paymentMethod, remarks, earlyCheckInFee, encodedBy }) {
+  static async checkInWithSecurityDeposit(bookingId, { depositAmount, paymentMethod, remarks, earlyCheckInFee, earlyFeePayLater = false, encodedBy }) {
     try {
       await queryDatabasePromise('START TRANSACTION');
 
       const bookingRows = await queryDatabasePromise(
-        `SELECT IDNo, BOOKING_STATUS, CHECK_IN_STATUS FROM booking WHERE IDNo = ? AND ACTIVE = 1 LIMIT 1`,
+        `SELECT IDNo, BOOKING_STATUS, CHECK_IN_STATUS, ROOM_ID FROM booking WHERE IDNo = ? AND ACTIVE = 1 LIMIT 1`,
         [bookingId]
       );
 
@@ -1581,11 +1601,15 @@ class DashboardModel {
         }
       }
 
+      // Late check-in (hotel rule, like KGrand): arriving from 12:00 AM to 5:59 AM is declared Late automatically
+      // (CHECK_IN_STATUS = 0 - the calendar bar gets its Late marker) and belongs to the previous hotel day.
       const updateResult = await queryDatabasePromise(
-        `UPDATE booking SET BOOKING_STATUS = 'check-In', ACTUAL_CHECK_IN_DT = COALESCE(
+        `UPDATE booking SET BOOKING_STATUS = 'check-In', IS_OCCUPIED = 1,
+          CHECK_IN_STATUS = CASE WHEN HOUR(NOW()) BETWEEN 0 AND 5 THEN 0 ELSE CHECK_IN_STATUS END,
+          ACTUAL_CHECK_IN_DT = COALESCE(
           ACTUAL_CHECK_IN_DT,
           CASE
-            WHEN CHECK_IN_STATUS = 0 AND HOUR(NOW()) BETWEEN 0 AND 5
+            WHEN HOUR(NOW()) BETWEEN 0 AND 5
               THEN DATE_SUB(NOW(), INTERVAL 1 DAY)
             ELSE NOW()
           END
@@ -1596,6 +1620,12 @@ class DashboardModel {
       if (updateResult.affectedRows === 0) {
         await queryDatabasePromise('ROLLBACK');
         return { success: false, message: 'Failed to update booking status.' };
+      }
+
+      // Checked in = occupied: the room goes Occupied (2) together with the booking.
+      // (There is no separate "Move to Occupied" step any more.)
+      if (bookingRows[0].ROOM_ID) {
+        await queryDatabasePromise(`UPDATE room SET ROOM_STATUS = 2 WHERE IDNo = ? AND ACTIVE = 1`, [bookingRows[0].ROOM_ID]);
       }
 
       // Early check-in fee: paid on the spot at check-in (unlike adding "Early
@@ -1620,23 +1650,26 @@ class DashboardModel {
         if (existing.length) {
           bookingServiceId = existing[0].IDNo;
           await queryDatabasePromise(
-            `UPDATE booking_service SET TOTAL_COST = ?, STATUS = 'paid', ENCODED_DT = NOW() WHERE IDNo = ?`,
-            [earlyFeeNum, bookingServiceId]
+            `UPDATE booking_service SET TOTAL_COST = ?, STATUS = ?, ENCODED_DT = NOW() WHERE IDNo = ?`,
+            [earlyFeeNum, earlyFeePayLater ? 'unpaid' : 'paid', bookingServiceId]
           );
         } else {
           const insertResult = await queryDatabasePromise(
             `INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE)
-             VALUES (?, 70, 1, ?, 'paid', ?, NOW(), 1)`,
-            [bookingId, earlyFeeNum, encodedBy]
+             VALUES (?, 70, 1, ?, ?, ?, NOW(), 1)`,
+            [bookingId, earlyFeeNum, earlyFeePayLater ? 'unpaid' : 'paid', encodedBy]
           );
           bookingServiceId = insertResult.insertId;
         }
 
-        await queryDatabasePromise(
-          `INSERT INTO payments (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, REMARKS, ENCODED_BY)
-           VALUES (?, ?, ?, 'cash', 'service', NOW(), 'Early check-in fee', ?)`,
-          [bookingId, bookingServiceId, earlyFeeNum, encodedBy]
-        );
+        // Pay at check-out: the fee only goes on the bill (Unpaid) - no payment is recorded now.
+        if (!earlyFeePayLater) {
+          await queryDatabasePromise(
+            `INSERT INTO payments (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, REMARKS, ENCODED_BY)
+             VALUES (?, ?, ?, 'cash', 'service', NOW(), 'Early check-in fee', ?)`,
+            [bookingId, bookingServiceId, earlyFeeNum, encodedBy]
+          );
+        }
       }
 
       await queryDatabasePromise('COMMIT');
@@ -1816,66 +1849,6 @@ class DashboardModel {
       const query = 'UPDATE room SET ROOM_STATUS = ? WHERE IDNo IN (?) AND ACTIVE = 1';
       const result = await queryDatabasePromise(query, [status, roomIds]);
       return result.affectedRows;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  // Move to occupied
-  static async moveToOccupied(propertyId) {
-    try {
-      // First, get all the rooms that need to be updated
-      const roomsToUpdate = await queryDatabasePromise(`
-        SELECT DISTINCT b.ROOM_ID
-        FROM booking b
-        WHERE b.BOOKING_STATUS = 'check-In'
-        AND b.IS_OCCUPIED = 0
-        AND b.ACTIVE = 1
-        AND b.PROPERTY_ID = ?
-      `, [propertyId]);
-
-      // Update booking status to occupied - scoped to this property only,
-      // otherwise this would also flip the other property's pending check-ins.
-      const bookingQuery = `
-        UPDATE booking
-        SET IS_OCCUPIED = 1
-        WHERE BOOKING_STATUS = 'check-In'
-        AND IS_OCCUPIED = 0
-        AND ACTIVE = 1
-        AND PROPERTY_ID = ?
-      `;
-      const bookingResult = await queryDatabasePromise(bookingQuery, [propertyId]);
-
-      // Update room status to occupied (status = 2)
-      if (roomsToUpdate.length > 0) {
-        const roomIds = roomsToUpdate.map(room => room.ROOM_ID);
-        const roomQuery = `
-          UPDATE room 
-          SET ROOM_STATUS = 2 
-          WHERE IDNo IN (${roomIds.map(() => '?').join(',')}) 
-          AND ACTIVE = 1
-        `;
-        await queryDatabasePromise(roomQuery, roomIds);
-      }
-
-      return bookingResult.affectedRows;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  // Get check-in bookings count
-  static async getCheckInBookings(propertyId) {
-    try {
-      const result = await queryDatabasePromise(`
-        SELECT COUNT(*) as count
-        FROM booking
-        WHERE BOOKING_STATUS = 'check-In'
-        AND IS_OCCUPIED = 0
-        AND ACTIVE = 1
-        AND PROPERTY_ID = ?
-      `, [propertyId]);
-      return result[0]?.count || 0;
     } catch (error) {
       throw error;
     }

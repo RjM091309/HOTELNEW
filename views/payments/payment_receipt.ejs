@@ -254,6 +254,8 @@
       margin-top: 2px;
     }
 
+    .signature-field .sig-img { display: block; max-height: 34px; max-width: 100%; object-fit: contain; }
+
     .signature-field .field-value.blank {
       min-height: 38px;
       margin-top: 2px;
@@ -560,9 +562,10 @@
             <div class="field signature-field">
               <div class="field-label">
                 <span class="field-icon"><svg viewBox="0 0 24 24"><path d="M4 18l4-8 4 4 4-6 4 10"/><path d="M4 20h16"/></svg></span>
-                Signature <span style="font-weight:400;font-size:6.5pt;color:#999;">(handwritten)</span>
+                Signature <% if (!(typeof signature !== 'undefined' && signature && !isBlank)) { %><span style="font-weight:400;font-size:6.5pt;color:#999;">(handwritten)</span><% } %>
               </div>
-              <div class="field-value blank"></div>
+              <% const sigImg = (typeof signature !== 'undefined' && signature && !isBlank) ? signature : ''; %>
+              <div class="field-value blank"><% if (sigImg) { %><img src="<%= sigImg %>" alt="" class="sig-img"><% } %></div>
             </div>
           </div>
 

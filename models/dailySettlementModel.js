@@ -650,7 +650,8 @@ class DailySettlementModel {
                     ), 0) AS ROOM_REVENUE
                 FROM payments p
                 INNER JOIN booking b ON p.BOOKING_ID = b.IDNo
-                WHERE p.PAYMENT_TYPE IN ('room', 'extended', 'discount', 'refund')
+                WHERE p.PAYMENT_TYPE IN ('room', 'extended', 'discount', 'refund', 'cancellation_fee')
+                    AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL) -- credit is not revenue until it is paid
                     AND p.PAYMENT_DATE >= ?
                     AND p.PAYMENT_DATE <= ?
                     AND b.ACTIVE = 1 ${this._pf('b', propertyId)}
@@ -671,6 +672,7 @@ class DailySettlementModel {
                 FROM payments p
                 INNER JOIN booking b ON p.BOOKING_ID = b.IDNo
                 WHERE p.PAYMENT_TYPE IN ('service', 'pickdrop')
+                    AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL) -- credit is not revenue until it is paid
                     AND p.PAYMENT_DATE >= ?
                     AND p.PAYMENT_DATE <= ?
                     AND b.ACTIVE = 1 ${this._pf('b', propertyId)}
@@ -780,7 +782,8 @@ class DailySettlementModel {
                     ), 0) AS ROOM_REVENUE
                 FROM payments p
                 INNER JOIN booking b ON p.BOOKING_ID = b.IDNo
-                WHERE p.PAYMENT_TYPE IN ('room', 'extended', 'discount', 'refund')
+                WHERE p.PAYMENT_TYPE IN ('room', 'extended', 'discount', 'refund', 'cancellation_fee')
+                    AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL) -- credit is not revenue until it is paid
                     AND p.PAYMENT_DATE >= ?
                     AND p.PAYMENT_DATE <= ?
                     AND b.ACTIVE = 1 ${this._pf('b', propertyId)}
@@ -801,6 +804,7 @@ class DailySettlementModel {
                 FROM payments p
                 INNER JOIN booking b ON p.BOOKING_ID = b.IDNo
                 WHERE p.PAYMENT_TYPE IN ('service', 'pickdrop')
+                    AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL) -- credit is not revenue until it is paid
                     AND p.PAYMENT_DATE >= ?
                     AND p.PAYMENT_DATE <= ?
                     AND b.ACTIVE = 1 ${this._pf('b', propertyId)}

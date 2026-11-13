@@ -10,7 +10,7 @@ const { queryDatabasePromise } = require('../config/database');
 //   EXPENSE_DATE   -> the day it was keyed in (set on add, kept on edit)
 // Dates are sent as text ('YYYY-MM-DD', 'YYYY-MM-DD HH:MM:SS') so they never shift with time zones.
 // Older rows may still carry COMPANY_NAME / ReceiptNo (SI no.); they are kept.
-// Categories live in expense_category, return money in expense_return_money.
+// Categories live in expense_category.
 const SELECT_EXPENSE = `
   SELECT e.IDNo, DATE_FORMAT(e.EXPENSE_DATE, '%Y-%m-%d') AS EXPENSE_DATE, e.COMPANY_NAME, e.Group_Category AS MAIN_CATEGORY, e.Category AS SUB_CATEGORY,
          e.Description, e.ReceiptNo, e.Amount, e.IN_CHARGE, e.VEHICLE_ID, e.ODO, e.RECEIPT_PHOTO,
@@ -21,19 +21,19 @@ const SELECT_EXPENSE = `
 `;
 
 const expensesModel = {
-  getAllExpenses: async () =>
-    queryDatabasePromise(`${SELECT_EXPENSE} WHERE e.ACTIVE = 1 ORDER BY e.EXPENSE_DATE DESC, e.IDNo DESC`),
+  getAllExpenses: async (propertyId) =>
+    queryDatabasePromise(`${SELECT_EXPENSE} WHERE e.ACTIVE = 1 AND e.PROPERTY_ID = ? ORDER BY e.EXPENSE_DATE DESC, e.IDNo DESC`, [propertyId]),
 
-  getExpenseById: async (id) => {
-    const rows = await queryDatabasePromise(`${SELECT_EXPENSE} WHERE e.IDNo = ? AND e.ACTIVE = 1`, [id]);
+  getExpenseById: async (id, propertyId) => {
+    const rows = await queryDatabasePromise(`${SELECT_EXPENSE} WHERE e.IDNo = ? AND e.ACTIVE = 1 AND e.PROPERTY_ID = ?`, [id, propertyId]);
     return rows[0] || null;
   },
 
   addExpense: async (e) => {
     const result = await queryDatabasePromise(
-      `INSERT INTO expenses (EXPENSE_DATE, Group_Category, Category, Description, Amount, IN_CHARGE, VEHICLE_ID, ODO, RECEIPT_PHOTO, ENCODED_BY, ENCODED_DT, ACTIVE)
-       VALUES (CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 1)`,
-      [e.mainCategory, e.subCategory, e.details, e.amount, e.inCharge, e.vehicleId, e.odo, e.receiptPhoto, e.encodedBy]
+      `INSERT INTO expenses (EXPENSE_DATE, Group_Category, Category, Description, Amount, IN_CHARGE, VEHICLE_ID, ODO, RECEIPT_PHOTO, ENCODED_BY, ENCODED_DT, ACTIVE, PROPERTY_ID)
+       VALUES (CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 1, ?)`,
+      [e.mainCategory, e.subCategory, e.details, e.amount, e.inCharge, e.vehicleId, e.odo, e.receiptPhoto, e.encodedBy, e.propertyId]
     );
     return { success: true, id: result.insertId };
   },
@@ -47,14 +47,14 @@ const expensesModel = {
       params.push(e.receiptPhoto);
     }
     const result = await queryDatabasePromise(
-      `UPDATE expenses SET ${sets.join(', ')}, EDITED_BY = ?, EDITED_DT = NOW() WHERE IDNo = ? AND ACTIVE = 1`,
-      [...params, e.editedBy, id]
+      `UPDATE expenses SET ${sets.join(', ')}, EDITED_BY = ?, EDITED_DT = NOW() WHERE IDNo = ? AND ACTIVE = 1 AND PROPERTY_ID = ?`,
+      [...params, e.editedBy, id, e.propertyId]
     );
     return result.affectedRows === 0 ? { success: false, notFound: true } : { success: true };
   },
 
-  deleteExpense: async (expenseId, editedBy) => {
-    const result = await queryDatabasePromise('UPDATE expenses SET ACTIVE = 0, EDITED_BY = ?, EDITED_DT = NOW() WHERE IDNo = ? AND ACTIVE = 1', [editedBy, expenseId]);
+  deleteExpense: async (expenseId, editedBy, propertyId) => {
+    const result = await queryDatabasePromise('UPDATE expenses SET ACTIVE = 0, EDITED_BY = ?, EDITED_DT = NOW() WHERE IDNo = ? AND ACTIVE = 1 AND PROPERTY_ID = ?', [editedBy, expenseId, propertyId]);
     return result.affectedRows === 0 ? { success: false, notFound: true } : { success: true };
   },
 
@@ -93,33 +93,6 @@ const expensesModel = {
   /** Archives a category (a main takes its subs with it). Expenses keep the name they were filed under. */
   deleteCategory: async (id, by) =>
     queryDatabasePromise('UPDATE expense_category SET ACTIVE = 0, EDITED_BY = ?, EDITED_DT = NOW() WHERE ACTIVE = 1 AND (IDNo = ? OR PARENT_ID = ?)', [by, id, id]),
-
-  // ---------- return money ----------
-
-  getReturnMoney: async () =>
-    queryDatabasePromise(
-      `SELECT IDNo, DATE_FORMAT(RETURN_DATE, '%Y-%m-%d') AS RETURN_DATE, DESCRIPTION, AMOUNT, ENCODED_BY, DATE_FORMAT(ENCODED_DT, '%Y-%m-%d %H:%i:%s') AS ENCODED_DT
-       FROM expense_return_money WHERE ACTIVE = 1 ORDER BY RETURN_DATE DESC, IDNo DESC`
-    ),
-
-  addReturnMoney: async (r) =>
-    queryDatabasePromise(
-      'INSERT INTO expense_return_money (RETURN_DATE, DESCRIPTION, AMOUNT, ENCODED_BY, ENCODED_DT, ACTIVE) VALUES (CURDATE(), ?, ?, ?, NOW(), 1)',
-      [r.details, r.amount, r.encodedBy]
-    ),
-
-  updateReturnMoney: async (id, r) => {
-    const result = await queryDatabasePromise(
-      'UPDATE expense_return_money SET DESCRIPTION = ?, AMOUNT = ?, EDITED_BY = ?, EDITED_DT = NOW() WHERE IDNo = ? AND ACTIVE = 1',
-      [r.details, r.amount, r.editedBy, id]
-    );
-    return result.affectedRows > 0;
-  },
-
-  deleteReturnMoney: async (id, by) => {
-    const result = await queryDatabasePromise('UPDATE expense_return_money SET ACTIVE = 0, EDITED_BY = ?, EDITED_DT = NOW() WHERE IDNo = ? AND ACTIVE = 1', [by, id]);
-    return result.affectedRows > 0;
-  },
 
   /** Vehicles to pick from on a vehicle expense. */
   getVehicleChoices: async () =>

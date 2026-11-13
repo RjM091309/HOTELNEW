@@ -649,97 +649,6 @@ document.addEventListener('DOMContentLoaded', () => {
   toggleSortButton();
 });
 
-// --- Move to Occupied Button ---
-$(document).ready(function () {
-  $("#moveToOccupiedBtn").click(function () {
-      $.ajax({
-          url: "/dashboard/check-move-to-occupied",
-          type: "GET",
-          success: function (response) {
-              if (response.count === 0) {
-                  // Show info toast for no guests
-                  $.toast({
-                      heading: 'No Guests Available',
-                      text: 'There are no guests to move to occupied.',
-                      position: 'top-right',
-                      loaderBg: '#ff6849',
-                      icon: 'info',
-                      hideAfter: 3000,
-                      stack: 6
-                  });
-              } else {
-                  // Show SweetAlert2 confirmation
-                  Swal.fire({
-                      title: "Move to Occupied?",
-                      text: `Are you sure you want to move ${response.count} checked-in guests to occupied status?`,
-                      icon: "warning",
-                      showCancelButton: true,
-                      confirmButtonColor: "#DD6B55",
-                      confirmButtonText: "Yes, move them!",
-                      cancelButtonText: "No, cancel",
-                      allowOutsideClick: false
-                  }).then((result) => {
-                      if (result.isConfirmed) {
-                          // Show loading state
-                          Swal.fire({
-                              title: "Moving Guests...",
-                              text: "Please wait while we move the guests to occupied status.",
-                              allowOutsideClick: false,
-                              didOpen: () => {
-                                  Swal.showLoading();
-                              }
-                          });
-                          
-                          // Send move to occupied request
-                          $.ajax({
-                              url: "/dashboard/move-to-occupied",
-                              type: "POST",
-                              success: function (moveResponse) {
-                                  // Close loading dialog
-                                  Swal.close();
-                                  
-                                  // Show success toast
-                                  PMSCore.showSuccess('Success!', `${response.count} guests have been moved to occupied status successfully.`, {
-                                      hideAfter: 5000
-                                  });
-
-                                  // Smooth reload of dashboard data
-                                  setTimeout(() => {
-                                      reloadDashboardData();
-                                      // Initialize S/C/R/M indicator colors after reload
-                                      setTimeout(() => {
-                                          if (typeof window.loadAllBookingCardComplaintCounts === 'function') {
-                                              window.loadAllBookingCardComplaintCounts();
-                                          }
-                                      }, 500);
-                                  }, 1000);
-                              },
-                              error: function (xhr, status, error) {
-                                  // Close loading dialog
-                                  Swal.close();
-                                  
-                                  // Show error toast
-                                  PMSCore.showError('Error!', 'Failed to move guests to occupied status. Please try again.', {
-                                      hideAfter: 5000
-                                  });
-                              }
-                          });
-                      }
-                  });
-              }
-          },
-          error: function (xhr, status, error) {
-              // Show error toast
-              PMSCore.showError('Error!', 'Failed to check guest status. Please try again.', {
-                  hideAfter: 5000
-              });
-          }
-      });
-  });
-});
-
-
-
 // --- Check-in/Check-out Toggle Functionality ---
 document.addEventListener('DOMContentLoaded', function () {
     const toggles = document.querySelectorAll('.custom-toggle-checkin');
@@ -1023,13 +932,6 @@ $(document).ready(function() {
         const activeTab = $('.tab-content.active-tab');
         const activeTabId = activeTab.attr('id');
         
-        // Move to Occupied button - only show on checked-in tab
-        if (activeTabId === 'checked-in-content') {
-            $('#moveToOccupiedBtn').show();
-        } else {
-            $('#moveToOccupiedBtn').hide();
-        }
-        
         // Sort button - only show on checked-in and checkout tabs
         if (activeTabId === 'checked-in-content' || activeTabId === 'checkout-content') {
             $('#sort-button').show();
@@ -1139,32 +1041,6 @@ $(document).ready(function() {
 // ========================================
 
 $(document).ready(function() {
-    // Function to toggle "Move to Occupied" button visibility
-    function toggleMoveToOccupiedButton() {
-        const activeTab = $('.tab-content.active-tab');
-        const moveToOccupiedBtn = $('#moveToOccupiedBtn');
-
-        if (activeTab.length && activeTab.attr('id') === 'checked-in-content') {
-            moveToOccupiedBtn.show(); // Show button only if Checked-In tab is active
-        } else {
-            moveToOccupiedBtn.hide(); // Hide button in other tabs
-        }
-    }
-
-    // Ensure correct button visibility on page load
-    const moveToOccupiedBtn = $('#moveToOccupiedBtn');
-    moveToOccupiedBtn.hide(); // Hide the button by default
-
-    // Small delay to allow tab activation detection
-    setTimeout(() => {
-        toggleMoveToOccupiedButton();
-    }, 100);
-
-    // Listen for tab clicks and update button visibility
-    $('.tabs_three').on('click', function() {
-        setTimeout(toggleMoveToOccupiedButton, 100);
-    });
-
     // CHECK-IN TOGGLE (REVERSIBLE)
     $(document).on('change', '.custom-toggle-checkin', function() {
         const $toggle = $(this);

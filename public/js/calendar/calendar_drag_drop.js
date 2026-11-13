@@ -39,6 +39,13 @@ async function handleEventDrop(info) {
     info.revert();
     return;
   }
+
+  // moved onto a room that is Out of order: put it back
+  if (isRoomChange && targetRoom.extendedProps && targetRoom.extendedProps.outOfOrder) {
+    info.revert();
+    if (window.Swal) Swal.fire({ icon: 'warning', title: 'Out of order', text: 'Room ' + (targetRoom.title || '') + ' is Out of order, so a booking cannot be moved there.', heightAuto: false });
+    return;
+  }
   
   // Auto-snap times based on check-in/check-out defaults
   // Set check-in time to 3 PM

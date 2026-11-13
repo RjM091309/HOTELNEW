@@ -4,9 +4,14 @@ const {
   getReceiptRenderContext
 } = require('../helpers/receiptHelpers');
 
+// Credit that was left unpaid is NOT money received: it is listed on the receipt, but kept out of "paid" and shown as a balance.
+const isUnsettledCreditPayment = (payment) =>
+  ['credit', 'marker'].includes(String(payment.PAYMENT_METHOD || '').toLowerCase()) && !payment.SETTLED_DATE;
+
 function buildReceiptDataFromPayments(booking, payments, processedBy) {
-  const totalAmount = payments.reduce((sum, payment) => sum + Number(payment.AMOUNT_PAID || 0), 0);
-  const methods = [...new Set(payments.map((payment) => (payment.PAYMENT_METHOD || '').toLowerCase()).filter(Boolean))];
+  const received = payments.filter((payment) => !isUnsettledCreditPayment(payment));
+  const totalAmount = received.reduce((sum, payment) => sum + Number(payment.AMOUNT_PAID || 0), 0);
+  const methods = [...new Set(received.map((payment) => (payment.PAYMENT_METHOD || '').toLowerCase()).filter(Boolean))];
   const primaryMethod = methods.length === 1 ? methods[0] : (methods[0] || '');
 
   const purposeParts = [];
@@ -38,7 +43,7 @@ function buildReceiptDataFromPayments(booking, payments, processedBy) {
         minute: '2-digit'
       });
     }
-    const methodLabel = formatPaymentMethodLabel(payment.PAYMENT_METHOD);
+    const methodLabel = isUnsettledCreditPayment(payment) ? 'Credit (not paid yet)' : formatPaymentMethodLabel(payment.PAYMENT_METHOD);
     const amount = Number(payment.AMOUNT_PAID || 0).toLocaleString('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
@@ -62,8 +67,19 @@ function buildReceiptDataFromPayments(booking, payments, processedBy) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
-  purposeParts.push(`Grand Total: PHP ${formattedTotal}`);
-  purposeLines.push({ type: 'total', label: 'Grand Total', amount: formattedTotal });
+  const fmt = (n) => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Bill total / paid / balance of the whole booking (a group's main shows the whole group), so it is clear what is still owed.
+  if (booking.TOTAL_AMOUNT !== undefined && booking.BALANCE !== undefined) {
+    const billTotal = Number(booking.TOTAL_AMOUNT || 0) - Number(booking.DISCOUNT_AMOUNT || 0);
+    purposeParts.push(`Bill Total: PHP ${fmt(billTotal)}`);
+    purposeLines.push({ type: 'total', label: 'Bill Total', amount: fmt(billTotal) });
+  }
+  purposeParts.push(`Total Paid: PHP ${formattedTotal}`);
+  purposeLines.push({ type: 'total', label: 'Total Paid', amount: formattedTotal });
+  if (booking.BALANCE !== undefined && Number(booking.BALANCE) > 0.009) {
+    purposeParts.push(`Balance: PHP ${fmt(booking.BALANCE)}`);
+    purposeLines.push({ type: 'total', label: 'Balance (still owed)', amount: fmt(booking.BALANCE) });
+  }
 
   const receiptNo = payments.length === 1
     ? `RCP-${payments[0].IDNo}`
@@ -122,7 +138,7 @@ const paymentsController = {
       // so date/shift/order all key off the payment's own p.PAYMENT_DATE.
       const columns = [
         'BOOKING_ID', 'PAYMENT_ID', 'BOOKING_ID', 'GUEST_NAME', 'ROOM_NUMBER', 'CONFIRMATION_NUMBER',
-        'TOTAL_AMOUNT', 'TOTAL_PAID', 'LAST_PAYMENT_AMOUNT', 'BALANCE', 'PAYMENT_STATUS', 'PAYMENT_METHOD', 'LAST_PAYMENT_DATE', 'PROCESSED_BY_NAME'
+        'TOTAL_AMOUNT', 'LAST_PAYMENT_AMOUNT', 'BALANCE', 'PAYMENT_STATUS', 'PAYMENT_METHOD', 'LAST_PAYMENT_DATE', 'PROCESSED_BY_NAME'
       ];
       const orderBy = columns[orderColumn] || 'PAYMENT_ID';
 
@@ -136,8 +152,13 @@ const paymentsController = {
 
       // Date filter based on each payment's own date (matches PAYMENT DATE column in the table)
       let dateCondition = '';
+      let businessDay = null;
       if (filter === 'today') {
-        dateCondition = `AND DATE(p.PAYMENT_DATE) = CURRENT_DATE()`;
+        // "Today" is the running business day: from the first shift of the open shift's business date until now, so a payment taken
+        // at 2 AM before Shift 3 is ended still belongs to the day before.
+        businessDay = await paymentsModel.getCurrentBusinessDay(req.propertyId);
+        dateCondition = `AND p.PAYMENT_DATE >= ?`;
+        searchParams.push(businessDay.startedAt);
       } else if (filter === 'last3days') {
         dateCondition = `
           AND DATE(p.PAYMENT_DATE) >= DATE_SUB(CURRENT_DATE(), INTERVAL 2 DAY)
@@ -164,7 +185,7 @@ const paymentsController = {
       // looks up that shift's real [STARTED_AT, ENDED_AT] window (the FO's
       // own actual cutoff times) instead of a fixed clock-hour bucket.
       if (filter === 'today' && shift && shift !== 'all') {
-        const businessDate = paymentsModel._businessDateFor(new Date());
+        const businessDate = businessDay.businessDate;
         const window = await paymentsModel.getShiftWindow(shift, businessDate, req.propertyId);
         if (window) {
           if (window.ENDED_AT) {
@@ -296,6 +317,42 @@ const paymentsController = {
     }
   },
 
+  // Data for printing one shift (?shift=1|2|3) or the whole business day (no shift) - see the Print buttons on the Payments page.
+  shiftReport: async (req, res) => {
+    try {
+      const current = await paymentsModel.getCurrentShift(req.propertyId);
+      const day = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(req.query.day || ''))
+        ? req.query.day
+        : paymentsModel._dateKey(current.BUSINESS_DATE);
+      let shifts = await paymentsModel.getShiftsForBusinessDate(day, req.propertyId);
+      shifts = shifts.sort((a, b) => a.IDNo - b.IDNo);
+      const wanted = req.query.shift ? Number(req.query.shift) : null;
+      if (wanted) shifts = shifts.filter((s) => s.SHIFT_NUMBER === wanted);
+      const fmt = (d) => new Date(d).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      const out = [];
+      for (const s of shifts) {
+        out.push({
+          shiftNumber: s.SHIFT_NUMBER,
+          hours: `${fmt(s.STARTED_AT)} - ${s.ENDED_AT ? fmt(s.ENDED_AT) : 'now'}`,
+          open: !s.ENDED_AT,
+          lines: await paymentsModel.getShiftPaymentLines(s)
+        });
+      }
+      const prop = res.locals.currentProperty || {};
+      res.json({
+        success: true,
+        day,
+        hotelName: prop.DISPLAY_NAME || prop.NAME || '',
+        logo: prop.LOGO || '',
+        preparedBy: req.user?.FULLNAME || req.user?.name || '',
+        shifts: out
+      });
+    } catch (err) {
+      console.error('Error building shift report:', err);
+      res.status(500).json({ success: false, message: 'Failed to build the report' });
+    }
+  },
+
   todayPaidPayments: async (req, res) => {
     try {
       const range = req.query.range === 'last7days' ? 'last7days' : 'today';
@@ -371,7 +428,7 @@ const paymentsController = {
   getPaymentsByBooking: async (req, res) => {
     try {
       const { bookingId } = req.params;
-      const data = await paymentsModel.listPayments({ bookingId, propertyId: req.propertyId });
+      const data = await paymentsModel.listPayments({ bookingId, propertyId: req.propertyId, includeMates: true });
       res.json({ success: true, data });
     } catch (err) {
       console.error('Error getting payments by booking:', err);

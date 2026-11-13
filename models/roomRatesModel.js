@@ -42,8 +42,14 @@ class RoomRatesModel {
   // copies included) - the optional mid-month override lives in the
   // sibling `splits` object instead, so code that never learned about it
   // keeps working exactly as before (whole-month assignment only).
-  static async getSeasonMonthMap() {
-    const rows = await queryDatabasePromise(`SELECT MONTH_NO, SEASON, SPLIT_DAY, SPLIT_SEASON FROM room_rate_season_months`);
+  // Per property: each property has its own 12 month rows. No propertyId falls
+  // back to the default property (Main Hotel).
+  static async getSeasonMonthMap(propertyId = null) {
+    const rows = await queryDatabasePromise(
+      `SELECT MONTH_NO, SEASON, SPLIT_DAY, SPLIT_SEASON FROM room_rate_season_months
+       WHERE PROPERTY_ID = COALESCE(?, (SELECT IDNo FROM property WHERE IS_DEFAULT = 1 LIMIT 1))`,
+      [propertyId || null]
+    );
     const map = {};
     for (let m = 1; m <= 12; m++) map[m] = 'lean';
     const splits = {};
@@ -69,10 +75,53 @@ class RoomRatesModel {
     return (monthSeasonMap && monthSeasonMap[month]) || 'lean';
   }
 
+  // ---- custom rate categories (per property), amounts stored in room_rates as CATEGORY 'custom_<id>'
+  static async listCustom(propertyId) {
+    if (!propertyId) return [];
+    const rows = await queryDatabasePromise(
+      `SELECT IDNo, LABEL FROM rate_category WHERE PROPERTY_ID = ? AND ACTIVE = 1 ORDER BY IDNo`, [propertyId]);
+    return rows.map((r) => ({ id: r.IDNo, key: `custom_${r.IDNo}`, label: r.LABEL, custom: true }));
+  }
+
+  // copyFrom: an existing category key whose amounts start the new one off (so it is not an empty table)
+  static async createCustom(propertyId, label, userId = null, copyFrom = '') {
+    const name = String(label || '').trim().slice(0, 60);
+    if (!name) throw new Error('Give the rate a name.');
+    const dupe = await queryDatabasePromise(
+      `SELECT IDNo FROM rate_category WHERE PROPERTY_ID = ? AND ACTIVE = 1 AND LOWER(LABEL) = LOWER(?) LIMIT 1`, [propertyId, name]);
+    if (dupe.length) throw new Error('A rate with that name already exists.');
+    const ins = await queryDatabasePromise(
+      `INSERT INTO rate_category (PROPERTY_ID, LABEL, CREATED_BY) VALUES (?, ?, ?)`, [propertyId, name, userId]);
+    const key = `custom_${ins.insertId}`;
+    if (copyFrom && /^[a-z_0-9]+$/.test(copyFrom)) {
+      await queryDatabasePromise(
+        `INSERT INTO room_rates (SEASON, CATEGORY, DAY_RANGE, ROOM_TYPE_ID, BREAKFAST, AMOUNT, UPDATED_BY)
+         SELECT rr.SEASON, ?, rr.DAY_RANGE, rr.ROOM_TYPE_ID, rr.BREAKFAST, rr.AMOUNT, ?
+           FROM room_rates rr JOIN room_type rt ON rt.IDNo = rr.ROOM_TYPE_ID
+          WHERE rr.CATEGORY = ? AND rt.PROPERTY_ID = ?`, [key, userId, copyFrom, propertyId]);
+    }
+    return { id: ins.insertId, key, label: name };
+  }
+
+  static async renameCustom(propertyId, id, label) {
+    const name = String(label || '').trim().slice(0, 60);
+    if (!name) throw new Error('Give the rate a name.');
+    const r = await queryDatabasePromise(`UPDATE rate_category SET LABEL = ? WHERE IDNo = ? AND PROPERTY_ID = ? AND ACTIVE = 1`, [name, id, propertyId]);
+    return r.affectedRows > 0;
+  }
+
+  // Removed from every dropdown; bookings already made keep the price they were saved with.
+  static async removeCustom(propertyId, id) {
+    const r = await queryDatabasePromise(`UPDATE rate_category SET ACTIVE = 0 WHERE IDNo = ? AND PROPERTY_ID = ?`, [id, propertyId]);
+    return r.affectedRows > 0;
+  }
+
   // Booking source / route -> room_rates.CATEGORY. Unknown -> walk_in.
   static categoryFromBookingRoute(route) {
     const r = String(route || '').toLowerCase();
+    if (/^custom_\d+$/.test(r)) return r;
     if (r === 'agency') return 'agency';
+    if (r === 'contracted') return 'contracted';
     if (r === 'tenant') return 'tenant';
     if (r === 'vip') return 'vip';
     if (r === 'employee') return 'employee';
@@ -228,7 +277,7 @@ class RoomRatesModel {
   static async getRoomCheckerRates({ startDate, endDate, category, breakfast, propertyId }) {
     const [{ kingTypeId, queenTypeId }, monthSeasonMap] = await Promise.all([
       this.getBedRoomTypeIds(propertyId),
-      this.getSeasonMonthMap()
+      this.getSeasonMonthMap(propertyId)
     ]);
     // Also fetch the "no breakfast" baseline for the same room/category/range
     // regardless of which tier is actually selected - the difference between
@@ -316,7 +365,7 @@ class RoomRatesModel {
   // is always written (1-12 required elsewhere), so this always upserts all
   // 12 rows. splitDay/splitSeason are cleared (set NULL) whenever not given
   // or invalid, so removing a split is just omitting it on the next save.
-  static async saveSeasonMonths(pairs, userId = null) {
+  static async saveSeasonMonths(pairs, userId = null, propertyId = null) {
     const { SEASON_KEYS } = require('../config/roomRates');
     const clean = (Array.isArray(pairs) ? pairs : [])
       .map((p) => {
@@ -336,13 +385,14 @@ class RoomRatesModel {
       );
 
     if (!clean.length) return { updated: 0 };
+    if (!propertyId) throw new Error('saveSeasonMonths needs a propertyId');
 
-    const placeholders = clean.map(() => '(?, ?, ?, ?, ?)').join(', ');
+    const placeholders = clean.map(() => '(?, ?, ?, ?, ?, ?)').join(', ');
     const params = [];
-    clean.forEach((p) => params.push(p.month, p.season, p.splitDay, p.splitSeason, userId));
+    clean.forEach((p) => params.push(propertyId, p.month, p.season, p.splitDay, p.splitSeason, userId));
 
     await queryDatabasePromise(
-      `INSERT INTO room_rate_season_months (MONTH_NO, SEASON, SPLIT_DAY, SPLIT_SEASON, UPDATED_BY)
+      `INSERT INTO room_rate_season_months (PROPERTY_ID, MONTH_NO, SEASON, SPLIT_DAY, SPLIT_SEASON, UPDATED_BY)
        VALUES ${placeholders}
        ON DUPLICATE KEY UPDATE
          SEASON = VALUES(SEASON),

@@ -58,6 +58,7 @@ const LONG_TERM_BANDS = [
     { min: 32, max: null, category: 'long_term_over30' }
 ];
 function longTermCategoryForNights(nights) {
+    if (window.__noLongTermRates) return null; // this property has no Long Term rates
     const n = parseInt(nights, 10) || 0;
     for (const band of LONG_TERM_BANDS) {
         if (n >= band.min && (band.max === null || n <= band.max)) return band.category;
@@ -174,7 +175,7 @@ window.seasonForNight = seasonForNight;
 // as SEASON_MONTH_MAP above, only actually fetched when Pool Villa is the
 // active property.
 function isPoolVillaActive() {
-    return document.documentElement.getAttribute('data-property-theme') === 'pool_villa';
+    return document.documentElement.getAttribute('data-property-pricing') === 'guest';
 }
 
 let POOL_VILLA_RATES = {};
@@ -664,7 +665,9 @@ function displayConsecutiveRooms(blocks) {
                 // longer used - pricing lives entirely in room_rates.
                 function grpRateCategory() {
                     const t = getPriceBookingType();
+                    if (/^custom_\d+$/.test(String(t || ''))) return t;
                     if (t === 'agency') return 'agency';
+                    if (t === 'contracted') return 'contracted';
                     if (t === 'tenant') return 'tenant';
                     if (t === 'vip') return 'vip';
                     if (t === 'employee') return 'employee';
@@ -1732,13 +1735,15 @@ $(document).ready(function () {
                 // (they return before it in updateSeasonalPrice()), so a staff
                 // member who explicitly typed/percented a price keeps full control.
                 function isLongTermStayRate() {
-                    return getStayNights() >= 10;
+                    return !window.__noLongTermRates && getStayNights() >= 10; // a property without Long Term rates never switches to them
                 }
                 function rateCategory() {
+                    if (/^custom_\d+$/.test(String(getPriceBookingType() || ''))) return getPriceBookingType();   // a rate the property made itself: its own table, no long-term override
                     const longTermCat = longTermCategoryForNights(getStayNights());
                     if (longTermCat) return longTermCat;
                     const t = getPriceBookingType();               // 'walk-in' | 'agency' | ...
                     if (t === 'agency') return 'agency';
+                    if (t === 'contracted') return 'contracted';
                     if (t === 'tenant') return 'tenant';
                     if (t === 'vip') return 'vip';
                     if (t === 'employee') return 'employee';
@@ -1757,6 +1762,7 @@ $(document).ready(function () {
                     const select = document.getElementById('bookingRoute');
                     if (!select) return;
                     if (isManualEntryPricing() || isPercentagePricing()) return;
+                    if (/^custom_\d+$/.test(select.value)) return;   // a rate the property made itself stays as picked
                     if (isLongTermStayRate() && select.value !== 'long_term') {
                         select.value = 'long_term';
                         // Setting .value directly doesn't fire 'change', so the
@@ -1792,7 +1798,7 @@ $(document).ready(function () {
                 // "Room Rate" dropdown, kept live with the picked room + dates +
                 // breakfast. OTA / Channel is priced as walk-in.
                 const RATE_OPT_CAT = {
-                    'walk-in': 'walk_in', 'agency': 'agency', 'tenant': 'tenant',
+                    'walk-in': 'walk_in', 'agency': 'agency', 'contracted': 'contracted', 'tenant': 'tenant',
                     'vip': 'vip', 'employee': 'employee', 'senior_special': 'senior_special',
                     'booking-channel': 'walk_in', 'manual_rate': 'walk_in', 'percentage': 'walk_in',
                     'long_term': 'long_term'
@@ -1822,7 +1828,7 @@ $(document).ready(function () {
                         // one - picking any of them ends up charging the same
                         // amount anyway.
                         const longTermCat = longTermCategoryForNights(getStayNights());
-                        const cat = longTermCat || (RATE_OPT_CAT[val] || 'walk_in');
+                        const cat = /^custom_\d+$/.test(val) ? val : (longTermCat || (RATE_OPT_CAT[val] || 'walk_in'));
                         const rr = room.ROOM_RATES && room.ROOM_RATES[season] && room.ROOM_RATES[season][cat];
                         let amt = 0;
                         if (rr) {

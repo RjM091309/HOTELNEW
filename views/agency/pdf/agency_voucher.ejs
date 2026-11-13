@@ -127,7 +127,7 @@
  <!-- Wrapper with relative positioning -->
     <div style="position: relative; text-align: center; margin-bottom: 5px;">
         <!-- Logo centered -->
-        <img src="<%= imageUrl %>" alt="MSTAY Logo" >
+        <% if (typeof imageUrl !== 'undefined' && imageUrl) { %><img src="<%= imageUrl %>" alt="Hotel Logo" ><% } %>
     
         <!-- Voucher number absolutely positioned top-right -->
         <div style="position: absolute; top: 0; right: 0; font-weight: bold; font-size: 13px;">

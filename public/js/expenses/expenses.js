@@ -1,22 +1,18 @@
 // ========================================
 // EXPENSES (cage-system concept, data entry only - no settlement)
-//   date range | total expenses / return money / net | selected total + breakdown |
+//   date range | total expenses | selected total + breakdown |
 //   main category | sub category | expenses table
-// Return money ("sukli", the change given back) is listed with the expenses under
-// its own green main category "Return Money" and taken off the expenses for the net.
 // ========================================
 
 (function () {
 'use strict';
 
-const RETURN_MONEY = 'Return Money';
 const UNCATEGORIZED = 'Uncategorized';
 const BAR_COLORS = ['#3b59ff', '#f06522', '#7c3aed', '#db2777', '#0891b2', '#ca8a04', '#4f46e5', '#b45309'];
-const RETURN_COLOR = '#109d59';
 const RECEIPT_URL = '/uploads/expense_receipts/';
 
 const xp = {
-    rows: null,        // expenses and return money, one shape (see toRow / toReturnRow)
+    rows: null,        // the expenses (see toRow)
     categories: [],    // { id, name, parentId }
     vehicles: [],      // { id, name } for the expense form
     range: ['', ''],   // 'YYYY-MM-DD' pair; empty = any date
@@ -64,27 +60,9 @@ function toRow(e) {
     };
 }
 
-function toReturnRow(r) {
-    return {
-        kind: 'return',
-        id: String(r.IDNo),
-        date: r.RETURN_DATE || '',
-        main: RETURN_MONEY,
-        sub: '',
-        details: r.DESCRIPTION || '',
-        inCharge: '',
-        vehicleName: '',
-        odo: null,
-        photo: '',
-        amount: Number(r.AMOUNT) || 0,
-        encodedBy: r.ENCODED_BY || '',
-        encodedDt: r.ENCODED_DT || ''
-    };
-}
-
 function applyData(res) {
     if (!res || !res.success) return showError((res && res.message) || 'Failed to load expenses.');
-    xp.rows = (res.expenses || []).map(toRow).concat((res.returns || []).map(toReturnRow))
+    xp.rows = (res.expenses || []).map(toRow)
         .sort(function (a, b) { return (b.date || '').localeCompare(a.date || '') || (b.encodedDt || '').localeCompare(a.encodedDt || ''); });
     xp.categories = (res.categories || []).map(function (c) {
         return { id: String(c.IDNo), name: c.CATEGORY, parentId: c.PARENT_ID == null ? '' : String(c.PARENT_ID) };
@@ -93,7 +71,7 @@ function applyData(res) {
     render();
 }
 
-const mainOf = (r) => (r.kind === 'return' ? RETURN_MONEY : r.main || UNCATEGORIZED);
+const mainOf = (r) => r.main || UNCATEGORIZED;
 const isVehicleMain = (name) => /vehicle|차량/i.test(name || '');
 const vehicleLine = (r) => [r.vehicleName, r.odo != null ? 'ODO ' + Number(r.odo).toLocaleString('en-US') + ' km' : ''].filter(Boolean).join(' - ');
 
@@ -112,7 +90,7 @@ function selectedRows() {
     return inDates().filter((r) => (!xp.main || mainOf(r) === xp.main) && (!xp.sub || r.sub === xp.sub));
 }
 
-const sumOf = (list, kind) => list.reduce((s, r) => s + (r.kind === kind ? r.amount : 0), 0);
+const sumOf = (list) => list.reduce((s, r) => s + r.amount, 0);
 
 // ========================================
 // RENDER
@@ -120,31 +98,24 @@ const sumOf = (list, kind) => list.reduce((s, r) => s + (r.kind === kind ? r.amo
 
 function render() {
     const rows = inDates();
-    const total = sumOf(rows, 'expense');
-    const returned = sumOf(rows, 'return');
-    const expenseCount = rows.filter((r) => r.kind === 'expense').length;
-    const returnCount = rows.length - expenseCount;
+    const total = sumOf(rows);
+    const expenseCount = rows.length;
     const label = dateLabel();
 
     $('#xp-total').text(peso(total));
     $('#xp-total-meta').text(label + ' · ' + expenseCount + (expenseCount === 1 ? ' entry' : ' entries'));
-    $('#xp-returned').text(peso(returned));
-    $('#xp-returned-meta').text(label + ' · ' + returnCount + (returnCount === 1 ? ' entry' : ' entries'));
-    $('#xp-net').text(peso(total - returned));
-    $('#xp-net-meta').text(label + ' · expenses less return money');
 
-    // Selected total, as a share of everything, the return money, or the expenses.
+    // Selected total, as a share of everything or of the expenses.
     const selected = selectedRows();
     const selectedTotal = selected.reduce((s, r) => s + r.amount, 0);
-    const base = !xp.main ? total + returned : xp.main === RETURN_MONEY ? returned : total;
+    const base = total;
     const scope = xp.main ? xp.main + (xp.sub ? ' › ' + xp.sub : '') : 'All categories';
-    const of = xp.main === RETURN_MONEY ? 'return money' : xp.main ? 'expenses' : 'total';
+    const of = xp.main ? 'expenses' : 'total';
     $('#xp-selected').text(peso(selectedTotal));
     $('#xp-selected-meta').text(scope + (base > 0 ? ' · ' + ((selectedTotal / base) * 100).toFixed(1) + '% of ' + of : ''));
-    $('#xp-selected-card').toggleClass('is-return', xp.main === RETURN_MONEY);
 
     const mains = mainItems(rows);
-    renderBreakdown(mains, total + returned);
+    renderBreakdown(mains, total);
     renderMainList(mains, rows.length);
     renderSubList(rows);
     renderButtons();
@@ -152,7 +123,7 @@ function render() {
     $('#xp-table-scope').text(xp.main ? scope : '');
 }
 
-/** The main categories with their counts and totals: the saved ones, then names only found on the rows, then Return Money. */
+/** The main categories with their counts and totals: the saved ones, then names only found on the rows. */
 function mainItems(rows) {
     const stats = {};
     rows.forEach((r) => {
@@ -164,9 +135,8 @@ function mainItems(rows) {
     const tree = categoryTree();
     const items = tree.map((m) => ({ name: m.name, category: m, ...(stats[m.name] || { count: 0, sum: 0 }) }));
     Object.keys(stats)
-        .filter((n) => n !== RETURN_MONEY && !tree.some((m) => m.name === n))
+        .filter((n) => !tree.some((m) => m.name === n))
         .forEach((n) => items.push({ name: n, ...stats[n] }));
-    items.push({ name: RETURN_MONEY, isReturn: true, ...(stats[RETURN_MONEY] || { count: 0, sum: 0 }) });
     return items;
 }
 
@@ -178,7 +148,7 @@ function renderBreakdown(mains, base) {
     }
     let i = 0;
     const html = top.map((m) => {
-        const color = m.isReturn ? RETURN_COLOR : BAR_COLORS[i++ % BAR_COLORS.length];
+        const color = BAR_COLORS[i++ % BAR_COLORS.length];
         const pct = base > 0 ? (m.sum / base) * 100 : 0;
         return (
             '<button type="button" class="xp-bar-row' + (xp.main === m.name ? ' is-active' : '') + '" data-bd="' + attr(m.name) + '" data-color="' + color + '" title="Click to see its entries">' +
@@ -199,7 +169,7 @@ function catItemHtml(item, active, level) {
           '</span>'
         : '';
     return (
-        '<div class="xp-cat' + (active ? ' is-active' : '') + (item.isReturn ? ' xp-cat--return' : '') + '" data-' + level + '="' + attr(item.name) + '">' +
+        '<div class="xp-cat' + (active ? ' is-active' : '') + '" data-' + level + '="' + attr(item.name) + '">' +
         '<span class="xp-cat__name"><span title="' + attr(item.name) + '">' + escapeHtml(item.name) + '</span>' +
         (item.sum > 0 ? '<span class="xp-cat__sum">' + peso(item.sum) + '</span>' : '') + '</span>' +
         '<span class="xp-cat__side">' + actions + '<span class="xp-count">' + item.count + '</span></span>' +
@@ -218,7 +188,7 @@ function renderSubList(rows) {
     const mainCat = categoryTree().find((m) => m.name === xp.main);
     $('#xp-add-sub').prop('disabled', !mainCat);
     if (!xp.main) return $list.html('<div class="xp-empty">Select a main category</div>');
-    if (xp.main === RETURN_MONEY || xp.main === UNCATEGORIZED) return $list.html('<div class="xp-empty">No sub categories for this main</div>');
+    if (xp.main === UNCATEGORIZED) return $list.html('<div class="xp-empty">No sub categories for this main</div>');
 
     const ofMain = rows.filter((r) => mainOf(r) === xp.main);
     const stats = {};
@@ -240,8 +210,7 @@ function renderSubList(rows) {
 
 /** As in the cage system, the buttons follow the selected main category. */
 function renderButtons() {
-    $('#xp-btn-new').toggleClass('xp-hidden', !xp.main || xp.main === RETURN_MONEY);
-    $('#xp-btn-return').toggleClass('xp-hidden', xp.main !== RETURN_MONEY);
+    $('#xp-btn-new').toggleClass('xp-hidden', !xp.main);
     $('#xp-btn-vehicles').toggleClass('xp-hidden', !isVehicleMain(xp.main));
 }
 
@@ -249,17 +218,15 @@ function renderTable(rows) {
     if (!xp.table) return;
     xp.table.clear();
     xp.table.rows.add(rows.map((r) => {
-        const isReturn = r.kind === 'return';
-        const cls = isReturn ? ' class="xp-return-text"' : '';
         const subLine = r.sub ? '<span class="xp-sub-line">' + escapeHtml(r.sub) + '</span>' : '';
         const vLine = vehicleLine(r) ? '<span class="xp-sub-line"><i class="fa fa-car"></i> ' + escapeHtml(vehicleLine(r)) + '</span>' : '';
         const time = r.encodedDt ? ', ' + r.encodedDt.slice(11, 16) : '';
         const key = r.kind + ':' + r.id;
         return {
-            category: '<strong' + cls + '>' + escapeHtml(mainOf(r)) + '</strong>' + subLine,
+            category: '<strong>' + escapeHtml(mainOf(r)) + '</strong>' + subLine,
             details: escapeHtml(r.details || '—') + vLine,
             inCharge: escapeHtml(r.inCharge || '—'),
-            amount: { display: '<span' + cls + '><strong>' + peso(r.amount) + '</strong></span>', sort: r.amount },
+            amount: { display: '<span><strong>' + peso(r.amount) + '</strong></span>', sort: r.amount },
             date: {
                 display: (r.date ? fmtDate(r.date) : '—') + time + (r.encodedBy ? '<span class="xp-sub-line">by ' + escapeHtml(r.encodedBy) + '</span>' : ''),
                 sort: r.date + ' ' + r.encodedDt
@@ -411,13 +378,12 @@ function bindEvents() {
         if (!row) return;
         const act = $(this).attr('data-act');
         if (act === 'receipt') return viewReceipt(row);
-        if (act === 'edit') return kind === 'return' ? openReturn(row) : openExpense(row);
+        if (act === 'edit') return openExpense(row);
         if (act === 'delete') return deleteRow(row);
     });
 
     // header buttons
     $('#xp-btn-new').on('click', function () { openExpense(null); });
-    $('#xp-btn-return').on('click', function () { openReturn(null); });
     $('#xp-btn-vehicles').on('click', openVehicles);
     $('#exportToExcel').on('click', exportToExcel);
 
@@ -431,7 +397,6 @@ function bindEvents() {
     // Amount / ODO fields show thousands separators while typing (2,550.50).
     $('.xp').on('input', '.xp-money', function () { formatMoneyInput(this); });
     $('#xp-expense-form').on('submit', submitExpense);
-    $('#xp-return-form').on('submit', submitReturn);
 
     // vehicles window
     $('#xp-vehicle-add').on('click', function () { showVehicleForm(null); });
@@ -468,7 +433,7 @@ function toggleVehicleFields() {
 
 function openExpense(row) {
     const tree = categoryTree();
-    const mainName = row ? row.main : xp.main === UNCATEGORIZED || xp.main === RETURN_MONEY ? '' : xp.main;
+    const mainName = row ? row.main : xp.main === UNCATEGORIZED ? '' : xp.main;
     const mains = tree.map((m) => m.name);
     if (mainName && !mains.includes(mainName)) mains.push(mainName); // filed under a removed main
     $('#xp-expense-title').text(row ? 'Edit Expense' : 'Add Expense');
@@ -505,40 +470,19 @@ function submitExpense(e) {
 }
 
 // ========================================
-// RETURN MONEY FORM
-// ========================================
-
-function openReturn(row) {
-    $('#xp-return-title').text(row ? 'Edit Return Money' : 'Add Return Money');
-    $('#xp-return-id').val(row ? row.id : '');
-    $('#xp-return-amount').val(row ? withCommas(row.amount.toFixed(2)) : '');
-    $('#xp-return-details').val(row ? row.details : '');
-    $('#xp-return-modal').modal('show');
-}
-
-function submitReturn(e) {
-    e.preventDefault();
-    const amount = parseMoney($('#xp-return-amount').val());
-    if (!(amount > 0)) return showError('Enter the amount returned.');
-    const id = $('#xp-return-id').val();
-    sendJson('POST', id ? '/expenses/return-money/' + id : '/expenses/return-money', { amount, details: $('#xp-return-details').val().trim() }, '#xp-return-modal');
-}
-
-// ========================================
 // DELETE / RECEIPT
 // ========================================
 
 function deleteRow(row) {
-    const isReturn = row.kind === 'return';
     Swal.fire({
-        title: isReturn ? 'Delete return money?' : 'Delete expense?',
+        title: 'Delete expense?',
         text: (row.details || mainOf(row)) + ' · ' + peso(row.amount),
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
         confirmButtonText: 'Delete'
     }).then((r) => {
-        if (r.isConfirmed) sendJson('DELETE', isReturn ? '/expenses/return-money/' + row.id : '/expenses/delete/' + row.id);
+        if (r.isConfirmed) sendJson('DELETE', '/expenses/delete/' + row.id);
     });
 }
 
@@ -547,7 +491,7 @@ function viewReceipt(row) {
         Swal.fire({
             icon: 'info',
             title: 'No receipt uploaded',
-            text: row.kind === 'return' ? 'Return money has no receipt photo.' : 'No receipt photo was uploaded for this expense. Add one with Edit.'
+            text: 'No receipt photo was uploaded for this expense. Add one with Edit.'
         });
         return;
     }
@@ -653,7 +597,7 @@ function renderBreakdownRows() {
             const extra = [r.sub, vehicleLine(r)].filter(Boolean).join(' · ');
             return '<tr><td>' + escapeHtml(r.details || '—') + (extra ? '<span class="xp-sub-line">' + escapeHtml(extra) + '</span>' : '') + '</td>' +
                 '<td>' + escapeHtml(r.inCharge || '—') + '</td>' +
-                '<td class="text-end"' + (r.kind === 'return' ? ' style="color:' + RETURN_COLOR + '"' : '') + '><strong>' + peso(r.amount) + '</strong></td>' +
+                '<td class="text-end"><strong>' + peso(r.amount) + '</strong></td>' +
                 '<td>' + (r.date ? fmtDate(r.date) : '—') + (r.encodedDt ? ', ' + r.encodedDt.slice(11, 16) : '') + '</td></tr>';
         }).join('') || '<tr><td colspan="4" class="xp-muted">No entries.</td></tr>'
     );
@@ -786,12 +730,10 @@ async function exportToExcel() {
         rows.forEach((r) => {
             const row = ws.addRow([mainOf(r), r.sub, r.details, vehicleLine(r), r.inCharge, r.amount, r.date, r.encodedBy, r.encodedDt]);
             row.getCell(6).numFmt = '#,##0.00';
-            if (r.kind === 'return') row.getCell(1).font = row.getCell(6).font = { color: { argb: 'FF109D59' } };
             row.eachCell({ includeEmpty: true }, (cell) => { cell.border = border(); });
         });
-        const total = sumOf(rows, 'expense');
-        const returned = sumOf(rows, 'return');
-        [['Total Expenses', total], ['Total Return Money', returned], ['Net Expenses', total - returned]].forEach(([label, amount]) => {
+        const total = sumOf(rows);
+        [['Total Expenses', total]].forEach(([label, amount]) => {
             const row = ws.addRow(['', '', '', '', label, amount, '', '', '']);
             row.font = { bold: true };
             row.getCell(6).numFmt = '#,##0.00';

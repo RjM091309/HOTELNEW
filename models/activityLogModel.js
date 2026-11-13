@@ -100,7 +100,7 @@ class ActivityLogModel {
              - COALESCE(bill.DISCOUNT_AMOUNT, 0) - COALESCE(bill.RESERVATION_FEE, 0)) AS totalCost,
            COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p
               WHERE p.BOOKING_ID = b.IDNo
-                AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'security_deposit_refund')), 0) AS paidAmount,
+                AND p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'security_deposit_refund') AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL)), 0) AS paidAmount,
            COALESCE((SELECT SUM(sd.AMOUNT) FROM security_deposits sd
               WHERE sd.BOOKING_ID = b.IDNo AND sd.ACTIVE = 1 AND sd.STATUS = 'held'), 0) AS securityDeposit
          FROM booking b

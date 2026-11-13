@@ -1,15 +1,18 @@
 const { queryDatabasePromise } = require('../config/database');
 
+// Columns every property lookup returns (see the per-property settings migration).
+const PROPERTY_COLUMNS = 'IDNo, CODE, NAME, IS_DEFAULT, DISPLAY_NAME, COLOR, ICON, HIDDEN_MENUS, HIDDEN_RATE_OPTIONS, HIDDEN_ROOM_FIELDS, GUEST_PRICING, LOGO, BUILDING_VIEW';
+
 class PropertyModel {
   static async getAllActive() {
     return queryDatabasePromise(
-      `SELECT IDNo, CODE, NAME, IS_DEFAULT FROM property WHERE ACTIVE = 1 ORDER BY IS_DEFAULT DESC, NAME ASC`
+      `SELECT ${PROPERTY_COLUMNS} FROM property WHERE ACTIVE = 1 ORDER BY IS_DEFAULT DESC, NAME ASC`
     );
   }
 
   static async getById(propertyId) {
     const rows = await queryDatabasePromise(
-      `SELECT IDNo, CODE, NAME, IS_DEFAULT FROM property WHERE IDNo = ? AND ACTIVE = 1 LIMIT 1`,
+      `SELECT ${PROPERTY_COLUMNS} FROM property WHERE IDNo = ? AND ACTIVE = 1 LIMIT 1`,
       [propertyId]
     );
     return rows[0] || null;
@@ -17,7 +20,7 @@ class PropertyModel {
 
   static async getByCode(code) {
     const rows = await queryDatabasePromise(
-      `SELECT IDNo, CODE, NAME, IS_DEFAULT FROM property WHERE CODE = ? AND ACTIVE = 1 LIMIT 1`,
+      `SELECT ${PROPERTY_COLUMNS} FROM property WHERE CODE = ? AND ACTIVE = 1 LIMIT 1`,
       [code]
     );
     return rows[0] || null;
@@ -25,7 +28,7 @@ class PropertyModel {
 
   static async getDefault() {
     const rows = await queryDatabasePromise(
-      `SELECT IDNo, CODE, NAME, IS_DEFAULT FROM property WHERE IS_DEFAULT = 1 AND ACTIVE = 1 LIMIT 1`
+      `SELECT ${PROPERTY_COLUMNS} FROM property WHERE IS_DEFAULT = 1 AND ACTIVE = 1 LIMIT 1`
     );
     return rows[0] || null;
   }

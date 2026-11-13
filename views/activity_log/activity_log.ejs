@@ -139,6 +139,11 @@
 
 	[data-theme="dark"] .al-chg-from { color: #e6a23c; }
 	[data-theme="dark"] .al-chg-to { color: #86efac; }
+	/* the light theme turns every span dark: keep each Source badge's own text colour, and the Close button readable */
+	html[data-theme] .al-cat.al-cat--dashboard, html[data-theme] .al-cat.al-cat--booking, html[data-theme] .al-cat.al-cat--settings, html[data-theme] .al-cat.al-cat--rooms, html[data-theme] .al-cat.al-cat--system { color: #ffffff !important; }
+	html[data-theme] .al-cat.al-cat--calendar { color: #04303a !important; }
+	html[data-theme] .al-cat.al-cat--payments { color: #3d2f00 !important; }
+	html[data-theme] .modal .modal-footer .btn.btn-secondary { background: #6c757d !important; color: #ffffff !important; border-color: #6c757d !important; }
 </style>
 
 <script>

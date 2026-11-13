@@ -1,5 +1,7 @@
 const DashboardModel = require('../models/dashboardModel');
 const PropertyModel = require('../models/propertyModel');
+const OverviewModel = require('../models/overviewModel');
+const PropertyDashboardModel = require('../models/propertyDashboardModel');
 
 // A handful of endpoints below (guest app / housekeeping app integrations,
 // mounted in routes/r_api.js) are deliberately reachable with no auth
@@ -15,6 +17,73 @@ async function resolvePropertyId(req) {
 }
 
 class DashboardController {
+  // Dashboard: ONE CARD PER PROPERTY (reservations of today, housekeeping, check-ins of the last 7 days, money received).
+  // The full operations dashboard of a property is /dashboard/full ("Expand Full Dashboard").
+  static async getOverview(req, res) {
+    try {
+      // old links (notifications...) that ask the full dashboard for a booking / room keep working
+      const q = req.query || {};
+      // (the old operations dashboard is gone: cleaning rooms and bookings are handled in the Calendar)
+      if (q.cleaning) return res.redirect('/calendar?cleaning=' + encodeURIComponent(q.cleaning));
+      const bid = q.checkin || q.checkout || q.booking;
+      if (bid) return res.redirect('/calendar?openBooking=' + encodeURIComponent(bid));
+      const properties = (await PropertyModel.getAllActive()).filter((p) => !req.allowedPropertyIds || req.allowedPropertyIds.includes(p.IDNo));
+      if (properties.length === 1) return res.redirect('/dashboard/full');          // one property: no choice to make
+      const cards = await OverviewModel.getAllProperties(properties);
+      res.render('dashboard/overview', {
+        title: 'Dashboard',
+        subTitle: 'Dashboard',
+        page: 'dashboard',
+        activePage: 'dashboard',
+        hideBreadcrumb: true,
+        user: req.user || null,
+        cards
+      });
+    } catch (error) {
+      console.error('Error rendering the dashboard overview:', error);
+      res.status(500).render('error/500', { message: 'Failed to load the dashboard' });
+    }
+  }
+
+  // The full dashboard of the ACTIVE property (the page behind "Expand Full Dashboard").
+  static async getFullDashboard(req, res) {
+    try {
+      res.render('dashboard/full', {
+        title: 'Dashboard',
+        subTitle: 'Dashboard',
+        page: 'dashboard',
+        activePage: 'dashboard',
+        hideBreadcrumb: true,
+        user: req.user || null
+      });
+    } catch (error) {
+      console.error('Error rendering the full dashboard:', error);
+      res.status(500).render('error/500', { message: 'Failed to load the dashboard' });
+    }
+  }
+
+  static async getFullData(req, res) {
+    try {
+      const data = await PropertyDashboardModel.getFull(req.propertyId);
+      res.json({ success: true, data });
+    } catch (error) {
+      console.error('Error loading the full dashboard data:', error);
+      res.status(500).json({ success: false, message: 'Failed to load the dashboard' });
+    }
+  }
+
+  // The same numbers as JSON (the page refreshes itself with this).
+  static async getOverviewData(req, res) {
+    try {
+      const properties = (await PropertyModel.getAllActive()).filter((p) => !req.allowedPropertyIds || req.allowedPropertyIds.includes(p.IDNo));
+      const cards = await OverviewModel.getAllProperties(properties);
+      res.json({ success: true, cards });
+    } catch (error) {
+      console.error('Error loading the dashboard overview data:', error);
+      res.status(500).json({ success: false, message: 'Failed to load the dashboard' });
+    }
+  }
+
   // Main dashboard controller
   static async getDashboard(req, res) {
     try {
@@ -233,55 +302,6 @@ class DashboardController {
     }
   }
 
-  // Check move to occupied controller
-  static async checkMoveToOccupied(req, res) {
-    try {
-      const count = await DashboardModel.getCheckInBookings(req.propertyId);
-      res.json({
-        success: true,
-        message: 'Move to occupied check completed',
-        canMove: count > 0,
-        count: count
-      });
-    } catch (error) {
-      console.error('Error checking move to occupied:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Server error'
-      });
-    }
-  }
-
-  // Move to occupied controller
-  static async moveToOccupied(req, res) {
-    try {
-      const affectedRows = await DashboardModel.moveToOccupied(req.propertyId);
-      
-      // Get the io instance from the app
-      const io = req.app.get('io');
-      
-      // Emit Socket.IO event for real-time dashboard updates
-      if (io) {
-        io.to('dashboard-room').emit('dashboard-refresh', {
-          action: 'dashboard-updated',
-          message: `${affectedRows} guests moved to occupied successfully`,
-          data: { affectedRows }
-        });
-      }
-      
-      res.json({
-        success: true,
-        message: `${affectedRows} guests moved to occupied successfully`
-      });
-    } catch (error) {
-      console.error('Error moving to occupied:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Server error'
-      });
-    }
-  }
-
   // Check if room is occupied before check-in
   static async checkRoomOccupied(req, res) {
     try {
@@ -390,7 +410,7 @@ class DashboardController {
   // Check in guest with security deposit
   static async checkInWithSecurityDeposit(req, res) {
     try {
-      const { BookingID, depositAmount, paymentMethod, remarks, earlyCheckInFee } = req.body;
+      const { BookingID, depositAmount, paymentMethod, remarks, earlyCheckInFee, earlyFeePayLater } = req.body;
       const encodedBy = req.user?.userId;
 
       if (!BookingID) {
@@ -402,6 +422,7 @@ class DashboardController {
         paymentMethod,
         remarks,
         earlyCheckInFee,
+        earlyFeePayLater: earlyFeePayLater === true || earlyFeePayLater === 'true',
         encodedBy
       });
 
@@ -508,7 +529,7 @@ class DashboardController {
   static async getRoomMonitoring(req, res) {
     try {
       const propertyId = await resolvePropertyId(req);
-      const isPoolVilla = !!(res.locals.currentProperty && res.locals.currentProperty.CODE === 'pool_villa');
+      const isPoolVilla = !!res.locals.isGuestPricing;
       const floors = await DashboardModel.getRoomMonitoringData(propertyId, isPoolVilla);
       res.json({ floors });
     } catch (error) {

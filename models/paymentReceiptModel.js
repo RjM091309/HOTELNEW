@@ -41,8 +41,8 @@ class PaymentReceiptModel {
     const query = `
       INSERT INTO payment_receipt
       (RECEIPT_NO, ROOM_NO, RECEIPT_DATE, RECEIVED_FROM, AMOUNT_PAID, PAYMENT_METHOD,
-       PAYMENT_METHOD_OTHER, PURPOSE, RECEIVED_BY, ENCODED_BY, ENCODED_DT, ACTIVE, PROPERTY_ID)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+       PAYMENT_METHOD_OTHER, PURPOSE, RECEIVED_BY, SIGNATURE, ENCODED_BY, ENCODED_DT, ACTIVE, PROPERTY_ID)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
     `;
     const result = await queryDatabasePromise(query, [
       data.RECEIPT_NO,
@@ -54,6 +54,7 @@ class PaymentReceiptModel {
       data.PAYMENT_METHOD_OTHER,
       data.PURPOSE,
       data.RECEIVED_BY,
+      data.SIGNATURE || null,
       data.ENCODED_BY,
       data.ENCODED_DT,
       data.PROPERTY_ID
@@ -80,6 +81,7 @@ class PaymentReceiptModel {
           PAYMENT_METHOD_OTHER = ?,
           PURPOSE = ?,
           RECEIVED_BY = ?,
+          SIGNATURE = ?,
           EDITED_BY = ?,
           EDITED_DT = ?
       WHERE IDNo = ? AND ACTIVE = 1
@@ -94,6 +96,7 @@ class PaymentReceiptModel {
       data.PAYMENT_METHOD_OTHER,
       data.PURPOSE,
       data.RECEIVED_BY,
+      data.SIGNATURE || null,
       data.EDITED_BY,
       data.EDITED_DT,
       data.IDNo

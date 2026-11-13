@@ -6,11 +6,14 @@
 (function () {
   const usernameEl = document.querySelector('.navbar .username');
   const avatarEl = document.getElementById('navbarAvatarImg');
+  // The sidebar's user panel (picture + name) needs the same refresh.
+  const sideAvatarEl = document.getElementById('sidebarAvatarImg');
+  const sideNameEl = document.querySelector('.sidebar-userpic-name');
   // Same staleness applies to the lock screen's avatar/name (lock-screen.ejs
   // also renders them from the JWT payload).
   const lockAvatarEl = document.getElementById('lockScreenAvatar');
   const lockNameEl = document.getElementById('lockScreenName');
-  if (!usernameEl && !avatarEl && !lockAvatarEl && !lockNameEl) return;
+  if (!usernameEl && !avatarEl && !lockAvatarEl && !lockNameEl && !sideAvatarEl && !sideNameEl) return;
 
   fetch('/user_info/api/current-user')
     .then((r) => (r.ok ? r.json() : null))
@@ -19,6 +22,9 @@
       if (usernameEl && data.data.FULLNAME) {
         usernameEl.textContent = ' ' + data.data.FULLNAME + ' ';
       }
+      if (sideNameEl && data.data.FULLNAME) {
+        sideNameEl.textContent = ' ' + data.data.FULLNAME + ' ';
+      }
       if (lockNameEl && data.data.FULLNAME) {
         lockNameEl.textContent = data.data.FULLNAME;
       }
@@ -26,6 +32,7 @@
         const url = '/uploads/avatars/' + data.data.PROFILE_PHOTO;
         if (avatarEl) avatarEl.src = url;
         if (lockAvatarEl) lockAvatarEl.src = url;
+        if (sideAvatarEl) sideAvatarEl.src = url;
       }
     })
     .catch(() => { /* stay on the SSR-rendered default */ });

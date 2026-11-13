@@ -1017,13 +1017,13 @@ function populateEditBreakdown(selectedRooms, computedPrices) {
   const container = $('#editGroupRoomBreakdown');
   container.empty();
   if (!selectedRooms || !selectedRooms.length) {
+    $('#editGroupSummaryRoomLine').hide();
     return;
   }
 
+  // Selected Room Prices + "Room Rate (N rooms x M nights)": the same rows as the Summary of Add Group Booking
   const mainNights = parseInt($('#editGroupNights').val(), 10) || 0;
-
-  // Map: roomNumber -> nights from individual date inputs
-  const individualNightsMap = {};
+  const individualNightsMap = {};   // roomNumber -> nights, when a room has its own dates
   $('.edit-individual-nights').each(function() {
     const roomNumber = $(this).data('room-number');
     const nights = parseInt($(this).val(), 10) || 0;
@@ -1032,24 +1032,24 @@ function populateEditBreakdown(selectedRooms, computedPrices) {
     }
   });
 
-  let html = '<div class="group-room-breakdown"><b>Selected Room Prices:</b><ul>';
+  const peso = (n) => '\u20b1' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  let html = '<div class="group-summary-subtitle">Selected Room Prices</div>';
+  let roomTotal = 0;
   selectedRooms.forEach((room, idx) => {
     const price = computedPrices[idx] || 0;
     const roomNumber = room.ROOM_NUMBER || room.roomNumber;
-
-    // Use individual nights if available, otherwise use main nights
     const nights = individualNightsMap[roomNumber] || mainNights;
     const total = nights > 0 ? price * nights : price;
-
-    // Add indicator if using individual nights
-    const nightsLabel = individualNightsMap[roomNumber]
-      ? ` (${nights} nights - different dates)`
-      : ` (${nights} nights)`;
-
-    html += `<li>Room ${roomNumber}: ₱${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per night ${nights > 0 ? `(₱${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total${nightsLabel})` : ''}</li>`;
+    roomTotal += total;
+    const own = individualNightsMap[roomNumber] ? ' (' + nights + ' nights, own dates)' : '';
+    html += '<div class="group-summary-line group-room-breakdown-line"><span>Room ' + roomNumber + own + '</span><span>' + peso(price) + '/night' + (nights > 0 ? ' &middot; ' + peso(total) : '') + '</span></div>';
   });
-  html += '</ul></div>';
   container.html(html);
+
+  const n = selectedRooms.length;
+  $('#editGroupSummaryRoomLabel').text('Room Rate (' + n + ' room' + (n === 1 ? '' : 's') + ' \u00d7 ' + mainNights + ' night' + (mainNights === 1 ? '' : 's') + ')');
+  $('#editGroupSummaryRoomTotal').text(roomTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+  $('#editGroupSummaryRoomLine').show();
 }
 
 function formatPaidAmount(input) {
@@ -1065,7 +1065,7 @@ function computeEditGroupTotal() {
     // Get main nights (for bookings without individual dates)
     const mainNights = parseInt($('#editGroupNights').val(), 10) || 0;
     const pricesRaw = $('#editGroupSelectedRoomPrices').val();
-    const prices = pricesRaw ? pricesRaw.split(',').map(p => parseFloat(p) || 0) : [];
+    const prices = pricesRaw ? pricesRaw.split(/[|,]/).map(p => parseFloat(p) || 0) : [];
     
     // Get individual booking dates and map to room numbers
     // Map: roomNumber -> nights
@@ -1135,7 +1135,9 @@ function computeEditGroupTotal() {
     const numRooms = selectedRooms ? selectedRooms.split(',').length : 1;
 
     const breakfastTotal = (adultQty * adultPrice) + (kidQty * kidPrice);
-    const breakfastTotalWithIndividual = breakfastIndividual ? breakfastTotal * numRooms : breakfastTotal;
+    let breakfastTotalWithIndividual = breakfastIndividual ? breakfastTotal * numRooms : breakfastTotal;
+    // only the extras above 2 per room are charged (the 2 included are inside the room rate), like Add Group Booking
+    if (typeof window.getEditGroupExtraBreakfast === 'function') breakfastTotalWithIndividual = window.getEditGroupExtraBreakfast().total;
 
     const servicesTotal = breakfastTotalWithIndividual + pickupPrice + dropoffPrice;
 
@@ -1608,6 +1610,17 @@ function populateEditGroupForm(booking) {
         $('#editGroupBreakfastKidId').val('75'); // Default breakfast kid service ID
     }
 
+    // the extra breakfast already saved on the group (above 2 per room): its prices and how many each room has
+    if (typeof window.setEditGroupExtraBfState === 'function') {
+        const ex = booking.breakfastExtras || {};
+        const byRoom = {};
+        (booking.bookings || []).forEach(function (b) {
+            const rec = ex.byBooking && ex.byBooking[b.bookingId];
+            byRoom[b.ROOM_ID || b.roomId] = rec ? { a: rec.a || 0, k: rec.k || 0 } : { a: 0, k: 0 };
+        });
+        window.setEditGroupExtraBfState(ex.adultPrice, ex.kidPrice, byRoom);
+    }
+
     if (parseFloat(booking.pickupPrice) > 0) {
         $('#editGroupIncludePickup').prop('checked', true);
         $('#editGroupPickupWrapper').show();
@@ -1765,7 +1778,7 @@ function displayIndividualBookingDates(bookingsWithDifferentDates) {
         // Refresh breakdown using current bookings data + prices
         if (Array.isArray(window.editGroupBookingsData)) {
           const pricesRaw = $('#editGroupSelectedRoomPrices').val();
-          const computedPrices = pricesRaw ? pricesRaw.split(',').map(p => parseFloat(p) || 0) : [];
+          const computedPrices = pricesRaw ? pricesRaw.split(/[|,]/).map(p => parseFloat(p) || 0) : [];
           populateEditBreakdown(window.editGroupBookingsData, computedPrices);
         }
     });
@@ -2033,3 +2046,11 @@ function joinExistingGroup(groupId) {
         }
     });
 } 
+
+// /booking/group?editGroup=<id>: opens the edit form of that whole group (the Edit button of a group booking's details window goes here)
+$(function () {
+  var id = new URLSearchParams(window.location.search).get('editGroup');
+  if (!id) return;
+  try { window.history.replaceState({}, '', window.location.pathname); } catch (e) { /* keep the link */ }
+  setTimeout(function () { if (typeof editGroupBooking === 'function') editGroupBooking(id); }, 500);
+});

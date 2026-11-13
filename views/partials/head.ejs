@@ -15,6 +15,7 @@
 		}
 	</style>
 	<meta name="theme-color" content="#0b0e11" />
+	<script>window.__noLongTermRates = <%= (typeof hideRate === 'function' && hideRate('long_term')) ? 'true' : 'false' %>;</script>
 	<!-- data-property-theme records which property is active, purely for
 	     public/css/theme-color.css's [data-property-theme="pool_villa"]
 	     rules to recolor specific elements (the Real-Time Booking Monitor/
@@ -28,6 +29,9 @@
 		var propertyCode = '<%= typeof currentProperty !== "undefined" && currentProperty ? currentProperty.CODE : "main" %>';
 		try { document.documentElement.setAttribute('data-theme', localStorage.getItem('ui_data_theme') || 'dark'); } catch(e) { document.documentElement.setAttribute('data-theme', 'dark'); }
 		document.documentElement.setAttribute('data-property-theme', propertyCode);
+		try { document.documentElement.style.setProperty('--property-accent', '<%= typeof currentProperty !== "undefined" && currentProperty && /^#[0-9a-fA-F]{6}$/.test(currentProperty.COLOR || "") ? currentProperty.COLOR : "#d4a017" %>'); } catch (e) {}
+		// Pricing mode is a property setting (not tied to a code): 'guest' = rates by number of guests.
+		document.documentElement.setAttribute('data-property-pricing', '<%= typeof isGuestPricing !== "undefined" && isGuestPricing ? "guest" : "room" %>');
 	})();</script>
 	<!-- The reload after a property switch (views/partials/navbar.ejs's
 	     propertyToggleBtn handler) briefly shows raw unstyled HTML before
@@ -65,6 +69,17 @@
 			document.documentElement.style.visibility = 'visible';
 		}
 	})();</script>
+	<!-- Critical rules, before any stylesheet: things that sit lower in the page markup must not show for a moment while it is still loading
+	     (the lock-screen card used to flash as a small white window on every page change, because its own <style> comes after its markup). -->
+	<style>
+		#lockScreenOverlay { position: fixed; inset: 0; opacity: 0; visibility: hidden; pointer-events: none; }
+		.modal:not(.show) { display: none; }
+	</style>
+	<!-- connect to the CDNs the pages use right away, so their files do not wait for a new connection on every page change -->
+	<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+	<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+	<link rel="preconnect" href="https://unpkg.com" crossorigin>
+	<link rel="preconnect" href="https://cdn.datatables.net" crossorigin>
 	<!-- icons -->
 	<link href="/plugins/simple-line-icons/simple-line-icons.min.css" rel="stylesheet" type="text/css" />
 	<link href="/plugins/font-awesome/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
@@ -91,7 +106,7 @@
 	<link rel="stylesheet" href="/css/card.css?v=btn-row-wrap-2"  type="text/css" />
 	<link rel="stylesheet" href="/css/room.css"  type="text/css" />
 	<link href="/css/responsive.css" rel="stylesheet" type="text/css" />
-	<link href="/css/theme-color.css?v=pool-villa-event-bar-4" rel="stylesheet" type="text/css" />
+	<link href="/css/theme-color.css?v=swal-dark-5" rel="stylesheet" type="text/css" />
 	<!-- Date Time item CSS -->
 	<link rel="stylesheet" href="/plugins/flatpicker/flatpickr.min.css">
 	<!-- DataTables CSS -->

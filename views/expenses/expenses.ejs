@@ -1,10 +1,10 @@
 <!-- start page content -->
 <!--
   Expenses, laid out like the cage system's expense page (data entry only, no settlement):
-  date range | total expenses / return money / net | selected total + breakdown by category |
-  main category | sub category | expenses table. Return money ("sukli") is its own green main category.
+  date range | total expenses | selected total + breakdown by category |
+  main category | sub category | expenses table.
 -->
-<link rel="stylesheet" href="/css/expenses.css?v=cage-concept-1">
+<link rel="stylesheet" href="/css/expenses.css?v=no-return-1">
 
 <div class="xp">
   <!-- Date range + export -->
@@ -20,7 +20,7 @@
     </button>
   </div>
 
-  <!-- Total expenses, return money and the net -->
+  <!-- Total expenses -->
   <div class="xp-kpis">
     <div class="xp-card xp-kpi">
       <span class="xp-kpi__icon"><i class="fa fa-wallet"></i></span>
@@ -29,22 +29,6 @@
         <div class="xp-kpi__value" id="xp-total">₱0.00</div>
       </div>
       <div class="xp-kpi__meta" id="xp-total-meta"></div>
-    </div>
-    <div class="xp-card xp-kpi xp-kpi--return">
-      <span class="xp-kpi__icon"><i class="fa fa-undo"></i></span>
-      <div class="xp-kpi__text">
-        <div class="xp-kpi__label">Total return money</div>
-        <div class="xp-kpi__value" id="xp-returned">₱0.00</div>
-      </div>
-      <div class="xp-kpi__meta" id="xp-returned-meta"></div>
-    </div>
-    <div class="xp-card xp-kpi">
-      <span class="xp-kpi__icon"><i class="fa fa-calculator"></i></span>
-      <div class="xp-kpi__text">
-        <div class="xp-kpi__label">Net expenses</div>
-        <div class="xp-kpi__value" id="xp-net">₱0.00</div>
-      </div>
-      <div class="xp-kpi__meta" id="xp-net-meta"></div>
     </div>
   </div>
 
@@ -89,7 +73,6 @@
         <div class="xp-table-panel__actions">
           <!-- As in the cage system, the buttons follow the selected main category. -->
           <button type="button" class="btn btn-outline-secondary btn-sm xp-hidden" id="xp-btn-vehicles"><i class="fa fa-car"></i> Vehicles</button>
-          <button type="button" class="btn btn-success btn-sm xp-hidden" id="xp-btn-return"><i class="fa fa-undo"></i> Return money</button>
           <button type="button" class="btn btn-primary btn-sm xp-hidden" id="xp-btn-new"><i class="fa fa-plus"></i> New expense</button>
         </div>
       </div>
@@ -112,11 +95,10 @@
   </div>
 
   <%- include('modal/expense_form') %>
-  <%- include('modal/return_money') %>
   <%- include('modal/vehicles') %>
   <%- include('modal/breakdown') %>
 </div>
 
 <!-- ExcelJS: styled Excel export (fills / bold / number formats) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
-<script src="/js/expenses/expenses.js?v=cage-concept-4"></script>
+<script src="/js/expenses/expenses.js?v=no-return-1"></script>

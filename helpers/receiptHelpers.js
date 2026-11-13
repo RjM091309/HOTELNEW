@@ -1,15 +1,10 @@
 const fs = require('fs').promises;
 const path = require('path');
 const ReceiptSettingsModel = require('../models/receiptSettingsModel');
+const { loadPropertyLogoDataUri } = require('./propertyBranding');
 
-async function loadReceiptLogo() {
-  try {
-    const logoPath = path.join(__dirname, '../public/img/Logo-Black.png');
-    const logoBuf = await fs.readFile(logoPath);
-    return `data:image/png;base64,${logoBuf.toString('base64')}`;
-  } catch (_) {
-    return '';
-  }
+async function loadReceiptLogo(propertyId) {
+  return loadPropertyLogoDataUri(propertyId);
 }
 
 async function loadReceiptTemplateSettings(propertyId) {
@@ -55,7 +50,8 @@ function mapReceiptRecordToViewData(record) {
     paymentMethodLabel: formatPaymentMethodLabel(methodKey, otherLabel),
     purpose: record.PURPOSE || '',
     purposeLines: [],
-    receivedBy: record.RECEIVED_BY || ''
+    receivedBy: record.RECEIVED_BY || '',
+    signature: record.SIGNATURE || ''
   };
 }
 
@@ -76,7 +72,7 @@ function mapBlankReceiptViewData() {
 
 async function getReceiptRenderContext(viewData, embed, propertyId) {
   const templateSettings = await loadReceiptTemplateSettings(propertyId);
-  const logoUrl = templateSettings.showLogo ? await loadReceiptLogo() : '';
+  const logoUrl = templateSettings.showLogo ? await loadReceiptLogo(propertyId) : '';
   return {
     layout: false,
     embed: embed === '1' || embed === true,

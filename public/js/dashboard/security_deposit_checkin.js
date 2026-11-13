@@ -135,6 +135,8 @@
             delete earlyFeeInput.dataset.savedValue;
         }
         if (waiveCheckbox) waiveCheckbox.checked = false;
+        const payNow = modalEl.querySelector('#sdEarlyFeePayNow');
+        if (payNow) payNow.checked = true;
     }
 
     async function fetchExistingDeposit(bookingId) {
@@ -150,7 +152,10 @@
         if (earlyCheckInState.isEarly) {
             const waived = document.getElementById('sdWaiveEarlyFee')?.checked;
             const earlyFee = waived ? 0 : parseAmountInput(document.getElementById('sdEarlyFeeAmount')?.value);
-            if (earlyFee > 0) payload.earlyCheckInFee = earlyFee;
+            if (earlyFee > 0) {
+                payload.earlyCheckInFee = earlyFee;
+                payload.earlyFeePayLater = document.getElementById('sdEarlyFeePayLater')?.checked === true;
+            }
         }
 
         if (!depositInfo.exists) {

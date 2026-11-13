@@ -1,5 +1,7 @@
 const { queryDatabasePromise, pool } = require('../config/database');
 const CalendarModel = require('./calendarModel');
+const { loadPropertyLogoDataUri } = require('../helpers/propertyBranding');
+const { getMasterGroupMates } = require('../helpers/masterBilling');
 
 class BookingModel {
 
@@ -7,6 +9,23 @@ class BookingModel {
   // can arrive from ~1 AM, so it overlaps any booking that only frees the room at
   // noon on that same date. Returns the conflicting Early Check-In booking, or
   // null if the room+checkout-date is clear.
+  // A room whose status is "Out of order" (3, set in the Rooms menu) cannot be booked. Returns { roomId, roomNumber } of the first one found, or null.
+  // excludeGroupId: rooms that are already part of that group are not counted (editing a group that was booked before the room went out of order).
+  static async findOutOfOrderRoom({ roomIds = [], roomNumbers = [], propertyId = null, excludeGroupId = null } = {}) {
+    const ids = (roomIds || []).map((x) => parseInt(x, 10)).filter((x) => Number.isInteger(x));
+    const nums = (roomNumbers || []).map((x) => String(x == null ? '' : x).trim()).filter(Boolean);
+    if (!ids.length && !nums.length) return null;
+    const conds = [];
+    const params = [];
+    if (ids.length) { conds.push('r.IDNo IN (?)'); params.push(ids); }
+    if (nums.length) { conds.push('r.ROOM_NUMBER IN (?)'); params.push(nums); }
+    let sql = `SELECT r.IDNo, r.ROOM_NUMBER FROM room r WHERE (${conds.join(' OR ')}) AND r.ROOM_STATUS = '3' AND r.ACTIVE = 1`;
+    if (propertyId) { sql += ' AND r.PROPERTY_ID = ?'; params.push(propertyId); }
+    if (excludeGroupId) { sql += ' AND r.IDNo NOT IN (SELECT ROOM_ID FROM booking WHERE GROUP_BOOKING_ID = ? AND ACTIVE = 1)'; params.push(excludeGroupId); }
+    const rows = await queryDatabasePromise(sql + ' LIMIT 1', params);
+    return rows.length ? { roomId: rows[0].IDNo, roomNumber: rows[0].ROOM_NUMBER } : null;
+  }
+
   static async findEarlyCheckInConflict(roomId, checkOutDate, excludeBookingId = null) {
     if (!roomId || !checkOutDate) return null;
     const rows = await queryDatabasePromise(
@@ -203,15 +222,30 @@ class BookingModel {
               WHEN bill.PAYMENT_STATUS = 'paid'
                 AND COALESCE(services_unpaid_count.TOTAL_UNPAID_SERVICES, 0) = 0
                 AND COALESCE(extensions_unpaid_count.TOTAL_UNPAID_EXTENSIONS, 0) = 0
+                AND NOT EXISTS (
+                  SELECT 1 FROM payments p_cr
+                  JOIN booking bcr2 ON bcr2.IDNo = p_cr.BOOKING_ID
+                  WHERE p_cr.PAYMENT_METHOD IN ('credit', 'marker') AND p_cr.SETTLED_DATE IS NULL
+                    AND (
+                      bcr2.IDNo = b.IDNo
+                      OR (b.GROUP_BOOKING_ID IS NOT NULL AND bcr2.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID
+                          AND (SELECT gbc2.BILLING_TYPE FROM group_booking gbc2 WHERE gbc2.IDNo = b.GROUP_BOOKING_ID) = 1)
+                    )
+                )
               THEN 'paid'
               ELSE 'unpaid'
             END AS PAYMENT_STATUS,
             bill.PAYMENT_METHOD AS PAYMENT_METHOD,
             EXISTS (
               SELECT 1 FROM payments p_credit
-              WHERE p_credit.BOOKING_ID = b.IDNo
-                AND p_credit.PAYMENT_METHOD IN ('credit', 'marker')
+              JOIN booking bcr ON bcr.IDNo = p_credit.BOOKING_ID
+              WHERE p_credit.PAYMENT_METHOD IN ('credit', 'marker')
                 AND p_credit.SETTLED_DATE IS NULL
+                AND (
+                  bcr.IDNo = b.IDNo
+                  OR (b.GROUP_BOOKING_ID IS NOT NULL AND bcr.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID
+                      AND (SELECT gbc.BILLING_TYPE FROM group_booking gbc WHERE gbc.IDNo = b.GROUP_BOOKING_ID) = 1)
+                )
             ) AS HAS_UNSETTLED_CREDIT,
             ${useIndividualCalculation ? `
             -- Use individual balance calculation for all bookings (including group bookings shown individually)
@@ -266,7 +300,7 @@ class BookingModel {
                             FROM payments p
                             JOIN booking b3 ON p.BOOKING_ID = b3.IDNo
                             WHERE b3.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID
-                              AND p.PAYMENT_TYPE IN ('room','service','extended')
+                              AND p.PAYMENT_TYPE IN ('room','service','extended','cancellation_fee') AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL)
                           )
                         )
                       ELSE
@@ -307,7 +341,7 @@ class BookingModel {
                         FROM payments p
                         JOIN booking b3 ON p.BOOKING_ID = b3.IDNo
                         WHERE b3.GROUP_BOOKING_ID = b.GROUP_BOOKING_ID
-                          AND p.PAYMENT_TYPE IN ('room','service','extended')
+                          AND p.PAYMENT_TYPE IN ('room','service','extended','cancellation_fee') AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL)
                       )
                     )
                 END
@@ -402,6 +436,7 @@ class BookingModel {
                 SUM(p.AMOUNT_PAID) AS TOTAL_PAYMENTS_MADE
               FROM payments p
               WHERE p.PAYMENT_TYPE NOT IN ('reservation_fee', 'discount', 'security_deposit', 'security_deposit_refund')
+                AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL)
               GROUP BY p.BOOKING_ID
             ) actual_payments ON b.IDNo = actual_payments.BOOKING_ID
           WHERE b.ACTIVE = 1
@@ -508,6 +543,7 @@ class BookingModel {
           SELECT BOOKING_ID, COALESCE(SUM(AMOUNT_PAID), 0) AS TOTAL_PAYMENTS_MADE
           FROM payments
           WHERE PAYMENT_TYPE IN ('room', 'service', 'extended')
+            AND NOT (PAYMENT_METHOD IN ('credit', 'marker') AND SETTLED_DATE IS NULL)
           GROUP BY BOOKING_ID
         ) actual_payments ON b.IDNo = actual_payments.BOOKING_ID
         WHERE b.ACTIVE = 1
@@ -626,6 +662,7 @@ class BookingModel {
         AND b.BOOKING_STATUS = 'check-In'
         ${propertyFilter}
         AND (bs.STATUS IS NULL OR bs.STATUS <> 'cancelled')
+        AND COALESCE(bs.CUSTOM_NAME, '') NOT LIKE 'Extra Breakfast (%'   /* these rows only describe who of the breakfast guests (74 / 75) is paid extra: counting them too would count a guest twice */
         AND (
           bs.SERVICE_ID IN (74, 75)
           OR LOWER(COALESCE(s.SERVICE_NAME, '')) LIKE '%breakfast%'
@@ -1073,7 +1110,7 @@ class BookingModel {
   //                  keep the booking's own scheduled CHECK_OUT_DATE (capped at NOW so a future
   //                  schedule can never be recorded) so the calendar bar does not stretch over
   //                  later bookings. ACTUAL_CHECK_OUT_DT still records the real time of the action.
-  static async checkoutBookings({ bookingIds, encodedBy, refundBookingId = null, refundAmount = 0, penaltyAmount = 0, applyDiscount = false, checkoutDateMode = 'now', propertyId }) {
+  static async checkoutBookings({ bookingIds, encodedBy, refundBookingId = null, refundAmount = 0, penaltyAmount = 0, applyDiscount = false, checkoutDateMode = 'now', keepBookedNights = false, propertyId }) {
     if (!bookingIds || bookingIds.length === 0) {
       throw new Error('No bookings to checkout');
     }
@@ -1130,6 +1167,8 @@ class BookingModel {
         connection.query(updateRoomSql, [ids], (err, res) => (err ? reject(err) : resolve(res)));
       });
 
+      // keepBookedNights ("No refund" on an early check-out): the guest still pays for every night booked, so the room
+      // days and the extension days are NOT reduced to the nights actually stayed.
       // Update billing.QTY: cap at originally booked room days unless guest left before that period ended
       const updateBillingQtySql = `
         UPDATE billing bill
@@ -1141,12 +1180,14 @@ class BookingModel {
             ))
         WHERE b.IDNo IN (?) AND bill.ACTIVE = 1
       `;
-      await new Promise((resolve, reject) => {
-        connection.query(updateBillingQtySql, [ids], (err, res) => (err ? reject(err) : resolve(res)));
-      });
+      if (!keepBookedNights) {
+        await new Promise((resolve, reject) => {
+          connection.query(updateBillingQtySql, [ids], (err, res) => (err ? reject(err) : resolve(res)));
+        });
 
-      // Prorate unused extension days so billing receipt matches early checkout
-      await BookingModel.prorateExtensionsOnEarlyCheckout(connection, ids, encodedBy, effDateExpr);
+        // Prorate unused extension days so billing receipt matches early checkout
+        await BookingModel.prorateExtensionsOnEarlyCheckout(connection, ids, encodedBy, effDateExpr);
+      }
 
       // Remove discount from billing and payments if applyDiscount is false (early checkout without discount)
       if (!applyDiscount) {
@@ -1472,6 +1513,7 @@ class BookingModel {
           b.ENCODED_DT,
           COALESCE(u.FULLNAME, 'System') AS ENCODED_BY_NAME,
           bill.ROOM_CHARGE AS ROOM_RATE,
+          bill.ROOM_PRICE AS ROOM_NIGHT_RATE,
           COALESCE(bill.RESERVATION_FEE, 0) AS RESERVATION_FEE,
 
           bill.QTY AS ORIGINAL_DAYS,
@@ -1788,10 +1830,10 @@ class BookingModel {
           const processedGuestLevel = (guestLevel && guestLevel.trim() !== '') ? guestLevel : null;
 
           const customerQuery = `
-            INSERT INTO customer (NAME, CONTACTNo, NATIONALITY, TYPE, LEVEL, ADDRESS, ENCODED_BY, ENCODED_DT, ACTIVE)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+            INSERT INTO customer (NAME, CONTACTNo, NATIONALITY, TYPE, LEVEL, ADDRESS, ENCODED_BY, ENCODED_DT, ACTIVE, PROPERTY_ID)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
           `;
-          const customerValues = [fullname, number, processedNationality, processedGuestType, processedGuestLevel, address, encodedBy, date];
+          const customerValues = [fullname, number, processedNationality, processedGuestType, processedGuestLevel, address, encodedBy, date, propertyId || null];
 
           const customerResult = await new Promise((resolve, reject) => {
             connection.query(customerQuery, customerValues, (err, result) => {
@@ -2574,14 +2616,16 @@ class BookingModel {
         }
 
         // Update billing with total service cost
+        // (Used to be set to only the services sent in this call, which wiped earlier lines - e.g. the group's
+        // extra breakfast - out of the total the calendar and booking lists read.)
         const updateBillingQuery = `
           UPDATE billing
-          SET SERVICES_CHARGE = ?
+          SET SERVICES_CHARGE = (SELECT COALESCE(SUM(TOTAL_COST), 0) FROM booking_service WHERE BOOKING_ID = ? AND ACTIVE = 1)
           WHERE BOOKING_ID = ?
         `;
 
         await new Promise((resolve, reject) => {
-          connection.query(updateBillingQuery, [totalCost, bookingId], (err) => {
+          connection.query(updateBillingQuery, [bookingId, bookingId], (err) => {
             if (err) reject(err);
             else resolve();
           });
@@ -2746,6 +2790,19 @@ class BookingModel {
         total_unpaid_balance: 0
       };
 
+      // Master Billing: paying the main room settles the whole group, so it also owes the other rooms' unpaid services.
+      const master = await getMasterGroupMates(bookingId);
+      if (master.mates.length) {
+        const mateRows = await queryDatabasePromise(
+          `SELECT COALESCE(SUM(GREATEST(0, bs.TOTAL_COST - COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_SERVICE_ID = bs.IDNo AND p.PAYMENT_TYPE = 'service'), 0))), 0) AS u
+             FROM booking_service bs WHERE bs.BOOKING_ID IN (?) AND bs.ACTIVE = 1`,
+          [master.mates.map((x) => x.id)]
+        );
+        const extra = parseFloat(mateRows[0] && mateRows[0].u) || 0;
+        balanceData.service_unpaid = (parseFloat(balanceData.service_unpaid) || 0) + extra;
+        balanceData.total_unpaid_balance = (parseFloat(balanceData.total_unpaid_balance) || 0) + extra;
+      }
+
       return balanceData;
     } catch (error) {
       console.error('Error in getUnpaidBalance:', error);
@@ -2847,6 +2904,237 @@ class BookingModel {
     }
   }
 
+  // Every open room of the booking's group with the services still on its bill (what "Remove services"
+  // lists). Paid lines, Late Check-out and rooms already checked out / cancelled are left out.
+  static async getGroupServiceLines(bookingId, propertyId) {
+    const src = await queryDatabasePromise(
+      `SELECT b.GROUP_BOOKING_ID, g.GROUP_NAME FROM booking b
+       LEFT JOIN group_booking g ON g.IDNo = b.GROUP_BOOKING_ID
+       WHERE b.IDNo = ? AND b.PROPERTY_ID = ? AND b.ACTIVE = 1 LIMIT 1`,
+      [bookingId, propertyId]
+    );
+    if (!src.length) return { isGroup: false, canGroup: false, scope: 'all', rooms: [] };
+    const groupId = src[0].GROUP_BOOKING_ID;
+    const openRooms = `b.ACTIVE = 1 AND b.PROPERTY_ID = ? AND COALESCE(b.IS_CANCELLED, 0) = 0 AND b.BOOKING_STATUS IN ('pending', 'check-In')`;
+    let groupRooms = [];
+    if (groupId) {
+      groupRooms = await queryDatabasePromise(
+        `SELECT b.IDNo AS bookingId, r.ROOM_NUMBER AS roomNo
+         FROM booking b LEFT JOIN room r ON r.IDNo = b.ROOM_ID
+         WHERE b.GROUP_BOOKING_ID = ? AND ${openRooms} ORDER BY r.ROOM_NUMBER, b.IDNo`,
+        [groupId, propertyId]
+      );
+    }
+    // Group bookings only: a single booking has nothing to list here.
+    const canGroup = groupRooms.length > 1;
+    const useScope = 'group';
+    const rooms = groupRooms;
+    const title = src[0].GROUP_NAME;
+    if (!canGroup) return { isGroup: !!groupId, canGroup: false, scope: useScope, groupName: title, rooms: [] };
+    if (!rooms.length) return { isGroup: true, canGroup, scope: useScope, groupName: title, rooms: [] };
+    const lines = await queryDatabasePromise(
+      `SELECT bs.IDNo AS id, bs.BOOKING_ID AS bookingId, bs.SERVICE_ID AS serviceId,
+              CASE WHEN bs.SERVICE_ID = -1 AND bs.CUSTOM_NAME IS NOT NULL THEN bs.CUSTOM_NAME ELSE s.SERVICE_NAME END AS name,
+              bs.QTY AS qty, bs.TOTAL_COST AS total
+       FROM booking_service bs LEFT JOIN services s ON s.IDNo = bs.SERVICE_ID
+       WHERE bs.ACTIVE = 1 AND bs.BOOKING_ID IN (?) AND bs.SERVICE_ID <> 72 AND COALESCE(bs.STATUS, 'unpaid') <> 'paid'
+       ORDER BY bs.BOOKING_ID, bs.IDNo`,
+      [rooms.map((r) => r.bookingId)]
+    );
+    const byBooking = new Map();
+    lines.forEach((l) => {
+      if (!byBooking.has(l.bookingId)) byBooking.set(l.bookingId, []);
+      byBooking.get(l.bookingId).push({ id: l.id, serviceId: l.serviceId, name: l.name || 'Service', qty: Number(l.qty) || 0, total: Number(l.total) || 0 });
+    });
+    return {
+      isGroup: !!groupId,
+      canGroup,
+      scope: useScope,
+      groupName: title,
+      rooms: rooms
+        .map((r) => ({ bookingId: r.bookingId, roomNo: r.roomNo, groupName: r.groupName || null, lines: byBooking.get(r.bookingId) || [] }))
+        .filter((r) => r.lines.length > 0)
+    };
+  }
+
+  // Take the ticked service lines off the group's bills in one go.
+  static async removeGroupServiceLines({ bookingId, propertyId, ids, reason, userId }) {
+    const list = [...new Set((ids || []).map((x) => parseInt(x, 10)).filter(Boolean))];
+    if (!list.length) throw new Error('Nothing selected.');
+    const data = await BookingModel.getGroupServiceLines(bookingId, propertyId);
+    if (!data.canGroup) throw new Error('This is not a group booking.');
+    const allowed = new Map();
+    data.rooms.forEach((r) => r.lines.forEach((l) => allowed.set(l.id, { bookingId: r.bookingId, total: l.total })));
+    const chosen = list.filter((id) => allowed.has(id));
+    if (chosen.length !== list.length) throw new Error('Some of the selected services can no longer be removed (paid, checked out or already removed). Reopen the window and try again.');
+    const note = String(reason || '').slice(0, 200);
+    const perBooking = new Map();
+    let amount = 0;
+    for (const id of chosen) {
+      const { bookingId: bid, total } = allowed.get(id);
+      await queryDatabasePromise(
+        `UPDATE booking_service SET ACTIVE = 0, REMARKS = ?, EDITED_BY = ?, EDITED_DT = NOW() WHERE IDNo = ? AND ACTIVE = 1`,
+        [note, userId, id]
+      );
+      perBooking.set(bid, (perBooking.get(bid) || 0) + total);
+      amount += total;
+    }
+    for (const bid of perBooking.keys()) {
+      await BookingModel.syncServicesCharge(bid);
+    }
+    return { success: true, removed: chosen.length, amount };
+  }
+
+  // "Apply to all rooms": add the same service (same qty / price) to every OTHER room of the group
+  // that is still active (not checked out / cancelled): adds to a same-price unpaid line of that room, or a new line.
+  // billing.SERVICES_CHARGE = what the booking's active service lines add up to (calendar, booking lists and
+  // payments read this column, the room window adds the lines up - this keeps them equal).
+  static async syncServicesCharge(bookingId) {
+    await queryDatabasePromise(
+      `UPDATE billing SET SERVICES_CHARGE = (SELECT COALESCE(SUM(TOTAL_COST), 0) FROM booking_service WHERE BOOKING_ID = ? AND ACTIVE = 1)
+       WHERE BOOKING_ID = ?`,
+      [bookingId, bookingId]
+    );
+  }
+
+  static async addServiceToGroupRooms({ bookingId, propertyId, service, userId }) {
+    const src = await queryDatabasePromise(
+      'SELECT GROUP_BOOKING_ID FROM booking WHERE IDNo = ? AND PROPERTY_ID = ? AND ACTIVE = 1 LIMIT 1',
+      [bookingId, propertyId]
+    );
+    const groupId = src[0] && src[0].GROUP_BOOKING_ID;
+    if (!groupId) throw new Error('This is not a group booking.');
+    const others = await queryDatabasePromise(
+      `SELECT IDNo FROM booking
+       WHERE GROUP_BOOKING_ID = ? AND ACTIVE = 1 AND IDNo <> ? AND PROPERTY_ID = ?
+         AND COALESCE(IS_CANCELLED, 0) = 0 AND BOOKING_STATUS NOT IN ('check-Out')
+       ORDER BY IDNo`,
+      [groupId, bookingId, propertyId]
+    );
+    const qty = parseInt(service.QUANTITY, 10) || 0;
+    const unit = parseFloat(service.CUSTOM_COST) || 0;
+    const sid = parseInt(service.SERVICE_ID, 10);
+    for (const row of others) {
+      let merged = false;
+      if (sid !== -1) {
+        // same service at the same price still unpaid on that room: add to that line
+        const same = await queryDatabasePromise(
+          `SELECT IDNo, QTY, TOTAL_COST FROM booking_service
+           WHERE BOOKING_ID = ? AND SERVICE_ID = ? AND ACTIVE = 1 AND COALESCE(STATUS, 'unpaid') <> 'paid' ORDER BY IDNo DESC`,
+          [row.IDNo, sid]
+        );
+        const hit = same.find((x) => Number(x.QTY) > 0 && Math.abs(Number(x.TOTAL_COST) / Number(x.QTY) - unit) < 0.01);
+        if (hit) {
+          const newQty = Number(hit.QTY) + qty;
+          await queryDatabasePromise(
+            'UPDATE booking_service SET QTY = ?, TOTAL_COST = ?, EDITED_BY = ?, EDITED_DT = NOW() WHERE IDNo = ?',
+            [newQty, newQty * unit, userId, hit.IDNo]
+          );
+          merged = true;
+        }
+      }
+      if (!merged) {
+        await queryDatabasePromise(
+          `INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE, CUSTOM_NAME)
+           VALUES (?, ?, ?, ?, 'unpaid', ?, NOW(), 1, ?)`,
+          [row.IDNo, sid, qty, qty * unit, userId, sid === -1 ? (service.SERVICE_NAME || 'Custom Service') : null]
+        );
+      }
+      await BookingModel.syncServicesCharge(row.IDNo);
+    }
+    return { success: true, count: others.length };
+  }
+
+  // Master Billing: one bill for the whole group (what the main booking shows). Used by the other rooms'
+  // windows, which show these group numbers instead of a bill of their own.
+  static async getMasterGroupSummary(bookingId, propertyId) {
+    const info = await getMasterGroupMates(bookingId);
+    if (!info.isMain && !info.isMateOfMaster) return { isMaster: false };
+    const mainId = info.main.id;
+    const bill = await BookingModel.getBilling(mainId, propertyId);
+    if (!bill) return { isMaster: false };
+    const mainInfo = await getMasterGroupMates(mainId);
+    const ids = [mainId];
+    const own = await queryDatabasePromise('SELECT AMOUNT_PAID, PAYMENT_TYPE, PAYMENT_METHOD, SETTLED_DATE FROM payments WHERE BOOKING_ID = ?', [mainId]);
+    let rows = own;
+    if (mainInfo.mates.length) {
+      const matePaid = await queryDatabasePromise(
+        "SELECT AMOUNT_PAID, PAYMENT_TYPE, PAYMENT_METHOD, SETTLED_DATE FROM payments WHERE BOOKING_ID IN (?) AND PAYMENT_TYPE IN ('service', 'extended', 'cancellation_fee')",
+        [mainInfo.mates.map((x) => x.id)]
+      );
+      rows = own.concat(matePaid);
+    }
+    const paid = rows.reduce((sum, p) => {
+      if (['reservation_fee', 'discount', 'security_deposit', 'security_deposit_refund'].includes(p.PAYMENT_TYPE)) return sum;
+      // credit (a balance left unpaid on purpose) is not money received until it is settled
+      if (['credit', 'marker'].includes(String(p.PAYMENT_METHOD || '').toLowerCase()) && !p.SETTLED_DATE) return sum;
+      return sum + (parseFloat(p.AMOUNT_PAID) || 0);
+    }, 0);
+    const total = parseFloat(bill.subTotal) || 0;
+    const net = total - (bill.reservationFee || 0) - (bill.discountAmount || 0);
+    const grp = await queryDatabasePromise(
+      'SELECT g.GROUP_NAME FROM booking b LEFT JOIN group_booking g ON g.IDNo = b.GROUP_BOOKING_ID WHERE b.IDNo = ?',
+      [mainId]
+    );
+    // The rooms of the group (main first) with their status, for the "Check in whole group" button.
+    const roomRows = await queryDatabasePromise(
+      `SELECT b.IDNo AS id, r.ROOM_NUMBER AS roomNo, b.BOOKING_STATUS AS status, r.ROOM_STATUS AS roomStatus
+         FROM booking b LEFT JOIN room r ON r.IDNo = b.ROOM_ID
+        WHERE b.IDNo IN (?) AND b.ACTIVE = 1 ORDER BY b.IDNo`,
+      [[mainId].concat(mainInfo.mates.map((x) => x.id))]
+    );
+    return {
+      isMaster: true,
+      isMain: !!info.isMain,
+      rooms: roomRows,
+      mainBookingId: mainId,
+      mainRoomNo: info.main.roomNo,
+      groupName: (grp[0] && grp[0].GROUP_NAME) || '',
+      total,
+      net,
+      paid,
+      balance: Math.max(0, net - paid)
+    };
+  }
+
+  // Take N off one custom "Extra Breakfast" line (e.g. a room with fewer guests than the group's
+  // extra count). The line is removed when it reaches 0; the bill drops by N x the unit price.
+  static async reduceExtraService({ bookingId, bookingServiceId, reduceBy = 1, reason = '', userId = null }) {
+    const n = Math.max(1, parseInt(reduceBy, 10) || 1);
+    const [bk] = await queryDatabasePromise('SELECT BOOKING_STATUS FROM booking WHERE IDNo = ? LIMIT 1', [bookingId]);
+    if (bk && bk.BOOKING_STATUS === 'check-Out') throw new Error('This booking is already checked out - it can no longer be edited.');
+    const rows = await queryDatabasePromise(
+      `SELECT IDNo, QTY, TOTAL_COST, STATUS FROM booking_service
+       WHERE IDNo = ? AND BOOKING_ID = ? AND SERVICE_ID = -1 AND ACTIVE = 1 LIMIT 1`,
+      [bookingServiceId, bookingId]
+    );
+    if (!rows.length) throw new Error('Service not found or already removed.');
+    const row = rows[0];
+    if ((row.STATUS || 'unpaid') === 'paid') throw new Error('Paid services cannot be reduced.');
+    const qty = parseInt(row.QTY, 10) || 0;
+    const total = parseFloat(row.TOTAL_COST) || 0;
+    if (qty <= 0) throw new Error('Nothing left to remove.');
+    const unit = total / qty;
+    const take = Math.min(n, qty);
+    const newQty = qty - take;
+    const removed = unit * take;
+    const newTotal = Math.max(0, total - removed);
+    const note = String(reason || '').slice(0, 200);
+    if (newQty <= 0) {
+      await queryDatabasePromise(
+        `UPDATE booking_service SET ACTIVE = 0, REMARKS = LEFT(CONCAT_WS(' | ', NULLIF(REMARKS, ''), ?), 255), EDITED_BY = ?, EDITED_DT = NOW() WHERE IDNo = ?`,
+        [note, userId, bookingServiceId]
+      );
+    } else {
+      await queryDatabasePromise(
+        `UPDATE booking_service SET QTY = ?, TOTAL_COST = ?, REMARKS = LEFT(CONCAT_WS(' | ', NULLIF(REMARKS, ''), ?), 255), EDITED_BY = ?, EDITED_DT = NOW() WHERE IDNo = ?`,
+        [newQty, newTotal, note, userId, bookingServiceId]
+      );
+    }
+    await BookingModel.syncServicesCharge(bookingId);
+    return { success: true, qty: newQty, removed };
+  }
+
   // Get booking services (including extensions and transport)
   static async getBookingServices(bookingId) {
     try {
@@ -2862,7 +3150,8 @@ class BookingModel {
           bs.QTY, 
           bs.TOTAL_COST, 
           bs.STATUS, 
-          bs.ENCODED_DT
+          bs.ENCODED_DT,
+          bs.IDNo AS BS_ID
         FROM booking_service bs
         LEFT JOIN services s ON bs.SERVICE_ID = s.IDNo
         WHERE bs.BOOKING_ID = ? AND bs.ACTIVE = 1
@@ -2962,7 +3251,9 @@ class BookingModel {
 
   // Remove service (handles regular services, extensions, and transport)
   static async removeService(params) {
-    const { bookingId, serviceId, isExtension, isTransport, removalReason, userId } = params;
+    const { bookingId, serviceId, isExtension, isTransport, removalReason, userId, bookingServiceId } = params;
+    const rowOnly = bookingServiceId ? ' AND IDNo = ?' : '';
+    const rowParam = bookingServiceId ? [bookingServiceId] : [];
 
     try {
       // Get connection from pool for transaction
@@ -3110,11 +3401,13 @@ class BookingModel {
           const fetchServiceQuery = `
             SELECT TOTAL_COST, STATUS 
             FROM booking_service
-            WHERE BOOKING_ID = ? AND SERVICE_ID = ? AND ACTIVE = 1
+            WHERE BOOKING_ID = ? AND SERVICE_ID = ? AND ACTIVE = 1${rowOnly}
+            ORDER BY IDNo ASC
+            LIMIT 1
           `;
 
           const results = await new Promise((resolve, reject) => {
-            connection.query(fetchServiceQuery, [bookingId, serviceId], (err, results) => {
+            connection.query(fetchServiceQuery, [bookingId, serviceId, ...rowParam], (err, results) => {
               if (err) reject(err);
               else resolve(results);
             });
@@ -3140,11 +3433,11 @@ class BookingModel {
           const updateActiveQuery = `
             UPDATE booking_service
             SET ACTIVE = 0, REMARKS = ?, EDITED_BY = ?, EDITED_DT = NOW()
-            WHERE BOOKING_ID = ? AND SERVICE_ID = ?
+            WHERE BOOKING_ID = ? AND SERVICE_ID = ?${rowOnly}
           `;
 
           await new Promise((resolve, reject) => {
-            connection.query(updateActiveQuery, [removalReason || '', userId, bookingId, serviceId], (err) => {
+            connection.query(updateActiveQuery, [removalReason || '', userId, bookingId, serviceId, ...rowParam], (err) => {
               if (err) reject(err);
               else resolve();
             });
@@ -3152,12 +3445,12 @@ class BookingModel {
 
           const updateBillingQuery = `
             UPDATE billing
-            SET SERVICES_CHARGE = SERVICES_CHARGE - ?
+            SET SERVICES_CHARGE = (SELECT COALESCE(SUM(TOTAL_COST), 0) FROM booking_service WHERE BOOKING_ID = ? AND ACTIVE = 1)
             WHERE BOOKING_ID = ?
           `;
 
           await new Promise((resolve, reject) => {
-            connection.query(updateBillingQuery, [totalCost, bookingId], (err) => {
+            connection.query(updateBillingQuery, [bookingId, bookingId], (err) => {
               if (err) reject(err);
               else resolve();
             });
@@ -3384,6 +3677,15 @@ class BookingModel {
         WHERE BOOKING_ID = ?
       `;
       const paymentsData = await queryDatabasePromise(paymentsQuery, [bookingId]);
+      // Master Billing: what was paid towards the other rooms' services counts on the main bill too.
+      const masterMates = groupAwareRoomAmount !== null ? await getMasterGroupMates(bookingId) : { isMain: false, mates: [] };
+      if (masterMates.mates.length) {
+        const matePaid = await queryDatabasePromise(
+          "SELECT AMOUNT_PAID, PAYMENT_TYPE FROM payments WHERE BOOKING_ID IN (?) AND PAYMENT_TYPE IN ('service', 'extended', 'cancellation_fee')",
+          [masterMates.mates.map((x) => x.id)]
+        );
+        paymentsData.push(...matePaid);
+      }
       
       // Calculate room amount and get billing values
       const roomAmount = groupAwareRoomAmount !== null ? groupAwareRoomAmount : (roomRate * roomDaysBilled);
@@ -3479,6 +3781,24 @@ class BookingModel {
         WHERE bs.ACTIVE = 1 AND bs.BOOKING_ID = ?
       `;
       const serviceData = await queryDatabasePromise(serviceQuery, [bookingId]);
+      // Master Billing: the main room's bill also carries the other rooms' services (labelled with the room).
+      if (masterMates.mates.length) {
+        const roomOf = new Map(masterMates.mates.map((x) => [String(x.id), x.roomNo]));
+        const mateServices = await queryDatabasePromise(
+          `SELECT bs.BOOKING_ID,
+                  bs.SERVICE_ID,
+                  CASE WHEN bs.SERVICE_ID = -1 AND bs.CUSTOM_NAME IS NOT NULL THEN bs.CUSTOM_NAME ELSE s.SERVICE_NAME END AS SERVICE_NAME,
+                  CASE WHEN bs.SERVICE_ID = -1 THEN bs.TOTAL_COST / NULLIF(bs.QTY, 0) ELSE s.SERVICE_COST END AS SERVICE_COST,
+                  bs.QTY, bs.TOTAL_COST, bs.STATUS
+           FROM booking_service bs LEFT JOIN services s ON bs.SERVICE_ID = s.IDNo
+           WHERE bs.ACTIVE = 1 AND bs.BOOKING_ID IN (?) ORDER BY bs.BOOKING_ID, bs.IDNo`,
+          [masterMates.mates.map((x) => x.id)]
+        );
+        mateServices.forEach((ms) => {
+          const label = /\bRoom\s+\S+\s*$/i.test(String(ms.SERVICE_NAME || '')) ? '' : ` · Room ${roomOf.get(String(ms.BOOKING_ID)) || ''}`;
+          serviceData.push({ ...ms, SERVICE_NAME: `${ms.SERVICE_NAME || 'Service'}${label}` });
+        });
+      }
 
       // Fetch extensions
       const extensionQuery = `
@@ -3522,6 +3842,62 @@ class BookingModel {
         });
       });
 
+      // Master Billing: each other room's own night price (so the bill can list the rooms one by one).
+      let masterRooms = [];
+      if (masterMates.mates.length) {
+        const mrows = await queryDatabasePromise(
+          `SELECT bill.BOOKING_ID AS bookingId, r.ROOM_NUMBER AS roomNo, bill.ROOM_PRICE AS price, bill.QTY AS nights
+             FROM billing bill
+             JOIN booking mb ON mb.IDNo = bill.BOOKING_ID
+             LEFT JOIN room r ON r.IDNo = mb.ROOM_ID
+            WHERE bill.BOOKING_ID IN (?) AND bill.ACTIVE = 1 ORDER BY bill.BOOKING_ID`,
+          [masterMates.mates.map((x) => x.id)]
+        );
+        masterRooms = mrows.map((m) => ({ bookingId: m.bookingId, roomNo: m.roomNo, price: parseFloat(m.price) || 0, nights: parseInt(m.nights, 10) || 1 }));
+      }
+
+      // Master Billing: the other rooms' extended nights are charged on the main bill too (labelled with the room).
+      if (masterMates.mates.length) {
+        const mateExt = await queryDatabasePromise(
+          `SELECT be.BOOKING_ID, be.EXTEND_DATE, be.QTY, be.COST, be.PAYMENT_STATUS, r.ROOM_NUMBER AS roomNo
+             FROM booking_extension be
+             JOIN booking mb ON mb.IDNo = be.BOOKING_ID
+             LEFT JOIN room r ON r.IDNo = mb.ROOM_ID
+            WHERE be.BOOKING_ID IN (?) AND be.ACTIVE = 1 AND be.QTY > 0
+            ORDER BY be.BOOKING_ID, be.EXTEND_DATE ASC, be.IDNo ASC`,
+          [masterMates.mates.map((x) => x.id)]
+        );
+        mateExt.forEach((ext) => {
+          roomItems.push({
+            date: ext.EXTEND_DATE,
+            description: `${b.ROOM_TYPE} (Extended) · Room ${ext.roomNo || ''}`,
+            basePrice: ext.COST,
+            qty: ext.QTY,
+            subTotal: ext.COST * ext.QTY,
+            status: ext.PAYMENT_STATUS
+          });
+        });
+      }
+
+      // Extended nights taken off by an early check-out: not charged, but still listed (crossed out) so the bill shows what was released.
+      const voidIds = [bookingId].concat(masterMates.mates.map((x) => x.id));
+      const voidRows = await queryDatabasePromise(
+        `SELECT be.BOOKING_ID AS bookingId, r.ROOM_NUMBER AS roomNo, be.QTY AS qty, be.COST AS cost
+           FROM booking_extension be
+           JOIN booking mb ON mb.IDNo = be.BOOKING_ID
+           LEFT JOIN room r ON r.IDNo = mb.ROOM_ID
+          WHERE be.BOOKING_ID IN (?) AND be.ACTIVE = 0 AND be.QTY > 0 AND be.REMARKS = 'Early checkout proration'
+          ORDER BY be.BOOKING_ID, be.EXTEND_DATE ASC, be.IDNo ASC`,
+        [voidIds]
+      );
+      const voidedExtensions = voidRows.map((v) => ({
+        bookingId: v.bookingId,
+        roomNo: v.roomNo,
+        isOwn: String(v.bookingId) === String(bookingId),
+        qty: parseInt(v.qty, 10) || 0,
+        cost: parseFloat(v.cost) || 0
+      }));
+
       const lateCheckoutChargeFromBilling = parseFloat(b.LATE_CHECKOUT_CHARGE) || 0;
 
       // Format services
@@ -3540,7 +3916,7 @@ class BookingModel {
           // Flat fee (late checkout / early check-in) — base price and subtotal
           // must match the entered amount, no per-night multiply.
           let feeAmount = totalCost;
-          if (isLateCheckout && feeAmount <= 0 && lateCheckoutChargeFromBilling > 0) {
+          if (isLateCheckout && feeAmount <= 0 && lateCheckoutChargeFromBilling > 0 && service.STATUS !== 'paid') {
             feeAmount = lateCheckoutChargeFromBilling;
           } else if (feeAmount <= 0 && service.STATUS !== 'paid') {
             feeAmount = catalogCost;
@@ -3562,12 +3938,35 @@ class BookingModel {
 
       const penaltyItems = penaltyAmount > 0 ? [{
         date: b.CHECK_OUT_DATE || b.CHECK_IN_DATE,
-        description: 'Cancellation Fee',
+        description: isCancelled ? 'Cancellation Fee' : 'Early check-out penalty',
         basePrice: penaltyAmount,
         qty: 1,
         subTotal: penaltyAmount,
         status: 'penalty'
       }] : [];
+      // Master Billing: a penalty charged to another room (early check-out) is part of the group's bill on the main booking.
+      if (masterMates.mates.length) {
+        const matePen = await queryDatabasePromise(
+          `SELECT bill.BOOKING_ID AS bookingId, r.ROOM_NUMBER AS roomNo, bill.CANCELLATION_PENALTY AS pen, mb.CHECK_OUT_DATE AS co
+             FROM billing bill
+             JOIN booking mb ON mb.IDNo = bill.BOOKING_ID
+             LEFT JOIN room r ON r.IDNo = mb.ROOM_ID
+            WHERE bill.BOOKING_ID IN (?) AND bill.ACTIVE = 1 AND COALESCE(bill.CANCELLATION_PENALTY, 0) > 0
+            ORDER BY bill.BOOKING_ID`,
+          [masterMates.mates.map((x) => x.id)]
+        );
+        matePen.forEach((mp) => {
+          const amt = parseFloat(mp.pen) || 0;
+          penaltyItems.push({
+            date: mp.co || b.CHECK_IN_DATE,
+            description: `Early check-out penalty · Room ${mp.roomNo || ''}`,
+            basePrice: amt,
+            qty: 1,
+            subTotal: amt,
+            status: 'penalty'
+          });
+        });
+      }
 
       const baseChargeItems = [...roomItems, ...serviceItems];
 
@@ -3603,7 +4002,9 @@ class BookingModel {
         penaltyAmount: penaltyAmount,
         discountApplied: b.DISCOUNT_APPLIED === 1 ? 1 : 0,
         isCancelled,
-        paidAmountAfterRefund
+        paidAmountAfterRefund,
+        masterRooms,
+        voidedExtensions
       };
 
       // If billing.REMARKS is empty, fall back to latest Discount-category remark
@@ -3827,6 +4228,49 @@ class BookingModel {
           return parseFloat(a.remainingAmount) - parseFloat(b.remainingAmount);
         });
         
+        // Master Billing: the other rooms' unpaid services are settled through the main room too.
+        const masterGroup = await getMasterGroupMates(bookingId);
+        let mateServiceRows = [];
+        if (masterGroup.mates.length) {
+          mateServiceRows = await queryDatabasePromise(
+            `SELECT bs.IDNo, bs.BOOKING_ID, bs.SERVICE_ID, bs.TOTAL_COST,
+                    (bs.TOTAL_COST - COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_SERVICE_ID = bs.IDNo AND p.PAYMENT_TYPE = 'service'), 0)) AS remainingAmount
+               FROM booking_service bs
+              WHERE bs.BOOKING_ID IN (?) AND bs.ACTIVE = 1
+             HAVING remainingAmount > 0
+              ORDER BY bs.BOOKING_ID, bs.IDNo`,
+            [masterGroup.mates.map((x) => x.id)]
+          );
+        }
+        const totalMateServiceAmount = mateServiceRows.reduce((sum, s) => sum + parseFloat(s.remainingAmount), 0);
+        // ...and their extended nights, too.
+        let mateExtRows = [];
+        if (masterGroup.mates.length) {
+          mateExtRows = await queryDatabasePromise(
+            `SELECT be.IDNo, be.BOOKING_ID, (be.COST * be.QTY) AS total,
+                    ((be.COST * be.QTY) - COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_EXTENSION_ID = be.IDNo AND p.PAYMENT_TYPE = 'extended'), 0)) AS remainingAmount
+               FROM booking_extension be
+              WHERE be.BOOKING_ID IN (?) AND be.ACTIVE = 1 AND be.QTY > 0
+             HAVING remainingAmount > 0
+              ORDER BY be.BOOKING_ID, be.IDNo`,
+            [masterGroup.mates.map((x) => x.id)]
+          );
+        }
+        const totalMateExtAmount = mateExtRows.reduce((sum, e) => sum + parseFloat(e.remainingAmount), 0);
+        // ...and any penalty an early check-out put on another room.
+        let matePenRows = [];
+        if (masterGroup.mates.length) {
+          matePenRows = await queryDatabasePromise(
+            `SELECT bill.BOOKING_ID, bill.IDNo AS billingId,
+                    (bill.CANCELLATION_PENALTY - COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_ID = bill.BOOKING_ID AND p.PAYMENT_TYPE = 'cancellation_fee'), 0)) AS remainingAmount
+               FROM billing bill
+              WHERE bill.BOOKING_ID IN (?) AND bill.ACTIVE = 1 AND COALESCE(bill.CANCELLATION_PENALTY, 0) > 0
+             HAVING remainingAmount > 0`,
+            [masterGroup.mates.map((x) => x.id)]
+          );
+        }
+        const totalMatePenAmount = matePenRows.reduce((sum, e) => sum + parseFloat(e.remainingAmount), 0);
+
         // Get cancellation penalty and check if it's already paid
         const cancellationPenalty = parseFloat(billing.CANCELLATION_PENALTY) || 0;
         let unpaidCancellationPenalty = 0;
@@ -3850,7 +4294,7 @@ class BookingModel {
         // Note: reservation fee and discount are already deducted from fullRoomAmount in Step 3
         const reservationFee = parseFloat(billing.RESERVATION_FEE) || 0;
         const discountAmount = parseFloat(billing.DISCOUNT_AMOUNT) || 0;
-        const grossTotal = fullRoomAmount + totalExtensionAmount + totalServiceAmount + unpaidCancellationPenalty;
+        const grossTotal = fullRoomAmount + totalExtensionAmount + totalMateExtAmount + totalServiceAmount + totalMateServiceAmount + unpaidCancellationPenalty + totalMatePenAmount;
         const netBalance = grossTotal; // No need to deduct reservation fee and discount again
         
         // Determine payment amount
@@ -3946,6 +4390,29 @@ class BookingModel {
           }
         }
 
+        // 2b. Master Billing: the other rooms' extended nights (recorded on that room's own booking).
+        for (const me of mateExtRows) {
+          if (remainingPayment <= 0) break;
+          const cost = parseFloat(me.remainingAmount);
+          const pay = Math.min(remainingPayment, cost);
+          await new Promise((resolve, reject) => {
+            connection.query(
+              `INSERT INTO payments (BOOKING_ID, BOOKING_EXTENSION_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
+               VALUES (?, ?, ?, ?, 'extended', NOW(), ?, ?)`,
+              [me.BOOKING_ID, me.IDNo, pay, paymentMethod, encodedBy, paymentNotes || 'Paid through the main booking (Master Billing)'],
+              (err) => (err ? reject(err) : resolve())
+            );
+          });
+          await new Promise((resolve, reject) => {
+            connection.query(
+              `UPDATE booking_extension SET PAYMENT_STATUS = ? WHERE IDNo = ? AND ACTIVE = 1`,
+              [pay >= cost - 0.005 ? 'paid' : 'partial', me.IDNo],
+              (err) => (err ? reject(err) : resolve())
+            );
+          });
+          remainingPayment -= pay;
+        }
+
         // 3. Pay services if remaining payment available
         if (remainingPayment > 0 && serviceRows.length > 0) {
           
@@ -3991,6 +4458,42 @@ class BookingModel {
           }
         }
 
+        // 3b. Master Billing: the other rooms' services (each payment is recorded on that room's own booking,
+        //     so that room shows its services paid and the main room's bill shows the group paid).
+        for (const ms of mateServiceRows) {
+          if (remainingPayment <= 0) break;
+          const cost = parseFloat(ms.remainingAmount);
+          const pay = Math.min(remainingPayment, cost);
+          await new Promise((resolve, reject) => {
+            connection.query(
+              `INSERT INTO payments (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
+               VALUES (?, ?, ?, ?, 'service', NOW(), ?, ?)`,
+              [ms.BOOKING_ID, ms.IDNo, pay, paymentMethod, encodedBy, paymentNotes || 'Paid through the main booking (Master Billing)'],
+              (err) => (err ? reject(err) : resolve())
+            );
+          });
+          await new Promise((resolve, reject) => {
+            connection.query(
+              `UPDATE booking_service SET STATUS = ? WHERE IDNo = ? AND ACTIVE = 1`,
+              [pay >= cost ? 'paid' : 'partial', ms.IDNo],
+              (err) => (err ? reject(err) : resolve())
+            );
+          });
+          remainingPayment -= pay;
+        }
+        if (mateServiceRows.length || masterGroup.mates.length) {
+          // free lines (₱0) and lines now fully covered show as paid on those rooms too
+          await new Promise((resolve, reject) => {
+            connection.query(
+              `UPDATE booking_service bs SET bs.STATUS = 'paid'
+                WHERE bs.BOOKING_ID IN (?) AND bs.ACTIVE = 1 AND bs.STATUS <> 'paid'
+                  AND bs.TOTAL_COST <= COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_SERVICE_ID = bs.IDNo AND p.PAYMENT_TYPE = 'service'), 0)`,
+              [masterGroup.mates.map((x) => x.id)],
+              (err) => (err ? reject(err) : resolve())
+            );
+          });
+        }
+
         // 4. Pay cancellation penalty if remaining payment available
         if (remainingPayment > 0 && unpaidCancellationPenalty > 0) {
           const penaltyPaymentAmount = Math.min(remainingPayment, unpaidCancellationPenalty);
@@ -4010,6 +4513,21 @@ class BookingModel {
           remainingPayment -= penaltyPaymentAmount;
         }
         
+
+        // 4b. Master Billing: a penalty put on another room (recorded on that room's own booking).
+        for (const mp of matePenRows) {
+          if (remainingPayment <= 0) break;
+          const pay = Math.min(remainingPayment, parseFloat(mp.remainingAmount));
+          await new Promise((resolve, reject) => {
+            connection.query(
+              `INSERT INTO payments (BOOKING_ID, BILLING_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
+               VALUES (?, ?, ?, ?, 'cancellation_fee', NOW(), ?, ?)`,
+              [mp.BOOKING_ID, mp.billingId, pay, paymentMethod, encodedBy, paymentNotes || 'Paid through the main booking (Master Billing)'],
+              (err) => (err ? reject(err) : resolve())
+            );
+          });
+          remainingPayment -= pay;
+        }
 
         // Step 5: Check if all balances are cleared, mark everything as 'paid'
         // Calculate remaining balance after this payment
@@ -4813,7 +5331,7 @@ class BookingModel {
             FROM payments p
             JOIN booking b2 ON p.BOOKING_ID = b2.IDNo
             WHERE b2.GROUP_BOOKING_ID = gb.IDNo
-              AND p.PAYMENT_TYPE IN ('room','service','extended')
+              AND p.PAYMENT_TYPE IN ('room','service','extended','cancellation_fee') AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL)
           ) AS TOTAL_PAID,
           -- Get all statuses in a group
           GROUP_CONCAT(DISTINCT b.BOOKING_STATUS ORDER BY b.BOOKING_STATUS SEPARATOR ', ') AS all_statuses,
@@ -5176,7 +5694,7 @@ class BookingModel {
         FROM payments p
         JOIN booking b ON p.BOOKING_ID = b.IDNo
         WHERE b.GROUP_BOOKING_ID = ?
-          AND p.PAYMENT_TYPE IN ('room','service','extended')
+          AND p.PAYMENT_TYPE IN ('room','service','extended','cancellation_fee') AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL)
       `;
       const paidSumResult = await queryDatabasePromise(paidSumQuery, [groupBookingId]);
       const groupTotalPaid = parseFloat(paidSumResult?.[0]?.totalPaid || 0);
@@ -5224,7 +5742,7 @@ class BookingModel {
 
       // Get selected rooms and prices
       const selectedRooms = bookingsResult.map(b => b.ROOM_ID).join(',');
-      const selectedRoomPrices = bookingsResult.map(b => b.ROOM_CHARGE).join(',');
+      const selectedRoomPrices = bookingsResult.map(b => b.ROOM_CHARGE).join('|');   // '|' like the Add form (the update reads it with '|')
 
       // Calculate bed requirements from selected rooms
       const bedRequirements = { bed1: 0, bed2: 0 };
@@ -5255,7 +5773,8 @@ class BookingModel {
         // Categorize group-level services (services for any booking in the group)
         // Check if this service belongs to any booking in the group
         const belongsToGroup = bookingsResult.some(booking => booking.bookingId === service.BOOKING_ID);
-        if (belongsToGroup) {
+        // "Extra Breakfast (Adult|Kid) · Room N" lines are the extras above the 2 included per room: not the group's breakfast guests
+        if (belongsToGroup && !/^extra breakfast/i.test(String(service.SERVICE_NAME || ''))) {
           const serviceName = service.SERVICE_NAME.toLowerCase();
           
           // Use service ID matching as primary method, with name fallback
@@ -5293,16 +5812,32 @@ class BookingModel {
       // If breakfast service exists in MORE THAN ONE booking, it's individual
       const breakfastAdultBookings = servicesResult.filter(s => {
         const serviceName = s.SERVICE_NAME.toLowerCase();
+        if (/^extra breakfast/i.test(s.SERVICE_NAME || '')) return false;
         return s.SERVICE_ID === 74 || (serviceName.includes('adult') && serviceName.includes('breakfast'));
       }).map(s => s.BOOKING_ID);
       
       const breakfastKidBookings = servicesResult.filter(s => {
         const serviceName = s.SERVICE_NAME.toLowerCase();
+        if (/^extra breakfast/i.test(s.SERVICE_NAME || '')) return false;
         return s.SERVICE_ID === 75 || (serviceName.includes('kid') && serviceName.includes('breakfast'));
       }).map(s => s.BOOKING_ID);
       
       const uniqueBreakfastBookings = new Set([...breakfastAdultBookings, ...breakfastKidBookings]);
       const isBreakfastIndividual = uniqueBreakfastBookings.size > 1;
+
+      // Extra breakfast already saved (above 2 per room): the price of one extra adult / kid, and how many each room has
+      const breakfastExtras = { adultPrice: 0, kidPrice: 0, byBooking: {} };
+      servicesResult.forEach((s) => {
+        const m = /^extra breakfast \((adult|kid)\)/i.exec(String(s.SERVICE_NAME || ''));
+        if (!m) return;
+        const q = parseInt(s.QTY, 10) || 0;
+        if (q <= 0) return;
+        const kind = m[1].toLowerCase() === 'adult' ? 'a' : 'k';
+        const rec = (breakfastExtras.byBooking[s.BOOKING_ID] = breakfastExtras.byBooking[s.BOOKING_ID] || { a: 0, k: 0 });
+        rec[kind] += q;
+        const unit = (parseFloat(s.TOTAL_COST) || 0) / q;
+        if (unit > 0) { if (kind === 'a') breakfastExtras.adultPrice = unit; else breakfastExtras.kidPrice = unit; }
+      });
 
       return {
         groupBookingId: groupBooking.IDNo,
@@ -5332,6 +5867,7 @@ class BookingModel {
         consolidatedBilling: isConsolidatedBilling, // Derived from billing data
         bedRequirements: bedRequirements, // Calculated from selected rooms
         breakfastIndividual: isBreakfastIndividual, // Detected: true if breakfast exists in multiple bookings
+        breakfastExtras,
         // Services data
         breakfastAdultQty: groupServices.breakfastAdult.qty || '0',
         breakfastAdultPrice: groupServices.breakfastAdult.price || '0',
@@ -5477,7 +6013,7 @@ class BookingModel {
         FROM payments p
         JOIN booking b ON p.BOOKING_ID = b.IDNo
         WHERE b.GROUP_BOOKING_ID = ?
-          AND p.PAYMENT_TYPE IN ('room','service','extended')
+          AND p.PAYMENT_TYPE IN ('room','service','extended','cancellation_fee') AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL)
       `;
       const paidResult = await queryDatabasePromise(paidQuery, [groupId]);
       const paidAmount = parseFloat(paidResult?.[0]?.totalPaid || 0);
@@ -5567,6 +6103,9 @@ class BookingModel {
       breakfastKidPrice,
       breakfastKidId,
       breakfastIndividual = false,
+      breakfastExtraPerRoom = undefined,   // extra breakfast above 2 per room, one {a, k} per selected room (same as Add Group Booking)
+      breakfastExtraAdultPrice = 0,
+      breakfastExtraKidPrice = 0,
       pickupServiceId,
       pickupPrice,
       dropoffServiceId,
@@ -6042,10 +6581,10 @@ class BookingModel {
 
           // Insert customer
           const [custResult] = await connection.promise().query(`
-            INSERT INTO customer (NAME, CONTACTNo, TYPE, LEVEL, ADDRESS, MESSAGE, ENCODED_BY, ENCODED_DT, ACTIVE, IS_GROUP)
-            VALUES (?, ?, ?, ?, '', '', ?, ?, 1, 1)
+            INSERT INTO customer (NAME, CONTACTNo, TYPE, LEVEL, ADDRESS, MESSAGE, ENCODED_BY, ENCODED_DT, ACTIVE, IS_GROUP, PROPERTY_ID)
+            VALUES (?, ?, ?, ?, '', '', ?, ?, 1, 1, ?)
           `, [
-            guestFullName, groupContact, guestType, guestLevel, encodedBy, date
+            guestFullName, groupContact, guestType, guestLevel, encodedBy, date, propertyId || null
           ]);
 
           const guestID = custResult.insertId;
@@ -6135,6 +6674,30 @@ class BookingModel {
       const [allBookings] = await connection.promise().query(allBookingIdsQuery, propertyId ? [groupBookingId, propertyId] : [groupBookingId]);
       const targetBookingIds = allBookings.map(b => b.IDNo);
 
+      // Extra breakfast (above 2 per room), like Add Group Booking: the form sends one {a, k} per selected room. The extras are
+      // saved as one line per room and type; the unpaid lines of before are replaced, a line that was already paid is kept.
+      const bfExtraProvided = breakfastExtraPerRoom !== undefined && breakfastExtraPerRoom !== null && breakfastExtraPerRoom !== '';
+      const bfExtras = BookingModel.groupBreakfastExtras(breakfastExtraPerRoom, breakfastExtraAdultPrice, breakfastExtraKidPrice);
+      const bfBillingDelta = new Map();   // bookingId -> change of billing.SERVICES_CHARGE
+      const bfAddDelta = (id, amount) => bfBillingDelta.set(id, (bfBillingDelta.get(id) || 0) + (Number(amount) || 0));
+      const bfPaidQty = new Map();        // "bookingId|a" / "bookingId|k" -> quantity already paid (kept)
+      if (bfExtraProvided && targetBookingIds.length > 0) {
+        const [oldExtras] = await connection.promise().query(
+          `SELECT IDNo, BOOKING_ID, QTY, TOTAL_COST, STATUS, CUSTOM_NAME FROM booking_service
+            WHERE BOOKING_ID IN (?) AND SERVICE_ID = -1 AND ACTIVE = 1 AND CUSTOM_NAME LIKE 'Extra Breakfast (%'`,
+          [targetBookingIds]
+        );
+        for (const row of oldExtras) {
+          if (String(row.STATUS || '').toLowerCase() === 'paid') {
+            const key = row.BOOKING_ID + '|' + (/\(adult\)/i.test(row.CUSTOM_NAME) ? 'a' : 'k');
+            bfPaidQty.set(key, (bfPaidQty.get(key) || 0) + (parseInt(row.QTY, 10) || 0));
+            continue;
+          }
+          await connection.promise().query('DELETE FROM booking_service WHERE IDNo = ?', [row.IDNo]);
+          bfAddDelta(row.BOOKING_ID, -(parseFloat(row.TOTAL_COST) || 0));
+        }
+      }
+
       // Delete only form-managed services (breakfast, pickup, dropoff, late checkout)
       // Preserve other extra services (like Car Rentals, Extended Stay, etc.)
       for (const bookingId of targetBookingIds) {
@@ -6164,10 +6727,15 @@ class BookingModel {
 
         // Breakfast Adult
         if (parseInt(breakfastAdultQty) > 0 && breakfastAdultId) {
-          const totalAdult = (parseFloat(breakfastAdultQty) || 0) * (parseFloat(breakfastAdultPrice) || 0);
+          const totalAdult = bfExtraProvided ? 0 : (parseFloat(breakfastAdultQty) || 0) * (parseFloat(breakfastAdultPrice) || 0);
           const serviceStatus = 'unpaid'; // Will be updated based on payment distribution
           
-          if (breakfastIndividual) {
+          if (bfExtraProvided) {
+            // the 2 breakfasts per room are inside the room rate: each room carries its guests, the extras are separate lines (below)
+            for (const bookingId of targetBookingIds) {
+              groupServices.push([bookingId, breakfastAdultId, breakfastAdultQty, totalAdult, serviceStatus, encodedBy, date, 1]);
+            }
+          } else if (breakfastIndividual) {
             // Apply individually to each booking
             for (const bookingId of targetBookingIds) {
               groupServices.push([bookingId, breakfastAdultId, breakfastAdultQty, totalAdult, serviceStatus, encodedBy, date, 1]);
@@ -6182,10 +6750,15 @@ class BookingModel {
 
         // Breakfast Kid
         if (parseInt(breakfastKidQty) > 0 && breakfastKidId) {
-          const totalKid = (parseFloat(breakfastKidQty) || 0) * (parseFloat(breakfastKidPrice) || 0);
+          const totalKid = bfExtraProvided ? 0 : (parseFloat(breakfastKidQty) || 0) * (parseFloat(breakfastKidPrice) || 0);
           const serviceStatus = 'unpaid'; // Will be updated based on payment distribution
           
-          if (breakfastIndividual) {
+          if (bfExtraProvided) {
+            // the 2 breakfasts per room are inside the room rate: each room carries its guests, the extras are separate lines (below)
+            for (const bookingId of targetBookingIds) {
+              groupServices.push([bookingId, breakfastKidId, breakfastKidQty, totalKid, serviceStatus, encodedBy, date, 1]);
+            }
+          } else if (breakfastIndividual) {
             // Apply individually to each booking
             for (const bookingId of targetBookingIds) {
               groupServices.push([bookingId, breakfastKidId, breakfastKidQty, totalKid, serviceStatus, encodedBy, date, 1]);
@@ -6236,8 +6809,51 @@ class BookingModel {
             VALUES ?
           `;
           await connection.promise().query(serviceQuery, [groupServices]);
-          
+
           // Service payments will be handled by payment distribution logic
+        }
+
+        // the new extra breakfast lines: one per room and type, on THAT room's own bill
+        if (bfExtraProvided) {
+          const roomIdList = String(selectedRooms || '').split(',').map((x) => x.trim()).filter(Boolean);
+          const [roomBookings] = await connection.promise().query(
+            'SELECT IDNo, ROOM_ID FROM booking WHERE IDNo IN (?) AND ACTIVE = 1', [targetBookingIds]);
+          const bookingOfRoom = new Map(roomBookings.map((b) => [String(b.ROOM_ID), b.IDNo]));
+          const [roomNoRows] = roomIdList.length
+            ? await connection.promise().query('SELECT IDNo, ROOM_NUMBER FROM room WHERE IDNo IN (?)', [roomIdList])
+            : [[]];
+          const roomNo = new Map(roomNoRows.map((r) => [String(r.IDNo), r.ROOM_NUMBER]));
+          if (bfExtras.perRoom.length === roomIdList.length) {
+            for (let i = 0; i < roomIdList.length; i++) {
+              const owner = bookingOfRoom.get(roomIdList[i]);
+              if (!owner) continue;
+              const label = roomNo.get(roomIdList[i]) || roomIdList[i];
+              const lines = [
+                { name: 'Extra Breakfast (Adult)', kind: 'a', qty: bfExtras.perRoom[i].a, price: bfExtras.adultPrice },
+                { name: 'Extra Breakfast (Kid)', kind: 'k', qty: bfExtras.perRoom[i].k, price: bfExtras.kidPrice }
+              ];
+              for (const line of lines) {
+                const qty = line.qty - (bfPaidQty.get(owner + '|' + line.kind) || 0);   // what is already paid stays as it is
+                if (qty > 0) {
+                  const cost = qty * line.price;
+                  await connection.promise().query(
+                    `INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE, CUSTOM_NAME)
+                     VALUES (?, -1, ?, ?, 'unpaid', ?, ?, 1, ?)`,
+                    [owner, qty, cost, encodedBy, date, `${line.name} · Room ${label}`]
+                  );
+                  bfAddDelta(owner, cost);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // keep billing.SERVICES_CHARGE (read by the calendar / lists / payments) in step with the extra breakfast lines
+      for (const [id, delta] of bfBillingDelta) {
+        if (delta !== 0) {
+          await connection.promise().query(
+            'UPDATE billing SET SERVICES_CHARGE = GREATEST(COALESCE(SERVICES_CHARGE, 0) + ?, 0) WHERE BOOKING_ID = ?', [delta, id]);
         }
       }
 
@@ -6922,6 +7538,7 @@ class BookingModel {
           bill.QTY AS room_qty,
           bill.PAYMENT_STATUS,
           COALESCE(bill.CANCELLATION_PENALTY, 0) AS PENALTY_AMOUNT,
+          MAX(b.IS_CANCELLED) AS IS_CANCELLED,
           gb.BILLING_TYPE
         FROM billing bill
         JOIN booking b ON bill.BOOKING_ID = b.IDNo
@@ -7028,7 +7645,7 @@ class BookingModel {
           penaltyRows.push({
             BOOKING_ID: row.BOOKING_ID,
             ROOM_NUMBER: row.ROOM_NUMBER,
-            description: 'Cancellation Fee',
+            description: row.IS_CANCELLED ? 'Cancellation Fee' : 'Early check-out penalty',
             charges: penaltyAmount,
             service_qty: 1,
             STATUS: 'penalty'
@@ -7136,8 +7753,7 @@ class BookingModel {
 
       const path = require('path');
       const fs = require('fs');
-      const imagePath = path.join(__dirname, '../public/img/Logo-Black.png');
-      const imageBase64 = fs.existsSync(imagePath) ? fs.readFileSync(imagePath, 'base64') : '';
+      const logoDataUri = await loadPropertyLogoDataUri(propertyId);
 
       // Map rows for template
       const rows = [];
@@ -7178,7 +7794,7 @@ class BookingModel {
         SERVICES_PAID: 0, // not split accurately; optional
         ROOM_PAID: 0,     // optional breakdown (can be refined later)
         TOTAL_UNPAID: Math.max(0, parseFloat(details.grandTotal || 0) - parseFloat(details.totalPaid || 0)),
-        imageUrl: imageBase64 ? `data:image/png;base64,${imageBase64}` : '',
+        imageUrl: logoDataUri,
         ISSUED_BY: user?.FULLNAME || 'N/A'
       };
 
@@ -8682,6 +9298,28 @@ class BookingModel {
   }
 
   // Get all agencies
+  // Navbar global search: bookings of the active property matching a guest name,
+  // room number or confirmation number. Nearest to today first, capped at 10.
+  static async globalSearch(term, propertyId) {
+    const clean = String(term || '').trim().slice(0, 60);
+    if (clean.length < 2 || !propertyId) return [];
+    const like = `%${clean.replace(/[\\%_]/g, '\\$&')}%`;
+    return await queryDatabasePromise(
+      `SELECT b.IDNo AS bookingId, b.CONFIRMATION_NUMBER AS confirmation, b.BOOKING_STATUS AS status,
+              b.ROOM_ID AS roomId, r.ROOM_NUMBER AS roomNumber, c.NAME AS guestName,
+              DATE_FORMAT(b.CHECK_IN_DATE, '%Y-%m-%d') AS checkIn,
+              DATE_FORMAT(b.CHECK_OUT_DATE, '%Y-%m-%d') AS checkOut
+       FROM booking b
+       JOIN customer c ON c.IDNo = b.CUSTOMER_ID
+       LEFT JOIN room r ON r.IDNo = b.ROOM_ID
+       WHERE b.ACTIVE = 1 AND b.PROPERTY_ID = ?
+         AND (c.NAME LIKE ? OR r.ROOM_NUMBER LIKE ? OR b.CONFIRMATION_NUMBER LIKE ?)
+       ORDER BY ABS(DATEDIFF(b.CHECK_IN_DATE, CURDATE())) ASC, b.IDNo DESC
+       LIMIT 10`,
+      [propertyId, like, like, like]
+    );
+  }
+
   // Property-scoped: `agency` has its own PROPERTY_ID column (Main Hotel and
   // Pool Villa each keep their own agency list).
   static async getAgency(propertyId = null) {
@@ -8933,9 +9571,7 @@ class BookingModel {
       // Add image and user data
       const path = require('path');
       const fs = require('fs');
-      const imagePath = path.join(__dirname, '../public/img/Logo-Black.png');
-      const imageBase64 = fs.readFileSync(imagePath, 'base64');
-      data.imageUrl = `data:image/png;base64,${imageBase64}`;
+      data.imageUrl = await loadPropertyLogoDataUri(propertyId);
       data.ISSUED_BY = user?.FULLNAME || 'N/A';
 
       // Generate PDF using Playwright
@@ -8974,16 +9610,10 @@ class BookingModel {
 
   // Generate voucher PDF
   static async generateVoucher(params) {
-    const { data, user } = params;
+    const { data, user, propertyId } = params;
     
     try {
-      // Add image and user data
-      const path = require('path');
-      const fs = require('fs');
-      const imagePath = path.join(__dirname, '../public/img/Logo-Black.png');
-      const imageBase64 = fs.readFileSync(imagePath, 'base64');
-
-      data.imageUrl = `data:image/png;base64,${imageBase64}`;
+      data.imageUrl = await loadPropertyLogoDataUri(propertyId);
 
       // Generate PDF using Playwright
       const { chromium } = require('playwright');
@@ -9042,29 +9672,12 @@ class BookingModel {
 
   // Generate group voucher PDF
   static async generateGroupVoucher(params) {
-    const { data, user } = params;
+    const { data, user, propertyId } = params;
     
     try {
-      // Add image and user data
       const path = require('path');
       const fs = require('fs');
-      const imagePath = path.join(__dirname, '../public/img/Logo-Black.png');
-      
-      let imageBase64 = '';
-      let imageUrl = '';
-      
-      try {
-        if (fs.existsSync(imagePath)) {
-          imageBase64 = fs.readFileSync(imagePath, 'base64');
-          imageUrl = `data:image/png;base64,${imageBase64}`;
-        } else {
-          console.warn('Logo image not found, using placeholder');
-          imageUrl = '';
-        }
-      } catch (imgError) {
-        console.error('Error loading image:', imgError);
-        imageUrl = '';
-      }
+      const imageUrl = await loadPropertyLogoDataUri(propertyId);
 
       // Use servicesTotal if provided, otherwise calculate from breakfast/pickup/dropoff
       let servicesTotal = 0;
@@ -10096,6 +10709,14 @@ class BookingModel {
                 );
               }
             }
+
+            // 5B. Keep the billing row's late check-out charge equal to what was just saved. Otherwise an old charge
+            //     (e.g. 2,000 from before the booking was switched to Regular, or set Free) is still read by the bill
+            //     and shows as a 2,000 line next to a FREE service.
+            await connection.promise().query(
+              'UPDATE billing SET LATE_CHECKOUT_CHARGE = ? WHERE BOOKING_ID = ? AND ACTIVE = 1',
+              [checkOutStatus == 1 ? Math.max(0, parseFloat(lateCheckoutFee) || 0) : 0, bookingId]
+            );
 
             // 6. Update payments based on paid amount
             if (paymentStatus === 'paid' || paymentStatus === 'partial') {
@@ -11244,6 +11865,25 @@ class BookingModel {
     }
   }
 
+  // Group breakfast: the room-rate tier already includes 2 breakfasts per room, so only the
+  // extras (per room, adult/kid) are charged - once per booking, at the typed prices.
+  static groupBreakfastExtras(perRoomRaw, adultPriceRaw, kidPriceRaw) {
+    let list = perRoomRaw;
+    if (typeof list === 'string') {
+      try { list = JSON.parse(list); } catch (_) { list = []; }
+    }
+    if (!Array.isArray(list)) list = [];
+    const perRoom = list.map((r) => ({
+      a: Math.max(0, parseInt(r && r.a, 10) || 0),
+      k: Math.max(0, parseInt(r && r.k, 10) || 0)
+    }));
+    const adultPrice = Math.max(0, parseFloat(adultPriceRaw) || 0);
+    const kidPrice = Math.max(0, parseFloat(kidPriceRaw) || 0);
+    const adultTotal = perRoom.reduce((s, r) => s + r.a, 0) * adultPrice;
+    const kidTotal = perRoom.reduce((s, r) => s + r.k, 0) * kidPrice;
+    return { perRoom, adultPrice, kidPrice, adultTotal, kidTotal };
+  }
+
   // addGroupBooking temporarily removed per request
   static async addGroupBooking(data) {
     const {
@@ -11274,6 +11914,9 @@ class BookingModel {
       breakfastKidPrice,
       breakfastKidId,
       breakfastIndividual = false,
+      breakfastExtraPerRoom = [],
+      breakfastExtraAdultPrice = 0,
+      breakfastExtraKidPrice = 0,
       pickupServiceId,
       pickupPrice,
       dropoffServiceId,
@@ -11619,8 +12262,8 @@ class BookingModel {
 
         // customer
         const customerQuery = `
-          INSERT INTO customer (NAME, CONTACTNo, TYPE, LEVEL, ADDRESS, MESSAGE, ENCODED_BY, ENCODED_DT, ACTIVE, IS_GROUP)
-          VALUES (?, ?, ?, ?, '', '', ?, ?, 1, 1)
+          INSERT INTO customer (NAME, CONTACTNo, TYPE, LEVEL, ADDRESS, MESSAGE, ENCODED_BY, ENCODED_DT, ACTIVE, IS_GROUP, PROPERTY_ID)
+          VALUES (?, ?, ?, ?, '', '', ?, ?, 1, 1, ?)
         `;
         const [custResult] = await connection.promise().query(customerQuery, [
           guestFullName,
@@ -11628,7 +12271,8 @@ class BookingModel {
           guestType,
           guestLevel,
           encodedBy,
-          date
+          date,
+          propertyId || null
         ]);
         const guestID = custResult.insertId;
 
@@ -11903,39 +12547,29 @@ class BookingModel {
         const groupServices = [];
         
         // Breakfast Adult
+        // The rows keep QTY = guests (Breakfast List) and carry only the EXTRA charge as TOTAL_COST:
+        // the 2 breakfasts per room are already inside the room-rate tier.
+        const bfExtras = BookingModel.groupBreakfastExtras(breakfastExtraPerRoom, breakfastExtraAdultPrice, breakfastExtraKidPrice);
+        const bfPerRoomUsable = bfExtras.perRoom.length === targetBookingIds.length;
         if (parseInt(breakfastAdultQty) > 0 && breakfastAdultId) {
-          const totalAdult = (parseFloat(breakfastAdultQty) || 0) * (parseFloat(breakfastAdultPrice) || 0);
+          const totalAdult = 0; // the extras are separate per-room lines (below)
           const serviceStatus = 'unpaid'; // Will be updated based on payment distribution
           
-          if (breakfastIndividual) {
-            // Apply individually to each booking
-            for (const bookingId of targetBookingIds) {
-              groupServices.push([bookingId, breakfastAdultId, breakfastAdultQty, totalAdult, serviceStatus, encodedBy, date, 1]);
-              // Payment distribution logic will handle service payments
-            }
-          } else {
-            // Apply only to first booking
-            groupServices.push([targetBookingIds[0], breakfastAdultId, breakfastAdultQty, totalAdult, serviceStatus, encodedBy, date, 1]);
-            // Payment distribution logic will handle service payments
-          }
+          // Every room carries its own breakfast guests (qty per room), whatever the billing type.
+          targetBookingIds.forEach((bookingId) => {
+            groupServices.push([bookingId, breakfastAdultId, breakfastAdultQty, totalAdult, serviceStatus, encodedBy, date, 1]);
+          });
         }
         
         // Breakfast Kid
         if (parseInt(breakfastKidQty) > 0 && breakfastKidId) {
-          const totalKid = (parseFloat(breakfastKidQty) || 0) * (parseFloat(breakfastKidPrice) || 0);
+          const totalKid = 0; // the extras are separate per-room lines (below)
           const serviceStatus = 'unpaid'; // Will be updated based on payment distribution
           
-          if (breakfastIndividual) {
-            // Apply individually to each booking
-            for (const bookingId of targetBookingIds) {
-              groupServices.push([bookingId, breakfastKidId, breakfastKidQty, totalKid, serviceStatus, encodedBy, date, 1]);
-              // Payment distribution logic will handle service payments
-            }
-          } else {
-            // Apply only to first booking
-            groupServices.push([targetBookingIds[0], breakfastKidId, breakfastKidQty, totalKid, serviceStatus, encodedBy, date, 1]);
-            // Payment distribution logic will handle service payments
-          }
+          // Every room carries its own breakfast guests (qty per room), whatever the billing type.
+          targetBookingIds.forEach((bookingId) => {
+            groupServices.push([bookingId, breakfastKidId, breakfastKidQty, totalKid, serviceStatus, encodedBy, date, 1]);
+          });
         }
         
         // Pickup
@@ -11958,20 +12592,60 @@ class BookingModel {
             VALUES ?
           `;
           await connection.promise().query(serviceQuery, [groupServices]);
-          
+
           // Service payments will be handled by payment distribution logic
+        }
+
+        // Extra breakfast (beyond the 2 per room already in the rate tier): one line per room per
+        // type, like a custom service, so staff can later remove or reduce a single room's extras.
+        const billingAdds = new Map(); // bookingId -> amount to add to billing.SERVICES_CHARGE
+        const addBilling = (id, amount) => billingAdds.set(id, (billingAdds.get(id) || 0) + (Number(amount) || 0));
+        groupServices.forEach((row) => addBilling(row[0], row[3]));
+
+        if (bfPerRoomUsable && (bfExtras.adultTotal + bfExtras.kidTotal) > 0 && roomIds.length === targetBookingIds.length) {
+          const [roomNoRows] = await connection.promise().query('SELECT IDNo, ROOM_NUMBER FROM room WHERE IDNo IN (?)', [roomIds]);
+          const roomNo = new Map(roomNoRows.map((r) => [String(r.IDNo), r.ROOM_NUMBER]));
+          for (let i = 0; i < targetBookingIds.length; i++) {
+            // Each room's extra breakfast goes on THAT room's own bill (Master billing only moves the room charge to the main room).
+            const owner = targetBookingIds[i];
+            const label = roomNo.get(String(roomIds[i])) || roomIds[i];
+            const lines = [
+              { name: 'Extra Breakfast (Adult)', qty: bfExtras.perRoom[i].a, price: bfExtras.adultPrice },
+              { name: 'Extra Breakfast (Kid)', qty: bfExtras.perRoom[i].k, price: bfExtras.kidPrice }
+            ];
+            for (const line of lines) {
+              if (line.qty > 0) {
+                const cost = line.qty * line.price;
+                await connection.promise().query(
+                  `INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE, CUSTOM_NAME)
+                   VALUES (?, -1, ?, ?, 'unpaid', ?, ?, 1, ?)`,
+                  [owner, line.qty, cost, encodedBy, date, `${line.name} · Room ${label}`]
+                );
+                addBilling(owner, cost);
+              }
+            }
+          }
+        }
+
+        // Group services used to be left out of billing.SERVICES_CHARGE (calendar / lists /
+        // payments read that column), so keep it in step with the rows saved above.
+        for (const [id, amount] of billingAdds) {
+          if (amount > 0) {
+            await connection.promise().query(
+              'UPDATE billing SET SERVICES_CHARGE = COALESCE(SERVICES_CHARGE, 0) + ? WHERE BOOKING_ID = ?',
+              [amount, id]
+            );
+          }
         }
       }
 
       // Calculate services total and grand total
       // If individual breakfast, multiply by number of rooms; otherwise, apply once
       const numRooms = targetBookingIds.length;
-      const breakfastAdultTotal = (parseInt(breakfastAdultQty) > 0 && breakfastAdultPrice) 
-        ? (parseFloat(breakfastAdultQty) || 0) * (parseFloat(breakfastAdultPrice) || 0) * (breakfastIndividual ? numRooms : 1) 
-        : 0;
-      const breakfastKidTotal = (parseInt(breakfastKidQty) > 0 && breakfastKidPrice) 
-        ? (parseFloat(breakfastKidQty) || 0) * (parseFloat(breakfastKidPrice) || 0) * (breakfastIndividual ? numRooms : 1) 
-        : 0;
+      // Only the extras beyond the 2 breakfasts per room (already in the rate tier) are charged.
+      const bfExtrasTotals = BookingModel.groupBreakfastExtras(breakfastExtraPerRoom, breakfastExtraAdultPrice, breakfastExtraKidPrice);
+      const breakfastAdultTotal = (parseInt(breakfastAdultQty) > 0 && breakfastAdultId) ? bfExtrasTotals.adultTotal : 0;
+      const breakfastKidTotal = (parseInt(breakfastKidQty) > 0 && breakfastKidId) ? bfExtrasTotals.kidTotal : 0;
       const pickupTotal = pickupPrice ? parseFloat(pickupPrice) : 0;
       const dropoffTotal = dropoffPrice ? parseFloat(dropoffPrice) : 0;
       

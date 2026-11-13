@@ -3,7 +3,7 @@
 <%
   // Same Pool Villa guest-count pricing used by add_booking.ejs - see
   // models/poolVillaRatesModel.js.
-  const isPoolVillaBooking = typeof currentProperty !== 'undefined' && currentProperty && currentProperty.CODE === 'pool_villa';
+  const isPoolVillaBooking = typeof isGuestPricing !== 'undefined' && isGuestPricing;
 %>
 
 <div class="modal fade" id="modal-editbooking" tabindex="-1" role="dialog" aria-labelledby="editBookingModalLabel" aria-hidden="true" data-bs-backdrop="static">
@@ -80,16 +80,17 @@
                                     <select class="form-select" id="edit_bookingRoute" name="bookingRoute">
                                         <option value="walk-in" selected>Walk-in</option>
                                         <option value="agency">Agency</option>
+                                        <% if (!(typeof hideRate === 'function' && hideRate('contracted'))) { %><option value="contracted">Contracted</option><% } %><% (typeof customRates !== 'undefined' ? customRates : []).forEach(function (r) { %><option value="<%= r.key %>" data-base-label="<%= r.label %>"><%= r.label %></option><% }); %>
                                         <!-- Only Walk-in/Agency are real Pool Villa categories (see
                                              add_booking.ejs for the same restriction). -->
                                         <% if (!isPoolVillaBooking) { %>
-                                        <option value="tenant">Tenant (15%)</option>
-                                        <option value="vip">VIP (20%)</option>
-                                        <option value="employee">Employee (30%)</option>
-                                        <option value="senior_special">Senior / Special 20%</option>
+                                        <% if (!(typeof hideRate === 'function' && hideRate('tenant'))) { %><option value="tenant">Tenant (15%)</option><% } %>
+                                        <% if (!(typeof hideRate === 'function' && hideRate('vip'))) { %><option value="vip">VIP (20%)</option><% } %>
+                                        <% if (!(typeof hideRate === 'function' && hideRate('employee'))) { %><option value="employee">Employee (30%)</option><% } %>
+                                        <% if (!(typeof hideRate === 'function' && hideRate('senior_special'))) { %><option value="senior_special">Senior / Special 20%</option><% } %>
                                         <% } %>
                                         <% if (!isPoolVillaBooking) { %>
-                                        <option value="booking-channel">OTA / Channel</option>
+                                        <% if (!(typeof hideRate === 'function' && hideRate('booking-channel'))) { %><option value="booking-channel">OTA / Channel</option><% } %>
                                         <% } %>
                                     </select>
                                 </div>
@@ -698,7 +699,7 @@ function getEditPriceBookingType() {
 // "each modal keeps its own copy" convention already used for Group
 // Booking's groupSeasonMonthMap/editGroupSeasonMonthMap.
 function editIsPoolVillaActive() {
-    return document.documentElement.getAttribute('data-property-theme') === 'pool_villa';
+    return document.documentElement.getAttribute('data-property-pricing') === 'guest';
 }
 
 let EDIT_SEASON_MONTH_MAP = { 1: 'lean', 2: 'lean', 3: 'lean', 4: 'lean', 5: 'lean', 6: 'lean', 7: 'lean', 8: 'lean', 9: 'lean', 10: 'lean', 11: 'lean', 12: 'lean' };
@@ -2064,7 +2065,22 @@ function loadEditExistingServices(bookingId) {
 
             const status = $(this).val();
             if (status == 1) {
-                const existingFee = parseFloat($('#edit_lateCheckoutFee').val()) || 0;
+                let existingFee = parseFloat($('#edit_lateCheckoutFee').val()) || 0;
+                // Same rule as Add Booking: 3+ nights is a free late check-out; otherwise ask Free / Amount
+                // (default 2,000) so the charge is never left blank.
+                const nightsNow = parseInt($('#edit_diffindays').val(), 10) || 1;
+                if (nightsNow >= 3) {
+                    existingFee = 0;
+                } else if (typeof window.promptLateCheckoutFee === 'function') {
+                    try {
+                        existingFee = await window.promptLateCheckoutFee({ defaultAmount: existingFee > 0 ? existingFee : 2000 });
+                    } catch (_) {
+                        $(this).val(prevCO);
+                        return;
+                    }
+                } else if (existingFee <= 0) {
+                    existingFee = 2000;
+                }
                 $('#edit_lateCheckoutFee').val(existingFee);
                 $('#edit_lateCheckoutFeeInput').val(existingFee);
                 $('#edit_lateCheckoutFeeDisplay').show();

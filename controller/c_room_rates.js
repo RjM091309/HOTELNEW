@@ -15,7 +15,15 @@ const RoomRatesController = {
         user: req.user || null,
         seasons: SEASONS,
         months: MONTHS,
-        categories: CATEGORIES,
+        // Rate categories this property does not use (property.HIDDEN_RATE_OPTIONS) are not listed; every Long Term band
+        // follows the single key 'long_term'.
+        categories: CATEGORIES.filter((c) => {
+          const key = String(c.key).startsWith('long_term') ? 'long_term' : c.key;
+          return !(typeof res.locals.hideRate === 'function' && res.locals.hideRate(key));
+        }).concat(await RoomRatesModel.listCustom(req.propertyId)),
+        // the standard categories a new custom rate can start from (copy of their amounts)
+        copyFromChoices: CATEGORIES.filter((c) => !String(c.key).startsWith('long_term')
+          && !(typeof res.locals.hideRate === 'function' && res.locals.hideRate(c.key))),
         dayRanges: DAY_RANGES,
         roomTypes: (roomTypes || []).map((t) => ({ id: t.IDNo, name: t.NAME })),
         breakfastOptions: BREAKFAST_OPTIONS
@@ -34,7 +42,7 @@ const RoomRatesController = {
     try {
       const [rates, seasonMonths, poolVillaRates] = await Promise.all([
         RoomRatesModel.getAll(req.propertyId),
-        RoomRatesModel.getSeasonMonthMap(),
+        RoomRatesModel.getSeasonMonthMap(req.propertyId),
         PoolVillaRatesModel.getAll()
       ]);
       res.json({ success: true, rates, seasonMonths, poolVillaRates });
@@ -49,7 +57,7 @@ const RoomRatesController = {
   // under, without pulling the whole rates grid.
   getSeasonMonths: async (req, res) => {
     try {
-      const seasonMonths = await RoomRatesModel.getSeasonMonthMap();
+      const seasonMonths = await RoomRatesModel.getSeasonMonthMap(req.propertyId);
       res.json({ success: true, seasonMonths });
     } catch (error) {
       console.error('Error fetching season months:', error);
@@ -86,6 +94,33 @@ const RoomRatesController = {
     }
   },
 
+  // Custom rate categories: POST { label, copyFrom? }, PUT /category/:id { label }, DELETE /category/:id
+  createCategory: async (req, res) => {
+    try {
+      if (!req.propertyId) return res.status(400).json({ success: false, message: 'No property selected.' });
+      const cat = await RoomRatesModel.createCustom(req.propertyId, req.body && req.body.label, req.user?.userId || null, req.body && req.body.copyFrom);
+      res.json({ success: true, category: cat });
+    } catch (error) {
+      res.status(400).json({ success: false, message: error.message || 'Could not add the rate.' });
+    }
+  },
+  renameCategory: async (req, res) => {
+    try {
+      const ok = await RoomRatesModel.renameCustom(req.propertyId, parseInt(req.params.id, 10), req.body && req.body.label);
+      res.json({ success: ok, message: ok ? undefined : 'Rate not found.' });
+    } catch (error) {
+      res.status(400).json({ success: false, message: error.message || 'Could not rename the rate.' });
+    }
+  },
+  deleteCategory: async (req, res) => {
+    try {
+      const ok = await RoomRatesModel.removeCustom(req.propertyId, parseInt(req.params.id, 10));
+      res.json({ success: ok, message: ok ? undefined : 'Rate not found.' });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Could not delete the rate.' });
+    }
+  },
+
   // Body: { months: [{ month, season }, ...] }
   saveSeasonMonths: async (req, res) => {
     try {
@@ -94,7 +129,7 @@ const RoomRatesController = {
         return res.status(400).json({ success: false, message: 'No month assignment to save.' });
       }
       const userId = req.user?.userId || null;
-      const result = await RoomRatesModel.saveSeasonMonths(months, userId);
+      const result = await RoomRatesModel.saveSeasonMonths(months, userId, req.propertyId);
       res.json({ success: true, updated: result.updated });
     } catch (error) {
       console.error('Error saving season months:', error);

@@ -13,6 +13,10 @@ const propertyController = {
         return res.status(400).json({ success: false, message: 'Unknown property' });
       }
 
+      if (Array.isArray(req.allowedPropertyIds) && !req.allowedPropertyIds.includes(property.IDNo)) {
+        return res.status(403).json({ success: false, message: 'This account cannot open that property.' });
+      }
+
       res.cookie('current_property', property.CODE, {
         maxAge: 90 * 24 * 60 * 60 * 1000,
         httpOnly: false,

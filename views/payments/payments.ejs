@@ -12,6 +12,7 @@
           <button type="button" class="filter-btn" data-filter="last3days">Last 3 Days</button>
           <button type="button" class="filter-btn" data-filter="thisWeek">This Week</button>
           <button type="button" class="filter-btn" data-filter="thisMonth">This Month</button>
+          <button type="button" class="filter-btn" id="printDayBtn" title="Print the whole day's payments: every shift, then the total"><i class="fas fa-print"></i> Print Day</button>
         </div>
       </div>
     </div>
@@ -37,9 +38,14 @@
           </div>
         </div>
         <div class="payment-sales-card__footer" id="daily-sales-breakdown"></div>
-        <button type="button" class="shift-end-btn" data-shift="1" style="display:none;">
-          <i class="fas fa-door-open"></i> End Shift
-        </button>
+        <div class="shift-btn-row">
+          <button type="button" class="shift-end-btn" data-shift="1" style="display:none;">
+            <i class="fas fa-door-open"></i> End Shift
+          </button>
+          <button type="button" class="shift-print-btn" data-shift="1" title="Print the payments of Shift 1">
+            <i class="fas fa-print"></i> Print
+          </button>
+        </div>
       </div>
 
       <div class="payment-sales-card payment-sales-card--weekly card-accent-orange">
@@ -59,9 +65,14 @@
           </div>
         </div>
         <div class="payment-sales-card__footer" aria-hidden="true">&nbsp;</div>
-        <button type="button" class="shift-end-btn" data-shift="2" style="display:none;">
-          <i class="fas fa-door-open"></i> End Shift
-        </button>
+        <div class="shift-btn-row">
+          <button type="button" class="shift-end-btn" data-shift="2" style="display:none;">
+            <i class="fas fa-door-open"></i> End Shift
+          </button>
+          <button type="button" class="shift-print-btn" data-shift="2" title="Print the payments of Shift 2">
+            <i class="fas fa-print"></i> Print
+          </button>
+        </div>
       </div>
 
       <div class="payment-sales-card payment-sales-card--monthly card-accent-violet">
@@ -81,9 +92,14 @@
           </div>
         </div>
         <div class="payment-sales-card__footer" aria-hidden="true">&nbsp;</div>
-        <button type="button" class="shift-end-btn" data-shift="3" style="display:none;">
-          <i class="fas fa-door-open"></i> End Shift
-        </button>
+        <div class="shift-btn-row">
+          <button type="button" class="shift-end-btn" data-shift="3" style="display:none;">
+            <i class="fas fa-door-open"></i> End Shift
+          </button>
+          <button type="button" class="shift-print-btn" data-shift="3" title="Print the payments of Shift 3">
+            <i class="fas fa-print"></i> Print
+          </button>
+        </div>
       </div>
     </div>
 
@@ -98,7 +114,6 @@
             <th style="text-align: center;">ROOM NUMBER</th>
             <th style="text-align: center;">CONFIRMATION NUMBER</th>
             <th style="text-align: center;">TOTAL AMOUNT</th>
-            <th style="text-align: center;">PAID</th>
             <th style="text-align: center;">AMOUNT PAID</th>
             <th style="text-align: center;">BALANCE</th>
             <th style="text-align: center;">PAYMENT STATUS</th>
@@ -110,7 +125,7 @@
         <tbody></tbody>
         <tfoot>
           <tr id="payments-total-row" style="display:none;">
-            <td colspan="14" style="text-align:right; font-weight:600; color:#ce93d8; padding:8px 14px;">
+            <td colspan="13" style="text-align:right; font-weight:600; color:#ce93d8; padding:8px 14px;">
               Total Amount Paid: <span id="payments-total-amount">0</span>
             </td>
           </tr>
@@ -197,7 +212,6 @@
           }
         },
         { data: 'TOTAL_AMOUNT', className: 'center', render: d => '' + Number(d||0).toLocaleString('en-US', { maximumFractionDigits: 0 }) },
-        { data: 'TOTAL_PAID', className: 'center', render: d => '' + Number(d||0).toLocaleString('en-US', { maximumFractionDigits: 0 }) },
         { data: 'LAST_PAYMENT_AMOUNT', className: 'center', render: d => '' + Number(d || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) },
         { data: 'BALANCE', className: 'center', render: d => '' + Number(d||0).toLocaleString('en-US', { maximumFractionDigits: 0 }) },
         { data: null, className: 'center', render: function(_d,_t,row){
@@ -569,6 +583,131 @@
       $badge.hide();
     }
   }
+
+  /* --------------------------------------------------------------------
+   * Print a shift (Print on a shift card) or the whole day (Print Day):
+   * every payment taken, one line each, then cash / non-cash / total.
+   * Data comes from /payments/shift-report, the same rows the shift
+   * totals are built from, so the printed total matches the card.
+   * -------------------------------------------------------------------- */
+  function escPrint(t) { return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function peso(n) { return (n < 0 ? '-' : '') + '₱' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function sumLines(l) { return l.reduce(function (s, x) { return s + x.amount; }, 0); }
+  function isCashLine(x) { return String(x.method || '').toLowerCase() === 'cash'; }
+  function methodLabel(m) { return String(m || '').replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }); }
+  function timeLabel(d) { const t = new Date(d); return isNaN(t) ? '' : t.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }); }
+
+  function reportRows(lines, startAt) {
+    if (!lines.length) return '<tr><td colspan="8" class="c mut">No payments</td></tr>';
+    return lines.map(function (l, i) {
+      return '<tr><td class="c">' + (startAt + i + 1) + '</td><td class="nw">' + escPrint(timeLabel(l.paidAt)) + '</td>' +
+        '<td>' + escPrint(l.name || '—') + (l.remarks ? '<span class="mut"> · ' + escPrint(l.remarks) + '</span>' : '') + '</td>' +
+        '<td class="c">' + escPrint(l.roomNumber == null || l.roomNumber === '' ? '—' : l.roomNumber) + '</td>' +
+        '<td class="nw">' + escPrint(l.code || '—') + '</td><td>' + escPrint(methodLabel(l.method)) + '</td>' +
+        '<td class="r' + (l.amount < 0 ? ' neg' : '') + '">' + peso(l.amount) + '</td><td>' + escPrint(l.processedBy || '—') + '</td></tr>';
+    }).join('');
+  }
+
+  function totalsTable(lines, label) {
+    const methods = []; lines.forEach(function (l) { if (!isCashLine(l) && methods.indexOf(l.method) < 0) methods.push(l.method); });
+    return '<table class="sum"><tr><td>Cash</td><td class="r">' + peso(sumLines(lines.filter(isCashLine))) + '</td></tr>' +
+      methods.map(function (m) { return '<tr><td>' + escPrint(methodLabel(m)) + '</td><td class="r">' + peso(sumLines(lines.filter(function (l) { return l.method === m; }))) + '</td></tr>'; }).join('') +
+      '<tr class="grey"><td>' + escPrint(label) + '<br><span class="mut">' + lines.length + ' payment' + (lines.length === 1 ? '' : 's') + '</span></td><td class="r"><big>' + peso(sumLines(lines)) + '</big></td></tr></table>';
+  }
+
+  function buildReportHtml(d, single) {
+    const allLines = []; d.shifts.forEach(function (s) { s.lines.forEach(function (l) { allLines.push(l); }); });
+    const dayLabel = new Date(d.day + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric' });
+    const printed = new Date().toLocaleString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    const head = '<tr><th class="c">#</th><th>Time</th><th>Guest</th><th class="c">Room</th><th>Booking</th><th>Method</th><th class="r">Amount</th><th>Processed by</th></tr>';
+    const css = '@page{margin:12mm}body{font-family:Arial,sans-serif;font-size:12px;color:#000;background:#fff;margin:0}.box{border:2px solid #000;padding:14px 18px}' +
+      '.top{text-align:center}.top img{height:60px;width:auto}.sub{text-align:center;font-size:11px;margin:2px 0 8px}.title{text-align:center;font-weight:bold;font-size:17px;margin-bottom:8px;letter-spacing:1px}' +
+      'table{width:100%;border-collapse:collapse}.info td{border:1px solid #000;padding:4px 8px}.info .label{font-weight:bold;width:22%}.list{margin-top:10px}' +
+      '.list th{background:#eee;border:1px solid #000;padding:4px 6px;text-align:left;font-size:11px}.list td{border:1px solid #999;padding:3px 6px;vertical-align:top}' +
+      '.c{text-align:center}.r{text-align:right;white-space:nowrap}.nw{white-space:nowrap}.neg{color:#c0392b}.mut{color:#666;font-size:11px;font-weight:normal}' +
+      '.sum{margin-top:10px;page-break-inside:avoid}.sum td{border:1px solid #000;padding:5px 10px}.sum .grey td{background:#d9d9d9;border-top:2px solid #000;border-bottom:2px solid #000;font-weight:bold}.sum big{font-size:16px}' +
+      '.sep td{background:#e4e7ee;font-weight:bold;font-size:11px;letter-spacing:1px;border:1px solid #999;padding:3px 6px}' +
+      '.sign{margin-top:26px;display:flex;justify-content:space-around;text-align:center;font-size:11px;page-break-inside:avoid}.sign div{width:34%;border-top:1px solid #000;padding-top:3px}' +
+      '*{-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+      'html,body{background:#f2f2f2}.pv-bar{position:sticky;top:0;z-index:9;display:flex;justify-content:center;gap:10px;padding:10px;background:#1b2336}' +
+      '.pv-bar button{cursor:pointer;border:0;border-radius:8px;padding:9px 24px;font:600 14px Arial,sans-serif;background:#fff;color:#1b2336}.pv-bar button.p{background:#ce93d8}.pv-bar button:disabled{opacity:.6;cursor:wait}' +
+      '.pv-sheet{max-width:880px;margin:16px auto;background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.18)}.box{border-radius:0}' +
+      '@media print{html,body{background:#fff}.pv-bar{display:none}.pv-sheet{max-width:none;margin:0;box-shadow:none}}';
+    let body;
+    if (single) {
+      const s = d.shifts[0];
+      body = '<div class="title">SHIFT PAYMENT REPORT</div><table class="info"><tr><td class="label">SHIFT:</td><td>Shift ' + s.shiftNumber + ' · ' + escPrint(s.hours) + (s.open ? ' (still open)' : '') +
+        '</td><td class="label">DATE:</td><td>' + escPrint(dayLabel) + '</td></tr><tr><td class="label">PAYMENTS:</td><td>' + s.lines.length + '</td><td class="label">PRINTED:</td><td>' + escPrint(printed) + '</td></tr></table>' +
+        '<table class="list">' + head + reportRows(s.lines, 0) + '</table>' + totalsTable(s.lines, 'TOTAL COLLECTED · Shift ' + s.shiftNumber) +
+        '<div class="sign"><div>Prepared by: ' + escPrint(d.preparedBy) + '</div><div>Received by</div></div>';
+    } else {
+      let n = 0;
+      const rows = d.shifts.map(function (s) {
+        const r = '<tr class="sep"><td colspan="8">SHIFT ' + s.shiftNumber + ' · ' + escPrint(s.hours) + (s.open ? ' (still open)' : '') + ' · ' + peso(sumLines(s.lines)) + '</td></tr>' + reportRows(s.lines, n);
+        n += s.lines.length; return r;
+      }).join('');
+      body = '<div class="title">DAILY REVENUE · ' + escPrint(dayLabel.toUpperCase()) + '</div><table class="list">' + head + rows + '</table>' +
+        totalsTable(allLines, 'TOTAL OF THE DAY') +
+        '<div class="sign"><div>Prepared by: ' + escPrint(d.preparedBy) + '</div><div>Received by</div></div>' +
+        '<div class="sub" style="margin-top:10px;text-align:left">Printed ' + escPrint(printed) + '</div>';
+    }
+    return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + (single ? 'Shift ' + d.shifts[0].shiftNumber + ' payments ' : 'Daily revenue ') + escPrint(d.day) + '</title><style>' + css + '</style></head><body>' +
+      '<div class="pv-bar"><button type="button" class="p" onclick="window.print()">Print</button><button type="button" id="pv-save" onclick="pvSave()">Save PDF</button></div>' +
+      '<div class="pv-sheet"><div class="box">' +
+      (d.logo ? '<div class="top"><img src="' + escPrint(d.logo) + '" alt=""></div>' : '') + '<div class="sub"><strong>' + escPrint(d.hotelName) + '</strong></div>' + body + '</div></div>' +
+      '<script>function pvSave(){var a=window.opener;if(!a||!a.__pvPdf){alert("Close this window and open it again from the Payments page to save it.");return;}' +
+      'var b=document.getElementById("pv-save");b.disabled=true;b.textContent="Saving...";' +
+      'a.__pvPdf(document.querySelector(".pv-sheet"),' + JSON.stringify((single ? 'Shift-' + d.shifts[0].shiftNumber + '-Payments-' : 'Daily-Revenue-') + d.day + '.pdf') + ')' +
+      '.catch(function(e){alert("Could not save the PDF: "+(e&&e.message?e.message:e));}).then(function(){b.disabled=false;b.textContent="Save PDF";});}<\/script>' +
+      '</body></html>';
+  }
+
+  function loadPdfLib(src) {
+    return new Promise(function (resolve, reject) {
+      const sc = document.createElement('script'); sc.src = src; sc.onload = resolve; sc.onerror = function () { reject(new Error('Could not load ' + src)); };
+      document.head.appendChild(sc);
+    });
+  }
+  // Called by the report window's Save PDF button: the sheet is turned into an A4 PDF (several pages if long) and downloaded.
+  window.__pvPdf = function (sheet, fileName) {
+    return Promise.all([
+      window.html2canvas ? 0 : loadPdfLib('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'),
+      window.jspdf ? 0 : loadPdfLib('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+    ]).then(function () {
+      return window.html2canvas(sheet, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+    }).then(function (canvas) {
+      const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+      const margin = 8, pageW = 210, pageH = 297, maxW = pageW - margin * 2, maxH = pageH - margin * 2;
+      const mmPerPx = maxW / canvas.width;
+      const sliceH = Math.floor(maxH / mmPerPx); // canvas pixels that fit on one page
+      for (let y = 0, page = 0; y < canvas.height; y += sliceH, page++) {
+        const h = Math.min(sliceH, canvas.height - y);
+        const part = document.createElement('canvas'); part.width = canvas.width; part.height = h;
+        part.getContext('2d').drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+        if (page) pdf.addPage();
+        pdf.addImage(part.toDataURL('image/jpeg', 0.95), 'JPEG', margin, margin, maxW, h * mmPerPx);
+      }
+      pdf.save(fileName);
+    });
+  };
+
+  function printShiftReportFor(shift) {
+    const w = window.open('', '_blank');
+    if (!w) { Swal.fire('Pop-up blocked', 'Please allow pop-ups for this site to print.', 'warning'); return; }
+    w.document.write('<p style="font-family:Arial;padding:20px">Preparing report…</p>');
+    fetch('/payments/shift-report' + (shift ? '?shift=' + encodeURIComponent(shift) : ''))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.success) throw new Error('report failed');
+        if (shift && !d.shifts.length) { w.close(); Swal.fire('Nothing to print', 'That shift has not started yet.', 'info'); return; }
+        w.document.open(); w.document.write(buildReportHtml(d, !!shift)); w.document.close();
+        w.focus();
+      })
+      .catch(function (err) { console.error(err); try { w.close(); } catch (e) {} Swal.fire('Error', 'Could not prepare the report.', 'error'); });
+  }
+
+  $(document).on('click', '.shift-print-btn', function (e) { e.stopPropagation(); printShiftReportFor(this.dataset.shift); });
+  $(document).on('click', '#printDayBtn', function (e) { e.stopPropagation(); printShiftReportFor(''); });
 
   /* ----------------------------------------------------------------------
    * End Shift button, one per shift card - only the currently-open shift's
@@ -1219,6 +1358,25 @@
     cursor: default;
     transition: filter 0.15s ease;
   }
+
+  .shift-btn-row { display: flex; gap: 8px; margin-top: 10px; }
+  .shift-btn-row .shift-end-btn { flex: 1 1 auto; width: auto; margin-top: 0; }
+  .shift-print-btn {
+    display: none;
+    padding: 8px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 6px;
+    background: transparent;
+    color: #e8ecef !important;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .shift-print-btn:hover { background: rgba(255, 255, 255, 0.16); }
+  html[data-theme="white"] .shift-print-btn { color: #2b3338 !important; border-color: rgba(0, 0, 0, 0.35); }
+  html[data-theme="white"] .shift-print-btn:hover { background: rgba(0, 0, 0, 0.07); }
+  .payment-sales-card--shift .shift-print-btn { display: inline-block; }
+  #printDayBtn { margin-left: 10px; }
 
   .shift-end-btn--active {
     border-color: #ce93d8;

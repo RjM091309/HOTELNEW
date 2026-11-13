@@ -95,3 +95,25 @@ jQuery(document).ready(function () {
         });
     });
 });
+
+// Booking forms (Add / Edit Booking, Edit Group Booking): the Total / Paid / Balance row moves into the window's footer, which stays
+// on screen (sticky) - so the amounts are always visible and the form does not need a big empty box for them. See theme-color.css (.bk-totals-dock).
+(function () {
+    var IDS = '#modal-addbooking, #modal-editbooking, #modal-add-group-booking, #modal-edit-group-booking';
+    function dock(m) {
+        if (!m || m.getAttribute('data-totals-docked')) return;
+        var total = m.querySelector('#computedTotal, #edit_computedTotal, #editGroupComputedTotal');
+        var footer = m.querySelector('.modal-footer');
+        if (!total || !footer) return;
+        var row = total.closest('.row');
+        if (!row || footer.contains(row)) return;
+        var prev = row.previousElementSibling;
+        footer.insertBefore(row, footer.firstChild);
+        row.classList.add('bk-totals-dock');
+        if (prev && prev.tagName === 'HR') prev.style.display = 'none';
+        m.setAttribute('data-totals-docked', '1');
+    }
+    function all() { document.querySelectorAll(IDS).forEach(dock); }
+    document.addEventListener('show.bs.modal', function (e) { if (e.target && e.target.matches && e.target.matches(IDS)) dock(e.target); });
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', all); else all();
+})();

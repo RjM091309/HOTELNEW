@@ -89,8 +89,17 @@
               <label for="addPurpose" class="form-label">Purpose of Payment</label>
               <textarea class="form-control" id="addPurpose" rows="3" placeholder="e.g. Room payment, deposit, etc."></textarea>
             </div>
-            <div class="col-md-12">
-              <small class="text-muted"><i class="fa fa-pencil"></i> Signature is not entered digitally — it will be left blank on print for handwritten signing.</small>
+            <div class="col-md-12 mb-3">
+              <label class="form-label">E-signature <span class="text-muted" style="font-weight:400;">(optional)</span></label>
+              <div class="receipt-sig-box">
+                <div class="receipt-sig-preview" id="addSigPreview"><span class="text-muted">No signature - the receipt prints a blank line for handwritten signing.</span></div>
+                <div class="receipt-sig-actions">
+                  <label class="btn btn-secondary btn-sm mb-0" for="addSigFile"><i class="fa fa-upload"></i> Upload signature</label>
+                  <input type="file" id="addSigFile" accept="image/png,image/jpeg,image/webp" style="display:none;">
+                  <button type="button" class="btn btn-sm btn-outline-danger receipt-sig-clear" id="addSigClear" style="display:none;">Remove</button>
+                </div>
+                <input type="hidden" id="addSignature">
+              </div>
             </div>
           </div>
         </div>
@@ -155,6 +164,18 @@
               <label for="editPurpose" class="form-label">Purpose of Payment</label>
               <textarea class="form-control" id="editPurpose" rows="3"></textarea>
             </div>
+            <div class="col-md-12 mb-3">
+              <label class="form-label">E-signature <span class="text-muted" style="font-weight:400;">(optional)</span></label>
+              <div class="receipt-sig-box">
+                <div class="receipt-sig-preview" id="editSigPreview"><span class="text-muted">No signature - the receipt prints a blank line for handwritten signing.</span></div>
+                <div class="receipt-sig-actions">
+                  <label class="btn btn-secondary btn-sm mb-0" for="editSigFile"><i class="fa fa-upload"></i> Upload signature</label>
+                  <input type="file" id="editSigFile" accept="image/png,image/jpeg,image/webp" style="display:none;">
+                  <button type="button" class="btn btn-sm btn-outline-danger receipt-sig-clear" id="editSigClear" style="display:none;">Remove</button>
+                </div>
+                <input type="hidden" id="editSignature">
+              </div>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
@@ -171,13 +192,16 @@
   document.addEventListener('DOMContentLoaded', function () {
     setTimeout(function () {
       const script = document.createElement('script');
-      script.src = '/js/payments/receipts.js';
+      script.src = '/js/payments/receipts.js?v=sig-1';
       document.body.appendChild(script);
     }, 300);
   });
 </script>
 
 <style>
+  .receipt-sig-box { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:10px 12px; border:1px dashed rgba(128,128,128,.5); border-radius:6px; }
+  .receipt-sig-preview { flex:1 1 200px; min-height:44px; display:flex; align-items:center; font-size:12px; }
+  .receipt-sig-actions { display:flex; gap:8px; }
   #addReceiptModal .modal-content,
   #editReceiptModal .modal-content {
     background-color: #2a3135;

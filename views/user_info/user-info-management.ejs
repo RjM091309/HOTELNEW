@@ -125,6 +125,17 @@
                             </div>
                         </div>
                     </div>
+                    <div class="row">
+                        <div class="col-12 p-t-20">
+                            <label style="font-size:12px;opacity:.75;display:block;margin-bottom:6px;">Properties this account can open</label>
+                            <div class="up-box" id="addPropertyBox" style="display:flex;flex-wrap:wrap;gap:8px 18px;">
+                                <% (typeof allProperties !== 'undefined' ? allProperties : []).forEach(function (p) { %>
+                                    <label style="display:inline-flex;align-items:center;gap:6px;margin:0;cursor:pointer;"><input type="checkbox" class="up-check" data-mode="add" data-current="<%= (typeof currentProperty !== 'undefined' && currentProperty && currentProperty.IDNo === p.IDNo) ? 1 : 0 %>" value="<%= p.IDNo %>"> <%= p.DISPLAY_NAME || p.NAME %></label>
+                                <% }); %>
+                            </div>
+                            <small class="up-note" id="addPropertyNote" style="display:none;opacity:.7;">An Admin can open every property.</small>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -216,6 +227,17 @@
                             </div>
                         </div>
                     </div>
+                    <div class="row">
+                        <div class="col-12 p-t-20">
+                            <label style="font-size:12px;opacity:.75;display:block;margin-bottom:6px;">Properties this account can open</label>
+                            <div class="up-box" id="editPropertyBox" style="display:flex;flex-wrap:wrap;gap:8px 18px;">
+                                <% (typeof allProperties !== 'undefined' ? allProperties : []).forEach(function (p) { %>
+                                    <label style="display:inline-flex;align-items:center;gap:6px;margin:0;cursor:pointer;"><input type="checkbox" class="up-check" data-mode="edit" value="<%= p.IDNo %>"> <%= p.DISPLAY_NAME || p.NAME %></label>
+                                <% }); %>
+                            </div>
+                            <small class="up-note" id="editPropertyNote" style="display:none;opacity:.7;">An Admin can open every property.</small>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -287,7 +309,7 @@
         // Load scripts with proper timing
         setTimeout(function() {
             var usersScript = document.createElement('script');
-            usersScript.src = '/js/user_info/users_data.js';
+            usersScript.src = '/js/user_info/users_data.js?v=prop-2';
             document.body.appendChild(usersScript);
         }, 300);
     });

@@ -340,8 +340,8 @@ function handleEventClick(info) {
       break;
       
     case 'check-Out':
-      // Open checkout backtrack modal for completed check-outs
-      window.openCheckoutBacktrackModal(bookingId, event);
+      // A checked-out booking opens the same booking details (read-only: its bill, payments and any balance still owed).
+      window.openRoomMenuModal(bookingId, event);
       break;
       
     case 'pending': {
@@ -354,10 +354,12 @@ function handleEventClick(info) {
 
       // Otherwise route on the actual late-check-in flag rather than fill color,
       // since fill color now encodes payment status (paid/unpaid/OTA/pencil).
-      if (!isHoldPendingEvt && isLateCheckIn(event)) {
-        showLateCheckInModal(event);
-      } else {
+      // Reserved (Regular / Early / Late) goes straight to the booking details, which has the Check in footer.
+      // Only a Hold Pending reservation keeps the small popup (no check-in processing for it).
+      if (isHoldPendingEvt) {
         showPendingModal(event);
+      } else {
+        window.openRoomMenuModal(bookingId, event);
       }
       break;
     }
@@ -407,6 +409,13 @@ function handleEventClick(info) {
 // crossed with payment status (paid vs not-fully-paid). Late check-in, late
 // check-out/back-to-back, and "reservation fee paid" (partial payment) are shown
 // separately as side-indicator accents — see applySideIndicatorAccents().
+// "Reservation fee paid" (the violet / fuchsia marks) only belongs to a RESERVATION. Once the guest is checked in (or out)
+// the bar is simply paid or unpaid: green until it is fully paid, however much was paid on the way.
+function isReservationWithFee(event) {
+  const st = String(event.extendedProps?.bookingStatus || '').toLowerCase();
+  return st === 'pending' && getPaymentStatusNormalized(event) === 'partial';
+}
+
 function getPaymentStatusNormalized(event) {
   const raw = (event.extendedProps?.paymentStatus || 'unpaid').toLowerCase();
   return raw === 'partial_paid' ? 'partial' : raw;
@@ -420,11 +429,21 @@ const DARK_TEXT_FILL_COLORS = new Set([
   CHECKOUT_UNPAID_COLOR
 ]);
 
+// Neon bars (like the KGrand tape chart): the status color is no longer a solid fill but a tinted glass bar with a bright outline and a soft glow.
+// The color goes to --neon; calendar.css (.neon-bar) draws it. Cancelled / maintenance bars stay solid black.
+function applyNeonBar(el, color) {
+  el.classList.add('neon-bar');
+  el.style.setProperty('--neon', color);
+  el.style.removeProperty('color');
+  el.style.removeProperty('text-shadow');
+}
+
 function applyCompositeStatusStyles(event, el) {
   try {
     const bookingStatus = event.extendedProps?.bookingStatus;
 
     if (bookingStatus === 'cancelled' || bookingStatus === 'maintenance') {
+      el.classList.remove('neon-bar');
       el.removeAttribute('data-composite');
       el.style.background = '';
       el.style.backgroundColor = event.backgroundColor || '#000000';
@@ -463,15 +482,18 @@ function applyCompositeStatusStyles(event, el) {
     }
     // !important: calendar.css forces white text on group/long-term-booking
     // events; this fill-based contrast choice must win over that.
-    const useDarkText = DARK_TEXT_FILL_COLORS.has(fillColor);
-    el.style.setProperty('color', useDarkText ? '#000' : '#fff', 'important');
-    // The title chip's text-shadow inherits from here. A dark shadow behind
-    // dark text just smudges the letters, so flip to a light halo instead.
-    el.style.setProperty(
-      'text-shadow',
-      useDarkText ? '0 1px 1px rgba(255, 255, 255, 0.7)' : '0 1px 1px rgba(0, 0, 0, 0.5)',
-      'important'
-    );
+    if (/^#[0-9a-f]{6}$/i.test(fillColor || '')) {
+      applyNeonBar(el, fillColor);
+    } else {
+      el.classList.remove('neon-bar');
+      const useDarkText = DARK_TEXT_FILL_COLORS.has(fillColor);
+      el.style.setProperty('color', useDarkText ? '#000' : '#fff', 'important');
+      el.style.setProperty(
+        'text-shadow',
+        useDarkText ? '0 1px 1px rgba(255, 255, 255, 0.7)' : '0 1px 1px rgba(0, 0, 0, 0.5)',
+        'important'
+      );
+    }
     applyBookingHighlightBorder(event, el);
 
     // Lower z-index for pending/check-in bars so a same-day checkout bar
@@ -533,7 +555,7 @@ function applySideIndicatorAccents(event, el) {
     if (isLateCheckout(event) || isBackToBackEvent(event)) {
       shadows.push(`inset -4px 0 0 0 ${LATE_CHECKOUT_BTB_ACCENT_COLOR}`);
     }
-    if (getPaymentStatusNormalized(event) === 'partial') {
+    if (isReservationWithFee(event)) {
       shadows.push(`inset 0 -4px 0 0 ${RESERVATION_FEE_ACCENT_COLOR}`);
     }
 
@@ -673,7 +695,7 @@ function applyReservationFeeStartMarker(event, el) {
   try {
     const harness = el.closest('.fc-timeline-event-harness') || el;
     const status = String(event.extendedProps?.bookingStatus || '').toLowerCase();
-    const isResFee = getPaymentStatusNormalized(event) === 'partial';
+    const isResFee = isReservationWithFee(event);
 
     const existing = harness.querySelector(':scope > .reservation-fee-start-marker');
 
@@ -892,23 +914,36 @@ function buildEventTooltipHtml(event) {
   const coAccent = lateCO ? '#1A3FA0' : null;
 
   const pay = String(p.paymentStatus || '').toLowerCase().replace('partial_paid', 'partial');
+  const isReservation = String(p.bookingStatus || '').toLowerCase() === 'pending';
   const payText = pay === 'paid' ? 'Fully paid'
-    : pay === 'partial' ? 'Reservation fee paid (partial)'
+    : (pay === 'partial' && isReservation) ? 'Reservation fee paid (partial)'
+    : pay === 'partial' ? 'Unpaid (balance left)'
     : 'Unpaid';
-  const payAccent = pay === 'partial' ? '#D500F9' : null;
+  const payAccent = (pay === 'partial' && isReservation) ? '#D500F9' : null;
 
   // Guest count (not room type) is what actually drives Pool Villa's price
   // (see models/poolVillaRatesModel.js), so it's worth surfacing in the
   // tooltip there - shown ALONGSIDE Breakfast, not instead of it (Breakfast
   // still only shows when the booking actually has one, same condition as
   // Main Hotel already uses).
-  const isPoolVillaCalendar = document.documentElement.getAttribute('data-property-theme') === 'pool_villa';
+  const isPoolVillaCalendar = document.documentElement.getAttribute('data-property-pricing') === 'guest';
 
   add('Room', roomNo);
   add('Check-in', `${fmtTooltipDate(event.start)} - ${ciText}`, ciAccent);
   add('Check-out', `${fmtTooltipDate(event.end)} - ${coText}`, coAccent);
   add('Payment', payText, payAccent);
-  if (p.totalCost != null) add('Total', '₱' + Number(p.totalCost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+  const fmtMoney = (n) => '₱' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Total = what the booking is billed (room, extension, services), the same figure the Paid / Balance below are measured against.
+  if (p.billedTotal != null && Number(p.billedTotal) > 0) add('Total' + (p.balanceIsGroup ? ' (group)' : ''), fmtMoney(p.billedTotal));
+  else if (p.totalCost != null) add('Total', fmtMoney(p.totalCost));
+  // How much was paid and what is still owed (a room of a one-bill group shows the GROUP's figures, from the main booking).
+  if (status !== 'cancelled' && status !== 'maintenance' && p.billedTotal != null) {
+    const owed = Number(p.outstandingBalance) || 0;
+    const paidSoFar = Math.max(0, (Number(p.billedTotal) || 0) - owed);
+    const scope = p.balanceIsGroup ? ' (group)' : '';
+    if (paidSoFar > 0.009 || owed > 0.009) add('Paid' + scope, fmtMoney(paidSoFar), paidSoFar > 0.009 ? '#2f7d32' : null);
+    if (owed > 0.009) add('Balance' + scope, fmtMoney(owed) + (Number(p.creditBalance) > 0.009 ? ' · on credit' : ''), '#c62828');
+  }
   if (p.hasPickup) add('Transport', '✈ Pick-up / Drop-off');
   if (isPoolVillaCalendar && p.guestsCount) add('Guests', `${p.guestsCount} person${Number(p.guestsCount) === 1 ? '' : 's'}`);
   if (p.breakfastQty > 0) add('Breakfast', `🍳 ${p.breakfastQty}`);
@@ -982,6 +1017,7 @@ function handleEventDidMount(info) {
   }
 
   window.eventElements[info.event.id] = info.el;
+  if (window.__calFocus) window.__calFocus.style(info.event.id, info.el);   // /calendar?focus=arrivals|departures: keep the highlight on re-drawn bookings
 
   // Apply the booking-highlight fill color (phase x payment status)
   try {
@@ -1053,13 +1089,13 @@ function handleEventDidMount(info) {
       chip.className = 'event-title-chip';
       chip.style.visibility = hasOverlay ? 'hidden' : '';
       const span = document.createElement('span');
-      span.textContent = info.event.title || '';
+      span.textContent = (/^(AG - )?Maintenance$/.test(String(info.event.title || ''))) ? 'Out of order' : (info.event.title || '');
       chip.appendChild(span);
       info.el.appendChild(chip);
     } else {
       existing.style.visibility = hasOverlay ? 'hidden' : '';
       const span = existing.querySelector('span') || document.createElement('span');
-      span.textContent = info.event.title || '';
+      span.textContent = (/^(AG - )?Maintenance$/.test(String(info.event.title || ''))) ? 'Out of order' : (info.event.title || '');
       if (!existing.contains(span)) existing.appendChild(span);
     }
   } catch (e) {

@@ -263,7 +263,6 @@ function calculateCardVariables(booking) {
 						<button type="button" class="filter-btn" id="cleanAllRoomsBtn" style="display: none;">
 							<i class="fas fa-broom"></i> Clean All Rooms
 						</button>
-						<button type="button" class="filter-btn" id="moveToOccupiedBtn">Move to Occupied</button>
 						<button type="button" class="filter-btn" id="sort-button">Sort</button>
 						<button type="button" class="filter-btn" id="filter-newest">Newest Booking</button>
 						<button type="button" class="filter-btn" id="filter-all">All Floors</button>
@@ -781,7 +780,7 @@ function calculateCardVariables(booking) {
 					</div>
 				</div>
 				<div class="tab-bar">
-					<% if (typeof currentProperty !== 'undefined' && currentProperty && currentProperty.CODE === 'pool_villa') { %>
+					<% if (typeof isGuestPricing !== 'undefined' && isGuestPricing) { %>
 					<div class="tab-item is-active" data-target="villa-content">Villa Rooms</div>
 					<% } else { %>
 					<div class="tab-item is-active" data-target="3rd-floor-content">3rd Floor</div>
@@ -792,12 +791,12 @@ function calculateCardVariables(booking) {
 				</div>
 			</div>
 			<div class="dashboard-card-body">
-				<% if (typeof currentProperty !== 'undefined' && currentProperty && currentProperty.CODE === 'pool_villa') { %>
+				<% if (typeof isGuestPricing !== 'undefined' && isGuestPricing) { %>
 				<div class="tab-panel is-active" id="villa-content">
 					<div id="floor-layout-villa" class="single-floor"></div>
 				</div>
 				<% } %>
-				<div class="tab-panel <%= (typeof currentProperty !== 'undefined' && currentProperty && currentProperty.CODE === 'pool_villa') ? '' : 'is-active' %>" id="3rd-floor-content">
+				<div class="tab-panel <%= (typeof isGuestPricing !== 'undefined' && isGuestPricing) ? '' : 'is-active' %>" id="3rd-floor-content">
 					<div id="floor-layout-3" class="single-floor"></div>
 				</div>
 				<div class="tab-panel" id="4th-floor-content">
@@ -869,7 +868,7 @@ function calculateCardVariables(booking) {
 		lateCheckoutFeeScript.src = '/js/booking/late_checkout_fee.js';
 		lateCheckoutFeeScript.onload = function () {
 			var script2 = document.createElement('script');
-			script2.src = '/js/dashboard/room-menu_data.js?v=late-checkin-date-fix-1';
+			script2.src = '/js/dashboard/room-menu_data.js?v=single-pay-2';
 			document.body.appendChild(script2);
 		};
 		document.body.appendChild(lateCheckoutFeeScript);
@@ -882,7 +881,7 @@ function calculateCardVariables(booking) {
 		if (!window.__billingJsRequested) {
 			window.__billingJsRequested = true;
 			var billingJs = document.createElement('script');
-			billingJs.src = '/js/booking/billing.js?v=receipt-edit-1';
+			billingJs.src = '/js/booking/billing.js?v=receipt-credit-1';
 			document.body.appendChild(billingJs);
 		}
 		var script7 = document.createElement('script');
@@ -3322,7 +3321,7 @@ async function deleteRequestFromModal(id) {
 <%- include('../booking/modal/cancel_booking') %>
 <%- include('modal/security_deposit') %>
 <%- include('modal/security_deposit_refund') %>
-<script src="/js/dashboard/security_deposit_checkin.js?v=early-checkin-5"></script>
+<script src="/js/dashboard/security_deposit_checkin.js?v=early-checkin-6"></script>
 <script src="/js/dashboard/security_deposit_checkout.js"></script>
 					
 					

@@ -6,6 +6,9 @@ const FlightController = require('../controller/c_flight');
 // Route to render the main booking page
 router.get('/', BookingController.renderBookingPage);
 
+// Navbar global search
+router.get('/global-search', BookingController.globalSearch);
+
 // Route to render the group booking page
 router.get('/group', BookingController.renderGroupBookingPage);
 
@@ -61,6 +64,11 @@ router.post('/add_booking', BookingController.addBooking);
 router.post('/save-booking-services', BookingController.saveBookingServices);
 router.post('/update-service-status', BookingController.updateServiceStatus);
 router.post('/remove-service', BookingController.removeService);
+router.post('/reduce-service', BookingController.reduceService);
+router.post('/add-service-to-group-rooms', BookingController.addServiceToGroupRooms);
+router.get('/group-services/:bookingId', BookingController.getGroupServices);
+router.get('/group-summary/:bookingId', BookingController.getGroupSummary);
+router.post('/remove-group-services', BookingController.removeGroupServices);
 
 // Payment processing
 router.post('/process-payment', BookingController.processPayment);

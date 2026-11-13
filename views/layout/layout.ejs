@@ -12,6 +12,7 @@
       if(dt==='white'){if(!ss||ss==='dark-sidebar-color')ss='white-sidebar-color';if(!lg||lg==='logo-dark')lg='logo-white';if(!hd||hd==='header-dark')hd='header-white';}
       if(dt){document.documentElement.setAttribute('data-theme', dt);}
       document.documentElement.setAttribute('data-property-theme', propertyCode);
+      document.documentElement.setAttribute('data-property-pricing', '<%= typeof isGuestPricing !== "undefined" && isGuestPricing ? "guest" : "room" %>');
       var c=document.body.className;if(ss){c=c.replace(/\b(white|dark|blue|indigo|green|red|cyan)-sidebar-color\b/g,'').trim();c+=' '+ss;}if(lg){c=c.replace(/\blogo-(white|dark|blue|indigo|red|cyan|green)\b/g,'').trim();c+=' '+lg;}if(hd){c=c.replace(/\bheader-(white|dark|blue|indigo|red|cyan|green)\b/g,'').trim();c+=' '+hd;}document.body.className=c.trim();
     }catch(e){}})();</script>
     <!-- Show the lock overlay before anything else paints, if this browser left the system locked (survives a page reload/new tab, not just an in-memory flag). -->

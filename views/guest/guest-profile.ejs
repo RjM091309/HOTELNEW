@@ -202,7 +202,7 @@
                                     <!-- Left Section: Hotel Info -->
                                     <div class="pull-left">
                                         <address>
-                                            <img src="/img/Logo-Black.png" alt="Main Stay Hotel" class="logo-default" style="max-height: 80px; width: auto;" />
+                                            <% if (typeof propertyLogo !== 'undefined' && propertyLogo) { %><img src="<%= propertyLogo %>" alt="Hotel Logo" class="logo-default" style="max-height: 80px; width: auto;" /><% } %>
                                             <span class="logo-default">MAIN STAY HOTEL</span>
                                             <p class="text-muted m-l-5">
                                                 Clark Terrace Building, Lot 2 Block 1, <br>

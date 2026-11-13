@@ -390,7 +390,9 @@ body.header-white .page-header.navbar input#datePicker {
    Ensures dark text on light backgrounds when using light/white theme
    ===================== */
 [data-theme="white"] .page-content,
-[data-theme="white"] .page-content * {
+/* the two dashboards (.ov-page: all properties, .fd: one property) have their own colors - tile numbers, icons, muted labels -
+   so this catch-all dark gray must not repaint what is inside them (it turned every number and icon black) */
+[data-theme="white"] .page-content *:not(.ov-page *):not(.fd *) {
     color: #1f2937;
 }
 [data-theme="white"] .dashboard-card {
@@ -7431,18 +7433,443 @@ body.white-sidebar-color .legend-color-mountain-view {
   min-height: auto !important;
 }
 
+/* ==========================================================================
+   DARK THEME of the booking forms (Add Booking, Add Group Booking, Edit Booking, Edit Group Booking) - same look as the
+   Booking details window: dark window, the property color (--property-accent) on the header and the main buttons.
+   Only for the dark theme; the light theme keeps its own rules above.
+   ========================================================================== */
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .modal-content { background: #11141d !important; border: 1px solid color-mix(in srgb, var(--property-accent, #e8590c) 30%, #2a2f3d) !important; border-radius: 12px !important; color: #e8ecf5 !important; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .modal-header { background: linear-gradient(135deg, color-mix(in srgb, var(--property-accent, #e8590c) 24%, #11141d) 0%, #11141d 72%) !important; border-bottom: 1px solid color-mix(in srgb, var(--property-accent, #e8590c) 38%, #262b3a) !important; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .modal-title, html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .modal-header h4, html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .modal-header h5 { color: color-mix(in srgb, var(--property-accent, #e8590c) 78%, #ffffff) !important; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .btn-close { filter: invert(1) grayscale(1) brightness(1.8); opacity: .8; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .modal-body { background: #11141d !important; color: #e8ecf5 !important; scrollbar-color: #3a4156 transparent; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) label, html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .form-label, html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .mdl-textfield__label { color: #8b93a7 !important; font-weight: 500; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .form-check-label, html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .checkbox label, html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .form-check label { color: #c9d0e0 !important; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .form-control, html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .form-select, html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) input[type="text"], html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) input[type="number"], html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) input[type="email"], html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) input[type="tel"], html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) textarea, html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) select {
+    background-color: #151a27 !important; color: #e8ecf5 !important; border: 1px solid #323a50 !important; color-scheme: dark; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) input[readonly], html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .form-control[readonly], html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) input:disabled, html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) select:disabled { background-color: #121624 !important; color: #b4bccd !important; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .form-control::placeholder, html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) textarea::placeholder { color: #7f889c !important; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .form-control:focus, html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .form-select:focus, html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) textarea:focus, html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) select:focus { border-color: var(--property-accent, #e8590c) !important; box-shadow: 0 0 0 .15rem color-mix(in srgb, var(--property-accent, #e8590c) 25%, transparent) !important; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) option { background: #151a27 !important; color: #e8ecf5 !important; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .input-group-text { background: #1a2030 !important; color: #c9d0e0 !important; border-color: #323a50 !important; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) hr { border-color: #262b3a !important; opacity: 1; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .text-muted, html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) small, html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .form-text { color: #8b93a7 !important; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) #arrivalDepartureSummaryText { background: linear-gradient(135deg, color-mix(in srgb, var(--property-accent, #e8590c) 14%, #181c28) 0%, #141824 70%) !important; border: 1px solid color-mix(in srgb, var(--property-accent, #e8590c) 42%, #2a3042) !important; color: #f1f4fb !important; border-radius: 8px !important; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) h3, html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) h5 { color: #e8ecf5 !important; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) #computedTotal { color: color-mix(in srgb, var(--property-accent, #e8590c) 78%, #ffffff) !important; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) #computedPaidAmount { color: #6ee7a0 !important; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) #computedBalance { color: #ff7b7b !important; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .modal-footer { background: #0d1018 !important; border-top: 1px solid #262b3a !important; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .btn-primary { background-color: var(--property-accent, #e8590c) !important; border-color: var(--property-accent, #e8590c) !important; color: #ffffff !important; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .btn-primary:hover { filter: brightness(.9); }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .btn-secondary { background-color: #222838 !important; border-color: #323a50 !important; color: #dfe5f2 !important; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .btn-dark { background-color: #1a1f2d !important; border-color: #323a50 !important; color: #dfe5f2 !important; }
 
+/* ==========================================================================
+   FLOATING FOOTER of the booking forms: the Total / Paid / Balance row (moved here by theme-color.js) sits in a compact bar above the
+   buttons, and the whole footer stays at the bottom of the window while the form scrolls.
+   ========================================================================== */
+:is(#modal-addbooking, #modal-editbooking, #modal-add-group-booking, #modal-edit-group-booking) .modal-footer { position: sticky; bottom: 0; z-index: 6; flex-wrap: wrap; justify-content: flex-end; padding: 8px 14px !important; }
+:is(#modal-addbooking, #modal-editbooking, #modal-add-group-booking, #modal-edit-group-booking) .modal-footer .bk-totals-dock { flex: 0 0 100%; display: flex; flex-wrap: nowrap; gap: 8px; margin: 0 0 6px !important; padding: 0 0 6px; border-bottom: 1px solid rgba(128, 138, 160, .25); }
+:is(#modal-addbooking, #modal-editbooking, #modal-add-group-booking, #modal-edit-group-booking) .modal-footer .bk-totals-dock > [class*="col"] { flex: 1 1 0; width: auto; max-width: none; padding: 0 6px; }
+:is(#modal-addbooking, #modal-editbooking, #modal-add-group-booking, #modal-edit-group-booking) .modal-footer .bk-totals-dock h3 { margin: 0 !important; font-size: 15px !important; line-height: 1.2; font-weight: 600; white-space: nowrap; }
+:is(#modal-addbooking, #modal-editbooking, #modal-add-group-booking, #modal-edit-group-booking) .modal-footer .bk-totals-dock h3 span { font-weight: 700; font-variant-numeric: tabular-nums; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-editbooking, #modal-add-group-booking, #modal-edit-group-booking) .modal-footer, html[data-theme="light"] :is(#modal-addbooking, #modal-editbooking, #modal-add-group-booking, #modal-edit-group-booking) .modal-footer { background: #ffffff; border-top: 1px solid #dee2e6; }
 
+/* ==========================================================================
+   PROPERTY COLOR EVERYWHERE
+   --property-accent is the color of the active property (set in views/partials/head.ejs from property.COLOR: Clark Central orange,
+   Main Stay blue, Pool Villa green). The whole system carries it, so it is always clear which property is open: a line under the
+   header, the active menu item, the main buttons, tabs, pagination, focus rings and the top edge of every window.
+   Status colors (paid green, unpaid red, calendar bars...) are NOT touched.
+   ========================================================================== */
+.page-header.navbar { box-shadow: inset 0 -2px 0 var(--property-accent, #4361ee) !important; }
+.sidebar-container .sidemenu .nav-item.active > .nav-link,
+.sidebar-container .sidemenu .nav-link.active,
+.sidebar-container .sidemenu .sub-menu .nav-link.active { box-shadow: inset 3px 0 0 var(--property-accent, #4361ee) !important; }
+html[data-theme="dark"] .sidebar-container .sidemenu .nav-item.active > .nav-link,
+html[data-theme="dark"] .sidebar-container .sidemenu .nav-link.active,
+html[data-theme="dark"] .sidebar-container .sidemenu .sub-menu .nav-link.active { background: color-mix(in srgb, var(--property-accent, #4361ee) 22%, #3d434a) !important; }
+.btn-primary:not(:disabled):not(.disabled) { background-color: var(--property-accent, #4361ee) !important; border-color: var(--property-accent, #4361ee) !important; color: #ffffff !important; }
+.btn-primary:not(:disabled):not(.disabled):hover, .btn-primary:not(:disabled):not(.disabled):focus { filter: brightness(.9); }
+.btn-outline-primary { color: color-mix(in srgb, var(--property-accent, #4361ee) 78%, #ffffff) !important; border-color: var(--property-accent, #4361ee) !important; background-color: transparent; }
+.btn-outline-primary:hover { background-color: var(--property-accent, #4361ee) !important; color: #ffffff !important; }
+.nav-tabs .nav-link.active, .nav-pills .nav-link.active { border-color: var(--property-accent, #4361ee) !important; }
+.nav-pills .nav-link.active { background-color: var(--property-accent, #4361ee) !important; color: #ffffff !important; }
+.nav-tabs .nav-link.active { box-shadow: inset 0 -2px 0 var(--property-accent, #4361ee); }
+.page-item.active .page-link, .dataTables_wrapper .dataTables_paginate .paginate_button.current { background: var(--property-accent, #4361ee) !important; border-color: var(--property-accent, #4361ee) !important; color: #ffffff !important; }
+.form-control:focus, .form-select:focus, textarea:focus { border-color: var(--property-accent, #4361ee) !important; box-shadow: 0 0 0 .15rem color-mix(in srgb, var(--property-accent, #4361ee) 25%, transparent) !important; }
+.form-check-input:checked { background-color: var(--property-accent, #4361ee) !important; border-color: var(--property-accent, #4361ee) !important; }
+.badge.bg-primary { background-color: var(--property-accent, #4361ee) !important; }
+/* the top edge of every window carries the property color */
+.modal-content { position: relative; }
+.modal-content::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--property-accent, #4361ee); border-radius: 6px 6px 0 0; z-index: 7; pointer-events: none; }
 
+/* ==========================================================================
+   SMOOTH PAGE TRANSITIONS
+   Going from one menu to another cross-fades the pages instead of blinking (cross-document View Transitions: Chrome / Edge 126+).
+   The header and the sidebar are the same on every page, so they stay put and only the page area fades. Browsers without it
+   (Firefox / Safari) get a short fade-in of the page area instead.
+   ========================================================================== */
+@view-transition { navigation: auto; }
+.page-header.navbar { view-transition-name: pm-header; }
+.sidebar-container { view-transition-name: pm-sidebar; }
+::view-transition-group(pm-header), ::view-transition-group(pm-sidebar) { animation-duration: 0s; }
+::view-transition-old(pm-header), ::view-transition-new(pm-header),
+::view-transition-old(pm-sidebar), ::view-transition-new(pm-sidebar) { animation: none; mix-blend-mode: normal; }
+/* one short, symmetric cross-fade (the browser's default old/new blend adds up to full brightness, so there is no dip to black) */
+::view-transition-group(root) { animation-duration: .16s; animation-timing-function: ease-out; }
+@supports not (view-transition-name: none) {
+  .page-content-wrapper { animation: pmFallbackIn .3s ease-out both; }
+  @keyframes pmFallbackIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+  .page-content-wrapper { animation: none !important; }
+}
 
+/* ==========================================================================
+   LIGHT THEME: property color
+   The same property identity as the dark theme: the line under the header, a light tint of the property color on the active menu item
+   (the dark gray block was too heavy on white), readable name and role under the avatar.
+   ========================================================================== */
+[data-theme="white"] .page-header.navbar,
+[data-theme="light"] .page-header.navbar,
+body.white-sidebar-color .page-header.navbar,
+body.header-white .page-header.navbar { box-shadow: inset 0 -2px 0 var(--property-accent, #4361ee), 0 1px 3px rgba(0, 0, 0, 0.06) !important; }
+html[data-theme="white"] .sidebar-container .sidemenu .nav-item.active > .nav-link,
+html[data-theme="white"] .sidebar-container .sidemenu .nav-link.active,
+html[data-theme="white"] .sidebar-container .sidemenu .sub-menu .nav-link.active,
+html[data-theme="light"] .sidebar-container .sidemenu .nav-item.active > .nav-link,
+html[data-theme="light"] .sidebar-container .sidemenu .nav-link.active,
+html[data-theme="light"] .sidebar-container .sidemenu .sub-menu .nav-link.active {
+  background: color-mix(in srgb, var(--property-accent, #4361ee) 13%, #ffffff) !important;
+  color: color-mix(in srgb, var(--property-accent, #4361ee) 72%, #000000) !important;
+  box-shadow: inset 3px 0 0 var(--property-accent, #4361ee) !important;
+}
+html[data-theme="white"] .sidebar-container .sidemenu .nav-item.active > .nav-link i,
+html[data-theme="white"] .sidebar-container .sidemenu .nav-link.active i,
+html[data-theme="white"] .sidebar-container .sidemenu .sub-menu .nav-link.active i,
+html[data-theme="light"] .sidebar-container .sidemenu .nav-item.active > .nav-link i,
+html[data-theme="light"] .sidebar-container .sidemenu .nav-link.active i { color: var(--property-accent, #4361ee) !important; }
+html[data-theme="white"] .sidebar-userpic-name, html[data-theme="light"] .sidebar-userpic-name { color: #2b3445 !important; }
+html[data-theme="white"] .profile-usertitle-job, html[data-theme="light"] .profile-usertitle-job { color: #6b7385 !important; }
 
+/* ==========================================================================
+   LIGHT THEME of the booking forms (Add Booking, Add Group Booking, Edit Booking, Edit Group Booking)
+   The same design as the dark one: a white window, a header with a light tint of the property color (--property-accent), the property
+   color on the title and the main buttons. It replaces the old mix of a blue header, green buttons and teal totals.
+   ========================================================================== */
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .modal-content { background: #ffffff !important; border: 1px solid color-mix(in srgb, var(--property-accent, #4361ee) 28%, #d9dee8) !important; border-radius: 12px !important; color: #1f2937 !important; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .modal-header { background: linear-gradient(135deg, color-mix(in srgb, var(--property-accent, #4361ee) 16%, #ffffff) 0%, #ffffff 76%) !important; border-bottom: 1px solid color-mix(in srgb, var(--property-accent, #4361ee) 30%, #e5e7eb) !important; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .modal-title, html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .modal-header h4, html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .modal-header h5 { color: color-mix(in srgb, var(--property-accent, #4361ee) 72%, #000000) !important; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .btn-close { filter: none !important; opacity: .55; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .modal-body { background: #ffffff !important; color: #1f2937 !important; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) label, html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .form-label, html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .mdl-textfield__label { color: #6b7385 !important; font-weight: 500; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .form-check-label, html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .checkbox label, html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .form-check label { color: #374151 !important; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .form-control, html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .form-select, html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) input[type="text"], html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) input[type="number"], html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) input[type="email"], html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) input[type="tel"], html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) textarea, html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) select {
+    background-color: #f8f9fc !important; color: #1f2937 !important; border: 1px solid #d5dae5 !important; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) input[readonly], html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .form-control[readonly], html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) input:disabled, html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) select:disabled { background-color: #eef0f5 !important; color: #4b5563 !important; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .form-control::placeholder, html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) textarea::placeholder { color: #9aa3b5 !important; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .form-control:focus, html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .form-select:focus, html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) textarea:focus, html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) select:focus { border-color: var(--property-accent, #4361ee) !important; box-shadow: 0 0 0 .15rem color-mix(in srgb, var(--property-accent, #4361ee) 22%, transparent) !important; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) option { background: #ffffff !important; color: #1f2937 !important; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .input-group-text { background: #eef0f5 !important; color: #374151 !important; border-color: #d5dae5 !important; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) hr { border-color: #e5e7eb !important; opacity: 1; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .text-muted, html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) small, html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .form-text { color: #6b7385 !important; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) #arrivalDepartureSummaryText { background: linear-gradient(135deg, color-mix(in srgb, var(--property-accent, #4361ee) 12%, #ffffff) 0%, #ffffff 72%) !important; border: 1px solid color-mix(in srgb, var(--property-accent, #4361ee) 38%, #d9dee8) !important; color: #1f2937 !important; border-radius: 8px !important; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) h3, html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) h5 { color: #1f2937 !important; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) #computedTotal { color: color-mix(in srgb, var(--property-accent, #4361ee) 72%, #000000) !important; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) #computedPaidAmount { color: #059669 !important; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) #computedBalance { color: #e11d48 !important; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .modal-footer { background: #f7f8fc !important; border-top: 1px solid #e5e7eb !important; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .btn-primary { background-color: var(--property-accent, #4361ee) !important; border-color: var(--property-accent, #4361ee) !important; color: #ffffff !important; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .btn-primary:hover { filter: brightness(.92); }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .btn-secondary { background-color: #eef0f5 !important; border-color: #d5dae5 !important; color: #374151 !important; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .btn-dark { background-color: #1f2937 !important; border-color: #1f2937 !important; color: #ffffff !important; }
 
+/* Per Night / Manual Price (discount) buttons: the same in both themes - an outline in the property color, filled when chosen */
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .discount-mode-btn, html[data-theme="light"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .discount-mode-btn { background: transparent !important; border: 1px solid color-mix(in srgb, var(--property-accent, #4361ee) 55%, #b8c0d0) !important; color: color-mix(in srgb, var(--property-accent, #4361ee) 72%, #000000) !important; }
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .discount-mode-btn { background: transparent !important; border: 1px solid color-mix(in srgb, var(--property-accent, #4361ee) 60%, #323a50) !important; color: color-mix(in srgb, var(--property-accent, #4361ee) 78%, #ffffff) !important; }
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .discount-mode-btn:hover, html[data-theme="light"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .discount-mode-btn:hover,
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .discount-mode-btn:hover,
+html[data-theme="white"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .discount-mode-btn.discount-mode-active, html[data-theme="light"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .discount-mode-btn.discount-mode-active,
+html[data-theme="dark"] :is(#modal-addbooking, #modal-add-group-booking, #modal-editbooking, #modal-edit-group-booking) .discount-mode-btn.discount-mode-active { background: var(--property-accent, #4361ee) !important; border-color: var(--property-accent, #4361ee) !important; color: #ffffff !important; }
 
+/* ==========================================================================
+   LIGHT THEME: text inside modals
+   table.css forces ".modal input, .modal select, .modal textarea { color: #e0e0e0 !important }" (light gray, made for the dark window) on every
+   modal of the site, and dark tables inside modals. In the light theme that was light gray text on a white window: what you typed (Add New
+   Agency > Contact Number, and the same in every plain modal) could not be seen. Light versions, for ALL modals.
+   ========================================================================== */
+[data-theme="white"] .modal input,
+[data-theme="white"] .modal select,
+[data-theme="white"] .modal textarea { color: #1f2937 !important; -webkit-text-fill-color: #1f2937; }
+[data-theme="white"] .modal input:focus,
+[data-theme="white"] .modal select:focus,
+[data-theme="white"] .modal textarea:focus { color: #111827 !important; -webkit-text-fill-color: #111827; }
+[data-theme="white"] .modal input::placeholder,
+[data-theme="white"] .modal textarea::placeholder { color: #9aa3b5 !important; -webkit-text-fill-color: #9aa3b5; }
+[data-theme="white"] .modal select option { background: #ffffff; color: #1f2937; }
+[data-theme="white"] .modal input[type="checkbox"], [data-theme="white"] .modal input[type="radio"] { -webkit-text-fill-color: initial; }
+[data-theme="white"] .modal .table { background-color: #ffffff; color: #1f2937; border-color: #e5e7eb; }
+[data-theme="white"] .modal .table thead th { background-color: #f3f4f8; color: #374151; border-color: #e5e7eb; }
+[data-theme="white"] .modal .table tbody td { background-color: #ffffff; color: #1f2937; border-color: #eef0f4; }
+[data-theme="white"] .modal .table tbody tr { border-color: #eef0f4; }
+[data-theme="white"] .modal .table tbody tr:hover td { background-color: #f5f7fb !important; }
+[data-theme="white"] .modal .dataTables_filter input,
+[data-theme="white"] .modal .dataTables_length select { background-color: #ffffff !important; border: 1px solid #d5dae5 !important; color: #1f2937 !important; }
+[data-theme="white"] .modal .dataTables_length label, [data-theme="white"] .modal .dataTables_filter label, [data-theme="white"] .modal .dataTables_info { color: #4b5563 !important; }
 
+/* Edit Group Booking: Total / Paid / Balance colors (same as the Add booking forms) */
+html[data-theme="dark"] #editGroupComputedTotal { color: color-mix(in srgb, var(--property-accent, #e8590c) 78%, #ffffff) !important; }
+html[data-theme="dark"] #editGroupComputedPaidAmount { color: #6ee7a0 !important; }
+html[data-theme="dark"] #editGroupComputedBalance { color: #ff7b7b !important; }
+html[data-theme="white"] #editGroupComputedTotal { color: color-mix(in srgb, var(--property-accent, #e8590c) 72%, #000000) !important; }
+html[data-theme="white"] #editGroupComputedPaidAmount { color: #059669 !important; }
+html[data-theme="white"] #editGroupComputedBalance { color: #e11d48 !important; }
 
+/* ===== Dark-mode readability sweep (found by an automated contrast scan of every page) ===== */
+html[data-theme="dark"] .page-bar .page-breadcrumb li > a,
+html[data-theme="dark"] .page-bar .page-breadcrumb li > i,
+html[data-theme="dark"] .page-bar .page-breadcrumb li.active,
+html[data-theme="dark"] .page-bar .page-breadcrumb .parent-item { color: #cbd5e1 !important; }
+html[data-theme="dark"] .page-bar .page-breadcrumb li.active { color: #f1f5f9 !important; }
+/* links / link-buttons inside tables and cards */
+html[data-theme="dark"] .dashboard-card table a:not(.btn),
+html[data-theme="dark"] .dashboard-card table .btn-link,
+html[data-theme="dark"] table a.confirmation-link { color: #7ab8ff !important; }
+html[data-theme="dark"] table .text-danger { color: #ff8b88 !important; }
+html[data-theme="dark"] .text-success:not(.btn):not(.badge):not(.label) { color: #4ade80 !important; }
+html[data-theme="dark"] .text-danger:not(.btn):not(.badge):not(.label) { color: #ff8b88 !important; }
+/* pagination (DataTables) */
+html[data-theme="dark"] .pagination .page-link,
+html[data-theme="dark"] .paginate_button .page-link { color: #cbd5e1 !important; background: transparent !important; border-color: rgba(148,163,184,.25) !important; }
+html[data-theme="dark"] .pagination .page-item.disabled .page-link { color: #7b8794 !important; }
+html[data-theme="dark"] .pagination .page-item.active .page-link { color: #fff !important; background: var(--property-accent, #e8590c) !important; border-color: var(--property-accent, #e8590c) !important; }
+/* text that kept the light-mode black (rgba(0,0,0,.87)) */
+html[data-theme="dark"] .al-daterange-lbl, html[data-theme="dark"] .al-muted,
+html[data-theme="dark"] .form-check-label,
+html[data-theme="dark"] .card h5, html[data-theme="dark"] .card h6, html[data-theme="dark"] .card .card-title { color: #e2e8f0 !important; }
+html[data-theme="dark"] .al-muted { color: #94a3b8 !important; }
+html[data-theme="dark"] .btn .material-icons, html[data-theme="dark"] .btn i.material-icons { color: #fff !important; }
+html[data-theme="dark"] .btn-info, html[data-theme="dark"] .btn-warning, html[data-theme="dark"] .btn-success { color: #fff !important; }
+/* Rooms floor cards */
+html[data-theme="dark"] .rg-floor-title { color: color-mix(in srgb, var(--property-accent, #f59e0b) 55%, #ffffff) !important; }
+html[data-theme="dark"] .rg-s2 .rg-badge, html[data-theme="dark"] .rg-s3 .rg-badge { color: #ffb4b4 !important; }
 
+/* ===== Sweep 2: modals, muted text, buttons (dark + light) ===== */
+/* dark: every modal is dark, even the ones that never had a dark style (security deposit, etc.). Low specificity: own dark styles still win */
+html[data-theme="dark"] .modal-content { background-color: #232b32; color: #e2e8f0; border-color: rgba(148,163,184,.22); }
+html[data-theme="dark"] .modal-body, html[data-theme="dark"] .modal-footer { background-color: transparent; }
+html[data-theme="dark"] .modal .text-muted, html[data-theme="dark"] .modal small.text-muted, html[data-theme="dark"] .modal .form-text,
+html[data-theme="dark"] .modal .text-muted.fw-normal { color: #a7b2c0 !important; }
+html[data-theme="dark"] .modal .modal-title, html[data-theme="dark"] .modal label, html[data-theme="dark"] .modal h4, html[data-theme="dark"] .modal h5 { color: #e8edf3; }
+html[data-theme="dark"] .modal .text-warning:not(.btn):not(.badge) { color: #fbbf24 !important; }
+html[data-theme="dark"] .summary-item { background: rgba(148,163,184,.10) !important; }
+html[data-theme="dark"] .upload-icon i, html[data-theme="dark"] .upload-text, html[data-theme="dark"] .file-types { color: #a7b2c0 !important; }
+html[data-theme="dark"] .mdl-icon-toggle__label.material-icons { color: #a7b2c0 !important; }
+/* the Billing Receipt modal was written with light-mode colours */
+html[data-theme="dark"] #modal-billing .billing-title, html[data-theme="dark"] #modal-billing .date-value, html[data-theme="dark"] #modal-billing .payment-breakdown-title,
+html[data-theme="dark"] #modal-billing h2, html[data-theme="dark"] #modal-billing h3, html[data-theme="dark"] #modal-billing h4 { color: #f1f5f9 !important; }
+html[data-theme="dark"] #modal-billing .hotel-address p, html[data-theme="dark"] #modal-billing .invoice-date strong, html[data-theme="dark"] #modal-billing .note-item span,
+html[data-theme="dark"] #modal-billing .note-item strong, html[data-theme="dark"] #modal-billing th, html[data-theme="dark"] #modal-billing .summary-label,
+html[data-theme="dark"] #modal-billing td, html[data-theme="dark"] #modal-billing .generated-date, html[data-theme="dark"] #modal-billing span { color: #cbd5e1; }
+html[data-theme="dark"] #modal-billing .paid-amount { color: #4ade80 !important; }
+html[data-theme="dark"] #modal-billing .total-amount { color: #7ab8ff !important; }
+/* buttons: white text needs a deeper background */
+html[data-theme="dark"] .btn-info, html[data-theme="dark"] .btn-sm.btn-info { background-color: #0f7fc2 !important; border-color: #0f7fc2 !important; color: #fff !important; }
+html[data-theme="dark"] .dataTables_wrapper .dataTables_paginate ul.pagination .page-item .page-link { color: #cbd5e1 !important; }
+html[data-theme="dark"] .dataTables_wrapper .dataTables_paginate ul.pagination .page-item.disabled .page-link { color: #7b8794 !important; }
+html[data-theme="dark"] .dataTables_wrapper .dataTables_paginate ul.pagination .page-item.active .page-link { color: #fff !important; }
+html[data-theme="dark"] table td span[style*="d9534f"] { color: #ff8b88 !important; }
 
+/* light mode */
+html[data-theme="white"] .text-muted, html[data-theme="white"] small.text-muted, html[data-theme="white"] .modal .text-muted { color: #64748b !important; }
+html[data-theme="white"] .page-footer, html[data-theme="white"] .page-footer-inner { color: #64748b !important; }
+html[data-theme="white"] .modal h3 span[id$="ComputedTotal"], html[data-theme="white"] #edit_computedTotal, html[data-theme="white"] #groupComputedTotal { color: #0e7490 !important; }
+html[data-theme="white"] #edit_computedPaidAmount, html[data-theme="white"] #groupComputedPaidAmount, html[data-theme="white"] #totalPaid { color: #15803d !important; }
+html[data-theme="white"] #edit_computedBalance, html[data-theme="white"] #groupComputedBalance, html[data-theme="white"] #editGroupComputedBalance { color: #c2410c !important; }
+html[data-theme="white"] #totalPayment { color: #1d6fb8 !important; }
+html[data-theme="white"] .al-badge-failed { color: #fff !important; }
+html[data-theme="white"] .btn-info { background-color: #0f7fc2 !important; border-color: #0f7fc2 !important; color: #fff !important; }
+html[data-theme="white"] .quotation-add-row-btn, html[data-theme="white"] .quotation-reset-btn { color: #fff !important; }
+html[data-theme="white"] .dataTables_wrapper .dataTables_paginate ul.pagination .page-item.disabled .page-link { color: #6b7280 !important; }
+html[data-theme="white"] .fd-avatar, html[data-theme="white"] .fd-badge { filter: brightness(.65) saturate(1.3); }
 
+/* ===== Sweep 3 ===== */
+html[data-theme="dark"] #modal-billing th, html[data-theme="dark"] #modal-billing .summary-label, html[data-theme="dark"] #modal-billing td { color: #cbd5e1 !important; }
+html[data-theme="dark"] #securityDepositRefundModal .modal-content, html[data-theme="dark"] #securityDepositModal .modal-content,
+html[data-theme="dark"] #securityDepositRefundModal .modal-body, html[data-theme="dark"] #securityDepositModal .modal-body { background: #232b32 !important; color: #e2e8f0 !important; }
+html[data-theme="dark"] #securityDepositRefundModal label, html[data-theme="dark"] #securityDepositModal label { color: #e8edf3 !important; }
+html[data-theme="dark"] #modal-booking-details .modal-content, html[data-theme="dark"] #modal-booking-details .modal-body,
+html[data-theme="dark"] #modal-booking-details *:not(.btn):not([class*="label"]):not([class*="badge"]):not(i) { background-color: transparent !important; }
+html[data-theme="dark"] #modal-booking-details .modal-content { background-color: #232b32 !important; }
+html[data-theme="dark"] .summary-label { color: #a7b2c0 !important; }
+html[data-theme="dark"] .modal .text-primary:not(.btn) { color: #7ab8ff !important; }
+html[data-theme="dark"] .btn-warning, html[data-theme="white"] .btn-warning { background-color: #c26a00 !important; border-color: #c26a00 !important; color: #fff !important; }
+html[data-theme="white"] #modal-editbooking #edit_computedTotal { color: #0e7490 !important; }
+html[data-theme="white"] #modal-editbooking #edit_computedPaidAmount { color: #15803d !important; }
+html[data-theme="white"] #modal-editbooking #edit_computedBalance, html[data-theme="white"] #modal-add-group-booking #groupComputedBalance, html[data-theme="white"] #modal-edit-group-booking #editGroupComputedBalance { color: #c2410c !important; }
+html[data-theme="white"] .mdl-icon-toggle__label.material-icons { color: #64748b !important; }
+html[data-theme="white"] label.text-white, html[data-theme="white"] .form-label.text-white, html[data-theme="white"] #currentConfig h5, html[data-theme="white"] #currentConfig strong, html[data-theme="white"] #currentConfig * { color: #1e293b !important; }
+html[data-theme="white"] .payment-sales-card__title { color: #64748b !important; }
+html[data-theme="white"] #pdTabBar .tab-item:not(.is-active) { color: #475569 !important; }
+html[data-theme="white"] .modal .summary-item .text-warning { color: #b45309 !important; }
 
+/* ===== Sweep 4 ===== */
+html[data-theme="dark"] #modal-payment .summary-label, html[data-theme="dark"] #modal-payment .summary-row span { color: #cbd5e1 !important; }
+html[data-theme="dark"] #modal-billing thead, html[data-theme="dark"] #modal-billing thead tr, html[data-theme="dark"] #modal-billing th { background: rgba(148,163,184,.14) !important; color: #e2e8f0 !important; }
+html[data-theme="dark"] .sdr-deposit-question, html[data-theme="dark"] [class^="sdr-"], html[data-theme="dark"] [class*=" sdr-"] { color: #e8edf3 !important; }
+html[data-theme="white"] .dashboard-card-body .form-group > label, html[data-theme="white"] #kakaoAccountsList h5, html[data-theme="white"] #kakaoAccountsList strong,
+html[data-theme="white"] .dashboard-card-body > p, html[data-theme="white"] .dashboard-card-body h6 { color: #334155 !important; }
+html[data-theme="white"] #kakaoAccountsList span { color: #64748b !important; }
+html[data-theme="white"] .btn .material-icons, html[data-theme="white"] .btn i.material-icons { color: #fff !important; }
+html[data-theme="white"] #rateSummaryDateRange { color: #64748b !important; }
 
+/* ===== Sweep 5 ===== */
+html[data-theme="dark"] #modal-billing thead, html[data-theme="dark"] #modal-billing thead tr, html[data-theme="dark"] #modal-billing th { background: #2f3a46 !important; background-image: none !important; }
+html[data-theme="dark"] #modal-payment label, html[data-theme="dark"] #modal-payment h6, html[data-theme="dark"] #modal-payment .form-label, html[data-theme="dark"] #modal-payment .option-title { color: #e2e8f0 !important; }
+html[data-theme="dark"] #securityDepositRefundModal [class*="sdr-"]:not(.sdr-option-desc) { background-color: rgba(148,163,184,.12) !important; }
+html[data-theme="dark"] #securityDepositRefundModal .sdr-option-desc { background: transparent !important; color: #cbd5e1 !important; }
+html[data-theme="white"] .dashboard-card-body h5 { color: #334155 !important; }
+html[data-theme="dark"] #securityDepositRefundModal strong, html[data-theme="dark"] #securityDepositRefundModal .sdr-option strong { color: #f1f5f9 !important; }
+html[data-theme="dark"] #sdrDepositAmount { color: #4ade80 !important; }
 
+/* ===== Billing Receipt in dark mode: the whole paper becomes dark (screen only, printing keeps white paper) ===== */
+@media screen {
+  html[data-theme="dark"] #modal-billing .billing-receipt-container,
+  html[data-theme="dark"] #modal-billing .customer-info-section,
+  html[data-theme="dark"] #modal-billing .billing-summary-section { background: linear-gradient(145deg, #27313a, #20282f) !important; border-color: rgba(148,163,184,.22) !important; box-shadow: none !important; }
+  html[data-theme="dark"] #modal-billing .billing-table, html[data-theme="dark"] #modal-billing .billing-table.table, html[data-theme="dark"] #modal-billing .billing-table .table,
+  html[data-theme="dark"] #modal-billing .billing-table tbody td, html[data-theme="dark"] #modal-billing .billing-table .table tbody td { background: #232b32 !important; color: #e2e8f0 !important; border-color: rgba(148,163,184,.18) !important; }
+  html[data-theme="dark"] #modal-billing .billing-table thead th, html[data-theme="dark"] #modal-billing .billing-table .table thead th { background: #323f4b !important; color: #f1f5f9 !important; }
+  html[data-theme="dark"] #modal-billing .billing-table tbody tr.billing-total-row td, html[data-theme="dark"] #modal-billing .billing-table tbody tr:hover td, html[data-theme="dark"] #modal-billing .billing-table.table-hover tbody tr:hover td { background: #2a343e !important; }
+  html[data-theme="dark"] #modal-billing .invoice-date, html[data-theme="dark"] #modal-billing .payment-summary, html[data-theme="dark"] #modal-billing .customer-header .customer-name { background: rgba(148,163,184,.10) !important; }
+  html[data-theme="dark"] #modal-billing .billing-title, html[data-theme="dark"] #modal-billing .billing-title * { color: #f1f5f9 !important; -webkit-text-fill-color: #f1f5f9 !important; background: none !important; }
+  html[data-theme="dark"] #modal-billing .customer-name, html[data-theme="dark"] #modal-billing .customer-header, html[data-theme="dark"] #modal-billing .customer-header * { color: #e2e8f0 !important; -webkit-text-fill-color: currentColor; }
+  html[data-theme="dark"] #modal-billing .invoice-date *, html[data-theme="dark"] #modal-billing .note-item, html[data-theme="dark"] #modal-billing .note-item *,
+  html[data-theme="dark"] #modal-billing .hotel-address p, html[data-theme="dark"] #modal-billing .payment-breakdown-title { color: #cbd5e1 !important; -webkit-text-fill-color: currentColor; }
+  html[data-theme="dark"] #modal-billing .billing-table td, html[data-theme="dark"] #modal-billing .billing-table td * { color: #e2e8f0 !important; }
+  html[data-theme="dark"] #modal-billing .payment-summary th { background: #323f4b !important; color: #f1f5f9 !important; }
+}
+@media screen {
+  /* the logo tile stays white (the logo is black), so its address text is dark */
+  html[data-theme="dark"] #modal-billing .hotel-address p, html[data-theme="dark"] #modal-billing .hotel-address p * { color: #475569 !important; }
+  html[data-theme="dark"] #modal-billing .hotel-address i { color: #3498db !important; }
+}
+
+/* Remarks list (booking details > Remarks): follows the theme instead of fixed white */
+html[data-theme="dark"] table[data-remarks] { background: transparent !important; }
+html[data-theme="dark"] table[data-remarks] tbody tr, html[data-theme="dark"] table[data-remarks] tbody td { background: #232b32 !important; color: #e2e8f0 !important; border-color: rgba(148,163,184,.2) !important; }
+html[data-theme="dark"] table[data-remarks] tbody tr:hover td { background: #2a343e !important; }
+html[data-theme="dark"] table[data-remarks] .rm-small { color: #a7b2c0 !important; }
+html[data-theme="white"] table[data-remarks] tbody td { background: #fff !important; color: #334155 !important; }
+html[data-theme="white"] table[data-remarks] .rm-small { color: #64748b !important; }
+
+/* Payment modal (dark): solid dark surfaces, no see-through */
+html[data-theme="dark"] #modal-payment .modal-content { background: #1f2730 !important; }
+html[data-theme="dark"] #modal-payment .modal-body, html[data-theme="dark"] #modal-payment .modal-footer, html[data-theme="dark"] #modal-payment .payment-form, html[data-theme="dark"] #modal-payment .payment-details-section { background: #1f2730 !important; }
+html[data-theme="dark"] #modal-payment .payment-summary-card, html[data-theme="dark"] #modal-payment .payment-option, html[data-theme="dark"] #modal-payment .pdep-option, html[data-theme="dark"] #modal-payment #pdepPartialWrap { background: #2a343e !important; border-color: rgba(148,163,184,.28) !important; }
+html[data-theme="dark"] #modal-payment .payment-option:hover, html[data-theme="dark"] #modal-payment .pdep-option:hover { background: #323f4b !important; }
+html[data-theme="dark"] #modal-payment #paymentAmountInput, html[data-theme="dark"] #modal-payment #paymentNotes, html[data-theme="dark"] #modal-payment textarea { background: #151c23 !important; color: #f1f5f9 !important; border: 1px solid rgba(148,163,184,.35) !important; }
+html[data-theme="dark"] #modal-payment .payment-summary-card *, html[data-theme="dark"] #modal-payment .option-title, html[data-theme="dark"] #modal-payment label { color: #e2e8f0 !important; }
+html[data-theme="dark"] #modal-payment h5, html[data-theme="dark"] #modal-payment h6 { color: #f1f5f9 !important; }
+html[data-theme="dark"] #modal-payment .payment-form { border-color: rgba(148,163,184,.28) !important; box-shadow: none !important; }
+
+/* Payment modal: plain text (no glow / shadow), no empty outlined box */
+#modal-payment, #modal-payment * { text-shadow: none !important; filter: none; }
+#modal-payment .payment-details-section:empty { display: none !important; }
+html[data-theme="dark"] #modal-payment .payment-details-section { border: 0 !important; box-shadow: none !important; padding: 0 !important; }
+html[data-theme="dark"] #modal-payment .modal-header, html[data-theme="dark"] #modal-payment .modal-title { text-shadow: none !important; }
+html[data-theme="dark"] #modal-payment .payment-summary-card .summary-row span, html[data-theme="dark"] #modal-payment .payment-summary-card .summary-value { color: #e2e8f0 !important; opacity: 1 !important; }
+html[data-theme="dark"] #modal-payment .form-label, html[data-theme="dark"] #modal-payment .option-title, html[data-theme="dark"] #modal-payment h6 { font-weight: 600 !important; letter-spacing: 0 !important; }
+html[data-theme="dark"] #modal-payment .option-title, html[data-theme="dark"] #modal-payment .payment-option label { font-weight: 500 !important; }
+html[data-theme="dark"] #modal-payment .payment-summary-card h6, html[data-theme="dark"] #modal-payment .form-label { font-weight: 500 !important; }
+/* Payment modal, light: every method name looks the same (hover / selected no longer turns one black and bold) */
+html[data-theme="white"] #modal-payment .option-title, html[data-theme="white"] #modal-payment .payment-option:hover .option-title, html[data-theme="white"] #modal-payment .payment-option .option-title { color: #334155 !important; font-weight: 500 !important; text-shadow: none !important; }
+html[data-theme="white"] #modal-payment .form-label, html[data-theme="white"] #modal-payment h6 { color: #1e293b !important; font-weight: 600 !important; }
+
+/* Breakfast List: the Canteen discount box and the Today / Tomorrow switch */
+html[data-theme="dark"] .breakfast-discount-field { background: #151c23 !important; border-color: rgba(148,163,184,.35) !important; }
+html[data-theme="dark"] .breakfast-discount-field input { color: #f1f5f9 !important; }
+html[data-theme="dark"] .breakfast-discount-field span { color: #a7b2c0 !important; }
+html[data-theme="dark"] .breakfast-discount-clear { background: #3a4654 !important; color: #e2e8f0 !important; }
+html[data-theme="dark"] .filter-btn-group .filter-btn.active, html[data-theme="dark"] .filter-btn-group .filter-btn.is-active { background: var(--property-accent, #0d6efd) !important; border-color: var(--property-accent, #0d6efd) !important; color: #fff !important; }
+/* text inside the coloured banners stays white in both themes (bold dates, times, inline spans) */
+.gradient-header .breakfast-list-note, .gradient-header .breakfast-list-note *, .gradient-header .cb-note, .gradient-header .cb-note *,
+.gradient-header .quotation-note, .gradient-header .quotation-note *:not(.quotation-color-hint) { color: #fff !important; }
+html[data-theme="white"] .gradient-header .breakfast-list-note { color: rgba(255,255,255,.92) !important; }
+html[data-theme="dark"] #modal-payment input:not([type="radio"]):not([type="checkbox"]), html[data-theme="dark"] #modal-payment .form-control, html[data-theme="dark"] #modal-payment select { background: #151c23 !important; color: #f1f5f9 !important; border: 1px solid rgba(148,163,184,.35) !important; }
+html[data-theme="dark"] #modal-payment input::placeholder, html[data-theme="dark"] #modal-payment textarea::placeholder { color: #8b97a6 !important; }
+
+/* ===== SweetAlert pop-ups in dark mode =====
+   Simple pop-ups (a title, plain text or a few tags, an input, the buttons) follow the dark theme.
+   Pop-ups with hand-styled inline HTML or their own class (checkout window, tables...) keep their own look. */
+html[data-theme="dark"] .swal2-popup:not(.swal-bdco):not(.swal-checkout):not(.swal-custom-popup):not(.session-terminated-popup):not(.maintenance-swal-popup):not(.late-checkout-fee-swal):not(:has(.swal2-html-container :is([style*="color"], [style*="background"]))) {
+  background: #2a3135;
+  color: #e6eaec;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+html[data-theme="dark"] .swal2-popup:not(.swal-bdco):not(.swal-checkout):not(.swal-custom-popup):not(.session-terminated-popup):not(.maintenance-swal-popup):not(.late-checkout-fee-swal):not(:has(.swal2-html-container :is([style*="color"], [style*="background"]))) :is(.swal2-title, .swal2-html-container, .swal2-content, .swal2-checkbox, .swal2-radio label, .swal2-validation-message) {
+  color: #e6eaec;
+}
+html[data-theme="dark"] .swal2-popup:not(.swal-bdco):not(.swal-checkout):not(.swal-custom-popup):not(.session-terminated-popup):not(.maintenance-swal-popup):not(.late-checkout-fee-swal):not(:has(.swal2-html-container :is([style*="color"], [style*="background"]))) :is(.swal2-input, .swal2-textarea, .swal2-select, .swal2-file) {
+  background: #3a4247;
+  color: #f1f4f5;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+html[data-theme="dark"] .swal2-popup:not(.swal-bdco):not(.swal-checkout):not(.swal-custom-popup):not(.session-terminated-popup):not(.maintenance-swal-popup):not(.late-checkout-fee-swal):not(:has(.swal2-html-container :is([style*="color"], [style*="background"]))) .swal2-input::placeholder,
+html[data-theme="dark"] .swal2-popup:not(.swal-bdco):not(.swal-checkout):not(.swal-custom-popup):not(.session-terminated-popup):not(.maintenance-swal-popup):not(.late-checkout-fee-swal):not(:has(.swal2-html-container :is([style*="color"], [style*="background"]))) .swal2-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+html[data-theme="dark"] .swal2-popup:not(.swal-bdco):not(.swal-checkout):not(.swal-custom-popup):not(.session-terminated-popup):not(.maintenance-swal-popup):not(.late-checkout-fee-swal):not(:has(.swal2-html-container :is([style*="color"], [style*="background"]))) .swal2-validation-message {
+  background: #3a2a2a;
+}
+
+/* ===== Drop-down lists (native <select> options) in dark mode: dark list, readable text ===== */
+html[data-theme="dark"] select,
+html[data-theme="dark"] .form-select { color-scheme: dark; }
+html[data-theme="dark"] select option,
+html[data-theme="dark"] select optgroup {
+  background-color: #2a3135;
+  color: #e6eaec;
+}
+html[data-theme="dark"] select option:checked,
+html[data-theme="dark"] select option:hover {
+  background-color: #4a5a3a;
+  color: #ffffff;
+}
+
+/* Dark mode: every drop-down list (native select, calendar month picker, print pop-ups) is dark with light text - forced, since
+   some pages/libraries set their own option colours. */
+html[data-theme="dark"] select option,
+html[data-theme="dark"] select optgroup,
+html[data-theme="dark"] .flatpickr-monthDropdown-months,
+html[data-theme="dark"] .flatpickr-monthDropdown-months .flatpickr-monthDropdown-month,
+html[data-theme="dark"] .flatpickr-monthDropdown-month {
+  background-color: #2a3135 !important;
+  color: #e6eaec !important;
+}
+html[data-theme="dark"] select option:checked,
+html[data-theme="dark"] .flatpickr-monthDropdown-month:checked {
+  background-color: #4a5a3a !important;
+  color: #ffffff !important;
+}
+
+/* Dark mode: Material (MDL) drop-down menus - the Category / Type / etc. pick-lists inside the add/edit forms. */
+html[data-theme="dark"] .mdl-menu__outline {
+  background: #2a3135 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5) !important;
+}
+html[data-theme="dark"] .mdl-menu__item {
+  color: #e6eaec !important;
+  background: transparent !important;
+}
+html[data-theme="dark"] .mdl-menu__item:hover,
+html[data-theme="dark"] .mdl-menu__item:focus {
+  background: #3a4a30 !important;
+  color: #ffffff !important;
+}
+html[data-theme="dark"] .mdl-menu__item[disabled] { color: rgba(255, 255, 255, 0.35) !important; }
+html[data-theme="dark"] .mdl-menu__item--full-bleed-divider { border-bottom-color: rgba(255, 255, 255, 0.12) !important; }

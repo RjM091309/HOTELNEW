@@ -116,7 +116,7 @@
 <body>
 
   <div class="header">
-    <img src="<%= imageUrl %>" alt="logo" class="logo-default" />
+    <% if (imageUrl) { %><img src="<%= imageUrl %>" alt="logo" class="logo-default" /><% } %>
 
     <div class="invoice-title">INVOICE</div>
     <div class="sub-header">

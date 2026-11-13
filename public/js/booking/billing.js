@@ -770,6 +770,10 @@ window.showBilling = async function (bookingID) {
                     if (payment.PAYMENT_TYPE === 'reservation_fee' || payment.PAYMENT_TYPE === 'discount' || payment.PAYMENT_TYPE === 'security_deposit') {
                         return sum;
                     }
+                    // credit that has not been settled is still owed, not paid
+                    if (['credit', 'marker'].includes(String(payment.PAYMENT_METHOD || '').toLowerCase()) && !payment.SETTLED_DATE) {
+                        return sum;
+                    }
 
                     return sum + parseFloat(payment.AMOUNT_PAID);
                 }, 0);
@@ -1001,6 +1005,13 @@ window.showBilling = async function (bookingID) {
                         document.body.style.removeProperty('overflow');
                     }
                 }
+                // Print menu (Booking details): fill the receipt and print it straight away, without opening the Billing window
+                if (window.__printReceiptAfterLoad) {
+                    window.__printReceiptAfterLoad = false;
+                    await embedHotelLogo('#modal-billing .hotel-logo');
+                    printBillingReceipt();
+                    return;
+                }
                 if (typeof $ !== 'undefined' && $.fn.modal) {
                     $('#modal-billing').modal('show');
                 } else if (window.bootstrap && bootstrap.Modal) {
@@ -1097,4 +1108,8 @@ async function sendBillingReceipt() {
 
 ensureActionPopupHelpers();
 window.printBillingReceipt = printBillingReceipt;
+window.printBillingReceiptFor = function (bookingId) {
+    window.__printReceiptAfterLoad = true;
+    window.showBilling(bookingId);
+};
 window.sendBillingReceipt = sendBillingReceipt;

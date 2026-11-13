@@ -25,6 +25,22 @@ class UserModel {
     return await queryDatabasePromise(query);
   }
 
+  // The properties an account may open (ids). Admin is not stored: it has every property.
+  static async getPropertyIds(userId) {
+    const rows = await queryDatabasePromise('SELECT PROPERTY_ID FROM user_property WHERE USER_ID = ?', [userId]);
+    return rows.map((r) => r.PROPERTY_ID);
+  }
+
+  static async setPropertyIds(userId, ids) {
+    const clean = [...new Set((Array.isArray(ids) ? ids : []).map((x) => parseInt(x, 10)).filter((x) => Number.isInteger(x) && x > 0))];
+    await queryDatabasePromise('DELETE FROM user_property WHERE USER_ID = ?', [userId]);
+    if (clean.length) {
+      await queryDatabasePromise('INSERT INTO user_property (USER_ID, PROPERTY_ID) VALUES ' + clean.map(() => '(?, ?)').join(', '), clean.flatMap((p) => [userId, p]));
+    }
+    require('../middleware/m_auth').forgetUserProperties(userId);
+    return clean;
+  }
+
   // Get user by ID
   static async getUserById(id) {
     const query = `

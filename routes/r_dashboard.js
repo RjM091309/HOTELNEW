@@ -2,13 +2,14 @@ const express = require('express');
 const router = express.Router();
 const DashboardController = require('../controller/c_dashboard');
 
-// Dashboard routes
-router.get('/', DashboardController.getDashboard);
-router.get('/dashboard', DashboardController.getDashboard);
-
-// Move to occupied routes
-router.get('/check-move-to-occupied', DashboardController.checkMoveToOccupied);
-router.post('/move-to-occupied', DashboardController.moveToOccupied);
+// Dashboard routes: the home is the overview of every property; the full operations dashboard of the
+// active property is /dashboard/full (the "Expand Full Dashboard" button of a card)
+router.get('/', DashboardController.getOverview);
+router.get('/dashboard', DashboardController.getOverview);
+router.get('/overview-data', DashboardController.getOverviewData);
+router.get('/full', DashboardController.getFullDashboard);
+router.get('/full-data', DashboardController.getFullData);
+router.get('/legacy', (req, res) => res.redirect('/dashboard'));   // the old operations dashboard was removed
 
 // Room transfer routes
 router.get('/transfer-available-rooms', DashboardController.getAvailableRoomsForTransfer);

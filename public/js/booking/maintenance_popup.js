@@ -211,7 +211,7 @@
    */
   async function showMaintenanceSchedulePopup({ roomNo, checkIn, checkOut, parentModalEl = null }) {
     if (typeof Swal === 'undefined') {
-      const reason = prompt(`Room ${roomNo}\nSchedule: ${checkIn} - ${checkOut}\n\nEnter maintenance reason:`);
+      const reason = prompt(`Room ${roomNo}\nSchedule: ${checkIn} - ${checkOut}\n\nEnter the reason (out of order):`);
       if (reason === null) return null;
       return reason;
     }
@@ -221,7 +221,7 @@
     let parentModalInstance = null;
 
     const popupResult = await Swal.fire({
-      title: 'Set Maintenance',
+      title: 'Set Out of Order',
       width: 520,
       padding: 0,
       background: '#ffffff',
@@ -235,7 +235,7 @@
       html: `
       <div class="maintenance-swal-titlebar">
         <i class="fas fa-tools"></i>
-        <span>Set Maintenance</span>
+        <span>Set Out of Order</span>
       </div>
       <div class="maintenance-swal-body">
         <div class="maintenance-swal-summary">

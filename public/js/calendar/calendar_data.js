@@ -2215,6 +2215,14 @@ const customButtons = {
     click: function() {
       proceedWithGroupCreate();
     }
+  },
+
+  // Rooms waiting to be cleaned (moved here from the Dashboard's Cleaning Room tab)
+  cleaningRooms: {
+    text: 'Cleaning Rooms',
+    click: function() {
+      openCleaningRoomsDialog();
+    }
   }
 };
 
@@ -2443,7 +2451,8 @@ function processRoomsData(roomsData) {
     title: `${room.ROOM_NUMBER}`.trim(),
     roomNumber: room.ROOM_NUMBER,
     bedCount: room.ROOM_BED,
-    roomView: parseInt(room.ROOM_VIEW, 10) || null
+    roomView: parseInt(room.ROOM_VIEW, 10) || null,
+    outOfOrder: String(room.ROOM_STATUS) === '3'     // the room status "Out of order" (Rooms menu): continuous, not a date range
   });
   const byRoomNumber = (a, b) => {
     const numA = parseInt(String(a.roomNumber).replace(/[^\d]/g, ''), 10);
@@ -2463,7 +2472,7 @@ function processRoomsData(roomsData) {
   // updateRoomViewLegendCounts() - both previously assumed every
   // resource had a .children array (only true for floor-group
   // resources), which this flat shape doesn't have.
-  if (document.documentElement.getAttribute('data-property-theme') === 'pool_villa') {
+  if (document.documentElement.getAttribute('data-property-pricing') === 'guest') {
     return roomsData.map(roomObjFor).sort(byRoomNumber);
   }
 
@@ -2631,6 +2640,11 @@ function applyIncomingHighlight() {
   startAt.setHours(15, 0, 0, 0);
   const endAt = new Date(endDate);
   endAt.setHours(12, 0, 0, 0);
+
+  // Bring the highlighted stay into view when it is outside the visible range (the calendar navigation buttons were removed).
+  try {
+    if (calendar.view && (startAt < calendar.view.activeStart || startAt >= calendar.view.activeEnd)) calendar.gotoDate(startDate);
+  } catch (e) { /* no-op */ }
 
   // Ensure resource exists
   const resource = (typeof calendar.getResourceById === 'function')
@@ -2924,6 +2938,50 @@ async function reloadCalendarBookingsForVisibleRange() {
   }, 150);
 }
 
+// Rooms whose status is "Out of order" (Rooms menu): the whole lane is crossed out. Done straight on the rows (found by data-resource-id) after
+// every render, so it does not depend on the calendar's own class hooks alone, and it follows the status when the rooms are loaded again.
+function applyOutOfOrderLanes() {
+  try {
+    const root = document.getElementById('calendar');
+    if (!root) return;
+    const flat = (typeof getFlatRoomResources === 'function') ? getFlatRoomResources(window.allCalendarFloors) : [];
+    const ids = new Set(flat.filter((r) => r && r.outOfOrder).map((r) => String(r.id)));
+    // a room that is not out of order any more
+    root.querySelectorAll('td.fc-timeline-lane.fc-room-ooo').forEach((td) => {
+      if (!ids.has(String(td.getAttribute('data-resource-id')))) {
+        td.classList.remove('fc-room-ooo');
+        td.querySelectorAll('.fc-room-ooo-tag').forEach((n) => n.remove());
+      }
+    });
+    ids.forEach((id) => {
+      // FullCalendar puts data-resource-id on the lane cell itself
+      root.querySelectorAll('td.fc-timeline-lane[data-resource-id="' + CSS.escape(id) + '"]').forEach((td) => {
+        td.classList.add('fc-room-ooo');
+        const frame = td.querySelector('.fc-timeline-lane-frame');
+        if (frame && !frame.querySelector(':scope > .fc-room-ooo-tag')) {
+          const tag = document.createElement('div');
+          tag.className = 'fc-room-ooo-tag';
+          tag.textContent = 'Out of order';
+          frame.appendChild(tag);
+        }
+      });
+    });
+  } catch (e) { /* the calendar still works without the cross-out */ }
+}
+// when this tab comes back into view after something was changed in another tab (a room set to Out of order, a booking...), see footer.ejs
+window.__refreshOnShow = function () { return loadCalendarData(); };
+let outOfOrderObserver = null;
+let outOfOrderTimer = null;
+function installOutOfOrderObserver() {
+  const root = document.getElementById('calendar');
+  if (!root || outOfOrderObserver || !window.MutationObserver) return;
+  outOfOrderObserver = new MutationObserver(() => {
+    clearTimeout(outOfOrderTimer);
+    outOfOrderTimer = setTimeout(applyOutOfOrderLanes, 150);   // the rows are drawn again when you scroll / change the view
+  });
+  outOfOrderObserver.observe(root, { childList: true, subtree: true });
+}
+
 async function loadCalendarData() {
   const dataStartTime = Date.now();
   
@@ -2962,6 +3020,8 @@ async function loadCalendarData() {
     if (calendarEl) calendarEl.classList.add('calendar-not-ready');
     calendar.render();
     applyBedFilter();
+    applyOutOfOrderLanes();
+    installOutOfOrderObserver();
     if (typeof updateLegendCounts === 'function') {
       updateLegendCounts();
     } else if (typeof updateRoomViewLegendCounts === 'function') {
@@ -3194,7 +3254,7 @@ const findHeader = setInterval(() => {
   currentWeekStart.setHours(0, 0, 0, 0);
 
   // Initialize calendar
-  const isPoolVillaCalendar = document.documentElement.getAttribute('data-property-theme') === 'pool_villa';
+  const isPoolVillaCalendar = document.documentElement.getAttribute('data-property-pricing') === 'guest';
   calendar = new FullCalendar.Calendar(calendarEl, {
     initialView: 'month',
     initialDate: today,
@@ -3224,6 +3284,14 @@ const findHeader = setInterval(() => {
     selectOverlap: true,
     selectAllow: function(selectInfo) {
       if (!selectInfo.resource || isFloorResourceId(selectInfo.resource.id)) {
+        return false;
+      }
+      // a room whose status is Out of order cannot be booked: the drag does not even start a booking
+      if (selectInfo.resource.extendedProps && selectInfo.resource.extendedProps.outOfOrder) {
+        if (window.__oooWarnAt == null || Date.now() - window.__oooWarnAt > 2500) {
+          window.__oooWarnAt = Date.now();
+          try { if (window.PMSCore && PMSCore.showToast) PMSCore.showToast('warning', 'Out of order', 'Room ' + (selectInfo.resource.title || '') + ' is Out of order, so it cannot be booked.'); } catch (e) { /* no toast */ }
+        }
         return false;
       }
       if (typeof window.isCalendarSlotBooked === 'function') {
@@ -3305,7 +3373,10 @@ const findHeader = setInterval(() => {
 
     eventClick: handleEventClick,
     eventDidMount: handleEventDidMount,
-    datesSet: handleDatesSet,
+    datesSet: function(info) {
+      handleDatesSet(info);
+      try { updateCleaningRoomsButton(); } catch (e) { console.warn(e); } // the toolbar is redrawn on view changes
+    },
     eventDrop: handleEventDrop,
     eventDragStart: handleEventDragStart,
     eventDragStop: handleEventDragStop,
@@ -3315,9 +3386,12 @@ const findHeader = setInterval(() => {
 
     resourceOrder: '',
     headerToolbar: {
-      left:  'searchBox bed1Filter bed2Filter groupCreateToggle groupCreateProceed dayPrev customToday dayNext',
+      // Removed for the calendar rework (all properties): K/Q bed filters, < Today >, and
+      // Full Screen / week / month / prev / next. Their definitions stay in customButtons
+      // above so they can be put back by adding the names here again.
+      left:  'searchBox groupCreateToggle groupCreateProceed',
       center:'title',
-      right: 'customFullscreen week customMonth customPrev customNext'
+      right: 'cleaningRooms'
     },
 
     customButtons: customButtons,
@@ -3378,12 +3452,21 @@ const findHeader = setInterval(() => {
     },
 
     resourceLaneClassNames: function(arg) {
-      return (arg.resource && arg.resource.extendedProps && arg.resource.extendedProps.isFloor)
-        ? ['fc-floor-lane', 'fc-floor-row']
-        : [];
+      const xp = arg.resource && arg.resource.extendedProps;
+      if (xp && xp.isFloor) return ['fc-floor-lane', 'fc-floor-row'];
+      return (xp && xp.outOfOrder) ? ['fc-room-ooo'] : [];
     },
 
     resourceLaneDidMount: function(arg) {
+      if (arg.resource && arg.resource.extendedProps && arg.resource.extendedProps.outOfOrder) {
+        const frame = arg.el.querySelector('.fc-timeline-lane-frame');
+        if (frame && !frame.querySelector(':scope > .fc-room-ooo-tag')) {
+          const tag = document.createElement('div');
+          tag.className = 'fc-room-ooo-tag';
+          tag.textContent = 'Out of order';
+          frame.appendChild(tag);
+        }
+      }
       if (arg.resource && arg.resource.extendedProps && arg.resource.extendedProps.isFloor) {
         arg.el.setAttribute('data-is-floor', 'true');
         arg.el.classList.add('fc-floor-lane', 'fc-floor-row');
@@ -3454,11 +3537,13 @@ const findHeader = setInterval(() => {
     // Listen for booking checkout updates and general booking updates
     calendarSocket.on('calendar-booking-updated', (data) => {
       console.log('📡 Received calendar booking update event:', data);
+      loadCleaningRooms(); // a check-out puts the room on the cleaning list
       
       if (data && data.data) {
         if (data.action === 'booking-checked-out' && data.data.bookings) {
-          // Update calendar events for checked out bookings
-          updateCalendarEventsForCheckout(data.data.bookings);
+          // Reload from the server so the checked-out booking really turns grey/dark
+          // (patching the event only moved its end date, not its colour).
+          scheduleCalendarRefresh();
         } else if (data.action === 'booking-updated' || data.action === 'booking-extended') {
           // Update calendar event for general booking updates (including checkout date changes)
           updateCalendarEventForBooking(data.data);
@@ -3469,9 +3554,10 @@ const findHeader = setInterval(() => {
     // Also listen to dashboard-refresh events for checkout
     if (typeof window.dashboardSocket !== 'undefined' && window.dashboardSocket) {
       window.dashboardSocket.on('dashboard-refresh', (data) => {
+        loadCleaningRooms();
         if (data && data.action === 'booking-checked-out' && data.data && data.data.bookings) {
           console.log('📡 Received dashboard-refresh checkout event:', data);
-          updateCalendarEventsForCheckout(data.data.bookings);
+          scheduleCalendarRefresh();
         }
       });
     }
@@ -3480,7 +3566,187 @@ const findHeader = setInterval(() => {
     window.calendarSocket = calendarSocket;
   }
 
+  loadCleaningRooms();
+  setInterval(loadCleaningRooms, 60000);
+
+  // Check-in / check-out / payments done in another tab (e.g. the Dashboard) must show
+  // here without restarting this tab: when the calendar tab becomes visible again after
+  // being in the background, reload the bookings from the server. Socket events can be
+  // missed while a tab sleeps, so this is the safety net.
+  let calendarHiddenAt = 0;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      calendarHiddenAt = Date.now();
+    } else if (calendarHiddenAt && Date.now() - calendarHiddenAt > 3000) {
+      calendarHiddenAt = 0;
+      scheduleCalendarRefresh();
+    }
+  });
+
 });
+
+// One reload at a time, shortly after the last trigger (several events can arrive together).
+let calendarRefreshTimer = null;
+function scheduleCalendarRefresh() {
+  clearTimeout(calendarRefreshTimer);
+  calendarRefreshTimer = setTimeout(() => {
+    if (typeof refreshCalendarBookings === 'function') refreshCalendarBookings();
+    loadCleaningRooms();
+  }, 400);
+}
+
+// =============================================================================
+// CLEANING ROOMS (the Dashboard's Cleaning Room tab, now on the calendar)
+// =============================================================================
+let calendarCleaningRooms = [];
+
+async function loadCleaningRooms() {
+  try {
+    const res = await fetch('/api/dashboard/cleaning-rooms?_=' + Date.now());
+    const data = await res.json();
+    calendarCleaningRooms = (data && data.success && Array.isArray(data.data)) ? data.data : [];
+  } catch (e) { /* keep the last list */ }
+  updateCleaningRoomsButton();
+  return calendarCleaningRooms;
+}
+
+function updateCleaningRoomsButton() {
+  const n = calendarCleaningRooms.length;
+  const label = '\u{1F9F9} Cleaning Rooms' + (n ? ' (' + n + ')' : '');
+  // FullCalendar draws the button text itself: change the option and let it redraw (never write into the button)
+  // This runs from datesSet (i.e. during calendar.render()), and changing options mid-render
+  // throws - which used to land in loadCalendarData's catch and blank the whole calendar.
+  // So the option change is deferred until the render has finished, and can never throw out.
+  if (window.calendar && customButtons.cleaningRooms.text !== label) {
+    customButtons.cleaningRooms.text = label;
+    setTimeout(() => {
+      try {
+        window.calendar.setOption('customButtons', Object.assign({}, customButtons));
+      } catch (e) {
+        console.warn('Cleaning Rooms button refresh failed:', e);
+      }
+      const btn = document.querySelector('.fc-cleaningRooms-button');
+      if (btn) {
+        btn.classList.toggle('has-cleaning', n > 0);
+        btn.title = n ? n + ' room' + (n === 1 ? '' : 's') + ' to clean' : 'No rooms to clean';
+      }
+    }, 0);
+  }
+  requestAnimationFrame(() => {
+    const btn = document.querySelector('.fc-cleaningRooms-button');
+    if (!btn) return;
+    btn.classList.toggle('has-cleaning', n > 0);
+    btn.title = n ? n + ' room' + (n === 1 ? '' : 's') + ' to clean' : 'No rooms to clean';
+  });
+}
+
+function cleaningToast(icon, title) {
+  const type = icon === 'error' ? 'error' : 'success';
+  const heading = type === 'error' ? 'Error' : 'Cleaning Rooms';
+  try {
+    if (typeof PMSCore !== 'undefined' && PMSCore.showToast) { PMSCore.showToast(type, heading, title); return; }
+  } catch (e) { /* fall through */ }
+  if (window.Swal) Swal.fire({ toast: true, position: 'top-end', icon, title, showConfirmButton: false, timer: 3500 });
+}
+
+function notifyRoomStatusChanged(message, data) {
+  if (typeof dashboardSocket !== 'undefined' && dashboardSocket) {
+    dashboardSocket.emit('dashboard-updated', { action: 'room-status-updated', message, data });
+  }
+}
+
+async function openCleaningRoomsDialog() {
+  const rooms = await loadCleaningRooms();
+  const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  if (!rooms.length) {
+    try { if (typeof PMSCore !== 'undefined' && PMSCore.showInfo) { PMSCore.showInfo('Cleaning Rooms', 'No room is under cleaning right now.'); return; } } catch (e) { /* fall through */ }
+    Swal.fire({ icon: 'info', title: 'No rooms to clean', text: 'No room is under cleaning right now.', confirmButtonText: 'OK' });
+    return;
+  }
+  const floors = [...new Set(rooms.map((r) => r.ROOM_FLOOR))].sort((a, b) => a - b);
+  const html = floors.map((f) => {
+    const onFloor = rooms.filter((r) => r.ROOM_FLOOR === f).sort((a, b) => a.ROOM_NUMBER - b.ROOM_NUMBER);
+    const rows = onFloor.map((r) => `
+      <div data-room-row="${esc(r.ROOM_ID)}" style="display:flex;align-items:center;gap:10px;padding:6px 4px;border-top:1px solid #eef0f2;text-align:left;">
+        <i class="fa fa-broom" style="color:#f59f00;width:18px;"></i>
+        <b style="min-width:42px;">${esc(r.ROOM_NUMBER)}</b>
+        <span style="flex:1;color:#6c757d;font-size:13px;">${esc(r.ROOM_TYPE || '')}</span>
+        <button type="button" data-clean-room="${esc(r.ROOM_ID)}" data-room-no="${esc(r.ROOM_NUMBER)}" style="border:1px solid #28a745;background:#fff;color:#28a745;border-radius:6px;padding:2px 12px;font-size:12px;cursor:pointer;">Clean</button>
+      </div>`).join('');
+    return `<div data-floor-block style="margin-bottom:8px;"><div style="text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;color:#868e96;text-transform:uppercase;margin:6px 0 2px;">Floor ${esc(f)} · <span data-floor-count>${onFloor.length}</span></div>${rows}</div>`;
+  }).join('');
+
+  let remaining = rooms.slice();
+  const result = await Swal.fire({
+    title: 'Cleaning Rooms',
+    customClass: { popup: 'cleaning-popup' },
+    html: `<div id="cleaningSubtitle" style="font-size:13px;color:#868e96;margin:-6px 0 8px;">${rooms.length} room${rooms.length === 1 ? '' : 's'} waiting to be cleaned</div><div style="max-height:52vh;overflow-y:auto;">${html}</div>`,
+    width: 520,
+    showCancelButton: true,
+    cancelButtonText: 'Close',
+    confirmButtonText: 'Clean all ' + rooms.length,
+    confirmButtonColor: '#28a745',
+    didOpen: () => {
+      Swal.getHtmlContainer().querySelectorAll('[data-clean-room]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-clean-room');
+          const no = btn.getAttribute('data-room-no');
+          btn.disabled = true;
+          try {
+            const res = await fetch('/dashboard/room_maintenance/updateStatus/' + encodeURIComponent(id), {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: 1 }) // 1 = Available
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.message || 'Failed');
+            notifyRoomStatusChanged('Room ' + no + ' moved to available', data.data);
+            cleaningToast('success', 'Room ' + no + ' moved to Available');
+            remaining = remaining.filter((r) => String(r.ROOM_ID) !== String(id));
+            calendarCleaningRooms = calendarCleaningRooms.filter((r) => String(r.ROOM_ID) !== String(id));
+            updateCleaningRoomsButton();
+            const row = btn.closest('[data-room-row]');
+            const block = row && row.closest('[data-floor-block]');
+            if (row) row.remove();
+            if (block) {
+              const left = block.querySelectorAll('[data-room-row]').length;
+              if (!left) block.remove(); else block.querySelector('[data-floor-count]').textContent = left;
+            }
+            if (!remaining.length) { Swal.close(); return; }
+            const sub = document.getElementById('cleaningSubtitle');
+            if (sub) sub.textContent = remaining.length + ' room' + (remaining.length === 1 ? '' : 's') + ' waiting to be cleaned';
+            const confirmBtn = Swal.getConfirmButton();
+            if (confirmBtn) confirmBtn.textContent = 'Clean all ' + remaining.length;
+          } catch (e) {
+            btn.disabled = false;
+            cleaningToast('error', 'Could not update room ' + no);
+          }
+        });
+      });
+    },
+    preConfirm: async () => {
+      try {
+        const res = await fetch('/dashboard/room_maintenance/updateStatusBulk', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roomIds: remaining.map((r) => r.ROOM_ID), status: 1 })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || 'Failed');
+        return data;
+      } catch (e) {
+        Swal.showValidationMessage('Could not clean the rooms. Please try again.');
+        return false;
+      }
+    }
+  });
+  if (result.isConfirmed && result.value) {
+    const done = result.value.updatedCount || remaining.length;
+    notifyRoomStatusChanged(done + ' room(s) moved to available', { roomIds: remaining.map((r) => r.ROOM_ID) });
+    cleaningToast('success', done + ' room' + (done === 1 ? '' : 's') + ' moved to Available');
+    loadCleaningRooms();
+  }
+}
 
 // Function to update calendar events when checkout happens
 function updateCalendarEventsForCheckout(bookings) {
@@ -4299,7 +4565,7 @@ function createLegendOverlay() {
   
   // Pool Villa has no Condo/Mountain view distinction - drop the "Room View"
   // legend section (the last header + content pair) for that property only.
-  if (document.documentElement.getAttribute('data-property-theme') === 'pool_villa') {
+  if (document.documentElement.getAttribute('data-property-pricing') === 'guest') {
     const legendHeaders = legendOverlay.querySelectorAll('.calendar-legend-header');
     const roomViewHeader = Array.from(legendHeaders).find((h) => /room view/i.test(h.textContent));
     if (roomViewHeader) {
@@ -4352,7 +4618,7 @@ function classifyEventForLegend(event) {
     // Side indicators (independent booleans, can combine with any phase bucket above)
     'late-checkout-btb': (typeof isLateCheckout === 'function' && isLateCheckout(event)) || !!event.extendedProps?.isBackToBack,
     'late-checkout': (typeof isLateCheckout === 'function' && isLateCheckout(event)) || event.extendedProps?.checkOutStatus === 1 || event.extendedProps?.checkOutStatus === '1',
-    'reservation-fee-paid': paymentStatus === 'partial',
+    'reservation-fee-paid': paymentStatus === 'partial' && String(status).toLowerCase() === 'pending', // only a reservation has a fee paid
     'late-checkin': typeof isLateCheckIn === 'function' && isLateCheckIn(event),
     'early-checkin': !isHoldPending && Number(event.extendedProps?.checkInStatus) === 2,
     'back-to-back': !!event.extendedProps?.isBackToBack
@@ -4716,3 +4982,22 @@ window.clampLegendToViewport = clampLegendToViewport;
 // Global function for legend toggle (accessible from HTML)
 window.toggleLegend = toggleLegend;
 
+
+
+// Links from the notification bell: /calendar?cleaning=<room> opens the Cleaning Rooms list, /calendar?openBooking=<id> opens that booking's details.
+(function () {
+  function run() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const cleaning = params.get('cleaning'), bookingId = params.get('openBooking');
+      if (!cleaning && !bookingId) return;
+      const url = new URL(window.location.href); url.searchParams.delete('cleaning'); url.searchParams.delete('openBooking');
+      window.history.replaceState({}, '', url.toString());
+      setTimeout(function () {
+        if (cleaning && typeof openCleaningRoomsDialog === 'function') openCleaningRoomsDialog();
+        else if (bookingId && typeof window.openRoomMenuModal === 'function') window.openRoomMenuModal(bookingId);
+      }, 900);
+    } catch (e) { console.warn('calendar deep link failed', e); }
+  }
+  if (document.readyState === 'complete') run(); else window.addEventListener('load', run);
+})();

@@ -8,6 +8,9 @@ router.get('/data', RoomRatesController.getData);
 router.get('/season-months', RoomRatesController.getSeasonMonths);
 router.get('/pool-villa-rates', RoomRatesController.getPoolVillaRates);
 router.post('/save', RoomRatesController.saveRates);
+router.post('/category', RoomRatesController.createCategory);
+router.put('/category/:id', RoomRatesController.renameCategory);
+router.delete('/category/:id', RoomRatesController.deleteCategory);
 router.post('/save-season-months', RoomRatesController.saveSeasonMonths);
 router.post('/save-pool-villa-rates', RoomRatesController.savePoolVillaRates);
 

@@ -51,7 +51,7 @@ function showEventInfoModal(event) {
         statusIcon = 'error';
         break;
       case 'maintenance':
-        statusTitle = `Room ${roomNumber} - Maintenance`;
+        statusTitle = `Room ${roomNumber} - Out of order`;
         statusIcon = 'info';
         break;
       default:
@@ -120,7 +120,7 @@ function showLateCheckInModal(event) {
   const checkOut = co.toLocaleDateString();
 
   // Check if check-in date is today or in the past
-  const today = new Date();
+  const today = new Date(Date.now() - 6 * 3600 * 1000); // hotel day rolls over at 6:00 AM
   today.setHours(0, 0, 0, 0); // Reset time to start of day
   const checkInDateOnly = new Date(ci);
   checkInDateOnly.setHours(0, 0, 0, 0); // Reset time to start of day
@@ -293,8 +293,11 @@ function showLateCheckInModal(event) {
     const gotoCheckInBtn = document.getElementById('btn-goto-checkin');
     if (gotoCheckInBtn) {
       gotoCheckInBtn.addEventListener('click', () => {
-        const dashboardWindow = window.open(`/dashboard?checkin=${encodeURIComponent(bookingId)}`, 'hotel_dashboard_tab');
-        if (dashboardWindow) dashboardWindow.focus();
+        // Check-in now happens in the booking details window (Check in footer): same as the General Info button.
+        skipScheduleBarGlow = true;
+        Swal.close();
+        if (typeof window.cleanupModalOverlays === 'function') window.cleanupModalOverlays();
+        setTimeout(() => { if (typeof openRoomMenuModal === 'function') openRoomMenuModal(bookingId, event); }, 100);
       });
     }
 
@@ -371,7 +374,7 @@ function showPendingModal(event) {
   const checkOut = coDate2.toLocaleDateString();
 
   // Check if check-in date is today or in the past
-  const today = new Date();
+  const today = new Date(Date.now() - 6 * 3600 * 1000); // hotel day rolls over at 6:00 AM
   today.setHours(0, 0, 0, 0); // Reset time to start of day
   const checkInDateOnly = new Date(ciDate2);
   checkInDateOnly.setHours(0, 0, 0, 0); // Reset time to start of day
@@ -553,8 +556,11 @@ function showPendingModal(event) {
     const gotoCheckInBtn = document.getElementById('btn-goto-checkin');
     if (gotoCheckInBtn) {
       gotoCheckInBtn.addEventListener('click', () => {
-        const dashboardWindow = window.open(`/dashboard?checkin=${encodeURIComponent(bookingId)}`, 'hotel_dashboard_tab');
-        if (dashboardWindow) dashboardWindow.focus();
+        // Check-in now happens in the booking details window (Check in footer): same as the General Info button.
+        skipScheduleBarGlow = true;
+        Swal.close();
+        if (typeof window.cleanupModalOverlays === 'function') window.cleanupModalOverlays();
+        setTimeout(() => { if (typeof openRoomMenuModal === 'function') openRoomMenuModal(bookingId, event); }, 100);
       });
     }
 
@@ -648,13 +654,13 @@ function showMaintenanceModal(event) {
       : 'This room is under maintenance.';
 
     Swal.fire({
-      title: `Room ${roomNumber} - Maintenance`,
+      title: `Room ${roomNumber} - Out of order`,
       html: `
       <div class="text-left" style="padding: 20px 0;">
         <div style="margin-bottom: 20px;">
           <div style="display: flex; align-items: center; margin-bottom: 15px;">
             <div style="width: 8px; height: 8px; background-color: #000000; border-radius: 50%; margin-right: 12px;"></div>
-            <span style="font-weight: 600; color: #ffffff; font-size: 16px;">Maintenance</span>
+            <span style="font-weight: 600; color: #ffffff; font-size: 16px;">Out of order</span>
           </div>
           <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border-left: 3px solid #000000;">
             <div style="margin-bottom: 15px;">
@@ -756,7 +762,7 @@ function completeMaintenanceBooking(bookingId, event) {
         Swal.fire({
           icon: 'success',
           title: 'Fixed',
-          text: data.message || 'Maintenance schedule removed.',
+          text: data.message || 'Out of order removed.',
           confirmButtonColor: '#000000',
           timer: 2000,
           showConfirmButton: false

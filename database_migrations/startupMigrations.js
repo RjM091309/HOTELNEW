@@ -171,6 +171,14 @@ async function runReceiptMigrations() {
     `ROOM_NO VARCHAR(50) NULL DEFAULT NULL COMMENT 'Guest room number for receipt'`,
     'RECEIPT_NO'
   );
+
+  // Optional digital signature (small PNG data URL) attached to the printed receipt.
+  await ensureColumn(
+    'payment_receipt',
+    'SIGNATURE',
+    `SIGNATURE MEDIUMTEXT NULL DEFAULT NULL COMMENT 'Uploaded e-signature (PNG data URL) printed on the receipt'`,
+    'RECEIVED_BY'
+  );
 }
 
 async function runLongTermStayMigrations() {
@@ -558,6 +566,20 @@ async function runRoomRatesMigrations() {
   }
   console.log('✅ Ensured table + seed: room_rates (keyed by ROOM_TYPE_ID)');
 
+  // Custom rate categories a property adds itself (e.g. "Promo"): the amounts live in room_rates under CATEGORY = 'custom_<IDNo>'.
+  await queryDatabasePromise(`
+    CREATE TABLE IF NOT EXISTS rate_category (
+      IDNo INT NOT NULL AUTO_INCREMENT,
+      PROPERTY_ID INT NOT NULL,
+      LABEL VARCHAR(60) NOT NULL,
+      ACTIVE TINYINT(1) NOT NULL DEFAULT 1,
+      CREATED_BY INT NULL DEFAULT NULL,
+      CREATED_DT DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (IDNo),
+      KEY idx_rate_category_property (PROPERTY_ID, ACTIVE)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  `);
+
   // Swap the unique key to include ROOM_TYPE_ID instead of BED_TYPE.
   try {
     // Two previously-distinct BED_TYPE rows (king/queen) can collapse onto the
@@ -731,16 +753,20 @@ async function runRoomRateSeasonMonthsMigration() {
 
   // Seed all 12 months as Lean (INSERT IGNORE - never overwrites an admin's
   // existing month assignment). Matches "no Peak season assigned yet".
-  const values = [];
-  const params = [];
-  for (let m = 1; m <= 12; m++) {
-    values.push('(?, ?)');
-    params.push(m, 'lean');
+  // Only while the table is still the old one-set-for-everyone shape; once
+  // runPropertyMigrations has added PROPERTY_ID, each property seeds its own rows.
+  if (!(await columnExists('room_rate_season_months', 'PROPERTY_ID'))) {
+    const values = [];
+    const params = [];
+    for (let m = 1; m <= 12; m++) {
+      values.push('(?, ?)');
+      params.push(m, 'lean');
+    }
+    await queryDatabasePromise(
+      `INSERT IGNORE INTO room_rate_season_months (MONTH_NO, SEASON) VALUES ${values.join(', ')}`,
+      params
+    );
   }
-  await queryDatabasePromise(
-    `INSERT IGNORE INTO room_rate_season_months (MONTH_NO, SEASON) VALUES ${values.join(', ')}`,
-    params
-  );
   console.log('✅ Ensured table + seed: room_rate_season_months (12 months, default lean)');
 
   // Optional mid-month season switch - e.g. a month assigned to Lean/Off
@@ -1094,6 +1120,76 @@ async function runPropertyMigrations() {
     console.log('✅ Seeded property: Main Hotel (default), Pool Villa');
   }
 
+  // Per-property settings, so a new property is a row of data instead of code:
+  // display name (headers/quotation), switcher colour + icon, menus hidden from the
+  // sidebar (comma list of keys, see partials/sidebar.ejs) and GUEST_PRICING (rates by
+  // number of guests, single room panel, no Room View - the Pool Villa way).
+  // Seeded once, when the column is first added; edit the property row afterwards.
+  if (await tableExists('property')) {
+    const addedDisplay = await ensureColumn('property', 'DISPLAY_NAME', `DISPLAY_NAME VARCHAR(100) NULL DEFAULT NULL`);
+    const addedColor = await ensureColumn('property', 'COLOR', `COLOR VARCHAR(9) NULL DEFAULT NULL`);
+    const addedIcon = await ensureColumn('property', 'ICON', `ICON VARCHAR(40) NULL DEFAULT NULL`);
+    const addedHidden = await ensureColumn('property', 'HIDDEN_MENUS', `HIDDEN_MENUS VARCHAR(500) NULL DEFAULT NULL`);
+    const addedGuest = await ensureColumn('property', 'GUEST_PRICING', `GUEST_PRICING TINYINT(1) NOT NULL DEFAULT 0`);
+    // HIDDEN_RATE_OPTIONS: Room Rate choices of the booking forms this property does not offer (comma list of the option
+    // values: tenant, vip, employee, senior_special, booking-channel, percentage). NULL = all of them are offered.
+    // HIDDEN_ROOM_FIELDS: fields of the Rooms menu forms / table this property does not use (comma list: bed_type, room_size,
+    // max_occupants). NULL = all of them are used.
+    await ensureColumn('property', 'HIDDEN_ROOM_FIELDS', `HIDDEN_ROOM_FIELDS VARCHAR(200) NULL DEFAULT NULL`);
+    const addedRateOptions = await ensureColumn('property', 'HIDDEN_RATE_OPTIONS', `HIDDEN_RATE_OPTIONS VARCHAR(200) NULL DEFAULT NULL`);
+    if (addedRateOptions) {
+      // Main Hotel / Pool Villa use the "Contracted Rate (-P200/night)" checkbox, not a Contracted price list
+      await queryDatabasePromise(`UPDATE property SET HIDDEN_RATE_OPTIONS = 'contracted' WHERE CODE IN ('main', 'pool_villa')`);
+    }
+    // BUILDING_VIEW: 1 = the Dashboard shows this property's rooms as a 3D building (public/js/dashboard/building3d.js).
+    const addedBuilding = await ensureColumn('property', 'BUILDING_VIEW', `BUILDING_VIEW TINYINT(1) NOT NULL DEFAULT 0`);
+    if (addedBuilding) await queryDatabasePromise(`UPDATE property SET BUILDING_VIEW = 1 WHERE CODE = 'clark_central'`);
+    // user_property: which properties an account may open. Admin (PERMISSIONS = 1) always has all of them. Created once, and every
+    // existing non-admin account is given all the properties it could use before, so nobody is locked out; edit them in User Info.
+    const hadUserProperty = (await queryDatabasePromise(`SHOW TABLES LIKE 'user_property'`)).length > 0;
+    await queryDatabasePromise(`
+      CREATE TABLE IF NOT EXISTS user_property (
+        USER_ID INT NOT NULL,
+        PROPERTY_ID INT NOT NULL,
+        PRIMARY KEY (USER_ID, PROPERTY_ID)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+    `);
+    if (!hadUserProperty) {
+      await queryDatabasePromise(
+        `INSERT IGNORE INTO user_property (USER_ID, PROPERTY_ID)
+         SELECT u.IDno, p.IDNo FROM user_info u CROSS JOIN property p WHERE u.PERMISSIONS <> 1 AND p.ACTIVE = 1`);
+      console.log('✅ Created user_property (existing non-admin accounts keep every property)');
+    }
+    // LOGO: path under /public used on receipts, billing, invoices and vouchers. NULL = no logo.
+    const addedLogo = await ensureColumn('property', 'LOGO', `LOGO VARCHAR(255) NULL DEFAULT NULL`);
+    if (addedLogo) {
+      await queryDatabasePromise(`UPDATE property SET LOGO = '/img/Logo-Black.png' WHERE CODE = 'main'`);
+    }
+    // receipts / vouchers / billing of Clark Central and Pool Villa print their own logo (only filled while still empty, so a logo set by hand stays)
+    await queryDatabasePromise(`UPDATE property SET LOGO = '/img/properties/clark_central_receipt.png' WHERE CODE = 'clark_central' AND (LOGO IS NULL OR LOGO = '')`);
+    await queryDatabasePromise(`UPDATE property SET LOGO = '/img/properties/pool_villa.png' WHERE CODE = 'pool_villa' AND (LOGO IS NULL OR LOGO = '')`);
+    if (addedDisplay) {
+      await queryDatabasePromise(`UPDATE property SET DISPLAY_NAME = 'MAIN STAY HOTEL' WHERE CODE = 'main'`);
+      await queryDatabasePromise(`UPDATE property SET DISPLAY_NAME = 'POOL VILLA' WHERE CODE = 'pool_villa'`);
+    }
+    if (addedColor) {
+      await queryDatabasePromise(`UPDATE property SET COLOR = '#4361ee' WHERE CODE = 'main'`);
+      await queryDatabasePromise(`UPDATE property SET COLOR = '#0ca678' WHERE CODE = 'pool_villa'`);
+    }
+    if (addedIcon) {
+      await queryDatabasePromise(`UPDATE property SET ICON = 'fa-hotel' WHERE CODE = 'main'`);
+      await queryDatabasePromise(`UPDATE property SET ICON = 'fa-water' WHERE CODE = 'pool_villa'`);
+    }
+    if (addedHidden) {
+      await queryDatabasePromise(
+        `UPDATE property SET HIDDEN_MENUS = 'check-in-notifier,room-checker,unassigned-rooms,employee,guest,vehicle-monitoring,card-writer,channex,vehicle' WHERE CODE = 'pool_villa'`
+      );
+    }
+    if (addedGuest) {
+      await queryDatabasePromise(`UPDATE property SET GUEST_PRICING = 1 WHERE CODE = 'pool_villa'`);
+    }
+  }
+
   const [mainProperty] = await queryDatabasePromise(`SELECT IDNo FROM property WHERE CODE = 'main' LIMIT 1`);
   const mainId = mainProperty?.IDNo;
   if (!mainId) {
@@ -1104,7 +1200,7 @@ async function runPropertyMigrations() {
   // Own-column tables. NULL-able first so the ALTER is instant even on a
   // large `booking` table; backfilled below; NOT NULL tightening is a
   // deliberate separate follow-up (ensureColumn only supports ADD COLUMN).
-  const ownColumnTables = ['room', 'room_type', 'booking', 'customer', 'payment_receipt', 'payment_shifts', 'receipt_settings', 'expenses', 'agency'];
+  const ownColumnTables = ['room', 'room_type', 'booking', 'customer', 'payment_receipt', 'payment_shifts', 'receipt_settings', 'expenses', 'expense_return_money', 'agency'];
   for (const table of ownColumnTables) {
     if (!(await tableExists(table))) {
       console.warn(`⚠️ ${table} table not found, skipping PROPERTY_ID migration for it`);
@@ -1112,6 +1208,26 @@ async function runPropertyMigrations() {
     }
     await ensureColumn(table, 'PROPERTY_ID', `PROPERTY_ID INT NULL DEFAULT NULL COMMENT 'FK -> property.IDNo'`);
     await queryDatabasePromise(`UPDATE ${table} SET PROPERTY_ID = ? WHERE PROPERTY_ID IS NULL`, [mainId]);
+  }
+
+  // Season-month assignment is per property (Main Hotel and Pool Villa each pick
+  // their own Lean/Peak months). Existing rows become Main Hotel's; every other
+  // active property gets a copy to start from, so nothing changes until edited.
+  if (await tableExists('room_rate_season_months')) {
+    if (!(await columnExists('room_rate_season_months', 'PROPERTY_ID'))) {
+      await queryDatabasePromise(`ALTER TABLE room_rate_season_months ADD COLUMN PROPERTY_ID INT NULL DEFAULT NULL FIRST`);
+      await queryDatabasePromise(`UPDATE room_rate_season_months SET PROPERTY_ID = ? WHERE PROPERTY_ID IS NULL`, [mainId]);
+      await queryDatabasePromise(`ALTER TABLE room_rate_season_months MODIFY PROPERTY_ID INT NOT NULL, DROP PRIMARY KEY, ADD PRIMARY KEY (PROPERTY_ID, MONTH_NO)`);
+      console.log('✅ room_rate_season_months is now per property');
+    }
+    await queryDatabasePromise(
+      `INSERT IGNORE INTO room_rate_season_months (PROPERTY_ID, MONTH_NO, SEASON, SPLIT_DAY, SPLIT_SEASON)
+       SELECT p.IDNo, m.MONTH_NO, m.SEASON, m.SPLIT_DAY, m.SPLIT_SEASON
+       FROM property p
+       JOIN room_rate_season_months m ON m.PROPERTY_ID = ?
+       WHERE p.ACTIVE = 1 AND p.IDNo <> ?`,
+      [mainId, mainId]
+    );
   }
 
   // activity_log: PROPERTY_ID is nullable on purpose - rows with no booking and no

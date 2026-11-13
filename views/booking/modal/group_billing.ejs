@@ -28,7 +28,7 @@
                                 <div class="col-md-6">
                                     <div class="hotel-info-section">
                                         <div class="hotel-logo-container">
-                                            <img src="/img/Logo-Black.png" alt="Main Stay Hotel" class="hotel-logo" style="height: 80px; width: auto; max-width: 180px; object-fit: contain; display: block; margin: 0;" />
+                                            <% if (typeof propertyLogo !== 'undefined' && propertyLogo) { %><img src="<%= propertyLogo %>" alt="Hotel Logo" class="hotel-logo" style="height: 80px; width: auto; max-width: 180px; object-fit: contain; display: block; margin: 0;" /><% } %>
                                         </div>
                                         <div class="hotel-address">
                                             <p><i class="fa fa-map-marker"></i> Clark Terrace Building, Lot 2 Block 1</p>
@@ -143,14 +143,13 @@
                                                 <span class="summary-label">Refund Amount:</span>
                                                 <span class="summary-value refund-amount" id="refundAmount">0.00</span>
                                             </div>
-                                            <div class="summary-row">
-                                                <span class="summary-label">Balance:</span>
-                                                <span class="summary-value balance-amount" id="balanceAmount">₹0.00</span>
-                                            </div>
-                                            
                                             <div class="summary-row total-row">
                                                 <span class="summary-label">Total Amount:</span>
                                                 <span class="summary-value total-amount" id="totalAmount">₹0.00</span>
+                                            </div>
+                                            <div class="summary-row">
+                                                <span class="summary-label">Balance:</span>
+                                                <span class="summary-value balance-amount" id="balanceAmount">₹0.00</span>
                                             </div>
                                         </div>
                                     </div>

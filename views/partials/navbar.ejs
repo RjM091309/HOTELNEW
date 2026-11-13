@@ -3,10 +3,40 @@
 	<div class="page-header-inner ">
 		<!-- logo start -->
 		<div class="page-logo">
-			<a href="/">
-				<img alt="Main Stay Hotel" src="/img/darkmodelogo.png" class="page-logo-img page-logo-img-dark" style="height: 40px; width: auto;">
-				<img alt="Main Stay Hotel" src="/img/lightmodelogo.png" class="page-logo-img page-logo-img-light" style="height: 40px; width: auto;">
-				<span class="logo-default">MAIN STAY HOTEL</span> </a>
+			<a href="/dashboard/full">
+				<% var _pc = (typeof currentProperty !== 'undefined' && currentProperty && currentProperty.CODE) ? currentProperty.CODE : 'main';
+				   var _own = (_pc !== 'main'); %>
+				<span class="logo-flip" id="logoFlip" data-code="<%= _pc %>">
+					<img alt="<%= typeof propertyDisplayName !== 'undefined' ? propertyDisplayName : 'Main Stay Hotel' %>" src="<%= _own ? '/img/properties/' + _pc + '.png' : '/img/darkmodelogo.png' %>" class="page-logo-img page-logo-img-dark" style="height: 40px; width: auto;" onerror="this.onerror=null;this.src='/img/darkmodelogo.png'">
+					<img alt="<%= typeof propertyDisplayName !== 'undefined' ? propertyDisplayName : 'Main Stay Hotel' %>" src="<%= _own ? '/img/properties/' + _pc + '.png' : '/img/lightmodelogo.png' %>" class="page-logo-img page-logo-img-light" style="height: 40px; width: auto;" onerror="this.onerror=null;this.src='/img/lightmodelogo.png'">
+				</span>
+				<style>
+					.logo-flip { display: inline-block; perspective: 600px; vertical-align: middle; }
+					.logo-flip img { backface-visibility: hidden; transition: transform .38s cubic-bezier(.4,0,.2,1); }
+					.logo-flip.is-out img { transform: rotateY(90deg); }
+					.logo-flip.is-pre img { transform: rotateY(-90deg); transition: none; }
+				</style>
+				<script>
+					// the property was just switched: the old logo turns away and the logo of the new property flips in
+					(function () {
+						try {
+							var from = sessionStorage.getItem('logoFlipFrom'); sessionStorage.removeItem('logoFlipFrom');
+							var box = document.getElementById('logoFlip'); if (!from || !box) return;
+							if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+							var imgs = box.querySelectorAll('img'), finals = [].map.call(imgs, function (i) { return i.getAttribute('src'); });
+							if (finals.indexOf(from) !== -1 && finals[0] === from) return;
+							imgs.forEach(function (i) { i.onerror = null; i.src = from; });
+							setTimeout(function () {
+								box.classList.add('is-out');
+								setTimeout(function () {
+									imgs.forEach(function (i, n) { i.src = finals[n]; });
+									box.classList.remove('is-out'); box.classList.add('is-pre'); void box.offsetWidth; box.classList.remove('is-pre');
+								}, 400);
+							}, 350);
+						} catch (e) { /* the logo just shows */ }
+					})();
+				</script>
+				<span class="logo-default"><%= typeof propertyDisplayName !== 'undefined' ? propertyDisplayName : 'MAIN STAY HOTEL' %></span> </a>
 		</div>
 		<!-- logo end -->
 		<ul class="nav navbar-nav navbar-left in">
@@ -14,10 +44,16 @@
 		</ul>
 		
 		<!-- Date Picker for Available Rooms -->
-		<div class="col-lg-6 col-md-4 col-sm-4 col-4">
-			<div class="nav navbar-nav navbar-left" style="margin-top: 13px !important; display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: center;">
-				<input type="text" id="datePicker" placeholder="Available Rooms" />
-
+		<div class="header-tools-col">
+			<!-- header-tools: the property buttons + search start to the RIGHT of the sidebar, so they do not cover the avatar at its top -->
+			<style>
+				/* The property buttons + search sit on the SAME row as the logo / menu toggle (header height 60px), next to the menu
+				   button. They used to be in a half-width column that was too narrow for them, so they dropped to a second row, made
+				   the fixed header 116px tall and covered the top of the sidebar profile (avatar). */
+				.page-header .header-tools-col { float: left; width: auto; padding: 0; }
+				.page-header .header-tools { margin-left: 16px; }
+			</style>
+			<div class="nav navbar-nav navbar-left header-tools" style="margin-top: 13px !important; display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: center;">
 				<!-- Property switcher (Main Hotel / Pool Villa). currentProperty/
 				     allProperties come from res.locals, set by attachProperty() in
 				     middleware/m_auth.js on every authenticated request - no
@@ -29,30 +65,37 @@
 				     switch TO. Now the active property's button is solid/filled
 				     and disabled; the other one is outlined and clicking it
 				     switches straight to it. -->
-				<% if (typeof allProperties !== 'undefined' && allProperties && allProperties.length > 1) {
-					const PROPERTY_STYLES = {
-						main: { bg: '#4361ee', icon: 'fa-hotel' },
-						pool_villa: { bg: '#0ca678', icon: 'fa-water' }
-					};
-					const curCode = currentProperty ? currentProperty.CODE : '';
-				%>
-				<div class="property-switcher-group" id="propertySwitcherGroup">
-					<% allProperties.forEach(function(p) {
-						const pStyle = PROPERTY_STYLES[p.CODE] || { bg: '#6c757d', icon: 'fa-building' };
-						const isActive = p.CODE === curCode;
-					%>
-					<button type="button" class="property-toggle-btn <%= isActive ? 'is-active' : 'is-inactive' %>"
-						style="<%= isActive ? ('background-color: ' + pStyle.bg + '; box-shadow: 0 0 0 3px ' + pStyle.bg + '40, 0 2px 10px ' + pStyle.bg + '90;') : ('color: ' + pStyle.bg + '; border-color: ' + pStyle.bg + ';') %>"
-						data-code="<%= p.CODE %>"
-						<%= isActive ? 'disabled' : '' %>
-						title="<%= isActive ? (p.NAME + ' - currently viewing') : ('Switch to ' + p.NAME) %>">
-						<% if (isActive) { %><i class="fas fa-circle-check" style="font-size: 11px;"></i><% } %>
-						<i class="fas <%= pStyle.icon %>"></i>
-						<span><%= p.NAME %></span>
-					</button>
-					<% }); %>
+				<!-- The three property buttons (Main Hotel / Clark Central / Pool Villa) were removed from the header: a property is now
+				     chosen on the Dashboard (its cards, "Expand Full Dashboard"); the active property's name is shown beside the logo. -->
+				<!-- Global search: sits beside the property buttons (Main Hotel / Clark Central / Pool Villa). Replaces the old Available Rooms date picker: guest, room or confirmation number of the active property; a result opens the calendar on that booking. -->
+				<div class="global-search-wrap" id="globalSearchWrap">
+					<input type="text" id="globalSearchInput" autocomplete="off" placeholder="Search guest, room, booking... (Ctrl+K)" />
+					<div class="global-search-results" id="globalSearchResults" style="display:none;"></div>
 				</div>
+				<% if (typeof allProperties !== 'undefined' && allProperties.length > 1) { %>
+				<!-- Switch property from ANY page: the overview of all the properties (pick one there) -->
+				<a class="hdr-allprops" href="/dashboard" title="All properties: switch to another property"><i class="fas fa-th-large"></i><span>All properties</span></a>
 				<% } %>
+				<style>
+					.global-search-wrap { position: relative; margin-left: 14px; flex: 0 0 auto; }
+					#globalSearchInput { width: min(260px, max(130px, calc(100vw - 1230px))); height: 38px; padding: 0 12px; border: 1px solid #ced4da; border-radius: 4px; background: #e9ecef; color: #495057; font-size: 13px; outline: none; }
+					#globalSearchInput:focus { border-color: #6f9c40; }
+					.global-search-results { position: absolute; top: calc(100% + 6px); left: 0; z-index: 2000; width: 380px; max-width: 90vw; max-height: 340px; overflow-y: auto; background: #2a3135; color: #fff; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
+					.global-search-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 12px; }
+					.global-search-item:last-child { border-bottom: 0; }
+					.global-search-item:hover, .global-search-item.is-active { background: rgba(111,156,64,0.22); }
+					.global-search-item .gs-title { font-weight: 600; font-size: 13px; }
+					.global-search-item .gs-sub { opacity: 0.7; font-size: 11px; margin-top: 2px; }
+					.global-search-empty { padding: 10px 12px; font-size: 12px; opacity: 0.7; }
+					.hdr-allprops { display: inline-flex; align-items: center; gap: 8px; height: 38px; margin-left: 10px; padding: 0 13px; border: 1px solid rgba(255,255,255,.22); border-radius: 6px; background: transparent; color: #cfd6e6; font-size: 13px; text-decoration: none; white-space: nowrap; flex: 0 0 auto; transition: border-color .2s ease, color .2s ease, background .2s ease; }
+					.hdr-allprops:hover { color: #ffffff; border-color: var(--property-accent, #6f9c40); background: color-mix(in srgb, var(--property-accent, #6f9c40) 16%, transparent); text-decoration: none; }
+					[data-theme="white"] .hdr-allprops { color: #495057; border-color: #ced4da; }
+					[data-theme="white"] .hdr-allprops:hover { color: #212529; }
+					@media (max-width: 1100px) { .hdr-allprops span { display: none; } .hdr-allprops { padding: 0 11px; } }
+					[data-theme="white"] .global-search-results { background: #fff; color: #212529; border-color: #dee2e6; }
+					[data-theme="white"] .global-search-item { border-bottom-color: #eee; }
+				</style>
+
 			</div>
 		</div>
 		
@@ -528,6 +571,19 @@ height: 34px;
 	.notification-item div, .list-group-item div { font-size: 12px; line-height: 1.2; }
 	.date-completed-request-label { color: green; }
 	#notification-list-broom { padding: 10px; }
+	/* Dark theme for both header dropdowns (Today's Schedule + Cleaning Notifications) and the user menu */
+	html[data-theme="dark"] .navbar-notif-dropdown,
+	html[data-theme="dark"] .navbar-user-dropdown { background: #1b2430 !important; border: 1px solid rgba(148,163,184,.22) !important; box-shadow: 0 12px 32px rgba(0,0,0,.55) !important; }
+	html[data-theme="dark"] .navbar-notif-dropdown > li.external,
+	html[data-theme="dark"] .navbar-notif-dropdown > li.external h3 { background: #232d3b !important; color: #e8edf3 !important; border-bottom: 1px solid rgba(148,163,184,.2) !important; }
+	html[data-theme="dark"] .navbar-notif-dropdown .dropdown-menu-list,
+	html[data-theme="dark"] .navbar-notif-dropdown .dropdown-menu-list > li { background: transparent !important; border-color: rgba(148,163,184,.15) !important; }
+	html[data-theme="dark"] .navbar-notif-dropdown .dropdown-menu-list > li > a,
+	html[data-theme="dark"] .navbar-notif-dropdown .dropdown-menu-list > li > a * { color: #cbd5e1 !important; }
+	html[data-theme="dark"] .navbar-notif-dropdown .dropdown-menu-list > li > a:hover { background: rgba(148,163,184,.12) !important; }
+	html[data-theme="dark"] .navbar-notif-dropdown .notification-empty a { color: #94a3b8 !important; }
+	html[data-theme="dark"] .navbar-user-dropdown > li > a { color: #e2e8f0 !important; }
+	html[data-theme="dark"] .navbar-user-dropdown > li > a:hover { background: rgba(148,163,184,.12) !important; }
 	#allNotificationsModal .modal-body { max-height: 400px; overflow-y: auto; }
 	.list-group-item { font-size: 14px; line-height: 1.4; }
 	
@@ -621,7 +677,8 @@ height: 34px;
 
 <script>
 
-flatpickr("#datePicker", {
+// The Available Rooms date picker was replaced by the global search; guarded so this is a no-op without it.
+if (document.getElementById('datePicker')) flatpickr("#datePicker", {
     altInput: true, // Enables a separate input field for display
     showMonths: 2, // Display two months side by side
     altFormat: "M d, Y", // Format shown to the user (e.g., "Jan 6, 2025")
@@ -2318,7 +2375,10 @@ document.addEventListener('click', function (event) {
       }));
 
       // Open calendar in a new tab with params so highlight applies immediately
-      window.open(`/calendar?hlRoomId=${encodeURIComponent(String(roomId))}&hlStart=${startISO}&hlEnd=${endISO}`, '_blank');
+      const hlQuery = `?hlRoomId=${encodeURIComponent(String(roomId))}&hlStart=${startISO}&hlEnd=${endISO}`;
+      if (typeof openInOwnTab !== 'function' || !openInOwnTab('/calendar', hlQuery)) {
+        window.open(`/calendar${hlQuery}`, '_blank');
+      }
     } catch (e) { /* continue to fallback flow below if any error */ }
 
     fetch('/booking/get-room-details', {
@@ -2910,7 +2970,7 @@ function renderBellNotifications(data) {
             icon: 'fa-sign-in-alt', color: 'blue-bgcolor',
             text: '<b>' + navbarEscapeHtml(b.GuestName || 'Guest') + '</b> checking in &middot; Room ' + navbarEscapeHtml(b.RoomNumber || '-'),
             time: navbarFormatTime(b.ScheduleTime),
-            url: '/dashboard?checkin=' + encodeURIComponent(b.BookingID)
+            url: '/calendar?openBooking=' + encodeURIComponent(b.BookingID)
         });
     });
     (data.pickups || []).forEach(function (b) {
@@ -2928,7 +2988,7 @@ function renderBellNotifications(data) {
             icon: 'fa-sign-out-alt', color: 'deepPink-bgcolor',
             text: '<b>' + navbarEscapeHtml(b.GuestName || 'Guest') + '</b> checking out &middot; Room ' + navbarEscapeHtml(b.RoomNumber || '-'),
             time: navbarFormatTime(b.ScheduleTime),
-            url: '/dashboard?checkout=' + encodeURIComponent(b.BookingID)
+            url: '/calendar?openBooking=' + encodeURIComponent(b.BookingID)
         });
     });
 
@@ -3009,7 +3069,7 @@ function renderBroomNotifications(rooms) {
     list.innerHTML = rooms.map(function (room) {
         const since = room.SinceDT ? timeAgo(room.SinceDT) : '';
         const floor = room.RoomFloor ? ' &middot; Floor ' + navbarEscapeHtml(room.RoomFloor) : '';
-        return '<li><a href="javascript:;" onclick="navbarGotoDashboard(\'/dashboard?cleaning=' + encodeURIComponent(room.RoomNumber) + '\')">'
+        return '<li><a href="javascript:;" onclick="navbarGotoDashboard(\'/calendar?cleaning=' + encodeURIComponent(room.RoomNumber) + '\')">'
             + '<span class="time">' + since + '</span>'
             + '<span class="details"><span class="notification-icon circle blue-bgcolor"><i class="fas fa-broom"></i></span>'
             + 'Room <b>' + navbarEscapeHtml(room.RoomNumber) + '</b>' + floor + ' needs cleaning</span>'

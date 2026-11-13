@@ -138,6 +138,13 @@ class CalendarController {
       //   newRoomId
       // });
 
+      // dragged / moved to ANOTHER room that is Out of order: not allowed
+      if (isRoomTransfer || (oldRoomNumber && String(oldRoomNumber) !== String(room))) {
+        const BookingModelOoo = require('../models/bookingModel');
+        const ooo = await BookingModelOoo.findOutOfOrderRoom({ roomIds: newRoomId ? [newRoomId] : [], roomNumbers: room ? [room] : [], propertyId: req.propertyId });
+        if (ooo) return res.status(409).json({ success: false, message: `Room ${ooo.roomNumber} is Out of order, so it cannot be booked. Set it to Available in Rooms first.` });
+      }
+
       const beforeSnapshot = await snapshotBooking(id);
 
       const result = await CalendarModel.updateBooking(
@@ -400,6 +407,11 @@ class CalendarController {
       const beforeSnapshot = await snapshotBooking(bookingId);
 
       // Process room transfer using the same logic as dashboard
+      {
+        const BookingModelOoo = require('../models/bookingModel');
+        const ooo = await BookingModelOoo.findOutOfOrderRoom({ roomIds: [newRoomId], propertyId: req.propertyId });
+        if (ooo) return res.status(409).json({ success: false, message: `Room ${ooo.roomNumber} is Out of order, so it cannot be booked. Set it to Available in Rooms first.` });
+      }
       const result = await CalendarModel.transferRoom(bookingId, oldRoomNumber, newRoomId, transferDate, req.propertyId);
 
       if (result.success) {

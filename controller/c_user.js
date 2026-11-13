@@ -71,6 +71,7 @@ class UserController {
     try {
       const { id } = req.params;
       const user = await UserModel.getUserById(id);
+      if (user) user.PROPERTY_IDS = await UserModel.getPropertyIds(id);
       
       if (user) {
         res.json({
@@ -96,7 +97,7 @@ class UserController {
   // Create new user
   static async createUser(req, res) {
     try {
-      const { fullname, username, password, confirm_password, role, roomId } = req.body;
+      const { fullname, username, password, confirm_password, role, roomId, propertyIds } = req.body;
       
       if (!fullname || !username || !password || !confirm_password || !role) {
         return res.status(400).json({
@@ -122,6 +123,11 @@ class UserController {
         });
       }
 
+      // an account that is not an Admin must have at least one property to open
+      if (Number(role) !== 1 && !(Array.isArray(propertyIds) && propertyIds.length)) {
+        return res.status(400).json({ success: false, message: 'Choose at least one property for this account.' });
+      }
+
       const userData = {
         fullname,
         username,
@@ -132,6 +138,7 @@ class UserController {
       };
 
       const result = await UserModel.createUser(userData);
+      if (result && result.id && Number(role) !== 1) await UserModel.setPropertyIds(result.id, propertyIds);
       
       if (result) {
         res.json({
@@ -158,7 +165,7 @@ class UserController {
   // Update user
   static async updateUser(req, res) {
     try {
-      const { userId, fullname, username, password, confirm_password, role, roomId } = req.body;
+      const { userId, fullname, username, password, confirm_password, role, roomId, propertyIds } = req.body;
       
       if (!userId || !fullname || !username || !role) {
         return res.status(400).json({
@@ -187,6 +194,10 @@ class UserController {
         }
       }
 
+      if (Number(role) !== 1 && !(Array.isArray(propertyIds) && propertyIds.length)) {
+        return res.status(400).json({ success: false, message: 'Choose at least one property for this account.' });
+      }
+
       const userData = {
         userId,
         fullname,
@@ -198,6 +209,7 @@ class UserController {
       };
 
       const result = await UserModel.updateUser(userData);
+      if (result) await UserModel.setPropertyIds(userId, Number(role) === 1 ? [] : propertyIds);
       
       if (result) {
         res.json({

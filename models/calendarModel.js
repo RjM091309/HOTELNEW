@@ -169,6 +169,7 @@ class CalendarModel {
         ),
         billing_balance AS (
           SELECT bill2.BOOKING_ID,
+            (bill2.ROOM_CHARGE * bill2.QTY - COALESCE(bill2.RESERVATION_FEE,0) - COALESCE(bill2.DISCOUNT_AMOUNT,0)) AS TOT,
             GREATEST(0,
               (bill2.ROOM_CHARGE * bill2.QTY - COALESCE(bill2.RESERVATION_FEE,0) - COALESCE(bill2.DISCOUNT_AMOUNT,0))
               - COALESCE(pbt.AMOUNT, 0)
@@ -179,6 +180,7 @@ class CalendarModel {
         ),
         extension_balance AS (
           SELECT be.BOOKING_ID,
+            SUM(be.COST*be.QTY) AS TOT,
             SUM(GREATEST(0, be.COST*be.QTY - COALESCE(pet.AMOUNT,0))) AS BAL
           FROM booking_extension be
           LEFT JOIN payment_extension_totals pet ON pet.BOOKING_EXTENSION_ID = be.IDNo
@@ -187,6 +189,7 @@ class CalendarModel {
         ),
         service_balance AS (
           SELECT bs.BOOKING_ID,
+            SUM(bs.TOTAL_COST) AS TOT,
             SUM(GREATEST(0, bs.TOTAL_COST - COALESCE(pst.AMOUNT,0))) AS BAL
           FROM booking_service bs
           LEFT JOIN payment_service_totals pst ON pst.BOOKING_SERVICE_ID = bs.IDNo
@@ -195,11 +198,30 @@ class CalendarModel {
         ),
         outstanding_balance AS (
           SELECT bk.IDNo AS BOOKING_ID,
-            COALESCE(bb.BAL,0) + COALESCE(eb.BAL,0) + COALESCE(sb.BAL,0) AS BALANCE
+            COALESCE(bb.BAL,0) + COALESCE(eb.BAL,0) + COALESCE(sb.BAL,0) AS BALANCE,
+            COALESCE(bb.TOT,0) + COALESCE(eb.TOT,0) + COALESCE(sb.TOT,0) AS BILLED
           FROM booking bk
           LEFT JOIN billing_balance bb ON bb.BOOKING_ID = bk.IDNo
           LEFT JOIN extension_balance eb ON eb.BOOKING_ID = bk.IDNo
           LEFT JOIN service_balance sb ON sb.BOOKING_ID = bk.IDNo
+        ),
+        group_main_booking_for_ob AS (
+          SELECT gb.IDNo AS GROUP_BOOKING_ID, MIN(b2.IDNo) AS MAIN_BOOKING_ID
+          FROM group_booking gb
+          INNER JOIN booking b2 ON b2.GROUP_BOOKING_ID = gb.IDNo AND b2.ACTIVE = 1
+          WHERE gb.BILLING_TYPE = 1
+          GROUP BY gb.IDNo
+        ),
+        group_outstanding AS (
+          -- one-bill group: what the main booking shows is the whole group's bill (the other rooms' services, extensions, balance)
+          SELECT gm.MAIN_BOOKING_ID AS BOOKING_ID,
+                 SUM(obx.BALANCE) AS BALANCE,
+                 SUM(obx.BILLED) AS BILLED
+          FROM booking bk2
+          INNER JOIN group_main_booking_for_ob gm ON gm.GROUP_BOOKING_ID = bk2.GROUP_BOOKING_ID
+          INNER JOIN outstanding_balance obx ON obx.BOOKING_ID = bk2.IDNo
+          WHERE bk2.ACTIVE = 1
+          GROUP BY gm.MAIN_BOOKING_ID
         ),
         group_main_booking AS (
           SELECT gb.IDNo AS GROUP_BOOKING_ID, MIN(b2.IDNo) AS MAIN_BOOKING_ID
@@ -207,6 +229,16 @@ class CalendarModel {
           INNER JOIN booking b2 ON b2.GROUP_BOOKING_ID = gb.IDNo AND b2.ACTIVE = 1
           WHERE gb.BILLING_TYPE = 1
           GROUP BY gb.IDNo
+        ),
+        -- Credit (a balance left unpaid on purpose, still to be settled) counts as money NOT yet received,
+        -- so a booking on credit keeps its unpaid colour. For a one-bill group it is added up on the main booking.
+        credit_unsettled AS (
+          SELECT COALESCE(gmb2.MAIN_BOOKING_ID, bkc.IDNo) AS EVAL_BOOKING_ID, SUM(pc.AMOUNT_PAID) AS AMT
+          FROM payments pc
+          INNER JOIN booking bkc ON bkc.IDNo = pc.BOOKING_ID
+          LEFT JOIN group_main_booking gmb2 ON gmb2.GROUP_BOOKING_ID = bkc.GROUP_BOOKING_ID
+          WHERE pc.PAYMENT_METHOD IN ('credit', 'marker') AND pc.SETTLED_DATE IS NULL AND pc.AMOUNT_PAID > 0
+          GROUP BY COALESCE(gmb2.MAIN_BOOKING_ID, bkc.IDNo)
         ),
         payment_eval AS (
           SELECT bk.IDNo AS BOOKING_ID,
@@ -229,7 +261,7 @@ class CalendarModel {
           CASE
             WHEN b.BOOKING_STATUS = 'check-In' THEN '#12866f'
             WHEN b.BOOKING_STATUS = 'check-Out'
-              AND COALESCE(ob.BALANCE, 0) > 0.009
+              AND COALESCE(ob.BALANCE, 0) + COALESCE(cus.AMT, 0) > 0.009
               THEN '#0b3d91' -- dark blue when checked out but has balance
             WHEN b.BOOKING_STATUS = 'check-Out' THEN '#B3B3B3'
             WHEN b.BOOKING_STATUS = 'pending' AND COALESCE(b.HOLD_PENDING, 0) = 1 THEN '#FF6D00'
@@ -242,8 +274,12 @@ class CalendarModel {
           END AS backgroundColor,
           -- Pre-calculated extended properties
           COALESCE(bill.ROOM_CHARGE, 0) + COALESCE(bill.AMENITIES_CHARGE, 0) + COALESCE(bill.SERVICES_CHARGE, 0) + COALESCE(bill.LATE_CHECKOUT_CHARGE, 0) AS totalCost,
+          COALESCE(ob.BILLED, 0) AS billedTotal,
+          COALESCE(ob.BALANCE, 0) + COALESCE(cus.AMT, 0) AS outstandingBalance,
+          COALESCE(cus.AMT, 0) AS creditBalance,
+          CASE WHEN pe.PAYMENT_EVAL_BOOKING_ID <> b.IDNo THEN 1 ELSE 0 END AS balanceIsGroup,
           CASE
-            WHEN COALESCE(ob.BALANCE, 0) <= 0.009 THEN 'paid'
+            WHEN COALESCE(ob.BALANCE, 0) + COALESCE(cus.AMT, 0) <= 0.009 THEN 'paid'
             WHEN pen.BOOKING_ID IS NOT NULL
               OR COALESCE(bill_main.PAYMENT_STATUS, 'unpaid') IN ('partial_paid', 'partial', 'paid')
             THEN 'partial'
@@ -348,7 +384,14 @@ class CalendarModel {
         INNER JOIN customer c ON b.CUSTOMER_ID = c.IDNo
         LEFT JOIN billing bill ON bill.BOOKING_ID = b.IDNo AND bill.ACTIVE = 1
         LEFT JOIN payment_eval pe ON pe.BOOKING_ID = b.IDNo
-        LEFT JOIN outstanding_balance ob ON ob.BOOKING_ID = pe.PAYMENT_EVAL_BOOKING_ID
+        LEFT JOIN (
+          SELECT o1.BOOKING_ID,
+                 COALESCE(go.BALANCE, o1.BALANCE) AS BALANCE,
+                 COALESCE(go.BILLED, o1.BILLED) AS BILLED
+          FROM outstanding_balance o1
+          LEFT JOIN group_outstanding go ON go.BOOKING_ID = o1.BOOKING_ID
+        ) ob ON ob.BOOKING_ID = pe.PAYMENT_EVAL_BOOKING_ID
+        LEFT JOIN credit_unsettled cus ON cus.EVAL_BOOKING_ID = pe.PAYMENT_EVAL_BOOKING_ID
         LEFT JOIN billing bill_main ON bill_main.BOOKING_ID = pe.PAYMENT_EVAL_BOOKING_ID AND bill_main.ACTIVE = 1
         LEFT JOIN payment_exists_nonrefund pen ON pen.BOOKING_ID = pe.PAYMENT_EVAL_BOOKING_ID
         ${whereClause}
@@ -394,6 +437,10 @@ class CalendarModel {
           backgroundColor: row.backgroundColor,
           extendedProps: {
             totalCost: row.totalCost,
+            billedTotal: Number(row.billedTotal) || 0,
+            outstandingBalance: Number(row.outstandingBalance) || 0,
+            creditBalance: Number(row.creditBalance) || 0,
+            balanceIsGroup: Number(row.balanceIsGroup) === 1,
             paymentStatus: row.paymentStatus,
             totalDays: row.totalDays,
             bookingStatus: isMaintenanceRow ? 'maintenance' : row.bookingStatus,

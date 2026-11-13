@@ -662,9 +662,12 @@ $('#confirmPaymentButton').on('click', async function () {
         // pay so the payment step below doesn't charge the stale, pre-deposit total.
         if (typeof depositResult.remainingBalance !== 'undefined') {
             const freshBalance = parseFloat(depositResult.remainingBalance) || 0;
-            paymentAmount = freshBalance;
+            // Keep a smaller amount the cashier typed (a partial payment: the rest is left as credit); never charge more than what is left.
+            const typedAmount = parseFloat(String(paymentAmount == null ? '' : paymentAmount).replace(/[^0-9.]/g, '')) || 0;
+            const keepTyped = typedAmount > 0 && typedAmount < freshBalance - 0.005;
+            paymentAmount = keepTyped ? typedAmount : freshBalance;
             const amountInput = document.getElementById('paymentAmountInput');
-            if (amountInput) amountInput.value = freshBalance;
+            if (amountInput) amountInput.value = paymentAmount;
             if (typeof updatePaymentSummaryCard === 'function') {
                 updatePaymentSummaryCard(freshBalance, {});
             } else {
@@ -703,6 +706,13 @@ $('#confirmPaymentButton').on('click', async function () {
         }
         const creditRemarks = $('#creditRemarks').val() ? $('#creditRemarks').val().trim() : '';
         paymentNotes = `Credit approved by: ${creditApprovedBy}.` + (creditRemarks ? ` ${creditRemarks}` : '');
+    }
+
+    // The Payment window opened to settle CREDIT left at check-out: credit cannot be paid with credit.
+    const settlingCredit = !!(document.getElementById('modal-payment') && document.getElementById('modal-payment').dataset.creditSettlement);
+    if (settlingCredit && paymentMethod === 'credit') {
+        Swal.fire({ title: 'Choose how the guest pays', text: 'Pick cash, bank transfer, card... Credit cannot be used to pay a credit.', icon: 'error', confirmButtonText: 'OK' });
+        return;
     }
 
     // Validate payment details
@@ -770,10 +780,13 @@ $('#confirmPaymentButton').on('click', async function () {
                 paymentMethod: paymentMethod,
                 paymentNotes: paymentNotes
             };
+            if (settlingCredit && Array.isArray(window.__creditSettleIds) && window.__creditSettleIds.length) {
+                paymentData.paymentIds = window.__creditSettleIds; // only these credit entries are being paid
+            }
 
             // Send AJAX request
             $.ajax({
-                url: '/booking/process-payment', // URL of the backend route
+                url: settlingCredit ? '/credit/pay-credit' : '/booking/process-payment', // URL of the backend route
                 type: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify(paymentData), // Send as JSON

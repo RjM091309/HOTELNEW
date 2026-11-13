@@ -3,7 +3,7 @@
   // "Off Season" instead - the underlying season.key ('lean') is unchanged
   // (it's what's actually stored/matched against in the DB), only this
   // display label differs per property.
-  const isPoolVilla = typeof currentProperty !== 'undefined' && currentProperty && currentProperty.CODE === 'pool_villa';
+  const isPoolVilla = typeof isGuestPricing !== 'undefined' && isGuestPricing;
   function seasonDisplayLabel(season) {
     if (isPoolVilla && season.key === 'lean') return 'Off Season';
     return season.label;
@@ -26,6 +26,7 @@
           </div>
           <div class="room-rates-actions" <% if (isPoolVilla) { %>style="display:none;"<% } %>>
             <span class="room-rates-dirty" id="roomRatesDirty" style="display:none;">Unsaved changes</span>
+            <button type="button" class="btn room-rates-reset-btn" id="rrAddCategoryBtn" title="Add your own rate list (promo, corporate, ...)"><i class="fas fa-plus"></i> Add rate</button>
             <button type="button" class="btn room-rates-reset-btn" id="roomRatesResetBtn">Reset</button>
             <button type="button" class="btn room-rates-save-btn" id="roomRatesSaveBtn" disabled>Save changes</button>
           </div>
@@ -87,7 +88,14 @@
               <div class="season-section-title"><%= seasonDisplayLabel(season) %></div>
               <% categories.forEach(function(cat) { %>
                 <div class="rate-category">
-                  <div class="rate-category-title"><%= cat.label %></div>
+                  <div class="rate-category-title"><%= cat.label %>
+                    <% if (cat.custom) { %>
+                      <span class="rate-cat-tools">
+                        <button type="button" class="rate-cat-btn" data-rate-rename="<%= cat.id %>" data-label="<%= cat.label %>" title="Rename"><i class="fas fa-pen"></i></button>
+                        <button type="button" class="rate-cat-btn danger" data-rate-delete="<%= cat.id %>" data-label="<%= cat.label %>" title="Delete"><i class="fas fa-trash"></i></button>
+                      </span>
+                    <% } %>
+                  </div>
                   <div class="table-scrollable">
                     <table class="table table-bordered rate-table">
                       <thead>
@@ -813,8 +821,44 @@
   }
 </style>
 
+<style>
+  .rate-cat-tools { margin-left: 10px; display: inline-flex; gap: 6px; vertical-align: middle; }
+  .rate-cat-btn { border: 1px solid rgba(128,128,128,.4); background: transparent; color: inherit; border-radius: 6px; width: 26px; height: 24px; font-size: 11px; cursor: pointer; opacity: .75; }
+  .rate-cat-btn:hover { opacity: 1; } .rate-cat-btn.danger:hover { color: #ef4444; border-color: #ef4444; }
+</style>
 <script>
   (function () {
+    // ---- custom rate categories: add / rename / delete (the page reloads so every table is rebuilt)
+    var COPY_CHOICES = <%- JSON.stringify((typeof copyFromChoices !== 'undefined' ? copyFromChoices : []).map(function (c) { return { key: c.key, label: c.label }; })) %>;
+    function post(url, method, body) { return fetch(url, { method: method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }).then(function (r) { return r.json(); }); }
+    var addBtn = document.getElementById('rrAddCategoryBtn');
+    if (addBtn) addBtn.addEventListener('click', function () {
+      Swal.fire({
+        title: 'Add a rate',
+        html: '<input id="rrNewName" class="swal2-input" placeholder="Name (e.g. Promo, Corporate)" maxlength="60">' +
+          '<select id="rrNewCopy" class="swal2-select" style="width:80%;margin-top:10px"><option value="">Start empty</option>' +
+          COPY_CHOICES.map(function (c) { return '<option value="' + c.key + '">Start from a copy of ' + c.label + '</option>'; }).join('') + '</select>',
+        showCancelButton: true, confirmButtonText: 'Add', focusConfirm: false,
+        preConfirm: function () {
+          var name = document.getElementById('rrNewName').value.trim();
+          if (!name) { Swal.showValidationMessage('Give the rate a name.'); return false; }
+          return post('/room-rates/category', 'POST', { label: name, copyFrom: document.getElementById('rrNewCopy').value })
+            .then(function (j) { if (!j.success) throw new Error(j.message || 'Could not add the rate.'); return j; })
+            .catch(function (e) { Swal.showValidationMessage(e.message); return false; });
+        }
+      }).then(function (r) { if (r.isConfirmed) location.reload(); });
+    });
+    document.addEventListener('click', function (e) {
+      var ren = e.target.closest('[data-rate-rename]'), del = e.target.closest('[data-rate-delete]');
+      if (ren) {
+        Swal.fire({ title: 'Rename rate', input: 'text', inputValue: ren.dataset.label, showCancelButton: true, confirmButtonText: 'Save', inputValidator: function (v) { return !String(v).trim() ? 'Give the rate a name.' : null; } })
+          .then(function (r) { if (!r.isConfirmed) return; post('/room-rates/category/' + ren.dataset.rateRename, 'PUT', { label: r.value }).then(function (j) { if (j.success) location.reload(); else Swal.fire('Error', j.message || 'Could not rename.', 'error'); }); });
+      } else if (del) {
+        Swal.fire({ title: 'Delete "' + del.dataset.label + '"?', text: 'It disappears from the Room Rate choices. Bookings already made keep their price.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Delete', confirmButtonColor: '#ef4444' })
+          .then(function (r) { if (!r.isConfirmed) return; post('/room-rates/category/' + del.dataset.rateDelete, 'DELETE').then(function (j) { if (j.success) location.reload(); else Swal.fire('Error', j.message || 'Could not delete.', 'error'); }); });
+      }
+    });
+
     const grid = document.getElementById('roomRatesGrid');
     const saveBtn = document.getElementById('roomRatesSaveBtn');
     const resetBtn = document.getElementById('roomRatesResetBtn');

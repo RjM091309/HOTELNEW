@@ -48,6 +48,16 @@
                         <input type="text" class="form-control" id="sdEarlyFeeAmount" inputmode="decimal" placeholder="0.00" autocomplete="off" data-lpignore="true" data-1p-ignore>
                     </div>
                     <div class="form-text" id="sdEarlyFeeHint"></div>
+                    <div id="sdEarlyFeePayMode" class="mt-2">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="sdEarlyFeePay" id="sdEarlyFeePayNow" value="now" checked>
+                            <label class="form-check-label" for="sdEarlyFeePayNow">Collect now <span class="text-muted">(cash, at check-in)</span></label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="sdEarlyFeePay" id="sdEarlyFeePayLater" value="later">
+                            <label class="form-check-label" for="sdEarlyFeePayLater">Add to bill <span class="text-muted">(pay at check-out)</span></label>
+                        </div>
+                    </div>
                     <div class="form-check mt-2">
                         <input class="form-check-input" type="checkbox" id="sdWaiveEarlyFee">
                         <label class="form-check-label" for="sdWaiveEarlyFee">

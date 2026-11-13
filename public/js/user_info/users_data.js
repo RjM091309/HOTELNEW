@@ -307,6 +307,7 @@ function createUser() {
         fullname: fullname,
         username: username,
         role: role,
+        propertyIds: checkedProperties('add'),
         roomId: (String(role) === '9') ? ($('#addRoom').attr('data-value') || '') : '',
         password: password,
         confirm_password: confirm_password
@@ -407,6 +408,7 @@ function updateUser() {
         fullname: fullname,
         username: username,
         role: role,
+        propertyIds: checkedProperties('edit'),
         roomId: (String(role) === '9') ? ($('#editRoom').attr('data-value') || '') : '',
         password: password,
         confirm_password: confirm_password
@@ -538,13 +540,36 @@ function deleteUser(userId) {
 // FORM POPULATION FUNCTIONS
 // ========================================
 
+// ---- the properties an account may open (checkboxes in both forms); an Admin always has all of them
+function checkedProperties(mode) {
+    return $('.up-check[data-mode="' + mode + '"]:checked').map(function () { return parseInt(this.value, 10); }).get();
+}
+function syncPropertyBoxes(mode) {
+    const role = String(mode === 'add' ? ($('#addRole').attr('data-value') || '') : ($('#editRole').attr('data-value') || ''));
+    const admin = role === '1';
+    $('.up-check[data-mode="' + mode + '"]').prop('disabled', admin);
+    $('#' + mode + 'PropertyBox').css('opacity', admin ? 0.45 : 1);
+    $('#' + mode + 'PropertyNote').toggle(admin);
+}
+$(document).on('click', '[data-mdl-for="addRole"] .mdl-menu__item, [data-mdl-for="editRole"] .mdl-menu__item', function () {
+    const mode = $(this).closest('[data-mdl-for]').attr('data-mdl-for') === 'addRole' ? 'add' : 'edit';
+    setTimeout(function () { syncPropertyBoxes(mode); }, 60);
+});
+$(document).on('shown.bs.modal', '#addUserModal', function () {
+    // a new account starts with the property you are in now (tick more if the account works in several)
+    $('.up-check[data-mode="add"]').each(function () { this.checked = $(this).attr('data-current') === '1'; });
+    syncPropertyBoxes('add');
+});
+
 function populateEditForm(user) {
+    $('.up-check[data-mode="edit"]').each(function () { this.checked = (user.PROPERTY_IDS || []).indexOf(parseInt(this.value, 10)) !== -1; });
     $('#editUserId').val(user.IDno);
     $('#editFullName').val(user.FULLNAME);
     $('#editUsername').val(user.USERNAME);
     const roleName = getRoleNameById(user.PERMISSIONS);
     $('#editRole').val(roleName);
     $('#editRole').attr('data-value', user.PERMISSIONS);
+    syncPropertyBoxes('edit');
     if (String(user.PERMISSIONS) === '9' && user.ROOM_ID) {
         ensureRoomsLoaded().then(function(){
             const room = (cachedRooms||[]).find(function(r){ return String(r.IDNo) === String(user.ROOM_ID); });

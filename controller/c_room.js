@@ -155,8 +155,13 @@ class RoomController {
           AMENITIES
         } = req.body;
 
+        // A field the property does not use (property.HIDDEN_ROOM_FIELDS) is not asked for: it gets a neutral value.
+        const hideField = typeof res.locals.hideRoomField === 'function' ? res.locals.hideRoomField : () => false;
+        const roomMax = ROOM_MAX || (hideField('max_occupants') ? 4 : ROOM_MAX);
+        const roomBed = ROOM_BED || (hideField('bed_type') ? 1 : ROOM_BED);
+        const roomSize = ROOM_SIZE || (hideField('room_size') ? null : ROOM_SIZE);
         if (!ROOM_TYPE_ID || !ROOM_NUMBER || !ROOM_STATUS ||
-            !ROOM_MAX || !ROOM_BED || !ROOM_SIZE || !ROOM_VIEW) {
+            !roomMax || !roomBed || (!roomSize && !hideField('room_size')) || !ROOM_VIEW) {
           return res.status(400).json({
             success: false,
             message: 'All required fields must be provided'
@@ -183,7 +188,7 @@ class RoomController {
 
         const result = await RoomModel.createRoom(
           ROOM_TYPE_ID, ROOM_NUMBER, ROOM_STATUS,
-          ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW,
+          roomMax, roomBed, roomSize, ROOM_VIEW,
           ROOM_DESCRIPTION, ROOM_IMAGE, parsedAmenities, encodedBy, req.propertyId
         );
         
@@ -234,8 +239,12 @@ class RoomController {
           AMENITIES
         } = req.body;
 
+        const hideField = typeof res.locals.hideRoomField === 'function' ? res.locals.hideRoomField : () => false;
+        const roomMax = ROOM_MAX || (hideField('max_occupants') ? 4 : ROOM_MAX);
+        const roomBed = ROOM_BED || (hideField('bed_type') ? 1 : ROOM_BED);
+        const roomSize = ROOM_SIZE || (hideField('room_size') ? null : ROOM_SIZE);
         if (!IDNo || !ROOM_TYPE_ID || !ROOM_NUMBER || !ROOM_STATUS ||
-            !ROOM_MAX || !ROOM_BED || !ROOM_SIZE || !ROOM_VIEW) {
+            !roomMax || !roomBed || (!roomSize && !hideField('room_size')) || !ROOM_VIEW) {
           return res.status(400).json({
             success: false,
             message: 'All required fields must be provided'
@@ -262,7 +271,7 @@ class RoomController {
 
         const result = await RoomModel.updateRoom(
           IDNo, ROOM_TYPE_ID, ROOM_NUMBER, ROOM_STATUS,
-          ROOM_MAX, ROOM_BED, ROOM_SIZE, ROOM_VIEW,
+          roomMax, roomBed, roomSize, ROOM_VIEW,
           ROOM_DESCRIPTION, ROOM_IMAGE, parsedAmenities, editedBy, req.propertyId
         );
         

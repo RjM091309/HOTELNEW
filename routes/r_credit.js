@@ -8,5 +8,6 @@ router.get('/breakdown', creditController.breakdown);
 router.post('/settle/:paymentId', creditController.settle);
 router.post('/settle-group', creditController.settleGroup);
 router.post('/settle-selected', creditController.settleSelected);
+router.post('/pay-credit', creditController.payCredit);
 
 module.exports = router;

@@ -9,11 +9,22 @@ var dataTable;
 // ========================================
 
 // Get label class based on room status (matching payment status design)
+// Room Status: the dropdown shows a name (Available / Occupied / Out of order / Cleaning) but the database keeps 1 / 2 / 3 / 4.
+// The form used to send the NAME as it was written in the field, which the database does not accept (the room ended with an empty status
+// and "UNKNOWN" in the table). These two turn a name into its number and back.
+const ROOM_STATUS_NAMES = { '1': 'Available', '2': 'Occupied', '3': 'Out of order', '4': 'Cleaning' };
+function roomStatusValue(selector) {
+    const raw = String($(selector).val() || '').trim();
+    if (/^[1-4]$/.test(raw)) return raw;
+    const byName = { 'available': '1', 'occupied': '2', 'out of order': '3', 'maintenance': '3', 'cleaning': '4' };
+    return byName[raw.toLowerCase()] || $(selector).attr('data-value') || raw;
+}
+
 function getRoomStatusLabel(status) {
     const statusMap = {
         '1': 'label-success',    // Available
         '2': 'label-danger',     // Occupied
-        '3': 'label-info',       // Maintenance
+        '3': 'label-info',       // Out of order
         '4': 'label-warning'     // Cleaning
     };
     return statusMap[status] || 'label-default';
@@ -292,29 +303,42 @@ function generateEditPricingTable(seasons, existingPricing = []) {
 // DATATABLE CONFIGURATION
 // ========================================
 
-function initializeDataTable() {
-    if ($.fn.DataTable.isDataTable('#roomTable')) {
-        $('#roomTable').DataTable().destroy();
-    }
+var roomGridData = [];
 
-    dataTable = $("#roomTable").DataTable({
-        columnDefs: [
-            { targets: [10], className: "text-center" },
-            { targets: [10], orderable: false, searchable: false }
-        ],
-        pageLength: 10,
-        lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
-        searching: true,
-        ordering: true,
-        autoWidth: false,
-        responsive: true,
-        order: [[1, 'asc']], // Sort by room number (column 1) in ascending order
-        language: {
-            search: "Search:"
-        }
-    });
-    
+function initializeDataTable() {
+    $('#roomGridSearch').off('input').on('input', renderRoomGrid);
     reloadData();
+}
+
+function escRoom(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
+
+// Rooms grouped by floor, as cards (like the calendar's Room View)
+function renderRoomGrid() {
+    var q = String($('#roomGridSearch').val() || '').trim().toLowerCase();
+    var names = { '1': 'Available', '2': 'Occupied', '3': 'Out of order', '4': 'Cleaning' };
+    var rooms = roomGridData.filter(function (r) {
+        if (!q) return true;
+        return [r.ROOM_NUMBER, r.ROOM_TYPE_NAME, names[String(r.ROOM_STATUS)], r.ROOM_DESCRIPTION].join(' ').toLowerCase().indexOf(q) !== -1;
+    });
+    var floors = {};
+    rooms.forEach(function (r) {
+        var n = parseInt(String(r.ROOM_NUMBER), 10);
+        var f = (r.ROOM_FLOOR != null && r.ROOM_FLOOR !== '') ? r.ROOM_FLOOR : (n >= 100 ? Math.floor(n / 100) : 0);
+        (floors[f] = floors[f] || []).push(r);
+    });
+    var html = Object.keys(floors).sort(function (a, b) { return a - b; }).map(function (f) {
+        var list = floors[f].sort(function (a, b) { return String(a.ROOM_NUMBER).localeCompare(String(b.ROOM_NUMBER), undefined, { numeric: true }); });
+        return '<div class="rg-floor"><div class="rg-floor-title">Floor ' + escRoom(f) + ' <small>' + list.length + ' rooms</small></div><div class="rg-cards">' + list.map(function (r) {
+            var s = String(r.ROOM_STATUS);
+            var id = escRoom(r.IDNo);
+            return '<div class="rg-card rg-s' + escRoom(s) + '"><div class="rg-top"><span class="rg-num">#' + escRoom(r.ROOM_NUMBER) + '</span><span class="rg-badge">' + escRoom(names[s] || 'Unknown') + '</span></div>' +
+                '<div class="rg-type">' + escRoom(r.ROOM_TYPE_NAME || '') + '</div>' +
+                '<div class="rg-desc">' + escRoom(r.ROOM_DESCRIPTION || names[s] || '') + '</div>' +
+                '<div class="rg-actions"><button type="button" onclick="editRoom(\'' + id + '\')" title="Edit Room"><i class="fa fa-pencil"></i></button><button type="button" class="rg-del" onclick="deleteRoom(\'' + id + '\')" title="Delete Room"><i class="fa fa-trash"></i></button></div></div>';
+        }).join('') + '</div></div>';
+    }).join('');
+    $('#roomGrid').html(html || '<div style="opacity:.6">No rooms found.</div>');
+    $('#roomGridCount').text(rooms.length + ' rooms');
 }
 
 function refreshCurrentTab() {
@@ -335,61 +359,8 @@ function reloadData() {
         dataType: 'json',
         success: function(response) {
             if (response.success) {
-                dataTable.clear();
-                
-                if (response.data && response.data.length > 0) {
-                    response.data.forEach(function(room) {
-                        // Handle room image URL - only use ROOM_IMAGE field if it looks like a valid image filename
-                        let roomImage;
-                        if (room.ROOM_IMAGE && room.ROOM_IMAGE !== '' && 
-                            (room.ROOM_IMAGE.includes('.jpg') || room.ROOM_IMAGE.includes('.jpeg') || 
-                             room.ROOM_IMAGE.includes('.png') || room.ROOM_IMAGE.includes('.gif'))) {
-                            roomImage = `<img src="/img/rooms/${room.ROOM_IMAGE}" class="img-circle" width="50" height="50" alt="Room Image">`;
-                        } else {
-                            roomImage = `<div class="img-circle bg-secondary d-flex align-items-center justify-content-center" style="width: 50px; height: 50px; color: white; font-size: 12px;">No Image</div>`;
-                        }
-                        
-                        const bedCount = room.ROOM_BED + " Bed" + (room.ROOM_BED > 1 ? "s" : "");
-                        const roomView = room.ROOM_VIEW == 1 ? "Condo View" : "Mountain View";
-                        const amenities = room.AMENITIES && room.AMENITIES.length > 0 
-                            ? room.AMENITIES.map(amenity => amenity.NAME).join(', ')
-                            : 'No amenities';
-                        
-                        const statusText = {
-                            '1': 'AVAILABLE',
-                            '2': 'OCCUPIED',
-                            '3': 'MAINTENANCE',
-                            '4': 'CLEANING'
-                        };
-                        const statusBadge = `<span class="label label-sm ${getRoomStatusLabel(room.ROOM_STATUS)}">
-                            ${statusText[room.ROOM_STATUS] || 'UNKNOWN'}
-                        </span>`;
-                        
-                        const actions = `
-                            <button type="button" class="btn btn-tbl-edit btn-xs" onclick="editRoom('${room.IDNo}')" title="Edit Room">
-                                <i class="fa fa-pencil"></i>
-                            </button>
-                            <button type="button" class="btn btn-tbl-delete btn-xs" onclick="deleteRoom('${room.IDNo}')" title="Delete Room">
-                                <i class="fa fa-trash"></i>
-                            </button>
-                        `;
-                        
-                        dataTable.row.add([
-                            roomImage,
-                            room.ROOM_NUMBER,
-                            room.ROOM_TYPE_NAME,
-                            room.ROOM_MAX,
-                            bedCount,
-                            room.ROOM_SIZE,
-                            roomView,
-                            amenities,
-                            statusBadge,
-                            room.ROOM_DESCRIPTION,
-                            actions
-                        ]);
-                    });
-                    dataTable.draw();
-                }
+                roomGridData = response.data || [];
+                renderRoomGrid();
             } else {
                 console.error('Error loading room data:', response.message);
                 Swal.fire({
@@ -430,7 +401,7 @@ function createRoom() {
     // Add form fields  (room pricing lives in room_rates - no per-room price)
     formData.append('ROOM_TYPE_ID', $('#addRoomType').attr('data-value') || $('#addRoomType').val());
     formData.append('ROOM_NUMBER', $('#addRoomNumber').val());
-    formData.append('ROOM_STATUS', $('#addRoomStatus').val());
+    formData.append('ROOM_STATUS', roomStatusValue('#addRoomStatus'));
     formData.append('ROOM_MAX', $('#addRoomMax').val());
     formData.append('ROOM_BED', $('#addRoomBed').val());
     formData.append('ROOM_SIZE', $('#addRoomSize').val());
@@ -438,11 +409,6 @@ function createRoom() {
     formData.append('ROOM_DESCRIPTION', $('#addRoomDescription').val());
     formData.append('AMENITIES', JSON.stringify(selectedAmenities));
     
-    // Add image file if selected
-    const imageFile = $('#addRoomImage')[0].files[0];
-    if (imageFile) {
-        formData.append('ROOM_IMAGE', imageFile);
-    }
     
     $.ajax({
         url: '/room/api/rooms/create',
@@ -536,7 +502,7 @@ function populateEditRoomForm(room) {
     // Set dropdowns
     $('#editRoomType').val(room.ROOM_TYPE_NAME || '');
     $('#editRoomType').attr('data-value', room.ROOM_TYPE_ID);
-    $('#editRoomStatus').val(room.ROOM_STATUS);
+    $('#editRoomStatus').val(ROOM_STATUS_NAMES[String(room.ROOM_STATUS)] || '').attr('data-value', room.ROOM_STATUS).closest('.mdl-textfield').addClass('is-dirty');
     $('#editRoomBed').val(room.ROOM_BED);
     $('#editRoomView').val(room.ROOM_VIEW);
 
@@ -569,7 +535,7 @@ function updateRoom() {
     formData.append('IDNo', $('#editRoomId').val());
     formData.append('ROOM_TYPE_ID', $('#editRoomType').attr('data-value') || $('#editRoomType').val());
     formData.append('ROOM_NUMBER', $('#editRoomNumber').val());
-    formData.append('ROOM_STATUS', $('#editRoomStatus').val());
+    formData.append('ROOM_STATUS', roomStatusValue('#editRoomStatus'));
     formData.append('ROOM_MAX', $('#editRoomMax').val());
     formData.append('ROOM_BED', $('#editRoomBed').val());
     formData.append('ROOM_SIZE', $('#editRoomSize').val());
@@ -577,11 +543,6 @@ function updateRoom() {
     formData.append('ROOM_DESCRIPTION', $('#editRoomDescription').val());
     formData.append('AMENITIES', JSON.stringify(selectedAmenities));
     
-    // Add image file if selected
-    const imageFile = $('#editRoomImage')[0].files[0];
-    if (imageFile) {
-        formData.append('ROOM_IMAGE', imageFile);
-    }
     
     $.ajax({
         url: '/room/api/rooms/update',

@@ -42,8 +42,8 @@
         <div class="quotation-sheet" id="quotationSheet">
           <div class="quotation-header">
             <% if (!isPoolVilla) { %>
-            <img src="/img/Logo-Black.png" class="quotation-logo" alt="Main Stay Hotel">
-            <h2 contenteditable="true">MAIN STAY HOTEL</h2>
+            <% if (typeof propertyLogo !== 'undefined' && propertyLogo) { %><img src="<%= propertyLogo %>" class="quotation-logo" alt="Hotel Logo"><% } %>
+            <h2 contenteditable="true"><%= typeof propertyDisplayName !== 'undefined' ? propertyDisplayName : 'MAIN STAY HOTEL' %></h2>
             <p class="quotation-address" contenteditable="true">Clark Terrace Building, Lot 2 Block 1, The Villages, Prince Balagtas Avenue, Clark Freeport Zone, Pampanga, 2023<br>Clark Freeport Zone, Pampanga, 2023</p>
             <% } else { %>
             <h2 contenteditable="true">POOL VILLA</h2>
@@ -374,6 +374,34 @@
     recalcGrandTotal();
   });
 
+  // Pre-fill from a booking (print menu in Booking details)
+  const prefill = <%- JSON.stringify(typeof prefill !== 'undefined' ? prefill : null).replace(/</g, '\u003c') %>;
+  if (prefill) {
+    const billed = document.getElementById('quotationBilledTo');
+    if (billed) billed.textContent = String(prefill.guest || '').toUpperCase();
+    const esc = (s) => String(s).replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch]));
+    const tr = blankRow();
+    const cells = tr.querySelectorAll('td[contenteditable]');
+    cells[0].innerHTML = prefill.dateText;
+    cells[1].innerHTML = esc(prefill.roomType) + '<br>' + prefill.nights + (prefill.nights === 1 ? ' NIGHT' : ' NIGHTS');
+    cells[2].textContent = '1 ROOM';
+    cells[3].innerHTML = formatMoney(prefill.rate) + '<br>(PER NIGHT)';
+    cells[4].textContent = formatMoney(prefill.total);
+    rowsBody.innerHTML = '';
+    rowsBody.appendChild(tr);
+    (prefill.extras || []).forEach(function (x) {
+      const r = blankRow();
+      const cs = r.querySelectorAll('td[contenteditable]');
+      cs[0].innerHTML = prefill.dateText;
+      cs[1].innerHTML = esc(x.name);
+      cs[2].textContent = x.qty + (x.qty === 1 ? ' PC' : ' PCS');
+      cs[3].innerHTML = formatMoney(x.unit) + '<br>(PER PC)';
+      cs[4].textContent = formatMoney(x.amount);
+      rowsBody.appendChild(r);
+    });
+    recalcGrandTotal();
+  }
+
   const defaultSheetHtml = sheet.innerHTML;
   document.getElementById('quotationResetBtn').addEventListener('click', function () {
     Swal.fire({
@@ -431,6 +459,12 @@
         // 0.35in margin on Letter (8.5x11in) at 96dpi -> printable area.
         const pageWidthPx = (8.5 - 0.7) * 96;
         const pageHeightPx = (11 - 0.7) * 96;
+        // Measure the sheet itself at its own width. The popup window can be much wider than the sheet,
+        // and measuring the full-width wrapper made the scale (and the printout) tiny.
+        const sheetEl = printWindow.document.getElementById('quotationSheet');
+        const sheetW = sheetEl ? Math.min(sheetEl.offsetWidth || 820, 820) : 820;
+        fitEl.style.width = sheetW + 'px';
+        fitEl.style.margin = '0 auto';
         const rect = fitEl.getBoundingClientRect();
         let scale = Math.min(1, pageWidthPx / rect.width, pageHeightPx / rect.height);
         // Re-measure after zooming, since a zoomed element's own reflowed

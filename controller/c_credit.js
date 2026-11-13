@@ -103,6 +103,30 @@ const creditController = {
     }
   },
 
+  // The guest pays (part of) the credit through the normal Payment window.
+  payCredit: async (req, res) => {
+    try {
+      const { bookingId, paymentAmount, paymentMethod, paymentNotes } = req.body;
+      const paymentIds = Array.isArray(req.body.paymentIds) ? req.body.paymentIds.map((x) => parseInt(x, 10)).filter((x) => x > 0) : null;
+      const method = String(paymentMethod || '').toLowerCase();
+      if (!bookingId) return res.status(400).json({ success: false, message: 'Booking not found.' });
+      if (!method || method === 'credit' || method === 'marker') {
+        return res.status(400).json({ success: false, message: 'Choose how the guest pays (cash, bank transfer, card...). Credit cannot settle credit.' });
+      }
+      const amount = parseFloat(paymentAmount);
+      if (!(amount > 0)) return res.status(400).json({ success: false, message: 'Enter the amount paid.' });
+      const result = await creditModel.payCredit(bookingId, amount, method, String(paymentNotes || '').trim(), req.user.userId, paymentIds);
+      if (result.paid <= 0) return res.status(400).json({ success: false, message: 'There is no credit left to pay for this booking.' });
+      const msg = result.creditLeft > 0.004
+        ? `₱${result.paid.toFixed(2)} received. ₱${result.creditLeft.toFixed(2)} is still on credit.`
+        : `₱${result.paid.toFixed(2)} received. The credit is fully paid.`;
+      res.json({ success: true, message: msg, paid: result.paid, creditLeft: result.creditLeft });
+    } catch (err) {
+      console.error('Error paying credit:', err);
+      res.status(500).json({ success: false, message: 'Failed to record the payment.' });
+    }
+  },
+
   settleSelected: async (req, res) => {
     try {
       const { paymentIds } = req.body;

@@ -2,7 +2,7 @@
 <%
   // Same Pool Villa guest-count pricing used by add_booking.ejs - see
   // models/poolVillaRatesModel.js.
-  const isPoolVillaBooking = typeof currentProperty !== 'undefined' && currentProperty && currentProperty.CODE === 'pool_villa';
+  const isPoolVillaBooking = typeof isGuestPricing !== 'undefined' && isGuestPricing;
 %>
 
 <div class="modal fade" id="modal-add-group-booking" tabindex="-1" role="dialog" aria-labelledby="modalAddGroupBookingLabel" aria-hidden="true" data-bs-backdrop="static">
@@ -75,18 +75,19 @@
                   <option value="" disabled>Select Booking Resource</option>
                   <option value="walk-in" selected>Walk-in</option>
                   <option value="agency">Agency</option>
+                  <% if (!(typeof hideRate === 'function' && hideRate('contracted'))) { %><option value="contracted">Contracted</option><% } %><% (typeof customRates !== 'undefined' ? customRates : []).forEach(function (r) { %><option value="<%= r.key %>" data-base-label="<%= r.label %>"><%= r.label %></option><% }); %>
                   <!-- Only Walk-in/Agency are real Pool Villa categories (see add_booking.ejs). -->
                   <% if (!isPoolVillaBooking) { %>
-                  <option value="tenant">Tenant (15%)</option>
-                  <option value="vip">VIP (20%)</option>
-                  <option value="employee">Employee (30%)</option>
-                  <option value="senior_special">Senior / Special 20%</option>
+                  <% if (!(typeof hideRate === 'function' && hideRate('tenant'))) { %><option value="tenant">Tenant (15%)</option><% } %>
+                  <% if (!(typeof hideRate === 'function' && hideRate('vip'))) { %><option value="vip">VIP (20%)</option><% } %>
+                  <% if (!(typeof hideRate === 'function' && hideRate('employee'))) { %><option value="employee">Employee (30%)</option><% } %>
+                  <% if (!(typeof hideRate === 'function' && hideRate('senior_special'))) { %><option value="senior_special">Senior / Special 20%</option><% } %>
                   <% } %>
                   <% if (!isPoolVillaBooking) { %>
-                  <option value="booking-channel">OTA / Channel</option>
+                  <% if (!(typeof hideRate === 'function' && hideRate('booking-channel'))) { %><option value="booking-channel">OTA / Channel</option><% } %>
                   <% } %>
                   <option value="manual_rate">Manual Price</option>
-                  <option value="percentage">Manual Percent</option>
+                  <% if (!(typeof hideRate === 'function' && hideRate('percentage'))) { %><option value="percentage">Manual Percent</option><% } %>
                   <!-- Not manually pickable (disabled + hidden from the open list) - matches
                        single booking's add_booking.ejs: only ever shown by
                        syncGroupLongTermRateDropdown() once the stay hits 10+ nights, so the
@@ -209,18 +210,19 @@
               </div>
             </div>
             
-            <div class="col-lg-3">
+            <!-- Guest Type / Guest Level removed from the screen (kept hidden, not required, for the JS that fills and reads them) -->
+            <div class="col-lg-3" style="display:none;">
               <div class="form-group">
                 <label class="form-label">Guest Type</label>
-                <select class="form-select" id="groupGuestType" name="groupGuestType" required>
+                <select class="form-select" id="groupGuestType" name="groupGuestType">
                   <option value="" disabled selected>Guest Type</option>
                 </select>
               </div>
             </div>
-            <div class="col-lg-3">
+            <div class="col-lg-3" style="display:none;">
               <div class="form-group">
                 <label class="form-label">Guest Level</label>
-                <select class="form-select" id="groupGuestLevel" name="groupGuestLevel" required>
+                <select class="form-select" id="groupGuestLevel" name="groupGuestLevel">
                   <option value="" disabled selected>Guest Level</option>
                 </select>
               </div>
@@ -263,25 +265,52 @@
                 <div id="groupBreakfastRateNote" class="group-breakfast-note" style="display:none;"></div>
               </div>
             </div>
-            <div class="col-lg-4">
-              <div class="form-check mb-2">
-                <input class="form-check-input" type="checkbox" id="groupIncludePickup" name="groupIncludePickup">
-                <label class="form-check-label" for="groupIncludePickup">Add Pick-up</label>
+            <div class="col-lg-8">
+              <div class="row">
+            <div class="col-sm-6">
+                      <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="groupIncludePickup" name="groupIncludePickup">
+                        <label class="form-check-label" for="groupIncludePickup">Add Pick-up</label>
+                      </div>
+                      <div id="groupPickupWrapper" class="mt-2" style="display: none;">
+                        <input type="number" class="form-control" id="groupPickupPrice" name="groupPickupPrice" placeholder="Pick-up Price" min="0" step="0.01">
+                        <input type="hidden" id="groupPickupServiceId" name="groupPickupServiceId">
+                      </div>
+                    </div>
+                    <div class="col-sm-6">
+                      <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="groupIncludeDropoff" name="groupIncludeDropoff">
+                        <label class="form-check-label" for="groupIncludeDropoff">Add Drop-off</label>
+                      </div>
+                      <div id="groupDropoffWrapper" class="mt-2" style="display: none;">
+                        <input type="number" class="form-control" id="groupDropoffPrice" name="groupDropoffPrice" placeholder="Drop-off Price" min="0" step="0.01">
+                        <input type="hidden" id="groupDropoffServiceId" name="groupDropoffServiceId">
+                      </div>
+                    </div>
               </div>
-              <div id="groupPickupWrapper" class="mt-2" style="display: none;">
-                <input type="number" class="form-control" id="groupPickupPrice" name="groupPickupPrice" placeholder="Pick-up Price" min="0" step="0.01">
-                <input type="hidden" id="groupPickupServiceId" name="groupPickupServiceId">
-              </div>
-            </div>
-            <div class="col-lg-4">
-              <div class="form-check mb-2">
-                <input class="form-check-input" type="checkbox" id="groupIncludeDropoff" name="groupIncludeDropoff">
-                <label class="form-check-label" for="groupIncludeDropoff">Add Drop-off</label>
-              </div>
-              <div id="groupDropoffWrapper" class="mt-2" style="display: none;">
-                <input type="number" class="form-control" id="groupDropoffPrice" name="groupDropoffPrice" placeholder="Drop-off Price" min="0" step="0.01">
-                <input type="hidden" id="groupDropoffServiceId" name="groupDropoffServiceId">
-              </div>
+                    <!-- Extra breakfast: the room-rate tier already covers 2 breakfasts per room; anything
+                         above that is charged here, once per booking, at a price typed by staff. -->
+                    <div id="groupBreakfastExtraBox" class="group-breakfast-extra" style="display:none;">
+                      <div class="gbx-head">
+                        <span class="gbx-title">Extra breakfast</span>
+                        <span class="gbx-total">Total: <b id="groupExtraBfTotal">₱0.00</b></span>
+                      </div>
+                      <div class="gbx-sub">Above 2 per room &middot; once per booking</div>
+                      <div class="gbx-prices">
+                        <div id="gbxAdultPriceWrap">
+                          <label for="groupExtraBfAdultPrice">Extra adult</label>
+                          <input type="number" class="form-control" id="groupExtraBfAdultPrice" value="500" min="0" step="0.01">
+                        </div>
+                        <div id="gbxKidPriceWrap">
+                          <label for="groupExtraBfKidPrice">Extra kid</label>
+                          <input type="number" class="form-control" id="groupExtraBfKidPrice" value="500" min="0" step="0.01">
+                        </div>
+                      </div>
+                      <details class="gbx-details" open>
+                        <summary>Adjust per room</summary>
+                        <div id="groupExtraBfRooms" class="gbx-rooms"></div>
+                      </details>
+                    </div>
             </div>
             <div id="groupPickupDropoffFlightInfo" class="col-lg-12" style="display: none; margin-top: 10px;">
               <div class="d-flex gap-2 align-items-end flex-wrap">
@@ -352,12 +381,11 @@
               <input type="hidden" id="groupDiscountRemarks" name="groupDiscountRemarks">
             </div>
             <div class="col-lg-6">
-              <div class="form-check mb-2">
-                <input class="form-check-input" type="checkbox" id="groupIndividualBilling">
-                <label class="form-check-label" for="groupIndividualBilling">Individual Billing</label>
-              </div>
-              <div class="form-text">
-                <small class="text-muted">If unchecked, all charges go to main booking (Master Billing)</small>
+              <!-- Every new group has ONE bill on the main booking (Master Billing). The "Individual Billing" choice is gone;
+                   the checkbox stays in the page (always unchecked) because the group code still reads it. -->
+              <input type="checkbox" id="groupIndividualBilling" style="display: none;">
+              <div class="form-text mt-1">
+                <small class="text-muted"><i class="fa fa-info-circle"></i> One bill for the whole group: all charges go to the main booking.</small>
               </div>
             </div>
           </div>
@@ -392,7 +420,7 @@
                       <input class="form-check-input" type="checkbox" id="groupWeekendPriceToggle" name="groupWeekendPriceToggle">
                       <label class="form-check-label" for="groupWeekendPriceToggle">Separate Weekend Rate</label>
                     </div>
-                    <div class="form-check mb-0">
+                    <div class="form-check mb-0" style="<%= (typeof hideRate === 'function' && !hideRate('contracted')) ? 'display:none;' : '' %>">
                       <input class="form-check-input" type="checkbox" id="groupIncludeContractedRate" name="groupIncludeContractedRate">
                       <label class="form-check-label" for="groupIncludeContractedRate">Contracted Rate (-₱200/night, all rooms)</label>
                     </div>
@@ -939,7 +967,35 @@
 
 /* Same visual language as single booking's #breakfastRateNote - confirms the
    room rate already absorbed the breakfast tier bump, no separate charge. */
-#modal-add-group-booking .group-breakfast-note {
+#modal-add-group-booking .group-breakfast-extra {
+  margin-top: 8px; padding: 8px 10px; border-radius: 8px; box-sizing: border-box; max-width: 100%;
+  border: 1px solid rgba(255, 193, 7, 0.45); background: rgba(255, 193, 7, 0.08); font-size: 12px;
+}
+#modal-add-group-booking .group-breakfast-extra .gbx-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+#modal-add-group-booking .group-breakfast-extra .gbx-title { font-weight: 600; }
+#modal-add-group-booking .group-breakfast-extra .gbx-sub { font-size: 11px; opacity: 0.75; margin-bottom: 6px; }
+#modal-add-group-booking .group-breakfast-extra .gbx-prices { display: flex; gap: 8px; }
+#modal-add-group-booking .group-breakfast-extra .gbx-prices > div { flex: 1 1 0; min-width: 0; }
+#modal-add-group-booking .group-breakfast-extra .gbx-prices input { height: 30px; padding: 2px 8px; }
+#modal-add-group-booking .group-breakfast-extra label { display: block; font-size: 11px; margin-bottom: 2px; opacity: 0.85; }
+#modal-add-group-booking .group-breakfast-extra .gbx-details { margin-top: 6px; }
+#modal-add-group-booking .group-breakfast-extra .gbx-details summary { cursor: pointer; font-size: 11px; opacity: 0.9; }
+#modal-add-group-booking .group-breakfast-extra .gbx-rooms { margin-top: 6px; max-height: 230px; overflow-y: auto; }
+#modal-add-group-booking .group-breakfast-extra .gbx-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+#modal-add-group-booking .group-breakfast-extra .gbx-table th { position: sticky; top: 0; background: #2b3035; font-weight: 600; font-size: 11px; padding: 4px 6px; text-align: center; border-bottom: 1px solid rgba(255,255,255,.15); z-index: 1; }
+#modal-add-group-booking .group-breakfast-extra .gbx-table th small { font-weight: 400; opacity: .7; }
+#modal-add-group-booking .group-breakfast-extra .gbx-table td { padding: 4px 6px; text-align: center; border-bottom: 1px solid rgba(255,255,255,.07); vertical-align: middle; }
+#modal-add-group-booking .group-breakfast-extra .gbx-table th:first-child,
+#modal-add-group-booking .group-breakfast-extra .gbx-table td:first-child { text-align: left; font-weight: 600; }
+#modal-add-group-booking .group-breakfast-extra .gbx-table td:last-child { text-align: right; white-space: nowrap; }
+#modal-add-group-booking .group-breakfast-extra .gbx-table th:last-child { text-align: right; }
+#modal-add-group-booking .group-breakfast-extra .gbx-all td { background: rgba(255,255,255,.05); }
+#modal-add-group-booking .group-breakfast-extra .gbx-step { display: inline-flex; align-items: center; gap: 6px; }
+#modal-add-group-booking .group-breakfast-extra .gbx-step b { min-width: 16px; display: inline-block; text-align: center; font-size: 13px; }
+#modal-add-group-booking .group-breakfast-extra .gbx-btn { width: 22px; height: 22px; padding: 0; line-height: 1; border-radius: 50%; border: 1px solid rgba(255,255,255,.35); background: transparent; color: inherit; cursor: pointer; font-size: 14px; }
+#modal-add-group-booking .group-breakfast-extra .gbx-btn:hover:not(:disabled) { background: rgba(255,255,255,.15); }
+#modal-add-group-booking .group-breakfast-extra .gbx-btn:disabled { opacity: .3; cursor: not-allowed; }
+
   display: flex;
   gap: 8px;
   align-items: flex-start;
@@ -1857,7 +1913,7 @@
   // guest count (groupRoomGuestCounts, keyed by room IDNo) via the input
   // added to its row in displayManualRateInputs().
   function groupIsPoolVillaActive() {
-    return document.documentElement.getAttribute('data-property-theme') === 'pool_villa';
+    return document.documentElement.getAttribute('data-property-pricing') === 'guest';
   }
 
   let groupPoolVillaRates = {};
@@ -2016,7 +2072,7 @@
   // booking's Room Rate select uses (public/js/booking/add_booking.js
   // RATE_OPT_CAT) - OTA/Channel is priced as walk-in there too.
   const GROUP_RATE_OPT_CAT = {
-    'walk-in': 'walk_in', 'agency': 'agency', 'tenant': 'tenant',
+    'walk-in': 'walk_in', 'agency': 'agency', 'contracted': 'contracted', 'tenant': 'tenant',
     'vip': 'vip', 'employee': 'employee', 'senior_special': 'senior_special',
     'booking-channel': 'walk_in', 'manual_rate': 'walk_in', 'percentage': 'walk_in'
   };
@@ -2034,6 +2090,7 @@
     { min: 32, max: null, category: 'long_term_over30' }
   ];
   function groupLongTermCategoryForNights(nights) {
+    if (window.__noLongTermRates) return null; // this property has no Long Term rates
     const n = parseInt(nights, 10) || 0;
     for (const band of GROUP_LONG_TERM_BANDS) {
       if (n >= band.min && (band.max === null || n <= band.max)) return band.category;
@@ -2045,10 +2102,11 @@
   // selected, same as single booking's rateCategory() - resolved from the
   // stay length rather than picked manually.
   function isGroupLongTermStayRate() {
-    return (parseInt($('#groupNights').val(), 10) || 0) >= 10;
+    return !window.__noLongTermRates && (parseInt($('#groupNights').val(), 10) || 0) >= 10;
   }
 
   function groupRateCategory() {
+    if (/^custom_\d+$/.test(String(getGroupPriceBookingType() || ''))) return getGroupPriceBookingType();   // the property's own rate: no long-term override
     const longTermCat = groupLongTermCategoryForNights($('#groupNights').val());
     if (longTermCat) return longTermCat;
     return GROUP_RATE_OPT_CAT[getGroupPriceBookingType()] || 'walk_in';
@@ -2063,7 +2121,7 @@
     const select = document.getElementById('groupBookingRoute');
     if (!select) return;
     const currentVal = select.value;
-    if (currentVal === 'booking-channel' || currentVal === 'manual_rate' || currentVal === 'percentage') return;
+    if (currentVal === 'booking-channel' || currentVal === 'manual_rate' || currentVal === 'percentage' || /^custom_\d+$/.test(currentVal)) return;
     if (isGroupLongTermStayRate() && currentVal !== 'long_term') {
       select.value = 'long_term';
       // .value doesn't fire 'change', so the dependent field toggles (which
@@ -2110,6 +2168,114 @@
         .show();
     }
   }
+
+  // ---- Extra breakfast: the room-rate tier already includes 2 breakfasts per room. ----
+  // Anything above 2 per room is an extra, charged ONCE per booking (not per night) at a
+  // price staff types, applied to every selected room - and staff can lower/remove the
+  // extras of a single room. The 2 included go to adults first, then kids.
+  const GROUP_BF_INCLUDED_PER_ROOM = 2;
+  let groupExtraBfOverrides = {};   // roomId -> { a, k } (only when staff changed that room)
+  let groupExtraBfCountSig = '';    // extras-per-room signature; a change drops the overrides
+  let groupExtraBfRenderSig = '';   // extras + room list signature; a change re-draws the list
+
+  function groupExtraBfBase() {
+    if (!$('#groupIncludeBreakfast').is(':checked')) return { a: 0, k: 0 };
+    const adults = parseInt($('#groupBreakfastAdultQty').val(), 10) || 0;
+    const kids = parseInt($('#groupBreakfastKidQty').val(), 10) || 0;
+    const kidsIncluded = Math.max(0, GROUP_BF_INCLUDED_PER_ROOM - adults);
+    return { a: Math.max(0, adults - GROUP_BF_INCLUDED_PER_ROOM), k: Math.max(0, kids - kidsIncluded) };
+  }
+
+  // A room's extra breakfast people: the extras per room can be split any way between adults and kids
+  // (e.g. 1 adult + 3 kids -> 2 adults + 2 kids), but never more people than the extras that exist.
+  function groupExtraBfEff(base, ov) {
+    const cap = base.a + base.k;
+    if (!ov) return { a: base.a, k: base.k };
+    const a = Math.max(0, Math.min(ov.a, cap));
+    const k = Math.max(0, Math.min(ov.k, cap - a));
+    return { a, k };
+  }
+
+  function refreshGroupExtraBf() {
+    const base = groupExtraBfBase();
+    const roomVal = $('#groupSelectedRooms').val();
+    const ids = roomVal ? roomVal.split(',').filter(Boolean) : [];
+    const $box = $('#groupBreakfastExtraBox');
+
+    const countSig = base.a + '|' + base.k;
+    if (countSig !== groupExtraBfCountSig) {
+      groupExtraBfCountSig = countSig;
+      groupExtraBfOverrides = {};
+    }
+
+    const adultPrice = Math.max(0, parseFloat($('#groupExtraBfAdultPrice').val()) || 0);
+    const kidPrice = Math.max(0, parseFloat($('#groupExtraBfKidPrice').val()) || 0);
+
+    const rows = (ids.length ? ids : [null]).map(id => {
+      const ov = id !== null ? groupExtraBfOverrides[id] : null;
+      const eff = groupExtraBfEff(base, ov);
+      return { id, a: eff.a, k: eff.k };
+    });
+    const adultTotal = rows.reduce((s, r) => s + r.a, 0) * adultPrice;
+    const kidTotal = rows.reduce((s, r) => s + r.k, 0) * kidPrice;
+    const total = adultTotal + kidTotal;
+
+    if (base.a + base.k === 0) {
+      $box.hide();
+      groupExtraBfRenderSig = '';
+    } else {
+      $box.show();
+      const cap = base.a + base.k;
+      $('#gbxAdultPriceWrap, #gbxKidPriceWrap').show();
+      $('#groupExtraBfBox summary, .gbx-details summary').text('Adjust per room (up to ' + cap + ' extra each, adults + kids)');
+      const money = (n) => '₱' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const step = (id, kind, val, atMin, atMax) =>
+        '<span class="gbx-step"><button type="button" class="gbx-btn" data-room-id="' + id + '" data-kind="' + kind + '" data-step="-1"' + (atMin ? ' disabled' : '') + '>&minus;</button>' +
+        '<b>' + val + '</b>' +
+        '<button type="button" class="gbx-btn" data-room-id="' + id + '" data-kind="' + kind + '" data-step="1"' + (atMax ? ' disabled' : '') + '>+</button></span>';
+      const real = rows.filter(r => r.id !== null);
+      let html = '';
+      if (real.length) {
+        const same = (key) => real.every(r => r[key] === real[0][key]);
+        const allRow = real.length > 1
+          ? '<tr class="gbx-all"><td>All rooms</td>' +
+            '<td>' + step('all', 'a', same('a') ? real[0].a : '–', real.every(r => r.a <= 0), real.every(r => r.a + r.k >= cap)) + '</td>' +
+            '<td>' + step('all', 'k', same('k') ? real[0].k : '–', real.every(r => r.k <= 0), real.every(r => r.a + r.k >= cap)) + '</td>' +
+            '<td>' + money(total) + '</td></tr>'
+          : '';
+        const body = real.map(r => {
+          const room = groupAvailableRooms.find(x => normalizeRoomId(x.IDNo) === normalizeRoomId(r.id));
+          const label = room && room.ROOM_NUMBER ? room.ROOM_NUMBER : r.id;
+          return '<tr><td>' + label + '</td>' +
+            '<td>' + step(r.id, 'a', r.a, r.a <= 0, r.a + r.k >= cap) + '</td>' +
+            '<td>' + step(r.id, 'k', r.k, r.k <= 0, r.a + r.k >= cap) + '</td>' +
+            '<td>' + money(r.a * adultPrice + r.k * kidPrice) + '</td></tr>';
+        }).join('');
+        html = '<table class="gbx-table"><thead><tr><th>Room</th>' +
+          '<th>Adults <small>(₱' + adultPrice.toLocaleString('en-US') + ')</small></th>' +
+          '<th>Kids <small>(₱' + kidPrice.toLocaleString('en-US') + ')</small></th>' +
+          '<th>Amount</th></tr></thead><tbody>' + allRow + body + '</tbody></table>';
+      } else {
+        html = '<div style="opacity:.7;padding:4px 0;">Pick the rooms to set the extras room by room.</div>';
+      }
+      const $list = $('#groupExtraBfRooms');
+      const keepScroll = $list.scrollTop();
+      $list.html(html);
+      $list.scrollTop(keepScroll);
+      groupExtraBfRenderSig = countSig;
+    }
+    $('#groupExtraBfTotal').text('₱' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
+    return {
+      total,
+      adultTotal,
+      kidTotal,
+      adultPrice,
+      kidPrice,
+      perRoom: rows.map(r => ({ a: r.a, k: r.k }))
+    };
+  }
+  window.getGroupExtraBreakfast = refreshGroupExtraBf;
 
   // Contracted Rate: fixed -₱200/night, applied on top of whatever the
   // category/day/breakfast/season lookup (or legacy fallback) resolves to.
@@ -2571,6 +2737,9 @@
     window.__roomCheckerQuotedRoomTotal = 0; // only set for this one Room Checker handoff (see openRoomCheckerGroupBooking), never carry into the next open
     window.__roomCheckerQuotedRoomCount = 0;
     $('#groupBookingId').val(''); // Clear existing group ID
+    groupExtraBfOverrides = {};
+    groupExtraBfCountSig = '';
+    groupExtraBfRenderSig = '';
     $('#groupJoinExistingGroup').val('false'); // Reset join flag
     groupBlocks = [];
     groupNonConsecutiveBlocks = [];
@@ -3001,12 +3170,8 @@
     // get the free slot; when only adults are set (breakfastCount handed off
     // from Room Checker with kidQty 0, the common case) this reduces to the
     // exact same math Room Checker itself used.
-    const totalBreakfastQty = adultQty + kidQty;
-    const freeBreakfastBaseline = numRooms * nights;
-    const freeBreakfastQty = Math.min(totalBreakfastQty, freeBreakfastBaseline);
-    const chargeableBreakfastRatio = totalBreakfastQty > 0 ? (totalBreakfastQty - freeBreakfastQty) / totalBreakfastQty : 0;
-    const breakfastTotal = ((adultQty * adultPrice) + (kidQty * kidPrice)) * chargeableBreakfastRatio;
-    const breakfastTotalWithIndividual = breakfastIndividual ? breakfastTotal * numRooms : breakfastTotal;
+    // Extra breakfast only (beyond the 2 included in the rate tier), once per booking.
+    const breakfastTotalWithIndividual = refreshGroupExtraBf().total;
 
     const servicesTotal = breakfastTotalWithIndividual + pickupPrice + dropoffPrice + extraBedTotal;
 
@@ -4014,6 +4179,29 @@
       updateGroupBreakfastNote();
       refreshGroupRoomPricing();
     });
+
+    // Extra breakfast: price boxes + per-room reduce/remove.
+    $(document).on('input change', '#groupExtraBfAdultPrice, #groupExtraBfKidPrice', function() {
+      computeGroupTotal();
+    });
+    // Stepper buttons (- / +) per room, or for all rooms at once; the count can never go past the extras that exist.
+    $(document).on('click', '#groupExtraBfRooms .gbx-btn', function() {
+      const base = groupExtraBfBase();
+      const kind = $(this).attr('data-kind');
+      const delta = parseInt($(this).attr('data-step'), 10) || 0;
+      const target = String($(this).attr('data-room-id'));
+      const roomVal = $('#groupSelectedRooms').val();
+      const ids = roomVal ? roomVal.split(',').filter(Boolean) : [];
+      const cap = base.a + base.k;
+      const other = kind === 'a' ? 'k' : 'a';
+      const apply = (id) => {
+        const cur = groupExtraBfEff(base, groupExtraBfOverrides[id]);
+        cur[kind] = Math.max(0, Math.min(cap - cur[other], cur[kind] + delta));
+        groupExtraBfOverrides[id] = cur;
+      };
+      (target === 'all' ? ids : [target]).forEach(apply);
+      computeGroupTotal();
+    });
   }
 
   function setManualSelectionMode(enabled) {
@@ -4891,12 +5079,8 @@
       // Same free-baseline split as computeGroupTotal (1 breakfast per room,
       // per night is already covered by the room rate) - keeps the printed
       // voucher's total matching what the live Summary showed.
-      const totalBreakfastQty = adultQty + kidQty;
-      const freeBreakfastBaseline = numRooms * nights;
-      const freeBreakfastQty = Math.min(totalBreakfastQty, freeBreakfastBaseline);
-      const chargeableBreakfastRatio = totalBreakfastQty > 0 ? (totalBreakfastQty - freeBreakfastQty) / totalBreakfastQty : 0;
-      const breakfastTotal = ((adultQty * adultPrice) + (kidQty * kidPrice)) * chargeableBreakfastRatio;
-      const breakfastTotalWithIndividual = breakfastIndividual ? breakfastTotal * numRooms : breakfastTotal;
+      // Extra breakfast only (beyond the 2 included in the rate tier), once per booking.
+      const breakfastTotalWithIndividual = refreshGroupExtraBf().total;
       const pickupPrice = $('#groupIncludePickup').is(':checked') ? parseFloat($('#groupPickupPrice').val()) || 0 : 0;
       const dropoffPrice = $('#groupIncludeDropoff').is(':checked') ? parseFloat($('#groupDropoffPrice').val()) || 0 : 0;
       const extraBedQty = $('#groupIncludeExtraBed').is(':checked') ? (parseInt($('#groupExtraBedQty').val(), 10) || 0) : 0;
@@ -4949,5 +5133,5 @@
 })();
 </script>
 <script src="/js/booking/contact_channel.js?v=2"></script>
-<script src="/js/booking/group_booking_submit.js?v=remove-senior-pwd-1"></script>
+<script src="/js/booking/group_booking_submit.js?v=extra-bf-1"></script>
 

@@ -11,14 +11,58 @@ const PropertyModel = require('../models/propertyModel');
 // no per-controller render() changes). Falls back to the default property
 // (Main Hotel) when the cookie is missing/invalid - never leaves
 // req.propertyId pointing at nothing while the property table has rows.
+// The properties an account may open: an Admin has all of them, everybody else only the ones given in User Info (user_property).
+// Cached for a short time per account (the list is changed rarely; saving it in User Info clears the cache).
+const propertyCache = new Map();
+function forgetUserProperties(userId) { if (userId == null) propertyCache.clear(); else propertyCache.delete(Number(userId)); }
+async function allowedPropertiesOf(user, all) {
+  if (!user || Number(user.PERMISSIONS) === 1 || user.userId == null) return all;
+  let ids;
+  const hit = propertyCache.get(Number(user.userId));
+  if (hit && Date.now() - hit.at < 20000) ids = hit.ids;
+  else {
+    try { ids = (await require('../models/userModels').getPropertyIds(user.userId)); } catch (e) { ids = null; }
+    if (ids) propertyCache.set(Number(user.userId), { ids, at: Date.now() });
+  }
+  if (!ids) return all;                                  // could not read the list: do not lock anybody out
+  const mine = all.filter((p) => ids.includes(p.IDNo));
+  return mine.length ? mine : all.filter((p) => p.IS_DEFAULT).slice(0, 1);
+}
+
 async function attachProperty(req, res) {
-  const property = await PropertyModel.resolveFromCookie(req.cookies?.current_property);
+  const everyProperty = await PropertyModel.getAllActive();
+  const allowed = await allowedPropertiesOf(req.user, everyProperty);
+  let property = await PropertyModel.resolveFromCookie(req.cookies?.current_property);
+  if (!property || !allowed.some((p) => p.IDNo === property.IDNo)) {
+    property = allowed[0] || property;                   // the property in the cookie is not this account's: use its own
+    if (property && res.cookie) res.cookie('current_property', property.CODE, { maxAge: 90 * 24 * 60 * 60 * 1000, httpOnly: false, sameSite: 'lax' });
+  }
   req.propertyId = property ? property.IDNo : null;
+  req.allowedPropertyIds = allowed.map((p) => p.IDNo);
   res.locals.currentProperty = property;
-  res.locals.allProperties = await PropertyModel.getAllActive();
+  res.locals.allProperties = allowed;
+  // Per-property settings the views read (all from the property row, nothing hardcoded per code):
+  //   isGuestPricing   - rates by number of guests / single room panel / no Room View
+  //   hideMenu('key')  - true when the sidebar item is hidden for this property
+  //   propertyDisplayName - the name for headers and printed documents
+  res.locals.isGuestPricing = !!(property && property.GUEST_PRICING);
+  res.locals.propertyLogo = (property && property.LOGO) || '';
+  const hidden = new Set(String((property && property.HIDDEN_MENUS) || '').split(',').map((k) => k.trim()).filter(Boolean));
+  res.locals.hideMenu = (key) => hidden.has(key);
+  // Room Rate choices (booking forms) this property does not offer - hideRate('tenant') etc.
+  const hiddenRates = new Set(String((property && property.HIDDEN_RATE_OPTIONS) || '').split(',').map((k) => k.trim()).filter(Boolean));
+  res.locals.hideRate = (key) => hiddenRates.has(key);
+  // Custom Room Rate choices this property made on the Room Rates page: [{ key: 'custom_3', label: 'Promo' }]
+  try { res.locals.customRates = await require('../models/roomRatesModel').listCustom(req.propertyId); } catch (e) { res.locals.customRates = []; }
+  // Rooms menu fields this property does not use - hideRoomField('bed_type') etc.
+  const hiddenRoomFields = new Set(String((property && property.HIDDEN_ROOM_FIELDS) || '').split(',').map((k) => k.trim()).filter(Boolean));
+  res.locals.hideRoomField = (key) => hiddenRoomFields.has(key);
+  res.locals.propertyDisplayName = (property && (property.DISPLAY_NAME || property.NAME)) || 'MAIN STAY HOTEL';
 }
 
 class AuthMiddleware {
+  static forgetUserProperties(userId) { forgetUserProperties(userId); }
+
   // Check if user is authenticated (for API routes)
   static async isAuthenticated(req, res, next) {
     const token = req.headers.authorization?.split(' ')[1] || req.cookies?.token;

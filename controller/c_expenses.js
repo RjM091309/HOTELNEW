@@ -4,10 +4,9 @@ const path = require('path');
 const fs = require('fs');
 
 // Expenses like the cage system's expense page (data entry only, no settlement):
-// main / sub categories, expenses, return money ("sukli") and receipt photos.
+// main / sub categories, expenses and receipt photos.
 
 const RECEIPT_DIR = 'public/uploads/expense_receipts';
-const RETURN_MONEY = 'return money';
 
 // Receipt photo upload, the same way vehicle photos are stored.
 const upload = multer({
@@ -69,22 +68,21 @@ async function expenseFields(body) {
   return e;
 }
 
-/** Everything the page shows: expenses, return money, categories and the vehicles to pick from. */
-async function pageData() {
-  const [expenses, returns, categories, vehicles] = await Promise.all([
-    expensesModel.getAllExpenses(),
-    expensesModel.getReturnMoney(),
+/** Everything the page shows: expenses, categories and the vehicles to pick from. */
+async function pageData(propertyId) {
+  const [expenses, categories, vehicles] = await Promise.all([
+    expensesModel.getAllExpenses(propertyId),
     expensesModel.getCategories(),
     expensesModel.getVehicleChoices()
   ]);
-  return { success: true, expenses, returns, categories, vehicles };
+  return { success: true, expenses, categories, vehicles };
 }
 
 /** Sends the page data with a message, or the error message as a 400. */
-async function reply(res, work, message) {
+async function reply(req, res, work, message) {
   try {
     await work();
-    res.json({ ...(await pageData()), message });
+    res.json({ ...(await pageData(req.propertyId)), message });
   } catch (error) {
     if (error && error.message && !error.sql) return res.status(400).json({ success: false, message: error.message });
     console.error('Expenses error:', error);
@@ -95,7 +93,6 @@ async function reply(res, work, message) {
 function categoryName(body) {
   const name = text(body.name);
   if (!name) throw new Error('Enter a category name.');
-  if (name.toLowerCase() === RETURN_MONEY) throw new Error('"Return Money" is kept for the change given back; choose another name.');
   return name;
 }
 
@@ -116,7 +113,7 @@ const expensesController = {
 
   getExpensesData: async (req, res) => {
     try {
-      res.json(await pageData());
+      res.json(await pageData(req.propertyId));
     } catch (error) {
       console.error('Error fetching expenses data:', error);
       res.status(500).json({ success: false, message: 'Error retrieving expenses data.' });
@@ -128,11 +125,12 @@ const expensesController = {
   addExpense: withUpload(async (req, res) => {
     const photo = req.file ? req.file.filename : null;
     await reply(
+      req,
       res,
       async () => {
         try {
           const e = await expenseFields(req.body);
-          await expensesModel.addExpense({ ...e, receiptPhoto: photo, encodedBy: userName(req) });
+          await expensesModel.addExpense({ ...e, receiptPhoto: photo, encodedBy: userName(req), propertyId: req.propertyId });
         } catch (error) {
           removeReceiptFile(photo);
           throw error;
@@ -145,15 +143,16 @@ const expensesController = {
   updateExpense: withUpload(async (req, res) => {
     const photo = req.file ? req.file.filename : null;
     await reply(
+      req,
       res,
       async () => {
-        const before = await expensesModel.getExpenseById(req.params.id);
+        const before = await expensesModel.getExpenseById(req.params.id, req.propertyId);
         try {
           if (!before) throw new Error('Expense not found.');
           const e = await expenseFields(req.body);
           // A new file replaces the photo; removePhoto clears it; otherwise it is kept.
           const receiptPhoto = photo || (req.body.removePhoto === '1' ? null : undefined);
-          await expensesModel.updateExpense(req.params.id, { ...e, receiptPhoto, editedBy: userName(req) });
+          await expensesModel.updateExpense(req.params.id, { ...e, receiptPhoto, editedBy: userName(req), propertyId: req.propertyId });
           if (receiptPhoto !== undefined) removeReceiptFile(before.RECEIPT_PHOTO);
         } catch (error) {
           removeReceiptFile(photo);
@@ -166,9 +165,10 @@ const expensesController = {
 
   deleteExpense: async (req, res) => {
     await reply(
+      req,
       res,
       async () => {
-        const result = await expensesModel.deleteExpense(req.params.id, userName(req));
+        const result = await expensesModel.deleteExpense(req.params.id, userName(req), req.propertyId);
         if (result.notFound) throw new Error('Expense not found or already deleted.');
       },
       'Expense deleted successfully!'
@@ -179,6 +179,7 @@ const expensesController = {
 
   addCategory: async (req, res) => {
     await reply(
+      req,
       res,
       async () => {
         const name = categoryName(req.body);
@@ -197,6 +198,7 @@ const expensesController = {
 
   renameCategory: async (req, res) => {
     await reply(
+      req,
       res,
       async () => {
         const name = categoryName(req.body);
@@ -212,6 +214,7 @@ const expensesController = {
 
   deleteCategory: async (req, res) => {
     await reply(
+      req,
       res,
       async () => {
         const category = await expensesModel.getCategoryById(req.params.id);
@@ -219,43 +222,6 @@ const expensesController = {
         await expensesModel.deleteCategory(category.IDNo, userName(req));
       },
       'Category deleted.'
-    );
-  },
-
-  // ---------- return money ----------
-
-  addReturnMoney: async (req, res) => {
-    await reply(
-      res,
-      async () => {
-        const amount = money(req.body.amount);
-        if (!(amount > 0)) throw new Error('Enter the amount returned.');
-        await expensesModel.addReturnMoney({ details: text(req.body.details, 5000) || null, amount, encodedBy: userName(req) });
-      },
-      'Return money saved.'
-    );
-  },
-
-  updateReturnMoney: async (req, res) => {
-    await reply(
-      res,
-      async () => {
-        const amount = money(req.body.amount);
-        if (!(amount > 0)) throw new Error('Enter the amount returned.');
-        const ok = await expensesModel.updateReturnMoney(req.params.id, { details: text(req.body.details, 5000) || null, amount, editedBy: userName(req) });
-        if (!ok) throw new Error('Return money not found.');
-      },
-      'Return money updated.'
-    );
-  },
-
-  deleteReturnMoney: async (req, res) => {
-    await reply(
-      res,
-      async () => {
-        if (!(await expensesModel.deleteReturnMoney(req.params.id, userName(req)))) throw new Error('Return money not found.');
-      },
-      'Return money deleted.'
     );
   }
 };

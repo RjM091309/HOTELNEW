@@ -13,6 +13,239 @@
 <!-- Socket.io Script -->
 <script src="/socket.io/socket.io.js"></script>
 <script>
+// Opens a page in its own browser tab and reuses that tab next time (logic taken from the K Grand
+// system's openInOwnTab): the tab is found by name, so another call brings the first one forward
+// instead of opening a copy. An already-open tab was already refreshed in the background after the last save (see the tab sync below), and goes elsewhere if a new query
+// (e.g. '?hlRoomId=5') has to be applied, or it has gone to another page. Returns false when the
+// browser blocks the popup, so the caller can fall back to a normal link.
+function openInOwnTab(path, query) {
+    query = query || '';
+    var name = 'hotel_tab:' + path;
+    // Already inside that tab: nothing to open - only load the query if one was asked for.
+    // (The tab keeps its name when you move to another page inside it, e.g. Calendar -> Credit. Then the link must
+    // simply go to the page, otherwise the click would do nothing at all.)
+    if (window.name === name) {
+        if (window.location.pathname !== path || query) window.location.href = path + query;
+        return true;
+    }
+    var tab = window.open('', name);
+    if (!tab) return false;
+    var url = path + query;
+    try {
+        if (tab.location.href === 'about:blank') {
+            tab.location.href = url;                       // just created
+        } else if (tab.location.pathname !== path || query) {
+            tab.location.href = url;                       // gone elsewhere, or a new query to apply
+        } else if (tab.document.documentElement.getAttribute('data-property-theme') !== document.documentElement.getAttribute('data-property-theme')) {
+            tab.location.href = url;                       // that tab still shows the other property
+        } else {
+            // Already open on this page. The other tabs refresh themselves in the background right after a save, so normally it is up to date and
+            // nothing has to be waited for. It is reloaded here when something was saved AFTER that tab was loaded (the shared stamp is newer than
+            // the time it shows), or when it is a tab that cannot tell (opened before this existed). The decision is made HERE, from those two
+            // numbers, so it does not matter what that tab is doing or whether it still runs its own refresh.
+            var changedAt = 0;
+            try { changedAt = Number(localStorage.getItem('hotel_data_changed_at') || 0); } catch (e2) { changedAt = 0; }
+            var loadedAt = Number(tab.__hotelLoadedAt || 0);
+            if (!loadedAt || changedAt > loadedAt) tab.location.reload();
+        }
+    } catch (e) {
+        tab.location.href = url;
+    }
+    tab.focus();
+    return true;
+}
+</script>
+<script>
+// The active property lives in a cookie shared by every tab. A tab that was left open on the other
+// property would keep showing (and saving to!) the wrong hotel, so when a tab comes back into view
+// and its property no longer matches the cookie, it reloads itself.
+(function () {
+    function cookiePropertyCode() {
+        var m = document.cookie.match(/(?:^|;\s*)current_property=([^;]*)/);
+        return m ? decodeURIComponent(m[1]) : '';
+    }
+    function check() {
+        var shown = document.documentElement.getAttribute('data-property-theme');
+        var wanted = cookiePropertyCode();
+        if (!shown || !wanted || shown === wanted) return;
+        try {
+            // Guard: never reload more than once every 5 s (e.g. a cookie naming an unknown property).
+            var last = Number(sessionStorage.getItem('property_sync_reload') || 0);
+            if (Date.now() - last < 5000) return;
+            sessionStorage.setItem('property_sync_reload', String(Date.now()));
+        } catch (e) { /* storage blocked: reload anyway, once per event */ }
+        window.location.reload();
+    }
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') check(); });
+    window.addEventListener('focus', check);
+})();
+</script>
+<script>
+// A tab that was left open (the menus open each page in its own tab and bring it forward again) must show what was changed in ANOTHER tab.
+// Every save (a POST / PUT / PATCH / DELETE that went through) leaves a time stamp that all the tabs share; when a tab comes back into view
+// and a newer stamp than its own is there, it refreshes: the page's own refresh (window.__refreshOnShow) if it has one, else it reloads.
+// Its own saves never make it refresh itself, and a tab with a window open on top (a form) waits until the window is closed.
+(function () {
+    var KEY = 'hotel_data_changed_at';
+    var pageStart = Date.now();
+    var seen = pageStart;                       // the newest change this tab already shows
+    window.__hotelLoadedAt = pageStart;         // the time this tab shows (read by openInOwnTab of the tab that brings it forward)
+    function markChanged() {
+        if (Date.now() - pageStart < 3000) return;          // the calls a page makes while it opens are not changes
+        var now = Date.now();
+        seen = now;
+        try { localStorage.setItem(KEY, String(now)); } catch (e) { /* storage blocked */ }
+    }
+    function isSave(method, url) {
+        var m = String(method || 'GET').toUpperCase();
+        if (m === 'GET' || m === 'HEAD' || m === 'OPTIONS') return false;
+        return !/\/auth\/|\/api\/auth\//i.test(String(url || ''));      // the session / login calls are not data
+    }
+    // jQuery is loaded AFTER this footer (the scripts come at the end of the page), so the hook cannot be set right here: it is set when the page
+    // has loaded its scripts. (Most saves of the system - Rooms, bookings, payments - are jQuery calls; without this they left no sign.)
+    var ajaxHooked = false;
+    function hookAjax() {
+        if (ajaxHooked || !window.jQuery) return;
+        ajaxHooked = true;
+        jQuery(document).ajaxSuccess(function (e, xhr, opts) { if (isSave(opts && (opts.type || opts.method), opts && opts.url)) markChanged(); });
+    }
+    hookAjax();
+    document.addEventListener('DOMContentLoaded', hookAjax);
+    window.addEventListener('load', hookAjax);
+    if (window.fetch) {
+        var nativeFetch = window.fetch;
+        window.fetch = function (input, init) {
+            var p = nativeFetch.apply(this, arguments);
+            try {
+                var method = (init && init.method) || (input && input.method) || 'GET';
+                var url = typeof input === 'string' ? input : (input && input.url);
+                if (isSave(method, url)) p.then(function (r) { if (r && r.ok) markChanged(); }, function () { /* failed: nothing changed */ });
+            } catch (e) { /* keep the call as it is */ }
+            return p;
+        };
+    }
+    // a window that is really on screen (a hidden / left-over element with the same class must not hold the refresh back for ever)
+    function dialogOpen() {
+        function shown(el) { return !!el && el.offsetParent !== null && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden'; }
+        var open = false;
+        document.querySelectorAll('.modal.show').forEach(function (m) { if (shown(m)) open = true; });
+        document.querySelectorAll('.swal2-container.swal2-shown .swal2-popup').forEach(function (m) { if (shown(m)) open = true; });
+        return open;
+    }
+    function newerExists() {
+        var v = 0;
+        try { v = Number(localStorage.getItem(KEY) || 0); } catch (e) { v = 0; }
+        return v > seen;
+    }
+    function refreshIfChanged() {
+        if (document.visibilityState !== 'visible' || !newerExists()) return;
+        if (dialogOpen()) return;   // do not disturb a form that is open; the next time it comes back
+        try { seen = Number(localStorage.getItem(KEY) || Date.now()); } catch (e) { seen = Date.now(); }
+        if (typeof window.__refreshOnShow === 'function') { try { window.__refreshOnShow(); window.__hotelLoadedAt = Date.now(); return; } catch (e) { /* reload below */ } }
+        window.location.reload();
+    }
+    window.__hotelIsStale = newerExists;        // read by openInOwnTab of the tab that is bringing this one forward
+    // A tab that is NOT in view reloads itself a moment after another tab saved something, so it is already up to date when you switch to it
+    // (the calendar takes a while to load; this way you do not wait for it). A window / form left open on it holds the reload back until it is closed.
+    var bgTimer = null;
+    function backgroundRefresh() {
+        if (!newerExists()) return;
+        if (dialogOpen()) return;
+        try { seen = Number(localStorage.getItem(KEY) || Date.now()); } catch (e) { seen = Date.now(); }
+        window.location.reload();
+    }
+    document.addEventListener('visibilitychange', refreshIfChanged);
+    window.addEventListener('focus', refreshIfChanged);
+    window.addEventListener('storage', function (e) {
+        if (e.key !== KEY) return;
+        if (document.visibilityState === 'visible') { refreshIfChanged(); return; }
+        clearTimeout(bgTimer);
+        bgTimer = setTimeout(backgroundRefresh, 700);     // several saves in a row: one reload
+    });
+})();
+</script>
+<script>
+// Navbar global search: guest / room / confirmation number of the active property.
+// A result opens the calendar (its own reused tab) with that booking's room and dates highlighted.
+(function () {
+    var input = document.getElementById('globalSearchInput');
+    var box = document.getElementById('globalSearchResults');
+    if (!input || !box) return;
+
+    var timer = null;
+    var seq = 0;
+    var items = [];
+    var active = -1;
+    var STATUS = { 'check-In': 'Checked-in', 'check-Out': 'Checked-out', 'pending': 'Reserved', 'cancelled': 'Cancelled' };
+
+    function esc(v) {
+        return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+    function hide() { box.style.display = 'none'; active = -1; }
+    function pick(r) {
+        hide();
+        input.value = '';
+        if (r.roomId && r.checkIn && r.checkOut) {
+            var q = '?hlRoomId=' + encodeURIComponent(r.roomId) + '&hlStart=' + r.checkIn + '&hlEnd=' + r.checkOut;
+            if (typeof openInOwnTab !== 'function' || !openInOwnTab('/calendar', q)) window.open('/calendar' + q, '_blank');
+        } else {
+            // No room assigned yet - nothing to highlight on the calendar, so show it in the booking list.
+            window.open('/booking?highlight=' + encodeURIComponent(r.bookingId), '_blank');
+        }
+    }
+    function render(list) {
+        items = list;
+        active = -1;
+        if (!list.length) {
+            box.innerHTML = '<div class="global-search-empty">No matches.</div>';
+        } else {
+            box.innerHTML = list.map(function (r, i) {
+                var sub = (r.roomNumber ? 'Room ' + esc(r.roomNumber) : 'No room yet') + ' \u00b7 ' + esc(r.checkIn) + ' \u2192 ' + esc(r.checkOut) +
+                          ' \u00b7 ' + esc(STATUS[r.status] || r.status || '') + (r.confirmation ? ' \u00b7 ' + esc(r.confirmation) : '');
+                return '<div class="global-search-item" data-i="' + i + '"><div class="gs-title">' + esc(r.guestName) + '</div><div class="gs-sub">' + sub + '</div></div>';
+            }).join('');
+        }
+        box.style.display = 'block';
+    }
+    function setActive(n) {
+        var els = box.querySelectorAll('.global-search-item');
+        if (!els.length) return;
+        active = (n + els.length) % els.length;
+        els.forEach(function (el, i) { el.classList.toggle('is-active', i === active); });
+        els[active].scrollIntoView({ block: 'nearest' });
+    }
+    function run() {
+        var term = input.value.trim();
+        if (term.length < 2) { hide(); return; }
+        var mine = ++seq;
+        fetch('/booking/global-search?q=' + encodeURIComponent(term), { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) { if (mine === seq) render((d && d.results) || []); })
+            .catch(function () { if (mine === seq) hide(); });
+    }
+
+    input.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(run, 250); });
+    input.addEventListener('focus', function () { if (input.value.trim().length >= 2) run(); });
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowDown') { e.preventDefault(); setActive(active + 1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(active - 1); }
+        else if (e.key === 'Enter') { e.preventDefault(); var r = items[active >= 0 ? active : 0]; if (r) pick(r); }
+        else if (e.key === 'Escape') { hide(); input.blur(); }
+    });
+    box.addEventListener('mousedown', function (e) {
+        var el = e.target.closest('.global-search-item');
+        if (el && items[+el.getAttribute('data-i')]) { e.preventDefault(); pick(items[+el.getAttribute('data-i')]); }
+    });
+    document.addEventListener('mousedown', function (e) { if (!e.target.closest('#globalSearchWrap')) hide(); });
+    // Ctrl/Cmd+K focuses the search from anywhere.
+    window.addEventListener('keydown', function (e) {
+        if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'k') { e.preventDefault(); input.focus(); input.select(); }
+    });
+})();
+</script>
+<script>
 // Custom Toast System (copied from pmsCore.js)
 function showToast(type, heading, message, options = {}) {
     const defaultOptions = {

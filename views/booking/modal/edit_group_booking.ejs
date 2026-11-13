@@ -7,7 +7,7 @@
   // (resolveEditGroupRoomPriceBase just auto-recomputes already-selected
   // rooms' prices, no editable per-room rows exist here) - only the
   // category dropdown restriction below is applied for Pool Villa.
-  const isPoolVillaBooking = typeof currentProperty !== 'undefined' && currentProperty && currentProperty.CODE === 'pool_villa';
+  const isPoolVillaBooking = typeof isGuestPricing !== 'undefined' && isGuestPricing;
 %>
 
 <div class="modal fade" id="modal-edit-group-booking" tabindex="-1" role="dialog" aria-labelledby="modalEditGroupBookingLabel" aria-hidden="true" data-bs-backdrop="static">
@@ -17,8 +17,8 @@
         <h4 class="modal-title" id="modalEditGroupBookingLabel">Edit Group Booking</h4>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="window.location.reload()"></button>
       </div>
+      <form id="editGroupBookingForm" autocomplete="off">
       <div class="modal-body">
-        <form id="editGroupBookingForm" autocomplete="off">
           <input type="hidden" id="editGroupBookingId" name="groupBookingId">
           <input type="hidden" id="editGroupVoucherNo" name="groupVoucherNo">
           <input type="hidden" id="editGroupSelectedRooms" name="groupSelectedRooms">
@@ -26,6 +26,12 @@
           <input type="hidden" id="editGroupSelectedRoomNumbers" name="groupSelectedRoomNumbers">
           <input type="hidden" id="editGroupNights" name="groupNights" value="0">
           <input type="hidden" id="editGroupLateCheckoutFee" name="groupLateCheckoutFee" value="0">
+
+          <div class="group-two-col">
+          <div class="group-col-left">
+
+          <div class="group-field-card group-card-booking">
+          <h6 class="group-field-card-title">Booking Details</h6>
 
           <div class="row">
             <div class="col-lg-6">
@@ -42,7 +48,6 @@
               </div>
             </div>
           </div>
-
           <!-- Individual Booking Dates Section (shown when bookings have different dates) -->
           <div class="row p-t-20" id="editGroupIndividualDatesSection" style="display: none;">
             <div class="col-lg-12">
@@ -54,7 +59,6 @@
               </div>
             </div>
           </div>
-
           <div class="row p-t-20">
             <div class="col-lg-4" id="editDivGroupCheckInStatus">
               <div class="form-group">
@@ -86,7 +90,6 @@
               </div>
             </div>
           </div>
-
           <div class="row p-t-20">
             <div class="col-lg-4">
               <div class="form-group">
@@ -95,15 +98,16 @@
                   <option value="" disabled>Select Booking Resource</option>
                   <option value="walk-in">Walk-in</option>
                   <option value="agency">Agency</option>
+                  <% if (!(typeof hideRate === 'function' && hideRate('contracted'))) { %><option value="contracted">Contracted</option><% } %><% (typeof customRates !== 'undefined' ? customRates : []).forEach(function (r) { %><option value="<%= r.key %>" data-base-label="<%= r.label %>"><%= r.label %></option><% }); %>
                   <!-- Only Walk-in/Agency are real Pool Villa categories (see add_booking.ejs). -->
                   <% if (!isPoolVillaBooking) { %>
-                  <option value="tenant">Tenant (15%)</option>
-                  <option value="vip">VIP (20%)</option>
-                  <option value="employee">Employee (30%)</option>
-                  <option value="senior_special">Senior / Special 20%</option>
+                  <% if (!(typeof hideRate === 'function' && hideRate('tenant'))) { %><option value="tenant">Tenant (15%)</option><% } %>
+                  <% if (!(typeof hideRate === 'function' && hideRate('vip'))) { %><option value="vip">VIP (20%)</option><% } %>
+                  <% if (!(typeof hideRate === 'function' && hideRate('employee'))) { %><option value="employee">Employee (30%)</option><% } %>
+                  <% if (!(typeof hideRate === 'function' && hideRate('senior_special'))) { %><option value="senior_special">Senior / Special 20%</option><% } %>
                   <% } %>
                   <% if (!isPoolVillaBooking) { %>
-                  <option value="booking-channel">OTA / Channel</option>
+                  <% if (!(typeof hideRate === 'function' && hideRate('booking-channel'))) { %><option value="booking-channel">OTA / Channel</option><% } %>
                   <% } %>
                   <!-- Not manually pickable (disabled + hidden) - only ever shown by
                        syncEditGroupLongTermRateDropdown() once the stay hits 10+ nights. -->
@@ -118,7 +122,6 @@
               </div>
             </div>
           </div>
-
           <!-- Late Checkout Fee Display - appears below when visible -->
           <div id="editGroupLateCheckoutFeeDisplay" class="row p-t-20" style="display: none;">
             <div class="col-lg-3">
@@ -128,7 +131,6 @@
               </div>
             </div>
           </div>
-
           <div class="row p-t-20">
           
             <div class="col-lg-12" id="editGroupAgencyWrapper" style="display: none;">
@@ -158,69 +160,10 @@
               </div>
             </div>
           </div>
-
-          <div class="row p-t-20">
-            <div class="col-lg-12 d-flex align-items-center gap-3 flex-wrap">
-              <div class="form-group mb-0">
-                <label class="form-label mb-1">Bed Requirements</label>
-                <div class="d-flex gap-3 flex-wrap">
-                  <div class="bed-requirement-group">
-                    <label class="form-label mb-1">King</label>
-                    <input type="number" class="form-control" id="editGroupBed1Count" name="groupBed1Count" min="0" value="0">
-                  </div>
-                  <div class="bed-requirement-group">
-                    <label class="form-label mb-1">Queen</label>
-                    <input type="number" class="form-control" id="editGroupBed2Count" name="groupBed2Count" min="0" value="0">
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
 
-          <div class="row p-t-20">
-            <div class="col-lg-12 d-flex justify-content-start">
-              <button type="button" class="btn btn-success" id="editGroupSearchRooms">Search Rooms</button>
-            </div>
-          </div>
-
-          <div class="row p-t-20" id="editGroupResultsContainer" style="display: none;">
-            <div class="col-lg-12">
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="mb-0">Available Rooms</h5>
-              </div>
-              <div class="room-filter-section mb-3">
-                <div class="d-flex align-items-center w-100" style="display:flex; justify-content: space-between; width:100%;">
-                  <div class="d-flex align-items-center">
-                    <label class="text-white mb-0 me-3">Filter:</label>
-                    <div class="filter-radio-group">
-                      <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="editGroupRoomFilter" id="editFilterAll" value="all" checked>
-                        <label class="form-check-label" for="editFilterAll">All</label>
-                      </div>
-                      <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="editGroupRoomFilter" id="editFilter1B" value="1B">
-                        <label class="form-check-label" for="editFilter1B">King</label>
-                      </div>
-                      <div class="form-check form-check-inline">
-                        <input class="form-check-input" type="radio" name="editGroupRoomFilter" id="editFilter2B" value="2B">
-                        <label class="form-check-label" for="editFilter2B">Queen</label>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="text-white">
-                    <span id="editGroupRoomCount" style="margin-left: 24px;">&nbsp;&nbsp;&nbsp;&nbsp;Available: 0</span>
-                  </div>
-                </div>
-              </div>
-              <div id="editGroupRoomsList" class="room-list-container"></div>
-              <div class="mt-2 text-warning" id="editGroupAvailabilityWarning" style="display: none;"></div>
-              <div class="form-check mt-2">
-                <input class="form-check-input" type="checkbox" id="editGroupIncludeContractedRate" name="editGroupIncludeContractedRate">
-                <label class="form-check-label" for="editGroupIncludeContractedRate">Contracted Rate (-₱200/night, all rooms)</label>
-              </div>
-              <div id="editGroupRoomBreakdown" class="mt-3"></div>
-            </div>
-          </div>
+          <div class="group-field-card group-card-guest">
+          <h6 class="group-field-card-title">Guest &amp; Payment</h6>
 
           <div class="row p-t-20">
             <div class="col-lg-6">
@@ -244,7 +187,6 @@
               </div>
             </div>
           </div>
-
           <div class="row p-t-20">
             <div class="col-lg-4">
               <div class="form-group">
@@ -258,24 +200,24 @@
                 <input class="form-control" type="text" id="editGroupPaymentStatus" name="groupPaymentStatus" readonly>
               </div>
             </div>
-            <div class="col-lg-4">
+            <!-- Guest Type / Guest Level removed from the screen (kept hidden, not required: the group keeps the values it already has) -->
+            <div class="col-lg-4" style="display:none;">
               <div class="form-group">
                 <label class="form-label">Guest Type</label>
-                <select class="form-select" id="editGroupGuestType" name="groupGuestType" required>
+                <select class="form-select" id="editGroupGuestType" name="groupGuestType">
                   <option value="" disabled selected>Guest Type</option>
                 </select>
               </div>
             </div>
-            <div class="col-lg-4">
+            <div class="col-lg-4" style="display:none;">
               <div class="form-group">
                 <label class="form-label">Guest Level</label>
-                <select class="form-select" id="editGroupGuestLevel" name="groupGuestLevel" required>
+                <select class="form-select" id="editGroupGuestLevel" name="groupGuestLevel">
                   <option value="" disabled selected>Guest Level</option>
                 </select>
               </div>
             </div>
           </div>
-
           <div class="row p-t-20">
             <div class="col-lg-12">
               <div class="form-group">
@@ -284,6 +226,10 @@
               </div>
             </div>
           </div>
+          </div>
+
+          <div class="group-field-card group-card-addons">
+          <h6 class="group-field-card-title">Add-ons &amp; Discounts</h6>
 
           <div class="row p-t-20 align-items-start">
             <div class="col-lg-4">
@@ -328,7 +274,33 @@
               </div>
             </div>
           </div>
-
+          <!-- Extra breakfast (same as Add Group Booking): the room-rate tier already covers 2 breakfasts per room; anything above that is
+               charged here at a price typed by staff, and can be lowered per room. -->
+          <div class="row p-t-10">
+            <div class="col-lg-12">
+              <div id="editGroupBreakfastExtraBox" class="group-breakfast-extra" style="display:none;">
+                <div class="gbx-head">
+                  <span class="gbx-title">Extra breakfast</span>
+                  <span class="gbx-total">Total: <b id="editGroupExtraBfTotal">&#8369;0.00</b></span>
+                </div>
+                <div class="gbx-sub">Above 2 per room &middot; once per booking</div>
+                <div class="gbx-prices">
+                  <div>
+                    <label for="editGroupExtraBfAdultPrice">Extra adult</label>
+                    <input type="number" class="form-control" id="editGroupExtraBfAdultPrice" value="500" min="0" step="0.01">
+                  </div>
+                  <div>
+                    <label for="editGroupExtraBfKidPrice">Extra kid</label>
+                    <input type="number" class="form-control" id="editGroupExtraBfKidPrice" value="500" min="0" step="0.01">
+                  </div>
+                </div>
+                <details class="gbx-details" open>
+                  <summary>Adjust per room</summary>
+                  <div id="editGroupExtraBfRooms" class="gbx-rooms"></div>
+                </details>
+              </div>
+            </div>
+          </div>
           <div class="row p-t-20">
             <div class="col-lg-4">
               <!-- Senior/PWD Discount is no longer staff-editable here (removed as
@@ -363,7 +335,6 @@
               </div>
             </div>
           </div>
-
           <!-- EXTRA SERVICES SECTION -->
           <hr class="my-4" id="editGroup_extra-services-hr" style="display: none;">
           <div class="row p-t-10" id="editGroup_extra-services-wrapper" style="display: none;">
@@ -378,35 +349,110 @@
               </div>
             </div>
           </div>
+          </div>
 
-          <hr class="my-4">
-          <div class="row p-t-20">
-            <div class="col-lg-4">
-              <h3>Total: <span id="editGroupComputedTotal">0.00</span></h3>
-            </div>
-            <div class="col-lg-4">
-              <h3>Paid: <span id="editGroupComputedPaidAmount">0.00</span></h3>
-            </div>
-            <div class="col-lg-4">
-              <h3>Balance: <span id="editGroupComputedBalance">0.00</span></h3>
-            </div>
-            <div class="col-lg-12">
+          </div>
+          <div class="group-col-right">
+
+            <div class="group-summary-card">
+              <h6 class="group-field-card-title">Summary</h6>
+              <div id="editGroupRoomBreakdown"></div>
+              <div class="group-summary-line" id="editGroupSummaryRoomLine" style="display: none;">
+                <span id="editGroupSummaryRoomLabel">Room Rate</span>
+                <span id="editGroupSummaryRoomTotal">0.00</span>
+              </div>
+              <div class="group-summary-line">
+                <span>Total</span>
+                <h3 id="editGroupComputedTotal">0.00</h3>
+              </div>
+              <div class="group-summary-line">
+                <span>Paid</span>
+                <h3 id="editGroupComputedPaidAmount">0.00</h3>
+              </div>
+              <div class="group-summary-line">
+                <span>Balance</span>
+                <h3 id="editGroupComputedBalance">0.00</h3>
+              </div>
+              <div class="col-lg-12">
               <div id="editGroupCreditDisplay" style="display: none; margin-top: 10px;">
                 <span style="color: #28a745; font-weight: bold;">Credit: <span id="editGroupCreditAmount">₱0.00</span></span>
               </div>
             </div>
-            <div class="row p-t-20">
-              <div class="col-lg-12">
-                <div class="d-flex justify-content-end gap-2">
-                  <button type="button" class="btn btn-success" id="editBtnGroupVoucherPreview">Voucher</button>
-                  <button type="submit" class="btn btn-primary">Update Booking</button>
-                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="window.location.reload()">Close</button>
+            </div>
+
+            <div class="group-field-card group-card-rooms">
+            <h6 class="group-field-card-title">Rooms</h6>
+
+          <div class="row p-t-20">
+            <div class="col-lg-12 d-flex align-items-center gap-3 flex-wrap">
+              <div class="form-group mb-0">
+                <label class="form-label mb-1">Bed Requirements</label>
+                <div class="d-flex gap-3 flex-wrap">
+                  <div class="bed-requirement-group">
+                    <label class="form-label mb-1">King</label>
+                    <input type="number" class="form-control" id="editGroupBed1Count" name="groupBed1Count" min="0" value="0">
+                  </div>
+                  <div class="bed-requirement-group">
+                    <label class="form-label mb-1">Queen</label>
+                    <input type="number" class="form-control" id="editGroupBed2Count" name="groupBed2Count" min="0" value="0">
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </form>
+          <div class="row p-t-20">
+            <div class="col-lg-12 d-flex justify-content-start">
+              <button type="button" class="btn btn-success" id="editGroupSearchRooms">Search Rooms</button>
+            </div>
+          </div>
+          <div class="row p-t-20" id="editGroupResultsContainer" style="display: none;">
+            <div class="col-lg-12">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Available Rooms</h5>
+              </div>
+              <div class="room-filter-section mb-3">
+                <div class="d-flex align-items-center w-100" style="display:flex; justify-content: space-between; width:100%;">
+                  <div class="d-flex align-items-center">
+                    <label class="text-white mb-0 me-3">Filter:</label>
+                    <div class="filter-radio-group">
+                      <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="editGroupRoomFilter" id="editFilterAll" value="all" checked>
+                        <label class="form-check-label" for="editFilterAll">All</label>
+                      </div>
+                      <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="editGroupRoomFilter" id="editFilter1B" value="1B">
+                        <label class="form-check-label" for="editFilter1B">King</label>
+                      </div>
+                      <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="editGroupRoomFilter" id="editFilter2B" value="2B">
+                        <label class="form-check-label" for="editFilter2B">Queen</label>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="text-white">
+                    <span id="editGroupRoomCount" style="margin-left: 24px;">&nbsp;&nbsp;&nbsp;&nbsp;Available: 0</span>
+                  </div>
+                </div>
+              </div>
+              <div id="editGroupRoomsList" class="room-list-container"></div>
+              <div class="mt-2 text-warning" id="editGroupAvailabilityWarning" style="display: none;"></div>
+              <div class="form-check mt-2" style="<%= (typeof hideRate === 'function' && !hideRate('contracted')) ? 'display:none;' : '' %>">
+                <input class="form-check-input" type="checkbox" id="editGroupIncludeContractedRate" name="editGroupIncludeContractedRate">
+                <label class="form-check-label" for="editGroupIncludeContractedRate">Contracted Rate (-₱200/night, all rooms)</label>
+              </div>
+            </div>
+          </div>
+            </div>
+
+          </div>
+          </div>
       </div>
+      <div class="modal-footer group-booking-footer">
+        <button type="button" class="btn btn-success" id="editBtnGroupVoucherPreview">Voucher</button>
+        <button type="submit" class="btn btn-primary">Update Booking</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="window.location.reload()">Close</button>
+      </div>
+      </form>
     </div>
   </div>
 </div>
@@ -1140,6 +1186,62 @@
   background-color: #f3f4f6 !important;
   color: #15803d !important;
 }
+
+/* ===== Layout of the Edit Group Booking window = the Add Group Booking window: two columns of cards, a fixed footer ===== */
+#modal-edit-group-booking .modal-dialog { max-height: 99vh; margin: 1vh auto; max-width: 1600px; width: 97vw; }
+#modal-edit-group-booking .modal-content { max-height: 98vh; display: flex; flex-direction: column; overflow: hidden; }
+#modal-edit-group-booking form { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
+#modal-edit-group-booking .modal-body { max-height: none; flex: 1 1 auto; min-height: 0; overflow-y: auto !important; padding: 16px 18px; }
+#modal-edit-group-booking .modal-footer { flex: 0 0 auto; }
+#modal-edit-group-booking .group-two-col { display: flex; gap: 20px; align-items: flex-start; }
+#modal-edit-group-booking .group-col-left, #modal-edit-group-booking .group-col-right { flex: 1 1 0; min-width: 0; }
+#modal-edit-group-booking .group-field-card, #modal-edit-group-booking .group-summary-card { background: #202629; border-radius: 8px; padding: 18px 20px; margin-bottom: 18px; }
+#modal-edit-group-booking .group-field-card-title { color: #9aa4ac; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+#modal-edit-group-booking .group-summary-line { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+#modal-edit-group-booking .group-summary-line:last-of-type { border-bottom: none; }
+#modal-edit-group-booking .group-summary-line span { color: #cfcfcf; font-size: 13px; }
+#modal-edit-group-booking .group-summary-line h3 { margin: 0; font-size: 20px; }
+#modal-edit-group-booking .group-card-rooms .row.p-t-20:first-child { padding-top: 0; }
+#modal-edit-group-booking .group-breakfast-extra { margin-top: 4px; padding: 10px 12px; border-radius: 8px; box-sizing: border-box; max-width: 100%; border: 1px solid rgba(255, 193, 7, 0.45); background: rgba(255, 193, 7, 0.08); font-size: 12px; }
+#modal-edit-group-booking .group-breakfast-extra .gbx-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+#modal-edit-group-booking .group-breakfast-extra .gbx-title { font-weight: 600; }
+#modal-edit-group-booking .group-breakfast-extra .gbx-sub { font-size: 11px; opacity: 0.75; margin-bottom: 6px; }
+#modal-edit-group-booking .group-breakfast-extra .gbx-prices { display: flex; gap: 8px; max-width: 320px; }
+#modal-edit-group-booking .group-breakfast-extra .gbx-prices > div { flex: 1 1 0; min-width: 0; }
+#modal-edit-group-booking .group-breakfast-extra .gbx-prices input { height: 30px; padding: 2px 8px; }
+#modal-edit-group-booking .group-breakfast-extra label { display: block; font-size: 11px; margin-bottom: 2px; opacity: 0.85; }
+#modal-edit-group-booking .group-breakfast-extra .gbx-details { margin-top: 6px; }
+#modal-edit-group-booking .group-breakfast-extra .gbx-details summary { cursor: pointer; font-size: 11px; opacity: 0.9; }
+#modal-edit-group-booking .group-breakfast-extra .gbx-rooms { margin-top: 6px; max-height: 230px; overflow-y: auto; }
+#modal-edit-group-booking .group-breakfast-extra .gbx-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+#modal-edit-group-booking .group-breakfast-extra .gbx-table th { position: sticky; top: 0; background: inherit; font-weight: 600; font-size: 11px; padding: 4px 6px; text-align: center; border-bottom: 1px solid rgba(128,138,160,.35); }
+#modal-edit-group-booking .group-breakfast-extra .gbx-table th small { font-weight: 400; opacity: .7; }
+#modal-edit-group-booking .group-breakfast-extra .gbx-table td { padding: 4px 6px; text-align: center; border-bottom: 1px solid rgba(128,138,160,.2); vertical-align: middle; }
+#modal-edit-group-booking .group-breakfast-extra .gbx-table th:first-child, #modal-edit-group-booking .group-breakfast-extra .gbx-table td:first-child { text-align: left; font-weight: 600; }
+#modal-edit-group-booking .group-breakfast-extra .gbx-table td:last-child, #modal-edit-group-booking .group-breakfast-extra .gbx-table th:last-child { text-align: right; white-space: nowrap; }
+#modal-edit-group-booking .group-breakfast-extra .gbx-all td { background: rgba(128,138,160,.12); }
+#modal-edit-group-booking .group-breakfast-extra .gbx-step { display: inline-flex; align-items: center; gap: 6px; }
+#modal-edit-group-booking .group-breakfast-extra .gbx-step b { min-width: 16px; display: inline-block; text-align: center; font-size: 13px; }
+#modal-edit-group-booking .group-breakfast-extra .gbx-btn { width: 22px; height: 22px; padding: 0; line-height: 1; border-radius: 50%; border: 1px solid rgba(128,138,160,.55); background: transparent; color: inherit; cursor: pointer; }
+#modal-edit-group-booking .group-breakfast-extra .gbx-btn:hover:not(:disabled) { background: rgba(128,138,160,.25); }
+#modal-edit-group-booking .group-breakfast-extra .gbx-btn:disabled { opacity: .3; cursor: not-allowed; }
+html[data-theme="white"] #modal-edit-group-booking .group-breakfast-extra { background: rgba(255, 193, 7, 0.12); color: #374151; }
+html[data-theme="white"] #modal-edit-group-booking .group-breakfast-extra label { color: #374151 !important; }
+#modal-edit-group-booking .group-summary-subtitle { font-weight: 600; font-size: 14px; margin: 2px 0 4px; }
+#modal-edit-group-booking .group-room-breakdown-line { padding: 7px 0; }
+#modal-edit-group-booking .group-room-breakdown-line span:last-child { font-size: 13px; }
+@media (max-width: 991px) { #modal-edit-group-booking .group-two-col { flex-direction: column; } }
+html[data-theme="white"] #modal-edit-group-booking .modal-body { background: #f3f4f6 !important; }
+html[data-theme="white"] #modal-edit-group-booking .group-field-card, html[data-theme="white"] #modal-edit-group-booking .group-summary-card { background: #ffffff !important; border: 1px solid #e5e7eb; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04); }
+html[data-theme="white"] #modal-edit-group-booking .group-field-card-title { color: #6b7280 !important; border-bottom-color: #e5e7eb !important; }
+html[data-theme="white"] #modal-edit-group-booking .group-summary-line { border-bottom-color: #e5e7eb !important; }
+html[data-theme="white"] #modal-edit-group-booking .group-summary-line span { color: #374151 !important; }
+html[data-theme="white"] #modal-edit-group-booking .group-summary-line h3 { color: #111827 !important; }
+html[data-theme="white"] #modal-edit-group-booking .room-list-container { background-color: #f9fafb !important; border: 1px solid #e5e7eb !important; }
+html[data-theme="dark"] #modal-edit-group-booking .modal-body { background: #11141d !important; }
+html[data-theme="dark"] #modal-edit-group-booking .group-field-card, html[data-theme="dark"] #modal-edit-group-booking .group-summary-card { background: linear-gradient(135deg, color-mix(in srgb, var(--property-accent, #e8590c) 8%, #181c28) 0%, #141824 65%); border: 1px solid color-mix(in srgb, var(--property-accent, #e8590c) 22%, #2a3042); }
+html[data-theme="dark"] #modal-edit-group-booking .group-field-card-title { color: color-mix(in srgb, var(--property-accent, #e8590c) 78%, #ffffff); border-bottom-color: color-mix(in srgb, var(--property-accent, #e8590c) 30%, transparent); }
+html[data-theme="dark"] #modal-edit-group-booking .group-summary-line { border-bottom-color: #262b3a; }
 </style>
 
 <script src="/plugins/flatpicker/flatpickr.min.js"></script>
@@ -1185,7 +1287,7 @@ window.editGroupAddedServicesMap = {};
   // booking's Room Rate select and Add Group Booking use - OTA/Channel is
   // priced as walk-in.
   const EDIT_GROUP_RATE_OPT_CAT = {
-    'walk-in': 'walk_in', 'agency': 'agency', 'tenant': 'tenant',
+    'walk-in': 'walk_in', 'agency': 'agency', 'contracted': 'contracted', 'tenant': 'tenant',
     'vip': 'vip', 'employee': 'employee', 'senior_special': 'senior_special',
     'booking-channel': 'walk_in'
   };
@@ -1249,6 +1351,134 @@ window.editGroupAddedServicesMap = {};
     }
   }
 
+  // ---- Extra breakfast: the room-rate tier includes 2 breakfasts per room; anything above that is an extra, charged once per booking at a
+  // price staff types, and staff can lower the extras of a single room (same as Add Group Booking). The 2 included go to adults first. ----
+  const EDIT_BF_INCLUDED_PER_ROOM = 2;
+  let editExtraBfOverrides = {};   // roomId -> { a, k } (only when that room differs)
+  let editExtraBfCountSig = '';    // extras-per-room signature; a change drops the overrides
+
+  function editExtraBfBase() {
+    if (!$('#editGroupIncludeBreakfast').is(':checked')) return { a: 0, k: 0 };
+    const adults = parseInt($('#editGroupBreakfastAdultQty').val(), 10) || 0;
+    const kids = parseInt($('#editGroupBreakfastKidQty').val(), 10) || 0;
+    const kidsIncluded = Math.max(0, EDIT_BF_INCLUDED_PER_ROOM - adults);
+    return { a: Math.max(0, adults - EDIT_BF_INCLUDED_PER_ROOM), k: Math.max(0, kids - kidsIncluded) };
+  }
+
+  function editExtraBfEff(base, ov) {
+    const cap = base.a + base.k;
+    if (!ov) return { a: base.a, k: base.k };
+    const a = Math.max(0, Math.min(ov.a, cap));
+    const k = Math.max(0, Math.min(ov.k, cap - a));
+    return { a, k };
+  }
+
+  function editRoomLabelOf(id) {
+    const sid = String(id);
+    const fromBookings = (window.editGroupBookingsData || []).find(function (b) { return String(b.ROOM_ID || b.roomId) === sid; });
+    if (fromBookings && (fromBookings.ROOM_NUMBER || fromBookings.roomNumber)) return fromBookings.ROOM_NUMBER || fromBookings.roomNumber;
+    const fromAvail = (editGroupAvailableRooms || []).find(function (r) { return String(r.IDNo) === sid; });
+    return fromAvail && fromAvail.ROOM_NUMBER ? fromAvail.ROOM_NUMBER : id;
+  }
+
+  function refreshEditGroupExtraBf() {
+    const base = editExtraBfBase();
+    const roomVal = $('#editGroupSelectedRooms').val();
+    const ids = roomVal ? roomVal.split(',').map(function (x) { return x.trim(); }).filter(Boolean) : [];
+    const $box = $('#editGroupBreakfastExtraBox');
+
+    const countSig = base.a + '|' + base.k;
+    if (countSig !== editExtraBfCountSig) { editExtraBfCountSig = countSig; editExtraBfOverrides = {}; }
+
+    const adultPrice = Math.max(0, parseFloat($('#editGroupExtraBfAdultPrice').val()) || 0);
+    const kidPrice = Math.max(0, parseFloat($('#editGroupExtraBfKidPrice').val()) || 0);
+    const rows = (ids.length ? ids : [null]).map(function (id) {
+      const eff = editExtraBfEff(base, id !== null ? editExtraBfOverrides[id] : null);
+      return { id: id, a: eff.a, k: eff.k };
+    });
+    const total = rows.reduce(function (s, r) { return s + r.a; }, 0) * adultPrice + rows.reduce(function (s, r) { return s + r.k; }, 0) * kidPrice;
+
+    if (base.a + base.k === 0) {
+      $box.hide();
+    } else {
+      $box.show();
+      const cap = base.a + base.k;
+      $box.find('.gbx-details summary').text('Adjust per room (up to ' + cap + ' extra each, adults + kids)');
+      const money = function (n) { return '\u20b1' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+      const step = function (id, kind, val, atMin, atMax) {
+        return '<span class="gbx-step"><button type="button" class="gbx-btn" data-room-id="' + id + '" data-kind="' + kind + '" data-step="-1"' + (atMin ? ' disabled' : '') + '>&minus;</button>' +
+          '<b>' + val + '</b>' +
+          '<button type="button" class="gbx-btn" data-room-id="' + id + '" data-kind="' + kind + '" data-step="1"' + (atMax ? ' disabled' : '') + '>+</button></span>';
+      };
+      const real = rows.filter(function (r) { return r.id !== null; });
+      let html = '';
+      if (real.length) {
+        const same = function (key) { return real.every(function (r) { return r[key] === real[0][key]; }); };
+        const allRow = real.length > 1
+          ? '<tr class="gbx-all"><td>All rooms</td>' +
+            '<td>' + step('all', 'a', same('a') ? real[0].a : '\u2013', real.every(function (r) { return r.a <= 0; }), real.every(function (r) { return r.a + r.k >= cap; })) + '</td>' +
+            '<td>' + step('all', 'k', same('k') ? real[0].k : '\u2013', real.every(function (r) { return r.k <= 0; }), real.every(function (r) { return r.a + r.k >= cap; })) + '</td>' +
+            '<td>' + money(total) + '</td></tr>'
+          : '';
+        const body = real.map(function (r) {
+          return '<tr><td>' + editRoomLabelOf(r.id) + '</td>' +
+            '<td>' + step(r.id, 'a', r.a, r.a <= 0, r.a + r.k >= cap) + '</td>' +
+            '<td>' + step(r.id, 'k', r.k, r.k <= 0, r.a + r.k >= cap) + '</td>' +
+            '<td>' + money(r.a * adultPrice + r.k * kidPrice) + '</td></tr>';
+        }).join('');
+        html = '<table class="gbx-table"><thead><tr><th>Room</th>' +
+          '<th>Adults <small>(\u20b1' + adultPrice.toLocaleString('en-US') + ')</small></th>' +
+          '<th>Kids <small>(\u20b1' + kidPrice.toLocaleString('en-US') + ')</small></th>' +
+          '<th>Amount</th></tr></thead><tbody>' + allRow + body + '</tbody></table>';
+      } else {
+        html = '<div style="opacity:.7;padding:4px 0;">Pick the rooms to set the extras room by room.</div>';
+      }
+      const $list = $('#editGroupExtraBfRooms');
+      const keepScroll = $list.scrollTop();
+      $list.html(html);
+      $list.scrollTop(keepScroll);
+    }
+    $('#editGroupExtraBfTotal').text('\u20b1' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    return { total: total, adultPrice: adultPrice, kidPrice: kidPrice, perRoom: rows.map(function (r) { return { a: r.a, k: r.k }; }) };
+  }
+  window.getEditGroupExtraBreakfast = refreshEditGroupExtraBf;
+
+  // The extras already saved on the group: their price and how many each room has (called when the group is loaded, after the breakfast guests are filled)
+  window.setEditGroupExtraBfState = function (adultPrice, kidPrice, byRoomId) {
+    if (adultPrice > 0) $('#editGroupExtraBfAdultPrice').val(adultPrice);
+    if (kidPrice > 0) $('#editGroupExtraBfKidPrice').val(kidPrice);
+    const base = editExtraBfBase();
+    editExtraBfCountSig = base.a + '|' + base.k;     // so the first refresh does not throw the saved numbers away
+    editExtraBfOverrides = {};
+    Object.keys(byRoomId || {}).forEach(function (id) { editExtraBfOverrides[id] = { a: byRoomId[id].a || 0, k: byRoomId[id].k || 0 }; });
+  };
+  window.resetEditGroupExtraBf = function () {
+    editExtraBfOverrides = {};
+    editExtraBfCountSig = '';
+    $('#editGroupExtraBfAdultPrice, #editGroupExtraBfKidPrice').val(500);
+    $('#editGroupBreakfastExtraBox').hide();
+  };
+
+  // price boxes + the (-) (+) of each room, or of all the rooms at once
+  $(document).on('input change', '#editGroupExtraBfAdultPrice, #editGroupExtraBfKidPrice', function () { computeEditGroupTotal(); });
+  $(document).on('click', '#editGroupExtraBfRooms .gbx-btn', function () {
+    const base = editExtraBfBase();
+    const kind = $(this).attr('data-kind');
+    const delta = parseInt($(this).attr('data-step'), 10) || 0;
+    const target = String($(this).attr('data-room-id'));
+    const roomVal = $('#editGroupSelectedRooms').val();
+    const ids = roomVal ? roomVal.split(',').map(function (x) { return x.trim(); }).filter(Boolean) : [];
+    const cap = base.a + base.k;
+    const other = kind === 'a' ? 'k' : 'a';
+    const apply = function (id) {
+      const cur = editExtraBfEff(base, editExtraBfOverrides[id]);
+      cur[kind] = Math.max(0, Math.min(cap - cur[other], cur[kind] + delta));
+      editExtraBfOverrides[id] = cur;
+    };
+    (target === 'all' ? ids : [target]).forEach(apply);
+    computeEditGroupTotal();
+  });
+
   // Long Term Stay promo bands (see config/roomRates.js LONG_TERM_BANDS, same
   // source of truth - duplicated here since this is a browser script and
   // can't require() that Node module). Each band is its own room_rates
@@ -1262,6 +1492,7 @@ window.editGroupAddedServicesMap = {};
     { min: 32, max: null, category: 'long_term_over30' }
   ];
   function editGroupLongTermCategoryForNights(nights) {
+    if (window.__noLongTermRates) return null; // this property has no Long Term rates
     const n = parseInt(nights, 10) || 0;
     for (const band of EDIT_GROUP_LONG_TERM_BANDS) {
       if (n >= band.min && (band.max === null || n <= band.max)) return band.category;
@@ -1273,7 +1504,7 @@ window.editGroupAddedServicesMap = {};
   // selected, same as single booking's rateCategory() / Add Group Booking's
   // groupRateCategory() - resolved from the stay length rather than picked manually.
   function isEditGroupLongTermStayRate() {
-    return (parseInt($('#editGroupNights').val(), 10) || 0) >= 10;
+    return !window.__noLongTermRates && (parseInt($('#editGroupNights').val(), 10) || 0) >= 10;
   }
 
   // Contracted Rate: fixed -₱200/night, applied on top of whatever the
@@ -1290,7 +1521,8 @@ window.editGroupAddedServicesMap = {};
 
   function resolveEditGroupRoomPriceBase(room, checkInDate) {
     const longTermCat = editGroupLongTermCategoryForNights($('#editGroupNights').val());
-    const cat = longTermCat || (EDIT_GROUP_RATE_OPT_CAT[getEditGroupPriceBookingType()] || 'walk_in');
+    const _t = getEditGroupPriceBookingType();
+    const cat = /^custom_\d+$/.test(String(_t || '')) ? _t : (longTermCat || (EDIT_GROUP_RATE_OPT_CAT[_t] || 'walk_in'));
     const rr = room.ROOM_RATES || {};
     const bf = editGroupBreakfastKey();
     const checkMoment = checkInDate ? new Date(checkInDate) : null;
@@ -1416,6 +1648,7 @@ window.editGroupAddedServicesMap = {};
     $('#editGroupIncludeBreakfast, #editGroupIncludePickup, #editGroupIncludeDropoff, #editGroupIncludeDiscount, #editGroupIndividualBilling, #editGroupIncludeContractedRate').prop('checked', false); // Default to Master Billing (unchecked)
     $('#editGroupBreakfastIndividual').prop('checked', false); // Default breakfast to group (not individual)
     $('#editGroupBreakfastAdultQty, #editGroupBreakfastKidQty').val('');
+    if (typeof window.resetEditGroupExtraBf === 'function') window.resetEditGroupExtraBf();
     $('#editGroupPickupWrapper, #editGroupDropoffWrapper, #editGroupDiscountWrapper').hide();
     $('#editGroupPickupPrice, #editGroupDropoffPrice, #editGroupDiscount').val('');
     $('#editGroupRoomBreakdown').removeClass('d-none');
@@ -2060,6 +2293,10 @@ window.editGroupAddedServicesMap = {};
       breakfastKidPrice: $('#editGroupBreakfastKidPrice').val(),
       breakfastKidId: $('#editGroupBreakfastKidId').val(),
       breakfastIndividual: $('#editGroupBreakfastIndividual').is(':checked') ? 'on' : '',
+      // the extras above 2 per room, one {a, k} per selected room in the same order as groupSelectedRooms (like Add Group Booking)
+      breakfastExtraPerRoom: (typeof window.getEditGroupExtraBreakfast === 'function') ? JSON.stringify(window.getEditGroupExtraBreakfast().perRoom) : undefined,
+      breakfastExtraAdultPrice: (typeof window.getEditGroupExtraBreakfast === 'function') ? window.getEditGroupExtraBreakfast().adultPrice : 0,
+      breakfastExtraKidPrice: (typeof window.getEditGroupExtraBreakfast === 'function') ? window.getEditGroupExtraBreakfast().kidPrice : 0,
       pickupServiceId: $('#editGroupPickupServiceId').val(),
       pickupPrice: $('#editGroupPickupPrice').val(),
       dropoffServiceId: $('#editGroupDropoffServiceId').val(),
@@ -2285,15 +2522,13 @@ window.editGroupAddedServicesMap = {};
     const container = $('#editGroupRoomBreakdown');
     container.empty();
     if (!selectedRooms || !selectedRooms.length) {
+      $('#editGroupSummaryRoomLine').hide();
       return;
     }
 
-    // Get main nights (for bookings without individual dates)
+    // Selected Room Prices + "Room Rate (N rooms x M nights)": the same rows as the Summary of Add Group Booking
     const mainNights = parseInt($('#editGroupNights').val(), 10) || 0;
-    
-    // Get individual booking dates and map to room numbers
-    // Map: roomNumber -> nights
-    const individualNightsMap = {};
+    const individualNightsMap = {};   // roomNumber -> nights, when a room has its own dates
     $('.edit-individual-nights').each(function() {
       const roomNumber = $(this).data('room-number');
       const nights = parseInt($(this).val(), 10) || 0;
@@ -2301,23 +2536,25 @@ window.editGroupAddedServicesMap = {};
         individualNightsMap[roomNumber] = nights;
       }
     });
-    
-    let html = '<div class="group-room-breakdown"><b>Selected Room Prices:</b><ul>';
+
+    const peso = (n) => '\u20b1' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    let html = '<div class="group-summary-subtitle">Selected Room Prices</div>';
+    let roomTotal = 0;
     selectedRooms.forEach((room, idx) => {
       const price = computedPrices[idx] || 0;
       const roomNumber = room.ROOM_NUMBER || room.roomNumber;
-      
-      // Use individual nights if available, otherwise use main nights
       const nights = individualNightsMap[roomNumber] || mainNights;
       const total = nights > 0 ? price * nights : price;
-      
-      // Add indicator if using individual nights
-      const nightsLabel = individualNightsMap[roomNumber] ? ` (${nights} nights - different dates)` : ` (${nights} nights)`;
-      
-      html += `<li>Room ${roomNumber}: ₱${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per night ${nights > 0 ? `(₱${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total${nightsLabel})` : ''}</li>`;
+      roomTotal += total;
+      const own = individualNightsMap[roomNumber] ? ' (' + nights + ' nights, own dates)' : '';
+      html += '<div class="group-summary-line group-room-breakdown-line"><span>Room ' + roomNumber + own + '</span><span>' + peso(price) + '/night' + (nights > 0 ? ' &middot; ' + peso(total) : '') + '</span></div>';
     });
-    html += '</ul></div>';
     container.html(html);
+
+    const n = selectedRooms.length;
+    $('#editGroupSummaryRoomLabel').text('Room Rate (' + n + ' room' + (n === 1 ? '' : 's') + ' \u00d7 ' + mainNights + ' night' + (mainNights === 1 ? '' : 's') + ')');
+    $('#editGroupSummaryRoomTotal').text(roomTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    $('#editGroupSummaryRoomLine').show();
   }
 
   // Initialize event handlers

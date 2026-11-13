@@ -378,8 +378,8 @@ $(document).ready(function () {
       }
 
       const confirmResult = await Swal.fire({
-        title: 'Set Maintenance?',
-        text: 'This will block the room for maintenance. No guest details are required.',
+        title: 'Set Out of Order?',
+        text: 'This will mark the room out of order for these dates, so it cannot be booked. No guest details are required.',
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: 'OK',

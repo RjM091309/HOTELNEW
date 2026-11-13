@@ -1,4 +1,5 @@
 const AgencyModel = require('../models/agencyModel');
+const { loadPropertyLogoDataUri } = require('../helpers/propertyBranding');
 const { chromium } = require('playwright');
 const path = require('path');
 const ejs = require('ejs');
@@ -268,15 +269,7 @@ class AgencyController {
       const rows = await AgencyModel.getBulkPaymentReceiptData(agencyId, bookingIds);
       const agencyName = rows?.[0]?.AGENCY_NAME || 'Agency';
 
-      // Attempt to load logo from public assets (optional)
-      let logoUrl = '';
-      try {
-        const logoPath = path.join(__dirname, '../public/img/Logo-Black.png');
-        const logoBuf = await fs.readFile(logoPath);
-        logoUrl = `data:image/png;base64,${logoBuf.toString('base64')}`;
-      } catch (_) {
-        logoUrl = '';
-      }
+      const logoUrl = await loadPropertyLogoDataUri(req.propertyId);
 
       const templatePath = path.join(__dirname, '../views/agency/pdf/bulk_payment_receipt.ejs');
       const templateContent = await fs.readFile(templatePath, 'utf-8');
@@ -342,19 +335,7 @@ class AgencyController {
       const templatePath = path.join(__dirname, '../views/agency/pdf/agency_voucher.ejs');
       const templateContent = await fs.readFile(templatePath, 'utf-8');
 
-      // Load logo as base64 for Playwright
-      const logoPath = path.join(__dirname, '../public/img/Logo-Black.png');
-      let imageUrl = '';
-      try {
-        if (require('fs').existsSync(logoPath)) {
-          const imageBase64 = require('fs').readFileSync(logoPath, 'base64');
-          imageUrl = `data:image/png;base64,${imageBase64}`;
-        } else {
-          console.error('❌ [AGENCY VOUCHER PDF] Logo file not found:', logoPath);
-        }
-      } catch (error) {
-        console.error('❌ [AGENCY VOUCHER PDF] Error loading logo:', error);
-      }
+      const imageUrl = await loadPropertyLogoDataUri(req.propertyId);
 
       // Generate unique voucher number (current date + time only)
       const now = new Date();

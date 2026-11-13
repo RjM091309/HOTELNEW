@@ -82,6 +82,7 @@ $(document).ready(function () {
     const breakfastKidPrice = $('#groupBreakfastKidPrice').val();
     const breakfastKidId = $('#groupBreakfastKidId').val();
     const breakfastIndividual = $('#groupBreakfastIndividual').is(':checked');
+    const extraBf = typeof window.getGroupExtraBreakfast === 'function' ? window.getGroupExtraBreakfast() : null;
     
     const pickupServiceId = $('#groupPickupServiceId').val();
     const pickupPrice = $('#groupPickupPrice').val();
@@ -212,6 +213,11 @@ $(document).ready(function () {
       breakfastKidPrice,
       breakfastKidId,
       breakfastIndividual: breakfastIndividual ? 'on' : '',
+      // Extra breakfast (beyond the 2 per room already in the rate tier), per room in the
+      // same order as selectedRooms; charged once per booking.
+      breakfastExtraPerRoom: JSON.stringify(extraBf ? extraBf.perRoom : []),
+      breakfastExtraAdultPrice: extraBf ? extraBf.adultPrice : 0,
+      breakfastExtraKidPrice: extraBf ? extraBf.kidPrice : 0,
       pickupServiceId,
       pickupPrice,
       dropoffServiceId,
@@ -299,8 +305,7 @@ $(document).ready(function () {
         const breakfastIndividual = $('#groupBreakfastIndividual').is(':checked');
         const selectedRooms = $('#groupSelectedRooms').val();
         const numRooms = selectedRooms ? selectedRooms.split(',').length : 1;
-        const breakfastTotal = (adultQty * adultPrice) + (kidQty * kidPrice);
-        const breakfastTotalWithIndividual = breakfastIndividual ? breakfastTotal * numRooms : breakfastTotal;
+        const breakfastTotalWithIndividual = extraBf ? extraBf.total : 0;
         const pickupPrice = $('#groupIncludePickup').is(':checked') ? parseFloat($('#groupPickupPrice').val()) || 0 : 0;
         const dropoffPrice = $('#groupIncludeDropoff').is(':checked') ? parseFloat($('#groupDropoffPrice').val()) || 0 : 0;
         // Exclude late checkout fee from servicesTotal as it's displayed separately

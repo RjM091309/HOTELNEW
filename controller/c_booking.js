@@ -1,4 +1,5 @@
 const BookingModel = require('../models/bookingModel');
+const { loadPropertyLogoDataUri } = require('../helpers/propertyBranding');
 const moment = require('moment');
 
 class BookingController {
@@ -121,10 +122,47 @@ class BookingController {
 
       // Pool Villa quotes by season x category x guest count (pool_villa_rates),
       // not by room type - hand the rate card to the page as a staff reference.
-      const isPoolVilla = !!(res.locals.currentProperty && res.locals.currentProperty.CODE === 'pool_villa');
+      const isPoolVilla = !!res.locals.isGuestPricing;
       const poolVillaRates = isPoolVilla ? await require('../models/poolVillaRatesModel').getAll() : null;
 
+      // Opened from a booking's print menu: pre-fill the quotation with that booking's guest, room, dates and rate
+      let prefill = null;
+      const qBookingId = parseInt(req.query.bookingId, 10);
+      if (qBookingId) {
+        try {
+          const d = await BookingModel.getBookingDetails(qBookingId, req.propertyId);
+          if (d) {
+            const fmt = (v) => new Date(v).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }).toUpperCase();
+            const inDate = new Date(d.CHECK_IN_DATE);
+            const nights = Math.max(1, Number(d.ORIGINAL_DAYS) || Math.round((new Date(d.CHECK_OUT_DATE) - inDate) / 86400000));
+            const outDate = new Date(inDate.getTime() + nights * 86400000);
+            const rate = Number(d.ROOM_RATE) || 0;
+            // the booking's extra services (and extended stay), one quotation row each
+            let extras = [];
+            try {
+              const svc = await BookingModel.getBookingServices(qBookingId);
+              extras = (svc || []).map((s) => {
+                const qty = Number(s.QTY) || 1;
+                const isExt = Number(s.SERVICE_ID) === -999;
+                const amount = isExt ? (Number(s.TOTAL_COST) || 0) * qty : (Number(s.TOTAL_COST) || 0);
+                return { name: String(s.SERVICE_NAME || 'Service').toUpperCase(), qty, unit: qty ? amount / qty : amount, amount };
+              }).filter((s) => s.amount > 0);
+            } catch (e) { console.error('Quotation services failed:', e.message); }
+            prefill = {
+              extras,
+              guest: d.CustomerName || '',
+              dateText: fmt(inDate) + '<br>TO<br>' + fmt(outDate),
+              roomType: String(d.ROOM_TYPE || '').toUpperCase(),
+              nights,
+              rate,
+              total: rate * nights
+            };
+          }
+        } catch (e) { console.error('Quotation prefill failed:', e.message); }
+      }
+
       res.render('booking/quotation', {
+        prefill,
         title: 'Quotation',
         subTitle: 'Quotation',
         activePage: 'quotation',
@@ -593,7 +631,7 @@ class BookingController {
   // New: Checkout endpoint (supports individual or group scope)
   static async checkoutBookings(req, res) {
     try {
-      const { bookingId, scope = 'individual', hasRefund = false, refundAmount = 0, penaltyAmount = 0, applyDiscount = false, checkoutDateMode = 'now' } = req.body;
+      const { bookingId, scope = 'individual', hasRefund = false, refundAmount = 0, penaltyAmount = 0, applyDiscount = false, checkoutDateMode = 'now', keepBookedNights = false } = req.body;
       const encodedBy = req.user?.userId;
 
       if (!bookingId) {
@@ -620,6 +658,7 @@ class BookingController {
         penaltyAmount: parseFloat(penaltyAmount) || 0,
         applyDiscount: applyDiscount === true || applyDiscount === 'true',
         checkoutDateMode: normalizedCheckoutDateMode,
+        keepBookedNights: keepBookedNights === true || keepBookedNights === 'true',
         propertyId: req.propertyId
       });
       
@@ -907,6 +946,10 @@ class BookingController {
 
       // Block if this stay checks out (12 noon) on the same day the room already
       // has an Early Check-In arriving - the early guest can be in from ~1 AM.
+      if (room_id && !isMaintenanceBooking) {
+        const ooo = await BookingModel.findOutOfOrderRoom({ roomIds: [room_id], propertyId: req.propertyId });
+        if (ooo) return res.status(409).json({ success: false, message: `Room ${ooo.roomNumber} is Out of order, so it cannot be booked. Set it to Available in Rooms first.` });
+      }
       if (room_id && !isMaintenanceBooking) {
         const eciConflict = await BookingModel.findEarlyCheckInConflict(room_id, checkOutDate);
         if (eciConflict) {
@@ -1274,9 +1317,109 @@ class BookingController {
   }
 
   // Remove service
+  // The group's open rooms with their service lines (for the "Remove services" window).
+  static async getGroupServices(req, res) {
+    try {
+      const data = await BookingModel.getGroupServiceLines(req.params.bookingId, req.propertyId);
+      res.json({ success: true, ...data });
+    } catch (error) {
+      console.error('Error loading group services:', error);
+      res.status(500).json({ success: false, error: 'Could not load the group services.' });
+    }
+  }
+
+  // Remove the ticked service lines of a group.
+  static async removeGroupServices(req, res) {
+    try {
+      const { bookingId, ids, reason } = req.body;
+      if (!bookingId || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ success: false, error: 'Nothing selected.' });
+      }
+      if (!reason || !String(reason).trim()) {
+        return res.status(400).json({ success: false, error: 'A reason is required.' });
+      }
+      const result = await BookingModel.removeGroupServiceLines({
+        bookingId,
+        propertyId: req.propertyId,
+        ids,
+        reason: String(reason).trim(),
+        userId: req.user?.userId || null
+      });
+      res.json(result);
+    } catch (error) {
+      console.error('Error removing group services:', error);
+      res.status(400).json({ success: false, error: error.message || 'Could not remove the services.' });
+    }
+  }
+
+  // Master Billing: the group's single bill (for the other rooms' windows).
+  static async getGroupSummary(req, res) {
+    try {
+      const data = await BookingModel.getMasterGroupSummary(req.params.bookingId, req.propertyId);
+      res.json({ success: true, ...data });
+    } catch (error) {
+      console.error('Error loading group summary:', error);
+      res.status(500).json({ success: false, error: 'Could not load the group summary.' });
+    }
+  }
+
+  // Add the same service to every other active room of the booking's group.
+  static async addServiceToGroupRooms(req, res) {
+    try {
+      const { bookingId, service } = req.body;
+      if (!bookingId || !service) {
+        return res.status(400).json({ success: false, error: 'Missing booking or service.' });
+      }
+      const qty = parseInt(service.QUANTITY, 10);
+      const cost = parseFloat(service.CUSTOM_COST);
+      if (!qty || qty <= 0 || isNaN(cost) || cost < 0 || [-999, -101, -102].includes(parseInt(service.SERVICE_ID, 10))) {
+        return res.status(400).json({ success: false, error: 'Invalid service.' });
+      }
+      const clean = {
+        SERVICE_ID: parseInt(service.SERVICE_ID, 10),
+        SERVICE_NAME: service.SERVICE_NAME,
+        QUANTITY: qty,
+        TOTAL_COST: qty * cost,
+        CUSTOM_COST: cost,
+        IS_CUSTOM: !!service.IS_CUSTOM || parseInt(service.SERVICE_ID, 10) === -1
+      };
+      const result = await BookingModel.addServiceToGroupRooms({
+        bookingId,
+        propertyId: req.propertyId,
+        service: clean,
+        userId: req.user?.userId || null
+      });
+      res.json(result);
+    } catch (error) {
+      console.error('Error adding service to group rooms:', error);
+      res.status(400).json({ success: false, error: error.message || 'Error adding service to the group.' });
+    }
+  }
+
+  // Take one (or N) off a custom "Extra Breakfast" line of a booking.
+  static async reduceService(req, res) {
+    try {
+      const { bookingId, bookingServiceId, reduceBy, reason } = req.body;
+      if (!bookingId || !bookingServiceId) {
+        return res.status(400).json({ success: false, error: 'Missing booking or service line.' });
+      }
+      const result = await BookingModel.reduceExtraService({
+        bookingId,
+        bookingServiceId,
+        reduceBy,
+        reason,
+        userId: req.user?.userId || null
+      });
+      res.json(result);
+    } catch (error) {
+      console.error('Error reducing service:', error);
+      res.status(400).json({ success: false, error: error.message || 'Error reducing service.' });
+    }
+  }
+
   static async removeService(req, res) {
     try {
-      const { bookingId, serviceId, isExtension, isTransport, removalReason } = req.body;
+      const { bookingId, serviceId, isExtension, isTransport, removalReason, bookingServiceId } = req.body;
 
       if (!bookingId || serviceId === undefined) {
         return res.status(400).json({ 
@@ -1290,6 +1433,7 @@ class BookingController {
         isExtension,
         isTransport,
         removalReason,
+        bookingServiceId: bookingServiceId || null,
         userId: req.user?.userId || null
       });
 
@@ -1873,6 +2017,9 @@ class BookingController {
         breakfastKidPrice,
         breakfastKidId,
         breakfastIndividual: breakfastIndividualValue,
+        breakfastExtraPerRoom,
+        breakfastExtraAdultPrice,
+        breakfastExtraKidPrice,
         pickupServiceId,
         pickupPrice,
         dropoffServiceId,
@@ -1922,8 +2069,10 @@ class BookingController {
       const totalRoomPrice = roomPrices.reduce((sum, price) => sum + price, 0) * parseInt(qty);
       
       // Calculate services total
-      const breakfastAdultTotal = parseFloat(breakfastAdultQty) * parseFloat(breakfastAdultPrice) || 0;
-      const breakfastKidTotal = parseFloat(breakfastKidQty) * parseFloat(breakfastKidPrice) || 0;
+      // Breakfast is inside the room-rate tier; only the extras (beyond 2 per room) are charged.
+      const bfExtras = BookingModel.groupBreakfastExtras(breakfastExtraPerRoom, breakfastExtraAdultPrice, breakfastExtraKidPrice);
+      const breakfastAdultTotal = bfExtras.adultTotal;
+      const breakfastKidTotal = bfExtras.kidTotal;
       const pickupTotal = parseFloat(pickupPrice) || 0;
       const dropoffTotal = parseFloat(dropoffPrice) || 0;
       const servicesTotal = breakfastAdultTotal + breakfastKidTotal + pickupTotal + dropoffTotal;
@@ -1948,6 +2097,10 @@ class BookingController {
 
       const roomIdList = (selectedRooms || '').split(',').map(id => id.trim()).filter(Boolean);
       const expectedRoomCount = parseInt(numberOfRooms, 10) || 0;
+      {
+        const ooo = await BookingModel.findOutOfOrderRoom({ roomIds: roomIdList, propertyId: req.propertyId, excludeGroupId: (typeof existingGroupId !== 'undefined' && existingGroupId) ? parseInt(existingGroupId, 10) : null });
+        if (ooo) return res.status(409).json({ success: false, message: `Room ${ooo.roomNumber} is Out of order, so it cannot be booked. Set it to Available in Rooms first.` });
+      }
       if (expectedRoomCount > 0 && roomIdList.length !== expectedRoomCount) {
         return res.status(400).json({
           success: false,
@@ -2000,6 +2153,9 @@ class BookingController {
         breakfastKidPrice,
         breakfastKidId,
         breakfastIndividual,
+        breakfastExtraPerRoom,
+        breakfastExtraAdultPrice,
+        breakfastExtraKidPrice,
         pickupServiceId,
         pickupPrice,
         dropoffServiceId,
@@ -2127,6 +2283,9 @@ class BookingController {
         breakfastKidPrice,
         breakfastKidId,
         breakfastIndividual: breakfastIndividualValue,
+        breakfastExtraPerRoom,
+        breakfastExtraAdultPrice,
+        breakfastExtraKidPrice,
         pickupServiceId,
         pickupPrice,
         dropoffServiceId,
@@ -2157,6 +2316,11 @@ class BookingController {
         });
       }
 
+      {
+        const ooo = await BookingModel.findOutOfOrderRoom({ roomIds: String(selectedRooms || '').split(','), propertyId: req.propertyId, excludeGroupId: parseInt(groupBookingId, 10) || null });
+        if (ooo) return res.status(409).json({ success: false, message: `Room ${ooo.roomNumber} is Out of order, so it cannot be booked. Set it to Available in Rooms first.` });
+      }
+
       // Convert individual service flag (only for Breakfast)
       const breakfastIndividual = breakfastIndividualValue === 'on';
 
@@ -2167,8 +2331,13 @@ class BookingController {
       const totalDiscountNum = seniorPwdDiscountNum + discountNum; // Combine both discounts
       const roomPrices = (selectedRoomPrice || '').split('|').filter(p => p.trim() !== '').map(p => parseFloat(p.replace(/,/g, '')) || 0);
       const totalRoomPrice = roomPrices.reduce((sum, price) => sum + price, 0) * (parseInt(qty, 10) || 0);
-      const servicesTotal = (parseFloat(breakfastAdultQty) * parseFloat(breakfastAdultPrice) || 0)
-        + (parseFloat(breakfastKidQty) * parseFloat(breakfastKidPrice) || 0)
+      // Breakfast: with the extras sent (like Add Group Booking) only the extras above 2 per room are charged; otherwise the old way
+      const bfExtraSent = breakfastExtraPerRoom !== undefined && breakfastExtraPerRoom !== null && breakfastExtraPerRoom !== '';
+      const bfEx = BookingModel.groupBreakfastExtras(breakfastExtraPerRoom, breakfastExtraAdultPrice, breakfastExtraKidPrice);
+      const breakfastCharge = bfExtraSent
+        ? (bfEx.adultTotal + bfEx.kidTotal)
+        : ((parseFloat(breakfastAdultQty) * parseFloat(breakfastAdultPrice) || 0) + (parseFloat(breakfastKidQty) * parseFloat(breakfastKidPrice) || 0));
+      const servicesTotal = breakfastCharge
         + (parseFloat(pickupPrice) || 0)
         + (parseFloat(dropoffPrice) || 0);
       const lateCheckoutFeeNum = parseFloat(lateCheckoutFee) || 0;
@@ -2209,6 +2378,9 @@ class BookingController {
         breakfastKidPrice,
         breakfastKidId,
         breakfastIndividual,
+        breakfastExtraPerRoom,
+        breakfastExtraAdultPrice,
+        breakfastExtraKidPrice,
         pickupServiceId,
         pickupPrice,
         dropoffServiceId,
@@ -2692,6 +2864,17 @@ class BookingController {
     }
   }
 
+  // Navbar global search (guest / room / confirmation number) - active property only.
+  static async globalSearch(req, res) {
+    try {
+      const results = await BookingModel.globalSearch(req.query.q, req.propertyId);
+      res.json({ success: true, results });
+    } catch (error) {
+      console.error('Global search error:', error);
+      res.status(500).json({ success: false, results: [] });
+    }
+  }
+
   // Get all agencies
   static async getAgency(req, res) {
     try {
@@ -3082,20 +3265,8 @@ class BookingController {
           otherServicesCount: otherServices.length
         });
 
-        // Load logo as base64 for Playwright
-        const logoPath = path.join(__dirname, '../public/img/Logo-Black.png');
-        let imageUrl = '';
-        try {
-          if (require('fs').existsSync(logoPath)) {
-            const imageBase64 = require('fs').readFileSync(logoPath, 'base64');
-            imageUrl = `data:image/png;base64,${imageBase64}`;
-            console.log('✅ [VOUCHER] Logo loaded as base64');
-          } else {
-            console.error('❌ [VOUCHER] Logo file not found:', logoPath);
-          }
-        } catch (error) {
-          console.error('❌ [VOUCHER] Error loading logo:', error);
-        }
+        // Logo of the current property (none for a property without one)
+        const imageUrl = await loadPropertyLogoDataUri(req.propertyId);
 
         // Check if this is a direct reservation (unassigned room)
         const isDirectReservation = voucherData.isDirectReservation === 1 || voucherData.isDirectReservation === '1' || !voucherData.roomNumber;
@@ -3158,7 +3329,7 @@ class BookingController {
         });
       }
 
-      const voucherData = await BookingModel.generateVoucher({ data, user });
+      const voucherData = await BookingModel.generateVoucher({ data, user, propertyId: req.propertyId });
       
       // Use confirmation number directly as filename (already contains "UR" for unassigned rooms)
       const filename = `voucher-${data.voucherNo}.pdf`;
@@ -3229,16 +3400,7 @@ class BookingController {
       const fs = require('fs').promises;
       const { chromium } = require('playwright');
 
-      const logoPath = path.join(__dirname, '../public/img/Logo-Black.png');
-      let imageUrl = '';
-      try {
-        if (require('fs').existsSync(logoPath)) {
-          const imageBase64 = require('fs').readFileSync(logoPath, 'base64');
-          imageUrl = `data:image/png;base64,${imageBase64}`;
-        }
-      } catch (error) {
-        console.error('❌ [QUOTATION] Error loading logo:', error);
-      }
+      const imageUrl = await loadPropertyLogoDataUri(req.propertyId);
 
       const templatePath = path.join(__dirname, '../views/booking/pdf/room_checker_quotation.ejs');
       const templateContent = await fs.readFile(templatePath, 'utf-8');
@@ -3330,7 +3492,7 @@ class BookingController {
         data.voucherNo = `GV${yyyy}${mm}${dd}${hours}${minutes}`;
       }
 
-      const voucherData = await BookingModel.generateGroupVoucher({ data, user });
+      const voucherData = await BookingModel.generateGroupVoucher({ data, user, propertyId: req.propertyId });
       
       const download = req.query.download === '1';
       const filename = `group-voucher-${data.voucherNo}.pdf`;
@@ -3405,6 +3567,10 @@ class BookingController {
   static async assignRoomToDirectReservation(req, res) {
     try {
       const { bookingId, roomId, roomNumber, roomType, bedCount, price, floor, paymentStatus, paidAmount } = req.body;
+      {
+        const ooo = await BookingModel.findOutOfOrderRoom({ roomIds: [roomId], propertyId: req.propertyId });
+        if (ooo) return res.status(409).json({ success: false, message: `Room ${ooo.roomNumber} is Out of order, so it cannot be booked. Set it to Available in Rooms first.` });
+      }
       const encodedBy = req.user?.userId || null;
       
       if (!bookingId || !roomId || !roomNumber) {
@@ -4247,20 +4413,8 @@ class BookingController {
         otherServicesCount: otherServices.length
       });
 
-      // Load logo as base64 for Playwright
-      const logoPath = path.join(__dirname, '../public/img/Logo-Black.png');
-      let imageUrl = '';
-      try {
-        if (require('fs').existsSync(logoPath)) {
-          const imageBase64 = require('fs').readFileSync(logoPath, 'base64');
-          imageUrl = `data:image/png;base64,${imageBase64}`;
-          console.log('✅ [VOUCHER PDF] Logo loaded as base64');
-        } else {
-          console.error('❌ [VOUCHER PDF] Logo file not found:', logoPath);
-        }
-      } catch (error) {
-        console.error('❌ [VOUCHER PDF] Error loading logo:', error);
-      }
+      // Logo of the current property (none for a property without one)
+      const imageUrl = await loadPropertyLogoDataUri(req.propertyId);
 
       // Check if this is a direct reservation (unassigned room)
       const isDirectReservation = voucherData.isDirectReservation === 1 || voucherData.isDirectReservation === '1' || !voucherData.roomNumber;

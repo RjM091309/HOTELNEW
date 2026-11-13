@@ -185,6 +185,7 @@ class GuestModel {
                   SELECT SUM(p.AMOUNT_PAID) 
                   FROM payments p 
                   WHERE p.BILLING_ID = bill.IDNo
+                    AND NOT (p.PAYMENT_METHOD IN ('credit', 'marker') AND p.SETTLED_DATE IS NULL)
               ), 0) +
               COALESCE((
                   SELECT SUM(p2.AMOUNT_PAID) 
@@ -192,6 +193,7 @@ class GuestModel {
                   WHERE p2.BOOKING_EXTENSION_ID IN (
                       SELECT IDNo FROM booking_extension WHERE BOOKING_ID = b.IDNo AND ACTIVE = 1
                   )
+                    AND NOT (p2.PAYMENT_METHOD IN ('credit', 'marker') AND p2.SETTLED_DATE IS NULL)
               ), 0)
           ) AS TOTAL_PAID,
           CASE

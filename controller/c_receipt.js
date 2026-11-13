@@ -18,6 +18,13 @@ function normalizePaymentMethod(method) {
   return 'other';
 }
 
+// Only a small PNG/JPEG data URL is accepted as the e-signature; anything else is dropped.
+function cleanSignature(value) {
+  const v = String(value || '');
+  if (!/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(v)) return null;
+  return v.length > 400000 ? null : v;
+}
+
 function parseReceiptPayload(body) {
   const paymentMethod = normalizePaymentMethod(body.paymentMethod);
   const paymentMethodOther = paymentMethod === 'other'
@@ -32,7 +39,8 @@ function parseReceiptPayload(body) {
     PAYMENT_METHOD: paymentMethod,
     PAYMENT_METHOD_OTHER: paymentMethodOther,
     PURPOSE: String(body.purpose || '').trim(),
-    RECEIVED_BY: String(body.receivedBy || '').trim()
+    RECEIVED_BY: String(body.receivedBy || '').trim(),
+    SIGNATURE: cleanSignature(body.signature)
   };
 }
 

@@ -78,7 +78,16 @@ app.use(methodOverride('_method'));
 app.use(cookieParser());
 
 // Static files
-app.use(express.static(path.join(__dirname, 'public')));
+// Before, every page change asked the server about every css / js file again (about 60 requests, each answered 304). Files that are
+// loaded with a version (?v=...) are now kept by the browser for a day - bumping the version (as the pages already do) loads the new
+// file at once. Files without a version are still checked every time, as before.
+app.use((req, res, next) => {
+    if ((req.method === 'GET' || req.method === 'HEAD') && /\.(css|js|png|jpe?g|gif|svg|ico|woff2?|ttf|eot)$/i.test(req.path)) {
+        res.setHeader('Cache-Control', req.query && req.query.v ? 'public, max-age=86400' : 'no-cache');
+    }
+    next();
+});
+app.use(express.static(path.join(__dirname, 'public'), { cacheControl: false }));
 
 // Debug middleware to log requests
 app.use((req, res, next) => {
