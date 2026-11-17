@@ -18,28 +18,35 @@
 // instead of opening a copy. An already-open tab was already refreshed in the background after the last save (see the tab sync below), and goes elsewhere if a new query
 // (e.g. '?hlRoomId=5') has to be applied, or it has gone to another page. Returns false when the
 // browser blocks the popup, so the caller can fall back to a normal link.
-function openInOwnTab(path, query) {
+function openInOwnTab(path, query, key) {
     query = query || '';
-    var name = 'hotel_tab:' + path;
+    // The Dashboard and the Calendar of each property have their own tab (Main Stay, Clark Central and Pool Villa side by side, up to six tabs);
+    // the tab is pinned to its property with ?p=<code> (see head.ejs). Everything else is one tab per page.
+    var perProperty = path === '/dashboard/full' || path === '/calendar';
+    if (perProperty && key === undefined) key = window.__tabProperty || document.documentElement.getAttribute('data-property-theme') || '';
+    if (!perProperty) key = '';
+    var name = 'hotel_tab:' + path + (key ? '#' + key : '');
+    var pinQ = key ? (query ? query + '&p=' : '?p=') + encodeURIComponent(key) : query;   // what the tab is sent to; `query` alone decides whether a tab already open has to be moved
     // Already inside that tab: nothing to open - only load the query if one was asked for.
     // (The tab keeps its name when you move to another page inside it, e.g. Calendar -> Credit. Then the link must
     // simply go to the page, otherwise the click would do nothing at all.)
     // A dashboard is never turned into that tab: a tab that was the Calendar and then went to the Dashboard still carries the name,
     // so it gives the name up and the calendar opens in its own tab.
-    if (window.name === name && /^\/dashboard/.test(window.location.pathname)) window.name = '';
+    // (Except when the link is to that very dashboard: then it is simply this tab.)
+    if (window.name === name && /^\/dashboard/.test(window.location.pathname) && window.location.pathname !== path) window.name = '';
     if (window.name === name) {
-        if (window.location.pathname !== path || query) window.location.href = path + query;
+        if (window.location.pathname !== path || query) window.location.href = path + pinQ;
         return true;
     }
     var tab = window.open('', name);
     if (!tab) return false;
-    var url = path + query;
+    var url = path + pinQ;
     try {
         if (tab.location.href === 'about:blank') {
             tab.location.href = url;                       // just created
         } else if (tab.location.pathname !== path || query) {
             tab.location.href = url;                       // gone elsewhere, or a new query to apply
-        } else if (tab.document.documentElement.getAttribute('data-property-theme') !== document.documentElement.getAttribute('data-property-theme')) {
+        } else if (tab.document.documentElement.getAttribute('data-property-theme') !== (key || document.documentElement.getAttribute('data-property-theme'))) {
             tab.location.href = url;                       // that tab still shows the other property
         } else {
             // Already open on this page. The other tabs refresh themselves in the background right after a save, so normally it is up to date and
@@ -68,6 +75,7 @@ function openInOwnTab(path, query) {
         return m ? decodeURIComponent(m[1]) : '';
     }
     function check() {
+        if (window.__tabProperty) return;      // a tab pinned to its property (head.ejs) does not follow the cookie
         var shown = document.documentElement.getAttribute('data-property-theme');
         var wanted = cookiePropertyCode();
         if (!shown || !wanted || shown === wanted) return;

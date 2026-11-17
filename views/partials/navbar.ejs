@@ -241,6 +241,11 @@
 											// fade in, instead of flashing raw unstyled content
 											// while everything finishes loading.
 											try { sessionStorage.setItem('property_switching', '1'); } catch (e) {}
+											if (window.__tabProperty) {      // a tab pinned to a property moves its pin along
+												try { sessionStorage.setItem('tab_property', code); } catch (e) {}
+												var nu = new URL(window.location.href); nu.searchParams.set('p', code); window.location.replace(nu.toString());
+												return;
+											}
 											window.location.reload();
 										} else {
 											buttons.forEach(function (b) { b.disabled = b.classList.contains('is-active'); });
@@ -2941,7 +2946,12 @@ function navbarFormatTime(dateStr) {
 // button and other deep-links already use, instead of navigating the current
 // page away from wherever the navbar is being viewed from.
 function navbarGotoDashboard(url) {
-    const win = window.open(url, 'hotel_dashboard_tab');
+    // the same named tab as the sidebar's Dashboard link and the property cards (openInOwnTab, footer.ejs)
+    try {
+        const u = new URL(url, window.location.origin);
+        if (typeof openInOwnTab === 'function' && openInOwnTab(u.pathname, u.search)) return;
+    } catch (e) { /* fall back below */ }
+    const win = window.open(url, '_blank');
     if (win) win.focus();
 }
 window.navbarGotoDashboard = navbarGotoDashboard;

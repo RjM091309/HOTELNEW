@@ -32,7 +32,15 @@ async function allowedPropertiesOf(user, all) {
 async function attachProperty(req, res) {
   const everyProperty = await PropertyModel.getAllActive();
   const allowed = await allowedPropertiesOf(req.user, everyProperty);
-  let property = await PropertyModel.resolveFromCookie(req.cookies?.current_property);
+  // A tab pinned to one property (Dashboard / Calendar of Main Stay, Clark Central, Pool Villa open side by side) says which one with the
+  // X-Property header (every request the page makes) or ?p=<code> (the page itself). It wins over the shared cookie, which is left alone.
+  const pinCode = String(req.headers?.['x-property'] || (req.method === 'GET' && req.query ? req.query.p : '') || '').trim();
+  let property = null;
+  if (pinCode) {
+    const pinned = await PropertyModel.resolveFromCookie(pinCode);
+    if (pinned && pinned.CODE === pinCode && allowed.some((p) => p.IDNo === pinned.IDNo)) property = pinned;
+  }
+  if (!property) property = await PropertyModel.resolveFromCookie(req.cookies?.current_property);
   if (!property || !allowed.some((p) => p.IDNo === property.IDNo)) {
     property = allowed[0] || property;                   // the property in the cookie is not this account's: use its own
     if (property && res.cookie) res.cookie('current_property', property.CODE, { maxAge: 90 * 24 * 60 * 60 * 1000, httpOnly: false, sameSite: 'lax' });

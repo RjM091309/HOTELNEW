@@ -300,60 +300,27 @@
     var u = document.getElementById('ovUpdated'); if (u) u.textContent = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   }
 
-  // Click anywhere on a card (or Enter on it): switch to that property and open its full dashboard.
-  // The transition: the other cards fall back, the picked one lifts, and a panel grows from the card to the whole screen
-  // (showing the property's logo) while the property is switched; the full dashboard then fades it away and comes in.
+  // Click anywhere on a card (or Enter on it): switch to that property and open its full dashboard in its own tab (the same tab every
+  // time, see openInOwnTab in footer.ejs); this tab stays on the overview of all properties.
   var opening = false;
   function openCard(card) {
     if (!card || opening) return;
     opening = true;
     var c = card._c || {}, code = card.getAttribute('data-code');
     var accent = (card.style.getPropertyValue('--accent') || '').trim() || '#4361ee';
-    var go = function () { return fetch('/property/switch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: code }) }).then(function (r) { return r.json(); }); };
-    if (calm) { go().then(function (j) { if (j && j.success) window.location.href = '/dashboard/full'; else opening = false; }).catch(function () { opening = false; }); return; }
-
-    var rc = card.getBoundingClientRect();
-    var morph = document.createElement('div');
-    morph.className = 'ov-morph';
-    morph.setAttribute('data-code', code);
-    morph.style.cssText = '--accent:' + accent + ';left:' + rc.left + 'px;top:' + rc.top + 'px;width:' + rc.width + 'px;height:' + rc.height + 'px;border-radius:26px;';
-    morph.innerHTML = '<div class="ov-morph-inner">' + (c.logo ? '<img src="' + esc(c.logo) + '" alt="">' : '<i class="fas ' + esc(c.icon || 'fa-building') + '"></i>') + '<b>' + esc(c.displayName || '') + '</b><div class="ov-morph-bar"><span></span></div></div>';
-    document.body.appendChild(morph);
-    grid.classList.add('is-leaving'); card.classList.add('is-picked');
-    void morph.offsetWidth;                                    // start from the card, then open to the full screen
-    var t0 = Date.now();
-    requestAnimationFrame(function () {
-      morph.classList.add('is-full');
-      var ar = (document.querySelector('.page-content') || document.body).getBoundingClientRect();   // only the page area: header and sidebar stay visible
-      var hd = document.querySelector('.page-header'), top0 = hd ? hd.getBoundingClientRect().bottom : ar.top;   // from under the header to the bottom of the window
-      morph.style.left = ar.left + 'px'; morph.style.top = top0 + 'px'; morph.style.width = ar.width + 'px'; morph.style.height = (window.innerHeight - top0) + 'px'; morph.style.borderRadius = '0px';
-    });
-    go().then(function (j) {
-      if (!j || !j.success) throw new Error('switch');
-      try { var lg = document.querySelector('.page-logo .page-logo-img-dark'); if (lg) sessionStorage.setItem('logoFlipFrom', lg.getAttribute('src')); } catch (e) { /* no flip */ }
-      try { sessionStorage.setItem('fdEnter', JSON.stringify({ code: code, color: accent, name: c.displayName || '', logo: c.logo || '', icon: c.icon || '' })); } catch (e) { /* the page just opens */ }
-      setTimeout(function () { window.location.href = '/dashboard/full'; }, Math.max(0, 640 - (Date.now() - t0)));
-    }).catch(function () {                                      // could not switch: close the panel again
-      morph.style.opacity = '0'; setTimeout(function () { morph.remove(); }, 300);
-      grid.classList.remove('is-leaving'); card.classList.remove('is-picked'); opening = false;
-    });
+    // no property switch: the tab is pinned to the property (?p=), the shared cookie is left alone
+    opening = false;
+    var ok = false;
+    try { ok = typeof openInOwnTab === 'function' && openInOwnTab('/dashboard/full', '', code); } catch (e) { ok = false; }
+    if (!ok) { var w = window.open('/dashboard/full?p=' + encodeURIComponent(code), '_blank'); if (!w) window.location.href = '/dashboard/full?p=' + encodeURIComponent(code); }
   }
   // Check-in / Check-out tile: switch to that property, then open its calendar with today's arrivals / departures highlighted
   function openFocus(tile) {
-    var card = tile.closest('.ov-card'); if (!card || opening) return;
-    opening = true;
-    fetch('/property/switch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: card.getAttribute('data-code') }) })
-      .then(function (r) { return r.json(); })
-      .then(function (j) {
-        opening = false;
-        if (!j || !j.success) return;
-        // the calendar opens in its own shared tab; this tab stays on the overview
-        var q = '?focus=' + encodeURIComponent(tile.getAttribute('data-focus'));
-        var ok = false;
-        try { ok = typeof openInOwnTab === 'function' && openInOwnTab('/calendar', q); } catch (e) { ok = false; }
-        if (!ok) { var w = window.open('/calendar' + q, '_blank'); if (!w) window.location.href = '/calendar' + q; }
-      })
-      .catch(function () { opening = false; });
+    var card = tile.closest('.ov-card'); if (!card) return;
+    var code = card.getAttribute('data-code'), q = '?focus=' + encodeURIComponent(tile.getAttribute('data-focus'));
+    var ok = false;
+    try { ok = typeof openInOwnTab === 'function' && openInOwnTab('/calendar', q, code); } catch (e) { ok = false; }
+    if (!ok) { var w = window.open('/calendar' + q + '&p=' + encodeURIComponent(code), '_blank'); if (!w) window.location.href = '/calendar' + q + '&p=' + encodeURIComponent(code); }
   }
   grid.addEventListener('click', function (e) {
     var t = e.target.closest('.ov-tile[data-focus]');

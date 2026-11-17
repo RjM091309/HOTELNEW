@@ -29,6 +29,38 @@
 		var propertyCode = '<%= typeof currentProperty !== "undefined" && currentProperty ? currentProperty.CODE : "main" %>';
 		try { document.documentElement.setAttribute('data-theme', localStorage.getItem('ui_data_theme') || 'dark'); } catch(e) { document.documentElement.setAttribute('data-theme', 'dark'); }
 		document.documentElement.setAttribute('data-property-theme', propertyCode);
+		// A tab opened with ?p=<code> (the Dashboard / Calendar of one property) is PINNED to that property for as long as it lives: every request it
+		// makes carries X-Property (see middleware/m_auth.js), so several properties can be open side by side while the shared cookie says another.
+		try {
+			var u = new URL(window.location.href), ps = u.searchParams.get('p');
+			if (ps) sessionStorage.setItem('tab_property', ps);
+			var pin = sessionStorage.getItem('tab_property');
+			if (pin) {
+				window.__tabProperty = pin;
+				if (pin !== propertyCode) {      // this page was drawn for the cookie's property: ask for the pinned one (once)
+					var last = Number(sessionStorage.getItem('tab_property_fix') || 0);
+					if (Date.now() - last > 5000) { sessionStorage.setItem('tab_property_fix', String(Date.now())); u.searchParams.set('p', pin); window.location.replace(u.toString()); }
+				}
+				var sameOrigin = function (url) { try { return new URL(url, window.location.href).origin === window.location.origin; } catch (e) { return false; } };
+				if (window.fetch) {
+					var nativeFetch = window.fetch;
+					window.fetch = function (input, init) {
+						try {
+							var url = typeof input === 'string' ? input : (input && input.url);
+							if (sameOrigin(url)) {
+								init = init || {};
+								var hd = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
+								hd.set('X-Property', pin); init.headers = hd;
+							}
+						} catch (e) { /* send it as it is */ }
+						return nativeFetch.call(this, input, init);
+					};
+				}
+				var xo = XMLHttpRequest.prototype.open, xs = XMLHttpRequest.prototype.send;
+				XMLHttpRequest.prototype.open = function (m, url) { this.__pinUrl = url; return xo.apply(this, arguments); };
+				XMLHttpRequest.prototype.send = function () { try { if (sameOrigin(this.__pinUrl)) this.setRequestHeader('X-Property', pin); } catch (e) { /* ignore */ } return xs.apply(this, arguments); };
+			}
+		} catch (e) { /* storage blocked: the tab just follows the cookie */ }
 		try { document.documentElement.style.setProperty('--property-accent', '<%= typeof currentProperty !== "undefined" && currentProperty && /^#[0-9a-fA-F]{6}$/.test(currentProperty.COLOR || "") ? currentProperty.COLOR : "#d4a017" %>'); } catch (e) {}
 		// Pricing mode is a property setting (not tied to a code): 'guest' = rates by number of guests.
 		document.documentElement.setAttribute('data-property-pricing', '<%= typeof isGuestPricing !== "undefined" && isGuestPricing ? "guest" : "room" %>');

@@ -12,7 +12,7 @@ const PropertyDashboardModel = require('../models/propertyDashboardModel');
 // every property's rows mixed together.
 async function resolvePropertyId(req) {
   if (req.propertyId) return req.propertyId;
-  const property = await PropertyModel.resolveFromCookie(req.cookies?.current_property);
+  const property = await PropertyModel.resolveFromCookie(String(req.headers?.['x-property'] || '').trim() || req.cookies?.current_property);
   return property ? property.IDNo : null;
 }
 
