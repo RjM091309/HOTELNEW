@@ -29,6 +29,7 @@
   // floor-plan buildings (narrower tiles): the bed dots sit BED_X from the tile's left edge and the room number starts NUM_X from it, after the dots
   // (left-aligned, so the dots and the number never touch, whatever the width of the font's digits)
   var BED_X = 5, NUM_X = 10.5;
+  var LEAVE_INK = { fill: '#ffffff', edge: '#8f1116' };   // floor-plan buildings: the number on a red room (the guest leaves today)
   var uidN = 0;
 
   function palette(dark, theme) {
@@ -402,8 +403,10 @@
           if (full) {
             // (a floor-plan building with bed dots: the number starts right after the dots instead of being centered)
             var afterDots = lay && r.beds && opt.view !== 'housekeeping';
-            o.push('<text x="' + (afterDots ? NUM_X - (u1 - u0) * len / 2 : -NUM_DX).toFixed(2) + '" y="' + (fs * 0.36 + NUM_DY).toFixed(2) + '" transform="matrix(1 0 ' + (-LEAN).toFixed(3) + ' ' + SQ + ' ' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')" text-anchor="' + (afterDots ? 'start' : 'middle') + '" font-size="' + fs.toFixed(2) + '" font-weight="400" letter-spacing="0.07em" style="font-variant-numeric:tabular-nums" pointer-events="none" fill="' + INK[k] + '"' +
-              (k === 'ooo' ? ' stroke="' + FILL.ooo + '" stroke-width="2.4" paint-order="stroke"' : '') + '>' + esc(r.no) + '</text>');
+            // (a floor-plan building: on a red room - the guest leaves today - the number is white with a dark red edge, readable on the whole red)
+            var redInk = lay && leave;
+            o.push('<text x="' + (afterDots ? NUM_X - (u1 - u0) * len / 2 : -NUM_DX).toFixed(2) + '" y="' + (fs * 0.36 + NUM_DY).toFixed(2) + '" transform="matrix(1 0 ' + (-LEAN).toFixed(3) + ' ' + SQ + ' ' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')" text-anchor="' + (afterDots ? 'start' : 'middle') + '" font-size="' + fs.toFixed(2) + '" font-weight="' + (redInk ? 600 : 400) + '" letter-spacing="0.07em" style="font-variant-numeric:tabular-nums" pointer-events="none" fill="' + (redInk ? LEAVE_INK.fill : INK[k]) + '"' +
+              (k === 'ooo' ? ' stroke="' + FILL.ooo + '" stroke-width="2.4" paint-order="stroke"' : redInk ? ' stroke="' + LEAVE_INK.edge + '" stroke-width="2.2" stroke-linejoin="round" paint-order="stroke"' : '') + '>' + esc(r.no) + '</text>');
           }
           // VIP room: a gold "V" in a royal serif font at the top-left corner of the tile (dark edge so it shows on every colour)
           if (full && vip) {
@@ -415,7 +418,7 @@
             var nb = r.beds >= 2 ? 2 : 1, half = (u1 - u0) * len / 2, bx = -half + (lay ? BED_X : 9), by = fs * 0.36 + NUM_DY - fs * 0.34;
             var dots = '';
             // two beds: the dots are stacked (like a colon), so they never run into the room number
-            for (var q = 0; q < nb; q++) dots += '<ellipse cx="' + bx.toFixed(1) + '" cy="' + (by + (nb === 2 ? (q ? 3.4 : -3.4) : 0)).toFixed(1) + '" rx="2.2" ry="2.2" fill="' + INK[k] + '" opacity=".75"/>';
+            for (var q = 0; q < nb; q++) dots += '<ellipse cx="' + bx.toFixed(1) + '" cy="' + (by + (nb === 2 ? (q ? 3.4 : -3.4) : 0)).toFixed(1) + '" rx="2.2" ry="2.2" fill="' + (lay && leave ? LEAVE_INK.fill : INK[k]) + '" opacity="' + (lay && leave ? '.9' : '.75') + '"/>';
             o.push('<g pointer-events="none" transform="matrix(1 0 ' + (-LEAN).toFixed(3) + ' ' + SQ + ' ' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')">' + dots + '</g>');
           }
           // housekeeping: a pending request for this room (MUR = make up room, REQ = a typed request) - a small pill on the tile's left corner
