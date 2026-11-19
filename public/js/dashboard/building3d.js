@@ -28,7 +28,7 @@
   var TILE_GAP = 4.4, DOOR_HALF = 24.75;   // floor-plan buildings: half the space between two tiles / half the entrance door, in drawing units
   // floor-plan buildings (narrower tiles): the bed dots sit BED_X from the tile's left edge and the room number starts NUM_X from it, after the dots
   // (left-aligned, so the dots and the number never touch, whatever the width of the font's digits)
-  var BED_X = 5, NUM_X = 10.5;
+  var BED_X = 5, NUM_X = 10.5, NUM_X2 = 1.6;   // NUM_X2: the extra space before the number of a room with two (stacked) bed dots
   var LEAVE_INK = { fill: '#ffffff', edge: '#8f1116' };   // floor-plan buildings: the number on a red room (the guest leaves today)
   var uidN = 0;
 
@@ -405,7 +405,9 @@
             var afterDots = lay && r.beds && opt.view !== 'housekeeping';
             // (a floor-plan building: on a red room - the guest leaves today - the number is white with a dark red edge, readable on the whole red)
             var redInk = lay && leave;
-            o.push('<text x="' + (afterDots ? NUM_X - (u1 - u0) * len / 2 : -NUM_DX).toFixed(2) + '" y="' + (fs * 0.36 + NUM_DY).toFixed(2) + '" transform="matrix(1 0 ' + (-LEAN).toFixed(3) + ' ' + SQ + ' ' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')" text-anchor="' + (afterDots ? 'start' : 'middle') + '" font-size="' + fs.toFixed(2) + '" font-weight="' + (redInk ? 600 : 400) + '" letter-spacing="0.07em" style="font-variant-numeric:tabular-nums" pointer-events="none" fill="' + (redInk ? LEAVE_INK.fill : INK[k]) + '"' +
+            // (two stacked dots: the number moves a little further right, so the bold outlined number of a red room keeps clear of the lower dot)
+            var numX = NUM_X + (r.beds >= 2 ? NUM_X2 : 0);
+            o.push('<text x="' + (afterDots ? numX - (u1 - u0) * len / 2 : -NUM_DX).toFixed(2) + '" y="' + (fs * 0.36 + NUM_DY).toFixed(2) + '" transform="matrix(1 0 ' + (-LEAN).toFixed(3) + ' ' + SQ + ' ' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')" text-anchor="' + (afterDots ? 'start' : 'middle') + '" font-size="' + fs.toFixed(2) + '" font-weight="' + (redInk ? 600 : 400) + '" letter-spacing="0.07em" style="font-variant-numeric:tabular-nums" pointer-events="none" fill="' + (redInk ? LEAVE_INK.fill : INK[k]) + '"' +
               (k === 'ooo' ? ' stroke="' + FILL.ooo + '" stroke-width="2.4" paint-order="stroke"' : redInk ? ' stroke="' + LEAVE_INK.edge + '" stroke-width="2.2" stroke-linejoin="round" paint-order="stroke"' : '') + '>' + esc(r.no) + '</text>');
           }
           // VIP room: a gold "V" in a royal serif font at the top-left corner of the tile (dark edge so it shows on every colour)

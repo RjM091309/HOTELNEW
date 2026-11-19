@@ -118,8 +118,10 @@ class OverviewModel {
                    FROM booking b WHERE ${live} AND b.BOOKING_STATUS = 'check-In' ORDER BY b.IDNo DESC LIMIT 1) AS lateOut
               , t.NAME AS typeName, t.DESCRIPTION AS typeDesc
          FROM room r LEFT JOIN room_type t ON t.IDNo = r.ROOM_TYPE_ID WHERE r.ACTIVE = 1 AND r.PROPERTY_ID = ? ORDER BY r.ROOM_NUMBER`, [propertyId]);
-    // beds: 1 or 2, from the room type ("2 King VIP" -> 2, "1 Queen VIP" / "King Bedroom" -> 1; the description "VIP room, 2 king beds" is read too)
+    // beds: 1 or 2, from the room type ("2 King VIP" -> 2, "1 Queen VIP" / "King Bedroom" -> 1; the description "VIP room, 2 king beds" is read too).
+    // "Twin" in the name or description is 2 beds too (Main Stay's "Queen Bedroom" is described as "Twin Bedroom").
     const bedsOf = (name, desc) => {
+      if (/\btwin\b/i.test(String(name || '') + ' ' + String(desc || ''))) return 2;
       const m = /^\s*(\d)/.exec(String(name || '')) || /(\d)\s*(?:king|queen|single|double)?\s*beds?/i.exec(String(desc || ''));
       return m && parseInt(m[1], 10) >= 2 ? 2 : 1;
     };
