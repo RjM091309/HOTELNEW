@@ -2444,7 +2444,9 @@ function processRoomsData(roomsData) {
     bedCount: room.ROOM_BED,
     roomView: parseInt(room.ROOM_VIEW, 10) || null,
     isVip: /vip/i.test(String(room.ROOM_TYPE || '')),   // the room type is named VIP: the room number is gold on the calendar
-    outOfOrder: String(room.ROOM_STATUS) === '3'     // the room status "Out of order" (Rooms menu): continuous, not a date range
+    // the room status "Out of order" (Rooms menu): continuous, not a date range. "Tenant" (5: rented out) is blocked exactly the same way.
+    outOfOrder: String(room.ROOM_STATUS) === '3' || String(room.ROOM_STATUS) === '5',
+    tenant: String(room.ROOM_STATUS) === '5'
   });
   const byRoomNumber = (a, b) => {
     const numA = parseInt(String(a.roomNumber).replace(/[^\d]/g, ''), 10);
@@ -2939,6 +2941,7 @@ function applyOutOfOrderLanes() {
     if (!root) return;
     const flat = (typeof getFlatRoomResources === 'function') ? getFlatRoomResources(window.allCalendarFloors) : [];
     const ids = new Set(flat.filter((r) => r && r.outOfOrder).map((r) => String(r.id)));
+    const tenantIds = new Set(flat.filter((r) => r && r.tenant).map((r) => String(r.id)));
     // a room that is not out of order any more
     root.querySelectorAll('td.fc-timeline-lane.fc-room-ooo').forEach((td) => {
       if (!ids.has(String(td.getAttribute('data-resource-id')))) {
@@ -2951,10 +2954,13 @@ function applyOutOfOrderLanes() {
       root.querySelectorAll('td.fc-timeline-lane[data-resource-id="' + CSS.escape(id) + '"]').forEach((td) => {
         td.classList.add('fc-room-ooo');
         const frame = td.querySelector('.fc-timeline-lane-frame');
-        if (frame && !frame.querySelector(':scope > .fc-room-ooo-tag')) {
+        const label = tenantIds.has(id) ? 'Tenant' : 'Out of order';
+        const old = frame && frame.querySelector(':scope > .fc-room-ooo-tag');
+        if (old) old.textContent = label;   // (the room may have gone from Out of order to Tenant, or back)
+        else if (frame) {
           const tag = document.createElement('div');
           tag.className = 'fc-room-ooo-tag';
-          tag.textContent = 'Out of order';
+          tag.textContent = label;
           frame.appendChild(tag);
         }
       });
@@ -3283,7 +3289,8 @@ const findHeader = setInterval(() => {
       if (selectInfo.resource.extendedProps && selectInfo.resource.extendedProps.outOfOrder) {
         if (window.__oooWarnAt == null || Date.now() - window.__oooWarnAt > 2500) {
           window.__oooWarnAt = Date.now();
-          try { if (window.PMSCore && PMSCore.showToast) PMSCore.showToast('warning', 'Out of order', 'Room ' + (selectInfo.resource.title || '') + ' is Out of order, so it cannot be booked.'); } catch (e) { /* no toast */ }
+          const oooLabel = selectInfo.resource.extendedProps.tenant ? 'Tenant' : 'Out of order';
+          try { if (window.PMSCore && PMSCore.showToast) PMSCore.showToast('warning', oooLabel, 'Room ' + (selectInfo.resource.title || '') + ' is ' + oooLabel + ', so it cannot be booked.'); } catch (e) { /* no toast */ }
         }
         return false;
       }
@@ -3456,7 +3463,7 @@ const findHeader = setInterval(() => {
         if (frame && !frame.querySelector(':scope > .fc-room-ooo-tag')) {
           const tag = document.createElement('div');
           tag.className = 'fc-room-ooo-tag';
-          tag.textContent = 'Out of order';
+          tag.textContent = arg.resource.extendedProps.tenant ? 'Tenant' : 'Out of order';
           frame.appendChild(tag);
         }
       }

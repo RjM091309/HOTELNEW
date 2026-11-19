@@ -397,7 +397,7 @@ class DailySettlementModel {
             const totalRoomsQuery = `
                 SELECT COUNT(*) AS TOTAL_ROOMS
                 FROM room
-                WHERE ACTIVE = 1 ${this._pf('', propertyId)} AND (ROOM_STATUS != 3 OR ROOM_STATUS IS NULL)
+                WHERE ACTIVE = 1 ${this._pf('', propertyId)} AND (ROOM_STATUS NOT IN (3, 5) OR ROOM_STATUS IS NULL)
             `;
             const totalRoomsResult = await queryDatabasePromise(totalRoomsQuery);
             const totalRooms = totalRoomsResult[0]?.TOTAL_ROOMS || 0;
@@ -453,7 +453,7 @@ class DailySettlementModel {
             const totalRoomsQuery = `
                 SELECT COUNT(*) AS TOTAL_ROOMS
                 FROM room
-                WHERE ACTIVE = 1 ${this._pf('', propertyId)} AND (ROOM_STATUS != 3 OR ROOM_STATUS IS NULL)
+                WHERE ACTIVE = 1 ${this._pf('', propertyId)} AND (ROOM_STATUS NOT IN (3, 5) OR ROOM_STATUS IS NULL)
             `;
             const totalRoomsResult = await queryDatabasePromise(totalRoomsQuery);
             const totalRooms = totalRoomsResult[0]?.TOTAL_ROOMS || 0;

@@ -8,13 +8,15 @@ const numericStatusLabels = {
   1: "AVAILABLE", 
   2: "OCCUPIED", 
   3: "MAINTENANCE", 
-  4: "CLEANING" 
+  4: "CLEANING",
+  5: "TENANT"
 };
 const numericStatusStyles = { 
   1: { background: "#4CAF50", border: "1px solid #4CAF50" }, 
   2: { background: "#3598dc", border: "1px solid #3598dc" }, 
   3: { background: "#FF9800", border: "1px solid #FF9800" }, 
-  4: { background: "#F44336", border: "1px solid #F44336" } 
+  4: { background: "#F44336", border: "1px solid #F44336" },
+  5: { background: "#a78bfa", border: "1px solid #a78bfa" }
 };
 
 function applyFilter(filterStatus, container) {

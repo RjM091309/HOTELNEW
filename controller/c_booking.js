@@ -954,7 +954,7 @@ class BookingController {
       // has an Early Check-In arriving - the early guest can be in from ~1 AM.
       if (room_id && !isMaintenanceBooking) {
         const ooo = await BookingModel.findOutOfOrderRoom({ roomIds: [room_id], propertyId: req.propertyId });
-        if (ooo) return res.status(409).json({ success: false, message: `Room ${ooo.roomNumber} is Out of order, so it cannot be booked. Set it to Available in Rooms first.` });
+        if (ooo) return res.status(409).json({ success: false, message: `Room ${ooo.roomNumber} is ${ooo.label || 'Out of order'}, so it cannot be booked. Set it to Available in Rooms first.` });
       }
       if (room_id && !isMaintenanceBooking) {
         const eciConflict = await BookingModel.findEarlyCheckInConflict(room_id, checkOutDate);
@@ -2120,7 +2120,7 @@ class BookingController {
       const expectedRoomCount = parseInt(numberOfRooms, 10) || 0;
       {
         const ooo = await BookingModel.findOutOfOrderRoom({ roomIds: roomIdList, propertyId: req.propertyId, excludeGroupId: (typeof existingGroupId !== 'undefined' && existingGroupId) ? parseInt(existingGroupId, 10) : null });
-        if (ooo) return res.status(409).json({ success: false, message: `Room ${ooo.roomNumber} is Out of order, so it cannot be booked. Set it to Available in Rooms first.` });
+        if (ooo) return res.status(409).json({ success: false, message: `Room ${ooo.roomNumber} is ${ooo.label || 'Out of order'}, so it cannot be booked. Set it to Available in Rooms first.` });
       }
       if (expectedRoomCount > 0 && roomIdList.length !== expectedRoomCount) {
         return res.status(400).json({
@@ -2342,7 +2342,7 @@ class BookingController {
 
       {
         const ooo = await BookingModel.findOutOfOrderRoom({ roomIds: String(selectedRooms || '').split(','), propertyId: req.propertyId, excludeGroupId: parseInt(groupBookingId, 10) || null });
-        if (ooo) return res.status(409).json({ success: false, message: `Room ${ooo.roomNumber} is Out of order, so it cannot be booked. Set it to Available in Rooms first.` });
+        if (ooo) return res.status(409).json({ success: false, message: `Room ${ooo.roomNumber} is ${ooo.label || 'Out of order'}, so it cannot be booked. Set it to Available in Rooms first.` });
       }
 
       // Convert individual service flag (only for Breakfast)
@@ -3620,7 +3620,7 @@ class BookingController {
       const { bookingId, roomId, roomNumber, roomType, bedCount, price, floor, paymentStatus, paidAmount } = req.body;
       {
         const ooo = await BookingModel.findOutOfOrderRoom({ roomIds: [roomId], propertyId: req.propertyId });
-        if (ooo) return res.status(409).json({ success: false, message: `Room ${ooo.roomNumber} is Out of order, so it cannot be booked. Set it to Available in Rooms first.` });
+        if (ooo) return res.status(409).json({ success: false, message: `Room ${ooo.roomNumber} is ${ooo.label || 'Out of order'}, so it cannot be booked. Set it to Available in Rooms first.` });
       }
       const encodedBy = req.user?.userId || null;
       

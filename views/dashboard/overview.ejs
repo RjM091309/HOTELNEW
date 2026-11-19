@@ -155,7 +155,7 @@
   <div class="ov-grid" id="ovGrid"></div>
 </div>
 
-<script src="/js/dashboard/building3d.js?v=49"></script>
+<script src="/js/dashboard/building3d.js?v=57"></script>
 <script>
 (function () {
   var INITIAL = <%- JSON.stringify(cards || []).replace(/</g, '\\u003c') %>;
@@ -211,7 +211,7 @@
       '<div class="ov-tags ov-a"><span class="ov-tag">' + esc(c.code.replace('_', ' ')) + '</span>' + (c.code === CURRENT ? '<span class="ov-tag is-here">Active</span>' : '') + '</div></div>';
     if (!d) return head + '<div class="ov-error">Could not load the numbers of this property.</div>';
     var r = d.rooms, res = d.reservation, hk = d.housekeeping;
-    // a property with a 3D building (Clark Central) shows it here instead of the check-ins chart
+    // a property with a 3D building (Clark Central, Main Stay) shows it here instead of the check-ins chart
     var ch = d.building ? null : chart(d.week, accent);
     var chartHtml = d.building
       ? '<div class="ov-chart ov-a ov-chart-bld"><div class="ov-chart-body ov-bld"></div></div>'
@@ -263,7 +263,7 @@
     var c = card._c, body = card.querySelector('.ov-chart-body');
     if (!c || !c.data || !body) return;
     if (c.data.building) {                                  // the 3D building: it scales itself to the box (svg 100% x 100%)
-      if (!card._bd && window.Building3D) { card._bd = true; window.Building3D.render(body, c.data.building, { name: c.displayName || c.name, mode: 'card', animate: entering }); }
+      if (!card._bd && window.Building3D) { card._bd = true; window.Building3D.render(body, c.data.building, { name: c.displayName || c.name, code: c.code, mode: 'card', animate: entering }); }
       return;
     }
     var h = Math.max(108, Math.round(body.clientHeight));

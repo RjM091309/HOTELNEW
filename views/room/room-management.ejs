@@ -29,6 +29,9 @@
   .rg-s3 .rg-badge { background: rgba(239,68,68,.22); color: #f87171; }
   .rg-s3 { background: repeating-linear-gradient(135deg, rgba(148,163,184,.14) 0 7px, rgba(148,163,184,.04) 7px 14px); }
   .rg-s4 .rg-badge { background: rgba(245,158,11,.20); color: #f59e0b; }
+  .rg-s5 .rg-badge { background: rgba(167,139,250,.22); color: #c4b5fd; }
+  .rg-s5 { background: repeating-linear-gradient(135deg, rgba(167,139,250,.12) 0 7px, rgba(167,139,250,.03) 7px 14px); }
+  [data-theme="white"] .rg-s5 .rg-badge { color: #6d28d9; }
   [data-theme="white"] .rg-floor { background: #fff; border-color: #e2e8f0; border-top-color: var(--property-accent, #f59e0b); }
   [data-theme="white"] .rg-card { background: #f8fafc; border-color: #e2e8f0; }
   [data-theme="white"] .rg-s1 .rg-badge { color: #15803d; }
@@ -135,6 +138,7 @@
                                     <li class="mdl-menu__item" data-val="2">Occupied</li>
                                     <li class="mdl-menu__item" data-val="3">Out of order</li>
                                     <li class="mdl-menu__item" data-val="4">Cleaning</li>
+                                    <li class="mdl-menu__item" data-val="5">Tenant</li>
                                 </ul>
                             </div>
                         </div>
@@ -265,6 +269,7 @@
                                     <li class="mdl-menu__item" data-val="2">Occupied</li>
                                     <li class="mdl-menu__item" data-val="3">Out of order</li>
                                     <li class="mdl-menu__item" data-val="4">Cleaning</li>
+                                    <li class="mdl-menu__item" data-val="5">Tenant</li>
                                 </ul>
                             </div>
                         </div>
@@ -466,7 +471,7 @@
         // Load scripts with proper timing
         setTimeout(function() {
             var roomScript = document.createElement('script');
-            roomScript.src = '/js/room/room_data.js?v=grid-3';
+            roomScript.src = '/js/room/room_data.js?v=tenant-1';
             document.body.appendChild(roomScript);
 
             setTimeout(function() {

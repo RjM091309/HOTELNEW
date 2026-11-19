@@ -142,7 +142,7 @@ class CalendarController {
       if (isRoomTransfer || (oldRoomNumber && String(oldRoomNumber) !== String(room))) {
         const BookingModelOoo = require('../models/bookingModel');
         const ooo = await BookingModelOoo.findOutOfOrderRoom({ roomIds: newRoomId ? [newRoomId] : [], roomNumbers: room ? [room] : [], propertyId: req.propertyId });
-        if (ooo) return res.status(409).json({ success: false, message: `Room ${ooo.roomNumber} is Out of order, so it cannot be booked. Set it to Available in Rooms first.` });
+        if (ooo) return res.status(409).json({ success: false, message: `Room ${ooo.roomNumber} is ${ooo.label || 'Out of order'}, so it cannot be booked. Set it to Available in Rooms first.` });
       }
 
       const beforeSnapshot = await snapshotBooking(id);
@@ -410,7 +410,7 @@ class CalendarController {
       {
         const BookingModelOoo = require('../models/bookingModel');
         const ooo = await BookingModelOoo.findOutOfOrderRoom({ roomIds: [newRoomId], propertyId: req.propertyId });
-        if (ooo) return res.status(409).json({ success: false, message: `Room ${ooo.roomNumber} is Out of order, so it cannot be booked. Set it to Available in Rooms first.` });
+        if (ooo) return res.status(409).json({ success: false, message: `Room ${ooo.roomNumber} is ${ooo.label || 'Out of order'}, so it cannot be booked. Set it to Available in Rooms first.` });
       }
       const result = await CalendarModel.transferRoom(bookingId, oldRoomNumber, newRoomId, transferDate, req.propertyId);
 
@@ -1123,6 +1123,10 @@ class CalendarController {
           case 4:
             status = 'Cleaning';
             statusClass = 'label-info';
+            break;
+          case 5:
+            status = 'Tenant';
+            statusClass = 'label-secondary';
             break;
           default:
             status = 'Unknown';

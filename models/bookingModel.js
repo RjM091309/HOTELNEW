@@ -9,7 +9,8 @@ class BookingModel {
   // can arrive from ~1 AM, so it overlaps any booking that only frees the room at
   // noon on that same date. Returns the conflicting Early Check-In booking, or
   // null if the room+checkout-date is clear.
-  // A room whose status is "Out of order" (3, set in the Rooms menu) cannot be booked. Returns { roomId, roomNumber } of the first one found, or null.
+  // A room whose status is "Out of order" (3) or "Tenant" (5, rented out: works like Out of order), set in the Rooms menu, cannot be booked.
+  // Returns { roomId, roomNumber, label } of the first one found (label = 'Out of order' or 'Tenant'), or null.
   // excludeGroupId: rooms that are already part of that group are not counted (editing a group that was booked before the room went out of order).
   static async findOutOfOrderRoom({ roomIds = [], roomNumbers = [], propertyId = null, excludeGroupId = null } = {}) {
     const ids = (roomIds || []).map((x) => parseInt(x, 10)).filter((x) => Number.isInteger(x));
@@ -19,11 +20,11 @@ class BookingModel {
     const params = [];
     if (ids.length) { conds.push('r.IDNo IN (?)'); params.push(ids); }
     if (nums.length) { conds.push('r.ROOM_NUMBER IN (?)'); params.push(nums); }
-    let sql = `SELECT r.IDNo, r.ROOM_NUMBER FROM room r WHERE (${conds.join(' OR ')}) AND r.ROOM_STATUS = '3' AND r.ACTIVE = 1`;
+    let sql = `SELECT r.IDNo, r.ROOM_NUMBER, r.ROOM_STATUS FROM room r WHERE (${conds.join(' OR ')}) AND r.ROOM_STATUS IN ('3', '5') AND r.ACTIVE = 1`;
     if (propertyId) { sql += ' AND r.PROPERTY_ID = ?'; params.push(propertyId); }
     if (excludeGroupId) { sql += ' AND r.IDNo NOT IN (SELECT ROOM_ID FROM booking WHERE GROUP_BOOKING_ID = ? AND ACTIVE = 1)'; params.push(excludeGroupId); }
     const rows = await queryDatabasePromise(sql + ' LIMIT 1', params);
-    return rows.length ? { roomId: rows[0].IDNo, roomNumber: rows[0].ROOM_NUMBER } : null;
+    return rows.length ? { roomId: rows[0].IDNo, roomNumber: rows[0].ROOM_NUMBER, label: String(rows[0].ROOM_STATUS) === '5' ? 'Tenant' : 'Out of order' } : null;
   }
 
   static async findEarlyCheckInConflict(roomId, checkOutDate, excludeBookingId = null) {
@@ -1686,7 +1687,7 @@ class BookingModel {
           room
         WHERE
           ACTIVE = 1
-          AND ROOM_STATUS != 3
+          AND ROOM_STATUS NOT IN (3, 5)
           AND ROOM_FLOOR = ?
           ${propertyId ? 'AND PROPERTY_ID = ?' : ''};
       `;
@@ -5062,7 +5063,8 @@ class BookingModel {
         LEFT JOIN booking b ON r.IDNo = b.ROOM_ID
             AND DATE(b.CHECK_IN_DATE) < ?
             AND DATE(b.CHECK_OUT_DATE) > ?
-        WHERE r.ROOM_STATUS !=3
+        WHERE r.ROOM_STATUS NOT IN (3, 5)
+          AND r.ACTIVE = 1
           AND (b.ROOM_ID IS NULL OR DATE(b.CHECK_OUT_DATE) = ?)
           ${propertyId ? 'AND r.PROPERTY_ID = ?' : ''}
         ORDER BY r.ROOM_NUMBER ASC;
@@ -9928,7 +9930,7 @@ class BookingModel {
         AND DATE(b.CHECK_IN_DATE) < ?
         AND DATE(b.CHECK_OUT_DATE) > ?
         AND (b.IS_CANCELLED IS NULL OR b.IS_CANCELLED != 1)
-    WHERE r.ROOM_STATUS != 3
+    WHERE r.ROOM_STATUS NOT IN (3, 5)
       AND (b.ROOM_ID IS NULL OR DATE(b.CHECK_OUT_DATE) = ?)
       ${bedCount ? 'AND r.ROOM_BED = ?' : ''}
       ${propertyId ? 'AND r.PROPERTY_ID = ?' : ''}
@@ -11015,6 +11017,8 @@ class BookingModel {
         WHERE r.ROOM_FLOOR = ?
         AND r.ACTIVE = 1
         ${propertyId ? 'AND r.PROPERTY_ID = ?' : ''}
+        -- not an Out of order (3) or Tenant (5) room: they cannot be booked (the booking's own room stays in the list)
+        AND (r.ROOM_STATUS NOT IN (3, 5) OR r.IDNo IN (SELECT bo.ROOM_ID FROM booking bo WHERE bo.IDNo = ? AND bo.ACTIVE = 1))
         AND (
           r.IDNo NOT IN (
             SELECT DISTINCT b.ROOM_ID
@@ -11039,6 +11043,7 @@ class BookingModel {
 
       const queryParams = [floor];
       if (propertyId) queryParams.push(propertyId);
+      queryParams.push(excludeBookingId);
       queryParams.push(checkInDate, checkInDate, checkOutDate, checkOutDate, checkInDate, checkOutDate, excludeBookingId);
 
       console.log('Executing query:', query);
@@ -11097,7 +11102,7 @@ class BookingModel {
              ) AS checkinType
       FROM room r
       JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
-      WHERE r.ROOM_STATUS != 3
+      WHERE r.ROOM_STATUS NOT IN (3, 5)
         ${propertyId ? 'AND r.PROPERTY_ID = ?' : ''}
         AND NOT EXISTS (
           SELECT 1 FROM booking b
@@ -11488,7 +11493,7 @@ class BookingModel {
         FROM room r
         JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
         WHERE r.IDNo IN (?)
-          AND r.ROOM_STATUS != 3
+          AND r.ROOM_STATUS NOT IN (3, 5)
           ${propertyId ? 'AND r.PROPERTY_ID = ?' : ''}
         ORDER BY CAST(r.ROOM_NUMBER AS UNSIGNED)
       `;
@@ -11633,7 +11638,7 @@ class BookingModel {
                ) AS checkinType
         FROM room r
         JOIN room_type rt ON r.ROOM_TYPE_ID = rt.IDNo
-        WHERE r.ROOM_STATUS != 3
+        WHERE r.ROOM_STATUS NOT IN (3, 5)
           ${propertyId ? 'AND r.PROPERTY_ID = ?' : ''}
           AND (
             -- Only include rooms that are currently assigned to the excluded group booking

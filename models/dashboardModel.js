@@ -1302,6 +1302,9 @@ class DashboardModel {
         case 4:
           status = 'Cleaning';
           break;
+        case 5:
+          status = 'Tenant';
+          break;
         default:
           status = 'Unknown';
       }
@@ -1935,7 +1938,7 @@ class DashboardModel {
         // a future range). Only a genuine maintenance block (ROOM_STATUS = 3) or an
         // overlapping pending/check-In booking disqualifies it.
         availabilityFilter = `
-          AND (r.ROOM_STATUS IS NULL OR r.ROOM_STATUS <> 3)
+          AND (r.ROOM_STATUS IS NULL OR r.ROOM_STATUS NOT IN (3, 5))
           AND NOT EXISTS (
             SELECT 1 FROM booking bx
             WHERE bx.ROOM_ID = r.IDNo
@@ -2061,6 +2064,9 @@ class DashboardModel {
       // stay. A merely "dirty"/"cleaning" room (status 4) is still a valid future target.
       if (roomStatus === 3) {
         throw new Error(`Room ${newRoomStatus[0].ROOM_NUMBER} is under maintenance.`);
+      }
+      if (roomStatus === 5) {
+        throw new Error(`Room ${newRoomStatus[0].ROOM_NUMBER} is a Tenant room, so a booking cannot be moved there.`);
       }
 
       const conflictRows = await queryDatabasePromise(`

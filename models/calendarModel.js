@@ -912,7 +912,8 @@ class CalendarModel {
               OR DATE(b.CHECK_IN_DATE) >= ?
             )
           )
-          AND r.ROOM_STATUS != 3
+          AND r.ROOM_STATUS NOT IN (3, 5)
+          AND r.ACTIVE = 1
           AND r.PROPERTY_ID = ?
       `, [transferDate, currentRoom, transferDate, formattedCheckOutDate, propertyId]);
 
@@ -1712,7 +1713,7 @@ class CalendarModel {
       const totalsRows = await queryDatabasePromise(
         `SELECT ROOM_BED, COUNT(*) AS total
          FROM room
-         WHERE ACTIVE = 1 AND ROOM_STATUS != 3 AND PROPERTY_ID = ?
+         WHERE ACTIVE = 1 AND ROOM_STATUS NOT IN (3, 5) AND PROPERTY_ID = ?
          GROUP BY ROOM_BED`,
         [propertyId]
       );
@@ -1905,13 +1906,13 @@ class CalendarModel {
     }
   }
 
-  // The status of one room from its bookings: someone checked in -> 2 (Occupied); else 3 (Out of order) and 4 (Cleaning) stay; else 1 (Available).
+  // The status of one room from its bookings: someone checked in -> 2 (Occupied); else 3 (Out of order), 4 (Cleaning) and 5 (Tenant) stay; else 1 (Available).
   static async syncRoomOccupancy(roomId) {
     await queryDatabasePromise(`
       UPDATE room r
       SET r.ROOM_STATUS = CASE
         WHEN EXISTS (SELECT 1 FROM booking b WHERE b.ROOM_ID = r.IDNo AND b.ACTIVE = 1 AND COALESCE(b.IS_CANCELLED, 0) = 0 AND b.BOOKING_STATUS = 'check-In') THEN 2
-        WHEN r.ROOM_STATUS IN (3, 4) THEN r.ROOM_STATUS
+        WHEN r.ROOM_STATUS IN (3, 4, 5) THEN r.ROOM_STATUS
         ELSE 1
       END
       WHERE r.IDNo = ? AND r.ACTIVE = 1

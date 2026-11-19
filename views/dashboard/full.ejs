@@ -127,6 +127,7 @@
   .fd-bv .fd-bld .b3d { width: 100%; height: clamp(360px, calc(100vh - 297px), 790px); }
   @media (max-width: 1100px) { .fd-bv-body { grid-template-columns: 1fr; } .fd-bv-side { flex-direction: row; flex-wrap: wrap; padding-left: 0; border-left: 0; } .fd-bv-side .fd-tile { flex: 1 1 30%; } }
   .fd-bld { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; min-height: 0; padding: 0 0 56px;   /* the extra bottom padding lifts the building a little */ }
+  .fd-bld-warn { color: var(--fd-warn); }
   .fd-bld-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; padding-top: 12px; margin-top: 6px; border-top: 1px solid var(--fd-line); font-size: 12px; color: var(--fd-muted); }
   .fd-bld-legend span { display: inline-flex; align-items: center; gap: 7px; } .fd-bld-legend b { color: var(--fd-text); font-variant-numeric: tabular-nums; }
   .fd-sw { width: 15px; height: 11px; border-radius: 3px; border: 1px solid var(--fd-line-2); display: inline-block; } .fd-sd { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid #fff; display: inline-block; }
@@ -214,7 +215,7 @@
   @media (prefers-reduced-motion: reduce) { .fd.is-enter .fd-card, .fd.is-enter .fd-a, .fd.is-enter .fd-head > *, .fd.is-enter .fd-bar, .fd-card.re .fd-bar, .fd.is-enter .fd-seg > span, .fd.is-enter .fd-draw, .fd.is-enter .fd-area, .fd.is-enter .fd-dotp { animation: none !important; } .fd.is-enter .fd-draw { stroke-dasharray: none; stroke-dashoffset: 0; } .fd-skel { animation: none; } .fd-splash { transition: none; } }
 </style>
 
-<script src="/js/dashboard/building3d.js?v=54"></script>
+<script src="/js/dashboard/building3d.js?v=57"></script>
 <% var BV = !!(typeof currentProperty !== 'undefined' && currentProperty && currentProperty.BUILDING_VIEW); %>
 <div class="fd<%= BV ? ' fd-bv' : '' %>" id="fd">
   <div class="fd-head">
@@ -267,7 +268,7 @@
   });
   var BV = <%= BV ? 'true' : 'false' %>;
   var PNAME = <%- JSON.stringify((typeof currentProperty !== 'undefined' && currentProperty) ? (currentProperty.DISPLAY_NAME || currentProperty.NAME) : '') %>;
-
+  var PCODE = <%- JSON.stringify((typeof currentProperty !== 'undefined' && currentProperty) ? currentProperty.CODE : '') %>;
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
   function peso(n) { return Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 }); }
   function pad(n) { return String(n).padStart(2, '0'); }
@@ -383,12 +384,15 @@
       '<div class="fd-tile-l"><span>' + label + '</span><i class="fas ' + icon + '"></i></div><div class="fd-tile-v">' + pad(value) + '</div><div class="fd-tile-s">' + (sub || '') + '</div></div>';
   }
   function cardBld() {
-    var B = window.Building3D, c = B.counts(D.building);
+    var B = window.Building3D, c = B.counts(D.building, PCODE), S = B.swatches(PCODE), lost = B.unplaced(D.building, PCODE);
     function sw(bg) { return '<i class="fd-sw" style="background:' + bg + '"></i>'; }
     var o = D.overview, r = o.reservation, h = o.housekeeping, hk = ui.view === 'housekeeping';
     var bedsKey = '<span class="fd-beds-key"><i class="fd-bed-dot"></i>1 bed</span><span class="fd-beds-key"><i class="fd-bed-dots"><i class="fd-bed-dot"></i><i class="fd-bed-dot"></i></i>2 beds</span>';
     var vipN = (D.building || []).filter(function (x) { return x.vip; }).length;
     var vipKey = vipN ? '<span><i class="fd-vip-v">V</i>VIP room <b>' + vipN + '</b></span>' : '';
+    // the Tenant rooms (status Tenant, any property: shown only when there are some), and the rooms of the system the building has no place for (not drawn: said here instead of hidden)
+    var tenantKey = c.tenant ? '<span>' + sw(S.tenant) + 'Tenant <b>' + c.tenant + '</b></span>' : '';
+    var warn = lost.length ? ' &middot; <span class="fd-bld-warn" title="These rooms exist in the system but have no place on the building">not on the building: ' + lost.map(function (x) { return esc(x.no); }).join(', ') + '</span>' : '';
     var side, legend, note;
     if (hk) {
       // HOUSEKEEPING: the work first. Dirty rooms, rooms that are about to be left (late ones too), who stays, who arrives (a dirty room with an arrival is URGENT)
@@ -408,8 +412,8 @@
         '<span><i class="fd-urgent-mark">!</i>Urgent <b>' + c.urgent + '</b></span>' +
         '<span><i class="fd-btb-pill">BTB</i>Back-to-back <b>' + c.btb + '</b></span>' +
         '<span><i class="fd-req-pill">MUR</i>Request <b>' + ui.reqs.length + '</b></span>' +
-        '<span>' + sw('repeating-linear-gradient(45deg,#b3aaa6 0 3px,#5a4a42 3px 4px)') + 'Out of order <b>' + c.ooo + '</b></span>' + vipKey;
-      note = '';
+        '<span>' + sw('repeating-linear-gradient(45deg,#b3aaa6 0 3px,#5a4a42 3px 4px)') + 'Out of order <b>' + c.ooo + '</b></span>' + tenantKey + vipKey;
+      note = warn;
     } else {
       side = tile('Occupied', 'fa-bed', pad(r.occupied), 'acc', 'of ' + D.totalRooms + ' rooms') +
         tile('Check in', 'fa-sign-in-alt', pad(r.checkIn.total), 'good', r.checkIn.done ? r.checkIn.done + ' already in' : 'still to arrive', '/calendar?focus=arrivals') +
@@ -418,15 +422,15 @@
         tile('Dirty', 'fa-broom', pad(h.dirty), 'warn', h.dirty ? 'to clean' : 'all clean', h.dirty ? '/calendar?cleaning=all' : '') +
         tile('Out of order', 'fa-ban', pad(h.outOfOrder), 'bad', h.outOfOrder ? 'maintenance' : 'none');
       legend = '<span>' + sw('linear-gradient(#fff4d6,#ffc65e)') + 'Occupied <b>' + c.occupied + '</b></span>' +
-        '<span>' + sw('#2c2430') + 'Clean, empty <b>' + c.vacant + '</b></span>' +
+        '<span>' + sw(S.vacant) + 'Clean, empty <b>' + c.vacant + '</b></span>' +
         '<span>' + sw('#8a7433') + 'To be cleaned <b>' + c.dirty + '</b></span>' +
         '<span>' + sw('repeating-linear-gradient(45deg,#b3aaa6 0 3px,#5a4a42 3px 4px)') + 'Out of order <b>' + c.ooo + '</b></span>' +
         '<span><i class="fd-sd" style="background:' + B.ARRIVE + '"></i>Arriving today <b>' + c.arrReg + '</b></span>' +
         '<span><i class="fd-sd" style="background:' + B.LATE_IN + '"></i>Late check-in <b>' + c.arrLate + '</b></span>' +
         '<span><i class="fd-btb-pill">BTB</i>Back-to-back <b>' + c.btb + '</b></span>' +
         '<span>' + sw('linear-gradient(#ff8f8f,#e8343a)') + 'Leaving today <b>' + (c.leaving - c.late) + '</b></span>' +
-        '<span>' + sw('linear-gradient(90deg,#f0494e 0 72%,' + B.LATE + ' 72% 100%)') + 'Late check-out <b>' + c.late + '</b></span>' + bedsKey + vipKey;
-      note = (D.building || []).length + ' rooms &middot; click a room to open it';
+        '<span>' + sw('linear-gradient(90deg,#f0494e 0 72%,' + B.LATE + ' 72% 100%)') + 'Late check-out <b>' + c.late + '</b></span>' + tenantKey + bedsKey + vipKey;
+      note = (D.building || []).length + ' rooms &middot; click a room to open it' + warn;
     }
     var reqBtn = '';
     var views = '<div class="fd-views" id="fdViews">' + BLD_VIEWS.map(function (v) {
@@ -667,7 +671,7 @@
   }
   function paintBld(animate) {
     var el = document.getElementById('fdBld'); if (!el || !D.building) return;
-    window.Building3D.render(el, D.building, { name: PNAME, mode: 'full', view: ui.view, focus: ui.view === 'housekeeping' ? ui.hkFocus : null, animate: !!animate, fitRatio: BV ? bldFitRatio(el) : 0, requests: ui.view === 'housekeeping' ? ui.reqMap : null, onRoom: function (r) {
+    window.Building3D.render(el, D.building, { name: PNAME, code: PCODE, mode: 'full', view: ui.view, focus: ui.view === 'housekeeping' ? ui.hkFocus : null, animate: !!animate, fitRatio: BV ? bldFitRatio(el) : 0, requests: ui.view === 'housekeeping' ? ui.reqMap : null, onRoom: function (r) {
       // Housekeeping view: a room does not open the booking details (they are for the front desk). Put what a click on a room should do for
       // housekeeping here (r = { no, status, guest, bookingId, leaving, late, arriving, ... }).
       if (ui.view === 'housekeeping') { openRequestModal(r); return; }

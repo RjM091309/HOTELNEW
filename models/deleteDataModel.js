@@ -33,7 +33,7 @@ class DeleteDataModel {
         deletedCounts[table] = result.affectedRows || 0;
       }
 
-      const [roomResult] = await conn.query('UPDATE room SET ROOM_STATUS = 1');
+      const [roomResult] = await conn.query('UPDATE room SET ROOM_STATUS = 1 WHERE COALESCE(ROOM_STATUS, 0) <> 5')   // (Tenant rooms stay Tenant: that is set-up, not data);
       deletedCounts.room_status_updated = roomResult.affectedRows || 0;
 
       await conn.query('SET FOREIGN_KEY_CHECKS = 1');

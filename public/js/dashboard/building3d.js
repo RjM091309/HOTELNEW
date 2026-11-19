@@ -1,10 +1,13 @@
 /* 3D building of a property's rooms (floors pulled apart and seen from above, front row nearest the street, back row behind the corridor).
-   Used by the Dashboard of a property that has BUILDING_VIEW = 1 (Clark Central): the property's card and its full dashboard.
+   Used by the Dashboard of a property that has BUILDING_VIEW = 1 (Clark Central, Main Stay): the property's card and its full dashboard.
    Ported from the "A · Floor plates" view of the hotel-layouts test bed (vanilla JS, no framework).
 
-     Building3D.render(el, rooms, { name, mode: 'full' | 'card', onRoom(room) })
-       rooms: [{ no, status ('1' clean, '2' occupied, '3' out of order, '4' dirty), guest, bookingId, arriving, leaving }]
-     Building3D.counts(rooms) -> { occupied, vacant, dirty, ooo, arriving, leaving }
+     Building3D.render(el, rooms, { name, code, mode: 'full' | 'card', onRoom(room) })
+       rooms: [{ no, status ('1' clean, '2' occupied, '3' out of order, '4' dirty, '5' tenant), guest, bookingId, arriving, leaving }]
+       code:  the property's CODE; a property listed in LAYOUTS (Main Stay) is drawn from its floor plan, any other one by placeOf (Clark Central)
+     Building3D.counts(rooms, code) -> { occupied, vacant, dirty, ooo, arriving, leaving, ..., tenant }
+     Building3D.unplaced(rooms, code) -> the rooms the building has no place for (they exist in the system but are not drawn)
+     Building3D.swatches(code, dark) -> the colors of the legend that depend on the building (clean-empty tile, tenant unit)
    'card' draws it small and not clickable (the card opens the full dashboard), without the room numbers. */
 (function () {
   var DX = 64, DY = 62, SLAB = 12, POD = 28, ROOM_H = 3, AIR = 15, FONT = 9, NUM_DY = 6, NUM_DX = 3;   // NUM_DY: the room number sits low on the tile, not in the middle
@@ -13,7 +16,7 @@
   var LIT = { top: '#fff4d6', bottom: '#ffc65e', glow: '#ffd27a', edge: '#fff0c4' };   // occupied: lit warm gold against the orange building
   var FILL = { dirty: '#8a7433', ooo: '#b3aaa6' };   // dirty: a muddy olive-brown, like something that needs cleaning
   var INK = { occupied: '#3a2300', vacant: '#fff1e6', dirty: '#fff3d0', ooo: '#241b18' };   // vacant: white on the dark tile (the original; other colors were tried and dropped)
-  var LABEL = { occupied: 'Occupied', vacant: 'Clean, empty', dirty: 'To be cleaned', ooo: 'Out of order' };
+  var LABEL = { occupied: 'Occupied', vacant: 'Clean, empty', dirty: 'To be cleaned', ooo: 'Out of order', tenant: 'Tenant' };
   var LIT_RED = { top: '#ff8f8f', bottom: '#e8343a', glow: '#ff4d52', edge: '#ffb3b3' };   // occupied and the guest leaves today: the lit room turns red
   var LATE_BLUE = '#1aa3ea';   // the strip of a room whose guest checks out LATE today
   var BTB_BG = '#1d3f9e';   // the BTB badge (back-to-back), same navy as the calendar's
@@ -21,12 +24,92 @@
   var LATE_IN = '#f59a23';   // the dot of a guest who checks in LATE today (orange); a regular check-in is green
   var ARRIVE = '#34d399', LEAVE = '#e8343a';
   var VIP_GOLD = '#f5c542';
+  var TENANT = { fill: '#d8b4fe', edge: '#f3e8ff', ink: '#3b0764' };   // a unit rented out to a tenant (Main Stay): not a room of the system, never booked
+  var TILE_GAP = 4.4, DOOR_HALF = 24.75;   // floor-plan buildings: half the space between two tiles / half the entrance door, in drawing units
+  // floor-plan buildings (narrower tiles): the bed dots sit BED_X from the tile's left edge and the room number starts NUM_X from it, after the dots
+  // (left-aligned, so the dots and the number never touch, whatever the width of the font's digits)
+  var BED_X = 5, NUM_X = 10.5;
   var uidN = 0;
 
-  function palette(dark) {
+  function palette(dark, theme) {
+    if (theme === 'blue') return dark ? BLUE.dark : BLUE.light;
     return dark
       ? { wallA: '#e0600f', wallB: '#b24509', roof: '#f47f36', edge: '#ffd0a8', empty: '#2c2430', emptyEdge: '#d98a5a', tileStroke: '#ffe3cf', label: '#fff0e4', faint: '#ffc9a0', ground: '#2a2120', shade: '#050304', sign: '#ff9a52', front: '#ffc9a0', back: '#ffc9a0', canvas: '#1d1a24' }
       : { wallA: '#f58a45', wallB: '#dd6a2c', roof: '#ffb27a', edge: '#a2400a', empty: '#5a3f4a', emptyEdge: '#7a3a14', tileStroke: '#9a5a3a', label: '#4a2410', faint: '#8a5030', ground: '#f6e6da', shade: '#7a3a14', sign: '#e8590c', front: '#a2400a', back: '#a2400a', canvas: '#fff8f3' };
+  }
+  // Main Stay's shell (walls, roof, edges, sign) in its own blue; the room colors stay the same as Clark Central's, so a tile means the same
+  // thing in every hotel. core = the stairs / elevator column.
+  var BLUE = {
+    dark: { wallA: '#3f5fe6', wallB: '#2c44b8', roof: '#7b93fa', edge: '#cdd7ff', empty: '#2c2430', emptyEdge: '#8ea0f5', tileStroke: '#e3e9ff', label: '#eef2ff', faint: '#b4c2ff', ground: '#1d2130', shade: '#020306', sign: '#8aa0ff', front: '#b4c2ff', back: '#b4c2ff', canvas: '#181c2b', core: '#4a63d8', coreInk: '#eef2ff' },
+    light: { wallA: '#6f8ff7', wallB: '#4f6fe6', roof: '#a9bcff', edge: '#233a9e', empty: '#5a3f4a', emptyEdge: '#2a3f9e', tileStroke: '#3a4f9a', label: '#16245e', faint: '#3550b8', ground: '#e4eafb', shade: '#1e2f80', sign: '#3b5bdb', front: '#233a9e', back: '#233a9e', canvas: '#f5f7ff', core: '#8aa2f5', coreInk: '#16245e' }
+  };
+
+  /* Floor plans, by property CODE. Each floor: the front row and the back row, both written LEFT TO RIGHT as seen from the street,
+     the left half | the right half (the stairs / elevator column sits between them). A token is
+       302        a room          302-307 / 331-324   a run of rooms (either direction)          302x2   a room 2 columns wide
+       T2         a tenant unit 2 columns wide that is not a room of the system                   -       an empty column
+     (a room whose status is Tenant is drawn as a tenant block wherever it is; Main Stay's tenant units are such rooms, e.g. 301x2)
+     When a half holds fewer columns than it has (6F of Main Stay), its units are stretched to fill it.
+     geo: the drawing's proportions (thinner tiles, deeper rows and more air between floors for the wide 18-column building). */
+  var LAYOUTS = {
+    main: {
+      theme: 'blue', halves: [8, 9], core: { front: 'STAIRS', back: 'ELEVATOR', backShort: 'ELEV' },
+      geo: { roomW: 40, dy: 74, air: 26 },
+      // Room numbers run counter-clockwise from the lower left: the front row left to right, then the back row right to left.
+      floors: {
+        // the wide rooms at the ends (301x2, 317x3...) are the tenant rooms (status Tenant)
+        3: { front: '301x2 302-307 | 308-316', back: '331-324 | 323-318 317x3' },
+        4: { front: '401x2 402-407 | 408-416', back: '431-424 | 423-418 417x3' },
+        5: { front: '501x2 502-507 | 508-516', back: '531-524 | 523 522 520-518 517x4' },   // 521 does not exist
+        6: { front: '601 602-607 | 608 610-616', back: '630-624 | 623x2 622-619 617x2' }    // 609 / 631 do not exist (618: part of 617's unit for now); 6F has fewer, bigger rooms
+      }
+    }
+  };
+
+  // one half-row of a floor plan -> [{ kind: 'room' | 'tenant' | 'blank', no, w }]
+  function tokens(s) {
+    var out = [];
+    String(s || '').trim().split(/\s+/).forEach(function (t) {
+      var m;
+      if (!t) return;
+      if ((m = /^T(\d+(?:\.\d+)?)$/i.exec(t))) out.push({ kind: 'tenant', w: +m[1] });
+      else if (t === '-') out.push({ kind: 'blank', w: 1 });
+      else if ((m = /^(\d+)-(\d+)$/.exec(t))) { var a = +m[1], b = +m[2], d = a <= b ? 1 : -1; for (var n = a; n !== b + d; n += d) out.push({ kind: 'room', no: String(n), w: 1 }); }
+      else if ((m = /^(\d+)x(\d+(?:\.\d+)?)$/i.exec(t))) out.push({ kind: 'room', no: m[1], w: +m[2] });
+      else if (/^\d+$/.test(t)) out.push({ kind: 'room', no: t, w: 1 });
+    });
+    return out;
+  }
+  function planTokens(lay) {
+    var all = [];
+    Object.keys(lay.floors).forEach(function (f) { ['front', 'back'].forEach(function (s) { all = all.concat(tokens(String(lay.floors[f][s] || '').replace('|', ' '))); }); });
+    return all;
+  }
+
+  // a floor plan -> the floors from the ground up, in the same shape as parts() (front / back rooms with pos + span, which may be fractional
+  // where a half is stretched), plus `extras`: the tenant units, the stairs / elevator column and the plan's rooms the system doesn't have
+  function layoutParts(rooms, lay) {
+    var byNo = {}; rooms.forEach(function (r) { byNo[String(r.no)] = r; });
+    var L = lay.halves[0], R = lay.halves[1], cols = L + 1 + R;
+    return Object.keys(lay.floors).map(Number).sort(function (a, b) { return a - b; }).map(function (f) {
+      var part = { kind: 'floor', floor: f, front: [], back: [], extras: [], cols: cols };
+      ['back', 'front'].forEach(function (side) {
+        var halves = String(lay.floors[f][side] || '').split('|');
+        [[halves[0], 0, L], [halves[1], L + 1, R]].forEach(function (h) {
+          var list = tokens(h[0]), sum = list.reduce(function (s, x) { return s + x.w; }, 0), at = h[1], k = sum ? h[2] / sum : 0;
+          list.forEach(function (x) {
+            var c0 = at, c1 = at + x.w * k; at = c1;
+            if (x.kind === 'tenant') part.extras.push({ kind: 'tenant', side: side, c0: c0, c1: c1 });
+            else if (x.kind === 'room') {
+              if (byNo[x.no]) part[side].push({ r: byNo[x.no], side: side, pos: c0 + 1, span: c1 - c0 });
+              else part.extras.push({ kind: 'missing', side: side, c0: c0, c1: c1, no: x.no });
+            }
+          });
+        });
+        if (lay.core) part.extras.push({ kind: 'core', side: side, c0: L, c1: L + 1 });
+      });
+      return part;
+    });
   }
 
   // Clark Central's numbering: 401-411 are the front rooms (401 at the right end seen from the street, 411 at the left end),
@@ -56,7 +139,7 @@
     return null;
   }
 
-  function kind(r) { var s = String(r.status); return s === '2' ? 'occupied' : s === '3' ? 'ooo' : s === '4' ? 'dirty' : 'vacant'; }
+  function kind(r) { var s = String(r.status); return s === '2' ? 'occupied' : s === '3' ? 'ooo' : s === '4' ? 'dirty' : s === '5' ? 'tenant' : 'vacant'; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
   function pts(l) { return l.map(function (q) { return q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join(' '); }
 
@@ -76,10 +159,24 @@
   }
 
   // (urgent = a DIRTY room where a guest arrives today; a leaving room with an arrival is the BTB badge)
-  function counts(rooms) {
-    var c = { occupied: 0, vacant: 0, dirty: 0, ooo: 0, arriving: 0, leaving: 0, late: 0, arrLate: 0, arrReg: 0, btb: 0, stay: 0, urgent: 0 };
+  function counts(rooms, code) {
+    var c = { occupied: 0, vacant: 0, dirty: 0, ooo: 0, arriving: 0, leaving: 0, late: 0, arrLate: 0, arrReg: 0, btb: 0, stay: 0, urgent: 0, tenant: 0 };
     (rooms || []).forEach(function (r) { c[kind(r)]++; if (r.arriving) c.arriving++; if (r.leaving) c.leaving++; if (r.leaving && r.late && !r.arriving) c.late++; if (r.arriving && r.leaving) c.btb++; if (kind(r) === 'occupied' && !r.leaving) c.stay++; if (r.arriving && kind(r) === 'dirty') c.urgent++; if (r.arriving && !r.leaving) { if (r.arrivingLate) c.arrLate++; else c.arrReg++; } });
+    // (the rooms with the Tenant status are counted above; a floor plan may also have tenant units that are not rooms - T tokens)
+    if (LAYOUTS[code]) c.tenant += planTokens(LAYOUTS[code]).filter(function (x) { return x.kind === 'tenant'; }).length;
     return c;
+  }
+
+  // the rooms of the system the building has no place for (not drawn): the dashboard names them instead of hiding them
+  function unplaced(rooms, code) {
+    var lay = LAYOUTS[code], set = {};
+    if (lay) planTokens(lay).forEach(function (x) { if (x.kind === 'room') set[x.no] = true; });
+    return (rooms || []).filter(function (r) { return lay ? !set[String(r.no)] : !placeOf(r.no); });
+  }
+  // legend colors that depend on the building: the clean-empty tile of the theme, the tenant unit (only a building with a floor plan has them)
+  function swatches(code, dark) {
+    var lay = LAYOUTS[code], p = palette(dark == null ? document.documentElement.getAttribute('data-theme') !== 'white' : dark, lay && lay.theme);
+    return { vacant: lay ? p.empty : '#2c2430', tenant: TENANT.fill };   // (Clark Central keeps the clean-empty swatch it always had)
   }
 
   // the building from the ground up: the floors that have rooms, with one break for each run of floors the hotel doesn't have
@@ -109,29 +206,79 @@
   }
 
   function build(rooms, opt) {
-    var full = opt.mode === 'full', dark = opt.dark !== false, p = palette(dark), uid = 'b3d' + (++uidN) + '-';
-    var P_ = parts(rooms); if (!P_.length) return '';
+    var full = opt.mode === 'full', dark = opt.dark !== false, lay = LAYOUTS[opt.code] || null, p = palette(dark, lay && lay.theme), uid = 'b3d' + (++uidN) + '-';
+    var P_ = lay ? layoutParts(rooms, lay) : parts(rooms); if (!P_.length) return '';
+    // a floor-plan building has its own proportions (Main Stay: 18 thinner columns, deeper rows); Clark Central uses the defaults
+    var geo = (lay && lay.geo) || {}, RW0 = geo.roomW || ROOM_W, Dy = geo.dy || DY, Air = geo.air || AIR;
     var widest = Math.max.apply(null, [10].concat(P_.map(function (x) { return x.kind === 'floor' ? x.cols : 0; })));
     // opt.fitRatio (width / height of the box the building is shown in): the rooms are drawn wider, so the building fills a wide box
     // instead of leaving empty bands at its sides (the height of the building does not change)
     var lift = opt.fitRatio > 0 ? 9 : 0;   // a little more room between the floors: the building is taller (stretched to the top) when it is shown big
     var top0 = opt.fitRatio > 0 ? 22 : TOP;   // when it is shown big the sign sits closer to the top (less empty space above the building)
-    var H0 = top0 + P_.reduce(function (sum, x) { return sum + (x.kind === 'gap' ? GAP_H : SLAB + ROOM_H + DY + AIR + lift); }, 0) + DY * 0.62 + 16 + POD;
-    var rw = ROOM_W;
-    if (opt.fitRatio > 0) rw = Math.max(ROOM_W, Math.min(ROOM_W * 1.9, ((opt.fitRatio * H0 - OX - DX - 70) * 0.96) / widest));
-    var fs = FONT * (1 + (rw / ROOM_W - 1) * 0.45);   // the room numbers grow a little with the wider rooms
+    var H0 = top0 + P_.reduce(function (sum, x) { return sum + (x.kind === 'gap' ? GAP_H : SLAB + ROOM_H + Dy + Air + lift); }, 0) + Dy * 0.62 + 16 + POD;
+    var rw = RW0;
+    if (opt.fitRatio > 0) rw = Math.max(RW0, Math.min(RW0 * 1.9, ((opt.fitRatio * H0 - OX - DX - 70) * 0.96) / widest));
+    var fs = FONT * (1 + (rw / RW0 - 1) * 0.45);   // the room numbers grow a little with the wider rooms
     var len = (widest * rw) / 0.96;
-    var pitch = SLAB + ROOM_H + DY + AIR + lift;
+    var gu = lay ? TILE_GAP / len : 0.008;   // the space at each side of a tile
+    var pitch = SLAB + ROOM_H + Dy + Air + lift;
     var heights = P_.map(function (x) { return x.kind === 'gap' ? GAP_H : pitch; });
     var totalH = heights.reduce(function (s, h) { return s + h; }, 0);
-    var W = OX + len + DX + 70, H = top0 + totalH + DY * 0.62 + 16 + POD, baseY = top0 + totalH, G = -POD;
-    var SQ = 0.88, LEAN = (DX / DY) * SQ * 0.3;
-    function P(u, v, h) { return [OX + u * len + v * DX, baseY - h - v * DY]; }
+    var W = OX + len + DX + 70, H = top0 + totalH + Dy * 0.62 + 16 + POD, baseY = top0 + totalH, G = -POD;
+    var SQ = 0.88, LEAN = (DX / Dy) * SQ * 0.3;
+    // the entrance door: in the middle, or in front of the stairs when the building has a stairs / elevator column
+    var d0 = 0.455, d1 = 0.545;
+    if (lay && lay.core) { var dc = 0.02 + (lay.halves[0] + 0.5) / P_[0].cols * 0.96; d0 = dc - DOOR_HALF / len; d1 = dc + DOOR_HALF / len; }
+    function P(u, v, h) { return [OX + u * len + v * DX, baseY - h - v * Dy]; }
     function quadTop(u0, u1, v0, v1, h) { return [P(u0, v0, h), P(u1, v0, h), P(u1, v1, h), P(u0, v1, h)]; }
     function quadFront(u0, u1, v, h0, h1) { return [P(u0, v, h0), P(u1, v, h0), P(u1, v, h1), P(u0, v, h1)]; }
     function quadRight(u, v0, v1, h0, h1) { return [P(u, v0, h0), P(u, v1, h0), P(u, v1, h1), P(u, v0, h1)]; }
     function ln(a, b, attrs) { return '<line x1="' + a[0].toFixed(1) + '" y1="' + a[1].toFixed(1) + '" x2="' + b[0].toFixed(1) + '" y2="' + b[1].toFixed(1) + '" ' + attrs + '/>'; }
     function poly(l, attrs) { return '<polygon points="' + pts(l) + '" ' + attrs + '/>'; }
+    // text lying on a tile (skewed like the tile, sitting low on it like the room numbers); fitSize = the biggest size at which it fits the tile
+    function tileText(face, txt, size, attrs) {
+      var cx = face.reduce(function (s, q) { return s + q[0]; }, 0) / 4, cy = face.reduce(function (s, q) { return s + q[1]; }, 0) / 4;
+      return '<text x="' + (-NUM_DX).toFixed(2) + '" y="' + (size * 0.36 + NUM_DY).toFixed(2) + '" transform="matrix(1 0 ' + (-LEAN).toFixed(3) + ' ' + SQ + ' ' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')" text-anchor="middle" font-size="' + size.toFixed(2) + '" pointer-events="none" ' + attrs + '>' + esc(txt) + '</text>';
+    }
+    function fitSize(wu, txt, max) { return Math.min(max, (wu - 6) / (String(txt).length * 0.7)); }
+    // a unit rented out to a tenant: raised like a room, its own color, TENANT instead of a number
+    function tenantBlock(u0, u1, v0, v1, t) {
+      var top = t + ROOM_H, face = quadTop(u0, u1, v0, v1, top), wu = (u1 - u0) * len, out = [];
+      out.push(ln(P(u0, v0, t), P(u1, v0, t), 'stroke="' + TENANT.fill + '" stroke-width="1.4" pointer-events="none"'));
+      [quadRight(u1, v0, v1, t, top), quadFront(u0, u1, v0, t, top)].forEach(function (sd) { out.push('<g pointer-events="none">' + poly(sd, 'fill="' + TENANT.fill + '"') + poly(sd, 'fill="#000" opacity=".3"') + '</g>'); });
+      out.push(poly(face, 'class="b3d-face" fill="' + TENANT.fill + '" stroke="' + TENANT.edge + '" stroke-opacity=".7" stroke-width=".7" stroke-linejoin="round"'));
+      if (full && wu >= 28) out.push(tileText(face, 'TENANT', fitSize(wu, 'TENANT', 6.5 * fs / FONT), 'font-weight="700" letter-spacing="0.08em" fill="' + TENANT.ink + '"'));
+      return out.join('');
+    }
+    // a tile of a floor plan that is not a room of the system (layoutParts' extras)
+    function extraTile(ex, part, t, v0, v1) {
+      var w = 0.96 / part.cols, u0 = 0.02 + ex.c0 * w + gu, u1 = 0.02 + ex.c1 * w - gu, wu = (u1 - u0) * len, top = t + ROOM_H, out = [];
+      var faded = opt.focus ? ' style="opacity:.17"' : '';   // the housekeeping focus shows only the rooms it asks for
+      // the stairs (front row) / elevator (back row): flat on the floor, drawn like a plan symbol (steps / a shaft with a cross)
+      if (ex.kind === 'core') {
+        var cf = quadTop(u0, u1, v0, v1, t + 0.6), stairs = ex.side === 'front', name = stairs ? lay.core.front : lay.core.back;
+        out.push('<g pointer-events="none"><title>' + (stairs ? 'Stairs' : 'Elevator') + '</title>');
+        out.push(poly(cf, 'fill="' + p.core + '" stroke="' + p.edge + '" stroke-opacity=".7" stroke-width=".7" stroke-linejoin="round"'));
+        if (stairs) { for (var s = 1; s < 6; s++) { var vs = v0 + (v1 - v0) * s / 6; out.push(ln(P(u0 + gu * 0.6, vs, t + 0.6), P(u1 - gu * 0.6, vs, t + 0.6), 'stroke="' + p.coreInk + '" stroke-opacity=".3" stroke-width=".8"')); } }
+        else out.push(ln(cf[0], cf[2], 'stroke="' + p.coreInk + '" stroke-opacity=".28" stroke-width=".8"') + ln(cf[1], cf[3], 'stroke="' + p.coreInk + '" stroke-opacity=".28" stroke-width=".8"'));
+        if (full) {
+          var fz = fitSize(wu, name, 6.5 * fs / FONT);
+          if (fz < 5.5 && !stairs && lay.core.backShort) { name = lay.core.backShort; fz = fitSize(wu, name, 6.5 * fs / FONT); }
+          out.push(tileText(cf, name, fz, 'font-weight="700" letter-spacing="0.06em" fill="' + p.coreInk + '" stroke="' + p.core + '" stroke-width="2.4" paint-order="stroke"'));
+        }
+        out.push('</g>');
+        return out.join('');
+      }
+      var face = quadTop(u0, u1, v0, v1, top);
+      // a unit rented out to a tenant: raised like a room, its own color, no number (tenants are not rooms of the system)
+      if (ex.kind === 'tenant') return '<g pointer-events="none"' + faded + '><title>Tenant (not bookable)</title>' + tenantBlock(u0, u1, v0, v1, t) + '</g>';
+      // a room of the floor plan the system doesn't have (deleted, or not created yet): only its outline
+      out.push('<g pointer-events="none"' + faded + '><title>Room ' + esc(ex.no) + ' · not in the system</title>');
+      out.push(poly(face, 'fill="none" stroke="' + p.faint + '" stroke-opacity=".7" stroke-width=".8" stroke-dasharray="3 2.5" stroke-linejoin="round"'));
+      if (full) out.push(tileText(face, ex.no, fs, 'font-weight="400" letter-spacing="0.07em" fill="' + p.faint + '" fill-opacity=".7"'));
+      out.push('</g>');
+      return out.join('');
+    }
     var o = [];
 
     o.push('<svg class="b3d ' + (full ? 'is-full' : 'is-card') + (opt.noClick ? ' b3d-noclick' : '') + (opt.animate ? ' b3d-in' : '') + '" viewBox="0 0 ' + W.toFixed(0) + ' ' + H.toFixed(0) + '" role="img" aria-label="' + esc(opt.name || 'Hotel') + ' building" style="' + (full ? '' : 'pointer-events:none') + '">');
@@ -155,12 +302,12 @@
 
     // the lobby the first floor stands on: a solid base with the glowing entrance door and the path to the street
     o.push('<g pointer-events="none">' +
-      poly(quadTop(0.455, 0.545, -0.45, 0, G), 'fill="' + LIT.glow + '" opacity=".22"') +
+      poly(quadTop(d0, d1, -0.45, 0, G), 'fill="' + LIT.glow + '" opacity=".22"') +
       poly(quadFront(0, 1, 0, G, 0), 'fill="' + p.wallA + '" stroke="' + p.edge + '" stroke-width=".8"') +
       poly(quadRight(1, 0, 1, G, 0), 'fill="' + p.wallB + '" stroke="' + p.edge + '" stroke-width=".8"') +
       poly(quadFront(0, 1, 0, G, 0), 'fill="url(#' + uid + 'wl)"') + poly(quadRight(1, 0, 1, G, 0), 'fill="url(#' + uid + 'wl)"') +
-      poly(quadFront(0.455, 0.545, 0, G, -5), 'fill="' + LIT.glow + '" filter="url(#' + uid + 'glow)" opacity=".8"') +
-      poly(quadFront(0.455, 0.545, 0, G, -5), 'fill="url(#' + uid + 'lit)" stroke="' + LIT.edge + '" stroke-width=".8"') + '</g>');
+      poly(quadFront(d0, d1, 0, G, -5), 'fill="' + LIT.glow + '" filter="url(#' + uid + 'glow)" opacity=".8"') +
+      poly(quadFront(d0, d1, 0, G, -5), 'fill="url(#' + uid + 'lit)" stroke="' + LIT.edge + '" stroke-width=".8"') + '</g>');
 
     var placed = [], h = 0;
     P_.forEach(function (part, i) { placed.push({ part: part, at: h, i: i }); h += heights[i]; });
@@ -217,9 +364,11 @@
         var v0 = ROWS[side][0], v1 = ROWS[side][1], list = side === 'front' ? part.front : part.back, color = side === 'front' ? p.front : p.back;
         var tag = P(1, (v0 + v1) / 2, t);
         // (no BACK / FRONT text beside the floors: the rows speak for themselves)
+        // a floor-plan building: its tenant units, the stairs / elevator column and the plan's rooms the system doesn't have
+        (part.extras || []).forEach(function (ex) { if (ex.side === side) o.push(extraTile(ex, part, t, v0, v1)); });
         list.forEach(function (it) {
           var r = it.r, k = kind(r), j = it.pos - 1, w = 0.96 / part.cols;
-          var a = 0.02 + j * w, b = 0.02 + (j + (it.span || 1)) * w, u0 = a + 0.008, u1 = b - 0.008, top = t + ROOM_H;
+          var a = 0.02 + j * w, b = 0.02 + (j + (it.span || 1)) * w, u0 = a + gu, u1 = b - gu, top = t + ROOM_H;
           var face = quadTop(u0, u1, v0, v1, top);
           var leave = k === 'occupied' && !!r.leaving, L = leave ? LIT_RED : LIT;   // leaving today (late or not): the lit room is red; a LATE check-out also gets the blue strip below   // the guest leaves today: the lit room is red instead of yellow
           var fill = k === 'occupied' ? 'url(#' + uid + (leave ? 'litr' : 'lit') + ')' : k === 'vacant' ? p.empty : FILL[k];
@@ -230,8 +379,13 @@
           var cx = face.reduce(function (s, q) { return s + q[0]; }, 0) / 4, cy = face.reduce(function (s, q) { return s + q[1]; }, 0) / 4;
           var hit = side === 'front'
             ? [P(a, 0, at), P(b, 0, at), P(b, 0, top), P(b, 0.5, top), P(a, 0.5, top), P(a, 0, top)]
-            : [P(a, 0.5, top), P(b, 0.5, top), P(b, 1, top), P(b, 1, top + AIR), P(a, 1, top + AIR), P(a, 1, top)];
+            : [P(a, 0.5, top), P(b, 0.5, top), P(b, 1, top), P(b, 1, top + Air), P(a, 1, top + Air), P(a, 1, top)];
           var faded = opt.focus && !matchFocus(r, k, opt.focus, opt.requests);
+          if (k === 'tenant') {
+            o.push('<g class="b3d-room" data-no="' + esc(r.no) + '"' + (full ? ' role="button" tabindex="0"' : '') + (faded ? ' style="opacity:.17"' : '') + '><title>' + esc('Room ' + r.no + ' · Tenant (not bookable)') + '</title>' +
+              (full ? poly(hit, 'fill="transparent"') : '') + tenantBlock(u0, u1, v0, v1, t) + '</g>');
+            return;
+          }
           o.push('<g class="b3d-room" data-no="' + esc(r.no) + '"' + (full ? ' role="button" tabindex="0"' : '') + (faded ? ' style="opacity:.17"' : '') + '><title>' + esc(title) + '</title>');
           o.push(ln(P(u0, v0, t), P(u1, v0, t), 'stroke="' + color + '" stroke-width="1.4" pointer-events="none"'));
           if (full) o.push(poly(hit, 'fill="transparent"'));
@@ -246,7 +400,9 @@
             o.push(poly(quadTop(u1 - (u1 - u0) * 0.15, u1, v0, v1, top), 'fill="' + LATE_BLUE + '" stroke="' + LIT_RED.edge + '" stroke-opacity=".8" stroke-width=".6" stroke-linejoin="round" pointer-events="none"'));
           }
           if (full) {
-            o.push('<text x="' + (-NUM_DX).toFixed(2) + '" y="' + (fs * 0.36 + NUM_DY).toFixed(2) + '" transform="matrix(1 0 ' + (-LEAN).toFixed(3) + ' ' + SQ + ' ' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')" text-anchor="middle" font-size="' + fs.toFixed(2) + '" font-weight="400" letter-spacing="0.07em" style="font-variant-numeric:tabular-nums" pointer-events="none" fill="' + INK[k] + '"' +
+            // (a floor-plan building with bed dots: the number starts right after the dots instead of being centered)
+            var afterDots = lay && r.beds && opt.view !== 'housekeeping';
+            o.push('<text x="' + (afterDots ? NUM_X - (u1 - u0) * len / 2 : -NUM_DX).toFixed(2) + '" y="' + (fs * 0.36 + NUM_DY).toFixed(2) + '" transform="matrix(1 0 ' + (-LEAN).toFixed(3) + ' ' + SQ + ' ' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')" text-anchor="' + (afterDots ? 'start' : 'middle') + '" font-size="' + fs.toFixed(2) + '" font-weight="400" letter-spacing="0.07em" style="font-variant-numeric:tabular-nums" pointer-events="none" fill="' + INK[k] + '"' +
               (k === 'ooo' ? ' stroke="' + FILL.ooo + '" stroke-width="2.4" paint-order="stroke"' : '') + '>' + esc(r.no) + '</text>');
           }
           // VIP room: a gold "V" in a royal serif font at the top-left corner of the tile (dark edge so it shows on every colour)
@@ -256,7 +412,7 @@
           }
           // beds: one small dot = a room with one bed, two dots = two beds - at the left end of the tile, level with the room number
           if (full && r.beds && opt.view !== 'housekeeping') {   // (housekeeping does not need the bed count)
-            var nb = r.beds >= 2 ? 2 : 1, half = (u1 - u0) * len / 2, bx = -half + 9, by = fs * 0.36 + NUM_DY - fs * 0.34;
+            var nb = r.beds >= 2 ? 2 : 1, half = (u1 - u0) * len / 2, bx = -half + (lay ? BED_X : 9), by = fs * 0.36 + NUM_DY - fs * 0.34;
             var dots = '';
             // two beds: the dots are stacked (like a colon), so they never run into the room number
             for (var q = 0; q < nb; q++) dots += '<ellipse cx="' + bx.toFixed(1) + '" cy="' + (by + (nb === 2 ? (q ? 3.4 : -3.4) : 0)).toFixed(1) + '" rx="2.2" ry="2.2" fill="' + INK[k] + '" opacity=".75"/>';
@@ -319,5 +475,5 @@
     el.__rooms = rooms || []; el.__onRoom = opt.onRoom;
   }
 
-  window.Building3D = { render: render, counts: counts, placeOf: placeOf, LABEL: LABEL, ARRIVE: ARRIVE, LEAVE: LEAVE, LATE: LATE_BLUE, LATE_IN: LATE_IN, URGENT: URGENT };
+  window.Building3D = { render: render, counts: counts, unplaced: unplaced, swatches: swatches, placeOf: placeOf, LABEL: LABEL, ARRIVE: ARRIVE, LEAVE: LEAVE, LATE: LATE_BLUE, LATE_IN: LATE_IN, URGENT: URGENT };
 })();

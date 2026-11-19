@@ -43,7 +43,8 @@ async function handleEventDrop(info) {
   // moved onto a room that is Out of order: put it back
   if (isRoomChange && targetRoom.extendedProps && targetRoom.extendedProps.outOfOrder) {
     info.revert();
-    if (window.Swal) Swal.fire({ icon: 'warning', title: 'Out of order', text: 'Room ' + (targetRoom.title || '') + ' is Out of order, so a booking cannot be moved there.', heightAuto: false });
+    const oooLabel = targetRoom.extendedProps.tenant ? 'Tenant' : 'Out of order';
+    if (window.Swal) Swal.fire({ icon: 'warning', title: oooLabel, text: 'Room ' + (targetRoom.title || '') + ' is ' + oooLabel + ', so a booking cannot be moved there.', heightAuto: false });
     return;
   }
   

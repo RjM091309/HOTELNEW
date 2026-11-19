@@ -12,11 +12,11 @@ var dataTable;
 // Room Status: the dropdown shows a name (Available / Occupied / Out of order / Cleaning) but the database keeps 1 / 2 / 3 / 4.
 // The form used to send the NAME as it was written in the field, which the database does not accept (the room ended with an empty status
 // and "UNKNOWN" in the table). These two turn a name into its number and back.
-const ROOM_STATUS_NAMES = { '1': 'Available', '2': 'Occupied', '3': 'Out of order', '4': 'Cleaning' };
+const ROOM_STATUS_NAMES = { '1': 'Available', '2': 'Occupied', '3': 'Out of order', '4': 'Cleaning', '5': 'Tenant' };   // 5 Tenant: rented out, never booked (works like Out of order)
 function roomStatusValue(selector) {
     const raw = String($(selector).val() || '').trim();
-    if (/^[1-4]$/.test(raw)) return raw;
-    const byName = { 'available': '1', 'occupied': '2', 'out of order': '3', 'maintenance': '3', 'cleaning': '4' };
+    if (/^[1-5]$/.test(raw)) return raw;
+    const byName = { 'available': '1', 'occupied': '2', 'out of order': '3', 'maintenance': '3', 'cleaning': '4', 'tenant': '5' };
     return byName[raw.toLowerCase()] || $(selector).attr('data-value') || raw;
 }
 
@@ -315,7 +315,7 @@ function escRoom(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, func
 // Rooms grouped by floor, as cards (like the calendar's Room View)
 function renderRoomGrid() {
     var q = String($('#roomGridSearch').val() || '').trim().toLowerCase();
-    var names = { '1': 'Available', '2': 'Occupied', '3': 'Out of order', '4': 'Cleaning' };
+    var names = ROOM_STATUS_NAMES;
     var rooms = roomGridData.filter(function (r) {
         if (!q) return true;
         return [r.ROOM_NUMBER, r.ROOM_TYPE_NAME, names[String(r.ROOM_STATUS)], r.ROOM_DESCRIPTION].join(' ').toLowerCase().indexOf(q) !== -1;

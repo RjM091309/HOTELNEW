@@ -1119,6 +1119,19 @@ async function runRoomRequestMigrations() {
   if (created) console.log('✅ Created table: room_request');
 }
 
+// Room status 5 = Tenant (a room rented out: it exists but is never booked, like Out of order), chosen in the Rooms menu for any property.
+// room.ROOM_STATUS is ENUM('1','2','3','4'): '5' is added AT THE END on purpose - the queries compare the status with numbers
+// (ROOM_STATUS != 3, IN (3, 4)...), which MySQL does by the ENUM's position, and '1'..'5' must stay at positions 1..5.
+async function runRoomStatusTenantMigration() {
+  const [col] = await queryDatabasePromise(
+    `SELECT COLUMN_TYPE AS t, IS_NULLABLE AS n, COLUMN_DEFAULT AS d FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'room' AND COLUMN_NAME = 'ROOM_STATUS'`);
+  if (!col || !/^enum\(/i.test(col.t) || /'5'/.test(col.t)) return;   // not an ENUM (any value fits), or already done
+  if (!/^enum\('1','2','3','4'\)$/i.test(col.t)) { console.warn(`⚠️ room.ROOM_STATUS is ${col.t}: Tenant (5) not added - check it by hand`); return; }
+  await queryDatabasePromise(`ALTER TABLE room MODIFY ROOM_STATUS ENUM('1','2','3','4','5') ${col.n === 'YES' ? 'NULL' : 'NOT NULL'}${col.d != null ? ` DEFAULT '${col.d}'` : ''}`);
+  console.log("✅ room.ROOM_STATUS: '5' (Tenant) added");
+}
+
 async function runPropertyMigrations() {
   const created = await ensureTable('property', `
     CREATE TABLE property (
@@ -1311,6 +1324,14 @@ async function runStartupMigrations() {
     await require('./seed_clark_central').ensureFloor11();   // the 11th floor (rooms 1101-1117): only what is missing
   } catch (error) {
     console.error('⚠️ Clark Central seed failed (app keeps starting):', error.message);
+  }
+  await runRoomStatusTenantMigration();
+  // Main Stay: its room list brought in line with the floor plan (tenant units / numbers that don't exist) and its 3D building turned on.
+  // One time only (startup_once); never stops the app from starting.
+  try {
+    await require('./main_stay_building').run();
+  } catch (error) {
+    console.error('⚠️ Main Stay building migration failed (app keeps starting):', error.message);
   }
 
   console.log('✅ Startup database migrations complete');
