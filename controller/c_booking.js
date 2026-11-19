@@ -1,5 +1,5 @@
 const BookingModel = require('../models/bookingModel');
-const { loadPropertyLogoDataUri } = require('../helpers/propertyBranding');
+const { loadPropertyLogoDataUri, loadPropertyInfo } = require('../helpers/propertyBranding');
 const moment = require('moment');
 
 class BookingController {
@@ -805,6 +805,12 @@ class BookingController {
       dropoffFlightNumber, // PUAP - drop-off (departure) flight number
       pickupDate,          // PUAP - actual calendar date of pick-up (if different from check-in)
       passengerCount,      // PUAP - number of passengers for pick-up/drop-off
+      extraBedQty,         // Extra bed - number of beds
+      extraBedPrice,       // Extra bed - price of one bed
+      extraBfAdultQty,     // Extra breakfast - adults above the 2 included in the rate
+      extraBfAdultPrice,   // Extra breakfast - price of one adult
+      extraBfKidQty,       // Extra breakfast - kids above the 2 included in the rate
+      extraBfKidPrice,     // Extra breakfast - price of one kid
 
       // ✅ Additional for Direct Reservations
       bedCount,
@@ -1009,6 +1015,12 @@ class BookingController {
         dropoffFlightNumber,
         pickupDate,
         passengerCount,
+        extraBedQty,
+        extraBedPrice,
+        extraBfAdultQty,
+        extraBfAdultPrice,
+        extraBfKidQty,
+        extraBfKidPrice,
         // ✅ Additional for Direct Reservations
         bedCount,
         isDirectReservation,
@@ -2020,11 +2032,14 @@ class BookingController {
         breakfastExtraPerRoom,
         breakfastExtraAdultPrice,
         breakfastExtraKidPrice,
+        extraBedPerRoom,
+        extraBedPrice,
         pickupServiceId,
         pickupPrice,
         dropoffServiceId,
         dropoffPrice,
         flightNumber,
+        dropoffFlightNumber,
         passengerCount,
         discount,
         discountRemarks,
@@ -2054,8 +2069,14 @@ class BookingController {
       }
 
       // PUAP: flight number and passenger count are required whenever Pick-up or Drop-off is selected
-      if ((pickupServiceId || dropoffServiceId) && (!flightNumber || !String(flightNumber).trim() || !passengerCount)) {
+      if ((pickupServiceId || dropoffServiceId) && !passengerCount) {
         return res.status(400).json({ success: false, message: 'Flight Number and Number of Passengers are required for Pick-up/Drop-off.' });
+      }
+      if (pickupServiceId && (!flightNumber || !String(flightNumber).trim())) {
+        return res.status(400).json({ success: false, message: 'Pick-up Flight Number is required for Pick-up.' });
+      }
+      if (dropoffServiceId && ((!dropoffFlightNumber || !String(dropoffFlightNumber).trim()) && (!flightNumber || !String(flightNumber).trim()))) {
+        return res.status(400).json({ success: false, message: 'Drop-off Flight Number is required for Drop-off.' });
       }
 
       // Calculate payment status based on paid amount for group booking
@@ -2156,11 +2177,14 @@ class BookingController {
         breakfastExtraPerRoom,
         breakfastExtraAdultPrice,
         breakfastExtraKidPrice,
+        extraBedPerRoom,
+        extraBedPrice,
         pickupServiceId,
         pickupPrice,
         dropoffServiceId,
         dropoffPrice,
         flightNumber,
+        dropoffFlightNumber,
         passengerCount,
         discount: totalDiscountNum, // Pass combined discount (seniorPwdDiscount + discount)
         discountRemarks: discountRemarks && String(discountRemarks).trim() !== '' ? String(discountRemarks).trim() : null,
@@ -2937,6 +2961,8 @@ class BookingController {
       // If bookingId is provided instead of full voucher data, fetch it from database
       if (!data.voucherNo && data.bookingId) {
         const voucherData = await BookingModel.getVoucherData(data.bookingId, req.propertyId);
+        // a room line of the bill is named after the room type ("1 Queen VIP", "King Bedroom"...): it is the room, not a service
+        const roomTypeLower = String((voucherData && voucherData.roomType) || '').trim().toLowerCase();
         
         if (!voucherData) {
           return res.status(404).send('Booking not found');
@@ -2984,6 +3010,8 @@ class BookingController {
         let pickup = 0;
         let dropoff = 0;
         let otherServices = []; // Collect other services for remarks
+        let extraBfQty = 0, extraBfTotal = 0; // extra breakfast (above the 2 included in the rate)
+        let extraBfAdultQty = 0, extraBfAdultTotal = 0, extraBfKidQty = 0, extraBfKidTotal = 0;
         
         if (billingData && billingData.items && Array.isArray(billingData.items)) {
           console.log('🍳 [VOUCHER] Processing billing items for services:', billingData.items.map(item => ({
@@ -3000,8 +3028,20 @@ class BookingController {
             const serviceId = item.serviceId;
             const itemDescription = item.description || '';
             
+            // Extra breakfast (above the 2 included in the rate): charged, not part of the guests of the Breakfast List
+            if (desc.startsWith('extra breakfast')) {
+              extraBfQty += parseInt(item.qty) || 0;
+              extraBfTotal += parseFloat(item.subTotal) || 0;
+              if (desc.includes('kid')) {
+                extraBfKidQty += parseInt(item.qty) || 0;
+                extraBfKidTotal += parseFloat(item.subTotal) || 0;
+              } else {
+                extraBfAdultQty += parseInt(item.qty) || 0;
+                extraBfAdultTotal += parseFloat(item.subTotal) || 0;
+              }
+            }
             // Breakfast - check description (case insensitive)
-            if (desc.includes('breakfast') && desc.includes('adult')) {
+            else if (desc.includes('breakfast') && desc.includes('adult')) {
               breakfastAdult = parseInt(item.qty) || 0;
               console.log('🍳 Found breakfast adult:', breakfastAdult, 'qty:', item.qty, 'from item:', itemDescription, 'serviceId:', serviceId);
             }
@@ -3025,6 +3065,7 @@ class BookingController {
             // Room items - ONLY if explicitly room-related AND no serviceId
             // Must match: bedroom, room, suite, or room type names, AND no serviceId
             else if (!item.serviceId && (
+              (roomTypeLower !== '' && desc === roomTypeLower) ||
               desc.includes('bedroom') || 
               desc.includes('single bedroom') ||
               desc.includes('double bedroom') ||
@@ -3055,7 +3096,8 @@ class BookingController {
               const serviceQty = parseInt(item.qty) || 1;
               otherServices.push({
                 name: serviceName,
-                qty: serviceQty
+                qty: serviceQty,
+                price: parseFloat(item.subTotal) || ((parseFloat(item.basePrice) || 0) * serviceQty) || 0
               });
               console.log('📦 [VOUCHER] Found other service:', serviceName, 'qty:', serviceQty, 'serviceId:', serviceId);
             }
@@ -3114,7 +3156,8 @@ class BookingController {
               const desc = item.description.toLowerCase();
               // Must be room-related AND no serviceId
               const isRoomItem = !item.serviceId && (
-                desc.includes('bedroom') || 
+                (roomTypeLower !== '' && desc === roomTypeLower) ||
+              desc.includes('bedroom') || 
                 desc.includes('single bedroom') ||
                 desc.includes('double bedroom') ||
                 desc.includes('twin bedroom') ||
@@ -3173,7 +3216,8 @@ class BookingController {
               
               // Exclude room items (must be explicitly room-related AND no serviceId)
               const isRoomItem = !item.serviceId && (
-                desc.includes('bedroom') || 
+                (roomTypeLower !== '' && desc === roomTypeLower) ||
+              desc.includes('bedroom') || 
                 desc.includes('single bedroom') ||
                 desc.includes('double bedroom') ||
                 desc.includes('twin bedroom') ||
@@ -3286,6 +3330,12 @@ class BookingController {
           pickup,
           dropoff,
           otherServices, // ✅ Pass other services array for template to display
+          extraBfQty,
+          extraBfTotal,
+          extraBfAdultQty,
+          extraBfAdultTotal,
+          extraBfKidQty,
+          extraBfKidTotal,
           reservationFee: voucherData.reservationFee || 0,
           discount: voucherData.discount || 0,
           checkOutStatus: voucherData.checkOutStatus,
@@ -3407,6 +3457,7 @@ class BookingController {
 
       const html = await ejs.render(templateContent, {
         imageUrl,
+        ...(await loadPropertyInfo(req.propertyId)),   // hotelName, isMainProperty (bank details are Main Stay's only)
         quotationDate: new Date(),
         checkInDate,
         checkOutDate,
@@ -4049,6 +4100,8 @@ class BookingController {
       }
 
       const voucherData = await BookingModel.getVoucherData(bookingId, req.propertyId);
+        // a room line of the bill is named after the room type ("1 Queen VIP", "King Bedroom"...): it is the room, not a service
+        const roomTypeLower = String((voucherData && voucherData.roomType) || '').trim().toLowerCase();
 
       if (!voucherData) {
         return res.status(404).json({
@@ -4120,6 +4173,8 @@ class BookingController {
       }
 
       const voucherData = await BookingModel.getVoucherData(bookingId, req.propertyId);
+        // a room line of the bill is named after the room type ("1 Queen VIP", "King Bedroom"...): it is the room, not a service
+        const roomTypeLower = String((voucherData && voucherData.roomType) || '').trim().toLowerCase();
 
       if (!voucherData) {
         return res.status(404).json({
@@ -4156,6 +4211,8 @@ class BookingController {
         let pickup = 0;
         let dropoff = 0;
         let otherServices = []; // Collect other services for remarks
+        let extraBfQty = 0, extraBfTotal = 0; // extra breakfast (above the 2 included in the rate)
+        let extraBfAdultQty = 0, extraBfAdultTotal = 0, extraBfKidQty = 0, extraBfKidTotal = 0;
         
         if (billingData && billingData.items && Array.isArray(billingData.items)) {
           console.log('🍳 [VOUCHER PDF] Processing billing items for services:', billingData.items.map(item => ({
@@ -4172,8 +4229,20 @@ class BookingController {
             const serviceId = item.serviceId;
             const itemDescription = item.description || '';
             
+            // Extra breakfast (above the 2 included in the rate): charged, not part of the guests of the Breakfast List
+            if (desc.startsWith('extra breakfast')) {
+              extraBfQty += parseInt(item.qty) || 0;
+              extraBfTotal += parseFloat(item.subTotal) || 0;
+              if (desc.includes('kid')) {
+                extraBfKidQty += parseInt(item.qty) || 0;
+                extraBfKidTotal += parseFloat(item.subTotal) || 0;
+              } else {
+                extraBfAdultQty += parseInt(item.qty) || 0;
+                extraBfAdultTotal += parseFloat(item.subTotal) || 0;
+              }
+            }
             // Breakfast - check description (case insensitive)
-            if (desc.includes('breakfast') && desc.includes('adult')) {
+            else if (desc.includes('breakfast') && desc.includes('adult')) {
               breakfastAdult = parseInt(item.qty) || 0;
               console.log('🍳 Found breakfast adult:', breakfastAdult, 'qty:', item.qty, 'from item:', itemDescription, 'serviceId:', serviceId);
             }
@@ -4197,6 +4266,7 @@ class BookingController {
             // Room items - ONLY if explicitly room-related AND no serviceId
             // Must match: bedroom, room, suite, or room type names, AND no serviceId
             else if (!item.serviceId && (
+              (roomTypeLower !== '' && desc === roomTypeLower) ||
               desc.includes('bedroom') || 
               desc.includes('single bedroom') ||
               desc.includes('double bedroom') ||
@@ -4222,7 +4292,8 @@ class BookingController {
               const serviceQty = parseInt(item.qty) || 1;
               otherServices.push({
                 name: serviceName,
-                qty: serviceQty
+                qty: serviceQty,
+                price: parseFloat(item.subTotal) || ((parseFloat(item.basePrice) || 0) * serviceQty) || 0
               });
               console.log('📦 [VOUCHER PDF] Found other service:', serviceName, 'qty:', serviceQty, 'serviceId:', serviceId);
             }
@@ -4290,7 +4361,8 @@ class BookingController {
           const desc = item.description.toLowerCase();
           // Must be room-related AND no serviceId
           const isRoomItem = !item.serviceId && (
-            desc.includes('bedroom') || 
+            (roomTypeLower !== '' && desc === roomTypeLower) ||
+              desc.includes('bedroom') || 
             desc.includes('single bedroom') ||
             desc.includes('double bedroom') ||
             desc.includes('twin bedroom') ||
@@ -4336,7 +4408,8 @@ class BookingController {
           
           // Exclude room items (must be explicitly room-related AND no serviceId)
           const isRoomItem = !item.serviceId && (
-            desc.includes('bedroom') || 
+            (roomTypeLower !== '' && desc === roomTypeLower) ||
+              desc.includes('bedroom') || 
             desc.includes('single bedroom') ||
             desc.includes('double bedroom') ||
             desc.includes('twin bedroom') ||
@@ -4434,6 +4507,12 @@ class BookingController {
         pickup,
         dropoff,
         otherServices, // ✅ Pass other services array for template to display
+        extraBfQty,
+        extraBfTotal,
+        extraBfAdultQty,
+        extraBfAdultTotal,
+        extraBfKidQty,
+        extraBfKidTotal,
         reservationFee: voucherData.reservationFee || 0,
         discount: voucherData.discount || 0,
         checkOutStatus: voucherData.checkOutStatus,

@@ -205,7 +205,7 @@
   <% records.forEach(function (record, index) { %>
   <div class="print-sheet" data-sheet-index="<%= index %>">
     <div class="print-logo">
-      <img src="/img/Logo-Black.png" alt="Main Stay Hotel">
+      <% if (typeof propertyLogo !== 'undefined' && propertyLogo) { %><img src="<%= propertyLogo %>" alt="<%= typeof propertyDisplayName !== 'undefined' ? propertyDisplayName : 'Hotel' %>"><% } %>
     </div>
 
     <% if (isDropoff) { %>

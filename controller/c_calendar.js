@@ -1283,12 +1283,22 @@ class CalendarController {
         });
       }
 
-      const overlaps = await CalendarModel.checkBookingOverlaps(
+      let overlaps = await CalendarModel.checkBookingOverlaps(
         roomId, 
         checkIn, 
         checkOut, 
         excludeBookingId || null
       );
+
+      // With the days of the new stay (checkInDay / checkOutDay, local dates) the overlap is judged by DAYS, not by hours: a booking that ends on
+      // the day the new one starts (or starts on the day it ends) is a turnover, not an overlap. The hours of check-out and check-in are saved in
+      // different ways, so comparing them made "Late check-out, then Late check-in" in the same room look like a conflict.
+      const { checkInDay, checkOutDay } = req.query;
+      const isDay = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''));
+      if (isDay(checkInDay) && isDay(checkOutDay)) {
+        const dayOf = (d) => { const x = new Date(d); return isNaN(x.getTime()) ? '' : x.toISOString().slice(0, 10); };
+        overlaps = overlaps.filter((o) => dayOf(o.CHECK_IN_DATE) < checkOutDay && dayOf(o.CHECK_OUT_DATE) > checkInDay);
+      }
       
       res.json({ 
         success: true, 

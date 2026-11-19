@@ -154,6 +154,16 @@ $(document).ready(function () {
       const dropoffFlightNumber = $('#dropoffFlightNumber').val();
       const pickupDate = $('#pickupDate').val();
       const passengerCount = $('#passengerCount').val();
+      // Extra bed (beds x price of one bed): only when the option is ticked
+      const extraBedOn = $('#includeExtraBed').is(':checked');
+      const extraBedQty = extraBedOn ? (parseInt($('#extraBedQty').val(), 10) || 0) : 0;
+      const extraBedPrice = extraBedOn ? (parseFloat($('#extraBedPrice').val()) || 0) : 0;
+      // Extra breakfast: the people above the 2 that the rate includes, and the price of one
+      const extraBf = typeof getSingleExtraBreakfast === 'function' ? getSingleExtraBreakfast() : {};
+      const extraBfAdultQty = extraBf.adultQty || 0;
+      const extraBfAdultPrice = extraBf.adultPrice || 0;
+      const extraBfKidQty = extraBf.kidQty || 0;
+      const extraBfKidPrice = extraBf.kidPrice || 0;
 
       // Discount and fees
       const seniorPwdDiscount = $('#includeSeniorPwdDiscount').is(':checked') ? parseFloat($('#seniorPwdDiscount').val()) || 0 : 0;
@@ -235,6 +245,7 @@ $(document).ready(function () {
           breakfastKidQty, breakfastKidPrice, breakfastKidId,
           pickupServiceId, pickupPrice, dropoffServiceId, dropoffPrice,
           flightNumber, dropoffFlightNumber, pickupDate, passengerCount,
+          extraBedQty, extraBedPrice, extraBfAdultQty, extraBfAdultPrice, extraBfKidQty, extraBfKidPrice,
           discount: discountAmount, discountRemarks, seniorPwdDiscount, seniorPwdDiscountPercent, reservationFee: reservationFeeAmount, lateCheckoutFee,
           isLongTermStay, roomChangeNote, isContractedRate
         },

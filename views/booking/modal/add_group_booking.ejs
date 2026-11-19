@@ -299,11 +299,11 @@
                       <div class="gbx-prices">
                         <div id="gbxAdultPriceWrap">
                           <label for="groupExtraBfAdultPrice">Extra adult</label>
-                          <input type="number" class="form-control" id="groupExtraBfAdultPrice" value="500" min="0" step="0.01">
+                          <input type="number" class="form-control" id="groupExtraBfAdultPrice" value="600" min="0" step="0.01">
                         </div>
                         <div id="gbxKidPriceWrap">
                           <label for="groupExtraBfKidPrice">Extra kid</label>
-                          <input type="number" class="form-control" id="groupExtraBfKidPrice" value="500" min="0" step="0.01">
+                          <input type="number" class="form-control" id="groupExtraBfKidPrice" value="300" min="0" step="0.01">
                         </div>
                       </div>
                       <details class="gbx-details" open>
@@ -314,17 +314,15 @@
             </div>
             <div id="groupPickupDropoffFlightInfo" class="col-lg-12" style="display: none; margin-top: 10px;">
               <div class="d-flex gap-2 align-items-end flex-wrap">
-                <div class="form-group flex-fill" style="min-width: 140px;">
-                  <label class="form-label">Flight Number</label>
-                  <input type="text" class="form-control" id="groupFlightNumber" name="groupFlightNumber" placeholder="e.g. PR123">
+                <div id="groupPickupFlightWrap" class="form-group flex-fill" style="min-width: 140px; position: relative; display: none;">
+                  <label class="form-label">Pick-up Flight Number</label>
+                  <input type="text" class="form-control" id="groupFlightNumber" name="groupFlightNumber" placeholder="e.g. PR123" autocomplete="off">
+                  <div id="groupFlightNumberDropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 1080; max-height: 220px; overflow-y: auto; background-color: #2a3135; border: 1px solid #445; border-radius: 6px; margin-top: 2px; box-shadow: 0 4px 10px rgba(0,0,0,0.4);"></div>
                 </div>
-                <div class="form-group flex-shrink-0">
-                  <label class="form-label">&nbsp;</label>
-                  <button type="button" class="btn btn-outline-light d-block" id="checkGroupFlightStatusBtn">Check Status</button>
-                </div>
-                <div class="form-group flex-shrink-0">
-                  <label class="form-label">&nbsp;</label>
-                  <button type="button" class="btn btn-outline-light d-block" id="viewGroupArrivalsBtn">View Arrivals</button>
+                <div id="groupDropoffFlightWrap" class="form-group flex-fill" style="min-width: 140px; position: relative; display: none;">
+                  <label class="form-label">Drop-off Flight Number</label>
+                  <input type="text" class="form-control" id="groupDropoffFlightNumber" name="groupDropoffFlightNumber" placeholder="e.g. PR124" autocomplete="off">
+                  <div id="groupDropoffFlightNumberDropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 1080; max-height: 220px; overflow-y: auto; background-color: #2a3135; border: 1px solid #445; border-radius: 6px; margin-top: 2px; box-shadow: 0 4px 10px rgba(0,0,0,0.4);"></div>
                 </div>
                 <div class="form-group flex-shrink-0" style="width: 160px;">
                   <label class="form-label">Number of Passengers</label>
@@ -336,14 +334,28 @@
           </div>
 
           <div class="row p-t-20">
-            <div class="col-lg-4">
+            <div class="col-lg-6">
               <div class="form-check mb-2">
                 <input class="form-check-input" type="checkbox" id="groupIncludeExtraBed" name="groupIncludeExtraBed">
                 <label class="form-check-label" for="groupIncludeExtraBed">Add Extra Bed</label>
               </div>
-              <div id="groupExtraBedWrapper" class="group-quantity-wrapper mt-2" style="display: none;">
-                <input type="number" class="form-control" id="groupExtraBedQty" name="groupExtraBedQty" placeholder="Qty" min="0" step="1" style="max-width: 90px;">
-                <input type="number" class="form-control" id="groupExtraBedPrice" name="groupExtraBedPrice" placeholder="Price per bed" min="0" step="0.01">
+              <!-- Extra bed: the price of one bed, and how many beds each room gets (like the extra breakfast). -->
+              <div id="groupExtraBedWrapper" class="mt-2" style="display: none;">
+                <input type="hidden" id="groupExtraBedQty" name="groupExtraBedQty" value="0">
+                <div id="groupExtraBedBox" class="group-breakfast-extra">
+                  <div class="gbx-head">
+                    <span class="gbx-title">Extra bed</span>
+                    <span class="gbx-total">Total: <b id="groupExtraBedTotal">₱0.00</b></span>
+                  </div>
+                  <div class="gbx-sub">Choose which room gets the extra bed</div>
+                  <div class="gbx-prices">
+                    <div>
+                      <label for="groupExtraBedPrice">Price per bed</label>
+                      <input type="number" class="form-control" id="groupExtraBedPrice" name="groupExtraBedPrice" value="1500" min="0" step="0.01">
+                    </div>
+                  </div>
+                  <div id="groupExtraBedRooms" class="gbx-rooms"></div>
+                </div>
               </div>
             </div>
           </div>
@@ -2277,6 +2289,58 @@
   }
   window.getGroupExtraBreakfast = refreshGroupExtraBf;
 
+  // ---- Extra bed: the price of one bed (typed by staff) and how many beds each room gets. ----
+  // The first room starts with 1 bed; staff move it with the - / + buttons (or give every room one with "All rooms").
+  const GROUP_EXTRA_BED_MAX_PER_ROOM = 9;
+  let groupExtraBedByRoom = {};      // roomId -> beds
+  let groupExtraBedSeeded = false;   // the first room got its starting bed
+
+  function refreshGroupExtraBed() {
+    const on = $('#groupIncludeExtraBed').is(':checked');
+    const price = Math.max(0, parseFloat($('#groupExtraBedPrice').val()) || 0);
+    const roomVal = $('#groupSelectedRooms').val();
+    const ids = roomVal ? roomVal.split(',').filter(Boolean) : [];
+    if (!on) {
+      $('#groupExtraBedQty').val(0);
+      return { total: 0, price: price, totalQty: 0, perRoom: ids.map(() => 0) };
+    }
+    // rooms that are no longer selected lose their beds
+    Object.keys(groupExtraBedByRoom).forEach((id) => { if (ids.indexOf(id) === -1) delete groupExtraBedByRoom[id]; });
+    if (!groupExtraBedSeeded && ids.length) { groupExtraBedByRoom[ids[0]] = 1; groupExtraBedSeeded = true; }
+    const rows = ids.map((id) => ({ id: id, q: groupExtraBedByRoom[id] || 0 }));
+    const totalQty = rows.reduce((n, r) => n + r.q, 0);
+    const total = totalQty * price;
+
+    const money = (n) => '₱' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const step = (id, val, atMin, atMax) =>
+      '<span class="gbx-step"><button type="button" class="gbx-btn" data-room-id="' + id + '" data-step="-1"' + (atMin ? ' disabled' : '') + '>&minus;</button>' +
+      '<b>' + val + '</b>' +
+      '<button type="button" class="gbx-btn" data-room-id="' + id + '" data-step="1"' + (atMax ? ' disabled' : '') + '>+</button></span>';
+    let html;
+    if (!rows.length) {
+      html = '<div style="opacity:.7;padding:4px 0;">Pick the rooms first, then choose which room gets the extra bed.</div>';
+    } else {
+      const same = rows.every((r) => r.q === rows[0].q);
+      const allRow = rows.length > 1
+        ? '<tr class="gbx-all"><td>All rooms</td><td>' + step('all', same ? rows[0].q : '–', rows.every((r) => r.q <= 0), rows.every((r) => r.q >= GROUP_EXTRA_BED_MAX_PER_ROOM)) + '</td><td>' + money(total) + '</td></tr>'
+        : '';
+      const body = rows.map((r) => {
+        const room = groupAvailableRooms.find((x) => normalizeRoomId(x.IDNo) === normalizeRoomId(r.id));
+        const label = room && room.ROOM_NUMBER ? room.ROOM_NUMBER : r.id;
+        return '<tr><td>' + label + '</td><td>' + step(r.id, r.q, r.q <= 0, r.q >= GROUP_EXTRA_BED_MAX_PER_ROOM) + '</td><td>' + money(r.q * price) + '</td></tr>';
+      }).join('');
+      html = '<table class="gbx-table"><thead><tr><th>Room</th><th>Beds <small>(' + money(price) + ' each)</small></th><th>Amount</th></tr></thead><tbody>' + allRow + body + '</tbody></table>';
+    }
+    const $list = $('#groupExtraBedRooms');
+    const keep = $list.scrollTop();
+    $list.html(html);
+    $list.scrollTop(keep);
+    $('#groupExtraBedTotal').text(money(total));
+    $('#groupExtraBedQty').val(totalQty);
+    return { total: total, price: price, totalQty: totalQty, perRoom: rows.map((r) => r.q) };
+  }
+  window.getGroupExtraBed = refreshGroupExtraBed;
+
   // Contracted Rate: fixed -₱200/night, applied on top of whatever the
   // category/day/breakfast/season lookup (or legacy fallback) resolves to.
   const GROUP_CONTRACTED_RATE_PER_NIGHT = 200;
@@ -2740,6 +2804,9 @@
     groupExtraBfOverrides = {};
     groupExtraBfCountSig = '';
     groupExtraBfRenderSig = '';
+    groupExtraBedByRoom = {};
+    groupExtraBedSeeded = false;
+    $('#groupExtraBedPrice').val(1500);
     $('#groupJoinExistingGroup').val('false'); // Reset join flag
     groupBlocks = [];
     groupNonConsecutiveBlocks = [];
@@ -2785,10 +2852,10 @@
     $('#groupBreakfastIndividual').prop('checked', false); // Default breakfast to group (not individual)
     $('#groupBreakfastAdultQty, #groupBreakfastKidQty').val('');
     $('#groupPickupWrapper, #groupDropoffWrapper, #groupExtraBedWrapper').hide();
-    $('#groupPickupPrice, #groupDropoffPrice, #groupExtraBedQty, #groupExtraBedPrice').val('');
+    $('#groupPickupPrice, #groupDropoffPrice').val('');
     $('#groupPickupServiceId, #groupDropoffServiceId').val('');
     $('#groupPickupDropoffFlightInfo').hide();
-    $('#groupFlightNumber, #groupPassengerCount').val('');
+    $('#groupFlightNumber, #groupDropoffFlightNumber, #groupPassengerCount').val('');
     $('#groupRoomBreakdown').removeClass('d-none');
     $('.consolidated-indicator').remove();
 
@@ -3148,9 +3215,10 @@
 
     const pickupPrice = $('#groupIncludePickup').is(':checked') ? parseFloat($('#groupPickupPrice').val()) || 0 : 0;
     const dropoffPrice = $('#groupIncludeDropoff').is(':checked') ? parseFloat($('#groupDropoffPrice').val()) || 0 : 0;
-    const extraBedQty = $('#groupIncludeExtraBed').is(':checked') ? (parseInt($('#groupExtraBedQty').val(), 10) || 0) : 0;
-    const extraBedPrice = parseFloat($('#groupExtraBedPrice').val()) || 0;
-    const extraBedTotal = extraBedQty * extraBedPrice;
+    const extraBedNow = refreshGroupExtraBed();   // per room: which rooms get an extra bed
+    const extraBedQty = extraBedNow.totalQty;
+    const extraBedPrice = extraBedNow.price;
+    const extraBedTotal = extraBedNow.total;
 
     // Get number of rooms for individual service calculations - same Room
     // Checker preview fallback as roomSubtotal above, so the "(N room x M
@@ -4029,8 +4097,20 @@
         $('#groupExtraBedWrapper').show();
       } else {
         $('#groupExtraBedWrapper').hide();
-        $('#groupExtraBedQty, #groupExtraBedPrice').val('');
+        groupExtraBedByRoom = {};
+        groupExtraBedSeeded = false;
       }
+      computeGroupTotal();
+    });
+    // - / + per room (or "All rooms"): the beds of a room, 0 up to the maximum
+    $(document).on('click', '#groupExtraBedRooms .gbx-btn', function() {
+      const delta = parseInt($(this).attr('data-step'), 10) || 0;
+      const target = String($(this).attr('data-room-id'));
+      const roomVal = $('#groupSelectedRooms').val();
+      const ids = roomVal ? roomVal.split(',').filter(Boolean) : [];
+      (target === 'all' ? ids : [target]).forEach((id) => {
+        groupExtraBedByRoom[id] = Math.max(0, Math.min(GROUP_EXTRA_BED_MAX_PER_ROOM, (groupExtraBedByRoom[id] || 0) + delta));
+      });
       computeGroupTotal();
     });
 
@@ -4038,8 +4118,11 @@
     $('#groupIncludePickup, #groupIncludeDropoff').on('change', function() {
       const needsFlightInfo = $('#groupIncludePickup').is(':checked') || $('#groupIncludeDropoff').is(':checked');
       $('#groupPickupDropoffFlightInfo').toggle(needsFlightInfo);
+      $('#groupPickupFlightWrap').toggle($('#groupIncludePickup').is(':checked'));     // pick-up: the flight that ARRIVES
+      $('#groupDropoffFlightWrap').toggle($('#groupIncludeDropoff').is(':checked'));   // drop-off: the flight that DEPARTS
+      if (!$('#groupIncludePickup').is(':checked')) $('#groupFlightNumber').val('');
+      if (!$('#groupIncludeDropoff').is(':checked')) $('#groupDropoffFlightNumber').val('');
       if (!needsFlightInfo) {
-        $('#groupFlightNumber').val('');
         $('#groupPassengerCount').val('');
       }
     });
@@ -4163,7 +4246,7 @@
       computeGroupTotal();
     });
 
-    $('#groupBreakfastAdultQty, #groupBreakfastKidQty, #groupPickupPrice, #groupDropoffPrice, #groupExtraBedQty, #groupExtraBedPrice').on('input', function() {
+    $('#groupBreakfastAdultQty, #groupBreakfastKidQty, #groupPickupPrice, #groupDropoffPrice, #groupExtraBedPrice').on('input', function() {
       computeGroupTotal();
       // Validate that price is not empty if service is checked
       if ($(this).val() === '' && $(this).closest('.row').find('input[type="checkbox"]:checked').length > 0) {
@@ -5080,12 +5163,15 @@
       // per night is already covered by the room rate) - keeps the printed
       // voucher's total matching what the live Summary showed.
       // Extra breakfast only (beyond the 2 included in the rate tier), once per booking.
-      const breakfastTotalWithIndividual = refreshGroupExtraBf().total;
+      const extraBfNow = refreshGroupExtraBf();
+      const breakfastTotalWithIndividual = extraBfNow.total;
+      const extraBfQtyNow = extraBfNow.perRoom.reduce((n, r) => n + r.a + r.k, 0);
       const pickupPrice = $('#groupIncludePickup').is(':checked') ? parseFloat($('#groupPickupPrice').val()) || 0 : 0;
       const dropoffPrice = $('#groupIncludeDropoff').is(':checked') ? parseFloat($('#groupDropoffPrice').val()) || 0 : 0;
-      const extraBedQty = $('#groupIncludeExtraBed').is(':checked') ? (parseInt($('#groupExtraBedQty').val(), 10) || 0) : 0;
-      const extraBedPrice = parseFloat($('#groupExtraBedPrice').val()) || 0;
-      const extraBedTotal = extraBedQty * extraBedPrice;
+      const extraBedNow = refreshGroupExtraBed();
+      const extraBedQty = extraBedNow.totalQty;
+      const extraBedPrice = extraBedNow.price;
+      const extraBedTotal = extraBedNow.total;
       // Exclude late checkout fee from servicesTotal as it's displayed separately
       const servicesTotal = breakfastTotalWithIndividual + pickupPrice + dropoffPrice + extraBedTotal;
 
@@ -5099,10 +5185,15 @@
         dateFrom: dateFrom,
         dateTo: dateTo,
         roomSummary: roomNumbersForVoucher || 'No rooms selected',
-        breakfastAdult: $('#groupBreakfastAdultQty').val() || 0,
-        breakfastKid: $('#groupBreakfastKidQty').val() || 0,
+        // people of ALL the rooms (the form asks per room), and the extras above the 2 per room that are paid for
+        breakfastAdult: adultQty * numRooms,
+        breakfastKid: kidQty * numRooms,
         breakfastAdultPrice: adultPrice,
         breakfastKidPrice: kidPrice,
+        breakfastExtraQty: extraBfQtyNow,
+        breakfastExtraTotal: breakfastTotalWithIndividual,
+        extraBedQty: extraBedQty,
+        extraBedTotal: extraBedTotal,
         pickup: pickupPrice,
         dropoff: dropoffPrice,
         remarks: $('#groupRemarks').val() || '',
@@ -5133,5 +5224,50 @@
 })();
 </script>
 <script src="/js/booking/contact_channel.js?v=2"></script>
-<script src="/js/booking/group_booking_submit.js?v=extra-bf-1"></script>
+<script>
+// Flight number lists of the Group Booking: pick the flight from the Flight Schedule, same as the single Add Booking.
+// Pick-up uses the ARRIVAL column (the flight that arrives), Drop-off the DEPARTURE column (the flight that leaves).
+(function(){
+  var list = null;
+  function load(cb) {
+    if (Array.isArray(list)) { cb(list); return; }
+    $.ajax({
+      url: '/flight-schedule/api/flights', type: 'GET', cache: false,
+      success: function(r) { list = (r.success && Array.isArray(r.data)) ? r.data : []; cb(list); },
+      error: function() { list = []; cb(list); }
+    });
+  }
+  function setup(inputId, dropdownId, codeField) {
+    function filter(term) {
+      var needle = (term || '').trim().toUpperCase();
+      return (list || []).filter(function(f) {
+        return !needle || (f[codeField] || '').toUpperCase().indexOf(needle) !== -1 || (f.FLIGHT_NUMBER || '').toUpperCase().indexOf(needle) !== -1;
+      });
+    }
+    function render(items) {
+      var $dd = $('#' + dropdownId);
+      if (!items.length) { $dd.html('<div style="padding: 8px 10px; color: #9aa; font-size: 13px;">No flight in Flight Schedule</div>').show(); return; }
+      $dd.empty();
+      items.forEach(function(f) {
+        var code = f[codeField] || '', airline = f.FLIGHT_NUMBER || '';
+        $('<div class="flight-number-option"></div>')
+          .css({ padding: '6px 10px', cursor: 'pointer', fontSize: '13px', borderBottom: '1px solid #384249' })
+          .html('<strong>' + code + '</strong> <span style="color:#9aa;">— ' + airline + '</span>')
+          .on('mouseenter', function() { $(this).css('background-color', '#374047'); })
+          .on('mouseleave', function() { $(this).css('background-color', ''); })
+          .on('click', function() { $('#' + inputId).val(code); $dd.hide(); })
+          .appendTo($dd);
+      });
+      $dd.show();
+    }
+    $(document).on('input click focus', '#' + inputId, function() { load(function() { render(filter($('#' + inputId).val())); }); });
+    $(document).on('click', function(e) {
+      if (!$(e.target).closest('#' + inputId + ', #' + dropdownId).length) $('#' + dropdownId).hide();
+    });
+  }
+  setup('groupFlightNumber', 'groupFlightNumberDropdown', 'ARRIVAL');
+  setup('groupDropoffFlightNumber', 'groupDropoffFlightNumberDropdown', 'DEPARTURE');
+})();
+</script>
+<script src="/js/booking/group_booking_submit.js?v=extra-bed-1"></script>
 

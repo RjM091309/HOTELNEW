@@ -116,7 +116,13 @@
       </tr>
       <tr>
         <td class="label">ROOMS:</td>
-        <td><%= roomSummary %></td>
+        <%
+          // how many rooms are reserved ("2 Rooms"), not their numbers; roomSummary is the list of room numbers
+          const roomList = Array.isArray(roomSummary) ? roomSummary : String(roomSummary || '').split(/[,;]+/).map(r => r.trim()).filter(Boolean);
+          const countText = roomList.length === 1 ? /^(\d+)\s*rooms?$/i.exec(roomList[0]) : null;   // already a count: "2 Rooms"
+          var roomCount = countText ? parseInt(countText[1], 10) : ((roomList.length === 1 && /no rooms/i.test(roomList[0])) ? 0 : roomList.length);
+        %>
+        <td><%= roomCount > 0 ? roomCount + (roomCount === 1 ? ' Room' : ' Rooms') : 'No rooms selected' %></td>
       </tr>
       <tr>
         <td class="label">REMARKS:</td>
@@ -138,12 +144,26 @@
               lines.push('Room Accommodation');
             }
             
+            // a line with a price: the name on the left, the price at the right edge so all prices line up
+            const money = (n) => 'PHP ' + (parseFloat(n) || 0).toLocaleString();
+            const priced = (label, n) => '<span style="display:flex;justify-content:space-between;gap:12px;"><span>' + label + '</span><span style="white-space:nowrap;">' + money(n) + '</span></span>';
+            // Breakfast (breakfastAdult / Kid = people of all the rooms): the rate includes 2 per room; the people above that are extras that are paid for.
             const paxTotal = (parseInt(breakfastAdult || 0) || 0) + (parseInt(breakfastKid || 0) || 0);
-            if (paxTotal > 0) lines.push(`${paxTotal} Pax Breakfast Included`);
-            if (pickup && parseFloat(pickup) > 0) lines.push('With Pick-Up');
-            if (dropoff && parseFloat(dropoff) > 0) lines.push('With Drop-off');
+            const extraBfQty = (typeof breakfastExtraQty !== 'undefined' ? parseInt(breakfastExtraQty) : 0) || 0;
+            const extraBfTotal = (typeof breakfastExtraTotal !== 'undefined' ? parseFloat(breakfastExtraTotal) : 0) || 0;
+            const includedPax = Math.max(0, paxTotal - extraBfQty);
+            // with more than one room (and the same in every room) it reads per room: "2 Pax Breakfast Included per room";
+            // the price of the extras is for all the rooms together
+            const evenPerRoom = (n) => roomCount > 1 && n % roomCount === 0;
+            if (includedPax > 0) lines.push(evenPerRoom(includedPax) ? `${includedPax / roomCount} Pax Breakfast Included per room` : `${includedPax} Pax Breakfast Included`);
+            if (extraBfQty > 0) lines.push(priced(evenPerRoom(extraBfQty) ? `${extraBfQty / roomCount} Extra Breakfast per room` : `${extraBfQty} Extra Breakfast`, extraBfTotal));
+            const bedQty = (typeof extraBedQty !== 'undefined' ? parseInt(extraBedQty) : 0) || 0;
+            const bedTotal = (typeof extraBedTotal !== 'undefined' ? parseFloat(extraBedTotal) : 0) || 0;
+            if (bedQty > 0 || bedTotal > 0) lines.push(priced(bedQty > 1 ? `${bedQty}x Extra Bed` : 'Extra Bed', bedTotal));
+            if (pickup && parseFloat(pickup) > 0) lines.push(priced('With Pick-Up', pickup));
+            if (dropoff && parseFloat(dropoff) > 0) lines.push(priced('With Drop-off', dropoff));
           %>
-          <%- lines.join('<br>') %>
+          <%- lines.map(l => l.startsWith('<span') ? l : l + '<br>').join('') %>
         </td>
       </tr>
       

@@ -554,18 +554,11 @@ class CalendarModel {
       isRoomTransfer = currentRoom !== targetRoom;
 
       // OPTIMIZATION: Execute base updates using Promise.all
+      // (The two room statuses used to be forced here - old room 1, new room 2 - whatever was really in the rooms: moving a future booking inside a
+      // room that has a guest in-house made that room "vacant". They are now worked out from the bookings, after the booking has moved: see below.)
       const updatePromises = [
-        // Update old room to available (if it's a transfer)
-        queryDatabasePromise(`
-          UPDATE room SET ROOM_STATUS = 1 
-          WHERE IDNo = ? AND ACTIVE = 1
-        `, [currentRoom]),
-        
-        // Update new room to occupied
-        queryDatabasePromise(`
-          UPDATE room SET ROOM_STATUS = 2 
-          WHERE IDNo = ? AND ACTIVE = 1
-        `, [targetRoom])
+        Promise.resolve(null),
+        Promise.resolve(null)
       ];
 
       // If it's a room transfer, add transfer-specific updates
@@ -604,6 +597,10 @@ class CalendarModel {
       if (results[bookingUpdateIndex].affectedRows === 0) {
         return false;
       }
+
+      // Room statuses from what is really in the rooms now: a guest checked in = Occupied; otherwise Available (Out of order / Cleaning stay as they are)
+      await CalendarModel.syncRoomOccupancy(currentRoom);
+      if (targetRoom !== currentRoom) await CalendarModel.syncRoomOccupancy(targetRoom);
 
       // If this change came from an extension, update EXTENDED flags/days
       if (isExtended && originalCheckOut) {
@@ -1906,6 +1903,19 @@ class CalendarModel {
     } catch (error) {
       throw error;
     }
+  }
+
+  // The status of one room from its bookings: someone checked in -> 2 (Occupied); else 3 (Out of order) and 4 (Cleaning) stay; else 1 (Available).
+  static async syncRoomOccupancy(roomId) {
+    await queryDatabasePromise(`
+      UPDATE room r
+      SET r.ROOM_STATUS = CASE
+        WHEN EXISTS (SELECT 1 FROM booking b WHERE b.ROOM_ID = r.IDNo AND b.ACTIVE = 1 AND COALESCE(b.IS_CANCELLED, 0) = 0 AND b.BOOKING_STATUS = 'check-In') THEN 2
+        WHEN r.ROOM_STATUS IN (3, 4) THEN r.ROOM_STATUS
+        ELSE 1
+      END
+      WHERE r.IDNo = ? AND r.ACTIVE = 1
+    `, [roomId]);
   }
 
   // NEW: Backend overlap detection - replaces frontend logic

@@ -43,7 +43,7 @@
   <div class="quote-box">
     <div class="header">
       <% if (imageUrl) { %><img src="<%= imageUrl %>" alt="Logo"><% } %>
-      <div class="hotel-name">MAIN STAY HOTEL</div>
+      <div class="hotel-name"><%= (typeof hotelName !== 'undefined' && hotelName) ? hotelName : 'MAIN STAY HOTEL' %></div>
     </div>
     <div class="sub-header">
       Clark Terrace Building, Lot 2 Block 1, The Villages, Prince Balagtas Avenue, Clark Freeport Zone, Pampanga, 2023<br>
@@ -102,6 +102,7 @@
     <% } %>
     <div class="grand-total-row">GRAND TOTAL &nbsp;=&nbsp; <%= peso(grandTotal) %></div>
 
+    <% if (typeof isMainProperty === 'undefined' || isMainProperty) { %>
     <div class="payment-section">
       <div class="payment-title">MODE OF PAYMENT: &nbsp;CHINA BANKING CORPORATION</div>
       <div class="payment-details">
@@ -110,6 +111,7 @@
         ADDRESS: CLARK TERRACE BUILDING, THE VILLAGES ZONE, CLARK FREEPORT, MABALACAT CITY, 2023
       </div>
     </div>
+    <% } %>
 
     <div class="policy">
       <div class="policy-title">Cancellation Refund Policy:</div>

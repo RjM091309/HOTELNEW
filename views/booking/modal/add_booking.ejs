@@ -281,6 +281,24 @@
                                         <span class="text-muted" style="font-size: 12px;">person/s</span>
                                       </div>
 
+                                      <!-- The rate includes 2 breakfasts; every person above 2 is an extra that is paid for (price of one, typed by staff). -->
+                                      <div id="extraBfSingleWrap" class="mt-2 mb-3" style="display: none;">
+                                        <div id="extraBfSingleLabel" style="font-size: 12px; margin-bottom: 4px; white-space: nowrap;"></div>
+                                        <!-- the extras can be adults and kids (each with its own price): the kids are taken out of the extras.
+                                             One grid, so the numbers and the prices of both rows line up. -->
+                                        <div style="display: grid; grid-template-columns: 42px 64px 28px 110px; gap: 6px 6px; align-items: center;">
+                                          <span style="font-size: 12px;">Adult</span>
+                                          <b id="extraBfSingleAdultQty" style="text-align: center;">0</b>
+                                          <span style="font-size: 12px; white-space: nowrap;">x &#8369;</span>
+                                          <input type="number" class="form-control" id="extraBfSinglePrice" name="extraBfSinglePrice" min="0" step="0.01" value="600" style="height: 32px; padding: 2px 8px;" title="Price of one extra adult breakfast">
+
+                                          <span style="font-size: 12px;">Kid</span>
+                                          <input type="number" class="form-control" id="extraBfSingleKidQty" name="extraBfSingleKidQty" min="0" step="1" value="0" style="height: 32px; padding: 2px 6px; text-align: center;" title="How many of the extras are kids">
+                                          <span style="font-size: 12px; white-space: nowrap;">x &#8369;</span>
+                                          <input type="number" class="form-control" id="extraBfSingleKidPrice" name="extraBfSingleKidPrice" min="0" step="0.01" value="300" style="height: 32px; padding: 2px 8px;" title="Price of one extra kid breakfast">
+                                        </div>
+                                      </div>
+
                                       <!-- Adult & kids breakfast are the same tier now - one pax count. Kids kept at 0 for the legacy service payload. -->
                                       <input type="hidden" id="breakfastKidQty" name="breakfastKidQty" value="0">
                                       <input type="hidden" id="breakfastAdultPrice" name="breakfastAdultPrice" value="0">
@@ -311,6 +329,19 @@
                                     <div id="dropoffWrapper" class="mt-1" style="display: none;">
                                       <input type="number" class="form-control" id="dropoffPrice" name="dropoffPrice" placeholder="Drop-off Price">
                                       <input type="hidden" id="dropoffServiceId" name="dropoffServiceId">
+                                    </div>
+                                  </div>
+
+                                  <div class="col-lg-4">
+                                    <div class="form-check mb-1">
+                                      <input class="form-check-input" type="checkbox" id="includeExtraBed">
+                                      <label class="form-check-label" for="includeExtraBed">Extra Bed</label>
+                                    </div>
+                                    <div id="extraBedWrapper" class="mt-1" style="display: none;">
+                                      <div class="d-flex gap-2 align-items-center">
+                                        <input type="number" class="form-control" id="extraBedQty" name="extraBedQty" min="1" max="9" step="1" value="1" placeholder="Qty" style="max-width: 80px;">
+                                        <input type="number" class="form-control" id="extraBedPrice" name="extraBedPrice" min="0" step="0.01" value="1500" placeholder="Price per bed">
+                                      </div>
                                     </div>
                                   </div>
 
@@ -554,7 +585,7 @@
 		document.body.appendChild(bookingScript);
 		bookingScript.onload = function() {
 			var bookingBillingScript = document.createElement('script');
-			bookingBillingScript.src = '/js/booking/add_booking.js?v=custom-rates-1';
+			bookingBillingScript.src = '/js/booking/add_booking.js?v=extra-bf-4';
 			document.body.appendChild(bookingBillingScript);
 		};
 
@@ -564,7 +595,7 @@
 		document.body.appendChild(maintenanceScript);
 		maintenanceScript.onload = function() {
 			var submitScript = document.createElement('script');
-			submitScript.src = '/js/booking/booking_submit.js?v=early-ci-conflict-4';
+			submitScript.src = '/js/booking/booking_submit.js?v=extra-bed-1';
 			document.body.appendChild(submitScript);
 		};
 
@@ -656,6 +687,11 @@
             $('#includeLongTermStay').prop('checked', false);
             $('#longTermStayWrapper').hide();
             $('#roomChangeNote').val('');
+            // extra bed back to its start
+            $('#includeExtraBed').prop('checked', false);
+            $('#extraBedWrapper').hide();
+            $('#extraBedQty').val(1);
+            $('#extraBedPrice').val(1500);
         });
     });
 })();
@@ -807,16 +843,28 @@
         $('#checkInStatus').on('focus', function(){ prevCI = $(this).val(); });
         $('#checkOutStatus').on('focus', function(){ prevCO = $(this).val(); });
 
+        // "Regular Check-in cannot directly follow a Late Check-out" - the way out is a Late Check-in, so on OK the booking becomes a Late Check-in
+        // by itself (the other choice the guest of the dropdown just made stays). The other conflict (my late check-out next to a regular
+        // check-in of ANOTHER booking) cannot be solved from here: that one still goes back.
+        const needsLateCheckIn = (result) => /^Regular Check-in cannot directly follow/.test(String(result.reason || ''));
+        const makeLateCheckIn = function(){
+            $('#checkInStatus').val('0');
+            prevCI = '0';
+            $('#checkInStatus').trigger('change');   // the banner (LCI) and everything that reads the status follow
+        };
+
         $('#checkInStatus').on('change', async function(){
             const result = await validateAdjacencyOnDropdown();
             if (!result.valid) {
+                const auto = needsLateCheckIn(result);
+                const $el = $(this), back = prevCI;
                 Swal.fire({
                     title: 'Not Allowed - Check-in Conflict',
-                    html: result.reason,
+                    html: result.reason + (auto ? '<br><br><b>Press OK: this booking becomes a Late Check-in.</b>' : ''),
                     icon: 'error',
                     confirmButtonText: 'OK'
-                });
-                $(this).val(prevCI);
+                }).then(() => { if (auto) makeLateCheckIn(); else $el.val(back); });
+                if (!auto) $(this).val(prevCI);
                 return;
             }
             prevCI = $(this).val();
@@ -825,13 +873,15 @@
         $('#checkOutStatus').on('change', async function(){
             const result = await validateAdjacencyOnDropdown();
             if (!result.valid) {
+                const auto = needsLateCheckIn(result);
+                const $el = $(this), back = prevCO, chosen = $(this).val();
                 Swal.fire({
                     title: 'Not Allowed - Check-out Conflict',
-                    html: result.reason,
+                    html: result.reason + (auto ? '<br><br><b>Press OK: this booking becomes a Late Check-in.</b>' : ''),
                     icon: 'error',
                     confirmButtonText: 'OK'
-                });
-                $(this).val(prevCO);
+                }).then(() => { if (auto) { prevCO = chosen; makeLateCheckIn(); } else $el.val(back); });
+                if (!auto) $(this).val(prevCO);
                 return;
             }
             prevCO = $(this).val();

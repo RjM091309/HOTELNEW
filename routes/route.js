@@ -32,6 +32,7 @@ const depositsRoutes = require('./r_deposits');
 const channexRoutes = require('./r_channex');
 const roomRatesRoutes = require('./r_room_rates');
 const propertyRoutes = require('./r_property');
+const roomRequestRoutes = require('./r_room_request');
 
 // Auth middleware
 const AuthMiddleware = require('../middleware/m_auth');
@@ -54,6 +55,7 @@ router.post('/telegram/webhook/update', TelegramController.handleWebhook);
 // Protected routes (require authentication)
 router.use('/dashboard', AuthMiddleware.requireAuth, auditTrail({ module: 'dashboard' }), dashboardRoutes);
 router.use('/booking', AuthMiddleware.requireAuth, auditTrail({ module: 'booking' }), bookingRoutes);
+router.use('/room-requests', AuthMiddleware.requireAuth, roomRequestRoutes);
 router.use('/user_info', AuthMiddleware.requireAuth, userRoutes);
 router.use('/guest', AuthMiddleware.requireAuth, guestRoutes);
 router.use('/calendar', AuthMiddleware.requireAuth, calendarRoutes);

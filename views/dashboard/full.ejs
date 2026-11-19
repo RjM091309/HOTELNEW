@@ -2,6 +2,8 @@
      FULL DASHBOARD of the active property ("Expand Full Dashboard" on the overview).
      Data: /dashboard/full-data (models/propertyDashboardModel.js). Refreshes itself every 30 s.
      ============================================================ -->
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap">
 <style>
   .fd { --accent: <%= (typeof currentProperty !== 'undefined' && currentProperty && currentProperty.COLOR) ? currentProperty.COLOR : '#4361ee' %>;
     --fd-card: #141b2e; --fd-card-2: #19223a; --fd-line: rgba(255,255,255,.07); --fd-line-2: rgba(255,255,255,.13); --fd-text: #eef2ff; --fd-muted: #8b97b8;
@@ -40,12 +42,90 @@
   @media (max-width: 1280px) { .c-res, .c-rooms { grid-column: span 6; } .c-rev { grid-column: span 12; } .c-book { grid-column: span 12; } .c-cal { grid-column: span 12; grid-row: auto; } .c-cust, .c-act { grid-column: span 6; } }
   @media (max-width: 760px) { .c-res, .c-rooms, .c-rev, .c-book, .c-cal, .c-cust, .c-act { grid-column: span 12; } .fd-title { font-size: 22px; } }
 
-  /* a property with a 3D building (BUILDING_VIEW): reservation | revenue | bookings, then the building beside the newest customers and activities */
-  .fd-bv .c-res, .fd-bv .c-rev, .fd-bv .c-book { grid-column: span 4; }
-  .fd-bv .c-bld { grid-column: 1 / span 8; grid-row: span 2; display: flex; flex-direction: column; }
-  .fd-bv .c-cust, .fd-bv .c-act { grid-column: 9 / span 4; }
-  @media (max-width: 1280px) { .fd-bv .c-res, .fd-bv .c-rev, .fd-bv .c-book { grid-column: span 12; } .fd-bv .c-bld { grid-column: span 12; grid-row: auto; } .fd-bv .c-cust, .fd-bv .c-act { grid-column: span 6; } }
-  @media (max-width: 760px) { .fd-bv .c-cust, .fd-bv .c-act { grid-column: span 12; } }
+  /* a property with a 3D building (BUILDING_VIEW): ONE container - the building is the main display (left), the six numbers (reservation + housekeeping) are stacked beside it (right) */
+  .fd-bv .c-bld { grid-column: 1 / -1; display: flex; flex-direction: column; }
+  .fd-bv-body { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 18px; align-items: stretch; flex: 1 1 auto; }
+  .fd-vip-v { display: inline-block; margin-right: 6px; font: 700 14px/1 Cinzel, Algerian, 'Times New Roman', serif; color: #f5c542; text-shadow: 0 0 1px #2a1a00, 0 0 3px #2a1a00; }
+  .fd-bv-main { display: flex; flex-direction: column; min-width: 0; }
+  .fd-bv-side { display: flex; flex-direction: column; gap: 10px; padding-left: 18px; border-left: 1px solid var(--fd-line); }
+  .fd-bv-side .fd-tile { flex: 1 1 0; display: flex; flex-direction: column; justify-content: center; padding: 8px 14px; min-height: 0; }
+  .fd-bv-side .fd-tile-v { margin-top: 4px; font-size: 26px; }
+  .fd-bv-side .fd-tile-s { margin-top: 2px; }
+  /* the building is scaled to the height of the window (not only to the width), so the whole card - building, legend and the six numbers - fits on the screen */
+  .fd-bv .fd-bld { padding-bottom: 0; }
+  .fd-views { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: color-mix(in srgb, var(--fd-text) 7%, transparent); border: 1px solid var(--fd-line); }
+  .fd-views button { border: 0; background: transparent; color: var(--fd-muted); font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 999px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .fd-views button:hover { color: var(--fd-text); }
+  .fd-views button.is-on { background: var(--accent); color: #fff; }
+  .fd-bv .fd-card-head { gap: 14px; }
+  .fd-bv .fd-card-head .fd-card-note { margin-left: auto; }
+  .fd-tile[data-hk] { cursor: pointer; transition: border-color .2s, transform .2s, background .2s; }
+  .fd-tile[data-hk]:hover { border-color: var(--t); background: color-mix(in srgb, var(--t) 8%, transparent); transform: translateY(-1px); }
+  .fd-tile[data-hk].is-on { border-color: var(--t); background: color-mix(in srgb, var(--t) 16%, transparent); box-shadow: 0 0 0 1px var(--t) inset; }
+  @keyframes bvSlide { from { opacity: 0; transform: translateX(26px) scale(.97); } to { opacity: 1; transform: none; } }
+  @keyframes bvFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @keyframes bvPill { from { opacity: .4; transform: scale(.92); } to { opacity: 1; transform: none; } }
+  .bv-swap .fd-bv-side .fd-tile { animation: bvSlide .55s cubic-bezier(.2,.8,.25,1) both; }
+  .bv-swap .fd-bv-side .fd-tile:nth-child(1) { animation-delay: .10s; } .bv-swap .fd-bv-side .fd-tile:nth-child(2) { animation-delay: .17s; } .bv-swap .fd-bv-side .fd-tile:nth-child(3) { animation-delay: .24s; }
+  .bv-swap .fd-bv-side .fd-tile:nth-child(4) { animation-delay: .31s; } .bv-swap .fd-bv-side .fd-tile:nth-child(5) { animation-delay: .38s; } .bv-swap .fd-bv-side .fd-tile:nth-child(6) { animation-delay: .45s; } .bv-swap .fd-bv-side .fd-tile:nth-child(7) { animation-delay: .52s; }
+  .bv-swap .fd-bld-legend span { animation: bvFade .5s ease both; animation-delay: .55s; }
+  .bv-swap .fd-views { animation: bvPill .4s ease both; }
+  @media (prefers-reduced-motion: reduce) { .bv-swap .fd-bv-side .fd-tile, .bv-swap .fd-bld-legend span, .bv-swap .fd-views { animation: none; } }
+  .fd-req-btn { border: 1px solid var(--fd-line); background: transparent; color: var(--fd-text); font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 999px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+  .fd-req-btn:hover { border-color: #7c3aed; }
+  .fd-req-btn i { font-size: 17px; }
+  .fd-req-btn b { background: #7c3aed; color: #fff; border-radius: 999px; min-width: 18px; padding: 1px 6px; text-align: center; font-size: 11px; }
+  .fd-req-btn b.is-zero { background: color-mix(in srgb, var(--fd-text) 20%, transparent); }
+  .fd-req-pill { display: inline-block; font-style: normal; font-size: 8px; font-weight: 800; line-height: 1; padding: 3px 6px; border-radius: 999px; background: #0d9488; color: #fff; }
+  /* the Request windows are added to the page body, outside .fd, so they carry the same colours themselves (dark by default, light in the white theme) */
+  .hkr-wrap, .fd-toast { --accent: <%= (typeof currentProperty !== 'undefined' && currentProperty && currentProperty.COLOR) ? currentProperty.COLOR : '#4361ee' %>;
+    --fd-card: #141b2e; --fd-card-2: #19223a; --fd-line: rgba(255,255,255,.07); --fd-line-2: rgba(255,255,255,.13); --fd-text: #eef2ff; --fd-muted: #8b97b8; }
+  [data-theme="white"] .hkr-wrap { --fd-card: #ffffff; --fd-card-2: #ffffff; --fd-line: rgba(15,23,42,.08); --fd-line-2: rgba(15,23,42,.16); --fd-text: #0f172a; --fd-muted: #64748b; }
+  .hkr-wrap { position: fixed; inset: 0; z-index: 100001; background: rgba(2, 6, 16, .6); display: none; align-items: center; justify-content: center; padding: 16px; }
+  .hkr-card { width: min(460px, 100%); max-height: 90vh; overflow: auto; background: var(--fd-card-2); color: var(--fd-text); border: 1px solid var(--fd-line-2, var(--fd-line)); border-radius: 18px; padding: 20px 22px; box-shadow: 0 30px 70px -20px rgba(0, 0, 0, .7); }
+  .hkr-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .hkr-head h3 { margin: 0; font-size: 19px; font-weight: 700; }
+  .hkr-x { border: 0; background: transparent; color: var(--fd-muted); font-size: 24px; line-height: 1; cursor: pointer; padding: 0 4px; }
+  .hkr-x:hover { color: var(--fd-text); }
+  .hkr-sub { font-size: 13px; color: var(--fd-muted); margin-bottom: 14px; }
+  .hkr-sub b { color: var(--fd-text); }
+  .hkr-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .hkr-opt { text-align: left; border: 1px solid var(--fd-line-2, var(--fd-line)); background: color-mix(in srgb, var(--fd-text) 4%, transparent); color: var(--fd-text); border-radius: 14px; padding: 14px 14px; cursor: pointer; display: flex; flex-direction: column; gap: 3px; }
+  .hkr-opt b { font-size: 17px; }
+  .hkr-opt small { color: var(--fd-muted); font-size: 12px; }
+  .hkr-opt:hover { border-color: var(--accent); }
+  .hkr-opt.is-on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .hkr-custom { margin-top: 12px; }
+  .hkr-custom textarea { width: 100%; min-height: 84px; resize: vertical; border-radius: 12px; border: 1px solid var(--fd-line-2, var(--fd-line)); background: color-mix(in srgb, var(--fd-text) 5%, transparent); color: var(--fd-text); padding: 10px 12px; font: inherit; font-size: 14px; }
+  .hkr-custom textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .hkr-actions { margin-top: 14px; display: flex; align-items: center; gap: 10px; }
+  .hkr-send { background: var(--accent); color: #fff; border: 0; border-radius: 12px; padding: 10px 20px; font-weight: 700; font-size: 14px; cursor: pointer; }
+  .hkr-send:disabled { opacity: .4; cursor: not-allowed; }
+  .hkr-msg { font-size: 13px; color: var(--fd-muted); }
+  .hkr-msg.is-err { color: #ff8a8a; }
+  .hkr-sec { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--fd-line); font-size: 12px; letter-spacing: .6px; text-transform: uppercase; color: var(--fd-muted); }
+  .hkr-list { margin-top: 8px; display: grid; gap: 8px; }
+  .hkr-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--fd-text) 5%, transparent); border: 1px solid var(--fd-line); }
+  .hkr-item .t { flex: 1; min-width: 0; font-size: 13.5px; }
+  .hkr-item .t small { display: block; color: var(--fd-muted); font-size: 11.5px; }
+  .hkr-item .rm { font-weight: 800; font-size: 15px; min-width: 46px; }
+  .hkr-badge { display: inline-block; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 999px; color: #fff; margin-right: 6px; background: #7c3aed; }
+  .hkr-badge.mur { background: #0d9488; }
+  .hkr-item button { border: 1px solid var(--fd-line-2, var(--fd-line)); background: transparent; color: var(--fd-text); border-radius: 10px; padding: 6px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+  .hkr-item button.done { background: #16a34a; border-color: #16a34a; color: #fff; }
+  .hkr-item button.cancel { color: var(--fd-muted); padding: 6px 9px; }
+  .hkr-empty { color: var(--fd-muted); font-size: 13px; padding: 6px 2px; }
+  .fd-toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 100002; background: #16a34a; color: #fff; padding: 10px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; box-shadow: 0 12px 30px -10px rgba(0,0,0,.6); }
+  .fd-toast.is-err { background: #dc2626; }
+  .fd-urgent-mark { display: inline-block; width: 13px; height: 13px; border-radius: 50%; background: #f97316; color: #fff; font-style: normal; font-size: 9px; font-weight: 900; line-height: 13px; text-align: center; }
+  .fd-bv .fd-bld-legend { gap: 5px 11px; font-size: 11.5px; padding-top: 8px; margin-top: 2px; }
+  .fd-bv .fd-bld-legend .fd-beds-key { margin-left: 0; padding-left: 0; border-left: 0; }
+  .fd-bld-legend .fd-beds-key { gap: 3px; margin-left: 6px; padding-left: 14px; border-left: 1px solid var(--fd-line); } .fd-bld-legend .fd-beds-key + .fd-beds-key { margin-left: 0; padding-left: 8px; border-left: 0; }
+  .fd-btb-pill { font-style: normal; font-size: 8px; font-weight: 800; letter-spacing: .02em; line-height: 1; padding: 3px 6px; border-radius: 999px; background: #1d3f9e; color: #fff; border: 1px solid #bcd0ff; margin-right: 0; }
+  .fd-bed-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--fd-muted); display: inline-block; } .fd-bed-dots { display: inline-flex; flex-direction: column; gap: 2px; }
+  .fd-bv .c-bld > .fd-card-head { margin-bottom: 4px; }
+  .fd-bv .fd-bld .b3d { width: 100%; height: clamp(360px, calc(100vh - 297px), 790px); }
+  @media (max-width: 1100px) { .fd-bv-body { grid-template-columns: 1fr; } .fd-bv-side { flex-direction: row; flex-wrap: wrap; padding-left: 0; border-left: 0; } .fd-bv-side .fd-tile { flex: 1 1 30%; } }
   .fd-bld { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; min-height: 0; padding: 0 0 56px;   /* the extra bottom padding lifts the building a little */ }
   .fd-bld-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; padding-top: 12px; margin-top: 6px; border-top: 1px solid var(--fd-line); font-size: 12px; color: var(--fd-muted); }
   .fd-bld-legend span { display: inline-flex; align-items: center; gap: 7px; } .fd-bld-legend b { color: var(--fd-text); font-variant-numeric: tabular-nums; }
@@ -59,7 +139,7 @@
   .fd-tile-v { margin-top: 8px; font-size: 28px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; color: var(--fd-text); }
   .fd-tile-s { margin-top: 5px; font-size: 11px; color: var(--fd-muted); min-height: 14px; }
   a.fd-tile.is-link { text-decoration: none; color: inherit; cursor: pointer; transition: border-color .2s, transform .2s, background .2s; } a.fd-tile.is-link:hover { border-color: var(--t); background: color-mix(in srgb, var(--t) 8%, transparent); transform: translateY(-2px); }
-  .t-good { --t: var(--fd-good); } .t-warn { --t: var(--fd-warn); } .t-bad { --t: var(--fd-bad); } .t-info { --t: var(--fd-info); } .t-acc { --t: var(--accent); }
+  .t-good { --t: var(--fd-good); } .t-warn { --t: var(--fd-warn); } .t-bad { --t: var(--fd-bad); } .t-info { --t: var(--fd-info); } .t-acc { --t: var(--accent); } .t-req { --t: #7c3aed; }
 
   .fd-occ { display: flex; align-items: baseline; gap: 6px; margin: 2px 0 10px; }
   .fd-occ b { font-size: 38px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; } .fd-occ span { font-size: 15px; color: var(--fd-muted); } .fd-occ em { font-style: normal; font-size: 12px; color: var(--fd-muted); margin-left: 4px; }
@@ -134,7 +214,7 @@
   @media (prefers-reduced-motion: reduce) { .fd.is-enter .fd-card, .fd.is-enter .fd-a, .fd.is-enter .fd-head > *, .fd.is-enter .fd-bar, .fd-card.re .fd-bar, .fd.is-enter .fd-seg > span, .fd.is-enter .fd-draw, .fd.is-enter .fd-area, .fd.is-enter .fd-dotp { animation: none !important; } .fd.is-enter .fd-draw { stroke-dasharray: none; stroke-dashoffset: 0; } .fd-skel { animation: none; } .fd-splash { transition: none; } }
 </style>
 
-<script src="/js/dashboard/building3d.js?v=21"></script>
+<script src="/js/dashboard/building3d.js?v=54"></script>
 <% var BV = !!(typeof currentProperty !== 'undefined' && currentProperty && currentProperty.BUILDING_VIEW); %>
 <div class="fd<%= BV ? ' fd-bv' : '' %>" id="fd">
   <div class="fd-head">
@@ -150,12 +230,7 @@
 
   <div class="fd-grid" id="fdGrid">
     <% if (BV) { %>
-    <section class="fd-card c-res"><div class="fd-skel"></div></section>
-    <section class="fd-card c-rev" role="link" tabindex="0" title="Open Payments"><div class="fd-skel"></div></section>
-    <section class="fd-card c-book"><div class="fd-skel"></div></section>
-    <section class="fd-card c-bld"><div class="fd-skel" style="height:460px"></div></section>
-    <section class="fd-card c-cust"><div class="fd-skel"></div></section>
-    <section class="fd-card c-act" role="link" tabindex="0" title="Open the Activity Log"><div class="fd-skel"></div></section>
+    <section class="fd-card c-bld"><div class="fd-skel" style="height:520px"></div></section>
     <% } else { %>
     <section class="fd-card c-res"><div class="fd-skel"></div></section>
     <section class="fd-card c-rooms"><div class="fd-skel"></div></section>
@@ -171,7 +246,14 @@
 <script>
 (function () {
   var D = null;                    // the last data
-  var ui = { days: 7, typeId: null, roomId: null };
+  var ui = { days: 7, typeId: null, roomId: null, view: 'frontdesk', hkFocus: null, reqs: [], reqMap: {}, reqSig: '' };
+  // The views of the Building card: each one shows only its own indicators. To add another one (maintenance, another building...) add it here and
+  // give cardBld() its tiles / legend.
+  var BLD_VIEWS = [
+    { id: 'frontdesk', label: 'Front desk', icon: 'fa-concierge-bell' },
+    { id: 'housekeeping', label: 'Housekeeping', icon: 'fa-broom' }
+  ];
+  try { var savedView = localStorage.getItem('fdBuildingView'); if (BLD_VIEWS.some(function (v) { return v.id === savedView; })) ui.view = savedView; } catch (e) { /* the default view */ }
   var grid = document.getElementById('fdGrid');
   // the whole Revenue card opens Payments, the whole Recent activities card opens the Activity Log (links inside a card keep their own target)
   var CARD_LINKS = { 'c-rev': '/payments', 'c-act': '/activity-log' };
@@ -295,44 +377,273 @@
 
   // the 3D building: the property's rooms with their status; a click opens the booking (or the cleaning list) in the calendar
   function bldSig() { var s = JSON.stringify(D.building || []), h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; }
+  // one tile of the Housekeeping view: a click shows only its rooms in the building (a second click shows all again)
+  function hkTile(key, label, icon, value, tone, sub) {
+    return '<div class="fd-tile t-' + tone + ' is-link' + (ui.hkFocus === key ? ' is-on' : '') + '" data-hk="' + key + '" role="button" tabindex="0" title="Show only these rooms">' +
+      '<div class="fd-tile-l"><span>' + label + '</span><i class="fas ' + icon + '"></i></div><div class="fd-tile-v">' + pad(value) + '</div><div class="fd-tile-s">' + (sub || '') + '</div></div>';
+  }
   function cardBld() {
     var B = window.Building3D, c = B.counts(D.building);
     function sw(bg) { return '<i class="fd-sw" style="background:' + bg + '"></i>'; }
-    return '<div class="fd-card-head"><div class="fd-card-title">Building</div><span class="fd-card-note">' + (D.building || []).length + ' rooms &middot; click a room to open it</span></div>' +
-      '<div class="fd-bld" id="fdBld" data-sig="' + bldSig() + '"></div>' +
-      '<div class="fd-bld-legend">' +
-      '<span>' + sw('linear-gradient(#fff4d6,#ffc65e)') + 'Occupied <b>' + c.occupied + '</b></span>' +
-      '<span>' + sw('#2c2430') + 'Clean, empty <b>' + c.vacant + '</b></span>' +
-      '<span>' + sw('#ffb59a') + 'To be cleaned <b>' + c.dirty + '</b></span>' +
-      '<span>' + sw('repeating-linear-gradient(45deg,#b3aaa6 0 3px,#5a4a42 3px 4px)') + 'Out of order <b>' + c.ooo + '</b></span>' +
-      '<span><i class="fd-sd" style="background:' + B.ARRIVE + '"></i>Arriving today <b>' + c.arriving + '</b></span>' +
-      '<span><i class="fd-sd" style="background:' + B.LEAVE + '"></i>Leaving today <b>' + c.leaving + '</b></span></div>';
+    var o = D.overview, r = o.reservation, h = o.housekeeping, hk = ui.view === 'housekeeping';
+    var bedsKey = '<span class="fd-beds-key"><i class="fd-bed-dot"></i>1 bed</span><span class="fd-beds-key"><i class="fd-bed-dots"><i class="fd-bed-dot"></i><i class="fd-bed-dot"></i></i>2 beds</span>';
+    var vipN = (D.building || []).filter(function (x) { return x.vip; }).length;
+    var vipKey = vipN ? '<span><i class="fd-vip-v">V</i>VIP room <b>' + vipN + '</b></span>' : '';
+    var side, legend, note;
+    if (hk) {
+      // HOUSEKEEPING: the work first. Dirty rooms, rooms that are about to be left (late ones too), who stays, who arrives (a dirty room with an arrival is URGENT)
+      var goingOut = c.leaving - c.late;
+      side = hkTile('dirty', 'To clean', 'fa-broom', c.dirty, 'warn', c.urgent ? c.urgent + ' urgent: arrives today' : (c.dirty ? 'dirty rooms' : 'all clean')) +
+        hkTile('leaving', 'Going to check out', 'fa-sign-out-alt', c.leaving, 'bad', c.leaving ? (goingOut + ' regular &middot; ' + c.late + ' late') : 'none today') +
+        hkTile('late', 'Late check-out', 'fa-clock', c.late, 'info', c.late ? 'leave later today' : 'none') +
+        hkTile('stay', 'Occupied', 'fa-bed', c.stay, 'acc', 'guests staying') +
+        hkTile('arriving', 'Arriving today', 'fa-sign-in-alt', c.arriving, 'good', 'rooms to be ready by 3 PM') +
+        hkTile('requests', 'Requests', 'fa-concierge-bell', ui.reqs.length, 'req', ui.reqs.length ? 'waiting: MUR / custom' : 'none waiting') +
+        hkTile('ooo', 'Out of order', 'fa-ban', h.outOfOrder, 'bad', h.outOfOrder ? 'not to be cleaned' : 'none');
+      legend = '<span>' + sw('#8a7433') + 'To clean <b>' + c.dirty + '</b></span>' +
+        '<span>' + sw('linear-gradient(#ff8f8f,#e8343a)') + 'Check-out today <b>' + goingOut + '</b></span>' +
+        '<span>' + sw('linear-gradient(90deg,#f0494e 0 72%,' + B.LATE + ' 72% 100%)') + 'Late check-out <b>' + c.late + '</b></span>' +
+        '<span>' + sw('linear-gradient(#fff4d6,#ffc65e)') + 'Occupied <b>' + c.stay + '</b></span>' +
+        '<span><i class="fd-sd" style="background:' + B.ARRIVE + '"></i>Arrives today <b>' + c.arriving + '</b></span>' +
+        '<span><i class="fd-urgent-mark">!</i>Urgent <b>' + c.urgent + '</b></span>' +
+        '<span><i class="fd-btb-pill">BTB</i>Back-to-back <b>' + c.btb + '</b></span>' +
+        '<span><i class="fd-req-pill">MUR</i>Request <b>' + ui.reqs.length + '</b></span>' +
+        '<span>' + sw('repeating-linear-gradient(45deg,#b3aaa6 0 3px,#5a4a42 3px 4px)') + 'Out of order <b>' + c.ooo + '</b></span>' + vipKey;
+      note = '';
+    } else {
+      side = tile('Occupied', 'fa-bed', pad(r.occupied), 'acc', 'of ' + D.totalRooms + ' rooms') +
+        tile('Check in', 'fa-sign-in-alt', pad(r.checkIn.total), 'good', r.checkIn.done ? r.checkIn.done + ' already in' : 'still to arrive', '/calendar?focus=arrivals') +
+        tile('Check out', 'fa-sign-out-alt', pad(r.checkOut.total), 'info', r.checkOut.done ? r.checkOut.done + ' already out' : 'still to leave', '/calendar?focus=departures') +
+        tile('Available', 'fa-check-circle', pad(h.available), 'good', 'ready to sell') +
+        tile('Dirty', 'fa-broom', pad(h.dirty), 'warn', h.dirty ? 'to clean' : 'all clean', h.dirty ? '/calendar?cleaning=all' : '') +
+        tile('Out of order', 'fa-ban', pad(h.outOfOrder), 'bad', h.outOfOrder ? 'maintenance' : 'none');
+      legend = '<span>' + sw('linear-gradient(#fff4d6,#ffc65e)') + 'Occupied <b>' + c.occupied + '</b></span>' +
+        '<span>' + sw('#2c2430') + 'Clean, empty <b>' + c.vacant + '</b></span>' +
+        '<span>' + sw('#8a7433') + 'To be cleaned <b>' + c.dirty + '</b></span>' +
+        '<span>' + sw('repeating-linear-gradient(45deg,#b3aaa6 0 3px,#5a4a42 3px 4px)') + 'Out of order <b>' + c.ooo + '</b></span>' +
+        '<span><i class="fd-sd" style="background:' + B.ARRIVE + '"></i>Arriving today <b>' + c.arrReg + '</b></span>' +
+        '<span><i class="fd-sd" style="background:' + B.LATE_IN + '"></i>Late check-in <b>' + c.arrLate + '</b></span>' +
+        '<span><i class="fd-btb-pill">BTB</i>Back-to-back <b>' + c.btb + '</b></span>' +
+        '<span>' + sw('linear-gradient(#ff8f8f,#e8343a)') + 'Leaving today <b>' + (c.leaving - c.late) + '</b></span>' +
+        '<span>' + sw('linear-gradient(90deg,#f0494e 0 72%,' + B.LATE + ' 72% 100%)') + 'Late check-out <b>' + c.late + '</b></span>' + bedsKey + vipKey;
+      note = (D.building || []).length + ' rooms &middot; click a room to open it';
+    }
+    var reqBtn = '';
+    var views = '<div class="fd-views" id="fdViews">' + BLD_VIEWS.map(function (v) {
+      return '<button type="button" data-view="' + v.id + '" class="' + (v.id === ui.view ? 'is-on' : '') + '"><i class="fas ' + v.icon + '"></i>' + v.label + '</button>';
+    }).join('') + '</div>';
+    return '<div class="fd-card-head"><div class="fd-card-title">Building</div>' + views + reqBtn + '<span class="fd-card-note">' + note + '</span></div>' +
+      '<div class="fd-bv-body"><div class="fd-bv-main">' +
+      '<div class="fd-bld" id="fdBld" data-sig="' + bldSig() + ui.view + (ui.hkFocus || '') + '"></div>' +
+      '<div class="fd-bld-legend">' + legend + '</div>' +
+      '</div><div class="fd-bv-side">' + side + '</div></div>';
   }
-  // The Booking details open right here on the dashboard: the calendar page is loaded invisibly in a frame (?embed=1 shows only its modal),
-  // so every button of the details (Edit, Move room, Billing, Payment, Check in...) works as in the calendar, and the dashboard stays.
+  // ---------------- Requests (Housekeeping view): MUR (make up room) or a custom request for a room; the housekeeping staff see them until they are done
+  function buildReqMap() {
+    var m = {};
+    ui.reqs.forEach(function (q) { var e = m[q.roomNumber] || (m[q.roomNumber] = { mur: false, custom: 0, items: [] }); if (q.type === 'MUR') e.mur = true; else e.custom++; e.items.push(q); });
+    ui.reqMap = m;
+  }
+  function loadRequests() {
+    fetch('/room-requests', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || !j.success) return;
+      var sig = j.requests.map(function (q) { return q.id; }).join(',');
+      if (sig === ui.reqSig) return;
+      ui.reqSig = sig; ui.reqs = j.requests; buildReqMap();
+      if (ui.view === 'housekeeping' && D) {   // (while the switch animation is still playing, the redraw waits for it to end)
+        var bc = grid.querySelector('.c-bld');
+        if (bc && bc.classList.contains('bv-swap')) setTimeout(function () { if (ui.view === 'housekeeping') repaintBuildingCard(); }, 1400); else repaintBuildingCard();
+      }
+      if (hkrRoom) renderRoomRequests();
+      if (hkrListOpen) renderRequestList();
+    }).catch(function () { /* keep what is shown */ });
+  }
+  function toast(msg, err) {
+    var t = document.createElement('div'); t.className = 'fd-toast' + (err ? ' is-err' : ''); t.textContent = msg; document.body.appendChild(t);
+    setTimeout(function () { t.remove(); }, 2600);
+  }
+  function postJson(url, body) {
+    return fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(function (r) { return r.json(); });
+  }
+  function reqLine(q) {
+    return '<span class="hkr-badge' + (q.type === 'MUR' ? ' mur' : '') + '">' + (q.type === 'MUR' ? 'MUR' : 'REQUEST') + '</span>' + (q.type === 'MUR' ? 'Make up room' : esc(q.text || ''));
+  }
+  function reqMeta(q) { var t = ago(q.requestedAt); return esc(q.requestedBy || 'someone') + ' &middot; ' + (t === 'just now' ? t : t + ' ago'); }
+  function closeRequest(id, kind) {
+    postJson('/room-requests/' + id + '/' + kind).then(function (j) {
+      if (j && j.success) { toast(kind === 'done' ? 'Request done' : 'Request cancelled'); ui.reqSig = ''; loadRequests(); }
+      else toast((j && j.message) || 'Could not update the request', true);
+    }).catch(function () { toast('Could not update the request', true); });
+  }
+
+  var hkrEl = null, hkrRoom = null, hkrPick = null, hkrListEl = null, hkrListOpen = false;
+  function hkrBuild() {
+    if (hkrEl) return;
+    hkrEl = document.createElement('div'); hkrEl.className = 'hkr-wrap'; hkrEl.id = 'hkReq';
+    hkrEl.innerHTML = '<div class="hkr-card" role="dialog" aria-label="Request">' +
+      '<div class="hkr-head"><h3>Request</h3><button type="button" class="hkr-x" data-x aria-label="Close">&times;</button></div>' +
+      '<div class="hkr-sub" id="hkrSub"></div>' +
+      '<div class="hkr-opts"><button type="button" class="hkr-opt" data-opt="MUR"><b>MUR</b><small>Make up room</small></button>' +
+      '<button type="button" class="hkr-opt" data-opt="CUSTOM"><b>Custom request</b><small>Write what the room needs</small></button></div>' +
+      '<div class="hkr-custom" id="hkrCustom" style="display:none"><textarea id="hkrText" maxlength="300" placeholder="e.g. extra towels, extra pillow, change the bed linen..."></textarea></div>' +
+      '<div class="hkr-actions"><button type="button" class="hkr-send" id="hkrSend" disabled>Send request</button><span class="hkr-msg" id="hkrMsg"></span></div>' +
+      '<div class="hkr-sec" id="hkrSec" style="display:none">Waiting for this room</div><div class="hkr-list" id="hkrRoomList"></div></div>';
+    document.body.appendChild(hkrEl);
+    hkrEl.addEventListener('click', function (e) {
+      if (e.target === hkrEl || e.target.closest('[data-x]')) { closeRequestModal(); return; }
+      var opt = e.target.closest('.hkr-opt');
+      if (opt) { hkrPick = opt.getAttribute('data-opt'); hkrRefresh(); if (hkrPick === 'CUSTOM') document.getElementById('hkrText').focus(); return; }
+      if (e.target.id === 'hkrSend') { sendRequest(); return; }
+      var b = e.target.closest('[data-rq]'); if (b) closeRequest(b.getAttribute('data-id'), b.getAttribute('data-rq'));
+    });
+    document.getElementById('hkrText').addEventListener('input', hkrRefresh);
+  }
+  function hkrRefresh() {
+    var send = document.getElementById('hkrSend'), txt = document.getElementById('hkrText');
+    [].forEach.call(hkrEl.querySelectorAll('.hkr-opt'), function (b) { b.classList.toggle('is-on', b.getAttribute('data-opt') === hkrPick); });
+    document.getElementById('hkrCustom').style.display = hkrPick === 'CUSTOM' ? '' : 'none';
+    send.disabled = !(hkrPick === 'MUR' || (hkrPick === 'CUSTOM' && txt.value.trim()));
+  }
+  function renderRoomRequests() {
+    var list = document.getElementById('hkrRoomList'), sec = document.getElementById('hkrSec'); if (!list || !hkrRoom) return;
+    var items = ui.reqs.filter(function (q) { return q.roomNumber === String(hkrRoom.no); });
+    sec.style.display = items.length ? '' : 'none';
+    list.innerHTML = items.map(function (q) {
+      return '<div class="hkr-item"><div class="t">' + reqLine(q) + '<small>' + reqMeta(q) + '</small></div>' +
+        '<button type="button" class="done" data-rq="done" data-id="' + q.id + '">Done</button><button type="button" class="cancel" data-rq="cancel" data-id="' + q.id + '" title="Cancel the request">&times;</button></div>';
+    }).join('');
+  }
+  function openRequestModal(r) {
+    hkrBuild(); hkrRoom = r; hkrPick = null;
+    document.getElementById('hkrText').value = ''; document.getElementById('hkrMsg').textContent = ''; document.getElementById('hkrMsg').className = 'hkr-msg';
+    var state = String(r.status) === '2' ? (r.guest ? esc(r.guest) : 'Occupied') : String(r.status) === '4' ? 'To be cleaned' : String(r.status) === '3' ? 'Out of order' : 'Vacant';
+    document.getElementById('hkrSub').innerHTML = 'Room <b>' + esc(r.no) + '</b> &middot; ' + state;
+    hkrRefresh(); renderRoomRequests();
+    hkrEl.style.display = 'flex';
+  }
+  function closeRequestModal() { if (hkrEl) hkrEl.style.display = 'none'; hkrRoom = null; }
+  function sendRequest() {
+    if (!hkrRoom || !hkrPick) return;
+    var send = document.getElementById('hkrSend'), msg = document.getElementById('hkrMsg'), room = hkrRoom.no;
+    send.disabled = true; msg.className = 'hkr-msg'; msg.textContent = 'Sending...';
+    postJson('/room-requests', { roomNumber: room, type: hkrPick, text: document.getElementById('hkrText').value }).then(function (j) {
+      if (j && j.success) {
+        toast(j.duplicate ? 'MUR is already requested for Room ' + room : (hkrPick === 'MUR' ? 'MUR requested for Room ' : 'Request sent for Room ') + room);
+        ui.reqSig = ''; loadRequests(); closeRequestModal();
+      } else { msg.className = 'hkr-msg is-err'; msg.textContent = (j && j.message) || 'Could not send the request'; hkrRefresh(); }
+    }).catch(function () { msg.className = 'hkr-msg is-err'; msg.textContent = 'Could not send the request'; hkrRefresh(); });
+  }
+  // the list of every waiting request (the Requests button)
+  function renderRequestList() {
+    var box = document.getElementById('hkrListBody'); if (!box) return;
+    box.innerHTML = ui.reqs.length ? ui.reqs.map(function (q) {
+      return '<div class="hkr-item"><span class="rm">' + esc(q.roomNumber) + '</span><div class="t">' + reqLine(q) + '<small>' + reqMeta(q) + '</small></div>' +
+        '<button type="button" class="done" data-rq="done" data-id="' + q.id + '">Done</button><button type="button" class="cancel" data-rq="cancel" data-id="' + q.id + '" title="Cancel the request">&times;</button></div>';
+    }).join('') : '<div class="hkr-empty">No request is waiting.</div>';
+  }
+  function openRequestList() {
+    if (!hkrListEl) {
+      hkrListEl = document.createElement('div'); hkrListEl.className = 'hkr-wrap'; hkrListEl.id = 'hkReqList';
+      hkrListEl.innerHTML = '<div class="hkr-card" role="dialog" aria-label="Requests"><div class="hkr-head"><h3>Requests</h3><button type="button" class="hkr-x" data-x aria-label="Close">&times;</button></div>' +
+        '<div class="hkr-sub">Waiting for housekeeping &middot; oldest first</div><div class="hkr-list" id="hkrListBody"></div></div>';
+      document.body.appendChild(hkrListEl);
+      hkrListEl.addEventListener('click', function (e) {
+        if (e.target === hkrListEl || e.target.closest('[data-x]')) { hkrListEl.style.display = 'none'; hkrListOpen = false; return; }
+        var b = e.target.closest('[data-rq]'); if (b) closeRequest(b.getAttribute('data-id'), b.getAttribute('data-rq'));
+      });
+    }
+    hkrListOpen = true; renderRequestList(); hkrListEl.style.display = 'flex';
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (hkrEl && hkrEl.style.display === 'flex') closeRequestModal();
+    else if (hkrListEl && hkrListEl.style.display === 'flex') { hkrListEl.style.display = 'none'; hkrListOpen = false; }
+  });
+
+  // switch of the view / a housekeeping tile: the whole Building card is drawn again
+  function repaintBuildingCard(swap) {
+    var el = grid.querySelector('.c-bld'); if (!el || !D) return;
+    var html = cardBld();
+    sigs['c-bld'] = html;
+    el.innerHTML = html;
+    // a switch of the view: the floors rise one by one, the tiles and the legend slide in (a tile click only redraws)
+    el.classList.remove('bv-swap'); if (swap) { void el.offsetWidth; el.classList.add('bv-swap'); }
+    paintBld(!!swap);
+  }
+  grid.addEventListener('click', function (e) {
+    var vb = e.target.closest('#fdViews button[data-view]');
+    if (vb) {
+      var nv = vb.getAttribute('data-view'); if (nv === ui.view) return;
+      ui.view = nv; ui.hkFocus = null;
+      try { localStorage.setItem('fdBuildingView', ui.view); } catch (er) { /* not saved */ }
+      repaintBuildingCard(true); if (ui.view === 'housekeeping') { ui.reqSig = ''; loadRequests(); }
+      return;
+    }
+    if (e.target.closest('#fdReqBtn')) { openRequestList(); return; }
+    var hkt = e.target.closest('.fd-tile[data-hk]');
+    if (hkt) { var key = hkt.getAttribute('data-hk'); ui.hkFocus = ui.hkFocus === key ? null : key; repaintBuildingCard(); }
+  });
+  grid.addEventListener('keydown', function (e) {
+    if ((e.key !== 'Enter' && e.key !== ' ') || !e.target.closest) return;
+    var hkt = e.target.closest('.fd-tile[data-hk]');
+    if (hkt) { e.preventDefault(); var key = hkt.getAttribute('data-hk'); ui.hkFocus = ui.hkFocus === key ? null : key; repaintBuildingCard(); }
+  });
+  // The Booking details open right here on the dashboard: the calendar page is kept loaded, invisible, in ONE frame (?embed=1&warm=1 shows only
+  // its modal), so every button of the details (Edit, Move room, Billing, Payment, Check in...) works as in the calendar, the dashboard stays,
+  // and opening a booking is a message to a page that is already loaded (no waiting for the calendar to load each time).
+  var bdWrap = null, bdFrame = null, bdWarm = false, bdPending = null, bdGuard = null;
+  function bdEnsureFrame() {
+    if (bdWrap) return;
+    bdWrap = document.createElement('div'); bdWrap.id = 'bdFrameWrap';
+    bdWrap.style.cssText = 'position:fixed;inset:0;z-index:100000;visibility:hidden;pointer-events:none;background:transparent';
+    bdWrap.innerHTML = '<div id="bdFrameSpin" style="position:absolute;inset:0;display:none;align-items:center;justify-content:center;color:#e8ecef;font:600 14px Poppins,sans-serif">Opening booking&hellip;</div>' +
+      '<iframe title="Booking details" style="position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent;opacity:0" allowtransparency="true" src="/calendar?embed=1&warm=1"></iframe>';
+    document.body.appendChild(bdWrap);
+    bdFrame = bdWrap.querySelector('iframe');
+  }
+  function bdShow(on) {
+    if (!bdWrap) return;
+    var spin = document.getElementById('bdFrameSpin');
+    bdWrap.style.visibility = on ? 'visible' : 'hidden';
+    bdWrap.style.pointerEvents = on ? 'auto' : 'none';
+    bdWrap.style.background = on ? 'rgba(2,6,16,.55)' : 'transparent';
+    if (spin) spin.style.display = on ? 'flex' : 'none';
+    if (!on) bdFrame.style.opacity = '0';
+  }
+  function bdSend(req) { try { bdFrame.contentWindow.postMessage({ type: 'bd-open', kind: req.kind, id: req.id }, window.location.origin); } catch (e) { /* the guard falls back */ } }
+  window.addEventListener('message', function (e) {
+    if (!bdFrame || e.origin !== window.location.origin || !e.data || e.source !== bdFrame.contentWindow) return;
+    var t = e.data.type;
+    if (t === 'bd-warm') { bdWarm = true; if (bdPending) { bdSend(bdPending); bdPending = null; } }
+    else if (t === 'bd-ready') {
+      clearTimeout(bdGuard); bdFrame.style.opacity = '1';
+      var sp = document.getElementById('bdFrameSpin'); if (sp) sp.style.display = 'none';
+      bdWrap.style.background = 'transparent';
+    }
+    else if (t === 'bd-closed') { bdShow(false); try { load(); } catch (er) {} }
+    else if (t === 'bd-failed') { clearTimeout(bdGuard); bdPending = null; bdShow(false); }
+  });
   function openBookingHere(id, kind) {
-    kind = kind || 'openBooking';   // 'cleaning' = the Cleaning Rooms list instead of a booking (id is the room number)
-    if (document.getElementById('bdFrameWrap')) return;
-    var wrap = document.createElement('div'); wrap.id = 'bdFrameWrap';
-    wrap.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(2,6,16,.55)';
-    wrap.innerHTML = '<div id="bdFrameSpin" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#e8ecef;font:600 14px Poppins,sans-serif">Opening booking&hellip;</div>' +
-      '<iframe title="Booking details" style="position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent;opacity:0" allowtransparency="true"></iframe>';
-    document.body.appendChild(wrap);
-    var frame = wrap.querySelector('iframe'), done = false;
-    function close(reload) {
-      if (done) return; done = true; window.removeEventListener('message', onMsg); clearTimeout(guard);
-      wrap.remove(); if (reload !== false) { try { load(); } catch (e) {} }
-    }
-    function onMsg(e) {
-      if (e.origin !== window.location.origin || !e.data || e.source !== frame.contentWindow) return;
-      if (e.data.type === 'bd-ready') { clearTimeout(guard); frame.style.opacity = '1'; var sp = document.getElementById('bdFrameSpin'); if (sp) sp.remove(); wrap.style.background = 'transparent'; }
-      else if (e.data.type === 'bd-closed') close(true);
-      else if (e.data.type === 'bd-failed') close(false);
-    }
-    window.addEventListener('message', onMsg);
-    var guard = setTimeout(function () { close(false); calendarTab('/calendar', '?' + kind + '=' + encodeURIComponent(id)); }, 20000); // frame never answered: the shared calendar tab opens it (this tab stays the dashboard)
-    frame.src = '/calendar?embed=1&' + kind + '=' + encodeURIComponent(id);
+    kind = kind === 'cleaning' ? 'cleaning' : 'openBooking';   // 'cleaning' = the Cleaning Rooms list instead of a booking (id is the room number)
+    bdEnsureFrame();
+    if (bdWrap.style.visibility === 'visible') return;           // one at a time
+    bdShow(true);
+    var req = { kind: kind, id: id };
+    if (bdWarm) bdSend(req); else bdPending = req;
+    clearTimeout(bdGuard);
+    bdGuard = setTimeout(function () {                           // the page never answered: the shared calendar tab opens it (this tab stays the dashboard)
+      bdPending = null; bdShow(false);
+      calendarTab('/calendar', '?' + (kind === 'cleaning' ? 'cleaning' : 'openBooking') + '=' + encodeURIComponent(id));
+    }, 20000);
   }
+  // get the frame ready only AFTER the dashboard has finished its entrance animation (startEntry), and when the browser is idle: loading that
+  // heavy page while the cards are animating made the animation stutter. (Safety: it starts after 7 s whatever happens.)
+  var bdWarmScheduled = false;
+  function bdWarmSoon() {
+    if (bdWarmScheduled) return; bdWarmScheduled = true;
+    if (window.requestIdleCallback) window.requestIdleCallback(bdEnsureFrame, { timeout: 3000 }); else setTimeout(bdEnsureFrame, 600);
+  }
+  setTimeout(bdWarmSoon, 7000);
   // Check in / Check out open the calendar in the SAME tab the sidebar's Calendar uses (openInOwnTab, footer.ejs): never a second calendar tab.
   document.addEventListener('click', function (e) {
     var t = e.target.closest && e.target.closest('a[data-own-tab]'); if (!t || typeof openInOwnTab !== 'function') return;
@@ -349,9 +660,17 @@
     window.open(path + query, '_blank');
   }
 
+  // the building is drawn as wide as the box it sits in (the height follows the window, see .fd-bv .fd-bld .b3d in the css)
+  function bldFitRatio(el) {
+    var h = Math.min(790, Math.max(360, window.innerHeight - 297)), w = el.clientWidth;
+    return (w > 0 && h > 0) ? w / h : 0;
+  }
   function paintBld(animate) {
     var el = document.getElementById('fdBld'); if (!el || !D.building) return;
-    window.Building3D.render(el, D.building, { name: PNAME, mode: 'full', animate: !!animate, onRoom: function (r) {
+    window.Building3D.render(el, D.building, { name: PNAME, mode: 'full', view: ui.view, focus: ui.view === 'housekeeping' ? ui.hkFocus : null, animate: !!animate, fitRatio: BV ? bldFitRatio(el) : 0, requests: ui.view === 'housekeeping' ? ui.reqMap : null, onRoom: function (r) {
+      // Housekeeping view: a room does not open the booking details (they are for the front desk). Put what a click on a room should do for
+      // housekeeping here (r = { no, status, guest, bookingId, leaving, late, arriving, ... }).
+      if (ui.view === 'housekeeping') { openRequestModal(r); return; }
       if (r.bookingId) openBookingHere(r.bookingId);
       // a room with no booking (clean and empty, to be cleaned, out of order) goes to the shared calendar tab, never away from the dashboard
       else if (String(r.status) === '4') openBookingHere(r.no, 'cleaning');
@@ -406,7 +725,7 @@
   function draw(force) {
     if (!D) return;
     var cards = { 'c-res': cardRes, 'c-rooms': cardRooms, 'c-rev': cardRev, 'c-book': cardBook, 'c-cal': cardCal, 'c-bld': cardBld, 'c-cust': cardCust, 'c-act': cardAct };
-    var order = BV ? ['c-res', 'c-rev', 'c-book', 'c-bld', 'c-cust', 'c-act'] : ['c-res', 'c-rooms', 'c-rev', 'c-book', 'c-cal', 'c-cust', 'c-act'];
+    var order = BV ? ['c-bld'] : ['c-res', 'c-rooms', 'c-rev', 'c-book', 'c-cal', 'c-cust', 'c-act'];
     order.forEach(function (k, ci) {
       var el = grid.querySelector('.' + k); if (!el) return;
       var html = cards[k]().replace(/Last update <span id="fdUpd">[^<]*<\/span>/, 'Last update');
@@ -442,7 +761,7 @@
     fetch('/dashboard/full-data', { credentials: 'same-origin' }).then(function (r) { return r.json(); })
       .then(function (j) { if (j && j.success) { D = j.data; if (firstLoad) { firstLoad = false; startEntry(); } else draw(); } })
       .catch(function () { /* keep what is shown */ })
-      .then(function () { busy = false; clock(); });
+      .then(function () { busy = false; clock(); if (ui.view === 'housekeeping') loadRequests(); });
   }
   var root = document.getElementById('fd');
   var splash = null, enter = null;
@@ -460,9 +779,13 @@
     entering = true; root.classList.add('is-enter');
     draw(true);
     if (splash) { var sp = splash; splash = null; requestAnimationFrame(function () { sp.classList.add('is-out'); setTimeout(function () { sp.remove(); }, 800); }); }
-    setTimeout(function () { root.classList.remove('is-enter'); entering = false; }, 3200);
+    setTimeout(function () { root.classList.remove('is-enter'); entering = false; bdWarmSoon(); }, 3200);
   }
   var firstLoad = true;
+  if (BV) {
+    var bldResizeT = null;
+    window.addEventListener('resize', function () { clearTimeout(bldResizeT); bldResizeT = setTimeout(function () { if (D) paintBld(false); }, 200); });
+  }
   window.__refreshOnShow = load;     // back in view after a change in another tab (footer.ejs)
   clock(); setInterval(clock, 15000); load(); setInterval(load, 30000);
   document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });

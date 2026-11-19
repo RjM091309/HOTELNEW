@@ -16,10 +16,15 @@ async function checkForOverlaps(newStart, newEnd, roomId, excludeEventId) {
     // that here (this used to POST a JSON body with different field names,
     // which 404'd on every call and silently fell through to the frontend
     // fallback below every time).
+    // the local calendar DAYS of the new stay: two bookings only overlap when their days overlap - a guest who leaves on the day the next one
+    // arrives (a turnover, late check-out then late check-in...) is not an overlap, whatever the hours are
+    const localDay = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     const params = new URLSearchParams({
       roomId: roomId,
       checkIn: newStart.toISOString(),
-      checkOut: newEnd.toISOString()
+      checkOut: newEnd.toISOString(),
+      checkInDay: localDay(newStart),
+      checkOutDay: localDay(newEnd)
     });
     if (excludeEventId) params.set('excludeBookingId', excludeEventId);
 
@@ -31,7 +36,8 @@ async function checkForOverlaps(newStart, newEnd, roomId, excludeEventId) {
 
     if (response.ok) {
       const data = await response.json();
-      return data.overlaps || [];
+      // (the server sends the guest name as CUSTOMER_NAME; the messages read .title)
+      return (data.overlaps || []).map(o => ({ ...o, title: o.title || o.CUSTOMER_NAME || ('Booking #' + (o.IDNo || '')) }));
     }
   } catch (error) {
     console.error('Backend overlap check failed, falling back to frontend:', error);

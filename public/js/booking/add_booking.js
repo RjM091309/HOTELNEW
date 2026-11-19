@@ -801,6 +801,36 @@ function formatPaidAmount(input) {
 }
 
 // Function to compute total booking cost dynamically
+// Breakfast above the 2 that the room rate already includes: each person above 2 is an extra breakfast with a price of its own.
+// (Pool Villa has no breakfast tier - its breakfast follows the guests - so nothing is charged extra there.)
+function getSingleExtraBreakfast() {
+    const on = $('#includeBreakfast').is(':checked') && !(typeof isPoolVillaActive === 'function' && isPoolVillaActive());
+    const pax = on ? (parseInt($('#breakfastAdultQty').val(), 10) || 0) : 0;
+    const qty = Math.max(0, pax - 2);
+    // the kids are part of the extras (never more than the extras there are); the rest are adults
+    let kidQty = Math.max(0, parseInt($('#extraBfSingleKidQty').val(), 10) || 0);
+    if (kidQty > qty) {
+        kidQty = qty;
+        if ($('#extraBfSingleKidQty').val() !== String(kidQty)) $('#extraBfSingleKidQty').val(kidQty);
+    }
+    const adultQty = qty - kidQty;
+    const adultPrice = qty > 0 ? parseMoney($('#extraBfSinglePrice').val()) : 0;
+    const kidPrice = qty > 0 ? parseMoney($('#extraBfSingleKidPrice').val()) : 0;
+    const $wrap = $('#extraBfSingleWrap');
+    $wrap.toggle(qty > 0);
+    if (qty > 0) {
+        $('#extraBfSingleLabel').text(qty + ' extra breakfast (above 2)');
+        $('#extraBfSingleAdultQty').text(adultQty);
+        $('#extraBfSingleKidQty').attr('max', qty);
+    }
+    return {
+        pax: pax, qty: qty,
+        adultQty: adultQty, adultPrice: adultPrice, kidQty: kidQty, kidPrice: kidPrice,
+        adultTotal: adultQty * adultPrice, kidTotal: kidQty * kidPrice,
+        total: adultQty * adultPrice + kidQty * kidPrice
+    };
+}
+
 function computeTotal() {
     // Only update if NOT group booking
     if ($('#groupBookingCheckbox').is(':checked')) return;
@@ -907,6 +937,11 @@ function computeTotal() {
 
     const pickupPrice = pickupChecked ? parseMoney($('#pickupPrice').val()) : 0;
     const dropoffPrice = dropoffChecked ? parseMoney($('#dropoffPrice').val()) : 0;
+    const extraBfTotal = getSingleExtraBreakfast().total;
+    // Extra bed: beds x price of one bed
+    const extraBedTotal = $('#includeExtraBed').prop('checked')
+        ? (Math.max(0, parseInt($('#extraBedQty').val(), 10) || 0) * parseMoney($('#extraBedPrice').val()))
+        : 0;
 
     // Reservation Fee and Discount
     const reservationFeeChecked = $('#includeReservationFee').prop('checked');
@@ -923,7 +958,7 @@ function computeTotal() {
     const roomCharges = rateDetails.roomCharges;
 
     // Calculate subtotal (charges) - before discounts
-    const subtotal = roomCharges + (adultQty * adultPrice) + (kidQty * kidPrice) + pickupPrice + dropoffPrice + lateCheckoutFee;
+    const subtotal = roomCharges + (adultQty * adultPrice) + (kidQty * kidPrice) + pickupPrice + dropoffPrice + extraBfTotal + extraBedTotal + lateCheckoutFee;
     
     // Calculate Senior/PWD discount (percentage of ROOM CHARGES ONLY, not services)
     if (seniorPwdDiscountChecked && roomCharges > 0) {
@@ -1291,6 +1326,14 @@ $(document).ready(function () {
 
     $('#includeDropoff').on('change', function () {
         $('#dropoffWrapper').toggle(this.checked);
+    });
+
+    $('#includeExtraBed').on('change', function () {
+        $('#extraBedWrapper').toggle(this.checked);
+        if (this.checked) {
+            if (!(parseInt($('#extraBedQty').val(), 10) > 0)) $('#extraBedQty').val(1);
+            if ($('#extraBedPrice').val() === '') $('#extraBedPrice').val(1500);
+        }
     });
 
     // Flight number / passenger count - required when either Pick-up or Drop-off is checked
@@ -1873,8 +1916,12 @@ $(document).ready(function () {
                           .show();
                     } else {
                         const tier = k === 'two' ? '2-breakfast' : '1-breakfast';
+                        const xb = getSingleExtraBreakfast();
+                        const extraText = xb.qty > 0
+                            ? ` The first 2 are inside the rate; the other <b>${xb.qty}</b> ${xb.qty === 1 ? 'is an extra breakfast' : 'are extra breakfasts'} that you pay for (set the price next to the number).`
+                            : ' This is already inside the room total; no separate breakfast charge is added.';
                         $n.removeClass('booking-note--warn').addClass('booking-note--active')
-                          .html(`<div>Nightly rate is now on the <b><u>${tier}</u></b> tier &mdash; higher than the No-BF base. This is already inside the room total; no separate breakfast charge is added.</div>`)
+                          .html(`<div>Nightly rate is now on the <b><u>${tier}</u></b> tier &mdash; higher than the No-BF base.${extraText}</div>`)
                           .show();
                     }
                 }
@@ -2360,7 +2407,9 @@ $(document).ready(function () {
         #breakfastAdultQty, #breakfastAdultPrice,
         #breakfastKidQty, #breakfastKidPrice,
         #pickupPrice, #dropoffPrice,
-        #includePickup, #includeDropoff
+        #includePickup, #includeDropoff,
+        #includeExtraBed, #extraBedQty, #extraBedPrice,
+        #includeBreakfast, #extraBfSinglePrice, #extraBfSingleKidQty, #extraBfSingleKidPrice
     `, function (e) {
         computeTotal();
     });
@@ -2425,8 +2474,6 @@ $(document).ready(function () {
       
       // Debug logging
       console.log('Voucher Calculation Debug:', {
-        priceValue: priceValue,
-        roomRateStr: roomRateStr,
         roomRate: roomRate,
         nights: nights,
         roomCharges: roomCharges
@@ -2442,7 +2489,10 @@ $(document).ready(function () {
       const dropoff = $('#includeDropoff').is(':checked') ? (parseFloat($('#dropoffPrice').val().toString().replace(/,/g, '')) || 0) : 0;
       const lateCheckoutFee = parseFloat($('#lateCheckoutFee').val().toString().replace(/,/g, '')) || 0;
       // Exclude late checkout fee from servicesTotal as it's displayed separately
-      const servicesTotal = parseFloat((breakfastTotal + pickup + dropoff).toFixed(2));
+      const extraBedQtyNow = $('#includeExtraBed').is(':checked') ? Math.max(0, parseInt($('#extraBedQty').val(), 10) || 0) : 0;
+      const extraBedPriceNow = $('#includeExtraBed').is(':checked') ? (parseFloat(($('#extraBedPrice').val() || '0').toString().replace(/,/g, '')) || 0) : 0;
+      const extraBfNow = getSingleExtraBreakfast();
+      const servicesTotal = parseFloat((breakfastTotal + pickup + dropoff + extraBfNow.total + extraBedQtyNow * extraBedPriceNow).toFixed(2));
 
       const bookingData = {
         voucherNo: $('#voucherNo').val(),
@@ -2476,6 +2526,14 @@ $(document).ready(function () {
         discount: $('#includeDiscount').is(':checked') ? $('#discountAmount').val() : 0,
         roomCharges: roomCharges.toFixed(2),
         servicesTotal: servicesTotal.toFixed(2),
+        extraBedQty: extraBedQtyNow,
+        extraBedPrice: extraBedPriceNow,
+        extraBfQty: extraBfNow.qty,
+        extraBfTotal: extraBfNow.total,
+        extraBfAdultQty: extraBfNow.adultQty,
+        extraBfAdultTotal: extraBfNow.adultTotal,
+        extraBfKidQty: extraBfNow.kidQty,
+        extraBfKidTotal: extraBfNow.kidTotal,
         directReservationFlag: isDirectReservation ? 'true' : 'false',
       };
         

@@ -83,6 +83,8 @@ $(document).ready(function () {
     const breakfastKidId = $('#groupBreakfastKidId').val();
     const breakfastIndividual = $('#groupBreakfastIndividual').is(':checked');
     const extraBf = typeof window.getGroupExtraBreakfast === 'function' ? window.getGroupExtraBreakfast() : null;
+    // extra bed: the beds of each selected room (same order as the rooms) and the price of one bed
+    const extraBed = ($('#groupIncludeExtraBed').is(':checked') && typeof window.getGroupExtraBed === 'function') ? window.getGroupExtraBed() : null;
     
     const pickupServiceId = $('#groupPickupServiceId').val();
     const pickupPrice = $('#groupPickupPrice').val();
@@ -93,6 +95,7 @@ $(document).ready(function () {
     const includePickup = $('#groupIncludePickup').is(':checked');
     const includeDropoff = $('#groupIncludeDropoff').is(':checked');
     const flightNumber = $('#groupFlightNumber').val();
+    const dropoffFlightNumber = $('#groupDropoffFlightNumber').val();
     const passengerCount = $('#groupPassengerCount').val();
 
     if (!daterange || !groupName) {
@@ -169,11 +172,13 @@ $(document).ready(function () {
       return;
     }
 
-    if ((includePickup || includeDropoff) && (!flightNumber || !flightNumber.trim() || !passengerCount)) {
+    if ((includePickup && (!flightNumber || !flightNumber.trim())) ||
+        (includeDropoff && (!dropoffFlightNumber || !dropoffFlightNumber.trim())) ||
+        ((includePickup || includeDropoff) && !passengerCount)) {
       Swal.fire({
         icon: 'error',
         title: 'Flight Info Required',
-        text: 'Please enter the Flight Number and Number of Passengers for Pick-up/Drop-off.',
+        text: 'Please enter the Flight Number (Pick-up and / or Drop-off) and Number of Passengers.',
       });
       return;
     }
@@ -217,12 +222,15 @@ $(document).ready(function () {
       // same order as selectedRooms; charged once per booking.
       breakfastExtraPerRoom: JSON.stringify(extraBf ? extraBf.perRoom : []),
       breakfastExtraAdultPrice: extraBf ? extraBf.adultPrice : 0,
+      extraBedPerRoom: JSON.stringify(extraBed ? extraBed.perRoom : []),
+      extraBedPrice: extraBed ? extraBed.price : 0,
       breakfastExtraKidPrice: extraBf ? extraBf.kidPrice : 0,
       pickupServiceId,
       pickupPrice,
       dropoffServiceId,
       dropoffPrice,
       flightNumber,
+      dropoffFlightNumber,
       passengerCount,
       paidAmount,
       discount,
@@ -309,7 +317,8 @@ $(document).ready(function () {
         const pickupPrice = $('#groupIncludePickup').is(':checked') ? parseFloat($('#groupPickupPrice').val()) || 0 : 0;
         const dropoffPrice = $('#groupIncludeDropoff').is(':checked') ? parseFloat($('#groupDropoffPrice').val()) || 0 : 0;
         // Exclude late checkout fee from servicesTotal as it's displayed separately
-        const servicesTotal = breakfastTotalWithIndividual + pickupPrice + dropoffPrice;
+        const extraBedTotalNow = extraBed ? extraBed.total : 0;
+        const servicesTotal = breakfastTotalWithIndividual + pickupPrice + dropoffPrice + extraBedTotalNow;
 
         // Use confirmation number from response as voucher number
         // If no confirmation number in response, fallback to auto-generated
@@ -333,12 +342,17 @@ $(document).ready(function () {
           dateFrom: dateFrom,
           dateTo: dateTo,
           roomSummary: roomNumbersForVoucher || 'No rooms selected',
-          breakfastAdult: $('#groupBreakfastAdultQty').val() || 0,
-          breakfastKid: $('#groupBreakfastKidQty').val() || 0,
+          // people of ALL the rooms (the form asks per room): same meaning as the voucher of a saved group
+          breakfastAdult: $('#groupIncludeBreakfast').is(':checked') ? adultQty * numRooms : 0,
+          breakfastKid: $('#groupIncludeBreakfast').is(':checked') ? kidQty * numRooms : 0,
           breakfastAdultPrice: adultPrice,
           breakfastKidPrice: kidPrice,
           pickup: pickupPrice,
           dropoff: dropoffPrice,
+          breakfastExtraQty: extraBf ? extraBf.perRoom.reduce((n, r) => n + r.a + r.k, 0) : 0,
+          breakfastExtraTotal: extraBf ? extraBf.total : 0,
+          extraBedQty: extraBed ? extraBed.totalQty : 0,
+          extraBedTotal: extraBed ? extraBed.total : 0,
           remarks: $('#groupRemarks').val() || '',
           total: numericTotal,
           paidAmount: numericPaid,

@@ -294,26 +294,34 @@ function isFloorResourceId(resourceId) {
   return false;
 }
 
-// A valid highlight/selection must start in the PM slot (check-in in the
-// evening) and land its check-out in the AM slot of a later day. Starting
-// the drag in the AM slot (e.g. an AM-to-PM same-day highlight) is not a
-// valid stay and must be blocked before any booking modal is opened.
-function isValidCheckInSelectionStart(start) {
-  return new Date(start).getHours() >= 12;
+// A highlight on the calendar can start in the 1st (AM) OR the 2nd (PM) box of a day and can stop in the 1st or the 2nd box of a LATER day: the
+// stay is always made as a Regular Check-in / Regular Check-out (check-in 3 PM, check-out 12 noon). Whether the check-out is late is changed
+// afterwards in the Booking Details. The only thing a selection needs is a check-out on a later day than the check-in.
+function selectionHasCheckoutOnLaterDay(start, end) {
+  const s = new Date(start); s.setHours(0, 0, 0, 0);
+  const e = normalizeSelectionEnd(end); e.setHours(0, 0, 0, 0);
+  return e.getTime() > s.getTime();
+}
+
+// A selection that starts in the AM box starts the same day's check-in: treat it as the PM (check-in) slot of that day.
+function normalizeSelectionStart(start) {
+  const d = new Date(start);
+  if (d.getHours() < 12) d.setHours(12, 0, 0, 0);
+  return d;
 }
 
 function showInvalidCheckInSelectionError() {
   if (typeof Swal !== 'undefined') {
     Swal.fire({
-      title: 'Invalid Check-in Selection',
-      text: 'Check-in must start on the PM slot, with check-out landing on the AM slot of a later day. Please start your selection from the PM half of the day.',
+      title: 'Select a later day',
+      text: 'Start on the check-in day and drag to a later day for the check-out (the 1st or the 2nd box both work). The booking is made as a regular check-in and check-out; a Late Check-out is set in the Booking Details.',
       icon: 'warning',
       confirmButtonText: 'OK',
       background: '#2a3135',
       color: '#ffffff'
     });
   } else {
-    alert('Check-in must start on the PM slot, with check-out on the AM slot of a later day.');
+    alert('Start on the check-in day and drag to a later day for the check-out. A Late Check-out is set in the Booking Details.');
   }
 }
 
@@ -387,9 +395,8 @@ function continueCalendarSelectFlow(info, modal, today) {
     return;
   }
 
-  // Check-in must start on the PM slot - an AM-started drag never proceeds,
-  // regardless of where it stops.
-  if (!isValidCheckInSelectionStart(info.start)) {
+  // The check-out has to be on a later day than the check-in (either box of either day).
+  if (!selectionHasCheckoutOnLaterDay(info.start, info.end)) {
     showInvalidCheckInSelectionError();
     calendar.unselect();
     resetGroupSelectState();
@@ -405,12 +412,13 @@ function continueCalendarSelectFlow(info, modal, today) {
       calendar.unselect();
       return;
     }
-    groupSelectDateRange = { start: new Date(info.start), end: new Date(info.end) };
+    const groupStart = normalizeSelectionStart(info.start), groupEnd = normalizeSelectionEnd(info.end);
+    groupSelectDateRange = { start: new Date(groupStart), end: new Date(groupEnd) };
 
     calendar.unselect();
 
-    checkCalendarRoomsAvailability(roomIds, info.start, info.end).then(function(result) {
-      handleGroupSelectAvailabilityResult(result, roomIds, info.start, info.end);
+    checkCalendarRoomsAvailability(roomIds, groupStart, groupEnd).then(function(result) {
+      handleGroupSelectAvailabilityResult(result, roomIds, groupStart, groupEnd);
     });
 
     return;
@@ -420,7 +428,7 @@ function continueCalendarSelectFlow(info, modal, today) {
   // Block before opening Add Booking if the room already has an Early Check-In
   // arriving the same day this stay would check out.
   if (typeof window.calendarSelectionEarlyCheckInConflict === 'function') {
-    const eci = window.calendarSelectionEarlyCheckInConflict(info.resource.id, info.end);
+    const eci = window.calendarSelectionEarlyCheckInConflict(info.resource.id, normalizeSelectionEnd(info.end));
     if (eci) {
       calendar.unselect();
       if (typeof Swal !== 'undefined') {
@@ -440,26 +448,9 @@ function continueCalendarSelectFlow(info, modal, today) {
     }
   }
 
-  // With 12-hour slots, the raw exclusive end lands on either boundary of a
-  // day: 12:00 means the drag stopped inside that day's AM slot (a regular,
-  // morning checkout) - 00:00 means it stopped inside the PREVIOUS day's PM
-  // slot (a late, afternoon/evening checkout). Only the PM-stop case is a
-  // late checkout; a clean PM check-in to AM check-out needs no confirmation
-  // at all and proceeds straight to Add Booking as Regular Check Out.
-  const dragStoppedInPmSlot = new Date(info.end).getHours() === 0;
-
-  if (!dragStoppedInPmSlot) {
-    openAddBookingModalForSelection(info, modal, today, false);
-    return;
-  }
-
-  confirmLateCheckoutSelection().then(function(confirmed) {
-    if (!confirmed) {
-      calendar.unselect();
-      return;
-    }
-    openAddBookingModalForSelection(info, modal, today, true);
-  });
+  // Stopping in the 1st or the 2nd box of the check-out day both make a REGULAR check-out; the booking is changed to a Late Check-out later,
+  // in the Booking Details (no question here any more).
+  openAddBookingModalForSelection(info, modal, today, false);
 }
 
 // Opens the Add Booking modal for a confirmed single-room selection,
@@ -525,7 +516,7 @@ function openAddBookingModalForSelection(info, modal, today, lateCheckout) {
   if (!usedHighlight) {
     // Use the calendar selection dates for normal selections
     modal.data('calendar-room-id', info.resource.id);
-    modal.data('calendar-start', info.start);
+    modal.data('calendar-start', normalizeSelectionStart(info.start));
     modal.data('calendar-end', normalizeSelectionEnd(info.end));
   }
 
@@ -3331,12 +3322,12 @@ const findHeader = setInterval(() => {
           calendar.unselect();
           return;
         }
-        if (!isValidCheckInSelectionStart(info.start)) {
+        if (!selectionHasCheckoutOnLaterDay(info.start, info.end)) {
           showInvalidCheckInSelectionError();
           calendar.unselect();
           return;
         }
-        toggleGroupCreateRoom(info.resource.id, info.start, info.end);
+        toggleGroupCreateRoom(info.resource.id, normalizeSelectionStart(info.start), normalizeSelectionEnd(info.end));
         calendar.unselect();
         return;
       }
@@ -4987,35 +4978,71 @@ window.toggleLegend = toggleLegend;
 
 
 // Loaded inside the Dashboard's frame (?embed=1): show only the Booking details modal over a transparent page.
-if (window.parent !== window && /[?&]embed=1/.test(window.location.search)) document.documentElement.setAttribute('data-bd-embed', '1');
+if (window.parent !== window && /[?&]embed=1\b/.test(window.location.search)) document.documentElement.setAttribute('data-bd-embed', '1');
 
 // Links from the notification bell: /calendar?cleaning=<room> opens the Cleaning Rooms list, /calendar?openBooking=<id> opens that booking's details.
+// ?embed=1 = this page is loaded inside a frame on the Dashboard: only the modal shows (see calendar.css) and the parent is told when it opened / closed.
+// ?embed=1&warm=1 = the Dashboard keeps this page ready in the background: it says 'bd-warm' when it can open a booking at once, and then
+// opens whatever the Dashboard asks for with a 'bd-open' message (no page load while the user waits).
 (function () {
+  const params = new URLSearchParams(window.location.search);
+  const embed = params.get('embed') === '1' && window.parent !== window;
+  const tell = (type) => { try { window.parent.postMessage({ type }, window.location.origin); } catch (e) { /* ignore */ } };
+
+  // tells the Dashboard when the modal appeared ('bd-ready') and when it is gone for good ('bd-closed')
+  let watching = null;
+  function watch() {
+    if (watching) clearInterval(watching);
+    let seen = false, gone = 0, waited = 0;
+    watching = setInterval(function () {
+      const open = document.querySelectorAll('.modal.show, .swal2-container').length > 0;
+      if (open) { gone = 0; if (!seen) { seen = true; tell('bd-ready'); } return; }
+      if (seen) { if (++gone >= 6) { clearInterval(watching); watching = null; tell('bd-closed'); } }   // ~0.9 s without any window: a window that opens another one is not "closed"
+      else if (++waited > 130) { clearInterval(watching); watching = null; tell('bd-failed'); }          // nothing opened (booking not found)
+    }, 150);
+  }
+
+  function openNow(kind, id) {
+    try {
+      if (kind === 'cleaning' && typeof openCleaningRoomsDialog === 'function') openCleaningRoomsDialog();
+      else if (kind !== 'cleaning' && typeof window.openRoomMenuModal === 'function') window.openRoomMenuModal(id);
+    } catch (e) { console.warn('open from the dashboard failed', e); }
+    if (embed) watch();
+  }
+
+  // the page is ready for a booking when its scripts have defined the opener and the calendar exists (gives up waiting after 6 s)
+  function whenReady(cb) {
+    const t0 = Date.now();
+    (function check() {
+      if ((typeof window.openRoomMenuModal === 'function' && window.calendar) || Date.now() - t0 > 6000) cb();
+      else setTimeout(check, 80);
+    })();
+  }
+
   function run() {
     try {
-      const params = new URLSearchParams(window.location.search);
       const cleaning = params.get('cleaning'), bookingId = params.get('openBooking');
-      if (!cleaning && !bookingId) return;
-      // ?embed=1 = loaded inside a frame on the Dashboard: only the modal shows (see calendar.css), and the parent is told when it opened / closed
-      const embed = params.get('embed') === '1' && window.parent !== window;
       if (embed) document.documentElement.setAttribute('data-bd-embed', '1');
-      const tell = (type) => { try { window.parent.postMessage({ type }, window.location.origin); } catch (e) { /* ignore */ } };
+      if (!cleaning && !bookingId) {
+        if (embed && params.get('warm') === '1') whenReady(function () { tell('bd-warm'); });
+        return;
+      }
       const url = new URL(window.location.href); url.searchParams.delete('cleaning'); url.searchParams.delete('openBooking');
       window.history.replaceState({}, '', url.toString());
-      setTimeout(function () {
-        if (cleaning && typeof openCleaningRoomsDialog === 'function') openCleaningRoomsDialog();
-        else if (bookingId && typeof window.openRoomMenuModal === 'function') window.openRoomMenuModal(bookingId);
-        if (embed) {
-          let seen = false, gone = 0, waited = 0;
-          const timer = setInterval(function () {
-            const open = document.querySelectorAll('.modal.show, .swal2-container').length > 0;
-            if (open) { gone = 0; if (!seen) { seen = true; tell('bd-ready'); } return; }
-            if (seen) { if (++gone >= 3) { clearInterval(timer); tell('bd-closed'); } }
-            else if (++waited > 40) { clearInterval(timer); tell('bd-failed'); } // nothing opened (booking not found)
-          }, 300);
-        }
-      }, 900);
+      const go = function () { openNow(cleaning ? 'cleaning' : 'openBooking', cleaning || bookingId); };
+      if (embed) whenReady(go); else setTimeout(go, 900);   // the shared calendar tab keeps its small wait
     } catch (e) { console.warn('calendar deep link failed', e); }
   }
-  if (document.readyState === 'complete') run(); else window.addEventListener('load', run);
+  // the kept-ready page does not wait for the whole page to finish loading (images, sockets...): it says 'bd-warm' as soon as the scripts
+  // that open a booking exist; the other ways in (a link, the shared calendar tab) wait for the load as before
+  if (embed && params.get('warm') === '1') { document.documentElement.setAttribute('data-bd-embed', '1'); whenReady(function () { tell('bd-warm'); }); }
+  else if (document.readyState === 'complete') run(); else window.addEventListener('load', run);
+
+  // the Dashboard asks this (kept-ready) page for a booking
+  if (embed) {
+    window.addEventListener('message', function (e) {
+      if (e.origin !== window.location.origin || e.source !== window.parent || !e.data || e.data.type !== 'bd-open') return;
+      openNow(e.data.kind === 'cleaning' ? 'cleaning' : 'openBooking', e.data.id);
+    });
+  }
 })();

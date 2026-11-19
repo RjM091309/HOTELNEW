@@ -78,7 +78,46 @@ async function importSeed() {
   }
 }
 
-module.exports = { importSeed, exportSeed };
+// ---- 11th floor of Clark Central (rooms 1101-1117, from the floor plan) -------------------------------------------------------------
+// 6 rooms on the front (veranda) side: 1101 (right end) ... 1106 (left end), and 11 on the back (balcony) side: 1107 (left end) ... 1117
+// (right end). Room types are existing ones of the property (rates come with the type): the front rooms and 1107 have two beds -> '2 King VIP',
+// the other back rooms have one bed -> 'Queen Bedroom'. Change a room's type later in Settings > Rooms if the plan says otherwise.
+// Creates only what is missing and never touches a room that exists, so it is safe to run at every start of the server.
+const FLOOR_11 = [
+  ['1101', '2 King VIP'], ['1102', '2 King VIP'], ['1103', '2 King VIP'], ['1104', '2 King VIP'], ['1105', '2 King VIP'], ['1106', '2 King VIP'],
+  ['1107', '2 King VIP'],
+  ['1108', 'Queen Bedroom'], ['1109', 'Queen Bedroom'], ['1110', 'Queen Bedroom'], ['1111', 'Queen Bedroom'], ['1112', 'Queen Bedroom'],
+  ['1113', 'Queen Bedroom'], ['1114', 'Queen Bedroom'], ['1115', 'Queen Bedroom'], ['1116', 'Queen Bedroom'], ['1117', 'Queen Bedroom']
+];
+
+async function ensureFloor11() {
+  const [property] = await q('SELECT IDNo FROM property WHERE CODE = ?', [CODE]);
+  if (!property) return 0;
+  const existing = new Set((await q('SELECT ROOM_NUMBER AS n FROM room WHERE PROPERTY_ID = ?', [property.IDNo])).map((r) => String(r.n)));
+  const missing = FLOOR_11.filter(([no]) => !existing.has(no));
+  if (!missing.length) return 0;
+  let created = 0;
+  for (const [no, typeName] of missing) {
+    const [type] = await q('SELECT IDNo FROM room_type WHERE PROPERTY_ID = ? AND NAME = ? LIMIT 1', [property.IDNo, typeName]);
+    if (!type) { console.warn(`Clark Central 11F: room type '${typeName}' not found - room ${no} not created.`); continue; }
+    // a room of that type is the model: same price, capacity, beds, description
+    const [model] = await q('SELECT * FROM room WHERE PROPERTY_ID = ? AND ROOM_TYPE_ID = ? AND ACTIVE = 1 ORDER BY ROOM_NUMBER LIMIT 1', [property.IDNo, type.IDNo]);
+    if (!model) { console.warn(`Clark Central 11F: no room of type '${typeName}' to copy - room ${no} not created.`); continue; }
+    const row = {
+      ...strip(model, 'IDNo'),
+      ROOM_NUMBER: no, ROOM_FLOOR: 11, ROOM_STATUS: '1', ROOM_MAINTENANCE_STATUS: 'Clean', ROOM_IMAGE: null,
+      ENCODED_DT: new Date(), EDITED_BY: null, EDITED_DT: null, ACTIVE: 1, REQ_CLEANING: 0,
+      CLEAN_UP_DEVICE_ID: null, DND_DEVICE_ID: null, HSENSOR_DEVICE_ID: null, CHOLDER_DEVICE_ID: null
+    };
+    const cols = Object.keys(row);
+    await q(`INSERT INTO room (${cols.map((c) => `\`${c}\``).join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`, cols.map((c) => row[c]));
+    created++;
+  }
+  if (created) console.log(`Clark Central 11F: created ${created} room(s) (${missing.map((m) => m[0]).join(', ')}).`);
+  return created;
+}
+
+module.exports = { importSeed, exportSeed, ensureFloor11 };
 
 if (require.main === module) {
   (process.argv[2] === 'export' ? exportSeed() : importSeed())

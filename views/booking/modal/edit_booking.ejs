@@ -2035,16 +2035,26 @@ function loadEditExistingServices(bookingId) {
         $('#edit_checkInStatus').on('focus', function(){ prevCI = $(this).val(); });
         $('#edit_checkOutStatus').on('focus', function(){ prevCO = $(this).val(); });
 
+        // Same as Add Booking: "Regular Check-in cannot directly follow a Late Check-out" - on OK the booking becomes a Late Check-in by itself
+        const needsLateCheckIn = (result) => /^Regular Check-in cannot directly follow/.test(String(result.reason || ''));
+        const makeLateCheckIn = function(){
+            $('#edit_checkInStatus').val('0');
+            prevCI = '0';
+            $('#edit_checkInStatus').trigger('change');
+        };
+
         $('#edit_checkInStatus').on('change', async function(){
             const result = await validateAdjacencyOnDropdown();
             if (!result.valid) {
+                const auto = needsLateCheckIn(result);
+                const $el = $(this), back = prevCI;
                 Swal.fire({
                     title: 'Not Allowed',
-                    html: result.reason,
+                    html: result.reason + (auto ? '<br><br><b>Press OK: this booking becomes a Late Check-in.</b>' : ''),
                     icon: 'error',
                     confirmButtonText: 'OK'
-                });
-                $(this).val(prevCI);
+                }).then(() => { if (auto) makeLateCheckIn(); else $el.val(back); });
+                if (!auto) $(this).val(prevCI);
                 return;
             }
             prevCI = $(this).val();
@@ -2053,13 +2063,15 @@ function loadEditExistingServices(bookingId) {
         $('#edit_checkOutStatus').on('change', async function(){
             const result = await validateAdjacencyOnDropdown();
             if (!result.valid) {
+                const auto = needsLateCheckIn(result);
+                const $el = $(this), back = prevCO, chosen = $(this).val();
                 Swal.fire({
                     title: 'Not Allowed',
-                    html: result.reason,
+                    html: result.reason + (auto ? '<br><br><b>Press OK: this booking becomes a Late Check-in.</b>' : ''),
                     icon: 'error',
                     confirmButtonText: 'OK'
-                });
-                $(this).val(prevCO);
+                }).then(() => { if (auto) { prevCO = chosen; makeLateCheckIn(); } else $el.val(back); });
+                if (!auto) $(this).val(prevCO);
                 return;
             }
 

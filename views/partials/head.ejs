@@ -37,6 +37,7 @@
 			var pin = sessionStorage.getItem('tab_property');
 			if (pin) {
 				window.__tabProperty = pin;
+				if (!ps) { try { u.searchParams.set('p', pin); window.history.replaceState(window.history.state, '', u.pathname + u.search + u.hash); } catch (e) { /* ignore */ } }   // the address always names the pin: windows opened from this page (receipts, vouchers) inherit it through the referer
 				if (pin !== propertyCode) {      // this page was drawn for the cookie's property: ask for the pinned one (once)
 					var last = Number(sessionStorage.getItem('tab_property_fix') || 0);
 					if (Date.now() - last > 5000) { sessionStorage.setItem('tab_property_fix', String(Date.now())); u.searchParams.set('p', pin); window.location.replace(u.toString()); }

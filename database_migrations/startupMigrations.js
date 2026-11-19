@@ -1095,6 +1095,30 @@ async function runBookingActualTimesMigration() {
 // BOOKING_ID -> booking.PROPERTY_ID or ROOM_ID/ROOM_TYPE_ID -> room(_type).PROPERTY_ID
 // and needs no column of its own. See models/propertyModel.js and
 // middleware/m_auth.js for how req.propertyId gets resolved per-request.
+// Room requests of the Housekeeping view: "MUR" (make up room) or a custom request for a room, seen by the housekeeping staff until it is done.
+async function runRoomRequestMigrations() {
+  const created = await ensureTable('room_request', `
+    CREATE TABLE IF NOT EXISTS room_request (
+      IDNo INT AUTO_INCREMENT PRIMARY KEY,
+      PROPERTY_ID INT NOT NULL,
+      ROOM_ID INT NOT NULL,
+      ROOM_NUMBER VARCHAR(20) NOT NULL,
+      REQUEST_TYPE VARCHAR(10) NOT NULL COMMENT 'MUR = make up room, CUSTOM = a typed request',
+      REQUEST_TEXT VARCHAR(500) NULL,
+      STATUS VARCHAR(12) NOT NULL DEFAULT 'pending' COMMENT 'pending, done or cancelled',
+      REQUESTED_BY INT NULL,
+      REQUESTED_BY_NAME VARCHAR(120) NULL,
+      REQUESTED_DT DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      DONE_BY INT NULL,
+      DONE_BY_NAME VARCHAR(120) NULL,
+      DONE_DT DATETIME NULL,
+      KEY idx_room_request_property_status (PROPERTY_ID, STATUS),
+      KEY idx_room_request_room (ROOM_ID, STATUS)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  if (created) console.log('✅ Created table: room_request');
+}
+
 async function runPropertyMigrations() {
   const created = await ensureTable('property', `
     CREATE TABLE property (
@@ -1279,10 +1303,12 @@ async function runStartupMigrations() {
   await runCheckInNotifierMigrations();
   await runPaymentShiftMigrations();
   await runPropertyMigrations();
+  await runRoomRequestMigrations();
   // Clark Central was created by hand on the dev database: create it once from seed_clark_central.json when this database has no such property.
   // Never stops the app from starting (the import is one transaction, so a failure leaves nothing half-made).
   try {
     await require('./seed_clark_central').importSeed();
+    await require('./seed_clark_central').ensureFloor11();   // the 11th floor (rooms 1101-1117): only what is missing
   } catch (error) {
     console.error('⚠️ Clark Central seed failed (app keeps starting):', error.message);
   }

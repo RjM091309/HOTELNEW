@@ -2644,6 +2644,11 @@ modalStyle.textContent = `
         border: 1px solid color-mix(in srgb, var(--property-accent, #e8590c) 26%, #2a3042) !important; color: #e8ecf5 !important; }
     html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-card-title, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .info-section-heading, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .extra-services-section h6, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .info-section > h6, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .discount-section .section-header {
         color: color-mix(in srgb, var(--property-accent, #e8590c) 78%, #ffffff) !important; border-bottom-color: color-mix(in srgb, var(--property-accent, #e8590c) 34%, transparent) !important; }
+    /* Transfer History (the timeline of the rooms the guest moved through): dark like the other cards, readable text */
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} #timeline { background: linear-gradient(135deg, color-mix(in srgb, var(--property-accent, #e8590c) 10%, #181c28) 0%, #141824 62%) !important; border: 1px solid color-mix(in srgb, var(--property-accent, #e8590c) 26%, #2a3042) !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} #timeline h6 { color: #e8ecf5 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} #timeline ol { background: #4a5269 !important; }
+    html[data-theme="dark"] #dynamicRoomModal_${bookingId} #timeline li .transfer-date { color: #a8b0c4 !important; }
     html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-icon { background: color-mix(in srgb, var(--property-accent, #e8590c) 20%, transparent) !important; color: color-mix(in srgb, var(--property-accent, #e8590c) 75%, #ffffff) !important; }
     html[data-theme="dark"] #dynamicRoomModal_${bookingId} .info-item label, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-messages-label, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .text-muted, html[data-theme="dark"] #dynamicRoomModal_${bookingId} small.text-muted { color: #8b93a7 !important; }
     html[data-theme="dark"] #dynamicRoomModal_${bookingId} .info-value, html[data-theme="dark"] #dynamicRoomModal_${bookingId} .bd-grid .info-value { color: #eef1f8 !important; }

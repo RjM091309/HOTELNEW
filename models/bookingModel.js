@@ -1,6 +1,6 @@
 const { queryDatabasePromise, pool } = require('../config/database');
 const CalendarModel = require('./calendarModel');
-const { loadPropertyLogoDataUri } = require('../helpers/propertyBranding');
+const { loadPropertyLogoDataUri, loadPropertyInfo } = require('../helpers/propertyBranding');
 const { getMasterGroupMates } = require('../helpers/masterBilling');
 
 class BookingModel {
@@ -1762,6 +1762,12 @@ class BookingModel {
       dropoffFlightNumber,
       pickupDate,
       passengerCount,
+      extraBedQty,
+      extraBedPrice,
+      extraBfAdultQty,
+      extraBfAdultPrice,
+      extraBfKidQty,
+      extraBfKidPrice,
       // ✅ Additional for Direct Reservations
       bedCount,
       isDirectReservation,
@@ -2201,6 +2207,63 @@ class BookingModel {
                 if (err) reject(err);
                 else resolve();
               });
+            });
+          }
+        }
+
+        // Extra breakfast: the people above the 2 that the rate includes, one custom line per type (adult / kid) with its own price.
+        // The breakfast line above keeps QTY = guests (Breakfast List); these lines carry only the charge.
+        if (parseInt(breakfastAdultQty, 10) > 2) {
+          const bfLines = [
+            { name: 'Extra Breakfast (Adult)', qty: Math.max(0, Math.min(20, parseInt(extraBfAdultQty, 10) || 0)), price: Math.max(0, parseFloat(extraBfAdultPrice) || 0) },
+            { name: 'Extra Breakfast (Kid)', qty: Math.max(0, Math.min(20, parseInt(extraBfKidQty, 10) || 0)), price: Math.max(0, parseFloat(extraBfKidPrice) || 0) }
+          ];
+          for (const line of bfLines) {
+            if (line.qty > 0 && line.price > 0) {
+              const bfCost = line.qty * line.price;
+              const bfResult = await new Promise((resolve, reject) => {
+                connection.query(
+                  `INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE, CUSTOM_NAME)
+                   VALUES (?, -1, ?, ?, ?, ?, ?, 1, ?)`,
+                  [bookingId, line.qty, bfCost, paymentStatus === 'paid' ? 'paid' : 'unpaid', encodedBy, date, line.name],
+                  (err, result) => (err ? reject(err) : resolve(result))
+                );
+              });
+              if (paymentStatus === 'paid') {
+                await new Promise((resolve, reject) => {
+                  connection.query(
+                    `INSERT INTO payments (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
+                     VALUES (?, ?, ?, 'cash', 'service', ?, ?)`,
+                    [bookingId, bfResult.insertId, bfCost, date, encodedBy],
+                    (err) => (err ? reject(err) : resolve())
+                  );
+                });
+              }
+            }
+          }
+        }
+
+        // Extra bed: one custom line (beds x price of one bed) on this booking's bill, shown in Extra Services
+        const extraBedQtyNum = Math.max(0, Math.min(9, parseInt(extraBedQty, 10) || 0));
+        const extraBedPriceNum = Math.max(0, parseFloat(extraBedPrice) || 0);
+        if (extraBedQtyNum > 0 && extraBedPriceNum > 0) {
+          const bedCost = extraBedQtyNum * extraBedPriceNum;
+          const bedResult = await new Promise((resolve, reject) => {
+            connection.query(
+              `INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE, CUSTOM_NAME)
+               VALUES (?, -1, ?, ?, ?, ?, ?, 1, 'Extra Bed')`,
+              [bookingId, extraBedQtyNum, bedCost, paymentStatus === 'paid' ? 'paid' : 'unpaid', encodedBy, date],
+              (err, result) => (err ? reject(err) : resolve(result))
+            );
+          });
+          if (paymentStatus === 'paid') {
+            await new Promise((resolve, reject) => {
+              connection.query(
+                `INSERT INTO payments (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY)
+                 VALUES (?, ?, ?, 'cash', 'service', ?, ?)`,
+                [bookingId, bedResult.insertId, bedCost, date, encodedBy],
+                (err) => (err ? reject(err) : resolve())
+              );
             });
           }
         }
@@ -6035,6 +6098,22 @@ class BookingModel {
       `;
       const breakfastResult = await queryDatabasePromise(breakfastQuery, [groupId]);
 
+      // Extra breakfast (above the 2 per room that the rate includes): saved as "Extra Breakfast (adult / kid)" lines, one per room
+      const extraBfResult = await queryDatabasePromise(`
+        SELECT COALESCE(SUM(bs.QTY), 0) AS qty, COALESCE(SUM(bs.TOTAL_COST), 0) AS total
+        FROM booking_service bs
+        JOIN booking b ON bs.BOOKING_ID = b.IDNo
+        WHERE b.GROUP_BOOKING_ID = ? AND bs.ACTIVE = 1 AND bs.SERVICE_ID = -1 AND bs.CUSTOM_NAME LIKE 'Extra Breakfast (%'
+      `, [groupId]);
+
+      // Extra beds saved as "Extra Bed · Room N" lines
+      const extraBedResult = await queryDatabasePromise(`
+        SELECT COALESCE(SUM(bs.QTY), 0) AS qty, COALESCE(SUM(bs.TOTAL_COST), 0) AS total
+        FROM booking_service bs
+        JOIN booking b ON bs.BOOKING_ID = b.IDNo
+        WHERE b.GROUP_BOOKING_ID = ? AND bs.ACTIVE = 1 AND bs.SERVICE_ID = -1 AND bs.CUSTOM_NAME LIKE 'Extra Bed%'
+      `, [groupId]);
+
       // Get check-out status (0 = normal, 1 = late checkout)
       const checkoutQuery = `
         SELECT MAX(CASE WHEN b.LATE_CHECKOUT = 1 THEN 1 ELSE 0 END) AS checkOutStatus
@@ -6056,6 +6135,10 @@ class BookingModel {
         breakfastKid: parseInt(breakfastResult?.[0]?.breakfastKid || 0),
         pickup: parseFloat(breakfastResult?.[0]?.pickup || 0),
         dropoff: parseFloat(breakfastResult?.[0]?.dropoff || 0),
+        breakfastExtraQty: parseInt(extraBfResult?.[0]?.qty || 0),
+        breakfastExtraTotal: parseFloat(extraBfResult?.[0]?.total || 0),
+        extraBedQty: parseInt(extraBedResult?.[0]?.qty || 0),
+        extraBedTotal: parseFloat(extraBedResult?.[0]?.total || 0),
         total: total,
         paidAmount: paidAmount,
         balance: balance,
@@ -7795,6 +7878,7 @@ class BookingModel {
         ROOM_PAID: 0,     // optional breakdown (can be refined later)
         TOTAL_UNPAID: Math.max(0, parseFloat(details.grandTotal || 0) - parseFloat(details.totalPaid || 0)),
         imageUrl: logoDataUri,
+        ...(await loadPropertyInfo(propertyId)),
         ISSUED_BY: user?.FULLNAME || 'N/A'
       };
 
@@ -9573,6 +9657,7 @@ class BookingModel {
       const fs = require('fs');
       data.imageUrl = await loadPropertyLogoDataUri(propertyId);
       data.ISSUED_BY = user?.FULLNAME || 'N/A';
+      Object.assign(data, await loadPropertyInfo(propertyId));
 
       // Generate PDF using Playwright
       const { chromium } = require('playwright');
@@ -9613,6 +9698,7 @@ class BookingModel {
     const { data, user, propertyId } = params;
     
     try {
+      const path = require('path');
       data.imageUrl = await loadPropertyLogoDataUri(propertyId);
 
       // Generate PDF using Playwright
@@ -9642,6 +9728,9 @@ class BookingModel {
         reservationFee: data.reservationFee !== undefined ? data.reservationFee : 0,
         roomCharges: data.roomCharges !== undefined ? data.roomCharges : 0,
         servicesTotal: data.servicesTotal !== undefined ? data.servicesTotal : 0,
+        otherServices: (parseInt(data.extraBedQty, 10) > 0 && parseFloat(data.extraBedPrice) > 0)
+          ? [{ name: 'Extra Bed', qty: parseInt(data.extraBedQty, 10), price: parseInt(data.extraBedQty, 10) * parseFloat(data.extraBedPrice) }]
+          : [],
         paidAmount: paidAmount,
         balance: balance
       };
@@ -9725,6 +9814,10 @@ class BookingModel {
         breakfastKid: data.breakfastKid || 0,
         pickup: data.pickup || 0,
         dropoff: data.dropoff || 0,
+        breakfastExtraQty: parseInt(data.breakfastExtraQty || 0) || 0,
+        breakfastExtraTotal: parseFloat(data.breakfastExtraTotal || 0) || 0,
+        extraBedQty: parseInt(data.extraBedQty || 0) || 0,
+        extraBedTotal: parseFloat(data.extraBedTotal || 0) || 0,
         total: data.total || '0',
         paidAmount: data.paidAmount !== undefined ? data.paidAmount : 0,
         balance: data.balance !== undefined ? data.balance : (() => {
@@ -11884,6 +11977,18 @@ class BookingModel {
     return { perRoom, adultPrice, kidPrice, adultTotal, kidTotal };
   }
 
+  // Extra beds of a group: the beds of each room (same order as the rooms) and the price of one bed.
+  static groupExtraBeds(perRoomRaw, priceRaw) {
+    let list = perRoomRaw;
+    if (typeof list === 'string') {
+      try { list = JSON.parse(list); } catch (_) { list = []; }
+    }
+    if (!Array.isArray(list)) list = [];
+    const perRoom = list.map((q) => Math.max(0, Math.min(9, parseInt(q, 10) || 0)));
+    const price = Math.max(0, parseFloat(priceRaw) || 0);
+    return { perRoom: perRoom, price: price, total: perRoom.reduce((n, q) => n + q, 0) * price };
+  }
+
   // addGroupBooking temporarily removed per request
   static async addGroupBooking(data) {
     const {
@@ -11917,11 +12022,14 @@ class BookingModel {
       breakfastExtraPerRoom = [],
       breakfastExtraAdultPrice = 0,
       breakfastExtraKidPrice = 0,
+      extraBedPerRoom = [],
+      extraBedPrice = 0,
       pickupServiceId,
       pickupPrice,
       dropoffServiceId,
       dropoffPrice,
       flightNumber,
+      dropoffFlightNumber,
       passengerCount,
       discount = 0,
       discountRemarks = null,
@@ -12278,8 +12386,8 @@ class BookingModel {
 
         // booking
         const bookingQuery = `
-          INSERT INTO booking (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, LATE_CHECKOUT, HOLD_PENDING, REMARKS, CONFIRMATION_NUMBER, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, GROUP_BOOKING_ID, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, FLIGHT_NUMBER, PASSENGER_COUNT, IS_CONTRACTED_RATE, PROPERTY_ID)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO booking (CUSTOMER_ID, ROOM_ID, CHECK_IN_DATE, CHECK_OUT_DATE, BOOKING_STATUS, BOOKING_CHANNEL, GUESTS_COUNT, LATE_CHECKOUT, HOLD_PENDING, REMARKS, CONFIRMATION_NUMBER, ENCODED_BY, ENCODED_DT, ACTIVE, CHECK_IN_STATUS, GROUP_BOOKING_ID, AGENCY_ID, AGENCY_PAYER, IS_DIRECT_RESERVATION, FLIGHT_NUMBER, DROPOFF_FLIGHT_NUMBER, PASSENGER_COUNT, IS_CONTRACTED_RATE, PROPERTY_ID)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const processedAgencyPayer = (bookingRoute === 'agency' && agencyPayer)
           ? (agencyPayer === 'guest' ? 'guest' : 'agency')
@@ -12304,7 +12412,8 @@ class BookingModel {
           agencyId || null,
           processedAgencyPayer,
           0,
-          (pickupServiceId || dropoffServiceId) ? (flightNumber || null) : null,
+          pickupServiceId ? (flightNumber || null) : null,
+          dropoffServiceId ? (dropoffFlightNumber || flightNumber || null) : null,
           (pickupServiceId || dropoffServiceId) ? (parseInt(passengerCount) || null) : null,
           isContractedRate ? 1 : 0,
           propertyId || null
@@ -12551,6 +12660,8 @@ class BookingModel {
         // the 2 breakfasts per room are already inside the room-rate tier.
         const bfExtras = BookingModel.groupBreakfastExtras(breakfastExtraPerRoom, breakfastExtraAdultPrice, breakfastExtraKidPrice);
         const bfPerRoomUsable = bfExtras.perRoom.length === targetBookingIds.length;
+        const bedBeds = BookingModel.groupExtraBeds(extraBedPerRoom, extraBedPrice);
+        const bedPerRoomUsable = bedBeds.perRoom.length === targetBookingIds.length;
         if (parseInt(breakfastAdultQty) > 0 && breakfastAdultId) {
           const totalAdult = 0; // the extras are separate per-room lines (below)
           const serviceStatus = 'unpaid'; // Will be updated based on payment distribution
@@ -12627,6 +12738,25 @@ class BookingModel {
           }
         }
 
+        // Extra bed: one line per room that gets beds, on THAT room's own bill, like the extra breakfast.
+        if (bedPerRoomUsable && bedBeds.price > 0 && roomIds.length === targetBookingIds.length) {
+          const [bedRoomRows] = await connection.promise().query('SELECT IDNo, ROOM_NUMBER FROM room WHERE IDNo IN (?)', [roomIds]);
+          const bedRoomNo = new Map(bedRoomRows.map((r) => [String(r.IDNo), r.ROOM_NUMBER]));
+          for (let i = 0; i < targetBookingIds.length; i++) {
+            const qty = bedBeds.perRoom[i];
+            if (qty > 0) {
+              const owner = targetBookingIds[i];
+              const cost = qty * bedBeds.price;
+              await connection.promise().query(
+                `INSERT INTO booking_service (BOOKING_ID, SERVICE_ID, QTY, TOTAL_COST, STATUS, ENCODED_BY, ENCODED_DT, ACTIVE, CUSTOM_NAME)
+                 VALUES (?, -1, ?, ?, 'unpaid', ?, ?, 1, ?)`,
+                [owner, qty, cost, encodedBy, date, `Extra Bed · Room ${bedRoomNo.get(String(roomIds[i])) || roomIds[i]}`]
+              );
+              addBilling(owner, cost);
+            }
+          }
+        }
+
         // Group services used to be left out of billing.SERVICES_CHARGE (calendar / lists /
         // payments read that column), so keep it in step with the rows saved above.
         for (const [id, amount] of billingAdds) {
@@ -12656,7 +12786,9 @@ class BookingModel {
         ? parseFloat(lateCheckoutFee) * numRooms
         : 0;
       
-      const servicesTotal = breakfastAdultTotal + breakfastKidTotal + pickupTotal + dropoffTotal + lateCheckoutFeeTotal;
+      const extraBedsNow = BookingModel.groupExtraBeds(extraBedPerRoom, extraBedPrice);
+      const extraBedTotal = extraBedsNow.perRoom.length === targetBookingIds.length ? extraBedsNow.total : 0;
+      const servicesTotal = breakfastAdultTotal + breakfastKidTotal + pickupTotal + dropoffTotal + extraBedTotal + lateCheckoutFeeTotal;
 
       // console.log('🔄 Grand Total Calculation:');
       // console.log(`   totalGroupRoomCharges: ₱${totalGroupRoomCharges.toLocaleString()}`);

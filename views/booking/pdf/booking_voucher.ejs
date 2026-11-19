@@ -167,11 +167,29 @@
               lines.push('Room Accommodation');
             }
       
+            // breakfastAdult / Kid = all the guests of the breakfast; the ones above the 2 that the rate includes are extras that are paid for
             const paxTotal = (parseInt(breakfastAdult || 0) || 0) + (parseInt(breakfastKid || 0) || 0);
-            if (paxTotal > 0) lines.push(`${paxTotal} Pax Breakfast Included`);
+            const exBfQty = (typeof extraBfQty !== 'undefined' ? parseInt(extraBfQty) : 0) || 0;
+            const exBfTotal = (typeof extraBfTotal !== 'undefined' ? parseFloat(extraBfTotal) : 0) || 0;
+            const includedPax = Math.max(0, paxTotal - exBfQty);
+            if (includedPax > 0) lines.push(`${includedPax} Pax Breakfast Included`);
       
-            if (pickup && parseFloat(pickup) > 0) lines.push('With Pick-Up');
-            if (dropoff && parseFloat(dropoff) > 0) lines.push('With Drop-off');
+            // a line with a price: the name on the left, the price at the right edge so all prices line up
+            const money = (n) => 'PHP ' + (parseFloat(n) || 0).toLocaleString();
+            const priced = (label, n) => '<span style="display:flex;justify-content:space-between;gap:12px;"><span>' + label + '</span><span style="white-space:nowrap;">' + money(n) + '</span></span>';
+            // adults and kids have their own price: one line each when the split is known
+            const exAQty = (typeof extraBfAdultQty !== 'undefined' ? parseInt(extraBfAdultQty) : 0) || 0;
+            const exATotal = (typeof extraBfAdultTotal !== 'undefined' ? parseFloat(extraBfAdultTotal) : 0) || 0;
+            const exKQty = (typeof extraBfKidQty !== 'undefined' ? parseInt(extraBfKidQty) : 0) || 0;
+            const exKTotal = (typeof extraBfKidTotal !== 'undefined' ? parseFloat(extraBfKidTotal) : 0) || 0;
+            if (exAQty + exKQty > 0) {
+              if (exAQty > 0) lines.push(priced(`${exAQty} Extra Breakfast (Adult)`, exATotal));
+              if (exKQty > 0) lines.push(priced(`${exKQty} Extra Breakfast (Kid)`, exKTotal));
+            } else if (exBfQty > 0) {
+              lines.push(priced(`${exBfQty} Extra Breakfast`, exBfTotal));
+            }
+            if (pickup && parseFloat(pickup) > 0) lines.push(priced('With Pick-Up', pickup));
+            if (dropoff && parseFloat(dropoff) > 0) lines.push(priced('With Drop-off', dropoff));
             
             // Add other services from booking_service table
             if (typeof otherServices !== 'undefined' && Array.isArray(otherServices) && otherServices.length > 0) {
@@ -180,17 +198,14 @@
                   const serviceName = service.name.trim();
                   const serviceQty = parseInt(service.qty) || 1;
                   // Format: "Service Name" or "Qty x Service Name" if qty > 1
-                  if (serviceQty > 1) {
-                    lines.push(`${serviceQty}x ${serviceName}`);
-                  } else {
-                    lines.push(serviceName);
-                  }
+                  const label = serviceQty > 1 ? `${serviceQty}x ${serviceName}` : serviceName;
+                  lines.push(parseFloat(service.price) > 0 ? priced(label, service.price) : label);
                 }
               });
             }
 
           %>
-          <%- lines.join('<br>') %>
+          <%- lines.map(l => l.startsWith('<span') ? l : l + '<br>').join('') %>
         </td>
       </tr>
       

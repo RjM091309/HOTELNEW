@@ -110,11 +110,24 @@ class OverviewModel {
               (SELECT b.IDNo FROM booking b WHERE ${live} AND b.BOOKING_STATUS = 'check-In' ORDER BY b.IDNo DESC LIMIT 1) AS stayId,
               (SELECT c.NAME FROM booking b JOIN customer c ON c.IDNo = b.CUSTOMER_ID WHERE ${live} AND b.BOOKING_STATUS = 'check-In' ORDER BY b.IDNo DESC LIMIT 1) AS guest,
               (SELECT DATE(b.CHECK_OUT_DATE) <= ${HOTEL_DAY} FROM booking b WHERE ${live} AND b.BOOKING_STATUS = 'check-In' ORDER BY b.IDNo DESC LIMIT 1) AS leaving,
-              (SELECT b.IDNo FROM booking b WHERE ${live} AND b.BOOKING_STATUS = 'pending' AND DATE(b.CHECK_IN_DATE) <= ${HOTEL_DAY} AND DATE(b.CHECK_OUT_DATE) > ${HOTEL_DAY} ORDER BY b.CHECK_IN_DATE LIMIT 1) AS arrivalId
-         FROM room r WHERE r.ACTIVE = 1 AND r.PROPERTY_ID = ? ORDER BY r.ROOM_NUMBER`, [propertyId]);
+              (SELECT b.IDNo FROM booking b WHERE ${live} AND b.BOOKING_STATUS = 'pending' AND DATE(b.CHECK_IN_DATE) <= ${HOTEL_DAY} AND DATE(b.CHECK_OUT_DATE) > ${HOTEL_DAY} ORDER BY b.CHECK_IN_DATE LIMIT 1) AS arrivalId,
+              /* the arrival's Check-In Status: 1 = regular, 0 = late, 2 = early (a manual choice on the booking, not a clock time) */
+              (SELECT COALESCE(b.CHECK_IN_STATUS, 1) FROM booking b WHERE ${live} AND b.BOOKING_STATUS = 'pending' AND DATE(b.CHECK_IN_DATE) <= ${HOTEL_DAY} AND DATE(b.CHECK_OUT_DATE) > ${HOTEL_DAY} ORDER BY b.CHECK_IN_DATE LIMIT 1) AS arrivalCiStatus
+              /* a late check-out is the booking's Check-Out Status (Late) OR the Late Check-Out service (72) added in Extra Services: either one counts */
+              , (SELECT CASE WHEN COALESCE(b.LATE_CHECKOUT, 0) = 1 OR EXISTS (SELECT 1 FROM booking_service s WHERE s.BOOKING_ID = b.IDNo AND s.SERVICE_ID = 72 AND s.ACTIVE = 1) THEN 1 ELSE 0 END
+                   FROM booking b WHERE ${live} AND b.BOOKING_STATUS = 'check-In' ORDER BY b.IDNo DESC LIMIT 1) AS lateOut
+              , t.NAME AS typeName, t.DESCRIPTION AS typeDesc
+         FROM room r LEFT JOIN room_type t ON t.IDNo = r.ROOM_TYPE_ID WHERE r.ACTIVE = 1 AND r.PROPERTY_ID = ? ORDER BY r.ROOM_NUMBER`, [propertyId]);
+    // beds: 1 or 2, from the room type ("2 King VIP" -> 2, "1 Queen VIP" / "King Bedroom" -> 1; the description "VIP room, 2 king beds" is read too)
+    const bedsOf = (name, desc) => {
+      const m = /^\s*(\d)/.exec(String(name || '')) || /(\d)\s*(?:king|queen|single|double)?\s*beds?/i.exec(String(desc || ''));
+      return m && parseInt(m[1], 10) >= 2 ? 2 : 1;
+    };
     return rows.map((r) => ({
       no: String(r.no), status: String(r.status), guest: r.guest || '',
-      bookingId: r.stayId || r.arrivalId || null, leaving: !!r.leaving, arriving: !!r.arrivalId
+      bookingId: r.stayId || r.arrivalId || null, leaving: !!r.leaving, late: !!r.leaving && Number(r.lateOut) === 1, arriving: !!r.arrivalId, arrivingLate: !!r.arrivalId && Number(r.arrivalCiStatus) === 0,
+      beds: bedsOf(r.typeName, r.typeDesc),
+      vip: /vip/i.test(String(r.typeName || '') + ' ' + String(r.typeDesc || ''))
     }));
   }
 

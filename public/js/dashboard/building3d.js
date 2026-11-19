@@ -11,10 +11,16 @@
   var ROOM_W = 48, GAP_H = 36, OX = 58, TOP = 46;
   var ROWS = { front: [0.05, 0.45], back: [0.55, 0.95] };
   var LIT = { top: '#fff4d6', bottom: '#ffc65e', glow: '#ffd27a', edge: '#fff0c4' };   // occupied: lit warm gold against the orange building
-  var FILL = { dirty: '#ffb59a', ooo: '#b3aaa6' };
-  var INK = { occupied: '#3a2300', vacant: '#fff1e6', dirty: '#3d1606', ooo: '#241b18' };   // vacant: white on the dark tile (the original; other colors were tried and dropped)
+  var FILL = { dirty: '#8a7433', ooo: '#b3aaa6' };   // dirty: a muddy olive-brown, like something that needs cleaning
+  var INK = { occupied: '#3a2300', vacant: '#fff1e6', dirty: '#fff3d0', ooo: '#241b18' };   // vacant: white on the dark tile (the original; other colors were tried and dropped)
   var LABEL = { occupied: 'Occupied', vacant: 'Clean, empty', dirty: 'To be cleaned', ooo: 'Out of order' };
-  var ARRIVE = '#34d399', LEAVE = '#60a5fa';
+  var LIT_RED = { top: '#ff8f8f', bottom: '#e8343a', glow: '#ff4d52', edge: '#ffb3b3' };   // occupied and the guest leaves today: the lit room turns red
+  var LATE_BLUE = '#1aa3ea';   // the strip of a room whose guest checks out LATE today
+  var BTB_BG = '#1d3f9e';   // the BTB badge (back-to-back), same navy as the calendar's
+  var URGENT = '#f97316';   // housekeeping: dirty room with a guest arriving today
+  var LATE_IN = '#f59a23';   // the dot of a guest who checks in LATE today (orange); a regular check-in is green
+  var ARRIVE = '#34d399', LEAVE = '#e8343a';
+  var VIP_GOLD = '#f5c542';
   var uidN = 0;
 
   function palette(dark) {
@@ -25,12 +31,28 @@
 
   // Clark Central's numbering: 401-411 are the front rooms (401 at the right end seen from the street, 411 at the left end),
   // 412-422 the back rooms (412 at the left end, behind 411). The only place that knows how a number becomes a place.
+  // Floors with a plan of their own (the 11th floor): the floor is divided into `cols` equal columns; every room has its first column (pos) and
+  // how many columns it covers (span). From the floor plan: the front rooms 1101-1106 are twice as wide as the back rooms and so is 1107 (left
+  // end). The stairs / lift hall of the plan is not drawn as a space: the rooms are simply as wide as the floor needs, so it is filled.
+  var PLANS = {
+    11: {
+      cols: 12,
+      front: { 1: [11, 2], 2: [9, 2], 3: [7, 2], 4: [5, 2], 5: [3, 2], 6: [1, 2] },
+      back: { 7: [1, 2], 8: [3, 1], 9: [4, 1], 10: [5, 1], 11: [6, 1], 12: [7, 1], 13: [8, 1], 14: [9, 1], 15: [10, 1], 16: [11, 1], 17: [12, 1] }
+    }
+  };
+
   function placeOf(no) {
     var n = parseInt(no, 10);
     if (!isFinite(n) || n < 100) return null;
     var floor = Math.floor(n / 100), idx = n % 100;
-    if (idx >= 1 && idx <= 11) return { floor: floor, side: 'front', pos: 12 - idx };
-    if (idx >= 12 && idx <= 22) return { floor: floor, side: 'back', pos: idx - 11 };
+    var plan = PLANS[floor];
+    if (plan) {
+      var hit = plan.front[idx] ? { side: 'front', c: plan.front[idx] } : plan.back[idx] ? { side: 'back', c: plan.back[idx] } : null;
+      return hit ? { floor: floor, side: hit.side, pos: hit.c[0], span: hit.c[1], cols: plan.cols } : null;
+    }
+    if (idx >= 1 && idx <= 11) return { floor: floor, side: 'front', pos: 12 - idx, span: 1 };
+    if (idx >= 12 && idx <= 22) return { floor: floor, side: 'back', pos: idx - 11, span: 1 };
     return null;
   }
 
@@ -38,20 +60,36 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
   function pts(l) { return l.map(function (q) { return q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join(' '); }
 
+  // Housekeeping view: a tile of the dashboard "focuses" one kind of room - the others fade out
+  function matchFocus(r, k, focus, reqs) {
+    switch (focus) {
+      case 'requests': return !!(reqs && reqs[r.no]);
+      case 'dirty': return k === 'dirty';
+      case 'leaving': return k === 'occupied' && !!r.leaving;
+      case 'late': return k === 'occupied' && !!r.leaving && !!r.late;
+      case 'stay': return k === 'occupied' && !r.leaving;
+      case 'arriving': return !!r.arriving;
+      case 'urgent': return !!r.arriving && k === 'dirty';
+      case 'ooo': return k === 'ooo';
+      default: return true;
+    }
+  }
+
+  // (urgent = a DIRTY room where a guest arrives today; a leaving room with an arrival is the BTB badge)
   function counts(rooms) {
-    var c = { occupied: 0, vacant: 0, dirty: 0, ooo: 0, arriving: 0, leaving: 0 };
-    (rooms || []).forEach(function (r) { c[kind(r)]++; if (r.arriving) c.arriving++; if (r.leaving) c.leaving++; });
+    var c = { occupied: 0, vacant: 0, dirty: 0, ooo: 0, arriving: 0, leaving: 0, late: 0, arrLate: 0, arrReg: 0, btb: 0, stay: 0, urgent: 0 };
+    (rooms || []).forEach(function (r) { c[kind(r)]++; if (r.arriving) c.arriving++; if (r.leaving) c.leaving++; if (r.leaving && r.late && !r.arriving) c.late++; if (r.arriving && r.leaving) c.btb++; if (kind(r) === 'occupied' && !r.leaving) c.stay++; if (r.arriving && kind(r) === 'dirty') c.urgent++; if (r.arriving && !r.leaving) { if (r.arrivingLate) c.arrLate++; else c.arrReg++; } });
     return c;
   }
 
   // the building from the ground up: the floors that have rooms, with one break for each run of floors the hotel doesn't have
   function parts(rooms) {
     var by = {};
-    rooms.forEach(function (r) { var pl = placeOf(r.no); if (!pl) return; (by[pl.floor] = by[pl.floor] || []).push({ r: r, side: pl.side, pos: pl.pos }); });
+    rooms.forEach(function (r) { var pl = placeOf(r.no); if (!pl) return; (by[pl.floor] = by[pl.floor] || []).push({ r: r, side: pl.side, pos: pl.pos, span: pl.span || 1, cols: pl.cols || 0 }); });
     var floors = Object.keys(by).map(Number); if (!floors.length) return [];
     var top = Math.max.apply(null, floors), out = [];
     for (var f = 1; f <= top; f++) {
-      if (by[f]) out.push({ kind: 'floor', floor: f, front: by[f].filter(function (x) { return x.side === 'front'; }), back: by[f].filter(function (x) { return x.side === 'back'; }), cols: Math.max.apply(null, by[f].map(function (x) { return x.pos; })) });
+      if (by[f]) out.push({ kind: 'floor', floor: f, front: by[f].filter(function (x) { return x.side === 'front'; }), back: by[f].filter(function (x) { return x.side === 'back'; }), cols: Math.max.apply(null, by[f].map(function (x) { return x.cols || (x.pos + x.span - 1); })) });
       // floors the hotel doesn't have (e.g. 1F-3F of Clark) are simply not drawn: the building starts at its first floor
     }
     return out;
@@ -61,7 +99,7 @@
     if (document.getElementById('b3dCss')) return;
     var st = document.createElement('style'); st.id = 'b3dCss';
     st.textContent =
-      '.b3d{display:block;width:100%;height:auto;overflow:visible}.b3d-room{outline:none}.b3d.is-full .b3d-room{cursor:pointer}' +
+      '.b3d{display:block;width:100%;height:auto;overflow:visible}.b3d-room{outline:none}.b3d.is-full .b3d-room{cursor:pointer}.b3d.b3d-noclick .b3d-room{cursor:default}' +
       '.b3d.is-full .b3d-room:hover .b3d-face,.b3d.is-full .b3d-room:focus-visible .b3d-face{stroke-width:2.2;stroke-opacity:1}' +
       '.b3d-in .b3d-floor{animation:b3dRise .8s cubic-bezier(.16,.84,.3,1) both;animation-delay:calc(var(--f,0)*120ms + 150ms)}' +
       '@keyframes b3dRise{from{opacity:0;transform:translateY(34px)}to{opacity:1;transform:none}}' +
@@ -74,11 +112,19 @@
     var full = opt.mode === 'full', dark = opt.dark !== false, p = palette(dark), uid = 'b3d' + (++uidN) + '-';
     var P_ = parts(rooms); if (!P_.length) return '';
     var widest = Math.max.apply(null, [10].concat(P_.map(function (x) { return x.kind === 'floor' ? x.cols : 0; })));
-    var len = (widest * ROOM_W) / 0.96;
-    var pitch = SLAB + ROOM_H + DY + AIR;
+    // opt.fitRatio (width / height of the box the building is shown in): the rooms are drawn wider, so the building fills a wide box
+    // instead of leaving empty bands at its sides (the height of the building does not change)
+    var lift = opt.fitRatio > 0 ? 9 : 0;   // a little more room between the floors: the building is taller (stretched to the top) when it is shown big
+    var top0 = opt.fitRatio > 0 ? 22 : TOP;   // when it is shown big the sign sits closer to the top (less empty space above the building)
+    var H0 = top0 + P_.reduce(function (sum, x) { return sum + (x.kind === 'gap' ? GAP_H : SLAB + ROOM_H + DY + AIR + lift); }, 0) + DY * 0.62 + 16 + POD;
+    var rw = ROOM_W;
+    if (opt.fitRatio > 0) rw = Math.max(ROOM_W, Math.min(ROOM_W * 1.9, ((opt.fitRatio * H0 - OX - DX - 70) * 0.96) / widest));
+    var fs = FONT * (1 + (rw / ROOM_W - 1) * 0.45);   // the room numbers grow a little with the wider rooms
+    var len = (widest * rw) / 0.96;
+    var pitch = SLAB + ROOM_H + DY + AIR + lift;
     var heights = P_.map(function (x) { return x.kind === 'gap' ? GAP_H : pitch; });
     var totalH = heights.reduce(function (s, h) { return s + h; }, 0);
-    var W = OX + len + DX + 70, H = TOP + totalH + DY * 0.62 + 16 + POD, baseY = TOP + totalH, G = -POD;
+    var W = OX + len + DX + 70, H = top0 + totalH + DY * 0.62 + 16 + POD, baseY = top0 + totalH, G = -POD;
     var SQ = 0.88, LEAN = (DX / DY) * SQ * 0.3;
     function P(u, v, h) { return [OX + u * len + v * DX, baseY - h - v * DY]; }
     function quadTop(u0, u1, v0, v1, h) { return [P(u0, v0, h), P(u1, v0, h), P(u1, v1, h), P(u0, v1, h)]; }
@@ -88,9 +134,10 @@
     function poly(l, attrs) { return '<polygon points="' + pts(l) + '" ' + attrs + '/>'; }
     var o = [];
 
-    o.push('<svg class="b3d ' + (full ? 'is-full' : 'is-card') + (opt.animate ? ' b3d-in' : '') + '" viewBox="0 0 ' + W.toFixed(0) + ' ' + H.toFixed(0) + '" role="img" aria-label="' + esc(opt.name || 'Hotel') + ' building" style="' + (full ? '' : 'pointer-events:none') + '">');
+    o.push('<svg class="b3d ' + (full ? 'is-full' : 'is-card') + (opt.noClick ? ' b3d-noclick' : '') + (opt.animate ? ' b3d-in' : '') + '" viewBox="0 0 ' + W.toFixed(0) + ' ' + H.toFixed(0) + '" role="img" aria-label="' + esc(opt.name || 'Hotel') + ' building" style="' + (full ? '' : 'pointer-events:none') + '">');
     o.push('<defs>' +
       '<linearGradient id="' + uid + 'lit" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + LIT.top + '"/><stop offset="1" stop-color="' + LIT.bottom + '"/></linearGradient>' +
+      '<linearGradient id="' + uid + 'litr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + LIT_RED.top + '"/><stop offset="1" stop-color="' + LIT_RED.bottom + '"/></linearGradient>' +
       '<linearGradient id="' + uid + 'wl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset="1" stop-color="#000" stop-opacity=".16"/></linearGradient>' +
       '<linearGradient id="' + uid + 'tl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".14"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>' +
       '<filter id="' + uid + 'glow" x="-70%" y="-70%" width="240%" height="240%"><feGaussianBlur stdDeviation="2.4"/></filter>' +
@@ -99,9 +146,9 @@
       '<pattern id="' + uid + 'hatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="4" stroke="#4a3025" stroke-width="1.6" stroke-opacity=".55"/></pattern></defs>');
 
     // the ground, with the street in front of the building
-    o.push(poly(quadTop(-0.06, 1.06, -0.62, 1.12, G), 'fill="' + p.ground + '" opacity=".85"'));
-    o.push(poly(quadTop(-0.06, 1.06, -0.62, -0.28, G), 'fill="' + p.faint + '" opacity=".18"'));
-    var st0 = P(-0.06, -0.45, G), st1 = P(1.06, -0.45, G), stm = P(0.5, -0.45, G);
+    o.push(poly(quadTop(0, 1.03, -0.62, 1.12, G), 'fill="' + p.ground + '" opacity=".85"'));
+    o.push(poly(quadTop(0, 1.03, -0.62, -0.28, G), 'fill="' + p.faint + '" opacity=".18"'));
+    var st0 = P(0.02, -0.45, G), st1 = P(1.01, -0.45, G), stm = P(0.5, -0.45, G);
     o.push(ln(st0, st1, 'stroke="' + p.label + '" stroke-opacity=".35" stroke-dasharray="8 6"'));
     o.push('<text x="' + stm[0].toFixed(1) + '" y="' + (stm[1] - 5).toFixed(1) + '" text-anchor="middle" font-size="12" font-weight="700" letter-spacing="0.2em" fill="' + p.front + '">STREET · FRONT ENTRANCE</text>');
 
@@ -157,6 +204,14 @@
       o.push(ln(P(0.02, 0.5, t), P(0.98, 0.5, t), 'stroke="' + p.faint + '" stroke-opacity=".5" stroke-dasharray="2 3" stroke-width=".7"'));
       var fl = P(0, 0.2, t);
       o.push('<text x="' + (OX - 10) + '" y="' + (fl[1] + 5).toFixed(1) + '" text-anchor="end" font-size="14" font-weight="700" fill="' + p.label + '">' + part.floor + 'F</text>');
+      if (full && opt.view === 'housekeeping') {
+        // rooms of this floor to clean or about to be left: a number, or a check when the floor has no work
+        var work = part.front.concat(part.back).filter(function (it) { var kk = kind(it.r); return kk === 'dirty' || (kk === 'occupied' && it.r.leaving) || !!(opt.requests && opt.requests[it.r.no]); }).length;
+        var bx = OX - 10, by2 = fl[1] + 11;
+        o.push('<g><title>' + (work ? work + ' room' + (work === 1 ? '' : 's') + ' to clean, to check out or with a request on this floor' : 'nothing to do on this floor') + '</title>' +
+          '<rect x="' + (bx - 26).toFixed(1) + '" y="' + by2.toFixed(1) + '" width="26" height="13" rx="6.5" fill="' + (work ? '#e0a316' : 'none') + '" stroke="' + (work ? '#e0a316' : '#3fbf8f') + '" stroke-width="1" opacity="' + (work ? 1 : 0.8) + '"/>' +
+          '<text x="' + (bx - 13).toFixed(1) + '" y="' + (by2 + 9.6).toFixed(1) + '" text-anchor="middle" font-size="9.5" font-weight="800" fill="' + (work ? '#2b1c00' : '#3fbf8f') + '">' + (work ? work : '&#10003;') + '</text></g>');
+      }
 
       ['back', 'front'].forEach(function (side) {
         var v0 = ROWS[side][0], v1 = ROWS[side][1], list = side === 'front' ? part.front : part.back, color = side === 'front' ? p.front : p.back;
@@ -164,34 +219,70 @@
         // (no BACK / FRONT text beside the floors: the rows speak for themselves)
         list.forEach(function (it) {
           var r = it.r, k = kind(r), j = it.pos - 1, w = 0.96 / part.cols;
-          var a = 0.02 + j * w, b = 0.02 + (j + 1) * w, u0 = a + 0.008, u1 = b - 0.008, top = t + ROOM_H;
+          var a = 0.02 + j * w, b = 0.02 + (j + (it.span || 1)) * w, u0 = a + 0.008, u1 = b - 0.008, top = t + ROOM_H;
           var face = quadTop(u0, u1, v0, v1, top);
-          var fill = k === 'occupied' ? 'url(#' + uid + 'lit)' : k === 'vacant' ? p.empty : FILL[k];
-          var col = k === 'occupied' ? LIT.bottom : k === 'vacant' ? p.empty : FILL[k];
-          var stroke = k === 'occupied' ? LIT.edge : k === 'vacant' ? p.emptyEdge : p.tileStroke;
-          var title = 'Room ' + r.no + ' (' + (side === 'front' ? 'Front' : 'Back') + ') · ' + LABEL[k].toLowerCase() + (r.guest && k === 'occupied' ? ' · ' + r.guest : '') + (r.arriving ? ' · arriving today' : '') + (r.leaving ? ' · leaving today' : '');
+          var leave = k === 'occupied' && !!r.leaving, L = leave ? LIT_RED : LIT;   // leaving today (late or not): the lit room is red; a LATE check-out also gets the blue strip below   // the guest leaves today: the lit room is red instead of yellow
+          var fill = k === 'occupied' ? 'url(#' + uid + (leave ? 'litr' : 'lit') + ')' : k === 'vacant' ? p.empty : FILL[k];
+          var col = k === 'occupied' ? L.bottom : k === 'vacant' ? p.empty : FILL[k];
+          var stroke = k === 'occupied' ? L.edge : k === 'vacant' ? p.emptyEdge : p.tileStroke;
+          var vip = !!r.vip;
+          var title = 'Room ' + r.no + ' (' + (side === 'front' ? 'Front' : 'Back') + ') · ' + LABEL[k].toLowerCase() + (r.guest && k === 'occupied' ? ' · ' + r.guest : '') + (r.arriving ? (r.leaving ? ' · back-to-back (BTB)' : r.arrivingLate ? ' · late check-in today' : ' · arriving today') : '') + (r.leaving ? (r.late ? ' · late check-out today' : ' · leaving today') : '') + (r.beds ? ' · ' + (r.beds >= 2 ? '2 beds' : '1 bed') : '') + (opt.view === 'housekeeping' && opt.requests && opt.requests[r.no] ? ' · request: ' + (opt.requests[r.no].mur ? 'MUR' : '') + (opt.requests[r.no].mur && opt.requests[r.no].custom ? ' + ' : '') + (opt.requests[r.no].custom ? 'custom' : '') : '');
           var cx = face.reduce(function (s, q) { return s + q[0]; }, 0) / 4, cy = face.reduce(function (s, q) { return s + q[1]; }, 0) / 4;
           var hit = side === 'front'
             ? [P(a, 0, at), P(b, 0, at), P(b, 0, top), P(b, 0.5, top), P(a, 0.5, top), P(a, 0, top)]
             : [P(a, 0.5, top), P(b, 0.5, top), P(b, 1, top), P(b, 1, top + AIR), P(a, 1, top + AIR), P(a, 1, top)];
-          o.push('<g class="b3d-room" data-no="' + esc(r.no) + '"' + (full ? ' role="button" tabindex="0"' : '') + '><title>' + esc(title) + '</title>');
+          var faded = opt.focus && !matchFocus(r, k, opt.focus, opt.requests);
+          o.push('<g class="b3d-room" data-no="' + esc(r.no) + '"' + (full ? ' role="button" tabindex="0"' : '') + (faded ? ' style="opacity:.17"' : '') + '><title>' + esc(title) + '</title>');
           o.push(ln(P(u0, v0, t), P(u1, v0, t), 'stroke="' + color + '" stroke-width="1.4" pointer-events="none"'));
           if (full) o.push(poly(hit, 'fill="transparent"'));
-          if (k === 'occupied') o.push(poly(face, 'class="b3d-lit" style="--g:' + (it.pos % 7) + '" fill="' + LIT.glow + '" filter="url(#' + uid + 'glow)" opacity=".7" pointer-events="none"'));
+          if (k === 'occupied') o.push(poly(face, 'class="b3d-lit" style="--g:' + (it.pos % 7) + '" fill="' + L.glow + '" filter="url(#' + uid + 'glow)" opacity=".7" pointer-events="none"'));
           [quadRight(u1, v0, v1, t, top), quadFront(u0, u1, v0, t, top)].forEach(function (sd) {
             o.push('<g pointer-events="none">' + poly(sd, 'fill="' + col + '"') + poly(sd, 'fill="#000" opacity="' + (k === 'vacant' ? 0.25 : 0.32) + '"') + '</g>');
           });
           o.push(poly(face, 'class="b3d-face" fill="' + fill + '" stroke="' + stroke + '" stroke-opacity=".6" stroke-width=".7" stroke-linejoin="round"'));
           if (k === 'ooo') o.push(poly(face, 'fill="url(#' + uid + 'hatch)" pointer-events="none"'));
+          // late check-out today: a blue strip along the right side of the (red) room
+          if (k === 'occupied' && r.leaving && r.late && !r.arriving) {   // (a back-to-back room is plain red with the BTB badge: no strip)
+            o.push(poly(quadTop(u1 - (u1 - u0) * 0.15, u1, v0, v1, top), 'fill="' + LATE_BLUE + '" stroke="' + LIT_RED.edge + '" stroke-opacity=".8" stroke-width=".6" stroke-linejoin="round" pointer-events="none"'));
+          }
           if (full) {
-            o.push('<text x="' + (-NUM_DX).toFixed(2) + '" y="' + (FONT * 0.36 + NUM_DY).toFixed(2) + '" transform="matrix(1 0 ' + (-LEAN).toFixed(3) + ' ' + SQ + ' ' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')" text-anchor="middle" font-size="' + FONT + '" font-weight="400" letter-spacing="0.07em" style="font-variant-numeric:tabular-nums" pointer-events="none" fill="' + INK[k] + '"' +
+            o.push('<text x="' + (-NUM_DX).toFixed(2) + '" y="' + (fs * 0.36 + NUM_DY).toFixed(2) + '" transform="matrix(1 0 ' + (-LEAN).toFixed(3) + ' ' + SQ + ' ' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')" text-anchor="middle" font-size="' + fs.toFixed(2) + '" font-weight="400" letter-spacing="0.07em" style="font-variant-numeric:tabular-nums" pointer-events="none" fill="' + INK[k] + '"' +
               (k === 'ooo' ? ' stroke="' + FILL.ooo + '" stroke-width="2.4" paint-order="stroke"' : '') + '>' + esc(r.no) + '</text>');
           }
-          // a guest arrives (green) or leaves (blue) today: a small light on the tile's right corner
-          if (r.arriving || r.leaving) {
+          // VIP room: a gold "V" in a royal serif font at the top-left corner of the tile (dark edge so it shows on every colour)
+          if (full && vip) {
+            var vx = -(u1 - u0) * len / 2 + 9;
+            o.push('<text x="' + vx.toFixed(1) + '" y="' + (-fs * 0.5).toFixed(2) + '" transform="matrix(1 0 ' + (-LEAN).toFixed(3) + ' ' + SQ + ' ' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')" text-anchor="middle" font-size="' + (fs * 0.85).toFixed(1) + '" font-weight="700" font-family="Cinzel, Algerian, Georgia, serif" pointer-events="none" fill="' + VIP_GOLD + '" stroke="#2a1a00" stroke-width="1.7" stroke-linejoin="round" paint-order="stroke">V</text>');
+          }
+          // beds: one small dot = a room with one bed, two dots = two beds - at the left end of the tile, level with the room number
+          if (full && r.beds && opt.view !== 'housekeeping') {   // (housekeeping does not need the bed count)
+            var nb = r.beds >= 2 ? 2 : 1, half = (u1 - u0) * len / 2, bx = -half + 9, by = fs * 0.36 + NUM_DY - fs * 0.34;
+            var dots = '';
+            // two beds: the dots are stacked (like a colon), so they never run into the room number
+            for (var q = 0; q < nb; q++) dots += '<ellipse cx="' + bx.toFixed(1) + '" cy="' + (by + (nb === 2 ? (q ? 3.4 : -3.4) : 0)).toFixed(1) + '" rx="2.2" ry="2.2" fill="' + INK[k] + '" opacity=".75"/>';
+            o.push('<g pointer-events="none" transform="matrix(1 0 ' + (-LEAN).toFixed(3) + ' ' + SQ + ' ' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')">' + dots + '</g>');
+          }
+          // housekeeping: a pending request for this room (MUR = make up room, REQ = a typed request) - a small pill on the tile's left corner
+          if (full && opt.view === 'housekeeping' && opt.requests && opt.requests[r.no]) {
+            var rq = opt.requests[r.no], rtxt = (rq.mur ? 'MUR' : 'REQ') + (rq.mur && rq.custom ? '+' : ''), rw2 = rtxt.length > 3 ? 34 : 29;
+            var rx = face[3][0] + 18, ry = face[3][1] + 5.2;
+            o.push('<g pointer-events="none"><rect x="' + (rx - rw2 / 2).toFixed(1) + '" y="' + (ry - 7).toFixed(1) + '" width="' + rw2 + '" height="14" rx="7" fill="' + (rq.mur ? '#0d9488' : '#7c3aed') + '" stroke="#fff" stroke-opacity=".85" stroke-width=".8"/>' +
+              '<text x="' + rx.toFixed(1) + '" y="' + (ry + 3.2).toFixed(1) + '" text-anchor="middle" font-size="8.6" font-weight="800" fill="#fff">' + rtxt + '</text></g>');
+          }
+          // a guest arrives today (green): a small light on the tile's right corner (a guest who leaves today makes the room red)
+          if (r.arriving) {
             var rr = full ? 3.4 : 4.6, gx = face[2][0] - 8, gy = face[2][1] + 4.5;   // the tile's back-right corner
-            if (r.arriving) o.push('<circle cx="' + gx.toFixed(1) + '" cy="' + gy.toFixed(1) + '" r="' + rr + '" fill="' + ARRIVE + '" stroke="#fff" stroke-width="1" pointer-events="none"/>');
-            if (r.leaving) o.push('<circle cx="' + (gx - (r.arriving ? rr * 2 + 2 : 0)).toFixed(1) + '" cy="' + gy.toFixed(1) + '" r="' + rr + '" fill="' + LEAVE + '" stroke="#fff" stroke-width="1" pointer-events="none"/>');
+            if (full && r.leaving) {
+              // back-to-back: a guest leaves and another arrives in this room today - the room is red and the corner carries a small BTB badge
+              o.push('<g pointer-events="none"><rect x="' + (gx - 10.5).toFixed(1) + '" y="' + (gy - 5.2).toFixed(1) + '" width="21" height="10.4" rx="5.2" fill="' + BTB_BG + '" stroke="#bcd0ff" stroke-width=".8"/>' +
+                '<text x="' + gx.toFixed(1) + '" y="' + (gy + 2.4).toFixed(1) + '" text-anchor="middle" font-size="6.6" font-weight="800" letter-spacing=".02em" fill="#fff">BTB</text></g>');
+            } else if (full && opt.view === 'housekeeping' && k === 'dirty') {
+              // housekeeping: the room is still dirty and a guest arrives today - it has to be ready first
+              o.push('<g pointer-events="none"><circle cx="' + gx.toFixed(1) + '" cy="' + gy.toFixed(1) + '" r="5.4" fill="' + URGENT + '" stroke="#fff" stroke-width="1"/>' +
+                '<text x="' + gx.toFixed(1) + '" y="' + (gy + 2.6).toFixed(1) + '" text-anchor="middle" font-size="8" font-weight="900" fill="#fff">!</text></g>');
+            } else {
+              o.push('<circle cx="' + gx.toFixed(1) + '" cy="' + gy.toFixed(1) + '" r="' + rr + '" fill="' + (r.arrivingLate ? LATE_IN : ARRIVE) + '" stroke="#fff" stroke-width="1" pointer-events="none"/>');
+            }
           }
           o.push('</g>');
         });
@@ -228,5 +319,5 @@
     el.__rooms = rooms || []; el.__onRoom = opt.onRoom;
   }
 
-  window.Building3D = { render: render, counts: counts, placeOf: placeOf, LABEL: LABEL, ARRIVE: ARRIVE, LEAVE: LEAVE };
+  window.Building3D = { render: render, counts: counts, placeOf: placeOf, LABEL: LABEL, ARRIVE: ARRIVE, LEAVE: LEAVE, LATE: LATE_BLUE, LATE_IN: LATE_IN, URGENT: URGENT };
 })();

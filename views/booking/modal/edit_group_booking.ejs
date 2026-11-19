@@ -287,11 +287,11 @@
                 <div class="gbx-prices">
                   <div>
                     <label for="editGroupExtraBfAdultPrice">Extra adult</label>
-                    <input type="number" class="form-control" id="editGroupExtraBfAdultPrice" value="500" min="0" step="0.01">
+                    <input type="number" class="form-control" id="editGroupExtraBfAdultPrice" value="600" min="0" step="0.01">
                   </div>
                   <div>
                     <label for="editGroupExtraBfKidPrice">Extra kid</label>
-                    <input type="number" class="form-control" id="editGroupExtraBfKidPrice" value="500" min="0" step="0.01">
+                    <input type="number" class="form-control" id="editGroupExtraBfKidPrice" value="300" min="0" step="0.01">
                   </div>
                 </div>
                 <details class="gbx-details" open>
@@ -1455,7 +1455,8 @@ window.editGroupAddedServicesMap = {};
   window.resetEditGroupExtraBf = function () {
     editExtraBfOverrides = {};
     editExtraBfCountSig = '';
-    $('#editGroupExtraBfAdultPrice, #editGroupExtraBfKidPrice').val(500);
+    $('#editGroupExtraBfAdultPrice').val(600);
+    $('#editGroupExtraBfKidPrice').val(300);
     $('#editGroupBreakfastExtraBox').hide();
   };
 
@@ -2860,7 +2861,9 @@ window.editGroupAddedServicesMap = {};
       const selectedRooms = $('#editGroupSelectedRooms').val();
       const numRooms = selectedRooms ? selectedRooms.split(',').length : 1;
       const breakfastTotal = (adultQty * adultPrice) + (kidQty * kidPrice);
-      const breakfastTotalWithIndividual = breakfastIndividual ? breakfastTotal * numRooms : breakfastTotal;
+      const extraBfNow = (typeof window.getEditGroupExtraBreakfast === 'function') ? window.getEditGroupExtraBreakfast() : null;
+      const breakfastTotalWithIndividual = extraBfNow ? extraBfNow.total : (breakfastIndividual ? breakfastTotal * numRooms : breakfastTotal);
+      const extraBfQtyNow = extraBfNow ? extraBfNow.perRoom.reduce((n, r) => n + r.a + r.k, 0) : 0;
       const pickupPrice = $('#editGroupIncludePickup').is(':checked') ? parseFloat($('#editGroupPickupPrice').val()) || 0 : 0;
       const dropoffPrice = $('#editGroupIncludeDropoff').is(':checked') ? parseFloat($('#editGroupDropoffPrice').val()) || 0 : 0;
       // Exclude late checkout fee from servicesTotal as it's displayed separately
@@ -2875,10 +2878,13 @@ window.editGroupAddedServicesMap = {};
         dateFrom: dateFrom,
         dateTo: dateTo,
         roomSummary: roomNumbersForVoucher || 'No rooms selected',
-        breakfastAdult: $('#editGroupBreakfastAdultQty').val() || 0,
-        breakfastKid: $('#editGroupBreakfastKidQty').val() || 0,
+        // people of ALL the rooms (the form asks per room), and the extras above the 2 per room that are paid for
+        breakfastAdult: adultQty * numRooms,
+        breakfastKid: kidQty * numRooms,
         breakfastAdultPrice: adultPrice,
         breakfastKidPrice: kidPrice,
+        breakfastExtraQty: extraBfQtyNow,
+        breakfastExtraTotal: breakfastTotalWithIndividual,
         pickup: pickupPrice,
         dropoff: dropoffPrice,
         remarks: $('#editGroupRemarks').val() || '',

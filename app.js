@@ -87,6 +87,68 @@ app.use((req, res, next) => {
     }
     next();
 });
+// Compression (no extra package: Node's own zlib). The calendar page alone loads ~100 scripts; sent as they are they are several MB, which is
+// what makes the first opening of a page (and the kept-ready calendar of the Dashboard) slow on a slow network. The browser says
+// 'Accept-Encoding: gzip'; the compressed copy of a file is kept in memory until the file changes.
+const zlib = require('zlib');
+const PUBLIC_DIR = path.join(__dirname, 'public');
+const gzipCache = new Map();   // file -> { mtimeMs, buf }
+app.use((req, res, next) => {
+    if ((req.method !== 'GET' && req.method !== 'HEAD') || !/\.(js|css|svg)$/i.test(req.path)) return next();
+    if (!/\bgzip\b/.test(String(req.headers['accept-encoding'] || ''))) return next();
+    let file;
+    try { file = path.join(PUBLIC_DIR, decodeURIComponent(req.path)); } catch (e) { return next(); }
+    if (!file.startsWith(PUBLIC_DIR + path.sep)) return next();
+    fs.stat(file, (err, st) => {
+        if (err || !st.isFile() || st.size < 1024) return next();
+        const reply = (buf) => {
+            res.setHeader('Content-Type', /\.js$/i.test(file) ? 'application/javascript; charset=UTF-8' : /\.css$/i.test(file) ? 'text/css; charset=UTF-8' : 'image/svg+xml');
+            res.setHeader('Content-Encoding', 'gzip');
+            res.setHeader('Vary', 'Accept-Encoding');
+            res.setHeader('Last-Modified', st.mtime.toUTCString());
+            res.setHeader('ETag', 'W/"' + st.size + '-' + Math.floor(st.mtimeMs) + '-gz"');
+            if (req.fresh) return res.status(304).end();
+            res.setHeader('Content-Length', buf.length);
+            return res.end(req.method === 'HEAD' ? undefined : buf);
+        };
+        const hit = gzipCache.get(file);
+        if (hit && hit.mtimeMs === st.mtimeMs) return reply(hit.buf);
+        fs.readFile(file, (e2, data) => {
+            if (e2) return next();
+            zlib.gzip(data, { level: 6 }, (e3, buf) => {
+                if (e3) return next();
+                gzipCache.set(file, { mtimeMs: st.mtimeMs, buf });
+                reply(buf);
+            });
+        });
+    });
+});
+
+// Pages and JSON answers (the calendar page is ~270 KB, the bookings of a year are bigger): compressed when they are big enough.
+app.use((req, res, next) => {
+    if (!/\bgzip\b/.test(String(req.headers['accept-encoding'] || ''))) return next();
+    const send = res.send.bind(res);
+    res.send = function (body) {
+        try {
+            if (req.method === 'HEAD' || res.headersSent || res.getHeader('Content-Encoding') || res.statusCode === 204 || res.statusCode === 304) return send(body);
+            const isStr = typeof body === 'string';
+            if (!isStr && !Buffer.isBuffer(body)) return send(body);
+            const len = isStr ? Buffer.byteLength(body) : body.length;
+            if (len < 1400) return send(body);
+            const type = String(res.getHeader('Content-Type') || (isStr ? 'text/html' : ''));
+            if (!/text\/|json|javascript|xml|svg/i.test(type)) return send(body);
+            const gz = zlib.gzipSync(isStr ? Buffer.from(body) : body, { level: 5 });
+            if (!res.getHeader('Content-Type')) res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Content-Encoding', 'gzip');
+            res.setHeader('Vary', 'Accept-Encoding');
+            return send(gz);
+        } catch (e) {
+            return send(body);
+        }
+    };
+    next();
+});
+
 app.use(express.static(path.join(__dirname, 'public'), { cacheControl: false }));
 
 // Debug middleware to log requests

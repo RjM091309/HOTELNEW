@@ -20,4 +20,14 @@ async function loadPropertyLogoDataUri(propertyId) {
   }
 }
 
-module.exports = { loadPropertyLogoDataUri };
+// Name of the property and whether it is the Main Stay (the bank account / company details printed on invoices and quotations are Main Stay's own).
+async function loadPropertyInfo(propertyId) {
+  try {
+    const property = propertyId ? await PropertyModel.getById(propertyId) : await PropertyModel.getDefault();
+    return { hotelName: (property && (property.DISPLAY_NAME || property.NAME)) || '', isMainProperty: !property || property.CODE === 'main' };
+  } catch (_) {
+    return { hotelName: '', isMainProperty: true };
+  }
+}
+
+module.exports = { loadPropertyLogoDataUri, loadPropertyInfo };
