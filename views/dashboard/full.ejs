@@ -1134,9 +1134,29 @@
   window.__refreshOnShow = load;     // back in view after a change in another tab (footer.ejs)
   clock(); setInterval(clock, 15000); load(); setInterval(load, 30000);
   document.addEventListener('visibilitychange', function () { if (!document.hidden) load(); });
-  try {
-    var sock = window.dashboardSocket || (typeof io !== 'undefined' ? io() : null);
-    if (sock && sock.on) { var t = null; ['dashboard-updated', 'calendar-updated', 'booking-updated', 'payment-updated'].forEach(function (ev) { sock.on(ev, function () { clearTimeout(t); t = setTimeout(load, 800); }); }); }
-  } catch (e) { /* the 30 s refresh still runs */ }
+  // Live updates: a change anywhere (the Housekeeping app marking a room clean / dirty, a request, a check-in at the front desk...)
+  // reloads the dashboard at once instead of at the next 30 s refresh. The socket.io client (/socket.io/socket.io.js) is loaded by the
+  // footer, AFTER this page's script: so the connection is made once the page has finished loading (it used to look for io() too early,
+  // find nothing, and the dashboard only ever saw changes every 30 s).
+  var liveT = null, liveHooked = false;
+  function liveReload() { clearTimeout(liveT); liveT = setTimeout(load, 600); }
+  function hookLive() {
+    if (liveHooked) return;
+    try {
+      var sock = window.dashboardSocket || (typeof io !== 'undefined' ? io({ transports: ['websocket', 'polling'] }) : null);
+      if (!sock || !sock.on) return;
+      liveHooked = true;
+      // dashboard-updated / calendar-updated...: sent to every screen; dashboard-refresh: sent to the screens that joined the dashboard room
+      ['dashboard-updated', 'dashboard-refresh', 'calendar-updated', 'booking-updated', 'payment-updated'].forEach(function (ev) { sock.on(ev, liveReload); });
+      sock.on('connect', function () { try { sock.emit('join-dashboard-room'); } catch (e) {} });
+      if (sock.connected) { try { sock.emit('join-dashboard-room'); } catch (e) {} }
+      // back online after a drop: what changed meanwhile
+      sock.io && sock.io.on && sock.io.on('reconnect', function () { load(); });
+    } catch (e) { /* the 30 s refresh still runs */ }
+  }
+  if (typeof io !== 'undefined' || window.dashboardSocket) hookLive();
+  else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hookLive);
+  else setTimeout(hookLive, 0);
+  window.addEventListener('load', hookLive);
 })();
 </script>
