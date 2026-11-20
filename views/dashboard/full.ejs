@@ -527,14 +527,10 @@
         '<span>' + sw('linear-gradient(90deg,#f0494e 0 72%,' + B.LATE + ' 72% 100%)') + 'Late check-out <b>' + c.late + '</b></span>' + tenantKey + bedsKey + vipKey;
       note = (D.building || []).length + ' rooms &middot; click a room to open it' + warn;
     }
-<<<<<<< Updated upstream
     // Housekeeping view: the work list (what the Housekeeping app showed) - rooms to clean in order, the requests, today's arrivals
     var workN = hk ? hkWorkCount() : 0;
     var reqBtn = hk ? '<button type="button" class="fd-req-btn" id="fdHkWorkBtn" title="Rooms to clean, requests and arrivals"><i class="fas fa-clipboard-list" style="font-size:14px"></i>Work list <b class="' + (workN ? '' : 'is-zero') + '">' + workN + '</b></button>' : '';
-=======
-    var reqBtn = '';
     if (ui.date) note = '<span class="fd-plan-note">Planned for <b>' + new Date(ui.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short' }) + '</b> from the bookings: every guest leaves on the check-out date &middot; <a id="fdToday">back to today</a></span>';
->>>>>>> Stashed changes
     var views = '<div class="fd-views" id="fdViews">' + BLD_VIEWS.map(function (v) {
       return '<button type="button" data-view="' + v.id + '" class="' + (v.id === ui.view ? 'is-on' : '') + '"><i class="fas ' + v.icon + '"></i>' + v.label + '</button>';
     }).join('') + '</div>';
@@ -1162,12 +1158,8 @@
   function load() {
     if (busy || document.hidden) return; busy = true;
     fetch('/dashboard/full-data', { credentials: 'same-origin' }).then(function (r) { return r.json(); })
-<<<<<<< Updated upstream
-      .then(function (j) { if (j && j.success) { D = j.data; if (firstLoad) { firstLoad = false; startEntry(); } else draw(); if (hkrRoom) renderRoomPanel(); if (hkwOpen) renderWork(); } })
-=======
-      .then(function (j) { if (j && j.success) { D = j.data; return ui.date ? fetchPlanned().then(function (b) { if (b) D.building = b; return true; }) : true; } return false; })
-      .then(function (ok) { if (ok) { if (firstLoad) { firstLoad = false; startEntry(); } else draw(); } })
->>>>>>> Stashed changes
+      .then(function (j) { if (j && j.success) { D = j.data; return ui.date ? fetchPlanned().then(function (bb) { if (bb) D.building = bb; return true; }) : true; } return false; })
+      .then(function (ok) { if (ok) { if (firstLoad) { firstLoad = false; startEntry(); } else draw(); if (hkrRoom) renderRoomPanel(); if (hkwOpen) renderWork(); } })
       .catch(function () { /* keep what is shown */ })
       .then(function () { busy = false; clock(); if (ui.view === 'housekeeping') loadRequests(); });
   }

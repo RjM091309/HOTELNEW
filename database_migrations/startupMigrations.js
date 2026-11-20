@@ -1366,12 +1366,9 @@ async function runStartupMigrations() {
   await runPaymentShiftMigrations();
   await runPropertyMigrations();
   await runRoomRequestMigrations();
-<<<<<<< Updated upstream
   await runStaffAppSessionMigrations();
-=======
   await runMainRoomFormMigration();
   await runPoolVillaViewMigration();
->>>>>>> Stashed changes
   // Clark Central was created by hand on the dev database: create it once from seed_clark_central.json when this database has no such property.
   // Never stops the app from starting (the import is one transaction, so a failure leaves nothing half-made).
   try {
