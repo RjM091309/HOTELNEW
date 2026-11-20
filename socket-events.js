@@ -2,6 +2,9 @@
 // SOCKET.IO EVENT HANDLERS
 // ========================================
 
+// a change made on the web PMS: the Housekeeping phone apps reload their room board too (services/staffAppRealtime.js)
+const staffAppRealtime = require('./services/staffAppRealtime');
+
 function setupSocketEvents(io) {
     io.on('connection', (socket) => {
         console.log(`🔌 New client connected: ${socket.id}`);
@@ -143,24 +146,28 @@ function setupSocketEvents(io) {
         
         // Handle dashboard updates
         socket.on('dashboard-updated', (data) => {
+            staffAppRealtime.changed(data && data.propertyId);
             socket.to('dashboard-room').emit('dashboard-refresh', data);
             console.log(`📡 Dashboard update broadcasted: ${JSON.stringify(data)}`);
         });
         
         // Handle room status changes for dashboard
         socket.on('room-status-updated', (data) => {
+            staffAppRealtime.changed(data && data.propertyId);
             socket.to('dashboard-room').emit('dashboard-refresh', data);
             console.log(`📡 Room status update broadcasted: ${JSON.stringify(data)}`);
         });
         
         // Handle booking status changes for dashboard
         socket.on('booking-status-updated', (data) => {
+            staffAppRealtime.changed(data && data.propertyId);
             socket.to('dashboard-room').emit('dashboard-refresh', data);
             console.log(`📡 Booking status update broadcasted: ${JSON.stringify(data)}`);
         });
         
         // Handle payment status changes for dashboard
         socket.on('payment-status-updated', (data) => {
+            staffAppRealtime.changed(data && data.propertyId);
             socket.to('dashboard-room').emit('dashboard-refresh', data);
             console.log(`📡 Payment status update broadcasted: ${JSON.stringify(data)}`);
         });

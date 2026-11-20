@@ -113,6 +113,8 @@ class OverviewModel {
               (SELECT b.IDNo FROM booking b WHERE ${live} AND b.BOOKING_STATUS = 'pending' AND DATE(b.CHECK_IN_DATE) <= ${HOTEL_DAY} AND DATE(b.CHECK_OUT_DATE) > ${HOTEL_DAY} ORDER BY b.CHECK_IN_DATE LIMIT 1) AS arrivalId,
               /* the arrival's Check-In Status: 1 = regular, 0 = late, 2 = early (a manual choice on the booking, not a clock time) */
               (SELECT COALESCE(b.CHECK_IN_STATUS, 1) FROM booking b WHERE ${live} AND b.BOOKING_STATUS = 'pending' AND DATE(b.CHECK_IN_DATE) <= ${HOTEL_DAY} AND DATE(b.CHECK_OUT_DATE) > ${HOTEL_DAY} ORDER BY b.CHECK_IN_DATE LIMIT 1) AS arrivalCiStatus
+              /* who arrives today (the Housekeeping view lists the arrivals with their room ready or not) */
+              , (SELECT c.NAME FROM booking b JOIN customer c ON c.IDNo = b.CUSTOMER_ID WHERE ${live} AND b.BOOKING_STATUS = 'pending' AND DATE(b.CHECK_IN_DATE) <= ${HOTEL_DAY} AND DATE(b.CHECK_OUT_DATE) > ${HOTEL_DAY} ORDER BY b.CHECK_IN_DATE LIMIT 1) AS arrivalGuest
               /* a late check-out is the booking's Check-Out Status (Late) OR the Late Check-Out service (72) added in Extra Services: either one counts */
               , (SELECT CASE WHEN COALESCE(b.LATE_CHECKOUT, 0) = 1 OR EXISTS (SELECT 1 FROM booking_service s WHERE s.BOOKING_ID = b.IDNo AND s.SERVICE_ID = 72 AND s.ACTIVE = 1) THEN 1 ELSE 0 END
                    FROM booking b WHERE ${live} AND b.BOOKING_STATUS = 'check-In' ORDER BY b.IDNo DESC LIMIT 1) AS lateOut
@@ -127,7 +129,7 @@ class OverviewModel {
     };
     return rows.map((r) => ({
       no: String(r.no), status: String(r.status), guest: r.guest || '',
-      bookingId: r.stayId || r.arrivalId || null, leaving: !!r.leaving, late: !!r.leaving && Number(r.lateOut) === 1, arriving: !!r.arrivalId, arrivingLate: !!r.arrivalId && Number(r.arrivalCiStatus) === 0,
+      bookingId: r.stayId || r.arrivalId || null, leaving: !!r.leaving, late: !!r.leaving && Number(r.lateOut) === 1, arriving: !!r.arrivalId, arrivingLate: !!r.arrivalId && Number(r.arrivalCiStatus) === 0, arrivingEarly: !!r.arrivalId && Number(r.arrivalCiStatus) === 2, arrivalGuest: r.arrivalId ? (r.arrivalGuest || '') : '', type: r.typeName || '',
       beds: bedsOf(r.typeName, r.typeDesc),
       vip: /vip/i.test(String(r.typeName || '') + ' ' + String(r.typeDesc || ''))
     }));

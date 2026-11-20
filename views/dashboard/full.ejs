@@ -115,7 +115,76 @@
   .hkr-item button.done { background: #16a34a; border-color: #16a34a; color: #fff; }
   .hkr-item button.cancel { color: var(--fd-muted); padding: 6px 9px; }
   .hkr-empty { color: var(--fd-muted); font-size: 13px; padding: 6px 2px; }
-  .fd-toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 100002; background: #16a34a; color: #fff; padding: 10px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; box-shadow: 0 12px 30px -10px rgba(0,0,0,.6); }
+  /* ===== Housekeeping (what the Housekeeping app did, here in the Housekeeping view): the room panel's actions, the work list, minibar / laundry ===== */
+  .hkw-wrap, .hkc-wrap { --accent: <%= (typeof currentProperty !== 'undefined' && currentProperty && currentProperty.COLOR) ? currentProperty.COLOR : '#4361ee' %>;
+    --fd-card: #141b2e; --fd-card-2: #19223a; --fd-line: rgba(255,255,255,.07); --fd-line-2: rgba(255,255,255,.13); --fd-text: #eef2ff; --fd-muted: #8b97b8;
+    --fd-good: #34d399; --fd-warn: #fbbf24; --fd-bad: #fb7185; --fd-info: #60a5fa; }
+  [data-theme="white"] .hkw-wrap, [data-theme="white"] .hkc-wrap { --fd-card: #ffffff; --fd-card-2: #ffffff; --fd-line: rgba(15,23,42,.08); --fd-line-2: rgba(15,23,42,.16); --fd-text: #0f172a; --fd-muted: #64748b;
+    --fd-good: #059669; --fd-warn: #b45309; --fd-bad: #e11d48; --fd-info: #2563eb; }
+  [data-theme="white"] .hkr-wrap { --fd-good: #059669; --fd-warn: #b45309; --fd-bad: #e11d48; --fd-info: #2563eb; }
+  .hkr-wrap { --fd-good: #34d399; --fd-warn: #fbbf24; --fd-bad: #fb7185; --fd-info: #60a5fa; }
+  .hk-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+  .hk-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; color: var(--c, var(--fd-muted)); background: color-mix(in srgb, var(--c, var(--fd-muted)) 14%, transparent); border: 1px solid color-mix(in srgb, var(--c, var(--fd-muted)) 30%, transparent); white-space: nowrap; }
+  .hk-chip.good { --c: var(--fd-good); } .hk-chip.warn { --c: var(--fd-warn); } .hk-chip.bad { --c: var(--fd-bad); } .hk-chip.info { --c: var(--fd-info); } .hk-chip.acc { --c: var(--accent); } .hk-chip.req { --c: #a78bfa; }
+  .hk-btn { border: 1px solid var(--fd-line-2, var(--fd-line)); background: transparent; color: var(--fd-text); border-radius: 10px; padding: 7px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .hk-btn:hover { border-color: var(--accent); }
+  .hk-btn:disabled { opacity: .45; cursor: not-allowed; }
+  .hk-btn.ok { background: #16a34a; border-color: #16a34a; color: #fff; }
+  .hk-btn.pri { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .hk-btn.ghost { color: var(--fd-muted); }
+  .hk-btn.sm { padding: 5px 10px; font-size: 12px; }
+  .hkr-state { margin: -4px 0 12px; }
+  .hkr-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--fd-line); }
+  .hkr-acts:empty { display: none; }
+  .hkr-note { font-size: 12.5px; color: var(--fd-muted); }
+  .hkr-item .who { color: var(--fd-info); }
+  /* the work list: a panel on the right side (full width on a phone) */
+  .hkw-wrap { position: fixed; inset: 0; z-index: 100000; display: none; justify-content: flex-end; background: rgba(2, 6, 16, .45); }
+  .hkw-wrap.is-open { display: flex; }
+  .hkw-panel { width: min(440px, 100%); height: 100%; display: flex; flex-direction: column; background: var(--fd-card-2); color: var(--fd-text); border-left: 1px solid var(--fd-line-2); box-shadow: -30px 0 60px -30px rgba(0,0,0,.7); animation: hkwIn .28s cubic-bezier(.2,.8,.25,1); }
+  @keyframes hkwIn { from { transform: translateX(40px); opacity: .3; } to { transform: none; opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .hkw-panel { animation: none; } }
+  .hkw-head { padding: 18px 20px 12px; border-bottom: 1px solid var(--fd-line); }
+  .hkw-head .hkr-head h3 { font-size: 18px; }
+  .hkw-head p { margin: 2px 0 12px; font-size: 12.5px; color: var(--fd-muted); }
+  .hkw-tabs { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: color-mix(in srgb, var(--fd-text) 6%, transparent); }
+  .hkw-tabs button { flex: 1; border: 0; background: transparent; color: var(--fd-muted); font-size: 12.5px; font-weight: 600; padding: 8px 6px; border-radius: 9px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  .hkw-tabs button.is-on { background: var(--fd-card); color: var(--fd-text); box-shadow: 0 2px 10px rgba(0,0,0,.2); }
+  .hkw-tabs b { font-size: 10.5px; min-width: 18px; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--fd-text) 16%, transparent); color: var(--fd-text); }
+  .hkw-tabs b.hot { background: var(--accent); color: #fff; }
+  .hkw-seg { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 12px; }
+  .hkw-seg button { border: 1px solid var(--fd-line-2); background: transparent; color: var(--fd-muted); border-radius: 999px; padding: 4px 11px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .hkw-seg button.is-on { border-color: var(--accent); color: var(--fd-text); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+  .hkw-body { flex: 1; overflow-y: auto; padding: 14px 20px 24px; }
+  .hkw-sec { margin: 16px 0 8px; font-size: 11.5px; letter-spacing: .6px; text-transform: uppercase; color: var(--fd-muted); display: flex; justify-content: space-between; }
+  .hkw-sec:first-child { margin-top: 0; }
+  .hkw-list { display: grid; gap: 8px; }
+  .hkw-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--fd-text) 4%, transparent); border: 1px solid var(--fd-line); cursor: pointer; }
+  .hkw-row:hover { border-color: var(--fd-line-2); }
+  .hkw-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .hkw-no { min-width: 52px; text-align: center; font-weight: 800; font-size: 15px; padding: 7px 4px; border-radius: 10px; background: color-mix(in srgb, var(--c, var(--fd-muted)) 18%, transparent); color: var(--c, var(--fd-text)); font-variant-numeric: tabular-nums; }
+  .hkw-no.dirty { --c: var(--fd-warn); } .hkw-no.urgent { --c: #f97316; } .hkw-no.occ { --c: var(--accent); } .hkw-no.ok { --c: var(--fd-good); } .hkw-no.bad { --c: var(--fd-bad); }
+  .hkw-main { flex: 1; min-width: 0; }
+  .hkw-t { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hkw-s { font-size: 11.5px; color: var(--fd-muted); margin-top: 2px; }
+  .hkw-acts { display: flex; gap: 6px; flex: none; }
+  .hkw-empty { padding: 26px 10px; text-align: center; color: var(--fd-muted); font-size: 13px; border: 1px dashed var(--fd-line-2); border-radius: 12px; }
+  .hkw-empty i { display: block; font-size: 22px; margin-bottom: 8px; opacity: .7; }
+  /* minibar / laundry */
+  .hkc-wrap { position: fixed; inset: 0; z-index: 100002; background: rgba(2, 6, 16, .6); display: none; align-items: center; justify-content: center; padding: 16px; }
+  .hkc-wrap.is-open { display: flex; }
+  .hkc-qty { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--fd-line); }
+  .hkc-qty .t { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; } .hkc-qty .t small { display: block; color: var(--fd-muted); font-weight: 400; font-size: 11.5px; }
+  .hkc-step { display: inline-flex; align-items: center; gap: 4px; }
+  .hkc-step button { width: 30px; height: 30px; border-radius: 9px; border: 1px solid var(--fd-line-2); background: transparent; color: var(--fd-text); cursor: pointer; }
+  .hkc-step button:disabled { opacity: .35; cursor: not-allowed; }
+  .hkc-step span { min-width: 26px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .hkc-field { display: block; margin: 10px 0 4px; font-size: 12px; color: var(--fd-muted); }
+  .hkc-input { width: 100%; border-radius: 10px; border: 1px solid var(--fd-line-2); background: color-mix(in srgb, var(--fd-text) 5%, transparent); color: var(--fd-text); padding: 9px 11px; font: inherit; font-size: 14px; }
+  .hkc-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .hkc-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--fd-line); }
+  .hkc-total { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; } .hkc-total small { display: block; font-size: 11.5px; font-weight: 500; color: var(--fd-muted); }
+  .fd-toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 100003; background: #16a34a; color: #fff; padding: 10px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; box-shadow: 0 12px 30px -10px rgba(0,0,0,.6); }
   .fd-toast.is-err { background: #dc2626; }
   .fd-urgent-mark { display: inline-block; width: 13px; height: 13px; border-radius: 50%; background: #f97316; color: #fff; font-style: normal; font-size: 9px; font-weight: 900; line-height: 13px; text-align: center; }
   .fd-bv .fd-bld-legend { gap: 5px 11px; font-size: 11.5px; padding-top: 8px; margin-top: 2px; }
@@ -432,7 +501,9 @@
         '<span>' + sw('linear-gradient(90deg,#f0494e 0 72%,' + B.LATE + ' 72% 100%)') + 'Late check-out <b>' + c.late + '</b></span>' + tenantKey + bedsKey + vipKey;
       note = (D.building || []).length + ' rooms &middot; click a room to open it' + warn;
     }
-    var reqBtn = '';
+    // Housekeeping view: the work list (what the Housekeeping app showed) - rooms to clean in order, the requests, today's arrivals
+    var workN = hk ? hkWorkCount() : 0;
+    var reqBtn = hk ? '<button type="button" class="fd-req-btn" id="fdHkWorkBtn" title="Rooms to clean, requests and arrivals"><i class="fas fa-clipboard-list" style="font-size:14px"></i>Work list <b class="' + (workN ? '' : 'is-zero') + '">' + workN + '</b></button>' : '';
     var views = '<div class="fd-views" id="fdViews">' + BLD_VIEWS.map(function (v) {
       return '<button type="button" data-view="' + v.id + '" class="' + (v.id === ui.view ? 'is-on' : '') + '"><i class="fas ' + v.icon + '"></i>' + v.label + '</button>';
     }).join('') + '</div>';
@@ -442,24 +513,37 @@
       '<div class="fd-bld-legend">' + legend + '</div>' +
       '</div><div class="fd-bv-side">' + side + '</div></div>';
   }
-  // ---------------- Requests (Housekeeping view): MUR (make up room) or a custom request for a room; the housekeeping staff see them until they are done
+  // ---------------- HOUSEKEEPING (the Housekeeping view): what the Housekeeping app did, here on the dashboard.
+  //  - Requests for a room: MUR (make up room) or a custom request. Waiting -> in progress (someone took it) -> done (or cancelled).
+  //  - A room (a click in the building or in the work list): its state, Mark cleaned / Mark dirty, Minibar / laundry on the guest's bill, a new request.
+  //  - The work list: the rooms to clean in the order to clean them, the requests, today's arrivals with their room ready or not.
+  var reqFirst = true, seenReq = {};
+  ui.reqsDone = []; ui.me = null;
   function buildReqMap() {
     var m = {};
     ui.reqs.forEach(function (q) { var e = m[q.roomNumber] || (m[q.roomNumber] = { mur: false, custom: 0, items: [] }); if (q.type === 'MUR') e.mur = true; else e.custom++; e.items.push(q); });
     ui.reqMap = m;
   }
   function loadRequests() {
-    fetch('/room-requests', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
+    fetch('/room-requests' + (hkwOpen ? '?done=1' : ''), { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
       if (!j || !j.success) return;
-      var sig = j.requests.map(function (q) { return q.id; }).join(',');
-      if (sig === ui.reqSig) return;
+      ui.me = j.me;
+      if (j.done) ui.reqsDone = j.done;
+      // a new request while the Housekeeping view is open is said at once (the app's pop-up)
+      var fresh = j.requests.filter(function (q) { return !seenReq[q.id]; });
+      j.requests.forEach(function (q) { seenReq[q.id] = true; });
+      if (!reqFirst && fresh.length && ui.view === 'housekeeping') toast('New request: Room ' + fresh.map(function (q) { return q.roomNumber; }).join(', '));
+      reqFirst = false;
+      var sig = j.requests.map(function (q) { return q.id + ':' + q.status + ':' + (q.acceptedBy || ''); }).join(',');
+      if (sig === ui.reqSig) { if (hkwOpen) renderWork(); return; }
       ui.reqSig = sig; ui.reqs = j.requests; buildReqMap();
       if (ui.view === 'housekeeping' && D) {   // (while the switch animation is still playing, the redraw waits for it to end)
         var bc = grid.querySelector('.c-bld');
         if (bc && bc.classList.contains('bv-swap')) setTimeout(function () { if (ui.view === 'housekeeping') repaintBuildingCard(); }, 1400); else repaintBuildingCard();
       }
-      if (hkrRoom) renderRoomRequests();
+      if (hkrRoom) renderRoomPanel();
       if (hkrListOpen) renderRequestList();
+      if (hkwOpen) renderWork();
     }).catch(function () { /* keep what is shown */ });
   }
   function toast(msg, err) {
@@ -469,35 +553,110 @@
   function postJson(url, body) {
     return fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(function (r) { return r.json(); });
   }
+  function byNo(a, b) { return String(a).localeCompare(String(b), undefined, { numeric: true }); }
+  function roomOf(no) { return ((D && D.building) || []).filter(function (x) { return String(x.no) === String(no); })[0] || null; }
+
+  // ----- requests
   function reqLine(q) {
     return '<span class="hkr-badge' + (q.type === 'MUR' ? ' mur' : '') + '">' + (q.type === 'MUR' ? 'MUR' : 'REQUEST') + '</span>' + (q.type === 'MUR' ? 'Make up room' : esc(q.text || ''));
   }
-  function reqMeta(q) { var t = ago(q.requestedAt); return esc(q.requestedBy || 'someone') + ' &middot; ' + (t === 'just now' ? t : t + ' ago'); }
+  function reqMeta(q) {
+    var t = ago(q.requestedAt), s = esc(q.requestedBy || 'someone') + ' &middot; ' + (t === 'just now' ? t : t + ' ago');
+    if (q.status === 'accepted') s += ' &middot; <span class="who"><i class="fas fa-user-clock"></i> ' + esc(q.acceptedBy || 'someone') + ' is on it</span>';
+    if (q.status === 'done') s += ' &middot; <span class="who"><i class="fas fa-check"></i> ' + esc(q.doneBy || 'someone') + ', ' + ago(q.doneAt) + '</span>';
+    return s;
+  }
+  function reqActs(q) {
+    if (q.status === 'done') return '';
+    if (q.status === 'accepted') return '<button type="button" class="done" data-rq="done" data-id="' + q.id + '">Done</button>' +
+      '<button type="button" class="cancel" data-rq="release" data-id="' + q.id + '" title="Give it back: it waits again for anyone">Give back</button>';
+    return '<button type="button" data-rq="accept" data-id="' + q.id + '" title="Take it: it is yours (in progress)">Take</button>' +
+      '<button type="button" class="done" data-rq="done" data-id="' + q.id + '">Done</button>' +
+      '<button type="button" class="cancel" data-rq="cancel" data-id="' + q.id + '" title="Cancel the request">&times;</button>';
+  }
+  function reqItem(q, withRoom) {
+    return '<div class="hkr-item">' + (withRoom ? '<span class="rm">' + esc(q.roomNumber) + '</span>' : '') + '<div class="t">' + reqLine(q) + '<small>' + reqMeta(q) + '</small></div>' + reqActs(q) + '</div>';
+  }
+  var REQ_WORD = { done: 'Request done', cancel: 'Request cancelled', accept: 'Request taken: it is yours', release: 'Request given back' };
   function closeRequest(id, kind) {
     postJson('/room-requests/' + id + '/' + kind).then(function (j) {
-      if (j && j.success) { toast(kind === 'done' ? 'Request done' : 'Request cancelled'); ui.reqSig = ''; loadRequests(); }
+      if (j && j.success) toast(REQ_WORD[kind] || 'Request updated');
       else toast((j && j.message) || 'Could not update the request', true);
+      ui.reqSig = ''; loadRequests();
     }).catch(function () { toast('Could not update the request', true); });
+  }
+
+  // ----- a room: its state and what housekeeping can do
+  function roomChips(r) {
+    var s = String(r.status), c = [], q = ui.reqMap[r.no];
+    if (s === '3') c.push(['Out of order', 'bad']);
+    else if (s === '5') c.push(['Tenant', '']);
+    else if (s === '2') c.push(['Occupied', 'acc']);
+    else if (s === '4') c.push(['To clean', 'warn']);
+    else c.push(['Clean &middot; vacant', 'good']);
+    if (r.leaving) c.push([r.late ? 'Late check-out today' : 'Check-out today', 'bad']);
+    if (r.arriving) c.push([(r.arrivingEarly ? 'Early arrival' : r.arrivingLate ? 'Late arrival' : 'Arriving') + ' today', 'info']);
+    if (r.arriving && r.leaving) c.push(['Back-to-back', 'info']);
+    if (r.arriving && s === '4') c.push(['Urgent', 'bad']);
+    if (q && q.mur) c.push(['MUR', 'req']);
+    if (q && q.custom) c.push([q.custom + ' request' + (q.custom > 1 ? 's' : ''), 'req']);
+    if (r.vip) c.push(['VIP', 'warn']);
+    return c;
+  }
+  function chipsHtml(list) { return list.map(function (x) { return '<span class="hk-chip ' + x[1] + '">' + x[0] + '</span>'; }).join(''); }
+  function roomActs(r) {
+    var s = String(r.status), q = ui.reqMap[r.no], h = '';
+    if (s === '4') h += '<button type="button" class="hk-btn ok" data-act="clean"><i class="fas fa-check"></i>Mark cleaned</button>';
+    if ((s === '2' || s === '1') && q && q.mur) h += '<button type="button" class="hk-btn ok" data-act="clean" title="The room was made up: the MUR is done"><i class="fas fa-check"></i>Room made up</button>';
+    if (s === '1') h += '<button type="button" class="hk-btn" data-act="dirty" title="It needs another cleaning"><i class="fas fa-undo"></i>Mark dirty</button>';
+    if (s === '2' && r.guest) h += '<button type="button" class="hk-btn" data-act="charge"><i class="fas fa-wine-bottle"></i>Minibar / laundry</button>';
+    if (s === '3') h += '<span class="hkr-note"><i class="fas fa-ban"></i> Out of order: not cleaned until it is back in service.</span>';
+    if (s === '5') h += '<span class="hkr-note">Tenant room: not cleaned by housekeeping.</span>';
+    return h;
+  }
+  var roomBusy = false;
+  function setRoom(no, status) {
+    if (roomBusy) return; roomBusy = true;
+    postJson('/room-requests/rooms/' + encodeURIComponent(no) + '/status', { status: status }).then(function (j) {
+      if (j && j.success) {
+        toast(status === 'dirty' ? 'Room ' + no + ' marked dirty' : Number(j.status) === 2 ? 'Room ' + no + ' made up (MUR done)' : 'Room ' + no + ' is clean');
+        var r = roomOf(no); if (r) r.status = String(j.status);              // shown at once; the reload below brings the rest
+        if (j.closedMur) { ui.reqs = ui.reqs.filter(function (q) { return !(q.roomNumber === String(no) && q.type === 'MUR'); }); buildReqMap(); }
+        ui.reqSig = '';
+        if (D && ui.view === 'housekeeping') repaintBuildingCard();
+        if (hkrRoom) renderRoomPanel();
+        if (hkwOpen) renderWork();
+        load();
+      } else toast((j && j.message) || 'Could not update the room', true);
+    }).catch(function () { toast('Could not update the room', true); }).then(function () { roomBusy = false; });
   }
 
   var hkrEl = null, hkrRoom = null, hkrPick = null, hkrListEl = null, hkrListOpen = false;
   function hkrBuild() {
     if (hkrEl) return;
     hkrEl = document.createElement('div'); hkrEl.className = 'hkr-wrap'; hkrEl.id = 'hkReq';
-    hkrEl.innerHTML = '<div class="hkr-card" role="dialog" aria-label="Request">' +
-      '<div class="hkr-head"><h3>Request</h3><button type="button" class="hkr-x" data-x aria-label="Close">&times;</button></div>' +
-      '<div class="hkr-sub" id="hkrSub"></div>' +
+    hkrEl.innerHTML = '<div class="hkr-card" role="dialog" aria-labelledby="hkrTitle">' +
+      '<div class="hkr-head"><h3 id="hkrTitle">Room</h3><button type="button" class="hkr-x" data-x aria-label="Close">&times;</button></div>' +
+      '<div class="hkr-sub" id="hkrSub"></div><div class="hk-chips hkr-state" id="hkrState"></div>' +
+      '<div class="hkr-acts" id="hkrActs"></div>' +
+      '<div class="hkw-sec">New request</div>' +
       '<div class="hkr-opts"><button type="button" class="hkr-opt" data-opt="MUR"><b>MUR</b><small>Make up room</small></button>' +
       '<button type="button" class="hkr-opt" data-opt="CUSTOM"><b>Custom request</b><small>Write what the room needs</small></button></div>' +
       '<div class="hkr-custom" id="hkrCustom" style="display:none"><textarea id="hkrText" maxlength="300" placeholder="e.g. extra towels, extra pillow, change the bed linen..."></textarea></div>' +
       '<div class="hkr-actions"><button type="button" class="hkr-send" id="hkrSend" disabled>Send request</button><span class="hkr-msg" id="hkrMsg"></span></div>' +
-      '<div class="hkr-sec" id="hkrSec" style="display:none">Waiting for this room</div><div class="hkr-list" id="hkrRoomList"></div></div>';
+      '<div class="hkr-sec" id="hkrSec" style="display:none">Open for this room</div><div class="hkr-list" id="hkrRoomList"></div></div>';
     document.body.appendChild(hkrEl);
     hkrEl.addEventListener('click', function (e) {
       if (e.target === hkrEl || e.target.closest('[data-x]')) { closeRequestModal(); return; }
       var opt = e.target.closest('.hkr-opt');
       if (opt) { hkrPick = opt.getAttribute('data-opt'); hkrRefresh(); if (hkrPick === 'CUSTOM') document.getElementById('hkrText').focus(); return; }
       if (e.target.id === 'hkrSend') { sendRequest(); return; }
+      var act = e.target.closest('[data-act]');
+      if (act && hkrRoom) {
+        var a = act.getAttribute('data-act');
+        if (a === 'charge') openCharge(roomOf(hkrRoom.no) || hkrRoom); else setRoom(hkrRoom.no, a);
+        return;
+      }
       var b = e.target.closest('[data-rq]'); if (b) closeRequest(b.getAttribute('data-id'), b.getAttribute('data-rq'));
     });
     document.getElementById('hkrText').addEventListener('input', hkrRefresh);
@@ -512,17 +671,24 @@
     var list = document.getElementById('hkrRoomList'), sec = document.getElementById('hkrSec'); if (!list || !hkrRoom) return;
     var items = ui.reqs.filter(function (q) { return q.roomNumber === String(hkrRoom.no); });
     sec.style.display = items.length ? '' : 'none';
-    list.innerHTML = items.map(function (q) {
-      return '<div class="hkr-item"><div class="t">' + reqLine(q) + '<small>' + reqMeta(q) + '</small></div>' +
-        '<button type="button" class="done" data-rq="done" data-id="' + q.id + '">Done</button><button type="button" class="cancel" data-rq="cancel" data-id="' + q.id + '" title="Cancel the request">&times;</button></div>';
-    }).join('');
+    list.innerHTML = items.map(function (q) { return reqItem(q, false); }).join('');
+  }
+  // the room panel: drawn again whenever the room or its requests change (it stays open)
+  function renderRoomPanel() {
+    if (!hkrEl || !hkrRoom) return;
+    var r = roomOf(hkrRoom.no) || hkrRoom; hkrRoom = r;
+    var s = String(r.status);
+    var who = s === '2' ? (r.guest ? esc(r.guest) : 'Guest in house') : r.arriving ? 'Arriving: ' + esc(r.arrivalGuest || 'a guest') : s === '3' ? 'Not in use' : 'No guest';
+    document.getElementById('hkrTitle').textContent = 'Room ' + r.no;
+    document.getElementById('hkrSub').innerHTML = (r.type ? esc(r.type) + ' &middot; ' : '') + who;
+    document.getElementById('hkrState').innerHTML = chipsHtml(roomChips(r));
+    document.getElementById('hkrActs').innerHTML = roomActs(r);
+    renderRoomRequests();
   }
   function openRequestModal(r) {
     hkrBuild(); hkrRoom = r; hkrPick = null;
     document.getElementById('hkrText').value = ''; document.getElementById('hkrMsg').textContent = ''; document.getElementById('hkrMsg').className = 'hkr-msg';
-    var state = String(r.status) === '2' ? (r.guest ? esc(r.guest) : 'Occupied') : String(r.status) === '4' ? 'To be cleaned' : String(r.status) === '3' ? 'Out of order' : 'Vacant';
-    document.getElementById('hkrSub').innerHTML = 'Room <b>' + esc(r.no) + '</b> &middot; ' + state;
-    hkrRefresh(); renderRoomRequests();
+    hkrRefresh(); renderRoomPanel();
     hkrEl.style.display = 'flex';
   }
   function closeRequestModal() { if (hkrEl) hkrEl.style.display = 'none'; hkrRoom = null; }
@@ -533,17 +699,15 @@
     postJson('/room-requests', { roomNumber: room, type: hkrPick, text: document.getElementById('hkrText').value }).then(function (j) {
       if (j && j.success) {
         toast(j.duplicate ? 'MUR is already requested for Room ' + room : (hkrPick === 'MUR' ? 'MUR requested for Room ' : 'Request sent for Room ') + room);
+        if (!j.duplicate) seenReq[j.id] = true;                             // (our own request is not announced as new)
         ui.reqSig = ''; loadRequests(); closeRequestModal();
       } else { msg.className = 'hkr-msg is-err'; msg.textContent = (j && j.message) || 'Could not send the request'; hkrRefresh(); }
     }).catch(function () { msg.className = 'hkr-msg is-err'; msg.textContent = 'Could not send the request'; hkrRefresh(); });
   }
-  // the list of every waiting request (the Requests button)
+  // the list of every open request (the Requests button)
   function renderRequestList() {
     var box = document.getElementById('hkrListBody'); if (!box) return;
-    box.innerHTML = ui.reqs.length ? ui.reqs.map(function (q) {
-      return '<div class="hkr-item"><span class="rm">' + esc(q.roomNumber) + '</span><div class="t">' + reqLine(q) + '<small>' + reqMeta(q) + '</small></div>' +
-        '<button type="button" class="done" data-rq="done" data-id="' + q.id + '">Done</button><button type="button" class="cancel" data-rq="cancel" data-id="' + q.id + '" title="Cancel the request">&times;</button></div>';
-    }).join('') : '<div class="hkr-empty">No request is waiting.</div>';
+    box.innerHTML = ui.reqs.length ? ui.reqs.map(function (q) { return reqItem(q, true); }).join('') : '<div class="hkr-empty">No request is waiting.</div>';
   }
   function openRequestList() {
     if (!hkrListEl) {
@@ -558,10 +722,186 @@
     }
     hkrListOpen = true; renderRequestList(); hkrListEl.style.display = 'flex';
   }
+
+  // ----- the work list (a panel on the right; full width on a phone)
+  var hkwEl = null, hkwOpen = false, hkwTab = 'clean', hkwSeg = 'pending';
+  try { var savedTab = localStorage.getItem('fdHkWorkTab'); if (['clean', 'requests', 'arrivals'].indexOf(savedTab) >= 0) hkwTab = savedTab; } catch (e) { /* the first tab */ }
+  // the rooms to clean, in the order to clean them: an arrival today first (early ones before), then what a guest asked for, then the other dirty rooms
+  function workClean() {
+    var out = [];
+    ((D && D.building) || []).forEach(function (r) {
+      var s = String(r.status), q = ui.reqMap[r.no];
+      if (s === '4') out.push({ r: r, p: r.arriving ? (r.arrivingEarly ? 0 : 1) : (q ? 2 : 3),
+        why: r.arriving ? (r.arrivingEarly ? 'Early arrival today' : r.arrivingLate ? 'Late arrival today' : 'Arrives today') + (r.arrivalGuest ? ' &middot; ' + esc(r.arrivalGuest) : '') : q ? 'Guest request' : 'To be cleaned' });
+      else if ((s === '2' || s === '1') && q && q.mur) out.push({ r: r, p: 2, why: 'Make up room' + (r.guest ? ' &middot; ' + esc(r.guest) : '') });
+    });
+    return out.sort(function (a, b) { return a.p - b.p || byNo(a.r.no, b.r.no); });
+  }
+  // occupied rooms that check out today: cleaned once the guest is gone (back-to-back first, late ones last)
+  function workLeaving() {
+    return ((D && D.building) || []).filter(function (r) { return String(r.status) === '2' && r.leaving; })
+      .sort(function (a, b) { return (b.arriving ? 1 : 0) - (a.arriving ? 1 : 0) || (a.late ? 1 : 0) - (b.late ? 1 : 0) || byNo(a.no, b.no); });
+  }
+  var READY = { '1': ['Room ready', 'good', 'ok', 3], '4': ['Room not ready', 'warn', 'dirty', 0], '2': ['Guest still in', 'bad', 'occ', 1], '3': ['Out of order', 'bad', 'bad', 2] };
+  function workArrivals() {
+    return ((D && D.building) || []).filter(function (r) { return r.arriving; })
+      .sort(function (a, b) { return ((READY[a.status] || [])[3] || 0) - ((READY[b.status] || [])[3] || 0) || (b.arrivingEarly ? 1 : 0) - (a.arrivingEarly ? 1 : 0) || byNo(a.no, b.no); });
+  }
+  function hkWorkCount() { return workClean().length + ui.reqs.filter(function (q) { return q.status === 'pending'; }).length; }
+  function wRow(r, cls, title, sub, chips, acts) {
+    return '<div class="hkw-row" role="button" tabindex="0" data-room="' + esc(r.no) + '" title="Open room ' + esc(r.no) + '"><span class="hkw-no ' + cls + '">' + esc(r.no) + '</span>' +
+      '<div class="hkw-main"><div class="hkw-t">' + title + '</div>' + (sub ? '<div class="hkw-s">' + sub + '</div>' : '') + (chips ? '<div class="hk-chips">' + chips + '</div>' : '') + '</div>' +
+      (acts ? '<div class="hkw-acts">' + acts + '</div>' : '') + '</div>';
+  }
+  function wEmpty(icon, text) { return '<div class="hkw-empty"><i class="far ' + icon + '"></i>' + text + '</div>'; }
+  function cleanBtn(r, label) { return '<button type="button" class="hk-btn ok sm" data-clean="' + esc(r.no) + '" title="Mark room ' + esc(r.no) + ' cleaned"><i class="fas fa-check"></i>' + (label || 'Cleaned') + '</button>'; }
+  function renderWork() {
+    if (!hkwEl || !D) return;
+    var clean = workClean(), leaving = workLeaving(), arr = workArrivals();
+    var waiting = ui.reqs.filter(function (q) { return q.status === 'pending'; }), prog = ui.reqs.filter(function (q) { return q.status === 'accepted'; });
+    var notReady = arr.filter(function (r) { return String(r.status) !== '1'; }).length;
+    function tab(id, label, n, hot) { return '<button type="button" data-tab="' + id + '" class="' + (hkwTab === id ? 'is-on' : '') + '">' + label + ' <b class="' + (hot ? 'hot' : '') + '">' + n + '</b></button>'; }
+    document.getElementById('hkwTabs').innerHTML = tab('clean', 'To clean', clean.length, clean.length > 0) + tab('requests', 'Requests', waiting.length, waiting.length > 0) + tab('arrivals', 'Arrivals', arr.length, notReady > 0);
+    document.getElementById('hkwSub').innerHTML = (clean.length ? clean.length + ' room' + (clean.length > 1 ? 's' : '') + ' to clean' : 'All rooms are clean') +
+      (waiting.length ? ' &middot; ' + waiting.length + ' request' + (waiting.length > 1 ? 's' : '') + ' waiting' : '') + (notReady ? ' &middot; ' + notReady + ' arrival' + (notReady > 1 ? 's' : '') + ' not ready' : '');
+    var h = '';
+    if (hkwTab === 'clean') {
+      h += '<div class="hkw-sec"><span>In this order</span><span>' + clean.length + '</span></div>';
+      h += clean.length ? '<div class="hkw-list">' + clean.map(function (w) {
+        var r = w.r, s = String(r.status), q = ui.reqMap[r.no], ch = [];
+        if (r.arriving && s === '4') ch.push(['Urgent', 'bad']);
+        if (q && q.mur) ch.push(['MUR', 'req']);
+        if (q && q.custom) ch.push([q.custom + ' request' + (q.custom > 1 ? 's' : ''), 'req']);
+        if (r.vip) ch.push(['VIP', 'warn']);
+        return wRow(r, w.p <= 1 ? 'urgent' : s === '4' ? 'dirty' : 'occ', esc(r.type || 'Room ' + r.no), w.why, chipsHtml(ch), cleanBtn(r, s === '4' ? 'Cleaned' : 'Made up'));
+      }).join('') + '</div>' : wEmpty('fa-check-circle', 'Nothing to clean right now.<br>Check-outs and guest requests show up here.');
+      if (leaving.length) {
+        h += '<div class="hkw-sec"><span>Checking out today &middot; clean after the guest leaves</span><span>' + leaving.length + '</span></div><div class="hkw-list">' +
+          leaving.map(function (r) {
+            var ch = [[r.late ? 'Late check-out' : 'Check-out today', r.late ? 'info' : 'bad']]; if (r.arriving) ch.push(['Back-to-back', 'info']);
+            return wRow(r, 'occ', esc(r.guest || 'Guest in house'), esc(r.type || ''), chipsHtml(ch), '');
+          }).join('') + '</div>';
+      }
+    } else if (hkwTab === 'requests') {
+      var done = ui.reqsDone || [];
+      var seg = function (id, label, n) { return '<button type="button" data-seg="' + id + '" class="' + (hkwSeg === id ? 'is-on' : '') + '">' + label + (n != null ? ' &middot; ' + n : '') + '</button>'; };
+      h += '<div class="hkw-seg">' + seg('pending', 'Waiting', waiting.length) + seg('accepted', 'In progress', prog.length) + seg('done', 'Done today', done.length) + '</div>';
+      var list = hkwSeg === 'accepted' ? prog : hkwSeg === 'done' ? done : waiting;
+      h += list.length ? '<div class="hkr-list">' + list.map(function (q) { return reqItem(q, true); }).join('') + '</div>'
+        : wEmpty('fa-bell', hkwSeg === 'accepted' ? 'Nothing in progress.' : hkwSeg === 'done' ? 'Nothing done yet today.' : 'No waiting requests.<br>Click a room in the building to send a MUR or a request.');
+    } else {
+      h += '<div class="hkw-sec"><span>Arriving today &middot; rooms to be ready by 3 PM</span><span>' + arr.length + '</span></div>';
+      h += arr.length ? '<div class="hkw-list">' + arr.map(function (r) {
+        var st = READY[String(r.status)] || ['', '', 'ok'], ch = [[st[0], st[1]]];
+        if (r.arrivingEarly) ch.push(['Early check-in', 'warn']); else if (r.arrivingLate) ch.push(['Late check-in', 'info']);
+        if (r.leaving) ch.push(['Back-to-back', 'info']);
+        if (r.vip) ch.push(['VIP', 'warn']);
+        return wRow(r, st[2], esc(r.arrivalGuest || 'Guest arriving'), esc(r.type || ''), chipsHtml(ch), String(r.status) === '4' ? cleanBtn(r) : '');
+      }).join('') + '</div>' : wEmpty('fa-calendar-check', 'No arrival today.');
+    }
+    document.getElementById('hkwBody').innerHTML = h;
+  }
+  function hkwBuild() {
+    if (hkwEl) return;
+    hkwEl = document.createElement('div'); hkwEl.className = 'hkw-wrap'; hkwEl.id = 'hkWork';
+    hkwEl.innerHTML = '<aside class="hkw-panel" role="dialog" aria-label="Housekeeping work list"><div class="hkw-head">' +
+      '<div class="hkr-head"><h3><i class="fas fa-broom" style="color:var(--accent);margin-right:8px"></i>Housekeeping</h3><button type="button" class="hkr-x" data-x aria-label="Close">&times;</button></div>' +
+      '<p id="hkwSub"></p><div class="hkw-tabs" id="hkwTabs"></div></div><div class="hkw-body" id="hkwBody"></div></aside>';
+    document.body.appendChild(hkwEl);
+    hkwEl.addEventListener('click', function (e) {
+      if (e.target === hkwEl || e.target.closest('[data-x]')) { closeWork(); return; }
+      var t = e.target.closest('[data-tab]');
+      if (t) { hkwTab = t.getAttribute('data-tab'); try { localStorage.setItem('fdHkWorkTab', hkwTab); } catch (er) { /* not saved */ } renderWork(); return; }
+      var sg = e.target.closest('[data-seg]'); if (sg) { hkwSeg = sg.getAttribute('data-seg'); renderWork(); return; }
+      var c = e.target.closest('[data-clean]'); if (c) { setRoom(c.getAttribute('data-clean'), 'clean'); return; }
+      var b = e.target.closest('[data-rq]'); if (b) { closeRequest(b.getAttribute('data-id'), b.getAttribute('data-rq')); return; }
+      var row = e.target.closest('.hkw-row[data-room]'); if (row) { var r = roomOf(row.getAttribute('data-room')); if (r) openRequestModal(r); }
+    });
+    hkwEl.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      var row = e.target.closest && e.target.closest('.hkw-row[data-room]'); if (!row || e.target !== row) return;
+      e.preventDefault(); var r = roomOf(row.getAttribute('data-room')); if (r) openRequestModal(r);
+    });
+  }
+  function openWork() { hkwBuild(); hkwOpen = true; hkwEl.classList.add('is-open'); renderWork(); ui.reqSig = ''; loadRequests(); }
+  function closeWork() { if (hkwEl) hkwEl.classList.remove('is-open'); hkwOpen = false; }
+
+  // ----- minibar & laundry on the bill of the guest in the room (Extra Services, unpaid). The price list is Settings -> Services,
+  // category "Minibar" or "Laundry"; without one, housekeeping writes what it is and the amount.
+  var hkcEl = null, hkc = null, chargeItems = null;
+  function hkcList() { return (chargeItems || []).filter(function (i) { return i.category === hkc.cat; }); }
+  function hkcTotal() { var l = hkcList(); return l.length ? l.reduce(function (s, i) { return s + i.price * (hkc.counts[i.id] || 0); }, 0) : (parseFloat(hkc.amount) || 0); }
+  function hkcReady() { var l = hkcList(); return l.length ? l.some(function (i) { return hkc.counts[i.id] > 0; }) : !!(hkc.desc.trim() && parseFloat(hkc.amount) > 0); }
+  function hkcFoot() {
+    document.getElementById('hkcTotal').innerHTML = '&#8369;' + hkcTotal().toLocaleString('en-US', { maximumFractionDigits: 2 }) + '<small>goes on the guest\'s bill</small>';
+    document.getElementById('hkcSave').disabled = hkc.busy || !hkcReady();
+  }
+  function hkcRender() {
+    var r = hkc.room;
+    document.getElementById('hkcTitle').textContent = 'Room ' + r.no + ' · Add to bill';
+    document.getElementById('hkcSub').innerHTML = esc(r.guest || 'Guest in house') + (r.type ? ' &middot; ' + esc(r.type) : '');
+    [].forEach.call(hkcEl.querySelectorAll('[data-cat]'), function (b) { b.classList.toggle('is-on', b.getAttribute('data-cat') === hkc.cat); });
+    var body = document.getElementById('hkcBody'), l = hkcList();
+    if (chargeItems === null) body.innerHTML = '<div class="hkr-empty"><i class="fas fa-sync-alt fa-spin"></i> Loading the price list&hellip;</div>';
+    else if (l.length) body.innerHTML = l.map(function (i) {
+      var n = hkc.counts[i.id] || 0;
+      return '<div class="hkc-qty"><div class="t">' + esc(i.name) + '<small>&#8369;' + peso(i.price) + ' each</small></div><div class="hkc-step">' +
+        '<button type="button" data-step="' + i.id + '" data-d="-1" aria-label="One less ' + esc(i.name) + '"' + (n ? '' : ' disabled') + '><i class="fas fa-minus"></i></button>' +
+        '<span aria-live="polite">' + n + '</span><button type="button" data-step="' + i.id + '" data-d="1" aria-label="One more ' + esc(i.name) + '"><i class="fas fa-plus"></i></button></div></div>';
+    }).join('');
+    else body.innerHTML = '<div class="hkr-note">No ' + hkc.cat.toLowerCase() + ' price list yet (Settings &rarr; Services, category &ldquo;' + hkc.cat + '&rdquo;). Write what it is and the amount.</div>' +
+      '<label class="hkc-field" for="hkcDesc">What</label><input id="hkcDesc" class="hkc-input" maxlength="150" placeholder="' + (hkc.cat === 'Laundry' ? 'e.g. 3 shirts, 1 pants' : 'e.g. 2 bottles of water') + '" value="' + esc(hkc.desc) + '">' +
+      '<label class="hkc-field" for="hkcAmt">Amount (&#8369;)</label><input id="hkcAmt" class="hkc-input" inputmode="decimal" placeholder="0" value="' + esc(hkc.amount) + '">';
+    hkcFoot();
+  }
+  function openCharge(r) {
+    if (!r) return;
+    if (!hkcEl) {
+      hkcEl = document.createElement('div'); hkcEl.className = 'hkc-wrap'; hkcEl.id = 'hkCharge';
+      hkcEl.innerHTML = '<div class="hkr-card" role="dialog" aria-labelledby="hkcTitle"><div class="hkr-head"><h3 id="hkcTitle">Add to bill</h3><button type="button" class="hkr-x" data-x aria-label="Close">&times;</button></div>' +
+        '<div class="hkr-sub" id="hkcSub"></div><div class="hkw-seg"><button type="button" data-cat="Minibar">Minibar</button><button type="button" data-cat="Laundry">Laundry</button></div>' +
+        '<div id="hkcBody"></div><div class="hkr-msg is-err" id="hkcMsg" style="margin-top:8px"></div>' +
+        '<div class="hkc-foot"><div class="hkc-total" id="hkcTotal"></div><button type="button" class="hk-btn pri" id="hkcSave"><i class="fas fa-check"></i>Add to bill</button></div></div>';
+      document.body.appendChild(hkcEl);
+      hkcEl.addEventListener('click', function (e) {
+        if (e.target === hkcEl || e.target.closest('[data-x]')) { closeCharge(); return; }
+        var c = e.target.closest('[data-cat]'); if (c) { hkc.cat = c.getAttribute('data-cat'); hkc.counts = {}; document.getElementById('hkcMsg').textContent = ''; hkcRender(); return; }
+        var st = e.target.closest('[data-step]');
+        if (st) { var id = st.getAttribute('data-step'); hkc.counts[id] = Math.max(0, Math.min(99, (hkc.counts[id] || 0) + parseInt(st.getAttribute('data-d'), 10))); hkcRender(); return; }
+        if (e.target.closest('#hkcSave')) saveCharge();
+      });
+      hkcEl.addEventListener('input', function (e) {
+        if (e.target.id === 'hkcDesc') hkc.desc = e.target.value;
+        else if (e.target.id === 'hkcAmt') { var v = e.target.value.replace(/[^\d.]/g, ''); if (v !== e.target.value) e.target.value = v; hkc.amount = v; }
+        hkcFoot();
+      });
+    }
+    hkc = { room: r, cat: 'Minibar', counts: {}, desc: '', amount: '', busy: false };
+    document.getElementById('hkcMsg').textContent = '';
+    hkcEl.classList.add('is-open'); hkcRender();
+    fetch('/room-requests/charge-items', { credentials: 'same-origin' }).then(function (x) { return x.json(); }).then(function (j) {
+      chargeItems = (j && j.success && j.items) || []; if (hkc) hkcRender();
+    }).catch(function () { chargeItems = chargeItems || []; if (hkc) hkcRender(); });
+  }
+  function closeCharge() { if (hkcEl) hkcEl.classList.remove('is-open'); hkc = null; }
+  function saveCharge() {
+    if (!hkc || hkc.busy || !hkcReady()) return;
+    var l = hkcList(), room = hkc.room.no, cat = hkc.cat, total = hkcTotal();
+    var body = l.length ? { category: cat, items: l.filter(function (i) { return hkc.counts[i.id] > 0; }).map(function (i) { return { id: i.id, count: hkc.counts[i.id] }; }) }
+      : { category: cat, description: hkc.desc.trim(), amount: parseFloat(hkc.amount) };
+    hkc.busy = true; hkcFoot(); document.getElementById('hkcMsg').textContent = '';
+    postJson('/room-requests/rooms/' + encodeURIComponent(room) + '/charges', body).then(function (j) {
+      if (j && j.success) { toast('₱' + Number(j.total || total).toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ' + cat.toLowerCase() + ' added to Room ' + room + '\'s bill'); closeCharge(); }
+      else { document.getElementById('hkcMsg').textContent = (j && j.message) || 'Could not add it to the bill.'; hkc.busy = false; hkcFoot(); }
+    }).catch(function () { if (!hkc) return; document.getElementById('hkcMsg').textContent = 'Could not add it to the bill.'; hkc.busy = false; hkcFoot(); });
+  }
+
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
-    if (hkrEl && hkrEl.style.display === 'flex') closeRequestModal();
+    if (hkcEl && hkcEl.classList.contains('is-open')) closeCharge();
+    else if (hkrEl && hkrEl.style.display === 'flex') closeRequestModal();
     else if (hkrListEl && hkrListEl.style.display === 'flex') { hkrListEl.style.display = 'none'; hkrListOpen = false; }
+    else if (hkwOpen) closeWork();
   });
 
   // switch of the view / a housekeeping tile: the whole Building card is drawn again
@@ -584,6 +924,7 @@
       return;
     }
     if (e.target.closest('#fdReqBtn')) { openRequestList(); return; }
+    if (e.target.closest('#fdHkWorkBtn')) { openWork(); return; }
     var hkt = e.target.closest('.fd-tile[data-hk]');
     if (hkt) { var key = hkt.getAttribute('data-hk'); ui.hkFocus = ui.hkFocus === key ? null : key; repaintBuildingCard(); }
   });
@@ -763,7 +1104,7 @@
   function load() {
     if (busy || document.hidden) return; busy = true;
     fetch('/dashboard/full-data', { credentials: 'same-origin' }).then(function (r) { return r.json(); })
-      .then(function (j) { if (j && j.success) { D = j.data; if (firstLoad) { firstLoad = false; startEntry(); } else draw(); } })
+      .then(function (j) { if (j && j.success) { D = j.data; if (firstLoad) { firstLoad = false; startEntry(); } else draw(); if (hkrRoom) renderRoomPanel(); if (hkwOpen) renderWork(); } })
       .catch(function () { /* keep what is shown */ })
       .then(function () { busy = false; clock(); if (ui.view === 'housekeeping') loadRequests(); });
   }

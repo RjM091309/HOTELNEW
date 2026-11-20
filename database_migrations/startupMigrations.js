@@ -1117,6 +1117,32 @@ async function runRoomRequestMigrations() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
   if (created) console.log('✅ Created table: room_request');
+  // Housekeeping (as in the Housekeeping app): a staff member takes a request ("accepted" = in progress) before it is done; who took it and when.
+  await ensureColumn('room_request', 'ACCEPTED_BY', 'ACCEPTED_BY INT NULL', 'REQUESTED_DT');
+  await ensureColumn('room_request', 'ACCEPTED_BY_NAME', 'ACCEPTED_BY_NAME VARCHAR(120) NULL', 'ACCEPTED_BY');
+  await ensureColumn('room_request', 'ACCEPTED_DT', 'ACCEPTED_DT DATETIME NULL', 'ACCEPTED_BY_NAME');
+}
+
+// Sign-ins of the staff phone apps (the Housekeeping app, /api/staff-app). Kept apart from user_sessions on purpose: signing in on the
+// phone must not sign the same account out of the web PMS (a non-admin web login ends the account's other web sessions).
+// Only a hash of the token is stored; the session is bound to one property (the one the app signed in to).
+async function runStaffAppSessionMigrations() {
+  const created = await ensureTable('staff_app_session', `
+    CREATE TABLE IF NOT EXISTS staff_app_session (
+      IDNo INT AUTO_INCREMENT PRIMARY KEY,
+      TOKEN_HASH CHAR(64) NOT NULL,
+      USER_ID INT NOT NULL,
+      APP VARCHAR(20) NOT NULL,
+      PROPERTY_ID INT NOT NULL,
+      CREATED_DT DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      LAST_SEEN_DT DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      EXPIRES_DT DATETIME NOT NULL,
+      ACTIVE TINYINT(1) NOT NULL DEFAULT 1,
+      UNIQUE KEY uq_staff_app_session_token (TOKEN_HASH),
+      KEY idx_staff_app_session_user (USER_ID, ACTIVE)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  if (created) console.log('✅ Created table: staff_app_session');
 }
 
 // Room status 5 = Tenant (a room rented out: it exists but is never booked, like Out of order), chosen in the Rooms menu for any property.
@@ -1317,6 +1343,7 @@ async function runStartupMigrations() {
   await runPaymentShiftMigrations();
   await runPropertyMigrations();
   await runRoomRequestMigrations();
+  await runStaffAppSessionMigrations();
   // Clark Central was created by hand on the dev database: create it once from seed_clark_central.json when this database has no such property.
   // Never stops the app from starting (the import is one transaction, so a failure leaves nothing half-made).
   try {

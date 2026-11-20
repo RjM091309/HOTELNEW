@@ -40,6 +40,10 @@ const AuthMiddleware = require('../middleware/m_auth');
 // Auto audit-trail middleware (writes every state-changing request to activity_log)
 const { auditTrail } = require('../middleware/m_activity_log');
 
+// The Housekeeping phone app: its own sign-in (bearer token). "/clark_central/api/staff-app" = signed in to that property.
+const staffAppRoutes = require('./r_staff_app');
+router.use(['/api/staff-app', '/:propertyCode/api/staff-app'], staffAppRoutes);
+
 // Public routes (no authentication required)
 router.use('/', loginRoutes);
 router.use('/api', apiRoutes);

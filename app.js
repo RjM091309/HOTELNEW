@@ -53,8 +53,14 @@ const io = socketIo(server, {
 });
 const PORT = process.env.PORT || 5001;
 
-// CORS middleware for API access from frontend
-app.use(cors({
+// The Housekeeping phone app (Hotelapp/standalone-apks): its own CORS (any origin, bearer token, no cookie) for /api/staff-app and
+// /<property code>/api/staff-app, and its own live updates on /api/socket.io (a second socket.io server: the web's /socket.io is untouched).
+const { staffAppCors } = require('./routes/r_staff_app');
+app.use(staffAppCors);
+require('./services/staffAppRealtime').attach(server);
+
+// CORS middleware for API access from frontend (not for the staff app above: it answers any origin itself)
+const webCors = cors({
     origin: [
         'http://localhost:6000', 
         'http://localhost:4173', 
@@ -69,7 +75,8 @@ app.use(cors({
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
+});
+app.use((req, res, next) => (req.staffApp ? next() : webCors(req, res, next)));
 
 // Middleware
 app.use(bodyParser.urlencoded({ extended: true }));
