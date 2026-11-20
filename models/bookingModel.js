@@ -4164,6 +4164,48 @@ class BookingModel {
   }
 
   // Process payment
+  // What is still to pay on ONE extra service of a booking (Extra Services list of the booking details: the "Pay" button of a service row).
+  static async serviceBalance(bookingServiceId, propertyId) {
+    const rows = await queryDatabasePromise(
+      `SELECT bs.IDNo, bs.BOOKING_ID, bs.TOTAL_COST, bs.STATUS,
+              COALESCE((SELECT SUM(p.AMOUNT_PAID) FROM payments p WHERE p.BOOKING_SERVICE_ID = bs.IDNo AND p.PAYMENT_TYPE = 'service'), 0) AS paid
+         FROM booking_service bs JOIN booking b ON b.IDNo = bs.BOOKING_ID
+        WHERE bs.IDNo = ? AND bs.ACTIVE = 1 AND b.ACTIVE = 1 AND b.PROPERTY_ID = ?`,
+      [bookingServiceId, propertyId]
+    );
+    if (!rows.length) return null;
+    const total = parseFloat(rows[0].TOTAL_COST) || 0, paid = parseFloat(rows[0].paid) || 0;
+    return { id: rows[0].IDNo, bookingId: rows[0].BOOKING_ID, total, paid, remaining: Math.max(0, +(total - paid).toFixed(2)) };
+  }
+
+  // The guest pays ONE extra service (all of it, or part of it) - nothing else on the bill is touched. The same payment row the "pay everything" flow
+  // writes for a service (PAYMENT_TYPE 'service' + BOOKING_SERVICE_ID), so the bill, the payments list and the shift totals see it as usual.
+  static async payService({ bookingServiceId, amount, paymentMethod, paymentNotes, encodedBy, propertyId }) {
+    const methods = ['cash', 'bank_transfer', 'credit_card', 'korean_bank', 'agoda', 'expedia'];
+    if (!methods.includes(String(paymentMethod))) return { error: 'Pick how the guest pays.' };
+    const bal = await BookingModel.serviceBalance(bookingServiceId, propertyId);
+    if (!bal) return { error: 'That service was not found.' };
+    if (bal.remaining <= 0) return { error: 'That service is already paid.' };
+    const want = amount == null || amount === '' ? bal.remaining : parseFloat(amount);
+    if (!(want > 0)) return { error: 'Enter the amount to pay.' };
+    const pay = Math.min(bal.remaining, +want.toFixed(2));
+    await queryDatabasePromise(
+      `INSERT INTO payments (BOOKING_ID, BOOKING_SERVICE_ID, AMOUNT_PAID, PAYMENT_METHOD, PAYMENT_TYPE, PAYMENT_DATE, ENCODED_BY, REMARKS)
+       VALUES (?, ?, ?, ?, 'service', NOW(), ?, ?)`,
+      [bal.bookingId, bal.id, pay, paymentMethod, encodedBy, paymentNotes || null]
+    );
+    const remaining = Math.max(0, +(bal.remaining - pay).toFixed(2));
+    const status = remaining <= 0.005 ? 'paid' : 'partial';
+    await queryDatabasePromise(`UPDATE booking_service SET STATUS = ? WHERE IDNo = ? AND ACTIVE = 1`, [status, bal.id]);
+    if (paymentNotes && String(paymentNotes).trim()) {
+      await queryDatabasePromise(
+        `INSERT INTO remarks (BOOKING_ID, CATEGORY, REMARK_TEXT, ENCODED_BY, ENCODED_DT, ACTIVE) VALUES (?, 'Payment', ?, ?, NOW(), 1)`,
+        [bal.bookingId, String(paymentNotes).trim(), encodedBy]
+      );
+    }
+    return { success: true, bookingId: bal.bookingId, paid: pay, remaining, status };
+  }
+
   static async processPayment(params) {
     const { paymentMethod, bookingId, paymentNotes, paymentAmount, encodedBy } = params;
 

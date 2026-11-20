@@ -3439,9 +3439,10 @@
       const guestCountField = groupIsPoolVillaActive()
         ? `<div class="rate-field-row">
              <label>Guests</label>
-             <input type="number" class="form-control group-guest-count-input"
-                    data-room-id="${roomId}" min="1" max="31"
-                    value="${groupRoomGuestCounts[roomId] || ''}" placeholder="#">
+             <select class="form-control group-guest-count-input" data-room-id="${roomId}" title="Pool Villa: 3, 4 or 5 guests">
+                    <option value="">Select</option>
+                    ${[3, 4, 5].map(function (n) { return '<option value="' + n + '"' + (groupRoomGuestCounts[roomId] === n ? ' selected' : '') + '>' + n + ' guests</option>'; }).join('')}
+             </select>
            </div>`
         : '';
 

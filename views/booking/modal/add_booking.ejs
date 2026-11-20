@@ -150,7 +150,12 @@
                             <div class="form-group">
                                 <label class="form-label"><%= isPoolVillaBooking ? 'Number of Guests' : 'Max Occupants' %></label>
                                 <% if (isPoolVillaBooking) { %>
-                                <input class="form-control" type="number" id="maxOccupants" name="maxOccupants" min="1" max="31" placeholder="e.g. 4">
+                                <select class="form-control" id="maxOccupants" name="maxOccupants" title="Pool Villa: 3, 4 or 5 guests">
+                                    <option value="">Select</option>
+                                    <option value="3">3 guests</option>
+                                    <option value="4">4 guests</option>
+                                    <option value="5">5 guests</option>
+                                </select>
                                 <% } else { %>
                                 <input class="form-control" type="text" id="maxOccupants" name="maxOccupants" readonly>
                                 <% } %>
@@ -288,7 +293,7 @@
                                              One grid, so the numbers and the prices of both rows line up. -->
                                         <div style="display: grid; grid-template-columns: 42px 64px 28px 110px; gap: 6px 6px; align-items: center;">
                                           <span style="font-size: 12px;">Adult</span>
-                                          <b id="extraBfSingleAdultQty" style="text-align: center;">0</b>
+                                          <input type="number" class="form-control" id="extraBfSingleAdultQty" min="0" step="1" value="0" style="height: 32px; padding: 2px 6px; text-align: center;" title="How many of the extras are adults (the rest are kids)">
                                           <span style="font-size: 12px; white-space: nowrap;">x &#8369;</span>
                                           <input type="number" class="form-control" id="extraBfSinglePrice" name="extraBfSinglePrice" min="0" step="0.01" value="600" style="height: 32px; padding: 2px 8px;" title="Price of one extra adult breakfast">
 
@@ -585,7 +590,7 @@
 		document.body.appendChild(bookingScript);
 		bookingScript.onload = function() {
 			var bookingBillingScript = document.createElement('script');
-			bookingBillingScript.src = '/js/booking/add_booking.js?v=extra-bf-4';
+			bookingBillingScript.src = '/js/booking/add_booking.js?v=extra-bf-6';
 			document.body.appendChild(bookingBillingScript);
 		};
 

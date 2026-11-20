@@ -158,7 +158,7 @@ class RoomController {
         // A field the property does not use (property.HIDDEN_ROOM_FIELDS) is not asked for: it gets a neutral value.
         const hideField = typeof res.locals.hideRoomField === 'function' ? res.locals.hideRoomField : () => false;
         const roomMax = ROOM_MAX || (hideField('max_occupants') ? 4 : ROOM_MAX);
-        const roomBed = ROOM_BED || (hideField('bed_type') ? 1 : ROOM_BED);
+        const roomBed = hideField('bed_type') ? ((await RoomModel.bedForType(ROOM_TYPE_ID, req.propertyId)) || ROOM_BED || 1) : ROOM_BED;   // not asked: the category (King / Queen...) decides it
         const roomSize = ROOM_SIZE || (hideField('room_size') ? null : ROOM_SIZE);
         if (!ROOM_TYPE_ID || !ROOM_NUMBER || !ROOM_STATUS ||
             !roomMax || !roomBed || (!roomSize && !hideField('room_size')) || !ROOM_VIEW) {
@@ -241,7 +241,7 @@ class RoomController {
 
         const hideField = typeof res.locals.hideRoomField === 'function' ? res.locals.hideRoomField : () => false;
         const roomMax = ROOM_MAX || (hideField('max_occupants') ? 4 : ROOM_MAX);
-        const roomBed = ROOM_BED || (hideField('bed_type') ? 1 : ROOM_BED);
+        const roomBed = hideField('bed_type') ? ((await RoomModel.bedForType(ROOM_TYPE_ID, req.propertyId)) || ROOM_BED || 1) : ROOM_BED;   // not asked: the category (King / Queen...) decides it
         const roomSize = ROOM_SIZE || (hideField('room_size') ? null : ROOM_SIZE);
         if (!IDNo || !ROOM_TYPE_ID || !ROOM_NUMBER || !ROOM_STATUS ||
             !roomMax || !roomBed || (!roomSize && !hideField('room_size')) || !ROOM_VIEW) {

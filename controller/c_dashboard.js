@@ -72,6 +72,17 @@ class DashboardController {
     }
   }
 
+  // The building of the active property on a chosen day (?date=YYYY-MM-DD): planned from the bookings. Today (or no date) = the real building.
+  static async getBuildingOn(req, res) {
+    try {
+      const building = await OverviewModel.buildingRoomsOn(req.propertyId, String(req.query.date || ''));
+      res.json({ success: true, building });
+    } catch (error) {
+      console.error('Error loading the planned building:', error);
+      res.status(500).json({ success: false, message: 'Failed to load that day' });
+    }
+  }
+
   // The same numbers as JSON (the page refreshes itself with this).
   static async getOverviewData(req, res) {
     try {

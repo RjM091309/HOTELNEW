@@ -3595,6 +3595,16 @@ if (roomServices.length === 0) {
             ? `<button class="btn btn-sm" onclick="reduceExtraService(${index}, '${bookingId}')" title="Take 1 off" style="background-color: #ffc107; border: none; border-radius: 50%; width: 28px; height: 28px; padding: 0; color: #212529; font-weight: 700; line-height: 1; display: flex; align-items: center; justify-content: center;">&minus;</button>`
             : '';
 
+        // A Pay button on each service that still has something to pay: ONLY that service is paid (the Payment button of the Guest Bill pays everything)
+        const modalRoEl = document.getElementById(`dynamicRoomModal_${bookingId}`);
+        const readOnlyModal = !!(modalRoEl && modalRoEl.classList.contains('room-modal-readonly'));
+        const canPay = !readOnlyModal && service.BS_ID && !(totalCost === 0) && ['unpaid', 'partial'].includes(String(service.STATUS || 'unpaid').toLowerCase());
+        const payButton = canPay
+            ? `<button class="btn btn-sm" onclick="payService(${index}, '${bookingId}')" title="Pay this service only" style="background-color: #28a745; border: none; border-radius: 50%; width: 28px; height: 28px; padding: 0; color: #fff;">
+                <i class="fas fa-coins" style="font-size: 11px;"></i>
+               </button>`
+            : '';
+
         const serviceRow = document.createElement('div');
         serviceRow.className = 'service-item mb-1';
         serviceRow.style.cssText = 'background: #ffffff; color: #333333; border: 1px solid #e9ecef; border-radius: 6px; padding: 8px; transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.05);';
@@ -3626,7 +3636,7 @@ if (roomServices.length === 0) {
                     ${statusDisplay}
                 </div>
                 <div class="col-2 text-center">
-                    <div class="d-flex gap-1 justify-content-center">${reduceButton}${deleteButton}</div>
+                    <div class="d-flex gap-1 justify-content-center">${payButton}${reduceButton}${deleteButton}</div>
                 </div>
             </div>
         `;
@@ -4365,6 +4375,66 @@ Swal.fire({
     }
 });
 }
+
+// ---- Pay ONE extra service (the green coin on a service row): how it is paid and how much, nothing else on the bill is touched ----
+window.payService = async function (index, bookingId) {
+    const svc = (addedServicesMap[bookingId] || [])[index];
+    if (!svc || !svc.BS_ID) { toastError('Error', 'This service has to be saved first.'); return; }
+    const money = (n) => '₱' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const esc = (t) => String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    let bal;
+    try {
+        const r = await fetch(`/booking/service-balance/${svc.BS_ID}?_=${Date.now()}`);
+        bal = await r.json();
+        if (!r.ok || !bal || !bal.success) throw new Error((bal && bal.message) || 'Could not read the balance');
+    } catch (e) { toastError('Error', e.message); return; }
+    if (bal.remaining <= 0) { toastInfo('Info', 'This service is already paid.'); svc.STATUS = 'paid'; updateAddedServicesList(bookingId); return; }
+    const res = await Swal.fire({
+        title: 'Pay ' + esc(svc.SERVICE_NAME || 'service'),
+        html: `<div style="text-align:left;font-size:.9rem;">
+            <div style="margin-bottom:8px;">To pay now: <b>${money(bal.remaining)}</b>${bal.paid > 0 ? ` <span style="color:#6c757d;">(${money(bal.paid)} already paid of ${money(bal.total)})</span>` : ''}</div>
+            <label style="font-size:.8rem;margin:0;">Amount</label>
+            <input id="psAmount" type="number" class="swal2-input" style="margin:2px 0 8px;width:100%;" min="0.01" max="${bal.remaining}" step="0.01" value="${bal.remaining}">
+            <label style="font-size:.8rem;margin:0;">Paid by</label>
+            <select id="psMethod" class="swal2-select" style="margin:2px 0 8px;width:100%;">
+                <option value="cash">Cash</option><option value="bank_transfer">Bank transfer</option><option value="credit_card">Credit card</option>
+                <option value="korean_bank">Korean bank</option><option value="agoda">Agoda</option><option value="expedia">Expedia</option>
+            </select>
+            <label style="font-size:.8rem;margin:0;">Notes (optional)</label>
+            <input id="psNotes" type="text" class="swal2-input" style="margin:2px 0 0;width:100%;" maxlength="200">
+        </div>`,
+        showCancelButton: true,
+        confirmButtonText: 'Pay',
+        confirmButtonColor: '#28a745',
+        cancelButtonText: 'Cancel',
+        heightAuto: false,
+        focusConfirm: false,
+        preConfirm: () => {
+            const amount = parseFloat(document.getElementById('psAmount').value);
+            if (!(amount > 0)) { Swal.showValidationMessage('Enter the amount to pay.'); return false; }
+            if (amount > bal.remaining + 0.005) { Swal.showValidationMessage('That is more than what is left (' + money(bal.remaining) + ').'); return false; }
+            return { amount, method: document.getElementById('psMethod').value, notes: document.getElementById('psNotes').value.trim() };
+        }
+    });
+    if (!res.isConfirmed) return;
+    const idInput = document.getElementById(`bookingID-${bookingId}`);
+    const realId = idInput && idInput.value ? idInput.value : bookingId;
+    try {
+        const r = await fetch('/booking/pay-service', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bookingId: realId, bookingServiceId: svc.BS_ID, paymentAmount: res.value.amount, paymentMethod: res.value.method, paymentNotes: res.value.notes })
+        });
+        const j = await r.json();
+        if (!r.ok || !j || !j.success) throw new Error((j && j.message) || 'Could not save the payment');
+        svc.STATUS = j.status;
+        updateAddedServicesList(bookingId);
+        calculateBalance(bookingId, realId);
+        try { if (typeof scheduleCalendarRefresh === 'function') scheduleCalendarRefresh(); } catch (e) { /* no-op */ }
+        toastSuccess('Paid', `${esc(svc.SERVICE_NAME || 'Service')}: ${money(j.paid)} received.` + (j.remaining > 0 ? ` ${money(j.remaining)} left.` : ''));
+    } catch (e) {
+        Swal.fire({ icon: 'error', title: 'Not paid', text: e.message, heightAuto: false });
+    }
+};
 
 // ---- Group "Remove services" window (rooms + services, tick what to remove) ----
 function groupServiceChipKey(name) {

@@ -135,6 +135,47 @@ class OverviewModel {
     }));
   }
 
+  // The building as it is PLANNED for a later hotel day (the date picker of the dashboard), from the bookings only: who stays over, who leaves
+  // on that date (every guest is taken to leave on his check-out date), who arrives, and the back-to-back rooms. Nothing can be said about dirty
+  // rooms that far ahead, so they show as clean; out-of-order rooms stay out of order. A past day or today gives today's real building.
+  static async buildingRoomsOn(propertyId, day) {
+    const [{ today }] = await queryDatabasePromise(`SELECT DATE_FORMAT(${HOTEL_DAY}, '%Y-%m-%d') AS today`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(day || '')) || day <= today) return OverviewModel.buildingRooms(propertyId);
+    const rooms = await queryDatabasePromise(
+      `SELECT r.IDNo AS id, r.ROOM_NUMBER AS no, r.ROOM_STATUS AS status, t.NAME AS typeName, t.DESCRIPTION AS typeDesc
+         FROM room r LEFT JOIN room_type t ON t.IDNo = r.ROOM_TYPE_ID WHERE r.ACTIVE = 1 AND r.PROPERTY_ID = ? ORDER BY r.ROOM_NUMBER`, [propertyId]);
+    const books = await queryDatabasePromise(
+      `SELECT b.IDNo AS id, b.ROOM_ID AS roomId, c.NAME AS guest,
+              DATE_FORMAT(b.CHECK_IN_DATE, '%Y-%m-%d') AS inD, DATE_FORMAT(b.CHECK_OUT_DATE, '%Y-%m-%d') AS outD,
+              COALESCE(b.CHECK_IN_STATUS, 1) AS ciStatus,
+              CASE WHEN COALESCE(b.LATE_CHECKOUT, 0) = 1 OR EXISTS (SELECT 1 FROM booking_service s WHERE s.BOOKING_ID = b.IDNo AND s.SERVICE_ID = 72 AND s.ACTIVE = 1) THEN 1 ELSE 0 END AS lateOut
+         FROM booking b LEFT JOIN customer c ON c.IDNo = b.CUSTOMER_ID
+        WHERE b.PROPERTY_ID = ? AND b.ACTIVE = 1 AND COALESCE(b.IS_CANCELLED, 0) = 0 AND b.ROOM_ID IS NOT NULL
+          AND b.BOOKING_STATUS IN ('pending', 'check-In')
+          AND DATE(b.CHECK_IN_DATE) <= ? AND DATE(b.CHECK_OUT_DATE) >= ?`, [propertyId, day, day]);
+    const by = {};
+    books.forEach((b) => { (by[b.roomId] = by[b.roomId] || []).push(b); });
+    const bedsOf = (name, desc) => {
+      const m = /^\s*(\d)/.exec(String(name || '')) || /(\d)\s*(?:king|queen|single|double)?\s*beds?/i.exec(String(desc || ''));
+      return m && parseInt(m[1], 10) >= 2 ? 2 : 1;
+    };
+    return rooms.map((r) => {
+      const list = by[r.id] || [];
+      const stay = list.find((b) => b.inD < day && b.outD > day);   // sleeps in the room that night, goes on after
+      const leave = list.find((b) => b.inD < day && b.outD === day);   // leaves on that date
+      const arrive = list.find((b) => b.inD === day && b.outD > day);   // arrives on that date
+      const here = stay || leave;
+      return {
+        no: String(r.no), status: here ? '2' : (['3', '5'].includes(String(r.status)) ? String(r.status) : '1'),   // out of order and tenant units stay as they are guest: here ? (here.guest || '') : '',
+        bookingId: (here || arrive) ? (here || arrive).id : null,
+        leaving: !!leave, late: !!leave && Number(leave.lateOut) === 1,
+        arriving: !!arrive, arrivingLate: !!arrive && Number(arrive.ciStatus) === 0,
+        beds: bedsOf(r.typeName, r.typeDesc),
+        vip: /vip/i.test(String(r.typeName || '') + ' ' + String(r.typeDesc || ''))
+      };
+    });
+  }
+
   // The emblem of a property for its card: public/img/properties/<code>.png (a transparent PNG made for the dark cards).
   // Without one the card shows the property's icon.
   static logoOf(code) {

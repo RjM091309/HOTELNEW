@@ -9,6 +9,7 @@ router.get('/dashboard', DashboardController.getOverview);
 router.get('/overview-data', DashboardController.getOverviewData);
 router.get('/full', DashboardController.getFullDashboard);
 router.get('/full-data', DashboardController.getFullData);
+router.get('/building-data', DashboardController.getBuildingOn);
 router.get('/legacy', (req, res) => res.redirect('/dashboard'));   // the old operations dashboard was removed
 
 // Room transfer routes

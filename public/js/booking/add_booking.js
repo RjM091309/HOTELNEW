@@ -801,12 +801,14 @@ function formatPaidAmount(input) {
 }
 
 // Function to compute total booking cost dynamically
-// Breakfast above the 2 that the room rate already includes: each person above 2 is an extra breakfast with a price of its own.
-// (Pool Villa has no breakfast tier - its breakfast follows the guests - so nothing is charged extra there.)
+// Breakfast above the number that the rate already includes (2 in a room, 5 in a Pool Villa = its 5 guests): each person above it is an extra
+// breakfast with a price of its own.
+function includedBreakfast() { return (typeof isPoolVillaActive === 'function' && isPoolVillaActive()) ? 5 : 2; }
 function getSingleExtraBreakfast() {
-    const on = $('#includeBreakfast').is(':checked') && !(typeof isPoolVillaActive === 'function' && isPoolVillaActive());
+    const on = $('#includeBreakfast').is(':checked');
     const pax = on ? (parseInt($('#breakfastAdultQty').val(), 10) || 0) : 0;
-    const qty = Math.max(0, pax - 2);
+    const included = includedBreakfast();
+    const qty = Math.max(0, pax - included);
     // the kids are part of the extras (never more than the extras there are); the rest are adults
     let kidQty = Math.max(0, parseInt($('#extraBfSingleKidQty').val(), 10) || 0);
     if (kidQty > qty) {
@@ -819,8 +821,10 @@ function getSingleExtraBreakfast() {
     const $wrap = $('#extraBfSingleWrap');
     $wrap.toggle(qty > 0);
     if (qty > 0) {
-        $('#extraBfSingleLabel').text(qty + ' extra breakfast (above 2)');
-        $('#extraBfSingleAdultQty').text(adultQty);
+        $('#extraBfSingleLabel').text(qty + ' extra breakfast (above ' + included + ')');
+        const $ad = $('#extraBfSingleAdultQty');   // a box like the kid one: both can be changed, the two always add up to the extras
+        if (!($ad.is(':focus') && $ad.val() === '')) $ad.val(adultQty);
+        $ad.attr('max', qty);
         $('#extraBfSingleKidQty').attr('max', qty);
     }
     return {
@@ -1358,10 +1362,8 @@ $(document).ready(function () {
     $('#includeBreakfast').on('change', function () {
         $('#breakfastInputs').toggle(this.checked);
         if (this.checked && !$('#breakfastAdultQty').val()) {
-            // Main Hotel: 1 pax. Pool Villa: breakfast count follows the number of guests.
-            const poolGuests = isPoolVillaActive() ? parseInt($('#maxOccupants').val(), 10) : NaN;
-            $('#breakfastAdultQty').val(Number.isInteger(poolGuests) && poolGuests > 0 ? poolGuests : 1);
-            if (isPoolVillaActive()) $('#breakfastAdultQty').data('autoFromGuests', true);
+            // Main Hotel: 1 pax. Pool Villa: 5 breakfasts (the villa's 5 guests); more than 5 are extras with a price (see getSingleExtraBreakfast).
+            $('#breakfastAdultQty').val(isPoolVillaActive() ? 5 : 1);
         }
         if (!this.checked) {
             $('#breakfastRateNote').hide().empty();
@@ -1904,8 +1906,9 @@ $(document).ready(function () {
                     if (!on) { $n.hide().empty(); return; }
                     if (isPoolVillaActive()) {
                         const pax = parseInt($('#breakfastAdultQty').val(), 10) || 0;
+                        const xbp = getSingleExtraBreakfast();
                         $n.removeClass('booking-note--warn').addClass('booking-note--active')
-                          .html(`<div>Breakfast for <b>${pax}</b> guest${pax === 1 ? '' : 's'} &mdash; follows the number of guests and goes on the Breakfast List. Pool Villa rates have no breakfast tier, so this does not change the villa rate.</div>`)
+                          .html(`<div>Breakfast for <b>${pax}</b> person${pax === 1 ? '' : 's'} on the Breakfast List. The villa includes <b>5</b>${xbp.qty > 0 ? `; the other <b>${xbp.qty}</b> ${xbp.qty === 1 ? 'is an extra breakfast' : 'are extra breakfasts'} that you pay for (set the price next to the number).` : '; nothing is charged extra.'} Pool Villa rates have no breakfast tier, so this does not change the villa rate.</div>`)
                           .show();
                         return;
                     }
@@ -2411,6 +2414,15 @@ $(document).ready(function () {
         #includeExtraBed, #extraBedQty, #extraBedPrice,
         #includeBreakfast, #extraBfSinglePrice, #extraBfSingleKidQty, #extraBfSingleKidPrice
     `, function (e) {
+        computeTotal();
+    });
+
+    // the adult number of the extra breakfast: the kids are what is left of the extras (and the other way round, see getSingleExtraBreakfast)
+    $(document).off('input.extraBfAdult', '#extraBfSingleAdultQty').on('input.extraBfAdult', '#extraBfSingleAdultQty', function () {
+        const pax = $('#includeBreakfast').is(':checked') ? (parseInt($('#breakfastAdultQty').val(), 10) || 0) : 0;
+        const extras = Math.max(0, pax - includedBreakfast());
+        const a = Math.min(extras, Math.max(0, parseInt($(this).val(), 10) || 0));
+        $('#extraBfSingleKidQty').val(extras - a);
         computeTotal();
     });
 

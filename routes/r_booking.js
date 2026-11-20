@@ -72,6 +72,8 @@ router.post('/remove-group-services', BookingController.removeGroupServices);
 
 // Payment processing
 router.post('/process-payment', BookingController.processPayment);
+router.post('/pay-service', BookingController.payService);
+router.get('/service-balance/:id', BookingController.serviceBalance);
 // Discount management
 router.post('/apply-discount', BookingController.applyDiscount);
 

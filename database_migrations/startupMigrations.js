@@ -1096,6 +1096,29 @@ async function runBookingActualTimesMigration() {
 // and needs no column of its own. See models/propertyModel.js and
 // middleware/m_auth.js for how req.propertyId gets resolved per-request.
 // Room requests of the Housekeeping view: "MUR" (make up room) or a custom request for a room, seen by the housekeeping staff until it is done.
+// Main Stay's room form is as simple as Clark Central's: the category (King Bedroom = 1 bed, Queen Bedroom = 2 beds) and the Room View (front of the
+// building = Condo View, back = Mountain View) say everything, so Max Occupants / Bed Type / Room Size are not asked. Only while nothing was chosen yet.
+async function runMainRoomFormMigration() {
+  const res = await queryDatabasePromise(
+    "UPDATE property SET HIDDEN_ROOM_FIELDS = 'max_occupants,bed_type,room_size' WHERE CODE = 'main' AND (HIDDEN_ROOM_FIELDS IS NULL OR HIDDEN_ROOM_FIELDS = '')");
+  if (res && res.affectedRows) console.log('✅ Main Stay: simple room form (category + view only)');
+}
+
+// Pool Villa's Dashboard shows its villas (public/js/dashboard/building3d.js, VILLAS) like the other hotels show their building. Switched on once at the
+// first start after this update (startup_once), so turning it off later in the property row is respected.
+async function runPoolVillaViewMigration() {
+  await queryDatabasePromise(`CREATE TABLE IF NOT EXISTS startup_once (
+    NAME VARCHAR(100) NOT NULL PRIMARY KEY,
+    RAN_AT DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    NOTE VARCHAR(1000) NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci`);
+  const done = await queryDatabasePromise("SELECT 1 FROM startup_once WHERE NAME = 'pool_villa_building_view'");
+  if (done.length) return;
+  const res = await queryDatabasePromise("UPDATE property SET BUILDING_VIEW = 1 WHERE CODE = 'pool_villa'");
+  await queryDatabasePromise("INSERT IGNORE INTO startup_once (NAME, NOTE) VALUES ('pool_villa_building_view', 'BUILDING_VIEW = 1')");
+  if (res && res.affectedRows) console.log('✅ Pool Villa: dashboard shows the villas');
+}
+
 async function runRoomRequestMigrations() {
   const created = await ensureTable('room_request', `
     CREATE TABLE IF NOT EXISTS room_request (
@@ -1343,7 +1366,12 @@ async function runStartupMigrations() {
   await runPaymentShiftMigrations();
   await runPropertyMigrations();
   await runRoomRequestMigrations();
+<<<<<<< Updated upstream
   await runStaffAppSessionMigrations();
+=======
+  await runMainRoomFormMigration();
+  await runPoolVillaViewMigration();
+>>>>>>> Stashed changes
   // Clark Central was created by hand on the dev database: create it once from seed_clark_central.json when this database has no such property.
   // Never stops the app from starting (the import is one transaction, so a failure leaves nothing half-made).
   try {

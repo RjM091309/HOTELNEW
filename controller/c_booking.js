@@ -827,6 +827,11 @@ class BookingController {
         isMaintenance,
         channelBookingId
     } = req.body;
+      // Pool Villa (guest pricing): the villa takes 3, 4 or 5 guests - nothing else is sold
+      const isMaintenanceFlag = isMaintenance === 1 || isMaintenance === '1' || isMaintenance === true || String(isMaintenance || '').toLowerCase() === 'true';   // (a maintenance block has no guests)
+      if (res.locals.isGuestPricing && !isMaintenanceFlag && ![3, 4, 5].includes(parseInt(maxOccupants, 10))) {
+        return res.status(400).json({ success: false, message: 'Pool Villa takes 3, 4 or 5 guests only.' });
+      }
 
       const isMaintenanceBooking =
         isMaintenance === 1 ||
@@ -1560,6 +1565,35 @@ class BookingController {
       res.status(500).json({ 
         error: 'Transaction failed. Payment not processed.' 
       });
+    }
+  }
+
+  // GET /booking/service-balance/:id - what is left to pay on one extra service
+  static async serviceBalance(req, res) {
+    try {
+      const bal = await BookingModel.serviceBalance(parseInt(req.params.id, 10), req.propertyId);
+      if (!bal) return res.status(404).json({ success: false, message: 'That service was not found.' });
+      res.json({ success: true, ...bal });
+    } catch (error) {
+      console.error('Error reading the service balance:', error);
+      res.status(500).json({ success: false, message: 'Could not read the service balance.' });
+    }
+  }
+
+  // POST /booking/pay-service { bookingServiceId, paymentAmount, paymentMethod, paymentNotes } - the guest pays ONE extra service
+  static async payService(req, res) {
+    try {
+      const { bookingServiceId, paymentAmount, paymentMethod, paymentNotes } = req.body;
+      if (!bookingServiceId) return res.status(400).json({ success: false, message: 'Pick the service to pay.' });
+      const result = await BookingModel.payService({
+        bookingServiceId: parseInt(bookingServiceId, 10), amount: paymentAmount, paymentMethod, paymentNotes: paymentNotes || '',
+        encodedBy: req.user.userId, propertyId: req.propertyId
+      });
+      if (result.error) return res.status(400).json({ success: false, message: result.error });
+      res.json({ success: true, message: 'Service paid.', ...result });
+    } catch (error) {
+      console.error('Error paying a service:', error);
+      res.status(500).json({ success: false, message: 'Could not save the payment.' });
     }
   }
 

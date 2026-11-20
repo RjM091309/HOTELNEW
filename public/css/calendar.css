@@ -2576,6 +2576,9 @@ html[data-bd-embed] .modal-backdrop.show { opacity: .55; }
 html[data-bd-embed] .calendar-legend-overlay { display: none !important; }
 /* the kept-ready frame of the Dashboard shows ONLY the modal: the calendar's own floating bars (the amber focus bar of the guests, the badge, the search) sit on the body, outside .page-wrapper, and used to show through on the dashboard */
 html[data-bd-embed] .cal-focus-bar, html[data-bd-embed] .cal-focus-spacer { display: none !important; }
+/* the booking-name chips of the calendar bars set visibility: visible themselves, so they showed through the hidden page (the blurred box with names over the dashboard's building) */
+html[data-bd-embed] .event-title-chip, html[data-bd-embed] .fc-event, html[data-bd-embed] .fc-timeline-event { display: none !important; }
+html[data-bd-embed] .page-wrapper :not(.modal):not(.modal *) { visibility: hidden !important; }
 html[data-bd-embed] body > :not(.page-wrapper):not(.modal):not(.modal-backdrop):not(.swal2-container):not(script):not(style):not(link) { visibility: hidden !important; pointer-events: none !important; }
 
 /* A room whose room type is named VIP: its number is gold (beats the room-view green / blue above in every theme). */

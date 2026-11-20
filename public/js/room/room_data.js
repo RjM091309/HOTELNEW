@@ -12,6 +12,7 @@ var dataTable;
 // Room Status: the dropdown shows a name (Available / Occupied / Out of order / Cleaning) but the database keeps 1 / 2 / 3 / 4.
 // The form used to send the NAME as it was written in the field, which the database does not accept (the room ended with an empty status
 // and "UNKNOWN" in the table). These two turn a name into its number and back.
+const ROOM_VIEW_NAMES = { '1': 'Condo View', '2': 'Mountain View' };
 const ROOM_STATUS_NAMES = { '1': 'Available', '2': 'Occupied', '3': 'Out of order', '4': 'Cleaning', '5': 'Tenant' };   // 5 Tenant: rented out, never booked (works like Out of order)
 function roomStatusValue(selector) {
     const raw = String($(selector).val() || '').trim();
@@ -405,7 +406,7 @@ function createRoom() {
     formData.append('ROOM_MAX', $('#addRoomMax').val());
     formData.append('ROOM_BED', $('#addRoomBed').val());
     formData.append('ROOM_SIZE', $('#addRoomSize').val());
-    formData.append('ROOM_VIEW', $('#addRoomView').val());
+    formData.append('ROOM_VIEW', $('#addRoomView').attr('data-value') || $('#addRoomView').val());
     formData.append('ROOM_DESCRIPTION', $('#addRoomDescription').val());
     formData.append('AMENITIES', JSON.stringify(selectedAmenities));
     
@@ -504,7 +505,8 @@ function populateEditRoomForm(room) {
     $('#editRoomType').attr('data-value', room.ROOM_TYPE_ID);
     $('#editRoomStatus').val(ROOM_STATUS_NAMES[String(room.ROOM_STATUS)] || '').attr('data-value', room.ROOM_STATUS).closest('.mdl-textfield').addClass('is-dirty');
     $('#editRoomBed').val(room.ROOM_BED);
-    $('#editRoomView').val(room.ROOM_VIEW);
+    // the Room View shows its name (Condo View / Mountain View), the number is kept in data-value
+    $('#editRoomView').val(ROOM_VIEW_NAMES[String(room.ROOM_VIEW)] || (room.ROOM_VIEW == null ? '' : String(room.ROOM_VIEW))).attr('data-value', room.ROOM_VIEW).closest('.mdl-textfield').addClass('is-dirty');
 
     // Populate amenities (will be done after amenities are loaded)
     window.currentRoomAmenities = room.AMENITIES || [];
@@ -539,7 +541,7 @@ function updateRoom() {
     formData.append('ROOM_MAX', $('#editRoomMax').val());
     formData.append('ROOM_BED', $('#editRoomBed').val());
     formData.append('ROOM_SIZE', $('#editRoomSize').val());
-    formData.append('ROOM_VIEW', $('#editRoomView').val());
+    formData.append('ROOM_VIEW', $('#editRoomView').attr('data-value') || $('#editRoomView').val());
     formData.append('ROOM_DESCRIPTION', $('#editRoomDescription').val());
     formData.append('AMENITIES', JSON.stringify(selectedAmenities));
     

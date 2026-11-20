@@ -109,7 +109,12 @@
                             <div class="form-group">
                                 <label class="form-label"><%= isPoolVillaBooking ? 'Number of Guests' : 'Max Occupants' %></label>
                                 <% if (isPoolVillaBooking) { %>
-                                <input class="form-control" type="number" id="edit_maxOccupants" name="maxOccupants" min="1" max="31" placeholder="e.g. 4">
+                                <select class="form-control" id="edit_maxOccupants" name="maxOccupants" title="Pool Villa: 3, 4 or 5 guests">
+                                    <option value="">Select</option>
+                                    <option value="3">3 guests</option>
+                                    <option value="4">4 guests</option>
+                                    <option value="5">5 guests</option>
+                                </select>
                                 <% } else { %>
                                 <input class="form-control" type="text" id="edit_maxOccupants" name="maxOccupants" readonly>
                                 <% } %>
@@ -2412,7 +2417,11 @@ function populateEditForm(booking) {
     } else {
         $('#edit_txtNumber').val(booking.number);
     }
-    $('#edit_maxOccupants').val(booking.GUESTS_COUNT);
+    (function () {   // Pool Villa takes 3, 4 or 5 guests; an older booking with another count keeps it as an extra choice
+        const g = String(booking.GUESTS_COUNT == null ? '' : booking.GUESTS_COUNT), $g = $('#edit_maxOccupants');
+        if ($g.is('select') && g && !$g.find('option[value="' + g + '"]').length) $g.append('<option value="' + g + '">' + g + ' guests (old booking)</option>');
+        $g.val(g);
+    })();
     $('#edit_paidAmount').val(booking.paidAmount || '');
     $('#edit_paymentStatus').val(booking.PAYMENT_STATUS || 'UNPAID');
     $('#edit_price').val(booking.price);

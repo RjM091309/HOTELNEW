@@ -130,6 +130,15 @@ class RoomModel {
   // Fetch room by room number
   // NOTE: superseded by the ROOM CONTROL METHODS section's getRoomByNumber
   // below (same class, later definition wins) - kept in sync for clarity.
+  // The bed count that goes with a room type of a property = the one most of its rooms have (Main Stay: King Bedroom 1, Queen Bedroom 2).
+  // Used when the property does not ask for the bed type on the room form (HIDDEN_ROOM_FIELDS has bed_type): the category decides it.
+  static async bedForType(roomTypeId, propertyId) {
+    const rows = await queryDatabasePromise(
+      `SELECT ROOM_BED AS bed, COUNT(*) AS n FROM room WHERE ROOM_TYPE_ID = ? AND PROPERTY_ID = ? AND ACTIVE = 1 AND ROOM_BED IS NOT NULL
+        GROUP BY ROOM_BED ORDER BY n DESC LIMIT 1`, [roomTypeId, propertyId]);
+    return rows[0] ? Number(rows[0].bed) : null;
+  }
+
   static async getRoomByNumber(roomNumber, propertyId) {
     try {
       const params = [roomNumber];
