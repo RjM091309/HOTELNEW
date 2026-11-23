@@ -3,6 +3,7 @@ const fs = require('fs');
 const AuthModel = require('../models/authModel');
 const StaffAppModel = require('../models/staffAppModel');
 const RoomRequestModel = require('../models/roomRequestModel');
+const OverviewModel = require('../models/overviewModel');
 const ActivityLogModel = require('../models/activityLogModel');
 const { getRequestMeta } = require('../utils/activityLogger');
 const staffRealtime = require('../services/staffAppRealtime');
@@ -223,6 +224,15 @@ class StaffAppController {
     audit(req, s, { action: 'SERVICE_ADD', bookingId: r.bookingId, entityType: 'booking', entityId: r.bookingId, amount: r.total, description: `Housekeeping app: ${String(b.category).toLowerCase()} for room ${room.ROOM_NUMBER} - ${r.lines.join(', ')}` });
     tell(req, s, 'room-charge');
     res.json({ total: r.total, lines: r.lines.length });
+  });
+
+  // GET /building -> the property's rooms as the Dashboard's 3D building draws them (only a property with BUILDING_VIEW has one)
+  static building = wrap(async (req, res) => {
+    const s = await session(req, res); if (!s) return;
+    res.json({
+      property: { code: s.propertyCode, name: s.propertyName, buildingView: s.buildingView },
+      rooms: s.buildingView ? await OverviewModel.buildingRooms(s.propertyId) : []
+    });
   });
 
   // GET /version?app=housekeeping -> the newest published build, or data: null. No sign-in: a phone signed out can still update.

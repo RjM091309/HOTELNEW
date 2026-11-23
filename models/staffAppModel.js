@@ -87,7 +87,7 @@ class StaffAppModel {
   static async sessionOf(token) {
     if (!token) return null;
     const [s] = await queryDatabasePromise(
-      `SELECT s.IDNo, s.USER_ID, s.APP, s.PROPERTY_ID, s.LAST_SEEN_DT, u.FULLNAME, u.USERNAME, u.PERMISSIONS, p.CODE, p.NAME AS PNAME, p.DISPLAY_NAME AS PDISPLAY
+      `SELECT s.IDNo, s.USER_ID, s.APP, s.PROPERTY_ID, s.LAST_SEEN_DT, u.FULLNAME, u.USERNAME, u.PERMISSIONS, p.CODE, p.NAME AS PNAME, p.DISPLAY_NAME AS PDISPLAY, p.BUILDING_VIEW
          FROM staff_app_session s
          JOIN user_info u ON u.IDNo = s.USER_ID AND u.ACTIVE = 1
          JOIN property p ON p.IDNo = s.PROPERTY_ID AND p.ACTIVE = 1
@@ -108,6 +108,7 @@ class StaffAppModel {
       propertyId: s.PROPERTY_ID,
       propertyCode: s.CODE,
       propertyName: s.PDISPLAY || s.PNAME,
+      buildingView: Number(s.BUILDING_VIEW) === 1,
       user: { IDNo: s.USER_ID, userId: s.USER_ID, FULLNAME: s.FULLNAME, USERNAME: s.USERNAME, PERMISSIONS: s.PERMISSIONS }
     };
   }
