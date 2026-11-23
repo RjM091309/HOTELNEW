@@ -1,7 +1,7 @@
 {
-    "versionCode":  7,
-    "versionName":  "1.0.6",
-    "releaseNotes":  "Pop-up ng kwarto sa Building tab: Mark cleaned, Mark dirty, Minibar / laundry\nMagpadala ng MUR o custom request mula sa Building tab\nHindi na lumalabas sa Expand view kapag pumindot ng kwarto",
+    "versionCode":  8,
+    "versionName":  "1.0.7",
+    "releaseNotes":  "Inayos ang sirang screen sa confirmation popup habang naka-Expand ang Building",
     "file":  "housekeeping-release.apk",
-    "publishedAt":  "2026-11-23T12:04:56.8468730+08:00"
+    "publishedAt":  "2026-11-23T12:54:09.9953805+08:00"
 }
