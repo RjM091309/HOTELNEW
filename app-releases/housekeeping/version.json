@@ -1,7 +1,7 @@
 {
-    "versionCode":  5,
-    "versionName":  "1.0.4",
-    "releaseNotes":  "Inayos ang room list\nBagong charge sheet",
+    "versionCode":  6,
+    "versionName":  "1.0.5",
+    "releaseNotes":  "Bagong Building tab: 3D na building ng hotel at status ng bawat kwarto\nExpand button para sa malaking view sa phone\nI-tap ang kwarto para buksan sa Rooms tab",
     "file":  "housekeeping-release.apk",
-    "publishedAt":  "2026-11-23T10:05:08.0321191+08:00"
+    "publishedAt":  "2026-11-23T11:38:57.3744054+08:00"
 }
